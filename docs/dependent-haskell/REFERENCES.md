@@ -3101,14 +3101,54 @@ covers the four added negative controls.
 Freeze and independent audit must pass before publication. See
 [the Core contract](CORE.md#checked-constructor-arguments-in-source-calls).
 
-The separate unimplemented M45 preparation reads
+## Signed source call beta: prior art
+
+M45 uses the selected Agda v2.8.0 readings in
 [Term 468–486](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L468-L486)
-and [542–587](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L542-L587)
-at blob `02991c9fa0085315cc854d2833a9080af14a7740`.
-These ranges select lambda checking from the target telescope, preserve source
-NameIds and check the body in the extended context. Its cache is
-`native-source-call-constructors-next-beta-v1/`. Agda modality handling does not
-establish GHC graded usage, permission to default Many, or Haskell seq laws.
-M45 requires explicitly signed, assigned-Many metadata and excludes Strict.
-No M45 implementation or execution is claimed. The seven-work, nine-PDF paper
-ledger is unchanged. No preservation theorem is claimed.
+and [542–587](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L542-L587),
+blob `02991c9fa0085315cc854d2833a9080af14a7740`.
+The header records the target. [Term 491–494](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L491-L494)
+selects checking from its telescope. The later range preserves source NameIds
+and checks the body in an extended context. Application 774–808, pinned above,
+checks the current domain before substituting the checked argument.
+The historical preparation cache is `native-source-call-constructors-next-beta-v1/`.
+
+GHC's Note [Signed source call beta] in Tc.Gen.Expr requires a surviving
+complete plain A -> A signature and actual checked assigned-Many metadata.
+It preserves Name/Unique through NameEnv, leaves Flexi unfilled and keeps the
+original runtime call. Agda modality handling does not justify GHC defaulting,
+Haskell seq or Strict demand. Strict gets no new dependent-beta admission;
+ordinary nondependent cases preserve their fallback behavior.
+
+Selected compiler `44e91a7618fe55c3713c85641b4a2d88d4536f13` passes both stages:
+public15, eight rejected clients and 15 located envelopes, with nine GHC-83865
+and six GHC-83605. These envelope counts overlap at five clients. Fifteen quiet
+API source observations, four supplementary demand/scope observations and the
+limited 1/1 trace markers remain separate evidence. Legacy6 and final9 pass.
+Freeze and independent audit must pass before publication. No new paper,
+Agda execution or preservation theorem is claimed. The seven-work, nine-PDF
+paper ledger is unchanged.
+
+## Head-only function-valued retained binders: prior art
+
+M46 is unimplemented. Its proposed binder has type/coercion occurrences only
+in TermAppTy/TermAppCo head slots. It would accept eligible variable operands
+under a fixed closed function domain. Scalar TermVarTy, inverse call decomposition, function equality,
+heterogeneous transport and call-interface codecs remain outside the proposal.
+See [the concrete plan](PLAN.md#m46-head-only-function-valued-retained-binders-unimplemented).
+
+Agda v2.8.0 [Conversion 746–761](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L746-L761)
+and [827–850](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L850),
+blob `69423e2c11b6f35bc5eee2d502cf2830efbc005a`, compare domains before checking
+codomains in one extended context. The Term/Application ranges above check
+arguments uniformly at their expected domain. A domain can itself be a Pi;
+these rules supply scope prior art, not GHC evidence or runtime guarantees.
+Exact source bytes, Git blobs, selected excerpts and reading limits are in
+`native-source-call-beta-next-function-pi-v1/`.
+
+The D/DC author PDF's Figure 8, page 16 (printed 31:16), supplies An-PiCong
+under a binder and forward An-AppCong. An-PiSnd on page 17 concerns Pi types,
+not injectivity of runtime calls. The existing matchability comparison above
+retains that distinction. This review rereads selected cached extracts only.
+The canonical paper ledger stays seven works/nine PDFs. No Agda eta law,
+Haskell function extensionality or combined preservation proof is adopted.

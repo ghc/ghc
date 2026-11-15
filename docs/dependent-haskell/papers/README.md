@@ -287,7 +287,7 @@ is claimed. The canonical seven-work, nine-PDF ledger is unchanged.
 See [the primary links and exact identities](../REFERENCES.md#strict-opaque-call-refinement-prior-art)
 and the [implemented source contract](../CORE.md#strict-opaque-call-refinement-from-source).
 
-## M44 constructor-call reading and M45 preparation
+## M44 constructor-call reading and M45 signed beta
 
 M44 reuses Agda v2.8.0 Application.hs lines 774–808 and With.hs lines 101–173. The selected ranges
 support checking an argument and abstracting a dependent context. Verified full
@@ -295,11 +295,29 @@ bytes and exact identities are recorded in
 `_build/verification/native-source-call-constructors-prior-art-v1/`.
 The six GHC snapshots there retain their historical M43 source commit.
 
-A separate M45 preparation reads Term.hs lines 468–486 and 542–587, plus
-Application.hs lines 774–808.
-It remains an unimplemented step for explicitly signed immediate lambda
-arguments with actual assigned Many metadata. It excludes Strict. These Agda
-readings do not prove GHC multiplicity inference or Haskell demand.
-See [the exact primary links](../REFERENCES.md#checked-constructor-call-arguments-prior-art).
+M45 uses selected Term.hs lines 468–486 and 542–587, plus Application.hs
+lines 774–808, for explicitly signed immediate lambda arguments. The document
+review also checks Term 491–494 for the target-telescope choice. The actual
+checked binder must have assigned Many metadata. The source implementation
+keeps the original runtime call and ordinary Strict fallback; it excludes
+Strict from the new dependent-beta admission. These Agda readings do not prove
+GHC multiplicity inference or Haskell demand.
+See [the exact primary links](../REFERENCES.md#signed-source-call-beta-prior-art).
 The canonical seven-work, nine-PDF ledger is unchanged. No new paper was read.
 Agda was not executed. No preservation theorem is claimed.
+
+## M46 head-only binder research
+
+M46 remains unimplemented. The review reuses Agda v2.8.0 Term 542–587 and
+Application 774–808, and verifies Conversion 746–761/827–850 at blob
+`69423e2c11b6f35bc5eee2d502cf2830efbc005a`. It checks expected-domain scope
+and comparison beneath Pi binders. It also rereads selected cached D/DC
+Figure 8 pages 16–17 and the existing matchability comparison. No new whole
+paper reading, downloaded version or proof replay is added. The canonical
+seven-work/nine-PDF manifest stays unchanged.
+
+The proposed GHC binder keeps function occurrences in dedicated call-head
+slots. Agda's general Pi rules and D/DC's binder congruence do not establish
+GHC substitution, dictionary/FC scope, Haskell laziness or a codec. The new
+research record is `native-source-call-beta-next-function-pi-v1/`.
+See [the detailed comparison](../REFERENCES.md#head-only-function-valued-retained-binders-prior-art).

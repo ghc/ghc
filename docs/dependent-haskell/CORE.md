@@ -1716,9 +1716,9 @@ fields. `exprToNativeIndex` checks saturation, domains and recursive fields.
 The classifier does not execute the temporary spine or repeat source checking.
 
 Parentheses, WrapExpr WpHole and the expression inside a checked source
-expansion are transparent. Argument expression signatures, nonidentity wrappers,
-casts, type/evidence applications, pattern synonyms, lambdas and opaque producers
-get no new rule.
+expansion are transparent. On the M44 path, argument expression signatures,
+nonidentity wrappers, casts, type/evidence applications, pattern synonyms,
+lambdas and opaque producers get no new rule. M45's signed exception is below.
 The original scrutinee remains in `NativeCaseAlias` and is desugared once.
 
 The renamed annotation matcher compares its application spine with the checked
@@ -1746,3 +1746,47 @@ Note [Source opaque call refinement] in `GHC.Tc.Gen.Match`, and
 [the pinned readings](REFERENCES.md#checked-constructor-call-arguments-prior-art).
 Ordinary optimization, lazy retained calls, function-domain retained binders
 and call-index interface encoding remain gated.
+
+### Signed beta arguments in source calls
+
+M45 adds an immediate checked lambda application with a surviving explicit
+ExprWithTySig. The complete source signature has one plain A -> A arrow and
+the same bare, optionally parenthesized TyCon Name on both sides. Aliases,
+applied domains, wildcard/forall/context signatures and nontrivial wrappers
+remain unsupported. The outer opaque function retains its closed A -> B policy.
+
+Require one actual LamSingle row, a bare VarPat, an unguarded RHS and empty
+local bindings. The during-TC zonker reads existing assignments in the actual
+binder and MatchGroup. Flexi remains unassigned; only existing Indirect chains
+can be compressed. Both actual binder and scaled argument require Many.
+Binder, argument and result domains agree. NameEnv maps each bound occurrence
+to that zonked actual Id, with its original Name/Unique. External M44 Id/head
+eligibility stays unchanged. No provisional Many Id or second usage check is
+introduced.
+
+A temporary Core.Lam feeds the existing scalar beta converter. Its normalized
+operand is an eligible local variable or nullary constructor worker. Constructed
+operands with fields remain unsupported. Supported nested scalar beta/constructor
+bodies can yield the canonical index for exact whole-call annotation matching.
+The runtime scrutinee is still the original checked expression. It is neither
+replaced by the temporary Core nor evaluated during classification.
+
+Under Strict the classifier returns Nothing. An ordinary nondependent case
+keeps its original source demand through the usual fallback. A dependent case
+can receive the existing located restriction. This is not general Strict beta,
+lambda inference, function unfolding or inverse call equality.
+
+Both stages pass public15 and eight negative clients, with 15 located envelopes
+(nine GHC-83865 and six GHC-83605). Five clients have both codes; one is an early
+local-signature scope error and two test mismatches after valid refinement.
+The API's 15 quiet source observations are separate from source17/source26/Core19.
+Strict2 and same-spelling scope2 supplement them. Two trace markers count 1/1;
+this is not a universal elaboration count. Goldens remain 1/37. Legacy6 and
+final9 pass, retaining raw/public106 and packed562 in both stages and the five
+registered tests. Freeze and independent audit must pass before publication.
+
+See Note [Signed source call beta] in GHC.Tc.Gen.Expr and
+[the pinned readings](REFERENCES.md#signed-source-call-beta-prior-art).
+Function-domain retained binders remain unimplemented M46 work. It requires a
+separate binder policy, exact local head substitution and fixed-head proof scope;
+TermVarTy must remain scalar-only. Call-bearing interfaces stay gated.

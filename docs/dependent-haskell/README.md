@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M44 passes both stages with constructor arguments in source calls; 562 packed-vector plus 106 qualified/container/worker runtime observations remain |
+| Last verified checkpoint | M45 passes both stages with signed immediate beta arguments in source calls; 562 packed-vector plus 106 qualified/container/worker runtime observations remain |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -76,7 +76,8 @@ Last updated: 2026-11-15.
 | Source index beta | Immediate single-variable lambda applications pass ordinary checking with actual binder identity; atomic arguments, supported domains and Many multiplicity remain required; Strict rejects the new form |
 | Native variable aliases | Literal local Many aliases substitute the same eligible Id in terms, types and coercions; opaque producer bindings stay lazy and shared; excluded metadata and non-variable targets keep their bindings |
 | Opaque call indices | Source cases on `f n`, `f Z` and `f (S n)` refine the exact whole call; nested constructor fields, captures and demand controls pass both stages |
-| Next task | Specify checked, explicitly signed immediate lambda arguments with actual assigned Many metadata; keep Strict excluded from that new path |
+| Signed call beta | Complete plain scalar endofunction signatures expose immediate checked lambda beta; actual assigned Many, binder identity and original call execution are preserved; Strict keeps its ordinary fallback |
+| Next task | Specify a head-only function-valued retained binder with complete local signatures and variable-only function arguments; keep scalar indices and call-interface gates distinct |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -3885,8 +3886,72 @@ See the [Core contract](CORE.md#checked-constructor-arguments-in-source-calls),
 [plan](PLAN.md#m44-checked-constructor-arguments-in-source-calls) and
 [primary readings](REFERENCES.md#checked-constructor-call-arguments-prior-art).
 
-C1 and C2 remain open. [M45](PLAN.md#m45-signed-beta-arguments-in-source-calls-unimplemented)
-is an unimplemented step for explicitly signed immediate lambda arguments.
-It must use actual assigned Many metadata, retain ordinary usage checking,
-and reject Strict for that new path. General function-domain binders, lazy
+At M44, signed immediate lambda arguments remained separate work. M45 below
+implements that bounded extension. General function-domain binders, lazy
 retained calls, optimizer support and call-index wire forms remain gated.
+
+## M45: signed beta arguments in source calls
+
+The [signed-call example](examples/qualified-pi/BetaCallClient.hs) accepts an
+immediate argument such as `case f (((\x -> S x) :: Nat -> Nat) n) of ...`.
+Branches can use the canonical annotation `Vec Int (f (S n))`. Signed identity,
+constant and nested scalar bodies preserve actual Id scope and field demand.
+The outer opaque function still has independently closed scalar domains A/B.
+The signed lambda itself must be an endofunction A -> A.
+
+The classifier requires the surviving checked `ExprWithTySig`. Its signature
+has one plain unrestricted arrow and the same bare, optionally parenthesized
+TyCon Name on both sides. It excludes aliases, applied domains, forall,
+contexts and wildcards. The actual LamSingle has one bare VarPat, one
+unguarded RHS and no local bindings. The during-TC zonker reads existing
+assignments. Actual Id and scaled MatchGroup multiplicities must be Many;
+binder, argument and result types must agree. Flexi is not filled or defaulted.
+A scoped NameEnv preserves the actual zonked binder's Name and Unique.
+
+The temporary Core lambda is classification data. The existing scalar beta
+bridge validates its atomic operand and constructor body. A local variable or
+nullary constructor can be an atomic operand; a constructor with fields cannot.
+The original checked scrutinee remains in the strict case carrier and executes
+once. Source checking and usage collection do not run again. Under Strict,
+this new classification returns unsupported; ordinary nondependent cases retain
+their existing checking and demand. No general evaluator or Core rule is added.
+
+Both stages pass 15 public runtime observations and reject eight CLI clients.
+Five clients emit both GHC-83865 and GHC-83605. One client emits only GHC-83605
+from the existing local-signature scope guard. Two emit only GHC-83865 after
+valid refinement, testing wrong and shadowed calls under active branch evidence.
+These eight clients produce 15 located diagnostic envelopes per stage: nine
+GHC-83865 and six GHC-83605. They are not two disjoint client groups.
+
+The bootstrap API and registered fixture pass 15 quiet source observations,
+separate from the inherited M44 source 17, M43 source 26 and M42 Core 19.
+The one-line and 37-line goldens stay unchanged. Four supplementary runtime
+observations per stage check ordinary Strict behavior and same-spelling binder
+scope, two of each. Each of two designated trace markers occurs once per stage.
+Those markers give limited lookup evidence, not a universal elaboration count.
+Six legacy checks preserve public programs of 9, 15 and 17 observations in
+both stages. The final nine phases pass with two API reuses and seven launches.
+Both stages preserve raw/public 106 and packed 562 observations. Registered
+results are five passes across 39 cases, with 34 skips and no unexpected results
+or framework warnings. No new registered test or golden file is added.
+
+Selected compiler: `44e91a7618fe55c3713c85641b4a2d88d4536f13`.
+Selected source: `0c1bb75a6ecaef5ecc62cf84450968ad21de67ca`.
+Snapshot1 records 82 compiler inputs and 100 source paths. The compiler changes
+only `Tc/Gen/Expr.hs`. Bootstrap2 takes 9.67s and peaks at 1594 MiB; self-hosting
+takes 7m24s and peaks at 4229 MiB. Builds use 16 GiB caps. API1 peaks at
+1247 MiB, legacy checks at 258 MiB and final checks at 1203 MiB under 4 GiB
+caps. Final swap is zero. Bootstrap1's wrong-target setup attempt remains
+preserved. It is not a compiler failure. The old M44 compiler's source baseline
+rejects with 20 errors, ten of each code above.
+
+Evidence uses `native-source-call-beta-*` and preserves M44. Freeze and
+independent audit must pass before publication. No full GHC suite, historical
+source41/known41/prior64 matrix or Tc metadata probe is claimed as rerun.
+See the [Core contract](CORE.md#signed-beta-arguments-in-source-calls),
+[plan](PLAN.md#m45-signed-beta-arguments-in-source-calls) and
+[pinned checking precedent](REFERENCES.md#signed-source-call-beta-prior-art).
+C1 and C2 remain open. [M46](PLAN.md#m46-head-only-function-valued-retained-binders-unimplemented)
+is an unimplemented local-signature step. It must preserve head-only scope,
+variable substitution and lazy function arguments; call-bearing exports stay
+gated until a separate interface increment.

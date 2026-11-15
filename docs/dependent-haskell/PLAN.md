@@ -2948,45 +2948,114 @@ The old baseline, API1's unsupported imported `bottomNat` argument and CLI1's
 `native-source-call-constructors-*`. Freeze and independent audit must pass before publication.
 C1 and C2 remain open.
 
-### M45: signed beta arguments in source calls (unimplemented)
+<a id="m45-signed-beta-arguments-in-source-calls-unimplemented"></a>
 
-Admit a bounded immediate lambda argument such as
-`case f (((\x -> S x) :: Nat -> Nat) n) of ...` through the existing Core beta
-bridge. Begin with an explicit complete monomorphic scalar endofunction
-signature. Require one written plain `A -> A` arrow with the same bare,
-optionally parenthesized type constructor Name on each side. Exclude signature
-aliases. Do not implement general unannotated lambda inference.
+### M45: signed beta arguments in source calls
 
-- [ ] Require the actual checked ExprWithTySig node retained by
-  `Tc.Gen.Head.tcExprWithSig` at lines 510–517. Do not infer signature provenance
-  from an expansion. Reject wildcard, forall and evidence-bearing signatures.
-- [ ] Read one checked LamSingle row with one bare VarPat, one unguarded RHS
-  and no local bindings. Preserve the actual binder Name and Unique.
-- [ ] Read existing type and multiplicity assignments with the during-TC
-  zonker. Require actual assigned Many and consistent MatchGroup metadata.
-  Leave Flexi or rigid multiplicities unsupported. Do not default or fill a
-  meta, allocate a provisional Many Id, or repeat usage checking.
-- [ ] Reconstruct a temporary Core.Lam and the supported scalar body. Admit
-  only identity wrappers and the complete checked annotation. Preserve the
-  original checked scrutinee for desugaring and execution.
-- [ ] Reuse the existing beta converter. Its operand must normalize to an
-  eligible local variable or nullary constructor. Binder and result domains
-  must agree. Keep constructed operands with fields and residual calls gated.
-- [ ] Match branch annotations against the canonical whole-call Type. Preserve
-  shadowing, captures, independent calls and the M44 constructor rules.
-- [ ] Reject Strict for this new path. Source VarPat bangs are introduced later
-  by desugaring and cannot be omitted from the demand contract.
-- [ ] Measure signed identity, constant and successor bodies, bottom head/order,
-  lazy partial/cyclic fields and one source elaboration. Pin One, unresolved
-  multiplicity, Strict, scope, wrapper, evidence and wrong-domain diagnostics.
+M45 implements `case f (((\x -> S x) :: Nat -> Nat) n) of ...` through the
+existing scalar Core beta bridge. It adds no Core node, equality rule or codec.
 
-Dependencies: actual checked metadata and assignment reads precede temporary
-conversion. That conversion precedes whole-call annotation matching and source
-execution. No new Core rule, function-valued retained Pi, nested opaque calls,
-general optimizer admission, codec or preservation theorem is planned.
+- [x] Require a surviving checked ExprWithTySig with one plain A -> A arrow.
+  Both domains have the same bare, optionally parenthesized TyCon Name.
+  Exclude aliases, applied domains, wildcards, forall and contexts.
+- [x] Require one actual LamSingle row, one bare VarPat, one unguarded RHS and
+  empty local binds. Preserve the actual Name/Unique through a scoped NameEnv.
+- [x] Read existing type/multiplicity assignments with the during-TC zonker.
+  Require Many in the actual Id and scaled MatchGroup argument, with matching
+  domains/result. Leave Flexi untouched. Do not default or manufacture Many.
+- [x] Reconstruct temporary Core classification data, then use the existing
+  atomic beta converter. Keep the original scrutinee and one usage check.
+- [x] Reuse canonical whole-call annotation matching and all M44 scope,
+  quotation, instrumentation, constructor and nominal transport checks.
+- [x] Return unsupported under Strict. Preserve ordinary nondependent fallback
+  and its source demand. Do not introduce an early global Strict rejection.
+- [x] Check signed identity/constant/successor/nested bodies, partial/cyclic
+  fields, bottom-head demand and canonical annotation scope in both stages.
+  Check the measured signature/Strict/producer and active-proof errors below.
+  Keep actual graded guards distinct from an isolated unresolved-meta test.
 
-The preparation is `native-source-call-constructors-next-beta-v1/`.
-Agda v2.8.0 Term.hs lines 468–486 and 542–587 supply selected lambda/context
-prior art. Application.hs lines 774–808 supply argument-checking order. These readings do not
-justify GHC multiplicity defaulting or Haskell demand changes. See
-[the provenance](REFERENCES.md#checked-constructor-call-arguments-prior-art).
+Selected compiler `44e91a7618fe55c3713c85641b4a2d88d4536f13` changes only
+Tc.Gen.Expr. Selected source is `0c1bb75a6ecaef5ecc62cf84450968ad21de67ca`;
+snapshot1 records 82 compiler inputs and 100 source paths. Both APIs pass on
+the first API attempt, including 15 quiet source observations. Goldens remain
+1/37, separate from inherited source17/source26/Core19. The older source
+corpus retains 243 package rejections, 322 total rejections and 95 quiet positives;
+these are not counts of new raw beta checks.
+
+Both stages pass public15 and reject eight CLI clients. Five have both codes,
+one has only the earlier GHC-83605 local-signature scope error, and two have
+only GHC-83865 under active refinement. Per stage, 15 located envelopes contain
+nine GHC-83865 and six GHC-83605 diagnostics. Four supplementary runtime
+observations per stage check Strict2 and same-spelling scope2. Trace markers
+count 1/1 per stage; this is limited marker evidence, not an elaboration theorem.
+Legacy6 preserves 9/15/17 observations at both stages. Final9 passes with two
+API reuses and seven launches: raw/public106 and packed562 at both stages,
+plus five registered tests. Registered totals are 39 cases, 34 skips and no
+unexpected results or framework warnings.
+
+Bootstrap2 passes in 9.67s at 1594 MiB; self-hosting in 7m24s at 4229 MiB,
+under 16 GiB caps. API1/legacy/final peak at 1247/258/1203 MiB under 4 GiB
+caps; final swap is zero. Bootstrap1 selected the wrong build target; preserve
+that setup attempt. It is not a compiler failure. The M44 source baseline
+rejects with 20 ordinary errors, ten GHC-83865 and ten GHC-83605.
+
+Evidence uses `native-source-call-beta-*`; parent M44 remains preserved.
+Freeze and independent audit must pass before publication. The full GHC suite,
+source41/known41/prior64 matrices and Tc metadata probe were not rerun.
+The exact signature/Many restriction is implemented. No separate experiment
+with unresolved multiplicities or general unannotated inference is claimed.
+See Note [Signed source call beta] and
+[the primary readings](REFERENCES.md#signed-source-call-beta-prior-art).
+
+### M46: head-only function-valued retained binders (unimplemented)
+
+Begin with complete local signatures and one variable equation:
+
+```haskell
+keepCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
+         -> Vec Int (f n) -> Int
+keepCall f n _ = 42
+
+idCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
+       -> Vec Int (f n) -> Vec Int (f n)
+idCall f n xs = xs
+```
+
+- [ ] Specify a distinct retained-binder policy: a scalar Id or an existing
+  eligible local Many function head with closed ordinary Many A -> B and
+  independently closed scalar A/B. Keep TermVarTy and scalar predicates unchanged.
+- [ ] Admit the actual runtime function Name in a complete local telescope.
+  Keep its type/coercion occurrences in TermAppTy/TermAppCo head slots.
+  Preserve outer aliases,
+  shadowing, ranks, staging and source errors. Start with bare variable patterns.
+- [ ] Select variable-only actual function operands at their exact domain.
+  Check usage once. Reuse head-only substitution and binder masking; reject
+  unsupported lambda/global/applied ranges, or keep a signed lazy local alias.
+- [ ] Update blocked Core lambda/type/application binder checks. Verify the
+  existing deep FVs, binder masking and capture avoidance. Preserve same-head
+  identity. Do not represent a bare function as TermVarTy or matchable AppTy.
+- [ ] Extend fixed-domain DepFunCo, Lint, lifting, normalization and permitted
+  Given checks. Permit only unchanged/reflexive head transport. Body congruence
+  can use TermAppCo under that same head. Add no function equality, inverse
+  call projection, native meta fill or heterogeneous domain rule.
+- [ ] Let CorePrep substitute an eligible local Var head directly. Do not use
+  scalar markers or strict DEFAULT naming for a function argument. Preserve
+  existing lazy head aliases, metadata protection and top-level Tidy behavior.
+- [ ] Run keep/id payloads through source, Core/STG Lint and execution. Check
+  ignored bottom function/index/payload, actual call demand, distinct heads,
+  alpha/capture cases and proof-only FVs. Pin invalid domains, scope and producer
+  errors. Keep pure Pi matching opt-in and its escape checks intact.
+- [ ] Keep exported call-bearing signatures and all new wire forms gated.
+  Do not extend the scalar interface reader as an accidental codec bypass.
+
+Dependencies: binder policy and exact variable application precede source
+checking. Coercion/type recovery and Prep scope precede execution. For an initial
+case consumer, define a complete local caller :: Vec Int (f n) -> Vec Int (f n)
+and caller = idCall f n outside the case. Existing M43 transport can capture
+that instantiated caller. Direct idCall f n xs inside a refining case remains
+unproven: its schema contains different bound heads/indices before application.
+Probe that composition separately; do not widen M43 Givens to promise it.
+No implementation, new evaluator, optimizer or theorem is claimed.
+C1 and C2 remain open. Preparation and exact source hashes are in
+`native-source-call-beta-next-function-pi-v1/`. See
+[the primary comparison](REFERENCES.md#head-only-function-valued-retained-binders-prior-art).

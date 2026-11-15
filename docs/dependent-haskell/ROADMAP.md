@@ -209,7 +209,7 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   preserves exact whole-call identity and reuses the existing Core bridge.
   Both stages pass source, demand and located negative controls. Function-domain
   retained binders, general computation and a preservation theorem remain open.
-  M45 is an unimplemented, explicitly signed immediate-lambda step. It requires
+  M45 implements an explicitly signed immediate-lambda step. It requires
   actual assigned Many metadata and excludes Strict from that new path.
 - [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
   missing transformations incrementally, including normal simplification and
@@ -229,6 +229,11 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   `seq` desugaring. Its `Strict` and opaque-head demand controls pass both stages.
   M44 extends the source classifier and structural annotation matcher. It adds
   no Core or backend transformation. Ordinary optimization remains gated.
+  M45 adds assigned-Many signed source beta using the existing scalar bridge.
+  It preserves the checked runtime expression and ordinary Strict fallback.
+  M46 is unimplemented: begin with complete local keepCall/idCall signatures,
+  a distinct retained-binder policy and variable-only function arguments.
+  Keep heads scoped, scalar TermVarTy unchanged, and exported call codecs gated.
   C1 and C2 remain open.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement
