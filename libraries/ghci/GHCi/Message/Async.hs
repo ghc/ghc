@@ -598,9 +598,8 @@ drainPipe p unmask = catch loop (void . replyToPendings) where
             Just q  -> writeTQueue q (uq,bs)
     Cancel uq -> cancelRequest am uq
 
-  replyToPendings e = do
-    atomically $ failPendingReplies p e
-    pipeCloseRead p `catch` \(_ :: IOException) -> pure ()
+  replyToPendings e = finally (pipeCloseRead p `catch` \(_ :: IOException) -> pure ()) -- TODO: log with verbose.
+    . atomically $ failPendingReplies p e
 
   am = pipeAsyncMngr p
 
@@ -669,8 +668,8 @@ fillPipe p unmask = loop `catch` cleanup Nothing where
 
   am = pipeAsyncMngr p
 
-  cleanup last_write e0 = do
-    atomically $ do
+  cleanup last_write e0 = finally (pipeCloseWrite p `catch` \(_ :: IOException) -> pure ()) -- TODO: log with verbose
+    . atomically $ do
       -- deactivate here too so we keep track of the exception if end still 'Open'.
       s <- deactivatePipeEnd (pipeWriteStatus p) (Just e0)
       case last_write of
@@ -680,7 +679,6 @@ fillPipe p unmask = loop `catch` cleanup Nothing where
           putTMVar var . Left $ if isOpen s then e0 else toException PipeWriteClosedException
       -- real exception already reported once
       failPendingWrites p $ toException PipeWriteClosedException
-    pipeCloseWrite p `catch` \(_ :: IOException) -> pure ()
 
 failPendingWrites :: Pipe -> SomeException -> STM ()
 failPendingWrites p e = do

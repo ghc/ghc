@@ -668,7 +668,7 @@ stopInterp interp = case interpInstance interp of
             pure (InterpPending,e)
   where
     gracefulShutdown i restore = do
-      x <- try (timeLimited restore $ sendMessage i Shutdown `finally` closePipe (interpPipe (instProcess i)))
+      x <- try (timeLimited restore (sendMessage i Shutdown) `finally` closePipe (interpPipe (instProcess i)))
       let ph = interpHandle (instProcess i)
       e <- case x of
         -- happy path: ext. interp. should be shutting down of its own accord.
