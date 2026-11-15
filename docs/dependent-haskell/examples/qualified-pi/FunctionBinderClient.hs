@@ -122,17 +122,11 @@ main = do
                 Z -> let payload :: Vec Int (f n); payload = VNil in toList (caller payload)
                 S k -> let payload :: Vec Int (f n); payload = VCons 42 (replicateNative @Int k 42) in toList (caller payload)
 
-    -- | Instantiate the retained worker inside each checked call branch.
+    -- | Instantiate the retained worker without a branch payload annotation.
     observeDirectCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> [Int]
     observeDirectCall f n = case f n of
-        Z ->
-            let payload :: Vec Int (f n)
-                payload = VNil
-             in toList (idCall f n payload)
-        S k ->
-            let payload :: Vec Int (f n)
-                payload = VCons 42 (replicateNative @Int k 42)
-             in toList (idCall f n payload)
+        Z -> toList (idCall f n VNil)
+        S k -> toList (idCall f n (VCons 42 (replicateNative @Int k 42)))
 
     -- \| Keep independently closed input and result domains on a function binder.
     keepMixedCall :: foreach (f :: Bool -> Nat) -> foreach (b :: Bool) -> Vec Int (f b) -> Int
