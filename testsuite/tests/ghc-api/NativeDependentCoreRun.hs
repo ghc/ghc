@@ -2236,6 +2236,124 @@ runNatSourceChecks = do
     runNatContextSourceChecks
     runCaseSourceChecks
     runOpaqueCallSourceChecks
+    runConstructorCallSourceChecks
+
+-- | Add constructor-call workers without changing the inherited source corpus.
+retainedConstructorCallSource :: String -> String -> String
+retainedConstructorCallSource moduleName observation =
+    unlines $ "{-# LANGUAGE TypeOperators #-}" : concatMap insert (lines (retainedNatSource moduleName observation))
+  where
+    insert line@"      run :: Nat -> IO String" = map ("      " ++) declarations ++ [line]
+    insert line@"import NativeRuntimeHelpers hiding (appendVec)" = [line, "import Data.Type.Equality ((:~:)(Refl))"]
+    insert line = [line]
+    declarations =
+        [ "-- | Observe an opaque call with a nullary constructor argument."
+        , "constructorZero :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "constructorZero f n original = case f Z of"
+        , "    Z -> let ys :: Vec Int (f Z); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f Z); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        , ""
+        , "-- | Observe a call whose argument contains the retained runtime index."
+        , "constructorLength :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "constructorLength f n original = case f (S n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        , ""
+        , "-- | Check a second constructor layer without evaluating its predecessor early."
+        , "constructorTwice :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "constructorTwice f n original = case f (S (S n)) of"
+        , "    Z -> let ys :: Vec Int (f (S (S n))); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S (S n))); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        , ""
+        , "-- | Transport a consumer captured before the outer call case."
+        , "constructorCaptured :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "constructorCaptured f n original ="
+        , "    let consume :: Vec Int (f (S n)) -> Int"
+        , "        consume cached = case f (S n) of"
+        , "            Z -> length (vecList cached)"
+        , "            S k -> length (vecList cached)"
+        , "     in case f (S n) of"
+        , "            Z -> let ys :: Vec Int (f (S n)); ys = VNil in consume ys"
+        , "            S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in consume ys"
+        , ""
+        , "-- | Read the new head without demanding the constructor argument's tail."
+        , "constructorHead :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "constructorHead f n original = case f (S n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in head (vecList ys)"
+        , ""
+        , "-- | Read a finite prefix from a cyclic constructor argument."
+        , "constructorPrefix :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> [Int]"
+        , "constructorPrefix f n original = case f (S n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in take 4 (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in take 4 (vecList ys)"
+        , ""
+        , "-- | Demand the actual result predecessor explicitly."
+        , "constructorSeq :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "constructorSeq f n original = case f (S n) of"
+        , "    Z -> 0"
+        , "    S k -> k `seq` 42"
+        , ""
+        , "-- | Keep the call case outside a returned ordinary function."
+        , "constructorFunction :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int -> Int"
+        , "constructorFunction f n original = case f (S n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in \\x -> length (vecList ys) + x"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in \\x -> head (vecList ys) + x"
+        , ""
+        , "-- | Check a Bool constructor argument with a different result domain."
+        , "constructorBool :: (Bool -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "constructorBool f n original = case f True of"
+        , "    Z -> let ys :: Vec Int (f True); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f True); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        , ""
+        , "-- | Check a constructor argument when the call returns Bool."
+        , "constructorMixed :: (Nat -> Bool) -> foreach (n :: Nat) -> Vec Int n -> Bool"
+        , "constructorMixed f n original = case f (S n) of"
+        , "    False -> let witness :: f (S n) :~: 'False; witness = Refl in case witness of Refl -> False"
+        , "    True -> let witness :: f (S n) :~: 'True; witness = Refl in case witness of Refl -> True"
+        ]
+
+-- | Keep constructor-call observations separate from the M43 source checks.
+runConstructorCallSourceChecks :: GHC.Ghc ()
+runConstructorCallSourceChecks = do
+    let moduleName = "NativeSourceConstructorCalls"
+        observation =
+            unlines
+                [ "do finite <- driveNats (\\n -> pure (show (constructorLength opaqueNat n bottomVec, constructorTwice opaqueNat n bottomVec, constructorCaptured opaqueNat n bottomVec)))"
+                , "        zero <- observeInt (constructorZero opaqueNat bottomNat bottomVec)"
+                , "        constant <- observeInt (constructorLength constantZeroNat bottomNat bottomVec)"
+                , "        lazyHead <- observeInt (constructorHead opaqueNat bottomNat bottomVec)"
+                , "        cyclicHead <- observeInt (constructorHead opaqueNat cyclicNat bottomVec)"
+                , "        prefix <- pure (show (constructorPrefix opaqueNat cyclicNat bottomVec))"
+                , "        boolean <- observeInt (constructorBool (\\b -> case b of { False -> Z; True -> S Z }) bottomNat bottomVec)"
+                , "        mixed <- observeBool (constructorMixed (\\x -> True) bottomNat bottomVec)"
+                , "        function <- case constructorFunction opaqueNat bottomNat bottomVec of !_ -> pure \"forced\""
+                , "        applied <- observeInt (constructorFunction opaqueNat Z VNil 7)"
+                , "        constants <- pure (show (constructorLength constantZeroNat Z VNil, constructorLength constantZeroNat (S Z) (VCons 7 VNil)))"
+                , "        pure (finite ++ unlines [zero,constant,lazyHead,cyclicHead,prefix,boolean,mixed,function,applied,constants])"
+                ]
+        expected = ["(1,2,1)", "(3,4,3)", "(4,5,4)", "0", "0", "42", "42", "[42,42,42,42]", "1", "True", "forced", "49", "(0,0)"]
+    expression <- sourceEntry moduleName (retainedConstructorCallSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source constructor calls" expression
+    unless (lines actual == expected) $
+        fail ("FAIL: source constructor call refinement or demand: " ++ show actual)
+    forM_
+        [ ("NativeSourceConstructorPredecessor", "observeInt (constructorSeq opaqueNat bottomNat bottomVec)", "native-bottom-nat")
+        , ("NativeSourceConstructorHead", "observeInt (constructorHead bottomFunction bottomNat bottomVec)", "native-bottom-function")
+        , ("NativeSourceConstructorLength", "observeInt (constructorLength opaqueNat bottomNat bottomVec)", "native-bottom-nat")
+        , ("NativeSourceConstructorFunction", "case constructorFunction bottomFunction bottomNat bottomVec of !_ -> pure \"forced\"", "native-bottom-function")
+        ]
+        $ \(name, body, fragment) -> do
+            bottomExpression <- sourceEntry name (retainedConstructorCallSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception
+                    | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
 
 -- | Check source call refinement, captured consumers and strict case demand.
 runOpaqueCallSourceChecks :: GHC.Ghc ()
