@@ -1642,12 +1642,13 @@ forall, do not consult family substitutions under that binder.
 The default policy does not descend into a retained function. Keep that policy
 for all existing matching, unification, injectivity and PMC callers. The separate
 tcMatchRetainedTyX_BM entry point opts in to immutable matching through supported
-runtime binders. Both binders must be local unrestricted native index Ids with
-the same closed domain. Both bodies must have kind Type, and the accumulated
+runtime binders. Both binders must satisfy isNativeRetainedBinder with
+the same closed domain. See Note [Function-valued retained binders] in
+GHC.Core.Type. Both bodies must have kind Type, and the accumulated
 kind coercion must be reflexive. Compare the domains; do not infer them.
 
-Use umRnBndr2 to compare the bodies in one shared binder scope. TermVarTy uses
-that renaming. The existing bound-variable escape check sees free runtime Ids,
+Use umRnBndr2 to compare the bodies in one shared binder scope. TermVarTy and
+TermAppTy heads use that renaming. The existing bound-variable escape check sees free runtime Ids,
 so an outer template variable cannot capture either runtime binder. Keep ordinary
 occurs checks and family matching unchanged. As under a forall, family
 substitution lookups do not occur under the runtime binder. The template-variable
@@ -1795,7 +1796,7 @@ unify_ty env ty1 (TyVarTy tv2) kco
 unify_ty env (DepFunTy b1 body1) (DepFunTy b2 body2) kco
   | Matching <- um_unif env
   , um_match_retained env
-  , isNativeIndexId b1, isNativeIndexId b2
+  , isNativeRetainedBinder b1, isNativeRetainedBinder b2
   , tcEqType (varType b1) (varType b2)
   , typeKind body1 `eqType` liftedTypeKind
   , typeKind body2 `eqType` liftedTypeKind

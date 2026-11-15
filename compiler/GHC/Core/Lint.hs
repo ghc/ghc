@@ -1091,7 +1091,7 @@ lintLambda var lintBody =
     do { (body_ty, ue) <- lintBody
        ; lintL (not (isNonCoVarId var)
                   || not (anyFreeVarsOfType (== var) body_ty)
-                  || isNativeIndexId var)
+                  || isNativeRetainedBinder var)
            (text "Unsupported runtime dependency in lambda result:" <+> ppr var
             $$ ppr body_ty)
        ; ue' <- checkLinearity ue var
@@ -1554,8 +1554,7 @@ lintValApp :: CoreExpr -> Type -> Type -> UsageEnv -> UsageEnv
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
   | DepFunTy b res_ty <- coreFullView fun_ty
   = do { ensureEqTys (varType b) arg_ty (mkAppMsg (varType b) arg_ty arg)
-       ; lintL (isNativeIndexId b && isJust (exprToNativeIndex arg))
-           (text "Unsupported retained constructor field:" <+> ppr arg)
+       ; lintRetainedArgument b arg
        ; in_scope <- getInScope
        ; let subst = Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv
        ; return (substTy subst res_ty, addUE fun_ue (scaleUE ManyTy arg_ue)) }
@@ -1568,6 +1567,19 @@ lintValApp arg fun_ty arg_ty fun_ue arg_ue
   = failWithL err2
   where
     err2 = mkNonFunAppMsg fun_ty arg_ty arg
+
+-- | Check the scalar or variable-only function operand of a retained binder.
+-- See Note [Function-valued retained binders] in GHC.Core.Type.
+lintRetainedArgument :: Id -> CoreExpr -> LintM ()
+lintRetainedArgument b arg
+  | isNativeIndexId b
+  = lintL (isJust (exprToNativeIndex arg)) unsupported
+  | isNativeIndexFunctionId b, Var f <- arg
+  = do { _ <- lintNativeIndexFunction f
+       ; ensureEqTys (varType b) (varType f) unsupported }
+  | otherwise = failWithL unsupported
+  where
+    unsupported = text "Unsupported retained runtime argument:" <+> ppr arg
 
 lintTyKind :: OutTyVar -> Type -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
@@ -2134,7 +2146,7 @@ lintType (TermAppTy f arg)
             $$ text "Expected:" <+> ppr domain) }
 
 lintType (DepFunTy b body)
-  = do { lintL (isNativeIndexId b)
+  = do { lintL (isNativeRetainedBinder b)
            (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
        ; lintL (b `elemVarSet` tyCoVarsOfType body)
            (text "Vacuous retained dependent binder:" <+> ppr b)
@@ -2370,8 +2382,7 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                        ; ensureEqTys (varType b) arg_ty
                            (text "Retained runtime argument has the wrong type:" <+> ppr arg)
                        ; let arg_expr = to_core arg
-                       ; lintL (isJust (exprToNativeIndex arg_expr))
-                           (text "Unsupported retained runtime argument:" <+> ppr arg)
+                       ; lintRetainedArgument b arg_expr
                        ; let Subst in_scope ids tvs cvs = subst
                              subst' = Subst in_scope (extendVarEnv ids b arg_expr) tvs cvs
                        ; go subst' body_ty acc' args }
@@ -2616,7 +2627,7 @@ lintCoercion (TermAppCo f arg_co)
             $$ ppr arg_co) }
 
 lintCoercion co@(DepFunCo b body_co)
-  = do { lintL (isNativeIndexId b)
+  = do { lintL (isNativeRetainedBinder b)
            (text "Invalid retained coercion binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
        ; lintBinder LambdaBind b $
          do { lintCoercion body_co

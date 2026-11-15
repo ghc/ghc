@@ -61,6 +61,7 @@ module GHC.Core.Type (
         mkPiTy, mkPiTys, mkDepFunTy, isBoolIndexId,
         isNativeIndexId, isNativeIndexType,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
+        isNativeRetainedBinder, isNativeRetainedBinderType,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
@@ -2328,9 +2329,17 @@ nativeIndexFunctionTys_maybe :: Id -> Maybe (Type, Type)
 nativeIndexFunctionTys_maybe f
   | isLocalId f, not (isCoVar f), isManyTy (idMult f)
   , not (isJoinIdDetails (idDetails f))
-  , noFreeVarsOfType (varType f), noFreeVarsOfType (idMult f)
+  , noFreeVarsOfType (idMult f)
+  = nativeIndexFunctionTypeTys_maybe (varType f)
+  | otherwise = Nothing
+
+-- | Check the closed ordinary function type shared by heads and retained binders.
+-- See Note [Function-valued retained binders].
+nativeIndexFunctionTypeTys_maybe :: Type -> Maybe (Type, Type)
+nativeIndexFunctionTypeTys_maybe ty
+  | noFreeVarsOfType ty
   , FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res }
-      <- coreFullView (varType f)
+      <- coreFullView ty
   , af == FTF_T_T, isManyTy mult
   , noFreeVarsOfType mult
   , isNativeIndexType arg, isNativeIndexType res
@@ -2346,6 +2355,41 @@ isNativeIndexId :: Id -> Bool
 isNativeIndexId v
   = isLocalId v && not (isCoVar v)
     && isManyTy (idMult v) && isNativeIndexType (varType v)
+
+-- | Test whether an Id can bind a scalar index or an opaque call head.
+-- See Note [Function-valued retained binders].
+isNativeRetainedBinder :: Id -> Bool
+isNativeRetainedBinder v = isNativeIndexId v || isNativeIndexFunctionId v
+
+-- | Test a retained binder domain without constructing a temporary Id.
+-- See Note [Function-valued retained binders].
+isNativeRetainedBinderType :: Type -> Bool
+isNativeRetainedBinderType ty
+  = isNativeIndexType ty || isJust (nativeIndexFunctionTypeTys_maybe ty)
+
+{- Note [Function-valued retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder can bind a scalar index or an eligible opaque call head.
+The function head has a closed ordinary visible Many arrow A -> B. Both A and
+B are independently supported scalar domains. The Id is local, unrestricted,
+and not a join point. Reuse the head policy; do not widen the scalar policy.
+
+A bound function occurs only in the head slot of TermAppTy or TermAppCo.
+It cannot occur as TermVarTy or as a matchable AppTy function. Applying its
+retained binder requires an eligible local Var with exactly the same type.
+Use the existing head-only Id substitution. Do not unfold that Var or transport
+the function domain through a coercion. DepFunCo keeps the domain unchanged.
+
+The binder scopes over calls in the result and its proofs. Existing runtime
+binder renaming masks outer substitutions and avoids capture in both places.
+The function argument remains a lazy runtime argument. A type occurrence does
+not force it or add a runtime use. No function equality or inverse call rule
+follows from this binder policy.
+
+See the pinned Agda context and neutral-call comparison in
+docs/dependent-haskell/REFERENCES.md, under
+head-only-function-valued-retained-binders-prior-art.
+-}
 
 {- Note [Algebraic runtime index domains]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

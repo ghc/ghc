@@ -250,9 +250,11 @@ data Type
 
 {- Note [Restricted retained dependent types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TermVarTy and DepFunTy implement an internal experiment. The runtime variable
-remains an Id. It must be local, non-coercion, unrestricted, and have a supported
-closed algebraic type. See Note [Algebraic runtime index domains] in GHC.Core.Type.
+TermVarTy and DepFunTy implement an internal experiment. A scalar runtime index
+remains a local, non-coercion, unrestricted Id with a supported closed algebraic
+type. See Note [Algebraic runtime index domains] in GHC.Core.Type.
+DepFunTy can also bind an eligible opaque call head. See Note [Function-valued
+retained binders] in GHC.Core.Type. Such a head occurs only in TermAppTy/TermAppCo.
 TermVarTy has the identifier's type as its kind. A DepFunTy result has kind Type. Constraint
 also has a lifted representation, but is not a supported result kind here.
 
@@ -273,8 +275,10 @@ docs/dependent-haskell/REFERENCES.md.
 
 {- Note [Retained dependent function coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-DepFunCo b co binds one unrestricted runtime index throughout co. Its domain
-is the unchanged closed algebraic type of b. If co relates s and t at role r,
+DepFunCo b co binds one unrestricted runtime binder throughout co. Its domain
+is the unchanged closed type of b. This can be a supported scalar domain or
+an eligible opaque function-head type. See Note [Function-valued retained
+binders] in GHC.Core.Type. If co relates s and t at role r,
 the result relates mkDepFunTy b s and mkDepFunTy b t at that role. Both body
 endpoints must have kind Type. Each endpoint can independently become an
 ordinary arrow when its result does not use b.

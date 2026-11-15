@@ -1361,7 +1361,7 @@ mkFunResCo :: Role -> Id -> Coercion -> Coercion
 mkFunResCo role id res_co
   | isNonCoVarId id
   , id `elemVarSet` tyCoVarsOfCo res_co
-  = if isNativeIndexId id
+  = if isNativeRetainedBinder id
     then mkDepFunCo id res_co
     else pprPanic "mkFunResCo: unsupported dependent runtime binder" (ppr id)
   | otherwise
@@ -1784,10 +1784,13 @@ ty_co_subst !lc role ty
           _ -> pprPanic "ty_co_subst: native function head changed" (ppr ty)
     go r ty@(TermVarTy {})  = lift_native r ty
     go r (DepFunTy b body)
+      | isNativeRetainedBinder b
       = let LC subst env = lc
             (subst', b') = substNativeIndexBndr subst b
             lc' = LC subst' (delVarEnv env b)
         in mkDepFunCo b' (ty_co_subst lc' r body)
+      | otherwise
+      = pprPanic "ty_co_subst: invalid retained binder" (ppr b)
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
     go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)

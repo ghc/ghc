@@ -192,8 +192,8 @@ mkLamType v body_ty
    = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
 
    | anyFreeVarsOfType (== v) body_ty
-   , isNativeIndexId v
-   = assertPpr (isNativeIndexId v && typeKind body_ty `eqType` liftedTypeKind)
+   , isNativeRetainedBinder v
+   = assertPpr (isNativeRetainedBinder v && typeKind body_ty `eqType` liftedTypeKind)
        (text "Unsupported retained dependent lambda:" <+> ppr v <+> dcolon <+> ppr body_ty) $
      DepFunTy v body_ty
 
@@ -254,12 +254,20 @@ applyTypeToArgs op_ty args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
     go op_ty (arg : args)
       | DepFunTy b res_ty <- coreFullView op_ty
-      , Just _ <- exprToNativeIndex arg
+      , isNativeRetainedBinder b
+      , retained_arg b arg
       = let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)
         in go (substTy (Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv) res_ty) args
     go op_ty (_ : args)           | Just (_, _, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
     go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
+
+    -- See Note [Function-valued retained binders] in GHC.Core.Type.
+    retained_arg b arg
+      | isNativeIndexId b = isJust (exprToNativeIndex arg)
+      | Var f <- arg
+      = isNativeIndexFunctionId f && varType f `eqType` varType b
+      | otherwise = False
 
     -- go_ty_args: accumulate type arguments so we can
     -- instantiate all at once with piResultTys

@@ -1582,7 +1582,7 @@ normalise_type ty
       | otherwise
       = pprPanic "normalise_type: invalid runtime index" (ppr ty)
     go (DepFunTy v body)
-      | isNativeIndexId v
+      | isNativeRetainedBinder v
       , typeKind body `eqType` liftedTypeKind
       = do { LC subst env <- getLC
            ; let (subst', v') = substNativeIndexBndr subst v
@@ -1685,7 +1685,10 @@ runtime-Id mappings. Normalise the body in this scope, then abstract its reducti
 with mkDepFunRedn. Both context substitutions must map a runtime occurrence to the
 same valid Id with the same domain. Do not transport it to another runtime value.
 
-The binder keeps its closed domain and unrestricted multiplicity. Ordinary forall
+The binder keeps its closed domain and unrestricted multiplicity. It can bind a
+scalar index or an eligible opaque function head. See Note [Function-valued
+retained binders] in GHC.Core.Type. Keep function heads identical on both sides;
+do not infer equality between different functions. Ordinary forall
 binders still normalise their kinds through normalise_var_bndr. Agda compares Pi
 codomains in one shared extended context. The D/DC PiCong rule supplies explicit
 evidence for this abstraction. See docs/dependent-haskell/REFERENCES.md#agda-provenance.
