@@ -272,7 +272,7 @@ simpleOptExprNoInline opts expr
     init_env   = (emptyEnv init_opts) { soe_subst = init_subst }
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 
--- | Simplify checked native dependent Core with restricted Boolean reductions.
+-- | Simplify checked native Core with restricted reductions and variable aliases.
 -- See Note [Restricted dependent simplification].
 simpleOptNativeExpr :: HasDebugCallStack => CoreExpr -> CoreExpr
 simpleOptNativeExpr expr
@@ -297,9 +297,31 @@ simpleOptNativeProgram = map simplify_bind
 simpleOptNativeExpr reuses the simple optimiser without occurrence analysis,
 general inlining, or eta reduction. Runtime index occurrences record scope
 dependencies, not runtime usage. Ordinary occurrence analysis can discard a
-binding that an index still needs. Preserve source lets until backend lowering.
+binding that an index still needs. Preserve source lets until backend lowering,
+except for the checked variable aliases described below.
 Do not create new rules or Core unfoldings. mkUnfolding would run occurrence
 analysis again. Do not create join points from pre-existing occurrence metadata.
+
+A local nonrecursive binding whose input RHS is literally a variable can be
+removed when both input Ids are eligible local Many indices. Look up that
+variable in the current substitution without simplifying or unfolding it.
+Require another eligible variable of the same closed domain. If substitution
+has produced a constructor, retain the binding. Exclude joins and aliases
+with exported, stable, rule-bearing, inactive, or loop-breaker metadata.
+Do not inspect the target's unfolding. In particular,
+
+  let n = opaqueProducer x in let alias = n in body[alias]
+
+can lose only the alias binding. The outer producer stays lazy and shared.
+Store the same actual Id with extendIdSubstWithClone; it allocates no Id and
+maintains the in-scope set. Clear the alias from the inlining environment.
+The existing traversal substitutes terms, types and coercions together and
+freshens surviving binders to avoid capture. This rule does not use ordinary
+inlining or occurrence analysis. Keep recursive and top-level bindings.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance for dependent
+substitution. See
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance for the
+demand restriction.
 
 Boolean beta reduction substitutes an optimized local variable or exact
 constructor into terms and types together. Retain the redex for an unsupported
@@ -784,6 +806,25 @@ Wrinkle [Unlifted newtypes with wrappers]
 ----------------------
 simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe OutBind)
+simple_opt_bind env (NonRec b (Var rhs)) NotTopLevel
+  | soe_native env
+  , isNativeIndexId b, isNativeIndexId rhs
+  , not (isJoinId b), not (isJoinId rhs)
+  , not (isExportedId b)
+  , not (isStableUnfolding (idUnfolding b))
+  , not (idHasRules b)
+  , isAlwaysActive (idInlineActivation b)
+  , not (isWeakLoopBreaker (idOccInfo b))
+  , idType b `eqType` idType rhs
+  , Var actual <- lookupIdSubst subst rhs
+  , isNativeIndexId actual, not (isJoinId actual)
+  , substTyUnchecked subst (idType b) `eqType` idType actual
+  -- See Note [Restricted dependent simplification].
+  = (env { soe_subst = extendIdSubstWithClone subst b actual
+         , soe_inl = delVarEnv (soe_inl env) b }, Nothing)
+  where
+    subst = soe_subst env
+
 simple_opt_bind env (NonRec b r) top_level
   = (env', case mb_pr of
             Nothing    -> Nothing
