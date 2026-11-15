@@ -2237,6 +2237,119 @@ runNatSourceChecks = do
     runCaseSourceChecks
     runOpaqueCallSourceChecks
     runConstructorCallSourceChecks
+    runBetaCallSourceChecks
+
+-- | Add signed beta-call workers as a separate source corpus.
+retainedBetaCallSource :: String -> String -> String
+retainedBetaCallSource moduleName observation =
+    unlines $ concatMap insert (lines (retainedNatSource moduleName observation))
+  where
+    insert line@"      run :: Nat -> IO String" = map ("      " ++) declarations ++ [line]
+    insert line = [line]
+    declarations =
+        [ "-- | Check the canonical index of betaCallIdentity without unfolding the opaque head."
+        , "betaCallIdentity :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "betaCallIdentity f n original = case f (((\\x -> x) :: Nat -> Nat) n) of"
+        , "    Z -> let ys :: Vec Int (f n); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f n); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        , ""
+        , "-- | Check the canonical index of betaCallSuccessor without unfolding the opaque head."
+        , "betaCallSuccessor :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "betaCallSuccessor f n original = case f (((\\x -> S x) :: Nat -> Nat) n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        , ""
+        , "-- | Check the canonical index of betaCallNested without unfolding the opaque head."
+        , "betaCallNested :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "betaCallNested f n original = case f (((\\x -> S (((\\y -> S y) :: Nat -> Nat) x)) :: Nat -> Nat) n) of"
+        , "    Z -> let ys :: Vec Int (f (S (S n))); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S (S n))); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        , ""
+        , "-- | Check the canonical index of betaCallConstant without unfolding the opaque head."
+        , "betaCallConstant :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "betaCallConstant f n original = case f (((\\x -> Z) :: Nat -> Nat) n) of"
+        , "    Z -> let ys :: Vec Int (f Z); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f Z); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        , ""
+        , "-- | Check the canonical index of betaCallHead without unfolding the opaque head."
+        , "betaCallHead :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "betaCallHead f n original = case f (((\\x -> S x) :: Nat -> Nat) n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in head (vecList ys)"
+        , ""
+        , "-- | Check the canonical index of betaCallPrefix without unfolding the opaque head."
+        , "betaCallPrefix :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> [Int]"
+        , "betaCallPrefix f n original = case f (((\\x -> S x) :: Nat -> Nat) n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in take 4 (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in take 4 (vecList ys)"
+        , ""
+        , "-- | Check the canonical index of betaCallSeq without unfolding the opaque head."
+        , "betaCallSeq :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "betaCallSeq f n original = case f (((\\x -> S x) :: Nat -> Nat) n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in k `seq` head (vecList ys)"
+        , ""
+        , "-- | Check the canonical index of betaCallFunction without unfolding the opaque head."
+        , "betaCallFunction :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int -> Int"
+        , "betaCallFunction f n original = case f (((\\x -> S x) :: Nat -> Nat) n) of"
+        , "    Z -> let ys :: Vec Int (f (S n)); ys = VNil in \\x -> length (vecList ys) + x"
+        , "    S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in \\x -> head (vecList ys) + x"
+        , ""
+        , "-- | Transport a consumer that captures the canonical successor call."
+        , "betaCallCaptured :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "betaCallCaptured f n original ="
+        , "    let consume :: Vec Int (f (S n)) -> Int"
+        , "        consume cached = case f (S n) of"
+        , "            Z -> length (vecList cached)"
+        , "            S k -> length (vecList cached)"
+        , "     in case f (((\\x -> S x) :: Nat -> Nat) n) of"
+        , "            Z -> let ys :: Vec Int (f (S n)); ys = VNil in consume ys"
+        , "            S k -> let ys :: Vec Int (f (S n)); ys = VCons 42 (replicateNative @Int k 42) in consume ys"
+        , ""
+        , "-- | Check a signed Bool endofunction in a mixed-domain call."
+        , "betaCallBool :: (Bool -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "betaCallBool f n original = case f (((\\b -> b) :: Bool -> Bool) True) of"
+        , "    Z -> let ys :: Vec Int (f True); ys = VNil in length (vecList ys)"
+        , "    S k -> let ys :: Vec Int (f True); ys = VCons 42 (replicateNative @Int k 42) in length (vecList ys)"
+        ]
+
+-- | Check signed beta calls without changing inherited source totals or goldens.
+runBetaCallSourceChecks :: GHC.Ghc ()
+runBetaCallSourceChecks = do
+    let moduleName = "NativeSourceBetaCalls"
+        observation =
+            unlines
+                [ "do finite <- driveNats (\\n -> pure (show (betaCallIdentity opaqueNat n bottomVec,betaCallSuccessor opaqueNat n bottomVec,betaCallNested opaqueNat n bottomVec,betaCallCaptured opaqueNat n bottomVec)))"
+                , "        constant <- driveNat (\\n -> observeInt (betaCallConstant opaqueNat n bottomVec)) bottomNat"
+                , "        ignored <- driveNat (\\n -> observeInt (betaCallIdentity constantZeroNat n bottomVec)) bottomNat"
+                , "        headOnly <- driveNat (\\n -> observeInt (betaCallHead opaqueNat n bottomVec)) bottomNat"
+                , "        cyclicHead <- driveNat (\\n -> observeInt (betaCallHead opaqueNat n bottomVec)) cyclicNat"
+                , "        prefix <- driveNat (\\n -> pure (show (betaCallPrefix opaqueNat n bottomVec))) cyclicNat"
+                , "        function <- driveNat (\\n -> case betaCallFunction opaqueNat n bottomVec of !_ -> pure \"forced\") bottomNat"
+                , "        applied <- observeInt (betaCallFunction opaqueNat Z VNil 7)"
+                , "        boolean <- driveNat (\\n -> observeInt (betaCallBool (\\b -> case b of {False -> Z;True -> S Z}) n bottomVec)) bottomNat"
+                , "        pure (finite ++ unlines [constant,ignored,headOnly,cyclicHead,prefix,function,applied,boolean])"
+                ]
+        expected = ["(0,1,2,1)", "(2,3,4,3)", "(3,4,5,4)", "0", "0", "42", "42", "[42,42,42,42]", "forced", "49", "1"]
+    expression <- sourceEntry moduleName (retainedBetaCallSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source beta calls" expression
+    unless (lines actual == expected) $ fail ("FAIL: source beta call demand: " ++ show actual)
+    forM_
+        [ ("NativeSourceBetaPredecessor", "driveNat (\\n -> observeInt (betaCallSeq opaqueNat n bottomVec)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceBetaHead", "driveNat (\\n -> observeInt (betaCallHead bottomFunction n bottomVec)) bottomNat", "native-bottom-function")
+        , ("NativeSourceBetaOperand", "driveNat (\\n -> observeInt (betaCallIdentity opaqueNat n bottomVec)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceBetaFunction", "driveNat (\\n -> case betaCallFunction bottomFunction n bottomVec of !_ -> pure \"forced\") bottomNat", "native-bottom-function")
+        ]
+        $ \(name, body, fragment) -> do
+            bottomExpression <- sourceEntry name (retainedBetaCallSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                Left exception -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
 
 -- | Add constructor-call workers without changing the inherited source corpus.
 retainedConstructorCallSource :: String -> String -> String
