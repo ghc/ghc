@@ -894,10 +894,13 @@ They do not define new Boolean constructors.
 
 ## Roadmap and proposal status
 
-- [Serokell's Dependent Haskell roadmap](https://ghc.serokell.io/dh) was last updated
-  on 2026-09-03 when inspected. It separates frontend work, promotion, and dependent
-  Core. Retained dependent quantifiers require dependent Core in that roadmap.
-  The roadmap gives dependencies, not an implementation guarantee or delivery date.
+- [Serokell's Dependent Haskell roadmap](https://ghc.serokell.io/dh), dated
+  2026-11-12, was reviewed again on 2026-11-15. This replaces the earlier
+  2026-09-03 page snapshot. [ROADMAP.md](ROADMAP.md) records all 50 feature cards,
+  all 67 graph edges, and a separate checklist for this fork. Edges mean
+  prerequisites or subtasks; two are explicit loose ends of completed visible
+  forall. The map separates retained quantification, universal promotion, and
+  language cleanup. It gives no completion date or implementation guarantee.
 - [GHC proposals repository](https://github.com/ghc-proposals/ghc-proposals) is the
   source for language decisions. Acceptance of a design does not establish that
   this checkout implements it. The table records both kinds of evidence.
@@ -2811,3 +2814,49 @@ proof evidence or permission to assign native types to mutable variables.
 PDF version, pinned Agda blobs, full GHC source snapshots and read ranges.
 The reading did not replay a paper proof or inspect the full Agda solver.
 The implementation and source validation are recorded separately.
+
+## Whole-program roadmap review
+
+The 2026-11-15 review read all roadmap card descriptions and dependency lists.
+It extracted the full embedded graph. The source has 50 feature nodes and 67
+edges. All 39 card-listed relations match graph edges. The other 28 edges point
+to completed children. There are 37 remaining prerequisite/subtask relations
+and two explicit possible improvements. Do not treat all edges as hard blockers.
+The [program checklist](ROADMAP.md) separates the upstream snapshot from the
+capabilities and remaining work of this fork.
+
+The ignored cache `native-known-arguments-roadmap-research-v1` records source
+URLs, fetch metadata, hashes, proposal revisions, reading scope, and the graph
+extraction checks. The fetched HTML SHA256 is
+`1d64aa659154eb9b1190c0cabe274e095d2d23ecc223bdd51aaa02649b54d8d8`.
+Proposal #378 has Git blob `39a812b8154ee164e7de3ad9e27e21e012ebc000`.
+The review read its design sketch, including erasure, lexical identity,
+checked dependent matching, the static subset, and the typed intermediate
+language. Its accepted design direction does not approve every later grammar
+or supply a combined Core implementation proof.
+
+[Type functions, PR #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+was open at head `f0b6af30a6e15545606195eb72c2981ea91aa326`.
+Its full 309-line proposal was read. It specifies closed, fully instantiated
+calls through loadable functions. A rigid argument can leave a call stuck.
+This does not implement general open evaluation. The prototype performance
+claims were not reproduced.
+
+[First-class existentials, PR #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
+was open at head `72de21d16aa0b6e1a85cd4ecc66c7dc729ee0d87`.
+The retained-witness discussion, elimination and Core passages were read.
+Its existential witness is erased. Retained dependent pairs are future work
+in that proposal. The current retained-field packages do not discharge the
+first-class `exists` or `some` roadmap tasks.
+
+The [additional paper reading record](papers/README.md#roadmap-review-2026-11-15)
+covers matchability, existential laziness, constrained families, and the
+39-page extended graded paper. That extended version is distinct from the
+32-page paper in the existing seven-work manifest. Appendix B explains why
+its implicit calculus still needs an explicit encoding for an efficient Core
+checker. Use the papers to state obligations; do not transfer their theorems
+to this implementation without a correspondence argument.
+
+The linked open-evaluator issue #27413 and homogeneous-equality wiki returned
+bot challenges. Their bodies were not read. The checklist attributes only the
+available roadmap descriptions to those tasks.

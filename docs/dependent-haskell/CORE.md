@@ -1369,3 +1369,50 @@ in `GHC.Tc.Gen.App` and [its provenance](REFERENCES.md#native-worker-argument-in
 Qualified Pi type arguments still require `ImpredicativeTypes`. Its applied
 Quick Look path is separate from this `NoQL` route. An erased forall after a
 visible argument also remains outside the collected telescope.
+
+## Fixed and declared choices with ImpredicativeTypes
+
+The `DoQL` entry prepares the leading written type-argument prefix once.
+It preserves the original head, residual signature, wrapper/evidence accumulator,
+and any allocated QL variables. A failed mode choice resumes with that prefix.
+It does not recheck the source or infer value arguments during mode selection.
+
+Fixed native applications can select ordinary checking when no choice or free
+QL variable remains in the residual, expected type, or checked prefix metadata.
+The existing immutable expected-result matcher can also select complete choices
+for a supported native proof type. Final checking keeps the actual substituted
+result and nominal entailment. These routes have priority over argument advice.
+See Note [Ground retained applications] in `GHC.Tc.Gen.App`.
+
+Otherwise, a declared monomorphic argument can provide complete erased choices:
+
+```haskell
+knownDirect :: foreach (n :: Nat) -> QPi -> Vec Int n
+knownDirect n f = withQ Refl f n
+```
+
+Read only bare variable types, with optional parentheses. Exclude constructors,
+leading foralls/contexts, unsupported types, and free QL variables in deep
+metadata. Global lookup can load an interface. The lookup does not call
+`tcInferId`, elaborate an expression, or charge an occurrence use. A linear
+value remains eligible; its eventual argument check records its actual use.
+
+Match eligible domains and declared types with one restricted kind-first
+substitution. Check every known pair that constrains a collected outer erased
+binder. Require all choices, exact substituted domains, matching kinds, valid
+runtime scope, no template escape, no free QL variables, and a native anchor.
+An expected result can seed this matching only at ordinary saturation. Extra
+arguments can consume the selected result later; their final expected type
+cannot stand for the original worker's result. Keep the no-concreteness guard.
+Signed/applied expressions supply no declaration advice in this mode.
+
+Carry successful choices in `RetainedInstPlan`. Keep the original signature
+and prefix so IALL consumes forall/context groups and emits evidence in their
+original order. Skip eager argument inference when this plan is present.
+Every argument then goes through ordinary scaled checking. Final nominal
+entailment, result subsumption, usage, and failure-cache ownership remain.
+A conflict retains the guarded fallback. An erased forall after a visible
+arrow stays outside this collected telescope. No native metavariable assignment
+or Core/interface change is added. See Note [Declared native argument choices]
+in `GHC.Tc.Gen.App` and
+[the primary-source record](REFERENCES.md#native-choices-from-declared-arguments).

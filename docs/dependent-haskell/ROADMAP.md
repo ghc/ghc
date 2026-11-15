@@ -1,0 +1,286 @@
+# Dependent Haskell program roadmap
+
+Use this file to plan the whole program. Use [PLAN.md](PLAN.md) for individual
+compiler increments, [CORE.md](CORE.md) for the current Core contract, and
+[REFERENCES.md](REFERENCES.md) for design provenance.
+
+The primary map is [Serokell's Dependent Haskell roadmap](https://ghc.serokell.io/dh),
+dated **2026-11-12** and reviewed on **2026-11-15**. This checklist records its
+50 feature cards and all 67 feature-to-feature graph edges. Layout nodes are
+excluded. The graph describes prerequisites **or subtasks**. It is not a build
+order. In particular, two edges below are explicitly loose ends of a completed
+feature. The card lists omit already completed children; the graph retains them.
+
+The upstream snapshot has 23 completed cards, seven accepted cards, and 20 cards
+without a status marker. These counts do not measure implementation effort.
+An unmarked card can have research or an implementation prototype.
+
+## Where this fork stands
+
+We have an end-to-end native experiment within the retained-quantifier part of
+the map. Source programs use a runtime value as a type index, refine that index
+by pattern matching, store it with dependent fields, and run compiled code.
+The supported static subset and native pipeline remain restricted.
+
+| Area | Demonstrated in this fork | Work before the roadmap task is complete |
+| --- | --- | --- |
+| Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
+| Dependent products (`R03`) | Visible `foreach (n :: Nat) -> ...`, dependent equations and checked lambdas, runtime indices from IO, and qualified higher-order values | General domains and applications, invisible retained quantification, and predictable inference beyond the measured subset. |
+| Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
+| Type computation (`R06`, `R13`) | Existing promoted constructors and saturated type families, with explicit equality proofs | Ordinary function promotion, closed and open evaluation, and lambda/let/case expressions in types. |
+| Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
+
+The example `Nat` is the source datatype `data Nat = Z | S Nat`. It is not a
+claim about native support for every built-in numeric or unboxed domain.
+Runtime names retain lexical identity: two separately bound lengths need a
+proof to be interchangeable, even when their runtime values happen to agree.
+This follows the identity rule in [proposal #378, term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types).
+
+These declarations already compile in the public vector example:
+
+```haskell
+replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n
+reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n
+appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
+             -> Vec a n -> Vec a m -> Vec a (Add n m)
+```
+
+`Add` is still a type family. The implementation does not yet let an arbitrary
+ordinary Haskell `length` or `append` compute inside a type.
+
+At M38, the selected compiler is `0e6d2f5ebcdcb231f7f5c42a27da563d049ac8af`.
+Both stages build. Each stage passes two source matrices: 41 clients with
+27 compilations and 14 located errors, and 64 prior clients with 43 compilations
+and 21 located errors. All 47 predefined outcome controls pass. Each stage also
+passes 94 qualified-function runtime observations and the previous 562 vector
+observations. The API fixture passes 322 rejection programs and 95 quiet positive
+programs. All five focused registered regressions pass. The full GHC suite has
+not run for M38. These checks establish the measured subset, not general type
+soundness or production readiness.
+
+## Main relationships
+
+Arrows have the same direction as the upstream graph: a task points to a
+prerequisite or subtask. This diagram omits completed preparation and smaller
+branches. The full checklist below preserves every edge.
+
+```mermaid
+flowchart TD
+    DH[Dependent Haskell] --> Q[Retained quantifiers]
+    DH --> P[Universal promotion]
+    DH --> L[Language cleanup]
+    Q --> PI[Dependent products]
+    Q --> SIGMA[Dependent sums]
+    PI --> CORE[Dependent Core]
+    PI --> V[Visible forall]
+    SIGMA --> CORE
+    SIGMA --> E[First-class existentials]
+    P --> F[Function promotion]
+    P --> OTHER[Literals, unboxed types, classes, data families]
+    F --> CLOSED[Closed evaluator]
+    F --> OPEN[Open evaluator]
+    F --> EXPR[Type-level lambda, let, case]
+    F --> DA[Declaration dependency analysis]
+    F --> UTF[Unsaturated families]
+    EXPR --> CORE
+    EXPR --> OPEN
+    L --> DA
+    L --> E
+    L --> UTF
+```
+
+A retained-quantifier experiment can proceed before universal promotion is
+complete. Completing that experiment will still leave the promotion and cleanup
+branches open.
+
+## Upstream checklist and complete dependency index
+
+A checked box means **completed on the upstream roadmap snapshot**. It does not
+mean that this fork completed the feature or that every related issue is closed.
+`Accepted` is a design status. Leave its box unchecked until implementation is
+verified. The `R` numbers are local reference labels; links retain upstream IDs.
+`Needs/includes` records the graph relation without claiming that every edge is
+a mandatory sequencing constraint. A leaf has no outgoing graph edge; it can
+still require substantial research.
+
+- [ ] **R01 [Dependent Haskell](https://ghc.serokell.io/dh#dependent-haskell)** — Unmarked. Needs/includes: R02, R06, R20.
+- [ ] **R02 [Dependent retained quantifiers](https://ghc.serokell.io/dh#dependent-retained-quantifiers)** — Unmarked. Needs/includes: R03, R04.
+- [ ] **R03 [Dependent products](https://ghc.serokell.io/dh#dependent-products)** — Unmarked. Needs/includes: R05, R39.
+- [ ] **R04 [Dependent sums](https://ghc.serokell.io/dh#dependent-sums)** — Unmarked. Needs/includes: R05, R22.
+- [ ] **R05 [Dependent Core language](https://ghc.serokell.io/dh#dependent-core-language)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [ ] **R06 [Universal promotion](https://ghc.serokell.io/dh#universal-promotion)** — Unmarked. Needs/includes: R07, R10, R12, R13, R14.
+- [ ] **R07 [Promote literals](https://ghc.serokell.io/dh#promote-literals)** — Unmarked. Needs/includes: R08, R09, R24.
+- [x] **R08 [Promote Char](https://ghc.serokell.io/dh#promote-char)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R09 [Promote Natural](https://ghc.serokell.io/dh#promote-natural)** — Completed. Needs/includes: no outgoing graph edge.
+- [ ] **R10 [Promote unboxed types](https://ghc.serokell.io/dh#promote-unboxed-types)** — Unmarked. Needs/includes: R11.
+- [ ] **R11 [Homogeneous equality](https://ghc.serokell.io/dh#homogeneous-equality)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24.
+- [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23.
+- [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [ ] **R17 [Type-level lambdas](https://ghc.serokell.io/dh#type-level-lambdas)** — Unmarked. Needs/includes: R05, R16.
+- [ ] **R18 [Type-level let-bindings](https://ghc.serokell.io/dh#type-level-let-bindings)** — Unmarked. Needs/includes: R05, R16.
+- [ ] **R19 [Type-level case-expressions](https://ghc.serokell.io/dh#type-level-case-expressions)** — Unmarked. Needs/includes: R05, R16.
+- [ ] **R20 [Clean up the language](https://ghc.serokell.io/dh#clean-up-the-language)** — Unmarked. Needs/includes: R21, R22, R23, R24, R27, R28, R35, R39, R49.
+- [ ] **R21 [Dependency analysis](https://ghc.serokell.io/dh#dependency-analysis)** — Accepted. Needs/includes: no outgoing graph edge.
+- [ ] **R22 [Existential quantification](https://ghc.serokell.io/dh#existential-quantification)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [ ] **R23 [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families)** — Accepted. Needs/includes: R25.
+- [ ] **R24 [Constrained type families](https://ghc.serokell.io/dh#constrained-type-families)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [x] **R25 [Modifiers syntax](https://ghc.serokell.io/dh#modifiers-syntax)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R26 [Standalone kind signatures](https://ghc.serokell.io/dh#standalone-kind-signatures)** — Completed. Needs/includes: no outgoing graph edge.
+- [ ] **R27 [Deprecate CUSKs](https://ghc.serokell.io/dh#deprecate-cusks)** — Accepted. Needs/includes: R26, R29.
+- [x] **R28 [Invisible type arguments](https://ghc.serokell.io/dh#invisible-type-arguments)** — Completed. Needs/includes: R29, R30, R31, R32, R33.
+- [x] **R29 [Invisible binders in types](https://ghc.serokell.io/dh#invisible-binders-in-types)** — Completed. Needs/includes: R26.
+- [x] **R30 [Invisible binders in functions](https://ghc.serokell.io/dh#invisible-binders-in-functions)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R31 [Invisible binders in constructors](https://ghc.serokell.io/dh#invisible-binders-in-constructors)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R32 [Visible type applications](https://ghc.serokell.io/dh#visible-type-applications)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R33 [Visible kind applications](https://ghc.serokell.io/dh#visible-kind-applications)** — Completed. Needs/includes: no outgoing graph edge.
+- [ ] **R34 [Syntactic unification](https://ghc.serokell.io/dh#syntactic-unification)** — Accepted. Needs/includes: R44, R45, R46, R47.
+- [ ] **R35 [Namespace management](https://ghc.serokell.io/dh#namespace-management)** — Accepted. Needs/includes: R36, R37, R38, R42.
+- [ ] **R36 [Pun warnings](https://ghc.serokell.io/dh#pun-warnings)** — Accepted. Needs/includes: no outgoing graph edge.
+- [x] **R37 [Namespace-specified imports](https://ghc.serokell.io/dh#namespace-specified-imports)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R38 [No list or tuple puns](https://ghc.serokell.io/dh#no-list-or-tuple-puns)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R39 [Visible forall](https://ghc.serokell.io/dh#visible-forall)** — Completed. Needs/includes: R34 (loose end), R40, R41 (loose end), R43.
+- [x] **R40 [Visibility coercions](https://ghc.serokell.io/dh#visibility-coercions)** — Completed. Needs/includes: no outgoing graph edge.
+- [ ] **R41 [Nested quantification in GADTs](https://ghc.serokell.io/dh#nested-quantification-in-gadts)** — Accepted. Needs/includes: no outgoing graph edge.
+- [x] **R42 [Embed types](https://ghc.serokell.io/dh#embed-types)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R43 [Term variable capture](https://ghc.serokell.io/dh#term-variable-capture)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R44 [No star kind syntax](https://ghc.serokell.io/dh#no-star-kind-syntax)** — Completed. Needs/includes: R50.
+- [x] **R45 [The forall keyword](https://ghc.serokell.io/dh#the-forall-keyword)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R46 [The tilde operator](https://ghc.serokell.io/dh#the-tilde-operator)** — Completed. Needs/includes: R48.
+- [x] **R47 [The dot type operator](https://ghc.serokell.io/dh#the-dot-type-operator)** — Completed. Needs/includes: R48.
+- [x] **R48 [Whitespace-sensitive operators](https://ghc.serokell.io/dh#whitespace-sensitive-operators)** — Completed. Needs/includes: no outgoing graph edge.
+- [x] **R49 [Unify type and kind variables](https://ghc.serokell.io/dh#unify-type-and-kind-variables)** — Completed. Needs/includes: R50.
+- [x] **R50 [Unify types and kinds](https://ghc.serokell.io/dh#unify-types-and-kinds)** — Completed. Needs/includes: no outgoing graph edge.
+
+`R39 -> R34` and `R39 -> R41` are the two loose-end edges. Required type
+arguments already exist while syntax unification and nested GADT quantifiers
+remain incomplete. Do not infer completion by propagating checkmarks through
+the graph.
+
+## Work sequence for this fork
+
+These boxes track our work. They are separate from the upstream boxes above.
+Dependencies below are proposed implementation order. Each open task needs its
+own small spec and validation boundary in PLAN.md before compiler edits.
+
+- [x] **S0: Retain a runtime index.** Native Bool functions, checked case
+  refinement, and `choose`/`keep` execution. `keep` does not force its index.
+  Evidence: CORE.md and the existing Core/API runtime fixtures.
+- [x] **S1: Use dependent data from source.** Nat-indexed vectors, retained
+  packages, append/reverse, dynamic-length equality, and bounded filtering.
+  Evidence: the public packed-vector example and its 562 observations.
+- [x] **S2: Cross module and IO boundaries.** Separate interfaces, retained
+  closures, runtime IO indices, scoped local types, and measured lazy fields.
+  Evidence: the public examples and the M23–M35 checkpoints in PLAN.md.
+- [x] **S3: Instantiate known native workers.** Expected types, visible type
+  arguments, and declared monomorphic arguments select immutable erased choices.
+  ImpredicativeTypes controls pass at M38. General mutable native instantiation
+  stays gated. Evidence: `KnownArgumentClient.hs`, M36–M38, and the two source
+  matrices above.
+- [ ] **C1: Reconcile the Core contract with the research.** Depends on the
+  measured S0–S3 baseline. Map each native form and coercion to the relevant
+  rules in the 2017 specification, 2019 roles paper, and 2021 graded paper.
+  State the differences. Specify substitution, conversion, scope, runtime usage,
+  and erasure before extending the representation. Close this task with a
+  reviewable contract and focused transformation checks, not a claim that the
+  papers prove our implementation. Advances `R05`.
+- [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
+  missing transformations incrementally, including normal simplification and
+  unfolding handling. Preserve Core Lint, type preservation, runtime demand,
+  sharing, and diagnostics at each step. Keep unsupported passes gated until
+  checked. Run broader GHC compatibility checks before closing this task.
+  Advances `R05`; it is also a release gate for later frontend work.
+- [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
+  release. Broaden the documented static subset and supported domains. Implement
+  invisible retained binders and their explicit `@` overrides. Reuse inherited
+  visibility and scoping machinery. State when annotations are required. Never
+  infer a new retained quantifier merely because a definition could have one.
+  Advances `R03` and `R02`.
+- [ ] **Q2: Add first-class dependent sums.** Depends on C1 and a specified
+  first-class existential design (`R22`). Reuse retained fields for storage,
+  but specify first-class formation, introduction, elimination, scope, and
+  erasure separately. Existing `PackVec` is the execution baseline. Keep erased
+  `exists` and retained `some` distinct. Advances `R04` and `R02`.
+- [ ] **E1: Specify and implement closed evaluation.** Depends on a typed
+  representation from C1 and an explicit compile-time evaluation boundary.
+  Select the smallest closed pure expression subset. Specify constraint,
+  divergence, caching, staging, and error behavior. A closed computation such
+  as list length must work in an actual type without a parallel handwritten
+  type family. A runtime executable alone does not close this task.
+  Advances `R15`.
+- [ ] **E2: Specify and implement open evaluation.** Depends on C1. Select and
+  document normalization rules for expressions with rigid variables. Include
+  stuck terms and capture avoidance. A lambda application to a rigid variable
+  must normalize while an opaque function application remains well scoped.
+  Closed evaluation alone does not close this task. Advances `R16`.
+- [ ] **P1: Reuse term definitions in types.** Depends on E1, E2, and the
+  selected requirements from `R17`–`R19`, `R21`, and `R23`. Integrate lambda,
+  let, and case syntax with the Core rules. Interleave term/type declaration
+  dependencies. Track matchability for unsaturated families. Demonstrate one
+  source function used at both levels across a module interface. Advances
+  `R13`; completing it does not finish all of `R06`.
+- [ ] **P2: Complete promotion domains.** Coordinate `R07`, `R10`–`R12`,
+  `R14`, and `R24`. Account for homogeneous equality, unboxed representations,
+  overloaded literals, dictionaries, and data families. Reuse the completed
+  Char/Natural work. Close each domain with its own boundary and evidence.
+- [ ] **L1: Finish language preparation.** Coordinate accepted upstream work
+  on `R21`, `R23`, `R27`, `R34`–`R36`, and `R41`, plus `R22` and `R24`.
+  Reuse inherited parser, renamer, namespace, and binder implementations.
+  Treat known issues on completed cards as individual follow-ups. This work can
+  proceed beside Core and evaluation work.
+- [ ] **I1: Integrate the full program.** Depends on the required work above.
+  Check ordinary Haskell compatibility, normal optimization, interfaces,
+  recompilation, tools, backends, errors, documentation, and compiler resources.
+  Establish a broad GHC regression baseline. State the remaining research and
+  implementation restrictions before a production-readiness claim.
+
+C1 is the next program task. More application-inference cases can support a
+specific task, but they must not replace work on Core or type computation.
+C2, Q1, Q2, and the evaluator tasks can be split into smaller increments after
+C1 identifies their actual shared requirements.
+
+## Research constraints and references
+
+[Proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html)
+is the accepted design direction. It leaves room for later proposals. Its
+quantifiers separate visibility from retention. Its dependent matching rules
+use a known result type. Its static subset can grow incrementally. Ordinary
+let-bound runtime names remain opaque. Preserve these distinctions when an
+experiment adds syntax or inference.
+
+The roadmap cites several complementary Core results. The
+[2017 specification](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf)
+studies explicit equality and erasure with nontermination. The
+[2019 roles paper](https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf)
+studies dependent nominal and representational equality. The
+[2021 graded paper](https://richarde.dev/papers/2021/grad/grad-extended.pdf)
+studies usage and dependent typing. These results do not constitute a combined
+implementation proof. See [the paper reading records](papers/README.md) for the
+sections already read and the limits of each result. Use Agda as the primary
+comparison for dependent checking and normalization. Preserve Haskell's chosen
+nontermination, laziness, coercion, and erasure behavior explicitly.
+
+The [first-class existentials proposal](https://github.com/ghc-proposals/ghc-proposals/pull/473)
+remains a proposal under discussion. Its witness is erased. The roadmap's
+retained sums need a separate runtime representation. The
+[type-functions proposal](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+also remains under discussion. Its closed evaluation design does not supply
+general open evaluation. Neither proposal is a completed feature in this fork.
+
+The remaining family work has its own prior art:
+[Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf)
+and [Constrained Type Families](https://richarde.dev/papers/2017/partiality/partiality-extended.pdf).
+These references guide `R23` and `R24`; they are not evidence that our fork
+implements them. The roadmap also cites
+[Gundry's thesis](https://adam.gundry.co.uk/pub/thesis/) for the static
+subset. This review does not claim a full reading of that thesis.
+
+The ignored cache `_build/verification/native-known-arguments-roadmap-research-v1/`
+keeps the fetched HTML, SVG, extracted cards and edges, proposal snapshots,
+paper extracts, reading notes, and hashes. The checklist contains all graph
+relations so that it remains usable without the cache. Refresh the source date
+and evidence when upstream changes. At each compiler checkpoint, update the
+relevant local box, record the narrower completed behavior in PLAN.md, and leave
+an upstream box open until its full stated task is supported.

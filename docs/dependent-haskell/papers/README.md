@@ -182,3 +182,48 @@ Follow the primary bibliography and keep unread work marked as queued:
 
 These papers guide design choices. They do not establish a preservation theorem
 for this GHC fork. See [the implementation plan](../PLAN.md) for the tested subset.
+
+## Roadmap review, 2026-11-15
+
+The [whole-program roadmap](../ROADMAP.md) prompted additional source reading.
+The seven-work manifest above preserves the earlier implementation readings.
+The additional downloads and extracts are in
+`_build/verification/native-known-arguments-roadmap-research-v1/`.
+Its `research-provenance.json`, `reading-scope.json`, and `SHA256SUMS` record
+versions, source URLs, page counts, and hashes. These records distinguish new
+reading from a fresh audit of an entire paper or its proofs.
+
+- [Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf),
+  ICFP 2019, DOI `10.1145/3341706`. The 26-page author PDF was fetched.
+  Read the abstract, introductory excerpts, and sections 2.1–2.4 on PDF pages
+  3–4. Matchability controls when equality can decompose an application.
+  Functions and type families do not inherit algebraic-constructor decomposition.
+  The later calculus, algorithm, and proofs were not audited.
+- [An Existential Crisis Resolved: Type Inference for First-Class Existential Types](https://richarde.dev/papers/2021/exists/exists.pdf),
+  ICFP 2021, DOI `10.1145/3473569`. The 58-page author document was fetched.
+  Read PDF pages 1–3, including the vector filter and lazy projection examples.
+  An inserted strict package match can change productivity. The full inference
+  algorithm and appendices were not audited.
+- [Constrained Type Families](https://richarde.dev/papers/2017/partiality/partiality-extended.pdf),
+  ICFP 2017, DOI `10.1145/3110286`. The 28-page author PDF was fetched.
+  Read the abstract and introduction on PDF pages 1–2. Its domain predicates
+  address partial type computations. Ordinary qualified native functions do
+  not implement this feature. The remaining calculus and proofs were not read.
+- [The extended graded paper](https://richarde.dev/papers/2021/grad/grad-extended.pdf),
+  39 PDF pages. Read selected introduction passages on pages 1–3, the Pi/Sigma
+  rules on pages 19–20, conversion and irrelevance discussion on pages 27–28,
+  and Appendix B on pages 38–39. The appendix requires an explicit encoding for
+  an efficient Core checker. It does not supply a combined FC/roles/usage
+  implementation theorem. The existing 32-page version remains unchanged.
+
+The review also reread selected D/DC passages on PDF pages 3, 7, 9, 12–14 and
+27, and Eisenberg's thesis at printed pages 68–71. DC checks explicit evidence
+for conversion; arbitrary definitional equivalence is undecidable. Neither
+paper transfers a preservation theorem to this fork without a correspondence
+argument.
+
+[Gundry's thesis landing page and errata](https://adam.gundry.co.uk/pub/thesis/)
+were read. The 2014 errata correct a higher-order pattern-unification rule and
+withdraw the original generality lemma. The thesis PDF was not read in this
+review. Treat its original algorithm as research to check, rather than an
+unchanged implementation recipe.

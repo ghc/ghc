@@ -2397,18 +2397,48 @@ argument normally at its selected domain. Retain result subsumption, linear
 usage and nominal proof entailment. No Core change or native meta assignment
 is proposed.
 
-- [ ] Preserve source baselines for bare local and global native arguments,
+- [x] Preserve source baselines for bare local and global native arguments,
   signed witnesses and applied heads. Identify actual ambient QL variables.
-- [ ] Check whether declared argument types can supply a complete immutable
+- [x] Check whether declared argument types can supply a complete immutable
   choice before any value elaboration. Follow pinned application rules and
   retain ordinary kind, scope, concreteness and evidence checks.
-- [ ] Preserve all M37 demand, identity, diagnostic and failure-cache checks.
+- [x] Preserve all M37 demand, identity, diagnostic and failure-cache checks.
   Keep general native Quick Look and mutable native-meta assignment blocked.
+
+Both stages now agree on 41 new source clients: 27 compile and 14 report
+located errors at 15 diagnostic envelopes. All 16 predefined outcomes pass.
+Compared with the preserved baseline, 15 additional clients compile. Linear
+single use compiles; double use reports GHC-18872. Scope, class, role and
+constructor errors reach their ordinary final checks. The failure control still
+elaborates `prefixProbe` once. On the new declared-choice path, this is ordinary
+checked elaboration after selection, not a failed cached-inference fallback.
+
+The prior 64-client matrix passes both stages with 43 compilations and
+21 located errors. `GroundAmbientApply` is newly accepted because a declared
+argument and the saturated expected result provide complete choices. All 31
+predefined controls pass. The other five exploratory signature/list/applied-head
+forms still report GHC-83605. Existing API checks admit one former boundary,
+`observe @Int xs`, and preserve its exact source as a quiet positive.
+
+Both stages pass 94 raw and public runtime observations. The old 76-line prefix
+and separate 562-line packed-vector output are unchanged. The API fixture passes
+243 package and 322 total rejection programs, plus 95 quiet positives. Its
+37-line golden is unchanged. All five registered tests pass: 39 cases, 34 skips,
+and no unexpected or framework failures or warnings.
+
+The selected compiler is `0e6d2f5ebcdcb231f7f5c42a27da563d049ac8af`, with
+37 archived inputs. Bootstrap and self-hosted builds pass on their first launch.
+All 12 selected validation phases pass on their first attempt: 11 launches and
+one reused bootstrap matrix. Evidence uses `native-known-arguments-*`; the full
+M37 and earlier preservation chain remains frozen. The full GHC suite and older
+standalone corpora were not rerun.
 
 ## Further work
 
-After M8, review broader retained kinds, nested and higher-order dependence,
-source inference, arbitrary index expressions, roles involving dependent
-functions, linear retained binders, and dependent runtime representations.
-Use separate tasks for each extension. SMT reasoning and proof-certificate
-checking remain separate work within the longer-term program.
+Follow the [whole-program roadmap](ROADMAP.md). Its next task is C1: map the
+native Core representation and coercions to the published calculi, state the
+remaining obligations, and check the next transformations. The map also tracks
+retained quantifiers, first-class sums, evaluation, promotion, and language
+cleanup. Source-inference improvements support that program but do not replace
+its Core and type-computation work. SMT reasoning and proof-certificate checking
+remain separate tasks.

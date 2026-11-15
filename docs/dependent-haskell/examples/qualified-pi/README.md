@@ -32,19 +32,19 @@ bash docs/dependent-haskell/examples/qualified-pi/run-example.sh "$PWD"
 Set `QUALIFIED_PI_GHC` to choose the compiler. Set `QUALIFIED_PI_WORK` to
 choose a separate output directory. The script compiles the shared
 `PackedVecLibrary`, then the value provider, producer, ground application
-client, identity client and
+client, known-argument client, identity client and
 executable.
 It copies interfaces between compilation directories and enables Core and
 STG Lint. It runs at `-O0`.
 
-The executable checks 76 observations. Finite lengths come through
+The executable checks 94 observations. Finite lengths come through
 independent `readIORef` calls. Other checks cover ignored and demanded bottom,
-cyclic indices, partial application, payload sharing and eight function
+cyclic indices, partial application, payload sharing and function
 `StableName` comparisons. Six dictionary checks use the single-method
 `Demand` class with `GHC.Exts.withDict`. They distinguish vector shape from
 method demand. They do not inject a bottom global `Eq Int` dictionary.
 
-Both compiler stages pass all 76 observations. The identity results apply to
+Both compiler stages pass all 94 observations. The identity results apply to
 these programs and build settings.
 The full optimizer and GHC test suite remain outside this validation.
 
@@ -107,6 +107,26 @@ checking when no erased choice or free Quick Look variable remains. A
 complete expected proof type can also supply immutable choices for `Refl` or
 `error`. Final argument checking and nominal entailment still run. General
 native Quick Look and mutable native-meta assignment remain separate work.
+
+`KnownArgumentClient` also enables `ImpredicativeTypes`. It omits the explicit
+type choice when a declared argument supplies it:
+
+```haskell
+knownDirect :: foreach (n :: Nat) -> QPi -> Vec Int n
+knownDirect n f = withQ Refl f n
+```
+
+The compiler reads the declared monomorphic type of `f` without recording an
+occurrence use. It selects `value := QPi` before checking `Refl`. Every argument
+then goes through ordinary checking, with the original context/evidence order.
+The same route handles named witnesses, generic `const`, and leading visible
+type arguments with remaining choices. It does not infer arbitrary applied or
+signed expressions during this selection.
+
+The 18 new observations preserve the previous 76-line prefix. They check
+IORef-fed lengths, an ignored full worker expression, proof and tag demand,
+two more function identity comparisons, partial indices, and a bounded prefix
+from a cyclic index. Both stages pass these checks at `-O0` with Core/STG Lint.
 
 See the [typing rules](../../CORE.md#qualified-retained-function-types),
 [source provenance](../../REFERENCES.md#qualified-retained-function-types)

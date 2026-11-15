@@ -10,6 +10,7 @@ Last updated: 2026-11-15.
 
 ## Project documents
 
+- [Program roadmap](ROADMAP.md): the full Serokell task graph, dependencies, and a separate checklist for this fork.
 - [Implementation plan](PLAN.md): Core extension, port tasks, and acceptance checks.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
 - [Paper reading ledger](papers/README.md): conference-paper findings, thesis sections and version hashes.
@@ -41,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M37 passes both stages and focused regressions; 562 packed-vector plus 76 qualified/container/worker runtime observations |
+| Last verified checkpoint | M38 passes both stages and focused regressions; 562 packed-vector plus 94 qualified/container/worker runtime observations |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -70,7 +71,8 @@ Last updated: 2026-11-15.
 | Qualified retained functions | Known monomorphic variables, immutable Given transport and synonym expansion pass; ordinary dictionaries preserve the tested demand and sharing behavior |
 | Native worker arguments | Full witness and equality-Given calls select complete erased parameters from known arguments through one checked cache |
 | Fixed native applications | Explicit type choices and complete expected proof types work with ImpredicativeTypes; runtime demand and function identity pass both stages |
-| Next task | M38: measure and support immutable choices from known native arguments with ImpredicativeTypes |
+| Declared native arguments | Bare local and global argument types select complete erased choices before checking witnesses under ImpredicativeTypes; ordinary usage, evidence and scope checks remain |
+| Next task | ROADMAP C1: relate the native Core contract to the published calculi before extending Core and type computation |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
