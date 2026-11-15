@@ -2200,6 +2200,13 @@ immutable expected-result match. Keep the same source as a positive control.
 Do not restore that old rejection by excluding containers. Recount the source
 inventory after this reclassification and the new container cases.
 
+The next API run reaches an old expected rejection for `transportRefl Refl f`.
+Its first argument is an ordinary equality witness. The corrected ordinary
+pattern route now checks this GADT pattern and scopes its Given over the Pi
+result. Keep the same declaration as a positive control. Keep the missing,
+unrelated, branch-local and representational evidence rejections. Add runtime
+checks for proof demand and function identity on this pattern route.
+
 - [ ] Preserve the measured `Refl` and bottom-proof failures. Pin the Agda
   argument-checking comparison and the existing GHC matching rules.
 - [ ] Extend only `isRetainedValueType` eligibility for exactly saturated
