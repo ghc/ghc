@@ -2683,14 +2683,53 @@ canonical M40 envelope, all 47 manifests and the older chain. It includes
 a complete external manifest for all 34 future-function research files,
 without changing existing cache manifests or claiming implementation.
 
-#### Next C1 task: opaque function-call indices (unimplemented)
+### M42: scoped opaque function-call indices
 
-Specify the bounded index grammar and its substitution obligations before
-admission. Account for function-head substitution and composition, range
-free variables, and the scalar-only CorePrep/Tidy alias guards. Native
-SimpleOpt already keeps ordinary function beta as a lazy let with
-`so_inline = const False`; that behavior does not establish substitution closure.
-Preserve runtime scope, lazy demand and sharing. Function-call indices
-remain research only. Source alias defaulting and the other C1/C2 gates
-remain open. See the
+Add `TermAppTy f arg` and nominal forward congruence `TermAppCo f co`.
+The head is an actual scoped local Many Id. Its type is an ordinary visible
+Many arrow from closed scalar domain A to closed scalar domain B. A and B
+can differ. Exclude joins, polymorphism and function-valued scalar indices.
+The type argument can be any scoped, well-kinded Type of A. In particular,
+Given transport can introduce a family application or another call index.
+The runtime conversion below has a smaller grammar.
+
+The result kind is B. Congruence requires nominal argument evidence of kind A
+and proves `f n ~# f m`. It does not provide inverse decomposition, evaluation,
+function equality or head transport. Different stuck calls remain MaybeApart.
+Compare equal heads and arguments under the actual renaming environment.
+Do not inspect an unfolding. Agda 2.8.0 provides the operational reference:
+`Var Int Elims` retains a neutral head and its applications; head substitution
+reapplies the elimination list. The initial GHC head-substitution contract is
+smaller: rename to a same-type eligible local Var, once. Keep an unsupported
+function RHS in its lazy binding. Include function ranges in composition,
+range free variables, freshening and all deep type/coercion traversals.
+
+First execute a strict `case f arg`. Add a separate case-index bridge whose
+argument uses the existing scalar variable, constructor and immediate-beta
+grammar. Keep `exprToNativeIndex` unchanged. The case obtains either constructor
+evidence `f arg ~# C fields` or DEFAULT evidence `case_binder ~# f arg`.
+Consume that proof inside the branch and return an ordinary Int. Check both
+Nat-to-Nat and mixed-domain heads. Preserve constructor-argument naming with
+nominal congruence; do not insert a strict alias for an arbitrary opaque call.
+Retain lazy function-head aliases through CorePrep and top-level Tidy.
+
+Add explicit scope, kind, role, escape, scanner and interface boundaries.
+An ordinary function lambda must not hide an escaping head in its result.
+Source retained-call arguments and new interface wire forms remain gated in
+this first slice. General lazy naming, higher-order retained binders, ordinary
+optimizer admission and the rest of C1/C2 remain open. This milestone is a
+partial implementation of the
 [pinned comparison](REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison).
+
+- [ ] Add the call node, forward congruence and complete scoped traversals.
+- [ ] Preserve head identity under cloning, substitution and composition.
+- [ ] Keep noninjective calls conservative in equality and family apartness.
+- [ ] Lower actual strict calls, including constructor-argument naming.
+- [ ] Check proof use, mixed domains, bottom order and type-only dependencies.
+- [ ] Build both stages and run existing fixtures without new golden lines.
+- [ ] Freeze complete input/output evidence and publish the verified boundary.
+
+Use fresh `native-neutral-calls-*` evidence. Preserve all M41 and older
+archives. No new tracked test is planned. Extend the existing quiet API and
+runtime checks only. This specification records intended behavior; no M42
+compiler or runtime result has been measured yet.
