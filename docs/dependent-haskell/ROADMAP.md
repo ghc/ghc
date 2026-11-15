@@ -186,6 +186,9 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   and erasure before extending the representation. Close this task with a
   reviewable contract and focused transformation checks, not a claim that the
   papers prove our implementation. Advances `R05`.
+  M39 records the correspondence limits and adds checked Core beta exposure.
+  The [contract](CORE.md#checked-beta-exposure) and existing API fixtures cover
+  this bounded reduction. The full C1 obligation remains open.
 - [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
   missing transformations incrementally, including normal simplification and
   unfolding handling. Preserve Core Lint, type preservation, runtime demand,

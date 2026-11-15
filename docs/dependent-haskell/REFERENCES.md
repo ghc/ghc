@@ -2868,19 +2868,38 @@ paper versions, 12 source snapshots, reading scope, and hashes. It maps the
 current closed-domain forms, scoped coercions, virtual case evidence, and erasure
 to the relevant obligations. It does not replay a proof for this implementation.
 
-The 2017 D/DC author PDF gives An-Beta and An-AppAbs in Figure 8 on PDF page 16.
+The 2017 D/DC author PDF gives An-Beta in Figure 8 on PDF page 16.
+An-AppAbs and An-Push appear in Figure 10 on PDF page 19.
 The endpoints must type check and the reduction must be an actual primitive
-step. An-Push on page 19 handles casted application with explicit evidence.
+step. An-Push handles casted application with explicit evidence.
 The 2019 role paper requires nominal equality for dependent arguments and does
 not supply its annotated implementable counterpart. The extended 2021 GraD
 paper separates type use from runtime usage and still requires an explicit
 checker. These results motivate a checked beta bridge, not arbitrary producer
 unfolding, equality between opaque names, or an eta rule.
 
-The proposed first bridge accepts an immediate lambda over an eligible Many
-index domain. Its argument is an existing atomic index. Its body normalizes
-inside the existing variable/constructor grammar. Runtime argument normalization,
-type recovery, index substitution, and CorePrep naming must agree. Keep the
-source elaboration step separate until it can preserve the same typing, scope,
-usage, and failure behavior. See [the Core contract](CORE.md#core-research-correspondence-and-remaining-obligations)
-and the M39 spec in PLAN.md.
+Agda v2.8.0 supplies a closer implementation reference.
+[`applyTermE`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L65-L98)
+contracts a lambda application through `lazyAbsApp`. Its internal terms are
+[beta normal](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L215-L229).
+[`lookupS`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute/Class.hs#L292-L307)
+returns a stored substitution range directly. Lifting handles the range under
+new binders. Our actual-Id representation instead preserves the range's outer
+context by returning its normalized atom/index pair without another lookup.
+[`piApplyM`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Telescope.hs#L705-L727)
+obtains a Pi/path view before substituting in the codomain. These helpers assume
+typing preconditions. They do not replace our original-expression Lint checks.
+
+The five full source blobs, Git hashes, SHA256 hashes, and selected reading
+ranges are cached in `native-index-beta-agda-research-v1`. Agda uses de Bruijn
+indices and a different internal representation. Its substitution code does
+not establish Haskell bottom, `seq`, sharing, or exception behavior. Runtime
+checks must establish the tested behavior in our implementation.
+
+The implemented first bridge accepts an immediate lambda over an eligible Many
+index domain. Its argument must normalize to an atomic index. Its body
+normalizes inside the existing variable/constructor grammar. Runtime argument
+normalization, type recovery, index substitution, and CorePrep naming agree on
+the same checked pair. Keep source elaboration separate until it preserves
+typing, scope, usage, and failure behavior. See
+[the Core contract](CORE.md#checked-beta-exposure) and the M39 spec in PLAN.md.

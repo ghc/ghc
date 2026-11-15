@@ -752,9 +752,10 @@ Entering a dependent binder removes its outer substitution and renames it to
 avoid capture. Extend the expression environment with the renamed runtime binder
 when required. Every occurrence in the result follows that renaming.
 
-Substitution of a supported variable or constructor tree into an index produces
-the corresponding index. Substitution of any other expression must fail explicitly
-in the initial experiment. It must not leave a stale variable behind.
+Substitution of an expression accepted by the checked index bridge produces
+its corresponding index. This includes supported variable/constructor forms
+and the bounded beta steps below. Reject other expressions explicitly.
+Do not leave a stale variable behind.
 
 `composeTCvSubst` composes type and coercion environments. It also composes
 supported algebraic index mappings in the expression environment. It preserves
@@ -799,8 +800,8 @@ proof identity. A field that captures `n` could change the expected equality.
 The worker still takes only its actual field. An ordinary `S k` alternative
 without a virtual proof keeps its ordinary typing rule.
 
-Check the scrutinee first. Derive its index with the same variable/constructor
-rule as retained application. Do not derive evidence from an unrelated variable,
+Check the scrutinee first. Derive its index with the same checked bridge
+as retained application. Do not derive evidence from an unrelated variable,
 the case binder, an unfolding, or an unsupported producer expression.
 
 A proof-bearing Boolean alternative must bind exactly one fresh local `CoVar`.
@@ -813,7 +814,7 @@ refinement. It can carry the separate checked index-alias proof described in
 the constructor-naming section.
 
 Require exhaustive alternatives whenever an algebraic alternative binds a proof.
-All constructors of its domain or a binder-free `DEFAULT` must cover the input.
+All constructors of its domain or a valid `DEFAULT` must cover the input.
 Existing Core Lint does not check this property for ordinary algebraic cases.
 It is necessary here: an unchecked single impossible alternative could supply a
 contradictory proof if later code treated that alternative as unconditional.
@@ -1442,11 +1443,36 @@ congruence, residual term expressions in types, optimizer substitution closure,
 and normal unfolding support remain open. An open evaluator must not assume a
 complete terminating equality procedure for arbitrary Haskell.
 
-The next bounded experiment uses a primitive beta step. Its spec is in PLAN.md.
-It will return a normalized runtime expression together with the same checked
-index. CorePrep must consume that pair before argument naming. Accepting a new
-expression shape in type recovery alone would leave naming inconsistent.
-The initial argument restriction is an already atomic variable or nullary
-constructor. This preserves named argument sharing while the bridge is checked.
-The source argument grammar remains separately gated until it has its own
-checked elaboration path.
+### Checked beta exposure
+
+`normaliseNativeIndexExpr` returns a normalized runtime expression and its
+checked index. It accepts an immediate `App (Lam b body) arg`. Require an
+eligible local Many binder and the same supported closed domain for the
+binder, argument, and body result. Normalize the argument first. Its result
+must be an eligible variable or a nullary constructor worker. The body must
+normalize within the existing variable/constructor grammar. Nested accepted
+beta steps can occur in either operand. Other expression forms remain gated.
+
+For scoped Nat variables, identity applied to `n` returns that actual `n`.
+Successor applied to `n` returns `S n`. Constant zero applied to `n` returns
+`Z`, even when the runtime binding of `n` is bottom. The walker does not inspect
+unfoldings or evaluate runtime values. Its stored substitution ranges are
+already normalized. Return each range directly. Do not substitute through it
+again under an inner binder that can shadow one of its free Ids.
+
+The atom restriction preserves the sharing of an argument used more than once.
+The bridge rejects `S n` as a beta argument, even when the body ignores it.
+The caller must still check the original expression with Core Lint. Reduction
+must not hide an ill-typed or out-of-scope argument.
+
+CorePrep consumes the normalized pair before naming. A normalized variable
+remains the same actual Id. An alias case would force an unused bottom.
+Normalized constructors use the existing scoped naming and nominal transport.
+Type recovery, substitution, case evidence, interface validation, and
+`mapNativeIndex` use the same bridge. This adds no coercion constructor or
+residual expression form in `Type`.
+
+See Note [Checked native index beta exposure] in `GHC.Core`, the M39 spec in
+PLAN.md, and [the pinned Agda and paper references](REFERENCES.md#core-contract-audit-and-bounded-beta-exposure).
+Source lambda-index elaboration, general promotion, ordinary optimizer support,
+and a general open evaluator remain separate tasks.

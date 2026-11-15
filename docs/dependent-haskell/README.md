@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M38 passes both stages and focused regressions; 562 packed-vector plus 94 qualified/container/worker runtime observations |
+| Last verified checkpoint | M39 passes both stages and focused regressions; 562 packed-vector plus 94 qualified/container/worker runtime observations |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -72,7 +72,8 @@ Last updated: 2026-11-15.
 | Native worker arguments | Full witness and equality-Given calls select complete erased parameters from known arguments through one checked cache |
 | Fixed native applications | Explicit type choices and complete expected proof types work with ImpredicativeTypes; runtime demand and function identity pass both stages |
 | Declared native arguments | Bare local and global argument types select complete erased choices before checking witnesses under ImpredicativeTypes; ordinary usage, evidence and scope checks remain |
-| Next task | ROADMAP C1: relate the native Core contract to the published calculi before extending Core and type computation |
+| Core beta exposure | Immediate checked lambdas normalize in the native index bridge; capture, interface evidence, and direct CorePrep demand checks pass |
+| Next task | Admit the checked beta subset from source, with explicit scope, multiplicity, and Strict-mode boundaries; continue ROADMAP C1/C2 |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3521,3 +3522,51 @@ and failed results remain available. Validation scopes peak at 1331 MiB under
 4 GiB, with swap disabled. The M36 evidence and its older preservation chain
 remain frozen. The full GHC suite, the full earlier 177-program standalone
 corpus and the older qualified-Pi standalone matrix were not rerun.
+
+## M39: checked beta exposure in Core
+
+The native index bridge now contracts a bounded immediate lambda application.
+Identity applied to a runtime Nat variable keeps that actual variable.
+Successor produces the corresponding constructor index. Constant zero can
+ignore a bottom-valued variable. The argument must normalize to an eligible
+variable or nullary constructor. Opaque functions and constructed beta arguments
+remain gated. This changes Core conversion; source lambda arguments remain
+unsupported until a separate checked elaboration increment.
+
+`normaliseNativeIndexExpr` returns the runtime normal form and index together.
+CorePrep consumes that pair before naming. A variable result stays that same
+Id. Constructor results use the existing nominal alias transport. The original
+expression still needs Lint. The owning Note and
+[contract](CORE.md#checked-beta-exposure) specify these obligations.
+[Agda's pinned substitution code](REFERENCES.md#core-contract-audit-and-bounded-beta-exposure)
+is the primary implementation precedent. The D/DC beta rules supply a separate
+typing obligation. Neither proves this implementation's Haskell runtime rules.
+
+Both compiler stages build. The 13 selected phases pass with 11 launches and
+two reused bootstrap API checks. Both stages preserve the 41-client matrix
+(27 compile, 14 located errors) and prior 64-client matrix (43 compile,
+21 located errors). All 47 predefined controls pass. Raw and public
+programs preserve 94 observations per stage. All 562 packed-vector observations
+remain unchanged. Five registered tests pass across 39 cases with 34 skips
+and no unexpected failures or framework warnings.
+
+Quiet additions to the existing fixtures check normalization, exact types,
+reused-Unique capture avoidance, wrong domains, multiplicity, scope, and opaque
+unfoldings. Binary proof expressions and imported unfoldings pass all three
+compression modes. Direct CorePrep checks run before SimpleOpt. They include
+`keep` returning 42 with a bottom index, plus constructor-field demand controls.
+No new tracked test or golden output was added.
+
+Two unit attempts failed on old identity-lambda rejection expectations.
+Those cases are now positives; genuine opaque producers retain rejection
+coverage. The passing third unit attempt and original CoreRun success are
+reused with matching fixture and compiler hashes. Both failures remain saved.
+The source-program corpus remains 243 package/322 total rejection programs
+and 95 quiet positives; these counts exclude the new raw beta checks.
+
+Evidence uses `native-index-beta-*`. Compiler source
+`707e681f284061f18b3e2bca590b27d153f2146a` has 37 archived inputs. Bootstrap
+build: 1m56s, peak 2008 MiB. Self-hosted build: 10m58s, peak 4502 MiB.
+Both use a 16 GiB cap. Final validation peaks at 1196 MiB under 4 GiB.
+Swap is disabled. M38 and the older evidence remain frozen. The full GHC
+suite and older standalone corpora were not rerun. ROADMAP C1/C2 remain open.

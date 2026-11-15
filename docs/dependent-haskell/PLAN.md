@@ -2472,13 +2472,37 @@ The unused bottom must stay lazy. A demanded bottom must retain its marker.
 The initial atomic-argument restriction avoids duplicating a constructed
 argument when a lambda uses it more than once.
 
-- [ ] Preserve the M38 Core/source baselines and add quiet checks to the existing
+- [x] Preserve the M38 Core/source baselines and add quiet checks to the existing
   Core API fixtures. Add no new tracked tests or golden output.
-- [ ] Implement the shared checked bridge and CorePrep normalization. Add one
+- [x] Implement the shared checked bridge and CorePrep normalization. Add one
   owning GHC Note with paper and implementation obligations.
-- [ ] Check type recovery, capture avoidance, nominal roles, wrong domains,
+- [x] Check type recovery, capture avoidance, nominal roles, wrong domains,
   invalid multiplicity/scope, opaque producers, runtime demand, and sharing.
-- [ ] Build both stages and run the focused existing regressions serially under
+- [x] Build both stages and run the focused existing regressions serially under
   the resource caps. Preserve the 94 and 562 source output prefixes.
-- [ ] Record the Core-only boundary and plan source admission after the kernel
+- [x] Record the Core-only boundary and plan source admission after the kernel
   and naming checks pass. Keep general promotion and open evaluation unchecked.
+
+Completed on 2026-11-15. Compiler source `707e681f284061f18b3e2bca590b27d153f2146a`
+changes only `GHC.Core` and `GHC.CoreToStg.Prep`. The selected fixture commit is
+`b0469bca8a4b160b8e5103ebe47ee7ac63628527`. All 37 archived compiler inputs match.
+The existing fixtures add seven Nat and two Bool normalization cases, a separate
+shared-Id assertion, 12 converter denials, and four original-expression Lint
+denials. Binary and imported-unfolding beta evidence passes at all three
+compression modes. Direct CorePrep identity, successor, constant, and `keep`
+checks preserve exact types and tested demand. `keep` returns 42 with a bottom
+index before any SimpleOpt pass.
+
+Both stages build. All 13 selected phases pass: 11 launches and two reused
+bootstrap API checks. Both stages preserve all 41 known-argument and 64 prior
+source outcomes, including 47 predefined controls. Raw and public
+programs preserve all 94 observations; the packed-vector program preserves all
+562. Five registered tests pass across 39 cases with 34 skips. The full GHC
+suite and older standalone corpora were not rerun.
+
+Two initial unit attempts exposed old identity-lambda rejection expectations.
+Those expressions are now valid by design. Keep them as positive raw/interface
+checks. Replacement opaque-producer denials retain unfolding error thunks.
+Preserve both failed attempts and the passing third attempt. Source syntax is
+unchanged. The next increment must account for Strict pattern demand and the
+actual lambda binder's final multiplicity before admitting source applications.
