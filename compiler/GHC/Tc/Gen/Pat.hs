@@ -1326,7 +1326,6 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
              con_like = RealDataCon con
              pat_mult = scaledMult pat_ty_scaled
        ; unless (null ex_tvs && null eq_spec && null theta
-                 && length (tyConDataCons (dataConTyCon con)) == 1
                  && binders `equalLength` arg_tys && not (pe_lazy penv)) bad_pattern
        ; case pe_ctxt penv of
            LamPat{} -> return ()
@@ -1432,9 +1431,14 @@ See docs/dependent-haskell/REFERENCES.md#source-package-patterns.
 
 Check ordinary fields with
 tcConArg. Nested GADT evidence then scopes over the later fields and the RHS.
-Keep one constructor and prefix patterns in a strict constructor match. The
-fields themselves stay lazy. Reject lazy package and let patterns. Match
-compilation keeps each equation's actual source field Ids in a separate case.
+Keep prefix patterns in a strict constructor match. The fields themselves
+stay lazy. Reject lazy package and let patterns. A retained telescope belongs
+to its selected constructor; other constructors do not change its field
+scope. matchExpectedConTy checks the parent and instantiates its universal
+arguments. Keep the checks for no existentials, equality specification or
+context, and require an identity result wrapper and unrestricted multiplicity.
+Match compilation keeps each equation's actual source field Ids in a separate
+case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 
 An ordinary case starts with a fresh multiplicity metavariable. Require Many

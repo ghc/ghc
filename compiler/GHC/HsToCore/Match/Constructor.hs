@@ -112,14 +112,9 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     matchNewtypeCon var vars ty group1
 
   -- See Note [Retained package equation scope].
-  | RealDataCon dc <- con1
-  , not (null (dataConRepArgBinders dc))
-  = do { unless (null other_groups) (failWithDs DsRetainedPackagePatterns)
-       ; results <- mapM match_retained_row group1
-       ; return (foldr1 combineMatchResults results) }
-
   -- See Note [Retained constructor equation scope].
-  | any (any has_native_proof) groups
+  | any (any has_retained_fields) groups
+    || any (any has_native_proof) groups
   = do { results <- mapM match_retained_row (join groups)
        ; return (foldr1 combineMatchResults results) }
 
@@ -140,6 +135,13 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     match_retained_row eqn
       = do { alt <- matchOneConLike vars ty (matchIdMult var) (eqn :| [])
            ; return (mkDataConCase var ty (toRealAlt alt :| [])) }
+
+    -- | Detect a retained telescope in any constructor group.
+    has_retained_fields :: EquationInfoNE -> Bool
+    has_retained_fields eqn
+      | ConPat { pat_con = L _ (RealDataCon con) } <- firstPat eqn
+      = not (null (dataConRepArgBinders con))
+      | otherwise = False
 
     -- Identify a checked native constructor pattern with its virtual proof.
     has_native_proof :: EquationInfoNE -> Bool
@@ -242,9 +244,16 @@ Each package equation binds its own runtime index Id. Later field types and
 the typed RHS refer to that Id. Sharing the first equation's fields with a
 later equation through ordinary let aliases does not substitute those types.
 
+A constructor family can contain both ordinary and retained constructors.
+Select this path if any group has retained fields, regardless of the first
+group. Do not share retained fields through the ordinary grouping path.
+
 Compile each equation with its own constructor case on the original shared
-scrutinee. Combine the MatchResults in source order. A failed field pattern
-or guard tries the next case. An earlier infallible match discards later rows.
+scrutinee. Combine the groups in their existing order and preserve source
+order within each constructor group. Different constructors do not overlap.
+A singleton case in a multi-constructor family keeps its DEFAULT failure
+continuation. A failed field pattern or guard then tries the next row outside
+the current row's field scope. An earlier infallible match discards later rows.
 Each case keeps its actual retained source field Ids. selectMatchVar chooses
 ordinary fields from their checked outer pattern types. Their nested patterns
 use the usual match compiler. No typed-AST or runtime-index alias is required.
