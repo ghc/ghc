@@ -3316,8 +3316,11 @@ its field telescope; siblings do not add bindings to that telescope.
   raw/public106 and packed562 match. The registered run retains five tests,
   39 cases,34 skips and five expected passes, with zero unexpected results
   or framework failures or warnings. Keep existing goldens1/37 unchanged.
-- [ ] Complete freeze, independent audit and publication. Preserve every
-  baseline, preparation, capture and failed API attempt.
+- [x] Freeze, independently audit and publish M50 at
+  `d918069c802b84490eec9dc175b77bfc25545c85`. Canonical SHA256 is
+  `85d0f9827b9fd444049a40ff11cc24bfe3b9a1eb62988c50df258fe9470fbb15`.
+  The audit passes 35874 integrity checks over 69 manifests. Preserve every
+  baseline, preparation, capture and failed API and freeze attempt.
 
 Do not aggregate overlapping CLI programs with the eight new object-module
 observations or the inherited243/322/95 source corpus. No new utility36,
@@ -3333,10 +3336,13 @@ measured controls; existing PMC remains enabled.
 
 ### Next requested source program: maintained Showcase
 
-- [ ] Add `docs/dependent-haskell/Showcase.hs` after M50 publication. Demonstrate
-  completed source capabilities with maintained examples and one command.
-- [ ] Map each example to its actual source/library support and bounded demand
-  contract. Keep unsupported forms and unmeasured generalizations explicit.
+- [x] Add `docs/dependent-haskell/Showcase.hs` as a separate change after the M50
+  source snapshot. Demonstrate completed source capabilities with one program.
+- [x] Map each group to its source/library support in the README. Keep the build
+  recipe in the source note. Pass both compilers with Core/STG Lint and the
+  independently specified 48-line output. Preserve all eleven source inputs
+  across the self-hosted run. Keep unsupported forms explicit.
 
-This requested program is not implemented by M50. It does not close R22, C1
-or C2 and does not replace focused regression evidence.
+Add a small labeled example in the same change that completes a source feature.
+Keep the program finite. This showcase does not close R22, C1 or C2 and does
+not replace focused regression evidence.

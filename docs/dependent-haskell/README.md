@@ -10,6 +10,7 @@ Last updated: 2026-11-15.
 
 ## Project documents
 
+- [Runnable showcase](Showcase.hs): completed source features in one maintained program.
 - [Program roadmap](ROADMAP.md): the full Serokell task graph, dependencies, and a separate checklist for this fork.
 - [Implementation plan](PLAN.md): Core extension, port tasks, and acceptance checks.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
@@ -19,6 +20,48 @@ Last updated: 2026-11-15.
 - [Historical port](PORT.md): pinned commits, module mapping, and missing rules.
 - [Restricted Core](CORE.md): representation, typing, substitution, and gates.
 - This file: current status, validation results, and instructions to resume work.
+
+## Run the showcase
+
+[Showcase.hs](Showcase.hs) is the short program for showing completed source
+features. Each observation has a label. It uses the checked example libraries.
+Run these commands from the repository root with this fork's matching compiler
+and libraries:
+
+```sh
+mkdir -p _build/showcase
+_build/stage1/bin/ghc --make -O0 -fomit-interface-pragmas \
+  -fno-write-if-simplified-core -dcore-lint -dstg-lint \
+  -idocs/dependent-haskell/examples/packed-vector \
+  -idocs/dependent-haskell/examples/qualified-pi \
+  -outputdir _build/showcase docs/dependent-haskell/Showcase.hs \
+  -o _build/showcase/showcase
+_build/showcase/showcase
+```
+
+| Source feature | Showcase group |
+| --- | --- |
+| Boolean result types, runtime input and ignored bottom arguments | `booleans` |
+| A three-constructor domain and checked empty-domain elimination | `finiteDomains` |
+| Runtime Nat indices, packages, equality, arithmetic and vector algorithms | `vectors` |
+| Bound proofs, checked variable/constructor lambdas and linear proof use | `vectors` |
+| Saved IO actions, tuple sections and scoped local signatures | `vectors` |
+| Qualified native functions, erased choices and equality transport | `vectors`, with the imported Ground/Known providers |
+| Opaque calls, index beta reduction and retained function arguments | `vectors`, `functions` |
+| Later retained arguments, dictionaries, equality contexts and shadowing | `laterArguments` |
+| Multiple package constructors, nested fields and guard fallback | `alternatives` |
+
+Both bootstrap and self-hosted compilers produce the expected 48 lines with
+Core Lint and STG Lint enabled. The self-hosted run preserves all eleven source
+inputs. The examples check ignored and demanded error values separately.
+The imported providers keep their own language extensions. In particular,
+GroundApplicationClient checks native function types as equality operands
+with ImpredicativeTypes. The main module uses ordinary application checking.
+
+Add a small labeled example in the same change that completes a source feature.
+Keep the program finite. Compiler-only invariants stay in the focused tests and
+[Core contract](CORE.md). This program does not establish totality, general
+optimization support or full roadmap completion.
 
 ## Current status
 
@@ -80,7 +123,7 @@ Last updated: 2026-11-15.
 | Function-valued retained binders | Snapshot6 passes both-stage source14, negative10 and constructor11 controls, plus legacy8 and final9; canonical audit/publication records are separate |
 | Constructed worker activation | Known local retained workers accept scalar constructor trees during metadata discovery; ordinary application and row evidence checks remain unchanged |
 | Multi-constructor packages | Constructor-local retained fields work beside ordinary constructors, ordinary GADT siblings and a different retained telescope; no Core or interface format changes |
-| Next task | Finish M50 evidence review, then maintain docs/dependent-haskell/Showcase.hs for completed features; R22/C1/C2 remain open |
+| Maintained showcase | `Showcase.hs` passes both compilers with 48 finite output lines; R22/C1/C2 remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -4291,8 +4334,11 @@ The new eight observations remain separate from the inherited 243 package/
 322 total rejection programs and95 quiet source controls. CLI programs overlap
 and are not added into one count. Utility36, duplicate and quotation evidence
 is inherited; source41, known41, prior64, TC metadata, the old177 standalone
-controls and the full GHC suite were not rerun. Freeze and independent audit
-must pass before publication. R22, C1 and C2 remain open.
+controls and the full GHC suite were not rerun. M50 is published at
+`d918069c802b84490eec9dc175b77bfc25545c85`. Its canonical audit SHA256 is
+`85d0f9827b9fd444049a40ff11cc24bfe3b9a1eb62988c50df258fe9470fbb15`.
+The independent audit passes 35874 integrity checks over 69 manifests.
+R22, C1 and C2 remain open.
 
 Constructor attempt1 failed before any target because its runner looked up the
 older M48 output manifest. The corrected runner uses the direct M49 parent.
@@ -4302,8 +4348,8 @@ raw/public106 and packed562 oracles. The registered run retains five tests,
 39 cases,34 skips and five expected passes, with no unexpected results or
 framework failures or warnings. No new test file or golden line is added.
 
-The next requested program is a maintained `docs/dependent-haskell/Showcase.hs`
-that demonstrates completed features through one command. It is not implemented
-in M50. See [the contract](CORE.md#multi-constructor-retained-package-patterns),
+The maintained [Showcase.hs](Showcase.hs) demonstrates the completed source
+features. It is a separate documentation change after the M50 source snapshot.
+See [the contract](CORE.md#multi-constructor-retained-package-patterns),
 [plan](PLAN.md#m50-multi-constructor-retained-package-patterns) and
 [prior art](REFERENCES.md#multi-constructor-retained-packages-prior-art).
