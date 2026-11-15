@@ -2882,31 +2882,33 @@ Evidence uses `native-source-neutral-calls-*`. Freeze and independent audit
 must pass before publication.
 
 
-### M44: checked constructor arguments in source calls (unimplemented)
+<a id="m44-checked-constructor-arguments-in-source-calls-unimplemented"></a>
 
-Expose the existing Core argument bridge through source `case f Z` and
+### M44: checked constructor arguments in source calls
+
+M44 exposes the existing Core argument bridge through source `case f Z` and
 `case f (S n)`. Keep M43's whole-call abstraction and all of its scope and
-demand checks. No new Core type or coercion constructor is planned.
+demand checks. No new Core type or coercion constructor is added.
 
-- [ ] Classify the already-checked scalar argument from actual `HsVar`,
+- [x] Classify the already-checked scalar argument from actual `HsVar`,
   `ConLikeTc` and `HsApp` nodes. Validate a temporary constructor spine with
   `exprToNativeIndex`. Keep actual Ids, DataCons, types and multiplicities.
   Reject unsupported wrappers and producers. Do not call the renamed-syntax
   `tcRetainedArg` or emit usage a second time.
-- [ ] Generalize `tcRetainedCallCase` from one variable argument to the complete
+- [x] Generalize `tcRetainedCallCase` from one variable argument to the complete
   checked index. Seed substitution scope with all free dependencies.
-- [ ] Match branch annotations against that index structurally. Compare actual
+- [x] Match branch annotations against that index structurally. Compare actual
   constructor and variable Names, arity and recursive fields. Parentheses may
   differ. Keep `f n`, `f (S n)`, other heads and shadowed leaves distinct.
   Do not infer an input from a call result.
-- [ ] Reuse `NativeCaseAlias`, nominal whole-call lifting, the retained motive,
+- [x] Reuse `NativeCaseAlias`, nominal whole-call lifting, the retained motive,
   quotation and instrumentation gates, and `Strict` capture protection.
-- [ ] Reuse CorePrep's recursive argument naming and forward congruence.
+- [x] Reuse CorePrep's recursive argument naming and forward congruence.
   Preserve constructor WHNF without forcing predecessor fields.
-- [ ] Check constant and nested constructor arguments, mixed domains, captured
+- [x] Check constant and nested constructor arguments, mixed domains, captured
   consumers and function results. Include bottom-head order, ignored partial
   fields, cyclic prefixes and explicit predecessor forcing with Core/STG Lint.
-- [ ] Measure independent-call, wrong-domain, arity, shadowing, wrapper and
+- [x] Measure independent-call, wrong-domain, arity, shadowing, wrapper and
   scope diagnostics. Preserve M43 and older focused regressions at both stages.
 
 Dependencies: checked argument classification precedes exact annotation
@@ -2915,8 +2917,74 @@ validation. The owning source Note remains [Source opaque call refinement].
 Agda's pinned Application 774–808 and with-abstraction ranges above supply
 checking and context-abstraction prior art. They do not prove Haskell demand.
 
-Typed beta arguments remain a separate decision. Their actual multiplicities
+Typed beta arguments remain separate work under M45 below. Their actual multiplicities
 can still contain metas before zonking. Do not replace them with provisional
 Many Ids. Nested opaque calls, function-valued retained binders, lazy retained
 calls, general optimization and new interface codecs stay outside M44.
 The preparation is `native-source-neutral-calls-next-boundary-v1.md`.
+
+Selected compiler: `f76bba39b8bc61ea3e7ee48338086b1949fdce60`.
+Selected source: `30fb3cca1eb2027b4ff490892ce69ec17ac57190`.
+Snapshot v2 records 82 compiler inputs and 99 source paths. Only the Expr and
+Match source checkers change. Both builds and the bootstrap API pair pass.
+The one-line and 37-line goldens remain unchanged. Seventeen new quiet source
+observations pass, separately from the inherited source 26 and Core 19 controls.
+
+Both stages pass 17 CLI observations and reject 17 clients: eleven GHC-83865
+and six GHC-83605 clients. There are 37 located envelopes, with 13 and 24
+respective codes. The four added controls have a separate semantic review.
+Four legacy checks pass public nine-line and supplement 15-line programs in
+both stages. The nine final phases pass with two API reuses and seven launches.
+Both stages retain 106 raw/public and 562 packed observations. Registered
+results are 5 passes, 39 cases, 34 skips and no unexpected results or warnings.
+No source 41-client, known 41-client or prior 64-client matrix, Tc metadata
+probe or full GHC suite was rerun.
+
+Bootstrap takes 33.59s and peaks at 1827 MiB. Self-hosting takes 7m25s and peaks
+at 4335 MiB. Both use 16 GiB caps with zero swap. API2, legacy and final checks
+peak at 1239, 221 and 1201 MiB under 4 GiB caps. Final swap is zero.
+The old baseline, API1's unsupported imported `bottomNat` argument and CLI1's
+13-client attempt remain recorded. Evidence uses
+`native-source-call-constructors-*`. Freeze and independent audit must pass before publication.
+C1 and C2 remain open.
+
+### M45: signed beta arguments in source calls (unimplemented)
+
+Admit a bounded immediate lambda argument such as
+`case f (((\x -> S x) :: Nat -> Nat) n) of ...` through the existing Core beta
+bridge. Begin with an explicit complete monomorphic scalar endofunction
+signature. Do not implement general unannotated lambda inference.
+
+- [ ] Require the actual checked ExprWithTySig node retained by
+  `Tc.Gen.Head.tcExprWithSig` at lines 510–517. Do not infer signature provenance
+  from an expansion. Reject wildcard, forall and evidence-bearing signatures.
+- [ ] Read one checked LamSingle row with one bare VarPat, one unguarded RHS
+  and no local bindings. Preserve the actual binder Name and Unique.
+- [ ] Read existing type and multiplicity assignments with the during-TC
+  zonker. Require actual assigned Many and consistent MatchGroup metadata.
+  Leave Flexi or rigid multiplicities unsupported. Do not default or fill a
+  meta, allocate a provisional Many Id, or repeat usage checking.
+- [ ] Reconstruct a temporary Core.Lam and the supported scalar body. Admit
+  only identity wrappers and the complete checked annotation. Preserve the
+  original checked scrutinee for desugaring and execution.
+- [ ] Reuse the existing beta converter. Its operand must normalize to an
+  eligible local variable or nullary constructor. Binder and result domains
+  must agree. Keep constructed operands with fields and residual calls gated.
+- [ ] Match branch annotations against the canonical whole-call Type. Preserve
+  shadowing, captures, independent calls and the M44 constructor rules.
+- [ ] Reject Strict for this new path. Source VarPat bangs are introduced later
+  by desugaring and cannot be omitted from the demand contract.
+- [ ] Measure signed identity, constant and successor bodies, bottom head/order,
+  lazy partial/cyclic fields and one source elaboration. Pin One, unresolved
+  multiplicity, Strict, scope, wrapper, evidence and wrong-domain diagnostics.
+
+Dependencies: actual checked metadata and assignment reads precede temporary
+conversion. That conversion precedes whole-call annotation matching and source
+execution. No new Core rule, function-valued retained Pi, nested opaque calls,
+general optimizer admission, codec or preservation theorem is planned.
+
+The preparation is `native-source-call-constructors-next-beta-v1/`.
+Agda v2.8.0 Term.hs lines 468–486 and 542–587 supply selected lambda/context
+prior art. Application.hs lines 774–808 supply argument-checking order. These readings do not
+justify GHC multiplicity defaulting or Haskell demand changes. See
+[the provenance](REFERENCES.md#checked-constructor-call-arguments-prior-art).

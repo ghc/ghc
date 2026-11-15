@@ -3073,3 +3073,42 @@ stages. The supplement's corrected implicit observer uses immutable argument
 matching; its first RuntimeRep source error is preserved as a probe mistake.
 Four full-file hashes do not claim full-file reading. No Agda execution or
 combined FC/usage/runtime preservation theorem is claimed.
+
+## Checked constructor-call arguments: prior art
+
+M44 reuses two selected Agda v2.8.0 readings.
+[Application 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks an argument at the current Pi domain before substituting it into the
+codomain. Its blob is `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+[With 101–173](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/With.hs#L101-L173)
+partitions the dependent context and constructs the helper type.
+Its blob is `fb84d352f3c6b2e786a0c095c74c5bee15e533cf`.
+
+The cache `native-source-call-constructors-prior-art-v1/` reuses their verified
+full bytes. Its provenance records exact URLs, blobs, SHA256 and selected read
+ranges. The six GHC source snapshots in that cache are historical M43 bytes at
+`edbe394d03628de2900fff828b4137d72e5cc94c`. They are not the selected M44
+implementation. Full-file hashes do not claim full-file reading.
+
+These sources support checked scope and argument substitution. GHC separately
+preserves constructor wrappers, actual Ids, Haskell sharing and field demand.
+The structural source matcher and the use of `dataConWrapId` are GHC choices.
+M44 adds no Agda eta conversion, function evaluation equation or inverse call
+rule. Its selected compiler is `f76bba39b8bc61ea3e7ee48338086b1949fdce60`.
+Both stages pass 17 source observations and 17 CLI observations. Seventeen
+negative clients produce 37 diagnostic envelopes. The separate semantic review
+covers the four added negative controls.
+Freeze and independent audit must pass before publication. See
+[the Core contract](CORE.md#checked-constructor-arguments-in-source-calls).
+
+The separate unimplemented M45 preparation reads
+[Term 468–486](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L468-L486)
+and [542–587](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L542-L587)
+at blob `02991c9fa0085315cc854d2833a9080af14a7740`.
+These ranges select lambda checking from the target telescope, preserve source
+NameIds and check the body in the extended context. Its cache is
+`native-source-call-constructors-next-beta-v1/`. Agda modality handling does not
+establish GHC graded usage, permission to default Many, or Haskell seq laws.
+M45 requires explicitly signed, assigned-Many metadata and excludes Strict.
+No M45 implementation or execution is claimed. The seven-work, nine-PDF paper
+ledger is unchanged. No preservation theorem is claimed.

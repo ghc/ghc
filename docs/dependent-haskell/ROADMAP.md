@@ -205,8 +205,12 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   M43 adds source formation and exact whole-call refinement for `case f n`.
   Checked alias evidence preserves call demand, captures and lazy fields.
   Both stages pass the focused source, runtime and negative controls.
-  Constructor-tree source arguments, higher-order binders, general computation
-  and a preservation theorem remain open.
+  M44 admits checked constructor-tree arguments in these source cases. It
+  preserves exact whole-call identity and reuses the existing Core bridge.
+  Both stages pass source, demand and located negative controls. Function-domain
+  retained binders, general computation and a preservation theorem remain open.
+  M45 is an unimplemented, explicitly signed immediate-lambda step. It requires
+  actual assigned Many metadata and excludes Strict from that new path.
 - [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
   missing transformations incrementally, including normal simplification and
   unfolding handling. Preserve Core Lint, type preservation, runtime demand,
@@ -223,7 +227,9 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   isolated execution probe.
   M43 adds a typed source carrier and preserves native index identities through
   `seq` desugaring. Its `Strict` and opaque-head demand controls pass both stages.
-  Ordinary optimization remains gated. This does not close C2.
+  M44 extends the source classifier and structural annotation matcher. It adds
+  no Core or backend transformation. Ordinary optimization remains gated.
+  C1 and C2 remain open.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement
   invisible retained binders and their explicit `@` overrides. Reuse inherited

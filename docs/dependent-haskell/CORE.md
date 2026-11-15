@@ -1622,9 +1622,10 @@ It does not form matchable `AppTy` from a runtime function or unfold its body.
 
 Checked type formation permits more arguments than runtime case recognition.
 A type argument can be any scoped, well-kinded `Type :: A` admitted by the
-checker. The source case path requires an `HsApp` whose head and sole argument
-are bare variables, allowing parentheses. Constructor arguments such as `f (S n)`
-are the next source step. A bare function is not a scalar index.
+checker. The source case path requires one checked `HsApp` with a bare local
+function head, allowing parentheses. M43 required a variable argument. M44
+also accepts saturated scalar constructor trees as described below.
+A bare function is not a scalar index.
 
 A complete constructor case on `f n` refines that exact whole call.
 It does not refine n, another call `f m`, or a call with a different head.
@@ -1700,3 +1701,48 @@ Note [Source opaque call refinement] in `GHC.Tc.Gen.Match`, and
 Note [Checked opaque case alias] in `GHC.Hs.Expr`.
 The [selected Agda reading](REFERENCES.md#strict-opaque-call-refinement-prior-art)
 supports scoped abstraction and checking, with Haskell demand checked separately.
+
+### Checked constructor arguments in source calls
+
+M44 exposes the existing Core bridge through `case f Z`, `case f (S n)` and
+nested constructor arguments. The head remains the actual eligible local
+Many, nonjoin Id with independently closed scalar input and result domains.
+
+`checkedNativeCallArgument` reads the already-checked HsVar, ConLikeTc and
+HsApp nodes. It reconstructs a temporary spine with the actual Ids and
+`dataConWrapId`. It never replaces a real wrapper with a worker. The existing
+native domain predicate excludes constructors with wrappers and unsupported
+fields. `exprToNativeIndex` checks saturation, domains and recursive fields.
+The classifier does not execute the temporary spine or repeat source checking.
+
+Parentheses, WrapExpr WpHole and the expression inside a checked source
+expansion are transparent. Argument expression signatures, nonidentity wrappers,
+casts, type/evidence applications, pattern synonyms, lambdas and opaque producers
+get no new rule.
+The original scrutinee remains in `NativeCaseAlias` and is desugared once.
+
+The renamed annotation matcher compares its application spine with the checked
+index. It requires identical variable and promoted DataCon Names, arities and
+recursive fields. It ignores parentheses. It expands no general synonym and
+infers no input from the function result. The transport substitution includes
+all free dependencies of the complete call, including constructor fields.
+Existing quotation, capture, evidence, scope and instrumentation checks remain.
+
+CorePrep already names nested constructor arguments and composes child proofs
+under `TermAppCo`. This source increment changes no Core or backend rule.
+A constructor argument can reach WHNF without forcing its fields. Under Strict,
+existing administrative capture protection remains; source patterns keep their
+demand. M44 does not reject Strict as a whole.
+
+Both stages pass 17 source observations, 17 negative clients and their 37 located
+diagnostic envelopes. These counts are separate from the old source 26 and
+Core 19 controls. The four legacy checks pass the public nine-line program and
+15-line supplement in both stages. The final nine phases preserve raw/public
+106 and packed 562 observations with the existing five registered tests.
+Freeze and independent audit must pass before publication.
+
+See Note [Checked source call arguments] in `GHC.Tc.Gen.Expr`,
+Note [Source opaque call refinement] in `GHC.Tc.Gen.Match`, and
+[the pinned readings](REFERENCES.md#checked-constructor-call-arguments-prior-art).
+Ordinary optimization, lazy retained calls, function-domain retained binders
+and call-index interface encoding remain gated.

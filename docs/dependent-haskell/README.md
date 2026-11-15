@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M43 passes both stages, source call refinement and focused regressions; 562 packed-vector plus 106 qualified/container/worker runtime observations |
+| Last verified checkpoint | M44 passes both stages with constructor arguments in source calls; 562 packed-vector plus 106 qualified/container/worker runtime observations remain |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -75,8 +75,8 @@ Last updated: 2026-11-15.
 | Core beta exposure | Immediate checked lambdas normalize in the native index bridge; capture, interface evidence, and direct CorePrep demand checks pass |
 | Source index beta | Immediate single-variable lambda applications pass ordinary checking with actual binder identity; atomic arguments, supported domains and Many multiplicity remain required; Strict rejects the new form |
 | Native variable aliases | Literal local Many aliases substitute the same eligible Id in terms, types and coercions; opaque producer bindings stay lazy and shared; excluded metadata and non-variable targets keep their bindings |
-| Opaque call indices | Source `case f n` refines the whole call through checked alias evidence; local signed heads, mixed Bool/Nat domains, captures and demand controls pass both stages |
-| Next task | Admit checked constructor-tree arguments such as `case f (S n)` through the existing Core bridge |
+| Opaque call indices | Source cases on `f n`, `f Z` and `f (S n)` refine the exact whole call; nested constructor fields, captures and demand controls pass both stages |
+| Next task | Specify checked, explicitly signed immediate lambda arguments with actual assigned Many metadata; keep Strict excluded from that new path |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -3823,8 +3823,70 @@ and supplemental source errors retain their actual outcomes. Pinned Agda
 with-abstraction and application checking supply operational prior art.
 They do not prove preservation for this implementation.
 
-Source case arguments are still bare eligible variables, modulo parentheses.
+At M43, source case arguments were bare eligible variables, modulo parentheses.
 Function-valued retained binders, lazy `keep (f n)`, new call-bearing interface
 forms, general evaluation and ordinary optimization remain gated. C1 and C2
-remain open. The [next plan](PLAN.md#m44-checked-constructor-arguments-in-source-calls-unimplemented)
-uses the existing Core constructor-argument bridge.
+remain open. M44 below exposes the existing Core constructor-argument bridge.
+
+## M44: checked constructor arguments in source calls
+
+The [constructor-call example](examples/qualified-pi/ConstructorCallClient.hs)
+accepts `case f Z`, `case f (S n)` and nested constructor arguments.
+Branches can construct or consume `Vec Int (f (S n))` at that exact call.
+The input n and other calls remain independent. Constant functions need no
+injectivity assumption.
+
+The dispatcher first checks the original expression and its usage. It builds
+a temporary constructor spine from the actual checked Ids and DataCons.
+It uses `dataConWrapId`, as desugaring does. Existing native domain checks
+reject constructors with wrappers. Parentheses, WpHole and checked source
+expansions are transparent. Argument expression signatures, casts, nonidentity
+wrappers, type/evidence applications, lambdas and residual opaque producers
+get no new admission.
+The original checked expression stays in `NativeCaseAlias` and runs once.
+
+Annotation matching compares actual variable and promoted constructor Names,
+exact arity and recursive fields. It keeps `f n`, `f (S n)`, `f (S m)` and
+shadowed heads distinct. The transport scope includes every free dependency
+of the call. Existing CorePrep recursively names constructor arguments and
+composes their proofs. This increment changes no Core node, equality rule,
+backend lowering or interface format. Fields keep their tested laziness.
+
+Both compiler stages pass the new 17-line program and 17 negative clients.
+Eleven clients report GHC-83865 and six report GHC-83605. Their 37 located
+envelopes contain 13 and 24 diagnostics, respectively. A separate semantic
+review checks the four added negative controls. The bootstrap API and the
+self-hosted registered fixture also pass 17 quiet source observations.
+Keep these separate from M43's 26 source controls and M42's 19 Core invocations.
+The one-line and 37-line goldens remain unchanged. No tracked test is added.
+
+Four legacy checks preserve the nine-line M43 public program and its separate
+15-line supplement in both stages. All nine final phases pass, with two API
+reuses and seven launches. Both stages preserve 106 raw/public and 562 packed
+observations. Five registered tests pass across 39 cases with 34 skips and no
+unexpected results or framework warnings. The source 41-client, known
+41-client, prior 64-client matrices, Tc metadata probe and full GHC suite
+were not rerun.
+
+Selected compiler: `f76bba39b8bc61ea3e7ee48338086b1949fdce60`.
+Selected source: `30fb3cca1eb2027b4ff490892ce69ec17ac57190`.
+Snapshot v2 records 82 compiler inputs and 99 source paths. The compiler delta
+changes only `Tc/Gen/Expr.hs` and `Tc/Gen/Match.hs`. Bootstrap took 33.59s and
+peaked at 1827 MiB. Self-hosting took 7m25s and peaked at 4335 MiB.
+Both builds used 16 GiB caps with zero swap. API checks peaked at 1239 MiB,
+legacy checks at 221 MiB, and final checks at 1201 MiB under 4 GiB caps.
+The final checks recorded zero swap.
+
+Evidence uses `native-source-call-constructors-*`. The old-compiler baseline,
+API1 source-preparation failure using imported `bottomNat`, and the earlier
+13-client CLI attempt remain preserved. Freeze and independent audit must pass before publication. Pinned Agda argument checking
+and context abstraction supply prior art, not a Haskell preservation theorem.
+See the [Core contract](CORE.md#checked-constructor-arguments-in-source-calls),
+[plan](PLAN.md#m44-checked-constructor-arguments-in-source-calls) and
+[primary readings](REFERENCES.md#checked-constructor-call-arguments-prior-art).
+
+C1 and C2 remain open. [M45](PLAN.md#m45-signed-beta-arguments-in-source-calls-unimplemented)
+is an unimplemented step for explicitly signed immediate lambda arguments.
+It must use actual assigned Many metadata, retain ordinary usage checking,
+and reject Strict for that new path. General function-domain binders, lazy
+retained calls, optimizer support and call-index wire forms remain gated.

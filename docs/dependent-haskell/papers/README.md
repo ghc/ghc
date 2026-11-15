@@ -286,3 +286,20 @@ implementation and runtime checks. No Agda execution or preservation theorem
 is claimed. The canonical seven-work, nine-PDF ledger is unchanged.
 See [the primary links and exact identities](../REFERENCES.md#strict-opaque-call-refinement-prior-art)
 and the [implemented source contract](../CORE.md#strict-opaque-call-refinement-from-source).
+
+## M44 constructor-call reading and M45 preparation
+
+M44 reuses Agda v2.8.0 Application.hs lines 774–808 and With.hs lines 101–173. The selected ranges
+support checking an argument and abstracting a dependent context. Verified full
+bytes and exact identities are recorded in
+`_build/verification/native-source-call-constructors-prior-art-v1/`.
+The six GHC snapshots there retain their historical M43 source commit.
+
+A separate M45 preparation reads Term.hs lines 468–486 and 542–587, plus
+Application.hs lines 774–808.
+It remains an unimplemented step for explicitly signed immediate lambda
+arguments with actual assigned Many metadata. It excludes Strict. These Agda
+readings do not prove GHC multiplicity inference or Haskell demand.
+See [the exact primary links](../REFERENCES.md#checked-constructor-call-arguments-prior-art).
+The canonical seven-work, nine-PDF ledger is unchanged. No new paper was read.
+Agda was not executed. No preservation theorem is claimed.
