@@ -20,6 +20,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import FunctionStableNameClient (sameFunction, samePlainFunction)
 import GHC.Exts (withDict)
 import GroundApplicationClient
+import IndexBetaClient
 import KnownArgumentClient
 import PackedVecLibrary
 import QualifiedPiLibrary
@@ -165,6 +166,7 @@ main = do
     runFullWorkerChecks
     runGroundApplicationChecks
     runKnownArgumentChecks
+    runIndexBetaChecks
 
 -- | Specialize the injected-context function from its complete expected arrow.
 specializeDemand :: DPi -> DPi
@@ -580,3 +582,44 @@ runKnownArgumentChecks = do
     putStrLn ("known cyclic index prefix: " ++ show cyclic)
     expectMarker "known bottom proof before index" "native-known-bottom-proof" $
         checkWhnf (toList (knownDemandProof original bottomLength))
+
+-- | Check source beta indices after the isolated client interface roundtrip.
+runIndexBetaChecks :: IO ()
+runIndexBetaChecks = do
+    forM_ [(0, Z), (2, S (S Z)), (3, S (S (S Z)))] $ \(count, seed) -> do
+        cell <- newIORef seed
+        n <- readIORef cell
+        let identityValues = toList (betaIdentity n 7)
+            successorValues = toList (betaSuccessor n 7)
+            constantValues = toList (betaConstant n 7)
+            nestedValues = toList (betaNested n 7)
+            shadowValues = toList (betaShadow n 7)
+            label = "source beta finite " ++ show count
+        assertEqual label (replicate count 7) identityValues
+        assertEqual label (replicate (count + 1) 7) successorValues
+        assertEqual label [] constantValues
+        assertEqual label (replicate (count + 1) 7) nestedValues
+        assertEqual label (replicate count 7) shadowValues
+        putStrLn (label ++ ": " ++ show identityValues ++ " | " ++ show successorValues ++ " | " ++ show constantValues ++ " | " ++ show nestedValues ++ " | " ++ show shadowValues)
+    let constantValues = toList (betaConstant bottomLength (error "native-source-beta-payload"))
+    assertEqual "source beta constant ignores bottoms" [] constantValues
+    putStrLn "source beta constant ignores bottoms: []"
+    expectMarker "source beta identity demands index" "native-q-bottom-index" $
+        checkWhnf (toList (betaIdentity bottomLength 7))
+    let partial = take 1 (toList (betaSuccessor bottomLength 7))
+    assertEqual "source beta successor head" [7] partial
+    putStrLn ("source beta successor head: " ++ show partial)
+    expectMarker "source beta successor tail" "native-q-bottom-index" $
+        checkWhnf (drop 1 (toList (betaSuccessor bottomLength 7)))
+    let cyclic = take 3 (toList (betaNested cyclicLength 7))
+    assertEqual "source beta cyclic prefix" [7, 7, 7] cyclic
+    putStrLn ("source beta cyclic prefix: " ++ show cyclic)
+    let emptyValues = toList (betaIdentity Z (error "native-source-beta-payload"))
+    assertEqual "source beta zero ignores payload" [] emptyValues
+    putStrLn "source beta zero ignores payload: []"
+    expectMarker "source beta demands original payload" "native-source-beta-payload" $
+        checkWhnf (head (toList (betaIdentity (S Z) (error "native-source-beta-payload"))))
+    expectMarker "source beta bottom function WHNF" "native-source-beta-function" $
+        checkWhnf (betaBottomPartial bottomLength)
+    checkWhnf (PackVec bottomLength (betaIdentity bottomLength (error "native-source-beta-payload")))
+    putStrLn "source beta package ignores index and vector: ok"
