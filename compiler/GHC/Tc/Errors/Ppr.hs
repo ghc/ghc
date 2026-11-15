@@ -3536,7 +3536,9 @@ pprRetainedQuantificationError reason = case reason of
   RetainedBinderNeedsType ->
     text "A retained argument requires an explicit domain type."
   RetainedUnsupportedDomain ty ->
-    vcat [ text "This retained argument has an unsupported domain."
+    vcat [ if isPiTy ty
+           then text "This retained argument has an unsupported function domain."
+           else text "A retained argument requires a supported closed first-order algebraic domain."
          , text "Its declared domain is:" <+> ppr ty ]
   RetainedResultKind ty ->
     vcat [ text "The result of retained quantification must have kind" <+> quotes (text "Type")
