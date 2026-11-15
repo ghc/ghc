@@ -1374,7 +1374,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                     ; let index = mkLocalId name ManyTy (scaledThing scaled_ty)
                           subst' = CoreSubst.extendIdSubst
                             (extendSubstInScope subst index) template (Var index)
-                    ; unless (isManyTy (scaledMult scaled_ty) && isNativeIndexId index
+                    ; unless (isManyTy (scaledMult scaled_ty) && isNativeRetainedBinder index
                               && scaledThing original_ty `eqType` scaledThing scaled_ty) bad_pattern
                     ; case unLoc pat of
                         VarPat{} ->
@@ -1383,7 +1383,9 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                                   check_fields subst' refinements (position + 1) args pats
                              ; return (pat' : pats', res) }
                         _ ->
-                          do { info <- tcRetainedCon (varType index) pat
+                          do { unless (isNativeIndexId index) $
+                                 failWithTc $ TcRnRetainedQuantificationError RetainedVariablePattern
+                             ; info <- tcRetainedCon (varType index) pat
                              ; (index_con, fields) <- maybe bad_pattern return info
                              ; let constructor_index = mkTyConApp (promoteDataCon index_con)
                                                          (map TermVarTy fields)
@@ -1428,6 +1430,11 @@ the inner constructor alternative. The whole-field as-pattern must remain
 outermost so match selection uses its exact Id. Ordinary row failure keeps
 the existing equation order; no complete source-case group is required.
 See docs/dependent-haskell/REFERENCES.md#source-package-patterns.
+
+A retained function field must have a bare variable pattern. Bind its actual
+Id before checking later payload fields. Reuse the closed Many head policy
+from Note [Function-valued retained binders] in GHC.Core.Type. Constructor
+decomposition remains a scalar operation; it supplies no function equality.
 
 Check ordinary fields with
 tcConArg. Nested GADT evidence then scopes over the later fields and the RHS.

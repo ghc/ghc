@@ -200,7 +200,11 @@ toIfaceTypeX fr (TermVarTy var)
   | var `elemVarSet` fr = IfaceFreeTermVar var
   | otherwise = IfaceTermVar (mkIfLclName (occNameFS (getOccName var)))
 toIfaceTypeX fr (TermAppTy fun arg)
-  = IfaceTermAppTy (mkIfLclName (occNameFS (getOccName fun))) (toIfaceTypeX fr arg)
+  -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
+  | fun `elemVarSet` fr = IfaceFreeTermAppTy fun arg'
+  | otherwise = IfaceTermAppTy (mkIfLclName (occNameFS (getOccName fun))) arg'
+  where
+    arg' = toIfaceTypeX fr arg
 toIfaceTypeX fr (DepFunTy var res)
   = IfaceDepFunTy (toIfaceIdBndrX fr var)
                   (toIfaceTypeX (fr `delVarSet` var) res)

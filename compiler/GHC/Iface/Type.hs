@@ -189,7 +189,8 @@ data IfaceType
   | IfaceDepFunTy IfaceIdBndr IfaceType
   | IfaceTermVar IfLclName
   | IfaceFreeTermVar Id                 -- Diagnostics only, like IfaceFreeTyVar
-  | IfaceTermAppTy IfLclName IfaceType  -- Diagnostic form; no wire encoding
+  | IfaceTermAppTy IfLclName IfaceType  -- See Note [Opaque call indices in interfaces]
+  | IfaceFreeTermAppTy Id IfaceType    -- Diagnostics only, like IfaceFreeTermVar
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
                                             -- Includes newtypes, synonyms, tuples
   | IfaceCastTy     IfaceType IfaceCoercion
@@ -227,6 +228,27 @@ Old readers must reject the file in the whole-file version check before
 type decoding.
 See docs/dependent-haskell/REFERENCES.md#agda-provenance for the comparison
 with Agda's explicit binder and variable serialization.
+-}
+
+{- Note [Opaque call indices in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+IfaceTermAppTy stores a local function name and its index argument with tag 12.
+The enclosing telescope writes the function's domain before that name enters
+scope. The importer resolves the actual local Id and checks its closed Many
+function domain and the argument kind before constructing TermAppTy. Constructor
+fields can refer only to earlier fields. This encoding adds no runtime call,
+function equality, or support for function-valued IfaceDepFunTy binders.
+
+An open diagnostic head must keep its actual Id. CoreToIface selects
+IfaceFreeTermAppTy when the head belongs to its free-variable set. Keep the
+argument for printing and traversal, but reject this form in the raw writer
+and importer. Do not encode an open head as a local spelling that could resolve
+to a different binder. Shared-type table writers use the same raw writer.
+
+Tag 12 requires the fork's distinct configured interface version. Native call
+coercions and unfolding generation remain separately gated. See the telescope
+scope comparison in docs/dependent-haskell/REFERENCES.md under
+function-valued-retained-package-fields-prior-art.
 -}
 
 {-
@@ -784,6 +806,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceTermVar {})       = False
     go (IfaceFreeTermVar {})   = False
     go (IfaceTermAppTy {})     = False
+    go (IfaceFreeTermAppTy {}) = False
     go (IfaceDepFunTy {})      = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ w arg res) = go w && go arg && go res
@@ -810,6 +833,7 @@ visibleTypeVarOccurencies = go
     go (IfaceTermVar {})        = mempty
     go (IfaceFreeTermVar {})    = mempty
     go (IfaceTermAppTy _ arg)   = go arg
+    go (IfaceFreeTermAppTy _ arg) = go arg
     go (IfaceDepFunTy (w, _, arg) res) = go w <> go arg <> go res
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ w arg res) = go w <> go arg <> go res
@@ -849,6 +873,7 @@ substIfaceType env ty
     go ty@(IfaceTermVar {})  = ty
     go ty@(IfaceFreeTermVar {}) = ty
     go (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go arg)
+    go (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun (go arg)
     go (IfaceDepFunTy {})    = pprPanic "substIfaceType: native dependent Core not implemented" (ppr ty)
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
@@ -1234,6 +1259,8 @@ ppr_ty _         (IfaceTermVar var)     = ppr var
 ppr_ty _         (IfaceFreeTermVar var) = ppr var
 ppr_ty ctxt_prec (IfaceTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
+ppr_ty ctxt_prec (IfaceFreeTermAppTy fun arg)
+  = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
 ppr_ty ctxt_prec (IfaceDepFunTy (_, var, arg) res)
   = maybeParen ctxt_prec funPrec $
     sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
@@ -1418,6 +1445,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
     go _ _ ty@(IfaceTermVar {}) = ty
     go _ _ ty@(IfaceFreeTermVar {}) = ty
     go subs rank1 (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go subs rank1 arg)
+    go subs rank1 (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun (go subs rank1 arg)
 
     go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs (ifLclNameFS tv) of
       Just s -> s
@@ -2489,8 +2517,10 @@ putIfaceType _ (IfaceFreeTyVar tv)
 
 putIfaceType _ (IfaceFreeTermVar var)
   = pprPanic "Can't serialise IfaceFreeTermVar" (ppr var)
-putIfaceType _ (IfaceTermAppTy {})
-  = ioError (userError "Opaque runtime call index interfaces are not implemented.")
+putIfaceType _ (IfaceFreeTermAppTy fun _)
+  = pprPanic "Can't serialise IfaceFreeTermAppTy" (ppr fun)
+putIfaceType bh (IfaceTermAppTy fun arg)
+  = do { putByte bh 12; put_ bh fun; put_ bh arg }
 putIfaceType bh (IfaceDepFunTy bndr body)
   = do { putByte bh 10; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceTermVar var)
@@ -2559,6 +2589,7 @@ getIfaceType bh = do
               10 -> do { bndr <- get bh; body <- get bh
                        ; return (IfaceDepFunTy bndr body) }
               11 -> IfaceTermVar <$> get bh
+              12 -> IfaceTermAppTy <$> get bh <*> get bh
               _  -> ioError (userError ("getIfaceType: invalid type tag " ++ show h))
 
 instance Binary IfLclName where
@@ -2767,6 +2798,7 @@ instance NFData IfaceType where
     IfaceTermVar var -> rnf var
     IfaceFreeTermVar var -> var `seq` ()
     IfaceTermAppTy fun arg -> rnf fun `seq` rnf arg
+    IfaceFreeTermAppTy fun arg -> fun `seq` rnf arg
     IfaceTyVar f1 -> rnf f1
     IfaceLitTy f1 -> rnf f1
     IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2

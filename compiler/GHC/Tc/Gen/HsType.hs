@@ -665,7 +665,7 @@ tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
             do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
                ; domain_ty <- liftZonkM $ zonkTcType domain_ty
                ; when validate_domain $
-                   unless (isNativeIndexType domain_ty) $
+                   unless (isNativeRetainedBinderType domain_ty) $
                      failWithTc $ TcRnRetainedQuantificationError
                                     (RetainedUnsupportedDomain domain_ty)
                ; let index = mkLocalId name ManyTy domain_ty

@@ -1300,10 +1300,10 @@ tcIfaceDataCons tycon_name tycon if_cons
                                  (\v -> isId v && not (v `elemVarSet` scope)) field_ty)
                             && case mb of
                                  Nothing -> True
-                                 Just _  -> isManyTy mult && isNativeIndexType field_ty) $
+                                 Just _  -> isManyTy mult && isNativeRetainedBinderType field_ty) $
                       failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
                                $$ text "Expected a lifted field with only earlier runtime indices;"
-                               $$ text "a named field must have multiplicity Many and a fixed index domain.")
+                               $$ text "a named field must have multiplicity Many and a supported retained domain.")
                   ; return (mult, field_ty) }
            ; case mb of
                Nothing -> do
@@ -1348,9 +1348,16 @@ forcing their own domain validation. Constructor type validation must not run
 when the DataCon skeleton is allocated. See Note [Retained constructor field
 telescopes] in GHC.Core.DataCon.
 
+A named field can bind an eligible opaque function head as well as a scalar.
+Its domain remains independently closed. A later TermAppTy resolves its head
+from this actual lexical Id environment. The complete field-type check still
+rejects every runtime Id outside the earlier-field prefix. Keep these checks
+deferred for recursive function domains too. See Note [Opaque call indices in
+interfaces] in GHC.Iface.Type.
+
 The ordinary field decoder keeps its existing lazy boundary. No new field
 name scopes over the constructor result, context, or erased binders. This
-codec does not enable source dependent constructor declarations. Retained
+codec alone does not enable source dependent constructor declarations. Retained
 declarations require an ordinary lifted parent. With no existential or
 equality specification, user and universal binders name the same variables.
 Check their names before binding, then check declared kinds after reuse;
@@ -1642,8 +1649,24 @@ tcIfaceType = go
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceFreeTermVar v)
       = failIfM (text "Cannot import a diagnostic-only retained index:" <+> ppr v)
-    go (IfaceTermAppTy {})
-      = failIfM (text "Opaque runtime call index interfaces are not implemented.")
+    go (IfaceFreeTermAppTy fun _)
+      = failIfM (text "Cannot import a diagnostic-only retained call head:" <+> ppr fun)
+    go (IfaceTermAppTy fun arg)
+      -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
+      = do { f <- tcIfaceLclId fun
+           ; case nativeIndexFunctionTys_maybe f of
+               Nothing ->
+                 failIfM (text "Invalid retained call head in interface:" <+> ppr fun
+                          $$ text "Expected a local unrestricted function with closed supported domains."
+                          $$ text "Actual type:" <+> ppr (varType f)
+                          $$ text "Actual multiplicity:" <+> ppr (idMult f))
+               Just (domain, _) ->
+                 do { arg' <- go arg
+                    ; unless (typeKind arg' `eqType` domain) $
+                        failIfM (text "Invalid retained call argument in interface for:" <+> ppr fun
+                                 $$ text "Expected kind:" <+> ppr domain
+                                 $$ text "Actual kind:" <+> ppr (typeKind arg'))
+                    ; return (TermAppTy f arg') } }
     go (IfaceTermVar n)
       = do { v <- tcIfaceLclId n
            ; unless (isNativeIndexId v) $

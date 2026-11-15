@@ -1203,7 +1203,7 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
         && not (anyFreeVarsOfType (\v -> isId v && not (v `elemVarSet` scope)) ty)
         && case mb of
              Nothing -> valid_fields scope bs tys
-             Just b  -> isNativeIndexId b && isManyTy mult
+             Just b  -> isNativeRetainedBinder b && isManyTy mult
                         && varType b `eqType` ty
                         && not (b `elemVarSet` mkVarSet univ_tvs)
                         && not (b `elemVarSet` scope)
@@ -1651,11 +1651,19 @@ The first subset has no wrapper, existential, constraint, record selector,
 data-family or newtype representation, "type data" parent, strict field, or
 unpacked field. The ordinary parent and all fields are lifted. The user quantifiers name exactly
 the universal type variables, with no duplicates. A named field has a closed
-native index domain and multiplicity Many. Its Id must be fresh. Only
-earlier retained fields can occur as free runtime Ids in a field type. No
+native scalar or opaque function domain and multiplicity Many. Its Id must be
+fresh. Only earlier retained fields can occur as free runtime Ids in a field type. No
 runtime field Id can escape into the constructor result. Rebuild the worker
 and wrapper types with DepFunTy at each named field. The runtime field remains
 an ordinary lazy constructor payload slot.
+
+A function field uses the existing retained-binder policy. Its closed ordinary
+Many arrow has independently supported scalar domains. The actual field Id
+scopes the head of TermAppTy in later fields; it is not a scalar TermVarTy.
+Keep the function and its argument as separate runtime fields. No call equality
+implies function or argument equality. See Note [Function-valued retained
+binders] in GHC.Core.Type and
+docs/dependent-haskell/REFERENCES.md#function-valued-retained-package-fields-prior-art.
 
 These constructors are not promotable. The promoted TyCon cache must fail
 explicitly if requested; an anonymous promoted telescope would leave runtime

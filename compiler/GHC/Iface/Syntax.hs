@@ -2134,6 +2134,7 @@ freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
 freeNamesIfType (IfaceFreeTermVar _)  = emptyNameSet
 freeNamesIfType (IfaceTermVar _)      = emptyNameSet
 freeNamesIfType (IfaceTermAppTy _ arg) = freeNamesIfType arg
+freeNamesIfType (IfaceFreeTermAppTy _ arg) = freeNamesIfType arg
 freeNamesIfType (IfaceDepFunTy (w, _, arg) res)
   = freeNamesIfType w &&& freeNamesIfType arg &&& freeNamesIfType res
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
