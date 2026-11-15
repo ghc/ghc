@@ -262,7 +262,10 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   legacy8, constructor11 and final9 pass. Both-stage raw/public106 and packed562
   pass. The registered run has 39 cases, 34 skips and five expected passes,
   with zero unexpected/framework failures or warnings. Artifact checks remain
-  separate. No Core/App/solver/backend rule changes. C1 and C2 remain open.
+  separate. M49 is published at `7029ed2a7d`, canonical audit
+  `ba310681ec8effaf4c6a84bc4e4dfe26ca902ee0545a89cd0aefe5f069cf25a7`.
+  M50 changes source package pattern checking and row desugaring, with no new
+  Core, solver, codec or backend rule. C1 and C2 remain open.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement
   invisible retained binders and their explicit `@` overrides. Reuse inherited
@@ -274,11 +277,15 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   but specify first-class formation, introduction, elimination, scope, and
   erasure separately. Existing `PackVec` is the execution baseline. Keep erased
   `exists` and retained `some` distinct. Advances `R04` and `R02`.
-  The next bounded source candidate is multi-constructor retained package
-  patterns. Both Pat's one-parent-constructor gate and constructor-family
-  desugaring need a coordinated change. Check branch scope, row failure, PMC,
-  interface imports and demand before admission. This candidate is unimplemented
-  and does not close R22, C1 or C2.
+  M50 admits the bounded multi-constructor package slice. Both stages pass
+  public17, mixed17 and twin17 through actual interfaces; lazy and linear
+  clients retain located compile-only rejections. Constructor-local scopes
+  and row failure reuse existing field metadata and case lowering. The Sigma3
+  control already passes the parent baseline. This does not implement general
+  first-class sums, universes or dependent projections and closes none of R22,
+  C1 or C2. Legacy/final evidence and artifact checks remain separate.
+  The next requested demonstration is maintained
+  `docs/dependent-haskell/Showcase.hs`, not yet implemented.
 - [ ] **E1: Specify and implement closed evaluation.** Depends on a typed
   representation from C1 and an explicit compile-time evaluation boundary.
   Select the smallest closed pure expression subset. Specify constraint,

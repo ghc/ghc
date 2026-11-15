@@ -404,3 +404,22 @@ the source matrix, public21 and final9 pass. Artifact checks are recorded in
 [the current checkpoint](../README.md#m49-constructed-worker-case-activation).
 These focused results do not establish a theorem or full GHC suite result.
 See [the source comparison](../REFERENCES.md#constructed-worker-case-activation-prior-art).
+
+
+## M50 constructor-local telescope and row scope
+
+Selected Agda v2.8.0 manual reads add constructor-telescope and clause-order
+provenance. Data Types1–191 has verified Git blob
+`7713c0755a94f784971a637059caaed4c616f04e`; Function Definitions1–64 has
+`3c7e86cd7e6b88d67f35e8882455ee28f7da6d4d`. See the
+[precise source ranges](../REFERENCES.md#multi-constructor-retained-packages-prior-art).
+These sources do not establish Haskell laziness, positivity or totality.
+
+The cached ICFP2017 author PDF was reread at section9, printed31:27/PDF27.
+Primitive datatypes and pattern matching remain outside its presented D/DC
+proof. No Coq replay, new PDF or whole-paper rereading is claimed. The canonical
+ledger stays at seven works and nine PDFs. M50's source/interface/runtime
+checks are component evidence; see [the checkpoint](../README.md#m50-multi-constructor-retained-package-patterns)
+for the measured source, legacy8, constructor11 and final9 scope. These results
+do not replace artifact checks. Freeze and independent audit must pass before
+publication.

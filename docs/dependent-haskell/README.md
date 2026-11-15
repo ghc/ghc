@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M49 snapshot1 passes both-stage builds, API1, the selected source matrix, public21, legacy8, constructor11 and final9; registered results are 39 cases, 34 skips and five expected passes |
+| Compiler validation | M50 snapshot3 passes both-stage builds, API2, public17/Sigma3/mixed17/twin17, legacy8, constructor11 and final9; compile-only lazy/linear clients reject normally; registered results are39 cases,34 skips and five expected passes |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -79,7 +79,8 @@ Last updated: 2026-11-15.
 | Signed call beta | Complete plain scalar endofunction signatures expose immediate checked lambda beta; actual assigned Many, binder identity and original call execution are preserved; Strict keeps its ordinary fallback |
 | Function-valued retained binders | Snapshot6 passes both-stage source14, negative10 and constructor11 controls, plus legacy8 and final9; canonical audit/publication records are separate |
 | Constructed worker activation | Known local retained workers accept scalar constructor trees during metadata discovery; ordinary application and row evidence checks remain unchanged |
-| Next task | Multi-constructor retained package patterns after M49 audit/publication; C1/C2 and the broader roadmap remain open |
+| Multi-constructor packages | Constructor-local retained fields work beside ordinary constructors, ordinary GADT siblings and a different retained telescope; no Core or interface format changes |
+| Next task | Finish M50 evidence review, then maintain docs/dependent-haskell/Showcase.hs for completed features; R22/C1/C2 remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -4208,9 +4209,101 @@ controls keep their existing denominator. M48 duplicate and quotation checks,
 and the transitive M47 utility36 evidence, are inherited rather than rerun.
 No source41, known41, prior64, TC-metadata or full-suite rerun is claimed.
 
-Freeze and independent audit must pass before publication. The next substantial
-source candidate is multi-constructor retained package patterns. Both pattern
-checking and constructor-family desugaring need a coordinated change. R22,
+M49 is published at `7029ed2a7d78e0b6ddc44ac3fa7c6b4e0b9cb7d5`. Its canonical
+audit SHA256 is `ba310681ec8effaf4c6a84bc4e4dfe26ca902ee0545a89cd0aefe5f069cf25a7`.
+It records 55 manifests and 35230 integrity checks. Multi-constructor package
+patterns were its next bounded source candidate and are implemented below. R22,
 C1 and C2 remain open. See [the contract](CORE.md#constructed-worker-case-activation),
 [plan](PLAN.md#m49-constructed-worker-case-activation) and
 [prior art](REFERENCES.md#constructed-worker-case-activation-prior-art).
+
+
+## M50: multi-constructor retained package patterns
+
+A datatype can now combine a retained-field constructor with other constructors.
+The public `NativeMultiPackage` producer and `MultiPackageClient` consumer use
+ordinary source declarations and actual interfaces:
+
+```haskell
+data Availability a where
+    Unavailable :: Availability a
+    Available :: foreach (n :: Nat) -> Vec a n -> Availability a
+
+toPacked :: Availability a -> Maybe (PackedVec a)
+toPacked Unavailable = Nothing
+toPacked (Available n xs) = Just (PackVec n xs)
+```
+
+Each constructor keeps its own field telescope. Each equation keeps its actual
+retained field Ids. Pattern checking removes the parent-constructor count check
+and keeps its existing constructor shape, scope, result-wrapper and Many checks.
+Desugaring detects retained fields in any constructor group. It builds a case
+for each row and keeps the DEFAULT failure continuation. A failed nested field
+pattern or guard can then try the next row outside the previous row's scope.
+Distinct outer constructors do not overlap. Source order within a constructor
+group is preserved. The fields retain their tested laziness.
+
+The compiler delta is three files: `Tc.Gen.Pat`, `HsToCore.Match.Constructor`
+and the package-pattern diagnostic in `Tc.Errors.Ppr`. It adds no Core node,
+solver rule, field representation, interface schema or backend rule. Native
+constructors retain the existing existential, equality-specification, context,
+prefix-pattern, multiplicity, wrapper, promotion, lazy-pattern and let-pattern
+restrictions. An ordinary GADT sibling can use its ordinary equality evidence.
+This is not a first-class Sigma or R22 implementation.
+
+Snapshot3 records compiler `7e47932abc629face112eecf0d083fb2f2efaca3`, source
+`905554e64226d1d26041dc7ba417ca006ae016ce`, 83 compiler inputs and 104 source
+paths. The two new public modules account for the source-path increase.
+The selected archive was captured after bootstrap1 and before self-hosting;
+its compiler bytes match the selected Git revision. Metadata1's inherited
+pre-build description and metadata2's earlier fixture remain historical.
+
+| Evidence | Measured result |
+| --- | --- |
+| Builds | Bootstrap1 passes in 35.81s; self-host1 passes in 6m16s, peak 5134MiB under 16GiB, swap0 |
+| Selected API2 | Unit/CoreRun pass in 5.716686885s/17.922187794s; exact 1/37 goldens and eight new quiet observations |
+| API2 post-build comparison | Both actual 296-entry input maps are unchanged and contain zero Stage1 paths |
+| Public source | Both stages pass the exact seventeen-line producer/consumer oracle, with IORef lengths0/2/3, both constructor orders, row failure and demand markers |
+| Fixed-Nat family control | Both stages pass three observations; this source form already passes the M49 baseline |
+| Mixed sibling source | Both stages pass seventeen observations, including ordinary fields and an `IntOnly` GADT sibling |
+| Distinct retained telescopes | Both stages pass seventeen observations; `TwoVec` stores two independent indices beside `OneVec` |
+| Lazy/linear clients | Both stages reject the compile-only clients with located GHC-83605/GHC-18872; no main-is, link or runtime phase |
+| Legacy8 | All eight selected phases pass |
+| Constructor11 | Selected attempt2 passes eleven observations in each stage |
+| Final9 | Two own API2 reuses and seven launches pass; raw/public106 and packed562 match in both stages |
+| Registered tests | Five total tests,39 cases,34 skips and five expected passes; zero unexpected/framework failures or warnings |
+
+The M49 compiler first compiles PackedVecLibrary and then rejects the original
+multi-constructor producer with located GHC-83605. No consumer or runtime phase
+runs in that baseline. Its Sigma control already passes three lines. The first
+M50 ignored-source run passes17 under metadata2. It stays historical; selected
+public17 covers the same operations without a redundant ignored-source run in
+both stages.
+
+API1 passed the unit fixture but failed the new group because extracted entry
+Core did not link its generated DataCon workers. The fixture now uses the
+existing `runModuleCase` object-module runner. API2 checks six finite package
+observations and both absent alternatives. These are genuine object-module
+observations, not a claim that the new declarations pass entry-only bytecode
+extraction. Existing groups and golden output remain unchanged.
+
+The new eight observations remain separate from the inherited 243 package/
+322 total rejection programs and95 quiet source controls. CLI programs overlap
+and are not added into one count. Utility36, duplicate and quotation evidence
+is inherited; source41, known41, prior64, TC metadata, the old177 standalone
+controls and the full GHC suite were not rerun. Freeze and independent audit
+must pass before publication. R22, C1 and C2 remain open.
+
+Constructor attempt1 failed before any target because its runner looked up the
+older M48 output manifest. The corrected runner uses the direct M49 parent.
+Selected attempt2 passes eleven observations in both stages. Final9 passes
+with two own API2 reuses and seven launches. Both stages preserve the exact
+raw/public106 and packed562 oracles. The registered run retains five tests,
+39 cases,34 skips and five expected passes, with no unexpected results or
+framework failures or warnings. No new test file or golden line is added.
+
+The next requested program is a maintained `docs/dependent-haskell/Showcase.hs`
+that demonstrates completed features through one command. It is not implemented
+in M50. See [the contract](CORE.md#multi-constructor-retained-package-patterns),
+[plan](PLAN.md#m50-multi-constructor-retained-package-patterns) and
+[prior art](REFERENCES.md#multi-constructor-retained-packages-prior-art).

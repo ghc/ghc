@@ -3266,8 +3266,10 @@ checking and ordinary motive/row Given evidence unchanged.
 - [x] Pass final9 with two own API1 reuses and seven launches. Both-stage
   raw/public106 and packed562 pass. The registered run has 39 cases, 34 skips
   and five expected passes, with zero unexpected/framework failures or warnings.
-- [ ] Freeze the exact evidence, pass the independent audit and publish the
-  canonical record. Infer no hashes or results from prepared helpers.
+- [x] Freeze, independently audit and publish M49 at
+  `7029ed2a7d78e0b6ddc44ac3fa7c6b4e0b9cb7d5`. Canonical SHA256 is
+  `ba310681ec8effaf4c6a84bc4e4dfe26ca902ee0545a89cd0aefe5f069cf25a7`,
+  with 55 manifests and 35230 integrity checks.
 
 Keep the eight new values separate from the inherited 243/322/95 source corpus
 and the overlapping CLI programs. Inherit M48 duplicate/quotation controls and
@@ -3276,24 +3278,65 @@ known41, prior64, TC-metadata or full GHC suite run. C1 and C2 remain open.
 See [the contract](CORE.md#constructed-worker-case-activation) and
 [prior art](REFERENCES.md#constructed-worker-case-activation-prior-art).
 
+### M50: multi-constructor retained package patterns
+
+The bounded source ADT slice is implemented. Each selected constructor owns
+its field telescope; siblings do not add bindings to that telescope.
+
+- [x] Remove only the parent-constructor count test in `tcRetainedDataConPat`.
+  Preserve native constructor shape, result wrapper, domain, scope and Many
+  checks. Keep lazy and let patterns unsupported.
+- [x] Detect retained fields in any constructor group in `matchConFamily`.
+  Compile each row with its own actual fields and a DEFAULT failure
+  continuation. Preserve order within each group; outer constructor groups
+  are disjoint. Leave the ordinary family path unchanged when no row needs
+  retained-field or native-proof handling.
+- [x] Update the structured package diagnostic to describe prefix syntax and
+  unrestricted multiplicity. Add no Core, solver, wire or backend rule.
+- [x] Preserve the M49 baseline producer rejection83605 without consumer/runtime.
+  Record its passing Sigma3 as a pre-existing form, not a new M50 feature.
+- [x] Pass bootstrap1 in35.81s and self-host1 in6m16s, peak5134MiB under16GiB,
+  swap0. Snapshot3 selects compiler7e47932abc/source905554e642,83/104 paths.
+  Its capture follows bootstrap1 and precedes self-hosting; retain snapshots1/2.
+- [x] Preserve API1's missing DataCon-object linkage failure. Reuse the existing
+  object-module runner for the new group; API2 passes in5.716686885s/17.922187794s
+  with eight genuine observations and exact1/37 goldens. Actual296-entry maps
+  per phase stay unchanged after self-hosting and contain zero Stage1 paths.
+- [x] Pass both-stage public17, Sigma3, mixed17 and twin17 through actual
+  interface/object imports. Cover both constructor orders, ordinary sibling
+  fields/GADT evidence, different retained telescopes, guard/field failure,
+  bottom/cyclic ignored fields, outer-bottom demand and selected payload demand.
+- [x] Reject lazy/linear clients with located83605/18872 in both stages.
+  Keep both compile-only; no main-is, link or runtime phase.
+- [x] Pass all eight selected legacy programs.
+- [x] Preserve constructor attempt1's stale-parent manifest lookup failure
+  before targets. Correct only the runner provenance; attempt2 passes eleven
+  observations in each stage.
+- [x] Pass final9 with two own API2 reuses and seven launches. Both-stage
+  raw/public106 and packed562 match. The registered run retains five tests,
+  39 cases,34 skips and five expected passes, with zero unexpected results
+  or framework failures or warnings. Keep existing goldens1/37 unchanged.
+- [ ] Complete freeze, independent audit and publication. Preserve every
+  baseline, preparation, capture and failed API attempt.
+
+Do not aggregate overlapping CLI programs with the eight new object-module
+observations or the inherited243/322/95 source corpus. No new utility36,
+source41, known41, prior64, TC-metadata, old177 or full-suite run is claimed.
+C1, C2 and R22 remain open. See [the contract](CORE.md#multi-constructor-retained-package-patterns).
+
 ### Next source candidate: multi-constructor retained packages
 
-This candidate is unimplemented. Specify a package with two ordinary parent
-constructors before changing either gate. The existing retained-field storage
-is an ADT facility; R22's first-class existential task stays open.
+The bounded candidate is now M50 above. First-class dependent sums and general
+Sigma formation/elimination remain unimplemented. Additional multi-constructor
+incomplete-coverage and index/proof-escape programs still need their own
+measured controls; existing PMC remains enabled.
 
-- [ ] Review `tcRetainedDataConPat` in `GHC.Tc.Gen.Pat`. It currently requires
-  exactly one constructor in the parent type. Define field/evidence scope for
-  each constructor and each row before removing that restriction.
-- [ ] Review `matchConFamily` in `GHC.HsToCore.Match.Constructor`. Its retained
-  path currently rejects other constructor groups. Preserve row failure,
-  clause order and actual field Ids across every constructor group.
-- [ ] Check PMC coverage, incomplete matches, per-branch index/proof escape,
-  declaration metadata and imports from actual interfaces. Test both constructor
-  orders and an ordinary constructor beside a retained-field constructor.
-- [ ] Check outer-bottom demand, selected and unselected payloads, lazy fields,
-  guards and fallback rows through actual machine code. Keep linear, lazy and
-  let-pattern restrictions unless a separate checked change admits them.
+### Next requested source program: maintained Showcase
 
-This needs coordinated pattern checking and desugaring. A typechecker-only
-change cannot establish the source contract. Keep full R22, C1 and C2 open.
+- [ ] Add `docs/dependent-haskell/Showcase.hs` after M50 publication. Demonstrate
+  completed source capabilities with maintained examples and one command.
+- [ ] Map each example to its actual source/library support and bounded demand
+  contract. Keep unsupported forms and unmeasured generalizations explicit.
+
+This requested program is not implemented by M50. It does not close R22, C1
+or C2 and does not replace focused regression evidence.

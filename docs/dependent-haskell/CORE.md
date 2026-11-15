@@ -1967,3 +1967,35 @@ name. Final9 passes. Artifact status is recorded in the
 Note [Source opaque call refinement] in GHC.Tc.Gen.Match owns the trigger.
 C1 and C2 remain open. See [the plan](PLAN.md#m49-constructed-worker-case-activation)
 and [prior art](REFERENCES.md#constructed-worker-case-activation-prior-art).
+
+
+## Multi-constructor retained package patterns
+
+M50 permits sibling constructors around a native retained field telescope.
+`tcRetainedDataConPat` no longer requires a single constructor in the parent.
+It still checks the selected native constructor's own universals, fields,
+context, equality specification, wrapper and multiplicity. Existing scope and
+pattern restrictions remain. An ordinary sibling keeps its ordinary GADT path.
+
+`matchConFamily` selects the row path when any group has retained fields or
+native virtual proof evidence. Testing only the first group misses an ordinary
+constructor placed before a retained one. Each row now gets its own case on
+the shared scrutinee. The row's actual retained field Ids scope its later
+fields, nested patterns, guards and RHS. A singleton alternative keeps its
+DEFAULT failure continuation in a multi-constructor family. Failure exits that
+row's field/evidence scope before trying the next row. Groups for different
+outer constructors are disjoint; order within a group is preserved.
+
+No field representation, Core/FC rule, coercion token, interface schema or
+runtime lowering rule changes. Core and STG Lint run on the source programs.
+Selecting an outer constructor does not force its unused indices or payloads.
+The selected demand checks do not imply totality or general lazy-pattern
+admission. Native package patterns still reject lazy and let patterns and
+require unrestricted multiplicity and the existing prefix/field subset.
+
+Actual object-module imports cover both declaration orders, ordinary fields,
+ordinary GADT sibling evidence and two distinct retained telescopes. Sigma3
+already passes the parent baseline. This scope does not implement first-class
+existentials, arbitrary universes or dependent record projections. See
+[the checkpoint](README.md#m50-multi-constructor-retained-package-patterns) and
+[primary sources](REFERENCES.md#multi-constructor-retained-packages-prior-art).

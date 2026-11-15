@@ -3289,3 +3289,36 @@ Artifact checks are tracked in
 GHC-05617 points at each wrong payload, but relevant bindings can still show a
 generated `call_motive` name. No new paper, PDF, full-file reading, Agda execution
 or theorem claim is added. The ledger remains seven works and nine PDFs.
+
+
+## Multi-constructor retained packages: prior art
+
+Agda v2.8.0's [Data Types source59–76](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/data-types.lagda.rst#L59-L76)
+gives each constructor a function type ending in its datatype. Its
+[Vector example95–108](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/data-types.lagda.rst#L95-L108)
+distinguishes shared parameters from locally bound constructor indices.
+The file's Git blob is `7713c0755a94f784971a637059caaed4c616f04e`.
+This supports constructor-local telescope scope, not GHC's runtime Id layout,
+Many restriction or field erasure policy.
+
+[Function Definitions source47–53](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/function-definitions.lagda.rst#L47-L53)
+describes first-matching-clause selection. Git blob is
+`3c7e86cd7e6b88d67f35e8882455ee28f7da6d4d`. M50 keeps order within each
+constructor group and uses GHC's existing case failure continuations. Distinct
+outer constructors do not overlap. This paragraph does not prove GHC's grouping
+transformation or Haskell guard demand. The
+[default Agda coverage/termination checks55–64](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/function-definitions.lagda.rst#L55-L64)
+and its positivity discipline are not adopted as Haskell laws.
+
+The new cache `native-multicon-package-prior-art-v1` records the actual fetched
+paths, verified blobs and selected reads: Data Types1–191 and Function
+Definitions1–64. The existing ICFP2017 author PDF was reread only at section9,
+printed31:27/PDF27. It leaves primitive datatypes and pattern matching as future
+work. Its D/DC proof does not establish GHC's primitive DataCon metadata,
+interfaces, PMC or backend extension. See [the paper ledger](papers/README.md#d-and-dc-icfp-2017).
+Seven works and nine cached PDFs remain unchanged. No proof replay or new
+whole-paper reading is claimed.
+
+The operational source evidence and remaining gates are in
+[the M50 contract](CORE.md#multi-constructor-retained-package-patterns) and
+[checkpoint](README.md#m50-multi-constructor-retained-package-patterns).
