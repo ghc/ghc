@@ -3490,7 +3490,10 @@ ABI. The erased payload parameter stays erased. Add no singleton or Core node.
 - [ ] Preserve the actual M51 compiler/reader before rebuilding. Measure the
   current producer rejection after its real dependencies compile.
 - [ ] Replace the private signature Name permission with an ordinary-value
-  signature flag. Only complete `FunSigCtxt` paths receive it. Keep the class
+  signature flag. Grant it only in the complete named branch of
+  `tcUserTypeSig`. `FunSigCtxt` is a diagnostic context, not a permission:
+  instance method signatures and `SPECIALISE` also use it. Pass `False` from
+  hs-boot checking and the generic `tcHsSigType` entry point. Keep the class
   path, general type-argument checks, staging, partial signatures, captured
   indices and result-kind checks unchanged. Use the existing closed visible
   Many `A -> B` function-domain policy. Update the diagnostic and owning Note.
