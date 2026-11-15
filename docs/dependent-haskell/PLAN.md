@@ -2370,6 +2370,33 @@ native argument can determine the erased parameter. Preserve the current
 failure before choosing an implementation. A failed preflight must not cause
 the value argument or a saved cache to be elaborated twice.
 
+The initial 39-client baseline agrees in both stages: 12 compile and 27
+report located errors. Three isolated targets, including `withQ Refl f` and
+the complete witness annotation, report GHC-83605. Evidence uses the new
+`native-known-arguments-*` prefix. The M37 prefix is frozen.
+
+Read declared types of bare value variables without calling `tcInferId`,
+elaborating an expression or collecting usage. Permit parentheses. Require
+a monomorphic type without a leading context. Zonk existing assignments and
+exclude free QL variables in deep type metadata. Global lookup can load an
+interface; it must not instantiate the value.
+
+Match eligible declared arguments against the ordinary value prefix with the
+existing restricted kind-first retained matcher. Match only outer erased
+binders. Require complete choices, substituted kinds, no template escape,
+valid runtime scope and a native anchor. Keep the no-concreteness guard.
+Use an expected seed only at declared ordinary saturation. An overapplied
+call cannot use its final expected type as the declared intermediate result.
+A conflicting exact match retains the guarded fallback.
+
+Carry the choices through the existing `RetainedInstPlan`. Preserve the
+original residual signature and prepared type-argument prefix. IALL consumes
+each original forall/context group and emits evidence in that order. Skip
+eager argument inference when this plan is present. Check every actual
+argument normally at its selected domain. Retain result subsumption, linear
+usage and nominal proof entailment. No Core change or native meta assignment
+is proposed.
+
 - [ ] Preserve source baselines for bare local and global native arguments,
   signed witnesses and applied heads. Identify actual ambient QL variables.
 - [ ] Check whether declared argument types can supply a complete immutable
