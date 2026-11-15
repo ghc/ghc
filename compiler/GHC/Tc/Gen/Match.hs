@@ -555,8 +555,12 @@ the motive to r, then q, then the transported old evidence and captures. This
 keeps the outer alias r distinct from the motive's index i.
 
 The constructor proof cv :: i ~# K refines q_motive's predicate through the
-existing dictionary transport. It produces q_branch :: K ~# f n. Only while
-checking that row body, record the exact call with sym q_branch :: f n ~# K.
+existing dictionary transport. It produces q_branch :: K ~# f n for solving.
+The application descriptor instead uses sym q_motive ; cv :: f n ~# K.
+Both source proofs are already bound in the row. A direct cast does not emit
+a Wanted that marks q_branch as needed. The solver can therefore prune that
+intermediate Given binding. Keep the direct proof independent of its liveness.
+Record the descriptor only while checking that row body.
 Keep q_motive in the ordinary evidence-parameter ABI. Only cv occupies the
 virtual constructor-proof slot. Its branch evidence binds remain under cv.
 Applications may use this descriptor only after substituting the actual
@@ -1203,13 +1207,10 @@ tcRetainedConMatchesWithCall call_refinement index invis_pat_tys pat_tys argumen
                  match' = renamed { m_pats = fmap (insert_dictionaries argument_plan) (m_pats renamed) }
                  check_body = case call_refinement of
                    Nothing -> tcBody
-                   Just (call_ty, motive_proof) ->
-                     case lookup motive_proof (zip (map fst dictionary_cos) refined_givens) of
-                       Just branch_proof -> \body body_ty ->
-                         withRetainedCallRefinement call_ty (mkSymCo (mkCoVarCo branch_proof)) $
-                           tcBody body body_ty
-                       Nothing -> pprPanic "tcRetainedConMatchesWithCall: missing call proof"
-                                    (ppr motive_proof)
+                   Just (call_ty, motive_proof) -> \body body_ty ->
+                     withRetainedCallRefinement call_ty
+                       (mkTransCo (mkSymCo (mkCoVarCo motive_proof)) (mkCoVarCo cv)) $
+                         tcBody body body_ty
                  check = tcMatchWithSource check_body (invis_pat_tys ++ index_arg : refined_args)
                            (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc match')
            ; (ev_binds, L checked_loc checked) <- if null refined_givens
