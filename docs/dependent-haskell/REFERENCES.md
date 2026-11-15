@@ -2723,3 +2723,45 @@ parameter or qualified `@QPi` without `ImpredicativeTypes` instead reports
 GHC-91510 during source formation. An ordinary `ProofBox` pattern can supply
 the named incoming proof on the supported `NoQL` route. Keep these boundaries
 separate. See the [next plan](PLAN.md#m37-applications-with-impredicativetypes).
+
+## Applications with fixed native type choices
+
+The M37 baseline has 61 clients in each compiler stage: 16 compile and 45
+report located source errors. Its two support providers compile. The four
+M36 applications and a closed `Refl` control still report GHC-83605.
+
+The corrected author copy of
+[A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf)
+separates choosing type arguments from checking value arguments. Figures 3–4
+on printed pages 89:7–89:8 use `h-var` to retrieve a head type and `ityarg`
+to substitute a supplied polytype. `iall` introduces a choice when an erased
+argument is still unknown. Section 4.4 on page 89:10 explains explicit VTA.
+Algorithmic Figures 7–8 on pages 89:19–89:20 retain argument checking and final
+result comparison. Section 8 on pages 89:21–89:22 retains constraint entailment.
+Section 5.8 on page 89:15 records the lazy semantic cost of eta expansion.
+The paper's theorem does not cover runtime Id indices or the native FC forms.
+
+Agda v2.8.0 retains the
+[checked argument prefix](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L619-L641)
+and [substitutes each checked argument](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+into the remaining telescope. Its
+[early expected-target comparison](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L690-L767)
+requires rigidity, sufficient arity and independence from consumed binders.
+Its [final comparison](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L449-L495)
+still applies when the earlier check has not established the result.
+Agda's contextual mutable metas do not justify native GHC meta assignment.
+
+The proposed GHC adaptation reuses its IALL/ITYARG loop to check a leading
+type-argument prefix once. It retains the prefix and original QL variables
+when mode selection fails. Fixed explicit choices or an existing complete
+immutable expected-result match can permit `NoQL`. Each inner application
+must justify that mode independently. Preserve the native evidence scope,
+constraint obligations, concrete representations, substituted kinds, runtime
+scope, usage and final subsumption. Add no eta expansion or new equality rule.
+
+The exact PDF, extraction, selected rendered figures, full Agda blobs and
+frozen M36 checker are recorded in
+`native-ground-applications-prior-art-v1/provenance.json`. The reading covers
+the named paper sections and Agda ranges. It does not include the appendices,
+the full Agda solver or a proof replay. Compiler changes and their validation
+remain pending.

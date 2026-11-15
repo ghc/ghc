@@ -2301,6 +2301,35 @@ Quick Look route is blocked. Preserve these measured sources before changing
 that route. A qualified Pi type argument without `ImpredicativeTypes` reports
 the separate source-formation error GHC-91510.
 
+The fresh M37 baseline agrees in both compiler stages: 61 clients produce
+16 accepts and 45 source errors at 50 located diagnostic envelopes. Both
+support providers compile. The original four application controls and closed
+`Refl` control still report GHC-83605. Preserve these results under
+`native-ground-applications-*`. The M36 prefix is frozen.
+
+Separate checked type arguments from value checking. Reuse the existing
+IALL/ITYARG loop for the leading type, pragma and wrapper prefix. Preserve
+its original Quick Look allocations, type arguments and evidence. Check
+each written type argument once. Stop prefix preparation before final
+IRESULT actions, including the unsaturated-newtype check. Perform preparation
+inside `tcRetainedAppEvidence`.
+
+Select `NoQL` when the supported native signature has no remaining erased
+choices and no free QL variables. A complete immutable expected-result match
+can supply another such choice, including the inner `Refl` or `error` call.
+Check deep metadata in the signature, expected type and prepared prefix.
+Keep ground constraints as obligations for IALL and `instCall`. Types may
+mention valid rigid outer variables and runtime indices. Preserve ordinary
+payload inference and the native mutable-meta guard.
+
+Resume with the original head and checked prefix accumulator. This keeps
+constructor and concreteness information, evidence order and written-VTA
+diagnostic positions. Failed mode selection continues with the same prefix
+and its original QL variables. Do not infer arguments before mode selection:
+ordinary Quick Look could otherwise elaborate a failed cache again. Keep
+the public `tcInstFun` caller on its existing guarded path. Preserve final
+subsumption, proof entailment, multiplicity and runtime demand.
+
 - [ ] Pin the Quick Look and Agda precedents for applications whose native
   types are already fixed. Identify when ordinary instantiation can still
   create a QL variable.
