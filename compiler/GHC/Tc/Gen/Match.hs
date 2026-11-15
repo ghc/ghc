@@ -65,7 +65,8 @@ import GHC.Core ( Expr(Var) )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind, eqType )
+                     , anyFreeVarsOfType, typeKind )
+import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
 import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
