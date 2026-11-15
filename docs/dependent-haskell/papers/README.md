@@ -423,3 +423,17 @@ checks are component evidence; see [the checkpoint](../README.md#m50-multi-const
 for the measured source, legacy8, constructor11 and final9 scope. These results
 do not replace artifact checks. Freeze and independent audit must pass before
 publication.
+
+
+## M51 function fields and relevant telescopes
+
+M51 revisits the thesis's dependency/relevance distinction at printed54–55
+(PDF69–70), and the existing D/DC author PDF at7–9 and14–16. Agda's dependent
+constructor/record telescopes and builtin Sigma give the closer field-scope
+precedent. The selected primary-source lines, pinned Git blobs, actual web
+checks and cached Sigma fetch boundary are recorded in
+[the comparison](../REFERENCES.md#function-valued-retained-package-fields-prior-art).
+The implementation stores actual lazy function/input fields. It adds no
+singleton or call-injectivity rule. Actual source/interface checks are
+operational evidence. No new whole-paper reading, proof replay or theorem
+transfer is claimed. The ledger stays at seven works and nine cached PDFs.

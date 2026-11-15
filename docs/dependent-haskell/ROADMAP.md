@@ -284,8 +284,13 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   control already passes the parent baseline. This does not implement general
   first-class sums, universes or dependent projections and closes none of R22,
   C1 or C2. Legacy/final evidence and artifact checks remain separate.
-  The next requested demonstration is maintained
-  `docs/dependent-haskell/Showcase.hs`, not yet implemented.
+  M51 adds closed function-valued retained fields with generic call-indexed
+  payloads. Source24 and mixed14 pass both stages through actual object
+  interfaces. Matching retains actual function/input scope and lazy fields.
+  Four logical body errors and two policy guards pass per stage. The maintained
+  `docs/dependent-haskell/Showcase.hs` now passes both stages with51 lines and
+  twelve actual source modules. Generic exported function Pi, coercion codec
+  and native unfoldings remain separate gates.
 - [ ] **E1: Specify and implement closed evaluation.** Depends on a typed
   representation from C1 and an explicit compile-time evaluation boundary.
   Select the smallest closed pure expression subset. Specify constraint,

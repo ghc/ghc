@@ -3350,7 +3350,7 @@ not replace focused regression evidence.
 
 ### M51: function-valued retained package fields
 
-Status: specified; implementation and final validation are pending.
+Status: compiler and source validation complete; evidence sealing and publication pending.
 The target stores the actual function used by the later payload type:
 
 ```haskell
@@ -3371,39 +3371,84 @@ scalar indices or infer input/function equality from equal call results.
   Baseline attempt1 failed dependency-interface lookup before this check;
   attempt2 copies the actual dependency interface and reaches the source gate.
   The saved old reader reads the actual old PackedVecLibrary interface.
-- [ ] Use `isNativeRetainedBinderType` in source field checking and deferred
+- [x] Use `isNativeRetainedBinderType` in source field checking and deferred
   named-field import. Use `isNativeRetainedBinder` in DataCon validation and
   source pattern fields. Preserve all existing declaration, scope, Many,
   wrapper, ordinary-field and scalar constructor-pattern checks. A stored
   function pattern must remain a bare variable.
-- [ ] Encode `IfaceTermAppTy` with fresh type tag12, a local head name and an
+- [x] Encode `IfaceTermAppTy` with fresh type tag12, a local head name and an
   argument type. Decode through the lexical Id environment. Check the exact
   closed function domains and argument kind before constructing `TermAppTy`.
   Keep the whole-field check for references to earlier fields only.
-- [ ] Preserve diagnostic free call heads in a separate non-serializable
+- [x] Preserve diagnostic free call heads in a separate non-serializable
   `IfaceFreeTermAppTy`, following `IfaceFreeTermVar`. Cover printing and all
   type traversals. A free head must not become a serialized local spelling.
-- [ ] Set tracked `VERSION_DATE` to20261115.1 and reconfigure the fork as
+- [x] Set tracked `VERSION_DATE` to20261115.1 and reconfigure the fork as
   10.1.20261115.1, header1001202611151. Rebuild matching compiler/libraries.
   Check old-reader/new-file and new-reader/old-file rejection, including
   IgnoreHiWay. Keep unknown tags explicit failures. Keep generic exported
   function-valued Pi, coercion encoding and native unfoldings gated.
-- [ ] Extend the existing API fixtures without new test files or golden lines.
+- [x] Extend the existing API fixtures without new test files or golden lines.
   Check binary round trips, lexical freshening, free/forward/sibling heads,
   wrong kinds/domains/multiplicities, noninjectivity and deferred malformed
   datatype knots. Check field order and runtime arity with Core/STG Lint.
-- [ ] Pass separate producer/consumer source imports in both compilers with
+- [x] Pass separate producer/consumer source imports in both compilers with
   the 24-line independently specified finite oracle. Cover IORef0/2/3,
   identity/successor/constant heads, a Char payload, repacking, row scope,
   package WHNF, ignored fields and distinct demanded errors. A producer
   failure must not count as a negative client rejection.
-- [ ] Run the existing relevant API, source, constructor, native pipeline and
+- [x] Run the existing relevant API, source, constructor, native pipeline and
   registered checks. Preserve historical failures and exact selected inputs.
   Add a labeled function-field example to Showcase.hs when this slice passes.
-- [ ] Update the contract, references and current status with actual results.
-  Freeze, independently audit and publish the completed checkpoint.
+- [x] Update the contract, references and current status with actual results.
+- [ ] Freeze, independently audit and publish the completed checkpoint.
 
 The preparation lives under `native-function-package-*`. M50 and its
 `native-multicon-package-*` namespace remain frozen. Prior art is recorded
 [with the references](REFERENCES.md#function-valued-retained-package-fields-prior-art).
 This slice does not close R22, C1 or C2 and does not establish totality.
+
+
+The selected compiler is `e238c74541bcb7c4061cd446f8bc91767f34aae8`.
+The actual source/fixture snapshot is `37634e1568` (snapshot3). It covers83
+compiler inputs and110 tracked paths. Snapshot1 precedes the first build.
+Snapshot2 follows bootstrap and the API-only fixture change. Snapshot3 follows
+both builds and the Showcase-only change. All selected target checks use
+snapshot3. Final documentation has separate committed hashes; test execution
+does not claim final prose bytes.
+
+Measured results: source24 and mixed14 in both stages; Showcase51 with twelve
+actual modules in both stages; four logical body errors and two policy guards
+per stage; actual old/new reader checks; API goldens1/37 plus24 quiet source
+observations; legacy8; constructor11 in each stage; final9 with two exact API
+reuses and seven launches; raw106/public106/packed562 in each stage; registered
+39 cases/34 skips/5 passes with zero unexpected failures. Counts overlap.
+No full source-matrix, old raw36 or whole GHC-suite replay is claimed.
+
+Preserve baseline1's dependency-lookup failure, the failed formatter attempts,
+the sandbox bus launch failure and Showcase1's invalid library-query option.
+The corrected showcase runner passes bootstrap2 and selfhost1. No compiler
+source change follows the successful builds. Existing goldens stay unchanged.
+
+### Next candidate: exported function-valued retained signatures
+
+The bounded target is an exported ordinary value signature:
+
+```haskell
+idCall :: forall a. foreach (f :: Nat -> Nat)
+       -> foreach (n :: Nat) -> Vec a (f n) -> Vec a (f n)
+idCall f n xs = xs
+```
+
+Use the existing M51 function package to supply actual local function/input
+fields across an object boundary. Research is in
+`native-function-signature-next-research-v1/report.md`. The source signature
+gate and generic `IfaceDepFunTy` reader still reject this exported form.
+Existing tags10/12 and the O0 omitted-unfolding ABI are candidates for reuse.
+Do not broaden inference, pattern activation or coercion encoding without
+separate evidence. Write the implementation specification before changing
+these gates. Synchronize the older scalar-field sentence in Note [Source
+retained signatures] in `GHC.Tc.Gen.HsType` when that section next changes.
+M51's actual field predicates and its owning DataCon/interface Notes already
+state the function-field policy. This stale sentence is a documentation
+follow-up, not a failed compiler check.

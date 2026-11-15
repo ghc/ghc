@@ -48,12 +48,13 @@ _build/showcase/showcase
 | Saved IO actions, tuple sections and scoped local signatures | `vectors` |
 | Qualified native functions, erased choices and equality transport | `vectors`, with the imported Ground/Known providers |
 | Opaque calls, index beta reduction and retained function arguments | `vectors`, `functions` |
+| Function fields, call-indexed generic payloads and lazy storage | `functionFields` |
 | Later retained arguments, dictionaries, equality contexts and shadowing | `laterArguments` |
 | Multiple package constructors, nested fields and guard fallback | `alternatives` |
 
-Both bootstrap and self-hosted compilers produce the expected 48 lines with
-Core Lint and STG Lint enabled. The self-hosted run preserves all eleven source
-inputs. The examples check ignored and demanded error values separately.
+Both bootstrap and self-hosted compilers produce the expected 51 lines with
+Core Lint and STG Lint enabled. Both runs preserve all twelve source inputs.
+The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
 GroundApplicationClient checks native function types as equality operands
 with ImpredicativeTypes. The main module uses ordinary application checking.
@@ -75,7 +76,7 @@ optimization support or full roadmap completion.
 | Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
-| Configured fork version | `10.1.20261113.2`, with interface header `1001202611132`; matching compiler and libraries rebuilt |
+| Configured fork version | `10.1.20261115.1`, with interface header `1001202611151`; matching compiler and libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
@@ -123,7 +124,8 @@ optimization support or full roadmap completion.
 | Function-valued retained binders | Snapshot6 passes both-stage source14, negative10 and constructor11 controls, plus legacy8 and final9; canonical audit/publication records are separate |
 | Constructed worker activation | Known local retained workers accept scalar constructor trees during metadata discovery; ordinary application and row evidence checks remain unchanged |
 | Multi-constructor packages | Constructor-local retained fields work beside ordinary constructors, ordinary GADT siblings and a different retained telescope; no Core or interface format changes |
-| Maintained showcase | `Showcase.hs` passes both compilers with 48 finite output lines; R22/C1/C2 remain open |
+| Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
+| Maintained showcase | `Showcase.hs` passes both compilers with 51 finite output lines; R22/C1/C2 remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -4353,3 +4355,63 @@ features. It is a separate documentation change after the M50 source snapshot.
 See [the contract](CORE.md#multi-constructor-retained-package-patterns),
 [plan](PLAN.md#m50-multi-constructor-retained-package-patterns) and
 [prior art](REFERENCES.md#multi-constructor-retained-packages-prior-art).
+
+
+## M51: function-valued retained package fields
+
+Compiler and source validation is complete. Evidence sealing and publication
+are the remaining checkpoint steps. The maintained [Showcase.hs](Showcase.hs)
+now includes the `functionFields` group.
+
+[FunctionPackageLibrary.hs](examples/qualified-pi/FunctionPackageLibrary.hs)
+stores the function and input used by a later field type:
+
+```haskell
+data FunctionPack a where
+    FunctionPack :: foreach (f :: Nat -> Nat)
+                  -> foreach (n :: Nat)
+                  -> Vec a (f n) -> FunctionPack a
+```
+
+The parameter `a` remains an ordinary erased parameter. The constructor stores
+three lazy runtime fields. Matching exposes fresh actual `f` and `n` Ids in
+the payload type. Repacking preserves those identities. Type checking does
+not execute `f` or `n`. A runtime observer can execute them.
+
+The source checker, DataCon validator and deferred interface importer admit
+the existing closed function-domain policy for a named field. The interface
+type codec stores a lexical call head and its argument with tag12. A separate
+`IfaceFreeTermAppTy` keeps diagnostic free heads out of the wire format. The
+fork is now `10.1.20261115.1`, header `1001202611151`. Both new readers accept
+their actual interfaces. Old/new reader combinations reject the version
+mismatch. The preserved old reader still reads its actual old interface.
+
+Both compiler stages pass the 24-line public producer/consumer program and a
+14-line mixed-constructor probe. The latter combines `Nat -> Nat` and
+`Bool -> Nat` fields with a plain alternative. These programs check IORef
+inputs, generic Char payloads, repacking, guard fallback, ignored bottoms and
+distinct demanded errors. Both compilers also pass the maintained showcase
+with all 51 lines and twelve actual source modules. Core and STG Lint run.
+
+Each stage rejects four invalid client bodies: deriving input equality from
+equal call results (GHC-05617), changing the head or input (GHC-83865), and
+returning the payload at an unrelated index (GHC-25897). Two separate controls
+retain GHC-83605 for a wildcard function field and a wrong function domain.
+Both dependencies compile before these compile-only controls run. No client
+link or runtime failure counts as a type rejection.
+
+Existing API goldens remain one and37 lines. The CoreRun fixture also executes
+24 quiet object-module observations. Legacy8, constructor11 per stage and all
+nine final phases pass. Two final phases reuse exact compatible API results;
+seven launch. Raw106, public106 and packed562 pass in each stage. Registered
+checks report39 cases,34 skips and5 passes with no unexpected failures. These
+counts overlap; they are not an aggregate observation count. Bootstrap takes
+5m17s. Self-hosting takes20m12s and peaks at7708MiB under16GiB with no swap.
+
+Only a bare variable can bind a stored function field. Functions are not
+scalar indices. Generic exported function-valued Pi signatures, native
+coercion encoding, native unfoldings and general optimization remain gated.
+The work does not establish totality or close R22, C1 or C2. See the
+[contract](CORE.md#function-valued-retained-package-fields),
+[plan](PLAN.md#m51-function-valued-retained-package-fields), and
+[prior art](REFERENCES.md#function-valued-retained-package-fields-prior-art).

@@ -3366,3 +3366,12 @@ For the wire boundary, follow GHC's existing separate free-variable diagnostic
 forms. A diagnostic free function head must remain distinct from a scoped
 local interface name. The new type tag requires a distinct fork version and
 actual old/new reader checks. See [the M51 plan](PLAN.md#m51-function-valued-retained-package-fields).
+
+
+M51's measured implementation is now described in the
+[contract](CORE.md#function-valued-retained-package-fields) and
+[checkpoint](README.md#m51-function-valued-retained-package-fields). The source
+and mixed-domain object programs pass in both stages. The ordinary body
+rejection for inverse call equality is distinct from the two explicit policy
+guards. These operational results do not transfer Agda's totality or D/DC's
+preservation result to this implementation.

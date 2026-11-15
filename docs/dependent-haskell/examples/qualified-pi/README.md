@@ -165,3 +165,19 @@ These checks add no singleton argument, Core form or equality rule.
 See the [typing rules](../../CORE.md#qualified-retained-function-types),
 [source provenance](../../REFERENCES.md#qualified-retained-function-types)
 and [paper reading ledger](../../papers/README.md).
+
+
+## Function-valued retained package fields
+
+[FunctionPackageLibrary.hs](FunctionPackageLibrary.hs) stores `f :: Nat -> Nat`
+and `n :: Nat` as lazy fields beside `Vec a (f n)`. The erased parameter `a`
+remains ordinary. The client checks24 finite observations through separately
+compiled producer/consumer objects in both compiler stages. It checks generic
+Char payloads, exact call scope, repacking, ignored bottom fields and distinct
+demanded errors.
+
+The maintained [Showcase.hs](../../Showcase.hs) imports this library and shows
+three function-field observations in its `functionFields` group. Use the
+[showcase recipe](../../README.md#run-the-showcase) to build the combined
+program. Generic exported function-valued Pi signatures and native coercion
+encoding remain gated. See the [contract](../../CORE.md#function-valued-retained-package-fields).

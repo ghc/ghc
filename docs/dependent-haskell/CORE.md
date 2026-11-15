@@ -1999,3 +1999,50 @@ already passes the parent baseline. This scope does not implement first-class
 existentials, arbitrary universes or dependent record projections. See
 [the checkpoint](README.md#m50-multi-constructor-retained-package-patterns) and
 [primary sources](REFERENCES.md#multi-constructor-retained-packages-prior-art).
+
+
+## Function-valued retained package fields
+
+M51 permits a named field with the existing closed, visible Many `A -> B`
+function type. Both domains must satisfy the existing scalar-domain check.
+The stored function remains a local, unrestricted, non-join runtime Id. It can
+head `TermAppTy`; it cannot occur as a bare scalar `TermVarTy`. This reuses
+M46's call-head rule and adds no Core node or singleton witness.
+
+`tcCheckRetainedConType` and deferred named-field import use
+`isNativeRetainedBinderType`. DataCon validation and source pattern fields use
+`isNativeRetainedBinder`. Existing universals, field order, scope, multiplicity,
+lifted-field, lazy-field and wrapper restrictions remain. A function field
+pattern must be a bare variable. Scalar constructor decomposition still uses
+the scalar predicate. See Note [Retained constructor field telescopes] in
+`GHC.Core.DataCon`.
+
+Later fields use the actual preceding field Ids. Imported field domains remain
+deferred. Allocate the lexical Id skeleton before forcing a domain. Extend
+the environment only with earlier named fields. The whole-field free-variable
+check rejects outer and sibling runtime fields. Two imports and two pattern
+instantiations use fresh identities and alpha-equivalent worker types. The
+generic three-field package occupies exactly three runtime slots.
+
+`IfaceTermAppTy` uses type tag12, a lexical head name and the argument type.
+The reader finds the actual local Id, checks its closed function policy and
+the argument kind, then builds `TermAppTy`. `IfaceFreeTermAppTy` preserves an
+actual diagnostic free Id and has no wire encoding. Printing and all interface
+type traversals preserve that distinction. See Note [Opaque call indices in
+interfaces] in `GHC.Iface.Type`. The fork version is10.1.20261115.1 and the
+interface header is1001202611151. IgnoreHiWay skips the profile comparison;
+it does not skip the version comparison.
+
+Equal results do not imply equal inputs or heads. The four located logical
+client controls check this boundary and index scope. The API fixture checks
+both compression modes, malformed metadata, wrong kinds/domains/multiplicities,
+free/forward/sibling heads and four bounded recursive-domain imports. Actual
+object programs check lazy storage and matching with two function domains and
+a plain sibling constructor. Both stages pass Core and STG Lint. These checks
+do not provide a preservation theorem.
+
+The generic `IfaceDepFunTy` function-domain reader remains gated. Native
+coercion encoding and native unfoldings remain gated. Primitive constructor
+field telescopes do not implement first-class dependent sums or projections.
+See [the checkpoint](README.md#m51-function-valued-retained-package-fields)
+and [primary sources](REFERENCES.md#function-valued-retained-package-fields-prior-art).
