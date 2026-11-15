@@ -11,7 +11,7 @@ import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags
 import GHC.Builtin.WiredIn.Prim (intPrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, eqCoercion, isReflCo, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkKindCo, mkTermAppCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
@@ -95,6 +95,7 @@ main = do
             runChecks dflags
             runAliasChecks dflags
             runOpaqueCallChecks dflags
+            runFunctionBinderChecks dflags
             runMatchingChecks dflags
             runTypeMapChecks
             runCaseChecks dflags
@@ -461,6 +462,8 @@ runRetainedFieldChecks dflags = do
     rejectsMetadata "retained metadata must align with fields" [Just template] originalArgs packageTy
     rejectsMetadata "retained metadata must use the declared field domain" [Just (setIdType template boolTy), Nothing] originalArgs packageTy
     rejectsMetadata "retained metadata must use unrestricted binders" [Just (setIdMult template OneTy), Nothing] originalArgs packageTy
+    let functionField = local 6299 "function_field" (mkFunctionType ManyTy natTy natTy)
+    rejectsMetadata "function-valued retained binders do not widen constructor fields" [Just functionField] [Scaled ManyTy (idType functionField)] packageTy
     rejectsMetadata "retained metadata cannot reference an unbound runtime Id" [Nothing, Nothing] originalArgs packageTy
     rejectsMetadata "retained field cannot escape into constructor result" [Just template, Nothing] originalArgs (payloadTy (TermVarTy template))
     let recursivePackage base constructors =
@@ -1795,7 +1798,7 @@ runOpaqueCallChecks dflags = do
     checkType dflags "unused synonym parameter hides the same closed arrow" (idType f) hiddenFree
     check "raw free head metadata is ineligible before synonym expansion" (not (isNativeIndexFunctionId hiddenHead))
     lintRejects dflags "raw free head metadata cannot enter a call" [hiddenHead, unused, n] (Coercion (mkNomReflCo (TermAppTy hiddenHead (TermVarTy n))))
-    lintRejects dflags "runtime function head cannot escape a lambda result" [n] (Lam f (Lam escapedPayload (Var escapedPayload)))
+    lintAccepts dflags "runtime function head is bound in a retained lambda result" [n] (Lam f (Lam escapedPayload (Var escapedPayload)))
     let symbolic = TermAppTy f (succTy zeroTy)
     lintAccepts dflags "type-node call argument need not be an atomic runtime value" [f] (Coercion (mkNomReflCo symbolic))
     let familyParameter = mkTyVar (mkSystemName (unique 6209) (mkTyVarOcc "call_family_arg")) boolTy
@@ -1838,6 +1841,131 @@ runOpaqueCallChecks dflags = do
         evaluate (Subst.substTy (indexSubst [n] f (Lam n (Var (dataConWorkId trueDataCon)))) call)
     rejectsWith "head substitution cannot change closed domains" "invalid native function head" $
         evaluate (Subst.substTy (indexSubst [reverseHead, n] f (Var reverseHead)) call)
+
+-- | Check head-only retained binders, exact application and fixed-domain evidence.
+runFunctionBinderChecks :: DynFlags -> IO ()
+runFunctionBinderChecks dflags = do
+    let (nat, zero, _) = peanoNat
+        natTy = mkTyConTy nat
+        zeroTy = mkTyConTy (promoteDataCon zero)
+        arrow = mkFunctionType ManyTy
+        f = local 6300 "retained_head" (arrow natTy natTy)
+        g = local 6301 "retained_head" (idType f)
+        cross = local 6302 "mixed_head" (arrow boolTy natTy)
+        n = local 6303 "retained_n" natTy
+        m = local 6304 "retained_m" natTy
+        at head arg = arrow (mkTyConApp eqTyCon [natTy, TermAppTy head arg, TermAppTy head arg]) intTy
+        atN head = at head (TermVarTy n)
+        body = arrow (atN f) (atN f)
+        retained = mkDepFunTy f body
+        alpha = mkDepFunTy g (arrow (atN g) (atN g))
+        payload = local 6305 "retained_payload" (atN f)
+        worker = Lam f (Lam payload (Var payload))
+    forM_ [f, cross] $ \head -> do
+        check "supported function head is an eligible retained binder" (isNativeRetainedBinder head && isNativeRetainedBinderType (idType head))
+        check "retained function stays outside scalar index eligibility" (not (isNativeIndexId head) && not (isNativeIndexType (idType head)))
+        check "scalar reification cannot turn a function into an index" $ case exprToNativeIndex (Var head) of
+            Nothing -> True
+            Just _ -> False
+        lintRejects dflags "a retained function cannot occur as TermVarTy" [head] (Coercion (mkNomReflCo (TermVarTy head)))
+    check "function-domain binder alpha equality" (eqType retained alpha)
+    let nested = mkDepFunTy f (mkDepFunTy n body)
+        nestedAlpha = mkDepFunTy g (mkDepFunTy m (arrow (at g (TermVarTy m)) (at g (TermVarTy m))))
+    check "nested function and scalar binders respect alpha equality" (eqType nested nestedAlpha)
+    check "nested function and scalar binders close their runtime indices" (isEmptyVarSet (tyCoVarsOfType nested))
+    lintAccepts dflags "nested function and scalar retained binders" [] (Coercion (mkNomReflCo nested))
+    check "function-domain binder scopes the head but preserves its argument" $
+        not (f `elemVarSet` tyCoVarsOfType retained) && n `elemVarSet` tyCoVarsOfType retained
+    lintAccepts dflags "function-domain retained identity" [n] worker
+    checkType dflags "function-domain lambda type recovery" retained (exprType worker)
+    let mixedPayload = local 6306 "mixed_payload" (at cross (constructorIndex trueDataCon))
+    lintAccepts dflags "Bool-to-Nat retained binder" [] (Lam cross (Lam mixedPayload (Var mixedPayload)))
+    let applied = App worker (Var g)
+        expected = arrow (atN g) (atN g)
+    lintAccepts dflags "exact local function operand" [g, n] applied
+    checkType dflags "function operand substitutes its actual identity" expected (exprType applied)
+    checkType dflags "explicit function application type recovery" expected (applyTypeToArgs retained [Var g])
+    forM_
+        [ ("different domain", [cross, n], Var cross)
+        , ("global function", [n], Var (globaliseId g))
+        , ("linear function", [setIdMult g OneTy, n], Var (setIdMult g OneTy))
+        , ("missing function", [n], Var g)
+        , ("lambda producer", [n], identity 6307 natTy)
+        ]
+        $ \(label, scope, argument) -> lintRejects dflags ("function retained operand rejects " ++ label) scope (App worker argument)
+    checkType dflags "function binder masks an outer head substitution" retained (Subst.substTy (indexSubst [g, n] f (Var g)) retained)
+    let pair = mkDepFunTy f (arrow (atN f) (atN g))
+        captured = Subst.substTy (indexSubst [f, n] g (Var f)) pair
+    case captured of
+        DepFunTy fresh result -> do
+            check "function binder freshens a capturing range" (fresh /= f)
+            checkType dflags "function capture keeps the free range head" (arrow (atN fresh) (atN f)) result
+            check "function capture tracks only the actual free replacement" $
+                f `elemVarSet` tyCoVarsOfType captured && not (fresh `elemVarSet` tyCoVarsOfType captured)
+            lintAccepts dflags "capture-avoiding retained function substitution" [f, n] (Coercion (mkNomReflCo captured))
+        _ -> fail "FAIL: function substitution lost its retained binder"
+    let cv = proof 6308 (TermVarTy n) (TermVarTy m)
+        callCo = mkTermAppCo f (mkCoVarCo cv)
+        dictionaryCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo natTy, callCo, callCo]
+        bodyCo = mkFunCoNoFTF Nominal (mkNomReflCo ManyTy) dictionaryCo (mkNomReflCo intTy)
+    forM_ [(Nominal, bodyCo), (Representational, mkSubCo bodyCo), (Phantom, mkReflCo Phantom (atN f))] $ \(role, evidence) -> do
+        let scoped = mkDepFunCo f evidence
+        check "function binder coercion preserves its body role" (coercionRole scoped == role)
+        checkType dflags "function binder coercion source" (mkDepFunTy f (coercionLKind evidence)) (coercionLKind scoped)
+        checkType dflags "function binder coercion target" (mkDepFunTy f (coercionRKind evidence)) (coercionRKind scoped)
+        check "function binder coercion removes its bound head" (not (f `elemVarSet` tyCoVarsOfCo scoped))
+        lintAccepts dflags "fixed-domain function binder coercion" [n, m, cv] (Coercion scoped)
+    let scopedCo = DepFunCo f bodyCo
+    check "function coercion binder masks an outer head substitution" $
+        eqCoercion scopedCo (Subst.substCo (indexSubst [g, n, m, cv] f (Var g)) scopedCo)
+    lintAccepts dflags "Pi abstraction scopes a function head" [n, m, cv] (Coercion (mkPiCo Nominal f bodyCo))
+    let parameter = mkTyVar (mkSystemName (unique 6309) (mkTyVarOcc "head_payload")) liftedTypeKind
+        given = proof 6310 intTy boolTy
+        openPi = mkDepFunTy f (arrow (atN f) (mkTyVarTy parameter))
+        context = extendLiftingContext (emptyLiftingContext (mkInScopeSet (mkVarSet [n, given]))) parameter (mkCoVarCo given)
+        lifted = liftCoSubst Nominal context openPi
+    checkType dflags "function binder lifting source" (mkDepFunTy f (arrow (atN f) intTy)) (coercionLKind lifted)
+    checkType dflags "function binder lifting target" (mkDepFunTy f (arrow (atN f) boolTy)) (coercionRKind lifted)
+    lintAccepts dflags "lifting ordinary evidence under a function binder" [n, given] (Coercion lifted)
+    let familyParameter = mkTyVar (mkSystemName (unique 6311) (mkTyVarOcc "head_family_arg")) natTy
+        familyBinders = [mkAnonTyConBinder familyParameter]
+        family = mkFamilyTyCon (mkSystemName (unique 6312) (mkTcOcc "HeadArgument")) (mkTyConKind familyBinders natTy) familyBinders 0 natTy Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
+        axiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 6313) (mkTcOcc "HeadArgumentAx")) family [mkCoAxBranch [] [] [] [zeroTy] zeroTy [] noSrcSpan]
+        original = mkDepFunTy f (at f (mkTyConApp family [zeroTy]))
+        normalized = mkDepFunTy f (at f zeroTy)
+    forM_ [Nominal, Representational, Phantom] $ \role -> do
+        let Reduction evidence actual = normaliseType emptyFamInstEnvs role original
+        checkType dflags "function binder normalization reduces a call argument" normalized actual
+        checkType dflags "function binder normalization proof source" original (coercionLKind evidence)
+        checkType dflags "function binder normalization proof target" normalized (coercionRKind evidence)
+        check "function binder normalization preserves role and scope" (coercionRole evidence == role && not (f `elemVarSet` tyCoVarsOfCo evidence))
+        lintAccepts dflags "normalized function binder evidence" [] (Coercion evidence)
+    let initial lhs rhs = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfType lhs `unionVarSet` tyCoVarsOfType rhs))
+        bindParameter var _ = if var == parameter then BindMe else DontBindMe
+        match lhs rhs = tcMatchRetainedTyX_BM bindParameter (initial lhs rhs) lhs rhs
+        target = mkDepFunTy g (arrow (atN g) intTy)
+        capturingTarget = mkDepFunTy g (arrow (atN g) (atN g))
+    case match openPi target of
+        Just result -> do
+            checkType dflags "scoped function binder matching infers an erased payload" intTy (Subst.substTy result (mkTyVarTy parameter))
+            check "scoped function matching cannot export bound heads" (isEmptyVarSet (Subst.getSubstRangeTyCoFVs result))
+        Nothing -> fail "FAIL: scoped function binder matching lost the payload"
+    check "scoped function matching rejects head escape" $ case match openPi capturingTarget of
+        Nothing -> True
+        Just _ -> False
+    check "default matching does not infer through a function binder" $ case tcMatchTyX_BM bindParameter (initial openPi target) openPi target of
+        Nothing -> True
+        Just _ -> False
+    check "fine unification remains conservative under an open function binder" $ case tcUnifyTysFG alwaysBindFam alwaysBindTv [openPi] [target] of
+        MaybeApart{} -> True
+        _ -> False
+    let indexParameter = mkTyVar (mkSystemName (unique 6314) (mkTyVarOcc "head_index")) natTy
+        opaqueTemplate = mkDepFunTy f (at f (mkTyVarTy indexParameter))
+        opaqueTarget = mkDepFunTy g (atN g)
+    check "opt-in function matching does not invert opaque call arguments" $
+        case tcMatchRetainedTyX_BM (\var _ -> if var == indexParameter then BindMe else DontBindMe) (initial opaqueTemplate opaqueTarget) opaqueTemplate opaqueTarget of
+            Nothing -> True
+            Just _ -> False
 
 -- | Check rigid index matching and conservative constructor apartness.
 runMatchingChecks :: DynFlags -> IO ()

@@ -2238,6 +2238,104 @@ runNatSourceChecks = do
     runOpaqueCallSourceChecks
     runConstructorCallSourceChecks
     runBetaCallSourceChecks
+    runFunctionBinderSourceChecks
+
+-- | Add head-only retained function workers as a separate source corpus.
+retainedFunctionBinderSource :: String -> String -> String
+retainedFunctionBinderSource moduleName observation =
+    unlines $ concatMap insert (lines (retainedNatSource moduleName observation))
+  where
+    insert line@"      run :: Nat -> IO String" = map ("      " ++) declarations ++ [line]
+    insert line = [line]
+    declarations =
+        [ "-- | Ignore all three runtime arguments, including the opaque function head."
+        , "keepCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n) -> Int"
+        , "keepCall f n payload = 42"
+        , ""
+        , "-- | Return the original payload at the same actual function and scalar indices."
+        , "idCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n) -> Vec Int (f n)"
+        , "idCall f n payload = payload"
+        , ""
+        , "-- | Fix a lifted error result before a visible native type argument."
+        , "raiseFunctionError :: forall a. String -> a"
+        , "raiseFunctionError = error"
+        , ""
+        , "-- | Supply an ignored payload without evaluating its index or head."
+        , "ignoreCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "ignoreCall f n ="
+        , "    let payload :: Vec Int (f n)"
+        , "        payload = raiseFunctionError @(Vec Int (f n)) \"function-payload\""
+        , "     in keepCall f n payload"
+        , ""
+        , "-- | Demand the original payload through a fully instantiated identity caller."
+        , "demandCallPayload :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "demandCallPayload f n ="
+        , "    let caller :: Vec Int (f n) -> Vec Int (f n)"
+        , "        caller = idCall f n"
+        , "        payload :: Vec Int (f n)"
+        , "        payload = raiseFunctionError @(Vec Int (f n)) \"function-payload\""
+        , "     in length (vecList (caller payload))"
+        , ""
+        , "-- | Transport an already-instantiated caller through a case on its whole index."
+        , "observeFunctionCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> [Int]"
+        , "observeFunctionCall f n ="
+        , "    let caller :: Vec Int (f n) -> Vec Int (f n)"
+        , "        caller = idCall f n"
+        , "     in case f n of"
+        , "            Z -> let payload :: Vec Int (f n); payload = VNil in vecList (caller payload)"
+        , "            S k -> let payload :: Vec Int (f n); payload = VCons 42 (replicateNative @Int k 42) in vecList (caller payload)"
+        , ""
+        , "-- | Keep independently closed input and result domains on a function binder."
+        , "keepMixedCall :: foreach (f :: Bool -> Nat) -> foreach (b :: Bool) -> Vec Int (f b) -> Int"
+        , "keepMixedCall f b payload = 42"
+        , ""
+        , "-- | Ignore a mixed-domain payload through the exact actual head."
+        , "ignoreMixedCall :: foreach (f :: Bool -> Nat) -> foreach (b :: Bool) -> Int"
+        , "ignoreMixedCall f b ="
+        , "    let payload :: Vec Int (f b)"
+        , "        payload = raiseFunctionError @(Vec Int (f b)) \"mixed-payload\""
+        , "     in keepMixedCall f b payload"
+        , ""
+        , "makeFunctionHead :: Int -> Nat -> Nat"
+        , "makeFunctionHead token = error \"producer-head\""
+        ]
+
+-- | Preserve payload and head demand without extending inherited totals.
+runFunctionBinderSourceChecks :: GHC.Ghc ()
+runFunctionBinderSourceChecks = do
+    let moduleName = "NativeSourceFunctionBinders"
+        observation =
+            unlines
+                [ "do finite <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (observeFunctionCall f n, ignoreCall f n)))"
+                , "        ignored <- driveNat (\\n -> let { f :: Nat -> Nat; f = bottomFunction } in observeInt (ignoreCall f n)) bottomNat"
+                , "        produced <- driveNat (\\n -> let { f :: Nat -> Nat; f = makeFunctionHead 7 } in observeInt (ignoreCall f n)) bottomNat"
+                , "        constants <- driveNat (\\n -> let { f :: Nat -> Nat; f = constantZeroNat } in pure (show (observeFunctionCall f Z,observeFunctionCall f (S Z)))) Z"
+                , "        headOnly <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (take 1 (observeFunctionCall f (S n))))) bottomNat"
+                , "        cyclicPrefix <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (take 4 (observeFunctionCall f n)))) cyclicNat"
+                , "        localAlias <- driveNat (\\n -> let { f :: Nat -> Nat; f = \\x -> x } in pure (show (observeFunctionCall f n))) (S Z)"
+                , "        mixed <- drive (\\b -> let { f :: Bool -> Nat; f = \\x -> case x of {False -> Z;True -> S Z} } in observeInt (ignoreMixedCall f b)) bottomBool"
+                , "        pure (finite ++ unlines [ignored,produced,constants,headOnly,cyclicPrefix,localAlias,mixed])"
+                ]
+        expected = ["([],42)", "([42,42],42)", "([42,42,42],42)", "42", "42", "([],[])", "[42]", "[42,42,42,42]", "[42]", "42"]
+    expression <- sourceEntry moduleName (retainedFunctionBinderSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source function binders" expression
+    unless (lines actual == expected) $ fail ("FAIL: source function binder demand: " ++ show actual)
+    forM_
+        [ ("NativeFunctionBinderPayload", "driveNat (\\n -> let { f :: Nat -> Nat; f = bottomFunction } in observeInt (demandCallPayload f n)) bottomNat", "function-payload")
+        , ("NativeFunctionBinderHead", "driveNat (\\n -> let { f :: Nat -> Nat; f = bottomFunction } in observeInt (length (observeFunctionCall f n))) bottomNat", "native-bottom-function")
+        , ("NativeFunctionBinderIndex", "driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in observeInt (length (observeFunctionCall f n))) bottomNat", "native-bottom-nat")
+        , ("NativeFunctionBinderProducer", "driveNat (\\n -> let { f :: Nat -> Nat; f = makeFunctionHead 7 } in observeInt (length (observeFunctionCall f n))) bottomNat", "producer-head")
+        ]
+        $ \(name, body, fragment) -> do
+            bottomExpression <- sourceEntry name (retainedFunctionBinderSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                Left exception -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
 
 -- | Add signed beta-call workers as a separate source corpus.
 retainedBetaCallSource :: String -> String -> String
