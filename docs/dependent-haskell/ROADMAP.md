@@ -58,6 +58,13 @@ programs. All five focused registered regressions pass. The full GHC suite has
 not run for M38. These checks establish the measured subset, not general type
 soundness or production readiness.
 
+M40 also accepts bounded immediate lambda applications as retained source
+arguments. Both stages pass its 41-client matrix, with 16 compilations and
+25 located errors. The public and raw examples now pass 106 observations per
+stage; the old 94-line prefix and 562 packed-vector observations remain.
+Actual zonked lambda metadata passes before desugaring on both stages.
+This adds no general term evaluation or ordinary optimizer support.
+
 ## Main relationships
 
 Arrows have the same direction as the upstream graph: a task points to a
@@ -188,7 +195,10 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   papers prove our implementation. Advances `R05`.
   M39 records the correspondence limits and adds checked Core beta exposure.
   The [contract](CORE.md#checked-beta-exposure) and existing API fixtures cover
-  this bounded reduction. The full C1 obligation remains open.
+  this bounded reduction. M40 exposes the same subset from source with checked
+  scope, multiplicity and Strict-mode boundaries. Its
+  [source contract](CORE.md#bounded-source-beta-applications) preserves ordinary
+  usage checking. The full C1 obligation remains open.
 - [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
   missing transformations incrementally, including normal simplification and
   unfolding handling. Preserve Core Lint, type preservation, runtime demand,

@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M39 passes both stages and focused regressions; 562 packed-vector plus 94 qualified/container/worker runtime observations |
+| Last verified checkpoint | M40 passes both stages and focused regressions; 562 packed-vector plus 106 qualified/container/worker runtime observations |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -73,7 +73,8 @@ Last updated: 2026-11-15.
 | Fixed native applications | Explicit type choices and complete expected proof types work with ImpredicativeTypes; runtime demand and function identity pass both stages |
 | Declared native arguments | Bare local and global argument types select complete erased choices before checking witnesses under ImpredicativeTypes; ordinary usage, evidence and scope checks remain |
 | Core beta exposure | Immediate checked lambdas normalize in the native index bridge; capture, interface evidence, and direct CorePrep demand checks pass |
-| Next task | Admit the checked beta subset from source, with explicit scope, multiplicity, and Strict-mode boundaries; continue ROADMAP C1/C2 |
+| Source index beta | Immediate single-variable lambda applications pass ordinary checking with actual binder identity; atomic arguments, supported domains and Many multiplicity remain required; Strict rejects the new form |
+| Next task | Check variable-alias propagation in native Core as a bounded C2 step; preserve index identity, lazy demand and sharing; ROADMAP C1/C2 remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3530,8 +3531,8 @@ Identity applied to a runtime Nat variable keeps that actual variable.
 Successor produces the corresponding constructor index. Constant zero can
 ignore a bottom-valued variable. The argument must normalize to an eligible
 variable or nullary constructor. Opaque functions and constructed beta arguments
-remain gated. This changes Core conversion; source lambda arguments remain
-unsupported until a separate checked elaboration increment.
+remain gated. M39 changed Core conversion. Source lambda arguments remained
+unsupported at that checkpoint; M40 adds the checked source subset below.
 
 `normaliseNativeIndexExpr` returns the runtime normal form and index together.
 CorePrep consumes that pair before naming. A variable result stays that same
@@ -3576,3 +3577,68 @@ Bootstrap build: 1m56s, peak 2008 MiB. Self-hosted build: 10m58s, peak 4502 MiB.
 Both use a 16 GiB cap. Final validation peaks at 1196 MiB under 4 GiB.
 Swap is disabled. M38 and the older evidence remain frozen. The full GHC
 suite and older standalone corpora were not rerun. ROADMAP C1/C2 remain open.
+
+## M40: checked source lambda indices
+
+The retained argument checker now admits an immediate single-variable,
+unguarded lambda application. The lambda has no local bindings. Its argument
+must normalize to an eligible local variable or nullary constructor. Its body
+must remain in the supported index grammar. Nested applications and lexical
+shadowing preserve the actual binder Name and Unique. Constructor fields use
+their own declared domains. The original argument still passes ordinary
+checking once.
+
+For example, the source client now checks:
+
+```haskell
+betaSuccessor :: foreach (n :: Nat) -> Int -> Vec Int (S n)
+betaSuccessor n x = replicateNative @Int ((\k -> S k) n) x
+```
+
+`Strict` rejects this new form with located GHC-83605. Expression signatures,
+non-variable patterns, opaque producers, lets, cases, residual lambdas and
+non-atomic beta arguments remain gated. No Core form, equality rule or general evaluator was
+added. An unsigned captured local alias can still have flexible multiplicity
+at this boundary. M39 and M40 both reject that case. A complete local `Nat`
+signature supplies `Many`; the signed alias works with and without beta.
+
+Both stages pass the 41-client source matrix: 16 compile and 25 reject with
+located diagnostics. Each stage separately checks six actual zonked lambda
+Ids before desugaring. All six have `Nat` domain, `Many` multiplicity and the
+renamed source identity, including under `LinearTypes`. The inherited 41- and
+64-client matrices preserve their outcomes, codes and source tokens. Their
+47 predefined controls and argument-cache checks pass.
+
+All 17 final phases pass, with 12 launches and five phase reuses.
+Raw and public programs pass 106 observations in each stage, with the original
+94 lines unchanged. The runner compiles `IndexBetaClient` in a separate
+directory. Its 12 observations cover finite inputs, shadowing, ignored and
+demanded bottoms, partial successor fields, cyclic prefixes and demand at
+function WHNF. Both stages also preserve all 562 packed-vector observations. Five
+registered tests pass across 39 cases with 34 skips and no unexpected failures
+or framework warnings. The API goldens remain one and 37 lines. The existing
+source-program corpus remains 243 package/322 total rejection programs and
+95 quiet positives; these counts exclude the new source matrix and raw checks.
+No tracked test or golden output was added.
+
+Selected compiler: `5853b765f3319ed994bb088f4ce257a61bbeafc5`. The fixture
+diagnostic update is in `366f94c32f5bea38c1a45916e0667aecaa52ac97`. The complete
+archive contains 39 compiler inputs. The source manifest covers 54 paths. All
+three changed compiler paths are included. Snapshot v2 captured the 39 inputs
+before the successful bootstrap build. Snapshot v3 captured the same 39 inputs
+before the self-hosted build. The M39 post-build correction and older evidence
+remain preserved. Evidence uses `native-source-beta-*`. Baseline and matrix
+interface-setup failures, the first bootstrap AST-pattern failure, the measured
+unsigned-alias oracle correction and the stale API diagnostic assertion remain
+saved.
+
+The bootstrap build took 1m11s and peaked at 1818 MiB. The self-hosted build
+took 17m18s and peaked at 5221 MiB. Both used a 16 GiB cap. Final validation
+peaked at 1317 MiB under 4 GiB, with no swap. The full GHC suite and older
+standalone corpora were not rerun. The next bounded C2 step is checked variable-
+alias propagation in native Core. General transformations and the other
+[roadmap gates](ROADMAP.md#work-sequence-for-this-fork) remain open.
+
+See the [source contract](CORE.md#bounded-source-beta-applications),
+[M40 plan](PLAN.md#m40-bounded-source-lambda-index-applications) and
+[pinned provenance](REFERENCES.md#bounded-source-beta-applications).

@@ -2923,10 +2923,11 @@ in [`new_infer_arg_ty`](../../compiler/GHC/Tc/Utils/Unify.hs).
 fixing `p` to `One`. Final
 [`commitFlexi`](../../compiler/GHC/Tc/Zonk/Type.hs) defaults an unresolved
 multiplicity to `Many`. This supports the bounded provisional-Many design.
-The bootstrap API probe checks six actual zonked lambda binders with
+Both compiler stages run an API probe over six actual zonked lambda binders with
 `LinearTypes`. Their Nat domains, Many multiplicities, and renamed Names/Unique
 values match before desugaring or SimpleOpt. The source and probe are in
-`native-source-beta-metadata-v1`; execution is recorded by the early smoke run.
+`native-source-beta-metadata-v1`. The bootstrap early smoke and final
+self-hosted phase record execution with matching compiler inputs.
 Do not generalize these checks to signatures or other forms that can impose a
 linear arrow.
 

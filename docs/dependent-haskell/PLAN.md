@@ -2577,8 +2577,35 @@ increment admits a bounded runtime argument expression. General term syntax in
 types, promotion, definition unfolding, Strict lowering and ordinary optimizer
 support remain open.
 
-- [ ] Preserve the measured source rejection baseline and complete M39 input coverage.
-- [ ] Add the bounded resolver and owning Note without a second argument check.
-- [ ] Check actual zonked lambda metadata and located rejection diagnostics.
-- [ ] Run the public source example with runtime demand and prefix checks.
-- [ ] Build both stages, run focused regressions, freeze evidence, and record the boundary.
+- [x] Preserve the measured source rejection baseline and complete M39 input coverage.
+- [x] Add the bounded resolver and owning Note without a second argument check.
+- [x] Check actual zonked lambda metadata and located rejection diagnostics.
+- [x] Run the public source example with runtime demand and prefix checks.
+- [x] Build both stages, run focused regressions, freeze evidence, and record the boundary.
+
+Both stages pass the 41-client matrix: 16 compile and 25 reject at the expected
+locations. Each stage also checks six actual zonked lambda Ids before
+desugaring. Their renamed identities, Nat domains and Many multiplicities
+match. The inherited 41- and 64-client matrices retain their M39 outcomes.
+All 47 predefined controls pass. The raw and public examples pass 106
+observations per stage, including the unchanged 94-line prefix. All 562
+packed-vector observations remain unchanged. Five registered regressions pass
+across 39 cases with 34 skips. The API source-program inventory remains
+243 package/322 total rejection programs and 95 quiet positives.
+
+The 17 final phases comprise 12 launches and five reused successes. Reuse
+checks each phase's own input hashes. The selected compiler is
+`5853b765f3319ed994bb088f4ce257a61bbeafc5`; the fixture source is
+`366f94c32f5bea38c1a45916e0667aecaa52ac97`. The complete compiler archive has
+39 inputs and covers all three changed compiler paths. The corrected bootstrap
+build used the v2 snapshot. The v3 snapshot adds the diagnostic fixture change
+before self-hosting; its 39 compiler inputs are identical. Source coverage is
+54 paths. The M39 correction and older evidence remain frozen.
+
+Bootstrap: 1m11s, peak 1818 MiB. Self-host: 17m18s, peak 5221 MiB. Both builds
+use a 16 GiB cap. Final validation peaks at 1317 MiB under 4 GiB. Swap is zero.
+Failed setup, AST, source-oracle and stale diagnostic attempts remain saved.
+The unsigned captured-alias rejection is a measured pre-existing multiplicity
+boundary; a signed alias works. The existing CoreRun diagnostic fragment now
+matches the expanded grammar. Its 37-line golden remains unchanged.
+The full GHC suite and older standalone matrices were not rerun.

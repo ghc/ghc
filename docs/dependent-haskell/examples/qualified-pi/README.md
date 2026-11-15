@@ -32,19 +32,19 @@ bash docs/dependent-haskell/examples/qualified-pi/run-example.sh "$PWD"
 Set `QUALIFIED_PI_GHC` to choose the compiler. Set `QUALIFIED_PI_WORK` to
 choose a separate output directory. The script compiles the shared
 `PackedVecLibrary`, then the value provider, producer, ground application
-client, known-argument client, identity client and
+client, known-argument client, identity client, isolated `IndexBetaClient` and
 executable.
 It copies interfaces between compilation directories and enables Core and
 STG Lint. It runs at `-O0`.
 
-The executable checks 94 observations. Finite lengths come through
+The executable checks 106 observations. Finite lengths come through
 independent `readIORef` calls. Other checks cover ignored and demanded bottom,
 cyclic indices, partial application, payload sharing and function
 `StableName` comparisons. Six dictionary checks use the single-method
 `Demand` class with `GHC.Exts.withDict`. They distinguish vector shape from
 method demand. They do not inject a bottom global `Eq Int` dictionary.
 
-Both compiler stages pass all 94 observations. The identity results apply to
+Both compiler stages pass all 106 observations. The identity results apply to
 these programs and build settings.
 The full optimizer and GHC test suite remain outside this validation.
 
@@ -127,6 +127,40 @@ The 18 new observations preserve the previous 76-line prefix. They check
 IORef-fed lengths, an ignored full worker expression, proof and tag demand,
 two more function identity comparisons, partial indices, and a bounded prefix
 from a cyclic index. Both stages pass these checks at `-O0` with Core/STG Lint.
+
+`IndexBetaClient` adds 12 observations after the unchanged 94-line prefix.
+It passes immediate source lambda applications as retained arguments:
+
+```haskell
+betaIdentity :: foreach (n :: Nat) -> Int -> Vec Int n
+betaIdentity n x = replicateNative @Int ((\k -> k) n) x
+
+betaSuccessor :: foreach (n :: Nat) -> Int -> Vec Int (S n)
+betaSuccessor n x = replicateNative @Int ((\k -> S k) n) x
+
+betaConstant :: Nat -> Int -> Vec Int Z
+betaConstant n x = replicateNative @Int ((\k -> Z) n) x
+```
+
+The compiler checks the original argument once. The lambda must have one bare
+variable pattern, one unguarded body and no local bindings. Its argument must
+normalize to an eligible local variable or nullary constructor. Nested
+applications and shadowing preserve binder identity. `Strict` rejects this
+form. Expression signatures, opaque producers, non-atomic arguments and general
+evaluation remain gated. An unsigned captured local alias retains its existing flexible-
+multiplicity restriction; a complete local `Nat` signature supplies `Many`.
+
+Independent IORef inputs 0, 2 and 3 check identity, successor, constant zero,
+nested beta and shadowing. Constant zero ignores a bottom index and payload.
+Identity demands the index when vector construction needs it. Successor leaves
+its predecessor lazy until the tail is selected. A cyclic index supplies a
+bounded prefix. Evaluating the partial worker to WHNF raises its original
+bottom-function marker. Separate checks demand a payload and leave unused
+package fields lazy. Both stages pass all 106 observations.
+The separate metadata probe also checks six actual lambda Ids in each stage
+before desugaring. Each has `Nat` domain, `Many` multiplicity and its renamed
+source Name/Unique.
+These checks add no singleton argument, Core form or equality rule.
 
 See the [typing rules](../../CORE.md#qualified-retained-function-types),
 [source provenance](../../REFERENCES.md#qualified-retained-function-types)
