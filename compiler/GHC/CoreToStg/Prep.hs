@@ -1283,7 +1283,8 @@ liftNativeIndexTransport context transport ty
       | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) ty) = Just ty
       | Just ty' <- coreView ty = abstract env ty'
     abstract env (TermVarTy index) = mkTyVarTy <$> lookupVarEnv env index
-    abstract env (TermAppTy fun arg) = TermAppTy fun <$> abstract env arg
+    abstract env (TermAppTy fun arg)
+      | not (isJust (lookupVarEnv env fun)) = TermAppTy fun <$> abstract env arg
     abstract env (DepFunTy index body)
       | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) (varType index))
       = mkDepFunTy index <$> abstract (delVarEnv env index) body
