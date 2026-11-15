@@ -2441,16 +2441,16 @@ runCallApplicationSourceChecks = do
                 Left exception -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
                 Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
     forM_
-        [ ("NativeCallApplicationSiblingRow", ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload); S k -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload) }"])
-        , ("NativeCallApplicationDistinctIndex", ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> foreach (m :: Nat) -> Int", "badCall f n m = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f m VNil } in length (vecList payload); S k -> 42 }"])
-        , ("NativeCallApplicationDistinctHead", ["badCall :: foreach (f :: Nat -> Nat) -> foreach (g :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f g n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall g n VNil } in length (vecList payload); S k -> 42 }"])
+        [ ("NativeCallApplicationSiblingRow", 83865, ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload); S k -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload) }"])
+        , ("NativeCallApplicationDistinctIndex", 5617, ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> foreach (m :: Nat) -> Int", "badCall f n m = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f m VNil } in length (vecList payload); S k -> 42 }"])
+        , ("NativeCallApplicationDistinctHead", 5617, ["badCall :: foreach (f :: Nat -> Nat) -> foreach (g :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f g n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall g n VNil } in length (vecList payload); S k -> 42 }"])
         ]
-        $ \(name, declarations) -> do
+        $ \(name, code, declarations) -> do
             let source =
                     unlines
                         $ concatMap (\line -> if line == "      run :: Nat -> IO String" then map ("      " ++) declarations ++ [line] else [line])
                         $ lines (retainedCallApplicationSource name "pure \"unused\"")
-            sourceModuleRejects name 83865 "Vec" name source
+            sourceModuleRejects name code "Vec" name source
 
 -- | Add signed beta-call workers as a separate source corpus.
 retainedBetaCallSource :: String -> String -> String
