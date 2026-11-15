@@ -205,6 +205,10 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   sharing, and diagnostics at each step. Keep unsupported passes gated until
   checked. Run broader GHC compatibility checks before closing this task.
   Advances `R05`; it is also a release gate for later frontend work.
+  M41 adds one checked local variable-alias substitution. Direct API checks
+  cover scope, exact types, type-only dependencies and demand. Both stages
+  preserve the 106 raw/public and 562 vector observations. Ordinary inlining,
+  occurrence analysis and general unfolding handling remain gated.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement
   invisible retained binders and their explicit `@` overrides. Reuse inherited

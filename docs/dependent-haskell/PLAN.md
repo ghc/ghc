@@ -5,7 +5,7 @@ work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful chan
 to current GHC and complete the missing rules. The first working target is a
 retained Boolean argument whose value determines the result type.
 
-Last updated: 2026-11-14. Upstream compiler base:
+Last updated: 2026-11-15. Upstream compiler base:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
@@ -2644,8 +2644,53 @@ Keep all existing goldens. Add no tracked test. Preserve M40 evidence unchanged
 and use `native-variable-alias-*` for new evidence. Source alias defaulting,
 function indices and the broader C1/C2 obligations remain open.
 
-- [ ] Preserve a measured pre-change alias-retention baseline.
-- [ ] Add the native-only substitution and owning Note.
-- [ ] Check scope, metadata, exact types and fallback cases directly.
-- [ ] Check runtime demand and both-stage source execution.
-- [ ] Build both stages, freeze the focused evidence and record the boundary.
+- [x] Preserve a measured pre-change alias-retention baseline.
+- [x] Add the native-only substitution and owning Note.
+- [x] Check scope, metadata, exact types and fallback cases directly.
+- [x] Check runtime demand and both-stage source execution.
+- [x] Build both stages, prepare the focused evidence freeze and record the boundary.
+
+Compiler `25f7652dce2488c73115963a4396cf74a066c31c` implements this rule.
+The fixture source is `ddd23db09cd2270c95d36879694ac0e1378868a1`.
+The pre-build archive contains all 39 selected compiler inputs. Its source
+manifest covers 54 paths. The exact compiler delta is
+`compiler/GHC/Core/SimpleOpt.hs`.
+The old-M40 baseline compiles, then fails exactly at the first alias-removal
+assertion. Its earlier GHC-87543 import ambiguity was a setup failure.
+Both attempts remain saved.
+
+The unit fixture checks 17 valid cases: six transformation, identity and
+capture cases, plus 11 fallbacks. Four malformed inputs fail input Lint.
+Five direct runtime kernels check finite replication, bottom demand,
+a finite cyclic prefix, ignored bottom and bottom-function WHNF. These
+checks are separate from the unchanged source-program corpus: 243 package
+and 322 total rejection programs, with 95 quiet positives. The existing
+goldens remain one and 37 lines. No tracked test was added.
+
+All nine final phases pass: seven launches and two bootstrap API reuses.
+Reuse verifies each phase's own fixture and 39 compiler input hashes.
+Both stages pass 106 raw/public observations with the old 94-line prefix,
+plus all 562 packed-vector observations. Five registered regressions pass
+across 39 cases with 34 skips. There are no unexpected failures or framework
+warnings. The 41-client source matrix, inherited 41- and 64-client matrices,
+and Tc metadata probe were not rerun. The full GHC suite and older standalone
+corpora were not rerun.
+
+Bootstrap: 25.76s, peak 1826 MiB. Self-host: 10m33s, peak 4302 MiB.
+Both builds used 16 GiB. API checks peaked at 1219 MiB and final validation
+at 1203 MiB under 4 GiB. Swap is zero. The prepared freeze preserves the
+canonical M40 envelope, all 47 manifests and the older chain. It includes
+a complete external manifest for all 34 future-function research files,
+without changing existing cache manifests or claiming implementation.
+
+#### Next C1 task: opaque function-call indices (unimplemented)
+
+Specify the bounded index grammar and its substitution obligations before
+admission. Account for function-head substitution and composition, range
+free variables, and the scalar-only CorePrep/Tidy alias guards. Native
+SimpleOpt already keeps ordinary function beta as a lazy let with
+`so_inline = const False`; that behavior does not establish substitution closure.
+Preserve runtime scope, lazy demand and sharing. Function-call indices
+remain research only. Source alias defaulting and the other C1/C2 gates
+remain open. See the
+[pinned comparison](REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison).

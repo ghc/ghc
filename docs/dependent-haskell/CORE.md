@@ -1496,8 +1496,8 @@ arguments. It removes all provisional lambda binders from the resulting index.
 
 Keep the original renamed argument for ordinary checking. `tcValArg` checks it
 once and records usage. Resolution neither installs provisional Ids in the Tc
-environment nor changes the source expression. A bootstrap API probe inspects
-six actual zonked lambda binders before desugaring. With `LinearTypes`, their
+environment nor changes the source expression. At M40, both compiler stages
+inspect six actual zonked lambda binders before desugaring. With `LinearTypes`, their
 Nat domains, Many multiplicities, and renamed identities match.
 
 Require one VarPat, one unguarded RHS, and no local bindings or signatures.
@@ -1517,3 +1517,30 @@ zonking of the new bounded lambda after ordinary argument checking.
 See Note [Retained argument application] in `GHC.Tc.Gen.App`,
 [the source provenance](REFERENCES.md#bounded-source-beta-applications), and
 `IndexBetaClient.hs` in the public qualified-function example.
+
+### Checked native variable aliases
+
+M41 removes `let alias = actual in body` in the restricted native simplifier.
+The input RHS must be literally `Var actual`. Both Ids must be eligible local
+Many indices. The current substitution must resolve the target to another
+eligible variable of the same closed domain. Constructor and nonvariable
+ranges retain the existing path. Joins, recursive and top-level bindings,
+exported aliases, stable unfoldings, rules, inactive inline activation and
+loop-breaker aliases remain excluded.
+
+Store the same actual Id with `extendIdSubstWithClone`. This helper allocates
+no Id. It maintains the in-scope set and the variable substitution. Clear a
+stale alias entry in the inlining environment. Existing traversal substitutes
+terms, binder types, Type arguments, coercions and native indices together.
+Surviving binders use the existing capture-avoidance rules. The original Core
+must pass Lint. `lintLetBody` rejects a local index that escapes in its result
+type. The direct checks compare input and output types with alpha equality.
+
+An outer `let actual = opaqueProducer x` remains lazy and shared. The rule
+does not unfold that producer or inspect the target's unfolding. It creates no
+constructor, equality evidence or runtime check. Ordinary optimization stays
+disabled. Direct checks cover type-only dependencies, repeated Id identity,
+reused-Unique capture, fallback cases and lazy demand before CorePrep.
+The source alias multiplicity boundary is unchanged. See
+Note [Restricted dependent simplification] in `GHC.Core.SimpleOpt` and the
+[M41 plan](PLAN.md#m41-checked-native-variable-aliases).

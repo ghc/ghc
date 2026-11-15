@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M40 passes both stages and focused regressions; 562 packed-vector plus 106 qualified/container/worker runtime observations |
+| Last verified checkpoint | M41 passes both stages and focused regressions; 562 packed-vector plus 106 qualified/container/worker runtime observations |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -74,7 +74,8 @@ Last updated: 2026-11-15.
 | Declared native arguments | Bare local and global argument types select complete erased choices before checking witnesses under ImpredicativeTypes; ordinary usage, evidence and scope checks remain |
 | Core beta exposure | Immediate checked lambdas normalize in the native index bridge; capture, interface evidence, and direct CorePrep demand checks pass |
 | Source index beta | Immediate single-variable lambda applications pass ordinary checking with actual binder identity; atomic arguments, supported domains and Many multiplicity remain required; Strict rejects the new form |
-| Next task | Check variable-alias propagation in native Core as a bounded C2 step; preserve index identity, lazy demand and sharing; ROADMAP C1/C2 remain open |
+| Native variable aliases | Literal local Many aliases substitute the same eligible Id in terms, types and coercions; opaque producer bindings stay lazy and shared; excluded metadata and non-variable targets keep their bindings |
+| Next task | Specify bounded opaque function-call indices under C1, including function-head substitution, range scope, and CorePrep/Tidy protections; research only, with no admission yet |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3635,10 +3636,67 @@ saved.
 The bootstrap build took 1m11s and peaked at 1818 MiB. The self-hosted build
 took 17m18s and peaked at 5221 MiB. Both used a 16 GiB cap. Final validation
 peaked at 1317 MiB under 4 GiB, with no swap. The full GHC suite and older
-standalone corpora were not rerun. The next bounded C2 step is checked variable-
-alias propagation in native Core. General transformations and the other
+standalone corpora were not rerun. M41 checks variable-alias propagation in
+native Core below. General transformations and the other
 [roadmap gates](ROADMAP.md#work-sequence-for-this-fork) remain open.
 
 See the [source contract](CORE.md#bounded-source-beta-applications),
 [M40 plan](PLAN.md#m40-bounded-source-lambda-index-applications) and
 [pinned provenance](REFERENCES.md#bounded-source-beta-applications).
+
+## M41: checked native variable aliases
+
+The restricted native simplifier now removes `let alias = actual in body`
+when both Ids are eligible local Many indices in the same closed domain.
+The input RHS must be a literal variable. The current substitution must also
+map its target to an eligible variable. Existing traversal substitutes the
+same actual Id through terms, types and coercions, with capture avoidance.
+An outer `let actual = opaqueProducer x` stays lazy and shared. The rule
+does not unfold its target or enable general inlining. Recursive bindings,
+top-level bindings, excluded metadata and constructor targets keep their
+existing behavior. Source alias defaulting remains unchanged.
+
+The old-M40 baseline compiles the new fixture, then fails exactly at
+`native literal variable alias disappears`. This establishes the missing
+transformation. The earlier baseline attempt failed on import ambiguity
+GHC-87543 for `setIdExported`. That setup failure and its correction remain
+saved. It is not structural baseline evidence.
+
+The unit fixture checks 17 valid cases: six transformation, identity and
+capture cases, plus 11 fallback cases. Four malformed inputs fail Core Lint
+before simplification. Five direct runtime kernels check finite replication,
+demanded bottom, a finite cyclic prefix, ignored bottom and bottom-function
+WHNF. The source-program corpus remains 243 package/322 total rejection
+programs and 95 quiet positives. These counts exclude the new raw checks.
+The one-line and 37-line goldens remain unchanged. No tracked test was added.
+
+All nine focused phases pass, with seven launches and two bootstrap API
+reuses. Each reuse checks its own fixture and complete compiler input hashes.
+Both stages pass 106 raw and public observations, with the original 94 lines
+unchanged, and all 562 packed-vector observations. Five registered tests pass
+across 39 cases with 34 skips. There are no unexpected failures or framework
+warnings. The 41-client source matrix, inherited 41- and 64-client matrices,
+and pre-desugaring Tc metadata probe were not rerun. The full GHC suite and
+older standalone corpora were not rerun.
+
+Selected compiler: `25f7652dce2488c73115963a4396cf74a066c31c`. Fixture source:
+`ddd23db09cd2270c95d36879694ac0e1378868a1`. The pre-build snapshot covers
+39 compiler inputs and 54 source paths. Its exact compiler delta is
+`compiler/GHC/Core/SimpleOpt.hs`. The bootstrap build took 25.76s and peaked
+at 1826 MiB. The self-hosted build took 10m33s and peaked at 4302 MiB.
+Both used a 16 GiB cap. The API scope peaked at 1219 MiB, and final validation
+peaked at 1203 MiB, under 4 GiB. Swap is zero.
+
+Evidence uses `native-variable-alias-*`. The prepared freeze preserves the
+canonical M40 envelope, its 47 manifests and the older chain. It also covers
+all 34 files in the external function-index research cache, including the
+substitution-closure comparison. Existing cache manifests remain unchanged.
+Opaque function-call indices are the next C1 design task. They remain
+unimplemented. Admission needs function-head substitution and composition,
+range free-variable tracking, and CorePrep/Tidy protections that currently
+accept only scalar indices. Native SimpleOpt already keeps ordinary function
+beta as a lazy let when `so_inline = const False`. This behavior does not
+settle those remaining obligations. General C1/C2 gates remain open.
+
+See the [M41 plan](PLAN.md#m41-checked-native-variable-aliases) and
+[function-index comparison](REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison).
