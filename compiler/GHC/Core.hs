@@ -34,7 +34,8 @@ module GHC.Core (
 
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
-        exprToNativeIndex, mapNativeIndex, isNativeIndexAlt, isNativeIndexAliasAlt,
+        exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
+        isNativeIndexAlt, isNativeIndexAliasAlt,
 
         mkBinds,
 
@@ -113,7 +114,7 @@ import GHC.Unit.Module
 import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Var.Env( InScopeSet )
+import GHC.Types.Var.Env( InScopeSet, IdEnv, emptyVarEnv, lookupVarEnv, extendVarEnv )
 import GHC.Types.Var
 import {-# SOURCE #-} GHC.Types.Id ( isDataConWorkId_maybe )
 import GHC.Types.Literal
@@ -2595,21 +2596,87 @@ mkTyBind tv ty      = NonRec tv (Type ty)
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)
 
--- | Convert a local value or saturated constructor tree to a native index.
--- Do not evaluate the expression or inspect identifier unfoldings.
+-- | Convert a supported expression to its checked native index normal form.
+-- See Note [Checked native index beta exposure].
 exprToNativeIndex :: CoreExpr -> Maybe Type
-exprToNativeIndex expr
-  | Var v <- expr, isNativeIndexId v
-  = Just (TermVarTy v)
-  | (Var worker, args) <- collectArgs expr
-  , Just con <- isDataConWorkId_maybe worker
-  , isNativeIndexType (mkTyConTy (dataConTyCon con))
-  , args `lengthIs` dataConSourceArity con
-  = do { indices <- traverse exprToNativeIndex args
-       ; if nativeIndexArgKinds con indices
-         then Just (mkTyConApp (promoteDataCon con) indices)
-         else Nothing }
-  | otherwise = Nothing
+exprToNativeIndex expr = snd <$> normaliseNativeIndexExpr expr
+
+-- | Return a supported runtime normal form together with its native index.
+-- The caller must check the original expression's typing and scope with Lint.
+-- See Note [Checked native index beta exposure].
+normaliseNativeIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
+normaliseNativeIndexExpr = go emptyVarEnv
+  where
+    go :: IdEnv (CoreExpr, Type) -> CoreExpr -> Maybe (CoreExpr, Type)
+    go env expr
+      | Var v <- expr, isNativeIndexId v
+      = case lookupVarEnv env v of
+          Just result@(_, index)
+            | sameNativeIndexDomain (varType v) (typeKind index) -> Just result
+            | otherwise -> Nothing
+          Nothing -> Just (expr, TermVarTy v)
+      | App (Lam binder body) arg <- expr
+      , isNativeIndexId binder
+      = do { arg_result@(arg', arg_index) <- go env arg
+           ; case arg' of
+               Var {}
+                 | sameNativeIndexDomain (varType binder) (typeKind arg_index)
+                 -> do { body_result@(_, body_index)
+                           <- go (extendVarEnv env binder arg_result) body
+                       ; if sameNativeIndexDomain (varType binder) (typeKind body_index)
+                         then Just body_result
+                         else Nothing }
+               _ -> Nothing }
+      | (Var worker, args) <- collectArgs expr
+      , Just con <- isDataConWorkId_maybe worker
+      , isNativeIndexType (mkTyConTy (dataConTyCon con))
+      , args `lengthIs` dataConSourceArity con
+      = do { results <- traverse (go env) args
+           ; let (args', indices) = unzip results
+           ; if nativeIndexArgKinds con indices
+             then Just (mkApps (Var worker) args',
+                        mkTyConApp (promoteDataCon con) indices)
+             else Nothing }
+      | otherwise = Nothing
+
+{- Note [Checked native index beta exposure]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A native index normal form is a local runtime variable or a saturated ordinary
+constructor tree. Also accept an immediate (\b -> body) arg when b is an
+eligible local Many index binder. The argument must normalize to an atom:
+an eligible variable or a nullary constructor worker. Require the argument,
+binder, and body result to have the same supported closed algebraic domain.
+Every constructor field must have its declared domain.
+
+The environment contains only normalized atom/index pairs. Return a stored
+range directly; do not substitute through it again. Thus an inner binder does
+not capture a free variable in an outer range. Repeated uses of b retain the
+same actual variable. Reject a constructed argument with fields, rather than
+duplicate its allocation when b occurs more than once. This finite syntax walk
+does not inspect an Id unfolding, force a runtime value, or admit residual
+applications, casts, lets, cases, ticks, or eta conversion.
+
+Return both the normalized expression and its index. CorePrep must use that
+expression before naming constructor arguments. A result variable must remain
+that variable; an alias case could force it. mapNativeIndex and type recovery
+use this same conversion. The caller must still Lint the original expression
+to check all actual scopes, types, and metadata. This helper checks only the
+supported grammar, binder restrictions, and domains.
+
+DC's An-Beta and An-AppAbs rules require a typed primitive reduction. Agda's
+application checking substitutes an actual argument in the dependent result.
+These are precedents, not a preservation proof for this fragment of lazy Core.
+See docs/dependent-haskell/REFERENCES.md#core-contract-audit-and-bounded-beta-exposure.
+No general evaluator, nominal proof from Coercible, or new coercion is added.
+-}
+
+-- | Compare supported closed domains after expanding type synonyms.
+sameNativeIndexDomain :: Type -> Type -> Bool
+sameNativeIndexDomain left right
+  | TyConApp left_tc [] <- coreFullView left
+  , TyConApp right_tc [] <- coreFullView right
+  = left_tc == right_tc
+  | otherwise = False
 
 -- | Check the domains of a saturated promoted constructor's field indices.
 nativeIndexArgKinds :: DataCon -> [Type] -> Bool
@@ -2617,16 +2684,13 @@ nativeIndexArgKinds con indices
   = and (zipWith same_domain indices (dataConRepArgTys con))
   where
     same_domain index (Scaled _ ty)
-      | TyConApp index_tc [] <- coreFullView (typeKind index)
-      , TyConApp field_tc [] <- coreFullView ty
-      = index_tc == field_tc
-      | otherwise = False
+      = sameNativeIndexDomain (typeKind index) ty
 
 -- | Substitute in a supported runtime index without evaluating its value.
 -- Leave expressions outside the supported index language unchanged.
 mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr
 mapNativeIndex subst expr
-  | Just index <- exprToNativeIndex expr
+  | Just (_, index) <- normaliseNativeIndexExpr expr
   = let index' = subst index
     in case from_index index' of
          Just expr' -> expr'

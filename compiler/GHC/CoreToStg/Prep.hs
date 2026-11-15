@@ -1084,7 +1084,7 @@ body of the eta-expansion lambda, resulting in
 which is unproblematic.
 -}
 
--- | Name constructed retained arguments with checked case-alias evidence.
+-- | Normalize and name retained arguments with checked index evidence.
 -- See Note [Retained constructor arguments in CorePrep].
 nameNativeConstructorArgs :: CoreExpr -> UniqSM (Maybe CoreExpr)
 nameNativeConstructorArgs expr
@@ -1103,7 +1103,8 @@ nameNativeConstructorArgs expr
     needs_names _ [] = False
     needs_names ty (arg : rest)
       | DepFunTy {} <- coreFullView ty
-      , Just (TyConApp _ (_ : _)) <- exprToNativeIndex arg = True
+      , not (exprIsTrivial arg)
+      , Just {} <- normaliseNativeIndexExpr arg = True
       | otherwise = needs_names (applyTypeToArgs ty [arg]) rest
 
     build ty app transport wrap []
@@ -1135,27 +1136,28 @@ nameNativeConstructorArgs expr
       | otherwise = return ()
 
     name_index arg
-      | Just index <- exprToNativeIndex arg
-      , (Var worker, fields) <- collectArgs arg
-      , Just con <- isDataConWorkId_maybe worker
-      , not (null fields)
-      = do { named <- mapM name_index fields
-           ; let atoms = [atom | (atom, _, _) <- named]
-                 field_cos = [co | (_, co, _) <- named]
-                 wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
-                 scrut = mkConApp con atoms
-                 scrut_index = expectJust (exprToNativeIndex scrut)
-           ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType arg)
-           ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
-                        (mkNomEqPred (TermVarTy value) scrut_index)
-           ; let co = mkTransCo (mkCoVarCo proof)
-                        (mkTyConAppCo Nominal (promoteDataCon con) field_cos)
-                 wrap body = wrap_fields $
-                   Case scrut value (exprType body) [Alt DEFAULT [proof] body]
-           ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
-               return (Var value, co, wrap) }
-      | Just index <- exprToNativeIndex arg
-      = return (arg, mkReflCo Nominal index, id)
+      | Just (normal, index) <- normaliseNativeIndexExpr arg
+      = case collectArgs normal of
+          (Var worker, fields)
+            | Just con <- isDataConWorkId_maybe worker
+            , not (null fields)
+            -> do { named <- mapM name_index fields
+                  ; let atoms = [atom | (atom, _, _) <- named]
+                        field_cos = [co | (_, co, _) <- named]
+                        wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
+                        scrut = mkConApp con atoms
+                        scrut_index = expectJust (exprToNativeIndex scrut)
+                  ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
+                  ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
+                               (mkNomEqPred (TermVarTy value) scrut_index)
+                  ; let co = mkTransCo (mkCoVarCo proof)
+                               (mkTyConAppCo Nominal (promoteDataCon con) field_cos)
+                        wrap body = wrap_fields $
+                          Case scrut value (exprType body) [Alt DEFAULT [proof] body]
+                  ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
+                      return (Var value, co, wrap) }
+          (Var _, []) -> return (normal, mkReflCo Nominal index, id)
+          _ -> nativeIndexTransportError "an unsupported normalized retained argument"
       | otherwise = nativeIndexTransportError "an unsupported retained argument"
 
 -- | Lift index equalities through value types and fixed-domain retained binders.
@@ -1437,9 +1439,10 @@ cpeApp top_env expr
         when (cp_allowNativeDependent (cpe_config env)) $
           case coreFullView (exprType fun') of
             DepFunTy {}
-              | Just (TyConApp _ (_ : _)) <- exprToNativeIndex arg
+              | not (exprIsTrivial arg)
+              , Just {} <- normaliseNativeIndexExpr arg
               -> throwGhcException (Sorry
-                   "Native dependent Core cannot transport a constructor-tree retained argument across this application spine in CorePrep.")
+                   "Native dependent Core cannot normalize a non-atomic retained argument across this application spine in CorePrep.")
             _ -> pure ()
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
@@ -1476,6 +1479,13 @@ so this strict case does not force k. Name nested constructor fields recursively
 Compose their equalities with the outer constructor equality. The outer proof
 then mentions the actual prepared fields, while transport recovers the original
 constructor tree. A variable field, including a bottom or cyclic value, stays lazy.
+
+Normalize a checked index beta redex before this naming step. Use the expression
+and index returned together by normaliseNativeIndexExpr. A variable result stays
+that variable. Do not put it under a strict alias case. A constructor result uses
+the checked naming rule above. Leaving the original redex for ordinary ANF naming
+would introduce a new Id whose index differs from the checked beta result.
+See Note [Checked native index beta exposure] in GHC.Core.
 
 Walk the complete supplied application with fresh symbolic index placeholders.
 For each later ordinary argument, lift the prepared-to-original index equalities
