@@ -3690,7 +3690,7 @@ runSourceRejectChecks = do
         , ("inner erased forall", 83605, "within the scope of a retained binder", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
         , ("non-variable retained pattern", 83605, "bare variable pattern", [], local [] selection ["keep _ x = x"] "42")
         , ("multiple variable equations", 83605, "one unguarded clause for each constructor", [], local [] selection (identity ++ identity) "42")
-        , ("producer expression argument", 83605, "local index variable or a supported constructor tree", [], local [] consumer identity "keep (not False) 42")
+        , ("producer expression argument", 83605, "local index variable, a supported constructor tree, or a supported immediate lambda application", [], local [] consumer identity "keep (not False) 42")
         , ("nonreflexive indexed constraint", 18872, "True", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
         , ("general indexed constraint", 39999, "Show", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
         , ("Quick Look through ($)", 83605, "Quick Look inference", [], local [] consumer ["keep b x = 42"] "(keep $ True) 42")

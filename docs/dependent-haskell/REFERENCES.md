@@ -2922,9 +2922,13 @@ in [`new_infer_arg_ty`](../../compiler/GHC/Tc/Utils/Unify.hs).
 [`submult`](../../compiler/GHC/Core/Multiplicity.hs) accepts `One <= p` without
 fixing `p` to `One`. Final
 [`commitFlexi`](../../compiler/GHC/Tc/Zonk/Type.hs) defaults an unresolved
-multiplicity to `Many`. This supports the bounded provisional-Many design;
-the actual zonked-lambda metadata probe remains pending. Do not generalize this
-argument to signatures or other forms that can impose a linear arrow.
+multiplicity to `Many`. This supports the bounded provisional-Many design.
+The bootstrap API probe checks six actual zonked lambda binders with
+`LinearTypes`. Their Nat domains, Many multiplicities, and renamed Names/Unique
+values match before desugaring or SimpleOpt. The source and probe are in
+`native-source-beta-metadata-v1`; execution is recorded by the early smoke run.
+Do not generalize these checks to signatures or other forms that can impose a
+linear arrow.
 
 [`decideBangHood`](../../compiler/GHC/HsToCore/Utils.hs) adds an outer bang to a
 bare pattern under `Strict`. Reducing a constant lambda without that demand
