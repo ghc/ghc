@@ -26,7 +26,7 @@ import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Utils.Env ( tcLookupIdMaybe, tcLookupConLike )
+import GHC.Tc.Utils.Env ( tcLookupIdMaybe, tcLookupConLike, tcLookupLcl_maybe )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
