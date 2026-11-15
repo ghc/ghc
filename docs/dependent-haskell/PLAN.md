@@ -2511,3 +2511,74 @@ checks. Replacement opaque-producer denials retain unfolding error thunks.
 Preserve both failed attempts and the passing third attempt. Source syntax is
 unchanged. The next increment must account for Strict pattern demand and the
 actual lambda binder's final multiplicity before admitting source applications.
+
+
+### M40: bounded source lambda-index applications
+
+The M39 Core bridge and backend are the implementation baseline. Add no Core
+form or evaluator. Use a new native-source-beta-* evidence prefix. Preserve
+all frozen M39 and earlier files, including the qualified post-build source-
+coverage correction.
+
+#### Source rule
+
+Pass the known retained binder domain to tcRetainedArg. Resolve only an
+immediate single-variable, unguarded LamSingle application with no local
+bindings. Parentheses and existing expansion wrappers are transparent. Reject
+signatures, other patterns, residual lambdas, lets, cases and opaque function
+heads. Reject this new form under Strict with a specific existing-family
+diagnostic at the lambda span.
+
+Use an explicit renamed-Name-to-provisional-Id environment. A provisional
+binder has the actual renamed Name/Unique, Many multiplicity and the known
+closed native domain. Resolve an application's argument in the outer
+environment and its lambda body in the extended environment. Constructor
+fields use their actual worker argument domains. Do not install these Ids in
+the real Tc environment or record usage during resolution. The shared Core
+bridge validates the finite expression, domains and atomic beta arguments.
+
+Keep the original renamed argument as EValArg. Ordinary tcValArg checks it
+exactly once and records usage. Do not insert public annotations, infer then
+recheck, mutate a checked binder, unfold a producer, or assign native syntax
+to a meta. The bounded grammar permits no explicit One constraint; final
+zonking should yield Many. Verify actual zonked GhcTc lambda Ids before
+desugaring, including LinearTypes, instead of inferring this from a later
+simplified Core dump.
+
+#### Checks and example
+
+Five independent source workers currently fail with GHC-83605 at M39:
+identity, constant, successor, nested beta and lexical shadowing. Preserve
+this measured baseline. Admit them and check the six actual lambda binder
+Names/Unique values, Nat domains and Many multiplicities. Add Bool and mixed-
+constructor-domain controls to exercise the resolver's domain propagation.
+
+Reject Strict, bang/signature/non-variable patterns, non-atomic beta
+arguments, opaque producers, wrong domains and escaping source names with
+located diagnostics. Retain the existing source errors and normal Haskell
+controls. Check usage and one-elaboration behavior where source hooks can
+expose it.
+
+Add one small public source client, separate from the known-worker inference
+client. Exercise IORef-fed Nat values 0/2/3, exact vector indices, constant-
+zero bottom avoidance, demanded bottoms, partial successor fields, nested
+beta, lexical shadowing and retained-function WHNF. Keep the old 94 public
+output lines as a prefix and all 562 packed-vector lines unchanged. Build both
+stages and run focused existing checks under the established serial caps. Add
+no new tracked tests or golden lines.
+
+#### Provenance and limits
+
+Reuse M39's pinned Agda application/substitution implementation and its GHC
+Note. Extend Note [Retained argument application] to own the source resolver's
+scope, multiplicity and demand rules. Keep GHC-83605; add
+RetainedIndexLambdaStrict and update the generic expression grammar text. This
+increment admits a bounded runtime argument expression. General term syntax in
+types, promotion, definition unfolding, Strict lowering and ordinary optimizer
+support remain open.
+
+- [ ] Preserve the measured source rejection baseline and complete M39 input coverage.
+- [ ] Add the bounded resolver and owning Note without a second argument check.
+- [ ] Check actual zonked lambda metadata and located rejection diagnostics.
+- [ ] Run the public source example with runtime demand and prefix checks.
+- [ ] Build both stages, run focused regressions, freeze evidence, and record the boundary.
