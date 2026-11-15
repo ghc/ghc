@@ -2969,6 +2969,11 @@ They retain the written type applications and check the saved invisible
 arguments as well as the residual type. Complete Refl witnesses use the
 ordinary constructor checker. No equality axiom is added.
 See Note [Ground retained applications] in GHC.Tc.Gen.App.
+Known-argument clients use checked local or global types to select erased
+parameters. Linear controls check that a known argument is used once.
+Negative controls retain predicate and nominal equality checks. Some source
+forms still stop at the Quick Look guard. They do not test later solving.
+The standalone matrix owns the once-only cached-prefix trace check.
 Each client checks its complete source without a local Nat or Vec declaration.
 Ordinary tau controls
 keep their existing inference path. Rejections record current guard and
@@ -3102,7 +3107,6 @@ runPackageSourceRejectChecks = do
         , ("IndexVTALocalResultIndexEscape", 83605, "out of scope here", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "bad :: Nat -> IO Int", "bad n = let result = let { k :: Nat; k = n } in keepIndex @Int (localVector k) in pure 42"])
         , ("IndexVTALinearCaptureTwice", 18872, "multiplicity", ["TypeApplications", "LinearTypes"], [], localActions ++ ["linearKeep :: forall a (index :: Nat). Vec a index %1 -> Vec a index", "linearKeep xs = xs", "bad :: foreach (n :: Nat) -> Vec Int n %1 -> (Vec Int n, Vec Int n)", "bad n xs = (linearKeep @Int xs, linearKeep @Int xs)"])
         , ("IndexVTAInterleavedTypeApplicationBoundary", 83865, "untouchable", ["TypeApplications"], [], localActions ++ ["interleavedIndex :: forall a. a -> forall (index :: Nat). Vec a index -> Int", "interleavedIndex _ _ = 42", "bad :: Nat -> IO Int", "bad n = pure (interleavedIndex @Int (0 :: Int) @_ (localVector n))"])
-        , ("IndexVTAQuickLookBoundary", 83605, "Quick Look inference", ["TypeApplications", "ImpredicativeTypes"], [], ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: foreach (n :: Nat) -> Vec Int n -> Int", "bad n xs = observe @Int xs"])
         , ("IndexVTAWrongClosedIndexArgument", 83865, "third argument", ["TypeApplications"], [], localActions ++ ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: Nat -> IO Int", "bad n = pure (observe @Int @Z (localVector n))"])
         , ("IndexVTACallbackInputIndexEscape", 83605, "outside the application scope", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "withAux :: forall a b c. IO a -> IO c -> (a -> IO b) -> IO b", "withAux action auxiliary callback = action >>= callback", "bad :: Nat -> IO Int", "bad n = let compute = withAux (pure (S Z)) (pure (localVector n)) (\\k -> pure (keepIndex @Int (localVector k))) in pure 42"])
         , ("IndexVTAWrongRemainingOrdinaryArgument", 83865, "Char", ["TypeApplications"], [], localActions ++ ["inspectTagged :: forall a (index :: Nat) tag. (tag, Vec a index) -> tag -> Int", "inspectTagged _ _ = 42", "bad :: Nat -> IO Int", "bad n = pure (inspectTagged @Int (True, localVector n) 'x')"])
@@ -3258,6 +3262,7 @@ runPackageSourceRejectChecks = do
         , ("QualifiedPiGroundPolymorphicHead", qualifiedPiExtensions, [], ["polyHead :: (foreach (n :: Nat) -> Eq Int => Vec Int n)", "polyHead = undefined"])
         , ("QualifiedPiGroundAppliedHead", qualifiedPiExtensions, [], ["sameQ :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "sameQ f = f", "applied :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "applied f = sameQ f"])
         , ("QualifiedPiGroundLeadingDictionary", qualifiedPiExtensions, [], ["leading :: (Eq Int => (foreach (n :: Nat) -> Eq Int => Vec Int n)) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "leading f = f"])
+        , ("IndexVTAKnownNativeArgument", ["TypeApplications", "ImpredicativeTypes"], [], ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: foreach (n :: Nat) -> Vec Int n -> Int", "bad n xs = observe @Int xs"])
         ]
         $ \(name, extensions, imports, declarations) -> do
             let moduleName = "NativeSourcePiOperand" ++ name
@@ -3347,6 +3352,18 @@ runPackageSourceRejectChecks = do
             , "data ProofBox = ProofBox ProofQ"
             , "withKnownQ :: ProofQ -> QPi -> QPi"
             , "withKnownQ proof f = case proof of Refl -> f"
+            , "fixedQ :: QPi"
+            , "fixedQ n = replicateNative @Int n 7"
+            , "taggedWithQ :: forall tag value. tag -> (value :~: QPi) -> value -> QPi"
+            , "taggedWithQ _ proof f = case proof of Refl -> f"
+            , "ordinaryIgnore :: forall value. value -> Int"
+            , "ordinaryIgnore _ = 42"
+            , "taggedIgnore :: forall tag value. tag -> value -> Int"
+            , "taggedIgnore _ _ = 42"
+            , "observeIndex :: forall a (index :: Nat). Vec a index -> Int"
+            , "observeIndex _ = 42"
+            , "prefixProbe :: forall value. value -> () -> value"
+            , "prefixProbe value _ = value"
             , "groundKindIdentity :: forall {kind} (a :: kind). Proxy a -> Proxy a"
             , "groundKindIdentity p = p"
             , "groundSpecifiedKindIdentity :: forall kind (a :: kind). Proxy a -> Proxy a"
@@ -3452,6 +3469,35 @@ runPackageSourceRejectChecks = do
         , ("GroundApplicationGroundRepresentationalGiven", Just (91028, "Cannot equate type variable"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))", "import Data.Coerce (Coercible)"], ["bad :: forall value. Coercible value QPi => value -> QPi", "bad f = withQ @value Refl f"])
         , ("GroundApplicationGroundMissingClass", Just (39999, "No instance for"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> QPi", "bad f = requiresShowQ @QPi Refl f"])
         , ("GroundApplicationGroundScopedWrongIndex", Just (83865, "Couldn't match type"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> ScopedQ n -> ScopedQ m", "bad n m f = withScoped @m @(ScopedQ n) Refl f"])
+        , ("KnownArgumentLocalKnownRefl", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = withQ Refl f"])
+        , ("KnownArgumentGlobalKnownRefl", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi", "via = withQ Refl fixedQ"])
+        , ("KnownArgumentLocalKnownBottomProof", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = withQ (error \"known-bottom-proof\") f"])
+        , ("KnownArgumentLocalKnownNamedProof", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: ProofQ -> QPi -> QPi", "via proof f = withQ proof f"])
+        , ("KnownArgumentPartialExpectedArrow", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via = withQ Refl"])
+        , ("KnownArgumentPartialBottomExpectedArrow", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via = withQ (error \"known-bottom-proof\")"])
+        , ("KnownArgumentPartialLeadingVTAExpectedArrow", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via = taggedWithQ @Bool True Refl"])
+        , ("KnownArgumentLeadingVTAKnownArgument", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = taggedWithQ @Bool True Refl f"])
+        , ("KnownArgumentLeadingVTAIncomingProof", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: ProofQ -> QPi -> QPi", "via proof f = taggedWithQ @Bool True proof f"])
+        , ("KnownArgumentContextOnlyKnownLocal", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> Int", "via f = contextConsumer f"])
+        , ("KnownArgumentContextOnlyLeadingVTA", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> Int", "via f = taggedContextConsumer @Bool True f"])
+        , ("KnownArgumentNominalGivenKnownValue", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: forall value. value ~ QPi => value -> QPi", "via f = withQ Refl f"])
+        , ("KnownArgumentKnownNativeVector", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: foreach (n :: Nat) -> Vec Int n -> Int", "via n xs = ordinaryIgnore xs"])
+        , ("KnownArgumentKnownNativeVectorLeadingVTA", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: foreach (n :: Nat) -> Vec Int n -> Int", "via n xs = taggedIgnore @Bool True xs"])
+        , ("KnownArgumentKnownNativeVectorIndexKind", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: foreach (n :: Nat) -> Vec Int n -> Int", "via n xs = observeIndex @Int xs"])
+        , ("KnownArgumentOrdinaryIdentityKnownFunction", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = id f"])
+        , ("KnownArgumentOrdinaryIgnoreKnownFunction", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> Int", "via f = ordinaryIgnore f"])
+        , ("KnownArgumentLinearDeclaredOnce", Nothing, ["ImpredicativeTypes", "LinearTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["data LinearBox value where", "  LinearBox :: value %1 -> LinearBox value", "linearHold :: forall value. value %1 -> LinearBox value", "linearHold value = LinearBox value", "via :: QPi %1 -> QPi", "via f = case linearHold f of LinearBox g -> g"])
+        , ("KnownArgumentContradictoryFunctions", Just (83605, "Quick Look inference"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> (foreach (n :: Nat) -> Eq Int => Vec Bool n) -> QPi", "bad f wrong = bothQ Refl f wrong"])
+        , ("KnownArgumentErasedPolymorphicOperandBoundary", Just (83605, "Quick Look inference"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["boundary :: (forall a. a) -> QPi", "boundary f = withQ Refl f"])
+        , ("KnownArgumentIndependentScopedIndices", Just (83865, "Couldn't match type"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> ScopedQ n -> ScopedQ m", "bad n m f = withScoped Refl f"])
+        , ("KnownArgumentPackageIndexEscape", Just (83865, "Couldn't match type"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: PackedVec Int -> ScopedQ Z", "bad (PackVec k xs) =", "  let worker :: ScopedQ k", "      worker n ys = (xs, ys)", "  in withScoped Refl worker"])
+        , ("KnownArgumentMissingClassConstraint", Just (39999, "No instance for"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> QPi", "bad f = requiresShowQ Refl f"])
+        , ("KnownArgumentRepresentationalGiven", Just (91028, "Cannot equate type variable"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))", "import Data.Coerce (Coercible)"], ["bad :: forall value. Coercible value QPi => value -> QPi", "bad f = withQ Refl f"])
+        , ("KnownArgumentWrongNominalWitness", Just (83605, "Quick Look inference"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: (Bool :~: Bool) -> QPi -> QPi", "bad proof f = withQ proof f"])
+        , ("KnownArgumentSignedWitnessBoundary", Just (83605, "Quick Look inference"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = withQ (Refl :: ProofQ) f"])
+        , ("KnownArgumentAppliedHeadBoundary", Just (83605, "Quick Look inference"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = (id withQ) Refl f"])
+        , ("KnownArgumentCacheOwnershipFailure", Just (83865, "Couldn't match type"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> (foreach (n :: Nat) -> Eq Int => Vec Bool n) -> QPi", "bad f wrong = bothQ Refl (prefixProbe f ()) wrong"])
+        , ("KnownArgumentLinearDeclaredTwice", Just (18872, "multiplicity"), ["ImpredicativeTypes", "LinearTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["data LinearBox value where", "  LinearBox :: value %1 -> LinearBox value", "linearHold :: forall value. value %1 -> LinearBox value", "linearHold value = LinearBox value", "bad :: QPi %1 -> (QPi,QPi)", "bad f = (case linearHold f of LinearBox g -> g, f)"])
         ]
     qualifiedPiExtensions = ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "ImpredicativeTypes"]
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]

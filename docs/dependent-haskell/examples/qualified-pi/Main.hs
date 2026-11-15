@@ -20,6 +20,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import FunctionStableNameClient (sameFunction, samePlainFunction)
 import GHC.Exts (withDict)
 import GroundApplicationClient
+import KnownArgumentClient
 import PackedVecLibrary
 import QualifiedPiLibrary
 import System.Mem.StableName (makeStableName)
@@ -163,6 +164,7 @@ main = do
     runGadtPatternChecks
     runFullWorkerChecks
     runGroundApplicationChecks
+    runKnownArgumentChecks
 
 -- | Specialize the injected-context function from its complete expected arrow.
 specializeDemand :: DPi -> DPi
@@ -511,3 +513,70 @@ runGroundApplicationChecks = do
         checkWhnf (toList (groundDemandProof original bottomLength))
     expectMarker "ground monomorphic bottom proof" "native-ground-bottom-proof" $
         checkWhnf (groundKnownDemandProof bottomFunction)
+
+-- | Compare implicit choices at an IORef-fed runtime length.
+checkKnownArgumentFinite :: Int -> Nat -> IO ()
+checkKnownArgumentFinite count index = do
+    cell <- newIORef index
+    n <- readIORef cell
+    let direct = toList (knownDirect n original)
+        named = toList (knownNamed n original)
+        ordered = toList (knownOrdered n 37 original)
+        constant = toList (knownConstant n 37 original)
+        given = toList (knownGiven n original)
+        expected = replicate count 7
+        label = "known Impred finite " ++ show count
+    forM_ [direct, named, ordered, constant, given] $ assertEqual label expected
+    putStrLn (label ++ ": " ++ show direct ++ " | " ++ show named ++ " | " ++ show ordered ++ " | " ++ show constant ++ " | " ++ show given)
+
+-- | Preserve demand and identity after declared-argument type selection.
+runKnownArgumentChecks :: IO ()
+runKnownArgumentChecks = do
+    forM_
+        [ (0, Z)
+        , (1, S Z)
+        , (2, S (S Z))
+        , (3, S (S (S Z)))
+        ]
+        $ \(count, n) -> checkKnownArgumentFinite count n
+    assertEqual "known generic ignored function" 42 (knownGenericIgnore bottomFunction)
+    putStrLn "known generic ignored function: 42"
+    assertEqual "known ignored proof and function" 42 (knownIgnoreWorker bottomFunction)
+    putStrLn "known ignored proof and function: 42"
+    checkWhnf (PackVec bottomLength (knownDirect bottomLength bottomFunction))
+    checkWhnf (PackVec cyclicLength (knownDirect cyclicLength bottomFunction))
+    putStrLn "known package ignores indices and vector: ok"
+    expectMarker "known proof before function" "native-known-bottom-proof" $
+        checkWhnf (knownDemandProof bottomFunction)
+    expectMarker "known Refl bottom function" "native-q-bottom-function" $
+        checkWhnf (knownTransport bottomFunction)
+    expectMarker "known named Refl bottom function" "native-q-bottom-function" $
+        checkWhnf (knownNamedTransport bottomFunction)
+    let transported :: QPi
+        transported = knownTransport original
+        ignored :: QPi
+        ignored = knownIgnoreProof original
+    checkWhnf original
+    checkWhnf transported
+    same <- sameFunction original transported
+    assertEqual "known transport function identity" True same
+    putStrLn "known transport function identity: True"
+    checkWhnf ignored
+    ignoredSame <- sameFunction original ignored
+    assertEqual "known ignored proof function identity" True ignoredSame
+    putStrLn "known ignored proof function identity: True"
+    checkWhnf knownPartialProof
+    putStrLn "known partial bottom proof: ok"
+    expectMarker "known demanded Eq tag" "native-known-bottom-tag" $
+        checkWhnf (knownDemandTag original)
+    let ignoredTag = toList (knownConstant (S Z) (error "native-known-bottom-tag") original)
+    assertEqual "known const ignores tag" [7] ignoredTag
+    putStrLn ("known const ignores tag: " ++ show ignoredTag)
+    let partial = take 1 (toList (knownDirect (S bottomLength) original))
+        cyclic = take 3 (toList (knownDirect cyclicLength original))
+    assertEqual "known partial index prefix" [7] partial
+    putStrLn ("known partial index prefix: " ++ show partial)
+    assertEqual "known cyclic index prefix" [7, 7, 7] cyclic
+    putStrLn ("known cyclic index prefix: " ++ show cyclic)
+    expectMarker "known bottom proof before index" "native-known-bottom-proof" $
+        checkWhnf (toList (knownDemandProof original bottomLength))
