@@ -1,12 +1,13 @@
+{-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoImpredicativeTypes #-}
 
 module Main (main) where
@@ -15,7 +16,8 @@ import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (forM_, unless)
 import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
-import FunctionStableNameClient (sameFunction)
+import Data.Type.Equality ((:~:) (Refl))
+import FunctionStableNameClient (sameFunction, samePlainFunction)
 import GHC.Exts (withDict)
 import PackedVecLibrary
 import QualifiedPiLibrary
@@ -155,6 +157,9 @@ main = do
     checkSharing
     runDictionaryChecks
     runFunctionIdentityChecks
+    runContainerChecks
+    runOrdinaryPatternChecks
+    runGadtPatternChecks
 
 -- | Specialize the injected-context function from its complete expected arrow.
 specializeDemand :: DPi -> DPi
@@ -243,3 +248,149 @@ runFunctionIdentityChecks = do
     nested <- sameFunction original returned
     assertEqual "qualified returned function identity" True nested
     putStrLn "qualified returned function identity: True"
+
+-- | Select the erased parameter from the complete function expectation.
+viaWitness :: QPi -> QPi
+viaWitness = withQ Refl
+
+-- | Keep the bottom witness unused when no equality evidence is needed.
+ignoringProof :: QPi -> QPi
+ignoringProof = ignoreProofQ (error "native-container-bottom-proof")
+
+-- | Force the bottom witness before exposing the returned function.
+demandingProof :: QPi -> QPi
+demandingProof = withQ (error "native-container-bottom-proof")
+
+-- | Exercise each container route at independent runtime lengths.
+checkContainerFinite :: Int -> Nat -> Int -> Nat -> IO ()
+checkContainerFinite count index outerCount outer = do
+    cell <- newIORef index
+    outerCell <- newIORef outer
+    n <- readIORef cell
+    m <- readIORef outerCell
+    let expected = replicate count 7
+        bools = replicateNative @Bool m True
+    assertEqual "container witness" expected (toList (viaWitness original n))
+    assertEqual
+        "container headTuple id"
+        expected
+        (toList (headTuple (id (original, original)) n))
+    assertEqual
+        "container worker duplicate"
+        expected
+        (toList (headTuple ((keepDuplicate duplicateQ) original) n))
+    assertEqual
+        "container newtype id"
+        expected
+        (toList (unwrapBox (id (Box original)) n))
+    case (keepTupleTransformer tupleTransport) (makeTuple original) m bools of
+        (transported, returned) -> do
+            let actual = toList (transported n)
+                returnedBools = toList returned
+            assertEqual "container tuple Pi function" expected actual
+            assertEqual "container tuple Pi vector" (replicate outerCount True) returnedBools
+            putStrLn
+                ( "container finite "
+                    ++ show count
+                    ++ ": "
+                    ++ show actual
+                    ++ " | "
+                    ++ show returnedBools
+                )
+
+-- | Check proof order, function identity and newtype bottom behavior.
+runContainerChecks :: IO ()
+runContainerChecks = do
+    forM_
+        [ (0, Z, 1, S Z)
+        , (1, S Z, 2, S (S Z))
+        , (2, S (S Z), 3, S (S (S Z)))
+        , (3, S (S (S Z)), 0, Z)
+        ]
+        $ \(count, n, outerCount, m) -> checkContainerFinite count n outerCount m
+    let proved :: QPi
+        proved = viaWitness original
+        duplicated :: QPi
+        duplicated = headTuple ((keepDuplicate duplicateQ) original)
+        unwrapped :: QPi
+        unwrapped = unwrapBox (id (Box original))
+    checkWhnf original
+    checkWhnf proved
+    proofSame <- sameFunction original proved
+    assertEqual "container witness function identity" True proofSame
+    putStrLn "container witness function identity: True"
+    checkWhnf (ignoringProof original)
+    putStrLn "container ignored bottom proof: ok"
+    let ignoredVector = toList (ignoringProof original (S Z))
+    assertEqual "container ignored proof vector" [7] ignoredVector
+    putStrLn "container ignored proof vector: [7]"
+    checkWhnf demandingProof
+    putStrLn "container partial bottom proof: ok"
+    expectMarker "container demanded proof at function WHNF" "native-container-bottom-proof" $
+        checkWhnf (demandingProof original)
+    expectMarker "container proof before bottom function" "native-container-bottom-proof" $
+        checkWhnf (toList (demandingProof bottomFunction Z))
+    expectMarker "container proof before bottom index" "native-container-bottom-proof" $
+        checkWhnf (toList (demandingProof original bottomLength))
+    let firstOnly = toList (headTuple (id (original, bottomFunction)) (S Z))
+    assertEqual "container tuple ignores second function" [7] firstOnly
+    putStrLn "container tuple ignores second function: [7]"
+    checkWhnf duplicated
+    duplicateSame <- sameFunction original duplicated
+    assertEqual "container duplicate worker identity" True duplicateSame
+    putStrLn "container duplicate worker identity: True"
+    checkWhnf unwrapped
+    newtypeSame <- sameFunction original unwrapped
+    assertEqual "container newtype function identity" True newtypeSame
+    putStrLn "container newtype function identity: True"
+    expectMarker "container newtype unwrapped bottom" "native-q-bottom-function" $
+        checkWhnf (unwrapBox (id (Box bottomFunction)))
+    expectMarker "container newtype WHNF bottom" "native-q-bottom-function" $
+        checkWhnf (id (Box bottomFunction))
+
+-- | Leave ordinary newtype and data pattern demand to match desugaring.
+runOrdinaryPatternChecks :: IO ()
+runOrdinaryPatternChecks = do
+    checkWhnf (ignoreBoxFixed (error "native-container-bottom-box"))
+    putStrLn "pattern named newtype ignores bottom box: ok"
+    expectMarker "pattern named data forces bottom box" "native-container-bottom-data-box" $
+        checkWhnf (ignoreDataFixed (error "native-container-bottom-data-box"))
+    checkWhnf
+        (keepBoxFunction (\(Box _) -> fixedQ) (error "native-container-bottom-box"))
+    putStrLn "pattern lambda newtype ignores bottom box: ok"
+    expectMarker "pattern lambda data forces bottom box" "native-container-bottom-data-box" $
+        checkWhnf
+            (keepDataFunction (\(DataBox _) -> fixedQ) (error "native-container-bottom-data-box"))
+    checkWhnf (ignoreDataFixed (DataBox bottomFunction))
+    putStrLn "pattern data ignores bottom function field: ok"
+    let result = toList (ignoreBoxFixed (error "native-container-bottom-box") (S Z))
+    assertEqual "pattern newtype ignored box vector" [7] result
+    putStrLn "pattern newtype ignored box vector: [7]"
+
+-- | Choose both element parameters before applying the transported function.
+transportPlain :: PlainPi -> PlainPi
+transportPlain = transportRefl Refl
+
+-- | Leave the GADT witness untouched until the second value argument arrives.
+transportPlainBottom :: PlainPi -> PlainPi
+transportPlainBottom = transportRefl (error "native-container-gadt-bottom-proof")
+
+-- | Check the constructor equation's evidence, identity and demand order.
+runGadtPatternChecks :: IO ()
+runGadtPatternChecks = do
+    cell <- newIORef (S Z)
+    n <- readIORef cell
+    let transported :: PlainPi
+        transported = transportPlain plainFunction
+        actual = toList (transported n)
+    assertEqual "GADT Refl vector" [7] actual
+    putStrLn "GADT Refl vector: [7]"
+    checkWhnf plainFunction
+    checkWhnf transported
+    same <- samePlainFunction plainFunction transported
+    assertEqual "GADT Refl function identity" True same
+    putStrLn "GADT Refl function identity: True"
+    checkWhnf transportPlainBottom
+    putStrLn "GADT partial bottom proof: ok"
+    expectMarker "GADT demanded returned function" "native-container-gadt-bottom-proof" $
+        checkWhnf (transportPlainBottom plainFunction)

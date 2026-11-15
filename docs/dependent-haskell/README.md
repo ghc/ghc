@@ -41,7 +41,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M34 source/runtime checkpoint passes both stages and focused regressions; 562 previous plus 22 new runtime observations; qualified-Pi witness callers remain open |
+| Last verified checkpoint | M35 passes both stages and focused regressions; 562 packed-vector plus 48 qualified/container runtime observations; M34 witness and tuple checks complete |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -68,7 +68,7 @@ Last updated: 2026-11-15.
 | Written runtime index types | Complete visible type arguments capture lexical indices; shadowing, generated wildcards and staging checks pass |
 | Native Pi equality operands | Complete checked Pi type arguments and immutable Given rewriting beneath another retained binder pass; native meta assignments remain blocked |
 | Qualified retained functions | Known monomorphic variables, immutable Given transport and synonym expansion pass; ordinary dictionaries preserve the tested demand and sharing behavior |
-| Next task | M35: exact expected matching through algebraic containers, then the remaining M34 proof-demand and tuple runtime checks |
+| Next task | M36: infer fully applied witness helpers from independently known native arguments, with one checked argument cache |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3212,8 +3212,9 @@ preservation, termination or a runtime correspondence theorem for this fork.
 
 ## M34: qualified retained function transport
 
-This is a verified source/runtime checkpoint. M34 remains open for witness
-construction and proof-demand checks. Both compiler stages build with the
+This section records the frozen M34 checkpoint. It left witness construction
+and proof-demand checks open. M35 below completes those checks. Both compiler
+stages built with the
 selected 37 compiler inputs from `9cbab37151`. Later commits add source
 controls and documentation without changing those compiler inputs.
 
@@ -3269,12 +3270,11 @@ unchanged. Both reject at the final `f`. The synonym trace records
 keeps an `EqCt`. This checks the recursive predicate boundary separately from
 an unrelated element-type mismatch.
 
-`withQ` checks an incoming equality witness. Separate `Refl` and bottom-proof
-callers at `QPi :~: QPi` still reject with GHC-91028. Proof demand and proof order
-remain unverified for that caller path. The original tuple-under-Pi source
-shape compiles, but the runtime example uses an ordinary vector argument there.
-The [M35 plan](PLAN.md#m35-exact-matching-through-algebraic-containers) keeps
-these acceptance checks open and specifies the next exact-matching extension.
+At the M34 checkpoint, `withQ` checked an incoming equality witness. Separate
+`Refl` and bottom-proof callers at `QPi :~: QPi` rejected with GHC-91028. Proof
+demand and proof order remained unverified for that caller path. The original tuple-under-Pi source
+shape compiled, but the M34 runtime example used an ordinary vector argument
+there. M35 below completes these acceptance checks.
 
 The [paper ledger](papers/README.md) now records seven works and nine downloaded
 PDF versions, including the corrected author copy of the Quick Look paper.
@@ -3289,3 +3289,84 @@ The M33 manifests and committed source/documentation versions are preserved.
 The compiler build used the serial 16 GiB cap and peaked at 4892 MiB.
 The final API and affected regression used the serial 4 GiB cap and peaked
 at 1123 MiB. Both scopes disabled swap and exited successfully.
+
+
+## M35: retained functions in algebraic containers
+
+Both compiler stages build from the 37 selected compiler inputs at
+`d09a21e379`. Later commits update the existing API fixture and documentation.
+M35 completes the M34 witness-caller, proof-demand and tuple runtime checks.
+The [public example](examples/qualified-pi/README.md) passes 48 observations
+through separate interfaces. Its first 22 outputs preserve the M34 oracle.
+
+Exact expected matching now traverses saturated algebraic containers of kind
+`Type`. Each argument keeps its incoming Pi scope. A Pi in one tuple field
+does not admit an independent qualified or erased-forall sibling. The existing
+immutable matcher still requires complete choices, kind agreement, scope,
+roles and final subsumption. General native Quick Look and mutable native-meta
+assignment remain unsupported.
+
+A single ordinary constructor prefix now uses the ordinary pattern checker.
+The expected first argument must be an actual `DepFunTy` before retained
+constructor coverage applies. This admits newtype patterns and leading GADT
+proof patterns without inserting function eta expansion. Multiple ordinary
+constructor rows remain unsupported.
+
+Native simplification also expands compulsory newtype constructor templates.
+These constructors have no runtime binding. Keeping their Ids as runtime calls
+caused the saved LFInfo panic. The narrow exception retains the activation,
+substitution and beta checks. General compulsory unfolding remains disabled.
+See Notes [Checked retained lambdas] in `GHC.Tc.Gen.Match` and
+[Restricted dependent simplification] in `GHC.Core.SimpleOpt`.
+
+| Check | Result |
+| --- | --- |
+| Compiler stages | Bootstrap and self-hosted builds pass |
+| Qualified/container executable | 48 observations per stage; 22 earlier outputs unchanged |
+| Packed-vector executable | All 562 earlier observations per stage unchanged |
+| Container source matrix | 26 per stage: 17 accepted, nine rejected or currently unsupported |
+| Located diagnostic envelopes | 11 across those nine source rejections |
+| Earlier qualified-Pi matrix | All 26 per stage unchanged: 13 accepted and 13 rejected |
+| API source inventory | 229 package and 309 total rejection programs; 53 quiet positives |
+| API golden | 37 lines, unchanged |
+| Focused registered regressions | Five passes across 39 cases, with 34 skips |
+| Full GHC suite | Not run |
+
+The runtime checks distinguish ignored proofs, partial application and demand
+at the returned function's WHNF. A demanded proof fails before the bottom
+function or index. The original tuple-under-Pi result now runs at independent
+runtime indices. Newtype and tuple transport preserve the tested function
+identity. Named and lambda data patterns demand the constructor but can leave
+its function field unused. Newtype patterns can ignore a bottom box. A leading
+`Refl` pattern transports vector contents and preserves the tested identity.
+These observations apply at `-O0`; they are not a general sharing theorem.
+
+Two former restrictions become positive controls. `undefined` accepts a
+complete `Maybe (foreach ...)` expected type through immutable matching.
+`transportRefl Refl f = f` checks through the corrected ordinary pattern route.
+The missing, unrelated, escaping and representational evidence controls still
+reject. The source inventory comes from these fixture changes and successful
+runs; it is not a printed runtime counter. The quiet total includes the existing
+standalone splice control, which earlier reported subtotals omitted.
+The API provider compiles as object
+code without linking. Native bytecode module compilation remains unsupported.
+
+Fully applied `withQ (error ...) f` still rejects at `f` with GHC-91028 when
+its result does not determine the erased parameter. The complete expected
+`QPi -> QPi` arrow makes the partial helper work. M36 will select the missing
+parameter from an independently known native argument and cache that check.
+The [plan](PLAN.md#m36-native-worker-arguments-after-full-application) keeps the
+native-meta and Quick Look guards explicit.
+
+The [references](REFERENCES.md#exact-matching-through-algebraic-containers)
+record Agda's scoped argument and pattern checking. Ordinary GHC Notes supply
+the newtype representation and demand rules. The paper ledger remains seven
+works with nine verified PDF versions. No paper theorem is claimed here.
+
+Evidence uses the fresh `native-pi-container-*` prefix. Failed source attempts
+and all three compiler archives remain available. The M34 prefix and its
+historical source and documentation remain frozen. The self-hosted compiler
+build peaked at 4363 MiB under 16 GiB. The final checks peaked at 2020 MiB under
+4 GiB. Both scopes disabled swap. All focused registered checks have zero
+unexpected failures, framework failures and framework warnings. The earlier
+177 standalone rejection corpus was not rerun in full for M35.

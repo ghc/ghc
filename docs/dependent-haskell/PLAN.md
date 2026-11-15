@@ -2108,9 +2108,9 @@ structural retained unification or optimizer transformations.
 
 ### M34: qualified retained function types
 
-This task remains open at a verified source/runtime checkpoint. Declaration
-checking and transport pass. Construction and demand of a qualified-Pi
-equality witness require M35 below.
+The frozen M34 checkpoint passed declaration checking and transport. It left
+construction and demand of a qualified-Pi equality witness open. M35 below
+completes these checks.
 
 The measured six-case baseline agrees in both stages. An ordinary qualified
 arrow compiles. Direct and beneath-binder Givens, a `Refl` witness and a
@@ -2155,21 +2155,22 @@ new native function type or instantiate a polymorphic head.
   payload sharing and function identity with 22 runtime observations. Preserve
   the 562 existing source observations. The API fixture and all five focused
   registered regressions pass. The full GHC suite was not run.
-- [ ] Complete the source witness callers and check proof demand. Run the
-  original tuple-under-Pi shape at runtime. Keep these checks open while the
-  `Refl` and bottom-proof clients reject with GHC-91028.
+- [x] Complete the source witness callers and check proof demand. M35 passes
+  the `Refl` and bottom-proof callers through complete expected arrows. Both
+  stages pass proof order, function identity and the original tuple-under-Pi
+  runtime shape. The combined qualified/container oracle has 48 observations.
 
 See [the paper reading](papers/README.md) and
 [the measured baseline](REFERENCES.md#retained-function-types-as-equality-operands).
 
 ### M35: exact matching through algebraic containers
 
-The imported `withQ` helper typechecks. Its callers cannot yet instantiate
-`QPi :~: QPi` through the complete expected type. The result eligibility
-predicate in `GHC.Tc.Gen.App` does not traverse a non-tau algebraic container.
-This blocks the existing exact immutable matching route before proof demand
-can be tested. The function-identity client already works; it is not evidence
-for this proposed extension.
+Before M35, the imported `withQ` helper typechecked. Its callers could not
+instantiate `QPi :~: QPi` through the complete expected type. The result
+eligibility predicate in `GHC.Tc.Gen.App` did not traverse a non-tau algebraic
+container. This blocked the existing exact immutable matching route before
+proof demand could be tested. The function-identity client already worked;
+it was not evidence for the container extension.
 
 The fresh three-case baseline agrees in both stages. A known qualified copy
 compiles. The `Refl` caller reports GHC-91028 at both `withQ` and `Refl`.
@@ -2207,24 +2208,56 @@ result. Keep the same declaration as a positive control. Keep the missing,
 unrelated, branch-local and representational evidence rejections. Add runtime
 checks for proof demand and function identity on this pattern route.
 
-- [ ] Preserve the measured `Refl` and bottom-proof failures. Pin the Agda
+- [x] Preserve the measured `Refl` and bottom-proof failures. Pin the Agda
   argument-checking comparison and the existing GHC matching rules.
-- [ ] Extend only `isRetainedValueType` eligibility for exactly saturated
+- [x] Extend only `isRetainedValueType` eligibility for exactly saturated
   algebraic containers of lifted result kind. Keep the ordinary `isTauTy`
   fast path. Recurse through each argument with the unchanged incoming
   `under_pi` flag. A Pi in one argument must not admit a qualified sibling.
   Exclude new class, family, unsaturated and nonlifted cases. This does not
   change `isTauTy`, Quick Look, source formation, candidate matching, coercion
   roles, scope checks or the mutable native-meta guard.
-- [ ] Cover both existing callers: expected result matching and worker
+- [x] Cover both existing callers: expected result matching and worker
   specialization. Use an imported tuple consumer and complete nested-container
   expected arrows. Keep erased forall, wrong-index, predicate, scope and
-  nominal/representational rejection controls. If newtype containers enter
-  the supported subset, check bottom preservation.
-- [ ] Run `Refl`, ignored bottom proof and demanded bottom proof through
+  nominal/representational rejection controls. Check newtype containers for
+  wrapped bottom, ignored boxes and function identity.
+- [x] Run `Refl`, ignored bottom proof and demanded bottom proof through
   separate interfaces. Add the original tuple-under-Pi runtime case. Update
   the existing API fixture and run both compiler stages and the focused
   regressions before closing M34.
+
+Both stages pass the 26-case container matrix: 17 accept and nine reject at
+11 located diagnostic envelopes. Both pass the 48-observation public example,
+the previous 562 observations and all 26 earlier qualified-Pi source cases.
+The existing API fixture passes with 229 package and 309 total rejection
+programs and 53 quiet positives. Its 37-line golden is unchanged. All five
+focused registered tests pass across 39 cases with 34 skips. The full GHC
+suite and the full earlier standalone rejection corpus were not run. The quiet
+total includes the existing standalone splice control. Earlier reported quiet
+subtotals omitted that control.
+
+### M36: native worker arguments after full application
+
+`withQ (error ...) f` still rejects at `f` with GHC-91028. After both arguments
+are consumed, the result `QPi` does not determine the erased `value` parameter.
+The partial form has expected type `QPi -> QPi` and determines that parameter.
+Keep this difference as the measured baseline.
+
+- [ ] Pin the scoped argument-checking comparison in Agda and the existing
+  GHC argument-cache rules. Do not transfer Agda's general Pi-meta policy.
+- [ ] Add a cache-producing `NoQL` route for a native worker. Select erased
+  parameters only from independently inferable named arguments whose formal
+  domains contain no native syntax. Check the native-template proof argument
+  after substitution. Infer each selected argument once.
+- [ ] Preserve complete choices, kinds, runtime scope, exact cached domains,
+  original instantiation, final subsumption and failure-cache ownership. Keep
+  native mutable-meta assignment and general native Quick Look disabled.
+  Do not infer inside `tcRetainedWorkerResultMatch`: it cannot return caches
+  and also runs after visible type application.
+- [ ] Check full and partial caller behavior, proof demand and order, forged
+  witnesses, conflicting arguments, scope escape, visible type application
+  and once-only cache use. Run both compiler stages and focused regressions.
 
 ## Further work
 

@@ -2586,9 +2586,9 @@ new runtime observations. The six dictionary observations use ordinary
 observations pass at `-O0` after forcing the compared values. These are
 program observations, not a general sharing theorem.
 
-The source helper with an incoming `:~:` proof compiles. Its separate `Refl`
-and bottom-proof callers still reject with GHC-91028. Do not claim proof
-demand for those callers. The next task extends exact expected matching
+At the frozen M34 checkpoint, the source helper with an incoming `:~:` proof
+compiled. Its separate `Refl` and bottom-proof callers rejected with GHC-91028.
+Proof demand was not established there. M35 extends exact expected matching
 through ordinary algebraic containers; general native Quick Look and
 native mutable-meta assignment remain separate work. See the
 [source example](examples/qualified-pi/README.md) and
@@ -2631,4 +2631,40 @@ Note [Matching retained function types] in `GHC.Core.Unify`.
 Four full-file Agda blobs are verified in
 `native-pi-container-prior-art-v1/provenance.json`. The GHC excerpts record
 the working-tree bytes read during implementation. They do not assign dirty
-bytes to the earlier baseline commit. Runtime results remain pending here.
+bytes to the earlier baseline commit.
+
+Agda's [left-hand-side checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1019-L1051)
+selects the current telescope domain before checking its pattern. Constructor
+splitting checks that domain's data or record type. The GHC adaptation checks
+whether the first expected argument is an actual `DepFunTy` before selecting
+retained constructor coverage. A single ordinary constructor prefix uses the
+existing pattern checker. Multiple ordinary constructor rows remain unsupported.
+The verified Agda source blob is `3779ffa6e418bca99e30c071e189106f82ecbe1b`.
+The source cache and reading ranges are in
+`native-pi-container-prior-art-patterns-v1/provenance-v1.json`.
+
+Ordinary GHC newtype patterns use a representational cast and a lazy binding.
+Data patterns use an ordinary constructor match. See `matchNewtypeCon` in
+`GHC.HsToCore.Match.Constructor` and `bindMatchId` in `GHC.HsToCore.Utils`.
+Note [Newtype workers] in `GHC.Types.Id.Make` states that the constructor has
+no runtime binding. Its compulsory unfolding becomes a cast. Its Id has
+`DataConWrapId` details even when accessed through `dataConWorkId`.
+The restricted native simplifier must expand this existing template. Preserve
+its activation, substitution, beta and multiplicity checks. Keep general
+compulsory unfolding disabled. See Note [Restricted dependent simplification]
+in `GHC.Core.SimpleOpt`. The before and after source hashes, owning Notes and
+measured panic are in `native-pi-container-prior-art-patterns-v2`.
+
+Both compiler stages now pass 48 runtime observations and 26 source cases:
+17 compile and nine reject at 11 located diagnostic envelopes. The runtime
+checks cover `Refl`, ignored and demanded bottom proofs, tuple-under-Pi results,
+function identity, and named and lambda patterns over data and newtypes.
+The fully applied `withQ (error ...) f` case remains an inference boundary.
+Its result does not determine the erased parameter. The partial helper has a
+complete expected arrow and compiles. This does not admit native mutable metas.
+A leading GADT `Refl` pattern now transports a retained function through its
+nominal evidence. Its vector, identity, partial-application and proof-demand
+observations pass in both stages. Two old expected rejections are retained as
+positive controls: the leading GADT pattern and `undefined` at a complete
+`Maybe (foreach ...)` result. The full existing API fixture and all five
+focused registered tests pass. The full GHC suite was not run.

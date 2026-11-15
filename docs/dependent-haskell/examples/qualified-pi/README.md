@@ -31,28 +31,48 @@ bash docs/dependent-haskell/examples/qualified-pi/run-example.sh "$PWD"
 
 Set `QUALIFIED_PI_GHC` to choose the compiler. Set `QUALIFIED_PI_WORK` to
 choose a separate output directory. The script compiles the shared
-`PackedVecLibrary`, then the producer, identity client and executable.
+`PackedVecLibrary`, then the value provider, producer, identity client and
+executable.
 It copies interfaces between compilation directories and enables Core and
 STG Lint. It runs at `-O0`.
 
-The executable checks 22 observations. Four finite lengths come through
+The executable checks 48 observations. Four finite lengths come through
 independent `readIORef` calls. Other checks cover ignored and demanded bottom,
-cyclic indices, partial application, payload sharing and two function
+cyclic indices, partial application, payload sharing and six function
 `StableName` comparisons. Six dictionary checks use the single-method
 `Demand` class with `GHC.Exts.withDict`. They distinguish vector shape from
 method demand. They do not inject a bottom global `Eq Int` dictionary.
 
-Both compiler stages pass these observations. The identity results apply to
-these programs and build settings. The full optimizer and GHC test suite
-remain outside this validation.
+Both compiler stages pass all 48 observations. The identity results apply to
+these programs and build settings.
+The full optimizer and GHC test suite remain outside this validation.
 
-`withQ` compiles and checks an incoming `:~:` witness. Separate callers that
-construct `Refl` or pass a bottom witness at `QPi :~: QPi` still reject with
-GHC-91028. Proof demand is therefore unverified for that caller path. The
-[next plan](../../PLAN.md#m35-exact-matching-through-algebraic-containers)
-tracks the required extension. A source tuple beneath a retained binder
-compiles, but this executable uses an ordinary vector argument at that
-position. It does not establish the tuple runtime case.
+The complete expected arrow now admits a separate `Refl` caller:
+
+```haskell
+viaWitness :: QPi -> QPi
+viaWitness = withQ Refl
+```
+
+The proof-demand checks distinguish partial application from the returned
+function's WHNF. An ignored bottom proof stays lazy. `withQ` demands its proof
+before a bottom function or index. Finite runtime indices also exercise the
+original tuple-under-Pi result. Tuple and newtype transport preserve the tested
+function identity. Named and lambda patterns distinguish lazy newtypes from
+strict data constructors. A data pattern can demand its constructor without
+demanding the function field. A leading `Refl` pattern also supplies nominal
+evidence for transport beneath Pi. Its checks cover vector contents, function
+identity, lazy partial application and proof demand at the returned function.
+
+The value provider uses `NoImpredicativeTypes`. The producer imports its
+complete `fixedQ` type for the pattern checks. This avoids an applied native
+Quick Look inference path. No case or eta expansion replaces the newtype
+patterns.
+
+Fully applied `withQ (error ...) f` remains unsupported when the result alone
+cannot determine the erased `value` parameter. The compiler reports GHC-91028
+at `f`. The partial helper above has enough expected information. General
+native Quick Look and mutable native-meta assignment remain separate work.
 
 See the [typing rules](../../CORE.md#qualified-retained-function-types),
 [source provenance](../../REFERENCES.md#qualified-retained-function-types)
