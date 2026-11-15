@@ -2012,10 +2012,46 @@ tcRetainedArgInst do_ql expected rn_head args fun sigma
                  ; tcRetainedArgInstEnabled Nothing do_ql expected rn_head args fun sigma }
          else return (fun, sigma, [], Nothing) }
 
+{- Note [Native worker argument inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A native worker can need an erased parameter from a later argument:
+  withQ :: forall value. (value :~: QPi) -> value -> QPi
+  withQ Refl f  -- f :: QPi
+The result does not determine value. Infer f once and match its type against
+the ordinary formal domain value. Do not infer Refl against the native
+witness template. Check that argument after choosing value := QPi.
+
+Use the existing cache-producing NoQL route for a known head without
+concreteness requirements. The original body, including its leading theta,
+selects this mode. Classify its tau with isRetainedValueType. Infer only
+eligible original tau domains without native syntax. Require a native anchor
+among these arguments or an immutable expected-result choice. An overapplied
+call starts without a result choice: its final expected type is not the
+declared result used for prefix inference.
+
+Match kinds before types with the same outer-binder predicate and immutable
+substitution. Retained-aware matching also compares a repeated selected Pi
+type in another argument. Require every invisible parameter, its substituted
+kind, exact cached domains and current runtime scope. Do not let an original
+template variable escape. Do not infer callback results or freshen missing
+ordinary parameters in this mode. Other argument-inference modes retain
+their existing rules.
+
+Keep every checked expression and usage if matching fails. The ordinary
+fallback must consume the same cache. The ordered instantiation plan retains
+forall and theta groups after nested contexts and leading VTA. IALL and
+instCall still check the original evidence. Final argument subsumption and
+result checking still run. No native type is assigned to a mutable meta.
+No runtime argument order or function eta rule changes. See
+Note [Cached retained argument inference] and
+docs/dependent-haskell/REFERENCES.md#native-worker-argument-inference.
+-}
+
 -- | Match cached index arguments when the experimental extension is enabled.
 -- See Note [Available expected types in native applications].
 -- See Note [Generic retained argument inference] for overapplication.
 -- See Note [Native inference after visible type applications] for the mode argument.
+-- See Note [Native worker argument inference] for native templates.
 tcRetainedArgInstEnabled :: Maybe Int -> QLFlag -> Maybe TcRhoType -> (HsExpr GhcRn, SrcSpan)
                          -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                          -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
@@ -2025,6 +2061,7 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
   , let (tvs, theta, tau) = tcRetainedInstTelescope sigma
         nested = length tvs /= length outer_tvs
   , let index_tvs = filter (isNativeIndexType . tyVarKind) tvs
+        native_worker = hasNativeDependentExpr (Core.Type body)
   , not (null tvs)
   , null theta || hasNoConcreteTyVars fun
   , let (domains, result) = splitFunTys tau
@@ -2033,17 +2070,28 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
         overapplied = arity < length value_args
   , arity == length value_args
     || (overapplied && arity > 0 && hasNoConcreteTyVars fun)
-  , isTauTy tau, not (isFunTy result)
-  , not (hasNativeDependentExpr (Core.Type body))
+  , if native_worker
+    then hasNoConcreteTyVars fun && isRetainedValueType tau
+    else isTauTy tau && not (isFunTy result)
   = do { expected_ty <- mapM (liftZonkM . zonkTcType) expected
-       ; let index_route = not (null index_tvs)
+       ; let index_route = not native_worker && not (null index_tvs)
              initial_subst | overapplied = Subst.emptySubst
-                           | otherwise = result_subst expected_ty index_route tvs result
+                           | otherwise = result_subst expected_ty index_route native_worker tvs result
              result_anchor = any (hasNativeDependentExpr . Core.Type)
                                [ty | tv <- tvs, Just ty <- [Subst.lookupTyVar initial_subst tv]]
              needed_tvs | index_route = index_tvs
                         | otherwise = filter (isNothing . Subst.lookupTyVar initial_subst) tvs
-       ; eligible <- if index_route
+       ; eligible <- if native_worker
+                     then do { shapes <- mapM tcRetainedInferableArg (take arity value_args)
+                             ; let eligible domain (inferable, anchor)
+                                     = (inferable && isTauTy (scaledThing domain)
+                                        && not (hasNativeDependentExpr (Core.Type (scaledThing domain))),
+                                        anchor)
+                                   selected = zipWith eligible domains shapes
+                             ; return (if result_anchor || any (uncurry (&&)) selected
+                                       then Just (map fst selected)
+                                       else Nothing) }
+                     else if index_route
                      then if hasNoConcreteTyVars fun
                           then do { shapes <- mapM tcRetainedInferableArg
                                                 (take arity value_args)
@@ -2067,10 +2115,16 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
              ; initial_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) initial_cache
              ; let initial_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- initial_cache ]
                    match_args subst pairs = foldM (\subst (formal, actual) ->
-                                        tcMatchTyX_BM (bind_outer tvs) subst formal actual)
+                                        if native_worker
+                                        then match_worker_type tvs subst formal actual
+                                        else tcMatchTyX_BM (bind_outer tvs) subst formal actual)
                                       subst pairs
                    -- See Note [Ordinary heads in native argument matching].
-             ; initial_match <- if index_route
+             ; initial_match <- if native_worker
+                                then return (case match_args initial_subst (zip initial_templates initial_tys) of
+                                               Nothing -> match_args Subst.emptySubst (zip initial_templates initial_tys)
+                                               other -> other)
+                                else if index_route
                                 then return (match_args initial_subst (zip initial_templates initial_tys))
                                 else do
                                   { matched <- tcRetainedMatchArgs tvs initial_subst
@@ -2088,18 +2142,22 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
                         ; extra_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) extra_cache
                         ; let extra_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- extra_cache ]
                         ; return (match_args subst (zip extra_templates extra_tys), initial_cache ++ extra_cache) }
-                   Just subst | not index_route ->
+                   Just subst | not index_route, not native_worker ->
                      tcRetainedCallbackArgs tvs domains args subst initial_cache
                    _ -> return (initial_match, initial_cache)
              ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
              ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
              ; choices <- case matched of
+                            Just subst | native_worker
+                              -> return $ do { inst_tys <- traverse (Subst.lookupTyVar subst) tvs
+                                             ; return (subst, inst_tys) }
                             Just subst -> tcRetainedArgChoices index_route tvs subst
                             Nothing -> return Nothing
              ; case choices of
                  Just (subst, inst_tys)
                    | index_route || any (hasNativeDependentExpr . Core.Type) inst_tys
                    , not nested || any (hasNativeDependentExpr . Core.Type) inst_tys
+                   , not native_worker || not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
                    , and (zipWith (kind_agrees subst) tvs inst_tys)
                    , and (zipWith (\formal actual -> eqType (Subst.substTy subst formal) actual)
                                   templates actual_tys)
@@ -2121,13 +2179,25 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
 
-    result_subst expected index_route tvs result
+    result_subst expected index_route native_worker tvs result
       | Just expected_ty <- expected
+      , native_worker
+      , isRetainedValueType expected_ty
+      , Just subst <- match_worker_type tvs Subst.emptySubst result expected_ty
+      = subst
+      | Just expected_ty <- expected
+      , not native_worker
       , isTauTy expected_ty
       , not index_route || hasNativeDependentExpr (Core.Type expected_ty)
       , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected_ty
       = subst
       | otherwise = Subst.emptySubst
+
+    -- | Match kinds before worker types with the same restricted substitution.
+    match_worker_type :: [TyVar] -> Subst.Subst -> Type -> Type -> Maybe Subst.Subst
+    match_worker_type tvs subst formal actual
+      = do { subst <- tcMatchRetainedTyX_BM (bind_outer tvs) subst (typeKind formal) (typeKind actual)
+           ; tcMatchRetainedTyX_BM (bind_outer tvs) subst formal actual }
 
     actual_type (_, ty, _) = ty
 

@@ -2668,3 +2668,38 @@ observations pass in both stages. Two old expected rejections are retained as
 positive controls: the leading GADT pattern and `undefined` at a complete
 `Maybe (foreach ...)` result. The full existing API fixture and all five
 focused registered tests pass. The full GHC suite was not run.
+
+## Native worker argument inference
+
+The M36 baseline agrees in both compiler stages. Two partial witness helpers
+compile. Full `Refl`, full bottom proof, full Given transport and two direct
+runtime-index applications reject with GHC-91028. Their final result does not
+determine the erased `value` parameter. The known argument `f :: QPi` does.
+
+Agda v2.8.0 normally checks explicit arguments in
+[telescope order](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808).
+It checks the current domain's hiding and modality, then substitutes into the
+remaining type. A blocked check can retain its
+[checked prefix and remaining spine](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L619-L641).
+The [postponed check](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L607-L653)
+stores its context and a real unblock condition. The application source
+[warns against postponing unblocked arguments](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L779-L791).
+That comment records an abandoned experiment. It is not an implemented rule
+for scanning arbitrary later arguments first.
+
+The GHC adaptation uses its existing argument cache. Infer an independently
+known later argument once. Match its native-free formal domain immutably.
+Require complete parameter choices, kind agreement, exact domains and current
+runtime scope. Then check the earlier native-template proof normally. Match
+kinds before types with the same restricted substitution. Keep the original
+forall and evidence order through the existing instantiation plan. Preserve
+failed inference caches. Skip callback inference and fresh parameter creation
+for a native worker. General native Quick Look and mutable native-meta
+assignment remain blocked. This changes checking order, not runtime order.
+See Note [Native worker argument inference] in `GHC.Tc.Gen.App`.
+
+Four full Agda source files and the frozen M35 GHC checker are verified in
+`native-worker-arguments-prior-art-v1/provenance.json`. The reading records
+source ranges, SHA256 and calculated Git blobs. Agda's context-abstracted
+mutable metas and eta policies do not transfer to this implementation.
+The compiler change and its source/runtime checks remain pending.
