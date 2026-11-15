@@ -4,6 +4,7 @@ import Control.Exception (SomeException, displayException, try)
 import Control.Monad (forM_, unless, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (find, isInfixOf)
+import Data.Maybe (isNothing)
 import Data.Time.Clock (getCurrentTime)
 import qualified GHC
 import GHC.Builtin.WiredIn.Types
@@ -18,6 +19,7 @@ import GHC.Core.Lint (lintExpr)
 import GHC.Core.Make (mkCoreConApps, mkIntExpr)
 import GHC.Core.Opt.Arity (etaExpand)
 import GHC.Core.Predicate (mkNomEqPred)
+import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Rep (Type (..), scaledThing)
@@ -49,6 +51,7 @@ import GHC.Types.SrcLoc (isGoodSrcSpan, noLoc, noSrcSpan)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env (mkInScopeSet)
+import GHC.Types.Var.Set (elemVarSet)
 import GHC.Unit.Module.ModGuts (ModGuts (mg_binds))
 import GHC.Unit.Module.ModIface (mi_hash_fn, mi_mod_hash)
 import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
@@ -120,6 +123,10 @@ helperSource =
         , "driveNat k seed = newIORef seed >>= readIORef >>= k"
         , "driveNats :: (Nat -> IO String) -> IO String"
         , "driveNats k = unlines <$> mapM (driveNat k) [Z, S (S Z), S (S (S Z))]"
+        , "-- | Keep this producer opaque to native index conversion."
+        , "{-# NOINLINE opaqueNat #-}"
+        , "opaqueNat :: Nat -> Nat"
+        , "opaqueNat n = n"
         , "{-# NOINLINE driveNatPair #-}"
         , "driveNatPair :: (Nat -> Nat -> IO String) -> (Nat, Nat) -> IO String"
         , "driveNatPair k seed = newIORef seed >>= readIORef >>= uncurry k"
@@ -4387,6 +4394,63 @@ runNatChecks environment flags bindings tycons = do
     lintNative flags "direct beta keep CorePrep" preparedKeep
     expect "direct beta keep CorePrep does not force its input" "42" $
         mkApps (Var (helper bindings "driveNat")) [preparedKeep, Var (helper bindings "bottomNat")]
+    let aliasActual = local 3101 "alias_actual" natTy
+        aliasIndex = local 3102 "alias_index" natTy
+        aliasType = TermVarTy aliasIndex
+        aliasProducer = App (Var (helper bindings "opaqueNat")) (Var input)
+        -- | Check the native simplifier before backend alias substitution.
+        prepareAlias label body = do
+            let original = Lam input (Let (NonRec aliasActual aliasProducer) (Let (NonRec aliasIndex (Var aliasActual)) body))
+                simplified = simpleOptNativeExpr original
+            lintNative flags (label ++ " input") original
+            unless (eqType (exprType original) (exprType simplified)) $
+                fail ("FAIL: " ++ label ++ "; alias substitution changed the result type")
+            lintNative flags (label ++ " output") simplified
+            case simplified of
+                Lam _ (Let (NonRec actual producer) body') -> do
+                    unless (actual == aliasActual && isNothing (exprToNativeIndex producer)) $
+                        fail ("FAIL: " ++ label ++ "; opaque producer binding changed")
+                    case body' of
+                        Let (NonRec binder _) _ | binder == aliasIndex ->
+                            fail ("FAIL: " ++ label ++ "; native variable alias was retained")
+                        _ -> pure ()
+                    unless (actual `elemVarSet` exprFreeVars body' && not (aliasIndex `elemVarSet` exprFreeVars body')) $
+                        fail ("FAIL: " ++ label ++ "; alias substitution lost its scoped actual variable")
+                _ -> fail ("FAIL: " ++ label ++ "; lazy producer binding was removed")
+            pure simplified
+        aliasReplication observer =
+            Let (Rec [(worker, rhs)]) $
+                mkApps (Var (helper bindings observer)) [Type aliasType, mkApps (Var worker) [Var aliasIndex, payload]]
+    aliasFinite <- prepareAlias "direct variable alias replication" (aliasReplication "observeVec")
+    expect "variable alias replication at zero/two/three" (unlines ["[]:0", "[42,42]:2", "[42,42,42]:3"]) $
+        App (Var (helper bindings "driveNats")) aliasFinite
+    aliasHead <- prepareAlias "direct variable alias head" (aliasReplication "observeVecHead")
+    expectBottom "variable alias demands its original index" $
+        mkApps (Var (helper bindings "driveNat")) [aliasHead, Var (helper bindings "bottomNat")]
+    aliasPrefix <- prepareAlias "direct variable alias cyclic prefix" (aliasReplication "observeVecPrefix")
+    expect "variable alias preserves a finite cyclic prefix" "[42,42,42,42]" $
+        mkApps (Var (helper bindings "driveNat")) [aliasPrefix, Var (helper bindings "cyclicNat")]
+    let aliasDictionary = local 3103 "alias_dictionary" (mkTyConApp eqTyCon [natTy, aliasType, aliasType])
+        aliasValue = Lam aliasDictionary payload
+        aliasReflexive = mkCoreConApps eqDataCon [Type natTy, Type aliasType, Type aliasType, Coercion (mkNomReflCo aliasType)]
+        aliasKept = mkApps (Var keepId) [Var aliasIndex, aliasValue, aliasReflexive]
+        aliasKeepBody = Let (NonRec keepId keepExpr) (App (Var (helper bindings "observeInt")) aliasKept)
+    aliasKeep <- prepareAlias "direct variable alias keep" aliasKeepBody
+    expect "variable alias keep ignores bottom" "42" $
+        mkApps (Var (helper bindings "driveNat")) [aliasKeep, Var (helper bindings "bottomNat")]
+    let aliasPartial = App (Var bottomFunction) (Var aliasIndex)
+        aliasBottomBody =
+            Let (NonRec bottomFunction bottomFunctionRhs) $
+                mkApps (Var (helper bindings "force")) [Type (exprType aliasPartial), aliasPartial]
+    aliasBottom <- prepareAlias "direct variable alias bottom function" aliasBottomBody
+    aliasBottomOutcome <-
+        try
+            (execute environment flags "variable alias preserves bottom function WHNF" $ mkApps (Var (helper bindings "driveNat")) [aliasBottom, Var (helper bindings "bottomNat")]) ::
+            IO (Either SomeException String)
+    case aliasBottomOutcome of
+        Left exception | "native-bottom-function" `isInfixOf` displayException exception -> pure ()
+        Left exception -> fail ("FAIL: variable alias changed bottom function demand: " ++ displayException exception)
+        Right value' -> fail ("FAIL: variable alias hid a bottom function: " ++ show value')
   where
     namedTyCon label = case find ((== label) . occNameString . nameOccName . tyConName) tycons of
         Just tycon -> pure tycon
