@@ -72,7 +72,7 @@ import GHC.Types.TyThing (TyThing (AConLike, ATyCon, AnId))
 import GHC.Types.TypeEnv (mkTypeEnv)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Unique.FM (sizeUFM)
-import GHC.Types.Var
+import GHC.Types.Var hiding (setIdExported)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Unit.Types (IsBootInterface (NotBoot), mainUnit, mkModule, mkModuleName)
