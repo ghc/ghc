@@ -3375,3 +3375,29 @@ and mixed-domain object programs pass in both stages. The ordinary body
 rejection for inverse call equality is distinct from the two explicit policy
 guards. These operational results do not transfer Agda's totality or D/DC's
 preservation result to this implementation.
+
+## Exported function-valued retained signatures prior art
+
+M52 extends complete ordinary value signatures from local bindings to exported
+bindings. Application substitutes the actual function/input into the result.
+The binder's scope must survive interface writing and fresh reconstruction.
+
+Agda v2.8.0 [internal terms221–260](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L221-L260)
+represent Pi domains/bodies and neutral variable application spines.
+[Substitution827–850](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L827-L850)
+substitutes variable heads and eliminations. [Abs substitution1053–1063](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L1053-L1063)
+lifts the substitution under a binder. These exact cached primary ranges were
+read again for M52. Git blobs are `a6e0938ed369b1f0f5f0b8aa1ff3baeb9aad033b`
+and `1ef41f6d2a0223c8328984903b60dabc2a05a783`. The original read context and
+source hashes are in `native-function-signature-next-research-v1/provenance.json`.
+No fresh fetch, whole-module reading or Agda proof replay is inferred from
+this cache reuse.
+
+The existing 2017 author PDF of
+[A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf),
+PDF14–16, gives relevant Pi application and typed substitution. Its Pi
+congruence permits broader domain transport. M52 preserves the existing fixed,
+closed Many function domain and does not implement that broader rule. These
+sources support the scope/substitution design. They do not specify GHC's wire
+codec, lazy runtime ABI or restricted optimizer. See
+[the implementation plan](PLAN.md#m52-exported-function-valued-retained-value-signatures).

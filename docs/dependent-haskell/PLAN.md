@@ -3469,3 +3469,60 @@ retained signatures] in `GHC.Tc.Gen.HsType` when that section next changes.
 M51's actual field predicates and its owning DataCon/interface Notes already
 state the function-field policy. This stale sentence is a documentation
 follow-up, not a failed compiler check.
+
+### M52: exported function-valued retained value signatures
+
+Status: specified; implementation and validation pending.
+The target is an ordinary exported value with a complete signature:
+
+```haskell
+idCall :: forall a. foreach (f :: Nat -> Nat)
+       -> foreach (n :: Nat) -> Vec a (f n) -> Vec a (f n)
+idCall f n xs = xs
+```
+
+A separate client opens an actual M51 `FunctionPack` and calls
+`idCall @a f n xs`. Preserve the actual local function/input Ids in the result.
+Use ordinary object imports with O0, omitted unfoldings, Core Lint and STG
+Lint. Reuse `DepFunTy`, `TermAppTy`, tags10/12 and the three-argument runtime
+ABI. The erased payload parameter stays erased. Add no singleton or Core node.
+
+- [ ] Preserve the actual M51 compiler/reader before rebuilding. Measure the
+  current producer rejection after its real dependencies compile.
+- [ ] Replace the private signature Name permission with an ordinary-value
+  signature flag. Only complete `FunSigCtxt` paths receive it. Keep the class
+  path, general type-argument checks, staging, partial signatures, captured
+  indices and result-kind checks unchanged. Use the existing closed visible
+  Many `A -> B` function-domain policy. Update the diagnostic and owning Note.
+- [ ] Reconstruct generic `IfaceDepFunTy` through `isNativeRetainedBinder`.
+  Allocate the actual local Id before decoding its body. Preserve the exact
+  result-kind check. Keep bare `IfaceTermVar` scalar-only and reject diagnostic
+  free heads. Keep Pi/call coercion encoding and native unfoldings gated.
+- [ ] Keep `VERSION_DATE` at20261115.1. The wire layout and tags do not change.
+  State the admission boundary accurately: an old reader can display the raw
+  signature but must reject its typed import at the old function-binder gate.
+  Force the imported Id type in that control; an unused import is insufficient.
+- [ ] Update existing API fixtures without adding test files or golden lines.
+  Replace the generic function-Pi rejection with both-compression round trips,
+  two fresh imports, alpha equality and nested same-spelling scope controls.
+  Retain malformed domain, multiplicity, missing/forward head, bare function
+  index and coercion-codec negatives. Replace only obsolete source negatives.
+- [ ] Compile and link the actual producer/client with both compilers. Check
+  finite IORef inputs, generic Char payloads, exact head/input scope, payload
+  sharing, partial application and ignored/demanded bottoms. Record a separate
+  literal oracle. A dependency/producer failure cannot count as a client error.
+- [ ] Measure omitted VTA and an explicitly typed local alias separately. Do
+  not widen `App.isRetainedValueType`, imported-worker case activation or
+  native metavariable assignment solely to bypass the direct target.
+- [ ] Add a small maintained Showcase example. Run the relevant API, source,
+  native pipeline and registered regressions. Keep exact input provenance and
+  historical failures. Record actual diagnostic codes and source spans.
+- [ ] Update current contracts, references and status. Audit and publish the
+  source milestone. Keep the full program goal active.
+
+Use `native-exported-function-signature-*` for new evidence. M51's frozen
+namespace and external repair files remain unchanged. The next-research cache
+is prior read-only evidence. Record its original reading context separately.
+The primary comparison is
+[with the references](REFERENCES.md#exported-function-valued-retained-signatures-prior-art).
+This increment does not close R22, C1 or C2 or establish totality.
