@@ -3536,7 +3536,7 @@ pprRetainedQuantificationError reason = case reason of
   RetainedBinderNeedsType ->
     text "A retained argument requires an explicit domain type."
   RetainedUnsupportedDomain ty ->
-    vcat [ text "A retained argument requires a supported closed first-order algebraic domain."
+    vcat [ text "This retained argument has an unsupported domain."
          , text "Its declared domain is:" <+> ppr ty ]
   RetainedResultKind ty ->
     vcat [ text "The result of retained quantification must have kind" <+> quotes (text "Type")
@@ -3559,7 +3559,7 @@ pprRetainedQuantificationError reason = case reason of
     vcat [ text "The inferred callback result contains a runtime index outside the application scope:"
          , ppr ty ]
   RetainedInvalidBinder var ->
-    text "A retained index must be a local, unrestricted value of a supported algebraic domain:" <+> ppr var
+    text "A retained index or function head must be a local, unrestricted value of a supported domain:" <+> ppr var
   RetainedIndexOutOfScope var ->
     text "The runtime index" <+> quotes (ppr var) <+> text "is out of scope here."
   RetainedPartialSignature ->
