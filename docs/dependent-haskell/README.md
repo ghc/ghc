@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M41 passes both stages and focused regressions; 562 packed-vector plus 106 qualified/container/worker runtime observations |
+| Last verified checkpoint | M43 passes both stages, source call refinement and focused regressions; 562 packed-vector plus 106 qualified/container/worker runtime observations |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -75,8 +75,8 @@ Last updated: 2026-11-15.
 | Core beta exposure | Immediate checked lambdas normalize in the native index bridge; capture, interface evidence, and direct CorePrep demand checks pass |
 | Source index beta | Immediate single-variable lambda applications pass ordinary checking with actual binder identity; atomic arguments, supported domains and Many multiplicity remain required; Strict rejects the new form |
 | Native variable aliases | Literal local Many aliases substitute the same eligible Id in terms, types and coercions; opaque producer bindings stay lazy and shared; excluded metadata and non-variable targets keep their bindings |
-| Opaque call indices | Scoped local `A -> B` heads, forward nominal congruence, strict case proofs and backend lowering pass both API fixtures; source formation and interface encoding remain gated |
-| Next task | Expose strict opaque-call refinement from source with whole-call abstraction, checked alias evidence and the existing retained constructor matcher |
+| Opaque call indices | Source `case f n` refines the whole call through checked alias evidence; local signed heads, mixed Bool/Nat domains, captures and demand controls pass both stages |
+| Next task | Admit checked constructor-tree arguments such as `case f (S n)` through the existing Core bridge |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -96,7 +96,8 @@ printing. It does not add a singleton argument or evaluate index variables.
 `TermAppTy` also records scoped opaque calls in Core. Its head is an ordinary
 local function between independently closed scalar domains. This form supports
 forward congruence. It supplies no injectivity or function evaluation rule.
-Source call formation remains separate work. See the [M42 checkpoint](#m42-scoped-opaque-function-call-indices).
+Source `case f n` now exposes this representation. See the
+[M43 checkpoint](#m43-strict-opaque-call-refinement-from-source).
 
 Boolean alternatives can bind checked nominal equality evidence. The strict case
 justifies each proof. Proof-bearing cases must cover both Boolean values, and
@@ -3756,10 +3757,74 @@ Pinned Agda neutral applications and scoped substitution supply operational
 prior art. D/DC and System DR supply separate equality precedents.
 These references do not prove this implementation.
 
-Source call formation and interface encoding remain gated. Function-domain
+At M42, source call formation and interface encoding remain gated. Function-domain
 retained binders, general evaluation and ordinary optimization remain open.
 The next step is a strict source case that refines the whole call while
 preserving unrelated inputs and source demand. See the
 [Core contract](CORE.md#opaque-native-call-indices),
 [M42 plan](PLAN.md#m42-scoped-opaque-function-call-indices) and
 [M43 source plan](PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented).
+
+## M43: strict opaque-call refinement from source
+
+The [source example](examples/qualified-pi/OpaqueCallClient.hs) accepts an
+ordinary function and an unknown runtime index. In `case f n`, each branch can
+construct a value of type `Vec Int (f n)`. Neither the input index nor a different
+call is refined. The mixed-domain example uses `f :: Bool -> Nat` and a Boolean
+read from an IORef. No singleton argument or function evaluation rule is added.
+
+Type checking records the actual local head and argument. A typed
+`NativeCaseAlias` emits one strict DEFAULT case around the checked call.
+Its proof connects the computed result to the whole `f n` index. The existing
+retained constructor matcher checks each branch. Captured consumers receive
+explicit nominal transport. The call is checked once and executed once per
+case. Wildcard and variable cases without dependent refinement stay lazy.
+
+Twenty-six quiet source controls pass in the bootstrap API and the self-hosted
+registered fixture. They cover captures, function-valued case results, partial
+and cyclic fields, bottom order, and six `Strict` controls. The one-line and
+37-line goldens are unchanged. Both compilers separately compile, link and run
+the public example's nine observations. Fourteen negative clients reject with
+located diagnostics: six use GHC-83865 and eight use GHC-83605. Coverage and
+debug options produce six errors each, so the clients produce 24 error envelopes.
+The arity client rejects after branch rewriting produces `'Z n`; it does not
+isolate the direct call-arity diagnostic.
+
+A separate fifteen-line program preserves the public nine-line prefix and
+adds six controls. Both stages accept a local function with a complete
+signature. They preserve opaque-head identity through `seq` and leave an unused
+bottom index unevaluated. Ordinary `toList ys` obtains its known call index
+through the existing immutable argument-instantiation route. General mutable
+native-meta assignment is unchanged.
+
+The `Strict` controls exposed a binder-identity error in `seq` desugaring.
+Reusing an index as the case binder let capture-avoiding substitution change
+a type argument while a captured vector kept the outer index. The corrected
+path uses an unused case binder when the continuation contains native types.
+It preserves the operand's demand and evaluation order.
+
+Both compiler stages build. The nine final phases pass: two validated API
+reuses and seven launches. Both stages preserve the old 106 raw/public and
+562 packed-vector observations. Five registered regressions pass across
+39 cases with 34 skips and no unexpected results or framework warnings.
+The source 41-client, known 41-client and prior 64-client matrices, Tc metadata
+probe and full GHC suite were not rerun.
+
+Selected compiler and source: `edbe394d03628de2900fff828b4137d72e5cc94c`.
+Snapshot v5 covers 82 compiler inputs and 98 source paths. All five snapshots
+retain their own Git identities. The final bootstrap build took 21.67s and
+peaked at 1825 MiB. Self-hosting took 20m11s and peaked at 5791 MiB.
+Both builds used 16 GiB caps. API checks peaked at 1243 MiB and final checks
+at 1185 MiB under 4 GiB caps. Swap is zero.
+
+Evidence uses `native-source-neutral-calls-*`. It preserves the frozen M42
+envelope and its 45 manifest hashes. Earlier import, dispatch, `seq`, finder
+and supplemental source errors retain their actual outcomes. Pinned Agda
+with-abstraction and application checking supply operational prior art.
+They do not prove preservation for this implementation.
+
+Source case arguments are still bare eligible variables, modulo parentheses.
+Function-valued retained binders, lazy `keep (f n)`, new call-bearing interface
+forms, general evaluation and ordinary optimization remain gated. C1 and C2
+remain open. The [next plan](PLAN.md#m44-checked-constructor-arguments-in-source-calls-unimplemented)
+uses the existing Core constructor-argument bridge.

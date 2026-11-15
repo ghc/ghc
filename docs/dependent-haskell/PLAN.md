@@ -2765,7 +2765,9 @@ inputs and outputs. It preserves the canonical M41 envelope, its 21 manifest
 hashes and the earlier chain. Freeze and independent audit must pass before
 publication. C1, C2 and the rest of the program remain open.
 
-### M43: strict opaque-call refinement from source (unimplemented)
+<a id="m43-strict-opaque-call-refinement-from-source-unimplemented"></a>
+
+### M43: strict opaque-call refinement from source
 
 Expose M42 through a checked source case. Keep `f` an ordinary Many function
 with M42's closed scalar domains. Use an argument or a local binding with a
@@ -2785,35 +2787,36 @@ probe f n original =
 ```
 
 `size` is an ordinary vector length observer. Refine the whole `f n` call.
-Do not refine `n` or assume that `f` is injective. This work is unimplemented.
-Keep current source-call gates until formation, checking and lowering agree.
+Do not refine `n` or assume that `f` is injective. M43 implements this subset.
+The checked source runtime call requires a bare eligible variable argument, modulo
+parentheses. Source type formation has a larger symbolic argument domain.
 
-- [ ] Register eligible lexical function heads in complete type contexts.
+- [x] Register eligible lexical function heads in complete type contexts.
   Preserve actual Names, shadowing, staging, wildcard and signature gates.
-- [ ] Recognize a saturated source type application before generic type
+- [x] Recognize a saturated source type application before generic type
   application. Build `TermAppTy f arg` at B after checking `arg` at A.
   Reject bare function indices; do not construct matchable `AppTy`.
-- [ ] Extend `Validity` and `tcRetainedInstScope` for checked local head
+- [x] Extend `Validity` and `tcRetainedInstScope` for checked local head
   dependencies. Read assigned metadata without changing Unique or Many.
   Keep native meta-assignment, inference and Quick Look safeguards.
-- [ ] Require the existing full constructor-refining subset. Exclude guards,
+- [x] Require the existing full constructor-refining subset. Exclude guards,
   wildcard, variable and lazy-only rows before introducing a strict alias.
   Leave ordinary irrefutable cases lazy. Detect branch-local call annotations
   as a new dependency trigger.
-- [ ] Classify the already-checked scrutinee after `tcInferRhoFRR`.
+- [x] Classify the already-checked scrutinee after `tcInferRhoFRR`.
   Preserve its actual head/argument Ids, usage and wrappers. Do not check,
   expand or desugar its source twice. Reject unsupported forms at their spans.
-- [ ] Abstract exact whole-call occurrences in expected types, captured
+- [x] Abstract exact whole-call occurrences in expected types, captured
   values, incoming predicates and branch-local annotations. Reuse nominal
   FC lifting and explicit transport. Preserve quotation and scope checks.
-- [ ] Emit one strict outer DEFAULT alias `q :: r ~# f n`. Reuse existing
+- [x] Emit one strict outer DEFAULT alias `q :: r ~# f n`. Reuse existing
   per-row retained constructor cases on `r`. Compose `sym q` with each
   `r ~# C fields` proof when the original call equality is needed.
   Keep the call once, the actual field Ids and ordinary row failure order.
-- [ ] Preserve this shape through desugaring and PMC. The ordinary HsCase
+- [x] Preserve this shape through desugaring and PMC. The ordinary HsCase
   lazy scrutinee binding cannot silently replace the checked alias case.
   Do not apply a retained motive function directly to the opaque call.
-- [ ] Check finite IORef inputs, constant-function noninjectivity, bottom
+- [x] Check finite IORef inputs, constant-function noninjectivity, bottom
   head/argument order, lazy predecessor fields, exact-call captures and
   independent calls. Add mixed-domain, escape and located negative controls.
   Check producer/consumer execution with existing signature codecs; keep
@@ -2821,7 +2824,7 @@ Keep current source-call gates until formation, checking and lowering agree.
 
 No function-valued retained Pi binder or lazy `keep (f n)` admission is planned.
 General Given rewriting, call evaluation and function extensionality stay open.
-This future implementation checklist remains open.
+The full C1 and C2 obligations remain open.
 
 Provenance: Agda v2.8.0 [with-abstraction 710–741, 910–936](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L710-L741)
 (blob `ff0888af84f3101351c501534de087c180dc7afd`),
@@ -2835,16 +2838,85 @@ Dependencies: head formation and scope checks precede whole-call abstraction.
 The checker precedes the typed carrier and desugaring. Backend Lint precedes
 source execution and interface checks.
 
-The proposed carrier is one typed-only `XXExprGhcTc` constructor. It stores
+The checked carrier is one typed-only `XXExprGhcTc` constructor. It stores
 the checked scrutinee, fresh result Id r, nominal proof q, result type and
 checked body. Desugaring emits `Case scrut r result [DEFAULT q -> body]`.
 Only the body sees r and q. The result type stays outside their scope.
-Zonking, expression type recovery, printing, HIE and PMC must handle the form.
+Zonking, expression type recovery, printing, HIE and PMC handle the form.
 An enclosing source expansion preserves the original source for diagnostics.
 Existing wrappers do not bind this strict DEFAULT proof.
 
 The static carrier and demand reviews are in
 `native-neutral-calls-source-carrier-review-v1.md` and
 `native-neutral-calls-source-demand-addendum-v1.md`.
-No M43 source or runtime result has been measured. Extend existing quiet
-fixtures and public examples. Add no tracked test or golden line.
+Selected compiler/source: `edbe394d03628de2900fff828b4137d72e5cc94c`.
+Snapshot v5 records 82 compiler inputs and 98 source paths. All five historical
+snapshots preserve their own Git identities. The M42 envelope and its 45
+manifest hashes remain frozen.
+
+Twenty-six quiet source controls pass at bootstrap and in the self-hosted
+registered fixture. Six check `Strict`. Both stages pass the public nine-line
+program and fourteen negative clients. A separate fifteen-line program keeps
+the public nine-line prefix and adds six signed-local-head and `seq` controls.
+The inherited 19 Core invocations and source corpus keep separate counts.
+The one-line and 37-line goldens remain unchanged. No tracked test file or
+golden line is added.
+
+All nine final phases pass, with two checked API reuses and seven launches.
+Both stages preserve 106 raw/public and 562 packed-vector observations.
+The registered group reports 5 passes, 39 cases, 34 skips and no unexpected
+results or framework warnings. The source 41-client, known 41-client, prior
+64-client matrices, Tc metadata probe and full GHC suite were not rerun.
+
+The `Strict` predecessor check exposed `seq` binder reuse that changed an
+index identity in type arguments. A focused desugaring guard preserves the
+outer scalar or function-head identity. Ordinary demand and row order remain.
+Earlier import, scalar-dispatch, `seq`, finder and supplemental source errors
+retain their actual failure records. The last was a wrong RuntimeRep type
+argument in the probe, not a compiler feature gate.
+
+The final bootstrap build takes 21.67s and peaks at 1825 MiB. Self-hosting takes
+20m11s and peaks at 5791 MiB. Both builds use 16 GiB caps. API checks peak at
+1243 MiB and final checks at 1185 MiB under 4 GiB caps. Swap is zero.
+Evidence uses `native-source-neutral-calls-*`. Freeze and independent audit
+must pass before publication.
+
+
+### M44: checked constructor arguments in source calls (unimplemented)
+
+Expose the existing Core argument bridge through source `case f Z` and
+`case f (S n)`. Keep M43's whole-call abstraction and all of its scope and
+demand checks. No new Core type or coercion constructor is planned.
+
+- [ ] Classify the already-checked scalar argument from actual `HsVar`,
+  `ConLikeTc` and `HsApp` nodes. Validate a temporary constructor spine with
+  `exprToNativeIndex`. Keep actual Ids, DataCons, types and multiplicities.
+  Reject unsupported wrappers and producers. Do not call the renamed-syntax
+  `tcRetainedArg` or emit usage a second time.
+- [ ] Generalize `tcRetainedCallCase` from one variable argument to the complete
+  checked index. Seed substitution scope with all free dependencies.
+- [ ] Match branch annotations against that index structurally. Compare actual
+  constructor and variable Names, arity and recursive fields. Parentheses may
+  differ. Keep `f n`, `f (S n)`, other heads and shadowed leaves distinct.
+  Do not infer an input from a call result.
+- [ ] Reuse `NativeCaseAlias`, nominal whole-call lifting, the retained motive,
+  quotation and instrumentation gates, and `Strict` capture protection.
+- [ ] Reuse CorePrep's recursive argument naming and forward congruence.
+  Preserve constructor WHNF without forcing predecessor fields.
+- [ ] Check constant and nested constructor arguments, mixed domains, captured
+  consumers and function results. Include bottom-head order, ignored partial
+  fields, cyclic prefixes and explicit predecessor forcing with Core/STG Lint.
+- [ ] Measure independent-call, wrong-domain, arity, shadowing, wrapper and
+  scope diagnostics. Preserve M43 and older focused regressions at both stages.
+
+Dependencies: checked argument classification precedes exact annotation
+matching. Those checks precede source execution and both-stage regression
+validation. The owning source Note remains [Source opaque call refinement].
+Agda's pinned Application 774–808 and with-abstraction ranges above supply
+checking and context-abstraction prior art. They do not prove Haskell demand.
+
+Typed beta arguments remain a separate decision. Their actual multiplicities
+can still contain metas before zonking. Do not replace them with provisional
+Many Ids. Nested opaque calls, function-valued retained binders, lazy retained
+calls, general optimization and new interface codecs stay outside M44.
+The preparation is `native-source-neutral-calls-next-boundary-v1.md`.

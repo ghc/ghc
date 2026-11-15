@@ -2955,8 +2955,8 @@ Core-only evidence remain unchanged. No eta rule or general evaluator is added.
 This comparison preceded M42. M42 selects a dedicated scoped call node for a
 bounded Core kernel. The token/family alternative remains research. Keep scalar
 index domains, permitted runtime function heads, and future domains of retained
-function binders as separate policies. Source calls and new wire forms remain
-gated. See the [Core contract](CORE.md#opaque-native-call-indices).
+function binders as separate policies. M43 adds the bounded source path below;
+new wire forms remain gated. See the [Core contract](CORE.md#opaque-native-call-indices).
 
 [Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf)
 uses matchability to control equality decomposition. The read version is the
@@ -3029,8 +3029,47 @@ Note [Opaque native call indices] in `GHC.Core.TyCo.Rep`.
 Compiler `0447f8a7a199675423cd7f5fafa94567afa40114` and fixture source
 `428aa3795341e8628e258976adc6df434c17bda4` pass both-stage focused validation.
 The v7 snapshot records all 77 compiler inputs and 92 source paths.
-Source opaque-call formation and new wire encoding remain gated.
-The [M43 plan](PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented)
-pins separate Agda with-abstraction, LHS and application references.
-These support a future source elaboration. They do not justify Haskell demand
-changes or establish an FC preservation theorem.
+At that M42 checkpoint, source opaque-call formation and new wire encoding
+remained gated. M43 implements the source subset described below. Its
+[plan](PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented)
+retains the historical anchor. New wire encoding remains gated.
+
+
+## Strict opaque-call refinement: prior art
+
+Agda v2.8.0 supplies four selected source readings for M43:
+[With.hs 101–173](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/With.hs#L101-L173)
+partitions the context and constructs the abstracted helper type;
+[the manual 710–741](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L710-L741)
+explains the dependent case combinator and its limits;
+[manual 910–936](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L910-L936)
+requires checking the generalized type.
+[LHS 1503–1532](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1503-L1532)
+transports the remaining context, target and equations by constructor substitution.
+[Application 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks an argument before substituting it into the codomain.
+
+The fresh cache `native-source-neutral-calls-prior-art-v1/` records full bytes,
+URLs, tag, Git blobs, SHA256, access/reuse UTC and the exact selected ranges.
+With.hs was fetched and read on 2026-11-15; its independently computed blob
+matches the earlier REFERENCES pointer. The original carrier Note used that
+pointer before this local verification. The other three files reuse verified
+cached bytes. Their identities are:
+
+| File | Git blob | SHA256 |
+| --- | --- | --- |
+| With.hs | `fb84d352f3c6b2e786a0c095c74c5bee15e533cf` | `581b018beb066653327ab29b548e8fa77fdf84b6afec299d085b0bd795bb0d9a` |
+| WithAbstraction | `ff0888af84f3101351c501534de087c180dc7afd` | `67921864b3aa8b1d139a543904440e7a2011cdbfdb47285e96f9735d05a9959e` |
+| LHS.hs | `3779ffa6e418bca99e30c071e189106f82ecbe1b` | `263e2672f359cf2e7abe49e81f74ebf911aee20c6063b676f654100b9533c3f3` |
+| Application.hs | `82ba94ac864d19b947d4c92b9af252b0fe81347a` | `3c843f26cde8bfc80f029eb42fba54e19d2ff06f94a9dbf6e4ef81e27dbc43c2` |
+
+These readings support whole-call abstraction and checked scope transport.
+They do not justify inverse call equality, Haskell eta conversion, or demand
+changes. The strict DEFAULT alias, administrative lazy patterns under Strict,
+and scalar/function-head identity guard for `seq` are explicit GHC adaptations.
+The [Core contract](CORE.md#strict-opaque-call-refinement-from-source) records
+source26, CLI9/14 and supplement15 as separate measured sets. All pass in both
+stages. The supplement's corrected implicit observer uses immutable argument
+matching; its first RuntimeRep source error is preserved as a probe mistake.
+Four full-file hashes do not claim full-file reading. No Agda execution or
+combined FC/usage/runtime preservation theorem is claimed.

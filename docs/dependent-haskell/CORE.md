@@ -1588,8 +1588,8 @@ Core Tidy gives supported top-level heads lazy local aliases before globalising.
 The M41 checked alias rule also removes eligible literal function-head aliases.
 Its metadata exclusions and lazy producer behavior remain in force.
 
-Function-domain retained Pi binders, source call formation, new interface wire
-forms and general lazy retained-call naming remain gated.
+Function-domain retained Pi binders, new interface wire forms and general lazy
+retained-call naming remain gated. M43 source formation is described below.
 `mkLamType` and Lint reject a function head that escapes in a lambda result.
 Diagnostic interface forms support printing. Binary writing and importing
 reject them. Ordinary optimization and unfolding gates remain in force.
@@ -1607,5 +1607,96 @@ isolated execution probe.
 See Note [Opaque native call indices] in `GHC.Core.TyCo.Rep` and
 Note [Opaque call arguments in CorePrep] in `GHC.CoreToStg.Prep`.
 The [M42 plan](PLAN.md#m42-scoped-opaque-function-call-indices) records measured
-results. The [source plan](PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented)
-records the next step.
+results. The [M43 source contract](#strict-opaque-call-refinement-from-source)
+extends this kernel through the checked source path below.
+
+
+### Strict opaque-call refinement from source
+
+M43 admits a lexical function head in a complete checked type context.
+The head must be the actual local Many, nonjoin Id with the closed ordinary
+`A %Many -> B` type required above. A complete local function signature can
+supply this head. For example, `Vec Int (f n)` records the whole call.
+The checker uses the registered term Names and checks the type argument at A.
+It does not form matchable `AppTy` from a runtime function or unfold its body.
+
+Checked type formation permits more arguments than runtime case recognition.
+A type argument can be any scoped, well-kinded `Type :: A` admitted by the
+checker. The source case path requires an `HsApp` whose head and sole argument
+are bare variables, allowing parentheses. Constructor arguments such as `f (S n)`
+are the next source step. A bare function is not a scalar index.
+
+A complete constructor case on `f n` refines that exact whole call.
+It does not refine n, another call `f m`, or a call with a different head.
+The result type, captured values and incoming predicates are abstracted over
+one scalar motive index. Ordinary nominal FC congruence lifts the alias proof.
+Branch-local annotations at the exact call are specialized to the checked
+constructor index. The checker resolves both Names before this replacement.
+It rejects quotations before a rewrite could change quoted source.
+
+The typed-only carrier is
+`NativeCaseAlias scrutinee r q resultType body`. The scrutinee and result type
+are outside the scopes of r and q. The body is under r, then q, with
+`q :: r ~# f n`. The existing retained constructor matcher checks the motive
+with a fresh motive index. Its application uses r. The final transport returns
+its checked result at the original call index. There is no inverse call
+decomposition or new trusted equality.
+
+The dispatcher checks the original scrutinee and its usage once. It preserves
+the original source case through `ExpandedThingTc`. Zonking keeps the carrier's
+scope order. Desugaring emits one strict outer Core `Case` with one DEFAULT
+alternative and q as its proof binder. This case stays outside returned
+lambdas. The call evaluates the function first. The argument is forced only
+when the function needs it. Constructor fields stay lazy.
+Each source case supplies its own evaluation; this is not
+memoization across separate cases.
+
+Under `Strict`, generated capture and evidence patterns use administrative
+`LazyPat` markers. Desugaring removes these markers instead of adding bangs.
+Original constructor and field patterns keep their source demand.
+The ordinary wildcard-only and variable-only case paths can ignore the call;
+they do not acquire the strict alias. Supported constructor cases require
+complete, unguarded rows and bare variable fields. Instrumentation that could
+insert ticks around the call is rejected at the source location.
+
+`seq` also preserves native identity. When its continuation contains native
+syntax, desugaring does not reuse a scalar index or opaque function head as
+the case binder. An unused binder keeps the actual free Id in the continuation.
+The `NoMetadata` expression scan detects these dependencies without following
+unfoldings or treating unrelated Id metadata as executable syntax.
+See Note [Desugaring seq] in `GHC.HsToCore.Expr`.
+
+An observer such as `toList ys`, with `ys :: Vec Int (f n)`, uses the existing
+immutable index-kind application route. It infers and caches ys once, matches
+the formal index to `TermAppTy f n`, then validates the kinds and current scope.
+The original observer receives explicit type applications. Cached argument
+subsumption still runs. The mutable native-index assignment ban is unchanged.
+
+Both compiler stages pass the separate source corpus of 26 quiet runtime
+checks. These run through the API fixture and the registered group. The M42
+19 Core runtime invocations remain a separate set. The one-line unit golden
+and 37-line runtime golden are unchanged. The nine final regression phases
+reuse two passing API checks with their own input hashes and launch seven
+checks: raw106, public106 and packed562 in both stages, plus five registered
+tests. They do not repeat every historical source matrix.
+
+The separate CLI corpus passes nine runtime observations and rejects 14 source
+clients in both stages. Six clients report GHC-83865; eight report GHC-83605.
+Their diagnostics contain 24 located envelopes. The arity client's `f n n`
+annotation becomes `'Z n` during branch rewriting. Ordinary kind checking
+reports GHC-83865. This does not isolate direct call-arity validation.
+A supplementary program passes 15 observations in both stages: the same nine
+public lines, signed local-function results at lengths 0/2/3, and three opaque
+head `seq` demand controls. Its implicit `toList ys` succeeds. The earlier
+supplement's GHC-83865 was a mistaken RuntimeRep application to `error`, not a
+native-meta boundary. The corrected lifted error wrapper preserves demand.
+
+Function-domain Pi binders, lazy retained application of `f n`, new wire
+encoding, a general evaluator and ordinary optimizer support remain gated.
+Type formation and checked case refinement do not remove those restrictions.
+This increment does not complete C1/C2 or establish a preservation theorem.
+See Note [Source opaque call indices] in `GHC.Tc.Gen.HsType`,
+Note [Source opaque call refinement] in `GHC.Tc.Gen.Match`, and
+Note [Checked opaque case alias] in `GHC.Hs.Expr`.
+The [selected Agda reading](REFERENCES.md#strict-opaque-call-refinement-prior-art)
+supports scoped abstraction and checking, with Haskell demand checked separately.

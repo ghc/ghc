@@ -269,8 +269,20 @@ separate equality precedents. No inverse call projection or proof of this
 GHC implementation follows. The seven-work, nine-PDF ledger is unchanged.
 See [the source references](../REFERENCES.md#opaque-native-calls-representation-substitution-and-nominal-congruence).
 
-The next source plan also reads Agda's with-abstraction, LHS checking and
-application checking at pinned v2.8.0 blobs. The selected ranges support
-whole-call abstraction and checked substitution. They do not specify Haskell
-case demand. The [M43 plan](../PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented)
-records the additional constructor-match and strict-alias boundaries.
+## M43 source-refinement reading
+
+M43 implements checked opaque-call refinement through a strict case alias.
+Agda v2.8.0 provides selected context/generalization readings in With.hs 101–173,
+the with-abstraction manual 710–741 and 910–936, LHS 1503–1532, and
+Application 774–808. With.hs was fetched and read on 2026-11-15. Its Git blob
+`fb84d352f3c6b2e786a0c095c74c5bee15e533cf` matches the earlier reference.
+The other three files reuse verified cached bytes. Full sources, hashes,
+access/reuse UTC and selected ranges are in
+`_build/verification/native-source-neutral-calls-prior-art-v1/`.
+
+This reading supports abstraction and checked substitution. Haskell's strict
+case demand, administrative lazy patterns and `seq` identity require separate
+implementation and runtime checks. No Agda execution or preservation theorem
+is claimed. The canonical seven-work, nine-PDF ledger is unchanged.
+See [the primary links and exact identities](../REFERENCES.md#strict-opaque-call-refinement-prior-art)
+and the [implemented source contract](../CORE.md#strict-opaque-call-refinement-from-source).

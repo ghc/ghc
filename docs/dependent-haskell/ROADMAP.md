@@ -202,7 +202,11 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   M42 adds scoped opaque call indices with independently closed scalar input
   and result domains. It checks forward nominal congruence, conservative
   noninjectivity, function-head substitution and actual strict-call lowering.
-  Source formation, higher-order binders and a preservation theorem remain open.
+  M43 adds source formation and exact whole-call refinement for `case f n`.
+  Checked alias evidence preserves call demand, captures and lazy fields.
+  Both stages pass the focused source, runtime and negative controls.
+  Constructor-tree source arguments, higher-order binders, general computation
+  and a preservation theorem remain open.
 - [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
   missing transformations incrementally, including normal simplification and
   unfolding handling. Preserve Core Lint, type preservation, runtime demand,
@@ -217,6 +221,9 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   Direct CorePrep checks consume call proofs and preserve argument demand.
   Top-level Tidy protection is implemented and reviewed. It has no separate
   isolated execution probe.
+  M43 adds a typed source carrier and preserves native index identities through
+  `seq` desugaring. Its `Strict` and opaque-head demand controls pass both stages.
+  Ordinary optimization remains gated. This does not close C2.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement
   invisible retained binders and their explicit `@` overrides. Reuse inherited
