@@ -61,14 +61,14 @@ import GHC.Rename.Env ( irrefutableConLikeTc )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
-import GHC.Core ( Expr(Var) )
+import GHC.Core ( Expr(Var, App), exprToNativeIndex )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeIndexId )
+                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeIndexId, isNativeIndexType )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
-import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon, dataConTyCon, dataConOrigArgTys )
+import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon, dataConTyCon, dataConOrigArgTys, dataConFullSig, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Utils ( applyTypeToArgs )
@@ -559,21 +559,52 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
         spine args (HsVar _ (L _ (WithUserRdr _ name))) = Just (name, args)
         spine _ _ = Nothing
 
-        -- | Substitute eligible actual Vars without allocating type choices.
+        -- | Substitute eligible actual arguments without allocating type choices.
         consume consumed ty args
           | DepFunTy binder _ <- coreFullView ty
           = case args of
               arg : rest -> do
-                { actual <- local_variable (unLoc arg)
+                { actual <- if isNativeIndexFunctionId binder
+                            then do { var <- local_variable (unLoc arg)
+                                    ; return $ case var of
+                                        Just v | isNativeIndexFunctionId v
+                                               , varType v `eqType` varType binder -> Just (Var v)
+                                        _ -> Nothing }
+                            else scalar_argument (varType binder) (unLoc arg)
                 ; case actual of
-                    Just var
-                      | (if isNativeIndexFunctionId binder
-                         then isNativeIndexFunctionId var else isNativeIndexId var)
-                      , varType var `eqType` varType binder
-                      -> consume True (applyTypeToArgs ty [Var var]) rest
-                    _ -> return False }
+                    Just value -> consume True (applyTypeToArgs ty [value]) rest
+                    Nothing -> return False }
               [] -> return False
           | otherwise = return (consumed && isTauTy ty && depends ty)
+
+        -- | Reconstruct only resolved monomorphic scalar constructor trees.
+        -- This metadata query does not check or evaluate a source argument.
+        scalar_argument expected expr
+          | HsPar _ arg <- expr = scalar_argument expected (unLoc arg)
+          | Just (name, args) <- spine [] expr
+          , isDataOcc (nameOccName name)
+          = do { con_like <- tcLookupConLike (noUserRdr name)
+               ; case con_like of
+                   RealDataCon con
+                     | isNativeIndexType expected
+                     , mkTyConTy (dataConTyCon con) `eqType` expected
+                     , ([], [], [], [], fields, _) <- dataConFullSig con
+                     , fields `equalLength` args ->
+                       do { values <- zipWithM
+                              (\(Scaled _ ty) arg -> scalar_argument ty (unLoc arg)) fields args
+                          ; return $ do
+                              actuals <- sequence values
+                              let value = foldl' App (Var (dataConWorkId con)) actuals
+                              _ <- exprToNativeIndex value
+                              return value }
+                   _ -> return Nothing }
+          | HsVar{} <- expr
+          = do { actual <- local_variable expr
+               ; return $ case actual of
+                   Just var | isNativeIndexId var
+                            , varType var `eqType` expected -> Just (Var var)
+                   _ -> Nothing }
+          | otherwise = return Nothing
 
         -- | Use resolved lexical identities and decline unknown source locals.
         local_variable (HsPar _ expr) = local_variable (unLoc expr)
@@ -647,10 +678,13 @@ keeps the original case for diagnostics with ExpandedThingTc.
 
 If the original activation conditions are absent, inspect only complete
 bare-constructor rows without quotations. Read an already checked local
-worker type and its bare local actual Vars. Open only leading retained
-binders with applyTypeToArgs. Require a whole tau residual with the exact
-free call index. This is metadata discovery, not argument checking. Do not
-infer types, allocate metas, collect usage, or expand splices here. Decline
+worker type and its actual arguments. Keep function heads as bare local Vars.
+Reconstruct scalar arguments only from local Vars, parentheses and saturated
+monomorphic real constructor trees. Validate these trees with exprToNativeIndex.
+Open only leading retained binders with applyTypeToArgs. Require a whole tau
+residual with the exact free call index. This is metadata discovery, not
+argument checking. Do not infer types, allocate metas, collect usage, or
+expand splices here. Decline
 unknown workers, erased choices and unsupported source forms. Keep the
 ordinary case fallback on this path. Existing activation keeps its diagnostics.
 
