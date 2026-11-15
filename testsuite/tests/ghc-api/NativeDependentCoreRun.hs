@@ -2240,6 +2240,7 @@ runNatSourceChecks = do
     runBetaCallSourceChecks
     runFunctionBinderSourceChecks
     runCallApplicationSourceChecks
+    runCallActivationSourceChecks
 
 -- | Add head-only retained function workers as a separate source corpus.
 retainedFunctionBinderSource :: String -> String -> String
@@ -2451,6 +2452,67 @@ runCallApplicationSourceChecks = do
                         $ concatMap (\line -> if line == "      run :: Nat -> IO String" then map ("      " ++) declarations ++ [line] else [line])
                         $ lines (retainedCallApplicationSource name "pure \"unused\"")
             sourceModuleRejects name code "Vec" name source
+
+{- Note [Source activation by a known retained worker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These quiet checks use Int results and no branch-local index annotation.
+The existing local worker signature identifies the exact call after actual
+retained substitution. The ordinary row Given checks payload and result types.
+Keep guarded and incomplete ordinary cases on their existing path.
+See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+-}
+
+-- | Add cases whose direct worker call activates whole-call refinement.
+retainedCallActivationSource :: String -> String -> String
+retainedCallActivationSource moduleName observation =
+    unlines $ concatMap insert (lines (retainedFunctionBinderSource moduleName observation))
+  where
+    insert line@"      run :: Nat -> IO String" = map ("      " ++) declarations ++ [line]
+    insert line = [line]
+    declarations =
+        [ "-- | Infer the direct payload type in both constructor rows."
+        , "activateCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "activateCall f n = case f n of"
+        , "    Z -> length (vecList (idCall f n VNil))"
+        , "    S k -> length (vecList (idCall f n (VCons 42 (replicateNative @Int k 42))))"
+        , "-- | Check an unsigned row binding inside the same ordinary Given scope."
+        , "activateWhere :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "activateWhere f n = case f n of"
+        , "    Z -> length (vecList output)"
+        , "        where output = idCall f n VNil"
+        , "    S k -> length (vecList output)"
+        , "        where output = idCall f n (VCons 42 (replicateNative @Int k 42))"
+        , "-- | Keep an unused undefined payload lazy after selecting the row."
+        , "activateIgnored :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "activateIgnored f n = case f n of"
+        , "    Z -> const 42 (idCall f n undefined)"
+        , "    S k -> const 42 (idCall f n undefined)"
+        , "-- | Preserve ordinary guarded alternatives without a native worker use."
+        , "activationGuarded :: (Nat -> Nat) -> Nat -> Int"
+        , "activationGuarded f n = case f n of { Z | True -> 42; _ -> 7 }"
+        , "-- | Preserve an ordinary incomplete case for the covered input."
+        , "activationIncomplete :: (Nat -> Nat) -> Nat -> Int"
+        , "activationIncomplete f n = case f n of { Z -> 42 }"
+        ]
+
+-- | Check no-annotation activation and ordinary case compatibility quietly.
+runCallActivationSourceChecks :: GHC.Ghc ()
+runCallActivationSourceChecks = do
+    let moduleName = "NativeSourceCallActivation"
+        observation =
+            unlines
+                [ "do direct <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in observeInt (activateCall f n))"
+                , "        bound <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in observeInt (activateWhere f n))"
+                , "        ignored <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in observeInt (activateIgnored f n)) (S Z)"
+                , "        pure (direct ++ bound ++ unlines [ignored,show (activationGuarded opaqueNat Z),show (activationGuarded opaqueNat (S Z)),show (activationIncomplete opaqueNat Z)])"
+                ]
+        expected = ["0", "2", "3", "0", "2", "3", "42", "42", "7", "42"]
+    expression <- sourceEntry moduleName (retainedCallActivationSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source call activation" expression
+    unless (lines actual == expected) $
+        fail ("FAIL: source call activation or ordinary case compatibility: " ++ show actual)
 
 -- | Add signed beta-call workers as a separate source corpus.
 retainedBetaCallSource :: String -> String -> String
