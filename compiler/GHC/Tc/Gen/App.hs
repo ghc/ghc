@@ -44,7 +44,7 @@ import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
-import GHC.Core.Utils ( applyTypeToArgs )
+import GHC.Core.Utils ( applyTypeToArgs, exprType )
 import GHC.Core.FVs ( exprFreeVarsList )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -64,6 +64,7 @@ import GHC.Builtin.KnownKeys
 import GHC.Types.TyThing ( TyThing(AnId) )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
+import GHC.Types.Id ( mkLocalId )
 import GHC.Types.Var.Set ( elemVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
@@ -1349,7 +1350,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy binder _ <- coreFullView fun_ty
-      = do { core_arg <- tcRetainedArg arg
+      = do { core_arg <- tcRetainedArg (varType binder) arg
            ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy (varType binder))
            ; let body_ty = applyTypeToArgs fun_ty [core_arg]
            ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
@@ -1453,22 +1454,25 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
            _ -> ExpectedFunTyArg (HsExprTcThing tc_fun) arg
 
 
--- | Resolve a retained argument without evaluating or typechecking its value.
-tcRetainedArg :: LHsExpr GhcRn -> TcM Core.CoreExpr
-tcRetainedArg arg
+-- | Resolve a retained argument at its known domain without checking its value.
+-- See Note [Retained argument application].
+tcRetainedArg :: Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
+tcRetainedArg domain arg
   = setSrcSpanA (getLoc arg) $
-    do { core_arg <- resolve arg
+    do { core_arg <- resolve emptyNameEnv domain arg
        ; case Core.exprToNativeIndex core_arg of
            Just _ -> return core_arg
            Nothing -> unsupported }
   where
-    resolve :: LHsExpr GhcRn -> TcM Core.CoreExpr
-    resolve (L loc expr)
+    resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
+    resolve env expected (L loc expr)
       = setSrcSpanA loc $ case expr of
-          HsPar _ arg -> resolve arg
-          XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> resolve arg
-          HsApp _ fun arg -> Core.App <$> resolve fun <*> resolve arg
+          HsPar _ arg -> resolve env expected arg
+          XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> resolve env expected arg
+          HsApp _ fun arg -> resolve_app env expected fun arg
           HsVar _ lname
+            | Just arg_id <- lookupNameEnv env (unLocWithUserRdr lname)
+            -> return (Core.Var arg_id)
             | isDataOcc (nameOccName (unLocWithUserRdr lname))
             -> do { con <- tcLookupConLike (unLoc lname)
                   ; case con of
@@ -1485,20 +1489,68 @@ tcRetainedArg arg
                       _ -> unsupported }
           _ -> unsupported
 
+    resolve_app :: NameEnv Id -> Type -> LHsExpr GhcRn -> LHsExpr GhcRn
+                -> TcM Core.CoreExpr
+    resolve_app env expected (L _ (HsPar _ fun)) arg
+      = resolve_app env expected fun arg
+    resolve_app env expected (L _ (XExpr (ExpandedThingRn (HSE { hse_exp = fun })))) arg
+      = resolve_app env expected fun arg
+    resolve_app env expected (L loc (HsLam _ LamSingle matches)) arg
+      | [L _ Match { m_pats = L _ [L _ (VarPat _ lname)]
+                   , m_grhss = GRHSs { grhssGRHSs = grhss
+                                     , grhssLocalBinds = EmptyLocalBinds _ } }]
+          <- unLoc (mg_alts matches)
+      , [L _ (GRHS _ [] body)] <- NE.toList grhss
+      = setSrcSpanA loc $
+        do { strict <- xoptM LangExt.Strict
+           ; when strict $ failWithTc
+               (TcRnRetainedQuantificationError RetainedIndexLambdaStrict)
+           ; let name = unLoc lname
+                 binder = mkLocalId name ManyTy expected
+           ; arg' <- resolve env expected arg
+           ; body' <- resolve (extendNameEnv env name binder) expected body
+           ; return (Core.App (Core.Lam binder body') arg') }
+    resolve_app env expected fun arg
+      = do { fun' <- resolve env expected fun
+           ; case splitFunTy_maybe (exprType fun') of
+               Just (_, _, arg_ty, _)
+                 -> Core.App fun' <$> resolve env arg_ty arg
+               _ -> unsupported }
+
     unsupported :: TcM a
     unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)
 
 {- Note [Retained argument application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained argument is a value. Resolve a local unrestricted Id or a saturated
-constructor tree before instantiating the codomain. applyTypeToArgs uses the
-same index substitution as Core type recovery. Do not use tcVDQ: it translates
-an expression into an erased type argument.
+constructor tree before instantiating the codomain. Also resolve an immediate
+single-variable lambda application in the checked native beta grammar.
+applyTypeToArgs uses the same index substitution as Core type recovery.
+Do not use tcVDQ: it translates an expression into an erased type argument.
+
+The retained binder supplies the closed domain. A lambda's provisional Many
+Id uses its actual renamed Name. Keep these Ids in a separate NameEnv; do not
+install them in the Tc environment or collect usage. Resolve the argument in
+the outer environment and the body in the extended environment. Constructor
+worker arrows supply their actual field domains. Do not use a constructor's
+result domain for all its fields. The shared Core bridge validates domains,
+saturation, and atomic beta arguments. See Note [Checked native index beta
+exposure] in GHC.Core. No provisional lambda binder survives normalization.
+
+Keep the lambda grammar narrow: one VarPat, one unguarded RHS, and no local
+binds or signatures. Strict can make this variable pattern force its argument,
+so reject this new form with Strict. Under ordinary inference each admitted
+lambda starts with a fresh multiplicity. One usage does not equate it to One;
+Many usage requires Many. Remaining multiplicity metas default to Many during
+final zonking. No admitted signature, linear function head, or expected linear
+arrow can impose One. Check actual zonked lambda metadata when this grammar
+changes. The source pattern checker preserves the renamed Name/Unique.
 
 Keep a normal EValArg with the binder's domain as its expected type. tcValArg
 checks the value once and records its runtime usage. Resolution does not inspect
 unfoldings or evaluate values. Later argument types use the same runtime Id,
 including a lazy binding whose RHS is bottom. No singleton is added.
+The provisional Core expression does not replace this original source check.
 See docs/dependent-haskell/REFERENCES.md#agda-provenance and
 docs/dependent-haskell/CORE.md#laziness-and-eta.
 -}

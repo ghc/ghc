@@ -3604,7 +3604,9 @@ pprRetainedQuantificationError reason = case reason of
   RetainedResultWrapper ->
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedIndexExpression ->
-    text "A retained argument must be a local index variable or a supported constructor tree."
+    text "A retained argument must be a local index variable, a supported constructor tree, or a supported immediate lambda application."
+  RetainedIndexLambdaStrict ->
+    text "Immediate lambda applications used as retained arguments are not supported with Strict."
   RetainedLocalSignatureIndex ->
     text "A retained local signature index must refer to an already-bound unrestricted local value of a supported index domain."
   RetainedTypeArgumentIndex ->
