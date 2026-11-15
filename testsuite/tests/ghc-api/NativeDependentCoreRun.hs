@@ -2961,7 +2961,9 @@ source positions. See Note [Known native variables with ImpredicativeTypes]
 in GHC.Tc.Gen.App and Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
 
 Container clients load one ImpredicativeTypes provider. It imports the actual
-PackedVecLibrary types. Each client disables ImpredicativeTypes and checks its
+PackedVecLibrary types. Compile the provider to object code without linking.
+Native bytecode module compilation remains unsupported. Each client disables
+ImpredicativeTypes and checks its
 complete source without a local Nat or Vec declaration. Ordinary tau controls
 keep their existing inference path. Rejections record current guard and
 inference boundaries; they do not establish permanent source invalidity.
@@ -3295,19 +3297,15 @@ runPackageSourceRejectChecks = do
     logger <- GHC.getLogger
     (containerFlags, leftovers, _) <-
         GHC.parseDynamicFlags logger flags $
-            map noLoc ["-O0", "-fomit-interface-pragmas", "-fno-write-if-simplified-core", "-dcore-lint", "-dstg-lint", "-v0"]
+            map noLoc ["-O0", "-fasm", "-fomit-interface-pragmas", "-fno-write-if-simplified-core", "-dcore-lint", "-dstg-lint", "-v0"]
     unless (null leftovers) (fail "FAIL: native container flags were not parsed")
-    void $
-        GHC.setSessionDynFlags $
-            gopt_set
-                containerFlags{backend = GHC.bytecodeBackend, ghcLink = GHC.LinkInMemory}
-                Opt_ExternalInterpreter
+    void $ GHC.setSessionDynFlags containerFlags{ghcLink = GHC.NoLink}
     now <- liftIO getCurrentTime
     let target =
             GHC.Target
                 { GHC.targetId = GHC.TargetFile "NativePiContainerProvider.hs" Nothing
                 , GHC.targetUnitId = GHC.homeUnitId_ containerFlags
-                , GHC.targetAllowObjCode = False
+                , GHC.targetAllowObjCode = True
                 , GHC.targetContents = Just (stringToStringBuffer containerProvider, now)
                 }
     GHC.setTargets [target]
