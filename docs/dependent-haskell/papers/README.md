@@ -337,8 +337,8 @@ an additional conference-paper result.
 The next-refinement study reuses pinned Agda With 101–173, Application 774–808,
 LHS 1503–1532 and Conversion 746–761/827–850. It rereads D/DC Figure 8 and
 Figure 10 An-Push on author-PDF page 19. These readings distinguish an exact
-instantiated call from the worker's bound schema. Direct application inside
-a call-refining case remains unimplemented. The later two-stage probe2 reports
+instantiated call from the worker's bound schema. At that study's snapshot, direct application inside
+a call-refining case was unimplemented. The later two-stage probe2 reports
 two GHC-83865 payload mismatches per stage at lines 33/37, with no runtime
 result. The earlier static-study provenance is native-function-binders-next-refinement-v1/. No new work or PDF is added to the
 canonical seven-work/nine-PDF manifest. No full-paper reading or proof replay
@@ -349,6 +349,26 @@ The later scope review is native-function-binders-next-refinement-scope-v1/.
 It reuses those primary readings and inspects GHC's free-Id masking and
 ordinary evidence-argument paths. Its M47 plan keeps the motive/alias Ids
 distinct, carries an explicit equality and limits application transport to a
-whole tau residual after actual substitution under NoQL. It is unimplemented.
+whole tau residual after actual substitution under NoQL. That static plan
+precedes the simpler Given-only M47 implementation.
 Neither Agda's contextual checking nor D/DC's cast rule proves the proposed
 GHC scope, usage, token arity or Haskell demand behavior. The ledger is unchanged.
+
+## M47 remembered equality
+
+M47 adds no work or PDF to the canonical seven-work/nine-PDF manifest.
+Selected Agda v2.8.0 manual lines 634–697 describe `with ... in eq`.
+With.hs 175–215 implements the value/equality pair. The retained relation is
+the relevant prior art when a later application exposes the original expression
+again. See [the exact primary links and blobs](../REFERENCES.md#remembering-an-abstracted-call-prior-art).
+
+GHC uses an ordinary motive equality argument and the existing row Given scope,
+including `where` bindings. Its ordinary Wanted/Given path needs no custom App
+cast or lexical proof list. Coercion tokens, evidence tracking and Haskell
+demand remain GHC-specific obligations. The earlier failed custom variant is
+historical evidence, not the selected algorithm. Bootstrap, self-host, API
+and selected both-stage CLI checks pass. Final9 and its registered run pass.
+Artifact audit and publication remain separate. No new full-paper reading,
+Agda execution, proof replay or combined preservation theorem is claimed.
+The Agda source provenance is
+`native-call-application-refinement-remember-equality-prior-art-v1/`.

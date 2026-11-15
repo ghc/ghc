@@ -3111,56 +3111,60 @@ Note [Function reduction multiplicity roles] owns the targeted correction.
 Normalize multiplicity at Nominal; weaken only the evidence stored in a
 Phantom FunCo. Do not weaken Core Lint or drop the failing role case.
 
-### M47: direct application inside call refinement (unimplemented)
+### M47: remembered equality for direct call application
 
-Use the measured two-stage probes2/3 as the baseline. Both branches reject
-payloads with GHC-83865 at lines 33/37. Keep the working pre-instantiated
-caller control. Instantiating idCall f n first exposes the exact free call;
-the original schema has its own bound head and index. Do not compare that
-schema after discarding its binders.
+M47 compiler/runtime validation is complete. The selected Given-only
+implementation uses the existing retained matcher and ordinary Wanted/Given
+solving. It changes Match and the
+public/quiet fixtures. It does not add application or environment machinery.
 
-- [ ] After existing whole-call generalization, add q_motive :: i ~# f n.
-  Keep its RHS f n intact; do not generalize it to i. Put this first evidence
-  argument immediately after the motive index, before old generalized Givens
-  and captures. Supply the outer alias proof q :: r ~# f n at the application.
-  The motive Id i and strict alias Id r remain distinct.
-- [ ] Prepend q_motive's RetainedConDict entry. Reuse existing dictionary/cv
-  transport in a K row to derive q_branch :: K ~# f n from q_motive and
-  cv :: i ~# K. Its symmetry gives f n ~# K. Do not compose the outer q with cv
-  as if r and i were the same Id.
-- [ ] Install an exact key/proof descriptor only around the row RHS checker,
-  after patterns enter scope and inside the existing implication. Keep
-  cpt_dicts/cpt_binds scope. Restore it for other rows and clear it at staging,
-  static-form and arrow boundaries. It is not a solver inert rule.
-- [ ] In App, consume the actual retained prefix before testing the complete
-  residual type. Require NoQL and isTauTy on the WHOLE residual. Decline a
-  remaining DepFunTy, erased ForAllTy or context arrow, including nested ones.
-  Keep occurrence masking for bound/reused Ids; never expose a bound call by
-  peeling its binder. Require exact eligible in-scope head/operand choices.
-- [ ] Lift the descriptor's nominal proof through the supported residual
-  ordinary arrow/value. Attach mkWpCastN to the checked prefix, then continue
-  ordinary argument checking and final subsumption. Preserve dictionary order,
-  cached usage and once-only source checking. Do not solve a native meta or
-  use a constructor to guess an erased index choice. isTauTy is only a shape
-  gate; it does not prove that ordinary metas are solved.
-- [ ] Preserve ordinary CoVar/evidence-argument arity. Only cv occupies the
-  existing virtual constructor-proof slot. q_motive is an ordinary helper
-  evidence parameter; do not delete it as another virtual proof. Protect
-  generated patterns under Strict without changing source argument demand.
-- [ ] Add direct branch, shadowed/reused-Unique, recursive partial-worker and
-  unrelated residual-Pi controls. Check bottom function/index/payload order,
-  partial WHNF, evidence scope and usage with Core/STG Lint. A residual Pi
-  that captures a free call still fails the initial whole-residual tau gate.
+- [x] Create `q_motive :: i ~# f n` after whole-call generalization. Keep its
+  RHS intact. Put it immediately after `i`, before old evidence and captures.
+  Apply the motive to the strict alias `r`, then `q :: r ~# f n`, then those
+  old arguments. Keep the motive Id and alias Id distinct.
+- [x] Reuse existing constructor transport to derive `q_branch :: K ~# f n`
+  under `cv :: i ~# K`. The existing `checkConstraints` covers the whole row,
+  including `where` bindings. Ordinary Wanted solving records the dependency
+  and keeps the required evidence binding.
+- [x] Remove the experimental custom App cast and lexical refinement context.
+  Restore all seven affected App/environment/quotation/splice paths to M46.
+  Add no new NoQL/isTau transport gate or solver rule.
+- [x] Preserve ordinary CoVar argument arity. `q_motive` uses the ordinary
+  evidence-token ABI. Only `cv` uses the virtual constructor-proof slot.
+- [x] Pass Given-only bootstrap3 in 2m01s. Selected self-host2 passes in 10m20s,
+  peak 5196MiB under 16GiB, swap0.
+- [x] Pass selected API4: eleven new values, three expected runtime markers
+  and three located GHC-05617 source errors. Older quiet groups pass too.
+  Unit/CoreRun take 5.364124714s/16.739944110s; goldens stay exactly 1/37.
+- [x] Verify both 238-entry API4 input sets remain unchanged after the build.
+  Reuse API4; no API5 rerun is needed.
+- [x] Pass selected both-stage baseline3, public17 and annotated-where3 CLI
+  checks with Core/STG Lint. Preserve the old fourteen-line public prefix.
+- [x] Pass raw scope run2 with 36 assertions. It tests pure occurrence/type
+  utilities, not a source-admission gate, TcM, native meta assignment or target
+  runtime behavior.
+- [x] Pass all eight legacy phases and eleven positive constructor controls
+  in each stage.
+- [x] Pass all nine final phases: two API4 reuses and seven launches. Inherited
+  raw/public106 and packed562 pass in both stages. The registered run has
+  39 cases, 34 skips and five expected passes, with zero unexpected/framework
+  failures or warnings.
+- [ ] Complete the separate artifact audit and publication. Infer no counters
+  or hashes from the compiler/runtime passes.
 
-No implementation is claimed. This plan adds no inverse call decomposition,
-function equality, native mutable-meta assignment, general solver rule, eta
-law, Core node, codec or evaluator. Match owns the explicit evidence and row
-scope; App owns post-prefix transport. A lexical context helper must follow
-the existing native-Given scope resets. Existing Unify occurrence/lifting
-checks, DS and Zonk remain authoritative.
+Selected compiler is `3504f1be5342c9f3fbe12e2bf8dbe3bbc008e239`; source is
+`f7f0e92e4a775d407189faa79ae0cc608eee7749`. Snapshot5 records 83 compiler
+inputs and 102 source paths. The compiler delta is 22 Match lines. Preserve
+unpublished custom-App attempts and API3's expected-code failure separately.
+The latter needs only a fixture correction, not broader source acceptance.
+These are focused checks; the full GHC suite was not run.
 
-Pinned Agda context/substitution and D/DC readings are recorded in
-native-function-binders-next-refinement-v1/. The later scope review is
-native-function-binders-next-refinement-scope-v1/. These are static design
-records, distinct from the measured source-rejection probes. They do not
-establish a combined FC, usage or Haskell runtime theorem.
+Existing result, capture, Given or annotation information must still activate
+the retained case. Annotation-free activation is a separate future task.
+`where` support already follows from the complete row's Given scope.
+
+This step adds no Core/interface form, inverse call decomposition, function
+equality, native mutable-meta assignment, eta law, general solver rule or
+evaluator. Existing checking, scope, usage and staging remain authoritative.
+C1 and C2 stay open. See [the contract](CORE.md#remembered-equality-for-direct-call-application)
+and [the primary comparison](REFERENCES.md#remembering-an-abstracted-call-prior-art).

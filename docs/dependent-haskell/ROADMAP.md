@@ -237,9 +237,14 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   snapshot6 builds, source/API catalogs, constructor supplements, legacy8 and
   final9 pass. Canonical audit/publication records are separate. Direct
   in-case probes2/3 reject
-  payloads with GHC-83865 in both stages. M47 proposes row-local explicit
-  evidence and post-substitution whole-residual tau transport under NoQL.
-  That plan is unimplemented; C1/C2 dependency states do not change.
+  payloads with GHC-83865 in both stages. M47 remembers the motive-to-call
+  equality as an ordinary evidence parameter. Existing constructor transport
+  and Wanted/Given solving support direct calls, including row `where`
+  bindings. Bootstrap, self-host, API and selected both-stage source/runtime
+  controls pass. Final9 passes its two API4 reuses and seven launches, including
+  both-stage raw/public106 and packed562. The registered run gives five passes,
+  39 cases and 34 skips, with no unexpected/framework failures or warnings. No custom App cast, solver rule,
+  evaluator or codec is added. Annotation-free activation is a separate task.
   C1 and C2 remain open.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement

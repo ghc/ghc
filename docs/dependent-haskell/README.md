@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M46 snapshot6 passes both-stage builds, public14 and constructor11 controls; old packed562 and raw/public106 regressions remain separate passing sets |
+| Compiler validation | M47 snapshot5 passes both-stage builds, selected CLI/API controls, legacy8 and final9; the registered run gives five expected passes, 39 cases and 34 skips |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -78,7 +78,7 @@ Last updated: 2026-11-15.
 | Opaque call indices | Source cases on `f n`, `f Z` and `f (S n)` refine the exact whole call; nested constructor fields, captures and demand controls pass both stages |
 | Signed call beta | Complete plain scalar endofunction signatures expose immediate checked lambda beta; actual assigned Many, binder identity and original call execution are preserved; Strict keeps its ordinary fallback |
 | Function-valued retained binders | Snapshot6 passes both-stage source14, negative10 and constructor11 controls, plus legacy8 and final9; canonical audit/publication records are separate |
-| Next task | Implement the bounded M47 branch-proof transport after actual retained substitution; keep the direct in-case rejection baseline and pre-instantiated control |
+| Next task | Complete artifact audit/publication; scope annotation-free case activation separately while C1/C2 remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -3988,7 +3988,7 @@ The working client defines caller = idCall f n before case f n. Existing
 whole-call refinement can transport that instantiated caller. The separate
 direct in-branch probes2/3 reject in both stages: two GHC-83865 payload mismatches
 at lines 33/37 compare Vec Int Z or Vec Int (S k) with Vec Int (f n). These probes
-have no runtime result. Checked direct composition remains an M47 task.
+have no runtime result. The M47 section below records later direct checking.
 
 Selected snapshot6 has compiler/source
 `8fd22b97c74571c7d5508607f4f16e6611a84435`, with 83 compiler inputs and 102
@@ -4036,13 +4036,57 @@ suite were not rerun. The later canonical audit is recorded in
 `dependent-haskell-M46-final-audit-v1.json`; publication has its separate
 `dependent-haskell-M46-publication-v1.json` record. This section reports compiler
 validation, not predicted outcomes or counters for those records.
-The unimplemented M47 plan makes the branch equality explicit. It passes
-q_motive :: i ~# f n just after the motive index, before existing evidence and
-captures. Existing constructor evidence derives the row's f n ~# K proof.
-A descriptor exposes that proof only inside the row RHS. App may lift it through
-a whole ordinary tau residual type only after actual retained substitution,
-with NoQL and existing scope/usage checks. It must decline remaining native or
-erased binders and contexts. This is a plan, not a new solver or evaluator rule.
 See the [Core contract](CORE.md#function-valued-retained-binders),
-[plan](PLAN.md#m46-head-only-function-valued-retained-binders) and
+[plan](PLAN.md#m46-head-only-function-valued-retained-binders-compiler-validation-complete) and
 [primary comparison](REFERENCES.md#head-only-function-valued-retained-binders-prior-art).
+
+## M47: remembered equality for direct call application
+
+M47 remembers the relation between a checked call `f n` and its fresh motive
+index. Focused compiler/runtime validation is complete. A source branch can then check `idCall f n payload`
+directly. Existing result, capture, Given or annotation information still
+activates whole-call refinement. Annotation-free activation needs separate work.
+
+The motive takes `q_motive :: i ~# f n` as its first ordinary evidence argument
+after `i`. Existing constructor transport derives `q_branch :: K ~# f n`.
+Ordinary argument/result checking emits a Wanted equality. The existing solver
+uses the exact or symmetric Given. Its normal dependency tracking retains the
+needed evidence. The Given covers the complete row, including `where` bindings.
+Ordinary application and solver paths are unchanged. App, environment,
+quotation and splice paths retain their M46 behavior.
+
+Selected snapshot5 has compiler `3504f1be5342c9f3fbe12e2bf8dbe3bbc008e239`
+and source `f7f0e92e4a775d407189faa79ae0cc608eee7749`, with 83 compiler inputs
+and 102 source paths. At that selected source snapshot, the net change from
+M46 has three tracked paths. The compiler change adds 22 lines in Match;
+it adds no solver or backend rule.
+
+| Evidence | Measured result |
+| --- | --- |
+| Given-only bootstrap3 | Passes in 2m01s |
+| Selected self-host2 | Passes in 10m20s, peak 5196MiB under 16GiB, swap0 |
+| Selected API4 | Unit/CoreRun pass in 5.364124714s/16.739944110s; goldens remain exactly 1/37 |
+| API4 post-build comparison | Both 238-entry input sets remain unchanged; no API5 rerun |
+| Selected quiet controls | Eleven values, three expected runtime markers and three located GHC-05617 source rejections pass; older groups pass too |
+| Both-stage selected CLI | Baseline3, public17 and annotated-where3 pass in each stage with Core/STG Lint |
+| Raw scope run2 | All 36 pure assertions pass; these are utility facts, not a new admission policy |
+| Legacy checks | All eight phases pass |
+| Constructor supplements | All eleven positive controls pass in each stage |
+| Selected final9 | All nine phases pass: two API4 reuses and seven launched phases |
+| Inherited final controls | Raw/public106 and packed562 pass in both stages |
+| Registered run | 39 cases, 34 skips and five expected passes; zero unexpected/framework failures or warnings |
+
+Public17 preserves the old fourteen-line prefix and adds three direct inputs.
+The raw control is pure host API evidence, not TcM or a native-meta/source-proof
+test. The selected fixture pins all three measured GHC-05617 rejections.
+Earlier variants and expected-diagnostic assertion failures remain in
+`native-call-application-refinement-*` artifacts; they do not broaden acceptance.
+
+Compiler/runtime validation is complete for this bounded increment. The full
+GHC suite was not run. Artifact audit and publication remain pending.
+M47 adds no Core node, codec, inverse call rule, function equality or evaluator. Existing
+native-meta, Quick Look, scope and usage gates remain. General optimization
+and exported call codecs stay gated. C1 and C2 remain open.
+See the [contract](CORE.md#remembered-equality-for-direct-call-application),
+[plan](PLAN.md#m47-remembered-equality-for-direct-call-application) and
+[Agda comparison](REFERENCES.md#remembering-an-abstracted-call-prior-art).

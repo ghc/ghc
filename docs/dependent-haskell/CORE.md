@@ -1828,7 +1828,8 @@ indices, global or applied actuals, unsupported domains, staging and native
 mutable-meta assignments keep their gates. No export or expression codec is
 added. The public client instantiates caller = idCall f n outside a case.
 Direct in-branch probes2/3 reject two payloads with GHC-83865 in each stage
-at lines 33/37. These probes have no runtime result; checked composition remains M47 work.
+at lines 33/37. These M46 probes have no runtime result. The M47 section below
+records later direct checking.
 
 Note [Function-valued retained binders] in GHC.Core.Type owns the policy.
 Note [Function reduction multiplicity roles] in GHC.Core.Reduction owns an
@@ -1852,20 +1853,45 @@ no unexpected/framework failures or warnings. These compiler/runtime checks
 are complete. Canonical audit/publication records are separate; component
 checks do not establish combined preservation.
 
-The M47 plan is unimplemented. Its motive takes q_motive :: i ~# f n directly
-after i, before old evidence/captures. Create it after whole-call
-generalization; preserve f n on the RHS. Existing row cv :: i ~# K and checked
-dictionary transport derive q_branch :: K ~# f n. A lexical descriptor carries
-sym q_branch only inside the row RHS implication. The outer alias r is not i;
-its proof cannot compose directly with cv.
+## Remembered equality for direct call application
 
-Candidate application transport runs after actual retained substitution and
-requires NoQL plus isTauTy on the entire residual. A remaining Pi, forall or
-context anywhere in that residual declines the route. Existing free-call
-masking still excludes bound/shadowed dependencies. Lift only the exact
-nominal proof through the supported residual ordinary arrow/value; keep final
-subsumption, evidence order and once-only usage. Do not infer missing choices
-or fill native metas. Keep q_motive's ordinary evidence-token ABI; only cv uses
-the current virtual constructor-proof erasure. No solver, eta or inverse-call
-rule follows. See [the plan](PLAN.md#m47-direct-application-inside-call-refinement-unimplemented)
-and [the primary comparison](REFERENCES.md#head-only-function-valued-retained-binders-prior-art).
+After whole-call generalization, the generated motive takes
+`q_motive :: i ~# f n`. This is the first ordinary evidence argument after its
+index `i`. Keep `f n` on the RHS; do not generalize it to `i`. At the outer
+strict alias `r`, supply `q :: r ~# f n`. The alias Id and motive Id are distinct.
+
+Existing constructor transport derives `q_branch :: K ~# f n` from that
+parameter and checked `cv :: i ~# K`. The existing `checkConstraints` scopes
+the Given over the complete row, including its `where` bindings. A direct
+application can expose `f n` after actual retained substitution. Ordinary
+argument or result checking then emits a Wanted equality. The solver matches
+the exact or symmetric irreducible Given. It does not decompose a call or
+infer equality between independent inputs or function heads.
+
+Normal coercion-hole filling records evidence use. The solver therefore keeps
+the required branch binding during dead-Given pruning. Add no manual App cast
+or lexical proof list. The selected implementation restores those experimental
+paths to M46. It introduces no new whole-residual NoQL/isTau gate. Existing
+application, native-meta, scope, usage and staging checks retain their rules.
+
+Keep `q_motive` in the ordinary evidence-token ABI. Only `cv` occupies the
+existing virtual constructor-proof slot. The strict alias and its demand rules
+remain unchanged. Existing result, capture, Given or annotation information
+must activate the retained case. Annotation-free activation remains outside
+this increment.
+
+Given-only bootstrap, self-host2 and selected API4 pass. The quiet fixture
+checks eleven values, three runtime exception markers and three located
+GHC-05617 errors. The old 1/37 goldens and both API4 input sets are unchanged.
+Selected baseline3/public17/where3 CLI checks pass in both stages with Core/STG
+Lint. Raw scope run2 passes 36 pure utility assertions. Legacy8 and positive
+constructor11 pass separately. Final9 passes two API4 reuses and seven launched
+phases. Raw/public106 and packed562 pass in both stages. The registered run
+has five expected passes, 39 cases and 34 skips, with zero unexpected/framework
+failures or warnings. These focused checks do not cover the full GHC suite.
+Artifact audit and publication remain separate.
+
+M47 adds no Core/interface schema, codec, general optimizer or evaluator.
+C1 and C2 remain open. Note [Source opaque call refinement] in GHC.Tc.Gen.Match
+owns this evidence order. See [the plan](PLAN.md#m47-remembered-equality-for-direct-call-application)
+and [the Agda comparison](REFERENCES.md#remembering-an-abstracted-call-prior-art).

@@ -3194,8 +3194,46 @@ checks the existing free-call mask and proposed evidence order. Bound/reused
 runtime Ids do not count as free call dependencies. A distinct motive Id needs
 its own explicit i ~# f n parameter; the outer alias proof does not identify
 i with r. Existing checked dictionary/cv transport can derive the row proof.
-The proposed row-RHS descriptor and NoQL/whole-residual isTauTy gate remain
-unimplemented. isTauTy rejects binders and contexts, not all ordinary metas.
+That study proposed a row-RHS descriptor and NoQL/whole-residual isTauTy gate.
+M47's later Given-only ablation does not need them. The raw isTauTy observations
+remain utility facts, not a new source-admission policy.
 These are GHC scope/usage requirements. The pinned Agda and D/DC readings do
 not establish them for this implementation. No new paper or proof replay is
 added to the seven-work/nine-PDF ledger.
+
+## Remembering an abstracted call: prior art
+
+Agda v2.8.0 documents [with-abstraction equality and the inspect idiom](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#with-abstraction-equality).
+Generalizing an expression can lose its relation to the fresh helper argument.
+The manual uses `with ... in eq` to retain equality evidence for later
+occurrences. Its [manual source, lines 634–697](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L634-L697),
+blob `ff0888af84f3101351c501534de087c180dc7afd`, gives the doubled-value and
+filter examples. The [implementation, With.hs 175–215](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/With.hs#L175-L215),
+blob `fb84d352f3c6b2e786a0c095c74c5bee15e533cf`, counts two inspect arguments
+and expands the value together with a reflexivity witness.
+
+M47 uses that remembered-relation idea. Its motive retains `i ~# f n`, so a
+newly instantiated worker can expose the original call again. Existing
+constructor transport supplies a row Given. Ordinary exact or symmetric
+irreducible-Given solving discharges the Wanted from argument/result checking,
+including row `where` bindings. This needs neither inverse call reasoning nor
+a new application-cast or solver rule.
+
+The first ordinary evidence argument, its FC coercion-token ABI, strict alias,
+Haskell demand, nontermination and evidence liveness are GHC obligations.
+Agda's witness does not establish them or evaluate `f n` during GHC typechecking.
+The discarded custom-App variant exposed dead-Given pruning because a manual
+cast did not record a Wanted dependency. The selected ordinary evidence path
+uses existing coercion-hole tracking. Note [Tracking needed EvIds] and
+Note [Delete dead Given evidence bindings] in GHC.Tc.Solver.Solve explain that
+requirement. The earlier diagnosis remains a historical variant record.
+
+Exact source hashes, Git blobs and selected reading scope are in
+`native-call-application-refinement-remember-equality-prior-art-v1/`.
+The earlier D/DC forward-congruence and An-Push readings remain comparisons,
+not an implementation theorem. Bootstrap, self-host, API and selected
+both-stage CLI validation pass. Final9 and its registered run pass. Artifact
+audit and publication remain separate; these are focused checks, not a full
+GHC suite run. No Agda execution, proof replay,
+new PDF or combined preservation result is added. The ledger stays seven
+works and nine PDFs.
