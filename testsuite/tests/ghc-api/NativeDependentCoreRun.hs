@@ -2320,14 +2320,14 @@ runConstructorCallSourceChecks = do
         observation =
             unlines
                 [ "do finite <- driveNats (\\n -> pure (show (constructorLength opaqueNat n bottomVec, constructorTwice opaqueNat n bottomVec, constructorCaptured opaqueNat n bottomVec)))"
-                , "        zero <- observeInt (constructorZero opaqueNat bottomNat bottomVec)"
-                , "        constant <- observeInt (constructorLength constantZeroNat bottomNat bottomVec)"
-                , "        lazyHead <- observeInt (constructorHead opaqueNat bottomNat bottomVec)"
-                , "        cyclicHead <- observeInt (constructorHead opaqueNat cyclicNat bottomVec)"
-                , "        prefix <- pure (show (constructorPrefix opaqueNat cyclicNat bottomVec))"
-                , "        boolean <- observeInt (constructorBool (\\b -> case b of { False -> Z; True -> S Z }) bottomNat bottomVec)"
-                , "        mixed <- observeBool (constructorMixed (\\x -> True) bottomNat bottomVec)"
-                , "        function <- case constructorFunction opaqueNat bottomNat bottomVec of !_ -> pure \"forced\""
+                , "        zero <- driveNat (\\n -> observeInt (constructorZero opaqueNat n bottomVec)) bottomNat"
+                , "        constant <- driveNat (\\n -> observeInt (constructorLength constantZeroNat n bottomVec)) bottomNat"
+                , "        lazyHead <- driveNat (\\n -> observeInt (constructorHead opaqueNat n bottomVec)) bottomNat"
+                , "        cyclicHead <- driveNat (\\n -> observeInt (constructorHead opaqueNat n bottomVec)) cyclicNat"
+                , "        prefix <- driveNat (\\n -> pure (show (constructorPrefix opaqueNat n bottomVec))) cyclicNat"
+                , "        boolean <- driveNat (\\n -> observeInt (constructorBool (\\b -> case b of { False -> Z; True -> S Z }) n bottomVec)) bottomNat"
+                , "        mixed <- driveNat (\\n -> observeBool (constructorMixed (\\x -> True) n bottomVec)) bottomNat"
+                , "        function <- driveNat (\\n -> case constructorFunction opaqueNat n bottomVec of !_ -> pure \"forced\") bottomNat"
                 , "        applied <- observeInt (constructorFunction opaqueNat Z VNil 7)"
                 , "        constants <- pure (show (constructorLength constantZeroNat Z VNil, constructorLength constantZeroNat (S Z) (VCons 7 VNil)))"
                 , "        pure (finite ++ unlines [zero,constant,lazyHead,cyclicHead,prefix,boolean,mixed,function,applied,constants])"
@@ -2340,10 +2340,10 @@ runConstructorCallSourceChecks = do
     unless (lines actual == expected) $
         fail ("FAIL: source constructor call refinement or demand: " ++ show actual)
     forM_
-        [ ("NativeSourceConstructorPredecessor", "observeInt (constructorSeq opaqueNat bottomNat bottomVec)", "native-bottom-nat")
-        , ("NativeSourceConstructorHead", "observeInt (constructorHead bottomFunction bottomNat bottomVec)", "native-bottom-function")
-        , ("NativeSourceConstructorLength", "observeInt (constructorLength opaqueNat bottomNat bottomVec)", "native-bottom-nat")
-        , ("NativeSourceConstructorFunction", "case constructorFunction bottomFunction bottomNat bottomVec of !_ -> pure \"forced\"", "native-bottom-function")
+        [ ("NativeSourceConstructorPredecessor", "driveNat (\\n -> observeInt (constructorSeq opaqueNat n bottomVec)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceConstructorHead", "driveNat (\\n -> observeInt (constructorHead bottomFunction n bottomVec)) bottomNat", "native-bottom-function")
+        , ("NativeSourceConstructorLength", "driveNat (\\n -> observeInt (constructorLength opaqueNat n bottomVec)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceConstructorFunction", "driveNat (\\n -> case constructorFunction bottomFunction n bottomVec of !_ -> pure \"forced\") bottomNat", "native-bottom-function")
         ]
         $ \(name, body, fragment) -> do
             bottomExpression <- sourceEntry name (retainedConstructorCallSource name body)
