@@ -2241,6 +2241,7 @@ runNatSourceChecks = do
     runFunctionBinderSourceChecks
     runCallApplicationSourceChecks
     runCallActivationSourceChecks
+    runConstructedCallActivationSourceChecks
 
 -- | Add head-only retained function workers as a separate source corpus.
 retainedFunctionBinderSource :: String -> String -> String
@@ -5324,3 +5325,50 @@ runChecks = do
     liftIO $ runNatChecks environment flags bindings tycons
     runSourceChecks
     runSourceRejectChecks
+
+{- Note [Constructed call activation source checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check fresh worker applications at one and two constructor layers without
+payload annotations. Keep this group separate from the inherited bare-Var
+activation observations and from the registered stdout oracle.
+-}
+
+-- | Add unannotated constructed-call workers to the local complete group.
+retainedConstructedActivationSource :: String -> String -> String
+retainedConstructedActivationSource moduleName observation =
+    unlines $ concatMap insert (lines (retainedFunctionBinderSource moduleName observation))
+  where
+    insert line@"      run :: Nat -> IO String" = map ("      " ++) declarations ++ [line]
+    insert line = [line]
+    declarations =
+        [ "activateConstructed :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "activateConstructed f n = case f (S n) of"
+        , "    Z -> length (vecList (idCall f (S n) VNil))"
+        , "    S k -> length (vecList (idCall f (S n) (VCons 42 (replicateNative @Int k 42))))"
+        , "activateNested :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "activateNested f n = case f (S (S n)) of"
+        , "    Z -> length (vecList (idCall f (S (S n)) VNil))"
+        , "    S k -> length (vecList (idCall f (S (S n)) (VCons 42 (replicateNative @Int k 42))))"
+        , "activationConstant :: Nat -> Nat"
+        , "activationConstant n = Z"
+        ]
+
+-- | Check eight independent finite values without changing the stdout oracle.
+runConstructedCallActivationSourceChecks :: GHC.Ghc ()
+runConstructedCallActivationSourceChecks = do
+    let moduleName = "NativeSourceConstructedCallActivation"
+        observation =
+            unlines
+                [ "do one <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in observeInt (activateConstructed f n))"
+                , "        oneConstant <- driveNat (\\n -> let { f :: Nat -> Nat; f = activationConstant } in observeInt (activateConstructed f n)) (S (S Z))"
+                , "        two <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in observeInt (activateNested f n))"
+                , "        twoConstant <- driveNat (\\n -> let { f :: Nat -> Nat; f = activationConstant } in observeInt (activateNested f n)) (S (S Z))"
+                , "        pure (one ++ unlines [oneConstant] ++ two ++ unlines [twoConstant])"
+                ]
+        expected = ["1", "3", "4", "0", "2", "4", "5", "0"]
+    expression <- sourceEntry moduleName (retainedConstructedActivationSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "constructed call activation" expression
+    unless (lines actual == expected) $
+        fail ("FAIL: constructed call activation: " ++ show actual)
