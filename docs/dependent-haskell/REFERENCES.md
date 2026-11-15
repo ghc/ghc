@@ -2903,3 +2903,33 @@ normalization, type recovery, index substitution, and CorePrep naming agree on
 the same checked pair. Keep source elaboration separate until it preserves
 typing, scope, usage, and failure behavior. See
 [the Core contract](CORE.md#checked-beta-exposure) and the M39 spec in PLAN.md.
+
+## Bounded source beta applications
+
+M40 uses Agda v2.8.0's
+[expected-domain argument checking](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+and [lambda context extension](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L685-L710)
+as implementation precedents. The retained domain supplies the provisional
+lambda binder's type. The source checker keeps the original argument and checks
+it once. The Core bridge still validates its bounded grammar and domains.
+These sources do not prove the GHC rule or Haskell runtime behavior.
+
+At compiler commit `7129205`,
+[`tcPatBndr`](../../compiler/GHC/Tc/Gen/Pat.hs) constructs the actual Id from the
+renamed pattern Name. [`selectMatchVar`](../../compiler/GHC/HsToCore/Utils.hs)
+reuses that VarPat Id. Ordinary lambda inference allocates a fresh multiplicity
+in [`new_infer_arg_ty`](../../compiler/GHC/Tc/Utils/Unify.hs).
+[`submult`](../../compiler/GHC/Core/Multiplicity.hs) accepts `One <= p` without
+fixing `p` to `One`. Final
+[`commitFlexi`](../../compiler/GHC/Tc/Zonk/Type.hs) defaults an unresolved
+multiplicity to `Many`. This supports the bounded provisional-Many design;
+the actual zonked-lambda metadata probe remains pending. Do not generalize this
+argument to signatures or other forms that can impose a linear arrow.
+
+[`decideBangHood`](../../compiler/GHC/HsToCore/Utils.hs) adds an outer bang to a
+bare pattern under `Strict`. Reducing a constant lambda without that demand
+could hide a bottom argument. M40 rejects its new immediate-lambda form under
+`Strict`, at the original lambda span. Opaque producers remain unsupported.
+The source snapshots, exact ranges, hashes and two verified Agda blobs are
+cached in `native-source-beta-source-provenance-v1`. The M39 archive and its
+Core-only evidence remain unchanged. No eta rule or general evaluator is added.
