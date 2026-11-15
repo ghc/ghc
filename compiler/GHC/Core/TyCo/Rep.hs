@@ -301,7 +301,8 @@ native coercion serialization remains gated.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TermAppTy f arg represents an opaque call to one local unrestricted non-join
 function. Its visible unrestricted arrow has independently closed scalar
-domains A and B. The argument is a scoped Type of kind A; the call has kind B.
+domains A and B. Both arrow classifications are Type. The argument is a scoped
+Type of kind A; the call has kind B.
 Do not unfold f or infer argument equality from equality of calls.
 
 TermAppCo f co lifts a nominal argument proof through the same checked head.

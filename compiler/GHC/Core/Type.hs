@@ -2331,7 +2331,7 @@ nativeIndexFunctionTys_maybe f
   , noFreeVarsOfType (varType f), noFreeVarsOfType (idMult f)
   , FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res }
       <- coreFullView (varType f)
-  , isVisibleFunArg af, isManyTy mult
+  , af == FTF_T_T, isManyTy mult
   , noFreeVarsOfType mult
   , isNativeIndexType arg, isNativeIndexType res
   = Just (arg, res)
