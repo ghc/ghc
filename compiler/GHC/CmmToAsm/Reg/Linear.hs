@@ -1395,12 +1395,6 @@ raInsn new_instrs id !pos (LiveInstr (Instr instr) (Just live)) rest
                            setAssigR (addToUFM (delFromUFM assig src) dst loc)
 
            -- we have eliminated this instruction
-          {-
-          freeregs <- getFreeRegsR
-          assig <- getAssigR
-          pprTrace "raInsn" (text "ELIMINATED: " <> docToSDoc (pprInstr instr)
-                        $$ ppr r_dying <+> ppr w_dying $$ text (show freeregs) $$ ppr assig) $ do
-          -}
            return (new_instrs, [])
 
         _ -> genRaInsn new_instrs id pos instr rest live

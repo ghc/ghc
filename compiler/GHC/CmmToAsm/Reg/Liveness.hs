@@ -804,8 +804,33 @@ sccBlocks blocks entries mcfg = (sccs, succs)
         -- each block's jump targets
         succs = mapFromList [ (b, ds) | DigraphNode _ b ds <- nodes ]
 
+        -- a jump's single target left out where it repeats one of the first
+        -- two distinct such targets of the block: on x86 the block of a
+        -- floating-point comparison that tests for an unordered result names
+        -- one target in two jumps.  Three loops, those two targets their
+        -- arguments and the rest of the list built before its cell: with
+        -- the targets held in a list instead, the compiler ran 0.043% more
+        -- instructions and allocated 0.029% more compiling T9961 at -O0, and
+        -- 0.016% and 0.006% more compiling T3294 at -O0, on GHC 10.1.20261111.
         getOutEdges :: Instruction instr => [instr] -> [BlockId]
-        getOutEdges instrs = concatMap jumpDestsOfInstr instrs
+        getOutEdges = go0
+          where
+            go0 [] = []
+            go0 (instr : instrs) = case jumpDestsOfInstr instr of
+              []  -> go0 instrs
+              [a] -> let !rest = go1 a instrs in a : rest
+              ds  -> ds ++ go0 instrs
+            go1 _ [] = []
+            go1 a (instr : instrs) = case jumpDestsOfInstr instr of
+              []  -> go1 a instrs
+              [b] | b == a    -> go1 a instrs
+                  | otherwise -> let !rest = go2 a b instrs in b : rest
+              ds  -> ds ++ go1 a instrs
+            go2 _ _ [] = []
+            go2 a b (instr : instrs) = case jumpDestsOfInstr instr of
+              []  -> go2 a b instrs
+              [c] | c == a || c == b -> go2 a b instrs
+              ds  -> ds ++ go2 a b instrs
 
         -- This is truly ugly, but I don't see a good alternative.
         -- GHC.Data.Graph.Directed just has the wrong API.  We want to

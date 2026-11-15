@@ -164,6 +164,9 @@ chooseSpill info graph
 --   cost =     sum         loadCost * freq (u)  +    sum        storeCost * freq (d)
 --          u <- uses (v)                         d <- defs (v)
 --
+--  'slurpSpillCostInfo' counts every use and def once, whatever the frequency
+--  of its block.
+--
 --  If we don't have live range splitting then Chaitins function performs badly
 --  if we have lots of nested live ranges and very few registers.
 --

@@ -530,20 +530,22 @@ tryToInline platform liveAfter node assigs =
    | cannot_inline            = dont_inline
    | occurs_none              = discard  -- See Note [discard during inlining]
    | occurs_once              = inline_and_discard
+   | isNothing l_usages       = dont_inline  -- live after the node, not in it
    | isTrivial platform rhs   = inline_and_keep
    | otherwise                = dont_inline
    where
         inline_and_discard = go usages' live inl_node skipped rest
-          where usages' = foldLocalRegsUsed platform addUsage usages rhs
+        -- the node's uses once rhs stands where l stood
+        usages' = foldLocalRegsUsed platform addUsage usages rhs
 
         discard = go usages live node skipped rest
 
-        dont_inline        = keep node  -- don't inline the assignment, keep it
-        inline_and_keep    = keep inl_node -- inline the assignment, keep it
+        dont_inline        = keep usages node      -- don't inline the assignment, keep it
+        inline_and_keep    = keep usages' inl_node -- inline the assignment, keep it
 
-        keep :: CmmNode O x -> (CmmNode O x, Assignments)
-        keep node' = (final_node, a : rest')
-          where (final_node, rest') = go usages live' node' (insertLRegSet l skipped) rest
+        keep :: UniqFM LocalReg Int -> CmmNode O x -> (CmmNode O x, Assignments)
+        keep usages1 node' = (final_node, a : rest')
+          where (final_node, rest') = go usages1 live' node' (insertLRegSet l skipped) rest
 
                 -- Avoid discarding of assignments to vars on the rhs.
                 -- See Note [Keeping assignments mentioned in skipped RHSs]
