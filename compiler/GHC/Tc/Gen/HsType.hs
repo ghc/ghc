@@ -2000,6 +2000,7 @@ tc_app_ty :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty mode rn_ty exp_kind
   | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- hs_fun_ty
   , Just head_id <- lookupNameEnv (mode_indices mode) name
+  , isNativeIndexFunctionId head_id
   = do { (domain, result) <- case nativeIndexFunctionTys_maybe head_id of
                Just domains -> return domains
                Nothing -> invalid_call
