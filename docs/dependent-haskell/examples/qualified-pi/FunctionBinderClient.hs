@@ -88,6 +88,13 @@ main = do
         let f :: Nat -> Nat
             f = identityHead
         print (observeDirectCall f n)
+    forM_ [Z, S (S Z), S (S (S Z))] $ \seed -> do
+        ref <- newIORef seed
+        n <- readIORef ref
+        let f :: Nat -> Nat
+            f = identityHead
+        print (length (observeConstructedCall f n))
+    print (length (observeConstructedCall constant bottomN))
   where
     -- \| Ignore all three runtime arguments, including the opaque function head.
     keepCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n) -> Int
@@ -127,6 +134,12 @@ main = do
     observeDirectCall f n = case f n of
         Z -> toList (idCall f n VNil)
         S k -> toList (idCall f n (VCons 42 (replicateNative @Int k 42)))
+
+    -- | Instantiate the worker at a constructed index without a payload annotation.
+    observeConstructedCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> [Int]
+    observeConstructedCall f n = case f (S n) of
+        Z -> toList (idCall f (S n) VNil)
+        S k -> toList (idCall f (S n) (VCons 42 (replicateNative @Int k 42)))
 
     -- \| Keep independently closed input and result domains on a function binder.
     keepMixedCall :: foreach (f :: Bool -> Nat) -> foreach (b :: Bool) -> Vec Int (f b) -> Int
