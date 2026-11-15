@@ -62,7 +62,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var) )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind )
@@ -319,7 +319,7 @@ tcRetainedCase _ _ _ = return Nothing
 tcRetainedCallCase :: Type -> LHsExpr GhcTc
                    -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
                    -> TcM (Maybe (HsExpr GhcTc))
-tcRetainedCallCase call_ty@(TermAppTy fun (TermVarTy arg)) scrut
+tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                   matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
   = do { captures <- fmap catMaybes $ mapM capture
                        (nameSetElemsStable (retainedCaseNames matches))
@@ -351,8 +351,8 @@ tcRetainedCallCase call_ty@(TermAppTy fun (TermVarTy arg)) scrut
               ; given_cos <- mapM (tcRetainedCallCoercion call_ty alias_co . varType) givens
               ; index <- newSysLocalId (fsLit "call_motive") ManyTy domain
               ; let in_scope = mkInScopeSetList
-                      (alias : index : fun : arg : tyCoVarsOfTypesList
-                        (result_ty : map varType (fun : arg : givens ++ captures)))
+                      (alias : index : tyCoVarsOfTypesList
+                        (call_ty : result_ty : map varType (givens ++ captures)))
                     subst = Subst.mkIdSubst in_scope (unitVarEnv alias (Var index))
                     generalize = Subst.substTy subst . pSnd . coercionKind
               ; dictionaries <- newEvVars (map generalize given_cos)
@@ -426,13 +426,36 @@ tcRetainedCallCase call_ty@(TermAppTy fun (TermVarTy arg)) scrut
 
     is_call :: HsType GhcRn -> Bool
     is_call (HsParTy _ ty) = is_call (unLoc ty)
-    is_call (HsAppTy _ head_ty arg_ty)
-      = is_name (idName fun) (unLoc head_ty) && is_name (idName arg) (unLoc arg_ty)
+    is_call (HsAppTy _ head_ty source_arg)
+      = is_name (idName fun) (unLoc head_ty) && is_index arg_ty (unLoc source_arg)
     is_call _ = False
     is_name :: Name -> HsType GhcRn -> Bool
     is_name name (HsParTy _ ty) = is_name name (unLoc ty)
     is_name name (HsTyVar _ NotPromoted (L _ (WithUserRdr _ actual))) = name == actual
     is_name _ _ = False
+
+    -- | Compare only checked scalar variables and promoted constructor trees.
+    is_index :: Type -> HsType GhcRn -> Bool
+    is_index index (HsParTy _ ty) = is_index index (unLoc ty)
+    is_index (TermVarTy var) ty = is_name (idName var) ty
+    is_index (TyConApp tc args) ty
+      | Just con <- isPromotedDataCon_maybe tc
+      = case split_apps [] ty of
+          (HsTyVar _ _ (L _ (WithUserRdr _ name)), source_args)
+            -> name == dataConName con && args `equalLength` source_args
+               && and (zipWith is_index args source_args)
+          _ -> False
+    is_index _ _ = False
+
+    -- | Collect an ordinary type application spine without admitting wrappers.
+    split_apps :: [HsType GhcRn] -> HsType GhcRn
+               -> (HsType GhcRn, [HsType GhcRn])
+    split_apps args (HsParTy _ ty) = split_apps args (unLoc ty)
+    split_apps args (HsAppTy _ fun arg) = split_apps (unLoc arg : args) (unLoc fun)
+    split_apps args ty = (ty, args)
+
+    call_names :: [Name]
+    call_names = map getName (tyCoVarsOfTypeList call_ty)
 
     has_annotation :: Data a => a -> Bool
     has_annotation thing
@@ -456,7 +479,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun (TermVarTy arg)) scrut
           | Just ty <- (cast thing :: Maybe (HsType GhcRn)), is_call ty
           = fromMaybe thing (cast con_type)
           | Just names <- (cast thing :: Maybe NameSet)
-          , idName fun `elemNameSet` names, idName arg `elemNameSet` names
+          , all (`elemNameSet` names) call_names
           = fromMaybe thing (cast (names `unionNameSet`
               mkNameSet (dataConName con : map idName fields)))
           | Just _ <- (cast thing :: Maybe Name) = thing
@@ -478,9 +501,14 @@ Transport the original captures and Givens into that motive, then transport
 its result back. Under Strict, protect only the generated capture and evidence
 patterns with LazyPat. Desugaring removes this marker instead of adding a bang.
 Keep the original constructor and field patterns unchanged.
-Replace exact call annotations in each row with its checked
-constructor type. Resolve both source Names before this replacement. Reject
-quotations before any source rewrite can change a quoted Name.
+Replace exact call annotations in each row with its checked constructor type.
+For a constructor-tree argument, compare the renamed application spine with
+that checked tree. Require the same promoted DataCons, arities and variable
+Names at every field. Ignore parentheses. Do not expand synonyms or compare
+printed names. Keep f n, f (S n), f (S m) and shadowed heads distinct.
+Seed the transport substitution with all free variables of the whole call,
+including constructor fields. Reject quotations before any source rewrite
+can change a quoted Name.
 
 Require complete, unguarded constructor rows with bare variable fields.
 A source wildcard or variable case can ignore its scrutinee in Haskell.
@@ -491,7 +519,10 @@ keeps the original case for diagnostics with ExpandedThingTc.
 
 Agda with-abstraction supplies prior art for whole-term generalization and
 checking a helper in its dependent context. It supplies no Haskell demand
-law or FC proof. See docs/dependent-haskell/REFERENCES.md#agda-provenance
+law or FC proof. Agda v2.8.0 Rules/Application.hs lines 774-808 checks the
+argument before substituting it into the codomain. This is checking and scope prior
+art, not the algorithm for our structural source matcher.
+See docs/dependent-haskell/REFERENCES.md#strict-opaque-call-refinement-prior-art
 and Note [Checked opaque case alias] in GHC.Hs.Expr.
 -}
 

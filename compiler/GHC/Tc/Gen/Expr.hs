@@ -850,13 +850,52 @@ checkedNativeCallIndex :: LHsExpr GhcTc -> Type -> Maybe Type
 checkedNativeCallIndex expr result_ty
   | HsApp _ fun arg <- unLoc (stripParensLHsExpr expr)
   , HsVar _ (L _ head_id) <- unLoc (stripParensLHsExpr fun)
-  , HsVar _ (L _ arg_id) <- unLoc (stripParensLHsExpr arg)
   , Just (domain, codomain) <- nativeIndexFunctionTys_maybe head_id
-  , isNativeIndexId arg_id
-  , eqType domain (varType arg_id)
+  , Just core_arg <- checkedNativeCallArgument arg
+  , Just arg_index <- Core.exprToNativeIndex core_arg
+  , eqType domain (typeKind arg_index)
   , eqType codomain result_ty
-  = Just (TermAppTy head_id (TermVarTy arg_id))
+  = Just (TermAppTy head_id arg_index)
   | otherwise = Nothing
+
+-- | Reconstruct a checked scalar argument for classification, not execution.
+-- See Note [Checked source call arguments].
+checkedNativeCallArgument :: LHsExpr GhcTc -> Maybe Core.CoreExpr
+checkedNativeCallArgument expr
+  = case unLoc (stripParensLHsExpr expr) of
+      HsVar _ (L _ arg_id)
+        | isNativeIndexId arg_id -> Just (Core.Var arg_id)
+      XExpr (ConLikeTc (RealDataCon con))
+        -> Just (Core.Var (dataConWrapId con))
+      HsApp _ fun arg
+        -> Core.App <$> checkedNativeCallArgument fun
+                    <*> checkedNativeCallArgument arg
+      XExpr (WrapExpr WpHole inner)
+        -> checkedNativeCallArgument (noLocA inner)
+      XExpr (ExpandedThingTc (HSE _ inner))
+        -> checkedNativeCallArgument inner
+      _ -> Nothing
+
+{- Note [Checked source call arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Classify a constructor argument only after ordinary expression and usage
+checking. Reconstruct a temporary Core spine from the actual Ids and DataCons.
+Use dataConWrapId, as the desugarer does. Never replace a real wrapper with its
+worker. exprToNativeIndex checks the closed domain, saturation, field domains
+and multiplicities. Closed native domains exclude constructor wrappers.
+
+The temporary spine is not executed. The original checked scrutinee remains
+in NativeCaseAlias and is desugared once. Parentheses, WpHole and a checked
+source expansion preserve that expression. Other wrappers, casts, type or
+evidence applications, lambdas and opaque producers get no new admission.
+In particular, this classifier does not rerun tcRetainedArg on renamed syntax
+or emit argument usage a second time.
+
+Agda v2.8.0 Rules/Application.hs:774-808 checks the argument at the current
+domain before substitution (blob 82ba94ac864d19b947d4c92b9af252b0fe81347a).
+This supplies checking-order prior art, not a Haskell demand theorem.
+See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+-}
 
 {-
 ************************************************************************
