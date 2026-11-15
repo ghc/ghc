@@ -573,12 +573,16 @@ tcExpr (HsCase ctxt scrut matches) res_ty
         ; retained <- case unLoc (stripParensLHsExpr scrut') of
             HsVar _ (L _ index) | dependent, isNativeIndexId index ->
               tcRetainedCase index matches res_ty
-            _ | dependent, Just call_index <- checkedNativeCallIndex scrut' scrut_ty ->
-              do { refined <- tcRetainedCallCase call_index scrut' matches res_ty
-                 ; let preserve_origin expr = XExpr (ExpandedThingTc
-                         (HSE { hse_ctxt = ExprCtxt (HsCase ctxt scrut matches)
-                              , hse_exp = noLocA expr }))
-                 ; return (fmap preserve_origin refined) }
+            _ | dependent ->
+              do { call_index <- checkedNativeCallIndex scrut' scrut_ty
+                 ; case call_index of
+                     Nothing -> return Nothing
+                     Just index ->
+                       do { refined <- tcRetainedCallCase index scrut' matches res_ty
+                          ; let preserve_origin expr = XExpr (ExpandedThingTc
+                                  (HSE { hse_ctxt = ExprCtxt (HsCase ctxt scrut matches)
+                                       , hse_exp = noLocA expr }))
+                          ; return (fmap preserve_origin refined) } }
             _ -> return Nothing
         ; case retained of
             Just expr -> return expr
@@ -846,35 +850,132 @@ tcExpr e res_ty
 
 -- | Classify an opaque call after ordinary expression and usage checking.
 -- See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
-checkedNativeCallIndex :: LHsExpr GhcTc -> Type -> Maybe Type
+checkedNativeCallIndex :: LHsExpr GhcTc -> Type -> TcM (Maybe Type)
 checkedNativeCallIndex expr result_ty
   | HsApp _ fun arg <- unLoc (stripParensLHsExpr expr)
   , HsVar _ (L _ head_id) <- unLoc (stripParensLHsExpr fun)
   , Just (domain, codomain) <- nativeIndexFunctionTys_maybe head_id
-  , Just core_arg <- checkedNativeCallArgument arg
-  , Just arg_index <- Core.exprToNativeIndex core_arg
-  , eqType domain (typeKind arg_index)
-  , eqType codomain result_ty
-  = Just (TermAppTy head_id arg_index)
-  | otherwise = Nothing
+  = do { core_arg <- checkedNativeCallArgument emptyNameEnv arg
+       ; return $ do
+           arg_index <- core_arg >>= Core.exprToNativeIndex
+           guard (eqType domain (typeKind arg_index) && eqType codomain result_ty)
+           return (TermAppTy head_id arg_index) }
+  | otherwise = return Nothing
 
 -- | Reconstruct a checked scalar argument for classification, not execution.
--- See Note [Checked source call arguments].
-checkedNativeCallArgument :: LHsExpr GhcTc -> Maybe Core.CoreExpr
-checkedNativeCallArgument expr
+-- See Note [Checked source call arguments] and Note [Signed source call beta].
+checkedNativeCallArgument :: NameEnv Id -> LHsExpr GhcTc -> TcM (Maybe Core.CoreExpr)
+checkedNativeCallArgument bound expr
   = case unLoc (stripParensLHsExpr expr) of
       HsVar _ (L _ arg_id)
-        | isNativeIndexId arg_id -> Just (Core.Var arg_id)
+        | let actual = fromMaybe arg_id (lookupNameEnv bound (idName arg_id))
+        , isNativeIndexId actual -> return (Just (Core.Var actual))
       XExpr (ConLikeTc (RealDataCon con))
-        -> Just (Core.Var (dataConWrapId con))
+        -> return (Just (Core.Var (dataConWrapId con)))
       HsApp _ fun arg
-        -> Core.App <$> checkedNativeCallArgument fun
-                    <*> checkedNativeCallArgument arg
+        | ExprWithTySig _ inner signature <- unLoc (strip_checked fun)
+        , Just domain_name <- simple_signature signature
+        -> checked_beta domain_name inner arg
+        | otherwise
+        -> do { fun' <- checkedNativeCallArgument bound fun
+              ; case fun' of
+                  Nothing -> return Nothing
+                  Just core_fun -> do
+                    { arg' <- checkedNativeCallArgument bound arg
+                    ; return (Core.App core_fun <$> arg') } }
       XExpr (WrapExpr WpHole inner)
-        -> checkedNativeCallArgument (noLocA inner)
+        -> checkedNativeCallArgument bound (noLocA inner)
       XExpr (ExpandedThingTc (HSE _ inner))
-        -> checkedNativeCallArgument inner
-      _ -> Nothing
+        -> checkedNativeCallArgument bound inner
+      _ -> return Nothing
+  where
+    -- | Read only the existing transparent checked expression forms.
+    strip_checked :: LHsExpr GhcTc -> LHsExpr GhcTc
+    strip_checked expr = case unLoc (stripParensLHsExpr expr) of
+      XExpr (WrapExpr WpHole inner) -> strip_checked (noLocA inner)
+      XExpr (ExpandedThingTc (HSE _ inner)) -> strip_checked inner
+      _ -> stripParensLHsExpr expr
+
+    -- | Require a written, closed, plain A -> A signature with named domains.
+    simple_signature :: LHsSigWcType GhcRn -> Maybe Name
+    simple_signature (HsWC { hswc_ext = []
+                          , hswc_body = L _ HsSig
+                              { sig_bndrs = HsOuterImplicit { hso_ximplicit = [] }
+                              , sig_body = signature } })
+      | HsFunTy _ (HsModifiedFunArr _ [] (HsStandardArr _)) arg res <- strip_type signature
+      , HsTyVar _ NotPromoted (L _ (WithUserRdr _ arg_name)) <- strip_type arg
+      , HsTyVar _ NotPromoted (L _ (WithUserRdr _ res_name)) <- strip_type res
+      , arg_name == res_name
+      = Just arg_name
+    simple_signature _ = Nothing
+
+    -- | Remove parentheses without expanding type syntax or aliases.
+    strip_type :: LHsType GhcRn -> HsType GhcRn
+    strip_type (L _ (HsParTy _ ty)) = strip_type ty
+    strip_type (L _ ty) = ty
+
+    -- | Use the actual checked binder and read its existing assignments.
+    checked_beta :: Name -> LHsExpr GhcTc -> LHsExpr GhcTc
+                 -> TcM (Maybe Core.CoreExpr)
+    checked_beta domain_name inner arg
+      | HsLam _ LamSingle MG
+          { mg_ext = MatchGroupTc { mg_arg_tys = [pat_ty], mg_res_ty = result_ty }
+          , mg_alts = L _ [L _ Match
+              { m_pats = L _ [L _ (VarPat _ (L _ binder))]
+              , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] body) NE.:| []
+                                , grhssLocalBinds = L _ (EmptyLocalBinds _) } }] }
+          <- unLoc (strip_checked inner)
+      = do { strict <- xoptM LangExt.Strict
+           ; if strict then return Nothing else
+             do { (actual, argument, result) <- liftZonkM $
+                    (,,) <$> zonkId binder <*> zonkScaledTcType pat_ty
+                         <*> zonkTcType result_ty
+                ; case (idMult actual, scaledMult argument) of
+                    (ManyTy, ManyTy)
+                      | isNativeIndexId actual
+                      , eqType (idType actual) (scaledThing argument)
+                      , eqType (idType actual) result
+                      , Just (tc, []) <- splitTyConApp_maybe (coreFullView (idType actual))
+                      , tyConName tc == domain_name
+                      -> do { body' <- checkedNativeCallArgument
+                                         (extendNameEnv bound (idName actual) actual) body
+                            ; case body' of
+                                Nothing -> return Nothing
+                                Just core_body -> do
+                                  { arg' <- checkedNativeCallArgument bound arg
+                                  ; return (Core.App (Core.Lam actual core_body) <$> arg') } }
+                    _ -> return Nothing } }
+    checked_beta _ _ _ = return Nothing
+
+{- Note [Signed source call beta]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete written A -> A signature can supply a checked Many lambda binder.
+Require the surviving ExprWithTySig, one plain arrow and the same bare type
+constructor Name on each side. Reject implicit or explicit forall binders,
+wildcards, contexts, type applications, aliases and nontrivial wrappers.
+Check the actual LamSingle, VarPat, unguarded RHS and empty local bindings.
+
+Read existing assignments with the during-TC zonker. It leaves Flexi untouched;
+only existing Indirect chains can be compressed. Require literal Many in the
+actual Id and scaled MatchGroup argument. Check both domains and the result.
+Preserve the binder Name and Unique. Use that zonked Id for bound occurrences,
+without changing the existing policy for external index variables or heads.
+Do not default, fill a meta, create a provisional Many Id or repeat usage.
+
+The temporary Core.Lam is only classification data. exprToNativeIndex checks
+its existing atomic beta grammar and domains. Keep the original checked call
+for execution. No general lambda, residual opaque call or new Core rule is
+admitted. Under Strict return Nothing: source VarPat demand is added later by
+desugaring. Ordinary nondependent cases must retain their normal checking path.
+
+Agda v2.8.0 Rules/Term.hs lines 468-486 and 542-587 check a lambda in its
+target context. Rules/Application.hs lines 774-808 check and substitute the
+argument. Their blobs are 02991c9fa0085315cc854d2833a9080af14a7740 and
+82ba94ac864d19b947d4c92b9af252b0fe81347a. They supply scoped checking prior art,
+not GHC multiplicity defaulting or Haskell demand laws. See
+docs/dependent-haskell/REFERENCES.md#checked-constructor-call-arguments-prior-art
+and Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+-}
 
 {- Note [Checked source call arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -887,7 +988,8 @@ and multiplicities. Closed native domains exclude constructor wrappers.
 The temporary spine is not executed. The original checked scrutinee remains
 in NativeCaseAlias and is desugared once. Parentheses, WpHole and a checked
 source expansion preserve that expression. Other wrappers, casts, type or
-evidence applications, lambdas and opaque producers get no new admission.
+evidence applications and opaque producers get no new admission. The separate
+signed beta path is described in Note [Signed source call beta].
 In particular, this classifier does not rerun tcRetainedArg on renamed syntax
 or emit argument usage a second time.
 
