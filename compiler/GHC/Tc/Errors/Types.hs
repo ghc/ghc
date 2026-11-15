@@ -5324,6 +5324,7 @@ data RetainedQuantificationError
   | RetainedPartialTypeArgument
   | RetainedPolymorphicSignature
   | RetainedUnsupportedContext
+  | RetainedFunctionSignature
   | RetainedStaging
   | RetainedConstructorCoverage
   | RetainedMatrixCoverage
@@ -5337,9 +5338,11 @@ data RetainedQuantificationError
   | RetainedConstructorArguments
   | RetainedPatternType Type
   | RetainedVariablePattern
+  | RetainedFunctionPatterns
   | RetainedContextPattern
   | RetainedResultWrapper
   | RetainedIndexExpression
+  | RetainedFunctionArgument
   | RetainedCallIndex
   | RetainedCallInstrumentation
   | RetainedIndexLambdaStrict

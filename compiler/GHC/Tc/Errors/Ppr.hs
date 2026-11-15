@@ -3570,6 +3570,8 @@ pprRetainedQuantificationError reason = case reason of
     text "A forall within the scope of a retained binder is not supported yet."
   RetainedUnsupportedContext ->
     text "Retained quantification is supported only at the start of an explicit value signature."
+  RetainedFunctionSignature ->
+    text "A function-valued retained binder requires a complete local value signature."
   RetainedStaging ->
     text "Retained quantification in Template Haskell quotations or splices is not supported yet."
   RetainedConstructorCoverage ->
@@ -3599,12 +3601,16 @@ pprRetainedQuantificationError reason = case reason of
          , ppr ty ]
   RetainedVariablePattern ->
     text "The retained argument currently requires a bare variable pattern."
+  RetainedFunctionPatterns ->
+    text "Function-valued retained binders currently require one equation with bare variable patterns in retained columns."
   RetainedContextPattern ->
     text "A strict prefix pattern before a retained context is not supported when later value patterns remain."
   RetainedResultWrapper ->
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedIndexExpression ->
     text "A retained argument must be a local index variable, a supported constructor tree, or a supported immediate lambda application."
+  RetainedFunctionArgument ->
+    text "A function-valued retained argument must be an already-bound unrestricted local function variable of its declared domain."
   RetainedCallIndex ->
     text "An opaque call index requires an already-bound unrestricted local function and one argument of its declared domain."
   RetainedCallInstrumentation ->

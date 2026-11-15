@@ -367,12 +367,17 @@ zonkId id = updateIdTypeAndMultM zonkTcType id
 
 {- Note [Zonking retained Boolean indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained index is a rigid Id with type Bool and multiplicity Many.
+A retained Boolean index is a rigid Id with type Bool and multiplicity Many.
 Its metadata has no metavariables. During typechecking, preserve this Id at
 both its binder and its occurrences. Do not default it or turn it into a
 TyVar. The final zonker also preserves the occurrence's prototype Id. Its
-Name and Unique identify the actual runtime binder. Its fixed Bool/Many
-metadata needs no zonking.
+Name and Unique identify the actual runtime binder. Its closed domain and
+Many multiplicity need no zonking. Closed algebraic indices and eligible function
+heads use the same prototype policy. A function head has independently closed
+scalar argument/result domains and Many multiplicity. Its actual Name/Unique
+is preserved without consulting the recursive Id environment. The generic
+runtime binder callback already scopes it.
+See Note [Function-valued retained binders] in GHC.Core.Type.
 
 Do not look up an index occurrence in the knot-tied Id environment. Zonking
 can inspect the resulting type before the recursive bindings are available.

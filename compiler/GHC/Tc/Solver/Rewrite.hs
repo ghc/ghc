@@ -668,9 +668,11 @@ rewrite_args_slow binders inner_ki fvs roles tys
 ------------------
 {- Note [Rewriting retained dependent functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained function has a fixed closed index domain and a Many runtime binder.
-Normalize its body without changing that binder or its domain. mkDepFunRedn
-uses DepFunCo to bind the runtime Id in the reduction proof. Each endpoint uses
+A retained function has a fixed closed domain and a Many runtime binder.
+The domain can also be an eligible ordinary function type. Keep its Id only
+in dedicated call-head slots. See Note [Function-valued retained binders] in
+GHC.Core.Type. Normalize its body without changing that binder or its domain.
+mkDepFunRedn uses DepFunCo to bind the runtime Id in the reduction proof. Each endpoint uses
 mkDepFunTy independently: normalization can remove a dependency and produce an
 ordinary Many arrow on one side. A bound runtime index remains rigid. Do not
 inspect its definition or add a singleton witness.
@@ -745,7 +747,7 @@ rewrite_one ty@(TermVarTy {})
        ; return $! mkReflRedn role ty }
 rewrite_one ty@(DepFunTy b body)
   -- See Note [Rewriting retained dependent functions].
-  | isId b, isNativeIndexId b
+  | isId b, isNativeRetainedBinder b
   , isLiftedTypeKind (typeKind body)
   = withNativeBinder b $
     do { redn <- rewrite_one body

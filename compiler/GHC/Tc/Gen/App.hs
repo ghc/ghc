@@ -1350,7 +1350,9 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy binder _ <- coreFullView fun_ty
-      = do { core_arg <- tcRetainedArg (varType binder) arg
+      = do { core_arg <- if isNativeIndexFunctionId binder
+                          then tcRetainedFunctionArg (varType binder) arg
+                          else tcRetainedArg (varType binder) arg
            ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy (varType binder))
            ; let body_ty = applyTypeToArgs fun_ty [core_arg]
            ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
@@ -1453,6 +1455,29 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
            DoStmtOrigin -> ExpectedFunTySyntaxOp DoStmtOrigin tc_fun
            _ -> ExpectedFunTyArg (HsExprTcThing tc_fun) arg
 
+
+-- | Resolve one already-bound local function at its exact retained domain.
+-- Read existing assignments without instantiating or checking the value again.
+-- See Note [Function-valued retained binders] in GHC.Core.Type.
+tcRetainedFunctionArg :: Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
+tcRetainedFunctionArg domain arg
+  = setSrcSpanA (getLoc arg) $
+    case unLoc (stripParensLHsExpr arg) of
+      HsVar _ lname
+        -> do { thing <- tcLookupLcl_maybe (unLocWithUserRdr lname)
+              ; case thing of
+                  Just (ATcId { tct_id = actual }) ->
+                    do { actual <- liftZonkM (zonkId actual)
+                       ; if not (isExternalName (getName actual))
+                            && isNativeIndexFunctionId actual
+                            && varType actual `eqType` domain
+                         then return (Core.Var actual)
+                         else unsupported }
+                  _ -> unsupported }
+      _ -> unsupported
+  where
+    unsupported = failWithTc $
+      TcRnRetainedQuantificationError RetainedFunctionArgument
 
 -- | Resolve a retained argument at its known domain without checking its value.
 -- See Note [Retained argument application].

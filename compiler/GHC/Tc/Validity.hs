@@ -822,7 +822,7 @@ check_type ve (TermVarTy v)
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; check_retained_index ve v }
 check_type ve (DepFunTy v body)
-  = do { unless (isNativeIndexId v && not (v `elemVarSet` ve_indices ve)) $
+  = do { unless (isNativeRetainedBinder v && not (v `elemVarSet` ve_indices ve)) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; unless (typeKind body `eqType` liftedTypeKind) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedResultKind body)
@@ -926,7 +926,7 @@ check_retained_index ve v
        ; case level of
            Comp -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
-       ; unless (isNativeIndexId v && v `elemVarSet` ve_indices ve) $
+       ; unless (isNativeRetainedBinder v && v `elemVarSet` ve_indices ve) $
          do { mb_thing <- tcLookupLcl_maybe (getName v)
             ; case mb_thing of
                 Just (ATcId { tct_id = v' }) ->
@@ -949,7 +949,12 @@ Zonk the lexical binding's type and multiplicity before testing it. IO-bound
 indices can retain filled meta-variables in that metadata. Keep the same Unique
 and require the occurrence and binding domains to agree. This follows
 GHC.Tc.Gen.App, Note [Native index bindings during typechecking].
-Its domain must satisfy isNativeIndexType. Ordinary outer forall binders
+Its domain must satisfy the retained-binder policy. A bound function Id can
+occur only as a dedicated call head. TermVarTy remains scalar-only. Bound-set
+membership covers both binder domains; free function heads still need the
+actual lexical binding and internal Name.
+See Note [Function-valued retained binders] in GHC.Core.Type.
+Ordinary outer forall binders
 keep their existing type-variable scope and rank checks.
 Preserve this scope when checking nested constraints and their predicates.
 

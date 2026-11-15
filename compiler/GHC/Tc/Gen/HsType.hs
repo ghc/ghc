@@ -415,7 +415,7 @@ tcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM Type
 tcClassSigType names sig_ty
   = addSigCtxt sig_ctxt (UserLHsSigType sig_ty) $
     do { skol_info <- mkSkolemInfo skol_info_anon
-       ; (implic, ty) <- tc_lhs_sig_type False skol_info sig_ty (TheKind liftedTypeKind)
+       ; (implic, ty) <- tc_lhs_sig_type Nothing skol_info sig_ty (TheKind liftedTypeKind)
        ; emitImplication implic
        ; return ty }
        -- Do not zonk-to-Type, nor perform a validity check
@@ -446,10 +446,10 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
        ; skol_info <- mkSkolemInfo skol_info
           -- Generalise here: see Note [Kind generalisation]
-       ; let allow_retained = case ctxt of
-               FunSigCtxt{} -> True
-               _ -> False
-       ; (implic, ty) <- tc_lhs_sig_type allow_retained skol_info sig_ty (expectedKindInCtxt ctxt)
+       ; let retained_name = case ctxt of
+               FunSigCtxt name _ -> Just name
+               _ -> Nothing
+       ; (implic, ty) <- tc_lhs_sig_type retained_name skol_info sig_ty (expectedKindInCtxt ctxt)
 
        -- Float out constraints, failing fast if not possible
        -- See Note [Failure in local type signatures] in GHC.Tc.Solver
@@ -463,7 +463,7 @@ tcHsSigType ctxt sig_ty
   where
     skol_info = SigTypeSkol ctxt
 
-tc_lhs_sig_type :: Bool -> SkolemInfo -> LHsSigType GhcRn
+tc_lhs_sig_type :: Maybe Name -> SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Implication, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
@@ -471,7 +471,7 @@ tc_lhs_sig_type :: Bool -> SkolemInfo -> LHsSigType GhcRn
 -- This will never emit constraints, as it uses solveEqualities internally.
 -- No validity checking or zonking
 -- Returns also an implication for the unsolved constraints
-tc_lhs_sig_type allow_retained skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
+tc_lhs_sig_type retained_name skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
                                                    , sig_body = hs_ty })) ctxt_kind
   = setSrcSpanA loc $
     do { (tc_lvl, wanted, (exp_kind, (outer_bndrs, ty)))
@@ -480,8 +480,9 @@ tc_lhs_sig_type allow_retained skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = 
                  do { exp_kind <- newExpectedKind ctxt_kind
                           -- See Note [Escaping kind in type signatures]
                     ; stuff <- tcOuterTKBndrs skol_info hs_outer_bndrs $
-                               (if allow_retained then tcCheckRetainedSigType
-                                                  else tcCheckLHsType) hs_ty exp_kind
+                               (case retained_name of
+                                  Just name -> tcCheckRetainedSigType name
+                                  Nothing -> tcCheckLHsType) hs_ty exp_kind
                     ; return (exp_kind, stuff) }
 
        -- Default any unconstrained variables free in the kind
@@ -548,15 +549,16 @@ tcRetainedAmbientIndices invalid_reason hs_ty
 
 -- | Check retained telescopes in function positions of a complete signature.
 -- See Note [Higher-order retained signatures].
-tcCheckRetainedSigType :: LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckRetainedSigType hs_ty kind
+tcCheckRetainedSigType :: Name -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckRetainedSigType name hs_ty kind
   = do { indices <- tcRetainedAmbientIndices RetainedLocalSignatureIndex hs_ty
-       ; tcCheckRetainedType (typeLevelMode { mode_indices = indices }) hs_ty kind }
+       ; tcCheckRetainedType (isInternalName name)
+           (typeLevelMode { mode_indices = indices }) hs_ty kind }
 
 -- | Check a retained type without changing the caller's index environment.
 -- See Note [Retained Pi type arguments].
-tcCheckRetainedType :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckRetainedType = go
+tcCheckRetainedType :: Bool -> TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckRetainedType allow_function = go
   where
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
@@ -588,9 +590,11 @@ tcCheckRetainedType = go
               HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
                 do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
                    ; domain_ty <- liftZonkM $ zonkTcType domain_ty
-                   ; unless (isNativeIndexType domain_ty) $
+                   ; unless (isNativeRetainedBinderType domain_ty) $
                        failWithTc $ TcRnRetainedQuantificationError
                                       (RetainedUnsupportedDomain domain_ty)
+                   ; unless (allow_function || isNativeIndexType domain_ty) $
+                       failWithTc $ TcRnRetainedQuantificationError RetainedFunctionSignature
                    ; let index = mkLocalId name ManyTy domain_ty
                          mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
                    ; body_ty <- check_bndrs mode' rest
@@ -685,7 +689,13 @@ Names become TermVarTy. Ordinary term names still use the normal rejection
 path in tcTyVar. Check each binder domain before extending this environment.
 Then check the next binder and the body in the extended environment. The
 domain is a value type, so its annotation does not require KindSignatures.
-It must satisfy isNativeIndexType. Each runtime binder has multiplicity Many.
+It must satisfy isNativeRetainedBinderType. Each runtime binder has multiplicity
+Many. A function domain requires a complete local value signature. Carry that
+permission privately from the signature Name. Other formation paths do not gain
+it. Check before mkDepFunTy can remove a vacuous binder. Register a function
+Id only for dedicated call-head lookup; tcTyVar still rejects bare function
+indices. Retained constructor fields keep their scalar-domain check.
+See Note [Function-valued retained binders] in GHC.Core.Type.
 The ordinary outer-forall checker scopes erased type variables around the
 whole telescope. The result has kind Type. Retained binders in other type
 positions use Note [Higher-order retained signatures]. Inner foralls and
@@ -735,8 +745,9 @@ See docs/dependent-haskell/REFERENCES.md#explicit-higher-order-arguments.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained function is a value type of kind Type. A checked type argument can
 therefore contain a supported Pi, including an operand of a type equality.
-Use tcCheckRetainedType with the caller's mode. Reconstructing the signature
-mode would lose ambient runtime indices and the current wildcard policy.
+Use tcCheckRetainedType with the caller's mode and no local function permission.
+Reconstructing the signature mode would lose ambient runtime indices and the
+current wildcard policy.
 Each telescope extends only its body's environment. Check its closed domain,
 Many multiplicity, body kind and staging with the existing signature rules.
 Keep the original source span when entering this checker through tcHsType.
@@ -1426,7 +1437,7 @@ tcHsType mode ty@HsForEachTy{} exp_kind
   | TypeLevel <- mode_tyki mode
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
        ; unless experimental $ failWithTc TcRnRetainedQuantificationNotImplemented
-       ; ty' <- tcCheckRetainedType mode (noLocA ty) liftedTypeKind
+       ; ty' <- tcCheckRetainedType False mode (noLocA ty) liftedTypeKind
        ; checkExpKind ty ty' liftedTypeKind exp_kind }
   | otherwise
   = failWithTc TcRnRetainedQuantificationNotImplemented

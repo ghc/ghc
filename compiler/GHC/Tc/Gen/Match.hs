@@ -65,7 +65,7 @@ import GHC.Core ( Expr(Var) )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind )
+                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
 import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon )
@@ -92,7 +92,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
-import GHC.Types.Var ( EvVar, varType, isCoVar )
+import GHC.Types.Var ( EvVar, varType, isCoVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
@@ -170,6 +170,10 @@ tcRetainedMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> HsMatchContextRn
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
                   -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
 tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
+  | has_function_binder ty
+  , not (one_variable_equation matches)
+  = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionPatterns
+  | otherwise
   = case unLoc (mg_alts matches) of
       [L _ (Match { m_pats = L _ pats })]
         | not (first_retained_constructor pats) ->
@@ -187,6 +191,31 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
         | otherwise -> failWithTc $
             TcRnRetainedQuantificationError RetainedConstructorCoverage
   where
+    -- Function binders have no constructor-pattern rule. Keep the existing
+    -- scalar constructor path unchanged.
+    -- See Note [Function-valued retained binders] in GHC.Core.Type.
+    has_function_binder :: Type -> Bool
+    has_function_binder ty = case coreFullView ty of
+      DepFunTy binder body -> isNativeIndexFunctionId binder || has_function_binder body
+      FunTy { ft_res = body } -> has_function_binder body
+      _ -> False
+
+    one_variable_equation :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
+    one_variable_equation (MG { mg_alts = L _ [L _ (Match { m_pats = L _ pats })] })
+      = variable_retained_patterns ty (filter isVisArgLPat pats)
+    one_variable_equation _ = False
+
+    variable_retained_patterns :: Type -> [LPat GhcRn] -> Bool
+    variable_retained_patterns _ [] = True
+    variable_retained_patterns ty (pat : pats) = case coreFullView ty of
+      DepFunTy _ body -> case unLoc pat of
+        VarPat{} -> variable_retained_patterns body pats
+        _ -> False
+      FunTy { ft_af = af, ft_res = body }
+        | isVisibleFunArg af -> variable_retained_patterns body pats
+        | otherwise -> variable_retained_patterns body (pat : pats)
+      _ -> False
+
     first_retained_constructor pats
       | DepFunTy{} <- coreFullView ty
       = case filter isVisArgLPat pats of

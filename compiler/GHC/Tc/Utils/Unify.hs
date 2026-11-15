@@ -3726,7 +3726,7 @@ tcRetainedIndexCoercion index_ty occurs branch_co original_ty
                  <*> abstract_index template_ty arg
                  <*> abstract_index template_ty res
     abstract_index template_ty (DepFunTy binder body)
-      | isNativeIndexId binder
+      | isNativeRetainedBinder binder
       , not (occurs (varType binder))
       , typeKind body `eqType` liftedTypeKind
       = mkDepFunTy binder <$> abstract_index template_ty body
@@ -3770,9 +3770,12 @@ Checking an existing Given is different from assigning a metavariable.
 For a Given with a type-variable LHS and native syntax in its RHS,
 checkTypeEqNoUnification enables tefTyVar_allowNativeGivenRhs. Accept an opaque
 TermVarTy only when isNativeIndexId validates its closed unrestricted domain.
-For DepFunTy, require a valid binder and a lifted body. Recurse through the
-body with the same flags and wrap its reduction with mkDepFunRedn. This keeps
-the ordinary occurs and coercion checks. A reflexive shortcut would miss
+For DepFunTy, require a valid retained binder and a lifted body. Function
+binders stay in call-head slots under the same fixed domain.
+See Note [Function-valued retained binders] in GHC.Core.Type.
+Recurse through the body
+with the same flags and wrap its reduction with mkDepFunRedn. This keeps the
+ordinary occurs and coercion checks. A reflexive shortcut would miss
 occurrences such as a ~ (foreach n -> Vec a n). The binder scopes the complete
 body reduction. Do not decompose a wanted retained-function equality here.
 The same immutable check can traverse an invisible constraint arrow. Check
@@ -4527,7 +4530,7 @@ check_ty_eq_rhs flags ty
         -> return $ PuFail (cteProblem cteSkolemEscape)
       DepFunTy index body
         | native_given
-        , isNativeIndexId index
+        , isNativeRetainedBinder index
         , typeKind body `eqType` liftedTypeKind
         -> do { body_res <- check_ty_eq_rhs flags body
               ; return (mkDepFunRedn index <$> body_res) }
