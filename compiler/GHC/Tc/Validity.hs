@@ -30,6 +30,7 @@ import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe )
+import GHC.Tc.Types.TH ( ThLevel(Comp) )
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe, tcExtendIdEnv)
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
@@ -68,7 +69,7 @@ import GHC.Types.FieldLabel (flSelector)
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName
+import GHC.Types.Var     ( Id, VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName
                         , isId, isCoVar )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
@@ -475,7 +476,7 @@ checkValidType ctxt ty
        -- (and more complicated) errors in checkAmbiguity
        ; checkNoErrs $
          do { -- See Note [Validity of retained binders].
-              mapM_ (check_type ve . TermVarTy)
+              mapM_ (check_retained_index ve)
                 [v | v <- fvs, isId v, not (isCoVar v)]
             ; check_type ve ty
             ; checkUserTypeError ctxt ty
@@ -808,22 +809,18 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank 0 means no for-alls anywhere
 
 -- See Note [Validity of retained binders]
-check_type _ ty@(TermAppTy {})
-  = failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType ty)
+check_type ve (TermAppTy head_id arg)
+  = do { unless (isNativeIndexFunctionId head_id) $
+           failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
+       ; check_retained_index ve head_id
+       ; check_type ve arg
+       ; case nativeIndexFunctionTys_maybe head_id of
+           Just (domain, _) | typeKind arg `eqType` domain -> return ()
+           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex }
 check_type ve (TermVarTy v)
   = do { unless (isNativeIndexId v) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
-       ; unless (v `elemVarSet` ve_indices ve) $
-         do { mb_thing <- tcLookupLcl_maybe (getName v)
-            ; case mb_thing of
-                Just (ATcId { tct_id = v' }) ->
-                  do { binding <- liftZonkM (zonkId v')
-                     ; unless (v == binding && isNativeIndexId binding
-                               && eqType (varType v) (varType binding)) $
-                         failWithTc $ TcRnRetainedQuantificationError
-                                        (RetainedIndexOutOfScope v) }
-                _ -> failWithTc $ TcRnRetainedQuantificationError
-                                   (RetainedIndexOutOfScope v) } }
+       ; check_retained_index ve v }
 check_type ve (DepFunTy v body)
   = do { unless (isNativeIndexId v && not (v `elemVarSet` ve_indices ve)) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
@@ -919,6 +916,29 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
 check_type _ ty@(ForAllTy {}) = pprPanic "check_type" (ppr ty)
 check_type _ ty@(CoercionTy {}) = pprPanic "check_type" (ppr ty)
 
+-- | Check a runtime dependency against its actual lexical binding.
+-- See Note [Validity of retained binders].
+check_retained_index :: ValidityEnv -> Id -> TcM ()
+check_retained_index ve v
+  = do { unless (eligible v) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
+       ; level <- getThLevel
+       ; case level of
+           Comp -> return ()
+           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
+       ; unless (isNativeIndexId v && v `elemVarSet` ve_indices ve) $
+         do { mb_thing <- tcLookupLcl_maybe (getName v)
+            ; case mb_thing of
+                Just (ATcId { tct_id = v' }) ->
+                  do { binding <- liftZonkM (zonkId v')
+                     ; unless (v == binding && eligible binding
+                               && eqType (varType v) (varType binding)) out_of_scope }
+                _ -> out_of_scope } }
+  where
+    eligible index = isNativeIndexId index
+                  || (not (isExternalName (getName index)) && isNativeIndexFunctionId index)
+    out_of_scope = failWithTc $ TcRnRetainedQuantificationError (RetainedIndexOutOfScope v)
+
 {- Note [Validity of retained binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained binder introduces a value argument. Use the ordinary function
@@ -939,6 +959,13 @@ Those can contain runtime indices, including in an inferred local type.
 Reuse the deep free-variable list already needed for tidying. It excludes
 properly bound retained indices and follows kind and coercion metadata.
 Exclude CoVars: these Ids are erased evidence, not runtime indices.
+The deep check also accepts an eligible lexical opaque-call head. The
+structural check permits that Id only as a TermAppTy head, not TermVarTy.
+Check the symbolic argument at the head's declared domain. A retained Pi
+still binds only a scalar index. A function head must therefore resolve to
+an actual lexical binding; the retained-binder scope cannot introduce it.
+Keep both forms outside quotations. See Note [Source opaque call indices]
+in GHC.Tc.Gen.HsType.
 
 The dependent scope follows the function types described in
 docs/dependent-haskell/REFERENCES.md#agda-provenance. This check does not

@@ -2799,18 +2799,21 @@ tcRetainedInstScope tys
        ; global_env <- tcg_type_env <$> getGblEnv
        ; let current_binding v
                = case lookupNameEnv local_env (getName v) of
-                   Just (ATcId { tct_id = local_id }) -> Just local_id
+                   Just (ATcId { tct_id = local_id }) -> Just (True, local_id)
                    Just _ -> Nothing
                    Nothing -> case lookupTypeEnv global_env (getName v) of
-                     Just (AnId module_id) -> Just module_id
+                     Just (AnId module_id) -> Just (False, module_id)
                      _ -> Nothing
              valid_runtime_id v
                | not (isId v) = return True
-               | Just binding <- current_binding v
+               | Just (lexical, binding) <- current_binding v
                = do { occurrence <- liftZonkM (zonkId v)
                     ; binding <- liftZonkM (zonkId binding)
                     ; return (occurrence == binding
-                              && isNativeIndexId occurrence && isNativeIndexId binding
+                              && ((isNativeIndexId occurrence && isNativeIndexId binding)
+                                  || (lexical && not (isExternalName (getName occurrence))
+                                      && isNativeIndexFunctionId occurrence
+                                      && isNativeIndexFunctionId binding))
                               && eqType (varType occurrence) (varType binding)
                               && isManyTy (idMult occurrence) && isManyTy (idMult binding)) }
                | otherwise = return False
@@ -2832,6 +2835,13 @@ example, evaluate (sameNat bottomLength Z) and PackVec bottomLength leftVector
 need immutable instantiation at the actual bottomLength index. Checking only
 the local environment would reject that binding and fall back to a forbidden
 native meta-variable fill.
+
+An opaque call can also depend on an eligible ordinary function head. Admit
+that head only from the lexical environment. Keep the existing module lookup
+for scalar indices. Zonk both head occurrences without changing their Names,
+then check their closed ordinary Many arrows. This does not admit a bare
+function as a scalar index or extend retained runtime argument syntax. See
+Note [Source opaque call indices] in GHC.Tc.Gen.HsType.
 
 Look in the local environment first, then the existing module type environment.
 Do not load interfaces for a missing or stale name. Normalize both the index

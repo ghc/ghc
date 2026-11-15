@@ -311,6 +311,12 @@ dsExpr e@(XExpr ext_expr_tc)
 
       ExpandedThingTc (HSE _ e) -> dsLExpr e
 
+      -- See Note [Checked opaque case alias] in GHC.Hs.Expr.
+      NativeCaseAlias scrut value proof result_ty body
+        -> do { scrut' <- dsLExpr scrut
+              ; body' <- dsLExpr body
+              ; return (Case scrut' value result_ty [Alt DEFAULT [proof] body']) }
+
       -- Hpc Support
       HsTick tickish e -> do
         e' <- dsLExpr e

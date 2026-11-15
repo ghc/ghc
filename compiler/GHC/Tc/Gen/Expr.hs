@@ -41,6 +41,7 @@ import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcRetainedCase
+                       , tcRetainedCallCase
                        , tcGRHSNE, tcDoStmts )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Tc.Zonk.TcType
@@ -65,6 +66,7 @@ import GHC.Core.DataCon
 import GHC.Core.Class(classTyCon)
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep (Type(TermAppTy, TermVarTy))
 import GHC.Core.Coercion
 import GHC.Core.Predicate( decomposeIPPred )
 
@@ -571,6 +573,12 @@ tcExpr (HsCase ctxt scrut matches) res_ty
         ; retained <- case unLoc (stripParensLHsExpr scrut') of
             HsVar _ (L _ index) | dependent, isNativeIndexId index ->
               tcRetainedCase index matches res_ty
+            _ | dependent, Just call_index <- checkedNativeCallIndex scrut' scrut_ty ->
+              do { refined <- tcRetainedCallCase call_index scrut' matches res_ty
+                 ; let preserve_origin expr = XExpr (ExpandedThingTc
+                         (HSE { hse_ctxt = ExprCtxt (HsCase ctxt scrut matches)
+                              , hse_exp = noLocA expr }))
+                 ; return (fmap preserve_origin refined) }
             _ -> return Nothing
         ; case retained of
             Just expr -> return expr
@@ -835,6 +843,20 @@ tcExpr e res_ty
        ; case mb_hse of
            Just hse -> tcHsExpansion hse res_ty
            Nothing  -> pprPanic "tcExpr: unhandled case:" (ppr e) }
+
+-- | Classify an opaque call after ordinary expression and usage checking.
+-- See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+checkedNativeCallIndex :: LHsExpr GhcTc -> Type -> Maybe Type
+checkedNativeCallIndex expr result_ty
+  | HsApp _ fun arg <- unLoc (stripParensLHsExpr expr)
+  , HsVar _ (L _ head_id) <- unLoc (stripParensLHsExpr fun)
+  , HsVar _ (L _ arg_id) <- unLoc (stripParensLHsExpr arg)
+  , Just (domain, codomain) <- nativeIndexFunctionTys_maybe head_id
+  , isNativeIndexId arg_id
+  , eqType domain (varType arg_id)
+  , eqType codomain result_ty
+  = Just (TermAppTy head_id (TermVarTy arg_id))
+  | otherwise = Nothing
 
 {-
 ************************************************************************

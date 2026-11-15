@@ -5340,6 +5340,8 @@ data RetainedQuantificationError
   | RetainedContextPattern
   | RetainedResultWrapper
   | RetainedIndexExpression
+  | RetainedCallIndex
+  | RetainedCallInstrumentation
   | RetainedIndexLambdaStrict
   | RetainedLocalSignatureIndex
   | RetainedTypeArgumentIndex

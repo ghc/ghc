@@ -263,6 +263,10 @@ The local reader environment already contains every binder in the current
 binding group. Reject those Names instead of capturing a forward reference or
 an outer Name hidden by one of them. Do not look in the global reader environment.
 The typechecker checks the actual local Id's domain, multiplicity and scope.
+The same alias mechanism preserves a lexical function head in f n. It does
+not classify that Name as a type variable or make a bare function an index.
+The typechecker checks the complete call before ordinary type application.
+See Note [Source opaque call indices] in GHC.Tc.Gen.HsType.
 
 Do not alias named wildcards. If a signature needs a new alias, reject its
 partial type at a wildcard before installing aliases. Keep capture outside

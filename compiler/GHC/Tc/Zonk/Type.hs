@@ -1093,6 +1093,16 @@ zonkExpr (XExpr (ExpandedThingTc (HSE thing e)))
   = do e' <- zonkLExpr e
        return $ XExpr (ExpandedThingTc (HSE thing e'))
 
+-- See Note [Checked opaque case alias] in GHC.Hs.Expr.
+zonkExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
+  = do { scrut' <- zonkLExpr scrut
+       ; result_ty' <- zonkTcTypeToTypeX result_ty
+       ; runZonkBndrT (do { value' <- zonkIdBndrX value
+                         ; proof' <- zonkEvBndrX proof
+                         ; return (value', proof') }) $ \(value', proof') ->
+         do { body' <- zonkLExpr body
+            ; return (XExpr (NativeCaseAlias scrut' value' proof' result_ty' body')) } }
+
 zonkExpr e@(XExpr (ConLikeTc {}))
   = return e
 

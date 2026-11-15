@@ -522,7 +522,8 @@ tcRetainedAmbientIndices invalid_reason hs_ty
              Just ATyVar{} -> return Nothing
              Just (ATcId { tct_id = index }) ->
                do { index <- liftZonkM (zonkId index)
-                  ; unless (not (isExternalName name) && isNativeIndexId index) invalid_index
+                  ; unless (not (isExternalName name)
+                            && (isNativeIndexId index || isNativeIndexFunctionId index)) invalid_index
                   ; level <- getThLevel
                   ; case level of
                       Comp -> return ()
@@ -604,8 +605,9 @@ for example xs :: Vec Int n under a do-bound n. The binding renamer adds a
 signature-local type lookup alias for the actual term Name. Preserve that Name
 and find its existing ATcId in the local type environment. Zonk its type and
 multiplicity without changing its Unique. Require a local unrestricted Id of
-a supported closed index domain. Do not look through a global environment or
-create a replacement Id when the local lookup fails.
+a supported closed index domain. A call head can instead have an eligible
+ordinary function type. See Note [Source opaque call indices]. Do not look
+through a global environment or create a replacement Id when lookup fails.
 
 Seed mode_indices with only the runtime Names referenced by this signature.
 Registering all ambient index Ids would activate retained forall and context
@@ -1996,11 +1998,56 @@ tcInferTyAppHead mode ty
 
 tc_app_ty :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty mode rn_ty exp_kind
+  | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- hs_fun_ty
+  , Just head_id <- lookupNameEnv (mode_indices mode) name
+  = do { (domain, result) <- case nativeIndexFunctionTys_maybe head_id of
+               Just domains -> return domains
+               Nothing -> invalid_call
+       ; arg <- case filterOut is_par hs_args of
+               [HsValArg _ arg] -> return arg
+               _ -> invalid_call
+       ; arg_ty <- tc_check_lhs_type mode arg domain
+       ; checkExpKind rn_ty (TermAppTy head_id arg_ty) result exp_kind }
+    -- See Note [Source opaque call indices].
+  where
+    is_par HsArgPar{} = True
+    is_par _ = False
+    invalid_call :: TcM a
+    invalid_call = failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
+    (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
+tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
        ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty hs_args
        ; checkExpKind rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
+
+{- Note [Source opaque call indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete local type can mention a lexical function in a saturated call,
+for example Vec Int (f n). The renamer keeps the actual term Names. Register
+eligible function heads in mode_indices along with scalar indices. Require
+the closed ordinary Many arrow accepted by nativeIndexFunctionTys_maybe.
+Keep function-head eligibility separate from scalar-index eligibility.
+
+Recognize the registered head before tcInferTyApps. Check its sole value
+argument at the declared domain, then form TermAppTy at the result domain.
+Ignore parentheses, but reject kind arguments and other arities. A bare
+function head cannot form TermVarTy. Never send a registered runtime head
+through ordinary matchable AppTy formation. Erased type variables keep their
+ordinary application path and their existing lookup precedence.
+
+This rule checks a type. It does not admit f n as a retained runtime argument
+or evaluate the call. Strict source cases use the separate checked call
+refinement path. Validity checks the actual lexical binding and argument kind.
+No type metavariable receives a runtime index.
+
+Agda v2.8.0 checks an application argument before substituting it into the
+codomain. See Rules/Application.hs 774--808, blob
+82ba94ac864d19b947d4c92b9af252b0fe81347a. This is prior art for domain-directed
+checking. The fixed domains, Many restriction and FC node are GHC choices.
+See docs/dependent-haskell/REFERENCES.md for the pinned source record.
+-}
 
 ---------------------------
 -- | Apply a type of a given kind to a list of arguments. This instantiates
@@ -2478,7 +2525,9 @@ tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- This does not instantiate. See Note [Do not always instantiate eagerly in types]
 tcTyVar mode name
   | Just index <- lookupNameEnv (mode_indices mode) name
-  = pure (TermVarTy index, varType index)
+  = if isNativeIndexId index
+    then pure (TermVarTy index, varType index)
+    else failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
 tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name

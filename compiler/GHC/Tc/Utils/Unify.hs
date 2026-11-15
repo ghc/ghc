@@ -25,7 +25,7 @@ module GHC.Tc.Utils.Unify (
 
   -- Various unifications
   uType, unifyType, unifyKind, unifyInvisibleType,
-  tcRetainedCoercion,
+  tcRetainedCoercion, tcRetainedCallCoercion, retainedCallOccurs,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
   mightEqualLater,
@@ -3640,18 +3640,8 @@ tcRetainedCoercion index branch_co original_ty
                  && is_constructor (coercionRKind branch_co)) $
            pprPanic "tcRetainedCoercion: invalid branch proof"
              (ppr index $$ ppr branch_co $$ ppr original_ty)
-       ; ty <- liftZonkM $ zonkTcType original_ty
-       ; name <- newSysName (mkTyVarOcc "retained")
-       ; let template = mkTyVar name (varType index)
-       ; template_ty <- abstract_index (mkTyVarTy template) ty
-       ; let co = liftCoSubstWith Nominal [template] [branch_co] template_ty
-             rhs = substTyWith [template] [coercionRKind branch_co] template_ty
-       ; unless (coercionRole co == Nominal
-                 && coercionLKind co `eqType` ty
-                 && coercionRKind co `eqType` rhs) $
-           pprPanic "tcRetainedCoercion: invalid lifted proof"
-             (ppr co $$ ppr ty $$ ppr rhs)
-       ; return co }
+       ; tcRetainedIndexCoercion (TermVarTy index)
+           (anyFreeVarsOfType (== index)) branch_co original_ty }
   where
     is_constructor ty
       | TyConApp tc _ <- coreFullView ty
@@ -3660,11 +3650,69 @@ tcRetainedCoercion index branch_co original_ty
         && typeKind ty `eqType` varType index
       | otherwise = False
 
+-- | Find an exact free call index. Unsupported proof and kind dependencies
+-- are conservative candidates; the transport checker rejects these forms.
+retainedCallOccurs :: Type -> TcType -> Bool
+retainedCallOccurs call_ty = go
+  where
+    dependencies = filter (\v -> isId v && not (isCoVar v))
+                     (tyCoVarsOfTypeList call_ty)
+    go ty
+      | not (all (\v -> anyFreeVarsOfType (== v) ty) dependencies) = False
+      | call_ty `eqType` ty = True
+      | Just expanded <- coreView ty = go expanded
+    go (TyConApp _ args) = any go args
+    go (AppTy fun arg) = go fun || go arg
+    go (FunTy _ mult arg res) = any go [mult, arg, res]
+    go (DepFunTy binder body)
+      = go (varType binder) || (binder `notElem` dependencies && go body)
+    go (ForAllTy (Bndr binder _) body) = go (varType binder) || go body
+    go (TermAppTy _ arg) = go arg
+    go (CastTy ty co) = go ty || proof_depends co
+    go (CoercionTy co) = proof_depends co
+    go TyVarTy{} = True  -- A dependency in the variable's kind is unsupported.
+    go _ = False
+    proof_depends co = all (\v -> anyFreeVarsOfCo (== v) co) dependencies
+
+-- | Transport an exact checked call along its strict-case alias proof.
+-- See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+tcRetainedCallCoercion :: Type -> CoercionN -> TcType -> TcM CoercionN
+tcRetainedCallCoercion call_ty branch_co original_ty
+  = do { unless (valid_call call_ty
+                 && coercionRole branch_co == Nominal
+                 && coercionLKind branch_co `eqType` call_ty
+                 && typeKind (coercionRKind branch_co) `eqType` typeKind call_ty) $
+           pprPanic "tcRetainedCallCoercion: invalid alias proof"
+             (ppr call_ty $$ ppr branch_co $$ ppr original_ty)
+       ; tcRetainedIndexCoercion call_ty (retainedCallOccurs call_ty)
+           branch_co original_ty }
+  where
+    valid_call (TermAppTy fun arg)
+      | Just (domain, _) <- nativeIndexFunctionTys_maybe fun
+      = typeKind arg `eqType` domain
+    valid_call _ = False
+
+-- | Abstract one checked index, then use ordinary nominal FC lifting.
+tcRetainedIndexCoercion :: Type -> (TcType -> Bool) -> CoercionN
+                       -> TcType -> TcM CoercionN
+tcRetainedIndexCoercion index_ty occurs branch_co original_ty
+  = do { ty <- liftZonkM $ zonkTcType original_ty
+       ; name <- newSysName (mkTyVarOcc "retained")
+       ; let template = mkTyVar name (typeKind index_ty)
+       ; template_ty <- abstract_index (mkTyVarTy template) ty
+       ; let co = liftCoSubstWith Nominal [template] [branch_co] template_ty
+             rhs = substTyWith [template] [coercionRKind branch_co] template_ty
+       ; unless (coercionRole co == Nominal
+                 && coercionLKind co `eqType` ty
+                 && coercionRKind co `eqType` rhs) $
+           pprPanic "tcRetainedIndexCoercion: invalid lifted proof"
+             (ppr co $$ ppr ty $$ ppr rhs)
+       ; return co }
+  where
     abstract_index template_ty ty
-      | not (anyFreeVarsOfType (== index) ty) = return ty
+      | not (occurs ty) = return ty
+      | index_ty `eqType` ty = return template_ty
       | Just ty' <- coreView ty = abstract_index template_ty ty'
-    abstract_index template_ty (TermVarTy v)
-      | v == index = return template_ty
     abstract_index template_ty (TermAppTy f arg)
       | isNativeIndexFunctionId f
       = TermAppTy f <$> abstract_index template_ty arg
@@ -3679,7 +3727,7 @@ tcRetainedCoercion index branch_co original_ty
                  <*> abstract_index template_ty res
     abstract_index template_ty (DepFunTy binder body)
       | isNativeIndexId binder
-      , not (anyFreeVarsOfType (== index) (varType binder))
+      , not (occurs (varType binder))
       , typeKind body `eqType` liftedTypeKind
       = mkDepFunTy binder <$> abstract_index template_ty body
     abstract_index _ _

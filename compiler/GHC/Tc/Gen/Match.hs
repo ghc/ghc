@@ -17,6 +17,7 @@ module GHC.Tc.Gen.Match
    ( tcFunBindMatches
    , tcCaseMatches
    , tcRetainedCase
+   , tcRetainedCallCase
    , tcLambdaMatches
    , tcMatches
    , tcGRHSNE
@@ -61,10 +62,10 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var) )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind )
+                     , anyFreeVarsOfType, typeKind, eqType )
 import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
 import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
@@ -74,6 +75,10 @@ import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Make.BigTuple
 
 import GHC.Hs
+
+import GHC.Driver.Config.HsToCore.Ticks ( initTicksConfig )
+import GHC.Driver.Session ( getDynFlags, sccProfilingEnabled )
+import GHC.HsToCore.Ticks ( TicksConfig(ticks_passes) )
 
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
@@ -307,6 +312,187 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
     case_error :: TcM a
     case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
 tcRetainedCase _ _ _ = return Nothing
+
+-- | Refine a checked opaque call through a strict alias and a retained motive.
+-- See Note [Source opaque call refinement].
+tcRetainedCallCase :: Type -> LHsExpr GhcTc
+                   -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
+                   -> TcM (Maybe (HsExpr GhcTc))
+tcRetainedCallCase call_ty@(TermAppTy fun (TermVarTy arg)) scrut
+                  matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
+  = do { captures <- fmap catMaybes $ mapM capture
+                       (nameSetElemsStable (retainedCaseNames matches))
+       ; givens <- filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; if null captures && null givens && not (depends result_ty)
+            && not (has_annotation matches)
+         then return Nothing
+         else setSrcSpanA loc $
+           do { when (retainedCaseHasQuote matches) $
+                  failWithTc (TcRnRetainedQuantificationError RetainedCaseQuotation)
+              ; unless (typeKind result_ty `eqType` liftedTypeKind) $
+                  failWithTc (TcRnRetainedQuantificationError (RetainedResultKind result_ty))
+              ; constructors <- mapM constructor alternatives
+              ; let domain_cons = case splitTyConApp_maybe (coreFullView domain) of
+                      Just (tc, []) -> tyConDataCons tc
+                      _ -> []
+                    cons = map fst constructors
+              ; unless (not (null cons) && cons `equalLength` domain_cons
+                        && all (`elem` cons) domain_cons) case_error
+              ; dflags <- getDynFlags
+              ; unless (null (ticks_passes (initTicksConfig dflags))
+                        && not (sccProfilingEnabled dflags)) $
+                  failWithTc (TcRnRetainedQuantificationError RetainedCallInstrumentation)
+              ; alias <- newSysLocalId (fsLit "call_index") ManyTy domain
+              ; proof <- newEvVar (mkNomEqPred (TermVarTy alias) call_ty)
+              ; let alias_co = mkSymCo (mkCoVarCo proof)
+              ; result_co <- tcRetainedCallCoercion call_ty alias_co result_ty
+              ; capture_cos <- mapM (tcRetainedCallCoercion call_ty alias_co . varType) captures
+              ; given_cos <- mapM (tcRetainedCallCoercion call_ty alias_co . varType) givens
+              ; index <- newSysLocalId (fsLit "call_motive") ManyTy domain
+              ; let in_scope = mkInScopeSetList
+                      (alias : index : fun : arg : tyCoVarsOfTypesList
+                        (result_ty : map varType (fun : arg : givens ++ captures)))
+                    subst = Subst.mkIdSubst in_scope (unitVarEnv alias (Var index))
+                    generalize = Subst.substTy subst . pSnd . coercionKind
+              ; dictionaries <- newEvVars (map generalize given_cos)
+              ; names <- mapM (newSysName . nameOccName . idName) captures
+              ; let capture_names = zip (map idName captures) names
+                    add_arguments (L match_loc match@(Match { m_pats = L pats_loc pats }), (con, fields))
+                      = let extra = map (noLocA . VarPat noExtField . noLocA) names
+                            rewritten = renameRetainedMatch capture_names
+                                          (rewrite_call con fields match)
+                        in L match_loc (rewritten { m_ctxt = LamAlt LamSingle
+                                                  , m_pats = L pats_loc (pats ++ extra) })
+                    matches' = matches { mg_alts = L loc (map add_arguments (zip alternatives constructors)) }
+                    dictionary_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) dictionaries
+                    capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize) capture_cos
+                    argument_plan = map RetainedConDict dictionaries
+                                    ++ map (const RetainedConValue) captures
+              ; checked <- tcRetainedConMatches index [] (dictionary_tys ++ capture_tys)
+                             argument_plan (mkCheckExpType (generalize result_co)) matches'
+              ; strict <- xoptM LangExt.Strict
+              ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
+              ; let protect_arguments :: MatchGroup GhcTc (LHsExpr GhcTc)
+                                        -> MatchGroup GhcTc (LHsExpr GhcTc)
+                    protect_arguments group@(MG { mg_alts = L group_loc rows })
+                      | strict = group { mg_alts = L group_loc (map protect_row rows) }
+                      | otherwise = group
+                    protect_row :: LMatch GhcTc (LHsExpr GhcTc)
+                                -> LMatch GhcTc (LHsExpr GhcTc)
+                    protect_row (L row_loc row@(Match { m_pats = L pats_loc (first : rest) }))
+                      = L row_loc (row { m_pats = L pats_loc
+                          (first : map (\pat -> noLocA (LazyPat noExtField pat)) rest) })
+                    protect_row row = row
+                    motive = HsLam noAnn LamSingle (protect_arguments checked)
+                    alias_arg = noLocA (HsVar noExtField (noLocA alias))
+                    evidence = zipWith (\given co ->
+                      if isCoVar given
+                      then evCoercion (mkCoCast (mkCoVarCo given) (mkSubCo co))
+                      else evCast (Var given) (mkSubCo co)) givens given_cos
+                    with_evidence = mkHsWrap (mkWpEvApps evidence)
+                                      (HsApp noExtField (noLocA motive) alias_arg)
+                    arguments = zipWith (\var co -> mkLHsWrapCo co
+                                  (noLocA (HsVar noExtField (noLocA var)))) captures capture_cos
+                    body = foldl' (\f a -> HsApp noExtField (noLocA f) a) with_evidence arguments
+                    transported = mkHsWrapCo (mkSymCo result_co) body
+              ; return (Just (XExpr (NativeCaseAlias scrut alias proof result_ty
+                                      (noLocA transported)))) } }
+  where
+    domain = typeKind call_ty
+    depends = retainedCallOccurs call_ty
+    capture name
+      = do { thing <- tcLookupLcl_maybe name
+           ; case thing of
+               Just (ATcId { tct_id = var })
+                 | isLocalId var, not (isCoVar var), depends (varType var) ->
+                   do { unless (isManyTy (idMult var)) $
+                          failWithTc (TcRnRetainedQuantificationError (RetainedPatternType (varType var)))
+                      ; return (Just var) }
+               _ -> return Nothing }
+    constructor (L match_loc (Match { m_pats = L _ [pat]
+                                   , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
+      = setSrcSpanA match_loc $
+        do { unless (case_pattern pat) case_error
+           ; con <- tcRetainedCon domain pat
+           ; maybe case_error return con }
+    constructor (L match_loc _) = setSrcSpanA match_loc case_error
+    case_pattern (L _ (ParPat _ pat)) = case_pattern pat
+    case_pattern (L _ ConPat { pat_args = PrefixCon _ fields })
+      = all (\(L _ pat) -> case pat of VarPat{} -> True; _ -> False) fields
+    case_pattern _ = False
+    case_error :: TcM a
+    case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
+
+    is_call :: HsType GhcRn -> Bool
+    is_call (HsParTy _ ty) = is_call (unLoc ty)
+    is_call (HsAppTy _ head_ty arg_ty)
+      = is_name (idName fun) (unLoc head_ty) && is_name (idName arg) (unLoc arg_ty)
+    is_call _ = False
+    is_name :: Name -> HsType GhcRn -> Bool
+    is_name name (HsParTy _ ty) = is_name name (unLoc ty)
+    is_name name (HsTyVar _ NotPromoted (L _ (WithUserRdr _ actual))) = name == actual
+    is_name _ _ = False
+
+    has_annotation :: Data a => a -> Bool
+    has_annotation thing
+      | Just HsTypedBracket{} <- (cast thing :: Maybe (HsExpr GhcRn)) = False
+      | Just HsUntypedBracket{} <- (cast thing :: Maybe (HsExpr GhcRn)) = False
+      | Just ty <- (cast thing :: Maybe (HsType GhcRn)), is_call ty = True
+      | Just _ <- (cast thing :: Maybe Name) = False
+      | Just _ <- (cast thing :: Maybe NameSet) = False
+      | Just _ <- (cast thing :: Maybe Type) = False
+      | otherwise = or (gmapQ has_annotation thing)
+
+    rewrite_call :: Data a => DataCon -> [Id] -> a -> a
+    rewrite_call con fields = go
+      where
+        con_type :: HsType GhcRn
+        con_type = foldl' (\f a -> HsAppTy noExtField (noLocA f) a)
+          (HsTyVar noAnn IsPromoted (noLocA (noUserRdr (dataConName con))))
+          (map (noLocA . HsTyVar noAnn NotPromoted . noLocA . noUserRdr . idName) fields)
+        go :: Data b => b -> b
+        go thing
+          | Just ty <- (cast thing :: Maybe (HsType GhcRn)), is_call ty
+          = fromMaybe thing (cast con_type)
+          | Just names <- (cast thing :: Maybe NameSet)
+          , idName fun `elemNameSet` names, idName arg `elemNameSet` names
+          = fromMaybe thing (cast (names `unionNameSet`
+              mkNameSet (dataConName con : map idName fields)))
+          | Just _ <- (cast thing :: Maybe Name) = thing
+          | Just _ <- (cast thing :: Maybe Type) = thing
+          | otherwise = gmapT go thing
+tcRetainedCallCase _ _ _ _ = return Nothing
+
+{- Note [Source opaque call refinement]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked call f n has an opaque index. A constructor case can refine this
+whole index without assuming that f is injective. Keep n and every Vec n
+capture unchanged. Generalize only the exact call in the result, captures,
+and incoming evidence. Abstract it to an immutable template and lift the
+checked alias proof with ordinary nominal FC congruence.
+
+Introduce a strict alias r with q :: r ~# f n. Check the constructor rows
+with the existing retained motive checker, applied to the scalar index r.
+Transport the original captures and Givens into that motive, then transport
+its result back. Under Strict, protect only the generated capture and evidence
+patterns with LazyPat. Desugaring removes this marker instead of adding a bang.
+Keep the original constructor and field patterns unchanged.
+Replace exact call annotations in each row with its checked
+constructor type. Resolve both source Names before this replacement. Reject
+quotations before any source rewrite can change a quoted Name.
+
+Require complete, unguarded constructor rows with bare variable fields.
+A source wildcard or variable case can ignore its scrutinee in Haskell.
+Do not introduce this strict alias on that ordinary path. Reject active
+instrumentation: an inserted tick can obscure the checked runtime call.
+The dispatcher checks the original scrutinee and its usage once. It also
+keeps the original case for diagnostics with ExpandedThingTc.
+
+Agda with-abstraction supplies prior art for whole-term generalization and
+checking a helper in its dependent context. It supplies no Haskell demand
+law or FC proof. See docs/dependent-haskell/REFERENCES.md#agda-provenance
+and Note [Checked opaque case alias] in GHC.Hs.Expr.
+-}
 
 -- | Collect resolved names outside quotations and stored free-name sets.
 retainedCaseNames :: Data a => a -> NameSet
