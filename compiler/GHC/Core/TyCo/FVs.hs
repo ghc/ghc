@@ -87,6 +87,7 @@ import GHC.Utils.Misc
 import GHC.Utils.EndoOS
 
 import GHC.Data.Pair
+import GHC.Data.Maybe (orElse)
 
 import Data.Semigroup
 
