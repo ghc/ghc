@@ -65,10 +65,10 @@ import GHC.Core ( Expr(Var) )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId )
+                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeIndexId )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
-import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon )
+import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon, dataConTyCon, dataConOrigArgTys )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Utils ( applyTypeToArgs )
@@ -353,8 +353,14 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
   = do { captures <- fmap catMaybes $ mapM capture
                        (nameSetElemsStable (retainedCaseNames matches))
        ; givens <- filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
-       ; if null captures && null givens && not (depends result_ty)
-            && not (has_annotation matches)
+       ; let existing_trigger = not (null captures) || not (null givens)
+                                || depends result_ty || has_annotation matches
+       ; metadata_trigger <- if existing_trigger || retainedCaseHasQuote matches
+                             then return False
+                             else do { complete <- complete_constructor_rows
+                                     ; if complete then known_application matches
+                                       else return False }
+       ; if not (existing_trigger || metadata_trigger)
          then return Nothing
          else setSrcSpanA loc $
            do { when (retainedCaseHasQuote matches) $
@@ -488,6 +494,97 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
     call_names :: [Name]
     call_names = map getName (tyCoVarsOfTypeList call_ty)
 
+    -- | Decline unsupported ordinary cases without adding a new diagnostic.
+    complete_constructor_rows :: TcM Bool
+    complete_constructor_rows
+      = do { rows <- mapM row_constructor alternatives
+           ; let expected = case splitTyConApp_maybe (coreFullView domain) of
+                   Just (tc, []) -> tyConDataCons tc
+                   _ -> []
+           ; return $ case sequence rows of
+               Just cons -> not (null cons) && cons `equalLength` expected
+                            && all (`elem` cons) expected
+               Nothing -> False }
+      where
+        row_constructor (L _ (Match { m_pats = L _ [pat]
+                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
+          = pattern_constructor pat
+        row_constructor _ = return Nothing
+        pattern_constructor (L _ (ParPat _ pat)) = pattern_constructor pat
+        pattern_constructor (L _ (ConPat { pat_con = L _ name
+                                         , pat_args = PrefixCon _ fields }))
+          | all (\(L _ pat) -> case pat of VarPat{} -> True; _ -> False) fields
+          = do { con_like <- tcLookupConLike name
+               ; return $ case con_like of
+                   RealDataCon con
+                     | mkTyConTy (dataConTyCon con) `eqType` domain
+                     , fields `equalLength` dataConOrigArgTys con -> Just con
+                   _ -> Nothing }
+        pattern_constructor _ = return Nothing
+
+    -- | Inspect existing checked worker types without elaborating source values.
+    known_application :: Data a => a -> TcM Bool
+    known_application thing
+      | Just expr <- (cast thing :: Maybe (HsExpr GhcRn))
+      = case expr of
+          HsTypedBracket{} -> return False
+          HsUntypedBracket{} -> return False
+          HsTypedSplice{} -> return False
+          HsUntypedSplice{} -> return False
+          XExpr{} -> return False
+          HsApp{} -> do { found <- named_application expr
+                        ; if found then return True else children }
+          _ -> children
+      | Just _ <- (cast thing :: Maybe Name) = return False
+      | Just _ <- (cast thing :: Maybe NameSet) = return False
+      | Just _ <- (cast thing :: Maybe Type) = return False
+      | otherwise = children
+      where
+        children = or <$> sequence (gmapQ known_application thing)
+
+    -- | Open only the existing retained telescope of a known local worker.
+    named_application :: HsExpr GhcRn -> TcM Bool
+    named_application expr
+      = case spine [] expr of
+          Just (name, args) -> do
+            { thing <- tcLookupLcl_maybe name
+            ; case thing of
+                Just (ATcId { tct_id = worker }) -> consume False (varType worker) args
+                _ -> return False }
+          Nothing -> return False
+      where
+        -- | Read the source application without checking its arguments.
+        spine args (HsPar _ expr) = spine args (unLoc expr)
+        spine args (HsApp _ fun arg) = spine (arg : args) (unLoc fun)
+        spine args (HsVar _ (L _ (WithUserRdr _ name))) = Just (name, args)
+        spine _ _ = Nothing
+
+        -- | Substitute eligible actual Vars without allocating type choices.
+        consume consumed ty args
+          | DepFunTy binder _ <- coreFullView ty
+          = case args of
+              arg : rest -> do
+                { actual <- local_variable (unLoc arg)
+                ; case actual of
+                    Just var
+                      | (if isNativeIndexFunctionId binder
+                         then isNativeIndexFunctionId var else isNativeIndexId var)
+                      , varType var `eqType` varType binder
+                      -> consume True (applyTypeToArgs ty [Var var]) rest
+                    _ -> return False }
+              [] -> return False
+          | otherwise = return (consumed && isTauTy ty && depends ty)
+
+        -- | Use resolved lexical identities and decline unknown source locals.
+        local_variable (HsPar _ expr) = local_variable (unLoc expr)
+        local_variable (HsVar _ (L _ (WithUserRdr _ name)))
+          = do { thing <- tcLookupLcl_maybe name
+               ; return $ case thing of
+                   Just (ATcId { tct_id = var })
+                     | isLocalId var, not (isExternalName (idName var)) -> Just var
+                   _ -> Nothing }
+        local_variable _ = return Nothing
+
     has_annotation :: Data a => a -> Bool
     has_annotation thing
       | Just HsTypedBracket{} <- (cast thing :: Maybe (HsExpr GhcRn)) = False
@@ -547,6 +644,15 @@ Do not introduce this strict alias on that ordinary path. Reject active
 instrumentation: an inserted tick can obscure the checked runtime call.
 The dispatcher checks the original scrutinee and its usage once. It also
 keeps the original case for diagnostics with ExpandedThingTc.
+
+If the original activation conditions are absent, inspect only complete
+bare-constructor rows without quotations. Read an already checked local
+worker type and its bare local actual Vars. Open only leading retained
+binders with applyTypeToArgs. Require a whole tau residual with the exact
+free call index. This is metadata discovery, not argument checking. Do not
+infer types, allocate metas, collect usage, or expand splices here. Decline
+unknown workers, erased choices and unsupported source forms. Keep the
+ordinary case fallback on this path. Existing activation keeps its diagnostics.
 
 Pass an ordinary evidence parameter q_motive :: i ~# f n after the motive
 index. Create it after whole-call generalization. Apply the motive to the
