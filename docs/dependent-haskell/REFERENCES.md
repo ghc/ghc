@@ -2948,11 +2948,15 @@ The source snapshots, exact ranges, hashes and two verified Agda blobs are
 cached in `native-source-beta-source-provenance-v1`. The M39 archive and its
 Core-only evidence remain unchanged. No eta rule or general evaluator is added.
 
-## Opaque runtime function indices: unimplemented C1 comparison
+<a id="opaque-runtime-function-indices-unimplemented-c1-comparison"></a>
 
-This is future design research. Neither representation below is implemented
-or selected. Keep scalar index domains, permitted runtime function heads, and
-future domains of retained function binders as separate policies.
+## Opaque runtime function indices: C1 comparison and first kernel
+
+This comparison preceded M42. M42 selects a dedicated scoped call node for a
+bounded Core kernel. The token/family alternative remains research. Keep scalar
+index domains, permitted runtime function heads, and future domains of retained
+function binders as separate policies. Source calls and new wire forms remain
+gated. See the [Core contract](CORE.md#opaque-native-call-indices).
 
 [Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf)
 uses matchability to control equality decomposition. The read version is the
@@ -2987,11 +2991,46 @@ escape into matchable `AppTy`. A distinct checked token with a non-arrow kind
 could avoid that problem. The family and token would still need scope,
 substitution and runtime correspondence rules.
 
-A dedicated residual-call node appears smaller for the first bounded kernel.
-It must forbid inverse decomposition and preserve actual function Id scope.
+M42 uses a dedicated residual-call node for the first bounded kernel.
+It forbids inverse decomposition and preserves actual function Id scope.
 An Int-returning local test can avoid a function-domain retained binder.
 Returning an index-dependent result cannot silently use an ordinary arrow.
 Lazy naming of arbitrary calls also needs a separate rule; the existing strict
 constructor-alias case cannot serve that purpose. Exact versions, pages, source
 blobs, hashes and reading limits are in `native-next-core-function-indices-v1`.
 This comparison establishes no evaluator or combined preservation theorem.
+
+## Opaque native calls: representation, substitution and nominal congruence
+
+Agda v2.8.0 supplies the operational precedent for a neutral head with eliminations:
+[`Internal.hs`221–252](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L221-L252).
+Its scoped substitution applies a variable's stored replacement and eliminations:
+[`Substitute.hs`827–852](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L827-L852).
+These references motivate head scope and substitution. They supply neither
+inverse projection from an arbitrary call nor a proof of this GHC extension.
+D/DC forward application congruence and System DR nominal arguments supply
+separate equality precedents. Keep these roles distinct.
+
+The local cache is `_build/verification/native-neutral-calls-research-v1/`.
+Its `provenance.json` records access UTC, read ranges, URLs, hashes and reuse.
+`Internal-v2.8.0.hs` has Git blob
+`a6e0938ed369b1f0f5f0b8aa1ff3baeb9aad033b` and SHA256
+`19bd9c6dd75caaa5b8aaaf2a90dda0caa0c03ceb758f4bcd437418c0f71250fc`.
+`Substitute-v2.8.0.hs` has Git blob
+`1ef41f6d2a0223c8328984903b60dabc2a05a783` and SHA256
+`961b3e953d0eeff4370655d33b07cf81ce7837892eb263304173f0796dcd5800`.
+These two files reuse earlier verified primary-source bytes. No new fetch or
+Agda execution is claimed for that reuse. Full-file hashes do not imply
+full-file reading. The older `piApply` and `Abs` pointers concern binder beta.
+They are not the primary neutral-head reference for this increment.
+
+M42 implements a bounded Core kernel. Its owning Note is
+Note [Opaque native call indices] in `GHC.Core.TyCo.Rep`.
+Compiler `0447f8a7a199675423cd7f5fafa94567afa40114` and fixture source
+`428aa3795341e8628e258976adc6df434c17bda4` pass both-stage focused validation.
+The v7 snapshot records all 77 compiler inputs and 92 source paths.
+Source opaque-call formation and new wire encoding remain gated.
+The [M43 plan](PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented)
+pins separate Agda with-abstraction, LHS and application references.
+These support a future source elaboration. They do not justify Haskell demand
+changes or establish an FC preservation theorem.

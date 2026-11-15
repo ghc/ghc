@@ -199,6 +199,10 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   scope, multiplicity and Strict-mode boundaries. Its
   [source contract](CORE.md#bounded-source-beta-applications) preserves ordinary
   usage checking. The full C1 obligation remains open.
+  M42 adds scoped opaque call indices with independently closed scalar input
+  and result domains. It checks forward nominal congruence, conservative
+  noninjectivity, function-head substitution and actual strict-call lowering.
+  Source formation, higher-order binders and a preservation theorem remain open.
 - [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
   missing transformations incrementally, including normal simplification and
   unfolding handling. Preserve Core Lint, type preservation, runtime demand,
@@ -209,6 +213,10 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   cover scope, exact types, type-only dependencies and demand. Both stages
   preserve the 106 raw/public and 562 vector observations. Ordinary inlining,
   occurrence analysis and general unfolding handling remain gated.
+  M42 extends the checked alias and traversal rules to eligible function heads.
+  Direct CorePrep checks consume call proofs and preserve argument demand.
+  Top-level Tidy protection is implemented and reviewed. It has no separate
+  isolated execution probe.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement
   invisible retained binders and their explicit `@` overrides. Reuse inherited

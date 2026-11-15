@@ -8,11 +8,12 @@ specify the full dependent-Haskell language.
 
 ## Representation
 
-The internal `Type` datatype has two new constructors:
+The internal `Type` datatype has three new constructors:
 
 ```text
 TermVarTy b       -- The algebraic index of a runtime identifier.
 DepFunTy b result -- A retained dependent function.
+TermAppTy f arg   -- A scoped opaque runtime call index.
 ```
 
 `b` is a local non-coercion `Id`. Its type is a supported closed algebraic domain.
@@ -40,6 +41,9 @@ fields must have the same domain. Field multiplicities may be `One` or `Many`.
 This policy bounds the Core increment. It is not an Agda language restriction.
 The source checker and signature reader now use this structural policy. Nat
 source execution and signature imports pass the M9 regression checks.
+
+`TermAppTy` has a separate head policy. It does not make a function-valued
+`TermVarTy` valid. See [opaque native call indices](#opaque-native-call-indices).
 
 ## Retained constructor fields
 
@@ -1544,3 +1548,64 @@ reused-Unique capture, fallback cases and lazy demand before CorePrep.
 The source alias multiplicity boundary is unchanged. See
 Note [Restricted dependent simplification] in `GHC.Core.SimpleOpt` and the
 [M41 plan](PLAN.md#m41-checked-native-variable-aliases).
+
+## Opaque native call indices
+
+`TermAppTy f arg` records an opaque runtime call. The actual head `f` must be
+local, unrestricted and nonjoin. Its raw type and multiplicities must be closed.
+Its type must expand to an ordinary `FTF_T_T` arrow `A %Many -> B`.
+A and B are independently closed scalar native domains. They can differ.
+The argument is any scoped, well-kinded `Type :: A`. The call has kind B.
+Type formation can represent stuck family arguments and nested calls.
+
+`TermAppCo f co` supplies forward nominal congruence for the same actual head.
+Its child proof is nominal. Both child endpoints have kind A.
+The call endpoints have kind B. `mkKindCo` returns reflexivity at B.
+The smart constructor removes structurally reflexive children. It preserves
+other proof dependencies. Representational use requires ordinary `SubCo`.
+Equal call results supply no argument equality or function equality.
+Different unresolved calls remain `MaybeApart`. Call arguments are not injective.
+
+Type formation and runtime conversion have different domains.
+`exprToNativeCaseIndex` admits a strict call with an eligible variable head.
+Its argument uses the existing scalar variable, constructor and checked-beta
+grammar. The bridge does not evaluate a head or inspect its unfolding.
+`exprToNativeIndex` remains unchanged. General symbolic type arguments need
+not have a runtime representation in this subset.
+The strict case binds nominal evidence about its whole computed result.
+CorePrep preserves that evidence when it names constructor arguments.
+Forward call congruence composes the argument proof with the case proof.
+The actual call preserves function-before-argument demand and lazy fields.
+
+Head occurrences are free variables in types and coercions. Traversals preserve
+them through alpha renaming, zonking, tidying and type-map keys.
+Substitution accepts an eligible variable head with the same input and result
+domains. Composition updates head ranges. Lookup uses each stored range once.
+Capture avoidance freshens a bound head instead of capturing a free replacement.
+The pipeline retains unsupported function bindings. It rejects unsupported
+head substitution by a lambda, cast or arbitrary expression.
+Core Tidy gives supported top-level heads lazy local aliases before globalising.
+The M41 checked alias rule also removes eligible literal function-head aliases.
+Its metadata exclusions and lazy producer behavior remain in force.
+
+Function-domain retained Pi binders, source call formation, new interface wire
+forms and general lazy retained-call naming remain gated.
+`mkLamType` and Lint reject a function head that escapes in a lambda result.
+Diagnostic interface forms support printing. Binary writing and importing
+reject them. Ordinary optimization and unfolding gates remain in force.
+This kernel does not complete C1 or C2 and supplies no preservation theorem.
+
+Both compiler stages build. The existing API fixtures pass at bootstrap and
+in the self-hosted registered group. Nineteen quiet runtime invocations check
+actual proof use, mixed Bool/Nat domains, bottom order and constructor naming.
+Five use the direct SimpleOpt-to-CorePrep pipeline with input and output Lint.
+Other controls check scope, capture, substitution ranges and normalization at
+all three roles. The one-line and 37-line goldens remain unchanged.
+Top-level Tidy protection is implemented and reviewed. It has no separate
+isolated execution probe.
+
+See Note [Opaque native call indices] in `GHC.Core.TyCo.Rep` and
+Note [Opaque call arguments in CorePrep] in `GHC.CoreToStg.Prep`.
+The [M42 plan](PLAN.md#m42-scoped-opaque-function-call-indices) records measured
+results. The [source plan](PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented)
+records the next step.

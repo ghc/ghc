@@ -75,13 +75,14 @@ Last updated: 2026-11-15.
 | Core beta exposure | Immediate checked lambdas normalize in the native index bridge; capture, interface evidence, and direct CorePrep demand checks pass |
 | Source index beta | Immediate single-variable lambda applications pass ordinary checking with actual binder identity; atomic arguments, supported domains and Many multiplicity remain required; Strict rejects the new form |
 | Native variable aliases | Literal local Many aliases substitute the same eligible Id in terms, types and coercions; opaque producer bindings stay lazy and shared; excluded metadata and non-variable targets keep their bindings |
-| Next task | Specify bounded opaque function-call indices under C1, including function-head substitution, range scope, and CorePrep/Tidy protections; research only, with no admission yet |
+| Opaque call indices | Scoped local `A -> B` heads, forward nominal congruence, strict case proofs and backend lowering pass both API fixtures; source formation and interface encoding remain gated |
+| Next task | Expose strict opaque-call refinement from source with whole-call abstraction, checked alias evidence and the existing retained constructor matcher |
 
-The current direction is native dependent Core. The historical branch is
-unfinished. It supplies binder and application design work, but dependent type
-computation and Boolean elimination need completion. The native target must accept
-ordinary runtime Boolean bindings directly and preserve laziness. Singleton
-reification remains specific to the comparison implementation.
+The current direction is native dependent Core. The unfinished historical branch
+supplies binder and application design work. This fork adds checked Boolean and
+Nat elimination with ordinary runtime bindings. General dependent computation
+remains open. Singleton reification remains specific to the comparison
+implementation.
 
 ## Native Core implementation
 
@@ -91,6 +92,11 @@ closed algebraic domain, including Bool and user-defined Nat.
 Core Lint agree on retained application. The implementation includes scope,
 capture avoidance, supported index substitution, alpha equality, and diagnostic
 printing. It does not add a singleton argument or evaluate index variables.
+
+`TermAppTy` also records scoped opaque calls in Core. Its head is an ordinary
+local function between independently closed scalar domains. This form supports
+forward congruence. It supplies no injectivity or function evaluation rule.
+Source call formation remains separate work. See the [M42 checkpoint](#m42-scoped-opaque-function-call-indices).
 
 Boolean alternatives can bind checked nominal equality evidence. The strict case
 justifies each proof. Proof-bearing cases must cover both Boolean values, and
@@ -3700,3 +3706,60 @@ settle those remaining obligations. General C1/C2 gates remain open.
 
 See the [M41 plan](PLAN.md#m41-checked-native-variable-aliases) and
 [function-index comparison](REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison).
+
+## M42: scoped opaque function-call indices
+
+Core now represents an opaque call as `TermAppTy f arg`.
+The actual local head has an ordinary Many arrow between independently closed
+scalar domains. The argument can be a scoped symbolic type of the input domain.
+Forward `TermAppCo` congruence uses nominal argument evidence.
+Equal call results never imply equal inputs. A constant-function control checks
+this restriction. No unfolding or function evaluation rule is added.
+
+Strict Core cases can now inspect an actual call. They bind and consume checked
+constructor or DEFAULT evidence. CorePrep preserves proof endpoints when it
+names constructor arguments. Literal function aliases use the checked alias
+rule. Unsupported producers remain lazy. General lazy call naming stays gated.
+Runtime checks cover Nat-to-Nat and Bool-to-Nat calls, ignored and demanded
+bottom arguments, bottom heads, lazy predecessor fields and finite cyclic
+prefixes. Type-only dependencies return 42 without forcing the head or index.
+
+The existing fixtures add 19 quiet runtime invocations, including five direct
+SimpleOpt-to-CorePrep checks. Unit controls cover raw head validity, exact
+domains, roles, alpha equality, capture, composition and stored substitution
+ranges. Call arguments normalize at Nominal, Representational and Phantom.
+The source-program corpus remains 243 package and 322 total rejection programs,
+with 95 quiet positives. These counts exclude the new Core controls.
+No tracked test or golden line was added. The goldens remain one and 37 lines.
+
+All nine final phases pass: seven launches and two bootstrap API reuses.
+Each reuse verifies its own fixture and all 77 selected compiler input hashes.
+Both stages preserve 106 raw/public and 562 packed-vector observations.
+Five registered regressions pass across 39 cases with 34 skips.
+There are no unexpected failures or framework warnings.
+The source 41-client, known 41-client and prior 64-client matrices were not
+rerun. The Tc metadata probe and full GHC suite were not rerun.
+
+Selected compiler: `0447f8a7a199675423cd7f5fafa94567afa40114`.
+Fixture source: `428aa3795341e8628e258976adc6df434c17bda4`.
+Snapshot v7 covers 77 compiler inputs and 92 source paths. All 50 compiler
+delta paths are included. All seven snapshots retain their own Git identities.
+Bootstrap took 6m56s and peaked at 2899 MiB. Self-hosting took 20m58s and
+peaked at 5957 MiB. Both used 16 GiB caps. API checks peaked at 1223 MiB.
+Final checks peaked at 1214 MiB. Both validation scopes used 4 GiB. Swap is zero.
+Setup failures remain recorded. A separate measured failure exposed acceptance
+of constraint arrows. The corrected checker requires `FTF_T_T`.
+
+Evidence uses `native-neutral-calls-*`. The prepared freeze retains the
+canonical M41 envelope, its 21 manifest hashes and the older evidence chain.
+Pinned Agda neutral applications and scoped substitution supply operational
+prior art. D/DC and System DR supply separate equality precedents.
+These references do not prove this implementation.
+
+Source call formation and interface encoding remain gated. Function-domain
+retained binders, general evaluation and ordinary optimization remain open.
+The next step is a strict source case that refines the whole call while
+preserving unrelated inputs and source demand. See the
+[Core contract](CORE.md#opaque-native-call-indices),
+[M42 plan](PLAN.md#m42-scoped-opaque-function-call-indices) and
+[M43 source plan](PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented).

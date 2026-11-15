@@ -228,9 +228,9 @@ withdraw the original generality lemma. The thesis PDF was not read in this
 review. Treat its original algorithm as research to check, rather than an
 unchanged implementation recipe.
 
-## Future C1 comparison: opaque runtime function indices
+## C1 comparison: opaque runtime function indices
 
-This unimplemented comparison extends the roadmap reading above. It does not
+This comparison extends the roadmap reading above. It does not
 change the canonical seven-work, nine-PDF manifest. The 26-page author version
 of [Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf)
 was reread on selected pages 3–4, 6–7, 9, 11 and 13–16. The reading covers
@@ -245,10 +245,32 @@ comparisons. Singletons uses a saturated noninjective `Apply` family; its
 arbitrary-function `toSing` implementation uses `unsafeCoerce`.
 
 A saturated family with a checked non-arrow function token is a possible safe
-direction. A dedicated residual-call node appears smaller for the initial
-kernel. Neither is selected or implemented. Keep scalar domains, function-head
+direction. M42 selects a dedicated residual-call node for a bounded Core
+kernel. The token/family alternative remains research. Keep scalar domains, function-head
 eligibility and retained function-binder domains separate. No general evaluation
 or preservation result follows. See
 [the detailed comparison](../REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison)
 and the exact versions, hashes and reading scope in
 `_build/verification/native-next-core-function-indices-v1/`.
+
+## M42 operational source reading
+
+Agda v2.8.0 supplies the neutral-head precedent. Selected ranges in
+`Syntax/Internal.hs`221–252 and `TypeChecking/Substitute.hs`827–852 describe
+a variable with eliminations and scoped replacement of its head.
+The exact blobs, SHA256 values, read ranges and reuse provenance are recorded
+in `_build/verification/native-neutral-calls-research-v1/provenance.json`.
+The cache contains six full Agda source files. Full-file hashes do not imply
+full-file reading or an Agda execution.
+
+This reading supports M42's scoped call representation and substitution.
+D/DC application congruence and System DR nominal argument rules remain
+separate equality precedents. No inverse call projection or proof of this
+GHC implementation follows. The seven-work, nine-PDF ledger is unchanged.
+See [the source references](../REFERENCES.md#opaque-native-calls-representation-substitution-and-nominal-congruence).
+
+The next source plan also reads Agda's with-abstraction, LHS checking and
+application checking at pinned v2.8.0 blobs. The selected ranges support
+whole-call abstraction and checked substitution. They do not specify Haskell
+case demand. The [M43 plan](../PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented)
+records the additional constructor-match and strict-alias boundaries.
