@@ -688,6 +688,7 @@ runNatChecks dflags = do
         betaCases =
             [ ("identity variable", betaIdentity (Var m), Var m, TermVarTy m)
             , ("identity constructor", betaIdentity zeroExpr, zeroExpr, zeroTy)
+            , ("stored range avoids reused-Unique capture", App (Lam beta (App (Lam m (Var beta)) zeroExpr)) (Var m), Var m, TermVarTy m)
             , ("successor variable", betaSuccessor (Var m), succExpr (Var m), succTy (TermVarTy m))
             , ("constant ignores opaque index", betaConstant (Var betaOpaque), zeroExpr, zeroTy)
             , ("nested atomic argument", betaSuccessor (App (Lam innerBeta (Var innerBeta)) (Var m)), succExpr (Var m), succTy (TermVarTy m))
@@ -1016,8 +1017,10 @@ runNatChecks dflags = do
         Case (succExpr (Var n)) (setIdMult alias OneTy) intTy [Alt DEFAULT [aliasProof] (Var payload)]
     lintRejects dflags "DEFAULT alias binder cannot escape into the result annotation" [n, payload] $
         Case (succExpr (Var n)) alias (indexedNat aliasIndex) [Alt DEFAULT [aliasProof] (Lam aliasDictionary (Var payload))]
-    lintRejects dflags "DEFAULT alias evidence cannot describe an arbitrary producer" [n, payload] $
+    lintAccepts dflags "DEFAULT alias evidence accepts a checked identity beta index" [n, payload] $
         Case (App (identity 569 natTy) (Var n)) alias intTy [Alt DEFAULT [proof 570 aliasIndex index] (Var payload)]
+    lintRejects dflags "DEFAULT alias evidence cannot describe an opaque producer" [n, payload, opaqueProducer] $
+        Case (App (Var opaqueProducer) (Var n)) alias intTy [Alt DEFAULT [proof 570 aliasIndex index] (Var payload)]
 
 -- | Construct an index substitution with an explicit scope.
 indexSubst :: [Var] -> Id -> CoreExpr -> Subst.Subst
