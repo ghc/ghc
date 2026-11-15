@@ -427,6 +427,8 @@ orphNamesOfType ty | Just ty' <- coreView ty = orphNamesOfType ty'
                 -- Look through type synonyms (#4912)
 orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (TermVarTy v)        = orphNamesOfType (varType v)
+orphNamesOfType (TermAppTy f arg)    = orphNamesOfType (varType f)
+                                       `unionNameSet` orphNamesOfType arg
 orphNamesOfType (DepFunTy v res)     = orphNamesOfType (varType v)
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (LitTy {})           = emptyNameSet

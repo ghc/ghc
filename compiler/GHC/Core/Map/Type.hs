@@ -148,6 +148,7 @@ type TypeMapG = GenMap TypeMapX
 data TypeMapX a
   = TM { tm_var    :: VarMap a
        , tm_termvar :: VarMap a -- See Note [Native type-map keys]
+       , tm_termapp :: VarMap (TypeMapG a)
        , tm_depfun :: TypeMapG (TypeMapG a)
        , tm_app    :: TypeMapG (TypeMapG a)  -- Note [Equality on AppTys] in GHC.Core.Type
        , tm_tycon  :: DNameEnv a
@@ -167,6 +168,10 @@ Keep TermVarTy in a separate VarMap from TyVarTy. Reuse eqDeBruijnVar and
 lkVar/xtVar. Bound runtime Ids compare by their de Bruijn positions. Free
 runtime Ids compare by their Unique. A free Id must not match a bound Id.
 The separate fields keep the two type constructors distinct.
+
+TermAppTy has its own head VarMap followed by an argument type map. Compare
+the actual scoped head and the argument. This structural lookup does not
+decompose an equality proof or assert that runtime functions are injective.
 
 Keep DepFunTy separate from ordinary arrows and erased foralls. Compare its
 domain in the outer context. Compare its body after extending each context
@@ -201,11 +206,12 @@ trieMapView _ = Nothing
 -- TODO(22292): derive
 instance Functor TypeMapX where
     fmap f TM
-      { tm_var = tvar, tm_termvar = ttermvar, tm_depfun = tdepfun
+      { tm_var = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun
       , tm_app = tapp, tm_tycon = ttycon, tm_forall = tforall
       , tm_tylit = tlit, tm_coerce = tcoerce } = TM
       { tm_var = fmap f tvar
       , tm_termvar = fmap f ttermvar
+      , tm_termapp = fmap (fmap f) ttermapp
       , tm_depfun = fmap (fmap f) tdepfun
       , tm_app = fmap (fmap f) tapp, tm_tycon = fmap f ttycon
       , tm_forall = fmap (fmap f) tforall
@@ -274,6 +280,9 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
           (_, CastTy t1' _) -> hasCast (go (D env t) (D env t1'))
 
           -- See Note [Native type-map keys].
+          (TermAppTy f a, TermAppTy f' a')
+              -> liftEquality (eqDeBruijnVar (D env f) (D env' f')) `andEq`
+                 go (D env a) (D env' a')
           (TermVarTy v, TermVarTy v')
               -> liftEquality $ eqDeBruijnVar (D env v) (D env' v')
           (DepFunTy v ty, DepFunTy v' ty')
@@ -335,6 +344,7 @@ instance {-# OVERLAPPING #-}
 emptyT :: TypeMapX a
 emptyT = TM { tm_var  = emptyTM
             , tm_termvar = emptyTM
+            , tm_termapp = emptyTM
             , tm_depfun = emptyTM
             , tm_app  = emptyTM
             , tm_tycon  = emptyDNameEnv
@@ -348,6 +358,7 @@ lkT (D env ty) m = go ty m
   where
     go ty | Just ty' <- trieMapView ty = go ty'
     go (TermVarTy v)              = tm_termvar >.> lkVar env v
+    go (TermAppTy f arg)          = tm_termapp >.> lkVar env f >=> lkG (D env arg)
     go (DepFunTy v ty)            = tm_depfun >.> lkG (D env (varType v))
                                                >=> lkG (D (extendCME env v) ty)
     go (TyVarTy v)                 = tm_var    >.> lkVar env v
@@ -370,6 +381,8 @@ xtT :: DeBruijn Type -> XT a -> TypeMapX a -> TypeMapX a
 xtT (D env ty) f m | Just ty' <- trieMapView ty = xtT (D env ty') f m
 
 xtT (D env (TermVarTy v))     f m = m { tm_termvar = tm_termvar m |> xtVar env v f }
+xtT (D env (TermAppTy fun arg)) f m
+  = m { tm_termapp = tm_termapp m |> xtVar env fun |>> xtG (D env arg) f }
 xtT (D env (DepFunTy v ty))   f m
   = m { tm_depfun = tm_depfun m |> xtG (D env (varType v))
                                 |>> xtG (D (extendCME env v) ty) f }
@@ -392,6 +405,7 @@ xtT (D _   ty@(FunTy {}))         _ _ = pprPanic "xtT FunTy" (ppr ty)
 fdT :: (a -> b -> b) -> TypeMapX a -> b -> b
 fdT k m = foldTM k (tm_var m)
         . foldTM k (tm_termvar m)
+        . foldTM (foldTM k) (tm_termapp m)
         . foldTM (foldTM k) (tm_depfun m)
         . foldTM (foldTM k) (tm_app m)
         . foldTM k (tm_tycon m)
@@ -400,12 +414,13 @@ fdT k m = foldTM k (tm_var m)
         . foldMaybe k (tm_coerce m)
 
 filterT :: (a -> Bool) -> TypeMapX a -> TypeMapX a
-filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_depfun = tdepfun
+filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun
               , tm_app = tapp, tm_tycon = ttycon
               , tm_forall = tforall, tm_tylit = tlit
               , tm_coerce = tcoerce })
   = TM { tm_var    = filterTM f tvar
        , tm_termvar = filterTM f ttermvar
+       , tm_termapp = fmap (filterTM f) ttermapp
        , tm_depfun = fmap (filterTM f) tdepfun
        , tm_app    = fmap (filterTM f) tapp
        , tm_tycon  = filterTM f ttycon
@@ -693,12 +708,13 @@ xtDNamed :: NamedThing n => n -> XT a -> DNameEnv a -> DNameEnv a
 xtDNamed tc f m = alterDNameEnv f m (getName tc)
 
 mpT :: (a -> Maybe b) -> TypeMapX a -> TypeMapX b
-mpT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_depfun = tdepfun
+mpT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun
           , tm_app = tapp, tm_tycon = ttycon
           , tm_forall = tforall, tm_tylit = tlit
           , tm_coerce = tcoerce })
   = TM { tm_var    = mapMaybeTM f tvar
        , tm_termvar = mapMaybeTM f ttermvar
+       , tm_termapp = fmap (mapMaybeTM f) ttermapp
        , tm_depfun = fmap (mapMaybeTM f) tdepfun
        , tm_app    = fmap (mapMaybeTM f) tapp
        , tm_tycon  = mapMaybeTM f ttycon

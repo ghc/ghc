@@ -379,6 +379,14 @@ opt_co4' opts env sym rep r (AppCo co1 co2)
   = mkAppCo (opt_co4 opts env sym rep r co1)
             (opt_co4 opts env sym False Nominal co2)
 
+opt_co4' opts env@(LC subst _) sym _rep r (TermAppCo f co)
+  -- The child proof is nominal even when the result is used representationally.
+  -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+  = case substTy subst (TermAppTy f (coercionLKind co)) of
+      TermAppTy f' _ -> downgradeRole r Nominal $
+        mkTermAppCo f' (opt_co4 opts env sym False Nominal co)
+      ty -> pprPanic "opt_co4: native function substitution" (ppr ty)
+
 opt_co4' opts (LC subst lift_env) sym rep r (DepFunCo b co)
   -- The closed domain is unchanged. Keep the runtime binder scoped over the
   -- proof, even when it does not occur in either result endpoint.
@@ -646,6 +654,7 @@ mkDeepSymCo = go
     go co@(UnivCo { uco_lty = t1, uco_rty = t2 }) = co { uco_lty = t2, uco_rty = t1 }
     go (TyConAppCo r tc cos)                      = TyConAppCo r tc $ map go cos
     go (AppCo co1 co2)                            = AppCo (go co1) (go co2)
+    go (TermAppCo f co)                          = mkTermAppCo f (go co)
     go (DepFunCo b co)                           = mkDepFunCo b (go co)
     go (FunCo r afl afr cow co1 co2)              = FunCo r afr afl (go cow) (go co1) (go co2)
     go (TransCo co1 co2)                          = TransCo (go co2) (go co1)

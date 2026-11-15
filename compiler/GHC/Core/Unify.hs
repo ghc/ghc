@@ -32,7 +32,7 @@ import GHC.Core.TyCon
 import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Compare ( eqType, tcEqType, tcEqTyConAppArgs )
+import GHC.Core.TyCo.Compare ( eqType, eqTypeX, tcEqType, tcEqTyConAppArgs )
 import GHC.Core.TyCo.Subst   ( mkTvSubst, deepSubstTy, extendSubstInScopeSet )
 import GHC.Core.Map.Type
 import GHC.Core.Multiplicity
@@ -1675,7 +1675,13 @@ reflexively. Different Ids can denote the same value. An opaque Id can also
 denote a constructor index, including S (TermVarTy v) for a cyclic Nat v.
 These comparisons must return MaybeApart,
 not SurelyApart. Otherwise a closed family could skip a possible earlier
-constructor equation. See (U3) and (U4) in Note [Specification of unification].
+constructor equation.
+
+TermAppTy is opaque for the same reason. Compare the head and argument only
+for structural reflexivity under the renaming environment. Do not unify its
+arguments by inverting equality of calls: a constant function can return the
+same value at distinct arguments. Occurs checking still traverses its argument.
+See (U3) and (U4) in Note [Specification of unification].
 
 Handle ordinary TyVars first. A family template variable can match a runtime
 index through the immutable matching substitution. This does not assign a Tc
@@ -1801,6 +1807,15 @@ unify_ty _ ty1@(DepFunTy {}) ty2@(DepFunTy {}) _
   = return ()
 unify_ty _ (DepFunTy {}) _ _ = maybeApart MARRetainedFunction
 unify_ty _ _ (DepFunTy {}) _ = maybeApart MARRetainedFunction
+
+-- Opaque calls have forward congruence, not inverse decomposition.
+-- See Note [Apartness of retained runtime indices].
+unify_ty env (TermAppTy f1 a1) (TermAppTy f2 a2) _
+  | rnOccL (um_rn_env env) f1 == rnOccR (um_rn_env env) f2
+  , eqTypeX (um_rn_env env) a1 a2
+  = return ()
+unify_ty _ (TermAppTy {}) _ _ = maybeApart MARRuntimeIndex
+unify_ty _ _ (TermAppTy {}) _ = maybeApart MARRuntimeIndex
 
 -- See Note [Apartness of retained runtime indices].
 unify_ty env (TermVarTy v1) (TermVarTy v2) _kco
@@ -2123,6 +2138,7 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go :: TyCoVarSet   -- Bound by enclosing foralls; see (OCU1)
        -> Type -> Bool
     go bvs ty | Just ty' <- coreView ty = go bvs ty'
+    go bvs (TermAppTy _ arg) = go bvs arg
     go _ (TermVarTy {}) = False
       -- A supported index Id has a closed algebraic domain and Many
       -- multiplicity. Its type has no type variables or family applications.
@@ -2465,6 +2481,7 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
    -- ^ Just env ==> liftCoSubst Nominal env ty == co, modulo roles.
    -- Also: Just env ==> lsubst(ty) == lty and rsubst(ty) == rty,
    -- where lsubst = lcSubstLeft(env) and rsubst = lcSubstRight(env)
+ty_co_match _ _ (TermAppTy {}) _ _ _ = Nothing
 ty_co_match _ _ (TermVarTy {}) _ _ _ = Nothing
 ty_co_match _ _ (DepFunTy {}) _ _ _ = Nothing
 ty_co_match menv subst ty co lkco rkco
@@ -2522,6 +2539,7 @@ ty_co_match menv subst (TyVarTy tv1) co lkco rkco
   -- Structural matching under a retained runtime binder is not supported.
   -- A template type variable can still bind to the whole coercion above.
 ty_co_match _ _ _ (DepFunCo {}) _ _ = Nothing
+ty_co_match _ _ _ (TermAppCo {}) _ _ = Nothing
 
   -- just look through SubCo's. We don't really care about roles here.
 ty_co_match menv subst ty (SubCo co) lkco rkco

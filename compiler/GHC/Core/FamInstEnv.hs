@@ -1545,6 +1545,26 @@ normalise_type ty
   = go ty
   where
     go :: Type -> NormM Reduction
+    -- Keep the head identical on both sides; lift only nominal argument evidence.
+    -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+    go ty@(TermAppTy f arg)
+      | Just (domain, _) <- nativeIndexFunctionTys_maybe f
+      , typeKind arg `eqType` domain
+      = do { lc <- getLC
+           ; role <- getRole
+           ; let left = substTy (lcSubstLeft lc) ty
+                 right = substTy (lcSubstRight lc) ty
+           ; case (left, right) of
+               (TermAppTy f' _, TermAppTy g' _)
+                 | f' == g', isNativeIndexFunctionId f'
+                 , varType f' `eqType` varType f
+                 -> do { Reduction co arg' <- withRole Nominal $ go arg
+                       ; return $ downgradeRedn role Nominal $
+                           mkReduction (mkTermAppCo f' co) (TermAppTy f' arg') }
+               _ -> pprPanic "normalise_type: native call head changed by lifting context"
+                      (ppr ty $$ ppr left $$ ppr right) }
+      | otherwise
+      = pprPanic "normalise_type: invalid native call" (ppr ty)
     go ty@(TermVarTy v)
       -- See Note [Normalising retained runtime indices].
       | isNativeIndexId v

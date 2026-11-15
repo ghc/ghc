@@ -35,6 +35,7 @@ module GHC.Core (
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
+        exprToNativeCaseIndex, nativeIndexFunctionVar_maybe,
         isNativeIndexAlt, isNativeIndexAliasAlt,
 
         mkBinds,
@@ -2600,6 +2601,24 @@ mkCoBind cv co      = NonRec cv (Coercion co)
 -- See Note [Checked native index beta exposure].
 exprToNativeIndex :: CoreExpr -> Maybe Type
 exprToNativeIndex expr = snd <$> normaliseNativeIndexExpr expr
+
+-- | Recognize a checked local function head without inspecting its unfolding.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
+nativeIndexFunctionVar_maybe (Var f)
+  | isNativeIndexFunctionId f = Just f
+nativeIndexFunctionVar_maybe _ = Nothing
+
+-- | Recover an index for an existing strict case, including an opaque call.
+-- This does not admit a call as a lazy retained application argument.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+exprToNativeCaseIndex :: CoreExpr -> Maybe Type
+exprToNativeCaseIndex (App (Var f) arg)
+  | Just (domain, _) <- nativeIndexFunctionTys_maybe f
+  , Just index <- exprToNativeIndex arg
+  , sameNativeIndexDomain domain (typeKind index)
+  = Just (TermAppTy f index)
+exprToNativeCaseIndex expr = exprToNativeIndex expr
 
 -- | Return a supported runtime normal form together with its native index.
 -- The caller must check the original expression's typing and scope with Lint.

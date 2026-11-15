@@ -4,7 +4,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.TyCon
 import {-# SOURCE #-} GHC.Core.TyCo.Rep( Type, Coercion )
 import GHC.Utils.Misc
-import GHC.Types.Var( FunTyFlag, TyVar )
+import GHC.Types.Var( FunTyFlag, TyVar, Id )
 import GHC.Types.Basic( TypeOrConstraint )
 
 
@@ -20,3 +20,7 @@ isLiftedTypeKind :: Type -> Bool
 
 partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
 typeTypeOrConstraint    :: HasDebugCallStack => Type -> TypeOrConstraint
+
+coreFullView :: Type -> Type
+isNativeIndexFunctionId :: Id -> Bool
+nativeIndexFunctionTys_maybe :: Id -> Maybe (Type, Type)

@@ -197,6 +197,10 @@ mkLamType v body_ty
        (text "Unsupported retained dependent lambda:" <+> ppr v <+> dcolon <+> ppr body_ty) $
      DepFunTy v body_ty
 
+   | anyFreeVarsOfType (== v) body_ty
+   = pprPanic "mkLamType: unsupported runtime dependency"
+       (ppr v $$ ppr body_ty)
+
    | otherwise
    = mkFunctionType (idMult v) (idType v) body_ty
 

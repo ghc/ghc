@@ -2889,6 +2889,8 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
     -- See Note [Rigid retained indices]
     go ty1@(TermVarTy v1) (TermVarTy v2)
       | v1 == v2 = return $ mkReflCo role ty1
+    go ty1@TermAppTy{} ty2@TermAppTy{}
+      | ty1 `tcEqType` ty2 = return $ mkReflCo role ty1
     go ty1@DepFunTy{} ty2@DepFunTy{}
       | ty1 `tcEqType` ty2 = return $ mkReflCo role ty1
 
@@ -3663,6 +3665,9 @@ tcRetainedCoercion index branch_co original_ty
       | Just ty' <- coreView ty = abstract_index template_ty ty'
     abstract_index template_ty (TermVarTy v)
       | v == index = return template_ty
+    abstract_index template_ty (TermAppTy f arg)
+      | isNativeIndexFunctionId f
+      = TermAppTy f <$> abstract_index template_ty arg
     abstract_index template_ty (TyConApp tc tys)
       = mkTyConApp tc <$> mapM (abstract_index template_ty) tys
     abstract_index template_ty (AppTy fun arg)
@@ -3789,6 +3794,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
        where
          occ_check = simpleOccursCheck lhs_tv_nm tcv
 
+    rhs_is_bad (TermAppTy {}) = True
     rhs_is_bad (TermVarTy {}) = True
     rhs_is_bad (DepFunTy {})  = True
     rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
@@ -4455,6 +4461,16 @@ check_ty_eq_rhs :: forall m a
 check_ty_eq_rhs flags ty
   = case ty of
       -- See Note [Rigid retained indices]
+      TermAppTy f arg
+        | native_given
+        , Just (domain, _) <- nativeIndexFunctionTys_maybe f
+        , typeKind arg `eqType` domain
+        -> do { arg_res <- check_ty_eq_rhs flags arg
+              ; return ((\(Reduction co arg') ->
+                           mkReduction (mkTermAppCo f co) (TermAppTy f arg'))
+                         <$> arg_res) }
+        | otherwise
+        -> return $ PuFail (cteProblem cteSkolemEscape)
       TermVarTy v
         | native_given
         , isNativeIndexId v

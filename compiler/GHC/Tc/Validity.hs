@@ -808,6 +808,8 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank 0 means no for-alls anywhere
 
 -- See Note [Validity of retained binders]
+check_type _ ty@(TermAppTy {})
+  = failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 check_type ve (TermVarTy v)
   = do { unless (isNativeIndexId v) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)

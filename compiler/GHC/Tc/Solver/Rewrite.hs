@@ -728,6 +728,18 @@ rewrite_one ty
   | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
   = rewrite_one ty'
 
+-- Nominal argument evidence gives forward congruence under the same head.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+rewrite_one ty@(TermAppTy f arg)
+  | Just (domain, _) <- nativeIndexFunctionTys_maybe f
+  , typeKind arg `eqType` domain
+  = do { role <- getRole
+       ; Reduction co arg' <- setEqRel NomEq $ rewrite_one arg
+       ; return $! downgradeRedn role Nominal $
+           mkReduction (mkTermAppCo f co) (TermAppTy f arg') }
+  | otherwise
+  = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
+
 rewrite_one ty@(TermVarTy {})
   = do { role <- getRole
        ; return $! mkReflRedn role ty }

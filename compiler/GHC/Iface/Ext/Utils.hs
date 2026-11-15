@@ -227,6 +227,8 @@ getTypeIndex t
 
     go ty@(TermVarTy {})
       = pprPanic "getTypeIndex: unsupported runtime index" (ppr ty)
+    go ty@(TermAppTy {})
+      = pprPanic "getTypeIndex: unsupported opaque runtime call index" (ppr ty)
     go ty@(DepFunTy {})
       = pprPanic "getTypeIndex: unsupported retained function" (ppr ty)
     go (TyVarTy v) = return $ HTyVarTy $ varName v

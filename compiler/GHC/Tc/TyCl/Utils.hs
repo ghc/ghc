@@ -95,6 +95,7 @@ synonymTyConsOfType ty
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go (TermVarTy v)     = go (varType v)
+     go (TermAppTy f arg) = go (varType f) `plusNameEnv` go arg
      go (DepFunTy v ty)   = go (varType v) `plusNameEnv` go ty
      go (TyConApp tc tys) = go_tc tc `plusNameEnv` go_s tys
      go (LitTy _)         = emptyNameEnv
@@ -129,6 +130,7 @@ synonymTyConsOfType ty
      go_mco MRefl    = emptyNameEnv
      go_mco (MCo co) = go_co co
 
+     go_co (TermAppCo f co)     = go (varType f) `plusNameEnv` go_co co
      go_co (DepFunCo v co)      = go (varType v) `plusNameEnv` go_co co
      go_co (Refl ty)            = go ty
      go_co (GRefl _ ty mco)     = go ty `plusNameEnv` go_mco mco
@@ -604,6 +606,10 @@ irType = go
   where
     go lcls ty                 | Just ty' <- coreView ty -- #14101
                                = go lcls ty'
+    go lcls ty@(TermAppTy f arg)
+      | f `elemVarSet` lcls, isNativeIndexFunctionId f
+      = markNominal lcls (varType f) >> markNominal lcls arg
+      | otherwise = pprPanic "irType: invalid native call scope" (ppr ty)
     go lcls ty@(TermVarTy v)
       | v `elemVarSet` lcls, isNativeIndexId v = markNominal lcls (varType v)
       | otherwise = pprPanic "irType: invalid runtime index scope" (ppr ty)
@@ -655,6 +661,10 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
      -- role inference. See [Coercions in role inference]
     get_ty_vars :: VarSet -> Type -> VarSet
     get_ty_vars scope t | Just t' <- coreView t = get_ty_vars scope t' -- #20999
+    get_ty_vars scope ty@(TermAppTy f arg)
+      | f `elemVarSet` scope, isNativeIndexFunctionId f
+      = get_ty_vars scope (varType f) `unionVarSet` get_ty_vars scope arg
+      | otherwise = pprPanic "markNominal: invalid native call scope" (ppr ty)
     get_ty_vars scope ty@(TermVarTy v)
       | v `elemVarSet` scope, isNativeIndexId v = get_ty_vars scope (varType v)
       | otherwise = pprPanic "markNominal: invalid runtime index scope" (ppr ty)

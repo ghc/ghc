@@ -1423,6 +1423,9 @@ userTypeError_maybe look_everywhere = go
       = foldr (firstJust . go) Nothing tys
     go (ForAllTy (Bndr tv _) ty) = go (tyVarKind tv) `firstJust` go ty
     go (TermVarTy v) = go (varType v)
+    go (TermAppTy _ arg)
+      | not look_everywhere = Nothing
+      | otherwise = go arg
     go (DepFunTy v ty) = go (varType v) `firstJust` go ty
     go (FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
       = firstJusts

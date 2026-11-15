@@ -303,7 +303,8 @@ Do not create new rules or Core unfoldings. mkUnfolding would run occurrence
 analysis again. Do not create join points from pre-existing occurrence metadata.
 
 A local nonrecursive binding whose input RHS is literally a variable can be
-removed when both input Ids are eligible local Many indices. Look up that
+removed when both input Ids are eligible local Many indices or native function
+heads. Look up that
 variable in the current substitution without simplifying or unfolding it.
 Require another eligible variable of the same closed domain. If substitution
 has produced a constructor, retain the binding. Exclude joins and aliases
@@ -364,8 +365,8 @@ docs/dependent-haskell/REFERENCES.md#agda-provenance. These rules do not establi
 preservation for Haskell. Agda's function eta equality does not justify eta
 reduction across Haskell's bottom and seq. See
 docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
-General inlining, occurrence analysis, and nonreflexive dependent congruence
-remain unsupported.
+General inlining and occurrence analysis remain unsupported. Forward opaque
+call congruence follows Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 
 simpleOptNativeProgram applies this mode independently to each RHS. Keep the
 top-level binders and groups unchanged. Their identities can occur in other
@@ -808,7 +809,8 @@ simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe OutBind)
 simple_opt_bind env (NonRec b (Var rhs)) NotTopLevel
   | soe_native env
-  , isNativeIndexId b, isNativeIndexId rhs
+  , isNativeIndexId b || isNativeIndexFunctionId b
+  , isNativeIndexId rhs || isNativeIndexFunctionId rhs
   , not (isJoinId b), not (isJoinId rhs)
   , not (isExportedId b)
   , not (isStableUnfolding (idUnfolding b))
@@ -817,7 +819,8 @@ simple_opt_bind env (NonRec b (Var rhs)) NotTopLevel
   , not (isWeakLoopBreaker (idOccInfo b))
   , idType b `eqType` idType rhs
   , Var actual <- lookupIdSubst subst rhs
-  , isNativeIndexId actual, not (isJoinId actual)
+  , isNativeIndexId actual || isNativeIndexFunctionId actual
+  , not (isJoinId actual)
   , substTyUnchecked subst (idType b) `eqType` idType actual
   -- See Note [Restricted dependent simplification].
   = (env { soe_subst = extendIdSubstWithClone subst b actual

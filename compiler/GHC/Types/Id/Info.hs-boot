@@ -7,5 +7,6 @@ data IdDetails
 vanillaIdInfo :: IdInfo
 coVarDetails :: IdDetails
 isCoVarDetails :: IdDetails -> Bool
+isJoinIdDetails :: IdDetails -> Bool
 pprIdDetails :: IdDetails -> SDoc
 

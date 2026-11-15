@@ -173,6 +173,8 @@ data Type
   -- See Note [Non-trivial definitional equality]
   = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
 
+  | TermAppTy Id Type -- ^ An opaque runtime call index. See Note [Opaque native call indices].
+
   | TermVarTy Id -- ^ The algebraic index of a local runtime identifier.
                  -- See Note [Restricted retained dependent types].
 
@@ -293,6 +295,31 @@ The first rule changes neither the domain nor the binder multiplicity. It adds
 no selector or erased InstCo rule. Native application and ordinary optimizer
 boundaries remain separate checks. Interface conversion supports diagnostics;
 native coercion serialization remains gated.
+-}
+
+{- Note [Opaque native call indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TermAppTy f arg represents an opaque call to one local unrestricted non-join
+function. Its visible unrestricted arrow has independently closed scalar
+domains A and B. The argument is a scoped Type of kind A; the call has kind B.
+Do not unfold f or infer argument equality from equality of calls.
+
+TermAppCo f co lifts a nominal argument proof through the same checked head.
+Both child endpoints have kind A. Both result endpoints have kind B. There
+is no inverse projection or function-value equality rule. The head is a free
+occurrence, not a binder. Substitution supports only eligible variable heads;
+the pipeline must retain bindings for other substitution ranges. Runtime
+reification is partial and has a narrower grammar than this Type constructor.
+
+Require the raw head type and multiplicities to have no free variables. An
+unused synonym argument must not hide metadata which needs zonking or scope
+transport. Keep function-head eligibility separate from scalar index and
+retained-binder eligibility.
+
+Agda's neutral application and scoped substitution are the operational
+precedent. See Agda v2.8.0 Syntax/Internal.hs221-252 and
+TypeChecking/Substitute.hs827-852, pinned in docs/dependent-haskell/REFERENCES.md.
+This rule does not add an evaluator to type equality.
 -}
 
 instance Outputable Type where
@@ -990,6 +1017,9 @@ data Coercion
 
   | AppCo Coercion CoercionN             -- lift AppTy
           -- AppCo :: e -> N -> e
+
+  | TermAppCo Id CoercionN
+      -- ^ Nominal argument congruence for the same runtime function.
 
   | DepFunCo Id Coercion
       -- DepFunCo :: _ -> e -> e
@@ -2228,6 +2258,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty ty | Just ty' <- view ty = go_ty ty'
     go_ty (TyVarTy tv)        = tyvar tv
     go_ty (TermVarTy v)       = termvar v
+    go_ty (TermAppTy f arg)   = termvar f M.<> go_ty arg
     go_ty (DepFunTy b body)   = go_ty (varType b) M.<> termbinder b (go_ty body)
     go_ty (LitTy l)           = lit l
     go_ty (AppTy t1 t2)       = go_ty t1 M.<> go_ty t2
@@ -2253,6 +2284,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co (GRefl ro ty (MCo co))   = lit ro M.<> go_ty ty M.<> go_co co
     go_co (TyConAppCo ro tc args)  = lit ro M.<> lit tc M.<> go_cos args
     go_co (AppCo c1 c2)            = go_co c1 M.<> go_co c2
+    go_co (TermAppCo f co)         = termvar f M.<> go_co co
     go_co (DepFunCo b co)          = go_ty (varType b) M.<> termbinder b (go_co co)
     go_co (CoVarCo cv)             = covar cv
     go_co (AxiomCo ax cos)         = lit ax M.<> go_cos cos
@@ -2324,6 +2356,7 @@ typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
+typeSize (TermAppTy f arg)         = 1 + typeSize (varType f) + typeSize arg
 typeSize (TermVarTy v)             = 1 + typeSize (varType v)
 typeSize (DepFunTy b t)            = 1 + typeSize (varType b) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
@@ -2338,6 +2371,7 @@ coercionSize (Refl ty)             = typeSize ty
 coercionSize (GRefl _ ty mco)      = typeSize ty + mCoercionSize mco
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
+coercionSize (TermAppCo f co)      = 1 + typeSize (varType f) + coercionSize co
 coercionSize (DepFunCo b co)       = 1 + typeSize (varType b) + coercionSize co
 coercionSize (ForAllCo { fco_kind = h, fco_body = co })
                                    = 1 + coercionSize co + mCoercionSize h

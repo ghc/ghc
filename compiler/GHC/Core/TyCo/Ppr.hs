@@ -248,6 +248,9 @@ debug_ppr_ty _ (TyVarTy tv)
 debug_ppr_ty _ (TermVarTy var)
   = ppr var
 
+debug_ppr_ty prec (TermAppTy fun arg)
+  = maybeParen prec appPrec $ ppr fun <+> debug_ppr_ty appPrec arg
+
 debug_ppr_ty prec (DepFunTy var res)
   = maybeParen prec funPrec $
     sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> debug_ppr_ty topPrec (varType var))

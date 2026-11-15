@@ -167,6 +167,8 @@ zonkEqTypes ev eq_rel ty1 ty2
     -- See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
     go ty1@(TermVarTy v1) (TermVarTy v2)
       | v1 == v2 = return (Right ty1)
+    go ty1@TermAppTy{} ty2@TermAppTy{}
+      | ty1 `tcEqType` ty2 = return (Right ty1)
     go ty1@DepFunTy{} ty2@DepFunTy{}
       | ty1 `tcEqType` ty2 = return (Right ty1)
 
@@ -466,6 +468,9 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(TermVarTy v1) _ (TermVarTy v2) _
   | bothRewritten ces, v1 == v2
   = canEqReflexive ev eq_rel ty1
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@TermAppTy{} _ ty2@TermAppTy{} _
+  | bothRewritten ces, ty1 `tcEqType` ty2
+  = canEqReflexive ev eq_rel ty1
 can_eq_nc ces _rdr_env _envs ev eq_rel ty1@DepFunTy{} _ ty2@DepFunTy{} _
   | bothRewritten ces, ty1 `tcEqType` ty2
   = canEqReflexive ev eq_rel ty1
@@ -685,11 +690,16 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   where
     -- See Note [Opaque runtime index equalities].
     opaque_index_equality = case (ty1, ty2) of
+      (TermAppTy f _, ty) -> call_domain f ty
+      (ty, TermAppTy f _) -> call_domain f ty
       (TermVarTy v, ty) -> same_domain v ty
       (ty, TermVarTy v) -> same_domain v ty
       _ -> False
 
     same_domain v ty = isNativeIndexId v && typeKind ty `eqType` varType v
+    call_domain f ty = case nativeIndexFunctionTys_maybe f of
+      Just (_, result) -> typeKind ty `eqType` result
+      Nothing -> False
 
 {- Note [Opaque runtime index equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

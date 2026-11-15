@@ -401,6 +401,12 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
               Nothing  -> tv1 == tv2
               Just env -> rnOccL env tv1 == rnOccR env tv2
 
+      (TermAppTy f1 a1, TermAppTy f2 a2)
+        -> (case mb_env of
+              Nothing -> f1 == f2
+              Just env -> rnOccL env f1 == rnOccR env f2)
+           && go a1 a2
+
       (TermVarTy v1, TermVarTy v2)
         -> case mb_env of
               Nothing  -> v1 == v2
@@ -471,6 +477,7 @@ hasCasts :: Type -> Bool
 hasCasts (CastTy {})     = True
 hasCasts (CoercionTy {}) = True
 hasCasts (AppTy t1 t2)   = hasCasts t1 || hasCasts t2
+hasCasts (TermAppTy _ arg) = hasCasts arg
 hasCasts (ForAllTy _ ty) = hasCasts ty
 hasCasts (DepFunTy v ty) = hasCasts (varType v) || hasCasts ty
 hasCasts _               = False   -- TyVarTy, TermVarTy, TyConApp, FunTy, LitTy
@@ -714,6 +721,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
+    go env (TermAppTy f1 a1) (TermAppTy f2 a2)
+      = liftOrdering (rnOccL env f1 `nonDetCmpVar` rnOccR env f2)
+        `thenCmpTy` go env a1 a2
     go env (TermVarTy v1)      (TermVarTy v2)
       = liftOrdering $ rnOccL env v1 `nonDetCmpVar` rnOccR env v2
     go env (DepFunTy v1 t1) (DepFunTy v2 t2)
@@ -756,6 +766,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
               = pprPanic "nonDetCmpTypeX.get_rank" (ppr [ty1,ty2])
             get_rank (TyVarTy {})    = 0
             get_rank (CoercionTy {}) = 1
+            get_rank (TermAppTy {})  = 9
             get_rank (TermVarTy {})  = 2
             get_rank (AppTy {})      = 3
             get_rank (LitTy {})      = 4
@@ -907,6 +918,10 @@ mayLookIdentical orig_ty1 orig_ty2
           do { kind_ok <- tell_on_mismatch InvisibleKind $ go env False (typeKind ty) (tyVarKind tv)
              ; return $ not kind_ok }
     go _ _ (TyVarTy {}) (TyVarTy {}) = return False
+
+    go env _top (TermAppTy f1 a1) (TermAppTy f2 a2)
+      | rnOccL env f1 == rnOccR env f2 = go env False a1 a2
+      | otherwise = return False
 
     go env _top (TermVarTy v1) (TermVarTy v2)
       = return $ rnOccL env v1 == rnOccR env v2

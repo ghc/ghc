@@ -51,7 +51,7 @@ module GHC.Core.TyCo.Make (
     , mkGReflCo, mkGReflRightCo, mkGReflLeftCo
     , mkGReflMCo, mkGReflRightMCo, mkGReflLeftMCo
     , mkSubCo, mkSymCo, mkSymMCo
-    , mkFunCo2, mkForAllCo, mkDepFunCo
+    , mkFunCo2, mkForAllCo, mkDepFunCo, mkTermAppCo
     , mkAxiomCo, mkUnbranchedAxInstCo
     , mkFunCo, mkNakedFunCo
     , mkNakedForAllCo, mkForAllVisCos, mkHomoForAllCo, mkHomoForAllCos
@@ -92,7 +92,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
     )
 
 import {-# SOURCE #-} GHC.Core.Type
-   ( mkCastTy )
+   ( mkCastTy, isNativeIndexFunctionId )
 
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( liftedTypeKind, unliftedTypeKind
@@ -185,6 +185,8 @@ data TyCoMapper m
   = TyCoMapper
       { tcm_tyvar :: TyVar -> m Type
       , tcm_termvar :: Id -> m Type
+      , tcm_termfun :: Id -> m Id
+          -- ^ Map a free native function head. See Note [Opaque native call indices].
       , tcm_termbinder :: forall r. Id -> (Id -> m r) -> m r
       , tcm_covar :: CoVar -> m Coercion
       , tcm_hole  :: CoercionHole -> m Coercion
@@ -220,6 +222,7 @@ mapTyCo :: forall m. Monad m
            , [Coercion] -> m [Coercion] )
 mapTyCo (TyCoMapper { tcm_tyvar = tyvar
                     , tcm_termvar = termvar
+                    , tcm_termfun = termfun
                     , tcm_termbinder = termbinder
                     , tcm_tycobinder = tycobinder
                     , tcm_tcapp_ty = tcapp_ty
@@ -234,6 +237,7 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
 
     go_ty (TyVarTy tv)    = tyvar tv
     go_ty (TermVarTy v)   = termvar v
+    go_ty (TermAppTy f arg) = TermAppTy <$> termfun f <*> go_ty arg
     go_ty (DepFunTy b body)
       = termbinder b $ \b' -> mkDepFunTy b' <$> go_ty body
     go_ty (AppTy t1 t2)   = mkAppTy <$> go_ty t1 <*> go_ty t2
@@ -267,6 +271,7 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_co (Refl ty)                  = Refl <$> go_ty ty
     go_co (GRefl r ty mco)           = mkGReflCo r <$> go_ty ty <*> go_mco mco
     go_co (AppCo c1 c2)              = mkAppCo <$> go_co c1 <*> go_co c2
+    go_co (TermAppCo f co)           = mkTermAppCo <$> termfun f <*> go_co co
     go_co (DepFunCo b co)            = termbinder b $ \b' -> mkDepFunCo b' <$> go_co co
     go_co (FunCo r afl afr cw c1 c2) = mkFunCo2 r afl afr <$> go_co cw
                                        <*> go_co c1 <*> go_co c2
@@ -761,6 +766,17 @@ These "smart constructors" maintain the invariants listed in the definition
 of Coercion, and they perform very basic optimizations.
 
 -}
+
+-- | Lift a nominal argument proof through one unchanged native function head.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+mkTermAppCo :: Id -> CoercionN -> CoercionN
+mkTermAppCo f co
+  = assertPpr (isNativeIndexFunctionId f && coercionRole co == Nominal)
+      (text "Invalid native call congruence:" <+> ppr f <+> ppr co) $
+    case co of
+      Refl ty -> mkNomReflCo (TermAppTy f ty)
+      GRefl Nominal ty MRefl -> mkNomReflCo (TermAppTy f ty)
+      _ -> TermAppCo f co
 
 -- | Bind one runtime index in a coercion with an unchanged closed domain.
 -- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.

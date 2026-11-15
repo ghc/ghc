@@ -667,6 +667,7 @@ isGenerativeType :: Type -> Bool
 --          a saturated type-family application
 -- See (CF5) in Note [Exploiting closed type families]
 isGenerativeType ty | Just ty' <- coreView ty = isGenerativeType ty'
+isGenerativeType (TermAppTy {}) = False
 isGenerativeType ty@(TermVarTy {})
   = pprPanic "isGenerativeType: unsupported runtime index" (ppr ty)
 isGenerativeType ty@(DepFunTy {})

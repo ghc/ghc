@@ -60,8 +60,8 @@ import GHC.Data.Maybe ( orElse )
 import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyConAppCo )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
-import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToNativeIndex, mapNativeIndex, varToCoreExpr )
-import {-# SOURCE #-} GHC.Core.Type( isCoercionTy )
+import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToNativeIndex, mapNativeIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
+import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, nativeIndexFunctionTys_maybe, coreFullView )
 
 import GHC.Core.TyCo.Make
 import GHC.Core.TyCon( TyCon )
@@ -240,15 +240,15 @@ emptyCvSubstEnv :: CvSubstEnv
 emptyCvSubstEnv = emptyVarEnv
 
 -- | Composes two substitutions, applying the second one provided first,
--- like in function composition. Compose supported algebraic index arguments in
--- the expression environment too. Other expression ranges remain unchanged;
+-- like in function composition. Compose supported scalar and function-head
+-- variable ranges in the expression environment too. Other ranges stay unchanged;
 -- this function does not compose general Core expression substitutions.
 composeTCvSubst :: Subst -> Subst -> Subst
 composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
   = Subst is3 ids3 tenv3 cenv3
   where
     is3 = is1 `unionInScope` is2
-    ids3 = ids1 `plusVarEnv` mapVarEnv (mapNativeIndex (substTy extended_subst1)) ids2
+    ids3 = ids1 `plusVarEnv` mapVarEnv compose_index ids2
     tenv3 = tenv1 `plusVarEnv` mapVarEnv (substTy extended_subst1) tenv2
     cenv3 = cenv1 `plusVarEnv` mapVarEnv (substCo extended_subst1) cenv2
 
@@ -256,6 +256,11 @@ composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
     -- cover the free variables in the range of the second substitution before
     -- applying it (#22235).
     extended_subst1 = subst1 `setInScope` is3
+
+    compose_index rhs
+      | Just f <- nativeIndexFunctionVar_maybe rhs
+      = varToCoreExpr (substNativeIndexFunction extended_subst1 f)
+      | otherwise = mapNativeIndex (substTy extended_subst1) rhs
 
 emptySubst :: Subst
 emptySubst = Subst emptyInScopeSet emptyVarEnv emptyVarEnv emptyVarEnv
@@ -317,12 +322,16 @@ setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
 -- substitution as a non-deterministic set.
 getSubstRangeTyCoFVs :: Subst -> VarSet
 getSubstRangeTyCoFVs (Subst _ ids tenv cenv)
-  = tenvFVs `unionVarSet` cenvFVs `unionVarSet` indexFVs
+  = tenvFVs `unionVarSet` cenvFVs `unionVarSet` indexFVs `unionVarSet` functionFVs
   where
     tenvFVs = tyCoVarsOfTyVarEnv tenv
     cenvFVs = tyCoVarsOfCoVarEnv cenv
     indexFVs = tyCoVarsOfTypes
       [ index | rhs <- nonDetEltsUFM ids, Just index <- [exprToNativeIndex rhs] ]
+    functionFVs = unionVarSets
+      [ unitVarSet f `unionVarSet` tyCoVarsOfType (varType f)
+                     `unionVarSet` tyCoVarsOfType (idMult f)
+      | rhs <- nonDetEltsUFM ids, Just f <- [nativeIndexFunctionVar_maybe rhs] ]
 
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
@@ -798,6 +807,7 @@ substTyCoMapper :: TyCoMapper SubstM
 substTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
                , tcm_termvar    = subst_index
+               , tcm_termfun    = subst_fun
                , tcm_termbinder = index_bndr
                , tcm_covar      = subst_cv
                , tcm_hole       = subst_ch
@@ -818,6 +828,8 @@ substTyCoMapper
          Nothing -> pprPanic "substTy: unsupported runtime index"
                       (ppr v <+> text ":=" <+> ppr rhs)
 
+   subst_fun f = StrictReaderT $ \subst -> return (substNativeIndexFunction subst f)
+
    index_bndr :: Id -> (Id -> SubstM r) -> SubstM r
    index_bndr old k = StrictReaderT $ \subst ->
      let (subst', new) = substNativeIndexBndr subst old
@@ -829,6 +841,25 @@ substTyCoMapper
        let !(subst', tcv') = substVarBndrUnchecked subst tcv
            -- Sadly unchecked because subst_ty is used from substTyUnchecked
        in runStrictReaderT (k tcv') subst'
+
+-- | Rename a checked function head. Return a stored range only once.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+substNativeIndexFunction :: Subst -> Id -> Id
+substNativeIndexFunction (Subst in_scope ids _ _) f
+  = case (nativeIndexFunctionTys_maybe f, nativeIndexFunctionTys_maybe actual) of
+      (Just (arg, res), Just (arg', res'))
+        | same_domain arg arg', same_domain res res' -> actual
+      _ -> pprPanic "substTy: invalid native function head" (ppr actual)
+  where
+    actual = case lookupVarEnv ids f of
+      Nothing -> lookupInScope in_scope f `orElse` f
+      Just rhs -> case nativeIndexFunctionVar_maybe rhs of
+        Just g -> g
+        Nothing -> pprPanic "substTy: unsupported native function range"
+                     (ppr f <+> text ":=" <+> ppr rhs)
+    same_domain ty ty' = case (coreFullView ty, coreFullView ty') of
+      (TyConApp tc [], TyConApp tc' []) -> tc == tc'
+      _ -> False
 
 -- | Rename a closed-domain runtime binder and mask its outer substitution.
 -- Use the resulting substitution only inside the binder's scope.
@@ -1096,6 +1127,7 @@ deepSubstTyCoMapper :: TyCoMapper SubstM
 deepSubstTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
                , tcm_termvar    = tcm_termvar substTyCoMapper
+               , tcm_termfun    = tcm_termfun substTyCoMapper
                , tcm_termbinder = tcm_termbinder substTyCoMapper
                , tcm_covar      = subst_cv
                , tcm_hole       = subst_ch

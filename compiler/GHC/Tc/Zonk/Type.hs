@@ -506,6 +506,7 @@ zonk_tycomapper :: TyCoMapper ZonkTcM
 zonk_tycomapper = TyCoMapper
     { tcm_tyvar      = zonkTyVarOcc
     , tcm_termvar    = pure . TermVarTy
+    , tcm_termfun    = pure
     , tcm_termbinder = \v k -> runZonkBndrT (zonkIdBndrX v) k
         -- See Note [Zonking retained Boolean indices] in GHC.Tc.Zonk.TcType
     , tcm_covar      = zonkCoVarOcc

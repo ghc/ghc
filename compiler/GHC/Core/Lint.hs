@@ -1089,6 +1089,11 @@ lintLambda var lintBody =
     addLoc (LambdaBodyOf var) $
     lintBinder LambdaBind var $
     do { (body_ty, ue) <- lintBody
+       ; lintL (not (isNonCoVarId var)
+                  || not (anyFreeVarsOfType (== var) body_ty)
+                  || isNativeIndexId var)
+           (text "Unsupported runtime dependency in lambda result:" <+> ppr var
+            $$ ppr body_ty)
        ; ue' <- checkLinearity ue var
        ; return (mkLamType var body_ty, ue') }
 
@@ -1617,7 +1622,7 @@ lintCaseExpr scrut case_bndr alt_ty alts
          -- See GHC.Core Note [Case expression invariants] item (7)
 
        ; -- Check the alternatives
-       ; alt_ues <- mapM (lintCoreAlt (exprToNativeIndex scrut) case_bndr scrut_ty scrut_mult alt_ty) alts
+       ; alt_ues <- mapM (lintCoreAlt (exprToNativeCaseIndex scrut) case_bndr scrut_ty scrut_mult alt_ty) alts
        ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
        ; return (alt_ty, case_ue) } }
   where
@@ -2085,6 +2090,22 @@ checkTyCon tc
   = checkL (not (isTcTyCon tc)) (text "Found TcTyCon:" <+> ppr tc)
 
 -------------------
+-- | Check a call head against its actual scoped binding.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+lintNativeIndexFunction :: Id -> LintM (Type, Type)
+lintNativeIndexFunction f
+  = do { in_scope <- getInScope
+       ; lintL (isNativeIndexFunctionId f
+                 && maybe False (\actual -> isNativeIndexFunctionId actual
+                                   && varType actual `eqType` varType f)
+                                (lookupInScope in_scope f))
+           (text "Invalid opaque runtime call head:" <+> ppr f
+            <+> dcolon <+> ppr (varType f))
+       ; lintVarOcc f
+       ; case nativeIndexFunctionTys_maybe f of
+           Just domains -> return domains
+           Nothing -> failWithL (text "Unsupported opaque runtime call head:" <+> ppr f) }
+
 lintType :: Type -> LintM ()
 -- See Note [Linting types and coercions]
 --
@@ -2104,6 +2125,13 @@ lintType (TermVarTy v)
                                 (lookupInScope in_scope v))
            (text "Invalid runtime index:" <+> ppr v <+> dcolon <+> ppr (varType v))
        ; lintVarOcc v }
+
+lintType (TermAppTy f arg)
+  = do { (domain, _) <- lintNativeIndexFunction f
+       ; lintType arg
+       ; lintL (typeKind arg `eqType` domain)
+           (text "Opaque runtime call argument has the wrong kind:" <+> ppr arg
+            $$ text "Expected:" <+> ppr domain) }
 
 lintType (DepFunTy b body)
   = do { lintL (isNativeIndexId b)
@@ -2576,6 +2604,17 @@ lintCoercion co@(AppCo co1 co2)
          else lintRole co Nominal r2 }
 
 ----------
+lintCoercion (TermAppCo f arg_co)
+  = do { (domain, _) <- lintNativeIndexFunction f
+       ; lintCoercion arg_co
+       ; lintL (coercionRole arg_co == Nominal)
+           (text "Opaque runtime call congruence requires nominal argument evidence."
+            $$ ppr arg_co)
+       ; let Pair left right = coercionKind arg_co
+       ; lintL (typeKind left `eqType` domain && typeKind right `eqType` domain)
+           (text "Opaque runtime call congruence has the wrong argument kinds."
+            $$ ppr arg_co) }
+
 lintCoercion co@(DepFunCo b body_co)
   = do { lintL (isNativeIndexId b)
            (text "Invalid retained coercion binder:" <+> ppr b <+> dcolon <+> ppr (varType b))

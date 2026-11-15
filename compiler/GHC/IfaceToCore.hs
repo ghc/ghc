@@ -1642,6 +1642,8 @@ tcIfaceType = go
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceFreeTermVar v)
       = failIfM (text "Cannot import a diagnostic-only retained index:" <+> ppr v)
+    go (IfaceTermAppTy {})
+      = failIfM (text "Opaque runtime call index interfaces are not implemented.")
     go (IfaceTermVar n)
       = do { v <- tcIfaceLclId n
            ; unless (isNativeIndexId v) $
@@ -1767,6 +1769,8 @@ tcIfaceCo = go
     go (IfaceFunCo r w c1 c2)    = mkFunCoNoFTF r <$> go w <*> go c1 <*> go c2
     go (IfaceDepFunCo {})
       = failIfM (text "Native dependent coercion interfaces are not implemented.")
+    go (IfaceTermAppCo {})
+      = failIfM (text "Opaque runtime call congruence interfaces are not implemented.")
     go (IfaceTyConAppCo r tc cs) = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2
     go (IfaceForAllCo tcv visL visR k co)

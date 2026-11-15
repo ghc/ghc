@@ -37,7 +37,7 @@ module GHC.Core.Coercion (
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
-        mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo,
+        mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo, mkTermAppCo,
         mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkUnivCoFromDeps, mkUnivCoAddTypeDeps,
         checkUnivCoDepsInv,
@@ -1018,6 +1018,7 @@ setNominalRole_maybe r co
       = TransCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_helper co2
     setNominalRole_maybe_helper (AppCo co1 co2)
       = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
+    setNominalRole_maybe_helper co@(TermAppCo {}) = Just co
     setNominalRole_maybe_helper (DepFunCo b co)
       = mkDepFunCo b <$> setNominalRole_maybe_helper co
     setNominalRole_maybe_helper co@(ForAllCo { fco_visL = visL, fco_visR = visR, fco_body = body_co })
@@ -1139,6 +1140,7 @@ mkKindCo :: Coercion -> Coercion
 mkKindCo (Refl ty)              = Refl (typeKind ty)
 mkKindCo (GRefl _ ty MRefl)     = Refl (typeKind ty)
 mkKindCo (GRefl _ _ (MCo co))   = co
+mkKindCo (TermAppCo f arg_co)  = mkNomReflCo (typeKind (TermAppTy f (coercionLKind arg_co)))
 mkKindCo co
   | let Pair ty1 ty2 = coercionKind co
         k1 = typeKind ty1
@@ -1201,6 +1203,7 @@ promoteCoercion co = case co of
             -- the first equation above.  Hence `assert False`
          mkNomReflCo liftedTypeKind
 
+    TermAppCo f arg_co -> mkNomReflCo (typeKind (TermAppTy f (coercionLKind arg_co)))
     DepFunCo {} -> mkNomReflCo liftedTypeKind
 
     FunCo {} -> mkKindCo co
@@ -1358,7 +1361,9 @@ mkFunResCo :: Role -> Id -> Coercion -> Coercion
 mkFunResCo role id res_co
   | isNonCoVarId id
   , id `elemVarSet` tyCoVarsOfCo res_co
-  = mkDepFunCo id res_co
+  = if isNativeIndexId id
+    then mkDepFunCo id res_co
+    else pprPanic "mkFunResCo: unsupported dependent runtime binder" (ppr id)
   | otherwise
   = mkFunCoNoFTF role mult arg_co res_co
   where
@@ -1772,6 +1777,11 @@ ty_co_subst !lc role ty
     go Phantom ty           = lift_phantom ty
     go r (TyVarTy tv)       = expectJust $
                               liftCoSubstTyVar lc r tv
+    go r ty@(TermAppTy _ arg)
+      = case (substTy (lcSubstLeft lc) ty, substTy (lcSubstRight lc) ty) of
+          (TermAppTy f _, TermAppTy g _) | f == g
+            -> downgradeRole r Nominal (mkTermAppCo f (go Nominal arg))
+          _ -> pprPanic "ty_co_subst: native function head changed" (ppr ty)
     go r ty@(TermVarTy {})  = lift_native r ty
     go r (DepFunTy b body)
       = let LC subst env = lc
@@ -2088,6 +2098,7 @@ coercion_lr_kind which orig_co
     go (GRefl _ ty (MCo co1)) = pickLR which (ty, mkCastTy ty co1)
     go (TyConAppCo _ tc cos)  = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)        = mkAppTy (go co1) (go co2)
+    go (TermAppCo f co)       = TermAppTy f (go co)
     go (DepFunCo b co)        = mkDepFunTy b (go co)
     go (CoVarCo cv)           = go_covar cv
     go (HoleCo h)             = go_covar (coHoleCoVar h)
@@ -2248,6 +2259,7 @@ coercionRole = go
     go (GRefl r _ _)                = r
     go (TyConAppCo r _ _)           = r
     go (AppCo co1 _)                = go co1
+    go (TermAppCo {})               = Nominal
     go (DepFunCo _ co)              = go co
     go (ForAllCo { fco_body = co }) = go co
     go (FunCo { fco_role = r })     = r
@@ -2300,6 +2312,11 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                   { TyVarTy tv2 -> tv1 == tv2
                   ; _           -> False      }) $
         mkNomReflCo ty1
+
+    go (TermAppTy f arg1) (TermAppTy g arg2)
+      | f == g = mkTermAppCo f (go arg1 arg2)
+    go ty1@(TermAppTy {}) ty2
+      = pprPanic "buildCoercion: different native function heads" (ppr ty1 $$ ppr ty2)
 
     go ty1@(TermVarTy {}) ty2
       | ty1 `eqType` ty2 = mkNomReflCo ty1

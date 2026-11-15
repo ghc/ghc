@@ -230,6 +230,7 @@ zonkCo      :: Coercion -> ZonkM Coercion
     zonkTcTypeMapper = TyCoMapper
       { tcm_tyvar = zonkTcTyVar
       , tcm_termvar = pure . TermVarTy
+      , tcm_termfun = pure
       , tcm_termbinder = \v k -> k v
           -- See Note [Zonking retained Boolean indices]
       , tcm_covar = \cv -> mkCoVarCo <$> zonkTyCoVarKind cv

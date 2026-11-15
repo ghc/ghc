@@ -14,7 +14,7 @@ Haskell. [WDP 94/11])
 
 module GHC.Types.Id.Info (
         -- * The IdDetails type
-        IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
+        IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails, isJoinIdDetails,
         mkDFunIdDetails,
         JoinArity, isJoinIdDetails_maybe,
 
@@ -413,6 +413,11 @@ coVarDetails :: IdDetails
 coVarDetails = CoVarId
 
 -- | Check if an 'IdDetails' says 'CoVarId'.
+-- | Test join-point details without exposing their representation.
+isJoinIdDetails :: IdDetails -> Bool
+isJoinIdDetails JoinId {} = True
+isJoinIdDetails _ = False
+
 isCoVarDetails :: IdDetails -> Bool
 isCoVarDetails CoVarId = True
 isCoVarDetails _       = False

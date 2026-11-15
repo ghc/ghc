@@ -1660,6 +1660,8 @@ invalidAbsDataSubTypes = execWriter . go
     go ty
       | Just ty' <- coreView ty
       = go ty'
+    go ty@(TermAppTy {})
+      = invalid ty
     go ty@(TermVarTy {})
       = invalid ty
     go ty@(DepFunTy {})

@@ -1421,6 +1421,9 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
     -----------------
     go :: CandidatesQTvs -> TcType -> TcM CandidatesQTvs
     -- Uses accumulating-parameter style
+    go dv (TermAppTy f arg)
+      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType f)
+           ; go dv1 arg }
     go dv (TermVarTy v)
       = collect_cand_qtvs orig_ty True cur_lvl bound dv (varType v)
         -- The Id is rigid. Only its type can contain quantification candidates.
@@ -1520,6 +1523,9 @@ collect_cand_qtvs_co :: TcType -- original type at top of recursion; for errors
                      -> TcM CandidatesQTvs
 collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
   where
+    go_co dv (TermAppCo f co)
+      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType f)
+           ; go_co dv1 co }
     go_co dv (DepFunCo v co)
       = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType v)
            ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` v) dv1 co }

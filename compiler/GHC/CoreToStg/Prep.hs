@@ -69,7 +69,7 @@ import GHC.Types.Basic
 import GHC.Types.Name   ( OccName, NamedThing(..), isInternalName, mkSystemName )
 import GHC.Types.Name.Occurrence (occNameString, mkTyVarOccFS)
 import GHC.Types.Var.Env ( mkInScopeSet, mkVarEnv, emptyVarEnv, lookupVarEnv, delVarEnv )
-import GHC.Types.Var.Set ( unionVarSet, unionVarSets )
+import GHC.Types.Var.Set ( unionVarSet, unionVarSets, extendVarSetList )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Unique.Supply
@@ -642,11 +642,11 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                    dmd lev env bndr1 rhs
        -- See Note [Inlining in CorePrep]
        ; let triv_rhs = exprIsTrivial rhs1
-                     -- Keep a lazy local index when its RHS is outside the
-                     -- supported index grammar. Types still refer to the Id.
+                     -- Keep lazy index and function-head bindings when their
+                     -- RHSs cannot replace the Id in native types.
+                     -- See Note [Opaque call arguments in CorePrep].
                      && (not (cp_allowNativeDependent (cpe_config env))
-                         || not (isNativeIndexId bndr)
-                         || isJust (exprToNativeIndex rhs1))
+                         || native_rhs_ok bndr1 rhs1)
              env2    | triv_rhs  = extendCorePrepEnvExpr env1 bndr rhs1
                      | otherwise = env1
              floats1 | triv_rhs, isInternalName (idName bndr)
@@ -657,6 +657,15 @@ cpeBind top_lvl env (NonRec bndr rhs)
              (new_float, _bndr2) = mkNonRecFloat env lev bndr1 rhs1
 
        ; return (env2, floats1, Nothing) }
+  where
+    native_rhs_ok bndr rhs
+      | isNativeIndexFunctionId bndr
+      = case rhs of
+          Var fun -> isNativeIndexFunctionId fun
+                  && idType fun `eqType` idType bndr
+          _ -> False
+      | isNativeIndexId bndr = isJust (exprToNativeIndex rhs)
+      | otherwise = True
 
 cpeBind top_lvl env (Rec pairs)
   -- A recursive join point.
@@ -936,6 +945,15 @@ cpeBodyF env (Case scrut bndr _ [Alt (DataAlt dc) [token_out, res] rhs])
   = cpeBodyF (extendCorePrepEnv env token_out token_in') rhs
 
 cpeBodyF env (Case scrut bndr ty alts)
+  | cp_allowNativeDependent (cpe_config env)
+  , App (Var fun) arg <- scrut
+  , isNativeIndexFunctionId fun
+  , not (exprIsTrivial arg)
+  , any (\alt -> isNativeIndexAlt alt || isNativeIndexAliasAlt alt) alts
+  , Just {} <- exprToNativeCaseIndex scrut
+  = do { named <- nameNativeCaseArgument fun arg bndr ty alts
+       ; cpeBodyF env named }
+  | otherwise
   = do { (floats, scrut') <- cpeBodyF env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let bndr3 = bndr2 `setIdUnfolding` evaldUnfolding
@@ -1112,7 +1130,7 @@ nameNativeConstructorArgs expr
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
       | DepFunTy index _ <- coreFullView ty
-      = do { (atom, co, wrap_arg) <- name_index arg
+      = do { (atom, co, wrap_arg) <- nameNativeIndexArg arg
            ; marker <- mkSysLocalM (fsLit "retained_template") ManyTy (varType index)
            ; let ty' = applyTypeToArgs ty [Var marker]
            ; build ty' (App app atom) ((marker, co) : transport)
@@ -1135,30 +1153,101 @@ nameNativeConstructorArgs expr
       = nativeIndexTransportError "a dependent erased binder kind"
       | otherwise = return ()
 
-    name_index arg
-      | Just (normal, index) <- normaliseNativeIndexExpr arg
-      = case collectArgs normal of
-          (Var worker, fields)
-            | Just con <- isDataConWorkId_maybe worker
-            , not (null fields)
-            -> do { named <- mapM name_index fields
-                  ; let atoms = [atom | (atom, _, _) <- named]
-                        field_cos = [co | (_, co, _) <- named]
-                        wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
-                        scrut = mkConApp con atoms
-                        scrut_index = expectJust (exprToNativeIndex scrut)
-                  ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
-                  ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
-                               (mkNomEqPred (TermVarTy value) scrut_index)
-                  ; let co = mkTransCo (mkCoVarCo proof)
-                               (mkTyConAppCo Nominal (promoteDataCon con) field_cos)
-                        wrap body = wrap_fields $
-                          Case scrut value (exprType body) [Alt DEFAULT [proof] body]
-                  ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
-                      return (Var value, co, wrap) }
-          (Var _, []) -> return (normal, mkReflCo Nominal index, id)
-          _ -> nativeIndexTransportError "an unsupported normalized retained argument"
-      | otherwise = nativeIndexTransportError "an unsupported retained argument"
+-- | Name a scalar index and prove its prepared-to-original equality.
+-- The wrapper evaluates constructor WHNFs, but does not evaluate their fields.
+nameNativeIndexArg :: CoreExpr
+                   -> UniqSM (CoreExpr, CoercionN, CoreExpr -> CoreExpr)
+nameNativeIndexArg arg
+  | Just (normal, index) <- normaliseNativeIndexExpr arg
+  = case collectArgs normal of
+      (Var worker, fields)
+        | Just con <- isDataConWorkId_maybe worker
+        , not (null fields)
+        -> do { named <- mapM nameNativeIndexArg fields
+              ; let atoms = [atom | (atom, _, _) <- named]
+                    field_cos = [co | (_, co, _) <- named]
+                    wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
+                    scrut = mkConApp con atoms
+                    scrut_index = expectJust (exprToNativeIndex scrut)
+              ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
+              ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
+                           (mkNomEqPred (TermVarTy value) scrut_index)
+              ; let co = mkTransCo (mkCoVarCo proof)
+                           (mkTyConAppCo Nominal (promoteDataCon con) field_cos)
+                    wrap body = wrap_fields $
+                      Case scrut value (exprType body) [Alt DEFAULT [proof] body]
+              ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
+                  return (Var value, co, wrap) }
+      (Var _, []) -> return (normal, mkReflCo Nominal index, id)
+      _ -> nativeIndexTransportError "an unsupported normalized retained argument"
+  | otherwise = nativeIndexTransportError "an unsupported retained argument"
+
+-- | Preserve strict call evidence when ANF naming changes its scalar argument.
+-- See Note [Opaque call arguments in CorePrep].
+nameNativeCaseArgument :: Id -> CoreExpr -> Id -> Type -> [CoreAlt]
+                       -> UniqSM CoreExpr
+nameNativeCaseArgument fun arg bndr ty alts
+  = do { (atom, arg_co, wrap) <- nameNativeIndexArg arg
+       ; let call_co = mkTermAppCo fun arg_co
+             prepared_index = coercionLKind call_co
+       ; alts' <- mapM (transport_alt call_co prepared_index) alts
+       ; return (wrap (Case (App (Var fun) atom) bndr ty alts')) }
+  where
+    transport_alt call_co prepared_index alt@(Alt con args rhs)
+      | DataAlt dc <- con
+      , isNativeIndexAlt alt
+      , (fields, [old_cv]) <- splitAt (dataConRepArity dc) args
+      = do { cv <- mkSysLocalOrCoVarM (fsLit "native_call") ManyTy
+                     (mkNomEqPred prepared_index
+                       (mkTyConApp (promoteDataCon dc) (map TermVarTy fields)))
+           ; let old_co = mkTransCo (mkSymCo call_co) (mkCoVarCo cv)
+           ; return (Alt con (fields ++ [cv]) (replace_proof old_cv old_co rhs)) }
+      | DEFAULT <- con
+      , [old_cv] <- args
+      , isCoVar old_cv
+      = do { cv <- mkSysLocalOrCoVarM (fsLit "native_call_alias") ManyTy
+                     (mkNomEqPred (TermVarTy bndr) prepared_index)
+           ; let old_co = mkTransCo (mkCoVarCo cv) call_co
+           ; return (Alt con [cv] (replace_proof old_cv old_co rhs)) }
+      | otherwise = return alt
+
+    replace_proof old_cv co rhs
+      = assertPpr (coercionType co `eqType` varType old_cv) (ppr old_cv $$ ppr co) $
+        substExpr (extendCvSubst (mkEmptySubst in_scope) old_cv co) rhs
+      where
+        in_scope = mkInScopeSet
+          (extendVarSetList (exprFreeVars rhs `unionVarSet` tyCoVarsOfCo co) [bndr])
+
+{- Note [Opaque call arguments in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked strict case can obtain evidence about f (S k), where f is an opaque
+local function. Ordinary ANF naming would replace S k with a fresh variable
+without preserving the original branch proof. Name the scalar argument with
+the existing checked constructor alias first. If q proves fresh ~# S k,
+TermAppCo f q proves f fresh ~# f (S k). Keep the actual call f fresh.
+
+A constructor branch now binds p :: f fresh ~# C fields. Replace its old proof
+with sym (TermAppCo f q) ; p. A DEFAULT alias instead binds
+p :: case_binder ~# f fresh; replace its old proof with p ; TermAppCo f q.
+Substitute these proofs through each RHS, including its types and coercions.
+Then use the ordinary CorePrep traversal for all binder cloning and naming.
+The argument wrappers evaluate only constructor WHNFs. Their fields stay lazy,
+so a bottom function still takes precedence over a bottom constructor field.
+Normalize supported immediate beta redexes before this step as for retained
+constructor arguments. Do not put a variable result under a strict alias case.
+
+This bridge belongs to an already strict case. Do not admit opaque calls as
+retained arguments through exprToNativeIndex: a strict alias for such a call
+could change the demand of a retained function that ignores its argument.
+Keep a local function head in its lazy binding unless its RHS is another
+eligible local variable of the same type. In particular, do not substitute a
+GlobalId or lambda into TermAppTy. Core Tidy supplies lazy aliases for free
+top-level heads; see Note [Local indices across Core Tidy] in GHC.Iface.Tidy.
+
+TermAppCo supplies forward argument congruence only. It neither evaluates the
+head nor decomposes an equality between call results. See
+docs/dependent-haskell/REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison.
+-}
 
 -- | Lift index equalities through value types and fixed-domain retained binders.
 -- Fresh symbolic Ids occur only in this temporary template, never in output Core.
@@ -1194,6 +1283,7 @@ liftNativeIndexTransport context transport ty
       | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) ty) = Just ty
       | Just ty' <- coreView ty = abstract env ty'
     abstract env (TermVarTy index) = mkTyVarTy <$> lookupVarEnv env index
+    abstract env (TermAppTy fun arg) = TermAppTy fun <$> abstract env arg
     abstract env (DepFunTy index body)
       | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) (varType index))
       = mkDepFunTy index <$> abstract (delVarEnv env index) body

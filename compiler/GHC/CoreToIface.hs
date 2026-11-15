@@ -199,6 +199,8 @@ toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType]
 toIfaceTypeX fr (TermVarTy var)
   | var `elemVarSet` fr = IfaceFreeTermVar var
   | otherwise = IfaceTermVar (mkIfLclName (occNameFS (getOccName var)))
+toIfaceTypeX fr (TermAppTy fun arg)
+  = IfaceTermAppTy (mkIfLclName (occNameFS (getOccName fun))) (toIfaceTypeX fr arg)
 toIfaceTypeX fr (DepFunTy var res)
   = IfaceDepFunTy (toIfaceIdBndrX fr var)
                   (toIfaceTypeX (fr `delVarSet` var) res)
@@ -330,6 +332,9 @@ toIfaceCoercionX fr co
 
     go (FunCo { fco_role = r, fco_mult = w, fco_arg = co1, fco_res = co2 })
       = IfaceFunCo r (go w) (go co1) (go co2)
+
+    go (TermAppCo fun co)
+      = IfaceTermAppCo (mkIfLclName (occNameFS (getOccName fun))) (go co)
 
     go (DepFunCo var co)
       = IfaceDepFunCo bndr

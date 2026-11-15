@@ -189,6 +189,7 @@ data IfaceType
   | IfaceDepFunTy IfaceIdBndr IfaceType
   | IfaceTermVar IfLclName
   | IfaceFreeTermVar Id                 -- Diagnostics only, like IfaceFreeTyVar
+  | IfaceTermAppTy IfLclName IfaceType  -- Diagnostic form; no wire encoding
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
                                             -- Includes newtypes, synonyms, tuples
   | IfaceCastTy     IfaceType IfaceCoercion
@@ -533,6 +534,7 @@ data IfaceCoercion
   | IfaceDepFunCo     IfaceIdBndr IfaceCoercion
       -- Diagnostic form only. The runtime binder scopes over the body.
       -- The interface writer and importer reject this form.
+  | IfaceTermAppCo    IfLclName IfaceCoercion -- Diagnostic form; no wire encoding
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceBndr !IfaceForAllTyFlag !IfaceForAllTyFlag IfaceMCoercion IfaceCoercion
@@ -781,6 +783,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceFreeTyVar {})     = False
     go (IfaceTermVar {})       = False
     go (IfaceFreeTermVar {})   = False
+    go (IfaceTermAppTy {})     = False
     go (IfaceDepFunTy {})      = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ w arg res) = go w && go arg && go res
@@ -806,6 +809,7 @@ visibleTypeVarOccurencies = go
     go (IfaceFreeTyVar {})      = mempty
     go (IfaceTermVar {})        = mempty
     go (IfaceFreeTermVar {})    = mempty
+    go (IfaceTermAppTy _ arg)   = go arg
     go (IfaceDepFunTy (w, _, arg) res) = go w <> go arg <> go res
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ w arg res) = go w <> go arg <> go res
@@ -844,6 +848,7 @@ substIfaceType env ty
     go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
     go ty@(IfaceTermVar {})  = ty
     go ty@(IfaceFreeTermVar {}) = ty
+    go (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go arg)
     go (IfaceDepFunTy {})    = pprPanic "substIfaceType: native dependent Core not implemented" (ppr ty)
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
@@ -863,6 +868,7 @@ substIfaceType env ty
     go_co (IfaceFunCo r w c1 c2)     = IfaceFunCo r (go_co w) (go_co c1) (go_co c2)
     go_co (IfaceDepFunCo {})
       = panic "substIfaceCoercion: native dependent coercion substitution is not implemented"
+    go_co (IfaceTermAppCo fun co) = IfaceTermAppCo fun (go_co co)
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
@@ -1226,6 +1232,8 @@ ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason 
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
 ppr_ty _         (IfaceTermVar var)     = ppr var
 ppr_ty _         (IfaceFreeTermVar var) = ppr var
+ppr_ty ctxt_prec (IfaceTermAppTy fun arg)
+  = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
 ppr_ty ctxt_prec (IfaceDepFunTy (_, var, arg) res)
   = maybeParen ctxt_prec funPrec $
     sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
@@ -1409,6 +1417,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
 
     go _ _ ty@(IfaceTermVar {}) = ty
     go _ _ ty@(IfaceFreeTermVar {}) = ty
+    go subs rank1 (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go subs rank1 arg)
 
     go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs (ifLclNameFS tv) of
       Just s -> s
@@ -2165,6 +2174,9 @@ ppr_co ctxt_prec (IfaceGReflCo r ty (IfaceMCo co))
   = ppr_special_co ctxt_prec
     (text "GRefl" <+> ppr r <+> pprParendIfaceType ty) [co]
 
+ppr_co ctxt_prec (IfaceTermAppCo fun co)
+  = maybeParen ctxt_prec appPrec (text "TermAppCo" <+> ppr fun <+> ppr_co appPrec co)
+
 ppr_co ctxt_prec (IfaceDepFunCo (_, var, arg) co)
   = maybeParen ctxt_prec funPrec $
     sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
@@ -2477,6 +2489,8 @@ putIfaceType _ (IfaceFreeTyVar tv)
 
 putIfaceType _ (IfaceFreeTermVar var)
   = pprPanic "Can't serialise IfaceFreeTermVar" (ppr var)
+putIfaceType _ (IfaceTermAppTy {})
+  = ioError (userError "Opaque runtime call index interfaces are not implemented.")
 putIfaceType bh (IfaceDepFunTy bndr body)
   = do { putByte bh 10; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceTermVar var)
@@ -2570,6 +2584,8 @@ instance Binary IfaceMCoercion where
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
 instance Binary IfaceCoercion where
+  put_ _ (IfaceTermAppCo {})
+       = ioError (userError "Opaque runtime call congruence interfaces are not implemented.")
   put_ _ (IfaceDepFunCo {})
        = ioError (userError "Native dependent coercion interfaces are not implemented.")
   put_ bh (IfaceReflCo a) = do
@@ -2750,6 +2766,7 @@ instance NFData IfaceType where
     IfaceDepFunTy bndr res -> rnf bndr `seq` rnf res
     IfaceTermVar var -> rnf var
     IfaceFreeTermVar var -> var `seq` ()
+    IfaceTermAppTy fun arg -> rnf fun `seq` rnf arg
     IfaceTyVar f1 -> rnf f1
     IfaceLitTy f1 -> rnf f1
     IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2
@@ -2769,6 +2786,7 @@ instance NFData IfaceTyLit where
 instance NFData IfaceCoercion where
   rnf = \case
     IfaceDepFunCo bndr co -> rnf bndr `seq` rnf co
+    IfaceTermAppCo fun co -> rnf fun `seq` rnf co
     IfaceReflCo f1 -> rnf f1
     IfaceGReflCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceFunCo f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4

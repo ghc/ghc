@@ -896,6 +896,9 @@ almost_devoid_co_var_of_co (TyConAppCo _ _ cos) cv
 almost_devoid_co_var_of_co (AppCo co arg) cv
   = almost_devoid_co_var_of_co co cv
   && almost_devoid_co_var_of_co arg cv
+almost_devoid_co_var_of_co (TermAppCo f co) cv
+  = almost_devoid_co_var_of_type (varType f) cv
+  && almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_co (DepFunCo v co) cv
   = almost_devoid_co_var_of_type (varType v) cv
   && almost_devoid_co_var_of_co co cv
@@ -939,6 +942,9 @@ almost_devoid_co_var_of_cos (co:cos) cv
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
+almost_devoid_co_var_of_type (TermAppTy f arg) cv
+  = almost_devoid_co_var_of_type (varType f) cv
+  && almost_devoid_co_var_of_type arg cv
 almost_devoid_co_var_of_type (TermVarTy v) cv
   = almost_devoid_co_var_of_type (varType v) cv
 almost_devoid_co_var_of_type (DepFunTy v ty) cv
@@ -989,6 +995,7 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     invis_vars = invis_vars1 `minusVarSet` vis_vars
 
     go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
+    go (TermAppTy f arg) = go (TermVarTy f) `mappend` go arg
     go (TermVarTy v)     = Pair (tyCoVarsOfType $ varType v) (unitVarSet v)
     go (DepFunTy v ty)
       = ((`delVarSet` v) <$> go ty) `mappend`
@@ -1028,6 +1035,7 @@ isInjectiveInType tv ty
   where
     go ty | Just ty' <- rewriterView ty = go ty'
     go (TyVarTy tv')                    = tv' == tv
+    go (TermAppTy {})                   = False
     go (TermVarTy v)                    = v == tv
     go (DepFunTy v ty)                  = go (varType v) || (tv /= v && go ty)
     go (AppTy f a)                      = go f || go a
@@ -1094,6 +1102,7 @@ inj_vars_of_type look_under_tfs = go
   where
     go ty | Just ty' <- rewriterView ty = go ty'
     go (TyVarTy v)                      = deepUnitFV (go . varType) v
+    go (TermAppTy {})                   = mempty
     go (TermVarTy v)                    = deepUnitFV (go . varType) v
     go (DepFunTy v ty)                  = go (varType v) `mappend`
                                           addBndrFV v (go ty)
@@ -1143,6 +1152,7 @@ invisibleVarsOfType = go
     go ty                  | Just ty' <- coreView ty
                            = go ty'
     go (TyVarTy v)         = go (tyVarKind v)
+    go (TermAppTy f arg)   = go (varType f) `unionVarSet` go arg
     go (TermVarTy v)       = go (varType v)
     go (DepFunTy v ty)
       = tyCoVarsOfType (varType v) `unionVarSet` (go ty `delVarSet` v)
@@ -1294,6 +1304,7 @@ tyConsOfType ty
      go :: Type -> UniqSet TyCon  -- The UniqSet does duplicate elim
      go ty | Just ty' <- coreView ty = go ty'
      go (TyVarTy {})                = emptyUniqSet
+     go (TermAppTy f arg)           = go (varType f) `unionUniqSets` go arg
      go (TermVarTy v)               = go (varType v)
      go (DepFunTy v ty)             = go (varType v) `unionUniqSets` go ty
      go (LitTy {})                  = emptyUniqSet
@@ -1310,6 +1321,7 @@ tyConsOfType ty
      go_co (GRefl _ ty mco)        = go ty `unionUniqSets` go_mco mco
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
+     go_co (TermAppCo f co)        = go (varType f) `unionUniqSets` go_co co
      go_co (DepFunCo v co)         = go (varType v) `unionUniqSets` go_co co
      go_co (ForAllCo { fco_kind = kind_co, fco_body = co })
                                    = go_mco kind_co `unionUniqSets` go_co co
@@ -1437,6 +1449,10 @@ occCheckExpand vs_to_avoid ty
       | bad_var_occ as tv               = Nothing
       | otherwise                       = return ty
 
+    go cxt@(as, env) (TermAppTy f arg)
+      | bad_var_occ as f = Nothing
+      | otherwise = TermAppTy (lookupVarEnv env f `orElse` f) <$> go cxt arg
+
     go (as, env) ty@(TermVarTy v)
       | Just v' <- lookupVarEnv env v = return (TermVarTy v')
       | bad_var_occ as v              = Nothing
@@ -1524,6 +1540,10 @@ occCheckExpand vs_to_avoid ty
                                              ; return (KindCo co') }
     go_co cxt (SubCo co)                = do { co' <- go_co cxt co
                                              ; return (SubCo co') }
+
+    go_co cxt@(as, env) (TermAppCo f arg_co)
+      | bad_var_occ as f = Nothing
+      | otherwise = TermAppCo (lookupVarEnv env f `orElse` f) <$> go_co cxt arg_co
 
     go_co cxt@(as, env) (DepFunCo v body_co)
       = do { arg_ty <- go cxt (varType v)

@@ -60,6 +60,7 @@ module GHC.Core.Type (
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys, mkDepFunTy, isBoolIndexId,
         isNativeIndexId, isNativeIndexType,
+        isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
@@ -244,6 +245,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
 
 -- friends:
 import GHC.Types.Var
+import {-# SOURCE #-} GHC.Types.Id.Info (isJoinIdDetails)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 
@@ -1794,6 +1796,7 @@ fun_kind_arg_flags = go emptySubst
 isTauTy :: Type -> Bool
 isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
 isTauTy (TyVarTy _)       = True
+isTauTy (TermAppTy _ arg) = isTauTy arg
 isTauTy (TermVarTy _)     = True
 isTauTy (DepFunTy {})     = False
 isTauTy (LitTy {})        = True
@@ -1811,6 +1814,7 @@ isAtomicTy :: Type -> Bool
 -- Used when deciding how to lay out type error messages; see the
 -- call in GHC.Tc.Errors
 isAtomicTy (TyVarTy {})    = True
+isAtomicTy (TermAppTy {})  = False
 isAtomicTy (TermVarTy {})  = True
 isAtomicTy (LitTy {})      = True
 isAtomicTy (TyConApp _ []) = True
@@ -1857,6 +1861,7 @@ coAxNthLHS ax ind =
 isFamFreeTy :: Type -> Bool
 isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
+isFamFreeTy (TermAppTy _ arg) = isFamFreeTy arg
 isFamFreeTy (TermVarTy _)     = True
 isFamFreeTy (DepFunTy b ty)   = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (LitTy {})        = True
@@ -2317,6 +2322,25 @@ isNativeIndexType ty = go emptyTyConSet [ty]
       ManyTy -> True
       _ -> False
 
+-- | Return the independently closed argument and result domains of a native head.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+nativeIndexFunctionTys_maybe :: Id -> Maybe (Type, Type)
+nativeIndexFunctionTys_maybe f
+  | isLocalId f, not (isCoVar f), isManyTy (idMult f)
+  , not (isJoinIdDetails (idDetails f))
+  , noFreeVarsOfType (varType f), noFreeVarsOfType (idMult f)
+  , FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res }
+      <- coreFullView (varType f)
+  , isVisibleFunArg af, isManyTy mult
+  , noFreeVarsOfType mult
+  , isNativeIndexType arg, isNativeIndexType res
+  = Just (arg, res)
+  | otherwise = Nothing
+
+-- | Test whether an identifier is an eligible opaque native call head.
+isNativeIndexFunctionId :: Id -> Bool
+isNativeIndexFunctionId = isJust . nativeIndexFunctionTys_maybe
+
 -- | Test whether a local unrestricted identifier has a supported index domain.
 isNativeIndexId :: Id -> Bool
 isNativeIndexId v
@@ -2365,6 +2389,9 @@ typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)              = typeLiteralKind l
 typeKind (FunTy { ft_af = af }) = liftedTypeOrConstraintKind (funTyFlagResultTypeOrConstraint af)
 typeKind (TyVarTy tyvar)        = tyVarKind tyvar
+typeKind (TermAppTy f _)        = case nativeIndexFunctionTys_maybe f of
+  Just (_, res) -> res
+  Nothing -> pprPanic "typeKind: invalid native function" (ppr f)
 typeKind (TermVarTy v)          = varType v
 typeKind (DepFunTy _ _)         = liftedTypeKind
 typeKind (CastTy _ty co)        = coercionRKind co
@@ -2554,6 +2581,7 @@ isConcreteTypeWith :: TyVarSet -> Type -> Bool
 isConcreteTypeWith conc_tvs = go
   where
     go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
+    go (TermAppTy {})      = False
     go (TermVarTy _)       = False
     go (DepFunTy {})       = False
     go (AppTy ty1 ty2)     = go ty1 && go ty2

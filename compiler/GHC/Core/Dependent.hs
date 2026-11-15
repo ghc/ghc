@@ -203,6 +203,7 @@ scanSynonym tc
 scanType :: Type -> NativeScan
 scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy _) = NativeScan (pure True)
+scanType (TermAppTy _ _) = NativeScan (pure True)
 scanType (DepFunTy _ _) = NativeScan (pure True)
 scanType (LitTy _) = mempty
 scanType (TyConApp tc args) = foldMap scanType args <> scanSynonym tc
@@ -215,6 +216,7 @@ scanType (CoercionTy co) = scanCo co
 -- | Inspect coercion annotations and dependencies.
 scanCo :: Coercion -> NativeScan
 scanCo (DepFunCo _ _) = NativeScan (pure True)
+scanCo (TermAppCo _ _) = NativeScan (pure True)
 scanCo (Refl ty) = scanType ty
 scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco
 scanCo (TyConAppCo _ _ args) = foldMap scanCo args

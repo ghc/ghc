@@ -898,6 +898,7 @@ rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty
 rnIfaceCo (IfaceGReflCo role ty mco)    = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
 rnIfaceCo (IfaceFunCo role w co1 co2)   = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceTermAppCo fun co) = IfaceTermAppCo fun <$> rnIfaceCo co
 rnIfaceCo (IfaceDepFunCo bndr co)
     = IfaceDepFunCo <$> rnIfaceIdBndr bndr <*> rnIfaceCo co
 rnIfaceCo (IfaceTyConAppCo role tc cos) = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
@@ -941,6 +942,7 @@ rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)
 rnIfaceType (IfaceFreeTermVar n) = pure (IfaceFreeTermVar n)
 rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
 rnIfaceType (IfaceTermVar n)   = pure (IfaceTermVar n)
+rnIfaceType (IfaceTermAppTy fun arg) = IfaceTermAppTy fun <$> rnIfaceType arg
 rnIfaceType (IfaceDepFunTy bndr body)
     = IfaceDepFunTy <$> rnIfaceIdBndr bndr <*> rnIfaceType body
 rnIfaceType (IfaceAppTy t1 t2)

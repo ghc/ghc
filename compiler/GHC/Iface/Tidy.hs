@@ -1197,7 +1197,8 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
                                        indices aliases
            ; return (bndr, mkLets alias_binds (CoreSubst.substExpr subst rhs)) }
       where
-        indices = filter (\v -> v `elemVarSet` top_binders && isNativeIndexId v)
+        indices = filter (\v -> v `elemVarSet` top_binders
+                            && (isNativeIndexId v || isNativeIndexFunctionId v))
                          (exprFreeVarsList rhs)
         index_set = mkVarSet indices
 
@@ -1211,7 +1212,8 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
 Core Tidy turns top-level LocalIds into GlobalIds. A native argument such as
 S bottomLength can therefore pass the earlier checks but fail after Tidy:
 exprToNativeIndex requires each variable leaf to be a local unrestricted Id.
-Do not extend that grammar to arbitrary GlobalIds.
+TermAppTy also requires a local unrestricted function head. Do not extend
+either grammar to arbitrary GlobalIds.
 
 Before tidyTopBinds, give each native RHS lazy local aliases for its free
 native top-level Ids. Use the deterministic exprFreeVarsList order. Substitute
@@ -1222,12 +1224,14 @@ alias local. Local binder and type tidying already share the same environment.
 
 The top binder and its type do not change. A selected index must not escape
 through that type. Source signature and inference checks already exclude
-that escape. The alias has the original closed domain and Many multiplicity.
-The lazy binding does not evaluate the index or change the function arity.
+that escape. The alias has the original closed scalar domain or closed-domain
+function type, and Many multiplicity. The lazy binding does not evaluate the
+index or function head, and does not change the function arity.
 Ordinary RHSs take the existing path. This late step runs after simplification;
 no simplifier can inline an alias before Tidy globalises its RHS. CorePrep's
-native cpeBind guard then keeps aliases whose global RHS is outside the index
-grammar. Keep the native unfolding and interface restrictions in force.
+native cpeBind guard then keeps aliases whose global RHS is outside the scalar
+index or local function-head grammar. Keep the native unfolding and interface
+restrictions in force.
 
 This is a GHC scope adaptation, not a new dependent equality rule. See
 docs/dependent-haskell/REFERENCES.md#source-vector-uncons.
