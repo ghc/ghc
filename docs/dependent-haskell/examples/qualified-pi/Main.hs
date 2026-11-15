@@ -19,6 +19,7 @@ import Data.List (isInfixOf)
 import Data.Type.Equality ((:~:) (Refl))
 import FunctionStableNameClient (sameFunction, samePlainFunction)
 import GHC.Exts (withDict)
+import GroundApplicationClient
 import PackedVecLibrary
 import QualifiedPiLibrary
 import System.Mem.StableName (makeStableName)
@@ -161,6 +162,7 @@ main = do
     runOrdinaryPatternChecks
     runGadtPatternChecks
     runFullWorkerChecks
+    runGroundApplicationChecks
 
 -- | Specialize the injected-context function from its complete expected arrow.
 specializeDemand :: DPi -> DPi
@@ -441,3 +443,71 @@ runFullWorkerChecks = do
     putStrLn "worker full ignored proof function identity: True"
     checkWhnf partial
     putStrLn "worker partial bottom proof: ok"
+
+-- | Feed a runtime index to operations compiled under ImpredicativeTypes.
+checkGroundApplicationFinite :: Int -> Nat -> IO ()
+checkGroundApplicationFinite count index = do
+    cell <- newIORef index
+    n <- readIORef cell
+    let direct = toList (groundDirect n original)
+        named = toList (groundNamed n original)
+        known = toList (groundKnown n original)
+        ordered = toList (groundOrdered n original)
+        given = toList (groundGiven n original)
+        expected = replicate count 7
+        label = "ground Impred finite " ++ show count
+    forM_ [direct, named, known, ordered, given] $ assertEqual label expected
+    putStrLn (label ++ ": " ++ show direct ++ " | " ++ show named ++ " | " ++ show known ++ " | " ++ show ordered ++ " | " ++ show given)
+
+-- | Check fixed instantiation without changing proof and function demand.
+runGroundApplicationChecks :: IO ()
+runGroundApplicationChecks = do
+    forM_
+        [ (0, Z)
+        , (1, S Z)
+        , (2, S (S Z))
+        , (3, S (S (S Z)))
+        ]
+        $ \(count, n) -> checkGroundApplicationFinite count n
+    assertEqual "ground ignored proof and function" 42 (groundIgnore bottomFunction)
+    putStrLn "ground ignored proof and function: 42"
+    checkWhnf (PackVec bottomLength (groundDirect bottomLength bottomFunction))
+    checkWhnf (PackVec cyclicLength (groundDirect cyclicLength bottomFunction))
+    putStrLn "ground package ignores indices and vector: ok"
+    expectMarker "ground proof before function" "native-ground-bottom-proof" $
+        checkWhnf (groundDemandProof bottomFunction)
+    expectMarker "ground Refl bottom function" "native-q-bottom-function" $
+        checkWhnf (groundTransport bottomFunction)
+    expectMarker "ground named Refl bottom function" "native-q-bottom-function" $
+        checkWhnf (groundNamedTransport bottomFunction)
+    let transported :: QPi
+        transported = groundTransport original
+        ignored :: QPi
+        ignored = groundIgnoreProof original
+    checkWhnf original
+    checkWhnf transported
+    same <- sameFunction original transported
+    assertEqual "ground transport function identity" True same
+    putStrLn "ground transport function identity: True"
+    checkWhnf ignored
+    ignoredSame <- sameFunction original ignored
+    assertEqual "ground ignored proof function identity" True ignoredSame
+    putStrLn "ground ignored proof function identity: True"
+    checkWhnf groundPartialProof
+    putStrLn "ground partial bottom proof: ok"
+    expectMarker "ground demanded Eq tag" "native-ground-bottom-tag" $
+        checkWhnf (groundDemandTag original)
+    assertEqual "ground phantom native argument" 42 groundPhantom
+    putStrLn "ground phantom native argument: 42"
+    assertEqual "ground inferred kind Proxy" 42 groundProxy
+    putStrLn "ground inferred kind Proxy: 42"
+    let partial = take 1 (toList (groundDirect (S bottomLength) original))
+        cyclic = take 3 (toList (groundDirect cyclicLength original))
+    assertEqual "ground partial index prefix" [7] partial
+    putStrLn ("ground partial index prefix: " ++ show partial)
+    assertEqual "ground cyclic index prefix" [7, 7, 7] cyclic
+    putStrLn ("ground cyclic index prefix: " ++ show cyclic)
+    expectMarker "ground bottom proof before index" "native-ground-bottom-proof" $
+        checkWhnf (toList (groundDemandProof original bottomLength))
+    expectMarker "ground monomorphic bottom proof" "native-ground-bottom-proof" $
+        checkWhnf (groundKnownDemandProof bottomFunction)

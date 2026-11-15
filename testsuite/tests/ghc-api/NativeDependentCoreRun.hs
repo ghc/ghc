@@ -2950,21 +2950,27 @@ checkSourceRejection label code fragment result =
 ImpredicativeTypes admits these complete qualified Pi equality operands.
 Conversion must retain each constraint arrow and its predicate. A known
 monomorphic variable can use its checked type without Quick Look inference.
-The negative head and local-alias cases record current inference restrictions.
-They do not specify that these source forms must always reject.
+The unsigned local alias still requires a complete signature. Other negative
+head cases record current inference restrictions. They do not specify that
+these source forms must always reject.
 Alias checks distinguish an unused synonym parameter from an occurrence in
 the expanded predicate.
 
-The local alias has separate inference and Quick Look diagnostics. Check both
-located envelopes from one compilation. The standalone matrix pins their exact
-source positions. See Note [Known native variables with ImpredicativeTypes]
+The unsigned local alias has one located explicit-signature diagnostic.
+The standalone matrix records its source position.
+See Note [Known native variables with ImpredicativeTypes]
 in GHC.Tc.Gen.App and Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
 
 Container clients load one ImpredicativeTypes provider. It imports the actual
 PackedVecLibrary types. Compile the provider to object code without linking.
-Native bytecode module compilation remains unsupported. Each client disables
-ImpredicativeTypes and checks its
-complete source without a local Nat or Vec declaration. Ordinary tau controls
+Native bytecode module compilation remains unsupported. Most clients disable
+ImpredicativeTypes. Ground application clients enable it after these defaults.
+They retain the written type applications and check the saved invisible
+arguments as well as the residual type. Complete Refl witnesses use the
+ordinary constructor checker. No equality axiom is added.
+See Note [Ground retained applications] in GHC.Tc.Gen.App.
+Each client checks its complete source without a local Nat or Vec declaration.
+Ordinary tau controls
 keep their existing inference path. Rejections record current guard and
 inference boundaries; they do not establish permanent source invalidity.
 The standalone matrix owns exact source positions and full pipeline checks.
@@ -3169,9 +3175,6 @@ runPackageSourceRejectChecks = do
         , ("QualifiedPiRepresentationalGiven", 91028, "Cannot equate type variable", qualifiedPiExtensions, ["import Data.Coerce (Coercible)"], ["representation :: forall value. Coercible value (foreach (n :: Nat) -> Eq Int => Vec Int n) => value -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "representation f = f"])
         , ("QualifiedPiPredicateOccurrence", 83865, "Couldn't match expected type", qualifiedPiExtensions, [], ["predicateCycle :: forall value. value ~ (foreach (n :: Nat) -> Eq value => Vec Int n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq value => Vec Int n), Vec Bool m))", "predicateCycle f = f"])
         , ("QualifiedPiPredicateMismatch", 83865, "Couldn't match type", qualifiedPiExtensions, [], ["wrongDictionary :: forall value. value ~ (foreach (n :: Nat) -> Eq Int => Vec Int n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq Bool => Vec Int n), Vec Bool m))", "wrongDictionary f = f"])
-        , ("QualifiedPiPolymorphicHeadUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["polyHead :: (foreach (n :: Nat) -> Eq Int => Vec Int n)", "polyHead = undefined"])
-        , ("QualifiedPiAppliedHeadUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["sameQ :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "sameQ f = f", "applied :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "applied f = sameQ f"])
-        , ("QualifiedPiLeadingDictionaryUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["leading :: (Eq Int => (foreach (n :: Nat) -> Eq Int => Vec Int n)) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "leading f = f"])
         , ("QualifiedAliasPredicateOccurrence", 83865, "Couldn't match expected type", qualifiedPiExtensions, [], ["type Cycle value = foreach (n :: Nat) -> Eq value => Vec Int n", "badAliasCycle :: forall value. value ~ Cycle value => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq value => Vec Int n), Vec Bool m))", "badAliasCycle f = f"])
         , ("MatrixFallbackUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [| 42 :: Int |] in Nothing"])
         , ("MatrixFallbackTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [|| 42 :: Int ||] in Nothing"])
@@ -3213,10 +3216,7 @@ runPackageSourceRejectChecks = do
                                , "  VCons :: a -> Vec a n -> Vec a (S n)"
                                ]
                             ++ declarations
-            let diagnostics =
-                    (code, fragment)
-                        : [(83605, "Quick Look inference") | name == "QualifiedPiKnownNativeLocalAlias"]
-            sourceModuleRejectsWith name diagnostics moduleName source
+            sourceModuleRejects name code fragment moduleName source
     -- Check Pi formation and immutable proof transport without adding output.
     forM_
         [ ("OrdinaryArrowGiven", ["TypeFamilies", "FlexibleContexts"], [], ["ordinaryArrow :: forall value. value ~ (Int -> Int) => value -> Int -> Int", "ordinaryArrow f = f"])
@@ -3255,6 +3255,9 @@ runPackageSourceRejectChecks = do
         , ("OrdinaryImpredicativeList", qualifiedPiExtensions, [], ["ids :: [forall a. a -> a]", "ids = [id, id]"])
         , ("QualifiedAliasBeneathBinder", qualifiedPiExtensions, [], ["type Q = foreach (n :: Nat) -> Eq Int => Vec Int n", "type Lift = foreach (m :: Nat) -> Vec Bool m -> Q", "aliasLift :: forall value. value ~ Q => (foreach (m :: Nat) -> Vec Bool m -> value) -> Lift", "aliasLift f = f"])
         , ("ForgetfulQualifiedAlias", qualifiedPiExtensions, [], ["type Forget value = foreach (n :: Nat) -> Eq Int => Vec Int n", "forgetful :: forall value. value ~ Forget value => (foreach (m :: Nat) -> Vec Bool m -> value) -> (foreach (m :: Nat) -> Vec Bool m -> Forget value)", "forgetful f = f"])
+        , ("QualifiedPiGroundPolymorphicHead", qualifiedPiExtensions, [], ["polyHead :: (foreach (n :: Nat) -> Eq Int => Vec Int n)", "polyHead = undefined"])
+        , ("QualifiedPiGroundAppliedHead", qualifiedPiExtensions, [], ["sameQ :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "sameQ f = f", "applied :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "applied f = sameQ f"])
+        , ("QualifiedPiGroundLeadingDictionary", qualifiedPiExtensions, [], ["leading :: (Eq Int => (foreach (n :: Nat) -> Eq Int => Vec Int n)) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "leading f = f"])
         ]
         $ \(name, extensions, imports, declarations) -> do
             let moduleName = "NativeSourcePiOperand" ++ name
@@ -3342,6 +3345,17 @@ runPackageSourceRejectChecks = do
             , "withQ proof f = case proof of Refl -> f"
             , "type ProofQ = QPi :~: QPi"
             , "data ProofBox = ProofBox ProofQ"
+            , "withKnownQ :: ProofQ -> QPi -> QPi"
+            , "withKnownQ proof f = case proof of Refl -> f"
+            , "groundKindIdentity :: forall {kind} (a :: kind). Proxy a -> Proxy a"
+            , "groundKindIdentity p = p"
+            , "groundSpecifiedKindIdentity :: forall kind (a :: kind). Proxy a -> Proxy a"
+            , "groundSpecifiedKindIdentity p = p"
+            , "groundClass :: forall tag value. Eq tag => tag -> (value :~: QPi) -> value -> QPi"
+            , "groundClass _ proof f = case proof of Refl -> f"
+            , "type ScopedQ (k :: Nat) = foreach (n :: Nat) -> Vec Bool n -> (Vec Int k, Vec Bool n)"
+            , "withScoped :: forall (index :: Nat) value. (value :~: ScopedQ index) -> value -> ScopedQ index"
+            , "withScoped proof f = case proof of Refl -> f"
             , "exposeQ :: forall value. value ~ QPi => value -> QPi"
             , "exposeQ f = f"
             , "contextConsumer :: forall value. value ~ QPi => value -> Int"
@@ -3423,6 +3437,21 @@ runPackageSourceRejectChecks = do
         , ("NominalContainerGiven", Nothing, [], ["import NativePiContainerProvider hiding (NativePi)"], ["type NativePi = foreach (n :: Nat) -> Vec Int n", "nominal :: forall value. value ~ (NativePi, NativePi) => value -> (NativePi, NativePi)", "nominal x = x"])
         , ("RepresentationalEvidenceIsNotNominal", Just (91028, "Cannot equate type variable"), [], ["import NativePiContainerProvider hiding (NativePi)", "import Data.Coerce (Coercible)"], ["type NativePi = foreach (n :: Nat) -> Vec Int n", "representation :: forall value. Coercible value (NativePi, NativePi) => value -> (NativePi, NativePi)", "representation x = x"])
         , ("NewtypeContainer", Nothing, [], ["import NativePiContainerProvider"], ["shellClient :: QPi -> QPi", "shellClient f = openShell (headTuple (ContainerShell f, ContainerShell f))"])
+        , ("GroundApplicationImpredExplicitVTARefl", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = withQ @QPi Refl f"])
+        , ("GroundApplicationImpredExplicitVTABottomProof", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = withQ @QPi (error \"native-worker-bottom-proof\") f"])
+        , ("GroundApplicationImpredExplicitVTAIncomingProof", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: ProofQ -> QPi -> QPi", "via proof f = withQ @QPi proof f"])
+        , ("GroundApplicationImpredKnownMonomorphicProofHead", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = withKnownQ Refl f"])
+        , ("GroundApplicationClosedGroundRefl", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["closed :: QPi :~: QPi", "closed = Refl"])
+        , ("GroundApplicationGroundInferredKindParameter", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))", "import Data.Proxy (Proxy)"], ["via :: Proxy QPi -> Proxy QPi", "via p = groundKindIdentity @QPi p"])
+        , ("GroundApplicationGroundSpecifiedKindParameter", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))", "import Data.Proxy (Proxy)", "import Data.Kind (Type)"], ["via :: Proxy QPi -> Proxy QPi", "via p = groundSpecifiedKindIdentity @Type @QPi p"])
+        , ("GroundApplicationGroundClassAndLeadingVTA", Nothing, ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = groundClass @Bool @QPi True Refl f"])
+        , ("GroundApplicationGroundPhantomInferredKindPrefix", Nothing, ["ImpredicativeTypes", "PolyKinds"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))", "import Data.Kind (Type)"], ["phantomKind :: forall {kind} (value :: Type). Int", "phantomKind = 42", "via :: Int", "via = phantomKind @QPi"])
+        , ("GroundApplicationGroundFilledInferredKindPrefix", Nothing, ["ImpredicativeTypes", "PolyKinds"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))", "import Data.Proxy (Proxy (..))"], ["filledKind :: forall {kind} (value :: kind). Proxy value -> Int", "filledKind _ = 42", "via :: Int", "via = filledKind @QPi Proxy"])
+        , ("GroundApplicationGroundDirectPhantomValuePrefix", Nothing, ["ImpredicativeTypes", "PolyKinds"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["phantomValue :: forall value. Int", "phantomValue = 42", "via :: Int", "via = phantomValue @QPi"])
+        , ("GroundApplicationGroundWrongProof", Just (83865, "Couldn't match type"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: (Bool :~: QPi) -> QPi -> QPi", "bad proof f = withQ @QPi proof f"])
+        , ("GroundApplicationGroundRepresentationalGiven", Just (91028, "Cannot equate type variable"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))", "import Data.Coerce (Coercible)"], ["bad :: forall value. Coercible value QPi => value -> QPi", "bad f = withQ @value Refl f"])
+        , ("GroundApplicationGroundMissingClass", Just (39999, "No instance for"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> QPi", "bad f = requiresShowQ @QPi Refl f"])
+        , ("GroundApplicationGroundScopedWrongIndex", Just (83865, "Couldn't match type"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> ScopedQ n -> ScopedQ m", "bad n m f = withScoped @m @(ScopedQ n) Refl f"])
         ]
     qualifiedPiExtensions = ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "ImpredicativeTypes"]
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
@@ -3593,6 +3622,17 @@ runSourceRejectChecks = do
             , "entry :: Int"
             , "entry = 42"
             ]
+    -- Keep the former Quick Look boundary as the same checked source.
+    void $ sourceEntry "NativeSourceGroundImpredicative" $
+        unlines $
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeFamilies, TypeOperators #-}"
+            , "{-# LANGUAGE ImpredicativeTypes #-}"
+            , "module NativeSourceGroundImpredicative where"
+            , "type family Select (b :: Bool) where"
+            , "  Select True = Int"
+            , "  Select False = Bool"
+            ]
+                ++ local [] consumer ["keep b x = 42"] "keep True 42"
     mapM_
         check
         [ ("unsupported algebraic domain", 83605, "supported closed first-order algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
@@ -3605,7 +3645,6 @@ runSourceRejectChecks = do
         , ("producer expression argument", 83605, "local index variable or a supported constructor tree", [], local [] consumer identity "keep (not False) 42")
         , ("nonreflexive indexed constraint", 18872, "True", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
         , ("general indexed constraint", 39999, "Show", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
-        , ("ImpredicativeTypes", 83605, "Quick Look inference", ["ImpredicativeTypes"], local [] consumer ["keep b x = 42"] "keep True 42")
         , ("Quick Look through ($)", 83605, "Quick Look inference", [], local [] consumer ["keep b x = 42"] "(keep $ True) 42")
         , ("INLINE retained function", 83605, "Optimisation pragmas", [], local ["{-# INLINE keep #-}"] selection identity "42")
         , ("INLINABLE retained function", 83605, "Optimisation pragmas", [], local ["{-# INLINABLE keep #-}"] selection identity "42")
