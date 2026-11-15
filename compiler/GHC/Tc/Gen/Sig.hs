@@ -226,7 +226,11 @@ tcUserTypeSig loc hs_sig_ty mb_name
   = failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
 
   | isCompleteHsSig hs_sig_ty
-  = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
+  = do { -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
+         let allow_function = case mb_name of
+               Just _ -> True
+               Nothing -> False
+       ; sigma_ty <- tcHsSigWcType allow_function ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $ TcCompleteSig $
          CSig { sig_bndr  = mkLocalId name ManyTy sigma_ty

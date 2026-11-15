@@ -1678,11 +1678,12 @@ tcIfaceType = go
            ; return (TermVarTy v) }
     go (IfaceDepFunTy bndr body)
       -- See Note [Retained binders in interfaces].
+      -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
       = bindIfaceId bndr $ \ v ->
-        do { unless (isNativeIndexId v) $
+        do { unless (isNativeRetainedBinder v) $
                failIfM (text "Invalid retained binder in interface:" <+> ppr v
                         $$ text "Expected a local identifier with multiplicity Many"
-                        $$ text "and a supported algebraic index domain."
+                        $$ text "and a supported scalar or closed function domain."
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; body' <- go body

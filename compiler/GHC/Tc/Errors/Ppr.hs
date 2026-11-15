@@ -3573,7 +3573,7 @@ pprRetainedQuantificationError reason = case reason of
   RetainedUnsupportedContext ->
     text "Retained quantification is supported only at the start of an explicit value signature."
   RetainedFunctionSignature ->
-    text "A function-valued retained binder requires a complete local value signature."
+    text "A function-valued retained binder requires a complete ordinary value signature."
   RetainedStaging ->
     text "Retained quantification in Template Haskell quotations or splices is not supported yet."
   RetainedConstructorCoverage ->

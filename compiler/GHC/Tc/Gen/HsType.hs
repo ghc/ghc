@@ -384,11 +384,13 @@ pprSigCtxt ctxt hs_ty
   = hang (text "In" <+> pprUserTypeCtxt ctxt <> colon)
        2 (ppr hs_ty)
 
-tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
+tcHsSigWcType :: Bool -> UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- This one is used when we have a LHsSigWcType, but in
 -- a place where wildcards aren't allowed. The renamer has
 -- already checked this, so we can simply ignore it.
-tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
+-- See Note [Exported function-valued retained signatures].
+tcHsSigWcType allow_function ctxt sig_ty =
+  tc_hs_sig_type allow_function ctxt (dropWildCards sig_ty)
 
 kcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM ()
 -- This is a special form of tcClassSigType that is used during the
@@ -441,15 +443,19 @@ tcClassSigType names sig_ty
 tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
 -- See Note [Recipe for checking a signature]
-tcHsSigType ctxt sig_ty
+tcHsSigType = tc_hs_sig_type False
+
+-- | Check a signature with explicit permission for retained function domains.
+tc_hs_sig_type :: Bool -> UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
+tc_hs_sig_type allow_function ctxt sig_ty
   = addSigCtxt ctxt (UserLHsSigType sig_ty) $
     do { traceTc "tcHsSigType {" (ppr sig_ty)
        ; skol_info <- mkSkolemInfo skol_info
           -- Generalise here: see Note [Kind generalisation]
-       ; let retained_name = case ctxt of
-               FunSigCtxt name _ -> Just name
+       ; let retained_sig = case ctxt of
+               FunSigCtxt{} -> Just allow_function
                _ -> Nothing
-       ; (implic, ty) <- tc_lhs_sig_type retained_name skol_info sig_ty (expectedKindInCtxt ctxt)
+       ; (implic, ty) <- tc_lhs_sig_type retained_sig skol_info sig_ty (expectedKindInCtxt ctxt)
 
        -- Float out constraints, failing fast if not possible
        -- See Note [Failure in local type signatures] in GHC.Tc.Solver
@@ -463,15 +469,17 @@ tcHsSigType ctxt sig_ty
   where
     skol_info = SigTypeSkol ctxt
 
-tc_lhs_sig_type :: Maybe Name -> SkolemInfo -> LHsSigType GhcRn
+tc_lhs_sig_type :: Maybe Bool -> SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Implication, TcType)
+-- Nothing selects the ordinary type checker. Just selects the retained
+-- signature walker and supplies its function-domain permission.
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities internally.
 -- No validity checking or zonking
 -- Returns also an implication for the unsolved constraints
-tc_lhs_sig_type retained_name skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
+tc_lhs_sig_type retained_sig skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
                                                    , sig_body = hs_ty })) ctxt_kind
   = setSrcSpanA loc $
     do { (tc_lvl, wanted, (exp_kind, (outer_bndrs, ty)))
@@ -480,8 +488,8 @@ tc_lhs_sig_type retained_name skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = h
                  do { exp_kind <- newExpectedKind ctxt_kind
                           -- See Note [Escaping kind in type signatures]
                     ; stuff <- tcOuterTKBndrs skol_info hs_outer_bndrs $
-                               (case retained_name of
-                                  Just name -> tcCheckRetainedSigType name
+                               (case retained_sig of
+                                  Just allow_function -> tcCheckRetainedSigType allow_function
                                   Nothing -> tcCheckLHsType) hs_ty exp_kind
                     ; return (exp_kind, stuff) }
 
@@ -549,10 +557,10 @@ tcRetainedAmbientIndices invalid_reason hs_ty
 
 -- | Check retained telescopes in function positions of a complete signature.
 -- See Note [Higher-order retained signatures].
-tcCheckRetainedSigType :: Name -> LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckRetainedSigType name hs_ty kind
+tcCheckRetainedSigType :: Bool -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckRetainedSigType allow_function hs_ty kind
   = do { indices <- tcRetainedAmbientIndices RetainedLocalSignatureIndex hs_ty
-       ; tcCheckRetainedType (isInternalName name)
+       ; tcCheckRetainedType allow_function
            (typeLevelMode { mode_indices = indices }) hs_ty kind }
 
 -- | Check a retained type without changing the caller's index environment.
@@ -690,11 +698,11 @@ path in tcTyVar. Check each binder domain before extending this environment.
 Then check the next binder and the body in the extended environment. The
 domain is a value type, so its annotation does not require KindSignatures.
 It must satisfy isNativeRetainedBinderType. Each runtime binder has multiplicity
-Many. A function domain requires a complete local value signature. Carry that
-permission privately from the signature Name. Other formation paths do not gain
-it. Check before mkDepFunTy can remove a vacuous binder. Register a function
-Id only for dedicated call-head lookup; tcTyVar still rejects bare function
-indices. Retained constructor fields keep their scalar-domain check.
+Many. See Note [Exported function-valued retained signatures] for the function
+domain permission. Check before mkDepFunTy can remove a vacuous binder.
+Register a function Id only for dedicated call-head lookup. tcTyVar still
+rejects bare function indices. Retained constructor fields use the same closed
+function-domain policy.
 See Note [Function-valued retained binders] in GHC.Core.Type.
 The ordinary outer-forall checker scopes erased type variables around the
 whole telescope. The result has kind Type. Retained binders in other type
@@ -708,6 +716,34 @@ Agda.TypeChecking.Rules.Term.checkTelescope'. This scope rule does not
 evaluate a runtime argument.
 The runtime Id follows the native representation described in
 Note [Restricted retained dependent types] in GHC.Core.TyCo.Rep.
+-}
+
+{- Note [Exported function-valued retained signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete ordinary value signature can bind a retained function, for example:
+
+  idCall :: forall a. foreach (f :: Nat -> Nat)
+         -> foreach (n :: Nat) -> Vec a (f n) -> Vec a (f n)
+
+tcUserTypeSig grants the function-domain permission only in its complete named
+branch. tcHsSigWcType carries that permission to tc_hs_sig_type. FunSigCtxt
+alone does not grant it: instance method signatures and SPECIALISE also use
+that diagnostic context. The generic tcHsSigType entry point and hs-boot
+checking pass False. Keep the scalar retained signature walker in those paths.
+Class signatures and general type arguments keep their existing checks.
+
+Check each domain before adding its Id to the telescope. The function must
+satisfy the closed visible Many A -> B policy.
+See Note [Function-valued retained binders] in GHC.Core.Type. A bare function
+is not a scalar index. Only the dedicated call syntax can use its Id.
+
+The interface already encodes this telescope with IfaceDepFunTy and
+IfaceTermAppTy. tcIfaceType uses isNativeRetainedBinder for the former.
+It still uses isNativeIndexId for a bare IfaceTermVar. Decode each binder
+before its body and check that the body has kind Type. No wire tag or layout
+changes. With the same header version, an old reader can display the raw
+signature. Its scalar-only binder check rejects a typed import. No new
+version is needed.
 -}
 
 {- Note [Higher-order retained signatures]

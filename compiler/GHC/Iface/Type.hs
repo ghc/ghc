@@ -236,8 +236,9 @@ IfaceTermAppTy stores a local function name and its index argument with tag 12.
 The enclosing telescope writes the function's domain before that name enters
 scope. The importer resolves the actual local Id and checks its closed Many
 function domain and the argument kind before constructing TermAppTy. Constructor
-fields can refer only to earlier fields. This encoding adds no runtime call,
-function equality, or support for function-valued IfaceDepFunTy binders.
+fields can refer only to earlier fields. A function-valued IfaceDepFunTy uses
+the same domain check. See Note [Exported function-valued retained signatures]
+in GHC.Tc.Gen.HsType. This encoding adds no runtime call or function equality.
 
 An open diagnostic head must keep its actual Id. CoreToIface selects
 IfaceFreeTermAppTy when the head belongs to its free-variable set. Keep the
