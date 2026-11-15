@@ -2485,7 +2485,12 @@ argument when a lambda uses it more than once.
 
 Completed on 2026-11-15. Compiler source `707e681f284061f18b3e2bca590b27d153f2146a`
 changes only `GHC.Core` and `GHC.CoreToStg.Prep`. The selected fixture commit is
-`b0469bca8a4b160b8e5103ebe47ee7ac63628527`. All 37 archived compiler inputs match.
+`b0469bca8a4b160b8e5103ebe47ee7ac63628527`. The original 37 archived inputs match.
+An independent audit found that this inherited list omitted both changed Core
+files. A post-build supplement adds their exact committed/current bytes. The
+complete archive now covers 39 selected inputs and 53 source paths. Preserve
+the original archive and this timing qualification. The pre-build Core record
+and later caller hashes agree; no source mismatch or compiler change was found.
 The existing fixtures add seven Nat and two Bool normalization cases, a separate
 shared-Id assertion, 12 converter denials, and four original-expression Lint
 denials. Binary and imported-unfolding beta evidence passes at all three

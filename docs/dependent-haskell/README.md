@@ -3565,8 +3565,14 @@ The source-program corpus remains 243 package/322 total rejection programs
 and 95 quiet positives; these counts exclude the new raw beta checks.
 
 Evidence uses `native-index-beta-*`. Compiler source
-`707e681f284061f18b3e2bca590b27d153f2146a` has 37 archived inputs. Bootstrap
-build: 1m56s, peak 2008 MiB. Self-hosted build: 10m58s, peak 4502 MiB.
+`707e681f284061f18b3e2bca590b27d153f2146a` has an original 37-input archive.
+The independent audit found that this inherited list omitted both changed Core
+files. The post-build `dependent-haskell-M39-complete-inputs-v1` supplement
+records their exact committed/current bytes. It covers 39 selected inputs and
+53 source paths. It does not claim an exact 39-file pre-build snapshot. The
+pre-build Core hash and later caller hashes match. The original 37-file reuse
+identity remains explicitly qualified; no source mismatch was found.
+Bootstrap build: 1m56s, peak 2008 MiB. Self-hosted build: 10m58s, peak 4502 MiB.
 Both use a 16 GiB cap. Final validation peaks at 1196 MiB under 4 GiB.
 Swap is disabled. M38 and the older evidence remain frozen. The full GHC
 suite and older standalone corpora were not rerun. ROADMAP C1/C2 remain open.
