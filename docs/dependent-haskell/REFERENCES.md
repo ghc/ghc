@@ -2930,6 +2930,15 @@ values match before desugaring or SimpleOpt. The source and probe are in
 Do not generalize these checks to signatures or other forms that can impose a
 linear arrow.
 
+Ambient aliases have a separate timing constraint. An unsigned captured let
+can use `NoGen` in [`tcPolyBinds`](../../compiler/GHC/Tc/Gen/Bind.hs).
+Its fresh multiplicity remains unresolved while the body is checked.
+`zonkId` reads assignments; it does not default that variable. M39 and M40 both
+reject the bare alias as a retained index. Both accept the signed bare alias;
+M40 also accepts beta application to that signed alias. The five measured
+controls and source excerpts are recorded in `native-source-beta-alias-controls-v1`
+and `native-source-beta-alias-boundary-v1`. M40 does not change ambient defaulting.
+
 [`decideBangHood`](../../compiler/GHC/HsToCore/Utils.hs) adds an outer bang to a
 bare pattern under `Strict`. Reducing a constant lambda without that demand
 could hide a bottom argument. M40 rejects its new immediate-lambda form under

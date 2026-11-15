@@ -1474,5 +1474,46 @@ residual expression form in `Type`.
 
 See Note [Checked native index beta exposure] in `GHC.Core`, the M39 spec in
 PLAN.md, and [the pinned Agda and paper references](REFERENCES.md#core-contract-audit-and-bounded-beta-exposure).
-Source lambda-index elaboration, general promotion, ordinary optimizer support,
-and a general open evaluator remain separate tasks.
+The source subset below uses this bridge. General promotion, ordinary optimizer
+support, and a general open evaluator remain separate tasks.
+
+### Bounded source beta applications
+
+The source checker accepts an immediate single-variable lambda application in
+a retained argument. For example, the public client defines:
+
+```haskell
+betaSuccessor :: foreach (n :: Nat) -> Int -> Vec Int (S n)
+betaSuccessor n x = replicateNative @Int ((\k -> S k) n) x
+```
+
+The retained binder supplies the lambda's known domain. Resolution uses a
+separate Name-to-Id environment. Each provisional Many binder uses the actual
+renamed Name/Unique. Resolve the argument in the outer environment. Resolve the
+body in the extended environment. Constructor worker arrows supply each field
+domain. The Core bridge then validates saturation, domains, and atomic beta
+arguments. It removes all provisional lambda binders from the resulting index.
+
+Keep the original renamed argument for ordinary checking. `tcValArg` checks it
+once and records usage. Resolution neither installs provisional Ids in the Tc
+environment nor changes the source expression. A bootstrap API probe inspects
+six actual zonked lambda binders before desugaring. With `LinearTypes`, their
+Nat domains, Many multiplicities, and renamed identities match.
+
+Require one VarPat, one unguarded RHS, and no local bindings or signatures.
+Reject this form under `Strict` with GHC-83605 at the lambda span. Strict can
+make a variable pattern force an argument that a constant body ignores.
+Bang, lazy, wildcard, constructor, and signature patterns remain unsupported.
+Opaque named functions remain unsupported even when their definitions are
+simple. This rule does not unfold them or add general term syntax in types.
+
+Ambient indices must already meet the existing Many rule. An unsigned captured
+local alias can still have an unresolved multiplicity while its body is checked.
+M39 and M40 both reject that case. A complete local Nat signature supplies a
+Many Id and permits the checked beta argument. Do not default or force the
+ambient alias's multiplicity during resolution. This differs from final
+zonking of the new bounded lambda after ordinary argument checking.
+
+See Note [Retained argument application] in `GHC.Tc.Gen.App`,
+[the source provenance](REFERENCES.md#bounded-source-beta-applications), and
+`IndexBetaClient.hs` in the public qualified-function example.
