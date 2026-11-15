@@ -1933,6 +1933,19 @@ runFunctionBinderChecks dflags = do
         axiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 6313) (mkTcOcc "HeadArgumentAx")) family [mkCoAxBranch [] [] [] [zeroTy] zeroTy [] noSrcSpan]
         original = mkDepFunTy f (at f (mkTyConApp family [zeroTy]))
         normalized = mkDepFunTy f (at f zeroTy)
+        multParameter = mkTyVar (mkSystemName (unique 6315) (mkTyVarOcc "multiplicity_arg")) boolTy
+        multBinders = [mkAnonTyConBinder multParameter]
+        multFamily = mkFamilyTyCon (mkSystemName (unique 6316) (mkTcOcc "ArrowMultiplicity")) (mkTyConKind multBinders multiplicityTy) multBinders 0 multiplicityTy Nothing (ClosedTypeFamilyTyCon (CTF (Just multAxiom))) Nothing NotInjective
+        multAxiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 6317) (mkTcOcc "ArrowMultiplicityAx")) multFamily [mkCoAxBranch [] [] [] [constructorIndex trueDataCon] ManyTy [] noSrcSpan]
+        ordinary = mkFunTy FTF_T_T (mkTyConApp multFamily [constructorIndex trueDataCon]) intTy intTy
+    -- The ordinary arrow has no retained binder or runtime index.
+    forM_ [Nominal, Representational, Phantom] $ \role -> do
+        let Reduction evidence actual = normaliseType emptyFamInstEnvs role ordinary
+        checkType dflags "ordinary multiplicity-family normalization" (arrow intTy intTy) actual
+        checkType dflags "ordinary multiplicity-family proof source" ordinary (coercionLKind evidence)
+        checkType dflags "ordinary multiplicity-family proof target" actual (coercionRKind evidence)
+        check "ordinary multiplicity-family normalization is nonreflexive at the requested role" (not (isReflCo evidence) && coercionRole evidence == role)
+        lintAccepts dflags "ordinary multiplicity-family normalization evidence" [] (Coercion evidence)
     forM_ [Nominal, Representational, Phantom] $ \role -> do
         let Reduction evidence actual = normaliseType emptyFamInstEnvs role original
         checkType dflags "function binder normalization reduces a call argument" normalized actual
