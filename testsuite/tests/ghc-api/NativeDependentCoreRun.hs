@@ -2239,6 +2239,7 @@ runNatSourceChecks = do
     runConstructorCallSourceChecks
     runBetaCallSourceChecks
     runFunctionBinderSourceChecks
+    runCallApplicationSourceChecks
 
 -- | Add head-only retained function workers as a separate source corpus.
 retainedFunctionBinderSource :: String -> String -> String
@@ -2336,6 +2337,120 @@ runFunctionBinderSourceChecks = do
                 Left exception | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
                 Left exception -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
                 Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
+
+{- Note [Direct retained call applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These quiet checks keep the M46 source corpus separate. Exact branch-local
+annotations activate the existing opaque-call case path. Instantiate the
+retained worker inside that branch instead of capturing a signed caller first.
+The application cast must use the row proof after both actual indices enter
+its residual type. A partial recursive worker and an unrelated remaining Pi
+must retain their binders. This path does not check row where bindings under
+the new application descriptor. See Note [Source opaque call refinement] in
+GHC.Tc.Gen.Match. Keep ordinary payload checking and the existing Lint paths.
+-}
+
+-- | Add direct branch-local applications without changing inherited sources.
+retainedCallApplicationSource :: String -> String -> String
+retainedCallApplicationSource moduleName observation =
+    unlines $ concatMap insert (lines (retainedFunctionBinderSource moduleName observation))
+  where
+    insert line@"      run :: Nat -> IO String" = map ("      " ++) declarations ++ [line]
+    insert line = [line]
+    declarations =
+        [ "-- | Instantiate the original worker in both constructor-refined rows."
+        , "directCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> [Int]"
+        , "directCall f n = case f n of"
+        , "    Z -> let payload :: Vec Int (f n); payload = VNil in vecList (idCall f n payload)"
+        , "    S k -> let payload :: Vec Int (f n); payload = VCons 42 (replicateNative @Int k 42) in vecList (idCall f n payload)"
+        , "-- | Expose a native result immediately after the two retained operands."
+        , "callResult :: foreach (g :: Nat -> Nat) -> foreach (m :: Nat) -> Vec Int (g m)"
+        , "callResult g m = raiseFunctionError @(Vec Int (g m)) \"direct-result\""
+        , "-- | Check the result-only route while leaving its bottom value unused."
+        , "directResult :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "directResult f n = case f n of"
+        , "    Z -> let payload :: Vec Int (f n); payload = callResult f n in 42"
+        , "    S k -> let payload :: Vec Int (f n); payload = callResult f n in 42"
+        , "-- | Return a function without demanding the supplied vector."
+        , "callPartial :: foreach (g :: Nat -> Nat) -> foreach (m :: Nat) -> Vec Int (g m) -> Int -> Int"
+        , "callPartial g m payload token = token"
+        , "-- | Keep the checked partial result lazy in its payload."
+        , "directPartial :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int -> Int"
+        , "directPartial f n = case f n of"
+        , "    Z -> let payload :: Vec Int (f n); payload = raiseFunctionError @(Vec Int (f n)) \"direct-payload\" in callPartial f n payload"
+        , "    S k -> let payload :: Vec Int (f n); payload = raiseFunctionError @(Vec Int (f n)) \"direct-payload\" in callPartial f n payload"
+        , "-- | Demand the directly transported payload only after the call case."
+        , "directDemand :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "directDemand f n = case f n of"
+        , "    Z -> let payload :: Vec Int (f n); payload = raiseFunctionError @(Vec Int (f n)) \"direct-payload\" in length (vecList (idCall f n payload))"
+        , "    S k -> let payload :: Vec Int (f n); payload = raiseFunctionError @(Vec Int (f n)) \"direct-payload\" in length (vecList (idCall f n payload))"
+        , "-- | Keep a recursive partial worker under its remaining retained binder."
+        , "walkCall :: foreach (g :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (g n) -> Vec Int (g n)"
+        , "walkCall g n payload = case g n of"
+        , "    Z -> let { again :: foreach (m :: Nat) -> Vec Int (g m) -> Vec Int (g m); again = walkCall g } in case again of !_ -> idCall g n payload"
+        , "    S k -> idCall g n payload"
+        , "-- | Observe the recursive partial worker with concrete branch payloads."
+        , "directRecursive :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> [Int]"
+        , "directRecursive f n = case f n of"
+        , "    Z -> let payload :: Vec Int (f n); payload = VNil in vecList (walkCall f n payload)"
+        , "    S k -> let payload :: Vec Int (f n); payload = VCons 42 (replicateNative @Int k 42) in vecList (walkCall f n payload)"
+        , "-- | Retain an unrelated index while the free call remains in later domains."
+        , "pendingCall :: foreach (g :: Nat -> Nat) -> foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int m -> Vec Int (g n) -> Vec Int (g n)"
+        , "pendingCall g n m witness payload = payload"
+        , "-- | Force only that partial function, without casting under its Pi."
+        , "directPending :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int"
+        , "directPending f n = case f n of"
+        , "    Z -> let payload :: Vec Int (f n); payload = VNil in case pendingCall f n of !_ -> 42"
+        , "    S k -> let payload :: Vec Int (f n); payload = VCons 42 (replicateNative @Int k 42) in case pendingCall f n of !_ -> 42"
+        ]
+
+-- | Check direct call transport, payload demand, and independent proof scopes.
+runCallApplicationSourceChecks :: GHC.Ghc ()
+runCallApplicationSourceChecks = do
+    let moduleName = "NativeSourceCallApplications"
+        observation =
+            unlines
+                [ "do finite <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (directCall f n)))"
+                , "        result <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in observeInt (directResult f n)) (S Z)"
+                , "        partial <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in case directPartial f n of !_ -> pure \"forced\") Z"
+                , "        constant <- driveNat (\\n -> let { f :: Nat -> Nat; f = constantZeroNat } in pure (show (directCall f n))) bottomNat"
+                , "        constructed <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (directCall f (S n)))) (S Z)"
+                , "        headOnly <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (take 1 (directCall f (S n))))) bottomNat"
+                , "        cyclicPrefix <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (take 4 (directCall f n)))) cyclicNat"
+                , "        recursive <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (directRecursive f n))) Z"
+                , "        pending <- driveNat (\\n -> let { f :: Nat -> Nat; f = constantZeroNat } in observeInt (directPending f n)) bottomNat"
+                , "        pure (finite ++ unlines [result,partial,constant,constructed,headOnly,cyclicPrefix,recursive,pending])"
+                ]
+        expected = ["[]", "[42,42]", "[42,42,42]", "42", "forced", "[]", "[42,42]", "[42]", "[42,42,42,42]", "[]", "42"]
+    expression <- sourceEntry moduleName (retainedCallApplicationSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source call applications" expression
+    unless (lines actual == expected) $ fail ("FAIL: source call application demand: " ++ show actual)
+    forM_
+        [ ("NativeCallApplicationHead", "driveNat (\\n -> let { f :: Nat -> Nat; f = bottomFunction } in observeInt (length (directCall f n))) bottomNat", "native-bottom-function")
+        , ("NativeCallApplicationIndex", "driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in observeInt (length (directCall f n))) bottomNat", "native-bottom-nat")
+        , ("NativeCallApplicationPayload", "driveNat (\\n -> let { f :: Nat -> Nat; f = constantZeroNat } in observeInt (directDemand f n)) bottomNat", "direct-payload")
+        ]
+        $ \(name, body, fragment) -> do
+            bottomExpression <- sourceEntry name (retainedCallApplicationSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                Left exception -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
+    forM_
+        [ ("NativeCallApplicationSiblingRow", ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload); S k -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload) }"])
+        , ("NativeCallApplicationDistinctIndex", ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> foreach (m :: Nat) -> Int", "badCall f n m = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f m VNil } in length (vecList payload); S k -> 42 }"])
+        , ("NativeCallApplicationDistinctHead", ["badCall :: foreach (f :: Nat -> Nat) -> foreach (g :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f g n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall g n VNil } in length (vecList payload); S k -> 42 }"])
+        ]
+        $ \(name, declarations) -> do
+            let source =
+                    unlines
+                        $ concatMap (\line -> if line == "      run :: Nat -> IO String" then map ("      " ++) declarations ++ [line] else [line])
+                        $ lines (retainedCallApplicationSource name "pure \"unused\"")
+            sourceModuleRejects name 83865 "Vec" name source
 
 -- | Add signed beta-call workers as a separate source corpus.
 retainedBetaCallSource :: String -> String -> String

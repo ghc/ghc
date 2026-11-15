@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
--- | Pass local opaque function heads through retained binders without forcing them.
+-- | Use retained function binders and checked branch-local applications.
 module FunctionBinderClient (main) where
 
 import Control.Exception (SomeException, displayException, evaluate, try)
@@ -82,6 +82,12 @@ main = do
     putStrLn "call-index: function-index"
     expectFunctionError "producer-head" (evaluate (length (observeFunctionCall produced bottomN)))
     putStrLn "producer-call: producer-head"
+    forM_ [Z, S (S Z), S (S (S Z))] $ \seed -> do
+        ref <- newIORef seed
+        n <- readIORef ref
+        let f :: Nat -> Nat
+            f = identityHead
+        print (observeDirectCall f n)
   where
     -- \| Ignore all three runtime arguments, including the opaque function head.
     keepCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n) -> Int
@@ -115,6 +121,18 @@ main = do
          in case f n of
                 Z -> let payload :: Vec Int (f n); payload = VNil in toList (caller payload)
                 S k -> let payload :: Vec Int (f n); payload = VCons 42 (replicateNative @Int k 42) in toList (caller payload)
+
+    -- | Instantiate the retained worker inside each checked call branch.
+    observeDirectCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> [Int]
+    observeDirectCall f n = case f n of
+        Z ->
+            let payload :: Vec Int (f n)
+                payload = VNil
+             in toList (idCall f n payload)
+        S k ->
+            let payload :: Vec Int (f n)
+                payload = VCons 42 (replicateNative @Int k 42)
+             in toList (idCall f n payload)
 
     -- \| Keep independently closed input and result domains on a function binder.
     keepMixedCall :: foreach (f :: Bool -> Nat) -> foreach (b :: Bool) -> Vec Int (f b) -> Int
