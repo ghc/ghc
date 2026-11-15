@@ -35,6 +35,7 @@ import GHC.Core.Opt.Arity
 import GHC.Core.Lint    ( EndPassConfig(..), LintPassResultConfig(..)
                         , endPassIO, lintPassResult )
 import GHC.Core hiding( FloatBind(..) )
+import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.Dependent
 import GHC.Core.Subst
 import GHC.Core.Make
