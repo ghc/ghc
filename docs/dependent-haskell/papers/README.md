@@ -227,3 +227,28 @@ were read. The 2014 errata correct a higher-order pattern-unification rule and
 withdraw the original generality lemma. The thesis PDF was not read in this
 review. Treat its original algorithm as research to check, rather than an
 unchanged implementation recipe.
+
+## Future C1 comparison: opaque runtime function indices
+
+This unimplemented comparison extends the roadmap reading above. It does not
+change the canonical seven-work, nine-PDF manifest. The 26-page author version
+of [Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf)
+was reread on selected pages 3–4, 6–7, 9, 11 and 13–16. The reading covers
+matchability, application congruence, restricted equality projections, and
+substitution and consistency obligations. No proof was replayed.
+
+The comparison also checks the D/DC 30-page author version on pages 16–17 and
+19, and the System DR 29-page conference version on pages 8, 11 and 18.
+Pi-type injectivity is not injectivity of an arbitrary runtime function.
+The pinned proposal #378 and singletons source supply design and implementation
+comparisons. Singletons uses a saturated noninjective `Apply` family; its
+arbitrary-function `toSing` implementation uses `unsafeCoerce`.
+
+A saturated family with a checked non-arrow function token is a possible safe
+direction. A dedicated residual-call node appears smaller for the initial
+kernel. Neither is selected or implemented. Keep scalar domains, function-head
+eligibility and retained function-binder domains separate. No general evaluation
+or preservation result follows. See
+[the detailed comparison](../REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison)
+and the exact versions, hashes and reading scope in
+`_build/verification/native-next-core-function-indices-v1/`.

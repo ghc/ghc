@@ -2947,3 +2947,51 @@ could hide a bottom argument. M40 rejects its new immediate-lambda form under
 The source snapshots, exact ranges, hashes and two verified Agda blobs are
 cached in `native-source-beta-source-provenance-v1`. The M39 archive and its
 Core-only evidence remain unchanged. No eta rule or general evaluator is added.
+
+## Opaque runtime function indices: unimplemented C1 comparison
+
+This is future design research. Neither representation below is implemented
+or selected. Keep scalar index domains, permitted runtime function heads, and
+future domains of retained function binders as separate policies.
+
+[Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf)
+uses matchability to control equality decomposition. The read version is the
+26-page ICFP 2019 author PDF. Pages 3–4 distinguish injectivity, generativity
+and Given decomposition. Pages 6–7 explain why an ordinary term arrow supplies
+no injectivity guarantee. Co_Left and Co_Right require matchability in Figure 5,
+page 14; section 4.3 gives the counterexample on page 13. A constant runtime
+function has equal results at `Z` and `S Z`. Projecting that result equality
+must not prove `Z ~ S Z`. Ordinary `AppTy` permits such projection today under
+its existing formation restrictions. Reusing it for opaque calls would remove
+those restrictions without replacing their justification.
+
+The pinned [proposal #378](https://api.github.com/repos/ghc-proposals/ghc-proposals/git/blobs/39a812b8154ee164e7de3ad9e27e21e012ebc000)
+discusses matchability and keeps ordinary function definitions opaque in types.
+[D/DC's 30-page author PDF](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf)
+supplies forward An-AppCong in Figure 8, page 16.
+Its An-PiSnd on page 17 concerns function types, not injectivity of runtime
+functions. [System DR's 29-page conference PDF](https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf)
+requires nominal arguments for
+unknown-function congruence on pages 8 and 11. Its E-Right rule requires a common
+constructor CasePath on page 18. These rules do not justify decomposing an
+arbitrary runtime call. The distinct ACM and extended versions remain separate.
+
+Pinned [singletons Apply](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons/src/Data/Singletons.hs#L460-L526)
+offers a second representation precedent. A saturated noninjective family
+blocks result decomposition and keeps nominal argument roles. It still needs
+a checked token for the actual runtime function Id. Its
+[arbitrary-function `toSing`](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons/src/Data/Singletons.hs#L755-L776)
+uses `unsafeCoerce`; it supplies no checked FC evidence for this extension.
+A function-valued `TermVarTy` would expose an ordinary arrow kind and could
+escape into matchable `AppTy`. A distinct checked token with a non-arrow kind
+could avoid that problem. The family and token would still need scope,
+substitution and runtime correspondence rules.
+
+A dedicated residual-call node appears smaller for the first bounded kernel.
+It must forbid inverse decomposition and preserve actual function Id scope.
+An Int-returning local test can avoid a function-domain retained binder.
+Returning an index-dependent result cannot silently use an ordinary arrow.
+Lazy naming of arbitrary calls also needs a separate rule; the existing strict
+constructor-alias case cannot serve that purpose. Exact versions, pages, source
+blobs, hashes and reading limits are in `native-next-core-function-indices-v1`.
+This comparison establishes no evaluator or combined preservation theorem.
