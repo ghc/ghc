@@ -888,6 +888,27 @@ retainedCallSource moduleName observation =
         , "ordinaryCallVariable f n = case f n of { ignored -> 42 }"
         ]
 
+-- | Isolate Strict call refinement from unrelated lazy source declarations.
+strictCallSource :: String -> String -> String
+strictCallSource moduleName observation =
+    unlines
+        [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, ScopedTypeVariables, Strict #-}"
+        , "module " ++ moduleName ++ " where"
+        , "import NativeRuntimeHelpers"
+        , "strictCaptured :: (Nat -> Nat) -> Nat -> Int"
+        , "strictCaptured f n = let { consume :: Vec Int (f n) -> Int; consume ~cached = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in length (vecList ys); S k -> length (vecList cached) } } in consume (error \"strict-capture\")"
+        , "strictHead :: (Nat -> Nat) -> Nat -> Int"
+        , "strictHead f n = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in length (vecList ys); S k -> let { ys :: Vec Int (f n); ys = VCons 42 (error \"strict-tail\") } in head (vecList ys) }"
+        , "strictPredecessor :: (Nat -> Nat) -> Nat -> Int"
+        , "strictPredecessor f n = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in length (vecList ys); S k -> let { ys :: Vec Int (f n); ys = VCons 42 (error \"strict-tail\") } in k `seq` head (vecList ys) }"
+        , "strictIgnored :: (Nat -> Nat) -> Nat -> Int"
+        , "strictIgnored f ~n = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in length (vecList ys); S k -> let { ys :: Vec Int (f n); ys = VCons 42 (error \"strict-tail\") } in head (vecList ys) }"
+        , "strictBare :: (Nat -> Nat) -> Nat -> Int"
+        , "strictBare f n = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in length (vecList ys); S k -> let { ys :: Vec Int (f n); ys = VCons 42 (error \"strict-tail\") } in head (vecList ys) }"
+        , "entry :: IO String"
+        , "entry = observeInt (" ++ observation ++ ")"
+        ]
+
 -- | Share the case worker between source, executable, and interface checks.
 retainedCaseDeclarations :: [String]
 retainedCaseDeclarations =
@@ -2272,6 +2293,34 @@ runOpaqueCallSourceChecks = do
                     | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
                     | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
                 Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
+
+    runStrictOpaqueCallSourceChecks
+
+-- | Preserve source Strict demand without forcing administrative captures.
+runStrictOpaqueCallSourceChecks :: GHC.Ghc ()
+runStrictOpaqueCallSourceChecks =
+    forM_
+        [ ("NativeSourceStrictCallCaptureIgnored", "strictCaptured constantZeroNat Z", Right "0")
+        , ("NativeSourceStrictCallCaptureDemanded", "strictCaptured opaqueNat (S Z)", Left "strict-capture")
+        , ("NativeSourceStrictCallHead", "strictHead opaqueNat partialNat", Right "42")
+        , ("NativeSourceStrictCallPredecessor", "strictPredecessor opaqueNat partialNat", Left "native-bottom-nat")
+        , ("NativeSourceStrictCallIgnoredIndex", "strictIgnored constantZeroNat bottomNat", Right "0")
+        , ("NativeSourceStrictCallBareIndex", "strictBare constantZeroNat bottomNat", Left "native-bottom-nat")
+        ]
+        $ \(moduleName, observation, expected) -> do
+            expression <- sourceEntry moduleName (strictCallSource moduleName observation)
+            environment <- GHC.getSession
+            flags <- GHC.getSessionDynFlags
+            outcome <- liftIO $ try (execute environment flags moduleName expression)
+            case (expected, outcome) of
+                (Right wanted, Right actual)
+                    | actual == wanted -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ moduleName ++ "; expected " ++ wanted ++ ", got " ++ show actual)
+                (Left fragment, Left exception)
+                    | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ moduleName ++ "; wrong exception: " ++ displayException exception)
+                (Right _, Left exception) -> fail ("FAIL: " ++ moduleName ++ "; unexpected exception: " ++ displayException exception)
+                (Left fragment, Right actual) -> fail ("FAIL: " ++ moduleName ++ "; expected " ++ fragment ++ ", got " ++ show actual)
 
 -- | Observe refined source cases and reject malformed dependent alternatives.
 runCaseSourceChecks :: GHC.Ghc ()
