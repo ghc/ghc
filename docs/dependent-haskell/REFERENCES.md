@@ -2751,7 +2751,7 @@ Its [final comparison](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Ty
 still applies when the earlier check has not established the result.
 Agda's contextual mutable metas do not justify native GHC meta assignment.
 
-The proposed GHC adaptation reuses its IALL/ITYARG loop to check a leading
+The GHC adaptation reuses its IALL/ITYARG loop to check a leading
 type-argument prefix once. It retains the prefix and original QL variables
 when mode selection fails. Fixed explicit choices or an existing complete
 immutable expected-result match can permit `NoQL`. Each inner application
@@ -2763,5 +2763,18 @@ The exact PDF, extraction, selected rendered figures, full Agda blobs and
 frozen M36 checker are recorded in
 `native-ground-applications-prior-art-v1/provenance.json`. The reading covers
 the named paper sections and Agda ranges. It does not include the appendices,
-the full Agda solver or a proof replay. Compiler changes and their validation
-remain pending.
+the full Agda solver or a proof replay.
+
+The selected compiler is `89c98cf7b4a23b048f8ffd77170537f27a434224`.
+Its `Ground retained applications` Note owns this adaptation. Both compiler
+stages agree on 64 source clients and pass 76 raw and public runtime
+observations. The evidence prefix is `native-ground-applications-*`.
+
+The prefix-metadata trace supplies a specific safeguard check. IALL creates
+two unresolved inferred variables for an unused phantom kind. The residual
+type is `Int`, but the saved type applications retain those same variables.
+Mode selection keeps `DoQL`, and later monomorphisation visits those
+identities. In the filled-kind control, ordinary VTA kind checking assigns
+`Type` to the inferred kind before mode selection permits `NoQL`.
+These observations support the bounded implementation. They do not extend
+the paper's theorem to native FC or permit native mutable-meta assignment.

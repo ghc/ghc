@@ -41,7 +41,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M36 passes both stages and focused regressions; 562 packed-vector plus 57 qualified/container/worker runtime observations |
+| Last verified checkpoint | M37 passes both stages and focused regressions; 562 packed-vector plus 76 qualified/container/worker runtime observations |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -69,7 +69,8 @@ Last updated: 2026-11-15.
 | Native Pi equality operands | Complete checked Pi type arguments and immutable Given rewriting beneath another retained binder pass; native meta assignments remain blocked |
 | Qualified retained functions | Known monomorphic variables, immutable Given transport and synonym expansion pass; ordinary dictionaries preserve the tested demand and sharing behavior |
 | Native worker arguments | Full witness and equality-Given calls select complete erased parameters from known arguments through one checked cache |
-| Next task | M37: check fixed native applications with ImpredicativeTypes; four source controls currently report GHC-83605 |
+| Fixed native applications | Explicit type choices and complete expected proof types work with ImpredicativeTypes; runtime demand and function identity pass both stages |
+| Next task | M38: measure and support immutable choices from known native arguments with ImpredicativeTypes |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3447,3 +3448,74 @@ pass. The validation scope peaks at 2209 MiB under 4 GiB. Both scopes disable
 swap. Failed and superseded source attempts remain available. The M35 prefix
 and older evidence remain frozen. The full GHC suite and the full earlier
 177-program standalone rejection corpus were not run for this checkpoint.
+
+## M37: fixed native applications with ImpredicativeTypes
+
+Direct source applications now work when explicit type arguments or a complete
+expected result fix the native choices. The four preserved M36 application
+failures compile in both stages. The public example contains this call in a
+separate module with `ImpredicativeTypes`:
+
+```haskell
+groundDirect :: foreach (n :: Nat) -> QPi -> Vec Int n
+groundDirect n f = withQ @QPi Refl f n
+```
+
+Its caller reads `n` from an `IORef`. It passes lengths zero through three and
+checks the resulting vector contents. Other direct calls use a named closed
+`qRefl = Refl`, a monomorphic proof worker, an intervening `Eq` dictionary and
+an equality-Given worker. The extra checks cover inferred kind arguments,
+phantom native type arguments, bottom proofs and function identity.
+The [source runner](examples/qualified-pi/README.md) compiles each module through
+separate interfaces with Core and STG Lint at `-O0`.
+
+The checker prepares only the leading type, pragma and wrapper arguments.
+It uses the existing IALL/ITYARG loop and checks each type argument once.
+It selects ordinary checking only after it excludes remaining erased choices
+and free QL variables in the signature, expected type and saved metadata.
+A failed selection retains the prefix and its original QL variables.
+A complete expected result can also choose `Refl` or `error` arguments
+immutably. The actual result type remains available for final subsumption.
+A nominal Given can discharge an equality; representational evidence cannot.
+The change adds no Core form, equality axiom or eta expansion.
+
+| Check | Result in each stage |
+| --- | --- |
+| New source matrix | 64 clients: 42 compile, 22 source errors, 28 located diagnostic envelopes |
+| Predefined source oracles | All 31 pass; the remaining 33 were exploratory observations |
+| Original 61 source clients | 39 compile; three additional prefix-metadata controls also compile |
+| Failure-cache ownership | `prefixProbe` elaborates once |
+| Raw and public executable | All 76 lines match the authored oracle; the previous 57-line prefix is unchanged |
+| Previous packed-vector executable | All 562 lines unchanged |
+| API source inventory | 233 package and 312 total rejection programs; 76 quiet positives |
+| API execution | Bootstrap API and self-hosted registered execution preserve the 37-line golden |
+| Focused registered tests | Five expected passes across 39 cases, 34 skips, zero unexpected failures or framework warnings |
+
+The unused phantom-kind trace creates unresolved inferred variables that do
+not occur in the residual `Int` type. They remain in the saved type arguments.
+The checker retains `DoQL`, and later monomorphisation visits those same
+variables. In the filled-kind control, ordinary VTA checking assigns `Type`
+to the inferred kind before the checker selects `NoQL`.
+The [provenance](REFERENCES.md#applications-with-fixed-native-type-choices)
+pins the Quick Look rules, corrected paper pages and Agda application checker.
+The paper ledger remains seven works and nine verified PDF versions.
+
+Six exploratory forms still report GHC-83605. They cover a signed witness,
+a signed application head, broader ambient inference and a polymorphic
+applied head. A qualified written operand without `ImpredicativeTypes` still
+reports GHC-91510. General native Quick Look, native instantiation across erased
+foralls after visible arguments and mutable native-meta assignment remain
+outside this checkpoint.
+The [M38 plan](PLAN.md#m38-native-choices-from-known-arguments-with-impredicativetypes)
+starts by measuring native choices supplied by known arguments.
+
+Evidence uses `native-ground-applications-*`. The selected compiler source is
+`89c98cf7b4a23b048f8ffd77170537f27a434224`, with 37 archived inputs. Both stages
+build. The self-hosted build takes 8m03s and peaks at 4512 MiB under 16 GiB.
+Ten selected validation phases pass. Two API/registered attempts failed after
+a newly positive fixture reused a module name. A unique name fixes that
+fixture; only those two checks were repeated. Both attempted source versions
+and failed results remain available. Validation scopes peak at 1331 MiB under
+4 GiB, with swap disabled. The M36 evidence and its older preservation chain
+remain frozen. The full GHC suite, the full earlier 177-program standalone
+corpus and the older qualified-Pi standalone matrix were not rerun.

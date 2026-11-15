@@ -11,7 +11,7 @@ exposeQ f = f
 ```
 
 The producer enables `ImpredicativeTypes` to admit the equality operand.
-The consumer uses `NoImpredicativeTypes`. Its complete expected arrow
+The main consumer uses `NoImpredicativeTypes`. Its complete expected arrow
 specializes the helper without a written type argument:
 
 ```haskell
@@ -31,19 +31,20 @@ bash docs/dependent-haskell/examples/qualified-pi/run-example.sh "$PWD"
 
 Set `QUALIFIED_PI_GHC` to choose the compiler. Set `QUALIFIED_PI_WORK` to
 choose a separate output directory. The script compiles the shared
-`PackedVecLibrary`, then the value provider, producer, identity client and
+`PackedVecLibrary`, then the value provider, producer, ground application
+client, identity client and
 executable.
 It copies interfaces between compilation directories and enables Core and
 STG Lint. It runs at `-O0`.
 
-The executable checks 57 observations. Finite lengths come through
+The executable checks 76 observations. Finite lengths come through
 independent `readIORef` calls. Other checks cover ignored and demanded bottom,
-cyclic indices, partial application, payload sharing and six function
+cyclic indices, partial application, payload sharing and eight function
 `StableName` comparisons. Six dictionary checks use the single-method
 `Demand` class with `GHC.Exts.withDict`. They distinguish vector shape from
 method demand. They do not inject a bottom global `Eq Int` dictionary.
 
-Both compiler stages pass all 57 observations. The identity results apply to
+Both compiler stages pass all 76 observations. The identity results apply to
 these programs and build settings.
 The full optimizer and GHC test suite remain outside this validation.
 
@@ -83,10 +84,29 @@ lengths. Ignoring the result leaves both a bottom proof and function unforced.
 Demanding the result checks the proof before the function. The ignored-proof
 worker also preserves the tested function identity.
 
-This argument route uses `NoQL`. Qualified Pi type arguments still need
-`ImpredicativeTypes`, whose applied native Quick Look path reports GHC-83605.
-General native Quick Look and mutable native-meta assignment remain separate
-work.
+This argument route uses `NoQL`. Qualified Pi type arguments need
+`ImpredicativeTypes`. The separate `GroundApplicationClient` enables it and
+checks direct applications whose erased choices are fixed:
+
+```haskell
+qRefl :: QPi :~: QPi
+qRefl = Refl
+
+groundDirect :: foreach (n :: Nat) -> QPi -> Vec Int n
+groundDirect n f = withQ @QPi Refl f n
+```
+
+The main consumer reads `n` from an `IORef` and calls this worker. The added
+19 observations check named and direct witnesses, an intervening `Eq`
+dictionary, inferred kind arguments, phantom native type arguments, proof
+demand and two more function identity comparisons. The first 57 observations
+are unchanged.
+
+The compiler checks the leading type arguments once. It uses ordinary
+checking when no erased choice or free Quick Look variable remains. A
+complete expected proof type can also supply immutable choices for `Refl` or
+`error`. Final argument checking and nominal entailment still run. General
+native Quick Look and mutable native-meta assignment remain separate work.
 
 See the [typing rules](../../CORE.md#qualified-retained-function-types),
 [source provenance](../../REFERENCES.md#qualified-retained-function-types)

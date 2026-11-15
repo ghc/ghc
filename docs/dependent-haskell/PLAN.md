@@ -2294,7 +2294,8 @@ full earlier standalone rejection corpus were not run.
 
 ### M37: applications with ImpredicativeTypes
 
-All four new application controls with `ImpredicativeTypes` report GHC-83605.
+The M36 baseline reports GHC-83605 for all four new application controls
+with `ImpredicativeTypes`.
 This includes explicit `withQ @QPi`, an incoming named proof, and an already
 monomorphic `withKnownQ` head. Their source formation succeeds, but the applied
 Quick Look route is blocked. Preserve these measured sources before changing
@@ -2335,14 +2336,47 @@ ordinary Quick Look could otherwise elaborate a failed cache again. Keep
 the public `tcInstFun` caller on its existing guarded path. Preserve final
 subsumption, proof entailment, multiplicity and runtime demand.
 
-- [ ] Pin the Quick Look and Agda precedents for applications whose native
+- [x] Pin the Quick Look and Agda precedents for applications whose native
   types are already fixed. Identify when ordinary instantiation can still
   create a QL variable.
-- [ ] Choose a narrow route that keeps immutable choices, original evidence,
+- [x] Choose a narrow route that keeps immutable choices, original evidence,
   final checking and failure-cache ownership. Keep general native Quick Look
   and mutable native-meta assignment blocked.
-- [ ] Run the four preserved controls with both compiler stages. Check proof
+- [x] Run the four preserved controls with both compiler stages. Check proof
   demand, function identity and the existing polymorphic-head guards.
+
+Both stages now agree on 64 source clients: 42 compile and 22 report source
+errors at 28 located diagnostic envelopes. All 31 predefined oracles pass.
+Of the original 61 clients, 39 compile. Three added prefix-metadata controls
+also compile. The cache-failure trace still elaborates `prefixProbe` once.
+The unresolved phantom-kind trace retains `DoQL`; the filled-kind trace
+selects `NoQL` after ordinary kind checking fills the same variable.
+
+Both stages pass 76 raw and public runtime observations. The old 57-line
+prefix and the separate 562-line packed-vector result are unchanged.
+The API checks 233 package and 312 total rejection programs, plus 76 quiet
+positives. Its 37-line golden is unchanged. Five registered tests pass.
+The full GHC suite and older standalone corpora were not rerun.
+
+The selected compiler is `89c98cf7b4a23b048f8ffd77170537f27a434224`, with
+37 archived inputs. Evidence uses `native-ground-applications-*`.
+The M36 prefix and its earlier preservation chain remain frozen.
+
+### M38: native choices from known arguments with ImpredicativeTypes
+
+M37 fixes explicit type arguments and complete expected results. Next,
+measure calls such as `withQ Refl f` under `ImpredicativeTypes`, where a known
+native argument can determine the erased parameter. Preserve the current
+failure before choosing an implementation. A failed preflight must not cause
+the value argument or a saved cache to be elaborated twice.
+
+- [ ] Preserve source baselines for bare local and global native arguments,
+  signed witnesses and applied heads. Identify actual ambient QL variables.
+- [ ] Check whether declared argument types can supply a complete immutable
+  choice before any value elaboration. Follow pinned application rules and
+  retain ordinary kind, scope, concreteness and evidence checks.
+- [ ] Preserve all M37 demand, identity, diagnostic and failure-cache checks.
+  Keep general native Quick Look and mutable native-meta assignment blocked.
 
 ## Further work
 
