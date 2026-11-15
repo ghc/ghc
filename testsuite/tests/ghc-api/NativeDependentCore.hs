@@ -11,7 +11,7 @@ import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags
 import GHC.Builtin.WiredIn.Prim (intPrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, eqCoercion, isReflCo, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, eqCoercion, isReflCo, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkKindCo, mkTermAppCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
@@ -19,13 +19,14 @@ import GHC.Core.Dependent
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, normaliseType)
 import GHC.Core.Lint (lintExpr)
+import GHC.Core.Make (mkIntExprInt)
 import GHC.Core.Map.Type (LooseTypeMap, TypeMap, emptyTypeMap)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Reduction (Reduction (..))
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
-import GHC.Core.TyCo.FVs (tyCoVarsOfCo)
+import GHC.Core.TyCo.FVs (isInjectiveInType, tyCoVarsOfCo, tyCoVarsOfType)
 import GHC.Core.TyCo.Rep (Coercion (..), Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
@@ -46,7 +47,7 @@ import GHC.Driver.Env (HscEnv (..), hscUpdateFlags)
 import GHC.Driver.Env.KnotVars (KnotVars (KnotVars))
 import GHC.Driver.Flags (GeneralFlag (Opt_DoCoreLinting))
 import GHC.Driver.Ppr (showSDoc)
-import GHC.Driver.Session (gopt_unset, parseDynamicFlagsCmdLine)
+import GHC.Driver.Session (gopt_unset, parseDynamicFlagsCmdLine, targetPlatform)
 import GHC.Hs (HsType (..))
 import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData)
 import GHC.Iface.Decl (tyThingToIfaceDecl)
@@ -93,6 +94,7 @@ main = do
             runSyntaxChecks dflags
             runChecks dflags
             runAliasChecks dflags
+            runOpaqueCallChecks dflags
             runMatchingChecks dflags
             runTypeMapChecks
             runCaseChecks dflags
@@ -1698,6 +1700,129 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
         case unknown of
             Left exception -> check "unknown interface type tag diagnostic" ("invalid type tag 255" `isInfixOf` displayException exception)
             Right _ -> fail "FAIL: unknown interface type tag was accepted"
+
+-- | Check opaque call indices, nominal forward congruence and actual head scope.
+runOpaqueCallChecks :: DynFlags -> IO ()
+runOpaqueCallChecks dflags = do
+    let (nat, zero, successor) = peanoNat
+        natTy = mkTyConTy nat
+        zeroTy = mkTyConTy (promoteDataCon zero)
+        succTy ty = mkTyConApp (promoteDataCon successor) [ty]
+        n = local 6200 "call_n" natTy
+        m = local 6201 "call_m" natTy
+        f = local 6202 "call_head" (mkFunctionType ManyTy natTy boolTy)
+        g = local 6203 "call_head" (idType f)
+        h = local 6204 "call_head" (idType f)
+        reverseHead = local 6205 "reverse_head" (mkFunctionType ManyTy boolTy natTy)
+        b = local 6206 "call_bool" boolTy
+        call = TermAppTy f (TermVarTy n)
+        cv = proof 6207 (TermVarTy n) (TermVarTy m)
+        co = mkTermAppCo f (mkCoVarCo cv)
+        right = TermAppTy f (TermVarTy m)
+        scope = [f, g, h, n, m, cv]
+        apart lhs rhs = case tcUnifyTysFG alwaysBindFam alwaysBindTv [lhs] [rhs] of
+            MaybeApart{} -> True
+            _ -> False
+    check "mixed-domain native function is eligible" (isNativeIndexFunctionId f)
+    check "native function is not a scalar index" (not (isNativeIndexId f))
+    checkType dflags "Nat-to-Bool call has Bool kind" boolTy (typeKind call)
+    checkType dflags "Bool-to-Nat call has Nat kind" natTy (typeKind (TermAppTy reverseHead (TermVarTy b)))
+    lintAccepts dflags "mixed-domain call index" [f, n] (Type call)
+    lintAccepts dflags "reverse mixed-domain call index" [reverseHead, b] (Type (TermAppTy reverseHead (TermVarTy b)))
+    check "call congruence is nominal" (coercionRole co == Nominal)
+    checkType dflags "call congruence left endpoint" call (coercionLKind co)
+    checkType dflags "call congruence right endpoint" right (coercionRKind co)
+    checkType dflags "call congruence kind proof has result domain" boolTy (coercionLKind (mkKindCo co))
+    checkType dflags "call congruence kind proof is reflexive at result domain" boolTy (coercionRKind (mkKindCo co))
+    check "call congruence tracks head and evidence" (all (`elemVarSet` tyCoVarsOfCo co) [f, cv])
+    lintAccepts dflags "nominal forward call congruence" scope (Coercion co)
+    lintAccepts dflags "call congruence can be weakened representationally" scope (Coercion (mkSubCo co))
+    check "reflexive call congruence reduces to reflexivity" (isReflCo (mkTermAppCo f (mkNomReflCo (TermVarTy n))))
+    let dependent = mkDepFunTy n (indexed call)
+        renamed = mkDepFunTy m (indexed (TermAppTy f (TermVarTy m)))
+    check "call indices respect retained alpha equality" (eqType dependent renamed)
+    check "different same-spelled heads have distinct identity" (not (eqType call (TermAppTy g (TermVarTy n))))
+    check "opaque calls do not imply argument injectivity" (apart call right)
+    check "opaque calls with different heads are only maybe apart" (apart call (TermAppTy g (TermVarTy n)))
+    check "opaque call versus constructor is only maybe apart" (apart call (constructorIndex trueDataCon))
+    let constant = setIdUnfolding f (unfolding (Lam n (Var (dataConWorkId trueDataCon))))
+    check "constant-head metadata does not decompose call arguments" (apart (TermAppTy constant (TermVarTy n)) (TermAppTy constant (TermVarTy m)))
+    let template = mkTyVar (mkSystemName (unique 6208) (mkTyVarOcc "call_template")) natTy
+    check "call argument is not injectively determined" (not (isInjectiveInType template (TermAppTy f (mkTyVarTy template))))
+    check "type-only call keeps both actual runtime identifiers free" (all (`elemVarSet` exprFreeVars (Type (indexed call))) [f, n])
+    case exprToNativeCaseIndex (App (Var f) (Var n)) of
+        Just (TermAppTy actual (TermVarTy argument)) -> check "term and type use the actual head and argument" (actual == f && argument == n)
+        _ -> fail "FAIL: strict-case converter lost the actual call identities"
+    let replaceF = indexSubst [g, n] f (Var g)
+        replaceG = indexSubst [h, n] g (Var h)
+        composed = Subst.composeTCvSubst replaceG replaceF
+        simultaneous = Subst.Subst (mkInScopeSet (mkVarSet [g, h, n])) (mkVarEnv [(f, Var g), (g, Var h)]) emptyVarEnv emptyVarEnv
+    checkType dflags "head substitution changes the actual head" (TermAppTy g (TermVarTy n)) (Subst.substTy replaceF call)
+    checkType dflags "head substitution composition changes its range" (TermAppTy h (TermVarTy n)) (Subst.substTy composed call)
+    checkType dflags "stored head substitution range is used once" (TermAppTy g (TermVarTy n)) (Subst.substTy simultaneous call)
+    check "head substitution range records its free function" (g `elemVarSet` Subst.getTCvSubstRangeTyCoFVs replaceF)
+    check "coercion substitution preserves the actual chosen head" (eqCoercion (mkTermAppCo g (mkCoVarCo cv)) (Subst.substCo (indexSubst [g, n, m, cv] f (Var g)) co))
+    let body = mkFunctionType ManyTy (indexed (TermAppTy f (TermVarTy n))) (indexed (TermAppTy f (TermVarTy m)))
+        captured = Subst.substTy (indexSubst [f, n] m (Var n)) (mkDepFunTy n body)
+    case captured of
+        DepFunTy fresh result -> do
+            check "call substitution freshens a reused runtime Unique" (fresh /= n)
+            checkType dflags "call substitution separates bound and free arguments" (mkFunctionType ManyTy (indexed (TermAppTy f (TermVarTy fresh))) (indexed call)) result
+            lintAccepts dflags "capture-avoiding call substitution" [f, n] (Type captured)
+        _ -> fail "FAIL: call substitution lost its retained binder"
+    let headProof = proof 6211 call call
+        headCapture = Lam g (Let (NonRec headProof (Coercion (mkNomReflCo call))) (mkIntExprInt (targetPlatform dflags) 42))
+        headSubst = CoreSubst.extendIdSubst (CoreSubst.mkEmptySubst (mkInScopeSet (mkVarSet [g, n]))) f (Var g)
+        headCaptured = CoreSubst.substExpr headSubst headCapture
+    lintAccepts dflags "original function-head capture control" [f, n] headCapture
+    case headCaptured of
+        Lam fresh (Let (NonRec actualProof (Coercion actualCo)) _) -> do
+            check "Core substitution freshens a capturing function binder" (fresh /= g)
+            check "Core substitution preserves the free range head" (g `elemVarSet` exprFreeVars headCaptured)
+            check "Core substitution excludes the fresh bound head from free variables" (not (fresh `elemVarSet` exprFreeVars headCaptured))
+            checkType dflags "captured head proof uses the original actual free head" (TermAppTy g (TermVarTy n)) (coercionLKind actualCo)
+            check "captured proof metadata preserves the original free head" (g `elemVarSet` tyCoVarsOfType (varType actualProof))
+            lintAccepts dflags "Core substitution avoids function-head capture" [g, n] headCaptured
+        _ -> fail "FAIL: Core substitution changed the head capture control shape"
+    let unused = mkTyVar (mkSystemName (unique 6212) (mkTyVarOcc "unused_head_parameter")) liftedTypeKind
+        unusedBinders = [mkAnonTyConBinder unused]
+        erasedHead = mkSynonymTyCon (mkSystemName (unique 6213) (mkTcOcc "ErasedHeadParameter")) (mkTyConKind unusedBinders liftedTypeKind) unusedBinders liftedTypeKind [Phantom] (idType f) True True True False
+        hiddenFree = mkTyConApp erasedHead [mkTyVarTy unused]
+        hiddenHead = local 6214 "hidden_free_head" hiddenFree
+        escapedPayload = local 6215 "head_dependent_payload" (indexed call)
+    checkType dflags "unused synonym parameter hides the same closed arrow" (idType f) hiddenFree
+    check "raw free head metadata is ineligible before synonym expansion" (not (isNativeIndexFunctionId hiddenHead))
+    lintRejects dflags "raw free head metadata cannot enter a call" [hiddenHead, unused, n] (Type (TermAppTy hiddenHead (TermVarTy n)))
+    lintRejects dflags "runtime function head cannot escape a lambda result" [n] (Lam f (Lam escapedPayload (Var escapedPayload)))
+    let symbolic = TermAppTy f (succTy zeroTy)
+    lintAccepts dflags "type-node call argument need not be an atomic runtime value" [f] (Type symbolic)
+    let familyParameter = mkTyVar (mkSystemName (unique 6209) (mkTyVarOcc "call_family_arg")) boolTy
+        familyBinders = [mkAnonTyConBinder familyParameter]
+        stuckFamily = mkFamilyTyCon (mkSystemName (unique 6210) (mkTcOcc "CallArgument")) (mkTyConKind familyBinders natTy) familyBinders 0 natTy Nothing OpenTypeFamilyTyCon Nothing NotInjective
+        familyArgument = mkTyConApp stuckFamily [TermVarTy b]
+        nestedCall = TermAppTy f (TermAppTy reverseHead (TermVarTy b))
+        poisoned = setIdUnfolding f (unfolding (error "opaque call inspected its head unfolding"))
+    lintAccepts dflags "call type permits a well-kinded stuck family argument" [f, b] (Type (TermAppTy f familyArgument))
+    lintAccepts dflags "call type permits nested mixed-domain calls" [f, reverseHead, b] (Type nestedCall)
+    checkType dflags "head substitution preserves a symbolic family argument" (TermAppTy g familyArgument) (Subst.substTy (indexSubst [g, b] f (Var g)) (TermAppTy f familyArgument))
+    check "head eligibility does not inspect unfoldings" (isNativeIndexFunctionId poisoned)
+    checkType dflags "call kind does not inspect head unfoldings" boolTy (typeKind (TermAppTy poisoned (TermVarTy n)))
+    forM_
+        [ ("linear head", setIdMult f OneTy, [setIdMult f OneTy, n])
+        , ("join head", asJoinId f 1, [asJoinId f 1, n])
+        , ("global head", globaliseId f, [n])
+        , ("missing head", f, [n])
+        , ("stale head metadata", f, [setIdType f (idType reverseHead), n])
+        , ("linear function arrow", setIdType f (mkFunctionType OneTy natTy boolTy), [setIdType f (mkFunctionType OneTy natTy boolTy), n])
+        ]
+        $ \(label, badHead, badScope) -> lintRejects dflags ("call rejects " ++ label) badScope (Type (TermAppTy badHead (TermVarTy n)))
+    lintRejects dflags "call argument must have its head's domain" [f, b] (Type (TermAppTy f (TermVarTy b)))
+    lintRejects dflags "call congruence child must be nominal" scope (Coercion (TermAppCo f (mkSubCo (mkCoVarCo cv))))
+    lintRejects dflags "call congruence child must have the input domain" [f, b] (Coercion (TermAppCo f (mkNomReflCo (TermVarTy b))))
+    rejectsWith "head substitution cannot silently keep a lambda range" "unsupported native function range" $
+        evaluate (Subst.substTy (indexSubst [n] f (Lam n (Var (dataConWorkId trueDataCon)))) call)
+    rejectsWith "head substitution cannot change closed domains" "invalid native function head" $
+        evaluate (Subst.substTy (indexSubst [reverseHead, n] f (Var reverseHead)) call)
 
 -- | Check rigid index matching and conservative constructor apartness.
 runMatchingChecks :: DynFlags -> IO ()

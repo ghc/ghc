@@ -25,7 +25,7 @@ import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Rep (Type (..), scaledThing)
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Utils (dataConRepInstPat, exprType)
+import GHC.Core.Utils (dataConRepInstPat, exprIsTrivial, exprType)
 import GHC.CoreToStg.Prep (CorePrepConfig (..), corePrepExpr)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
@@ -127,6 +127,15 @@ helperSource =
         , "{-# NOINLINE opaqueNat #-}"
         , "opaqueNat :: Nat -> Nat"
         , "opaqueNat n = n"
+        , "-- | Ignore a runtime argument without exposing the body to Core."
+        , "{-# NOINLINE constantZeroNat #-}"
+        , "constantZeroNat :: Nat -> Nat"
+        , "constantZeroNat _ = Z"
+        , "-- | Supply an opaque function whose input and output domains differ."
+        , "{-# NOINLINE boolToNat #-}"
+        , "boolToNat :: Bool -> Nat"
+        , "boolToNat True = S Z"
+        , "boolToNat False = Z"
         , "{-# NOINLINE driveNatPair #-}"
         , "driveNatPair :: (Nat -> Nat -> IO String) -> (Nat, Nat) -> IO String"
         , "driveNatPair k seed = newIORef seed >>= readIORef >>= uncurry k"
@@ -4084,6 +4093,21 @@ nativeVecHead nat vec successor cons = do
     worker = local 223 "head_native" (mkDepFunTy n (mkFunctionType ManyTy vectorTy intTy))
     (existentials, arguments) = dataConRepInstPat (map unique [230 .. 239]) ManyTy cons [intTy, successorIndex]
 
+{- Note [Opaque call runtime checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The strict-call kernel takes an ordinary function and a runtime index.
+Its constructor alternatives provide the exact equality for TermAppTy.
+Cast a vector at the observed constructor index to the opaque call index,
+then consume the vector with an ordinary observer. The DEFAULT kernel
+instead transports a vector at the actual case binder. Neither kernel
+evaluates an index by interpreting a type or inspecting an unfolding.
+
+Check ordinary function application, constructor argument naming and proof
+transport together. A type-only call must retain both free dependencies
+without evaluating either value. These are Core tests; source call indices
+and new interface forms remain outside this increment.
+-}
+
 -- | Check the Core intermediate with runtime inputs and lazy recursive fields.
 runNatChecks :: HscEnv -> DynFlags -> [Id] -> [TyCon] -> IO ()
 runNatChecks environment flags bindings tycons = do
@@ -4451,7 +4475,145 @@ runNatChecks environment flags bindings tycons = do
         Left exception | "native-bottom-function" `isInfixOf` displayException exception -> pure ()
         Left exception -> fail ("FAIL: variable alias changed bottom function demand: " ++ displayException exception)
         Right value' -> fail ("FAIL: variable alias hid a bottom function: " ++ show value')
+    let opaqueHead = local 3300 "opaque_head" (mkFunctionType ManyTy natTy natTy)
+        opaqueResult = local 3301 "opaque_result" natTy
+        opaquePredecessor = local 3302 "opaque_predecessor" natTy
+        predecessorIndex = TermVarTy opaquePredecessor
+        branchSuccessor = mkTyConApp (promoteDataCon successor) [predecessorIndex]
+        nilAtZero =
+            mkApps
+                (Var (dataConWorkId nil))
+                [Type intTy, Type betaZeroType, Coercion (mkNomReflCo betaZeroType)]
+        consAtSuccessor =
+            mkApps
+                (Var (dataConWorkId cons))
+                [ Type intTy
+                , Type branchSuccessor
+                , Type predecessorIndex
+                , Coercion (mkNomReflCo branchSuccessor)
+                , payload
+                , mkApps (Var worker) [Var opaquePredecessor, payload]
+                ]
+        -- | Consume exact strict-call evidence through an indexed vector cast.
+        opaqueKernel useDefault function parameter argument observer =
+            Let (Rec [(worker, rhs)])
+                $ Lam function
+                $ Lam parameter
+                $ Case (App (Var function) argument) opaqueResult observationType alternatives
+          where
+            callIndex = case exprToNativeCaseIndex (App (Var function) argument) of
+                Just index' -> index'
+                Nothing -> error "Missing checked opaque-call index in runtime fixture"
+            zeroCv = proof 3303 callIndex betaZeroType
+            successorCv = proof 3304 callIndex branchSuccessor
+            aliasCv = proof 3305 (TermVarTy opaqueResult) callIndex
+            observationType = exprType (App (Var (helper bindings "observeInt")) payload)
+            observe indexCo vector =
+                mkApps
+                    (Var (helper bindings observer))
+                    [ Type callIndex
+                    , Cast vector (mkTyConAppCo Representational vec [mkReflCo Representational intTy, indexCo])
+                    ]
+            alternatives
+                | useDefault =
+                    [ Alt DEFAULT [aliasCv] $
+                        observe (mkCoVarCo aliasCv) (mkApps (Var worker) [Var opaqueResult, payload])
+                    ]
+                | otherwise =
+                    [ Alt (DataAlt zero) [zeroCv] (observe (mkSymCo (mkCoVarCo zeroCv)) nilAtZero)
+                    , Alt (DataAlt successor) [opaquePredecessor, successorCv] (observe (mkSymCo (mkCoVarCo successorCv)) consAtSuccessor)
+                    ]
+        callKernel = opaqueKernel False opaqueHead input (Var input)
+        defaultKernel = opaqueKernel True opaqueHead input
+        callWith function kernel' seed =
+            mkApps (Var (helper bindings "driveNat")) [App kernel' function, seed]
+        identityHead = Var (helper bindings "opaqueNat")
+        zeroHead = Var (helper bindings "constantZeroNat")
+        successorHead = Var (dataConWorkId successor)
+        bottomHead = App (Var (helper bindings "bottomFunction")) (Type (varType opaqueHead))
+    expect "opaque identity call at zero/two/three" (unlines ["[]:0", "[42,42]:2", "[42,42,42]:3"]) $
+        App (Var (helper bindings "driveNats")) (App (callKernel "observeVec") identityHead)
+    expect "opaque constant is not injective in its argument" (unlines ["[]:0", "[]:0", "[]:0"]) $
+        App (Var (helper bindings "driveNats")) (App (callKernel "observeVec") zeroHead)
+    expect "opaque constant ignores its bottom argument" "[]:0" $
+        callWith zeroHead (callKernel "observeVec") (Var (helper bindings "bottomNat"))
+    expectBottom "opaque identity demands its bottom argument" $
+        callWith identityHead (callKernel "observeVec") (Var (helper bindings "bottomNat"))
+    expect "opaque successor leaves its predecessor lazy" "42" $
+        callWith successorHead (callKernel "observeVecHead") (Var (helper bindings "bottomNat"))
+    expectBottom "opaque successor tail demands its predecessor" $
+        callWith successorHead (callKernel "observeVec") (Var (helper bindings "bottomNat"))
+    expect "opaque identity preserves a finite cyclic prefix" "[42,42,42,42]" $
+        callWith identityHead (callKernel "observeVecPrefix") (Var (helper bindings "cyclicNat"))
+    expect "opaque identity leaves its partial predecessor lazy at the head" "42" $
+        callWith identityHead (callKernel "observeVecHead") (Var (helper bindings "partialNat"))
+    expectBottom "opaque identity inspects a partial predecessor only in the tail" $
+        callWith identityHead (callKernel "observeVec") (Var (helper bindings "partialNat"))
+    let constructedCall = opaqueKernel False opaqueHead input successorValue "observeVecHead"
+    forM_
+        [ ("variable", callKernel "observeVecHead")
+        , ("constructor", constructedCall)
+        , ("nested constructor", opaqueKernel False opaqueHead input nestedValue "observeVecHead")
+        , ("beta successor", opaqueKernel False opaqueHead input betaSuccessor "observeVecHead")
+        , ("DEFAULT constructor", defaultKernel successorValue "observeVecHead")
+        ]
+        $ \(label, rawKernel) -> do
+            lintNative flags ("opaque call " ++ label ++ " input") rawKernel
+            let simplified = simpleOptNativeExpr rawKernel
+            unless (eqType (exprType rawKernel) (exprType simplified)) $
+                fail ("FAIL: opaque call simplification changed the " ++ label ++ " kernel type")
+            lintNative flags ("opaque call " ++ label ++ " simplified") simplified
+            prepared <- corePrepExpr (hsc_logger environment) nativeCpConfig simplified
+            unless (eqType (exprType rawKernel) (exprType prepared)) $
+                fail ("FAIL: opaque call CorePrep changed the " ++ label ++ " kernel type")
+            lintNative flags ("opaque call " ++ label ++ " prepared") prepared
+            unless (hasPreparedCall prepared) $
+                fail ("FAIL: opaque call CorePrep removed its actual strict call: " ++ label)
+            let function = if label == "variable" then successorHead else identityHead
+            expect ("prepared opaque call " ++ label ++ " leaves constructor fields lazy") "42" $
+                callWith function prepared (Var (helper bindings "bottomNat"))
+    forM_ [("bottom argument", callKernel "observeVec"), ("constructor field", constructedCall)] $ \(label, kernel') -> do
+        bottomCallOutcome <-
+            try
+                (execute environment flags ("opaque function demand precedes " ++ label) $ callWith bottomHead kernel' (Var (helper bindings "bottomNat"))) ::
+                IO (Either SomeException String)
+        case bottomCallOutcome of
+            Left exception | "native-bottom-function" `isInfixOf` displayException exception -> pure ()
+            Left exception -> fail ("FAIL: opaque call changed function demand order: " ++ displayException exception)
+            Right actual -> fail ("FAIL: opaque call did not demand its bottom function: " ++ show actual)
+    expect "opaque DEFAULT evidence retains the computed value" (unlines ["[]:0", "[42,42]:2", "[42,42,42]:3"]) $
+        App (Var (helper bindings "driveNats")) (App (defaultKernel (Var input) "observeVec") identityHead)
+    let typeOnlyIndex = TermAppTy opaqueHead (TermVarTy input)
+        typeOnlyDictionary = local 3306 "opaque_type_only_dictionary" (mkTyConApp eqTyCon [natTy, typeOnlyIndex, typeOnlyIndex])
+        typeOnlyProof = mkCoreConApps eqDataCon [Type natTy, Type typeOnlyIndex, Type typeOnlyIndex, Coercion (mkNomReflCo typeOnlyIndex)]
+        typeOnlyBody = App (Var (helper bindings "observeInt")) (App (Lam typeOnlyDictionary payload) typeOnlyProof)
+        typeOnlyKernel = Lam opaqueHead (Lam input typeOnlyBody)
+    unless (opaqueHead `elemVarSet` exprFreeVars typeOnlyBody && input `elemVarSet` exprFreeVars typeOnlyBody) $
+        fail "FAIL: type-only opaque call lost its head or argument dependency"
+    expect "type-only opaque call ignores its bottom function and argument" "42" $
+        callWith bottomHead typeOnlyKernel (Var (helper bindings "bottomNat"))
+    let mixedHead = local 3310 "mixed_opaque_head" (mkFunctionType ManyTy boolTy natTy)
+        mixedInput = local 3311 "mixed_opaque_input" boolTy
+        mixedKernel = opaqueKernel False mixedHead mixedInput (Var mixedInput) "observeVec"
+    expect "opaque Bool-to-Nat call preserves distinct domains" "[42]:1\n[]:0" $
+        App (Var (helper bindings "driveBoth")) (App mixedKernel (Var (helper bindings "boolToNat")))
   where
+    -- | Find a checked strict call whose argument has reached ANF.
+    hasPreparedCall expression = case expression of
+        Case (App (Var function) argument) _ _ alternatives
+            | isNativeIndexFunctionId function
+            , exprIsTrivial argument
+            , any (\alt -> isNativeIndexAlt alt || isNativeIndexAliasAlt alt) alternatives ->
+                True
+        Case scrut _ _ alternatives -> hasPreparedCall scrut || any (\(Alt _ _ body) -> hasPreparedCall body) alternatives
+        Lam _ body -> hasPreparedCall body
+        Let (NonRec _ value) body -> hasPreparedCall value || hasPreparedCall body
+        Let (Rec pairs) body -> any (hasPreparedCall . snd) pairs || hasPreparedCall body
+        App function argument -> hasPreparedCall function || hasPreparedCall argument
+        Cast body _ -> hasPreparedCall body
+        Tick _ body -> hasPreparedCall body
+        _ -> False
+
     namedTyCon label = case find ((== label) . occNameString . nameOccName . tyConName) tycons of
         Just tycon -> pure tycon
         Nothing -> fail ("FAIL: missing loaded type constructor: " ++ label)
