@@ -53,7 +53,7 @@ import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserD
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
 import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
-import GHC.Iface.Type (IfaceAppArgs (IA_Nil), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
+import GHC.Iface.Type (IfaceAppArgs (IA_Nil), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
@@ -1055,6 +1055,22 @@ indexSubst scope b rhs =
 check :: String -> Bool -> IO ()
 check label condition = unless condition (fail ("FAIL: " ++ label))
 
+
+{- Note [Function field constructor interface checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Import each declaration twice to distinguish fresh field binders from repeated
+references to one field. The payload uses both the actual function head and
+its following scalar argument. Instantiating a pattern must substitute these
+fields in order. The lifted payload is an equality-dictionary function. It is
+not an executed vector; the separate source module checks a generic Nat/Vec
+package through its compiled object and interface.
+
+Generic function-Pi imports and call-coercion imports remain rejected. These
+checks use only the constructor-field prefix decoder and its scoped call-type
+codec. The bounded recursive-domain checks demand imported worker types after
+all parent knots exist. A timeout or unexpected exception is a test failure.
+-}
+
 -- | Check retained types and closed expressions through binary interface tables.
 runIfaceChecks :: FilePath -> IO ()
 runIfaceChecks libdir = runGhc (Just libdir) $ do
@@ -1295,6 +1311,96 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             many = toIfaceType ManyTy
             bool = toIfaceType boolTy
             invalid = "Invalid retained constructor"
+        -- See Note [Function field constructor interface checks] below.
+        let functionTy = mkFunctionType ManyTy boolTy boolTy
+            scalarName = mkIfLclName (fsLit "function_package_scalar")
+            functionTemplate = mkSysLocal (ifLclNameFS firstName) (unique 9500) ManyTy functionTy
+            scalarTemplate = mkSysLocal (ifLclNameFS scalarName) (unique 9501) ManyTy boolTy
+            functionPayload = toIfaceType (indexed (TermAppTy functionTemplate (TermVarTy scalarTemplate)))
+            functionConstructor = constructor
+                { ifConArgBinders = [Just firstName, Just scalarName, Nothing]
+                , ifConArgTys = [(many, toIfaceType functionTy), (many, bool), (many, functionPayload)]
+                , ifConStricts = replicate 3 IfNoBang
+                , ifConSrcStricts = replicate 3 (IfSrcBang NoSrcUnpack NoSrcStrict)
+                }
+            functionDeclaration = changePackage (const functionConstructor) declaration
+        forM_ (zip [0 :: Int ..] [NormalCompression, MaximumCompression]) $ \(iteration, compression) -> do
+            first <- restorePackage env =<< roundtrip compression functionDeclaration
+            second <- restorePackage env =<< roundtrip compression functionDeclaration
+            forcePackage first
+            forcePackage second
+            let con = tyConSingleDataCon first
+                otherCon = tyConSingleDataCon second
+                base = 9520 + iteration * 30
+                actualF = local base "actual_function" functionTy
+                actualN = local (base + 1) "actual_scalar" boolTy
+                actualPayload = local (base + 2) "actual_function_payload" (indexed (TermAppTy actualF (TermVarTy actualN)))
+                packageTy = mkTyConTy first
+                scrutinee = local (base + 3) "actual_function_package" packageTy
+                caseBinder = local (base + 4) "actual_function_case" packageTy
+                (existentials, fields) = dataConRepInstPat (map unique [base + 10 .. base + 19]) ManyTy con []
+                (_, otherFields) = dataConRepInstPat (map unique [base + 20 .. base + 29]) ManyTy con []
+            case (dataConRepArgBinders con, dataConRepArgBinders otherCon) of
+                ([Just f, Just n, Nothing], [Just g, Just m, Nothing]) -> do
+                    check "function field imports allocate distinct actual fields" (f /= g && n /= m && f /= functionTemplate && n /= scalarTemplate)
+                    check "function field imports preserve head and scalar policies" (isNativeIndexFunctionId f && isNativeIndexId n)
+                    case dataConOrigArgTys con of
+                        [Scaled _ fTy, Scaled _ nTy, Scaled _ payloadTy] -> do
+                            checkType dflags "function field imported domain" functionTy fTy
+                            checkType dflags "function field imported scalar domain" boolTy nTy
+                            checkType dflags "function field payload uses both imported fields" (indexed (TermAppTy f (TermVarTy n))) payloadTy
+                            case payloadTy of
+                                FunTy _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
+                                    check "constructor call endpoints share actual field identities" (left == f && right == f && ln == n && rn == n)
+                                _ -> fail "FAIL: constructor call payload lost repeated endpoints"
+                        _ -> fail "FAIL: function-field constructor changed source arity"
+                _ -> fail "FAIL: function-field constructor lost metadata"
+            checkType dflags "function field imported worker alpha equivalence" (idType (dataConWorkId con)) (idType (dataConWorkId otherCon))
+            checkType dflags "function field imported wrapper alpha equivalence" (dataConWrapperType con) (dataConWrapperType otherCon)
+            check "function fields occupy exactly three runtime slots" (dataConRepArity con == 3 && countConRepArgs con == 3 && countFunRepArgs 3 (idType (dataConWorkId con)) == 3)
+            check "function fields add no erased existentials" (null existentials)
+            case (fields, otherFields) of
+                ([f, n, payload], [g, m, otherPayload]) -> do
+                    check "function pattern fields freshen per instantiation" (f /= g && n /= m && payload /= otherPayload)
+                    checkType dflags "function pattern payload substitutes sequential actual fields" (indexed (TermAppTy f (TermVarTy n))) (idType payload)
+                    checkType dflags "second function pattern payload has its own fields" (indexed (TermAppTy g (TermVarTy m))) (idType otherPayload)
+                _ -> fail "FAIL: imported function package pattern changed runtime arity"
+            lintAccepts dflags "function field imported construction" [actualF, actualN, actualPayload] $
+                mkApps (Var (dataConWorkId con)) [Var actualF, Var actualN, Var actualPayload]
+            lintAccepts dflags "function field imported elimination and repackaging" [scrutinee] $
+                Case (Var scrutinee) caseBinder packageTy [Alt (DataAlt con) fields (mkApps (Var (dataConWorkId con)) (map Var fields))]
+            vacuous <- restorePackage env =<< roundtrip compression (changePackage (\_ -> functionConstructor{ifConArgTys = take 2 (ifConArgTys functionConstructor) ++ [(many, bool)]}) declaration)
+            forcePackage vacuous
+            let vacuousCon = tyConSingleDataCon vacuous
+            check "vacuous function codec preserves named field metadata" $ case dataConRepArgBinders vacuousCon of
+                [Just f, Just n, Nothing] -> isNativeIndexFunctionId f && isNativeIndexId n
+                _ -> False
+            check "vacuous function codec worker uses ordinary arrows" $ case idType (dataConWorkId vacuousCon) of
+                FunTy{} -> True
+                _ -> False
+        let badFunctionDomain = toIfaceType (mkFunctionType ManyTy boolTy intTy)
+            innerLinearFunction = toIfaceType (mkFunctionType OneTy boolTy boolTy)
+        forM_
+            [ ("function field metadata cannot duplicate names", invalid, functionConstructor{ifConArgBinders = [Just firstName, Just firstName, Nothing]})
+            , ("function field payload cannot precede its head", "Iface id out of scope", functionConstructor{ifConArgBinders = [Nothing, Just firstName, Just scalarName], ifConArgTys = [(many, functionPayload), (many, toIfaceType functionTy), (many, bool)]})
+            , ("function field cannot reference itself in its domain", "Iface id out of scope", functionConstructor{ifConArgTys = (many, functionPayload) : drop 1 (ifConArgTys functionConstructor)})
+            , ("function field rejects unsupported output domain", invalid, functionConstructor{ifConArgTys = (many, badFunctionDomain) : drop 1 (ifConArgTys functionConstructor)})
+            , ("function field rejects linear inner arrow", invalid, functionConstructor{ifConArgTys = (many, innerLinearFunction) : drop 1 (ifConArgTys functionConstructor)})
+            , ("function field rejects linear outer multiplicity", invalid, functionConstructor{ifConArgTys = (toIfaceType OneTy, toIfaceType functionTy) : drop 1 (ifConArgTys functionConstructor)})
+            ] $ \(label, fragment, malformed) -> rejectsPackage label fragment (changePackage (const malformed) declaration)
+        let outerHead = local 9590 "outer_function" functionTy
+            outerScalar = local 9591 "outer_function_scalar" boolTy
+            outerPayload = toIfaceType (indexed (TermAppTy outerHead (TermVarTy outerScalar)))
+            siblingName = mkIfLclName (fsLit "sibling_function")
+            sibling = functionConstructor
+                { ifConName = mkExternalName (unique 9592) (nameModule (ifName declaration)) (mkDataOcc "MkFunctionSibling") noSrcSpan
+                , ifConArgBinders = [Just siblingName, Just scalarName, Nothing]
+                }
+        rejectsPackageWithScope [outerHead, outerScalar] "function payload cannot inherit outer runtime fields" invalid $
+            changePackage (const functionConstructor{ifConArgTys = take 2 (ifConArgTys functionConstructor) ++ [(many, outerPayload)]}) declaration
+        rejectsPackage "function payload cannot inherit sibling head scope" "Iface id out of scope" $
+            declaration{ifCons = IfDataTyCon False [functionConstructor, sibling]}
+
         forM_
             [ ("constructor interface rejects misaligned binder metadata", invalid, constructor{ifConArgBinders = [Just firstName]})
             , ("constructor interface rejects duplicate field names", invalid, constructor{ifConArgBinders = [Just firstName, Just firstName]})
@@ -1371,6 +1477,24 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             rightDeclaration = withDomain leftDeclaration (recursiveDeclaration 2920 "IfaceRightDomain")
         rejectsImportedKnots "self-recursive imported retained domain" [selfDeclaration]
         rejectsImportedKnots "mutually recursive imported retained domains" [leftDeclaration, rightDeclaration]
+        -- Check the domain graph only after all imported parent knots exist.
+        let withFunctionDomain domain inputSide = changePackage $ \con ->
+                let reference = IfaceTyConApp (IfaceTyCon (ifName domain) (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
+                    arrow = case toIfaceType (mkFunctionType ManyTy boolTy boolTy) of
+                        IfaceFunTy flag mult _ _ ->
+                            if inputSide then IfaceFunTy flag mult reference bool else IfaceFunTy flag mult bool reference
+                        _ -> error "FAIL: ordinary interface function changed shape"
+                 in con{ifConArgTys = [(many, arrow), (many, bool)]}
+            selfInputFunction = withFunctionDomain selfInputFunction True (recursiveDeclaration 9800 "IfaceFunctionSelfInput")
+            selfOutputFunction = withFunctionDomain selfOutputFunction False (recursiveDeclaration 9810 "IfaceFunctionSelfOutput")
+            leftInputFunction = withFunctionDomain rightInputFunction True (recursiveDeclaration 9820 "IfaceFunctionLeftInput")
+            rightInputFunction = withFunctionDomain leftInputFunction True (recursiveDeclaration 9830 "IfaceFunctionRightInput")
+            leftOutputFunction = withFunctionDomain rightOutputFunction False (recursiveDeclaration 9840 "IfaceFunctionLeftOutput")
+            rightOutputFunction = withFunctionDomain leftOutputFunction False (recursiveDeclaration 9850 "IfaceFunctionRightOutput")
+        rejectsImportedKnots "function field rejects a self-referencing input domain" [selfInputFunction]
+        rejectsImportedKnots "function field rejects a self-referencing output domain" [selfOutputFunction]
+        rejectsImportedKnots "function field rejects mutually recursive input domains" [leftInputFunction, rightInputFunction]
+        rejectsImportedKnots "function field rejects mutually recursive output domains" [leftOutputFunction, rightOutputFunction]
         promotionMessages <- newIORef []
         temporaryTypes <- newIORef (mkTypeEnv [AConLike (RealDataCon firstParameterizedCon)])
         let promotionModule = nameModule (dataConName firstParameterizedCon)
