@@ -3297,7 +3297,7 @@ runPackageSourceRejectChecks = do
     logger <- GHC.getLogger
     (containerFlags, leftovers, _) <-
         GHC.parseDynamicFlags logger flags $
-            map noLoc ["-O0", "-fasm", "-fomit-interface-pragmas", "-fno-write-if-simplified-core", "-dcore-lint", "-dstg-lint", "-v0"]
+            map noLoc ["-O0", "-fobject-code", "-fasm", "-fforce-recomp", "-fomit-interface-pragmas", "-fno-write-if-simplified-core", "-dcore-lint", "-dstg-lint", "-v0"]
     unless (null leftovers) (fail "FAIL: native container flags were not parsed")
     void $ GHC.setSessionDynFlags containerFlags{ghcLink = GHC.NoLink}
     now <- liftIO getCurrentTime
