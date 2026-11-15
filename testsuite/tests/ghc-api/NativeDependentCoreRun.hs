@@ -2441,7 +2441,7 @@ runCallApplicationSourceChecks = do
                 Left exception -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
                 Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
     forM_
-        [ ("NativeCallApplicationSiblingRow", 83865, ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload); S k -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload) }"])
+        [ ("NativeCallApplicationSiblingRow", 5617, ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload); S k -> let { payload :: Vec Int (f n); payload = idCall f n VNil } in length (vecList payload) }"])
         , ("NativeCallApplicationDistinctIndex", 5617, ["badCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> foreach (m :: Nat) -> Int", "badCall f n m = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall f m VNil } in length (vecList payload); S k -> 42 }"])
         , ("NativeCallApplicationDistinctHead", 5617, ["badCall :: foreach (f :: Nat -> Nat) -> foreach (g :: Nat -> Nat) -> foreach (n :: Nat) -> Int", "badCall f g n = case f n of { Z -> let { payload :: Vec Int (f n); payload = idCall g n VNil } in length (vecList payload); S k -> 42 }"])
         ]
