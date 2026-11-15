@@ -1711,6 +1711,7 @@ runOpaqueCallChecks dflags = do
         n = local 6200 "call_n" natTy
         m = local 6201 "call_m" natTy
         f = local 6202 "call_head" (mkFunctionType ManyTy natTy boolTy)
+        constraintHead = setIdType f (FunTy FTF_T_C ManyTy natTy boolTy)
         g = local 6203 "call_head" (idType f)
         h = local 6204 "call_head" (idType f)
         reverseHead = local 6205 "reverse_head" (mkFunctionType ManyTy boolTy natTy)
@@ -1723,12 +1724,13 @@ runOpaqueCallChecks dflags = do
         apart lhs rhs = case tcUnifyTysFG alwaysBindFam alwaysBindTv [lhs] [rhs] of
             MaybeApart{} -> True
             _ -> False
+    check "native function rejects constraint result classification" (not (isNativeIndexFunctionId constraintHead))
     check "mixed-domain native function is eligible" (isNativeIndexFunctionId f)
     check "native function is not a scalar index" (not (isNativeIndexId f))
     checkType dflags "Nat-to-Bool call has Bool kind" boolTy (typeKind call)
     checkType dflags "Bool-to-Nat call has Nat kind" natTy (typeKind (TermAppTy reverseHead (TermVarTy b)))
-    lintAccepts dflags "mixed-domain call index" [f, n] (Type call)
-    lintAccepts dflags "reverse mixed-domain call index" [reverseHead, b] (Type (TermAppTy reverseHead (TermVarTy b)))
+    lintAccepts dflags "mixed-domain call index" [f, n] (Coercion (mkNomReflCo call))
+    lintAccepts dflags "reverse mixed-domain call index" [reverseHead, b] (Coercion (mkNomReflCo (TermAppTy reverseHead (TermVarTy b))))
     check "call congruence is nominal" (coercionRole co == Nominal)
     checkType dflags "call congruence left endpoint" call (coercionLKind co)
     checkType dflags "call congruence right endpoint" right (coercionRKind co)
@@ -1768,7 +1770,7 @@ runOpaqueCallChecks dflags = do
         DepFunTy fresh result -> do
             check "call substitution freshens a reused runtime Unique" (fresh /= n)
             checkType dflags "call substitution separates bound and free arguments" (mkFunctionType ManyTy (indexed (TermAppTy f (TermVarTy fresh))) (indexed call)) result
-            lintAccepts dflags "capture-avoiding call substitution" [f, n] (Type captured)
+            lintAccepts dflags "capture-avoiding call substitution" [f, n] (Coercion (mkNomReflCo captured))
         _ -> fail "FAIL: call substitution lost its retained binder"
     let headProof = proof 6211 call call
         headCapture = Lam g (Let (NonRec headProof (Coercion (mkNomReflCo call))) (mkIntExprInt (targetPlatform dflags) 42))
@@ -1792,18 +1794,18 @@ runOpaqueCallChecks dflags = do
         escapedPayload = local 6215 "head_dependent_payload" (indexed call)
     checkType dflags "unused synonym parameter hides the same closed arrow" (idType f) hiddenFree
     check "raw free head metadata is ineligible before synonym expansion" (not (isNativeIndexFunctionId hiddenHead))
-    lintRejects dflags "raw free head metadata cannot enter a call" [hiddenHead, unused, n] (Type (TermAppTy hiddenHead (TermVarTy n)))
+    lintRejects dflags "raw free head metadata cannot enter a call" [hiddenHead, unused, n] (Coercion (mkNomReflCo (TermAppTy hiddenHead (TermVarTy n))))
     lintRejects dflags "runtime function head cannot escape a lambda result" [n] (Lam f (Lam escapedPayload (Var escapedPayload)))
     let symbolic = TermAppTy f (succTy zeroTy)
-    lintAccepts dflags "type-node call argument need not be an atomic runtime value" [f] (Type symbolic)
+    lintAccepts dflags "type-node call argument need not be an atomic runtime value" [f] (Coercion (mkNomReflCo symbolic))
     let familyParameter = mkTyVar (mkSystemName (unique 6209) (mkTyVarOcc "call_family_arg")) boolTy
         familyBinders = [mkAnonTyConBinder familyParameter]
         stuckFamily = mkFamilyTyCon (mkSystemName (unique 6210) (mkTcOcc "CallArgument")) (mkTyConKind familyBinders natTy) familyBinders 0 natTy Nothing OpenTypeFamilyTyCon Nothing NotInjective
         familyArgument = mkTyConApp stuckFamily [TermVarTy b]
         nestedCall = TermAppTy f (TermAppTy reverseHead (TermVarTy b))
         poisoned = setIdUnfolding f (unfolding (error "opaque call inspected its head unfolding"))
-    lintAccepts dflags "call type permits a well-kinded stuck family argument" [f, b] (Type (TermAppTy f familyArgument))
-    lintAccepts dflags "call type permits nested mixed-domain calls" [f, reverseHead, b] (Type nestedCall)
+    lintAccepts dflags "call type permits a well-kinded stuck family argument" [f, b] (Coercion (mkNomReflCo (TermAppTy f familyArgument)))
+    lintAccepts dflags "call type permits nested mixed-domain calls" [f, reverseHead, b] (Coercion (mkNomReflCo nestedCall))
     checkType dflags "head substitution preserves a symbolic family argument" (TermAppTy g familyArgument) (Subst.substTy (indexSubst [g, b] f (Var g)) (TermAppTy f familyArgument))
     check "head eligibility does not inspect unfoldings" (isNativeIndexFunctionId poisoned)
     checkType dflags "call kind does not inspect head unfoldings" boolTy (typeKind (TermAppTy poisoned (TermVarTy n)))
@@ -1814,9 +1816,10 @@ runOpaqueCallChecks dflags = do
         , ("missing head", f, [n])
         , ("stale head metadata", f, [setIdType f (idType reverseHead), n])
         , ("linear function arrow", setIdType f (mkFunctionType OneTy natTy boolTy), [setIdType f (mkFunctionType OneTy natTy boolTy), n])
+        , ("constraint result classification", constraintHead, [constraintHead, n])
         ]
-        $ \(label, badHead, badScope) -> lintRejects dflags ("call rejects " ++ label) badScope (Type (TermAppTy badHead (TermVarTy n)))
-    lintRejects dflags "call argument must have its head's domain" [f, b] (Type (TermAppTy f (TermVarTy b)))
+        $ \(label, badHead, badScope) -> lintRejects dflags ("call rejects " ++ label) badScope (Coercion (mkNomReflCo (TermAppTy badHead (TermVarTy n))))
+    lintRejects dflags "call argument must have its head's domain" [f, b] (Coercion (mkNomReflCo (TermAppTy f (TermVarTy b))))
     lintRejects dflags "call congruence child must be nominal" scope (Coercion (TermAppCo f (mkSubCo (mkCoVarCo cv))))
     lintRejects dflags "call congruence child must have the input domain" [f, b] (Coercion (TermAppCo f (mkNomReflCo (TermVarTy b))))
     rejectsWith "head substitution cannot silently keep a lambda range" "unsupported native function range" $
