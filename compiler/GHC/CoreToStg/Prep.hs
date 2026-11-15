@@ -1103,8 +1103,9 @@ body of the eta-expansion lambda, resulting in
 which is unproblematic.
 -}
 
--- | Normalize and name retained arguments with checked index evidence.
+-- | Substitute local function heads and name scalar retained arguments.
 -- See Note [Retained constructor arguments in CorePrep].
+-- See Note [Function-valued retained binders] in GHC.Core.Type.
 nameNativeConstructorArgs :: CoreExpr -> UniqSM (Maybe CoreExpr)
 nameNativeConstructorArgs expr
   = do { head' <- case fun of
@@ -1130,6 +1131,15 @@ nameNativeConstructorArgs expr
       = do { co <- liftNativeIndexTransport "the application result" transport ty
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
+      | DepFunTy index _ <- coreFullView ty
+      , isNativeIndexFunctionId index
+      = case nativeIndexFunctionVar_maybe arg of
+          Just actual
+            | varType actual `eqType` varType index
+            -> build (applyTypeToArgs ty [Var actual]) (App app (Var actual))
+                     transport wrap rest
+          _ -> throwGhcException (Sorry
+                 "Native dependent Core requires a retained function argument to be an eligible local variable of its fixed function type in CorePrep.")
       | DepFunTy index _ <- coreFullView ty
       = do { (atom, co, wrap_arg) <- nameNativeIndexArg arg
            ; marker <- mkSysLocalM (fsLit "retained_template") ManyTy (varType index)
@@ -1560,6 +1570,12 @@ cpeApp top_env expr
 
 {- Note [Retained constructor arguments in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a function-valued retained binder, substitute an eligible local Var at the
+same fixed function type. Keep the actual head Id. Do not create a scalar
+marker or a strict case for the function value. The transport list below
+contains only scalar indices. See Note [Function-valued retained binders] in
+GHC.Core.Type.
+
 Changing f (S k) to let t = S k in f t changes its index from 'S k to TermVarTy t.
 Name the constructor with a checked case alias instead:
 
