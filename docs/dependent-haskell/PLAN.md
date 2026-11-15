@@ -2244,6 +2244,22 @@ are consumed, the result `QPi` does not determine the erased `value` parameter.
 The partial form has expected type `QPi -> QPi` and determines that parameter.
 Keep this difference as the measured baseline.
 
+The fresh seven-case baseline agrees in both compiler stages. The two partial
+witness helpers compile. Full `Refl`, full bottom proof, full Given transport
+and both overapplied runtime-index forms reject with GHC-91028. Preserve these
+sources and diagnostic positions under `native-worker-arguments-*`. The M35
+prefix is frozen.
+
+Use one native-worker mode in the existing cache-producing argument route.
+Detect native syntax in the original body, including its leading constraints.
+Classify the complete worker type with the existing retained-value predicate.
+Infer only original native-free tau domains. Use their known native anchor or
+an available expected-result choice. Match kinds before types with the same
+restricted immutable substitution. Require all invisible choices and reject
+template escape. Skip callback inference and fresh ordinary parameters in
+this mode. Keep every inferred cache entry if matching fails. Use the existing
+ordered plan for index parameters, nested contexts and leading VTA.
+
 - [ ] Pin the scoped argument-checking comparison in Agda and the existing
   GHC argument-cache rules. Do not transfer Agda's general Pi-meta policy.
 - [ ] Add a cache-producing `NoQL` route for a native worker. Select erased
