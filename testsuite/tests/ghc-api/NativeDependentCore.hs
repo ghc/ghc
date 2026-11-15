@@ -1806,6 +1806,18 @@ runOpaqueCallChecks dflags = do
         poisoned = setIdUnfolding f (unfolding (error "opaque call inspected its head unfolding"))
     lintAccepts dflags "call type permits a well-kinded stuck family argument" [f, b] (Coercion (mkNomReflCo (TermAppTy f familyArgument)))
     lintAccepts dflags "call type permits nested mixed-domain calls" [f, reverseHead, b] (Coercion (mkNomReflCo nestedCall))
+    let reducedFamily = mkFamilyTyCon (mkSystemName (unique 6216) (mkTcOcc "ReducedCallArgument")) (mkTyConKind familyBinders natTy) familyBinders 0 natTy Nothing (ClosedTypeFamilyTyCon (CTF (Just reducedAxiom))) Nothing NotInjective
+        reducedAxiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 6217) (mkTcOcc "ReducedCallArgumentAx")) reducedFamily [mkCoAxBranch [] [] [] [constructorIndex trueDataCon] zeroTy [] noSrcSpan]
+        reducibleCall = TermAppTy f (mkTyConApp reducedFamily [constructorIndex trueDataCon])
+        reducedCall = TermAppTy f zeroTy
+    forM_ [Nominal, Representational, Phantom] $ \role -> do
+        let Reduction callCo normalized = normaliseType emptyFamInstEnvs role reducibleCall
+        checkType dflags "call normalization reduces its symbolic argument" reducedCall normalized
+        checkType dflags "call normalization proof source" reducibleCall (coercionLKind callCo)
+        checkType dflags "call normalization proof target" reducedCall (coercionRKind callCo)
+        check "call normalization keeps the requested role" (coercionRole callCo == role)
+        check "call normalization retains the actual head dependency" (f `elemVarSet` tyCoVarsOfCo callCo)
+        lintAccepts dflags "forward call normalization evidence" [f] (Coercion callCo)
     checkType dflags "head substitution preserves a symbolic family argument" (TermAppTy g familyArgument) (Subst.substTy (indexSubst [g, b] f (Var g)) (TermAppTy f familyArgument))
     check "head eligibility does not inspect unfoldings" (isNativeIndexFunctionId poisoned)
     checkType dflags "call kind does not inspect head unfoldings" boolTy (typeKind (TermAppTy poisoned (TermVarTy n)))
