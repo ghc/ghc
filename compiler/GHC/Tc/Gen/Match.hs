@@ -197,7 +197,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     has_function_binder :: Type -> Bool
     has_function_binder ty = case coreFullView ty of
       DepFunTy binder body -> isNativeIndexFunctionId binder || has_function_binder body
-      FunTy { ft_res = body } -> has_function_binder body
+      FunTy _ _ _ body -> has_function_binder body
       _ -> False
 
     one_variable_equation :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
@@ -211,7 +211,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
       DepFunTy _ body -> case unLoc pat of
         VarPat{} -> variable_retained_patterns body pats
         _ -> False
-      FunTy { ft_af = af, ft_res = body }
+      FunTy af _ _ body
         | isVisibleFunArg af -> variable_retained_patterns body pats
         | otherwise -> variable_retained_patterns body (pat : pats)
       _ -> False
