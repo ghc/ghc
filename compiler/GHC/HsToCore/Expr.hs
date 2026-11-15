@@ -45,6 +45,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Instance.Class (lookupHasFieldLabel)
 
 import GHC.Core
+import GHC.Core.Dependent ( hasNativeDependentExprRhs )
 import GHC.Core.FVs( exprFreeVarsList, exprsFreeVarsList )
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.Core.Type
@@ -680,7 +681,22 @@ implemented in the `seqId` case of `ds_app_var`:
     The reason it's a hack is because if you define mySeq=seq, the hack
     won't work on mySeq.
 
- 3. (as described in #2409)
+ 3. A native index must keep its outer identity when the second operand
+    contains native syntax. For example, suppose ys :: Vec Int ('S k).
+    Reusing k as the case binder for k `seq` vecList @('S k) ys introduces
+    a shadowing binder. Capture-avoiding substitution then clones this binder
+    and changes the explicit type argument. The captured ys still has its
+    original type, which mentions the outer k. These types no longer match.
+
+    Use an unused case binder on this path. Keep references to the outer k
+    in both the explicit type argument and the captured value's type.
+    Apply the same restriction to an opaque call head f in a type f n.
+    This changes neither evaluation of the first operand nor its order.
+    The scanner checks the expression. It does not inspect unfolding or
+    rule metadata.
+    See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+
+ 4. (as described in #2409)
 
     The isInternalName ensures that we don't turn
             True `seq` e
@@ -813,12 +829,14 @@ ds_app_var (L loc fun_id) hs_args core_args
 
   -----------------------
   -- Deal with `seq`
-  -- See Note [Desugaring seq], points (1) and (2)
+  -- See Note [Desugaring seq].
   | fun_id `hasKey` seqIdKey
   , Type _r : Type ty1 : Type ty2 : arg1 : arg2 : rest_args <- core_args
   , let case_bndr = case arg1 of
             Var v1 | isInternalName (idName v1)
-                  -> v1        -- Note [Desugaring seq], points (2) and (3)
+                   , not ((isNativeIndexId v1 || isNativeIndexFunctionId v1)
+                          && hasNativeDependentExprRhs arg2)
+                  -> v1        -- Note [Desugaring seq], points (2), (3) and (4)
             _     -> mkWildValBinder ManyTy ty1
   = return (Case arg1 case_bndr ty2 [Alt DEFAULT [] arg2]
             `mkCoreApps` rest_args)
