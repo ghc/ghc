@@ -3823,3 +3823,56 @@ Audited documentation: `0d9c1a1a0b935c8caed53bf44b31591362b2f45a`. The final sta
 The complete `native-parameterized-domains-*` evidence namespace is permanently
 frozen. The later publication commit changes only README and PLAN. The full
 program goal remains active.
+
+## M57: nominal domain conversion for retained functions
+
+Status: planned. This increment addresses C1's conversion and substitution
+contract. Keep C1, C2 and the full program goal open.
+
+Extend retained Pi congruence with nominal evidence `delta : A ~N B`.
+Its body proof uses one actual unrestricted binder `x : A`. The left endpoint
+binds `x : A`. The right endpoint binds `y : B` and replaces body occurrences
+of `x` with `y` cast by `sym delta`. Preserve both endpoint kinds as `Type`.
+Keep fixed-domain construction as the reflexive specialization. Use optional
+nominal domain evidence in `DepFunCo`, as `ForAllCo` does for kind evidence.
+
+Use the existing `CastTy` form for converted index kinds. A runtime index cast
+must retain its nominal justification when it becomes a representational Core
+value cast. Do not treat arbitrary representational evidence as nominal.
+Extend the shared expression/index bridge and apply-once substitution together.
+Check scope, capture avoidance, actual Id metadata and the cast direction.
+Function-valued binder domains retain their fixed-domain restriction.
+
+Implement checked application for explicit retained congruence and its symmetry,
+transitivity and role weakening. Cast the actual argument back to the source
+domain. Instantiate the body proof with that same converted index. Preserve a
+cast on a function value until application. Do not eta-expand it. Opaque
+coercion assumptions need a separate projection design and keep their gate.
+Keep native coercion serialization and general optimization gated.
+
+The nonreflexive control uses `data Token a = Token`, `A = Token (F Bool)`
+and `B = Token Bool`, with nominal family evidence `F Bool ~ Bool`.
+Both domains qualify under M56. An opaque `f :: A -> Nat` makes the codomain
+`Vec Int (f x)` depend on the converted actual input. This checks a domain
+conversion that ordinary `eqType` cannot perform.
+
+Follow D/DC Figure 8 An-PiCong and Figure 10 An-Push, author-PDF pages 16 and 19.
+The asymmetric rule supplies the backward domain substitution. Agda v2.8.0
+Conversion.hs lines 746–761 and 827–849 supplies the domain/context comparison
+precedent. It does not supply a Haskell eta law. The 2019 roles and 2021 usage
+boundaries in the paper ledger still apply. Record selected source ranges,
+hashes and deviations. No combined preservation theorem is claimed.
+
+- [x] Specify the domain, index-cast, congruence and application contract.
+- [ ] Extend the coercion representation and all structural traversals.
+- [ ] Implement nominal index conversion, substitution, endpoints and Lint.
+- [ ] Lower checked casted applications without changing runtime demand.
+- [ ] Update existing API/runtime controls, including symmetry and composition.
+- [ ] Check wrong role/direction, capture, proof-only dependencies and bottoms.
+- [ ] Build both stages and run focused API/source/registered checks.
+- [ ] Update contracts, references and progress records; audit and publish.
+
+M56 remains frozen at canonical SHA256
+`f9af3265afcfea79878ecc87886d7cfcb915a0e417df21a081695ea092269d66`.
+The maintained Showcase keeps its 59 source observations until a new source
+feature uses this conversion rule. The Core controls cover this increment.
