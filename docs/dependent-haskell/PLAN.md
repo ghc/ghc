@@ -3915,7 +3915,7 @@ only README and PLAN. C1, C2 and the full program goal remain open.
 
 ## M58: scoped source domain conversion
 
-Status: implemented and checked; independent auditing and publication remain open.
+Status: implemented, checked, independently audited and published.
 
 The M57 compiler accepts the unchanged-domain source control. It rejects
 `adapt f original = original` when its retained domain changes from
@@ -3962,7 +3962,7 @@ See [nominal domain conversion](REFERENCES.md#nominal-retained-domain-conversion
 - [x] Build the bootstrap compiler and the compiler built by that compiler.
       Run the focused API, runtime, source and registered checks. Parse changed
       Haskell files and check the existing Cabal formatting boundary.
-- [ ] Update the contract, roadmap and references. Pin the selected inputs,
+- [x] Update the contract, roadmap and references. Pin the selected inputs,
       producer metadata, commands and outputs. Audit and publish the result.
 
 General dependent inference, open dependent domains, opaque Pi projection,

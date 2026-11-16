@@ -4830,7 +4830,15 @@ those examples with Core and STG Lint instead. The generated Cabal formatting
 check retains its existing failure; no Cabal input changed.
 
 Selected evidence is under `_build/verification/native-source-domain-conversion-*`.
-Independent auditing and publication remain pending at this documentation commit.
+The independent static audit passes 103,851 checks across 47,634 pinned paths.
+The audited documentation commit is `a03302da20`. The selected inputs remain the
+95 compiler leaves and 128 phase-source paths recorded above. The final partitions
+contain nine documents, 163 harness files and 1,325 output files. The cumulative
+manifest count is 100. The entire `native-source-domain-conversion-*` namespace is
+permanently frozen. The external canonical record is
+`_build/verification/dependent-haskell-M58-final-audit-v1.json`, with SHA256
+`ab9e2ce9ac0b60c86d66caf55ac6dc9eb715352fc9c600bb3b634c30f5df0270`.
+This publication commit changes only README and PLAN status.
 The existing seven-work, nine-PDF reading ledger is unchanged. D/DC supplies the
 nominal congruence rule. Agda supplies the domain-before-body comparison precedent.
 Neither supplies a preservation or sharing theorem for this combined implementation.
