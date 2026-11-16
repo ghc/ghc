@@ -293,55 +293,8 @@ isCompleteHsSig (HsWC { hswc_ext = wcs, hswc_body = hs_sig_ty })
 
 no_anon_wc_sig_ty :: LHsSigType GhcRn -> Bool
 no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body}))
-  =  all no_anon_wc_tvb (hsOuterExplicitBndrs outer_bndrs)
-  && no_anon_wc_ty body
-
-no_anon_wc_ty :: LHsType GhcRn -> Bool
-no_anon_wc_ty lty = go lty
-  where
-    go (L _ ty) = case ty of
-      HsWildCardTy _                 -> False
-      HsAppTy _ ty1 ty2              -> go ty1 && go ty2
-      HsAppKindTy _ ty ki            -> go ty && go ki
-      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go_mult w
-        where
-          go_mult (HsModifiedFunArr _ mods _) = all go_mod mods
-          go_mod (L _ (HsModifier _ ty)) = go ty
-      HsListTy _ ty                  -> go ty
-      HsTupleTy _ _ tys              -> gos tys
-      HsSumTy _ tys                  -> gos tys
-      HsOpTy _ ty1 tyop ty2          -> go tyop && go ty1 && go ty2
-      HsParTy _ ty                   -> go ty
-      HsIParamTy _ _ ty              -> go ty
-      HsKindSig _ ty kind            -> go ty && go kind
-      HsDocTy _ ty _                 -> go ty
-      HsExplicitListTy _ _ tys       -> gos tys
-      HsExplicitTupleTy _ _ tys      -> gos tys
-      HsForAllTy { hst_tele = tele
-                 , hst_body = ty } -> no_anon_wc_tele tele
-                                        && go ty
-      HsForEachTy { hst_bndrs = bndrs
-                  , hst_body = ty } -> all no_anon_wc_tvb bndrs && go ty
-      HsQualTy { hst_ctxt = ctxt
-               , hst_body = ty }  -> gos (hsc_ctxt $ unLoc ctxt) && go ty
-      HsSpliceTy (HsUntypedSpliceTop _ ty) _ -> go ty
-      HsSpliceTy (HsUntypedSpliceNested _) _ -> True
-      HsTyLit{} -> True
-      HsTyVar{} -> True
-      HsStarTy{} -> True
-      XHsType{} -> True       -- HsCoreTy, which does not have any wildcard
-
-    gos = all go
-
-no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
-no_anon_wc_tele tele = case tele of
-  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all no_anon_wc_tvb ltvs
-  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all no_anon_wc_tvb ltvs
-
-no_anon_wc_tvb :: LHsTyVarBndr flag GhcRn -> Bool
-no_anon_wc_tvb (L _ tvb) = case hsBndrKind tvb of
-  HsBndrNoKind _  -> True
-  HsBndrKind _ ki -> no_anon_wc_ty ki
+  =  all hsTyVarBndrHasNoAnonWildcards (hsOuterExplicitBndrs outer_bndrs)
+  && hsTypeHasNoAnonWildcards body
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

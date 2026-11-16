@@ -602,7 +602,10 @@ tcCheckRetainedType allow_function = go
                        failWithTc $ TcRnRetainedQuantificationError
                                       (RetainedUnsupportedDomain domain_ty)
                    ; unless (allow_function || isNativeIndexType domain_ty) $
-                       failWithTc $ TcRnRetainedQuantificationError RetainedFunctionSignature
+                       failWithTc $ TcRnRetainedQuantificationError $
+                         if mode_complete_type_arg mode == Just False
+                         then RetainedPartialTypeArgument
+                         else RetainedFunctionSignature
                    ; let index = mkLocalId name ManyTy domain_ty
                          mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
                    ; body_ty <- check_bndrs mode' rest
@@ -730,7 +733,8 @@ branch. tcHsSigWcType carries that permission to tc_hs_sig_type. FunSigCtxt
 alone does not grant it: instance method signatures and SPECIALISE also use
 that diagnostic context. The generic tcHsSigType entry point and hs-boot
 checking pass False. Keep the scalar retained signature walker in those paths.
-Class signatures and general type arguments keep their existing checks.
+Other signature contexts keep their existing checks. Explicit type arguments
+use the separate permission in Note [Retained Pi type arguments].
 
 Check each domain before adding its Id to the telescope. The function must
 satisfy the closed visible Many A -> B policy.
@@ -781,7 +785,16 @@ See docs/dependent-haskell/REFERENCES.md#explicit-higher-order-arguments.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained function is a value type of kind Type. A checked type argument can
 therefore contain a supported Pi, including an operand of a type equality.
-Use tcCheckRetainedType with the caller's mode and no local function permission.
+Use tcCheckRetainedType with the caller's mode. tcHsTypeApp records completeness
+of the whole explicit argument in mode_complete_type_arg. Only Just True grants
+function-binder permission. Just False selects the incomplete-argument error
+when a function binder is reached. Nothing retains the signature-context gate.
+Carry this context through ordinary nested type checking. Do not grant it from
+the wildcard mode or the outer syntax shape. A type-constructor operand or a
+kind-annotated value type uses the same rule. Fresh kind modes clear the context,
+and the TypeLevel guard still rejects literal retained syntax in a kind.
+The shared syntax predicate comes from Note [Anonymous wildcards in complete
+types] in GHC.Hs.Type. Check the renamer's named-wildcard list separately.
 Reconstructing the signature mode would lose ambient runtime indices and the
 current wildcard policy.
 Each telescope extends only its body's environment. Check its closed domain,
@@ -1053,7 +1066,9 @@ tcHsTypeApp wc_ty kind
   = do { mode <- mkHoleMode TypeLevel HM_VTA
                  -- HM_VTA: See Note [Wildcards in visible type application]
        ; indices <- tcRetainedAmbientIndices RetainedTypeArgumentIndex hs_ty
-       ; let mode' = mode { mode_indices = indices }
+       ; let complete = null sig_wcs && hsTypeHasNoAnonWildcards hs_ty
+             mode' = mode { mode_indices = indices
+                          , mode_complete_type_arg = Just complete }
        ; ty <- addTypeCtxt hs_ty                  $
                solveEqualities "tcHsTypeApp" $
                -- We are looking at a user-written type, very like a
@@ -1302,7 +1317,11 @@ tcModifiersMult = tc_modifiers_mult typeLevelMode
 data TcTyMode
   = TcTyMode { mode_tyki :: TypeOrKind
              , mode_holes :: HoleInfo
-             , mode_indices :: NameEnv Id }
+             , mode_indices :: NameEnv Id
+             , mode_complete_type_arg :: Maybe Bool }
+               -- Nothing outside a visible type argument. Just records
+               -- completeness of the whole argument, not the current child.
+               -- See Note [Retained Pi type arguments].
 
 -- See Note [Levels for wildcards]
 -- Nothing <=> no wildcards expected
@@ -1321,7 +1340,8 @@ data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
 
 mkMode :: TypeOrKind -> TcTyMode
 mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
-                      , mode_indices = emptyNameEnv }
+                      , mode_indices = emptyNameEnv
+                      , mode_complete_type_arg = Nothing }
 
 typeLevelMode, kindLevelMode :: TcTyMode
 -- These modes expect no wildcards (holes) in the type
@@ -1333,7 +1353,8 @@ mkHoleMode tyki hm
   = do { lvl <- getTcLevel
        ; return (TcTyMode { mode_tyki  = tyki
                           , mode_holes = Just (lvl,hm)
-                          , mode_indices = emptyNameEnv }) }
+                          , mode_indices = emptyNameEnv
+                          , mode_complete_type_arg = Nothing }) }
 
 instance Outputable HoleMode where
   ppr HM_Sig      = text "HM_Sig"
@@ -1342,9 +1363,11 @@ instance Outputable HoleMode where
   ppr HM_TyAppPat = text "HM_TyAppPat"
 
 instance Outputable TcTyMode where
-  ppr (TcTyMode { mode_tyki = tyki, mode_holes = hm, mode_indices = indices })
+  ppr (TcTyMode { mode_tyki = tyki, mode_holes = hm, mode_indices = indices
+               , mode_complete_type_arg = complete })
     = text "TcTyMode" <+> braces (sep [ ppr tyki <> comma
-                                      , ppr hm, ppr (nonDetNameEnvElts indices) ])
+                                      , ppr hm, ppr (nonDetNameEnvElts indices)
+                                      , ppr complete ])
 
 {-
 Note [Bidirectional type checking]
@@ -1473,7 +1496,8 @@ tcHsType mode ty@HsForEachTy{} exp_kind
   | TypeLevel <- mode_tyki mode
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
        ; unless experimental $ failWithTc TcRnRetainedQuantificationNotImplemented
-       ; ty' <- tcCheckRetainedType False mode (noLocA ty) liftedTypeKind
+       ; ty' <- tcCheckRetainedType (mode_complete_type_arg mode == Just True)
+                                    mode (noLocA ty) liftedTypeKind
        ; checkExpKind ty ty' liftedTypeKind exp_kind }
   | otherwise
   = failWithTc TcRnRetainedQuantificationNotImplemented
@@ -1615,7 +1639,8 @@ tcHsType mode rn_ty@(HsAppKindTy{}) exp_kind = tc_app_ty mode rn_ty exp_kind
 tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
-  = do { let mode' = mode { mode_tyki = KindLevel }
+  = do { let mode' = mode { mode_tyki = KindLevel
+                         , mode_complete_type_arg = Nothing }
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
@@ -4080,7 +4105,8 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
        ; go hs_tvs }
   where
     tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info
-                         , mode_indices = emptyNameEnv }
+                         , mode_indices = emptyNameEnv
+                         , mode_complete_type_arg = Nothing }
                  -- Inherit the HoleInfo from the context
 
     go [] = do { res <- thing_inside

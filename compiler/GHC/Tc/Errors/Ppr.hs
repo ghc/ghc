@@ -3567,13 +3567,13 @@ pprRetainedQuantificationError reason = case reason of
   RetainedPartialSignature ->
     text "Retained quantification requires a complete type signature."
   RetainedPartialTypeArgument ->
-    text "A visible type argument that captures a runtime index must be complete."
+    text "A visible type argument with runtime indices or retained function binders must be complete."
   RetainedPolymorphicSignature ->
     text "A forall within the scope of a retained binder is not supported yet."
   RetainedUnsupportedContext ->
     text "Retained quantification is supported only at the start of an explicit value signature."
   RetainedFunctionSignature ->
-    text "A function-valued retained binder requires a complete ordinary value signature."
+    text "A function-valued retained binder requires a complete ordinary value signature or a complete visible type argument."
   RetainedStaging ->
     text "Retained quantification in Template Haskell quotations or splices is not supported yet."
   RetainedConstructorCoverage ->

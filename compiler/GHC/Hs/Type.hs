@@ -81,6 +81,7 @@ module GHC.Hs.Type (
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsHasForEachTy, hsSigWcType, hsPatSigType,
+        hsTypeHasNoAnonWildcards, hsTyVarBndrHasNoAnonWildcards,
         hsTyKindSig,
         setHsTyVarBndrFlag, hsTyVarBndrFlag, updateHsTyVarBndrFlag,
 
@@ -683,6 +684,66 @@ hsHasForEachTy (HsQualTy _ _ ty) = hsHasForEachTy (unLoc ty)
 hsHasForEachTy (HsFunTy _ _ arg res)
   = hsHasForEachTy (unLoc arg) || hsHasForEachTy (unLoc res)
 hsHasForEachTy _ = False
+
+-- | Check anonymous-wildcard absence throughout a renamed type.
+-- See Note [Anonymous wildcards in complete types].
+hsTypeHasNoAnonWildcards :: LHsType GhcRn -> Bool
+hsTypeHasNoAnonWildcards lty = go lty
+  where
+    go (L _ ty) = case ty of
+      HsWildCardTy _                 -> False
+      HsAppTy _ ty1 ty2              -> go ty1 && go ty2
+      HsAppKindTy _ ty ki            -> go ty && go ki
+      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go_mult w
+        where
+          go_mult (HsModifiedFunArr _ mods _) = all go_mod mods
+          go_mod (L _ (HsModifier _ ty)) = go ty
+      HsListTy _ ty                  -> go ty
+      HsTupleTy _ _ tys              -> gos tys
+      HsSumTy _ tys                  -> gos tys
+      HsOpTy _ ty1 tyop ty2          -> go tyop && go ty1 && go ty2
+      HsParTy _ ty                   -> go ty
+      HsIParamTy _ _ ty              -> go ty
+      HsKindSig _ ty kind            -> go ty && go kind
+      HsDocTy _ ty _                 -> go ty
+      HsExplicitListTy _ _ tys       -> gos tys
+      HsExplicitTupleTy _ _ tys      -> gos tys
+      HsForAllTy { hst_tele = tele
+                 , hst_body = ty } -> no_anon_wc_tele tele && go ty
+      HsForEachTy { hst_bndrs = bndrs
+                  , hst_body = ty } -> all hsTyVarBndrHasNoAnonWildcards bndrs && go ty
+      HsQualTy { hst_ctxt = ctxt
+               , hst_body = ty }  -> gos (hsc_ctxt $ unLoc ctxt) && go ty
+      HsSpliceTy (HsUntypedSpliceTop _ ty) _ -> go ty
+      HsSpliceTy (HsUntypedSpliceNested _) _ -> True
+      HsTyLit{} -> True
+      HsTyVar{} -> True
+      HsStarTy{} -> True
+      XHsType{} -> True
+
+    gos = all go
+
+    no_anon_wc_tele (HsForAllVis { hsf_vis_bndrs = bndrs })
+      = all hsTyVarBndrHasNoAnonWildcards bndrs
+    no_anon_wc_tele (HsForAllInvis { hsf_invis_bndrs = bndrs })
+      = all hsTyVarBndrHasNoAnonWildcards bndrs
+
+-- | Check anonymous-wildcard absence in a renamed binder's kind.
+-- See Note [Anonymous wildcards in complete types].
+hsTyVarBndrHasNoAnonWildcards :: LHsTyVarBndr flag GhcRn -> Bool
+hsTyVarBndrHasNoAnonWildcards (L _ tvb) = case hsBndrKind tvb of
+  HsBndrNoKind _  -> True
+  HsBndrKind _ ki -> hsTypeHasNoAnonWildcards ki
+
+{- Note [Anonymous wildcards in complete types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Complete signatures and retained-function type arguments use the same syntax
+check. Inspect the whole type, including binder kinds, multiplicities and
+constraints. A wildcard outside a retained telescope still makes that type
+argument incomplete. Named wildcards are recorded separately by the renamer;
+the caller must also check that list. HsCoreTy contains no syntax wildcard.
+See Note [Retained Pi type arguments] in GHC.Tc.Gen.HsType.
+-}
 
 {-
 ************************************************************************
