@@ -3628,3 +3628,35 @@ or tracked source change was needed for the probe repairs.
 M53 evidence uses `native-occurrence-analysis-*`. This namespace is permanently
 frozen. M52 and earlier namespaces remain frozen. C1, C2, R22 and the full
 program goal stay open.
+
+### M54: diagnostics for detected recursive interface-domain failures
+
+Status: planned. Keep the full program goal active.
+
+Force the existing native interface eligibility results inside an IO exception
+boundary. Catch only `NonTermination`. Report the failure through `failIfM`.
+Keep all existing guards and their order. Return no placeholder type and do
+not retry an active field decoder. Apply the boundary to generic retained
+binders, scalar indices, opaque call heads and retained field checks.
+
+This is diagnostic containment. It is not a loader staging fix or a termination
+guarantee. The runtime does not guarantee detection of every loop. A separate
+shape-first design must expose raw declaration and synonym shapes before it
+checks recursive fields. Keep valid first-order recursive domains and ordinary
+fields with valid dependent function types. Do not reject recursion as syntax.
+
+GHC's lazy interface Notes and Agda v2.8.0's declaration stages explain the
+construction boundary. Their guarantees do not justify unchecked Type heads.
+The research and primary-source provenance are in
+`native-domain-loader-next-research-v1` and `native-domain-loader-review-v1`.
+
+- [ ] Record the current six failures without modifying frozen M52 evidence.
+- [ ] Add the narrow boundary and its owning GHC-style Note.
+- [ ] Update the existing API fixture. Require the normal interface error and
+  diagnostic text. A timeout, raw `NonTermination` or unrelated exception fails
+  the check. Include valid recursive domains, a synonym-hidden failure and an
+  ordinary field with a valid retained function type.
+- [ ] Build both stages and run focused API, source, Showcase and registered
+  checks. Keep the existing goldens and separate structural/runtime evidence.
+- [ ] Update references, contracts and publication status. Preserve failed
+  attempts. Keep shape-first loading, C1, C2 and R22 open.
