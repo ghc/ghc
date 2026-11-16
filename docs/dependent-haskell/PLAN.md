@@ -3826,8 +3826,7 @@ program goal remains active.
 
 ## M57: nominal domain conversion for retained functions
 
-Status: implementation and focused verification pass. Independent audit and
-publication remain pending. This increment addresses C1's conversion and
+Status: implemented and independently audited. This increment addresses C1's conversion and
 substitution contract.
 Keep C1, C2 and the full program goal open.
 
@@ -3876,7 +3875,7 @@ hashes and deviations. No combined preservation theorem is claimed.
 - [x] Run seven bytecode observations and one injected-Core native object control.
 - [x] Check wrong role/direction, capture, proof-only dependencies and bottoms.
 - [x] Build both stages and run focused API/source/registered checks.
-- [ ] Update contracts, references and progress records; audit and publish.
+- [x] Update contracts, references and progress records; audit and publish.
 
 M56 remains frozen at canonical SHA256
 `f9af3265afcfea79878ecc87886d7cfcb915a0e417df21a081695ea092269d66`.
@@ -3904,3 +3903,11 @@ Next, specify a source conversion that uses ordinary nominal family reduction
 between closed scalar domains. Preserve the proof in wrappers before desugaring.
 Require an exact aligned-body comparison and a real adapted worker from source.
 Keep opaque projection and general dependent inference as separate tasks.
+
+Audited documentation: `2351b533905fd9a237403f073e5aa619abec1614`.
+Canonical evidence is `_build/verification/dependent-haskell-M57-final-audit-v1.json`,
+SHA256 `27bddd7057cb0b6f26f220a461935bb2aed943ca7a804abbb4a2f398a9b60107`.
+The independent audit passes 101,598 static checks over 47,184 pinned paths.
+All 96 cumulative manifests are preserved. The complete
+`native-domain-conversion-*` namespace is permanently frozen. Publication changes
+only README and PLAN. C1, C2 and the full program goal remain open.

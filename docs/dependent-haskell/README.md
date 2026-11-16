@@ -4716,8 +4716,8 @@ C1 remains the next program priority.
 
 The selected compiler is `0c5699265f14826a0294d7a2b0ca9be2fefd0cbe`.
 The fixture source is `cd304ad0d1af2f4f7a5502de3601fe0aaf080111`.
-Both builds and the focused controls pass. Independent audit and publication
-remain pending.
+Both builds and the focused controls pass. M57 is independently audited.
+The audited documentation commit is `2351b533905fd9a237403f073e5aa619abec1614`.
 
 `DepFunCo` now has optional nominal domain evidence. Its body proof binds one
 actual argument in the source domain. Its right endpoint binds a fresh target
@@ -4761,3 +4761,11 @@ construct general domain congruence. Closed scalar source conversion is the
 next experiment. Changed function domains, opaque Pi projections, native
 coercion serialization, general optimization and the full GHC suite remain
 outside this validation. C1, C2 and the full program goal stay open.
+
+The canonical M57 record is
+`_build/verification/dependent-haskell-M57-final-audit-v1.json`, SHA256
+`27bddd7057cb0b6f26f220a461935bb2aed943ca7a804abbb4a2f398a9b60107`.
+It preserves 96 cumulative manifests. The independent audit passes 101,598
+static checks across 47,184 pinned paths. This audit executes no compiler or
+test target. The complete `native-domain-conversion-*` evidence namespace is
+permanently frozen. The later publication commit changes only README and PLAN.
