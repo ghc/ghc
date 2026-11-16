@@ -11,7 +11,7 @@ import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags
 import GHC.Builtin.WiredIn.Prim (intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConRepArity, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
@@ -21,6 +21,7 @@ import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, n
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Make (mkIntExprInt)
 import GHC.Core.Map.Type (LooseTypeMap, TypeMap, emptyTypeMap)
+import GHC.Core.Opt.Arity (pushCoArg)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Reduction (Reduction (..))
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
@@ -868,6 +869,7 @@ runNatChecks dflags = do
         betaCases =
             [ ("identity variable", betaIdentity (Var m), Var m, TermVarTy m)
             , ("identity constructor", betaIdentity zeroExpr, zeroExpr, zeroTy)
+            , ("reflexive nominally recoverable cast", betaIdentity (Cast (Var m) (mkReflCo Representational natTy)), Cast (Var m) (mkReflCo Representational natTy), TermVarTy m)
             , ("stored range avoids reused-Unique capture", App (Lam beta (App (Lam m (Var beta)) zeroExpr)) (Var m), Var m, TermVarTy m)
             , ("successor variable", betaSuccessor (Var m), succExpr (Var m), succTy (TermVarTy m))
             , ("constant ignores opaque index", betaConstant (Var betaOpaque), zeroExpr, zeroTy)
@@ -891,26 +893,25 @@ runNatChecks dflags = do
     forM_
         [ (App (Lam boolBeta (Var boolBeta)) (Var boolInput), Var boolInput, TermVarTy boolInput)
         , (App (Lam boolBeta (Var (dataConWorkId trueDataCon))) (Var boolInput), Var (dataConWorkId trueDataCon), mkTyConTy (promoteDataCon trueDataCon))
+        , (App (Lam beta (Var (dataConWorkId trueDataCon))) (Var m), Var (dataConWorkId trueDataCon), mkTyConTy (promoteDataCon trueDataCon))
         ]
         $ \(expression, expectedValue, expectedIndex) -> case normaliseNativeIndexExpr expression of
             Just (normalised, actualIndex) -> do
                 check "Bool beta retains its runtime form" (cheapEqExpr expectedValue normalised)
                 checkType dflags "Bool beta retains its exact index" expectedIndex actualIndex
                 checkType dflags "Bool beta index kind" boolTy (typeKind actualIndex)
-                lintAccepts dflags "Bool beta ordinary typing" [boolInput] expression
+                lintAccepts dflags "Bool beta ordinary typing" [boolInput, m] expression
             Nothing -> fail "FAIL: checked Bool beta was rejected"
     forM_
         [ ("linear binder", App (Lam (setIdMult beta OneTy) (Var beta)) (Var m))
         , ("linear argument", betaConstant (Var (setIdMult m OneTy)))
         , ("wrong argument domain", betaIdentity (Var (dataConWorkId trueDataCon)))
         , ("ignored wrong argument domain", betaConstant (Var (dataConWorkId trueDataCon)))
-        , ("wrong body domain", App (Lam beta (Var (dataConWorkId trueDataCon))) (Var m))
         , ("wrong Bool argument domain", App (Lam boolBeta (Var boolBeta)) zeroExpr)
         , ("malformed constructor body", App (Lam beta (succExpr (Var (dataConWorkId trueDataCon)))) (Var m))
         , ("non-atomic successor argument", betaIdentity (succExpr (Var m)))
         , ("opaque producer argument", betaIdentity (App (Var opaqueProducer) (Var m)))
         , ("opaque producer body", App (Lam beta (App (Var opaqueProducer) (Var beta))) (Var m))
-        , ("representational cast argument", betaIdentity (Cast (Var m) (mkReflCo Representational natTy)))
         , ("let argument", betaIdentity (Let (NonRec innerBeta (Var m)) (Var innerBeta)))
         ]
         $ \(label, expression) -> check ("checked beta rejects " ++ label) $ case normaliseNativeIndexExpr expression of
@@ -2501,7 +2502,7 @@ runFunctionBinderChecks dflags = do
         checkType dflags "function binder coercion target" (mkDepFunTy f (coercionRKind evidence)) (coercionRKind scoped)
         check "function binder coercion removes its bound head" (not (f `elemVarSet` tyCoVarsOfCo scoped))
         lintAccepts dflags "fixed-domain function binder coercion" [n, m, cv] (Coercion scoped)
-    let scopedCo = DepFunCo f bodyCo
+    let scopedCo = DepFunCo f MRefl bodyCo
     check "function coercion binder masks an outer head substitution" $
         eqCoercion scopedCo (Subst.substCo (indexSubst [g, n, m, cv] f (Var g)) scopedCo)
     lintAccepts dflags "Pi abstraction scopes a function head" [n, m, cv] (Coercion (mkPiCo Nominal f bodyCo))
@@ -2757,7 +2758,7 @@ runDepFunCoChecks dflags = do
         cv = proof 703 concrete intTy
         argument = mkFunctionType ManyTy (indexed (TermVarTy b)) (indexed (TermVarTy free))
         body = mkFunCoNoFTF Nominal (mkNomReflCo ManyTy) (mkNomReflCo argument) (mkCoVarCo cv)
-        raw = DepFunCo b body
+        raw = DepFunCo b MRefl body
         lifted = mkDepFunCo b body
         left = mkDepFunTy b (mkFunctionType ManyTy argument concrete)
         right = mkDepFunTy b (mkFunctionType ManyTy argument intTy)
@@ -2771,7 +2772,7 @@ runDepFunCoChecks dflags = do
     check "retained coercion preserves nominal evidence dependencies" (cv `elemVarSet` tyCoVarsOfCo raw)
     check "scanner detects retained coercion syntax" (hasNativeDependentExpr (Coercion raw))
     let representational = mkDepFunCo b (mkSubCo body)
-        phantom = DepFunCo b (mkReflCo Phantom (coercionLKind body))
+        phantom = DepFunCo b MRefl (mkReflCo Phantom (coercionLKind body))
     check "retained coercion inherits representational role" (coercionRole representational == Representational)
     checkType dflags "representational retained coercion source" left (coercionLKind representational)
     checkType dflags "representational retained coercion target" right (coercionRKind representational)
@@ -2779,7 +2780,7 @@ runDepFunCoChecks dflags = do
     check "retained coercion inherits phantom role" (coercionRole phantom == Phantom)
     lintAccepts dflags "phantom retained reflexivity" [free] (Coercion phantom)
     let renamedBody = Subst.substCo (indexSubst [other, free, cv] b (Var other)) body
-        renamed = DepFunCo other renamedBody
+        renamed = DepFunCo other MRefl renamedBody
     check "retained coercion alpha equality" (eqCoercion raw renamed)
     lintAccepts dflags "alpha-renamed retained coercion" [free, cv] (Coercion renamed)
     check
@@ -2787,7 +2788,7 @@ runDepFunCoChecks dflags = do
         (eqCoercion raw (Subst.substCo (indexSubst [free, cv] b (Var (dataConWorkId trueDataCon))) raw))
     let captured = Subst.substCo (indexSubst [b, cv] free (Var b)) raw
     case captured of
-        DepFunCo fresh _ -> do
+        DepFunCo fresh MRefl _ -> do
             check "coercion substitution freshens a capturing runtime binder" (fresh /= b)
             let expectedArgument = mkFunctionType ManyTy (indexed (TermVarTy fresh)) (indexed (TermVarTy b))
             checkType
@@ -2844,16 +2845,321 @@ runDepFunCoChecks dflags = do
         erased = mkTyVar (mkSystemName (unique 707) (mkTyVarOcc "co_erased")) boolTy
         wrongDomain = local 708 "co_int" intTy
         linear = setIdMult b OneTy
-    lintAccepts dflags "retained Nat coercion binder" [] (Coercion (DepFunCo nat (mkNomReflCo intTy)))
+    lintAccepts dflags "retained Nat coercion binder" [] (Coercion (DepFunCo nat MRefl (mkNomReflCo intTy)))
     forM_ [("erased variable", erased), ("coercion variable", cv), ("unsupported domain", wrongDomain), ("linear runtime binder", linear)] $ \(label, binder) ->
-        lintRejects dflags ("retained coercion rejects " ++ label) [] (Coercion (DepFunCo binder (mkNomReflCo intTy)))
-    lintRejects dflags "retained coercion rejects unlifted results" [] (Coercion (DepFunCo b (mkNomReflCo intPrimTy)))
+        lintRejects dflags ("retained coercion rejects " ++ label) [] (Coercion (DepFunCo binder MRefl (mkNomReflCo intTy)))
+    lintRejects dflags "retained coercion rejects unlifted results" [] (Coercion (DepFunCo b MRefl (mkNomReflCo intPrimTy)))
     forM_ [("left", proof 709 intPrimTy intTy), ("right", proof 710 intTy intPrimTy)] $ \(side, evidence) -> do
         lintAccepts dflags ("ordinary heterogeneous " ++ side ++ " endpoint evidence") [evidence] (Coercion (mkCoVarCo evidence))
-        lintRejects dflags ("retained coercion rejects an unlifted " ++ side ++ " result") [evidence] (Coercion (DepFunCo b (mkCoVarCo evidence)))
+        lintRejects dflags ("retained coercion rejects an unlifted " ++ side ++ " result") [evidence] (Coercion (DepFunCo b MRefl (mkCoVarCo evidence)))
     lintRejects dflags "retained coercion rejects an out-of-scope runtime dependency" [cv] (Coercion raw)
     lintRejects dflags "valid raw retained coercion cannot escape a let-bound index" [cv] $
         Let (NonRec free (Var (dataConWorkId trueDataCon))) (Coercion raw)
+
+    -- The phantom data parameter permits two supported domains. The family
+    -- axiom supplies nominal evidence without making their raw types equal.
+    let tokenName n occurrence = mkExternalName (unique n) (mkModule mainUnit (mkModuleName "DomainConversionAPI")) occurrence noSrcSpan
+        tokenParameter = mkTyVar (mkSystemName (unique 30010) (mkTyVarOcc "phantom")) liftedTypeKind
+        tokenBinders = [mkAnonTyConBinder tokenParameter]
+        token =
+            mkAlgTyCon
+                (tokenName 30000 (mkTcOcc "DomainToken"))
+                (mkTyConKind tokenBinders liftedTypeKind)
+                tokenBinders
+                0
+                liftedTypeKind
+                [Phantom]
+                Nothing
+                []
+                (mkDataTyConRhs [tokenConstructor])
+                (VanillaAlgTyCon (tokenName 30001 (mkVarOcc "domainToken_rep")))
+                False
+        tokenConstructor =
+            mkDataCon
+                (tokenName 30002 (mkDataOcc "DomainToken")) False (tokenName 30003 (mkVarOcc "domainToken_con_rep"))
+                [] [] [] [] [tokenParameter] [] noConcreteTyVars [Bndr tokenParameter Specified]
+                [] [] [] (mkTyConApp token [mkTyVarTy tokenParameter]) NoPromInfo token 1 []
+                (mkDataConWorkId (tokenName 30004 (mkDataConWorkerOcc (mkDataOcc "DomainToken"))) tokenConstructor)
+                NoDataConRep
+        parameter = mkTyVar (mkSystemName (unique 30500) (mkTyVarOcc "a")) liftedTypeKind
+        parameters = [mkAnonTyConBinder parameter]
+        family =
+            mkFamilyTyCon
+                (mkSystemName (unique 30501) (mkTcOcc "DomainF"))
+                (mkTyConKind parameters liftedTypeKind)
+                parameters
+                0
+                liftedTypeKind
+                Nothing
+                (ClosedTypeFamilyTyCon (CTF (Just axiom)))
+                Nothing
+                NotInjective
+        axiom =
+            mkBranchedCoAxiom Nominal (mkSystemName (unique 30502) (mkTcOcc "DomainFAx")) family
+                [mkCoAxBranch [] [] [] [boolTy] boolTy [] noSrcSpan]
+        familyDelta = mkAxInstCo Nominal (BranchedAxiom axiom 0) [] []
+        delta = mkTyConAppCo Nominal token [familyDelta]
+        domainA = mkTyConApp token [mkTyConApp family [boolTy]]
+        domainB = mkTyConApp token [boolTy]
+        natTy = mkTyConTy (let (tc, _, _) = peanoNat in tc)
+        x = local 31000 "domain_x" domainA
+        y = local 31001 "domain_y" domainB
+        fn = local 31002 "domain_fn" (mkFunctionType ManyTy domainA natTy)
+        at first second = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, TermAppTy fn first, TermAppTy fn second]) intTy
+        bodyType = at (TermVarTy x) (TermVarTy x)
+        back = mkCastTy (TermVarTy y) (mkSymCo delta)
+        expectedLeft = mkDepFunTy x bodyType
+        expectedRight = mkDepFunTy y (at back back)
+        converted = mkDepFunCoWithDomain x (MCo delta) (mkNomReflCo bodyType)
+    check "domain conversion has two supported raw-distinct domains" $
+        isNativeIndexType domainA && isNativeIndexType domainB && not (eqType domainA domainB)
+    forM_ [Nominal, Representational] $ \role -> do
+        let co = mkDepFunCoWithDomain x (MCo delta) (mkReflCo role bodyType)
+        check "nonreflexive domain survives a reflexive body" (not (isReflCo co))
+        check "domain conversion keeps the body role" (coercionRole co == role)
+        checkType dflags "domain conversion left endpoint" expectedLeft (coercionLKind co)
+        checkType dflags "domain conversion right endpoint" expectedRight (coercionRKind co)
+        lintAccepts dflags "nominal domain conversion" [fn] (Coercion co)
+    case coercionRKind converted of
+        DepFunTy binder (FunTy _ _ (TyConApp _ [_, TermAppTy headId (CastTy (TermVarTy occurrence) co), _]) _) -> do
+            check "converted endpoint uses its actual binder and original head" (occurrence == binder && headId == fn)
+            checkType dflags "converted occurrence metadata" domainB (varType occurrence)
+            check "converted index cast is nominal" (coercionRole co == Nominal)
+            checkType dflags "converted index cast starts at the right domain" domainB (coercionLKind co)
+            checkType dflags "converted index casts back to the left domain" domainA (coercionRKind co)
+        _ -> fail "FAIL: converted endpoint has no backward index cast"
+    check "domain conversion masks its binder and keeps its opaque head" $
+        not (x `elemVarSet` tyCoVarsOfCo converted) && fn `elemVarSet` tyCoVarsOfCo converted
+    let alpha = local 31003 "domain_alpha" domainA
+        alphaBody = at (TermVarTy alpha) (TermVarTy alpha)
+        alphaCo = mkDepFunCoWithDomain alpha (MCo delta) (mkNomReflCo alphaBody)
+        outer = local 31004 "domain_outer" domainA
+        captureBody = at (TermVarTy x) (TermVarTy outer)
+        captureCo = mkDepFunCoWithDomain x (MCo delta) (mkNomReflCo captureBody)
+        capturedCo = Subst.substCo (indexSubst [x, fn] outer (Var x)) captureCo
+    check "domain conversion alpha equality" (eqCoercion converted alphaCo)
+    case capturedCo of
+        DepFunCo fresh (MCo _) _ -> do
+            check "domain conversion avoids substitution capture" (fresh /= x)
+            check "domain conversion keeps the free replacement" (x `elemVarSet` tyCoVarsOfCo capturedCo)
+            checkType dflags "captured converted right endpoint" (mkDepFunTy y (at back (TermVarTy x))) (coercionRKind capturedCo)
+            lintAccepts dflags "capture-safe domain conversion" [x, fn] (Coercion capturedCo)
+        _ -> fail "FAIL: domain conversion lost its binder during substitution"
+    let domainProof = proof 31005 domainA domainB
+        givenCo = mkDepFunCoWithDomain x (MCo (mkCoVarCo domainProof)) (mkNomReflCo bodyType)
+        proofSubst = Subst.Subst (mkInScopeSet (mkVarSet [fn])) emptyVarEnv emptyVarEnv (unitVarEnv domainProof delta)
+    check "domain evidence remains free outside the runtime binder" (domainProof `elemVarSet` tyCoVarsOfCo givenCo)
+    check "domain evidence substitution visits the domain proof" (eqCoercion converted (Subst.substCo proofSubst givenCo))
+    lintAccepts dflags "in-scope domain evidence" [fn, domainProof] (Coercion givenCo)
+    lintRejects dflags "domain evidence cannot be bound by the retained binder" [fn] (Coercion givenCo)
+    let forgottenParameter = mkTyVar (mkSystemName (unique 31006) (mkTyVarOcc "ignored")) domainA
+        forgottenCon =
+            mkSynonymTyCon
+                (mkSystemName (unique 31007) (mkTcOcc "ForgetDomainIndex"))
+                (mkTyConKind [mkAnonTyConBinder forgottenParameter] liftedTypeKind)
+                [mkAnonTyConBinder forgottenParameter]
+                liftedTypeKind
+                [Phantom]
+                intTy
+                True
+                True
+                True
+                True
+        forgottenType = mkTyConApp forgottenCon [TermVarTy x]
+        forgettingCo = TransCo (mkNomReflCo forgottenType) (mkNomReflCo intTy)
+        proofOnlyCo = mkDepFunCoWithDomain x (MCo delta) (TransCo (SymCo forgettingCo) forgettingCo)
+    checkType dflags "domain conversion proof-only left endpoint" (mkFunctionType ManyTy domainA intTy) (coercionLKind proofOnlyCo)
+    checkType dflags "domain conversion proof-only right endpoint" (mkFunctionType ManyTy domainB intTy) (coercionRKind proofOnlyCo)
+    check "proof-only converted binder stays scoped" (not (x `elemVarSet` tyCoVarsOfCo proofOnlyCo))
+    lintAccepts dflags "proof-only dependency in a converted domain" [] (Coercion proofOnlyCo)
+    check "reflexive explicit domain uses the fixed-domain representation" $
+        case mkDepFunCoWithDomain b (MCo (mkNomReflCo boolTy)) body of
+            DepFunCo _ MRefl _ -> True
+            _ -> False
+    let functionDelta = mkFunCoNoFTF Nominal (mkNomReflCo ManyTy) delta (mkNomReflCo natTy)
+    forM_
+        [ ("representational domain evidence", DepFunCo x (MCo (mkSubCo delta)) (mkNomReflCo bodyType), [fn])
+        , ("reversed domain evidence", DepFunCo x (MCo (mkSymCo delta)) (mkNomReflCo bodyType), [fn])
+        , ("wrong left domain", DepFunCo b (MCo delta) (mkNomReflCo intTy), [])
+        , ("changed function-head domain", DepFunCo fn (MCo functionDelta) (mkNomReflCo intTy), [])
+        ]
+        $ \(label, co, scope) -> lintRejects dflags ("domain conversion rejects " ++ label) scope (Coercion co)
+
+    -- Keep a nonreflexive result proof as well as the domain conversion.
+    -- Each worker is an actual scoped assumption with the source Pi type.
+    let applicationBody role =
+            mkFunCoNoFTF role (mkNomReflCo ManyTy) (mkReflCo role bodyType)
+                (if role == Nominal then equation else mkSubCo equation)
+        applicationR = mkDepFunCoWithDomain x (MCo delta) (applicationBody Representational)
+        applicationN = mkDepFunCoWithDomain x (MCo delta) (applicationBody Nominal)
+        fixedHeadCo = mkDepFunCo fn (applicationBody Representational)
+        actualHead = local 31008 "domain_actual_head" (varType fn)
+        backward = Cast (Var y) (SubCo (mkSymCo delta))
+        forward = Cast (Var x) (SubCo delta)
+        roundTrip = Cast forward (SubCo (mkSymCo delta))
+        firstDelta = mkTyConAppCo Nominal token [mkTyConAppCo Nominal family [familyDelta]]
+        firstDomain = mkTyConApp token [mkTyConApp family [mkTyConApp family [boolTy]]]
+        firstBinder = local 31210 "domain_chain_first" firstDomain
+        middleBinder = local 31211 "domain_chain_middle" domainA
+        firstArgument = local 31212 "domain_chain_input" firstDomain
+        chainHead = local 31213 "domain_chain_head" (mkFunctionType ManyTy firstDomain natTy)
+        chainAt index = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, TermAppTy chainHead index, TermAppTy chainHead index]) intTy
+        firstBody = mkFunCoNoFTF Representational (mkNomReflCo ManyTy) (mkReflCo Representational (chainAt (TermVarTy firstBinder))) (mkSubCo equation)
+        firstCo = mkDepFunCoWithDomain firstBinder (MCo firstDelta) firstBody
+        middleIndex = mkCastTy (TermVarTy middleBinder) (mkSymCo firstDelta)
+        secondCo = mkDepFunCoWithDomain middleBinder (MCo delta) (mkReflCo Representational (mkFunctionType ManyTy (chainAt middleIndex) intTy))
+        chainCo = TransCo firstCo secondCo
+        backwardChain = Cast backward (SubCo (mkSymCo firstDelta))
+        forwardChain = Cast (Cast (Var firstArgument) (SubCo firstDelta)) (SubCo delta)
+        applications =
+            [ ("direct", applicationR, Var y, backward, [fn, y])
+            , ("inverse", SymCo applicationR, Var x, forward, [fn, x])
+            , ("composition", TransCo applicationR (SymCo applicationR), Var x, roundTrip, [fn, x])
+            , ("weakening", SubCo applicationN, Var y, backward, [fn, y])
+            , ("fixed function domain", fixedHeadCo, Var actualHead, Var actualHead, [x, actualHead])
+            , ("two distinct domain conversions", chainCo, Var y, backwardChain, [chainHead, y])
+            , ("inverse two distinct domain conversions", SymCo chainCo, Var firstArgument, forwardChain, [chainHead, firstArgument])
+            ]
+    check "composition uses three raw-distinct supported domains" $
+        isNativeIndexType firstDomain && not (eqType firstDomain domainA) && not (eqType firstDomain domainB)
+    forM_ (zip [0 ..] applications) $ \(number, (label, co, arg, expectedArg, freeScope)) -> do
+        let worker = local (31100 + number) "domain_application" (coercionLKind co)
+            scope = worker : freeScope
+            original = App (Cast (Var worker) co) arg
+            prefix = "retained application " ++ label
+        lintAccepts dflags (prefix ++ " original") scope original
+        case pushCoArg co arg of
+            Nothing -> fail ("FAIL: " ++ prefix ++ " did not push explicit congruence")
+            Just (pushedArg, result) -> do
+                check (prefix ++ " preserves argument identity and cast direction") (cheapEqExpr pushedArg expectedArg)
+                checkType dflags (prefix ++ " pushed argument type") (exprType expectedArg) (exprType pushedArg)
+                let sourceApplication = App (Var worker) pushedArg
+                    sourceResult = exprType sourceApplication
+                    targetResult = exprType original
+                    pushed = case result of
+                        MRefl -> sourceApplication
+                        MCo resultCo -> Cast sourceApplication resultCo
+                case result of
+                    MRefl -> checkType dflags (prefix ++ " reflexive result") sourceResult targetResult
+                    MCo resultCo -> do
+                        check (prefix ++ " result role") (coercionRole resultCo == Representational)
+                        checkType dflags (prefix ++ " result proof left endpoint") sourceResult (coercionLKind resultCo)
+                        checkType dflags (prefix ++ " result proof right endpoint") targetResult (coercionRKind resultCo)
+                        unless (label == "composition") $
+                            check (prefix ++ " retains the nonreflexive result proof") (not (isReflCo resultCo))
+                checkType dflags (prefix ++ " full result type") targetResult (exprType pushed)
+                lintAccepts dflags (prefix ++ " pushed") scope pushed
+                case targetResult of
+                    FunTy _ _ payloadType _ -> do
+                        let payload = local (31250 + number) "domain_later_payload" payloadType
+                            originalFull = App original (Var payload)
+                            pushedFull = App pushed (Var payload)
+                        checkType dflags (prefix ++ " later payload result") (exprType originalFull) (exprType pushedFull)
+                        lintAccepts dflags (prefix ++ " original later payload") (payload : scope) originalFull
+                        lintAccepts dflags (prefix ++ " pushed later payload") (payload : scope) pushedFull
+                    _ -> fail ("FAIL: " ++ prefix ++ " lost its later dependent payload")
+    let opaque =
+            mkCoVar
+                (mkSystemName (unique 31009) (mkVarOcc "opaque_domain_co"))
+                (mkReprEqPred (coercionLKind applicationR) (coercionRKind applicationR))
+        opaqueCo = mkCoVarCo opaque
+        opaqueWorker = local 31110 "opaque_domain_application" (coercionLKind opaqueCo)
+        opaqueOriginal = App (Cast (Var opaqueWorker) opaqueCo) (Var y)
+    lintAccepts dflags "opaque native congruence original application" [fn, y, opaque, opaqueWorker] opaqueOriginal
+    check "opaque native congruence has no invented Pi projection" $
+        case pushCoArg opaqueCo (Var y) of
+            Nothing -> True
+            Just _ -> False
+
+    -- The domain proof precedes the binder. Its free x and the body's bound
+    -- x can have the same Unique. The right endpoint must keep them distinct.
+    let outerParameter = mkTyVar (mkSystemName (unique 31020) (mkTyVarOcc "outer")) domainA
+        outerBinders = [mkAnonTyConBinder outerParameter]
+        outerAlias =
+            mkSynonymTyCon
+                (mkSystemName (unique 31021) (mkTcOcc "ForgetOuterDomain"))
+                (mkTyConKind outerBinders liftedTypeKind)
+                outerBinders
+                liftedTypeKind
+                [Phantom]
+                domainA
+                True
+                False
+                True
+                False
+        outerType = mkTyConApp outerAlias [TermVarTy x]
+        forgetOuter = TransCo (Refl outerType) (Refl domainA)
+        outerLoop = TransCo (SymCo forgetOuter) forgetOuter
+        scopedDelta = TransCo outerLoop delta
+        scopedConverted = mkDepFunCoWithDomain x (MCo scopedDelta) (mkNomReflCo bodyType)
+        scopedRight = coercionRKind scopedConverted
+        rightFree = tyCoVarsOfType scopedRight
+    check "domain proof retains its outer same-Unique dependency" (x `elemVarSet` tyCoVarsOfCo scopedDelta)
+    lintAccepts dflags "domain proof scopes its outer index before the binder" [x, fn] (Coercion scopedConverted)
+    case scopedRight of
+        DepFunTy actual _ -> do
+            check "converted endpoint freshens past the domain proof" (actual /= x)
+            checkType dflags "fresh converted binder metadata" domainB (varType actual)
+            check "converted endpoint masks only its fresh binder" (not (actual `elemVarSet` rightFree))
+        _ -> fail "FAIL: same-Unique domain proof lost its retained endpoint"
+    check "converted endpoint retains the original opaque head" (fn `elemVarSet` rightFree)
+    case lookupVarSet rightFree x of
+        Just outerIndex -> checkType dflags "converted endpoint keeps outer index metadata" domainA (varType outerIndex)
+        Nothing -> fail "FAIL: converted endpoint captured the domain proof's outer index"
+    lintAccepts dflags "converted endpoint independently preserves outer proof scope" [x, fn] (Coercion (mkNomReflCo scopedRight))
+
+    let betaActual = local 31220 "domain_beta_actual" domainA
+        betaIgnored = local 31221 "domain_beta_ignored" domainA
+        betaCast proofCo = Cast (Var x) (SubCo proofCo)
+        replaceBeta = indexSubst [betaActual] x (Var betaActual)
+        castBetaCases =
+            [ ("changed domain", App (Lam x (betaCast scopedDelta)) (Var betaActual), scopedDelta)
+            , ("proof-only loop", App (Lam x (betaCast outerLoop)) (Var betaActual), outerLoop)
+            , ("stored range avoids inner capture", App (Lam x (App (Lam betaActual (betaCast scopedDelta)) (Var betaIgnored))) (Var betaActual), scopedDelta)
+            ]
+    forM_ castBetaCases $ \(label, expression, proofCo) -> do
+        let expectedProof = Subst.substCo replaceBeta proofCo
+            expectedValue = Cast (Var betaActual) (SubCo expectedProof)
+            expectedIndex = CastTy (TermVarTy betaActual) expectedProof
+            prefix = "cast beta " ++ label
+        lintAccepts dflags (prefix ++ " original") [betaActual, betaIgnored] expression
+        case normaliseNativeIndexExpr expression of
+            Just (normal, index) -> do
+                check (prefix ++ " preserves the actual runtime range") (cheapEqExpr expectedValue normal)
+                checkType dflags (prefix ++ " substitutes the nominal index proof") expectedIndex index
+                checkType dflags (prefix ++ " result domain") (coercionRKind expectedProof) (typeKind index)
+                check (prefix ++ " leaves no escaped beta binder") $
+                    not (x `elemVarSet` exprFreeVars normal) && not (x `elemVarSet` tyCoVarsOfType index)
+                check (prefix ++ " retains the actual input Id") $
+                    betaActual `elemVarSet` exprFreeVars normal && betaActual `elemVarSet` tyCoVarsOfType index
+                lintAccepts dflags (prefix ++ " normalized value") [betaActual] normal
+                lintAccepts dflags (prefix ++ " normalized index") [betaActual] (Coercion (mkNomReflCo index))
+            Nothing -> fail ("FAIL: " ++ prefix ++ " was not normalized")
+
+    let unrelatedType = mkTyVar (mkSystemName (unique 31222) (mkTyVarOcc "unrelated")) liftedTypeKind
+        unrelatedProof = proof 31223 boolTy boolTy
+        emptyExpressionSubst = CoreSubst.mkEmptySubst (mkInScopeSet (mkVarSet [y]))
+        expressionSubsts =
+            [ ("type", CoreSubst.extendTvSubst emptyExpressionSubst unrelatedType intTy)
+            , ("coercion", CoreSubst.extendCvSubst emptyExpressionSubst unrelatedProof (mkNomReflCo boolTy))
+            ]
+    lintAccepts dflags "converted argument before expression substitution" [y] backward
+    forM_ expressionSubsts $ \(label, subst) -> do
+        let rewritten = CoreSubst.substExpr subst backward
+            prefix = "converted argument under unrelated " ++ label ++ " substitution"
+        check (prefix ++ " uses a nonempty substitution") (not (CoreSubst.isEmptySubst subst))
+        case rewritten of
+            Cast (Var actual) (SubCo nominalProof) -> do
+                check (prefix ++ " preserves its actual Id") (actual == y)
+                check (prefix ++ " keeps nominal evidence") (coercionRole nominalProof == Nominal)
+                checkType dflags (prefix ++ " cast source") domainB (coercionLKind nominalProof)
+                checkType dflags (prefix ++ " cast target") domainA (coercionRKind nominalProof)
+            _ -> fail ("FAIL: " ++ prefix ++ " discarded the nominal child")
+        checkType dflags (prefix ++ " expression type") (exprType backward) (exprType rewritten)
+        case exprToNativeIndex rewritten of
+            Just index -> checkType dflags (prefix ++ " recoverable index") (CastTy (TermVarTy y) (mkSymCo delta)) index
+            Nothing -> fail ("FAIL: " ++ prefix ++ " lost index conversion")
+        lintAccepts dflags prefix [y] rewritten
 
 -- | Compare recovered types and print both sides on failure.
 checkType :: DynFlags -> String -> Type -> Type -> IO ()

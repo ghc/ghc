@@ -98,6 +98,10 @@ helperSource =
         , "{-# NOINLINE bottomBool #-}"
         , "bottomBool :: Bool"
         , "bottomBool = error \"native-bottom-bool\""
+        , "data DomainToken a = DomainToken"
+        , "{-# NOINLINE bottomDomainToken #-}"
+        , "bottomDomainToken :: DomainToken Bool"
+        , "bottomDomainToken = error \"native-bottom-domain-token\""
         , "data Nat = Z | S Nat"
         , "data Vec a (n :: Nat) where"
         , "  VNil :: Vec a Z"
@@ -5264,6 +5268,120 @@ runNatChecks environment flags bindings tycons = do
         Just constructor -> pure constructor
         Nothing -> fail ("FAIL: missing loaded data constructor: " ++ label)
 
+{- Note [Retained domain conversion runtime checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Use an actual compiled token constructor and nominal family evidence between
+its two closed instances. The retained result mentions an opaque call, so
+its argument cannot disappear from the function type. Prepare the raw casted
+applications before the ordinary execution entry can simplify their lambdas.
+These quiet checks preserve the existing stdout golden.
+-}
+
+-- | Execute nominal domain conversions without eta expansion or extra demand.
+runDomainConversionChecks :: HscEnv -> DynFlags -> [Id] -> [TyCon] -> IO ()
+runDomainConversionChecks environment flags bindings tycons = do
+    token <- named "DomainToken"
+    nat <- named "Nat"
+    tokenCon <- case tyConDataCons token of
+        [con] -> pure con
+        _ -> fail "FAIL: domain conversion token has no unique constructor"
+    zero <- case tyConDataCons nat of
+        con : _ -> pure con
+        _ -> fail "FAIL: domain conversion Nat has no constructor"
+    let parameter = mkTyVar (mkSystemName (unique 12000) (mkTyVarOcc "domain_parameter")) liftedTypeKind
+        parameters = [mkAnonTyConBinder parameter]
+        family =
+            mkFamilyTyCon
+                (mkSystemName (unique 12001) (mkTcOcc "RuntimeDomainF"))
+                (mkTyConKind parameters liftedTypeKind)
+                parameters
+                0
+                liftedTypeKind
+                Nothing
+                (ClosedTypeFamilyTyCon (CTF (Just axiom)))
+                Nothing
+                NotInjective
+        axiom =
+            mkBranchedCoAxiom
+                Nominal
+                (mkSystemName (unique 12002) (mkTcOcc "RuntimeDomainFAx"))
+                family
+                [mkCoAxBranch [] [] [] [boolTy] boolTy [] noSrcSpan]
+        delta = mkTyConAppCo Nominal token [mkAxInstCo Nominal (BranchedAxiom axiom 0) [] []]
+        domainA = mkTyConApp token [mkTyConApp family [boolTy]]
+        domainB = mkTyConApp token [boolTy]
+        natTy = mkTyConTy nat
+        x = local 12003 "domain_source" domainA
+        y = local 12004 "domain_actual" domainB
+        function = local 12005 "domain_opaque_head" (mkFunctionType ManyTy domainA natTy)
+        headInput = local 12006 "domain_head_input" domainA
+        headRhs = Lam headInput (Var (dataConWorkId zero))
+        call index = TermAppTy function index
+        predicate index = mkTyConApp eqTyCon [natTy, call index, call index]
+        result index = mkFunctionType ManyTy (predicate index) intTy
+        dictionary = local 12007 "domain_dictionary" (predicate (TermVarTy x))
+        answer = mkIntExpr (targetPlatform flags) 42
+        ignored = Lam x (Lam dictionary answer)
+        caseBinder = local 12008 "domain_demand" domainA
+        demanded =
+            Lam
+                x
+                ( Case
+                    (Var x)
+                    caseBinder
+                    (result (TermVarTy x))
+                    [Alt (DataAlt tokenCon) [] (Lam dictionary answer)]
+                )
+        conversion = mkDepFunCoWithDomain x (MCo delta) (mkReflCo Representational (result (TermVarTy x)))
+        converted body = Cast body conversion
+        originalType = mkDepFunTy x (result (TermVarTy x))
+        back = CastTy (TermVarTy y) (mkSymCo delta)
+        evidence = mkCoreConApps eqDataCon [Type natTy, Type (call back), Type (call back), Coercion (mkNomReflCo (call back))]
+        observed body = mkApps (Var (helper bindings "observeInt")) [App (App (converted body) (Var y)) evidence]
+        closed body = Let (NonRec function headRhs) body
+        apply body argument = closed (App (Lam y (observed body)) argument)
+        realToken = App (Var (dataConWorkId tokenCon)) (Type boolTy)
+        bottomToken = Var (helper bindings "bottomDomainToken")
+        force body = mkApps (Var (helper bindings "force")) [Type (exprType body), body]
+        bottomFunction = App (Var (helper bindings "bottomFunction")) (Type originalType)
+    unless (isNativeIndexType domainA && isNativeIndexType domainB && not (eqType domainA domainB)) $
+        fail "FAIL: runtime domain conversion lost its nominal distinction"
+    unless (exprType (App (converted ignored) (Var y)) `eqType` result back) $
+        fail "FAIL: converted retained application has the wrong dependent result"
+    config <- initCorePrepConfig environment
+    let nativeConfig = config{cp_allowNativeDependent = True, cp_arityOpts = Nothing, cp_specEval = False, cp_specEvalDFun = False}
+        prepare label expression = do
+            lintNative flags (label ++ " original") expression
+            prepared <- corePrepExpr (hsc_logger environment) nativeConfig expression
+            lintNative flags (label ++ " prepared") prepared
+            unless (exprType expression `eqType` exprType prepared) $
+                fail ("FAIL: " ++ label ++ "; CorePrep changed the result type")
+            pure prepared
+        expect label expected expression = do
+            prepared <- prepare label expression
+            actual <- execute environment flags label prepared
+            unless (actual == expected) $
+                fail ("FAIL: " ++ label ++ "; expected " ++ show expected ++ ", got " ++ show actual)
+        expectBottom label marker expression = do
+            prepared <- prepare label expression
+            outcome <- try (execute environment flags label prepared) :: IO (Either SomeException String)
+            case outcome of
+                Left exception | marker `isInfixOf` displayException exception -> pure ()
+                Left exception -> fail ("FAIL: " ++ label ++ "; wrong exception: " ++ displayException exception)
+                Right actual -> fail ("FAIL: " ++ label ++ "; returned " ++ show actual)
+    expect "converted retained function accepts an actual token" "42" (apply ignored realToken)
+    expect "converted retained function ignores bottom token" "42" (apply ignored bottomToken)
+    expect "converted retained function demands an actual token" "42" (apply demanded realToken)
+    expectBottom "converted retained function demands bottom token" "native-bottom-domain-token" (apply demanded bottomToken)
+    expect "converted retained partial application ignores bottom token" "forced" $
+        closed (App (Lam y (force (App (converted ignored) (Var y)))) bottomToken)
+    expect "converted retained function remains a function at WHNF" "forced" (closed (force (converted ignored)))
+    expectBottom "converted bottom function remains bottom at WHNF" "native-bottom-function" (closed (force (converted bottomFunction)))
+  where
+    named label = case find ((== label) . occNameString . nameOccName . tyConName) tycons of
+        Just tycon -> pure tycon
+        Nothing -> fail ("FAIL: missing domain conversion type: " ++ label)
+
 -- | Lint a closed native expression before it reaches the backend API.
 lintNative :: DynFlags -> String -> CoreExpr -> IO ()
 lintNative flags label expression = do
@@ -5326,6 +5444,7 @@ runChecks = do
                 | otherwise -> fail ("FAIL: choose bottom raised another exception: " ++ displayException exception)
             Right actual -> fail ("FAIL: choose bottom returned " ++ show actual)
     liftIO $ runNatChecks environment flags bindings tycons
+    liftIO $ runDomainConversionChecks environment flags bindings tycons
     runSourceChecks
     runSourceRejectChecks
 
