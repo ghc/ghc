@@ -13,6 +13,7 @@ Last updated: 2026-11-16.
 
 - [Program roadmap](ROADMAP.md): the main work queue, all fifty upstream cards, dependencies and local completion boundaries.
 - Active feature pages: [R03 dependent products](roadmap/R03-dependent-products.md), [R05 dependent Core](roadmap/R05-dependent-core.md), and [R23 unsaturated type families](roadmap/R23-unsaturated-type-families.md).
+- [Subset, library and assurance tasks](ROADMAP.md#local-subset-library-and-assurance-work): module interoperability, a small dependent-base and optional totality research.
 - [Implementation plan](PLAN.md): bounded specifications, acceptance checks and historical `M` checkpoints. Each new increment names its owning roadmap card.
 - [Runnable showcase](Showcase.hs): source features in one maintained program. The verification state is recorded below.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.

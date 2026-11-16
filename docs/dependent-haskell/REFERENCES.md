@@ -85,7 +85,8 @@ the manual does not prove those decisions correct in System FC.
   coverage and termination. The GHC rule records a constructor refinement as a
   branch-local nominal `CoVar`. Its explicit coercions transport the branch
   result to the fixed outer result type. Exhaustive proof-bearing Boolean cases
-  are required. General termination checking is outside this Haskell spike.
+  are required. These checks do not establish termination. Optional totality
+  checking is now a separate local task in the roadmap.
 - [With-abstraction equality](https://agda.readthedocs.io/en/v2.8.0.2/language/with-abstraction.html#with-abstraction-equality)
   explains how `with ... in eq` retains an equation for an inspected expression.
   It motivates keeping explicit refinement evidence until checked lowering.
@@ -3817,3 +3818,95 @@ nominal evidence and modern required/invisible representational casts.
 Agda supplies the separately recorded telescope/substitution comparison; its
 eta and totality policies do not establish the FC projection rule. No new
 paper version, whole-paper reading or preservation proof is claimed here.
+
+## Dependent modules, library boundaries and optional totality
+
+The user selected a dependent subset in opt-in modules and suggested a small
+DependentBase library. The name is provisional. This direction narrows the
+initial adoption target. It does not authorize discarding an imported type or
+adding a stronger guarantee to ordinary Haskell code. The local tasks are in
+[ROADMAP.md](ROADMAP.md#local-subset-library-and-assurance-work).
+
+The primary library reference is
+[linear-base at abbb74f45f7d](https://github.com/tweag/linear-base/tree/abbb74f45f7dc395436159b9c12fe26ed5c30259).
+Its [guide](https://github.com/tweag/linear-base/blob/abbb74f45f7dc395436159b9c12fe26ed5c30259/docs/USER_GUIDE.md)
+uses mixed imports from linear-base and base. Its typed bridges preserve
+specific contracts. `Ur :: a -> Ur a` stores an unrestricted field; it cannot
+wrap an arbitrary linearly bound capability. The current `forget` consumes its
+function linearly. Public `withLinearIO` runs a computation with an unrestricted
+result. The internal `toSystemIO` is not exported. `Unsafe.Linear` and selected
+IO adapters use explicit unsafe equality or coercion and require a separate
+trust argument. These operations do not certify termination.
+
+The guide's blanket restriction on linear let/where bindings is stale. The
+current local GHC guide permits local linear bindings with stated restrictions.
+Current GHC source also preserves imported multiplicity through interface
+loading and call checking. Disabling syntax does not erase that contract.
+Use the same principle for dependent imports. Prefer a package with its actual
+index, a runtime checking operation, or an operation that forgets an invariant.
+Do not provide a general unchecked index assertion as a normal bridge.
+
+A small library can reuse the existing Nat, Vec, Fin, equality and packed-vector
+examples. It need not duplicate every Prelude class. Its first compatibility
+operations should convert vectors to lists, package lists with their actual
+length, check a requested length, and eliminate a package with both its index
+and payload in scope. Conversion of an infinite or undefined input can diverge.
+No new library implementation is claimed by this research.
+
+For optional totality checking, the selected references are
+[Idris2 v0.8.0](https://github.com/idris-lang/Idris2/blob/15a3e4e70843f7a34100f6470c04b791330788df/docs/source/tutorial/theorems.rst#L295)
+and [Agda v2.8.0](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/doc/user-manual/language/termination-checking.lagda.rst#L92).
+Start with coverage and structural descent over the complete recursive component.
+An unverified callback or import remains unknown. Failure to prove termination
+does not prove divergence. Record checked evidence and trusted assumptions
+separately. Agda's safe mode also controls positivity, universes and imports;
+a termination check alone does not supply that logical guarantee.
+
+Casinghino, Sjoberg and Weirich's
+[Combining Proofs and Programs in a Dependently Typed Language (POPL 2014)](https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf)
+is direct mixed-fragment prior art. The abstract and opening examples were read.
+Its potentially nonterminating solver returns checked evidence if it succeeds.
+Its calculus is call-by-value. Its results do not establish a theorem for lazy
+Haskell. Only a web extraction was retained for this reading, not verified PDF
+bytes. Safe Haskell supplies a separate module-trust comparison; it is not a
+totality checker.
+
+The ignored `native-arrow-matchability-boundary-research-v1` directory records
+source pins, selected line ranges and twelve verified Git blobs: eight
+linear-base files and four Idris/Agda files. It also records local GHC source
+hashes. No compiler, totality checker or library was run for that research.
+
+## Observational equality and partial Haskell
+
+The suggestion of observational equivalence opens a research task for R05.
+Distinguish contextual equivalence of programs, explicit propositional equality,
+and checker conversion. OTT develops the latter two with extensional equality
+and transport. It does not decide arbitrary contextual equivalence of Haskell
+programs. Pointwise equality also does not make arbitrary lifted Haskell
+functions interchangeable: `seq` distinguishes bottom from a lambda with a
+bottom body. See [Haskell 2010, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html).
+
+The [paper ledger](papers/README.md) now records four selectively read PDFs:
+Altenkirch, McBride and Swierstra (2007); Pujet and Tabareau (2022);
+Sirman, Lennon-Bertrand and Krishnaswami (TYPES 2024, published 2025); and
+Pujet, Leray and Tabareau (TOPLAS 2025). Their versions, hashes, page counts and
+reading scopes are in [manifest.json](papers/manifest.json).
+
+The 2022 paper identifies a conjecture dependency in the earlier normalization
+argument. The Haskell NbE implementation is an experimental object-language
+checker. Its `U : U` choice is deliberately inconsistent and undecidable.
+The expanded CICobs article limits its formalized conversion proof to the
+natural-number fragment. No formalization or prototype was rebuilt here.
+None of these results certifies the native Core extension.
+
+An OTT experiment would need a separate specification for proof computation,
+partial runtime terms, open casts, erasure and Core roles. Extensional equality
+would not remove the M premise for inverse application: a constant function
+still maps distinct inputs to the same output. M63 therefore retains its
+selected matchability rules. No OTT design switch is selected.
+
+The ignored `native-arrow-matchability-observational-research-v1` directory
+records the source review and a pinned four-file implementation archive.
+`native-arrow-matchability-observational-papers-v1` contains four original PDFs
+and per-page pypdf extractions. All eight PDF/text hashes verify. Automated
+extraction does not expand the recorded reading scope.

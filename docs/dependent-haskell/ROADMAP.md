@@ -50,8 +50,8 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-The published compiler checkpoint is M61. Both stages pass the 84-observation
-Showcase through fourteen source modules. M60 supplies its latest source group.
+The published compiler checkpoint is M62. Both stages pass the 88-observation
+Showcase through fourteen source modules. M62 supplies its latest source group.
 M56 provides
 the closed parameterized domains. M57 provides nominal scalar-domain conversion
 in Core. M58 exposes that conversion and scoped body solving from source.
@@ -132,6 +132,33 @@ increments do not complete the program.
 5. Update the feature page and this queue after verification. Mark the increment
    complete only within its measured scope. Close a roadmap card only when its
    full goal and compatibility requirements are supported.
+
+## Local subset, library and assurance work
+
+The user selected an opt-in dependent subset in modules. A small dependent-base
+library should make that subset useful with ordinary Haskell libraries. These
+local tasks do not add cards or edges to the upstream roadmap. They do not
+change M63's acceptance criteria.
+
+| Task | Roadmap relation | Next result and boundary |
+| --- | --- | --- |
+| Module interoperability | R03 and R05 | Check an indexed API from a module without dependent syntax. Preserve imported types and infer relationships where supported. Use an explicit adapter when a caller cannot express the contract. |
+| Small dependent-base | R03 and R04 | Start with the existing Nat, Vec, Fin, equality and package operations. Add list conversion, package elimination and a length-checking adapter. Package and module names remain provisional. |
+| Conservative totality checking | Local assurance work related to R05 | Specify the property for lazy Haskell. Start with coverage and structural recursion. Keep checked results, trusted assumptions and unknown status distinct across imports. |
+| Observational equality | R05 research | Compare explicit equality and transport with OTT. Keep checker conversion, contextual equivalence and inverse application distinct. No new equality rule is selected. |
+
+A module flag enables source features. It does not remove imported contracts.
+An ordinary import supplies no extra termination or proof guarantee unless a
+check or an explicit trusted contract establishes it. Partial dependent code
+can still preserve an index invariant when it returns. Totality remains a
+separate promise. A termination checker alone does not establish logical
+consistency; positivity, universes, proof elimination and unsafe operations
+also need rules.
+
+Use linear-base as the library and adapter reference. Use Idris and Agda as
+references for conservative totality checks and imported assumptions. Their
+current guarantees do not transfer to this fork. See the new boundary and
+observational-equality entries in [REFERENCES.md](REFERENCES.md).
 
 ## Main relationships
 

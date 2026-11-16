@@ -1,10 +1,12 @@
 # Dependent Haskell paper reading
 
 Read on 2026-11-14 through 2026-11-16. The [manifest](manifest.json) records
-sixteen works and twenty-two downloaded PDF versions. It contains source URLs,
+twenty works and twenty-six downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
-`_build/verification/dependent-haskell-papers-2026-11-14/`.
+`_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
+observational-equality PDFs are in the sibling directory
+`native-arrow-matchability-observational-papers-v1/`.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -31,6 +33,11 @@ versions and several selective readings.
 | [The Thoralf Plugin](https://richarde.dev/papers/2018/thoralf/thoralf.pdf) | Otwani and Eisenberg, Haskell 2018 | R05 | Solver translation and trusted equality evidence |
 | [Promoting Functions to Type Families in Haskell](https://richarde.dev/papers/2014/promotion/promotion.pdf) | Eisenberg and Stolarek, Haskell 2014 | R13, R17, R18, R21 | Lambda lifting, declaration order and defunctionalization |
 | [A Reflection on Types](https://richarde.dev/papers/2016/dynamic/dynamic.pdf) | Peyton Jones, Weirich, Eisenberg and Vytiniotis, WadlerFest 2016 | R03, R05 | Runtime type codes, equality and dynamic application |
+
+| [Observational Equality, Now!](https://people.cs.nott.ac.uk/psztxa/publ/obseqnow.pdf) | Altenkirch, McBride and Swierstra, PLPV 2007 | R05, R23 | Explicit extensional equality and dependent transport. The later literature records a normalization-conjecture dependency. |
+| [Observational Equality: Now for Good](https://pujet.fr/pdf/OTT_now_for_good.pdf) | Pujet and Tabareau, POPL 2022 | R05, R23 | TTobs, proof irrelevance and conversion metatheory. No proof was replayed. |
+| [Implementing a Type Theory with Observational Equality, Using Normalisation by Evaluation](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.TYPES.2024.5) | Sirman, Lennon-Bertrand and Krishnaswami, TYPES 2024; published 2025 | R05, R23 | Implementation experience in Haskell. The object-language prototype deliberately uses inconsistent U:U. It is not dependent Haskell. |
+| [Observational Equality Meets CIC](https://pujet.fr/pdf/toplas25_cicobs.pdf) | Pujet, Leray and Tabareau, TOPLAS 2025 | R05, R23 | Indexed transport and cast computation. The formalized conversion proof covers the natural-number fragment. |
 
 ## Singletons, Haskell 2012
 
@@ -576,3 +583,32 @@ The implementation stores actual lazy function/input fields. It adds no
 singleton or call-injectivity rule. Actual source/interface checks are
 operational evidence. No new whole-paper reading, proof replay or theorem
 transfer is claimed. The ledger stays at seven works and nine cached PDFs.
+
+
+## Observational equality, 2007 to 2025
+
+The four new PDFs were downloaded and hashed on 2026-11-16. Reading was selective.
+The manifest records each version and its exact scope. Automated per-page
+extraction does not count as reading every page. No Agda proof, Rocq kernel or
+Haskell prototype was rebuilt.
+
+Read the 2007 abstract, introduction, overview, selected function transports,
+neutral coercion quotation and conclusion. Read the 2022 introduction, selected
+normalization statements and related-work comparison. The later paper records
+a conjecture dependency in the earlier normalization argument.
+
+Read selected sections of the TYPES implementation paper, including its
+universe choice, syntax, conversion, casts, extensions and conclusion. It
+implements an object language in Haskell. Its U:U choice is deliberately
+inconsistent and undecidable. It also records a unit-conversion transitivity
+limitation. Do not treat it as a verified implementation of Dependent Haskell.
+
+Read the expanded TOPLAS article's introduction, overview, conversion algorithm
+and scope, selected theorem statements, implementation overview and conclusion.
+Section 5 limits the formalized conversion proof to the natural-number fragment.
+It does not claim the full indexed-inductive scheme is covered by that proof.
+
+These sources inform explicit equality and transport. They do not equate
+pointwise function equality with contextual equivalence of partial Haskell
+programs. Haskell's seq and divergence remain separate obligations. No OTT
+design is selected. See REFERENCES.md for the proposed research task.
