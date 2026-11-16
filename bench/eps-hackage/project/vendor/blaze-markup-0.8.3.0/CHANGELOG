@@ -1,0 +1,91 @@
+# Changelog
+
+- 0.8.3.0 (2023-09-25)
+    * Add `ToMarkup` and `ToValue` instances for `NonEmpty Char`
+    * Bump `bytestring` upper bound to 0.13
+    * Bump `text` upper bound to 2.1
+
+- 0.8.2.8 (2021-03-04)
+    * Bump `base` upper bound to 4.16
+    * Bump `tasty` upper bound to 1.5
+    * Bump `bytestring` upper bound to 0.12
+
+- 0.8.2.7 (2020-06-30)
+    * Bump Cabal version lower bound to 1.10
+
+- 0.8.2.6 (2020-06-30)
+    * Bump `tasty` upper bound to 1.4
+
+- 0.8.2.5 (2020-04-20)
+    * Bump `base` upper bound to 4.15
+
+- 0.8.2.4 (2020-03-29)
+    * Bump `QuickCheck` upper bound to 2.15
+
+- 0.8.2.3 (2019-10-02)
+    * Bump `base` to 4.13
+    * Bump `tasty` to 1.2
+    * Bump `QuickCheck` to 2.13
+
+- 0.8.2.2 (2018-09-25)
+    * Bump `base` to 4.12
+    * Bump `containers` to 0.6
+    * Bump `tasty` to 1.1
+
+- 0.8.2.1 (2018-04-09)
+    * Bump `QuickCheck` dependency to allow 2.11
+    * Bump `tasty` dependency to allow 1.0
+    * Bump `tasty-hunit` dependency to allow 0.10
+    * Bump `tasty-quickcheck` dependency to allow 0.10
+
+- 0.8.2.0 (2018-01-09)
+    * Define `ToMarkup` instance for `Natural`.
+
+- 0.8.1.0 (2017-09-16)
+    * Compatibility with Semigroup/Monoid proposal
+    * Switch to `tasty` for running tests
+
+- 0.8.0.0 (2017-01-30)
+    * Make `MarkupM` finally adhere to the Monad laws
+    * Stricten the `IsString` instance to only work with `MarkupM ()` and not
+      `MarkupM a`
+    * Change the type of `contents` to `MarkupM a -> MarkupM a`
+    * Add a `Semigroup` instance for `MarkupM`
+
+- 0.7.1.1
+    * Bump `HUnit` dependency to allow 1.5
+
+- 0.7.1.0
+    * Relax `QuickCheck` dependency to allow 2.9
+    * Add text builder instances
+
+- 0.7.0.3
+    * Relax `HUnit` dependency to allow 1.3
+
+- 0.7.0.2
+    * Relax `blaze-builder` dependency to allow 0.3
+
+- 0.7.0.1
+    * Bump `QuickCheck` dependency to allow 2.8
+
+- 0.7.0.0
+    * Depend on blaze-builder 0.4
+
+- 0.6.3.0
+    * Add combinators to insert HTML comments
+
+- 0.6.2.0
+    * Add `Applicative` instance for `MarkupM`
+
+- 0.6.1.1
+    * Bump `text` dependency to allow 1.2
+
+- 0.6.1.0
+    * Add the `null` query to Text.Blaze.Internal.
+
+- 0.6.0.0
+    * Add the operator (!?) for nicely setting conditional attributes
+
+- 0.5.2.0
+    * Provide ToHtml and ToValue instances for Int32, Int64, Word, Word32,
+      and Word64

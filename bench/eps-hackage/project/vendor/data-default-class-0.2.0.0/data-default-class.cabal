@@ -1,0 +1,24 @@
+cabal-version:   3.0
+name:            data-default-class
+version:         0.2.0.0
+category:        Data
+synopsis:        A class for types with a default value (compatibility shim)
+description:
+    This module re-exports the 'Default' class from "Data.Default", for
+    compatibility with older code.
+build-type:      Simple
+license:         BSD-3-Clause
+license-file:    LICENSE
+copyright:       (c) 2013 Lukas Mai
+author:          Lukas Mai
+maintainer:      <lukasmai.403+hackage@gmail.com>
+
+source-repository head
+    type: git
+    location: https://github.com/mauke/data-default
+    branch: flare
+
+library
+    build-depends:     base, data-default ^>=0.8
+    exposed-modules:   Data.Default.Class
+    default-language:  Haskell98

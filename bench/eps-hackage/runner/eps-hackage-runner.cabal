@@ -1,0 +1,31 @@
+cabal-version:      3.0
+name:               eps-hackage-runner
+version:            0.1.0.0
+synopsis:           Compile a package with the GHC API and measure the EPS
+description:
+  Built with the compiler under test (it links its ghc library). The
+  abstract-eps flag enables EPS stores (bench/eps-store); it needs a GHC with
+  the abstract EPS API.
+build-type:         Simple
+
+flag abstract-eps
+  description: Support --store (GHC with the abstract EPS API only)
+  default:     False
+  manual:      True
+
+executable eps-hackage-run
+  main-is:          Main.hs
+  hs-source-dirs:   ., ../common
+  other-modules:    EpsHackage.Result
+  default-language: GHC2021
+  ghc-options:      -Wall -rtsopts -threaded "-with-rtsopts=-T"
+  build-depends:
+    , base
+    , directory
+    , filepath
+    , ghc
+  if flag(abstract-eps)
+    cpp-options:   -DABSTRACT_EPS
+    build-depends:
+      , eps-store
+      , unix

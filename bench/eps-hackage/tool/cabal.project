@@ -1,0 +1,2 @@
+-- Built with the system GHC (ghcup default), not the compiler under test.
+packages: .

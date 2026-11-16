@@ -1,0 +1,81 @@
+cabal-version:      >=1.10
+name:               semialign
+version:            1.4
+synopsis:
+  Align and Zip type-classes from the common Semialign ancestor.
+
+homepage:           https://github.com/haskellari/these
+license:            BSD3
+license-file:       LICENSE
+author:             C. McCann, Oleg Grenrus
+maintainer:         Oleg Grenrus <oleg.grenrus@iki.fi>
+category:           Data, These
+build-type:         Simple
+extra-source-files: CHANGELOG.md
+description:
+  The major use of @These@ of this is provided by the @align@ member of
+  @Semialign@ class, representing a generalized notion of "zipping with padding"
+  that combines structures without truncating to the size of the smaller input.
+  .
+  It turns out that @zip@ operation fits well the @Semialign@ class,
+  forming lattice-like structure.
+
+tested-with:
+  GHC ==8.6.5
+   || ==8.8.4
+   || ==8.10.7
+   || ==9.0.2
+   || ==9.2.8
+   || ==9.4.8
+   || ==9.6.6
+   || ==9.8.4
+   || ==9.10.1
+   || ==9.12.4
+   || ==9.14.1
+
+source-repository head
+  type:     git
+  location: https://github.com/haskellari/these.git
+  subdir:   semialign
+
+flag semigroupoids
+  description: Build with semigroupoids dependency
+  manual:      True
+  default:     True
+
+library
+  default-language: Haskell2010
+  ghc-options:      -Wall -Wno-trustworthy-safe
+
+  if impl(ghc >=9.2)
+    ghc-options: -Wno-noncanonical-monoid-instances
+
+  hs-source-dirs:   src
+  exposed-modules:
+    Data.Align
+    Data.Crosswalk
+    Data.Semialign
+    Data.Semialign.Indexed
+    Data.Zip
+
+  other-modules:    Data.Semialign.Internal
+
+  -- ghc boot libs
+  build-depends:
+      base          >=4.12.0.0 && <4.23
+    , containers    >=0.6.0.1  && <0.9
+
+  -- These
+  build-depends:    these >=1.2.1 && <1.3
+
+  -- other dependencies
+  build-depends:
+      hashable                       >=1.4.4.0  && <1.6
+    , indexed-traversable            >=0.1.4    && <0.2
+    , indexed-traversable-instances  >=0.1.2    && <0.2
+    , tagged                         >=0.8.8    && <0.9
+    , unordered-containers           >=0.2.8.0  && <0.3
+    , vector                         >=0.13.0.0 && <0.14
+
+  if flag(semigroupoids)
+    build-depends: semigroupoids >=6.0.1 && <6.1

@@ -1,0 +1,5 @@
+-- Built by ../bench.sh with the compiler under test.
+packages: . ../../eps-store
+-- Hackage dependencies (of eps-store) don't know about GHC 10.1 yet.
+allow-newer: all
+constraints: ghc installed, base installed

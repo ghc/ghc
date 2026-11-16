@@ -1,0 +1,161 @@
+-- EPS benchmark: pandoc's library, with all its dependencies from Hackage,
+-- built with GHC HEAD (10.1). See ../README.md.
+--
+-- pandoc-3.14 is fetched by `bench.sh setup` (cabal get); vendor/ holds
+-- Hackage releases with the minimal changes they need for GHC HEAD
+-- (vendor/CHANGES.md).
+
+packages:
+  pandoc-3.14
+  vendor/blaze-markup-0.8.3.0
+  vendor/data-default-class-0.2.0.0
+  vendor/semialign-1.4
+  vendor/serialise-0.2.6.1
+  vendor/strict-0.5.1
+
+-- The same package versions for every compiler.
+index-state:
+  hackage.haskell.org 2026-11-16T10:08:49Z,
+  head.hackage.ghc.haskell.org 2026-11-16T08:34:57Z
+
+allow-newer: all
+
+-- Boot packages: always the ones that come with the compiler.
+constraints:
+  array installed,
+  base installed,
+  binary installed,
+  bytestring installed,
+  containers installed,
+  deepseq installed,
+  directory installed,
+  exceptions installed,
+  file-io installed,
+  filepath installed,
+  ghc-bignum installed,
+  ghc-boot-th installed,
+  ghc-prim installed,
+  haskeline installed,
+  integer-gmp installed,
+  mtl installed,
+  os-string installed,
+  parsec installed,
+  pretty installed,
+  process installed,
+  stm installed,
+  template-haskell installed,
+  terminfo installed,
+  text installed,
+  time installed,
+  transformers installed,
+  unix installed,
+  xhtml installed
+
+-- From https://ghc.gitlab.haskell.org/head.hackage/cabal.project (as of the
+-- index-state above), without its pins of boot packages.
+repository head.hackage.ghc.haskell.org
+   url: https://ghc.gitlab.haskell.org/head.hackage/
+   secure: True
+   key-threshold: 3
+   root-keys:
+       f76d08be13e9a61a377a85e2fb63f4c5435d40f8feb3e12eb05905edb8cdea89
+       26021a13b401500c8eb2761ca95c61f2d625bfef951b939a8124ed12ecf07329
+       7541f32a4ccca4f97aea3b22f5e593ba2c0267546016b992dfadcd2fe944e55d
+
+allow-newer:
+  Cabal,
+  base,
+  binary,
+  bytestring,
+  containers,
+  deepseq,
+  ghc,
+  ghc-bignum,
+  ghc-boot,
+  ghc-boot-th,
+  ghc-prim,
+  integer-gmp,
+  template-haskell,
+  text,
+  time
+
+constraints:
+  ghc installed
+
+constraints:
+  Agda ==2.7.0.1,
+  Cabal ==2.4.1.0 || ==3.0.2.0 || ==3.2.1.0,
+  Cabal-syntax ==3.8.1.0,
+  FPretty ==1.1,
+  JuicyPixels ==3.3.8,
+  algebraic-graphs ==0.7,
+  ansi-pretty ==0.1.2.2,
+  arith-encode ==1.0.2,
+  aur ==7.0.7,
+  aura ==3.2.10,
+  barbies-th ==0.1.11,
+  box-tuples ==0.2.0.4,
+  bv-sized ==1.0.5,
+  charsetdetect ==1.1.0.3,
+  charsetdetect-ae ==1.1.0.4,
+  chaselev-deque ==0.5.0.5,
+  constraints ==0.14.3,
+  critbit ==0.2.0.0,
+  crypto-random ==0.0.9,
+  cryptol ==3.4.0,
+  data-default-instances-new-base ==0.0.2,
+  data-r-tree ==0.6.0,
+  datetime ==0.3.1,
+  derive-lifted-instances ==0.2.2,
+  doctest ==0.24.0,
+  drinkery ==0.4,
+  endo ==0.3.0.1,
+  enumeration ==0.2.0,
+  free-functors ==1.2.1,
+  freer-simple ==1.2.1.2,
+  ghc-lib-parser ==9.12.2.20250421,
+  ghc-tcplugins-extra ==0.4.6,
+  ghc-typelits-extra ==0.4.7,
+  ghc-typelits-knownnat ==0.7.12,
+  ghc-typelits-natnormalise ==0.7.10,
+  ghcide ==2.9.0.0,
+  hashable ==1.4.7.0 || ==1.5.1.0,
+  haskell-src-meta ==0.8.13,
+  haxl ==2.4.0.0,
+  hgeometry ==0.14,
+  hgeometry-combinatorial ==0.14,
+  hgeometry-ipe ==0.13,
+  hiedb ==0.7.0.0,
+  inj-base ==0.2.0.0,
+  io-choice ==0.0.7,
+  language-bash ==0.11.1,
+  language-haskell-extract ==0.2.4,
+  lens ==5.2.3,
+  linear-generics ==0.2.3,
+  liquidhaskell-boot ==0.9.12.2,
+  mainland-pretty ==0.7.1,
+  monoidal-containers ==0.6.4.0,
+  packman ==0.5.0,
+  partial-isomorphisms ==0.2.3.0,
+  pgp-wordlist ==0.1.0.3,
+  refinery ==0.4.0.0,
+  rio ==0.1.22.0,
+  row-types ==1.0.1.2,
+  salak ==0.3.6,
+  sbv ==13.3,
+  singletons ==3.0.2,
+  siphash ==1.0.3,
+  strict-containers ==0.2,
+  text-short ==0.1.5,
+  text-show ==3.10.5,
+  th-abstraction ==0.5.0.0 || ==0.6.0.0,
+  th-compat ==0.1.4,
+  true-name ==0.1.0.3,
+  typelits-printf ==0.2.0.0,
+  vector-circular ==0.1.4,
+  vector-space ==0.16,
+  winery ==1.4
+
+constraints:
+  optparse-applicative -process,
+  tasty -unix
