@@ -1506,7 +1506,7 @@ tcRetainedArg domain arg
                   ; return (foldr (\value rest -> Core.mkApps cons [value, rest]) nil values) }
           HsVar _ lname
             | Just arg_id <- lookupNameEnv env (unLocWithUserRdr lname)
-            -> return (Core.Var arg_id)
+            -> index_var expected arg_id
             | isDataOcc (nameOccName (unLocWithUserRdr lname))
             -> do { con <- tcLookupConLike (unLoc lname)
                   ; case con of
@@ -1518,10 +1518,17 @@ tcRetainedArg domain arg
                       Just arg_id
                         -> do { arg_id <- liftZonkM (zonkId arg_id)
                               ; if isNativeIndexId arg_id
-                                then return (Core.Var arg_id)
+                                then index_var expected arg_id
                                 else unsupported }
                       _ -> unsupported }
           _ -> unsupported
+
+    -- Preserve nominal transport before the index substitution checks its kind.
+    index_var expected arg_id
+      | varType arg_id `tcEqType` expected = return (Core.Var arg_id)
+      | otherwise
+      = do { co <- unifyType Nothing (varType arg_id) expected
+           ; return (Core.Cast (Core.Var arg_id) (SubCo co)) }
 
     -- Instantiate the erased parameters from the complete expected domain.
     constructor expected dc = case nativeIndexDataConTyArgs expected dc of
@@ -1584,6 +1591,13 @@ Many usage requires Many. Remaining multiplicity metas default to Many during
 final zonking. No admitted signature, linear function head, or expected linear
 arrow can impose One. Check actual zonked lambda metadata when this grammar
 changes. The source pattern checker preserves the renamed Name/Unique.
+
+A scalar variable can have a nominally equal domain with a different family
+application. Keep its nominal domain cast in the resolved Core argument.
+The index substitution then receives an argument of the expected kind.
+The ordinary value checker still checks the argument and its usage. A failed
+domain equality remains a located type error instead of an invalid substitution.
+See Note [Nominal native index casts] in GHC.Core.
 
 Keep a normal EValArg with the binder's domain as its expected type. tcValArg
 checks the value once and records its runtime usage. Resolution does not inspect

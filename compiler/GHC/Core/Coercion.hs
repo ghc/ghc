@@ -38,7 +38,7 @@ module GHC.Core.Coercion (
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
         mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo, mkDepFunCoWithDomain, mkTermAppCo,
-        nativeIndexCastCo_maybe, mapNativeIndexCastCo,
+        nativeIndexCastCo_maybe, mapNativeIndexCastCo, mapNativeIndexCastCoM,
         mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkUnivCoFromDeps, mkUnivCoAddTypeDeps,
         checkUnivCoDepsInv,
@@ -1014,6 +1014,49 @@ mapNativeIndexCastCo :: (Coercion -> Coercion) -> CoercionR -> CoercionR
 mapNativeIndexCastCo rewrite co
   | Just delta <- nativeIndexCastCo_maybe co = SubCo (rewrite delta)
   | otherwise = rewrite co
+
+-- | Rewrite a value cast before checking its scalar domains. The callback
+-- preserves roles and resolves the types needed by 'isNativeIndexType'.
+-- See Note [Zonking nominal native index casts].
+mapNativeIndexCastCoM :: Applicative m
+                     => (Coercion -> m Coercion)
+                     -> CoercionR -> m CoercionR
+mapNativeIndexCastCoM rewrite co
+  | coercionRole co == Representational
+  , Just delta <- setNominalRole_maybe Representational co
+  , coercionRole delta == Nominal
+  = preserve <$> rewrite delta
+  | otherwise
+  = rewrite co
+  where
+    preserve delta
+      | isNativeIndexType (coercionLKind delta)
+      , isNativeIndexType (coercionRKind delta)
+      = SubCo delta
+      | otherwise
+      = mkSubCo delta
+
+{- Note [Zonking nominal native index casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source wrapper can carry a nominal proof of a scalar domain conversion.
+For example, Token (F Bool) ~N Token Bool can use a family axiom even when
+Token has a phantom parameter. mkSubCo discards that nominal argument proof.
+The native index of the value cast needs the original nominal proof.
+See Note [Nominal native index casts] in GHC.Core.
+
+mkWpCastN therefore retains a raw SubCo until final zonking. At that point,
+mapNativeIndexCastCoM recovers the nominal proof before the generic zonker
+can rebuild SubCo with mkSubCo. It zonks the proof at Nominal, then checks
+the scalar domains. It retains raw SubCo for an admitted scalar conversion
+and uses the ordinary mkSubCo rule otherwise. R-only evidence follows the
+ordinary zonking path. This does not strengthen representational evidence.
+
+The domain check must follow zonking. An assigned type metavariable can
+still occur syntactically in an endpoint before zonking. Checking that
+endpoint first could discard a proof needed by the resolved scalar domain.
+Unlike mapNativeIndexCastCo, this helper requires a callback that resolves
+these types before the domain check. It is not a generic coercion mapper.
+-}
 
 -- | Converts a coercion to be nominal, if possible.
 -- See Note [Role twiddling functions]

@@ -3788,7 +3788,9 @@ The caller uses the nominal proof for argument and inverse result casts.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Runtime indices are rigid local Ids. Equal occurrences of the same Id need
 only reflexivity. Alpha-equal retained functions also need only reflexivity.
-Do not decompose retained functions or construct dependent congruence here.
+Defer other retained function equalities as whole constraints. Their bodies
+need a private runtime-binder scope. See Note [Solving retained function
+equalities] in GHC.Tc.Solver.Equality.
 
 For now, a metavariable cannot be assigned a type that contains retained
 syntax. In particular, do not promote an index Id as if it were a TyVar.

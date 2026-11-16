@@ -108,6 +108,7 @@ runRewriteCtEv ev
 runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, CoHoleSet)
 runRewrite loc flav eq_rel thing_inside
   = do { dflags <- getDynFlags
+       ; native_binders <- getNativeBinderScope
        ; used_cos_ref  <- newTcRef emptyUnivCoDeps
        ; rewriters_ref <- newTcRef emptyCoHoleSet
        ; let fmode = RE { re_loc       = resetCtLocDepth loc
@@ -116,8 +117,9 @@ runRewrite loc flav eq_rel thing_inside
                         , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref
                         , re_used_cos  = used_cos_ref
-                        , re_native_binders = emptyVarSet
-                        , re_zap_coercions = gopt Opt_ZapCoercions dflags }
+                        , re_native_binders = native_binders
+                        , re_zap_coercions = isEmptyVarSet native_binders
+                                             && gopt Opt_ZapCoercions dflags }
        ; res <- runRewriteM thing_inside fmode
        ; rewriters <- readTcRef rewriters_ref
        ; return (res, rewriters) }
@@ -685,7 +687,9 @@ Wrapping the final proof in DepFunCo does not bind an Id in any such side effect
 
 Track every active retained runtime Id in re_native_binders throughout body
 normalization. Nested binders extend this set. Leaving a body restores the
-previous environment. In this mode:
+previous environment. A separate body Wanted inherits the TcS native binder
+scope. See Note [Native runtime binder scopes] in GHC.Tc.Solver.Monad.
+In this mode:
 
 * Do not query or call rewriting plugins. They can emit Wanted constraints.
 * Do not read or write the family application cache. Its reductions can carry

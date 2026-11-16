@@ -34,9 +34,10 @@ import GHC.Core.DataCon ( dataConName )
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
+import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
 import GHC.Core.Reduction
-import GHC.Core.FamInstEnv ( FamInstEnvs )
+import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
 import GHC.Core
 
 import GHC.Types.Var
@@ -52,6 +53,7 @@ import GHC.Utils.Monad
 
 import GHC.Data.Pair
 import GHC.Data.Bag
+import GHC.Data.FastString ( fsLit )
 
 import Control.Monad
 import Data.Maybe ( isJust, isNothing )
@@ -475,6 +477,16 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1@DepFunTy{} _ ty2@DepFunTy{} _
   | bothRewritten ces, ty1 `tcEqType` ty2
   = canEqReflexive ev eq_rel ty1
 
+-- See Note [Solving retained function equalities].
+can_eq_nc ces _rdr_env envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
+  | bothRewritten ces
+  , isWanted ev
+  , isNativeIndexId b1, isNativeIndexId b2
+  , Reduction co1 domain1 <- normaliseType envs Nominal (varType b1)
+  , Reduction co2 domain2 <- normaliseType envs Nominal (varType b2)
+  , domain1 `tcEqType` domain2
+  = can_eq_nc_depfun ev eq_rel ty1 ty2 (co1 `mkTransCo` mkSymCo co2)
+
 -- (EQNC2) Eager newtype decomposition (ReprEq only).
 -- Look for (N s1 .. sn) ~R# (N t1 .. tn)
 -- where either si=ti
@@ -722,6 +734,69 @@ If we have an unsolved equality like
 that is not necessarily insoluble!  Maybe 'a' will turn out to be a newtype.
 So we want to make it a potentially-soluble Irred not an insoluble one.
 Missing this point is what caused #15431
+-}
+
+---------------------------------
+-- | Compare retained bodies in a private runtime-binder scope.
+-- See Note [Solving retained function equalities].
+can_eq_nc_depfun :: CtEvidence -> EqRel -> Type -> Type -> CoercionN
+                 -> TcS (StopOrContinue (Either IrredCt EqCt))
+can_eq_nc_depfun ev eq_rel ty1@(DepFunTy b1 body1) ty2@(DepFunTy b2 body2) delta
+  | CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
+  = do { binder <- wrapTcS $ TcM.newSysLocalId (fsLit "retained") ManyTy (varType b1)
+       ; let in_scope = mkInScopeSet $
+                          extendVarSet (tyCoVarsOfTypes [ty1,ty2]
+                                        `unionVarSet` tyCoVarsOfCo delta) binder
+             subst b arg = Subst.mkIdSubst in_scope (unitVarEnv b arg)
+             left_body = Subst.substTy (subst b1 (Var binder)) body1
+             right_body = Subst.substTy (subst b2 (Cast (Var binder) (SubCo delta))) body2
+       ; nested_binds <- newNoTcEvBinds
+       ; (unifs, (body_co, solved)) <- reportFineGrainUnifications $
+           do { (level, (body_co, wanteds)) <-
+                  pushLevelNoWorkList (text "retained function equality") $
+                    wrapUnifier rws loc Nominal $ \uenv ->
+                      uType uenv left_body right_body
+              ; residual <- withNativeBinderScope binder $
+                  nestImplicTcS (UnifyForAllSkol ty1) nested_binds level $
+                    solveSimpleWanteds wanteds
+              ; return (body_co, isSolvedWC residual) }
+       ; kickOutAfterUnification unifs
+       ; let all_co = mkDepFunCoWithDomain binder (MCo delta) body_co
+             endpoints_match = coercionLKind all_co `tcEqType` ty1
+                               && coercionRKind all_co `tcEqType` ty2
+       ; if solved && endpoints_match
+         then do { -- Keep outer Given evidence live after the local solve.
+                   outer_binds <- getTcEvBindsVar
+                 ; combineTcEvBinds outer_binds nested_binds
+                 ; setWantedEq dest (CPH { cph_co = downgradeRole (eqRelRole eq_rel) Nominal all_co
+                                        , cph_holes = emptyCoHoleSet })
+                 ; stopWith ev "Retained function equality: solved" }
+         else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
+can_eq_nc_depfun _ _ ty1 ty2 _
+  = pprPanic "can_eq_nc_depfun" (ppr ty1 $$ ppr ty2)
+
+{- Note [Solving retained function equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Compare two retained functions using nominal DepFunCo. First normalize their
+closed scalar domains outside the runtime binder. The resulting proof delta
+has kind A ~N B. Use a fresh x :: A in both bodies. Replace the target binder
+by x cast through delta. The body proof then has the scope that DepFunCo needs.
+See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+
+Follow can_eq_nc_forall for ordinary body unification. Generate Wanteds at a
+deeper level and solve them synchronously in private inerts and a private work
+list. Keep the runtime binder active through rewriting and solver plugins.
+Do not encode it in ic_skols: an Id is not a TcTyVar. Do not emit an implication
+or a residual body Wanted. If any Wanted remains, keep the original whole
+equality instead. Track outer unifications and used Given evidence as the
+forall solver does. Existing native meta-assignment checks still apply.
+
+The body proof is nominal even for a representational Wanted. Downgrade the
+complete nominal proof only after constructing DepFunCo. A representational
+equality between phantom domain parameters cannot supply nominal transport.
+Function-valued domain changes and opaque Pi projection remain unsupported.
+This uses the D/DC An-PiCong rule and Agda's domain-before-body discipline.
+See docs/dependent-haskell/REFERENCES.md#nominal-retained-domain-conversion.
 -}
 
 ---------------------------------

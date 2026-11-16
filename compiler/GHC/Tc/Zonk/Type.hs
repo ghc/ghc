@@ -1255,7 +1255,9 @@ zonkCoFn (WpFun w arg res t1 t2) =
      ; t1' <- noBinders $ zonkTcTypeToTypeX t1
      ; t2' <- noBinders $ zonkTcTypeToTypeX t2
      ; return (WpFun w' arg' res' t1' t2') }
-zonkCoFn (WpCast co)   = WpCast  <$> noBinders (zonkCoToCo co)
+zonkCoFn (WpCast co)   = WpCast <$> noBinders
+                          (mapNativeIndexCastCoM zonkCoToCo co)
+  -- See Note [Zonking nominal native index casts] in GHC.Core.Coercion.
 zonkCoFn (WpEvLam ev)  = WpEvLam <$> zonkEvBndrX ev
 zonkCoFn (WpEvApp arg) = WpEvApp <$> noBinders (zonkEvTerm arg)
 zonkCoFn (WpTyLam tv)  = assert (isImmutableTyVar tv) $
@@ -1855,7 +1857,8 @@ zonkCoreExpr (Type ty)
     = Type <$> zonkTcTypeToTypeX ty
 
 zonkCoreExpr (Cast e co)
-    = Cast <$> zonkCoreExpr e <*> zonkCoToCo co
+    = Cast <$> zonkCoreExpr e <*> mapNativeIndexCastCoM zonkCoToCo co
+    -- See Note [Zonking nominal native index casts] in GHC.Core.Coercion.
 zonkCoreExpr (Tick t e)
     = Tick t <$> zonkCoreExpr e -- Do we need to zonk in ticks?
 

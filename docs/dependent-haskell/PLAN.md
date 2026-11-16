@@ -3928,7 +3928,7 @@ The baseline does not execute an adapted worker.
 Use the existing nominal `DepFunCo` rule. Do not add a new Core constructor.
 This follows D/DC An-PiCong and the domain-before-body context discipline in
 Agda. Neither source proves preservation for this combined implementation.
-See [nominal domain conversion](REFERENCES.md#nominal-domain-conversion).
+See [nominal domain conversion](REFERENCES.md#nominal-retained-domain-conversion).
 
 - [ ] Check both complete binder domains with the closed scalar admission rule.
       Use ordinary nominal family reduction outside the new runtime binder.
