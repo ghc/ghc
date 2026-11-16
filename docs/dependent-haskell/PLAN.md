@@ -4408,7 +4408,9 @@ matchability foundation before generic index domains.
 ## M63: ordinary-arrow matchability
 
 Roadmap owner: R23 unsaturated type families. Related card: R05 dependent Core.
-Status: specified. M62 remains the last built and published compiler checkpoint.
+Status: implementation in progress. Bootstrap attempt v8 passes after seven
+failed integration attempts. Self-hosting and runtime checks remain pending.
+M62 remains the last validated and published compiler checkpoint.
 
 The next foundation has two stages. M63 gives ordinary arrows explicit
 matchability through their complete pipeline. A later stage gives dependent
@@ -4431,6 +4433,20 @@ well-kinded, scoped and explicit. Bound metadata variables and explicit type
 computation must survive maps and substitution. This is not permission to
 infer a new matchability quantifier. The initial unannotated elaboration path
 chooses the context's concrete classification.
+
+Insert implicit metadata only when checking actually instantiates a binder.
+Preserve an explicit polymorphic kind when the expected kind keeps its binders.
+An inference path that preserves a forall must keep doing so.
+
+Checked declaration kinds need a separate ordering. Use local metadata
+metavariables for omitted annotations in that check. Constrain the anonymous
+arrows consumed by the declared argument prefix to the declaration's M or U
+classification. Then default remaining generated metadata to KindLevel M
+before kind generalization. Do not infer new matchability quantifiers. Check
+explicit or computed metadata with ordinary bounded equality solving. Reject
+conflicts instead of replacing the supplied kind. Preserve the independently
+specified result kind. The prototype's whole-signature M/U default is broader
+than this selected rule.
 
 Ordinary runtime arrows are U. Constructor kind arrows are M. Classify each
 declared family or synonym argument by arity; preserve its independently

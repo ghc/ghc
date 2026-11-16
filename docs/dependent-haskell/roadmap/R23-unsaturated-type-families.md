@@ -1,9 +1,10 @@
 # R23: Unsaturated type families
 
 Upstream: [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families).
-Upstream status: accepted, awaiting implementation. Local status: research and
-integration planning. M63 specifies the ordinary-arrow stage. Its compiler
-port has not passed a build. No completed matchability implementation is claimed.
+Upstream status: accepted, awaiting implementation. Local status: ordinary-arrow
+port in progress under the M63 specification. The bootstrap build passes.
+Self-hosting and checks remain pending. No completed matchability implementation
+is claimed.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Goal and dependencies

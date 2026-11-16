@@ -27,7 +27,7 @@ The user selected a native Core extension based on Eisenberg's historical
   M58 source checking uses those Core rules. M59 extends frontend comparison
   beneath unchanged function domains using the existing congruence rule.
 
-The [published M61 checkpoint](../ROADMAP.md#where-this-fork-stands) passes its
+The [published M62 checkpoint](../ROADMAP.md#where-this-fork-stands) passes its
 selected checks with both compiler stages and its independent artifact audit.
 Restricted pipelines and Lint checks do not establish general preservation.
 
@@ -97,9 +97,9 @@ for reading scope. The dated ignored research cache has
 `core/generic-matchability-v1.md`, and the Agda telescope review. These are
 research records; proposed controls remain unexecuted.
 
-The prepared opaque-cast candidate is in
+The historical opaque-cast preparation is in
 `_build/verification/native-opaque-pi-whole-cast-probe-preparation-v2/`.
-Its nine prospective quiet checks cover bytecode and demand. They have not run.
-Its object-path notes distinguish the actual backend preparation from a
-separate preview call. Runtime closure with reflexivity alone cannot establish
+M61 completed nine quiet API checks for bytecode and demand, plus separate
+object-path checks. Its object-path notes distinguish actual backend preparation
+from a preview call. Runtime closure with reflexivity alone cannot establish
 that opaque evidence survived an earlier typed phase.
