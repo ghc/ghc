@@ -1887,7 +1887,7 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
     constructor_result _ _ = Nothing
 tcRetainedWorkerResultMatch _ _ _ _ _ = return Nothing
 
--- | Admit known retained values without erased polymorphism.
+-- | Admit known scalar or function-valued retained binders without erased polymorphism.
 -- Constraint arrows are supported only below a retained binder.
 -- See Note [Known retained function instantiation].
 isRetainedValueType :: Type -> Bool
@@ -1895,7 +1895,7 @@ isRetainedValueType = go False
   where
     go _ ty | isTauTy ty = True
     go under_pi ty = case coreFullView ty of
-      DepFunTy index body -> isNativeIndexId index
+      DepFunTy index body -> isNativeRetainedBinder index
                          && typeKind body `eqType` liftedTypeKind
                          && go True body
       FunTy flag mult arg res -> isTauTy mult
@@ -1980,6 +1980,14 @@ The template remains ordinary and its result remains tau. The existing NoQL,
 type-argument, complete-substitution, kind, runtime-scope and exact-result checks
 still apply. Preserve the original body and its constraints in the substitution.
 The ordinary argument and result subsumption checks still run afterward.
+
+Use isNativeRetainedBinder for each known Pi binder. This includes an eligible
+opaque function head with a closed unrestricted arrow between scalar domains.
+The retained matcher pairs function binders only when their full domains agree.
+It does not construct a function cast or infer an index by decomposing a call.
+Actual function arguments still pass through tcRetainedFunctionArg. The value
+classifier does not admit new runtime operands or change their scope checks.
+See Note [Function-valued retained binders] in GHC.Core.Type.
 
 Emit the actual type applications. Do not fill a mutable metavariable with the
 Pi, introduce an equality axiom, or eta-expand the value. In particular, a bottom
