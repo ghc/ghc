@@ -94,6 +94,7 @@ main = do
             dflags <- runGhc (Just libdir) getSessionDynFlags
             runSyntaxChecks dflags
             runChecks dflags
+            runOccurrenceChecks dflags
             runAliasChecks dflags
             runOpaqueCallChecks dflags
             runFunctionBinderChecks dflags
@@ -2567,6 +2568,32 @@ simplifyAccepts dflags label scope expression = do
     lintAccepts dflags (label ++ " (after)") scope simplified
     checkType dflags label (exprType expression) (exprType simplified)
     pure simplified
+
+-- | Check dead local removal without losing an index used only in a type.
+runOccurrenceChecks :: DynFlags -> IO ()
+runOccurrenceChecks dflags = do
+    let (nat, _, _) = peanoNat
+        natTy = mkTyConTy nat
+        dead = local 6000 "ordinary_dead" intTy
+        intSeed = local 6001 "ordinary_seed" intTy
+        intProducer = local 6002 "ordinary_producer" (mkVisFunTyMany intTy intTy)
+        index = local 6003 "type_only_index" natTy
+        seed = local 6004 "index_seed" natTy
+        producer = local 6005 "index_producer" (mkVisFunTyMany natTy natTy)
+        parameter = mkTyVar (mkSystemName (unique 6006) (mkTyVarOcc "index")) natTy
+        consume = local 6007 "consume_index_type" (mkForAllTy (Bndr parameter Specified) intTy)
+        expression =
+            Let (NonRec dead (App (Var intProducer) (Var intSeed))) $
+                Let (NonRec index (App (Var producer) (Var seed))) $
+                    App (Var consume) (Type (TermVarTy index))
+    result <- simplifyAccepts dflags "native dead local and type-only index" [intSeed, intProducer, seed, producer, consume] expression
+    check "native occurrence analysis removes an ordinary dead let" $ case result of
+        Let (NonRec retained _) _ -> retained == index
+        _ -> False
+    check "native occurrence analysis retains the type-only index" $ case result of
+        Let (NonRec retained (App (Var rhsProducer) (Var rhsSeed))) (App (Var worker) (Type (TermVarTy actual))) ->
+            retained == index && actual == index && rhsProducer == producer && rhsSeed == seed && worker == consume
+        _ -> False
 
 -- | Make an unfolding without invoking the unsupported optimizer.
 unfolding :: CoreExpr -> Unfolding
