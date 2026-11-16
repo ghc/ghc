@@ -46,6 +46,7 @@ module GHC.Types.Name.Reader (
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
+        extendLocalRdrEnvWithAlias,
         lookupLocalRdrEnv, lookupLocalRdrOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
         localRdrEnvElts, minusLocalRdrEnv, minusLocalRdrEnvList,
@@ -503,6 +504,14 @@ extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
 extendLocalRdrEnvList lre@(LRE { lre_env = env, lre_in_scope = ns }) names
   = lre { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
         , lre_in_scope = extendNameSetList ns names }
+
+-- | Resolve another occurrence to the same local 'Name'.
+-- Retained quantification uses a type-variable occurrence to refer to a
+-- value binder. The alias preserves the binder's namespace and 'Unique'.
+extendLocalRdrEnvWithAlias :: LocalRdrEnv -> OccName -> Name -> LocalRdrEnv
+extendLocalRdrEnvWithAlias lre@(LRE { lre_env = env, lre_in_scope = ns }) occ name
+  = lre { lre_env = extendOccEnv env occ name
+        , lre_in_scope = extendNameSet ns name }
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
 lookupLocalRdrEnv (LRE { lre_env = env, lre_in_scope = ns }) rdr

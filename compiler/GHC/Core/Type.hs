@@ -58,7 +58,10 @@ module GHC.Core.Type (
         splitPiTy_maybe, splitPiTy, splitPiTys, splitUninstantiatedValArgTys,
         getRuntimeArgTys,
         mkTyConBindersPreferAnon,
-        mkPiTy, mkPiTys,
+        mkPiTy, mkPiTys, mkDepFunTy, isBoolIndexId,
+        isNativeIndexId, isNativeIndexType, nativeIndexDataConTyArgs,
+        isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
+        isNativeRetainedBinder, isNativeRetainedBinderType,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
@@ -228,7 +231,11 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Make
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
+import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType, eqTypes )
 import GHC.Core.TyCon
+import {-# SOURCE #-} GHC.Core.DataCon
+   ( DataCon, dataConTyCon, dataConFullSig, dataConRepArgTys, dataConStupidTheta
+   , dataConWrapId_maybe, dataConRepArgBinders )
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
@@ -239,6 +246,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
 
 -- friends:
 import GHC.Types.Var
+import {-# SOURCE #-} GHC.Types.Id.Info (isJoinIdDetails)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 
@@ -1789,6 +1797,9 @@ fun_kind_arg_flags = go emptySubst
 isTauTy :: Type -> Bool
 isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
 isTauTy (TyVarTy _)       = True
+isTauTy (TermAppTy _ arg) = isTauTy arg
+isTauTy (TermVarTy _)     = True
+isTauTy (DepFunTy {})     = False
 isTauTy (LitTy {})        = True
 isTauTy (TyConApp tc tys) = all isTauTy tys && isTauTyCon tc
 isTauTy (AppTy a b)       = isTauTy a && isTauTy b
@@ -1804,6 +1815,8 @@ isAtomicTy :: Type -> Bool
 -- Used when deciding how to lay out type error messages; see the
 -- call in GHC.Tc.Errors
 isAtomicTy (TyVarTy {})    = True
+isAtomicTy (TermAppTy {})  = False
+isAtomicTy (TermVarTy {})  = True
 isAtomicTy (LitTy {})      = True
 isAtomicTy (TyConApp _ []) = True
 
@@ -1849,6 +1862,9 @@ coAxNthLHS ax ind =
 isFamFreeTy :: Type -> Bool
 isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
+isFamFreeTy (TermAppTy _ arg) = isFamFreeTy arg
+isFamFreeTy (TermVarTy _)     = True
+isFamFreeTy (DepFunTy b ty)   = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
 isFamFreeTy (AppTy a b)       = isFamFreeTy a && isFamFreeTy b
@@ -2168,6 +2184,8 @@ seqCos   :: [Coercion] -> SeqResult
     folder :: TyCoFolder SeqResult
     folder = TyCoFolder { tcf_view       = noView
                         , tcf_tyvar      = seqUnit
+                        , tcf_termvar    = seqUnit
+                        , tcf_termbinder = \_ x -> x
                         , tcf_covar      = seqUnit
                         , tcf_lit        = seqUnit
                         , tcf_hole       = \h -> seqUnit (coHoleCoVar h)
@@ -2261,12 +2279,191 @@ See #14939.
 -}
 
 -----------------------------
+-- | Test whether a closed, lifted algebraic type is a supported index domain.
+-- See Note [Algebraic runtime index domains].
+isNativeIndexType :: Type -> Bool
+isNativeIndexType = go []
+  where
+    go path ty
+      | TyConApp tc args <- coreFullView ty
+      , Just previous <- lookup tc path
+      = eqTypes args previous
+      | TyConApp tc args <- coreFullView ty
+      , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
+      , not (isTypeDataTyCon tc), tyConArity tc == length args
+      , all (tcIsLiftedTypeKind . tyVarKind) (tyConTyVars tc)
+      , tcIsLiftedTypeKind (typeKind ty)
+      , all closed_argument args
+      , null (tyConStupidTheta tc)
+      , Just fields <- concat <$> traverse (con_fields ty args) (tyConDataCons tc)
+      = all (go ((tc, args) : path)) fields
+      | otherwise = False
+
+    closed_argument arg = noFreeVarsOfType arg && isTauTy arg
+                          && tcIsLiftedTypeKind (typeKind arg)
+
+    con_fields domain args con
+      | null (dataConRepArgBinders con)
+      , (univs, [], [], [], orig_args, res) <- dataConFullSig con
+      , univs `equalLength` args
+      , all (tcIsLiftedTypeKind . tyVarKind) univs
+      , null (dataConStupidTheta con)
+      , Nothing <- dataConWrapId_maybe con
+      , substTyWith univs args res `eqType` domain
+      , orig_args `equalLength` rep_args
+      , and (zipWith same_field (instantiate orig_args) (instantiate rep_args))
+      = Just (map scaledThing (instantiate rep_args))
+      | otherwise = Nothing
+      where
+        rep_args = dataConRepArgTys con
+        (univs, _, _, _, _, _) = dataConFullSig con
+        instantiate = map (mapScaledType (substTyWith univs args))
+
+    same_field (Scaled orig_mult orig) (Scaled rep_mult rep)
+      | closed_mult orig_mult, closed_mult rep_mult
+      = orig `eqType` rep
+      | otherwise = False
+
+    closed_mult ty = case coreFullView ty of
+      OneTy -> True
+      ManyTy -> True
+      _ -> False
+
+-- | Recover the ordinary universal arguments of a supported index constructor.
+-- See Note [Algebraic runtime index domains].
+nativeIndexDataConTyArgs :: Type -> DataCon -> Maybe [Type]
+nativeIndexDataConTyArgs domain con
+  | isNativeIndexType domain
+  , TyConApp tc args <- coreFullView domain
+  , tc == dataConTyCon con
+  = Just args
+  | otherwise = Nothing
+
+-- | Return the independently closed argument and result domains of a native head.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+nativeIndexFunctionTys_maybe :: Id -> Maybe (Type, Type)
+nativeIndexFunctionTys_maybe f
+  | isLocalId f, not (isCoVar f), isManyTy (idMult f)
+  , not (isJoinIdDetails (idDetails f))
+  , noFreeVarsOfType (idMult f)
+  = nativeIndexFunctionTypeTys_maybe (varType f)
+  | otherwise = Nothing
+
+-- | Check the closed ordinary function type shared by heads and retained binders.
+-- See Note [Function-valued retained binders].
+nativeIndexFunctionTypeTys_maybe :: Type -> Maybe (Type, Type)
+nativeIndexFunctionTypeTys_maybe ty
+  | noFreeVarsOfType ty
+  , FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res }
+      <- coreFullView ty
+  , af == FTF_T_T, isManyTy mult
+  , noFreeVarsOfType mult
+  , isNativeIndexType arg, isNativeIndexType res
+  = Just (arg, res)
+  | otherwise = Nothing
+
+-- | Test whether an identifier is an eligible opaque native call head.
+isNativeIndexFunctionId :: Id -> Bool
+isNativeIndexFunctionId = isJust . nativeIndexFunctionTys_maybe
+
+-- | Test whether a local unrestricted identifier has a supported index domain.
+isNativeIndexId :: Id -> Bool
+isNativeIndexId v
+  = isLocalId v && not (isCoVar v)
+    && isManyTy (idMult v) && isNativeIndexType (varType v)
+
+-- | Test whether an Id can bind a scalar index or an opaque call head.
+-- See Note [Function-valued retained binders].
+isNativeRetainedBinder :: Id -> Bool
+isNativeRetainedBinder v = isNativeIndexId v || isNativeIndexFunctionId v
+
+-- | Test a retained binder domain without constructing a temporary Id.
+-- See Note [Function-valued retained binders].
+isNativeRetainedBinderType :: Type -> Bool
+isNativeRetainedBinderType ty
+  = isNativeIndexType ty || isJust (nativeIndexFunctionTypeTys_maybe ty)
+
+{- Note [Function-valued retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder can bind a scalar index or an eligible opaque call head.
+The function head has a closed ordinary visible Many arrow A -> B. Both A and
+B are independently supported scalar domains. The Id is local, unrestricted,
+and not a join point. Reuse the head policy; do not widen the scalar policy.
+
+A bound function occurs only in the head slot of TermAppTy or TermAppCo.
+It cannot occur as TermVarTy or as a matchable AppTy function. Applying its
+retained binder requires an eligible local Var with exactly the same type.
+Use the existing head-only Id substitution. Do not unfold that Var or transport
+the function domain through a coercion. DepFunCo keeps function-valued domains
+unchanged. Scalar domain conversion uses nominal evidence; see
+Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+
+The binder scopes over calls in the result and its proofs. Existing runtime
+binder renaming masks outer substitutions and avoids capture in both places.
+The function argument remains a lazy runtime argument. A type occurrence does
+not force it or add a runtime use. No function equality or inverse call rule
+follows from this binder policy.
+
+See the pinned Agda context and neutral-call comparison in
+docs/dependent-haskell/REFERENCES.md, under
+head-only-function-valued-retained-binders-prior-art.
+-}
+
+{- Note [Algebraic runtime index domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A runtime index has a closed, first-order, lifted data type. Inspect ordinary
+TyCons and DataCons; Nat has no wired identity. Instantiate ordinary universal
+parameters with closed monotypes of kind Type. Check the instantiated original
+and representation fields. Static parameters need not themselves be scalar
+domains: Proxy (Bool -> Bool) has no function field, but Maybe (Bool -> Bool) does.
+
+Track full datatype applications along the active path. A return to the same
+TyCon must have nominally equal arguments. Use ordinary eqType, which requires
+a SOURCE import because type comparison uses this module. Separate siblings can
+use different instances. This uniform-recursion rule admits List Bool and
+mutually recursive uniform domains. It rejects growing arguments and parameter
+permutations. It does not assume finite or total runtime values.
+
+Reject existential variables, constructor constraints, datatype
+contexts, newtypes, type data, and wrappers. Retained field constructors need a
+separate promotion rule, even when a named field is unused by the later types.
+Inspect their metadata before the full signature. A recursive interface field
+can otherwise force the same domain thunk which is already being checked.
+
+Original and representation fields must have the same closed domain. Thus a
+promoted constructor's arguments match
+its worker's runtime fields. In particular, do not promote an unpacked payload as
+if it were the original boxed field. Constructor field multiplicities may be One
+or Many; the retained identifier itself must be unrestricted.
+
+Agda's constructor indices and refined field context are the precedent. The
+closed-domain and worker restrictions bound this implementation; they are not
+Agda language restrictions. Haskell fields can be partial or cyclic. Do not use
+termination or finite-tree apartness to compare opaque runtime indices.
+See the Agda Nat/Vec provenance in docs/dependent-haskell/REFERENCES.md.
+-}
+
+-- | Test whether an identifier can occur as a retained Boolean index.
+isBoolIndexId :: Id -> Bool
+isBoolIndexId v
+  | isLocalId v, not (isCoVar v)
+  , TyConApp tc [] <- coreFullView (varType v)
+  , tc `hasKey` boolTyConKey
+  , ManyTy <- coreFullView (idMult v)
+  = True
+  | otherwise = False
+
 typeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
 typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)              = typeLiteralKind l
 typeKind (FunTy { ft_af = af }) = liftedTypeOrConstraintKind (funTyFlagResultTypeOrConstraint af)
 typeKind (TyVarTy tyvar)        = tyVarKind tyvar
+typeKind (TermAppTy f _)        = case nativeIndexFunctionTys_maybe f of
+  Just (_, res) -> res
+  Nothing -> pprPanic "typeKind: invalid native function" (ppr f)
+typeKind (TermVarTy v)          = varType v
+typeKind (DepFunTy _ _)         = liftedTypeKind
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co
 
@@ -2454,6 +2651,9 @@ isConcreteTypeWith :: TyVarSet -> Type -> Bool
 isConcreteTypeWith conc_tvs = go
   where
     go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
+    go (TermAppTy {})      = False
+    go (TermVarTy _)       = False
+    go (DepFunTy {})       = False
     go (AppTy ty1 ty2)     = go ty1 && go ty2
     go (TyConApp tc tys)   = go_tc tc tys
     go ForAllTy{}          = False

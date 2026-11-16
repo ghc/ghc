@@ -41,15 +41,18 @@ import GHC.Driver.Session
 import GHC.Driver.Env
 
 import GHC.Builtin.KnownOccs( rationalTyConOcc )
-import GHC.Builtin.WiredIn.Types( integerTy )
+import GHC.Builtin.WiredIn.Types( boolTy, eqClass, integerTy )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type   ( hsLitType )
 
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Core ( isOrphan ) -- For the Coercion constructor
+import GHC.Core ( Expr(Coercion), isOrphan )
 import GHC.Core.Type
+import GHC.Core.Predicate ( getClassPredTys_maybe )
+import GHC.Core.TyCo.Rep ( Type(TermVarTy) )
+import GHC.Core.Coercion ( mkNomReflCo )
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.Class( Class )
 import GHC.Core.Coercion.Axiom
@@ -374,10 +377,39 @@ instCallConstraints orig preds
   | null preds
   = return idHsWrapper
   | otherwise
-  = do { evs <- mapM (emitWanted orig) preds
+  = do { evs <- mapM inst_pred preds
                 -- See Note [Possible fast path for equality constraints]
        ; traceTc "instCallConstraints" (ppr evs)
        ; return (mkWpEvApps evs) }
+  where
+    -- See Note [Reflexive retained equality evidence].
+    inst_pred pred
+      | Just (cls, [kind, lhs@(TermVarTy v1), TermVarTy v2])
+          <- getClassPredTys_maybe pred
+      , cls == eqClass
+      , tcEqType kind boolTy
+      , isBoolIndexId v1, isBoolIndexId v2
+      , v1 == v2
+      = return (evDictApp cls [kind, lhs, TermVarTy v2]
+                  [Coercion (mkNomReflCo lhs)])
+      | otherwise
+      = emitWanted orig pred
+
+{- Note [Reflexive retained equality evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For the restricted retained Boolean source fragment, instantiate (b ~ b)
+with direct boxed reflexivity evidence. A runtime binder does not establish
+an ordinary type-variable implication. A Wanted dictionary can therefore
+receive an evidence binding outside that runtime binder. Its type would then
+contain an out-of-scope index.
+
+Use the same dictionary constructor as solveEqualityDict. Keep the expression
+in WpEvApp at the call site, within the runtime binder's scope. Check both
+Boolean Ids and their identity. This rule does not unify indices, introduce
+bindings, or solve other native constraints. See
+ docs/dependent-haskell/REFERENCES.md#agda-provenance
+for reflexive equality. Ordinary constraint instantiation is unchanged.
+-}
 
 {- Note [Possible fast path for equality constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

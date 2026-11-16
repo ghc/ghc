@@ -39,6 +39,7 @@ import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.Compare( eqType, eqTypes )
+import GHC.Core.TyCo.Subst( substNativeIndexBndr )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
@@ -1544,6 +1545,53 @@ normalise_type ty
   = go ty
   where
     go :: Type -> NormM Reduction
+    -- Keep the head identical on both sides; lift only nominal argument evidence.
+    -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+    go ty@(TermAppTy f arg)
+      | Just (domain, _) <- nativeIndexFunctionTys_maybe f
+      , typeKind arg `eqType` domain
+      = do { lc <- getLC
+           ; role <- getRole
+           ; let left = substTy (lcSubstLeft lc) ty
+                 right = substTy (lcSubstRight lc) ty
+           ; case (left, right) of
+               (TermAppTy f' _, TermAppTy g' _)
+                 | f' == g', isNativeIndexFunctionId f'
+                 , varType f' `eqType` varType f
+                 -> do { Reduction co arg' <- withRole Nominal $ go arg
+                       ; return $ downgradeRedn role Nominal $
+                           mkReduction (mkTermAppCo f' co) (TermAppTy f' arg') }
+               _ -> pprPanic "normalise_type: native call head changed by lifting context"
+                      (ppr ty $$ ppr left $$ ppr right) }
+      | otherwise
+      = pprPanic "normalise_type: invalid native call" (ppr ty)
+    go ty@(TermVarTy v)
+      -- See Note [Normalising retained runtime indices].
+      | isNativeIndexId v
+      = do { lc <- getLC
+           ; r <- getRole
+           ; let lty = substTy (lcSubstLeft lc) ty
+                 rty = substTy (lcSubstRight lc) ty
+           ; case lty of
+               TermVarTy v' | isNativeIndexId v'
+                            , varType v' `eqType` varType v
+                            , lty `eqType` rty
+                 -> return $ mkReflRedn r lty
+               _ -> pprPanic "normalise_type: runtime index changed by lifting context"
+                      (ppr ty $$ ppr lty $$ ppr rty) }
+      | otherwise
+      = pprPanic "normalise_type: invalid runtime index" (ppr ty)
+    go (DepFunTy v body)
+      | isNativeRetainedBinder v
+      , typeKind body `eqType` liftedTypeKind
+      = do { LC subst env <- getLC
+           ; let (subst', v') = substNativeIndexBndr subst v
+                 lc' = LC subst' (delVarEnv env v)
+           ; redn <- withLC lc' $ normalise_type body
+           ; return $ mkDepFunRedn v' redn }
+      | otherwise
+      = pprPanic "normalise_type: invalid retained function"
+          (ppr v $$ ppr (varType v) $$ ppr body)
     go (TyConApp tc tys) = normalise_tc_app tc tys
     go ty@(LitTy {})
       = do { r <- getRole
@@ -1551,6 +1599,7 @@ normalise_type ty
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
     go (FunTy { ft_af = vis, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
+      -- See Note [Function reduction multiplicity roles] in GHC.Core.Reduction.
       = do { arg_redn <- go ty1
            ; res_redn <- go ty2
            ; w_redn <- withRole Nominal $ go w
@@ -1620,6 +1669,31 @@ normalise_args fun_ki roles args
 
     normalise1 role ty
       = withRole role $ normalise_type ty
+
+{- Note [Normalising retained runtime indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained runtime index is a rigid local Id with a fixed closed domain and
+unrestricted multiplicity. See Note [Algebraic runtime index domains] in GHC.Core.Type.
+Preserve that Id and return reflexivity at the current role. Do not inspect
+its unfolding or evaluate its value. Family matching keeps an opaque index
+MaybeApart from constructor indices; see Note [Apartness of retained runtime indices]
+in GHC.Core.Unify. A family application can therefore remain stuck at this index.
+
+NormM starts with an empty lifting context. A retained binder extends its ordinary
+substitution with a scoped runtime-Id renaming. Remove the bound Id from the
+lifting environment. That environment contains erased-variable coercions, not
+runtime-Id mappings. Normalise the body in this scope, then abstract its reduction
+with mkDepFunRedn. Both context substitutions must map a runtime occurrence to the
+same valid Id with the same domain. Do not transport it to another runtime value.
+
+The binder keeps its closed domain and unrestricted multiplicity. It can bind a
+scalar index or an eligible opaque function head. See Note [Function-valued
+retained binders] in GHC.Core.Type. Keep function heads identical on both sides;
+do not infer equality between different functions. Ordinary forall
+binders still normalise their kinds through normalise_var_bndr. Agda compares Pi
+codomains in one shared extended context. The D/DC PiCong rule supplies explicit
+evidence for this abstraction. See docs/dependent-haskell/REFERENCES.md#agda-provenance.
+-}
 
 normalise_tyvar :: TyVar -> NormM Reduction
 normalise_tyvar tv

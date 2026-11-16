@@ -1075,7 +1075,10 @@ renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeNames)
 renameSig ctxt sig@(TypeSig _ mods vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx vs
-        ; (new_ty, fvs) <- rnHsSigWcType doc ty
+        ; retained <- xoptM LangExt.ExperimentalDependentTypes
+        ; (new_ty, fvs) <- case ctxt of
+            LocalBindCtxt bound_names | retained -> rnLocalHsSigWcType bound_names doc ty
+            _ -> rnHsSigWcType doc ty
         ; (mods', mods_fvs) <- rnModifiersContext doc mods
         ; return (TypeSig noAnn mods' new_vs new_ty, fvs `plusFN` mods_fvs) }
 

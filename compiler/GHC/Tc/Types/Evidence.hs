@@ -62,7 +62,7 @@ import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Core.Predicate
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep (UnivCoProvenance(..))
+import GHC.Core.TyCo.Rep (Coercion(SubCo), UnivCoProvenance(..))
 import GHC.Core.TyCon
 import GHC.Core.Make    ( mkWildCase, mkRuntimeErrorApp, tYPE_ERROR_ID )
 import GHC.Core.Class   ( classTyCon )
@@ -454,8 +454,9 @@ mkWpCastN :: TcCoercionN -> HsWrapper
 mkWpCastN co
   | isReflCo co = WpHole
   | otherwise   = assertPpr (coercionRole co == Nominal) (ppr co) $
-                  WpCast (mkSubCo co)
-    -- The mkTcSubCo converts Nominal to Representational
+                  WpCast (SubCo co)
+    -- Keep the nominal proof until final zonking checks the scalar domains.
+    -- See Note [Zonking nominal native index casts] in GHC.Core.Coercion.
 
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys

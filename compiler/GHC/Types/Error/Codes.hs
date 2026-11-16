@@ -205,6 +205,7 @@ type GhcDiagnosticCode :: Symbol -> Nat
 type family GhcDiagnosticCode c = n | n -> c where
 
   -- Desugarer diagnostic codes
+  GhcDiagnosticCode "DsRetainedPackagePatterns"                     = 94726
   GhcDiagnosticCode "DsEmptyEnumeration"                            = 10190
   GhcDiagnosticCode "DsIdentitiesFound"                             = 04214
   GhcDiagnosticCode "DsOverflowedLiterals"                          = 97441
@@ -702,6 +703,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalTypeExpr"                           = 35499
   GhcDiagnosticCode "TcRnUnexpectedTypeSyntaxInTerms"               = 31244
   GhcDiagnosticCode "TcRnTypeApplicationsDisabled"                  = 23482
+  GhcDiagnosticCode "TcRnRetainedQuantificationNotImplemented"      = 43582
+  GhcDiagnosticCode "TcRnRetainedQuantificationError"               = 83605
   GhcDiagnosticCode "TcRnUnpromotableLit"                           = 51819
   GhcDiagnosticCode "TcRnUnrecognisedModifier"                      = 49969
   GhcDiagnosticCode "TcRnUnknownModifierKind"                       = 38026

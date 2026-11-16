@@ -1348,6 +1348,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
        ; let dfun_ev_binds = TcEvBinds dfun_ev_binds_var
        ; (tclvl, (sc_meth_ids, sc_meth_binds, sc_meth_implics))
              <- pushTcLevelM $
+                tcExtendNativeGivens dfun_ev_vars $
                 do { (sc_ids, sc_binds, sc_implics)
                         <- tcSuperClasses skol_info dfun_id clas inst_tyvars
                                           dfun_ev_vars dfun_ev_binds sc_theta'

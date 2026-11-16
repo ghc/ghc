@@ -388,7 +388,7 @@ recordPendingSplice sp pn (RnPending ref) = do
 recordPendingSplice sp pn (RnPendingTyped) = do
   let typed_splice = XTypedSplice pn
   return (HsTypedSplice (HsTypedSpliceNested sp) typed_splice)
-recordPendingSplice _ _ (TcPending _ _ _) = panic "impossible"
+recordPendingSplice _ _ (TcPending _ _ _ _) = panic "impossible"
 
 ------------------
 mkQuasiQuoteExpr :: UntypedSpliceFlavour -> LIdP GhcRn

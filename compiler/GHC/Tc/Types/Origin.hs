@@ -188,6 +188,9 @@ data SkolemInfoAnon
   | StaticFormSkol      -- Attached to an implication constraint that captures
                         -- the constraints from (static e)
 
+  | RetainedAppSkol     -- Keep evidence within a runtime index's scope.
+                        -- See Note [Retained application evidence] in GHC.Tc.Gen.App.
+
 
 -- | Use this when you can't specify a helpful origin for
 -- some skolem type variable.
@@ -248,6 +251,7 @@ pprSkolInfo ReifySkol             = text "the type being reified"
 pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 pprSkolInfo ArrowReboundIfSkol = text "the expected type of a rebound if-then-else command"
 pprSkolInfo StaticFormSkol     = text "a static expression"
+pprSkolInfo RetainedAppSkol    = text "a retained application"
 pprSkolInfo DefaultSkol        = text "a constraint being defaulted"
 
 -- unkSkol

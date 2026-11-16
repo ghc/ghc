@@ -9,6 +9,8 @@ module GHC.Core.SimpleOpt (
 
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprNoInline, simpleOptExprWith,
+        simpleOptNativeExpr,
+        simpleOptNativeProgram,
 
         -- ** Join points
         joinPointBinding_maybe, joinPointBindings_maybe,
@@ -28,13 +30,16 @@ import GHC.Core.FVs
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Make
-import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
+import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalyseNativeExpr,
+                             occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
 import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Predicate( isCoVarType, getEqPredTys_maybe )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.TyCo.Rep ( Coercion(SubCo) )
+import GHC.Core.TyCo.Compare ( eqType )
 
 import GHC.Types.Literal
 import GHC.Types.Id
@@ -269,6 +274,114 @@ simpleOptExprNoInline opts expr
     init_env   = (emptyEnv init_opts) { soe_subst = init_subst }
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 
+-- | Simplify checked native Core with restricted reductions and variable aliases.
+-- See Note [Restricted dependent simplification].
+simpleOptNativeExpr :: HasDebugCallStack => CoreExpr -> CoreExpr
+simpleOptNativeExpr expr
+  = simple_opt_expr init_env (occurAnalyseNativeExpr expr)
+  where
+    opts = defaultSimpleOpts { so_inline = const False
+                             , so_can_drop = const False
+                             , so_eta_red = False }
+    init_env = (emptyEnv opts) { soe_subst = init_subst, soe_native = True }
+    init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
+
+-- | Simplify native program RHSs without changing top-level binding identities.
+-- See Note [Restricted dependent simplification].
+simpleOptNativeProgram :: HasDebugCallStack => CoreProgram -> CoreProgram
+simpleOptNativeProgram = map simplify_bind
+  where
+    simplify_bind (NonRec b rhs) = NonRec b (simpleOptNativeExpr rhs)
+    simplify_bind (Rec pairs) = Rec [(b, simpleOptNativeExpr rhs) | (b, rhs) <- pairs]
+
+{- Note [Restricted dependent simplification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+simpleOptNativeExpr first removes unused lifted local bindings through
+occurAnalyseNativeExpr. See Note [Native dead local bindings] in
+GHC.Core.Opt.OccurAnal. Its deep free-variable annotations preserve bindings
+used only by native types. It retains all other nodes and infers no new
+occurrence counts. General occurrence analysis, inlining and eta reduction
+remain disabled. Runtime index occurrences record scope dependencies, not
+runtime usage. Keep other source lets until backend lowering, except for
+the checked variable aliases described below.
+Do not create new rules or Core unfoldings. mkUnfolding would run occurrence
+analysis again. Do not create join points from pre-existing occurrence metadata.
+
+A local nonrecursive binding whose input RHS is literally a variable can be
+removed when both input Ids are eligible local Many indices or native function
+heads. Look up that
+variable in the current substitution without simplifying or unfolding it.
+Require another eligible variable of the same closed domain. If substitution
+has produced a constructor, retain the binding. Exclude joins and aliases
+with exported, stable, rule-bearing, inactive, or loop-breaker metadata.
+Do not inspect the target's unfolding. In particular,
+
+  let n = opaqueProducer x in let alias = n in body[alias]
+
+can lose only the alias binding. The outer producer stays lazy and shared.
+Store the same actual Id with extendIdSubstWithClone; it allocates no Id and
+maintains the in-scope set. Clear the alias from the inlining environment.
+The existing traversal substitutes terms, types and coercions together and
+freshens surviving binders to avoid capture. This rule does not use ordinary
+inlining or occurrence analysis. Keep recursive and top-level bindings.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance for dependent
+substitution. See
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance for the
+demand restriction.
+
+Scalar beta reduction substitutes an optimized local variable or exact
+constructor into terms and types together. A retained function head substitutes
+only an eligible bare function variable of the same complete type. Its dedicated
+TermAppTy head slot cannot contain a constructor, cast, or arbitrary expression.
+Retain the redex for an unsupported producer. A lazy let for a retained argument
+could let its index escape through a partial application's result type.
+Disable general compulsory unfolding too: unfolding a valid variable index can
+expose an unsupported producer. Do not push casts through native lambdas.
+
+The wired-in leftSectionId and rightSectionId are exceptions. These helpers
+have no runtime definitions. Their representation-polymorphic types must not
+reach code generation. Expand their existing compulsory templates with the
+same substitution and beta rules. Keep their lambda binders and multiplicities.
+With PostfixOperators disabled, a source left section supplies one value
+argument to leftSectionId. A source right section supplies two value arguments
+to rightSectionId. Both leave a
+lambda, so the section does not force its operator or operand at WHNF.
+See Note [Left and right sections] in GHC.Rename.Expr and
+Note [Wired-in Ids for rebindable syntax] in GHC.Builtin.WiredIn.Ids.
+
+Newtype constructor wrappers are also exceptions. They have no runtime
+definitions. Their compulsory unfoldings produce casts. Expand these templates
+with the same substitution and beta rules. Do not force the wrapped value.
+See Note [Newtype workers] in GHC.Types.Id.Make.
+
+A virtual Boolean proof is not a constructor field. Reduce its case only when
+the scrutinee is an exact constructor and the substituted primitive nominal
+equality has that constructor at both endpoints. Replace the proof with nominal
+reflexivity. Constructor knowledge from an unfolding does not supply this proof.
+Keep variable cases strict and preserve ordinary coercion argument positions.
+
+A DEFAULT index alias proof relates the case binder to the scrutinee index.
+Preserve its explicit case and proof binder. Substitute the scrutinee, result
+type, and alternatives in their scopes. Do not eliminate the DEFAULT branch
+or float its proof out of the case. See Note [Native index alias evidence]
+in GHC.Core.Lint.
+
+Agda's dependent application rule motivates substitution into the codomain.
+Its case-tree reduction and with-abstraction equality motivate constructor
+reduction with an explicit scrutinee equation. See
+docs/dependent-haskell/REFERENCES.md#agda-provenance. These rules do not establish
+preservation for Haskell. Agda's function eta equality does not justify eta
+reduction across Haskell's bottom and seq. See
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+General inlining and occurrence analysis remain unsupported. Forward opaque
+call congruence follows Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+
+simpleOptNativeProgram applies this mode independently to each RHS. Keep the
+top-level binders and groups unchanged. Their identities can occur in other
+RHSs or rules. Do not use simpleOptPgm: it runs ordinary occurrence analysis
+before simplification. Module tidying sets the final arities afterward.
+-}
+
 simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
 simpleOptExprWith opts subst expr
@@ -334,6 +447,9 @@ data SimpleOptEnv
         , soe_rec_ids :: !UnVarSet
              -- ^ Fast OutVarSet tracking which recursive RHSs we are analysing.
              -- See Note [Eta reduction in recursive RHSs]
+
+        , soe_native :: !Bool
+             -- ^ See Note [Restricted dependent simplification].
         }
 
 instance Outputable SimpleOptEnv where
@@ -346,6 +462,7 @@ emptyEnv :: SimpleOpts -> SimpleOptEnv
 emptyEnv opts = SOE { soe_inl     = emptyVarEnv
                     , soe_subst   = emptySubst
                     , soe_rec_ids = emptyUnVarSet
+                    , soe_native  = False
                     , soe_opts    = opts  }
 
 soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
@@ -396,7 +513,27 @@ simple_opt_expr env expr = go expr
                              (env', Just bind) -> Let bind (simple_opt_expr env' body)
 
     go (Case e b ty as)
-      | isDeadBinder b
+      | soe_native env
+      , any isNativeIndexAliasAlt as
+      -- See Note [Restricted dependent simplification].
+      = Case e' b' (substTyUnchecked subst ty) (map (go_alt env') as)
+
+      | soe_native env
+      , Just index <- exprToBoolIndex e'
+      , Just (tc, []) <- splitTyConApp_maybe index
+      , Just con <- if tc == promoteDataCon trueDataCon then Just trueDataCon
+                    else if tc == promoteDataCon falseDataCon then Just falseDataCon
+                    else Nothing
+      , Just (Alt (DataAlt _) [cv] rhs) <- findAlt (DataAlt con) as
+      , isCoVar cv
+      , Just (Nominal, left, right) <- getEqPredTys_maybe (substTyUnchecked subst (varType cv))
+      , eqType left index, eqType right index
+      = let proof_env = env { soe_subst = extendCvSubst (extendIdSubst subst b e')
+                                                      cv (mkNomReflCo index) }
+        in simple_opt_expr proof_env rhs
+
+      | not (soe_native env)
+      , isDeadBinder b
       , Just (_, floats, con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
       , isEmptyFloatBinds floats
         -- We don't need to be concerned about floats when looking for coerce.
@@ -409,7 +546,8 @@ simple_opt_expr env expr = go expr
                                zipEqual bs es
 
          -- See Note [Getting the map/coerce RULE to work]
-      | isDeadBinder b
+      | not (soe_native env)
+      , isDeadBinder b
       , [Alt DEFAULT _ rhs] <- as
       , isCoVarType (varType b)
       , (Var fun, _args) <- collectArgs e
@@ -425,7 +563,7 @@ simple_opt_expr env expr = go expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
-    go_co co = optCoercion (so_co_opts (soe_opts env)) subst co
+    go_co co = mapNativeIndexCastCo (optCoercion (so_co_opts (soe_opts env)) subst) co
 
     ----------------------
     go_alt env (Alt con bndrs rhs)
@@ -441,7 +579,11 @@ simple_app env (Var v) as
   | Just (env', e) <- lookupVarEnv (soe_inl env) v
   = simple_app (soeSetInScope (soeInScope env) env') e as
 
-  | let unf = idUnfolding v
+  | not (soe_native env)
+    || v `hasKey` leftSectionKey
+    || v `hasKey` rightSectionKey
+    || maybe False isNewDataCon (isDataConWrapId_maybe v)
+  , let unf = idUnfolding v
   , isCompulsoryUnfolding unf
   , isAlwaysActive (idInlineActivation v)
     -- Make sure to inline Ids with compulsory unfoldings.
@@ -468,7 +610,25 @@ simple_app env e0@(Lam {}) as0@(_:_)
     n_args = count (\case {ApplyToArg {} -> True; CastIt {} -> False}) as0
 
     do_beta :: SimpleOptEnv -> InExpr -> [SimpleContItem] -> OutExpr
-    do_beta env (Lam b body) (ApplyToArg a:as)
+    do_beta env e@(Lam b body) args@(ApplyToArg a:as)
+      | soe_native env
+      , isNativeIndexId b'
+      = let arg = simple_opt_clo (soeInScope env') a
+        in case exprToNativeIndex arg of
+             Just _ -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
+                               body as
+             Nothing -> rebuild_app env (simple_opt_expr env e) args
+
+      | soe_native env
+      , isNativeIndexFunctionId b'
+      = let arg = simple_opt_clo (soeInScope env') a
+        in case nativeIndexFunctionVar_maybe arg of
+             Just actual
+               | idType b' `eqType` idType actual
+               -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
+                          body as
+             _ -> rebuild_app env (simple_opt_expr env e) args
+
       | -- simpl binder before looking at its type
         -- See Note [Dark corner with representation polymorphism]
         needsCaseBinding (idType b') (snd a)
@@ -483,7 +643,8 @@ simple_app env e0@(Lam {}) as0@(_:_)
 
     -- See Note [Eliminate casts in function position]
     do_beta env e@(Lam b _) as@(CastIt out_co:rest)
-      | isNonCoVarId b
+      | not (soe_native env)
+      , isNonCoVarId b
       -- Optimise the inner lambda to make it an 'OutExpr', which makes it
       -- possible to call 'pushCoercionIntoLambda' with the 'OutCoercion' 'co'.
       -- This is kind of horrible, as for nested casted lambdas with a big body,
@@ -557,12 +718,17 @@ add_cast env co1 as
   = as
   | otherwise
   = case as of
-      CastIt co2:rest -> CastIt (optTransCo opts in_scope opt_co1 co2):rest
+      CastIt co2:rest -> CastIt (compose_cast opt_co1 co2):rest
       _               -> CastIt opt_co1:as
   where
     opts     = so_co_opts (soe_opts env)
     in_scope = soeInScope env
-    opt_co1  = optCoercion opts (soe_subst env) co1
+    opt_co1  = mapNativeIndexCastCo (optCoercion opts (soe_subst env)) co1
+    compose_cast first second
+      | Just first_n <- nativeIndexCastCo_maybe first
+      , Just second_n <- nativeIndexCastCo_maybe second
+      = SubCo (optTransCo opts in_scope first_n second_n)
+      | otherwise = optTransCo opts in_scope first second
 
 rebuild_app :: HasDebugCallStack
             => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
@@ -664,19 +830,42 @@ Wrinkle [Unlifted newtypes with wrappers]
 ----------------------
 simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe OutBind)
+simple_opt_bind env (NonRec b (Var rhs)) NotTopLevel
+  | soe_native env
+  , isNativeIndexId b || isNativeIndexFunctionId b
+  , isNativeIndexId rhs || isNativeIndexFunctionId rhs
+  , not (isJoinId b), not (isJoinId rhs)
+  , not (isExportedId b)
+  , not (isStableUnfolding (idUnfolding b))
+  , not (idHasRules b)
+  , isAlwaysActive (idInlineActivation b)
+  , not (isWeakLoopBreaker (idOccInfo b))
+  , idType b `eqType` idType rhs
+  , Var actual <- lookupIdSubst subst rhs
+  , isNativeIndexId actual || isNativeIndexFunctionId actual
+  , not (isJoinId actual)
+  , substTyUnchecked subst (idType b) `eqType` idType actual
+  -- See Note [Restricted dependent simplification].
+  = (env { soe_subst = extendIdSubstWithClone subst b actual
+         , soe_inl = delVarEnv (soe_inl env) b }, Nothing)
+  where
+    subst = soe_subst env
+
 simple_opt_bind env (NonRec b r) top_level
   = (env', case mb_pr of
             Nothing    -> Nothing
             Just (b,r) -> Just (NonRec b r))
   where
-    (b', r') = joinPointBinding_maybe b r `orElse` (b, r)
+    (b', r') | soe_native env = (b, r)
+             | otherwise = joinPointBinding_maybe b r `orElse` (b, r)
     (env', mb_pr) = simple_bind_pair env b' Nothing (env,r') top_level
 
 simple_opt_bind env (Rec prs) top_level
   = (env2, res_bind)
   where
     res_bind          = Just (Rec (reverse rev_prs'))
-    prs'              = joinPointBindings_maybe prs `orElse` prs
+    prs' | soe_native env = prs
+         | otherwise = joinPointBindings_maybe prs `orElse` prs
     (env1, bndrs')    = subst_opt_bndrs env (map fst prs')
     (env2, rev_prs')  = enterRecGroupRHSs env1 bndrs' $ \env ->
                           foldl' do_pr (env, []) (prs' `zip` bndrs')
@@ -996,6 +1185,7 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
 ----------------------
 add_info :: SimpleOptEnv -> InVar -> TopLevelFlag -> OutExpr -> OutVar -> OutVar
 add_info env old_bndr top_level new_rhs new_bndr
+ | soe_native env = new_bndr  -- See Note [Restricted dependent simplification]
  | isTyVar old_bndr = new_bndr
  | otherwise        = lazySetIdInfo new_bndr new_info
  where

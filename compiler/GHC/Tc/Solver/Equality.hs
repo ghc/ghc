@@ -31,8 +31,11 @@ import GHC.Core.Type
 import GHC.Core.Predicate
 import GHC.Core.Class
 import GHC.Core.DataCon ( dataConName )
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
+import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo )
+import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv ( FamInstEnvs )
@@ -51,6 +54,7 @@ import GHC.Utils.Monad
 
 import GHC.Data.Pair
 import GHC.Data.Bag
+import GHC.Data.FastString ( fsLit )
 
 import Control.Monad
 import Data.Maybe ( isJust, isNothing )
@@ -161,6 +165,15 @@ zonkEqTypes ev eq_rel ty1 ty2
     go (TyVarTy tv1) (TyVarTy tv2) = tyvar_tyvar tv1 tv2
     go (TyVarTy tv1) ty2           = tyvar NotSwapped tv1 ty2
     go ty1 (TyVarTy tv2)           = tyvar IsSwapped  tv2 ty1
+
+    -- No index reduction or retained-function congruence is needed here.
+    -- See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+    go ty1@(TermVarTy v1) (TermVarTy v2)
+      | v1 == v2 = return (Right ty1)
+    go ty1@TermAppTy{} ty2@TermAppTy{}
+      | ty1 `tcEqType` ty2 = return (Right ty1)
+    go ty1@DepFunTy{} ty2@DepFunTy{}
+      | ty1 `tcEqType` ty2 = return (Right ty1)
 
     -- We handle FunTys explicitly here despite the fact that they could also be
     -- treated as an application. Why? Well, for one it's cheaper to just look
@@ -337,6 +350,20 @@ The key function `can_eq_nc` tries to make progress with a type equality t1~t2.
 (EQNC7) Give up. Make the (fully-rewrittten) constraint into an Irred and put it
   in the inerts.  See `finishCanWithIrred`.
 
+Note [Reflexivity after retained normalization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rewriting returns to can_eq_nc without repeating zonkEqTypes. A family equation
+can expose a shared runtime index or make two retained functions alpha-equal.
+For example, normalize Vec Int (Add Z n) under foreach n to Vec Int n.
+Recheck reflexivity after both sides have been rewritten. The rewriting evidence
+already relates the original constraint to these normalized endpoints.
+
+This check does not decompose a retained function or assign a meta-variable.
+Opaque runtime indices stay rigid. In particular, Add n Z does not reduce
+without constructor information about n. See Note [Rewriting retained dependent
+functions] in GHC.Tc.Solver.Rewrite and Note [Rigid retained indices] in
+GHC.Tc.Utils.Unify.
+
 Note [CanEqState]
 ~~~~~~~~~~~~~~~~~
 In `can_eq_nc` we want to avoid repeated attempts to rewrite or unwrap newtypes.
@@ -439,6 +466,41 @@ can_eq_nc _ces _rdr_env _envs ev eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TyConApp 
 can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | Just ty1' <- coreView ty1 = can_eq_nc ces rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
   | Just ty2' <- coreView ty2 = can_eq_nc ces rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+
+-- See Note [Reflexivity after retained normalization].
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(TermVarTy v1) _ (TermVarTy v2) _
+  | bothRewritten ces, v1 == v2
+  = canEqReflexive ev eq_rel ty1
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@TermAppTy{} _ ty2@TermAppTy{} _
+  | bothRewritten ces, ty1 `tcEqType` ty2
+  = canEqReflexive ev eq_rel ty1
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@DepFunTy{} _ ty2@DepFunTy{} _
+  | bothRewritten ces, ty1 `tcEqType` ty2
+  = canEqReflexive ev eq_rel ty1
+
+-- See Note [Solving retained function equalities].
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
+  | bothRewritten ces
+  , isWanted ev
+  , isNativeIndexFunctionId b1, isNativeIndexFunctionId b2
+  , varType b1 `tcEqType` varType b2
+  = can_eq_nc_depfun ev eq_rel ty1 ty2 MRefl
+
+-- See Note [Solving retained function equalities].
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
+  | bothRewritten ces
+  , isWanted ev
+  , isNativeIndexId b1, isNativeIndexId b2
+  = if domain1 `tcEqType` domain2
+    then can_eq_nc_depfun ev eq_rel ty1 ty2 MRefl
+    else do { Reduction co1 normal1 <- rewriteFamilyAxioms (ctEvLoc ev) domain1
+            ; Reduction co2 normal2 <- rewriteFamilyAxioms (ctEvLoc ev) domain2
+            ; if normal1 `tcEqType` normal2
+              then can_eq_nc_depfun ev eq_rel ty1 ty2 (MCo (co1 `mkTransCo` mkSymCo co2))
+              else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
+  where
+    domain1 = varType b1
+    domain2 = varType b2
 
 -- (EQNC2) Eager newtype decomposition (ReprEq only).
 -- Look for (N s1 .. sn) ~R# (N t1 .. tn)
@@ -644,13 +706,41 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 ----------------------------
 
 -- (EQNC7) We've rewritten and the types don't match. Give up.
-can_eq_nc _ _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
+can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   = do { traceTcS "can_eq_nc catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
        ; case eq_rel of -- See Note [Unsolved equalities]
             ReprEq -> finishCanWithIrred ReprEqReason ev
-            NomEq  -> finishCanWithIrred ShapeMismatchReason ev }
+            NomEq | opaque_index_equality -> finishCanWithIrred IrredShapeReason ev
+                  | otherwise -> finishCanWithIrred ShapeMismatchReason ev }
           -- No need to call canEqSoftFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
+  where
+    -- See Note [Opaque runtime index equalities].
+    opaque_index_equality = case (ty1, ty2) of
+      (TermAppTy f _, ty) -> call_domain f ty
+      (ty, TermAppTy f _) -> call_domain f ty
+      (TermVarTy v, ty) -> same_domain v ty
+      (ty, TermVarTy v) -> same_domain v ty
+      _ -> False
+
+    same_domain v ty = isNativeIndexId v && typeKind ty `eqType` varType v
+    call_domain f ty = case nativeIndexFunctionTys_maybe f of
+      Just (_, result) -> typeKind ty `eqType` result
+      Nothing -> False
+
+{- Note [Opaque runtime index equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A runtime index can equal a constructor or another index of the same domain.
+Failure to rewrite these well-kinded index forms does not establish
+a contradiction. Retain the equality as a non-insoluble IrredShapeReason.
+This also lets the pattern-match oracle retain a checked constructor proof.
+
+This rule does not solve the equality or rewrite the runtime index. A Given
+remains an inert irreducible equality. addIrredToCans still calls updGivenEqs,
+which records its level and prevents unsafe outer metavariable assignments.
+See Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet and
+Note [Apartness of retained runtime indices] in GHC.Core.Unify.
+-}
 
 {- Note [Unsolved equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -659,6 +749,89 @@ If we have an unsolved equality like
 that is not necessarily insoluble!  Maybe 'a' will turn out to be a newtype.
 So we want to make it a potentially-soluble Irred not an insoluble one.
 Missing this point is what caused #15431
+-}
+
+---------------------------------
+-- | Compare retained bodies in a private runtime-binder scope.
+-- See Note [Solving retained function equalities].
+can_eq_nc_depfun :: CtEvidence -> EqRel -> Type -> Type -> MCoercionN
+                 -> TcS (StopOrContinue (Either IrredCt EqCt))
+can_eq_nc_depfun ev eq_rel ty1@(DepFunTy b1 body1) ty2@(DepFunTy b2 body2) domain
+  | CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
+  = do { binder <- wrapTcS $ TcM.newSysLocalId (fsLit "retained") ManyTy (varType b1)
+       ; let in_scope = mkInScopeSet $
+                          extendVarSet (tyCoVarsOfTypes [ty1,ty2]
+                                        `unionVarSet` tyCoVarsOfMCo domain) binder
+             subst b arg = Subst.mkIdSubst in_scope (unitVarEnv b arg)
+             right_arg = case domain of
+                           MRefl -> Var binder
+                           MCo delta -> Cast (Var binder) (SubCo delta)
+             left_body = Subst.substTy (subst b1 (Var binder)) body1
+             right_body = Subst.substTy (subst b2 right_arg) body2
+       ; nested_binds <- newNoTcEvBinds
+       ; (unifs, (body_co, solved)) <- reportFineGrainUnifications $
+           do { (level, (body_co, wanteds)) <-
+                  pushLevelNoWorkList (text "retained function equality") $
+                    wrapUnifier rws loc Nominal $ \uenv ->
+                      uType uenv left_body right_body
+              ; residual <- withNativeBinderScope binder $
+                  nestImplicTcS (UnifyForAllSkol ty1) nested_binds level $
+                    solveSimpleWanteds wanteds
+              ; return (body_co, isSolvedWC residual) }
+       ; kickOutAfterUnification unifs
+       ; if solved
+         then do { all_co <- zonkCo (mkDepFunCoWithDomain binder domain body_co)
+                 ; left <- zonkTcType ty1
+                 ; right <- zonkTcType ty2
+                 ; if coercionLKind all_co `tcEqType` left
+                      && coercionRKind all_co `tcEqType` right
+                   then do { -- Keep outer Given evidence live after the local solve.
+                             outer_binds <- getTcEvBindsVar
+                           ; combineTcEvBinds outer_binds nested_binds
+                           ; setWantedEq dest (CPH { cph_co = downgradeRole (eqRelRole eq_rel) Nominal all_co
+                                                  , cph_holes = emptyCoHoleSet })
+                           ; stopWith ev "Retained function equality: solved" }
+                   else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
+         else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
+can_eq_nc_depfun _ _ ty1 ty2 _
+  = pprPanic "can_eq_nc_depfun" (ppr ty1 $$ ppr ty2)
+
+{- Note [Solving retained function equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Compare two retained functions using nominal DepFunCo. Use MRefl when their
+complete eligible scalar or function domains agree. Substitute the same fresh
+bare variable into both bodies. A function head must remain a Var; a reflexive
+cast around that variable is not a supported native call head.
+
+For unequal closed scalar domains, normalize them outside the runtime binder.
+The resulting proof delta has kind A ~N B. Use a fresh x :: A in both bodies.
+Replace the target binder by x cast through delta. The body proof then has the
+scope that DepFunCo needs.
+See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+
+Use reflexivity when the domains already agree. Otherwise use rewriteFamilyAxioms
+to reduce nominal family axioms with the solver reduction-depth limit. Do not
+use the pure normaliseType here: whole-Pi rewriting does not traverse the binder
+domain, and a recursive family in that domain can make normaliseType diverge.
+Disable inert evidence, plugins, caches and coercion zapping during this reduction.
+The domain proof must not introduce holes that the body solve does not track.
+
+Follow can_eq_nc_forall for ordinary body unification. Generate Wanteds at a
+deeper level and solve them synchronously in private inerts and a private work
+list. Keep the runtime binder active through rewriting and solver plugins.
+Do not encode it in ic_skols: an Id is not a TcTyVar. Do not emit an implication
+or a residual body Wanted. If any Wanted remains, keep the original whole
+equality instead. Track outer unifications and used Given evidence as the
+forall solver does. Existing native meta-assignment checks still apply.
+Zonk the completed proof and its expected endpoints before checking them.
+Ordinary body unification can assign payload metavariables.
+
+The body proof is nominal even for a representational Wanted. Downgrade the
+complete nominal proof only after constructing DepFunCo. A representational
+equality between phantom domain parameters cannot supply nominal transport.
+Function-valued domain changes and opaque Pi projection remain unsupported.
+This uses the D/DC An-PiCong rule and Agda's domain-before-body discipline.
+See docs/dependent-haskell/REFERENCES.md#nominal-retained-domain-conversion.
 -}
 
 ---------------------------------
@@ -2372,7 +2545,14 @@ checkTypeEqNoUnification ev eq_rel lhs rhs =
         -- See Note [Don't cycle-break Wanteds when not unifying]
 
     given_flags :: TyEqFlags TcM (TcTyVar, TcType)
-    given_flags = wanted_flags { tef_fam_app = mkTEFA_Break ev eq_rel BreakGiven }
+    given_flags
+      -- See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+      | TyVarLHS {} <- lhs
+      , hasNativeDependentExpr (Type rhs)
+      = wanted_flags { tefTyVar_allowNativeGivenRhs = True
+                     , tef_fam_app = TEFA_Recurse }
+      | otherwise
+      = wanted_flags { tef_fam_app = mkTEFA_Break ev eq_rel BreakGiven }
         -- TEFA_Break used for: [G] a ~ Maybe (F a)
         --                   or [G] F a ~ Maybe (F a)
 

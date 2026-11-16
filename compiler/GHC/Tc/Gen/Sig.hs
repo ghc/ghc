@@ -57,7 +57,8 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Zonk.Type
 
-import GHC.Core( hasSomeUnfolding )
+import GHC.Core( Expr(Type), hasSomeUnfolding )
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
@@ -219,8 +220,17 @@ tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name -> TcM TcIdSig
 -- Just n  => Function type signature       name :: type
 -- Nothing => Expression type signature   <expr> :: type
 tcUserTypeSig loc hs_sig_ty mb_name
+  | HsWC { hswc_body = L _ (HsSig { sig_body = body }) } <- hs_sig_ty
+  , hsHasForEachTy (unLoc body)
+  , not (isCompleteHsSig hs_sig_ty)
+  = failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
+
   | isCompleteHsSig hs_sig_ty
-  = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
+  = do { -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
+         let allow_function = case mb_name of
+               Just _ -> True
+               Nothing -> False
+       ; sigma_ty <- tcHsSigWcType allow_function ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $ TcCompleteSig $
          CSig { sig_bndr  = mkLocalId name ManyTy sigma_ty
@@ -265,6 +275,7 @@ lhsSigTypeContextSpan (L _ HsSig { sig_body = sig_ty }) = go sig_ty
   where
     go (L _ (HsQualTy { hst_ctxt = L span _ })) = WantRRC $ locA span -- Found it!
     go (L _ (HsForAllTy { hst_body = hs_ty })) = go hs_ty  -- Look under foralls
+    go (L _ HsForEachTy{}) = NoRRC  -- A retained binder introduces a value argument
     go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
     go _ = NoRRC  -- Did not find it
 
@@ -282,53 +293,8 @@ isCompleteHsSig (HsWC { hswc_ext = wcs, hswc_body = hs_sig_ty })
 
 no_anon_wc_sig_ty :: LHsSigType GhcRn -> Bool
 no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body}))
-  =  all no_anon_wc_tvb (hsOuterExplicitBndrs outer_bndrs)
-  && no_anon_wc_ty body
-
-no_anon_wc_ty :: LHsType GhcRn -> Bool
-no_anon_wc_ty lty = go lty
-  where
-    go (L _ ty) = case ty of
-      HsWildCardTy _                 -> False
-      HsAppTy _ ty1 ty2              -> go ty1 && go ty2
-      HsAppKindTy _ ty ki            -> go ty && go ki
-      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go_mult w
-        where
-          go_mult (HsModifiedFunArr _ mods _) = all go_mod mods
-          go_mod (L _ (HsModifier _ ty)) = go ty
-      HsListTy _ ty                  -> go ty
-      HsTupleTy _ _ tys              -> gos tys
-      HsSumTy _ tys                  -> gos tys
-      HsOpTy _ ty1 tyop ty2          -> go tyop && go ty1 && go ty2
-      HsParTy _ ty                   -> go ty
-      HsIParamTy _ _ ty              -> go ty
-      HsKindSig _ ty kind            -> go ty && go kind
-      HsDocTy _ ty _                 -> go ty
-      HsExplicitListTy _ _ tys       -> gos tys
-      HsExplicitTupleTy _ _ tys      -> gos tys
-      HsForAllTy { hst_tele = tele
-                 , hst_body = ty } -> no_anon_wc_tele tele
-                                        && go ty
-      HsQualTy { hst_ctxt = ctxt
-               , hst_body = ty }  -> gos (hsc_ctxt $ unLoc ctxt) && go ty
-      HsSpliceTy (HsUntypedSpliceTop _ ty) _ -> go ty
-      HsSpliceTy (HsUntypedSpliceNested _) _ -> True
-      HsTyLit{} -> True
-      HsTyVar{} -> True
-      HsStarTy{} -> True
-      XHsType{} -> True       -- HsCoreTy, which does not have any wildcard
-
-    gos = all go
-
-no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
-no_anon_wc_tele tele = case tele of
-  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all no_anon_wc_tvb ltvs
-  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all no_anon_wc_tvb ltvs
-
-no_anon_wc_tvb :: LHsTyVarBndr flag GhcRn -> Bool
-no_anon_wc_tvb (L _ tvb) = case hsBndrKind tvb of
-  HsBndrNoKind _  -> True
-  HsBndrKind _ ki -> no_anon_wc_ty ki
+  =  all hsTyVarBndrHasNoAnonWildcards (hsOuterExplicitBndrs outer_bndrs)
+  && hsTypeHasNoAnonWildcards body
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -629,7 +595,14 @@ lhsBindVisArity _ env = env        -- PatBind/VarBind
 addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
   | inl@(L _ prag) : inls <- inl_prags
-  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
+  = do { -- See Note [Retained optimisation pragmas].
+         case [ loc | L loc p <- inl_prags
+                    , isInlinePragma p || isInlinablePragma p ] of
+           loc : _ | hasNativeDependentExpr (Type (idType poly_id))
+             -> setSrcSpanA loc $
+                failWithTc (TcRnRetainedQuantificationError RetainedPragma)
+           _ -> return ()
+       ; traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
        ; unless (null inls) (warn_multiple_inlines inl inls)
        ; return (poly_id `setInlinePragma` prag) }
   | otherwise
@@ -650,6 +623,15 @@ addInlinePrags poly_id prags_for_me
          let dia = TcRnMultipleInlinePragmas poly_id inl1 (inl2 NE.:| inls)
          in addDiagnosticTc dia
 
+
+{- Note [Retained optimisation pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INLINE and INLINABLE create ordinary unfoldings during desugaring. SPECIALISE
+uses ordinary specialisation and rule code. These paths do not support retained
+types. Reject these supplied pragmas at their own source locations before
+entering those paths. Keep NOINLINE, OPAQUE, and unrelated pragmas unchanged.
+The native scanner also finds retained indices inside an ordinary arrow type.
+-}
 
 {- Note [Pattern synonym inline arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -962,6 +944,12 @@ tcSpecPrags :: Id -> [LSig GhcRn]
 -- Reason: required by tcSubExp
 tcSpecPrags poly_id prag_sigs
   = do { traceTc "tcSpecPrags" (ppr poly_id <+> ppr spec_sigs)
+       ; -- See Note [Retained optimisation pragmas].
+         case spec_sigs of
+           L loc _ : _ | hasNativeDependentExpr (Type (idType poly_id))
+             -> setSrcSpanA loc $
+                failWithTc (TcRnRetainedQuantificationError RetainedPragma)
+           _ -> return ()
        ; whenIsJust (NE.nonEmpty bad_sigs) warn_discarded_sigs
        ; pss <- mapAndRecoverM (wrapLocMA (tcSpecPrag poly_id)) spec_sigs
        ; return $ concatMap (\(L l ps) -> map (L (locA l)) ps) pss }

@@ -327,6 +327,12 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_sig_args 0 sep
     do_largs n leader (L _ t) = do_args n leader t
 
     do_args :: Int -> Html -> HsType DocNameI -> [SubDecl]
+    do_args n leader (HsForEachTy _ bndrs ltype)
+      | not (null bndrs) =
+          [ (ldr <+> ppForEachBinders unicode qual [bndr], argDoc i, [])
+          | (i, ldr, bndr) <- zip3 [n ..] (leader : repeat (arrow unicode)) bndrs
+          ]
+            ++ do_largs (n + length bndrs) (arrow unicode) ltype
     do_args n leader (HsForAllTy _ tele ltype) =
       do_largs n leader' ltype
       where
@@ -1766,6 +1772,7 @@ patSigContext sig_typ
     hasNonEmptyContext :: LHsType DocNameI -> Bool
     hasNonEmptyContext t =
       case unLoc t of
+        HsForEachTy _ _ s -> hasNonEmptyContext s
         HsForAllTy _ _ s -> hasNonEmptyContext s
         HsQualTy _ cxt s -> if null (hsc_ctxt $ unLoc cxt) then hasNonEmptyContext s else True
         HsFunTy _ _ _ s -> hasNonEmptyContext s
@@ -1773,6 +1780,7 @@ patSigContext sig_typ
     isFirstContextEmpty :: LHsType DocNameI -> Bool
     isFirstContextEmpty t =
       case unLoc t of
+        HsForEachTy _ _ s -> isFirstContextEmpty s
         HsForAllTy _ _ s -> isFirstContextEmpty s
         HsQualTy _ cxt _ -> null (hsc_ctxt $ unLoc cxt)
         HsFunTy _ _ _ s -> isFirstContextEmpty s
@@ -1804,6 +1812,11 @@ ppForAllPart unicode qual tele = case tele of
   HsForAllInvis{hsf_invis_bndrs = bndrs} ->
     hsep (forallSymbol unicode : ppTyVars unicode qual bndrs) +++ dot
 
+-- | Print retained value binders without the result arrow.
+ppForEachBinders :: Unicode -> Qualification -> [LHsTyVarBndr () DocNameI] -> Html
+ppForEachBinders unicode qual bndrs =
+  hsep (toHtml ("foreach" :: LText) : ppTyVars unicode qual bndrs)
+
 ppr_sig_ty :: HsSigType DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
 ppr_sig_ty (HsSig{sig_bndrs = outer_bndrs, sig_body = ltype}) unicode qual emptyCtxts =
   ppHsOuterTyVarBndrs unicode qual outer_bndrs <+> ppr_mono_lty ltype unicode qual emptyCtxts
@@ -1812,6 +1825,9 @@ ppr_mono_lty :: LHsType DocNameI -> Unicode -> Qualification -> HideEmptyContext
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty :: HsType DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
+ppr_mono_ty (HsForEachTy _ bndrs ty) unicode qual emptyCtxts =
+  ppForEachBinders unicode qual bndrs <+> arrow unicode
+    <+> ppr_mono_lty ty unicode qual emptyCtxts
 ppr_mono_ty (HsForAllTy _ tele ty) unicode qual emptyCtxts =
   ppForAllPart unicode qual tele <+> ppr_mono_lty ty unicode qual emptyCtxts
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode qual emptyCtxts =

@@ -16,6 +16,7 @@ module GHC.Tc.Solver.Monad (
     runTcSEqualities,
     nestTcS, nestImplicTcS, tryShortCutTcS, nestFunDepsTcS,
     setEvBindsTcS, setTcLevelTcS,
+    getNativeBinderScope, withNativeBinderScope,
 
     selectNextWorkItem,
     getWorkList,
@@ -1032,6 +1033,9 @@ data TcSEnv
       -- See Note [TcSMode]
       tcs_mode :: TcSMode,
 
+      -- See Note [Native runtime binder scopes].
+      tcs_native_binders :: VarSet,
+
       tcs_worklist :: TcRef WorkList
     }
 
@@ -1046,6 +1050,33 @@ instance MonadFix TcS where
 -- monad trick] in "GHC.Utils.Monad".
 mkTcS :: (TcSEnv -> TcM a) -> TcS a
 mkTcS f = TcS (oneShot f)
+
+-- | Return the runtime binders of the current retained equality comparison.
+getNativeBinderScope :: TcS VarSet
+getNativeBinderScope = mkTcS $ \env -> return (tcs_native_binders env)
+
+-- | Scope one runtime binder over a retained equality comparison.
+-- See Note [Native runtime binder scopes].
+withNativeBinderScope :: Id -> TcS a -> TcS a
+withNativeBinderScope binder thing_inside
+  = mkTcS $ \env ->
+      unTcS thing_inside
+        (env { tcs_native_binders = extendVarSet (tcs_native_binders env) binder })
+
+{- Note [Native runtime binder scopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Comparing retained function bodies can generate Wanteds that mention a fresh
+runtime Id. See Note [Solving retained function equalities] in
+GHC.Tc.Solver.Equality. Keep these Ids in a lexical, immutable TcSEnv field.
+Nested solver scopes inherit the field. A root solver starts with no such Ids.
+Leaving withNativeBinderScope restores the enclosing scope.
+
+Each rewriter starts with this set, so the existing retained-body restrictions
+also cover separate body Wanteds. Solver plugins must not see these Wanteds or
+the local Givens. The caller uses nestImplicTcS to isolate the inerts and work
+list. This field does not bind an Id in an Implication or permit residual body
+Wanteds to escape. Only a fully solved body proof can enter the DepFunCo.
+-}
 
 instance Applicative TcS where
   pure x = mkTcS $ \_ -> return x
@@ -1216,6 +1247,7 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
                           , tcs_count    = step_count
                           , tcs_inerts   = inert_var
                           , tcs_mode     = mode
+                          , tcs_native_binders = emptyVarSet
                           , tcs_worklist = wl_var }
 
              -- Run the computation

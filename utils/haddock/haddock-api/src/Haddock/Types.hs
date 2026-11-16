@@ -865,6 +865,7 @@ type instance XHsStandardArr DocNameI = NoExtField
 type instance XHsLinearArr DocNameI = NoExtField
 
 type instance XForAllTy DocNameI = EpAnn NoEpAnns
+type instance XForEachTy DocNameI = (EpToken "foreach", TokRarrow)
 type instance XQualTy DocNameI = EpAnn NoEpAnns
 type instance XTyVar DocNameI = EpAnn NoEpAnns
 type instance XStarTy DocNameI = EpAnn NoEpAnns

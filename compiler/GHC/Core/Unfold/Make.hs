@@ -26,6 +26,7 @@ import GHC.Core.Unfold
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Core.DataCon
+import GHC.Core.Dependent ( hasNativeDependentUnfolding )
 import GHC.Core.Utils
 import GHC.Types.Basic
 import GHC.Types.Id
@@ -341,7 +342,7 @@ mkUnfolding :: UnfoldingOpts
             -> Maybe UnfoldingCache
             -> Unfolding
 -- Calculates unfolding guidance
--- Occurrence-analyses the expression before capturing it
+-- Occurrence-analyse ordinary templates. Preserve native templates.
 mkUnfolding opts src top_lvl is_bottoming is_join expr cache
   = mkCoreUnfolding src top_lvl expr cache guidance
   where
@@ -352,10 +353,12 @@ mkUnfolding opts src top_lvl is_bottoming is_join expr cache
 
 mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> Maybe UnfoldingCache -> UnfoldingGuidance -> Unfolding
--- Occurrence-analyses the expression before capturing it
+-- Occurrence-analyse ordinary templates. Preserve native templates.
 mkCoreUnfolding src top_lvl expr precomputed_cache guidance
   = CoreUnfolding { uf_tmpl = cache `seq`
-                              occurAnalyseExpr expr
+                              if hasNativeDependentUnfolding expr
+                                then expr
+                                else occurAnalyseExpr expr
       -- occAnalyseExpr: see Note [OccInfo in unfoldings and rules] in GHC.Core
       -- See #20905 for what a discussion of this 'seq'.
       -- We are careful to make sure we only
@@ -378,6 +381,26 @@ mkCoreUnfolding src top_lvl expr precomputed_cache guidance
                                       , uf_expandable = is_expandable }
 
     cache = fromMaybe recomputed_cache precomputed_cache
+
+{- Note [Native dependent unfolding templates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ordinary occurrence analysis does not preserve runtime indices or virtual
+Boolean proof binders. Keep a native template unchanged. The native module
+and expression paths use their checked simplification and lowering passes.
+This does not enable native Core in the ordinary optimizer.
+
+Inspect the RHS and the stable unfoldings, rules, and dictionary unfoldings
+that ordinary occurrence analysis would traverse. A native stable template in
+bound-Id metadata must also preserve its parent template. Do not force unused
+unstable unfolding templates. Validate each native imported RHS inside its own
+forkM thunk in GHC.IfaceToCore, using a separate scan that skips bound metadata.
+That validation checks Core and compares its type with the declared signature.
+
+Keep classification inside uf_tmpl. Inspecting uf_src must not force expr.
+Preserve the precomputed cache and its forcing contract. See
+Note [Lazily checking Unfoldings] and Note [Tying the 'CoreUnfolding' knot]
+in GHC.IfaceToCore. Module unfolding generation remains separately gated.
+-}
 
 ----------------
 certainlyWillInline :: UnfoldingOpts -> IdInfo -> CoreExpr -> Maybe Unfolding

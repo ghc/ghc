@@ -25,6 +25,7 @@ where
 import GHC.Prelude
 
 import GHC.Driver.DynFlags
+import GHC.Driver.Ppr ( showSDoc )
 import GHC.Driver.Config
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module
@@ -42,6 +43,7 @@ import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.SimpleOpt
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
@@ -443,6 +445,14 @@ dsAbsBinds dflags tyvars dicts exports
 makeCorePair :: DynFlags -> Id -> Bool -> CoreExpr
              -> (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method rhs
+  | is_default_method || isInlinePragma inline_prag || isInlinablePragma inline_prag
+  , hasNativeDependentExpr rhs
+  -- See Note [Native unfolding construction].
+  = throwGhcException (Sorry
+      ("Native dependent Core cannot enter INLINE, INLINABLE, or default-method unfolding construction while desugaring binding "
+       ++ showSDoc dflags (ppr gbl_id)
+       ++ ". This operation does not support retained Boolean types or branch proofs."))
+
   | is_default_method    -- Default methods are *always* inlined
                          -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding' simpl_opts rhs, rhs)
@@ -472,6 +482,21 @@ makeCorePair dflags gbl_id is_default_method rhs
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
          (gbl_id `setIdUnfolding` mkInlineUnfoldingNoArity simpl_opts StableUserSrc rhs, rhs)
+
+{- Note [Native unfolding construction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INLINE, INLINABLE, and default-method unfoldings are constructed before the
+module driver checks for native dependent Core. Omitted interface pragmas do
+not prevent this construction. Reject a native RHS before these builders run.
+Check the pragma or default-method condition first. Ordinary bindings without
+an unfolding request need no native scan here.
+
+The unfolding builders run ordinary simpleOptExpr. mkCoreUnfolding also runs
+ordinary occurrence analysis. Selecting native SimpleOpt alone would still
+allow that analysis to delete bindings used only by runtime type indices.
+Native unfolding construction needs a separate implementation. Do not silently
+discard a requested unfolding or change compulsory default-method semantics.
+-}
 
 findSatArity :: VisArity -> Type -> Arity
 -- Given the VisArity, find the value Arity of the function.

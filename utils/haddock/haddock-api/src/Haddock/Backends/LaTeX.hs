@@ -591,6 +591,12 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_sig_args 0 leader typ
     arg_doc n = rDoc . fmap _doc $ Map.lookup n argDocs
 
     do_args :: Int -> LaTeX -> HsType DocNameI -> [(LaTeX, LaTeX)]
+    do_args n leader (HsForEachTy _ bndrs ltype)
+      | not (null bndrs) =
+          [ (decltt ldr, decltt (ppHsForEachBinders [bndr] unicode) <-> arg_doc i <+> nl)
+          | (i, ldr, bndr) <- zip3 [n ..] (leader : repeat (arrow unicode)) bndrs
+          ]
+            ++ do_largs (n + length bndrs) (arrow unicode) ltype
     do_args _n leader (HsForAllTy _ tele ltype) =
       [
         ( decltt leader
@@ -641,6 +647,11 @@ ppHsForAllTelescope tele unicode = case tele of
     hsep (forallSymbol unicode : ppTyVars unicode bndrs) <> text "\\" <> arrow unicode
   HsForAllInvis{hsf_invis_bndrs = bndrs} ->
     hsep (forallSymbol unicode : ppTyVars unicode bndrs) <> dot
+
+-- | Print retained value binders without the result arrow.
+ppHsForEachBinders :: [LHsTyVarBndr () DocNameI] -> Bool -> LaTeX
+ppHsForEachBinders bndrs unicode =
+  hsep (text "foreach" : ppTyVars unicode bndrs)
 
 ppTyVars :: RenderableBndrFlag flag => Bool -> [LHsTyVarBndr flag DocNameI] -> [LaTeX]
 ppTyVars unicode tvs = map (ppHsTyVarBndr unicode . unLoc) tvs
@@ -1307,6 +1318,11 @@ ppr_mono_lty :: LHsType DocNameI -> Bool -> LaTeX
 ppr_mono_lty ty unicode = ppr_mono_ty (unLoc ty) unicode
 
 ppr_mono_ty :: HsType DocNameI -> Bool -> LaTeX
+ppr_mono_ty (HsForEachTy _ bndrs ty) unicode =
+  sep
+    [ ppHsForEachBinders bndrs unicode <+> arrow unicode
+    , ppr_mono_lty ty unicode
+    ]
 ppr_mono_ty (HsForAllTy _ tele ty) unicode =
   sep
     [ ppHsForAllTelescope tele unicode

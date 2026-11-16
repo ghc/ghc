@@ -59,12 +59,13 @@ import GHC.Types.Unique.Supply
 import GHC.Tc.Utils.Monad   (getGblEnv)
 
 import GHC.Core
+import GHC.Core.Dependent   (hasNativeDependentExprRhs)
 import GHC.Core.FVs         (exprFreeVars)
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
 import GHC.Core.Predicate (typeDeterminesValue, mkNomEqPred)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
-import GHC.Core.Utils     (exprType)
+import GHC.Core.Utils     (exprType, dataConRepInstPat)
 import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr)
 
 import GHC.Data.FastString
@@ -334,6 +335,13 @@ pmTopNormaliseType :: TyState -> Type -> DsM TopNormaliseTypeResult
 -- NB: Normalisation can potentially change kinds, if the head of the type
 -- is a type family with a variable result kind. I (Richard E) can't think
 -- of a way to cause trouble here, though.
+pmTopNormaliseType _ typ
+  | DepFunTy{} <- coreFullView typ
+  = pure (NormalisedByConstraints typ)
+  | FunTy{} <- coreFullView typ
+  , hasNativeDependentExprRhs (Type typ)
+  -- See Note [Coverage checking retained functions].
+  = pure (NormalisedByConstraints typ)
 pmTopNormaliseType (TySt _ inert) typ = {-# SCC "pmTopNormaliseType" #-} do
   env <- dsGetFamInstEnvs
   tracePm "normalise" (ppr typ)
@@ -440,14 +448,40 @@ normaliseSourceTypeWHNF ty_st ty =
 
 -- | Is the source type in WHNF wrt. 'pmTopNormaliseType'?
 --
--- Returns False if the given type is not a TyCon application, or if the TyCon
--- app head is a type family TyCon. (But not for data family TyCons!)
+-- A retained function already has a function head. Otherwise, return False
+-- unless this is a TyCon application whose head is not a type family TyCon.
+-- Data family TyCons are in WHNF here.
 isSourceTypeInWHNF :: Type -> Bool
 isSourceTypeInWHNF ty
+  | DepFunTy{} <- coreFullView ty          = True
   | Just (tc, _) <- splitTyConApp_maybe ty = not (isTypeFamilyTyCon tc)
   | otherwise                              = False
 
-{- Note [Type normalisation]
+{- Note [Coverage checking retained functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+PMC needs the outer shape of a type to look for algebraic constructors. A
+DepFunTy already has a function head. An ordinary FunTy can also contain a
+retained function in its domain or result. Preserve these known function heads
+without asking tcNormalise to rewrite their components. Its rewriteType path
+requires dependent congruence when it encounters DepFunTy, which is not yet
+supported. Reporting that solver restriction from initTcDsForSolver panics.
+
+This is a WHNF rule, not normalization under a dependent binder. Agda 2.8.0
+also returns a Pi head without reducing its domain or codomain. Its full
+normalizer visits both components. See the pinned reduction references in
+docs/dependent-haskell/REFERENCES.md.
+
+Keep the usual conservative inhabitation path for a function type. In
+particular, failure to split an algebraic TyCon must not produce an empty
+constructor set. A function type can have a lambda value even when its result
+type has no constructors. A function expression can also be bottom. This type
+head test does not evaluate an expression or remove a strict wildcard match.
+The desugared Core case must retain its normal forcing behavior.
+
+No solver equality, Pi congruence, or mutable metavariable assignment is added
+by this rule. Types whose heads still require reduction use the existing path.
+
+Note [Type normalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Constructs like -XEmptyCase or a previous unsuccessful pattern match on a data
 constructor place a non-void constraint on the matched thing. This means that it
@@ -1553,7 +1587,14 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
       let gammas = substTheta sigma_ex (eqSpecPreds eq_spec ++ thetas)
       -- (4) Instantiate fresh term variables as arguments to the constructor
       let field_tys' = substTys sigma_ex $ map scaledThing field_tys
-      arg_ids <- mapM mkPmId field_tys'
+      arg_ids <- case con of
+        RealDataCon dc | not (null (dataConRepArgBinders dc)) -> do
+          -- See Note [Retained package fields in PMC].
+          uniqs <- getUniquesM
+          let inst_tys = map (substTyVar sigma_univ) (dataConUnivTyVars dc)
+              (_, fields) = dataConRepInstPat uniqs ManyTy dc inst_tys
+          pure fields
+        _ -> mapM mkPmId field_tys'
       tracePm (hdr "(cts)") $ vcat
         [ ppr x <+> dcolon <+> ppr match_ty
         , text "In WHNF:" <+> ppr (isSourceTypeInWHNF match_ty) <+> ppr norm_match_ty
@@ -1592,6 +1633,19 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
     Nothing -> do
       tracePm (hdr "(match_ty not instance of res_ty) }") empty
       pure (Just nabla) -- Matching against match_ty failed. Inhabited!
+
+{- Note [Retained package fields in PMC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A speculative package constructor needs fresh runtime field Ids too. A flat
+type substitution leaves the declaration's retained field templates free in
+later field types. Use dataConRepInstPat to freshen fields from left to right
+and substitute each retained Id into the remaining types. Retained package
+constructors have no erased existentials or constructor constraints.
+
+The observed source-pattern path instead uses its checked field Ids. See
+Note [Checking retained package patterns] in GHC.Tc.Gen.Pat. Both paths keep
+ordinary coverage checking. They do not evaluate runtime indices or fields.
+-}
                         -- See Note [Instantiating a ConLike].
 
 -- | @matchConLikeResTy _ _ ty K@ tries to match @ty@ against the result

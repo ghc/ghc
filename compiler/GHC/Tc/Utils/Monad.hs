@@ -18,6 +18,7 @@ module GHC.Tc.Utils.Monad(
   discardResult,
   getTopEnv, updTopEnv, updTopEnvIO, getGblEnv, updGblEnv,
   setGblEnv, getLclEnv, updLclEnv, updLclCtxt, setLclEnv, restoreLclEnv,
+  tcExtendNativeGivens,
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
   xoptM, doptM, goptM, woptM,
@@ -193,6 +194,8 @@ import GHC.Unit.External
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Home.PackageTable
 
+import qualified GHC.Core as Core
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.UsageEnv
 import GHC.Core.Coercion ( isReflCo )
 import GHC.Core.Multiplicity
@@ -238,6 +241,7 @@ import GHC.Types.Name
 import GHC.Types.SafeHaskell
 import GHC.Types.Id
 import GHC.Types.TypeEnv
+import GHC.Types.Var ( EvVar, varType )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
@@ -481,6 +485,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
+                tcl_native_givens = [],
                 tcl_tclvl      = topTcLevel
                 },
                 tcl_usage      = usage_var,
@@ -582,6 +587,33 @@ updLclEnv upd = updEnv (\ env@(Env { env_lcl = lcl }) ->
 
 updLclCtxt :: (TcLclCtxt -> TcLclCtxt) -> TcRnIf gbl TcLclEnv a -> TcRnIf gbl TcLclEnv a
 updLclCtxt = updLclEnv . modifyLclCtxt
+
+-- | Record actual native-dependent Given parameters, including CoVars,
+-- in their lexical evidence scope.
+tcExtendNativeGivens :: [EvVar] -> TcM a -> TcM a
+tcExtendNativeGivens givens thing_inside
+  = case filter (hasNativeDependentExpr . Core.Type . varType) givens of
+      [] -> thing_inside
+      native_givens -> updLclCtxt (\ctxt -> ctxt
+        { tcl_native_givens = native_givens ++ tcl_native_givens ctxt }) thing_inside
+
+{- Note [Lexical native Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained source case must transport lexical evidence whose predicate depends
+on its runtime index. Record the actual evidence parameters while checking the
+body of their implication. The implication itself is built after that body.
+Neither the source name environment nor the pending Wanteds contains all these
+parameters. This list is not a solver inert set. TcS still checks constraints
+and derives superclass evidence from the recorded dictionaries.
+
+Keep only evidence parameters with native-dependent predicates. Include equality
+CoVars as well as dictionary Ids. Mutable metavariables cannot be filled
+with native syntax, so this filter cannot hide a later native instantiation.
+Nested scopes retain enclosing parameters. Static forms clear the list because
+StaticFormSkol excludes enclosing Givens from constraint solving. Arrow scope
+escape restores the enclosing list with the original constraint accumulator.
+Nested typed splices restore the list saved at entry to their bracket.
+-}
 
 setLclEnv :: lcl' -> TcRnIf gbl lcl' a -> TcRnIf gbl lcl a
 setLclEnv lcl_env = updEnv (\ env -> env { env_lcl = lcl_env })
@@ -976,7 +1008,8 @@ holeFitTcMPlugins =
 newArrowScope :: TcM a -> TcM a
 newArrowScope
   = updLclEnv $ \env ->
-      modifyLclCtxt (\ctx -> ctx { tcl_arrow_ctxt = ArrowCtxt (getLclEnvRdrEnv env) (tcl_lie env) } ) env
+      modifyLclCtxt (\ctx -> ctx { tcl_arrow_ctxt = ArrowCtxt (getLclEnvRdrEnv env)
+                                                  (tcl_lie env) (tcl_native_givens ctx) }) env
 
 -- Return to the stored environment (from the enclosing proc)
 escapeArrowScope :: TcM a -> TcM a
@@ -984,9 +1017,11 @@ escapeArrowScope
   = updLclEnv $ \ env ->
     case getLclEnvArrowCtxt env of
       NoArrowCtxt       -> env
-      ArrowCtxt rdr_env lie -> env { tcl_lcl_ctxt = (tcl_lcl_ctxt env) { tcl_arrow_ctxt = NoArrowCtxt
-                                                                       , tcl_rdr = rdr_env }
-                                   , tcl_lie = lie }
+      ArrowCtxt rdr_env lie givens -> env
+        { tcl_lcl_ctxt = (tcl_lcl_ctxt env) { tcl_arrow_ctxt = NoArrowCtxt
+                                          , tcl_rdr = rdr_env
+                                          , tcl_native_givens = givens }
+        , tcl_lie = lie }
 
 {-
 ************************************************************************

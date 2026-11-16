@@ -941,6 +941,12 @@ instance HasHaddock (LocatedA (HsType GhcPs)) where
         body' <- addHaddock body
         pure $ L l (HsForAllTy x tele body')
 
+      -- foreach (b :: Bool) -> t
+      HsForEachTy x bndrs body -> do
+        traverse_ registerHdkA bndrs
+        body' <- addHaddock body
+        pure $ L l (HsForEachTy x bndrs body')
+
       -- (Eq a, Num a) => t
       HsQualTy x lhs rhs -> do
         registerHdkA lhs

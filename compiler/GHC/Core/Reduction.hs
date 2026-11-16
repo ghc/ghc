@@ -11,7 +11,7 @@ module GHC.Core.Reduction
      mkCastRedn1, mkCastRedn2,
      mkReflRedn, mkGReflRightRedn, mkGReflRightMRedn,
      mkGReflLeftRedn, mkGReflLeftMRedn,
-     mkAppRedn, mkAppRedns, mkFunRedn,
+     mkAppRedn, mkAppRedns, mkFunRedn, mkDepFunRedn,
      mkForAllRedn, mkHomoForAllRedn, mkTyConAppRedn, mkClassPredRedn,
      mkProofIrrelRedn, mkReflCoRedn,
      homogeniseHetRedn,
@@ -35,7 +35,7 @@ import GHC.Data.Pair       ( Pair(Pair) )
 import GHC.Data.List.Infinite ( Infinite (..) )
 import qualified GHC.Data.List.Infinite as Inf
 
-import GHC.Types.Var       ( VarBndr(..), setTyVarKind )
+import GHC.Types.Var       ( Id, VarBndr(..), setTyVarKind )
 import GHC.Types.Var.Env   ( mkInScopeSet )
 import GHC.Types.Var.Set   ( TyCoVarSet )
 
@@ -341,6 +341,7 @@ mkAppRedn (Reduction co1 ty1) (Reduction co2 ty2)
 -- | Create a function 'Reduction'.
 --
 -- Combines 'mkFunCo' and 'mkFunTy'.
+-- See Note [Function reduction multiplicity roles].
 mkFunRedn :: Role
           -> FunTyFlag
           -> ReductionN -- ^ multiplicity reduction
@@ -352,9 +353,31 @@ mkFunRedn r af
   (Reduction arg_co arg_ty)
   (Reduction res_co res_ty)
     = mkReduction
-        (mkFunCo r af w_co arg_co res_co)
+        (mkFunCo r af (downgradeRole (funRole r SelMult) Nominal w_co) arg_co res_co)
         (mkFunTy   af w_ty arg_ty res_ty)
 {-# INLINE mkFunRedn #-}
+
+{- Note [Function reduction multiplicity roles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normalise multiplicities at Nominal and keep the ReductionN input contract.
+A FunCo stores nominal multiplicity evidence at Nominal or Representational,
+but phantom multiplicity evidence at Phantom. See funRole and the FunCo
+declaration in GHC.Core.TyCo.Rep. Weaken the stored proof to that required role.
+Keep the reduced multiplicity type unchanged.
+
+Reflexive children can make mkFunCo collapse to reflexivity. A nonreflexive
+multiplicity, argument or result reduction prevents that collapse. Do not rely
+on it to hide an invalid multiplicity role in a Phantom FunCo.
+-}
+
+-- | Lift a body reduction under an unchanged retained runtime binder.
+-- The binder scopes over the complete proof. Each endpoint can independently
+-- become an ordinary arrow. See Note [Retained dependent function coercions]
+-- in GHC.Core.TyCo.Rep.
+mkDepFunRedn :: Id -> Reduction -> Reduction
+mkDepFunRedn b (Reduction co ty)
+  = mkReduction (mkDepFunCo b co) (mkDepFunTy b ty)
+{-# INLINE mkDepFunRedn #-}
 
 -- | Create a 'Reduction' associated to a Π type,
 -- from a kind 'Reduction' and a body 'Reduction'.

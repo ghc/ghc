@@ -44,8 +44,9 @@ import GHC.Core.Seq
 import GHC.Core.Utils
 
 import GHC.Core.Type
-import GHC.Core.Coercion( mkCoVarCo, substCoVarBndr )
+import GHC.Core.Coercion( mkCoVarCo, substCoVarBndr, mapNativeIndexCastCo )
 import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Subst ( isEmptyTypeSubst )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.FV
@@ -261,7 +262,7 @@ substExpr subst expr
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)     = Cast (go e) (substCo subst co)
+    go (Cast e co)     = Cast (go e) (mapNativeIndexCastCo (substCo subst) co)
        -- Do not optimise even identity coercions
        -- Reason: substitution applies to the LHS of RULES, and
        --         if you "optimise" an identity coercion, you may
@@ -381,9 +382,9 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
 
     old_ty = idType old_id
     old_w = idMult old_id
-    no_type_change = isEmptyTCvSubst subst ||
+    no_type_change = isEmptyTypeSubst subst [old_ty, old_w] [] ||
                      (noFreeVarsOfType old_ty && noFreeVarsOfType old_w)
-                     -- isEmptyTCvSubst: see Note [Keeping the substitution empty]
+                     -- See Note [Keeping the substitution empty].
                      --                  in GHC.Core.TyCo.Subst
 
         -- new_id has the right IdInfo
@@ -484,8 +485,8 @@ clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
 -}
 
 substIdType :: Subst -> Id -> Id
-substIdType subst@(Subst _ _ tv_env cv_env) id
-  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
+substIdType subst id
+  | isEmptyTypeSubst subst [old_ty, old_w] []
     || (noFreeVarsOfType old_ty && noFreeVarsOfType old_w) = id
   | otherwise   =
       updateIdTypeAndMult (substTyUnchecked subst) id

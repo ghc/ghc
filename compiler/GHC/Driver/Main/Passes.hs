@@ -43,6 +43,7 @@ import GHC.Driver.Main.Hsc
       iface_core_bindings,
       handleWarningsThrowErrors,
       ioMsgMaybe,
+      checkNativeDependentModule,
       hscSimpleIface )
 
 import GHC.Driver.Plugins
@@ -99,6 +100,7 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
+import GHC.Core.Dependent ( hasNativeDependentExpr, rejectNativeDependentExpr )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Utils          ( exprType )
@@ -107,9 +109,10 @@ import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
 import GHC.Core.InstEnv
 import GHC.Core.Rules
 import GHC.Core.Stats
+import GHC.Core.SimpleOpt ( simpleOptNativeExpr, simpleOptNativeProgram )
 
 
-import GHC.CoreToStg.Prep( corePrepExpr )
+import GHC.CoreToStg.Prep( CorePrepConfig(..), corePrepExpr )
 import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Errors.Types
@@ -1453,8 +1456,42 @@ hscSimplify' plugins ds_result = do
         else liftIO $ initializePlugins
                     $ hscUpdateFlags (\dflags -> foldr addPluginModuleName dflags plugins)
                       hsc_env
-    {-# SCC "Core2Core" #-}
-      liftIO $ core2core hsc_env_with_plugins ds_result
+    liftIO $ do
+      native <- checkNativeDependentModule hsc_env_with_plugins (mg_binds ds_result) (mg_rules ds_result) (mg_tcs ds_result)
+      if native
+        then do
+          let lint_env = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env_with_plugins
+              name_ppr_ctx = alwaysQualify
+              binds = mg_binds ds_result
+              rules = mg_rules ds_result
+          endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt binds rules
+          let simplified = simpleOptNativeProgram binds
+          endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt simplified rules
+          return (ds_result { mg_binds = simplified })
+        else {-# SCC "Core2Core" #-} core2core hsc_env_with_plugins ds_result
+
+{- Note [Compiling native dependent modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The restricted module path compiles retained Boolean workers, including
+exported native signatures. Reuse native SimpleOpt on each RHS and preserve
+top-level binding identities. Do not enter ordinary occurrence analysis or
+the full Core optimizer. Force Core Lint before and after simplification and
+module tidying. The program CorePrep entry requires the same checked opt-in
+and disabled speculation as the expression entry. Force STG Lint after erasure.
+
+Require -O0 and omit interface pragmas and serialized Core. Native interface
+signatures use scoped local Ids. Native unfoldings remain gated. Reject plugins,
+profiling, and non-object module backends before unsupported transformations.
+Repeat the option check at the machine-code entry for direct API callers.
+Include retained constructor worker types from the module's type constructors
+in each option check. A declaration-only module can have no native explicit
+binding. addImplicitBinds generates its constructor worker later. Classify
+that module before simplification and tidying, then use the checked native
+CorePrep path for its generated worker. Keep the late-plugin output guard.
+This adds no singleton or index evaluation. It carries the existing dependent
+application and constructor rules through the module driver; see the Agda
+provenance in docs/dependent-haskell/REFERENCES.md#agda-provenance.
+-}
 
 --------------------------------------------------------------
 -- CoreToStg
@@ -1485,8 +1522,14 @@ myCoreToStg logger dflags ic_inscope for_bytecode this_mod ml prepd_binds = do
 
 hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 hscTidy hsc_env guts = do
+  native <- checkNativeDependentModule hsc_env (mg_binds guts) (mg_rules guts) (mg_tcs guts)
   let logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
+  let lint_env | native = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env
+               | otherwise = hsc_env
+
+  when native $
+    endPassHscEnvIO lint_env alwaysQualify CoreDesugarOpt (mg_binds guts) (mg_rules guts)
 
   opts <- initTidyOpts hsc_env guts
   (cgguts, details) <- withTiming logger
@@ -1500,7 +1543,7 @@ hscTidy hsc_env guts = do
   let name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) (mg_rdr_env guts)
       ptc            = initPromotionTickContext (hsc_dflags hsc_env)
 
-  endPassHscEnvIO hsc_env name_ppr_ctx CoreTidy all_tidy_binds tidy_rules
+  endPassHscEnvIO lint_env name_ppr_ctx CoreTidy all_tidy_binds tidy_rules
 
   -- If the endPass didn't print the rules, but ddump-rules is
   -- on, print now
@@ -1529,6 +1572,26 @@ hscTidy hsc_env guts = do
 %*                                                                      *
 %********************************************************************* -}
 
+{- Note [Compiling native dependent Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The native bytecode entry uses the restricted SimpleOpt mode. See
+Note [Restricted dependent simplification] in GHC.Core.SimpleOpt. The ordinary
+simplifier does not preserve runtime index substitutions or virtual Bool proofs.
+Do not send native expressions through that path.
+
+Force Core Lint before and after simplification and CorePrep. Force STG Lint
+after lowering. Keep speculative evaluation and optional arity analysis disabled
+in CorePrep. A retained Bool is an ordinary lazy argument. An occurrence in a
+type must not force it. The strict case supplies branch evidence; CoreToStg
+removes that evidence after checking its scope and runtime representations.
+
+Report an unsupported backend as Sorry. It is a feature restriction, not an
+internal compiler error. The checked module path is separate; see
+Note [Compiling native dependent modules]. Native unfoldings remain gated.
+See docs/dependent-haskell/CORE.md and the Agda provenance in
+docs/dependent-haskell/REFERENCES.md.
+-}
+
 hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr hsc_env loc expr =
   case hscCompileCoreExprHook (hsc_hooks hsc_env) of
@@ -1538,15 +1601,29 @@ hscCompileCoreExpr hsc_env loc expr =
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   {- Simplify it -}
-  -- Question: should we call SimpleOpt.simpleOptExpr here instead?
-  -- It is, well, simpler, and does less inlining etc.
-  let dflags = hsc_dflags hsc_env
+  -- See Note [Compiling native dependent Core].
+  let native = hasNativeDependentExpr ds_expr
+      dflags = if native
+               then gopt_set (gopt_set (hsc_dflags hsc_env) Opt_DoCoreLinting)
+                             Opt_DoStgLinting
+               else hsc_dflags hsc_env
+      lint_env = hsc_env { hsc_dflags = dflags }
   let logger = hsc_logger hsc_env
   let ic = hsc_IC hsc_env
   let unit_env = hsc_unit_env hsc_env
   let simplify_expr_opts = initSimplifyExprOpts dflags ic
 
-  simpl_expr <- simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
+  simpl_expr <- if native
+    then do
+      case hscInterp hsc_env of
+        Interp { interpInstance = ExternalInterp (ExtJS _) } ->
+          rejectNativeDependentExpr "JavaScript code generation" ds_expr
+        _ -> return ()
+      lintInteractiveExpr (text "native Core before simplification") lint_env ds_expr
+      let simplified = simpleOptNativeExpr ds_expr
+      lintInteractiveExpr (text "native Core after simplification") lint_env simplified
+      return simplified
+    else simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
 
   -- Create a unique temporary binding
   --
@@ -1562,13 +1639,18 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   let tidy_expr    = tidyExpr tidy_env simpl_expr
 
   {- Prepare for codegen -}
-  cp_cfg <- initCorePrepConfig hsc_env
+  cp_cfg0 <- initCorePrepConfig hsc_env
+  let cp_cfg | native = cp_cfg0 { cp_allowNativeDependent = True
+                               , cp_arityOpts = Nothing
+                               , cp_specEval = False
+                               , cp_specEvalDFun = False }
+             | otherwise = cp_cfg0
   prepd_expr <- corePrepExpr
    logger cp_cfg
    tidy_expr
 
   {- Lint if necessary -}
-  lintInteractiveExpr (text "hscCompileCoreExpr") hsc_env prepd_expr
+  lintInteractiveExpr (text "hscCompileCoreExpr") lint_env prepd_expr
   let this_loc = OsPathModLocation
           { ml_hs_file_ospath   = Nothing,
             ml_hi_file_ospath   = panic "hscCompileCoreExpr':ml_hi_file_ospath",

@@ -1,9 +1,16 @@
 {-# LANGUAGE NoPolyKinds #-}
 module GHC.Core where
+import GHC.Prelude ( Maybe )
 import {-# SOURCE #-} GHC.Types.Var
+import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
 
 data Expr a
 
 type CoreBndr = Var
 
 type CoreExpr = Expr CoreBndr
+
+varToCoreExpr :: CoreBndr -> Expr b
+exprToNativeIndex :: CoreExpr -> Maybe Type
+nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
+mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr

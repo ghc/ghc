@@ -15,6 +15,7 @@ module GHC.Core.TyCo.Subst
 
         emptyIdSubstEnv, emptyTvSubstEnv, emptyCvSubstEnv, composeTCvSubst,
         emptySubst, mkEmptySubst, isEmptyTvSubst, isEmptyTCvSubst, isEmptySubst,
+        isEmptyTypeSubst,
         mkSubst, mkTCvSubst, mkTvSubst, mkCvSubst, mkIdSubst,
         getTvSubstEnv, getIdSubstEnv,
         getCvSubstEnv, substInScopeSet, setInScope, getSubstRangeTyCoFVs,
@@ -42,7 +43,7 @@ module GHC.Core.TyCo.Subst
         cloneTyVarBndr, cloneTyVarBndrs,
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
-        substCoVarBndr,
+        substCoVarBndr, substNativeIndexBndr,
         substTyVar, substTyVars,
         substTyCoVars,
         substTyCoBndr,
@@ -53,15 +54,17 @@ module GHC.Core.TyCo.Subst
   ) where
 
 import GHC.Prelude
+import GHC.Data.Maybe ( orElse )
 
 
 import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyConAppCo )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
-import {-# SOURCE #-} GHC.Core ( CoreExpr )
-import {-# SOURCE #-} GHC.Core.Type( isCoercionTy )
+import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToNativeIndex, mapNativeIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
+import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, nativeIndexFunctionTys_maybe, typeKind )
 
 import GHC.Core.TyCo.Make
+import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCon( TyCon )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -188,9 +191,9 @@ The TvSubstEnv and CvSubstEnv have a binding for each TyCoVar
   - whose unique has changed, OR
   - whose kind has changed
 
-This invariant allows a short-cut when the subst envs are empty:
-if the TvSubstEnv and CvSubstEnv are empty --- i.e. (isEmptyTCvSubst subst)
-holds --- then (substTy subst ty) does nothing.
+This invariant allows a short-cut for ordinary types when the TvSubstEnv and
+CvSubstEnv are empty. Native runtime indices also use the IdSubstEnv.
+Use isEmptyTypeSubst to check whether these indices require substitution.
 
 For example, consider:
         (/\a. /\b:(a~Int). ...b..) Int
@@ -238,13 +241,15 @@ emptyCvSubstEnv :: CvSubstEnv
 emptyCvSubstEnv = emptyVarEnv
 
 -- | Composes two substitutions, applying the second one provided first,
--- like in function composition. This function leaves IdSubstEnv untouched
--- because IdSubstEnv is not used during substitution for types.
+-- like in function composition. Compose supported scalar and function-head
+-- variable ranges in the expression environment too. Other ranges stay unchanged;
+-- this function does not compose general Core expression substitutions.
 composeTCvSubst :: Subst -> Subst -> Subst
-composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 _ tenv2 cenv2)
-  = Subst is3 ids1 tenv3 cenv3
+composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
+  = Subst is3 ids3 tenv3 cenv3
   where
     is3 = is1 `unionInScope` is2
+    ids3 = ids1 `plusVarEnv` mapVarEnv compose_index ids2
     tenv3 = tenv1 `plusVarEnv` mapVarEnv (substTy extended_subst1) tenv2
     cenv3 = cenv1 `plusVarEnv` mapVarEnv (substCo extended_subst1) cenv2
 
@@ -252,6 +257,11 @@ composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 _ tenv2 cenv2)
     -- cover the free variables in the range of the second substitution before
     -- applying it (#22235).
     extended_subst1 = subst1 `setInScope` is3
+
+    compose_index rhs
+      | Just f <- nativeIndexFunctionVar_maybe rhs
+      = varToCoreExpr (substNativeIndexFunction extended_subst1 f)
+      | otherwise = mapNativeIndex (substTy extended_subst1) rhs
 
 emptySubst :: Subst
 emptySubst = Subst emptyInScopeSet emptyVarEnv emptyVarEnv emptyVarEnv
@@ -269,11 +279,9 @@ isEmptyTvSubst (Subst _ _ tv_env _)
   = isEmptyVarEnv tv_env
 
 -- | Checks whether the tyvar and covar environments are empty.
--- This function should be used over 'isEmptySubst' when substituting
--- for types, because types currently do not contain expressions; we can
--- safely disregard the expression environment when deciding whether
--- to skip a substitution. Using 'isEmptyTCvSubst' gives us a non-trivial
--- performance boost (up to 70% less allocation for T18223)
+-- Ordinary types do not use the expression environment. Ignoring that
+-- environment reduced allocation by up to 70% for T18223 before native indices.
+-- Use 'isEmptyTypeSubst' when types can contain native runtime indices.
 isEmptyTCvSubst :: Subst -> Bool
 isEmptyTCvSubst (Subst _ _ tv_env cv_env)
   = isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
@@ -314,11 +322,17 @@ setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
 -- | Returns the deep free variables of the types in the range of a
 -- substitution as a non-deterministic set.
 getSubstRangeTyCoFVs :: Subst -> VarSet
-getSubstRangeTyCoFVs (Subst _ _ tenv cenv)
-  = tenvFVs `unionVarSet` cenvFVs
+getSubstRangeTyCoFVs (Subst _ ids tenv cenv)
+  = tenvFVs `unionVarSet` cenvFVs `unionVarSet` indexFVs `unionVarSet` functionFVs
   where
     tenvFVs = tyCoVarsOfTyVarEnv tenv
     cenvFVs = tyCoVarsOfCoVarEnv cenv
+    indexFVs = tyCoVarsOfTypes
+      [ index | rhs <- nonDetEltsUFM ids, Just index <- [exprToNativeIndex rhs] ]
+    functionFVs = unionVarSets
+      [ unitVarSet f `unionVarSet` tyCoVarsOfType (varType f)
+                     `unionVarSet` tyCoVarsOfType (idMult f)
+      | rhs <- nonDetEltsUFM ids, Just f <- [nativeIndexFunctionVar_maybe rhs] ]
 
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
@@ -665,19 +679,14 @@ substTyAddInScope subst ty =
 -- the substitution is a superset of the (deep) free vars of the range of
 -- the substitution.
 -- See also Note [The substitution invariant].
--- TODO: take into account ids and rename as isValidSubst
 isValidTCvSubst :: Subst -> Bool
-isValidTCvSubst (Subst in_scope _ tenv cenv) =
-  (tenvFVs `varSetInScope` in_scope) &&
-  (cenvFVs `varSetInScope` in_scope)
-  where
-  tenvFVs = tyCoVarsOfTyVarEnv tenv
-  cenvFVs = tyCoVarsOfCoVarEnv cenv
+isValidTCvSubst subst@(Subst in_scope _ _ _)
+  = getSubstRangeTyCoFVs subst `varSetInScope` in_scope
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
 checkValidSubst :: HasDebugCallStack => Subst -> [Type] -> [Coercion] -> a -> a
-checkValidSubst subst@(Subst in_scope _ tenv cenv) tys cos a
+checkValidSubst subst@(Subst in_scope ids tenv cenv) tys cos a
   = assertPpr (isValidTCvSubst subst)
               (text "in_scope" <+> ppr in_scope $$
                text "tenv" <+> ppr tenv $$
@@ -695,7 +704,7 @@ checkValidSubst subst@(Subst in_scope _ tenv cenv) tys cos a
                text "needInScope" <+> ppr needInScope)
     a
   where
-  substDomain = nonDetKeysUFM tenv ++ nonDetKeysUFM cenv
+  substDomain = nonDetKeysUFM ids ++ nonDetKeysUFM tenv ++ nonDetKeysUFM cenv
     -- It's OK to use nonDetKeysUFM here, because we only use this list to
     -- remove some elements from a set
   needInScope = (tyCoVarsOfTypes tys `unionVarSet`
@@ -704,12 +713,20 @@ checkValidSubst subst@(Subst in_scope _ tenv cenv) tys cos a
   tysCosFVsInScope = needInScope `varSetInScope` in_scope
 
 
--- | Substitute within a 'Type'
--- The substitution has to satisfy the invariants described in
+-- | Test whether a substitution leaves the given types and coercions unchanged.
+-- Ordinary types still ignore expression substitutions. Runtime indices cannot.
+isEmptyTypeSubst :: Subst -> [Type] -> [Coercion] -> Bool
+isEmptyTypeSubst subst@(Subst _ ids _ _) tys cos
+  = isEmptyTCvSubst subst
+    && (isEmptyVarEnv ids
+        || not (any (anyFreeVarsOfType isNonCoVarId) tys
+                || any (anyFreeVarsOfCo isNonCoVarId) cos))
+
+-- | Substitute within a 'Type'. The substitution must satisfy
 -- Note [The substitution invariant].
 substTy :: HasDebugCallStack => Subst -> Type  -> Type
 substTy subst ty
-  | isEmptyTCvSubst subst = ty
+  | isEmptyTypeSubst subst [ty] [] = ty
   | otherwise             = checkValidSubst subst [ty] [] $
                             subst_ty subst ty
 
@@ -720,7 +737,7 @@ substTy subst ty
 -- substTy and remove this function. Please don't use in new code.
 substTyUnchecked :: Subst -> Type -> Type
 substTyUnchecked subst ty
-  | isEmptyTCvSubst subst = ty
+  | isEmptyTypeSubst subst [ty] [] = ty
   | otherwise             = subst_ty subst ty
 
 substScaledTy :: HasDebugCallStack => Subst -> Scaled Type -> Scaled Type
@@ -734,12 +751,12 @@ substScaledTyUnchecked subst scaled_ty = mapScaledType (substTyUnchecked subst) 
 -- Note [The substitution invariant].
 substTys :: HasDebugCallStack => Subst -> [Type] -> [Type]
 substTys subst tys
-  | isEmptyTCvSubst subst = tys
+  | isEmptyTypeSubst subst tys [] = tys
   | otherwise = checkValidSubst subst tys [] $ map (subst_ty subst) tys
 
 substScaledTys :: HasDebugCallStack => Subst -> [Scaled Type] -> [Scaled Type]
 substScaledTys subst scaled_tys
-  | isEmptyTCvSubst subst = scaled_tys
+  | isEmptyTypeSubst subst (map scaledMult scaled_tys ++ map scaledThing scaled_tys) [] = scaled_tys
   | otherwise = checkValidSubst subst (map scaledMult scaled_tys ++ map scaledThing scaled_tys) [] $
                 map (mapScaledType (subst_ty subst)) scaled_tys
 
@@ -750,12 +767,12 @@ substScaledTys subst scaled_tys
 -- substTys and remove this function. Please don't use in new code.
 substTysUnchecked :: Subst -> [Type] -> [Type]
 substTysUnchecked subst tys
-                 | isEmptyTCvSubst subst = tys
+                 | isEmptyTypeSubst subst tys [] = tys
                  | otherwise             = map (subst_ty subst) tys
 
 substScaledTysUnchecked :: Subst -> [Scaled Type] -> [Scaled Type]
 substScaledTysUnchecked subst tys
-                 | isEmptyTCvSubst subst = tys
+                 | isEmptyTypeSubst subst (map scaledMult tys ++ map scaledThing tys) [] = tys
                  | otherwise             = map (mapScaledType (subst_ty subst)) tys
 
 -- | Substitute within a 'ThetaType'
@@ -790,6 +807,9 @@ subst_co :: Subst -> Coercion -> Coercion
 substTyCoMapper :: TyCoMapper SubstM
 substTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
+               , tcm_termvar    = subst_index
+               , tcm_termfun    = subst_fun
+               , tcm_termbinder = index_bndr
                , tcm_covar      = subst_cv
                , tcm_hole       = subst_ch
                , tcm_tycobinder = tcv_bndr
@@ -801,6 +821,23 @@ substTyCoMapper
    subst_cv cv = StrictReaderT $ \subst -> return (substCoVar  subst cv)
    subst_ch ch = StrictReaderT $ \subst -> return (substCoHole subst ch)
 
+   -- Return a stored converted range once, including its nominal evidence.
+   -- See Note [Nominal native index casts] in GHC.Core.
+   subst_index v = StrictReaderT $ \(Subst in_scope ids _ _) ->
+     return $ case lookupVarEnv ids v of
+       Nothing -> TermVarTy (lookupInScope in_scope v `orElse` v)
+       Just rhs -> case exprToNativeIndex rhs of
+         Just index | typeKind index `eqType` varType v -> index
+         _ -> pprPanic "substTy: unsupported runtime index or changed domain"
+                      (ppr v <+> text ":=" <+> ppr rhs)
+
+   subst_fun f = StrictReaderT $ \subst -> return (substNativeIndexFunction subst f)
+
+   index_bndr :: Id -> (Id -> SubstM r) -> SubstM r
+   index_bndr old k = StrictReaderT $ \subst ->
+     let (subst', new) = substNativeIndexBndr subst old
+     in runStrictReaderT (k new) subst'
+
    tcv_bndr :: TyCoVar -> ForAllTyFlag -> (TyCoVar -> SubstM r) -> SubstM r
    tcv_bndr tcv _vis k
      = StrictReaderT $ \subst ->
@@ -808,8 +845,34 @@ substTyCoMapper
            -- Sadly unchecked because subst_ty is used from substTyUnchecked
        in runStrictReaderT (k tcv') subst'
 
-   -- Avoid allocation in this very
-   -- common case (E.g. Int, LiftedRep etc)
+-- | Rename a checked function head. Return a stored range only once.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+substNativeIndexFunction :: Subst -> Id -> Id
+substNativeIndexFunction (Subst in_scope ids _ _) f
+  = case (nativeIndexFunctionTys_maybe f, nativeIndexFunctionTys_maybe actual) of
+      (Just (arg, res), Just (arg', res'))
+        | same_domain arg arg', same_domain res res' -> actual
+      _ -> pprPanic "substTy: invalid native function head" (ppr actual)
+  where
+    actual = case lookupVarEnv ids f of
+      Nothing -> lookupInScope in_scope f `orElse` f
+      Just rhs -> case nativeIndexFunctionVar_maybe rhs of
+        Just g -> g
+        Nothing -> pprPanic "substTy: unsupported native function range"
+                     (ppr f <+> text ":=" <+> ppr rhs)
+    same_domain = eqType
+
+-- | Rename a closed-domain runtime binder and mask its outer substitution.
+-- Use the resulting substitution only inside the binder's scope.
+substNativeIndexBndr :: Subst -> Id -> (Subst, Id)
+substNativeIndexBndr (Subst in_scope ids tvs cvs) old
+  = (Subst (extendInScopeSet in_scope new) ids' tvs cvs, new)
+  where
+    new = uniqAway in_scope old
+    ids' | new == old = delVarEnv ids old
+         | otherwise = extendVarEnv ids old (varToCoreExpr new)
+
+-- Avoid allocation in this very common case (e.g. Int, LiftedRep).
 nopTcAppTy :: Type -> TyCon -> [Type] -> SubstM Type
 nopTcAppTy  ty tc tys'
   | null tys'  = return ty
@@ -849,7 +912,7 @@ lookupTyVar (Subst _ _ tenv _) tv
 -- Note [The substitution invariant].
 substCo :: HasDebugCallStack => Subst -> Coercion -> Coercion
 substCo subst co
-  | isEmptyTCvSubst subst = co
+  | isEmptyTypeSubst subst [] [co] = co
   | otherwise = checkValidSubst subst [] [co] $ subst_co subst co
 
 -- | Substitute within several 'Coercion's
@@ -857,7 +920,7 @@ substCo subst co
 -- Note [The substitution invariant].
 substCos :: HasDebugCallStack => Subst -> [Coercion] -> [Coercion]
 substCos subst cos
-  | isEmptyTCvSubst subst = cos
+  | isEmptyTypeSubst subst [] cos = cos
   | otherwise = checkValidSubst subst [] cos $ map (subst_co subst) cos
 
 substCoHole :: Subst -> CoercionHole -> Coercion
@@ -924,8 +987,8 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
     -- Assertion check that we are not capturing something in the substitution
 
     old_ki = tyVarKind old_var
-    no_kind_change = isEmptyTCvSubst subst || noFreeVarsOfType old_ki
-                     -- isEmptyTCvSubst: see Note [Keeping the substitution empty]
+    no_kind_change = isEmptySubst subst || noFreeVarsOfType old_ki
+                     -- See Note [Keeping the substitution empty].
     no_change = no_kind_change && (new_var == old_var)
         -- no_change means that the new_var is identical in
         -- all respects to the old_var (same unique, same kind)
@@ -953,8 +1016,8 @@ substCoVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
     (Subst (in_scope `extendInScopeSet` new_var) idenv tenv new_cenv, new_var)
   where
     new_co         = mkCoVarCo new_var
-    no_kind_change = isEmptyTCvSubst subst || noFreeVarsOfTypes [t1, t2]
-                     -- isEmptyTCvSubst: see Note [Keeping the substitution empty]
+    no_kind_change = isEmptySubst subst || noFreeVarsOfTypes [t1, t2]
+                     -- See Note [Keeping the substitution empty].
     no_change      = new_var == old_var && no_kind_change
 
     new_cenv | no_change = delVarEnv cenv old_var
@@ -1064,6 +1127,9 @@ Wrinkles:
 deepSubstTyCoMapper :: TyCoMapper SubstM
 deepSubstTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
+               , tcm_termvar    = tcm_termvar substTyCoMapper
+               , tcm_termfun    = tcm_termfun substTyCoMapper
+               , tcm_termbinder = tcm_termbinder substTyCoMapper
                , tcm_covar      = subst_cv
                , tcm_hole       = subst_ch
                , tcm_tycobinder = tcv_bndr

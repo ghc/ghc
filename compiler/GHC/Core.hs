@@ -33,7 +33,10 @@ module GHC.Core (
         mkDoubleLit,
 
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
-        varToCoreExpr, varsToCoreExprs,
+        varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
+        exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
+        exprToNativeCaseIndex, nativeIndexFunctionVar_maybe,
+        isNativeIndexAlt, isNativeIndexAliasAlt,
 
         mkBinds,
 
@@ -101,21 +104,29 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core.Type
+import GHC.Core.TyCo.Compare ( eqType )
+import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, TyConApp, CastTy), Coercion(SubCo), Scaled(..) )
+import qualified GHC.Core.TyCo.Subst as TyCoSubst
+import GHC.Builtin.KnownKeys ( boolTyConKey )
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.DataCon
+import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon, isBoxedDataTyCon )
 import GHC.Unit.Module
 
 import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Var.Env( InScopeSet )
+import GHC.Types.Var.Env( InScopeSet, IdEnv, emptyVarEnv, lookupVarEnv, extendVarEnv, mapVarEnv, mkInScopeSet )
+import GHC.Types.Var.Set ( unionVarSet )
 import GHC.Types.Var
+import {-# SOURCE #-} GHC.Types.Id ( isDataConWorkId_maybe )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM ( nonDetEltsUFM )
 
 import GHC.Utils.Binary
 import GHC.Utils.Misc
@@ -347,7 +358,9 @@ type Arg b = Expr b
 
 -- | A case split alternative. Consists of the constructor leading to the alternative,
 -- the variables bound from the constructor, and the expression to be executed given that binding.
--- The default alternative is @(DEFAULT, [], rhs)@
+-- The ordinary default alternative is @(DEFAULT, [], rhs)@. A checked native
+-- index alias binds one virtual CoVar. See Note [Native index alias evidence]
+-- in GHC.Core.Lint.
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
@@ -786,6 +799,11 @@ Note [Case expression invariants]
 Case expressions are one of the more complicated elements of the Core
 language, and come with a number of invariants.  All of them should be
 checked by Core Lint.
+
+Experimental native algebraic alternatives can bind one virtual coercion variable
+after their ordinary fields. They require checked coverage and branch evidence.
+The ordinary optimizer remains gated. See Note [Native algebraic branch evidence]
+in GHC.Core.Lint.
 
 1. The list of alternatives may be empty;
    See Note [Empty case alternatives]
@@ -2583,7 +2601,239 @@ mkTyBind tv ty      = NonRec tv (Type ty)
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)
 
--- | Convert a binder into either a 'Var' or 'Type' 'Expr' appropriately
+-- | Convert a supported expression to its checked native index normal form.
+-- See Note [Checked native index beta exposure].
+exprToNativeIndex :: CoreExpr -> Maybe Type
+exprToNativeIndex expr = snd <$> normaliseNativeIndexExpr expr
+
+-- | Recognize a checked local function head without inspecting its unfolding.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
+nativeIndexFunctionVar_maybe (Var f)
+  | isNativeIndexFunctionId f = Just f
+nativeIndexFunctionVar_maybe _ = Nothing
+
+-- | Recover an index for an existing strict case, including an opaque call.
+-- This does not admit a call as a lazy retained application argument.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+exprToNativeCaseIndex :: CoreExpr -> Maybe Type
+exprToNativeCaseIndex (App (Var f) arg)
+  | Just (domain, _) <- nativeIndexFunctionTys_maybe f
+  , Just index <- exprToNativeIndex arg
+  , sameNativeIndexDomain domain (typeKind index)
+  = Just (TermAppTy f index)
+exprToNativeCaseIndex expr = exprToNativeIndex expr
+
+-- | Return a supported runtime normal form together with its native index.
+-- The caller must check the original expression's typing and scope with Lint.
+-- See Note [Checked native index beta exposure].
+normaliseNativeIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
+normaliseNativeIndexExpr = go emptyVarEnv
+  where
+    go :: IdEnv (CoreExpr, Type) -> CoreExpr -> Maybe (CoreExpr, Type)
+    go env expr
+      | Var v <- expr, isNativeIndexId v
+      = case lookupVarEnv env v of
+          Just result@(_, index)
+            | sameNativeIndexDomain (varType v) (typeKind index) -> Just result
+            | otherwise -> Nothing
+          Nothing -> Just (expr, TermVarTy v)
+      | Cast body co <- expr
+      , Just delta <- nativeIndexCastCo_maybe co
+      , coercionRole delta == Nominal
+      = do { let delta' = subst_cast env delta
+           ; (source, _) <- nativeIndexCastDomains delta'
+           ; (body', index) <- go env body
+           ; if sameNativeIndexDomain source (typeKind index)
+             then Just (Cast body' (SubCo delta'), CastTy index delta')
+             else Nothing }
+      | App (Lam binder body) arg <- expr
+      , isNativeIndexId binder
+      = do { arg_result@(arg', arg_index) <- go env arg
+           ; if native_atom arg'
+                && sameNativeIndexDomain (varType binder) (typeKind arg_index)
+             then do { body_result@(_, body_index)
+                           <- go (extendVarEnv env binder arg_result) body
+                       ; if isNativeIndexType (typeKind body_index)
+                         then Just body_result
+                         else Nothing }
+             else Nothing }
+      | (Var worker, args) <- collectArgs expr
+      , Just con <- isDataConWorkId_maybe worker
+      , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
+      , Just tys <- traverse type_arg type_args
+      , Just _ <- nativeIndexDataConTyArgs (mkTyConApp (dataConTyCon con) tys) con
+      , fields `lengthIs` dataConSourceArity con
+      = do { results <- traverse (go env) fields
+           ; let (fields', indices) = unzip results
+           ; if nativeIndexArgKinds con tys indices
+             then Just (mkApps (Var worker) (type_args ++ fields'),
+                        mkTyConApp (promoteDataCon con) (tys ++ indices))
+             else Nothing }
+      | otherwise = Nothing
+
+    type_arg (Type ty) = Just ty
+    type_arg _ = Nothing
+
+    native_atom (Cast body _) = native_atom body
+    native_atom expr = case collectArgs expr of
+      (Var {}, args) -> all isTypeArg args
+      _ -> False
+
+    subst_cast env delta
+      = TyCoSubst.substCo subst delta
+      where
+        range_fvs = tyCoVarsOfTypes (map snd (nonDetEltsUFM env))
+        in_scope = mkInScopeSet (tyCoVarsOfCo delta `unionVarSet` range_fvs)
+        subst = TyCoSubst.mkSubst in_scope (mapVarEnv fst env) emptyVarEnv emptyVarEnv
+
+{- Note [Checked native index beta exposure]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A native index normal form is a local runtime variable or a saturated ordinary
+constructor tree. Keep erased universal arguments before runtime fields in
+both the expression and promoted index. Instantiate field domains at those
+arguments. See Note [Algebraic runtime index domains] in GHC.Core.Type.
+Also accept an immediate (\b -> body) arg when b is an
+eligible local Many index binder. The argument must normalize to an atom:
+an eligible variable or a nullary constructor worker with erased applications.
+Require the argument and binder to have the same supported closed algebraic
+domain A. The body can have an independently supported closed scalar domain B.
+In particular, a checked nominal cast can change the result domain. This is
+typed beta exposure, not equality between the argument and result domains.
+Every constructor field must have its declared domain.
+
+The environment contains only normalized atom/index pairs. Return a stored
+range directly; do not substitute through it again. Thus an inner binder does
+not capture a free variable in an outer range. Repeated uses of b retain the
+same actual variable. Reject a constructed argument with fields, rather than
+duplicate its allocation when b occurs more than once. This finite syntax walk
+does not inspect an Id unfolding, force a runtime value, or admit residual
+applications, lets, cases, ticks, or eta conversion. A checked nominal domain
+cast can wrap an atom. See Note [Nominal native index casts].
+
+Return both the normalized expression and its index. CorePrep must use that
+expression before naming constructor arguments. A result variable must remain
+that variable; an alias case could force it. mapNativeIndex and type recovery
+use this same conversion. The caller must still Lint the original expression
+to check all actual scopes, types, and metadata. This helper checks only the
+supported grammar, binder restrictions, and domains.
+
+DC's An-Beta and An-AppAbs rules require a typed primitive reduction. Agda's
+application checking substitutes an actual argument in the dependent result.
+These are precedents, not a preservation proof for this fragment of lazy Core.
+See docs/dependent-haskell/REFERENCES.md#core-contract-audit-and-bounded-beta-exposure.
+No general evaluator, nominal proof from Coercible, or new coercion is added.
+-}
+
+{- Note [Nominal native index casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CastTy index delta changes the scalar index domain from A to B, where delta
+is nominal evidence A ~ B. Its runtime expression uses Cast expr (SubCo delta).
+Keep the raw SubCo: mkSubCo can simplify away the nominal proof structure.
+Recover nominal evidence only through setNominalRole_maybe, and check its role,
+both closed scalar domains and its source against the original index kind.
+An arbitrary representational coercion does not justify a converted index.
+
+Core expression substitution, SimpleOpt and CorePrep preserve this evidence
+with mapNativeIndexCastCo. Rewrite the nominal child and then restore raw SubCo.
+Rewriting the representational coercion directly with mkSubCo can erase the
+nominal child of a phantom parameter. Endpoint equality does not recover that
+proof. This preservation changes proof syntax, not runtime demand.
+
+Reconstruction preserves the same nominal proof and its direction. Converted
+atoms can enter the existing beta environment. Substitute that environment
+into cast evidence as well as its body: the proof can mention a beta binder
+even when both domain endpoints are closed. Use capture-safe coercion
+substitution with the deep proof and range free variables in scope. Return a
+stored range once; do not substitute through its index or conversion proof a
+second time.
+Function-head domains keep their separate fixed-domain policy. See
+Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+-}
+
+-- | Check the nominal evidence for conversion between closed scalar domains.
+nativeIndexCastDomains :: CoercionN -> Maybe (Type, Type)
+nativeIndexCastDomains delta
+  | coercionRole delta == Nominal
+  , let source = coercionLKind delta
+        target = coercionRKind delta
+  , isNativeIndexType source, isNativeIndexType target
+  = Just (source, target)
+  | otherwise = Nothing
+
+-- | Compare supported closed domains after expanding type synonyms.
+sameNativeIndexDomain :: Type -> Type -> Bool
+sameNativeIndexDomain left right
+  | TyConApp {} <- coreFullView left
+  , TyConApp {} <- coreFullView right
+  = left `eqType` right
+  | otherwise = False
+
+-- | Check the domains of a saturated promoted constructor's field indices.
+nativeIndexArgKinds :: DataCon -> [Type] -> [Type] -> Bool
+nativeIndexArgKinds con tys indices
+  = indices `equalLength` fields && and (zipWith same_domain indices fields)
+  where
+    fields = dataConInstOrigArgTys con tys
+    same_domain index (Scaled _ ty)
+      = sameNativeIndexDomain (typeKind index) ty
+
+-- | Substitute in a supported runtime index without evaluating its value.
+-- Leave expressions outside the supported index language unchanged.
+mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr
+mapNativeIndex subst expr
+  | Just (_, index) <- normaliseNativeIndexExpr expr
+  = let index' = subst index
+    in case from_index index' of
+         Just expr' -> expr'
+         Nothing -> pprPanic "mapNativeIndex: unsupported substituted index" (ppr index')
+  | otherwise = expr
+  where
+    from_index (TermVarTy v)
+      | isNativeIndexId v = Just (Var v)
+    from_index (CastTy index delta)
+      | Just (source, _) <- nativeIndexCastDomains delta
+      , sameNativeIndexDomain source (typeKind index)
+      = do { expr <- from_index index
+           ; return (Cast expr (SubCo delta)) }
+    from_index (TyConApp tc args)
+      | Just con <- isPromotedDataCon_maybe tc
+      , let (tys, fields) = splitAt (length (dataConUnivTyVars con)) args
+      , Just _ <- nativeIndexDataConTyArgs (mkTyConApp (dataConTyCon con) tys) con
+      , fields `lengthIs` dataConSourceArity con
+      , nativeIndexArgKinds con tys fields
+      = do { fields' <- traverse from_index fields
+           ; return (mkConApp con (map Type tys ++ fields')) }
+    from_index _ = Nothing
+
+-- | Detect extra proof slots on ordinary algebraic alternatives.
+-- Core Lint checks their instantiated domain, count, scope and nominal type.
+isNativeIndexAlt :: Alt b -> Bool
+isNativeIndexAlt (Alt (DataAlt con) args _)
+  | length args > dataConRepArity con
+  , isVanillaAlgTyCon (dataConTyCon con)
+  , isBoxedDataTyCon (dataConTyCon con)
+  , null (dataConRepArgBinders con)
+  , (_, [], [], [], _, _) <- dataConFullSig con
+  = True
+isNativeIndexAlt _ = False
+
+-- | Detect proof binders on a DEFAULT alternative, including malformed proofs.
+-- Core Lint checks their count, scope, and exact nominal equality type.
+isNativeIndexAliasAlt :: CoreAlt -> Bool
+isNativeIndexAliasAlt (Alt DEFAULT args _) = any isCoVar args
+isNativeIndexAliasAlt _ = False
+
+-- | Convert a Boolean argument through the restricted frontend index language.
+exprToBoolIndex :: CoreExpr -> Maybe Type
+exprToBoolIndex expr
+  | Just index <- exprToNativeIndex expr
+  , TyConApp tc [] <- coreFullView (typeKind index)
+  , tc `hasKey` boolTyConKey
+  = Just index
+  | otherwise = Nothing
+
+-- | Convert a binder into its variable, type, or coercion expression.
 varToCoreExpr :: CoreBndr -> Expr b
 varToCoreExpr v | isTyVar v = Type (mkTyVarTy v)
                 | isCoVar v = Coercion (mkCoVarCo v)

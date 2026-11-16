@@ -13,14 +13,15 @@ module GHC.Rename.HsType (
         rnModifier, rnModifierWith,
         rnModifierContext, rnModifiersContext, rnModifiersContextAndWarn,
         rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsModifiedFunArrWith,
-        HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
+        rnHsSigType, rnHsWcType, rnHsTypeApp, rnHsModifiedFunArrWith,
+        HsPatSigTypeScoping(..), rnHsSigWcType, rnLocalHsSigWcType,
+        rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
         rnHsConDeclRecFields,
         lookupField, mkHsOpTyRn,
         rnLTyVar,
 
-        rnHsConDeclField,
+        rnHsConDeclField, rnRetainedSigType,
 
         -- Precence related stuff
         NegationHandling(..),
@@ -91,6 +92,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List (nubBy, partition)
+import Data.Data (Data, cast, gmapQ)
 import Control.Monad
 
 {-
@@ -139,20 +141,264 @@ data HsPatSigTypeScoping
     -- See also @Note [Pattern signature binders and scoping]@ in
     -- "GHC.Hs.Type".
 
+-- | Rename a local signature with aliases for already-scoped term Names.
+-- The caller checks ExperimentalDependentTypes and LocalBindCtxt.
+-- See Note [Local retained signature aliases].
+rnLocalHsSigWcType :: NameSet -> HsDocContext -> LHsSigWcType GhcPs
+                  -> RnM (LHsSigWcType GhcRn, FreeNames)
+rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
+  = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
+       ; rnWithRetainedAliases bound_names RetainedPartialSignature free_vars sig_ty $
+           rnHsSigWcType doc ty }
+
+-- | Rename a visible type argument with aliases for lexical runtime indices.
+-- See Note [Runtime indices in visible type arguments].
+rnHsTypeApp :: LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeNames)
+rnHsTypeApp ty@(HsWC { hswc_body = hs_ty })
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; if experimental
+         then do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
+                 ; rnWithRetainedAliases emptyNameSet RetainedPartialTypeArgument free_vars hs_ty $
+                     rnHsWcType HsTypeCtx ty }
+         else rnHsWcType HsTypeCtx ty }
+
+-- | Scope aliases for complete types that capture lexical runtime Names.
+-- The excluded Names belong to an unavailable signature binding group.
+rnWithRetainedAliases :: Data a => NameSet -> RetainedQuantificationError -> FreeKiTyVars -> a
+                      -> RnM b -> RnM b
+rnWithRetainedAliases bound_names partial_error free_vars syntax action
+  = do { env <- getLocalRdrEnv
+       ; named_wildcards <- xoptM LangExt.NamedWildCards
+       ; aliases <- fmap catMaybes $ mapM (candidate env named_wildcards) free_vars
+       ; unless (null aliases) $
+           do { level <- getThLevel
+              ; case level of
+                  Comp -> return ()
+                  _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
+              ; (wildcards, _) <- partition_nwcs free_vars
+              ; case retainedWildcardSpan syntax `mplus`
+                     (getLocA <$> listToMaybe wildcards) of
+                  Nothing -> return ()
+                  Just loc -> setSrcSpan loc $
+                    failWithTc $ TcRnRetainedQuantificationError partial_error }
+       ; let env' = foldl' (\env (occ, name) -> extendLocalRdrEnvWithAlias env occ name)
+                          env aliases
+       ; setLocalRdrEnv env' action }
+  where
+    candidate env named_wildcards (L loc rdr)
+      | Unqual occ <- rdr
+      , not (named_wildcards && startsWithUnderscore occ)
+      , Nothing <- lookupLocalRdrEnv env rdr
+      , Just term_rdr <- demoteRdrNameTv rdr
+      , Just name <- lookupLocalRdrEnv env term_rdr
+      = do { when (name `elemNameSet` bound_names) $
+               setSrcSpanA loc $
+                 failWithTc $ TcRnRetainedQuantificationError RetainedLocalSignatureIndex
+           ; return (Just (occ, name)) }
+      | otherwise = return Nothing
+
+-- | Find a parsed anonymous wildcard without entering splice payloads.
+retainedWildcardSpan :: Data a => a -> Maybe SrcSpan
+retainedWildcardSpan thing
+  | Just (L loc HsWildCardTy{}) <- (cast thing :: Maybe (LHsType GhcPs))
+  = Just (locA loc)
+  | Just (L _ HsSpliceTy{}) <- (cast thing :: Maybe (LHsType GhcPs))
+  = Nothing
+  | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcPs))
+  = Nothing
+  | otherwise = msum (gmapQ retainedWildcardSpan thing)
+
+-- | Find a source Pi at any depth without entering splice payloads.
+hasParsedRetainedPi :: Data a => a -> Bool
+hasParsedRetainedPi thing
+  | Just (L _ HsForEachTy{}) <- (cast thing :: Maybe (LHsType GhcPs)) = True
+  | Just (L _ HsSpliceTy{}) <- (cast thing :: Maybe (LHsType GhcPs)) = False
+  | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcPs)) = False
+  | otherwise = or (gmapQ hasParsedRetainedPi thing)
+
+-- | Find a wildcard in a renamed type, including an expanded type splice.
+-- Inspect only the expanded type, not its module finalizers.
+renamedRetainedWildcardSpan :: Data a => a -> Maybe SrcSpan
+renamedRetainedWildcardSpan thing
+  | Just (L loc HsWildCardTy{}) <- (cast thing :: Maybe (LHsType GhcRn))
+  = Just (locA loc)
+  | Just (L _ (HsSpliceTy (HsUntypedSpliceTop _ ty) _))
+      <- (cast thing :: Maybe (LHsType GhcRn))
+  = renamedRetainedWildcardSpan ty
+  | Just (L _ HsSpliceTy{}) <- (cast thing :: Maybe (LHsType GhcRn)) = Nothing
+  | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcRn)) = Nothing
+  | Just _ <- (cast thing :: Maybe Name) = Nothing
+  | otherwise = msum (gmapQ renamedRetainedWildcardSpan thing)
+
+{- Note [Runtime indices in visible type arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With ExperimentalDependentTypes, a complete visible type argument can refer to
+an already-bound runtime index, for example f @(Vec Int n). Use the same lexical
+aliases as complete local signatures. Keep the actual term Name and Unique.
+Existing erased type variables take precedence. Do not capture named wildcards,
+global terms, or Names inside quotations. Reject partial types when they capture
+an index. Ordinary visible type arguments keep their existing wildcard rules.
+Type splices can produce anonymous wildcards after this initial scan. The
+typechecker also rejects HsWildCardTy under HM_VTA when mode_indices is nonempty.
+HsWC's extension contains only named wildcards. See Note
+[Wildcards in visible type application] in GHC.Tc.Gen.HsType.
+
+The typechecker validates each captured Id and seeds only mode_indices. It keeps
+HM_VTA, kind checking, validity checking, and the normal type application order.
+No type metavariable receives a runtime index. Unlike a local signature, an
+expression type argument has no unavailable signature binding group to exclude.
+See Note [Local retained signature aliases] and
+Note [Local runtime indices in signatures] in GHC.Tc.Gen.HsType.
+-}
+
+{- Note [Local retained signature aliases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete local signature can refer to an already-bound runtime index.
+Install type-variable occurrence aliases only while renaming that signature.
+Each alias keeps the term Name and Unique. Ordinary type lookup then prevents
+implicit quantification over the index. Preserve existing type-variable lookup,
+explicit forall shadowing, and RequiredTypeArguments capture.
+
+The local reader environment already contains every binder in the current
+binding group. Reject those Names instead of capturing a forward reference or
+an outer Name hidden by one of them. Do not look in the global reader environment.
+The typechecker checks the actual local Id's domain, multiplicity and scope.
+The same alias mechanism preserves a lexical function head in f n. It does
+not classify that Name as a type variable or make a bare function an index.
+The typechecker checks the complete call before ordinary type application.
+See Note [Source opaque call indices] in GHC.Tc.Gen.HsType.
+
+Do not alias named wildcards. If a signature needs a new alias, reject its
+partial type at a wildcard before installing aliases. Keep capture outside
+quotations, including untyped quotations that will not check the body yet.
+Keep all other signatures
+on the ordinary path. Type splices and compiler Core types have no parsed
+signature wildcard to inspect here.
+
+Agda checks a declared let type and its RHS in the existing local context.
+See docs/dependent-haskell/REFERENCES.md for the pinned let-checking sources.
+This precedent does not make Haskell runtime bindings definitionally transparent.
+The index remains the actual opaque Id. No RHS is unfolded or evaluated.
+-}
+
 rnHsSigWcType :: HsDocContext
               -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeNames)
 rnHsSigWcType doc (HsWC { hswc_body =
     sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
-  = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
        ; (nwc_rdrs', imp_tv_nms) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
+       ; when (experimental && hasParsedRetainedPi body_ty) $
+           case retainedWildcardSpan body_ty `mplus`
+                (getLocA <$> listToMaybe nwc_rdrs) of
+             Nothing -> pure ()
+             Just loc -> setSrcSpan loc $
+               failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
        ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
-    do { (wcs, body_ty', fvs) <- rnWcBodyType doc nwc_rdrs body_ty
+    do { (wcs, body_ty', fvs) <-
+           if | hsHasForEachTy (unLoc body_ty)
+              -> do { case doc of
+                       TypeSigCtx{} -> pure ()
+                       _ -> failWithTc $ TcRnRetainedQuantificationError RetainedUnsupportedContext
+                   ; unless (null nwc_rdrs) $
+                       failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
+                   ; (body', fvs) <- rnRetainedSigType doc body_ty
+                   ; pure ([], body', fvs) }
+              | otherwise -> rnWcBodyType doc nwc_rdrs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
                 HsSig { sig_ext = noExtField
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
               , fvs) } }
+
+-- | Rename retained telescopes in the arrow positions of a value signature.
+-- See Note [Source retained signatures] in GHC.Tc.Gen.HsType.
+rnRetainedSigType :: HsDocContext -> LHsType GhcPs
+                  -> RnM (LHsType GhcRn, FreeNames)
+rnRetainedSigType doc (L loc (HsParTy _ body))
+  = do { (body', fvs) <- rnRetainedSigType doc body
+       ; pure (L loc (HsParTy noAnn body'), fvs) }
+rnRetainedSigType doc (L loc (HsQualTy _ ctxt body))
+  = setSrcSpanA loc $
+    do { let env = mkTyKiEnv doc TypeLevel RnTypeBody
+       ; (ctxt', ctxt_fvs) <- rnTyKiContext env ctxt
+       ; (body', body_fvs) <- rnRetainedSigType doc body
+       ; pure (L loc (HsQualTy noExtField ctxt' body'), ctxt_fvs `plusFN` body_fvs) }
+rnRetainedSigType doc (L loc (HsFunTy x mult arg res))
+  = setSrcSpanA loc $
+    do { (arg', arg_fvs) <- rnRetainedSigType doc arg
+       ; (res', res_fvs) <- rnRetainedSigType doc res
+       ; let env = mkTyKiEnv doc TypeLevel RnTypeBody
+       ; (mult', mult_fvs) <- rnHsModifiedFunArrWith (rnModifier env) mult
+       ; pure (L loc (HsFunTy x mult' arg' res'),
+               plusFNs [arg_fvs, res_fvs, mult_fvs]) }
+rnRetainedSigType doc (L loc (HsForEachTy x bndrs body))
+  = setSrcSpanA loc $
+    do { ((bndrs', body'), fvs) <-
+           rnRetainedTelescope (mkTyKiEnv doc TypeLevel RnTypeBody)
+                               (rnRetainedSigType doc) bndrs body
+       ; pure (L loc (HsForEachTy x bndrs' body'), fvs) }
+rnRetainedSigType doc ty = rnLHsType doc ty
+
+-- | Rename a retained telescope in the caller's type context.
+-- Scope each fresh runtime Name over subsequent binders and the body only.
+-- See Note [Retained Pi type formation] below.
+rnRetainedTelescope :: RnTyKiEnv
+                    -> (LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
+                    -> [LHsTyVarBndr () GhcPs] -> LHsType GhcPs
+                    -> RnM (([LHsTyVarBndr () GhcRn], LHsType GhcRn), FreeNames)
+rnRetainedTelescope env rn_body bndrs body
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; unless (experimental && not (isRnKindLevel env)) $
+           failWithTc TcRnRetainedQuantificationNotImplemented
+       ; level <- getThLevel
+       ; case level of
+           Comp -> pure ()
+           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
+       ; when (null bndrs) $
+           failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+       ; checkDupRdrNames (mapMaybe hsLTyVarLocName bndrs)
+       ; bind_bndrs bndrs }
+  where
+    bind_bndrs []
+      = do { (body', fvs) <- rn_body body
+           ; pure (([], body'), fvs) }
+    bind_bndrs (L lb bndr : rest)
+      = setSrcSpanA lb $
+        case bndr of
+          HsTvb xb () (HsBndrVar _ (L lv (Unqual occ))) (HsBndrKind _ domain) ->
+            do { (domain', domain_fvs) <- rnLHsTyKi env domain
+               ; name <- newLocalBndrRn (L lv (mkRdrUnqual (setOccNameSpace varName occ)))
+               ; ((rest', body'), body_fvs) <- bindLocalNamesFV [name] $
+                   do { rdr_env <- getLocalRdrEnv
+                      ; setLocalRdrEnv (extendLocalRdrEnvWithAlias rdr_env occ name) $
+                          bind_bndrs rest }
+               ; let bndr' = L lb (HsTvb xb () (HsBndrVar noExtField (L lv name))
+                                              (HsBndrKind noExtField domain'))
+               ; pure ((bndr' : rest', body'), domain_fvs `plusFN` body_fvs) }
+          HsTvb _ _ HsBndrWildCard{} _ ->
+            failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsName
+          _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsType
+
+{- Note [Retained Pi type formation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rename a supported Pi in a TypeLevel position with the same telescope worker
+as a retained signature. Preserve the caller's context and named wildcard set.
+Each binder has a fresh term Name and a type-lookup alias of that same Name.
+Its domain precedes its scope. Its scope contains later domains and the body.
+Keep KindLevel and quotation restrictions. The typechecker checks the closed
+domain, multiplicity, kind, and later equality evidence independently.
+
+A visible type argument containing a source Pi must be complete. Reject both
+anonymous and named wildcards before renaming that argument. This also covers
+wildcards outside the Pi within the same argument. Inspect the renamed argument
+again to catch holes in already-expanded splices, including sibling arguments.
+Do not expand a splice twice or inspect its module finalizers. Ordinary arguments
+such as @_ keep their existing rules. Generated holes within a Pi also remain
+subject to the typechecker's native-index completeness guard.
+See Note [Retained Pi type arguments] in GHC.Tc.Gen.HsType.
+-}
 
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
@@ -216,13 +462,29 @@ rnWcBodyType = rnWcBodyTyKi TypeLevel
 rnWcBodyTyKi :: TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeNames)
 rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
-  = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; let pi_argument = experimental && TypeLevel == level &&
+                 case ctxt of
+                   HsTypeCtx -> hasParsedRetainedPi hs_ty
+                   _ -> False
+       ; when pi_argument $
+           case retainedWildcardSpan hs_ty `mplus`
+                (getLocA <$> listToMaybe nwc_rdrs) of
+             Nothing -> pure ()
+             Just loc -> setSrcSpan loc $
+               failWithTc $ TcRnRetainedQuantificationError RetainedPartialTypeArgument
+       ; nwcs <- mapM newLocalBndrRn nwc_rdrs
        ; let env = RTKE { rtke_level = level
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
                         , rtke_ctxt  = ctxt }
        ; (hs_ty', fvs) <- bindLocalNamesFV nwcs $
                           rn_lty env hs_ty
+       ; when pi_argument $
+           case renamedRetainedWildcardSpan hs_ty' of
+             Nothing -> pure ()
+             Just loc -> setSrcSpan loc $
+               failWithTc $ TcRnRetainedQuantificationError RetainedPartialTypeArgument
        ; return (nwcs, hs_ty', fvs) }
   where
     rn_lty env (L loc hs_ty)
@@ -232,6 +494,9 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
 
     rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
     -- A lot of faff just to allow the extra-constraints wildcard to appear
+    rn_ty env ty@HsForEachTy{}
+      = rnHsTyKi env ty
+
     rn_ty env (HsForAllTy { hst_tele = tele, hst_body = hs_body })
       = bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
         do { (hs_body', fvs) <- rn_lty env hs_body
@@ -588,6 +853,11 @@ rnLHsTyKi env (L loc ty)
        ; return (L loc ty', fvs) }
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
+
+rnHsTyKi env (HsForEachTy x bndrs body)
+  = do { ((bndrs', body'), fvs) <-
+           rnRetainedTelescope env (rnLHsTyKi env) bndrs body
+       ; pure (HsForEachTy x bndrs' body', fvs) }
 
 rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env (HsType ty)
@@ -2235,6 +2505,9 @@ extract_lty (L _ ty) acc
       HsKindSig _ ty ki           -> extract_kind_sig ty ki acc
       HsForAllTy { hst_tele = tele, hst_body = ty }
                                   -> extract_hs_for_all_telescope tele acc $
+                                     extract_lty ty []
+      HsForEachTy { hst_bndrs = bndrs, hst_body = ty }
+                                  -> extract_hs_tv_bndrs bndrs acc $
                                      extract_lty ty []
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }
                                   -> extract_lctxt ctxt $

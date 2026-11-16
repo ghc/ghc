@@ -25,6 +25,7 @@ import GHC.Tc.Types.TcRef
 import GHC.Tc.Types.Constraint
 import GHC.Hs.Expr ( PendingTcSplice, PendingRnSplice )
 import GHC.Types.ThLevelIndex
+import GHC.Types.Var ( EvVar )
 
 ---------------------------
 -- Template Haskell stages and levels
@@ -71,6 +72,8 @@ data PendingStuff
   | TcPending                     -- Typechecking the inside of a typed bracket
       (TcRef [PendingTcSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
+      [EvVar]                    -- Native Givens from outside the bracket.
+                                  -- Restore these when checking nested splices.
       QuoteWrapper                -- A type variable and evidence variable
                                   -- for the overall monad of
                                   -- the bracket. Splices are checked
@@ -81,7 +84,7 @@ data PendingStuff
 isTypedPending :: PendingStuff -> Bool
 isTypedPending (RnPending _) = False
 isTypedPending (RnPendingTyped) = True
-isTypedPending (TcPending _ _ _) = True
+isTypedPending (TcPending _ _ _ _) = True
 
 pattern UntypedBrack :: ThLevel -> TcRef [PendingRnSplice] -> ThLevel
 pattern UntypedBrack lvl tc_ref = Brack lvl (RnPending tc_ref)

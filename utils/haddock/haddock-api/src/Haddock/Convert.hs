@@ -807,6 +807,8 @@ synifyType
   -- ^ the type to convert
   -> LHsType GhcRn
 synifyType _ _ (TyVarTy tv) = noLocA $ HsTyVar noAnn NotPromoted $ noLocA (noUserRdr $ getName tv)
+synifyType _ _ (TermVarTy{}) = error "synifyType: native runtime index is not supported"
+synifyType _ _ (DepFunTy{}) = error "synifyType: native dependent function is not supported"
 synifyType _ boundTvs (TyConApp tc tys) =
   maybe_sig res_ty
   where

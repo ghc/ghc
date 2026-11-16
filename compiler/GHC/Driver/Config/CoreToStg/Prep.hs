@@ -20,6 +20,7 @@ initCorePrepConfig hsc_env = do
    let dflags = hsc_dflags hsc_env
    return $ CorePrepConfig
       { cp_catchNonexhaustiveCases = gopt Opt_CatchNonexhaustiveCases dflags
+      , cp_allowNativeDependent = False
       , cp_platform  = targetPlatform dflags
       , cp_arityOpts = if gopt Opt_DoCleverArgEtaExpansion dflags
                        then Just (initArityOpts dflags)

@@ -1,6 +1,7 @@
 req_ppr_deps = req_hadrian_deps(['test:check-ppr','test:check-exact'])
 
 test('Ppr001', [ignore_stderr,req_ppr_deps], makefile_test, ['ppr001'])
+test('RetainedPrint', [ignore_stderr,req_ppr_deps,extra_files(['RetainedPrintUnicode.hs'])], makefile_test, ['RetainedPrint'])
 test('Ppr002', [ignore_stderr,req_ppr_deps], makefile_test, ['ppr002'])
 test('Ppr002a', [ignore_stderr,req_ppr_deps], makefile_test, ['ppr002a'])
 test('Ppr003', [ignore_stderr,req_ppr_deps], makefile_test, ['ppr003'])

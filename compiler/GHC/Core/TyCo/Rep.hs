@@ -90,7 +90,7 @@ module GHC.Core.TyCo.Rep (
         mkInvisFunTy, mkInvisFunTys,
         tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTy, tcMkScaledFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
-        mkPiTy, mkPiTys,
+        mkPiTy, mkPiTys, mkDepFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
         nonDetCmpTyLit, cmpTyLit,
 
@@ -173,6 +173,14 @@ data Type
   -- See Note [Non-trivial definitional equality]
   = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
 
+  | TermAppTy Id Type -- ^ An opaque runtime call index. See Note [Opaque native call indices].
+
+  | TermVarTy Id -- ^ The algebraic index of a local runtime identifier.
+                 -- See Note [Restricted retained dependent types].
+
+  | DepFunTy Id Type -- ^ A retained runtime binder and its dependent result.
+                     -- See Note [Restricted retained dependent types].
+
   | AppTy
         Type
         Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
@@ -239,6 +247,95 @@ data Type
                     -- GADT data constructor
 
   deriving Data.Data
+
+{- Note [Restricted retained dependent types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TermVarTy and DepFunTy implement an internal experiment. A scalar runtime index
+remains a local, non-coercion, unrestricted Id with a supported closed algebraic
+type. See Note [Algebraic runtime index domains] in GHC.Core.Type.
+DepFunTy can also bind an eligible opaque call head. See Note [Function-valued
+retained binders] in GHC.Core.Type. Such a head occurs only in TermAppTy/TermAppCo.
+TermVarTy has the identifier's type as its kind. A DepFunTy result has kind Type. Constraint
+also has a lifted representation, but is not a supported result kind here.
+
+The binder scopes over the result. A vacuous binder is represented by FunTy;
+use mkDepFunTy to maintain this invariant. Index occurrences are scope
+dependencies, not additional runtime uses. Type-variable and coercion-variable
+callbacks must not process runtime index variables.
+
+Only variable and constructor index substitution is implemented. The restricted
+bytecode and module entries check these forms with Core Lint before and after
+preparation. Interface signatures use scoped local Ids. General expression
+substitution and the ordinary optimizer remain unsupported. Native interface
+templates have separate checks and a module writer gate. The restricted source
+checker accepts closed algebraic domains, including Bool and user-defined Nat.
+See docs/dependent-haskell/CORE.md and the Agda provenance in
+docs/dependent-haskell/REFERENCES.md.
+-}
+
+{- Note [Retained dependent function coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DepFunCo b domain co binds one unrestricted runtime binder throughout co.
+The optional domain proof is outside that binder. MRefl keeps its closed
+domain A. MCo delta requires nominal evidence A ~ B between supported scalar
+domains. The type of b is A. Both body endpoints have kind Type.
+
+If co relates S and T at role r, the left endpoint is foreach (b :: A) -> S.
+The right endpoint binds a fresh Id at type B and substitutes its backward
+conversion for the old b in T. Freshen against the domain proof's deep free
+variables and the body's free variables other than b. The domain proof is
+outside b's scope and can refer to an outer Id with the same Unique. CastTy carries this nominal kind
+conversion. The runtime bridge uses Cast value (SubCo (sym delta)). Preserve
+the nominal proof structure. See Note [Nominal native index casts] in GHC.Core.
+Function-valued binders retain MRefl: their occurrences are fixed-type Id heads.
+Each endpoint can independently become an ordinary arrow when b is unused.
+
+The binder scopes over the proof as well as its endpoints. Keep DepFunCo even
+when both endpoints omit b: an intermediate proof can still use that index.
+The smart constructor simplifies a reflexive body only at a fixed domain.
+Substitution, lifting, free variables and tidying use runtime binder callbacks.
+ForAllCo continues to bind only erased type and coercion variables.
+
+This follows D/DC's asymmetric An-PiCong rule. The right body needs the inverse
+domain conversion. Agda compares Pi domains before codomains under a shared
+context. See the pinned provenance in docs/dependent-haskell/REFERENCES.md.
+The body inherits an FC role; domain evidence remains nominal at every role.
+The comparison does not supply a preservation theorem for this implementation.
+
+Checked application of explicit congruence casts the actual argument back to A
+and substitutes that same argument in co. Symmetry reverses the transport.
+Transitivity composes the checked argument and result conversions. Preserve a
+cast on a function value until application: eta expansion can hide bottom.
+The Arity and CorePrep paths implement this selected An-Push specialization.
+Opaque coercion projections, changed multiplicities, native coercion encoding
+and general optimization remain separate gates.
+-}
+
+{- Note [Opaque native call indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TermAppTy f arg represents an opaque call to one local unrestricted non-join
+function. Its visible unrestricted arrow has independently closed scalar
+domains A and B. Both arrow classifications are Type. The argument is a scoped
+Type of kind A; the call has kind B.
+Do not unfold f or infer argument equality from equality of calls.
+
+TermAppCo f co lifts a nominal argument proof through the same checked head.
+Both child endpoints have kind A. Both result endpoints have kind B. There
+is no inverse projection or function-value equality rule. The head is a free
+occurrence, not a binder. Substitution supports only eligible variable heads;
+the pipeline must retain bindings for other substitution ranges. Runtime
+reification is partial and has a narrower grammar than this Type constructor.
+
+Require the raw head type and multiplicities to have no free variables. An
+unused synonym argument must not hide metadata which needs zonking or scope
+transport. Keep function-head eligibility separate from scalar index and
+retained-binder eligibility.
+
+Agda's neutral application and scoped substitution are the operational
+precedent. See Agda v2.8.0 Syntax/Internal.hs221-252 and
+TypeChecking/Substitute.hs827-852, pinned in docs/dependent-haskell/REFERENCES.md.
+This rule does not add an evaluator to type equality.
+-}
 
 instance Outputable Type where
   ppr = pprType
@@ -820,6 +917,12 @@ mkPiTy (Named bndr) ty    = mkForAllTy bndr ty
 mkPiTys :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
 
+-- | Construct a retained dependent function. Remove vacuous dependence.
+mkDepFunTy :: Id -> Type -> Type
+mkDepFunTy b body
+  | b `elemVarSet` tyCoVarsOfType body = DepFunTy b body
+  | otherwise = mkVisFunTyMany (varType b) body
+
 -- | 'mkNakedTyConTy' creates a nullary 'TyConApp'. In general you
 -- should rather use 'GHC.Core.Type.mkTyConTy', which picks the shared
 -- nullary TyConApp from inside the TyCon (via tyConNullaryTy.  But
@@ -929,6 +1032,13 @@ data Coercion
 
   | AppCo Coercion CoercionN             -- lift AppTy
           -- AppCo :: e -> N -> e
+
+  | TermAppCo Id CoercionN
+      -- ^ Nominal argument congruence for the same runtime function.
+
+  | DepFunCo Id MCoercionN Coercion
+      -- The optional nominal domain proof is outside the runtime binder scope.
+      -- See Note [Retained dependent function coercions].
 
   -- See Note [ForAllCo]
   | ForAllCo
@@ -2136,6 +2246,9 @@ data TyCoFolder a
       , tcf_tyvar :: TyVar -> a    -- Does not automatically recur
       , tcf_covar :: CoVar -> a    -- into kinds of variables
 
+      , tcf_termvar :: Id -> a
+      , tcf_termbinder :: Id -> a -> a
+
       , tcf_hole  :: CoercionHole -> a   -- ^ What to do with coercion holes.
                                          -- See Note [Coercion holes]
 
@@ -2150,6 +2263,8 @@ foldTyCo :: Monoid a => TyCoFolder a
 foldTyCo (TyCoFolder { tcf_view       = view
                      , tcf_lit        = lit
                      , tcf_tyvar      = tyvar
+                     , tcf_termvar    = termvar
+                     , tcf_termbinder = termbinder
                      , tcf_tycobinder = tycobinder
                      , tcf_covar      = covar
                      , tcf_hole       = cohole })
@@ -2157,6 +2272,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
   where
     go_ty ty | Just ty' <- view ty = go_ty ty'
     go_ty (TyVarTy tv)        = tyvar tv
+    go_ty (TermVarTy v)       = termvar v
+    go_ty (TermAppTy f arg)   = termvar f M.<> go_ty arg
+    go_ty (DepFunTy b body)   = go_ty (varType b) M.<> termbinder b (go_ty body)
     go_ty (LitTy l)           = lit l
     go_ty (AppTy t1 t2)       = go_ty t1 M.<> go_ty t2
     go_ty (CastTy ty co)      = go_ty ty M.<> go_co co
@@ -2181,6 +2299,8 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co (GRefl ro ty (MCo co))   = lit ro M.<> go_ty ty M.<> go_co co
     go_co (TyConAppCo ro tc args)  = lit ro M.<> lit tc M.<> go_cos args
     go_co (AppCo c1 c2)            = go_co c1 M.<> go_co c2
+    go_co (TermAppCo f co)         = termvar f M.<> go_co co
+    go_co (DepFunCo b domain co)   = go_ty (varType b) M.<> go_mco domain M.<> termbinder b (go_co co)
     go_co (CoVarCo cv)             = covar cv
     go_co (AxiomCo ax cos)         = lit ax M.<> go_cos cos
     go_co (HoleCo hole)            = cohole hole
@@ -2251,6 +2371,9 @@ typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
+typeSize (TermAppTy f arg)         = 1 + typeSize (varType f) + typeSize arg
+typeSize (TermVarTy v)             = 1 + typeSize (varType v)
+typeSize (DepFunTy b t)            = 1 + typeSize (varType b) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
 typeSize (CoercionTy co)            = coercionSize co
@@ -2263,6 +2386,8 @@ coercionSize (Refl ty)             = typeSize ty
 coercionSize (GRefl _ ty mco)      = typeSize ty + mCoercionSize mco
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
+coercionSize (TermAppCo f co)      = 1 + typeSize (varType f) + coercionSize co
+coercionSize (DepFunCo b domain co) = 1 + typeSize (varType b) + mCoercionSize domain + coercionSize co
 coercionSize (ForAllCo { fco_kind = h, fco_body = co })
                                    = 1 + coercionSize co + mCoercionSize h
 coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2

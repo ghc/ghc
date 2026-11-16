@@ -1,0 +1,5 @@
+RetainedQuantification.hs:12:17: error: [GHC-83605]
+    • A retained argument requires a supported closed first-order algebraic domain.
+      Its declared domain is: Int
+    • In the type signature:
+        keep :: foreach (b :: Int) -> Select b -> Select b

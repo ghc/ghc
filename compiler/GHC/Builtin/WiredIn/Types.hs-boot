@@ -10,6 +10,7 @@ import {-# SOURCE #-} GHC.Types.Name (Name)
 listTyCon :: TyCon
 typeSymbolKind :: Type
 charTy :: Type
+boolTy :: Type
 mkBoxedTupleTy :: [Type] -> Type
 
 coercibleTyCon, heqTyCon :: TyCon

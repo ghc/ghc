@@ -159,6 +159,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Var
+import GHC.Types.Var.Set (VarSet)
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
@@ -368,6 +369,18 @@ data RewriteEnv
           -- in the family application cache.
           --
           -- See Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite.
+
+       , re_native_binders :: !VarSet
+          -- ^ Retained runtime binders in scope during normalization.
+          -- Imported Given evidence must not depend on these Ids.
+          -- New evidence and cache effects remain disabled in this scope.
+          -- See Note [Rewriting retained dependent functions]
+          -- in GHC.Tc.Solver.Rewrite.
+
+       , re_fam_axioms_only :: !Bool
+          -- ^ Reduce family axioms without inert evidence, plugins or caches.
+          -- See Note [Solving retained function equalities]
+          -- in GHC.Tc.Solver.Equality.
 
        , re_zap_coercions :: !Bool
           -- ^ Whether to perform coercion zapping.

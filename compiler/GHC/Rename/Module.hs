@@ -2677,7 +2677,12 @@ rnConDecl (ConDeclGADT { con_names   = names
           bindHsGadtTelescopes ctxt inner_bndrs $ \inner_bndrs' ->
     do  { (new_cxts, fvs1)   <- mapFvRn (rnContext ctxt) cxts
         ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
-        ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+        ; (new_res_ty, fvs3) <-
+            if hsHasForEachTy (unLoc res_ty)
+            then do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+                    ; if enabled then rnRetainedSigType ctxt res_ty
+                                 else rnLHsType ctxt res_ty }
+            else rnLHsType ctxt res_ty
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
 
          -- Ensure that there are no nested `forall`s or contexts, per

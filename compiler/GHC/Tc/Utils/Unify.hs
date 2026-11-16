@@ -25,6 +25,7 @@ module GHC.Tc.Utils.Unify (
 
   -- Various unifications
   uType, unifyType, unifyKind, unifyInvisibleType,
+  tcRetainedCoercion, tcRetainedCallCoercion, retainedCallOccurs,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
   mightEqualLater,
@@ -60,7 +61,8 @@ module GHC.Tc.Utils.Unify (
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Tc.Errors.Types ( HsCtxt(..) )
+import GHC.Tc.Errors.Types ( HsCtxt(..), TcRnMessage(TcRnRetainedQuantificationError)
+                           , RetainedQuantificationError(RetainedPatternType) )
 import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -79,10 +81,14 @@ import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..), ReportRedundantConstraints(..)
                            , pprUserTypeCtxt  )
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Utils.TcMType qualified as TcM
+import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
+import qualified GHC.Core as Core
+import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.FamInstEnv ( normaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs
@@ -509,7 +515,8 @@ checkConstraints skol_info skol_tvs given thing_inside
   = do { implication_needed <- implicationNeeded skol_info skol_tvs given
 
        ; if implication_needed
-         then do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
+         then do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints $
+                                               tcExtendNativeGivens given thing_inside
                  ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
                  ; traceTc "checkConstraints A" (ppr tclvl $$ ppr skol_tvs $$ traceCallStackDoc)
                  ; emitImplications implics
@@ -1041,6 +1048,13 @@ matchExpectedTyConApp tc orig_ty
     go ty@(TyConApp tycon args)
        | tc == tycon  -- Common case
        = return (mkNomReflCo ty, args)
+       | isTypeFamilyTyCon tycon, hasNativeDependentExpr (Core.Type ty)
+       = do { fam_envs <- tcGetFamInstEnvs
+            ; let Reduction co reduced = normaliseType fam_envs Nominal ty
+            ; case tcSplitTyConApp_maybe reduced of
+                Just (actual, args) | actual == tc -> return (mkSymCo co, args)
+                _ -> defer }
+         -- See Note [Matching native family result shapes].
 
     go (TyVarTy tv)
        | isMetaTyVar tv
@@ -1068,6 +1082,23 @@ matchExpectedTyConApp tc orig_ty
                  tc_template = mkTyConApp tc args
            ; co <- unifyType Nothing tc_template orig_ty
            ; return (co, args) }
+
+{- Note [Matching native family result shapes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A known family result can contain runtime indices. For example,
+TreePayload ('Node left right) reduces to (TreePayload left, TreePayload right).
+The ordinary fallback allocates fresh tuple parameters before emitting equality
+constraints. Those parameters cannot hold native types. Reduce a native family
+head with GHC's existing nominal family normalizer before this fallback.
+
+Use the reduced parameters only when the result has the required algebraic
+TyCon. Return the inverse reduction as the required nominal coercion. Do not
+unwrap a newtype, recheck an expression, or assign a native type to a metavariable.
+Other shapes keep the existing fallback and diagnostic context. This evaluates
+type-family equations, not term definitions. Cached argument selection uses the
+same nominal matching view; see Note [Family views in native argument inference] in
+GHC.Tc.Gen.App.
+-}
 
 ----------------------
 matchExpectedAppTy :: TcRhoType                         -- orig_ty
@@ -2882,6 +2913,14 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
       | Just ty1' <- coreView ty1 = go ty1' ty2
       | Just ty2' <- coreView ty2 = go ty1  ty2'
 
+    -- See Note [Rigid retained indices]
+    go ty1@(TermVarTy v1) (TermVarTy v2)
+      | v1 == v2 = return $ mkReflCo role ty1
+    go ty1@TermAppTy{} ty2@TermAppTy{}
+      | ty1 `tcEqType` ty2 = return $ mkReflCo role ty1
+    go ty1@DepFunTy{} ty2@DepFunTy{}
+      | ty1 `tcEqType` ty2 = return $ mkReflCo role ty1
+
     -- Functions (t1 -> t2) just check the two parts
     go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
        (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
@@ -3618,6 +3657,183 @@ instance Outputable SimpleUnifyResult where
     SUC_NotSure     -> text "SUC_NotSure"
     SUC_CanUnify    -> text "SUC_CanUnify"
 
+-- | Lift a checked constructor branch proof through a supported value type.
+-- See Note [Transport through a retained index].
+tcRetainedCoercion :: Id -> CoercionN -> TcType -> TcM CoercionN
+tcRetainedCoercion index branch_co original_ty
+  = do { unless (isNativeIndexId index
+                 && coercionRole branch_co == Nominal
+                 && coercionLKind branch_co `eqType` TermVarTy index
+                 && is_constructor (coercionRKind branch_co)) $
+           pprPanic "tcRetainedCoercion: invalid branch proof"
+             (ppr index $$ ppr branch_co $$ ppr original_ty)
+       ; tcRetainedIndexCoercion (TermVarTy index)
+           (anyFreeVarsOfType (== index)) branch_co original_ty }
+  where
+    is_constructor ty
+      | TyConApp tc _ <- coreFullView ty
+      , Just con <- isPromotedDataCon_maybe tc
+      , Just _ <- nativeIndexDataConTyArgs (varType index) con
+      = typeKind ty `eqType` varType index
+      | otherwise = False
+
+-- | Find an exact free call index. Unsupported proof and kind dependencies
+-- are conservative candidates; the transport checker rejects these forms.
+retainedCallOccurs :: Type -> TcType -> Bool
+retainedCallOccurs call_ty = go
+  where
+    dependencies = filter (\v -> isId v && not (isCoVar v))
+                     (tyCoVarsOfTypeList call_ty)
+    go ty
+      | not (all (\v -> anyFreeVarsOfType (== v) ty) dependencies) = False
+      | call_ty `eqType` ty = True
+      | Just expanded <- coreView ty = go expanded
+    go (TyConApp _ args) = any go args
+    go (AppTy fun arg) = go fun || go arg
+    go (FunTy _ mult arg res) = any go [mult, arg, res]
+    go (DepFunTy binder body)
+      = go (varType binder) || (binder `notElem` dependencies && go body)
+    go (ForAllTy (Bndr binder _) body) = go (varType binder) || go body
+    go (TermAppTy _ arg) = go arg
+    go (CastTy ty co) = go ty || proof_depends co
+    go (CoercionTy co) = proof_depends co
+    go TyVarTy{} = True  -- A dependency in the variable's kind is unsupported.
+    go _ = False
+    proof_depends co = all (\v -> anyFreeVarsOfCo (== v) co) dependencies
+
+-- | Transport an exact checked call along its strict-case alias proof.
+-- See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+tcRetainedCallCoercion :: Type -> CoercionN -> TcType -> TcM CoercionN
+tcRetainedCallCoercion call_ty branch_co original_ty
+  = do { unless (valid_call call_ty
+                 && coercionRole branch_co == Nominal
+                 && coercionLKind branch_co `eqType` call_ty
+                 && typeKind (coercionRKind branch_co) `eqType` typeKind call_ty) $
+           pprPanic "tcRetainedCallCoercion: invalid alias proof"
+             (ppr call_ty $$ ppr branch_co $$ ppr original_ty)
+       ; tcRetainedIndexCoercion call_ty (retainedCallOccurs call_ty)
+           branch_co original_ty }
+  where
+    valid_call (TermAppTy fun arg)
+      | Just (domain, _) <- nativeIndexFunctionTys_maybe fun
+      = typeKind arg `eqType` domain
+    valid_call _ = False
+
+-- | Abstract one checked index, then use ordinary nominal FC lifting.
+tcRetainedIndexCoercion :: Type -> (TcType -> Bool) -> CoercionN
+                       -> TcType -> TcM CoercionN
+tcRetainedIndexCoercion index_ty occurs branch_co original_ty
+  = do { ty <- liftZonkM $ zonkTcType original_ty
+       ; name <- newSysName (mkTyVarOcc "retained")
+       ; let template = mkTyVar name (typeKind index_ty)
+       ; template_ty <- abstract_index (mkTyVarTy template) ty
+       ; let co = liftCoSubstWith Nominal [template] [branch_co] template_ty
+             rhs = substTyWith [template] [coercionRKind branch_co] template_ty
+       ; unless (coercionRole co == Nominal
+                 && coercionLKind co `eqType` ty
+                 && coercionRKind co `eqType` rhs) $
+           pprPanic "tcRetainedIndexCoercion: invalid lifted proof"
+             (ppr co $$ ppr ty $$ ppr rhs)
+       ; return co }
+  where
+    abstract_index template_ty ty
+      | not (occurs ty) = return ty
+      | index_ty `eqType` ty = return template_ty
+      | Just ty' <- coreView ty = abstract_index template_ty ty'
+    abstract_index template_ty (TermAppTy f arg)
+      | isNativeIndexFunctionId f
+      = TermAppTy f <$> abstract_index template_ty arg
+    abstract_index template_ty (TyConApp tc tys)
+      = mkTyConApp tc <$> mapM (abstract_index template_ty) tys
+    abstract_index template_ty (AppTy fun arg)
+      = mkAppTy <$> abstract_index template_ty fun
+                <*> abstract_index template_ty arg
+    abstract_index template_ty (FunTy af mult arg res)
+      = FunTy af <$> abstract_index template_ty mult
+                 <*> abstract_index template_ty arg
+                 <*> abstract_index template_ty res
+    abstract_index template_ty (DepFunTy binder body)
+      | isNativeRetainedBinder binder
+      , not (occurs (varType binder))
+      , typeKind body `eqType` liftedTypeKind
+      = mkDepFunTy binder <$> abstract_index template_ty body
+    abstract_index _ _
+      = failWithTc $ TcRnRetainedQuantificationError (RetainedPatternType original_ty)
+
+{- Note [Transport through a retained index]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked constructor pattern provides n ~# 'S k, for example. Its actual
+field identities are in scope when the branch body is checked. Check the
+constructor against the full ground parent, including its ordinary type arguments.
+See Note [Algebraic runtime index domains] in GHC.Core.Type. Abstract the
+free occurrences of n in a supported value type to one fresh, immutable TyVar
+of the index domain. Use liftCoSubstWith to transport that template along
+the branch proof. Existing FC lifting supplies the required congruence.
+The runtime Id remains an Id. The template never enters the checked type.
+
+Keep subtrees that do not depend on n unchanged. A retained closure type can
+capture n in its body. Preserve its inner runtime binder and unchanged domain.
+FC lifting then uses the existing fixed-domain DepFunCo rule. It freshens the
+inner binder and preserves its scope over the body proof. Cast the closure;
+eta expansion would change bottom-function behavior in Haskell.
+
+Reject changed domains, dependent erased foralls, casts, and coercion types.
+This adds no axiom, singleton, general Pi unification, or term evaluation.
+It follows dependent pattern specialization; see
+docs/dependent-haskell/REFERENCES.md#agda-provenance.
+The caller uses the nominal proof for argument and inverse result casts.
+-}
+
+{- Note [Rigid retained indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Runtime indices are rigid local Ids. Equal occurrences of the same Id need
+only reflexivity. Alpha-equal retained functions also need only reflexivity.
+Defer other retained function equalities as whole constraints. Their bodies
+need a private runtime-binder scope. See Note [Solving retained function
+equalities] in GHC.Tc.Solver.Equality.
+
+For now, a metavariable cannot be assigned a type that contains retained
+syntax. In particular, do not promote an index Id as if it were a TyVar.
+Report a conservative RHS-check failure instead of allowing an index to
+escape its binder. General native unification remains unsupported.
+
+Checking an existing Given is different from assigning a metavariable.
+For a Given with a type-variable LHS and native syntax in its RHS,
+checkTypeEqNoUnification enables tefTyVar_allowNativeGivenRhs. Accept an opaque
+TermVarTy only when isNativeIndexId validates its closed unrestricted domain.
+For DepFunTy, require a valid retained binder and a lifted body. Function
+binders stay in call-head slots under the same fixed domain.
+See Note [Function-valued retained binders] in GHC.Core.Type.
+Recurse through the body
+with the same flags and wrap its reduction with mkDepFunRedn. This keeps the
+ordinary occurs and coercion checks. A reflexive shortcut would miss
+occurrences such as a ~ (foreach n -> Vec a n). The binder scopes the complete
+body reduction. Do not decompose a wanted retained-function equality here.
+The same immutable check can traverse an invisible constraint arrow. Check
+its multiplicity, predicate and result with the same flags, and keep the
+complete FunTy reduction. This does not discharge a dictionary obligation
+or turn class evidence into equality evidence. Ordinary Given checks and
+every mutable check still reject these impredicative RHSs.
+Expand type synonyms on this path before checking their complete RHS. A
+retained Pi synonym is not a tau TyCon, but it needs the same immutable
+checks as the written Pi. Recurse after expansion so occurrences in a
+predicate or result remain visible. Keep the ordinary synonym policy for
+all other checks. See Note [Forgetful synonyms in checkTyConApp].
+The Given already belongs to a checked implication scope. No runtime Id is
+created, promoted or assigned. The scoped rewrite filter separately checks
+its use beneath a retained binder.
+
+Disable family cycle breaking on this Given path. A cycle breaker saves its
+RHS and later restores it with writeMetaTyVar. That route must not assign
+native syntax. An occurs cycle remains irreducible. Every Wanted, unification,
+defaulting and concreteness check keeps this option disabled.
+
+See docs/dependent-haskell/REFERENCES.md#agda-provenance for dependent
+binding and application. These checks add no evaluation or runtime uses;
+Haskell evaluation follows
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+-}
+
 simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUnifyResult
 -- ^ A fast check for unification. May return "not sure", in which case
 -- unification might still be OK, but it'll take more work to do
@@ -3652,6 +3868,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     rhs_tcv_is_bad tcv
        -- c.f. checkTyVar, the TEFTyVar case
        | isCoVar tcv                                      = occ_check
+       | isId tcv                                        = True
        | tcTyVarLevel tcv `strictlyDeeperThan` lhs_tv_lvl = True
        | lhs_tv_is_concrete, not (isConcreteTyVar tcv)    = True
        | occ_check                                        = True
@@ -3659,6 +3876,9 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
        where
          occ_check = simpleOccursCheck lhs_tv_nm tcv
 
+    rhs_is_bad (TermAppTy {}) = True
+    rhs_is_bad (TermVarTy {}) = True
+    rhs_is_bad (DepFunTy {})  = True
     rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
     rhs_is_bad (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
@@ -3846,6 +4066,9 @@ data TyEqFlags m a
         -- ^ Level check
     , tefTyVar_concreteCheck  :: ConcreteCheck m
         -- ^ Concreteness check
+    , tefTyVar_allowNativeGivenRhs :: Bool
+        -- ^ Check an existing native Given without assigning a metavariable.
+        -- See Note [Rigid retained indices].
     , tef_fam_app :: TyEqFamApp m a
         -- ^ How to deal with type family applications
     }
@@ -4007,6 +4230,7 @@ notUnifying_TEFTask occ_prob = \case
       { tefTyVar_occursCheck   = OC_Check (tyVarName tv) occ_prob
       , tefTyVar_levelCheck    = LC_None
       , tefTyVar_concreteCheck = CC_None
+      , tefTyVar_allowNativeGivenRhs = False
       , tef_fam_app            = TEFA_Recurse
      }
     -- We need an occurs-check here, but no level check.
@@ -4023,6 +4247,7 @@ unifyingLHSMetaTyVar_TEFTask ev lhs_tv =
     , tefTyVar_levelCheck    = LC_Promote { lc_lvlp = tcTyVarLevel lhs_tv
                                           , lc_deep = False }
     , tefTyVar_concreteCheck = mkConcreteCheck lhs_tv
+    , tefTyVar_allowNativeGivenRhs = False
     , tef_fam_app            = mkTEFA_Break ev NomEq (BreakWanted ev lhs_tv)
     }
 
@@ -4037,6 +4262,7 @@ defaulting_TEFTask lhs_tv =
               -- LC_Promote: promote deeper unification variables (DE4)
               -- lc_deep =  True: ...including under type families (DE5)
     , tefTyVar_concreteCheck = mkConcreteCheck lhs_tv
+    , tefTyVar_allowNativeGivenRhs = False
     , tef_fam_app = TEFA_Recurse
     }
 
@@ -4059,6 +4285,7 @@ pureTyEqFlags_LHSMetaTyVar lhs_tv =
     , tefTyVar_concreteCheck = case isConcreteTyVar_maybe lhs_tv of
                                   Nothing -> CC_None
                                   Just {} -> CC_Check   -- No promotion
+    , tefTyVar_allowNativeGivenRhs = False
     , tef_fam_app = TEFA_Recurse }
 
 
@@ -4144,7 +4371,7 @@ instance Outputable (TyEqFlags m a) where
         hcat [ ppr occ
              , ppr (mkTyConApp tc tys)
              , ppr fam_app ] )
-    TEFTyVar occ lc conc fam_app ->
+    TEFTyVar occ lc conc native fam_app ->
       text "TEFTyVar" <> braces (hcat (punctuate comma fields))
       where
         fields = [ text "OccursCheck:" <+> ppr occ ]
@@ -4152,6 +4379,8 @@ instance Outputable (TyEqFlags m a) where
                  [ text "LevelCheck:" <+> ppr lc ]
                    ++
                  [ text "ConcreteCheck:" <+> ppr conc ]
+                   ++
+                 [ text "RuntimeIndices:" <+> ppr native ]
                    ++
                  [ text "FamApp:" <+> ppr fam_app ]
 
@@ -4313,6 +4542,31 @@ check_ty_eq_rhs :: forall m a
 {-# INLINEABLE check_ty_eq_rhs #-}
 check_ty_eq_rhs flags ty
   = case ty of
+      -- See Note [Rigid retained indices]
+      TermAppTy f arg
+        | native_given
+        , Just (domain, _) <- nativeIndexFunctionTys_maybe f
+        , typeKind arg `eqType` domain
+        -> do { arg_res <- check_ty_eq_rhs flags arg
+              ; return ((\(Reduction co arg') ->
+                           mkReduction (mkTermAppCo f co) (TermAppTy f arg'))
+                         <$> arg_res) }
+        | otherwise
+        -> return $ PuFail (cteProblem cteSkolemEscape)
+      TermVarTy v
+        | native_given
+        , isNativeIndexId v
+        -> return $ okCheckRefl ty
+        | otherwise
+        -> return $ PuFail (cteProblem cteSkolemEscape)
+      DepFunTy index body
+        | native_given
+        , isNativeRetainedBinder index
+        , typeKind body `eqType` liftedTypeKind
+        -> do { body_res <- check_ty_eq_rhs flags body
+              ; return (mkDepFunRedn index <$> body_res) }
+        | otherwise
+        -> return $ PuFail impredicativeProblem
       LitTy {}        -> return $ okCheckRefl ty
       TyConApp tc tys -> checkTyConApp flags ty tc tys
       TyVarTy tv      -> checkTyVar flags tv
@@ -4322,6 +4576,7 @@ check_ty_eq_rhs flags ty
 
       FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r}
        | isInvisibleFunArg af  -- e.g.  Num a => blah
+       , not native_given     -- See Note [Rigid retained indices]
        -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
        | otherwise
        -> do { w_res <- check_ty_eq_rhs flags w
@@ -4342,6 +4597,10 @@ check_ty_eq_rhs flags ty
 
       ForAllTy {}   -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
          -- No need to worry about RuntimeUnkTv
+  where
+    native_given = case flags of
+      TEFTyVar { tefTyVar_allowNativeGivenRhs = True } -> True
+      _ -> False
 
 -------------------
 checkCo :: Monad m => TyEqFlags m a -> Coercion -> m (PuResult a Coercion)
@@ -4526,6 +4785,11 @@ checkTyConApp flags tc_app tc tys
        -- e.g. S a  where  type S a = F [a]
        --             or   type S a = Int
        -- See Note [Forgetful synonyms in checkTyConApp]
+  = check_ty_eq_rhs flags ty'
+
+  | TEFTyVar { tefTyVar_allowNativeGivenRhs = True } <- flags
+  , Just ty' <- coreView tc_app
+       -- See Note [Rigid retained indices].
   = check_ty_eq_rhs flags ty'
 
   | not (isTauTyCon tc)
@@ -4797,6 +5061,7 @@ checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl vs
   where
     do_one :: TyCoVar -> TcM CheckTyEqResult
     do_one v | isCoVar v             = return cteOK
+             | isId v                = return (cteProblem cteSkolemEscape)
              | tyVarName v == lhs_tv = return (cteProblem occ_prob)
              | no_promotion          = return cteOK
              | not (isMetaTyVar v)   = return (cteProblem cteSkolemEscape)
@@ -4904,6 +5169,7 @@ makeTypeConcrete occ_fs conc_orig ty =
                   -- LHS is a fresh meta-tyvar: no occurs check needed
               , tefTyVar_levelCheck    = LC_None
               , tefTyVar_concreteCheck = CC_Promote conc_orig
+              , tefTyVar_allowNativeGivenRhs = False
               , tef_fam_app            = TEFA_Recurse
               }
 

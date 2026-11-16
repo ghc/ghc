@@ -62,7 +62,7 @@ import GHC.Core.PatSyn (PatSyn(..))
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.Type
 import GHC.Core.TyCon
-import GHC.Core.TyCo.Rep( CoercionPlusHoles(..) )
+import GHC.Core.TyCo.Rep( CoercionPlusHoles(..), Type(TermVarTy) )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -505,6 +505,10 @@ zonkCoHole hole@(CH { ch_ref = ref, ch_co_var = cv })
 zonk_tycomapper :: TyCoMapper ZonkTcM
 zonk_tycomapper = TyCoMapper
     { tcm_tyvar      = zonkTyVarOcc
+    , tcm_termvar    = pure . TermVarTy
+    , tcm_termfun    = pure
+    , tcm_termbinder = \v k -> runZonkBndrT (zonkIdBndrX v) k
+        -- See Note [Zonking retained Boolean indices] in GHC.Tc.Zonk.TcType
     , tcm_covar      = zonkCoVarOcc
     , tcm_hole       = zonkCoHole
     , tcm_tycobinder = \ tcv _vis k -> runZonkBndrT (zonkTyBndrX tcv) k
@@ -1089,6 +1093,16 @@ zonkExpr (XExpr (ExpandedThingTc (HSE thing e)))
   = do e' <- zonkLExpr e
        return $ XExpr (ExpandedThingTc (HSE thing e'))
 
+-- See Note [Checked opaque case alias] in GHC.Hs.Expr.
+zonkExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
+  = do { scrut' <- zonkLExpr scrut
+       ; result_ty' <- zonkTcTypeToTypeX result_ty
+       ; runZonkBndrT (do { value' <- zonkIdBndrX value
+                         ; proof' <- zonkEvBndrX proof
+                         ; return (value', proof') }) $ \(value', proof') ->
+         do { body' <- zonkLExpr body
+            ; return (XExpr (NativeCaseAlias scrut' value' proof' result_ty' body')) } }
+
 zonkExpr e@(XExpr (ConLikeTc {}))
   = return e
 
@@ -1241,7 +1255,9 @@ zonkCoFn (WpFun w arg res t1 t2) =
      ; t1' <- noBinders $ zonkTcTypeToTypeX t1
      ; t2' <- noBinders $ zonkTcTypeToTypeX t2
      ; return (WpFun w' arg' res' t1' t2') }
-zonkCoFn (WpCast co)   = WpCast  <$> noBinders (zonkCoToCo co)
+zonkCoFn (WpCast co)   = WpCast <$> noBinders
+                          (mapNativeIndexCastCoM zonkCoToCo co)
+  -- See Note [Zonking nominal native index casts] in GHC.Core.Coercion.
 zonkCoFn (WpEvLam ev)  = WpEvLam <$> zonkEvBndrX ev
 zonkCoFn (WpEvApp arg) = WpEvApp <$> noBinders (zonkEvTerm arg)
 zonkCoFn (WpTyLam tv)  = assert (isImmutableTyVar tv) $
@@ -1841,7 +1857,8 @@ zonkCoreExpr (Type ty)
     = Type <$> zonkTcTypeToTypeX ty
 
 zonkCoreExpr (Cast e co)
-    = Cast <$> zonkCoreExpr e <*> zonkCoToCo co
+    = Cast <$> zonkCoreExpr e <*> mapNativeIndexCastCoM zonkCoToCo co
+    -- See Note [Zonking nominal native index casts] in GHC.Core.Coercion.
 zonkCoreExpr (Tick t e)
     = Tick t <$> zonkCoreExpr e -- Do we need to zonk in ticks?
 

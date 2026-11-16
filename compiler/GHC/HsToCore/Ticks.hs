@@ -547,6 +547,7 @@ isCallSite :: HsExpr GhcTc -> Bool
 isCallSite HsApp{}     = True
 isCallSite HsAppType{} = True
 isCallSite HsCase{}    = True
+isCallSite (XExpr NativeCaseAlias{}) = True
 isCallSite (XExpr (ExpandedThingTc (HSE _ e)))
   = isCallSite (unLoc e)
 
@@ -695,6 +696,10 @@ addTickHsExpr (XExpr (WrapExpr w e)) =
         liftM (XExpr . WrapExpr w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
 addTickHsExpr (XExpr (ExpandedThingTc hse)) = addTickHsExpanded hse
+addTickHsExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
+  = do { scrut' <- addTickLHsExpr scrut
+       ; body' <- bindNativeCaseIds [value, proof] (addTickLHsExpr body)
+       ; return (XExpr (NativeCaseAlias scrut' value proof result_ty body')) }
 
 addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually
@@ -1285,6 +1290,13 @@ bindLocals from (TM m) = TM $ \env st ->
   where with_bnds e = e{ inScope = inScope e `extendVarSetList` new_bnds
                        , recSelBinds = recSelBinds e `plusVarEnv` collectFldBinds from }
         new_bnds = collectBinds from
+
+-- | Scope the generated case binders without inventing source patterns.
+-- See Note [Checked opaque case alias] in GHC.Hs.Expr.
+bindNativeCaseIds :: [Id] -> TM a -> TM a
+bindNativeCaseIds ids (TM m) = TM $ \env st ->
+  case m (env { inScope = inScope env `extendVarSetList` ids }) st of
+    (r, fv, st') -> (r, fv `delListFromOccEnv` map (nameOccName . idName) ids, st')
 
 withBlackListed :: SrcSpan -> TM a -> TM a
 withBlackListed (RealSrcSpan ss _) = withEnv (\ env -> env { blackList = Set.insert ss (blackList env) })

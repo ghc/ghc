@@ -213,6 +213,7 @@ classify tok =
     ITvia -> TkKeyword
     ITwhere -> TkKeyword
     ITforall{} -> TkKeyword
+    ITforeach -> TkKeyword
     ITexport -> TkKeyword
     ITlabel -> TkKeyword
     ITdynamic -> TkKeyword

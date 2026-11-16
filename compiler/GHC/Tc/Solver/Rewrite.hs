@@ -10,7 +10,7 @@
 
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteForErrors, rewriteArgsNom,
-   rewriteType
+   rewriteType, rewriteFamilyAxioms
  ) where
 
 import GHC.Prelude
@@ -23,9 +23,11 @@ import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Errors.Types
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
-import GHC.Core.TyCo.FVs( univCoDepsDeepCoVars, univCoDepsHasHoles
+import GHC.Core.TyCo.FVs( tyCoVarsOfTypes, tyCoVarsOfCo
+                        , univCoDepsDeepCoVars, univCoDepsHasHoles
                         , emptyUnivCoDeps, isEmptyUnivCoDeps
                         , addUnivCoDep, addUnivCoDepCoVar, addUnivCoDepHole
                         , unionUnivCoDeps
@@ -106,6 +108,7 @@ runRewriteCtEv ev
 runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, CoHoleSet)
 runRewrite loc flav eq_rel thing_inside
   = do { dflags <- getDynFlags
+       ; native_binders <- getNativeBinderScope
        ; used_cos_ref  <- newTcRef emptyUnivCoDeps
        ; rewriters_ref <- newTcRef emptyCoHoleSet
        ; let fmode = RE { re_loc       = resetCtLocDepth loc
@@ -114,7 +117,10 @@ runRewrite loc flav eq_rel thing_inside
                         , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref
                         , re_used_cos  = used_cos_ref
-                        , re_zap_coercions = gopt Opt_ZapCoercions dflags }
+                        , re_native_binders = native_binders
+                        , re_fam_axioms_only = False
+                        , re_zap_coercions = isEmptyVarSet native_binders
+                                             && gopt Opt_ZapCoercions dflags }
        ; res <- runRewriteM thing_inside fmode
        ; rewriters <- readTcRef rewriters_ref
        ; return (res, rewriters) }
@@ -154,6 +160,26 @@ setEqRel new_eq_rel thing_inside
     then runRewriteM thing_inside env
     else runRewriteM thing_inside (env { re_eq_rel = new_eq_rel })
 {-# INLINE setEqRel #-}
+
+-- | Normalize a retained body with its runtime binder in scope.
+-- See Note [Rewriting retained dependent functions].
+withNativeBinder :: Id -> RewriteM a -> RewriteM a
+withNativeBinder b thing_inside
+  = mkRewriteM $ \env ->
+    runRewriteM thing_inside
+      (env { re_native_binders = extendVarSet (re_native_binders env) b
+           , re_zap_coercions = False })
+{-# INLINE withNativeBinder #-}
+
+-- | Skip external evidence during axiom-only reduction or under a runtime binder.
+-- See Note [Solving retained function equalities] in GHC.Tc.Solver.Equality.
+withoutExternalEvidence :: a -> RewriteM a -> RewriteM a
+withoutExternalEvidence fallback thing_inside
+  = mkRewriteM $ \env ->
+    if not (re_fam_axioms_only env) && isEmptyVarSet (re_native_binders env)
+    then runRewriteM thing_inside env
+    else return fallback
+{-# INLINE withoutExternalEvidence #-}
 
 bumpReductionDepthRM :: Type -> RewriteM a -> RewriteM a
 bumpReductionDepthRM ty (RewriteM thing_inside)
@@ -305,6 +331,17 @@ rewriteType loc ty
                      -- (Shouldn't matter, if only Givens are present
                      -- anyway)
        ; return $ reductionReducedType redn }
+
+-- | Reduce family axioms at nominal role with the solver reduction-depth limit.
+-- See Note [Solving retained function equalities] in GHC.Tc.Solver.Equality.
+rewriteFamilyAxioms :: CtLoc -> TcType -> TcS Reduction
+rewriteFamilyAxioms loc ty
+  = do { (redn, rewriters) <- runRewrite loc Given NomEq $
+           mkRewriteM $ \env ->
+             runRewriteM (rewrite_one ty)
+               (env { re_fam_axioms_only = True, re_zap_coercions = False })
+       ; massert (isEmptyCoHoleSet rewriters)
+       ; return redn }
 
 {- *********************************************************************
 *                                                                      *
@@ -644,6 +681,60 @@ rewrite_args_slow binders inner_ki fvs roles tys
            ; return $! mkReflRedn Phantom ty }
 
 ------------------
+{- Note [Rewriting retained dependent functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained function has a fixed closed domain and a Many runtime binder.
+The domain can also be an eligible ordinary function type. Keep its Id only
+in dedicated call-head slots. See Note [Function-valued retained binders] in
+GHC.Core.Type. Normalize its body without changing that binder or its domain.
+mkDepFunRedn uses DepFunCo to bind the runtime Id in the reduction proof. Each endpoint uses
+mkDepFunTy independently: normalization can remove a dependency and produce an
+ordinary Many arrow on one side. A bound runtime index remains rigid. Do not
+inspect its definition or add a singleton witness.
+
+The ordinary ForAllTy case recurses into its body, but it does not establish a
+solver scope for runtime Ids. In particular, a plugin can emit a Wanted, and a
+family cache can retain a reduction with a free occurrence of the inner Id.
+An inert equality can also import evidence from outside the retained binder.
+Wrapping the final proof in DepFunCo does not bind an Id in any such side effect.
+
+Track every active retained runtime Id in re_native_binders throughout body
+normalization. Nested binders extend this set. Leaving a body restores the
+previous environment. A separate body Wanted inherits the TcS native binder
+scope. See Note [Native runtime binder scopes] in GHC.Tc.Solver.Monad.
+In this mode:
+
+* Do not query or call rewriting plugins. They can emit Wanted constraints.
+* Do not read or write the family application cache. Its reductions can carry
+  evidence outside the runtime binder's scope.
+* Do not rewrite family applications with inert equalities.
+* A type variable can follow an inert Given only when its predicate, canonical
+  RHS and evidence coercion have no deep free occurrence of an active retained
+  Id. Include variable kinds and CoVar predicates in this check. Reject coercion
+  holes in the predicate, RHS and these variable types: free-variable collection
+  alone does not detect a hole. This allows an outer runtime index in the Given.
+  Preserve eqCanRewriteFR, role conversion and recordRewriter. Do not follow
+  Wanted evidence. This read-only path emits no new constraints.
+* Do not zap coercions. Keep the explicit scoped DepFunCo proof, and do not run
+  an intermediate lint check on a body whose runtime Id is not yet bound.
+
+Global family axioms can still reduce. Ordinary type meta-variables can still be
+read and zonked. These paths emit no new constraints or index assignments.
+Coercions are only zonked, as in rewrite_co; do not rewrite CoVar predicates.
+No runtime binder or local equality enters the outer inert set or a cache.
+The existing depth, role, and location context remains active. Nested retained
+binders inherit the same restrictions. Ordinary rewriting keeps its existing
+evidence paths without the additional dependency scans. The scope checks are
+inlined.
+
+This rule supplies congruence for normalization. It does not enable retained
+meta-variable assignment, inferred retained bindings, or structural unification.
+Agda's context extension and conversion motivate the scoped rule. Haskell keeps
+explicit FC evidence and its own evaluation rules. See the pinned sources and
+evaluation boundary in docs/dependent-haskell/REFERENCES.md#agda-provenance and
+Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+-}
+
 rewrite_one :: TcType -> RewriteM Reduction
 -- Rewrite a type to get rid of type function applications, returning
 -- the new type-function-free type, and a collection of new equality
@@ -655,6 +746,31 @@ rewrite_one :: TcType -> RewriteM Reduction
 rewrite_one ty
   | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
   = rewrite_one ty'
+
+-- Nominal argument evidence gives forward congruence under the same head.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+rewrite_one ty@(TermAppTy f arg)
+  | Just (domain, _) <- nativeIndexFunctionTys_maybe f
+  , typeKind arg `eqType` domain
+  = do { role <- getRole
+       ; Reduction co arg' <- setEqRel NomEq $ rewrite_one arg
+       ; return $! downgradeRedn role Nominal $
+           mkReduction (mkTermAppCo f co) (TermAppTy f arg') }
+  | otherwise
+  = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
+
+rewrite_one ty@(TermVarTy {})
+  = do { role <- getRole
+       ; return $! mkReflRedn role ty }
+rewrite_one ty@(DepFunTy b body)
+  -- See Note [Rewriting retained dependent functions].
+  | isId b, isNativeRetainedBinder b
+  , isLiftedTypeKind (typeKind body)
+  = withNativeBinder b $
+    do { redn <- rewrite_one body
+       ; return $! mkDepFunRedn b redn }
+  | otherwise
+  = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 
 rewrite_one xi@(LitTy {})
   = do { role <- getRole
@@ -996,7 +1112,8 @@ rewriteExactFamApp tc tys =
                      && not (univCoDepsHasHoles deps) -- (FAC_Holes)
                      ) $
                   -- NB: (FAC_Flag) is checked in 'extendFamAppCache'.
-                  liftTcS $ extendFamAppCache tc tys zapped_redn
+                  withoutExternalEvidence () $
+                    liftTcS $ extendFamAppCache tc tys zapped_redn
 
               ; return zapped_redn
               }}
@@ -1089,7 +1206,8 @@ rewrite_exact_fam_app_step tc tys
 
          -- STEP 3: try the inerts
        ; flavour <- getFlavour
-       ; mb_eq <- liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
+       ; mb_eq <- withoutExternalEvidence Nothing $
+                    liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
        ; case mb_eq of
          { Just (EqCt { eq_ev = inert_ev, eq_rhs = inert_rhs, eq_eq_rel = inert_eq_rel })
              -> do { traceRewriteM "rewrite family application with inert"
@@ -1740,8 +1858,13 @@ try_to_reduce tc tys tc_rewriters
                | otherwise
                = return mb_redn
 
-       ; result <-
-            liftTcS $ firstJustsM
+       ; result <- liftTcS $
+           if re_fam_axioms_only rewrite_env
+              || not (isEmptyVarSet (re_native_binders rewrite_env))
+           -- Global family axioms do not emit constraints or update caches.
+           -- See Note [Rewriting retained dependent functions].
+           then matchFam tc tys
+           else firstJustsM
               [ -- STEP 1a & STEP 4a
                 record_deps
                   =<< runTcPluginRewriters rewrite_env tc_rewriters tys
@@ -1773,7 +1896,8 @@ try_to_reduce tc tys tc_rewriters
 -- headed by the given 'TyCon`.
 getTcPluginRewritersForTyCon :: TyCon -> RewriteM [TcPluginRewriter]
 getTcPluginRewritersForTyCon tc
-  = liftTcS $ do { tcg_env <- getGblEnv
+  = withoutExternalEvidence [] $
+    liftTcS $ do { tcg_env <- getGblEnv
                  ; plugins <- readTcRef (tcg_plugins tcg_env)
                  ; let rewriters = rewriterTcMPlugins plugins
                  ; return (lookupWithDefaultUFM rewriters [] tc) }
@@ -1868,10 +1992,13 @@ rewrite_tyvar2 :: TcTyVar -> CtFlavourRole -> RewriteM RewriteTvResult
 -- See Note [Stability of rewriting] in GHC.Tc.Solver.Monad
 
 rewrite_tyvar2 tv fr@(_, eq_rel)
-  = do { ieqs <- liftTcS $ getInertEqs
+  = do { axioms_only <- getRewriteEnvField re_fam_axioms_only
+       ; native_binders <- getRewriteEnvField re_native_binders
+       ; ieqs <- liftTcS $ getInertEqs
        ; case lookupDVarEnv ieqs tv of
            Just equal_ct_list
-             | Just ct <- find can_rewrite equal_ct_list
+             | not axioms_only
+             , Just ct <- find (can_rewrite native_binders) equal_ct_list
              , EqCt { eq_ev = ctev, eq_lhs = TyVarLHS tv
                     , eq_rhs = rhs_ty, eq_eq_rel = ct_eq_rel } <- ct
              -> do { traceRewriteM "Following inert tyvar" $
@@ -1895,9 +2022,22 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
            _other -> return RTRNotFollowed }
 
   where
-    can_rewrite :: EqCt -> Bool
-    can_rewrite ct = eqCtFlavourRole ct `eqCanRewriteFR` fr
+    can_rewrite :: VarSet -> EqCt -> Bool
+    can_rewrite native_binders ct
+      = eqCtFlavourRole ct `eqCanRewriteFR` fr
+        && (isEmptyVarSet native_binders
+            || (isGiven ev
+                && disjointVarSet native_binders fvs
+                && not (hasCoercionHole predicate || hasCoercionHole rhs
+                        || anyVarSet (hasCoercionHole . varType) fvs)))
       -- This is THE key call of eqCanRewriteFR
+      -- See Note [Rewriting retained dependent functions].
+      where
+        ev = eq_ev ct
+        predicate = ctEvPred ev
+        rhs = eq_rhs ct
+        fvs = tyCoVarsOfTypes [predicate, rhs]
+              `unionVarSet` tyCoVarsOfCo (ctEvCoercion ev)
 
 {-
 Note [An alternative story for the inert substitution]

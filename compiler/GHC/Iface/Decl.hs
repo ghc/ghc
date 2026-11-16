@@ -38,7 +38,8 @@ import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.TyThing
 
-import GHC.Utils.Panic.Plain
+import GHC.Utils.Misc (zipEqual)
+import GHC.Utils.Panic.Plain (assert)
 
 import GHC.Data.Maybe
 import Data.List ( findIndex, mapAccumL )
@@ -238,9 +239,8 @@ tyConToIfaceDecl env tycon
                     ifConUserTvBinders = toIfaceForAllTyBndrs user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env3 theta,
-                    ifConArgTys  =
-                      map (\(Scaled w t) -> (tidyToIfaceType con_env3 w
-                                          , (tidyToIfaceType con_env3 t))) arg_tys,
+                    ifConArgTys  = if_arg_tys,
+                    ifConArgBinders = if_arg_binders,
                     ifConFields  = dataConFieldLabels data_con,
                     ifConStricts = map (toIfaceBang con_env1)
                                        (dataConImplBangs data_con),
@@ -257,6 +257,23 @@ tyConToIfaceDecl env tycon
           (con_env2, univ_tvs') = mapAccumL tidyFreeTyCoVarX con_env1 univ_tvs
           (con_env3, ex_tvs') = mapAccumL tidyFreeTyCoVarX con_env2 ex_tvs
           to_eq_spec (tv,ty) = (tidyTyVar con_env3 tv, tidyToIfaceType con_env3 ty)
+
+          arg_binders = dataConRepArgBinders data_con
+          (if_arg_binders, if_arg_tys)
+            | null arg_binders
+            = ([], map (\(Scaled w t) -> (tidyToIfaceType con_env3 w
+                                         , tidyToIfaceType con_env3 t)) arg_tys)
+            | otherwise
+            = unzip $ snd $ mapAccumL tidy_arg con_env3 (zipEqual arg_binders arg_tys)
+
+          -- See Note [Retained constructor fields in interfaces].
+          tidy_arg env (mb_binder, Scaled w ty)
+            = (body_env, (if_binder, (tidyToIfaceType env w, tidyToIfaceType env ty)))
+            where
+              (body_env, if_binder) = case mb_binder of
+                Nothing -> (env, Nothing)
+                Just binder -> let (env', binder') = tidyVarBndr env binder
+                               in (env', Just (mkIfLclName (getOccFS binder')))
 
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas

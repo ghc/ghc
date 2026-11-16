@@ -2,6 +2,16 @@ setTestOpts(when(arch('wasm32'), run_timeout_multiplier(2)))
 
 test('ghcApi', normal, compile_and_run, ['-package ghc'])
 
+test('NativeDependentCore', [extra_run_opts(f'"{config.libdir}"')],
+     compile_and_run, ['-package ghc'])
+
+test('NativeDependentCoreRun', [req_bco, req_process, req_host_target_ghc,
+                              unless(have_ncg(), skip),
+                              extra_files(['../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
+                                           '../../../docs/dependent-haskell/examples/packed-vector/Main.hs']),
+                              extra_run_opts(f'"{config.libdir}"')],
+     compile_and_run, ['-package ghc'])
+
 test('T6145',
      [extra_run_opts(f'"{config.libdir}"')
      # needs to spawn c compiler process, and wasm doesn't have

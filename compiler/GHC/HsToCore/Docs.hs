@@ -498,6 +498,8 @@ typeDocs = go 0
   where
     go n = \case
       HsForAllTy { hst_body = ty }          -> go n (unLoc ty)
+      HsForEachTy { hst_bndrs = bs, hst_body = ty }
+                                             -> go (n + length bs) (unLoc ty)
       HsQualTy   { hst_body = ty }          -> go n (unLoc ty)
       HsFunTy _ _ (unLoc->HsDocTy _ _ x) ty -> IM.insert n (unLoc x) $ go (n+1) (unLoc ty)
       HsFunTy _ _ _ ty                      -> go (n+1) (unLoc ty)

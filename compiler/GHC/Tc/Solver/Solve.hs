@@ -1895,9 +1895,12 @@ data TcPluginProgress = TcPluginProgress
 
 getTcPluginSolvers :: TcS [TcPluginSolver]
 getTcPluginSolvers
-  = do { tcg_env <- TcS.getGblEnv
+  = do { native_binders <- getNativeBinderScope
+       ; if not (isEmptyVarSet native_binders) then return [] else
+    -- See Note [Native runtime binder scopes] in GHC.Tc.Solver.Monad.
+    do { tcg_env <- TcS.getGblEnv
        ; plugins <- TcS.readTcRef (tcg_plugins tcg_env)
-       ; return $ TcM.solverTcMPlugins plugins }
+       ; return $ TcM.solverTcMPlugins plugins } }
 
 -- | Starting from a pair of (given, wanted) constraints,
 -- invoke each of the typechecker constraint-solving plugins in turn and return

@@ -92,6 +92,10 @@ renameType (HsForAllTy x tele lt) =
   HsForAllTy x
     <$> renameForAllTelescope tele
     <*> renameLType lt
+renameType (HsForEachTy x bndrs lt) =
+  HsForEachTy x
+    <$> mapM renameLBinder bndrs
+    <*> renameLType lt
 renameType (HsQualTy x lctxt lt) =
   HsQualTy x
     <$> renameLContext lctxt

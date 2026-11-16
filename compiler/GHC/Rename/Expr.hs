@@ -387,7 +387,7 @@ rnExpr (HsAppType _ fun arg)
   = do { type_app <- xoptM LangExt.TypeApplications
        ; unless type_app $ addErr $ typeAppErr TypeLevel $ hswc_body arg
        ; (fun',fvFun) <- rnLExpr fun
-       ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
+       ; (arg',fvArg) <- rnHsTypeApp arg
        ; return (HsAppType noExtField fun' arg', fvFun `plusFN` fvArg) }
 
 rnExpr (OpApp _ e1 op e2)

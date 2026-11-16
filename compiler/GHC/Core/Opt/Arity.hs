@@ -65,6 +65,7 @@ import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 import GHC.Core.TyCo.Compare( eqType, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy), Coercion(..) )
 
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
@@ -207,6 +208,9 @@ typeOneShots ty
 
       | Just (_,_,arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
+
+      | DepFunTy _ res <- coreFullView ty
+      = NoOneShotInfo : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
@@ -2305,7 +2309,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        -> Subst -> Type   -- We are really looking at subst(ty)
        -> (InScopeSet, EtaInfo)
     -- (go [o1,..,on] subst ty) = (in_scope, EI [b1,..,bn] co)
-    --    co :: subst(ty) ~ b1_ty -> ... -> bn_ty -> tr
+    --    co :: subst(ty) ~ mkLamTypes [b1,..,bn] tr
 
     go _ [] subst _
        ----------- Done!  No more expansion needed
@@ -2321,6 +2325,18 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
          -- we consume one of the [OneShotInfo]
        , (in_scope, EI bs mco) <- go n oss' subst' ty'
        = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Bndr tcv' vis) ty' mco))
+
+       ----------- Retained dependent functions
+       | DepFunTy b res_ty <- coreFullView ty
+       , (subst', eta_id) <- freshEtaId n subst (Scaled ManyTy (varType b))
+       , let eta_id' = eta_id `setIdOneShotInfo` one_shot
+             subst'' = Core.extendIdSubst subst' b (Var eta_id')
+       , (in_scope, EI bs mco) <- go (n+1) oss1 subst'' res_ty
+       = case checkReflexiveMCo mco of
+           MRefl -> (in_scope, EI (eta_id' : bs) MRefl)
+           MCo co -> pprPanic "mkEtaWW: native dependent congruence not implemented"
+                       (ppr b $$ ppr co)
+         -- Later argument types must use this eta binder's identity.
 
        ----------- Function types  (t1 -> t2)
        | Just (_af, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
@@ -2885,6 +2901,8 @@ pushCoArg co arg
   | Type ty <- arg
   = do { (_, ty', m_co') <- pushCoTyArg co ty
        ; return (Type ty', m_co') }
+  | Just result <- pushCoRetainedArg co arg
+  = Just result
   | otherwise
   = do { (_, arg_mco, m_co') <- pushCoValArg co
        ; let arg_mco' = checkReflexiveMCo arg_mco
@@ -2892,6 +2910,67 @@ pushCoArg co arg
              -- The coercion is very often (arg_co -> res_co), but without
              -- the argument coercion actually being ReflCo
        ; return (arg `mkCastMCo` arg_mco', m_co') }
+
+-- | Push explicit retained congruence through one checked runtime argument.
+-- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+pushCoRetainedArg :: Coercion -> CoreArg -> Maybe (CoreArg, MCoercion)
+pushCoRetainedArg = go
+  where
+    go (DepFunCo b domain body) arg = instantiate False b domain body arg
+    go (SymCo (DepFunCo b domain body)) arg = instantiate True b domain body arg
+    go (SymCo (SymCo co)) arg = go co arg
+    go (SymCo (TransCo first second)) arg
+      = go (TransCo (mkSymCo second) (mkSymCo first)) arg
+    go (SymCo (SubCo co)) arg = go (SubCo (mkSymCo co)) arg
+    go (TransCo first second) arg
+      = do { (middle, result_second) <- go second arg
+           ; (source, result_first) <- go first middle
+           ; return (source, compose result_first result_second) }
+    go (SubCo co) arg
+      = do { (source, result) <- go co arg
+           ; return (source, case result of
+                       MRefl -> MRefl
+                       MCo proof -> MCo (mkSubCo proof)) }
+    go co arg | Just {} <- isReflCo_maybe co = Just (arg, MRefl)
+    go _ _ = Nothing
+
+    instantiate symmetric b domain body arg
+      = do { delta <- case domain of
+               MRefl -> Just (mkNomReflCo (varType b))
+               MCo proof
+                 | coercionRole proof == Nominal
+                 , coercionLKind proof `eqType` varType b
+                 , isNativeIndexId b
+                 , isNativeIndexType (coercionRKind proof)
+                 -> Just proof
+               _ -> Nothing
+           ; let source_domain = if symmetric then coercionLKind delta
+                                              else coercionRKind delta
+           ; if exprType arg `eqType` source_domain then pure () else Nothing
+           ; let converted = case domain of
+                   MRefl -> arg
+                   MCo _ -> Cast arg (SubCo (if symmetric then delta else mkSymCo delta))
+                 replacement = if symmetric then arg else converted
+           ; if valid_argument b replacement then pure () else Nothing
+           ; let scope = mkInScopeSet (exprFreeVars replacement `unionVarSet` tyCoVarsOfCo body)
+                 subst = Core.extendIdSubst (Core.mkEmptySubst scope) b replacement
+                 proof = Core.substCo subst body
+           ; return (converted, MCo (if symmetric then mkSymCo proof else proof)) }
+
+    valid_argument b arg
+      | isNativeIndexId b
+      = case exprToNativeIndex arg of
+          Just index -> typeKind index `eqType` varType b
+          Nothing -> False
+      | isNativeIndexFunctionId b
+      = case nativeIndexFunctionVar_maybe arg of
+          Just actual -> varType actual `eqType` varType b
+          Nothing -> False
+      | otherwise = False
+
+    compose MRefl second = second
+    compose first MRefl = first
+    compose (MCo first) (MCo second) = MCo (mkTransCo first second)
 
 pushCoTyArg :: CoercionR -> Type -> Maybe (Type, Type, MCoercionR)
 -- We have (fun |> co) @ty
@@ -2955,7 +3034,9 @@ pushCoValArg co
   | Just (ty, _) <- isReflCo_maybe co
   = Just (ty, MRefl, MRefl)
 
-  | isFunTy tyL
+  | isFunTy tyL, isFunTy tyR
+  -- A retained coercion can have only one ordinary function endpoint.
+  -- Keep that cast intact; SelFun does not project retained functions.
   , (_, co1, co2) <- decomposeFunCo co
       -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
       -- then co1 :: tyL1 ~ tyR1
@@ -3031,7 +3112,23 @@ pushCoDataCon :: DataCon -> [CoreExpr] -> MCoercionR
 -- The left-hand one must be a T, because exprIsConApp returned True
 -- but the right-hand one might not be.  (Though it usually will.)
 pushCoDataCon dc dc_args MRefl    = Just $! (push_dc_refl dc dc_args)
-pushCoDataCon dc dc_args (MCo co) = push_dc_gen  dc dc_args co (coercionKind co)
+pushCoDataCon dc dc_args (MCo co)
+  | not (null (dataConRepArgBinders dc))
+  , not (isReflCo co)
+  -- See Note [Retained constructor casts].
+  = Nothing
+  | otherwise
+  = push_dc_gen dc dc_args co (coercionKind co)
+
+{- Note [Retained constructor casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ordinary KPush substitution binds erased variables only. A retained field
+also scopes over later field types. Pushing a nonreflexive result cast requires
+a scoped substitution through those fields. The flat zip in push_data_con does
+not provide it. Decline this transformation for retained constructors until a
+scoped rule is available. Reflexive casts preserve the existing field scope.
+See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
+-}
 
 push_dc_refl :: DataCon -> [CoreExpr] -> (DataCon, [Type], [CoreExpr])
 push_dc_refl dc dc_args
@@ -3147,7 +3244,8 @@ collectBindersPushingCo e
 
       | isId b
       , let Pair tyL tyR = coercionKind co
-      , assert (isFunTy tyL) $ isFunTy tyR
+      , isFunTy tyL, isFunTy tyR
+      -- Retained function casts must keep their scoped runtime binder.
       , (co_mult, co_arg, co_res) <- decomposeFunCo co
       , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
