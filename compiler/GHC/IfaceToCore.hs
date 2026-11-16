@@ -1689,8 +1689,6 @@ tcIfaceDomainShape (IfaceFunTy FTF_T_T mult arg res)
 tcIfaceDomainShape IfaceFunTy{} = return NativeInvalidDomain
 tcIfaceDomainShape IfaceDepFunTy{} = return NativePiDomain
 tcIfaceDomainShape IfaceForAllTy{} = return NativeInvalidDomain
-tcIfaceDomainShape IfaceTermVar{} = return NativeInvalidDomain
-tcIfaceDomainShape IfaceTermAppTy{} = return NativeInvalidDomain
 tcIfaceDomainShape IfaceLitTy{} = return NativeInvalidDomain
 tcIfaceDomainShape _ = return NativeUnknownDomain
 
@@ -1783,9 +1781,11 @@ Resolve those multiplicities by wired TyCon identity, including nullary aliases.
 A raw Pi is not scalar, but its function shape is unknown: mkDepFunTy converts
 a vacuous Pi to an ordinary arrow. Applied synonyms and casts also remain
 unknown. The precheck must not reject their possible normalization results.
+Leave raw variable and call-index forms unknown so that their decoders check
+lexical scope.
 
 True means only that this view cannot reject the domain. Run the existing
-typed predicate afterward, inside the M54 exception boundary. No unchecked
+typed predicate afterward, inside the exception boundary. No unchecked
 Type escapes. Keep the Id guards before domain inspection. The raw named-field
 precheck runs before decoding that field; the existing field checks still run
 in their original order. Parent kinds and binder headers must already exist.
