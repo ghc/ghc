@@ -3687,3 +3687,39 @@ executable, broad historical matrix or full GHC suite was run.
 The independent static artifact audit passes 2,733 checks over 735 pinned paths.
 All `native-recursive-domain-diagnostics-*` files and directories are permanently
 frozen. The full program goal stays active.
+
+### M55: inspect native interface domains before decoding fields
+
+Status: planned. M54 remains the diagnostic fallback.
+
+Derive a small domain-shape view from each raw data declaration and nullary
+synonym. Attach the view to the reconstructed `TyCon` before fields are forced.
+Resolve references through the existing lazy interface environment. Rebuild
+the nullary type cache when attaching the view. Add no interface tag, trusted
+wire flag, global name cache or unchecked `Type` head.
+
+Before each native interface eligibility check, inspect the reachable shapes.
+Reject only shapes that cannot satisfy the existing domain rules. Distinguish
+scalar domains, closed function domains and the two multiplicity policies.
+Allow data cycles. Track synonym expansion separately and reset that stack
+when entering data fields. Keep the existing typed checks after this precheck.
+Unclassified shapes, including applied synonyms and casts, use the typed path.
+A raw retained Pi is not scalar. Its function classification stays unknown,
+because a vacuous Pi can become an ordinary eligible arrow.
+
+This follows GHC's lazy interface construction and Agda's staged declaration
+checking. It does not use a temporary empty constructor list as a checked
+domain. The design and selected primary-source provenance are in
+`native-shape-first-loader-design-v1` and
+`native-domain-loader-next-research-v1`. This step does not guarantee termination
+before the declaration header exists or for unclassified normalization paths.
+C1, C2, R22 and the full program goal stay open.
+
+- [x] Record the shape representation, ownership, fallback and limits.
+- [ ] Add lazy `TyCon` metadata and rebuild its nullary cache on attachment.
+- [ ] Derive raw views and check them before the four typed eligibility sites.
+- [ ] Update the existing API fixture. Distinguish early shape rejection from
+  M54's detected-loop diagnostic. Keep recursive data, alias and multiplicity
+  controls. Keep the existing golden output.
+- [ ] Build both stages. Run focused API, source, Showcase and registered checks.
+- [ ] Update contracts and references. Freeze, audit and publish this increment.
