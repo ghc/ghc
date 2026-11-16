@@ -4645,4 +4645,9 @@ The owning Notes are [Native interface domain shapes] in GHC.Core.TyCon and
 [Checking native domain shapes] in GHC.IfaceToCore. See the
 [contract](CORE.md#native-interface-domain-shapes) and
 [provenance](REFERENCES.md#native-interface-domain-shapes-provenance).
-Independent audit and publication are pending.
+The independent static audit passes 3,789 checks over 1,094 pinned paths,
+including complete frozen-namespace coverage. Audited checkpoint
+`b5695d28a0b882eaa2da378ff91535702ad0344f` is published on the fork.
+All `native-interface-domain-shapes-*` files and directories are permanently
+frozen. The canonical record is `dependent-haskell-M55-final-audit-v1.json`,
+SHA256 `67c0af1483bffda59b9fc577ba30dfbcb78da11a34fcec6839a0d96b39b30877`.

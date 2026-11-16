@@ -3690,7 +3690,8 @@ frozen. The full program goal stays active.
 
 ### M55: inspect native interface domains before decoding fields
 
-Status: implemented and validated. Independent audit and publication pending.
+Status: complete. The source is validated, independently audited and published
+at `b5695d28a0b882eaa2da378ff91535702ad0344f`. The full goal stays active.
 M54 remains the detected-loop fallback for unclassified forms.
 
 Derive a small domain-shape view from each raw data declaration and nullary
@@ -3726,7 +3727,7 @@ C1, C2, R22 and the full program goal stay open.
   M54's detected-loop diagnostic. Keep recursive data, alias and multiplicity
   controls. Keep the existing golden output.
 - [x] Build both stages. Run focused API, source, Showcase and registered checks.
-- [ ] Update contracts and references. Freeze, audit and publish this increment.
+- [x] Update contracts and references. Freeze, audit and publish this increment.
 
 Validation selects compiler and source
 `b0b876db25e087b286022931df03223abd499059`: 90 compiler inputs and 119 source
@@ -3741,3 +3742,9 @@ The earlier scope failures and OS-interrupted alias cycle remain in the evidence
 The trace isolated alias expansion before Id allocation. The final raw precheck
 runs before that operation. This does not prove termination for arbitrary
 interfaces. No old executable, full GHC suite or broad historical matrix was run.
+
+The independent static audit passes 3,789 checks over 1,094 pinned paths.
+It covers the complete frozen namespace. All `native-interface-domain-shapes-*`
+files and directories are permanently frozen. The canonical record is
+`dependent-haskell-M55-final-audit-v1.json`, SHA256
+`67c0af1483bffda59b9fc577ba30dfbcb78da11a34fcec6839a0d96b39b30877`.
