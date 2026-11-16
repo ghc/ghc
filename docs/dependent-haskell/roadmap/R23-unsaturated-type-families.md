@@ -45,10 +45,13 @@ counterexample against the current closed subset is claimed.
       permit decomposition. Preserve generativity of ordinary constructors.
 - [ ] Port matchability through kinds, quantifiers, `FunTy`, coercions,
       substitution, Lint and native `DepFunTy`/`DepFunCo` handling.
-      Review the prototype's provisional invisible-forall assumption.
+      Preserve requested invisible `U` binders through smart constructors.
+      Review inferred/specified helpers and runtime type-lambda recovery.
 - [ ] Preserve role checks on every added coercion field. The prototype uses
       nominal matchability evidence in `ForAllCo`, including at phantom role.
       Do not infer that evidence from an arbitrary phantom parent coercion.
+      Preserve the current representational visibility cast between invisible
+      Core type lambdas and required source foralls.
 - [ ] Update raw `FUN` layout, kind recovery, interfaces, reflection and
       fingerprints. Its specified invisible binder does not consume the
       required visible multiplicity argument. Keep the other three arrow
@@ -80,8 +83,21 @@ compatibility correction:
 - `promotion/matchability-native-integration-addendum-v1/`.
 - `core/matchability-diagnostics-v1/`.
 - `core/generic-matchability-v1.md`.
+- `promotion/invisible-forall-matchability-v1/`.
 
 Read the addendum with the draft. It corrects the visible-argument analysis for
 the new invisible `FUN` binder. Each record states its source pin and reading
 scope. All proposed port controls remain unexecuted. Keep this feature page and
 [REFERENCES.md](../REFERENCES.md) usable without the ignored cache.
+
+The invisible-forall review identifies a concrete port obligation. The pinned
+prototype's `mkTyCoForAllTy` overwrites requested invisible matchability with
+`M`. Copying that shortcut would discard an explicit `U`. Visibility alone
+does not establish matchability. A future polymorphic runtime value can ignore
+its erased argument; current native formation gates reject that value.
+
+Modern GHC also preserves higher-rank invisible binders and uses representational
+`ForAllCo` casts for required type arguments. Keep the matchability evidence
+nominal through that bridge. Family saturation is an arity rule; a zero-arity
+family can retain a forall result kind. That fact alone does not establish a
+noninjective inhabitant or a current exploit.

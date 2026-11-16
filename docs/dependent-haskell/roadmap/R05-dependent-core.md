@@ -28,8 +28,8 @@ The user selected a native Core extension based on Eisenberg's historical
   beneath unchanged function domains using the existing congruence rule.
 
 The [published M58 checkpoint](../ROADMAP.md#where-this-fork-stands) supplies
-the last final audit. The M59 implementation has bootstrap evidence and a
-self-hosted build; its selected self-hosted source checks remain pending.
+the last final audit. M59 passes its selected checks with both compiler stages;
+its final audit and publication remain pending.
 Restricted pipelines and Lint checks do not establish general preservation.
 
 ## Next increments
@@ -38,6 +38,9 @@ Restricted pipelines and Lint checks do not establish general preservation.
       abstract payload types and a scoped coercion variable. Check type
       recovery, Lint, CorePrep and object execution with full and partial
       applications. Measure bottom demand and ignored arguments.
+      Prepare abstract evidence before supplying reflexivity at the call site.
+      The native-object check needs a separate abstract `NOINLINE` binding.
+      Inspect that binding after simplification, tidying and actual CorePrep.
 - [ ] Determine whether a required transformation needs an opaque Pi
       instantiation rule. Whole-cast lowering may already work. Specify a new
       proof operation only when a measured or calculus obligation requires it.
@@ -88,3 +91,10 @@ for reading scope. The dated ignored research cache has
 `core/opaque-pi-elimination-v1.md`, `core/generic-domain-obligations-v1.md`,
 `core/generic-matchability-v1.md`, and the Agda telescope review. These are
 research records; proposed controls remain unexecuted.
+
+The prepared opaque-cast candidate is in
+`_build/verification/native-opaque-pi-whole-cast-probe-preparation-v2/`.
+Its nine prospective quiet checks cover bytecode and demand. They have not run.
+Its object-path notes distinguish the actual backend preparation from a
+separate preview call. Runtime closure with reflexivity alone cannot establish
+that opaque evidence survived an earlier typed phase.

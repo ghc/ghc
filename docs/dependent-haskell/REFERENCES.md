@@ -40,6 +40,20 @@ and primary links usable without that cache.
 
 ## Reading order
 
+For M59, use the same-domain congruence and scoped comparison references in
+[the fixed-domain contract](CORE.md#fixed-function-domain-body-comparison).
+The implementation uses the existing `DepFunCo` with `MRefl` at an unchanged
+function domain. It does not derive function equality. The private body solve
+and separate known-value selection keep their existing scope and native-meta
+limits. See Note `[Solving retained function equalities]` in
+`GHC.Tc.Solver.Equality` and the M59 source controls.
+
+The later [R23 review](roadmap/R23-unsaturated-type-families.md#research-records)
+records the prototype's invisible-forall constructor shortcut and current
+required-forall visibility bridge. The [R05 probe plan](roadmap/R05-dependent-core.md)
+separates abstract CorePrep checks from bytecode and native-object evidence.
+Those prospective controls remain unexecuted and do not enlarge M59's scope.
+
 1. Read [the Agda provenance](#agda-provenance) and
    [the Haskell evaluation constraints](#haskell-evaluation-provenance).
    Separate the dependent typing rules from runtime evaluation rules.

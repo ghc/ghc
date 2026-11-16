@@ -19,10 +19,9 @@ prerequisites, acceptance checks and the behavior that remains unsupported.
 
 The current increment is [M59](#m59-bodies-beneath-fixed-function-domains), owned
 by [R03 dependent products](roadmap/R03-dependent-products.md). It exercises
-existing R05 evidence rules. The implementation and bootstrap controls pass.
-Both compiler stages build. Selected self-hosted source checks, final audit
-and publication remain pending. GHC execution is paused for benchmarks until
-2026-11-16 18:00 CET.
+existing R05 evidence rules. The implementation and selected checks pass with
+both compiler stages. Final audit and publication remain pending. The user
+resumed GHC execution on 2026-11-16 at 17:53 CET.
 
 The queue then measures closed-list indexing, probes opaque Pi application,
 and completes a bounded type-argument position. The next substantial foundation
@@ -3998,8 +3997,8 @@ pattern; runtime binders still need their own solver scope.
 
 Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
 
-Status: implemented; bootstrap controls pass and both compiler stages build.
-Selected self-hosted source checks, final audit and publication remain open.
+Status: implemented and checked with both compiler stages.
+Final audit and publication remain open.
 The implementation checkpoint is `5c527cd8b92a`; source fixtures are at
 `5e33b194f1e6`. The checkboxes below separate implemented steps from final
 verification. Documentation updates do not replace those source identities.
@@ -4041,18 +4040,36 @@ The existing Core and Arity rules already support this fixed-domain case.
       Direct function-Pi visible type arguments remain outside this step.
       Test an explicit ordinary payload wildcard separately, so the completed
       value selection path cannot hide the body solver in the trace.
-- [ ] Check imported worker specialization at runtime with identity, successor
+- [x] Check imported worker specialization at runtime with identity, successor
       and constant local functions. Check ignored bottom functions and indices,
       returned function WHNF, function-head demand order and scoped shadowing.
       Keep wrong payloads, local-index escape and changed domains rejected.
-- [ ] Trace payload allocation and assignment inside the new function-body
+- [x] Trace payload allocation and assignment inside the new function-body
       solve. Extend the existing fixtures and maintained Showcase after the
       new source programs pass. Keep old goldens and observations unchanged.
-- [ ] Build both compiler stages. Run the focused API, source, runtime and
+- [x] Build both compiler stages. Run the focused API, source, runtime and
       registered checks. Record exact selected inputs and actual executions.
-- [ ] Update the Core contract, references and roadmap. Audit and publish the
-      checked result. Keep the longer-term goal active.
+- [x] Update the Core contract, references and roadmap with the measured scope.
+- [ ] Audit and publish the checked result. Keep the longer-term goal active.
 
 This step adds no Core constructor, wire form, singleton translation or
 function eta expansion. Open domains, changed function domains, opaque Pi
 projection, native coercion serialization and ordinary optimization remain open.
+
+The selected compiler is `5c527cd8b92a`; executable fixtures are at
+`5e33b194f1e6`. Snapshot 5 adds the documentation checkpoint `7cae7c49bf`
+without changing the 95 compiler inputs or executable sources. Both stages
+pass public19, parameterized14 with three rejection controls, and Showcase79/14.
+The registered run passes five tests across 39 cases, with 34 skips and no
+unexpected failures or framework warnings. Both stages agree on fourteen
+focused source controls. Three programs run, one Given control compiles,
+and ten programs reject with located errors. Four rejections are existing
+source-context boundaries, not evidence of the later semantic check.
+
+Self-hosting changed twelve pinned GHC package artifacts. Fresh bootstrap API2
+checks therefore replace the earlier API1 result for the final selection.
+Goldens remain 1/37. The original bootstrap Showcase pins none of those changed
+artifacts; its cumulative 414-input/product map remains valid. Revalidation
+checks 46,346 unique paths and permits only exact project-documentation deltas.
+The two final specialization baselines each return `[42,42]`.
+No broader GHC suite or general preservation theorem is claimed.

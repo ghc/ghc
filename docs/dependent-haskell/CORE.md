@@ -2312,3 +2312,31 @@ work. System DR supports the nominal constructor boundary. GraD separates
 type dependency from runtime usage. These comparisons do not supply a
 preservation or sharing theorem for this implementation. C1, C2 and R22
 remain open. There is no new term evaluator or general optimizer support.
+
+## Fixed function-domain body comparison
+
+M59 extends source equality checking beneath an unchanged function-valued
+retained binder. Both binders must satisfy the existing opaque-head policy.
+Their complete rewritten function types must agree. Use one fresh bare
+function Id in both bodies. Keep `MRefl` as the domain evidence; a cast around
+the function Id is not an eligible call head.
+
+The shared solver keeps M58's nominal domain evidence for changed scalar
+domains. That path substitutes the backward-converted actual into the right
+body. Freshening includes the deep free variables of the domain proof.
+Both paths use the private body solve, active comparison scope and checked
+zonked endpoints. An ordinary payload meta can become `Int`. A local runtime
+index must not escape into that meta. See Note `[Solving retained function
+equalities]` in `GHC.Tc.Solver.Equality`.
+
+Known-value selection separately recognizes complete retained functions with
+eligible function binders. It preserves immutable matching, kind, scope and
+usage checks. An explicit ordinary wildcard exercises body solving independently
+of that earlier selection. The trace compiles and links this control; it is
+not a runtime trace. Its final proofs are reflexive after zonking.
+
+Both stages pass the selected source, demand and rejection controls. The
+Showcase has 79 observations through fourteen source modules. This increment
+adds no Core constructor, interface form, function equality or eta expansion.
+Changed function domains, opaque Pi projection, general native metas and normal
+optimization remain unsupported.

@@ -22,19 +22,19 @@ all Core transformations. Normal optimization remains a broader release gate.
 - Retained workers and function fields through separate interfaces.
 - Nominal scalar-domain conversion with scoped source body solving at M58.
 - Fixed function-domain body comparison and payload selection at M59.
-  Implementation and bootstrap controls pass. Selected self-hosted source
-  checks, final audit and publication remain pending.
+  Both stages pass the selected source, runtime and rejection controls.
+  Final audit and publication remain pending.
 
 The last published checkpoint is M58. Its Showcase has 68 observations in both
-stages. The M59 candidate has 79 observations checked with the bootstrap
-compiler. See [the current evidence](../ROADMAP.md#where-this-fork-stands) and
+stages. M59 has 79 observations checked with both compilers.
+See [the current evidence](../ROADMAP.md#where-this-fork-stands) and
 [the M59 specification](../PLAN.md#m59-bodies-beneath-fixed-function-domains).
 M56's domain representation and M57's conversion rules belong primarily to R05.
 M58 and M59 expose those rules through source checking.
 
 ## Next increments
 
-- [ ] Finish M59's selected checks and publication. Preserve the existing
+- [ ] Finish M59's final audit and publication. Preserve the existing
       compiler and fixture identities when documentation changes.
 - [ ] Measure closed-list safe indexing:
       `indexClosed :: foreach (xs :: [Bool]) -> Fin (Count xs) -> Bool`.

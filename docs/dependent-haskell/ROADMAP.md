@@ -57,9 +57,8 @@ in Core. M58 exposes that conversion and scoped body solving from source.
 Its canonical audit is
 `_build/verification/dependent-haskell-M58-final-audit-v1.json`.
 
-M59 is implemented and has bootstrap evidence. Both compiler stages build.
-The updated 79-observation Showcase passes the bootstrap compiler. Selected
-self-hosted source checks, final audit and publication remain open. Its compiler
+M59 is implemented and checked with both compiler stages. The 79-observation
+Showcase passes in both stages. Final audit and publication remain open. Its compiler
 checkpoint is `5c527cd8b92a`; its source fixture checkpoint is `5e33b194f1e6`.
 See [the M59 specification](PLAN.md#m59-bodies-beneath-fixed-function-domains).
 Observation counts measure those programs. They do not count roadmap features.
@@ -79,16 +78,16 @@ can advance a card while the card remains open.
 
 | Order | Owner and contribution | State | Gate and next result |
 | --- | --- | --- | --- |
-| 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Pending final verification: M59 | Finish the selected checks and audit. Preserve exact compiler and source checkpoints. |
+| 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Selected verification passed: M59 | Finish the final audit and publication. Preserve exact compiler and source checkpoints. |
 | 2 | R03: safe indexing over a retained `[Bool]` | Candidate written; unexecuted | After M59, measure composition of the existing `Count` family with an ordinary `Fin` GADT. Check bounds and demand. |
 | 3 | R05: application through opaque whole-function evidence | Research complete enough to specify a probe | Keep genuinely abstract payloads and a scoped coercion variable. Check Lint, CorePrep and object execution before choosing a new coercion rule. |
 | 4 | R03: explicit complete retained-function type arguments | Scoped source task identified | Use the existing lifted consumer. Preserve kind, scope, complete-type and native-meta checks. |
 | 5 | R23: matchability foundation; also advances R05 | Prior implementation and native integration reviewed; spec needed | Specify kinds, substitution, coercions, roles, interfaces and reflection before admitting unrestricted function-valued fields. |
 | 6 | R05: generic domain metadata and dependent telescopes; enables R03 source work | Research obligations identified | After the matchability foundation, target generic `[a]`. Transport binder types, occurrences and later fields together. State the policy for runtime-dependent domains separately. |
 
-GHC builds and compiler checks remain paused until **2026-11-16 18:00 CET**
-for benchmarks. Research and documentation can proceed during the pause.
-The pause is an execution constraint; it does not change the task dependencies.
+The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks
+serially under the configured memory cap. This execution policy does not add
+feature dependencies.
 
 ### Remaining work by roadmap area
 
