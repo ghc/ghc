@@ -3431,3 +3431,43 @@ ordinary-domain knot observations retain their unresolved `<<loop>>` outcome.
 They are not Agda counterexamples or successful defensive-import tests. The
 seven-work/nine-PDF reading ledger is unchanged. The selected reread of the
 existing 2017 author PDF14–16 adds no paper or whole-paper reading claim.
+
+### Native dead local binding analysis prior art
+
+Agda v2.8.0 distinguishes complete free-variable queries from queries that
+filter occurrences by relevance. Its
+[`allFreeVars` definition](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Free.hs#L220-L268)
+uses `IgnoreNot`. The Git blob is
+`a45e117bb0ff9a840efe1ab978b5c6bc147aad4f`. The
+[internal traversal](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Free/Lazy.hs#L515-L600)
+collects variable heads and spines, Pi components and type sort annotations.
+[`underBinder`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Free/Lazy.hs#L440-L462)
+masks bound indices. The Lazy.hs blob is
+`c0a19fb372712faccb45d939759276ee229ae9f5`.
+
+The separate
+[Treeless unused-argument pass](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Compiler/Treeless/Unused.hs#L22-L96)
+works after translation to Treeless. Its blob is
+`5782414c6f8642e0e4aa1c805662ae96b8580851`. Its representation omits native
+GHC type annotations. It cannot replace scope analysis before GHC erasure.
+Agda's
+[erased eta discussion](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Compiler/ToTreeless.hs#L547-L588)
+assumes total, effect-free terms. Those assumptions do not cover Haskell
+bottoms or `seq`. The ToTreeless.hs blob is
+`112b852e645f61614c37709bb8beb66e42c0b790`.
+
+M53 uses GHC's existing `freeVars` annotation tree and
+Note [The FVAnn invariant] in `GHC.Core.FVs`. That code includes deep Id
+types, multiplicities, binder telescopes, case results, coercions and stable
+metadata. Note [Controlling elimination of dead bindings in occurrence
+analysis] in `GHC.Core.Opt.OccurAnal` describes the `oa_can_drop` policy and
+bindings used only by Liquid Haskell refinement types. The new entry will
+use absence from the original body annotation. It will preserve the
+metadata on retained binders and infer no new occurrence counts.
+
+The local reading bundle is
+`native-occurrence-analysis-primary-reading-v1/reading.json`. It records ten
+full source fetches with verified Git blobs and 22 selected reading ranges.
+The selected reading covers 1,360 lines. It does not claim full-file reading,
+a new paper, a proof replay or a preservation theorem for this GHC pass.
+The seven-work/nine-PDF ledger stays unchanged.

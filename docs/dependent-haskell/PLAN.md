@@ -3556,3 +3556,50 @@ comparisons reach the unchanged scalar domain check. No old executable ran
 these synthetic cases. This malformed-interface validation gap remains open;
 these observations are not successful defensive rejections. Native coercion
 encoding, native unfoldings, general optimization, C1, C2 and R22 stay open.
+
+### M53: native dead local binding analysis
+
+Status: specified; implementation and measurements pending.
+
+Run a restricted native analysis before `simpleOptNativeExpr`. Use
+`GHC.Core.FVs.freeVars` and its existing deep `FVAnn` invariant. Reconstruct
+the annotated tree without binder substitution or new occurrence counts.
+Remove a local `NonRec` only when its binder is absent from the original
+body annotation and the existing binding policy permits removal. Require a
+lifted type and multiplicity `Many`. Keep CoVars, TyVars, joins, exported Ids,
+stable unfoldings, rules, inactive bindings and loop breakers. A scalar or
+function head that occurs only in a type must remain in scope.
+
+Keep all remaining binders, types, coercions, ticks, case alternatives and
+recursive groups in their original positions. Visit nested expressions but
+do not reorder or split recursive groups. Preserve top-level identities
+through the existing per-RHS program entry. Keep native SimpleOpt inlining,
+dropping and eta reduction disabled. Do not enable `-O1`, native unfoldings
+or the general occurrence analyser. Original annotations can retain an outer
+binding after an inner binding is removed. This is a conservative single
+pass; it does not promise complete dead-code elimination.
+
+The GHC implementation precedent is its deep free-variable annotation pass
+and `oa_can_drop` policy. Agda v2.8.0 separates complete free-variable
+queries from relevance filtering and later Treeless usage analysis. This
+supports the separation of scope from runtime demand. It does not justify
+Haskell eta reduction or a claim about totality. See the
+[prior art](REFERENCES.md#native-dead-local-binding-analysis-prior-art).
+
+- [ ] Measure the current compiler's structural failure to remove an ordinary
+  dead lifted let. Require valid input Core and the exact expected failure.
+- [ ] Add the native entry and its owning GHC-style Note. Use existing deep
+  FV annotations and the existing removal policy. Add no new FV algorithm.
+- [ ] Update the existing API fixture without new test files or golden lines.
+  Check dead-let removal and retained scalar/function-head dependencies in
+  erased arguments, later binder types, case results and coercions. Check
+  scope masking, recursive order, metadata and unlifted/token exclusions.
+  Lint input and output and compare the exact expression type.
+- [ ] Build both compiler stages. Run the existing API, source, Showcase and
+  selected registered regressions. Preserve type-only laziness and strict
+  case demand. Record structure separately from runtime observations.
+- [ ] Update current contracts and status. Record actual source provenance,
+  failed attempts and limits. Freeze, audit and publish the increment.
+
+Use `native-occurrence-analysis-*` for this increment. M52 and earlier
+namespaces remain frozen. C1, C2, R22 and the full program goal stay open.
