@@ -8,7 +8,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (find, foldl', isInfixOf, sort)
 import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags)
-import GHC.Builtin.WiredIn.Prim (intPrimTy)
+import GHC.Builtin.WiredIn.Prim (intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
@@ -2569,7 +2569,7 @@ simplifyAccepts dflags label scope expression = do
     checkType dflags label (exprType expression) (exprType simplified)
     pure simplified
 
--- | Check dead local removal without losing an index used only in a type.
+-- | Check dead local removal and dependencies in native type annotations.
 runOccurrenceChecks :: DynFlags -> IO ()
 runOccurrenceChecks dflags = do
     let (nat, _, _) = peanoNat
@@ -2594,6 +2594,73 @@ runOccurrenceChecks dflags = do
         Let (NonRec retained (App (Var rhsProducer) (Var rhsSeed))) (App (Var worker) (Type (TermVarTy actual))) ->
             retained == index && actual == index && rhsProducer == producer && rhsSeed == seed && worker == consume
         _ -> False
+
+    let headId = local 6010 "type_only_head" (mkVisFunTyMany natTy natTy)
+        makeHead = local 6011 "opaque_head_producer" (mkVisFunTyMany intTy (idType headId))
+        call = TermAppTy headId (TermVarTy index)
+        headExpression =
+            Let (NonRec headId (App (Var makeHead) (Var intSeed)))
+                $ Let (NonRec index (App (Var producer) (Var seed)))
+                $ App (Var consume) (Type call)
+    headResult <- simplifyAccepts dflags "native head and input used only in a type argument" [makeHead, intSeed, producer, seed, consume] headExpression
+    check "type-only call keeps both actual opaque bindings" $ case headResult of
+        Let (NonRec retainedHead _) (Let (NonRec retainedIndex _) (App (Var worker) (Type (TermAppTy actualHead (TermVarTy actualIndex))))) ->
+            retainedHead == headId && actualHead == headId && retainedIndex == index && actualIndex == index && worker == consume
+        _ -> False
+
+    let payloadType = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, call, call]) intTy
+        payloadBinder = local 6012 "later_payload" payloadType
+        answer = mkIntExprInt (targetPlatform dflags) 42
+        telescope = Lam headId (Lam index (Lam payloadBinder answer))
+    telescopeResult <- simplifyAccepts dflags "native dependencies in later lambda domains" [] telescope
+    check "later lambda domain keeps its preceding head and index" $ case telescopeResult of
+        Lam retainedHead (Lam retainedIndex (Lam retainedPayload _)) ->
+            retainedHead == headId
+                && retainedIndex == index
+                && retainedPayload == payloadBinder
+                && not (isDeadBinder retainedHead || isDeadBinder retainedIndex)
+                && headId `elemVarSet` tyCoVarsOfType (idType retainedPayload)
+                && index `elemVarSet` tyCoVarsOfType (idType retainedPayload)
+        _ -> False
+
+    let boolIndex = local 6013 "result_only_index" boolTy
+        scrutinee = local 6014 "empty_case_scrutinee" boolTy
+        caseBinder = local 6015 "empty_case_binder" boolTy
+        resultType = indexed (TermVarTy boolIndex)
+        resultOnly = Lam boolIndex (Case (Var scrutinee) caseBinder resultType [])
+    caseResult <- simplifyAccepts dflags "native index used only in a case result annotation" [scrutinee] resultOnly
+    check "case result retains its enclosing index identity" $ case caseResult of
+        Lam retained (Case (Var actualScrutinee) actualBinder actualType []) ->
+            retained == boolIndex
+                && not (isDeadBinder retained)
+                && actualScrutinee == scrutinee
+                && actualBinder == caseBinder
+                && eqType actualType resultType
+        _ -> False
+
+    let ordinaryRhs = App (Var intProducer) (Var intSeed)
+        stable = setIdUnfolding dead ((unfolding ordinaryRhs){uf_src = StableUserSrc})
+        inactive = setInlinePragma dead neverInlinePragma
+        loopBreaker = setIdOccInfo dead (IAmALoopBreaker False NoTailCallInfo)
+        linear = setIdMult dead OneTy
+        unlifted = local 6016 "unused_unlifted" intPrimTy
+        unliftedSeed = local 6017 "unlifted_seed" intPrimTy
+        token = local 6018 "unused_token" realWorldStatePrimTy
+        tokenSeed = local 6019 "token_seed" realWorldStatePrimTy
+        body = App (Var consume) (Type (TermVarTy index))
+        protectedCases =
+            [ ("stable unfolding", stable, ordinaryRhs, [intProducer, intSeed])
+            , ("inactive binding", inactive, ordinaryRhs, [intProducer, intSeed])
+            , ("loop breaker", loopBreaker, ordinaryRhs, [intProducer, intSeed])
+            , ("One multiplicity", linear, ordinaryRhs, [intProducer, intSeed])
+            , ("unlifted Many", unlifted, Var unliftedSeed, [unliftedSeed])
+            , ("state token", token, Var tokenSeed, [tokenSeed])
+            ]
+    forM_ protectedCases $ \(label, binder, rhs, scope) -> do
+        protected <- simplifyAccepts dflags ("native dead binding exclusion: " ++ label) (index : consume : scope) (Let (NonRec binder rhs) body)
+        check ("native dead binding exclusion keeps its binding: " ++ label) $ case protected of
+            Let (NonRec retained _) _ -> retained == binder && eqType (idMult retained) (idMult binder)
+            _ -> False
 
 -- | Make an unfolding without invoking the unsupported optimizer.
 unfolding :: CoreExpr -> Unfolding
