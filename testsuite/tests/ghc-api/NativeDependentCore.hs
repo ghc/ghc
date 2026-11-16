@@ -3,7 +3,7 @@
 module Main (main) where
 
 import Control.Exception (IOException, SomeException, displayException, evaluate, try)
-import Control.Monad (forM_, unless)
+import Control.Monad (forM, forM_, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (find, foldl', isInfixOf, sort)
@@ -52,8 +52,8 @@ import GHC.Hs (HsType (..))
 import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData)
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
-import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
-import GHC.Iface.Type (IfaceAppArgs (IA_Nil), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
+import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, IfaceSynonym, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
+import GHC.Iface.Type (IfaceAppArgs (IA_Nil, IA_Arg), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
@@ -1066,10 +1066,13 @@ fields in order. The lifted payload is an equality-dictionary function. It is
 not an executed vector; the separate source module checks a generic Nat/Vec
 package through its compiled object and interface.
 
-Generic function-Pi imports and call-coercion imports remain rejected. These
-checks use only the constructor-field prefix decoder and its scoped call-type
-codec. The bounded recursive-domain checks demand imported worker types after
-all parent knots exist. A timeout or unexpected exception is a test failure.
+Call-coercion imports remain rejected. The constructor-field checks use the
+prefix decoder and its scoped call-type codec. The generic Pi checks demand
+ordinary field types after all imported parent knots exist. Recursive classifier
+information must produce the normal interface diagnostic. Finite first-order
+recursive declarations and nullary synonyms remain valid. A timeout or any
+unexpected exception is a test failure. These checks do not prove termination
+for arbitrary interface data.
 -}
 
 -- | Check retained types and closed expressions through binary interface tables.
@@ -1210,41 +1213,52 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     Right (Right ()) -> fail ("FAIL: " ++ label ++ "; malformed constructor interface succeeded")
                 diagnostics <- unlines <$> readIORef messages
                 check (label ++ "; diagnostic: " ++ diagnostics) (fragment `isInfixOf` diagnostics)
-            rejectsImportedKnots :: String -> [IfaceDecl] -> IO ()
-            rejectsImportedKnots label declarations = do
-                messages <- newIORef []
+            -- | Reconstruct all declaration knots before demanding field types.
+            restoreImportedKnots :: CompressionIFace -> HscEnv -> [IfaceDecl] -> IO [TyCon]
+            restoreImportedKnots compression importEnv declarations = do
                 temporaryTypes <- newIORef (mkTypeEnv [])
-                decoded <- mapM (roundtrip NormalCompression) declarations
+                decoded <- mapM (roundtrip compression) declarations
                 let modu = case decoded of
                         first : _ -> nameModule (ifName first)
                         [] -> error "FAIL: recursive interface fixture is empty"
-                    quietEnv =
-                        env
-                            { hsc_logger = pushLogHook (\_ _ _ _ message -> modifyIORef' messages (showSDoc dflags message :)) (hsc_logger env)
-                            , hsc_type_env_vars = KnotVars [modu] (\candidate -> if candidate == modu then Just temporaryTypes else Nothing)
-                            }
-                    importDeclarations =
-                        initIfaceCheck (text "recursive retained interface test") quietEnv $
-                            mapM (\decl -> initIfaceLcl modu (text "recursive retained interface test") NotBoot (tcIfaceDecl False decl)) decoded
-                outcome <- try @IOEnvFailure $ try @GhcException $ do
+                    knotEnv = importEnv{hsc_type_env_vars = KnotVars [modu] (\candidate -> if candidate == modu then Just temporaryTypes else Nothing)}
+                imported <-
+                    initIfaceCheck (text "recursive retained interface test") knotEnv $
+                        mapM (\decl -> initIfaceLcl modu (text "recursive retained interface test") NotBoot (tcIfaceDecl False decl)) decoded
+                writeIORef temporaryTypes (mkTypeEnv imported)
+                forM imported $ \thing -> case thing of
+                    ATyCon package -> pure package
+                    _ -> fail "FAIL: recursive interface did not reconstruct a TyCon"
+            -- | Require a normal interface error with every expected diagnostic fragment.
+            rejectsImportedKnots :: String -> [String] -> [IfaceDecl] -> IO ()
+            rejectsImportedKnots label fragments declarations =
+                forM_ [NormalCompression, MaximumCompression] $ \compression -> do
+                    messages <- newIORef []
+                    let quietEnv = env{hsc_logger = pushLogHook (\_ _ _ _ message -> modifyIORef' messages (showSDoc dflags message :)) (hsc_logger env)}
+                    outcome <- try @IOEnvFailure $ try @GhcException $ do
+                        completed <- timeout 2000000 $ restoreImportedKnots compression quietEnv declarations >>= mapM_ forcePackage
+                        case completed of
+                            Just () -> pure ()
+                            Nothing -> fail ("FAIL: " ++ label ++ "; imported domain validation did not terminate")
+                    case outcome of
+                        Left _ -> pure ()
+                        Right (Left (ProgramError message)) ->
+                            check (label ++ " fork failure") (message == "Cannot continue after interface file error")
+                        Right (Left exception) -> fail ("FAIL: " ++ label ++ "; unexpected exception: " ++ displayException exception)
+                        Right (Right ()) -> fail ("FAIL: " ++ label ++ "; recursive retained domain was accepted")
+                    diagnostics <- unlines <$> readIORef messages
+                    forM_ fragments $ \fragment ->
+                        check (label ++ "; diagnostic: " ++ diagnostics) (fragment `isInfixOf` diagnostics)
+            -- | Force valid knots in the supplied order and check scalar-domain eligibility.
+            acceptsImportedKnots :: String -> [(IfaceDecl, Bool)] -> IO ()
+            acceptsImportedKnots label declarations =
+                forM_ [NormalCompression, MaximumCompression] $ \compression -> do
                     completed <- timeout 2000000 $ do
-                        imported <- importDeclarations
-                        writeIORef temporaryTypes (mkTypeEnv imported)
-                        forM_ imported $ \thing -> case thing of
-                            ATyCon package -> forcePackage package
-                            _ -> fail "FAIL: recursive interface did not reconstruct a TyCon"
-                    case completed of
-                        Just () -> pure ()
-                        Nothing -> fail ("FAIL: " ++ label ++ "; imported domain validation did not terminate")
-                case outcome of
-                    Left _ -> pure ()
-                    Right (Left (ProgramError message)) ->
-                        check (label ++ " fork failure") (message == "Cannot continue after interface file error")
-                    Right (Left exception) -> fail ("FAIL: " ++ label ++ "; unexpected exception: " ++ displayException exception)
-                    Right (Right ()) -> fail ("FAIL: " ++ label ++ "; recursive retained domain was accepted")
-                diagnostics <- unlines <$> readIORef messages
-                check (label ++ "; diagnostic: " ++ diagnostics) $
-                    "Invalid retained constructor fields in interface:" `isInfixOf` diagnostics
+                        imported <- restoreImportedKnots compression env (map fst declarations)
+                        forM_ (zip imported declarations) $ \(package, (_, eligible)) -> do
+                            forcePackage package
+                            check (label ++ "; scalar domain eligibility") (isNativeIndexType (mkTyConTy package) == eligible)
+                    check (label ++ "; imported declarations terminate") (completed == Just ())
         let package = retainedIfacePackage 2500 False
             vacuousPackage = retainedIfacePackage 2520 True
             declaration = tyThingToIfaceDecl (ATyCon package)
@@ -1476,8 +1490,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             selfDeclaration = withDomain selfDeclaration (recursiveDeclaration 2900 "IfaceSelfDomain")
             leftDeclaration = withDomain rightDeclaration (recursiveDeclaration 2910 "IfaceLeftDomain")
             rightDeclaration = withDomain leftDeclaration (recursiveDeclaration 2920 "IfaceRightDomain")
-        rejectsImportedKnots "self-recursive imported retained domain" [selfDeclaration]
-        rejectsImportedKnots "mutually recursive imported retained domains" [leftDeclaration, rightDeclaration]
+        rejectsImportedKnots "self-recursive imported retained domain" ["Invalid retained constructor fields in interface:"] [selfDeclaration]
+        rejectsImportedKnots "mutually recursive imported retained domains" ["Invalid retained constructor fields in interface:"] [leftDeclaration, rightDeclaration]
         -- Check the domain graph only after all imported parent knots exist.
         let withFunctionDomain domain inputSide = changePackage $ \con ->
                 let reference = IfaceTyConApp (IfaceTyCon (ifName domain) (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
@@ -1492,10 +1506,110 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             rightInputFunction = withFunctionDomain leftInputFunction True (recursiveDeclaration 9830 "IfaceFunctionRightInput")
             leftOutputFunction = withFunctionDomain rightOutputFunction False (recursiveDeclaration 9840 "IfaceFunctionLeftOutput")
             rightOutputFunction = withFunctionDomain leftOutputFunction False (recursiveDeclaration 9850 "IfaceFunctionRightOutput")
-        rejectsImportedKnots "function field rejects a self-referencing input domain" [selfInputFunction]
-        rejectsImportedKnots "function field rejects a self-referencing output domain" [selfOutputFunction]
-        rejectsImportedKnots "function field rejects mutually recursive input domains" [leftInputFunction, rightInputFunction]
-        rejectsImportedKnots "function field rejects mutually recursive output domains" [leftOutputFunction, rightOutputFunction]
+        rejectsImportedKnots "function field rejects a self-referencing input domain" ["Invalid retained constructor fields in interface:"] [selfInputFunction]
+        rejectsImportedKnots "function field rejects a self-referencing output domain" ["Invalid retained constructor fields in interface:"] [selfOutputFunction]
+        rejectsImportedKnots "function field rejects mutually recursive input domains" ["Invalid retained constructor fields in interface:"] [leftInputFunction, rightInputFunction]
+        rejectsImportedKnots "function field rejects mutually recursive output domains" ["Invalid retained constructor fields in interface:"] [leftOutputFunction, rightOutputFunction]
+        let -- | Build an ordinary field without retained telescope metadata.
+            ordinaryField field = changePackage $ \con ->
+                con{ifConArgBinders = [], ifConArgTys = [(many, field)], ifConStricts = [IfNoBang], ifConSrcStricts = [IfSrcBang NoSrcUnpack NoSrcStrict]}
+            -- | Refer to a nullary declaration by its actual Name.
+            reference domain = IfaceTyConApp (IfaceTyCon (ifName domain) (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
+            -- | Build a vacuous scalar binder for domain validation.
+            scalarPi domain = IfaceDepFunTy (many, firstName, reference domain) (toIfaceType intTy)
+            -- | Place an input or output domain in a retained function field.
+            genericFunctionDomain domain inputSide =
+                let arrow = case toIfaceType (mkFunctionType ManyTy boolTy boolTy) of
+                        IfaceFunTy flag mult _ _ ->
+                            if inputSide then IfaceFunTy flag mult (reference domain) bool else IfaceFunTy flag mult bool (reference domain)
+                        _ -> error "FAIL: ordinary interface function changed shape"
+                 in ordinaryField (IfaceDepFunTy (many, firstName, arrow) (toIfaceType intTy))
+            -- | Put the scalar binder in an ordinary constructor field.
+            genericScalarDomain domain = ordinaryField (scalarPi domain)
+            genericSelfInput = genericFunctionDomain genericSelfInput True (recursiveDeclaration 9900 "IfaceGenericSelfInput")
+            genericSelfOutput = genericFunctionDomain genericSelfOutput False (recursiveDeclaration 9910 "IfaceGenericSelfOutput")
+            genericLeft = genericFunctionDomain genericRight True (recursiveDeclaration 9920 "IfaceGenericLeft")
+            genericRight = genericFunctionDomain genericLeft True (recursiveDeclaration 9930 "IfaceGenericRight")
+            scalarSelf = genericScalarDomain scalarSelf (recursiveDeclaration 9940 "IfaceGenericScalarSelf")
+            scalarLeft = genericScalarDomain scalarRight (recursiveDeclaration 9950 "IfaceGenericScalarLeft")
+            scalarRight = genericScalarDomain scalarLeft (recursiveDeclaration 9960 "IfaceGenericScalarRight")
+            -- | Build a nullary synonym with the supplied interface RHS.
+            synonym base label rhs =
+                IfaceSynonym
+                    (mkExternalName (unique base) (nameModule (ifName declaration)) (mkTcOcc label) noSrcSpan)
+                    (toIfaceType liftedTypeKind)
+                    []
+                    []
+                    (toIfaceType liftedTypeKind)
+                    rhs
+            selfAlias = synonym 9970 "IfaceGenericSelfAlias" (reference aliasSelf)
+            aliasSelf = genericScalarDomain selfAlias (recursiveDeclaration 9980 "IfaceGenericAliasSelf")
+            -- | Keep the retained scalar in both equality operands.
+            nonvacuousBody domain = case snd dependent of
+                IfaceFunTy flag mult (IfaceTyConApp eqCon (IA_Arg _ visibility rest)) result ->
+                    IfaceFunTy flag mult (IfaceTyConApp eqCon (IA_Arg (reference domain) visibility rest)) result
+                _ -> error "FAIL: interface equality payload changed shape"
+            nonvacuousSelf =
+                ordinaryField
+                    (IfaceDepFunTy (many, firstName, reference nonvacuousSelf) (nonvacuousBody nonvacuousSelf))
+                    (recursiveDeclaration 9990 "IfaceGenericNonvacuousSelf")
+            recursiveDiagnostic = ["Cannot validate retained type in interface:", "Validation encountered recursive type information."]
+        forM_
+            [ ("generic Pi ordinary self input", [genericSelfInput])
+            , ("generic Pi ordinary self output", [genericSelfOutput])
+            , ("generic Pi ordinary mutual input", [genericLeft, genericRight])
+            , ("generic Pi ordinary scalar self", [scalarSelf])
+            , ("generic Pi ordinary scalar mutual left first", [scalarLeft, scalarRight])
+            , ("generic Pi ordinary scalar mutual right first", [scalarRight, scalarLeft])
+            , ("generic Pi nullary alias self cycle", [selfAlias, aliasSelf])
+            , ("generic Pi nonvacuous self cycle", [nonvacuousSelf])
+            ]
+            $ \(label, declarations) -> rejectsImportedKnots label recursiveDiagnostic declarations
+        let -- | Build a base constructor and a constructor with lazy fields.
+            ordinaryRecursive base label fieldTypes =
+                let owner = ordinaryField bool (recursiveDeclaration base label)
+                 in case owner of
+                        IfaceData{ifCons = IfDataTyCon typeData [con]} ->
+                            owner
+                                { ifCons =
+                                    IfDataTyCon
+                                        typeData
+                                        [ con
+                                            { ifConName = mkExternalName (unique (base + 2)) (nameModule (ifName owner)) (mkDataOcc ("Zero" ++ label)) noSrcSpan
+                                            , ifConArgTys = []
+                                            , ifConStricts = []
+                                            , ifConSrcStricts = []
+                                            }
+                                        , con
+                                            { ifConArgTys = map (\ty -> (many, ty)) fieldTypes
+                                            , ifConStricts = replicate (length fieldTypes) IfNoBang
+                                            , ifConSrcStricts = replicate (length fieldTypes) (IfSrcBang NoSrcUnpack NoSrcStrict)
+                                            }
+                                        ]
+                                }
+                        _ -> error "FAIL: recursive interface fixture changed shape"
+            validNat = ordinaryRecursive 10000 "IfaceValidNat" [reference validNat]
+            validList = ordinaryRecursive 10010 "IfaceValidBoolList" [bool, reference validList]
+            validLeft = ordinaryRecursive 10020 "IfaceValidMutualNat" [reference validRight]
+            validRight = ordinaryRecursive 10030 "IfaceValidMutualList" [bool, reference validLeft]
+            natHolder = genericScalarDomain validNat (recursiveDeclaration 10040 "IfaceValidNatHolder")
+            listHolder = genericScalarDomain validList (recursiveDeclaration 10050 "IfaceValidListHolder")
+            mutualHolder = genericScalarDomain validLeft (recursiveDeclaration 10060 "IfaceValidMutualHolder")
+            boolAlias = synonym 10070 "IfaceValidBoolAlias" bool
+            aliasHolder = genericScalarDomain boolAlias (recursiveDeclaration 10080 "IfaceValidAliasHolder")
+            boolHolder = ordinaryField (IfaceDepFunTy (many, firstName, bool) (snd dependent)) (recursiveDeclaration 10090 "IfaceValidBoolPiHolder")
+        forM_
+            [ ("valid self Nat first", [(validNat, True), (natHolder, False)])
+            , ("valid self Nat holder first", [(natHolder, False), (validNat, True)])
+            , ("valid self list first", [(validList, True), (listHolder, False)])
+            , ("valid self list holder first", [(listHolder, False), (validList, True)])
+            , ("valid mutual Nat first", [(validLeft, True), (validRight, True), (mutualHolder, False)])
+            , ("valid mutual holder first", [(mutualHolder, False), (validRight, True), (validLeft, True)])
+            , ("valid nullary synonym first", [(boolAlias, True), (aliasHolder, False)])
+            , ("valid nullary synonym holder first", [(aliasHolder, False), (boolAlias, True)])
+            , ("ordinary field holds a nonvacuous Bool Pi", [(boolHolder, False)])
+            ]
+            $ \(label, declarations) -> acceptsImportedKnots label declarations
         promotionMessages <- newIORef []
         temporaryTypes <- newIORef (mkTypeEnv [AConLike (RealDataCon firstParameterizedCon)])
         let promotionModule = nameModule (dataConName firstParameterizedCon)
