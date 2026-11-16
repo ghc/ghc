@@ -16,6 +16,7 @@ import System.IO
 import Control.Concurrent (rtsSupportsBoundThreads)
 import GHC.IO.Handle.Windows (handleToHANDLE)
 import GHC.IO.SubSystem (isWindowsNativeIO)
+import System.Process.CommunicationHandle.Internal (CommunicationHandle(..))
 import qualified System.Win32 as Win32
 #endif
 
@@ -30,8 +31,8 @@ runWithPipes createProc prog pre_opts opts = do
     (chTheyRead, wh)  <- fixedCreateTheyReadWeWritePipe
     let args = pre_opts ++ (show chTheyWrite : show chTheyRead : opts)
         closeTheirs = do
-          closeCommunicationHandle chTheyWrite
-          closeCommunicationHandle chTheyRead
+          closeTheirEnd chTheyWrite
+          closeTheirEnd chTheyRead
     -- These handles have no finalizers, so close them ourselves if the spawn fails.
     ph <- createProc (proc prog args)
             `onException` (closeTheirs >> hClose rh >> hClose wh)
@@ -73,4 +74,17 @@ toFdHandleIfNeeded h
   | otherwise = return h
 #else
 toFdHandleIfNeeded = return
+#endif
+
+-- | Workaround for locking prone closeCommunicationHandle on windows
+--
+-- Called after a createProcess: the subprocess might start reading from the
+-- inherited raw handle before this close is scheduled, and, on windows,
+-- closeCommunicationHandle will block on a pending read during its conversion
+-- to Handle. Calling Win32.closeHandle directly avoids the blocking.
+closeTheirEnd :: CommunicationHandle -> IO ()
+#if defined(mingw32_HOST_OS)
+closeTheirEnd (CommunicationHandle h) = Win32.closeHandle h
+#else
+closeTheirEnd = closeCommunicationHandle
 #endif
