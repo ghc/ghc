@@ -2294,9 +2294,6 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_cos []     = mempty
     go_cos (c:cs) = go_co c M.<> go_cos cs
 
-    go_mco MRefl = mempty
-    go_mco (MCo proof) = go_co proof
-
     go_co (Refl ty)                = go_ty ty
     go_co (GRefl ro ty MRefl)      = lit ro M.<> go_ty ty
     go_co (GRefl ro ty (MCo co))   = lit ro M.<> go_ty ty M.<> go_co co
