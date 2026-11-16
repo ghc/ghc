@@ -348,6 +348,15 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   Establish a broad GHC regression baseline. State the remaining research and
   implementation restrictions before a production-readiness claim.
 
+M56 completes a bounded part of C1: closed parameterized first-order domains.
+Ordinary type arguments now remain consistent across constructor indices,
+substitution, branch evidence, Lint, lowering and separate interfaces. Both
+stages check runtime `[Bool]`, `Maybe Nat` and `Tree Bool` source examples.
+Closed families compute vector lengths and heterogeneous tree payloads.
+Uniform recursive declarations qualify. General promotion, arbitrary term
+computation in types, native unfoldings and normal optimization remain open.
+This increment does not complete C1, C2 or R22.
+
 C1 is the next program task. More application-inference cases can support a
 specific task, but they must not replace work on Core or type computation.
 C2, Q1, Q2, and the evaluator tasks can be split into smaller increments after

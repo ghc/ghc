@@ -227,3 +227,51 @@ version is added. Native coercion encoding, unfoldings and general optimization
 remain gated. See the
 [contract](../../CORE.md#exported-function-valued-retained-value-signatures) and
 [checkpoint](../../README.md#m52-exported-function-valued-retained-value-signatures).
+
+## Closed parameterized runtime indices
+
+[ParameterizedIndexLibrary.hs](ParameterizedIndexLibrary.hs) uses ordinary
+`[Bool]`, `Maybe Nat` and `Tree Bool` domains in retained binders. Its explicit
+`Count`, `OptionalPayload` and `TreePayload` families compute result types from
+promoted constructors. For example:
+
+```haskell
+listVector :: foreach (bs :: [Bool]) -> Vec Int (Count bs)
+treePayload :: foreach (tree :: Tree Bool) -> TreePayload tree
+```
+
+[ParameterizedIndexClient.hs](ParameterizedIndexClient.hs) reads runtime values
+from `IORef`s. It checks vector construction, packaging, optional payloads and a
+nested tree payload with both `Int` and `Bool` leaves. It also checks ignored
+bottoms, a lazy list head, a lazy list tail and a lazy tree subtree.
+
+Both stages pass 14 authored observations. The producer and client compile in
+separate one-shot steps with Core Lint and STG Lint. The client has only copied
+interfaces and object files for the producers. Producer source is hidden during
+that step. Three separate invalid-domain controls reject growing recursion,
+GADT fields and actual function fields.
+
+The maintained [Showcase](../../Showcase.hs) adds six labeled observations from
+this library. It now emits 59 lines from 14 source modules in both stages. The
+previous 53 observations stay in order. Earlier counts above describe their
+original checkpoints.
+
+This example requires the fork's rebuilt compiler and matching libraries. From
+the repository root, run:
+
+```sh
+mkdir -p _build/parameterized-example
+_build/stage1/bin/ghc --make -O0 -fomit-interface-pragmas \
+  -fno-write-if-simplified-core -dcore-lint -dstg-lint \
+  -idocs/dependent-haskell/examples/qualified-pi \
+  -idocs/dependent-haskell/examples/packed-vector \
+  -outputdir _build/parameterized-example \
+  docs/dependent-haskell/examples/qualified-pi/ParameterizedIndexClient.hs \
+  -o _build/parameterized-example/parameterized
+_build/parameterized-example/parameterized
+```
+
+Only closed monotype parameters of kind `Type` qualify. Constructor parameters
+are erased. Stored fields retain their ordinary runtime representation and lazy
+demand. The family definitions remain explicit. General term evaluation in
+types and full dependent-Haskell optimization remain open.

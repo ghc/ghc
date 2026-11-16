@@ -4,7 +4,8 @@ The long-term goal is dependent types in Haskell. The first experiment is a
 retained Boolean argument whose value determines the result type. Extend Core
 from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
-The current source subset includes runtime Peano naturals and length-indexed vectors.
+The current source subset includes runtime Peano naturals, length-indexed vectors,
+and closed parameterized indices such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
 
 Last updated: 2026-11-16.
 
@@ -51,9 +52,10 @@ _build/showcase/showcase
 | Function fields, exported retained workers, generic payloads and lazy storage | `functionFields` |
 | Later retained arguments, dictionaries, equality contexts and shadowing | `laterArguments` |
 | Multiple package constructors, nested fields and guard fallback | `alternatives` |
+| Runtime list indices, optional indices and heterogeneous tree payloads | `parameterizedDomains` |
 
-Both bootstrap and self-hosted compilers produce the expected 53 lines with
-Core Lint and STG Lint enabled. Both runs preserve all thirteen source inputs.
+Both bootstrap and self-hosted compilers produce the expected 59 lines with
+Core Lint and STG Lint enabled. Both runs preserve all fourteen source inputs.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
 GroundApplicationClient checks native function types as equality operands
@@ -77,6 +79,7 @@ optimization support or full roadmap completion.
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
 | Native interface domain shapes | M55 checks derived raw views before fields and generic binder allocation; M54 remains the detected-loop fallback |
+| Parameterized index domains | M56 retains closed `[Bool]`, `Maybe Nat` and `Tree Bool` values through source, Core, interfaces and native lowering |
 | Configured fork version | `10.1.20261115.1`, with interface header `1001202611151`; matching compiler and libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
@@ -87,7 +90,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M52 passes both-stage public19 and Showcase53; API goldens remain1/37 with19 quiet object observations; selected reader, context and final regression records are separate |
+| Compiler validation | M56 passes both-stage public19, parameterized14 and Showcase 59 from 14 modules; API goldens remain1/37 with19 inherited quiet runtime observations |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -4651,3 +4654,51 @@ including complete frozen-namespace coverage. Audited checkpoint
 All `native-interface-domain-shapes-*` files and directories are permanently
 frozen. The canonical record is `dependent-haskell-M55-final-audit-v1.json`,
 SHA256 `67c0af1483bffda59b9fc577ba30dfbcb78da11a34fcec6839a0d96b39b30877`.
+
+## M56: closed parameterized index domains
+
+Implementation checks pass at source and compiler commit
+`3131ebc644c580632b8ba6f8776d3dab512c95f3`. The evidence audit and publication
+are pending in this documentation snapshot. The full program remains active.
+
+Ordinary datatype parameters now pass through native index formation, constructor
+conversion, substitution, branch evidence, Lint and CorePrep. The representation
+keeps existing Core types, coercions and interface tags. DataKinds supplies
+promoted constructors and their ordinary type arguments. Runtime arguments stay
+ordinary values. No singleton translation is added.
+
+The new [library](examples/qualified-pi/ParameterizedIndexLibrary.hs) and
+[client](examples/qualified-pi/ParameterizedIndexClient.hs) use runtime lists,
+optional natural numbers and Boolean trees. A list determines a vector length.
+A tree determines a nested payload with `Int` and `Bool` leaves. The examples
+use explicit closed families for these type computations. They do not promote
+arbitrary term functions.
+
+Validation uses the selected 91 compiler inputs and 122 source paths. It records:
+
+- Bootstrap build: 43.06 seconds. Self-hosted build: 904.05 seconds. Both use
+  `-j6`, a 16 GiB cap and no swap. The self-hosted peak is 6236 MiB.
+- Both stages: 14 parameterized source observations, three intended rejection
+  controls, 19 prior public programs, and the 59-line Showcase from 14 modules.
+- API: unchanged one-line and 37-line goldens. Each API phase preserves 354 actual
+  input hashes. The existing object fixture retains 19 quiet observations.
+- Both stages: a separate constructed-list/optional-result backend probe passes
+  two assertions. It emits one line per run.
+- Registered tests: five tests, 39 cases, 34 skips and five expected passes. There
+  are no unexpected results, missing libraries, or framework problems.
+
+The self-hosted build changes package configuration. The three bootstrap source
+runs were refreshed against that configuration. The final nine-phase record
+aggregates actual results without replay. Earlier compiler errors, harness errors
+and the registered wrapper's missing-configuration preflight remain recorded.
+Fourmolu parses 17 changed or probe Haskell files without rewriting them.
+`cabal-gild` reports the generated GHC Cabal file as not formatted. Its bytes and
+the tracked Cabal inputs remain unchanged.
+
+The domain must be saturated, boxed and first order. Its static arguments must
+be closed monotypes of kind `Type`. Constructor universals are instantiated
+before fields are checked. An active recursive declaration must retain the same
+nominal type arguments. Growing or permuting recursion, GADTs, constructor
+contexts, newtypes and actual function fields remain outside this domain.
+Runtime bottoms and cycles remain possible. Native unfoldings, general
+optimization and the full C1/C2 contracts remain open.

@@ -3751,7 +3751,8 @@ files and directories are permanently frozen. The canonical record is
 
 ### M56: retain closed parameterized algebraic values
 
-Status: planned. This increment addresses C1's domain and constructor contract.
+Status: implementation validated; evidence audit and publication pending.
+This increment addresses C1's domain and constructor contract.
 Keep C1, C2, R22 and the full program goal open.
 
 Use a runtime `[Bool]` as a retained index. A closed `Count` family maps its
@@ -3789,9 +3790,28 @@ alongside the implementation. Review substitution, scope, constructor identity,
 runtime demand and erasure together before extending each affected path.
 
 - [x] Record the domain, recursion, constructor and erasure contract.
-- [ ] Extend domain checking and constructor-index conversion together.
-- [ ] Instantiate source patterns, nominal proofs, Lint and backend lowering.
-- [ ] Check source construction, recursion, separate imports and lazy fields.
-- [ ] Update existing rejection/API controls and the maintained Showcase.
-- [ ] Build both stages and run focused source/API/registered checks.
+- [x] Extend domain checking and constructor-index conversion together.
+- [x] Instantiate source patterns, nominal proofs, Lint and backend lowering.
+- [x] Check source construction, recursion, separate imports and lazy fields.
+- [x] Update existing rejection/API controls and the maintained Showcase.
+- [x] Build both stages and run focused source/API/registered checks.
 - [ ] Record evidence and references, review the change and publish it.
+
+Selected source and compiler: `3131ebc644c580632b8ba6f8776d3dab512c95f3`.
+Both builds pass. Both stages pass the 14 source observations and three domain
+rejections, the 19 prior public programs, and Showcase 59 from 14 modules.
+The focused API preserves its 1/37 goldens. A separate backend probe checks a
+constructed list input and optional result with two assertions per stage.
+The five registered tests have 39 cases, 34 skips and no unexpected results.
+See the [checkpoint](README.md#m56-closed-parameterized-index-domains) and
+[domain contract](CORE.md#closed-parameterized-runtime-index-domains).
+
+Source matching uses the full instantiated parent. Family matching uses nominal
+normalization views. It preserves the checked expression cache and its single
+usage check. Empty-list and infix constructor patterns reuse ordinary pattern
+checking. Nested nonempty list patterns and overloaded pattern expansion remain
+outside this selected constructor-pattern subset.
+
+The M55 shape-first interface classifier retains its unknown fallback for applied
+domains. The typed eligibility check enforces the full instantiated contract.
+Keep C1, C2 and R22 open. C1 remains the next program priority.

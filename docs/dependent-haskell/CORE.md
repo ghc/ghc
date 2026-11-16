@@ -2226,3 +2226,48 @@ headers must already exist. Unclassified normalization paths still use the
 typed fallback. There is no general termination or preservation proof.
 C1, C2 and R22 remain open. See Note [Native interface domain shapes] in
 GHC.Core.TyCon and Note [Checking native domain shapes] in GHC.IfaceToCore.
+
+## Closed parameterized runtime index domains
+
+M56 instantiates ordinary datatype parameters before checking index fields.
+The same rule applies to `[Bool]`, `Maybe Nat` and `Tree Bool`. The retained
+value is the actual list, optional value or tree. Its static type arguments
+do not add a runtime witness. See Note `[Algebraic runtime index domains]`.
+
+| Operation | Restricted contract |
+| --- | --- |
+| Domain formation | Use saturated boxed vanilla data at closed monotype arguments of kind `Type`. Require ordinary parameter kinds and compatible original/representation fields. |
+| Recursion | Track complete applications on the active path. Repeated `TyCon` arguments must satisfy `eqTypes`. Check sibling instances independently. Reject growing and permuting recurrence. |
+| Constructor index | Preserve ordinary type arguments before runtime indices. Instantiate each runtime field domain with `dataConInstOrigArgTys`. |
+| Substitution | Preserve actual runtime Ids and capture avoidance. Function-head replacement must preserve the complete nominal input and result domains. |
+| Branch evidence | Relate the actual scrutinee index to the full promoted constructor application. Require fresh field Ids and one local nominal proof. Validate the instantiated parent in the source checker and Core Lint. |
+| Lowering | Preserve erased type applications. Name only runtime fields. Use nominal reflexivity for static arguments and checked transport for fields. Keep strict cases and lazy field demand. |
+| Interface import | Use existing type applications and constructor signatures. M55 leaves applied shapes unknown. The typed check validates the instantiated domain. Add no wire tag. |
+
+Selected list patterns use existing constructor checking. Expose `[]` as the
+resolved nil constructor. Expose an infix constructor as prefix syntax. Keep
+the original source span and match context. Only selected retained columns
+change. Nested list patterns remain outside the existing bare-field subset.
+
+Static parameters and stored fields have different obligations. A monokinded
+`Proxy (Bool -> Bool)` has no function field. `Maybe (Bool -> Bool)` stores
+one and fails scalar eligibility. No existential, equality specification,
+constructor context, wrapper, newtype or retained constructor telescope is
+admitted as an index domain. Haskell values may still be partial or cyclic.
+
+`Count`, `OptionalPayload` and `TreePayload` are explicit type families.
+Their equations use ordinary GHC nominal coercions. Before immutable cached
+argument matching, normalize the actual type view at Nominal role. Preserve
+the original cached expression, inferred type and usage. Final subsumption
+constructs the family coercion and emits saved usage once. For a known
+algebraic expected shape, reduce a native family head before allocating
+fresh parameters. Return the inverse nominal reduction. Keep the existing
+fallback for a stuck or different result shape. See Notes `[Family views in
+native argument inference]` and `[Matching native family result shapes]`.
+
+This follows GHC's existing normalization/subsumption pattern and Agda's
+parameter specialization. D/DC leaves primitive datatype matching for later
+work. System DR supports the nominal constructor boundary. GraD separates
+type dependency from runtime usage. These comparisons do not supply a
+preservation or sharing theorem for this implementation. C1, C2 and R22
+remain open. There is no new term evaluator or general optimizer support.

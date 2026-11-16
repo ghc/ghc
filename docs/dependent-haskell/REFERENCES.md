@@ -3542,3 +3542,28 @@ fallbacks. `native-interface-domain-shapes-unit-trace-v1` records the allocator
 boundary. All accepted domains still pass the original typed predicates.
 The seven-work/nine-PDF ledger is unchanged. No new whole-paper reading or
 proof replay is claimed.
+
+## Closed datatype parameters and constructor specialization
+
+The M56 reading uses selected official Agda v2.8.0 source ranges. In
+[`Rules/Data.hs`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Data.hs#L249-L337),
+constructor checking carries the datatype parameter telescope. The selected
+return-type checks are at lines 1820–1881. In
+[`Rules/LHS.hs`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1338-L1400),
+constructor splitting uses the actual datatype parameters and specializes
+the constructor type. Data.hs lines 120–129 make parameter erasure conditional
+on Agda's erasure and equality settings. Do not transfer that convention or
+Agda's evaluation properties to lazy Haskell.
+
+The cached complete files were verified against Git blob IDs
+`349a3c508d8a77d8f86b41decedec6de9a4d7afc` (Data) and
+`3779ffa6e418bca99e30c071e189106f82ecbe1b` (LHS). The selected reading, exact
+SHA256 values and scope are in `native-applied-domain-research-v1/`. This is
+source-range reading. It adds no paper to the seven-work, nine-PDF ledger.
+
+GHC already provides `dataConInstArgTys`, `dataConInstOrigArgTys` and nominal
+`normaliseType`. `mkInferredPolyId` in `GHC.Tc.Gen.Bind` normalizes an inferred
+type for selection and reconstructs the coercion through subsumption. M56
+uses that pattern for cached argument views. It preserves the original cache
+and usage. The D/DC, System DR and GraD limits in the paper ledger still
+apply. No theorem or proof artifact was replayed for this extension.
