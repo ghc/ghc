@@ -2253,6 +2253,7 @@ runNatSourceChecks = do
     runBetaCallSourceChecks
     runFunctionBinderSourceChecks
     runFunctionBodyComparisonSourceChecks
+    runCompleteFunctionArgumentSourceChecks
     runCallApplicationSourceChecks
     runCallActivationSourceChecks
     runConstructedCallActivationSourceChecks
@@ -2333,6 +2334,61 @@ runFunctionBodyComparisonSourceChecks = do
         $ \(name, fragment, declarations) ->
             sourceModuleRejects name 83865 fragment name $
                 retainedFunctionBodyComparisonSource name declarations "pure \"unused\""
+
+-- | Check explicit complete worker types without changing worker evaluation.
+runCompleteFunctionArgumentSourceChecks :: GHC.Ghc ()
+runCompleteFunctionArgumentSourceChecks = do
+    let phi = "(foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n))"
+        declarations =
+            [ "raiseExplicit :: forall a. String -> a"
+            , "raiseExplicit = error"
+            , "selectExplicit :: " ++ phi ++ " -> " ++ phi
+            , "selectExplicit worker = id @" ++ phi ++ " worker"
+            , "forceExplicit :: " ++ phi ++ " -> IO String"
+            , "forceExplicit worker = seq @" ++ phi ++ " worker (pure \"forced\")"
+            , "forceNested :: " ++ phi ++ " -> IO String"
+            , "forceNested worker = seq @(Maybe " ++ phi ++ ") (Just worker) (pure \"wrapped\")"
+            , "ambient :: foreach (n :: Nat) -> IO String"
+            , "ambient n = let { worker :: foreach (f :: Nat -> Nat) -> Vec Int (f n); worker f = polyWorker @Int f n } in force @(foreach (f :: Nat -> Nat) -> Vec Int (f n)) worker"
+            ]
+        moduleName = "NativeCompleteFunctionArguments"
+        source name extra observation =
+            retainedFunctionBodyComparisonSource name (declarations ++ extra) observation
+        observation =
+            unlines
+                [ "do values <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (vecList (selectExplicit specialize f n))))"
+                , "        whole <- forceExplicit specialize"
+                , "        nested <- forceNested (error \"unused nested worker\")"
+                , "        ignored <- ambient bottomNat"
+                , "        pure (values ++ unlines [whole,nested,ignored])"
+                ]
+    expression <- sourceEntry moduleName (source moduleName [] observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "complete function arguments" expression
+    unless (lines actual == ["[]", "[42,42]", "[42,42,42]", "forced", "wrapped", "forced"]) $
+        fail ("FAIL: complete function arguments: " ++ show actual)
+    let bottomName = "NativeExplicitBottomWorker"
+    bottomExpression <-
+        sourceEntry bottomName $
+            source bottomName [] ("forceExplicit (raiseExplicit @" ++ phi ++ " \"explicit-bottom-worker\")")
+    bottomEnvironment <- GHC.getSession
+    outcome <- liftIO $ try (execute bottomEnvironment flags bottomName bottomExpression)
+    case outcome of
+        Left exception
+            | "explicit-bottom-worker" `isInfixOf` displayException (exception :: SomeException) -> pure ()
+        _ -> fail "FAIL: explicit complete worker did not preserve bottom"
+    let partialName = "NativeRequiredPartialFunctionArgument"
+        partialSource =
+            "{-# LANGUAGE RequiredTypeArguments, ExplicitNamespaces #-}\n"
+                ++ source
+                    partialName
+                    [ "ignoreType :: forall a -> ()"
+                    , "ignoreType (type a) = ()"
+                    , "bad = ignoreType (Either (type " ++ phi ++ ") _)"
+                    ]
+                    "pure \"unused\""
+    sourceModuleRejects partialName 83605 "must be complete" partialName partialSource
 
 -- | Add head-only retained function workers as a separate source corpus.
 retainedFunctionBinderSource :: String -> String -> String

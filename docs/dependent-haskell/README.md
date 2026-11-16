@@ -57,6 +57,7 @@ _build/showcase/showcase
 | Nominal domain conversion, ordinary payload inference and cast demand | `domainConversion` |
 | Whole-worker specialization, payload inference and function demand | `fixedFunctionDomains` |
 | Runtime bounds, finite-position witnesses and lazy list access | `closedListIndexing` |
+| Complete explicit worker types, runtime application and lazy containers | `completeFunctionArguments` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to

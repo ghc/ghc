@@ -499,6 +499,26 @@ closedListIndexing = do
         cyclic = True : False : cyclic
     observe "checked position in cyclic list" (Parameterized.lookupRuntime cyclic 5)
 
+-- | Select retained workers with explicit types and preserve their demand.
+completeFunctionArguments :: IO ()
+completeFunctionArguments = do
+    lengthCell <- newIORef (S (S Z))
+    functionCell <- newIORef (id :: Nat -> Nat)
+    n <- readIORef lengthCell
+    selected <- readIORef functionCell
+    let f :: Nat -> Nat
+        f = selected
+        bottomWorker :: foreach (g :: Nat -> Nat) -> foreach (m :: Nat) -> Vec Int (g m)
+        bottomWorker = bottomValue "showcase-explicit-worker"
+    observe "explicit complete worker runtime application"
+        (toList (FunctionSignatures.selectCall FunctionSignatures.specializedCall f n))
+    FunctionSignatures.forceExplicitCall FunctionSignatures.specializedCall
+    observe "explicit complete worker WHNF" ()
+    expectError "explicit bottom worker WHNF" "showcase-explicit-worker"
+        (FunctionSignatures.forceExplicitCall bottomWorker)
+    FunctionSignatures.forceNestedCall bottomWorker
+    observe "explicit nested type ignores bottom worker" ()
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -514,3 +534,4 @@ main = do
     domainConversion
     fixedFunctionDomains
     closedListIndexing
+    completeFunctionArguments

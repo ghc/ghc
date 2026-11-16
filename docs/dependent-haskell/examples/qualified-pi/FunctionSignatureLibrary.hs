@@ -10,7 +10,8 @@
 
 -- | Export workers with actual retained function binders.
 module FunctionSignatureLibrary (idCall, numericCall, specializedCall, allocatedCall,
-    transportCall, shadowedCall, forceCall, forcePartialCall) where
+    transportCall, shadowedCall, forceCall, forcePartialCall,
+    selectCall, forceExplicitCall, forceNestedCall) where
 
 import PackedVecLibrary
 
@@ -28,8 +29,10 @@ below both binders. See Note [Solving retained function equalities] in
 GHC.Tc.Solver.Equality.
 
 forceValue has an ordinary lifted signature. Native known-value matching can
-select its parameter from a complete worker type. Direct seq has a concrete
-RuntimeRep parameter and retains its separate inference restriction.
+select its parameter from a complete worker type. A complete explicit type
+argument can also select that type. Direct seq accepts the complete lifted
+worker argument in this NoImpredicativeTypes module. Outer Quick Look checking
+has separate restrictions.
 The source controls check that neither comparison nor forcing adds an eta
 expansion that changes function WHNF.
 -}
@@ -74,3 +77,20 @@ forceCall worker = forceValue worker
 forcePartialCall :: foreach (f :: Nat -> Nat) ->
     (foreach (n :: Nat) -> Vec Int (f n)) -> IO ()
 forcePartialCall f worker = seq @(foreach (n :: Nat) -> Vec Int (f n)) worker (pure ())
+
+-- | Select a complete worker with a written type argument.
+selectCall ::
+    (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n)) ->
+    (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n))
+selectCall worker =
+    id @(foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n)) worker
+
+-- | Force a worker with a complete explicit type argument to seq.
+forceExplicitCall :: (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n)) -> IO ()
+forceExplicitCall worker =
+    seq @(foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n)) worker (pure ())
+
+-- | Force the outer constructor without forcing its retained worker field.
+forceNestedCall :: (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n)) -> IO ()
+forceNestedCall worker =
+    forceValue @(Maybe (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n))) (Just worker)

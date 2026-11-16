@@ -3703,6 +3703,15 @@ Whole-argument completeness includes wildcards outside the retained telescope.
 Do not infer permission from the wildcard mode or an outer syntax shape alone.
 Existing lexical scope, staged-code checks and native-meta restrictions remain.
 
+Current `GHC.Tc.Gen.App.tcVDQ` calls `expr_to_type`, then `tc_inst_forall_arg`.
+A required argument can contain a nested `HsEmbTy` plus a separate expression
+`HsHole`.
+The translation builds one `HsWC []` and changes the hole to `HsWildCardTy`.
+The renamer checked the nested embedded type, not this combined type. This
+existing RequiredTypeArguments path is the concrete reason to check the whole
+renamed argument in `tcHsTypeApp`. See Note [RequiredTypeArguments and the T2T mapping] in that
+module and the retained-type-argument Note in `GHC.Tc.Gen.HsType`.
+
 ## Opaque whole-function cast lowering
 
 M61 first measures the existing whole-cast path. It uses the selected D/DC

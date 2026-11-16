@@ -4276,7 +4276,7 @@ goal remain open.
 ## M62: complete retained-function type arguments
 
 Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
-Status: specified. The lifted-consumer baseline rejects two complete explicit
+Status: implemented; final validation is in progress. The lifted-consumer baseline rejects two complete explicit
 type arguments with located GHC-83605 errors in both rebuilt stages.
 
 Retained function types already have kind Type. Named complete signatures can
@@ -4301,6 +4301,13 @@ wildcards remain a separate check of the renamer's wildcard list.
 An ordinary visible wildcard argument without native indices or function
 binders must retain its existing behavior.
 
+The renamer already rejects many partial retained arguments. That check alone
+is insufficient for required type arguments. `tcVDQ` translates a surrounding
+expression into a type after renaming. It can combine a complete `(type Phi)`
+fragment with a separate anonymous wildcard, then call `tcHsTypeApp` on the
+whole partial type. Check this source path explicitly. Do not remove the shared
+whole-type scan because ordinary `@` rejection controls fail in the renamer.
+
 ```haskell
 forceValue :: forall a. a -> IO ()
 forceFull :: (foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
@@ -4310,18 +4317,20 @@ forceFull worker =
                  -> Vec Int (f n)) worker
 ```
 
-- [ ] Share the existing anonymous-wildcard predicates. Preserve ordinary
+- [x] Share the existing anonymous-wildcard predicates. Preserve ordinary
       signature completeness. Add no second syntax traversal for the same rule.
-- [ ] Carry whole-argument completeness in the private `TcTyMode`. Default it
+- [x] Carry whole-argument completeness in the private `TcTyMode`. Default it
       to absent outside the visible type-argument entry point. Keep it distinct
       from the wildcard mode and runtime-index environment. Reset it in fresh
       kind-checking modes. Preserve caller scope and source spans.
-- [ ] Permit complete retained-function binders through this path, including
+- [x] Permit complete retained-function binders through this path, including
       nested ordinary type applications and kind-annotated value types.
       Retain closed-domain, Many, staging, body-kind and native-meta checks.
 - [ ] Report incomplete native type arguments accurately. Check anonymous and
       named wildcards before, inside and after a retained telescope. Keep
       ordinary visible wildcards, unsupported contexts and wrong kinds separate.
+      Include required-type-argument translation with an outside wildcard;
+      that case must reach the new type-checker completeness guard.
 - [ ] Measure lifted good/bottom worker WHNF, ignored function arguments and
       runtime applications after explicit selection. Check nested container
       demand, ambient runtime indices, distinct names and scope rejection.

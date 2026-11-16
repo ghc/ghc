@@ -358,6 +358,16 @@ type argument for named, anonymous and generated holes. A hole beside the Pi
 is also incomplete. Inspect expanded type-splice types without revisiting
 expressions or finalizers.
 
+M62 carries whole-argument completeness through ordinary nested type checking.
+A complete explicit value type can contain a supported retained function
+binder. This includes container arguments and kind-annotated value types.
+Fresh kind modes clear the permission. Other signature contexts keep their
+existing gates. Signatures and explicit arguments share the anonymous-wildcard
+syntax check in `GHC.Hs.Type`; each caller also checks named wildcards.
+RequiredTypeArguments can combine an embedded complete type with an outside
+hole after renaming. `tcHsTypeApp` must check that combined type. Complete type
+formation adds no native meta assignment or function eta equality.
+
 Type synonyms follow this checked formation. Native scanners inspect their
 RHSs. Ordinary meta assignment stays blocked through an alias. Literal
 `foreach` kind syntax remains gated. A complete closed alias can be a kind
