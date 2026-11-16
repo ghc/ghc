@@ -4276,7 +4276,7 @@ goal remain open.
 ## M62: complete retained-function type arguments
 
 Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
-Status: validated with both stages; independent audit is pending. The original
+Status: complete bounded increment; independently audited. The original
 lifted-consumer baseline rejected two complete explicit type arguments with
 located GHC-83605 errors in both rebuilt stages.
 
@@ -4340,7 +4340,7 @@ forceFull worker =
       Preserve the old output prefixes and add no committed test files.
 - [x] Build both stages and run the selected API, source, runtime, rejection,
       Showcase and registered checks. Bind records to their actual inputs.
-- [ ] Update the roadmap, Core contract and references. Audit and publish the
+- [x] Update the roadmap, Core contract and references. Audit and publish the
       bounded result. Keep R03 and the full goal open.
 
 The prior art is GHC's existing type-application and completeness checking,
@@ -4391,3 +4391,15 @@ changed. No new test file, full GHC suite or proof replay is claimed.
 Records use the fresh `native-complete-function-type-arguments-*` prefix.
 The compiler snapshot has 95 files. The selected source snapshot has 128.
 The M61 canonical record and 106 inherited manifest hashes remain pinned.
+
+Audited documentation is `3c098f2c2a`. The independent audit passes 210,784
+checks over 47,471 pinned paths. Its canonical record is
+`_build/verification/dependent-haskell-M62-final-audit-v1.json`, SHA256
+`caa711f8dc137f1f0c0c9ae2e2e95c83389ec70beb263f90c729686f15ced61b`.
+The external evidence manifest freezes all 1,314 files in
+`native-complete-function-type-arguments-*`, including the failed verification
+attempts. The audit uses 4 GiB with no swap, peaks at 196 MiB and returns zero.
+The paper ledger remains sixteen works and twenty-two PDF versions with the
+same reading scopes. This publication changes status documents only. R03,
+R05 and the full goal remain open. The work queue next selects the R23
+matchability foundation before generic index domains.

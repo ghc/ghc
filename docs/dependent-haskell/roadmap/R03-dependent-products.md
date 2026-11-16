@@ -29,6 +29,7 @@ all Core transformations. Normal optimization remains a broader release gate.
 - Complete retained-function type arguments at M62. Both stages pass nested
   container formation, worker demand, ambient indices and located partial-type
   rejection. Required type arguments also check holes combined after renaming.
+  Its independent audit passes. The maintained Showcase now has 88 observations.
 
 The published M60 checkpoint appends five observations to M59's 79-line prefix
 and passes all 84 with both compilers. Its separate evidence audit passes.

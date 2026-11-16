@@ -103,7 +103,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M62 passes both builds, fresh API1/37, both-stage public19, parameterized14 and Showcase88/14, plus five registered tests; final audit is pending |
+| Compiler validation | Audited M62 passes both builds, fresh API1/37, both-stage public19, parameterized14 and Showcase88/14, plus five registered tests |
 | Example validation | Audited M60 passes both-stage hidden-interface source19, five rejection controls, compile-only equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
@@ -4913,7 +4913,9 @@ Both rebuilt stages pass eighteen focused cases and fifteen compatibility
 cases. The selected API goldens remain 1/37. Public19, parameterized14 with
 three rejections, Showcase88/14 modules and five registered tests pass.
 The existing fixture and Showcase contain the new observations. No test file
-was added. The independent evidence audit is pending.
+was added. The independent evidence audit passes 210,784 checks over 47,471
+pinned paths and freezes 1,314 evidence files. Its canonical record and source
+identities are in [the M62 plan](PLAN.md#m62-complete-retained-function-type-arguments).
 
 This uses the existing GHC completeness and type-application paths. It adds
 no Core constructor or singleton layer. NoImpredicativeTypes direct `seq`
