@@ -95,7 +95,7 @@ can advance a card while the card remains open.
 | 2 | R03: safe indexing over a retained `[Bool]` | Complete bounded increment: M60 | Both stages and the evidence audit pass. The next compiler task is the R05 opaque-cast probe. |
 | 3 | R05: application through opaque whole-function evidence | Complete bounded increment: M61 | Both builds, selected cohort and independent audit pass. Typed opaque proof projection remains separate. |
 | 4 | R03: explicit complete retained-function type arguments | Complete bounded increment: M62 | Both builds, nested source arguments, worker demand, the selected cohort and independent audit pass. Next: the R23 foundation. |
-| 5 | R23: matchability foundation; also advances R05 | M63 bootstrap passes; self-hosting and checks pending | Port actual arrow metadata, equality, interfaces and reflection. Preserve supplied kinds and explicit metadata. Complete the forall stage before unrestricted function-valued fields. |
+| 5 | R23: matchability foundation; also advances R05 | M63 first selfhost passes; final integration fixes and checks pending | Port actual arrow metadata, equality, interfaces and reflection. Preserve supplied kinds and explicit metadata. Complete the forall stage before unrestricted function-valued fields. |
 | 6 | R05: generic domain metadata and dependent telescopes; enables R03 source work | Research obligations identified | After the matchability foundation, target generic `[a]`. Transport binder types, occurrences and later fields together. State the policy for runtime-dependent domains separately. |
 
 The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks

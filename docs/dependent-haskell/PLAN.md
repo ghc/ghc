@@ -4418,7 +4418,15 @@ and repeated opaque targets. The correction and its quiet API controls need a
 fresh bootstrap build. Bootstrap v9 passes. Self-host v5 exposes generated
 selectors and reflection code that relied on inverse application. The next
 correction checks actual reflected heads and limits selector classification
-at opaque applications. Self-hosting and runtime checks remain pending.
+at opaque applications. Bootstrap v12 and selfhost v6 pass. The 13 pre-base
+selector controls pass. All 14 source formation and rejection controls pass.
+The corrected GHC API helper confirms declaration prefixes, residual kinds and
+FUN One. The first focused run exposes a primitive Typeable module mismatch
+that predates this increment. Correct the represented module before repeating
+the binary round trips. An interim kernel run also exposes hidden partial-FUN
+metadata in diagnostics. The unchanged fixture must pass after that fix.
+The candidate Showcase passes its original 88-line prefix and three new public
+reflection observations. The final selected cohort remains pending.
 M62 remains the last validated and published compiler checkpoint.
 
 The next foundation has two stages. M63 gives ordinary arrows explicit
@@ -4548,3 +4556,6 @@ compare the actual head with FUN or TYPE before it uses constructor injectivity.
 Inspect transparent aliases for hidden opaque applications. Preserve ordinary
 phantom and whole-field aliases. Scan the uninstantiated synonym definitions
 before expansion, so ordinary repeated aliases retain their compact syntax.
+Primitive Typeable bindings need the same module identity in the stored Module
+and the fingerprint calculation. Keep their binding in GHC.Internal.Types,
+but represent GHC.Internal.Prim. Do not weaken binary kind equality checks.
