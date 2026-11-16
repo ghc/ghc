@@ -61,7 +61,7 @@ import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyCo
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToNativeIndex, mapNativeIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
-import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, nativeIndexFunctionTys_maybe, coreFullView )
+import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, nativeIndexFunctionTys_maybe )
 
 import GHC.Core.TyCo.Make
 import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType )

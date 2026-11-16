@@ -233,7 +233,6 @@ import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType, eqTypes )
 import GHC.Core.TyCon
-import GHC.Core.TyCon.Set
 import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConTyCon, dataConFullSig, dataConRepArgTys, dataConStupidTheta
    , dataConWrapId_maybe, dataConRepArgBinders )
