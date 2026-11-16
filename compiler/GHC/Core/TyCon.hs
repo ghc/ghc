@@ -89,6 +89,7 @@ module GHC.Core.TyCon(
         tyConStupidTheta,
         tyConArity,
         tyConNullaryTy, mkTyConTy,
+        NativeDomainShape(..), tyConNativeDomainShape, setTyConNativeDomainShape,
         tyConRoles,
         tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe, tyConATs,
@@ -803,11 +804,54 @@ data TyCon = TyCon {
         tyConArity     :: Arity,         -- ^ Arity
         tyConNullaryTy :: Type,          -- ^ A pre-allocated @TyConApp tycon []@
 
+        tyConNativeDomainShape :: Maybe NativeDomainShape,
+          -- ^ Lazy interface information. See Note [Native interface domain shapes].
+
         tyConRoles :: [Role],  -- ^ The role for each type variable
                                -- This list has length = tyConArity
                                -- See also Note [TyCon Role signatures]
 
         tyConDetails :: !TyConDetails }
+
+-- | Independent shapes for native interface domain prechecks.
+-- See Note [Native interface domain shapes].
+data NativeDomainShape
+  = NativeUnknownDomain
+  | NativeInvalidDomain
+  | NativeDataDomain [(NativeDomainShape, NativeDomainShape)]
+  | NativeSynonymDomain NativeDomainShape
+  | NativeTyConDomain TyCon
+  | NativeFunctionDomain NativeDomainShape NativeDomainShape NativeDomainShape
+  | NativePiDomain
+
+-- | Attach a derived interface view and update the cached nullary type.
+-- See Note [Native interface domain shapes].
+setTyConNativeDomainShape :: TyCon -> NativeDomainShape -> TyCon
+setTyConNativeDomainShape tc shape = tc'
+  where
+    tc' = tc { tyConNativeDomainShape = Just shape
+             , tyConNullaryTy = mkNakedTyConTy tc' }
+
+{- Note [Native interface domain shapes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An imported constructor field can contain a retained Pi whose domain is its
+own parent. The typed domain checker then needs the field Type before its
+decoder has returned. A visited-TyCon set cannot supply that missing Type.
+
+IfaceToCore derives this small view from raw declarations before it forces
+their fields. References use the existing lazy interface environment. The
+view has no decoded field Types, trusted wire flag, or global name cache.
+Its fields must stay lazy. Existing TyCon builders default to no view.
+
+The view permits early rejection only. The typed checks remain mandatory.
+Unknown includes forms whose normalization is not represented here. In
+particular, a raw Pi can become an ordinary arrow when its binder is vacuous.
+An absent view is not evidence that a domain is valid or empty.
+
+Keep each view on its reconstructed TyCon. When attaching it, rebuild
+tyConNullaryTy so that mkTyConTy refers to that same TyCon and its view.
+See Note [Checking native domain shapes] in GHC.IfaceToCore.
+-}
 
 data TyConDetails =
   -- | Algebraic data types, from
@@ -2063,6 +2107,7 @@ mkTyCon name kind binders nb_eta_bndrs res_kind roles details
                  -- Cached things
                , tyConArity            = length binders
                , tyConNullaryTy        = mkNakedTyConTy tc
+               , tyConNativeDomainShape = Nothing
                , tyConHasClosedResKind = noFreeVarsOfType res_kind
                , tyConTyVars           = binderVars binders }
 

@@ -69,6 +69,7 @@ import GHC.Core.Lint
 import GHC.Core.Make
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Core.TyCon.Set
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Dependent ( hasNativeDependentExprRhs, hasNativeDependentUnfolding )
@@ -742,6 +743,7 @@ tc_iface_decl _ _
                        <+> ppr tc_name
                        $$ text "Expected an ordinary data parent with an empty context.")
        ; kind' <- tcIfaceType kind
+       ; shape <- tcIfaceDataDomainShape binders ctxt mb_parent rdr_cons
        ; tycon <- fixM $ \ tycon -> do
                { cons <- tcIfaceDataCons tc_name tycon rdr_cons
                ; bindIfaceTyConBinders_AT binders $ \ binders' ->
@@ -754,9 +756,10 @@ tc_iface_decl _ _
                              <+> ppr tc_name $$ text "The parent kind and its binders disagree.")
                ; stupid_theta <- tcIfaceCtxt ctxt
                ; parent' <- tc_parent tc_name mb_parent
-               ; return (mkAlgTyCon tc_name kind' binders' nb_eta_binders res_kind'
+               ; return (setTyConNativeDomainShape
+                         (mkAlgTyCon tc_name kind' binders' nb_eta_binders res_kind'
                                     roles cType stupid_theta
-                                    cons parent' gadt_syn) } }
+                                    cons parent' gadt_syn) shape) } }
        ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
        ; return (ATyCon tycon) }
   where
@@ -782,7 +785,11 @@ tc_iface_decl _ _
      do { res_kind' <- tcIfaceType res_kind     -- Note [Synonym kind loop]
         ; rhs      <- forkM (mk_doc tc_name) $
                       tcIfaceType rhs_ty
-        ; let tycon = buildSynTyCon tc_name kind' binders' res_kind' roles rhs
+        ; shape <- if null binders
+                   then NativeSynonymDomain <$> tcIfaceDomainShape rhs_ty
+                   else return NativeUnknownDomain
+        ; let tycon = setTyConNativeDomainShape
+                        (buildSynTyCon tc_name kind' binders' res_kind' roles rhs) shape
         ; return (ATyCon tycon) } }
    where
      mk_doc n = text "Type synonym" <+> ppr n
@@ -1293,7 +1300,14 @@ tcIfaceDataCons tycon_name tycon if_cons
     tc_retained_args _ _ [] [] = return ([], [])
     tc_retained_args name scope (mb : bs) ((w, ty) : args)
       = do { ~(mult, field_ty) <- forkM (mk_doc name <+> text "retained field") $
-               do { mult <- tcIfaceType w
+               do { when (isJust mb) $
+                      do { mult_shape <- tcIfaceDomainShape w
+                         ; domain_shape <- tcIfaceDomainShape ty
+                         ; precheckIfaceNativeDomain
+                             (text "Invalid retained constructor fields in interface:" <+> ppr name)
+                             (nativeDomainShapePossible NativeManyMultUse mult_shape
+                              && nativeDomainShapePossible NativeRetainedUse domain_shape) }
+                  ; mult <- tcIfaceType w
                   ; field_ty <- tcIfaceType ty
                   ; valid <- evaluateIfaceNativeDomain (ppr name) $
                             typeKind mult `eqType` multiplicityTy
@@ -1646,6 +1660,139 @@ loop. See #19744.
 ************************************************************************
 -}
 
+-- | Derive a scalar declaration view without decoding constructor fields.
+-- See Note [Checking native domain shapes].
+tcIfaceDataDomainShape :: [IfaceTyConBinder] -> IfaceContext -> IfaceTyConParent
+                       -> IfaceConDecls -> IfL NativeDomainShape
+tcIfaceDataDomainShape binders ctxt parent cons
+  | null binders, null ctxt, IfNoParent <- parent
+  , IfDataTyCon False cs <- cons
+  , all ordinary cs
+  = NativeDataDomain <$> mapM field (concatMap ifConArgTys cs)
+  | otherwise = return NativeInvalidDomain
+  where
+    ordinary con = null (ifConUnivTvs con) && null (ifConExTCvs con)
+                && null (ifConEqSpec con) && null (ifConCtxt con)
+                && null (ifConArgBinders con)
+    field (mult, ty) = (,) <$> tcIfaceDomainShape mult <*> tcIfaceDomainShape ty
+
+-- | Project raw syntax without forcing a decoded Type or a referenced TyCon.
+-- See Note [Checking native domain shapes].
+tcIfaceDomainShape :: IfaceType -> IfL NativeDomainShape
+tcIfaceDomainShape (IfaceTyConApp tc IA_Nil)
+  = NativeTyConDomain <$> forkM (text "Native domain shape") (tcIfaceTyCon tc)
+tcIfaceDomainShape (IfaceTupleTy BoxedTuple NotPromoted IA_Nil)
+  = return (NativeTyConDomain unitTyCon)
+tcIfaceDomainShape (IfaceFunTy FTF_T_T mult arg res)
+  = NativeFunctionDomain <$> tcIfaceDomainShape mult
+                         <*> tcIfaceDomainShape arg <*> tcIfaceDomainShape res
+tcIfaceDomainShape IfaceFunTy{} = return NativeInvalidDomain
+tcIfaceDomainShape IfaceDepFunTy{} = return NativePiDomain
+tcIfaceDomainShape IfaceForAllTy{} = return NativeInvalidDomain
+tcIfaceDomainShape IfaceTermVar{} = return NativeInvalidDomain
+tcIfaceDomainShape IfaceTermAppTy{} = return NativeInvalidDomain
+tcIfaceDomainShape IfaceLitTy{} = return NativeInvalidDomain
+tcIfaceDomainShape _ = return NativeUnknownDomain
+
+-- | Select the existing eligibility policy for a shape precheck.
+data NativeDomainUse = NativeScalarUse | NativeFunctionUse | NativeRetainedUse
+                     | NativeFieldMultUse | NativeManyMultUse
+  deriving Eq
+
+-- | Project an available Type head without expanding synonyms.
+-- See Note [Checking native domain shapes].
+nativeTypeDomainShape :: Type -> NativeDomainShape
+nativeTypeDomainShape (TyConApp tc []) = NativeTyConDomain tc
+nativeTypeDomainShape (FunTy FTF_T_T mult arg res)
+  = NativeFunctionDomain (nativeTypeDomainShape mult)
+                         (nativeTypeDomainShape arg) (nativeTypeDomainShape res)
+nativeTypeDomainShape FunTy{} = NativeInvalidDomain
+nativeTypeDomainShape DepFunTy{} = NativePiDomain
+nativeTypeDomainShape _ = NativeUnknownDomain
+
+-- | Reject known unsupported shapes; True still requires the typed checks.
+-- See Note [Checking native domain shapes].
+nativeDomainShapePossible :: NativeDomainUse -> NativeDomainShape -> Bool
+nativeDomainShapePossible NativeRetainedUse shape
+  = nativeDomainShapePossible NativeScalarUse shape
+    || nativeDomainShapePossible NativeFunctionUse shape
+nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
+  where
+    go seen aliases mode (NativeTyConDomain tc)
+      | mode == NativeFieldMultUse || mode == NativeManyMultUse
+      , tc == manyDataConTyCon = True
+      | mode == NativeFieldMultUse, tc == oneDataConTyCon = True
+      | mode == NativeManyMultUse, tc == oneDataConTyCon = False
+      | Just view <- tyConNativeDomainShape tc
+      = case view of
+          NativeSynonymDomain rhs
+            | tc `elemTyConSet` aliases -> False
+            | otherwise -> go seen (extendTyConSet aliases tc) mode rhs
+          NativeDataDomain{}
+            -> mode == NativeScalarUse
+               && (tc `elemTyConSet` seen
+                   || go (extendTyConSet seen tc) emptyTyConSet mode view)
+          _ -> go seen aliases mode view
+      | otherwise = True
+    go _ _ _ NativeUnknownDomain = True
+    go _ _ _ NativeInvalidDomain = False
+    go _ _ mode NativePiDomain = mode == NativeFunctionUse
+    go seen _ mode (NativeDataDomain fields)
+      = mode == NativeScalarUse && all field fields
+      where
+        field (mult, ty) = go seen emptyTyConSet NativeFieldMultUse mult
+                       && go seen emptyTyConSet NativeScalarUse ty
+    go seen aliases mode (NativeFunctionDomain mult arg res)
+      = mode == NativeFunctionUse
+        && go seen aliases NativeManyMultUse mult
+        && go seen aliases NativeScalarUse arg
+        && go seen aliases NativeScalarUse res
+    go seen aliases mode (NativeSynonymDomain rhs) = go seen aliases mode rhs
+
+-- | Preserve the Id guards before inspecting its imported domain view.
+nativeIdDomainShapePossible :: NativeDomainUse -> Id -> Bool
+nativeIdDomainShapePossible use v
+  | not (isLocalId v && not (isCoVar v) && isManyTy (idMult v)) = True
+  | use == NativeRetainedUse
+  = nativeDomainShapePossible NativeScalarUse shape
+    || not function_guards
+    || nativeDomainShapePossible NativeFunctionUse shape
+  | use == NativeFunctionUse, not function_guards = True
+  | otherwise = nativeDomainShapePossible use shape
+  where
+    shape = nativeTypeDomainShape (varType v)
+    function_guards = not (isJoinIdDetails (idDetails v))
+                   && noFreeVarsOfType (idMult v) && noFreeVarsOfType (varType v)
+
+-- | Report an early domain rejection without printing unfinished Types.
+-- See Note [Checking native domain shapes].
+precheckIfaceNativeDomain :: SDoc -> Bool -> IfL ()
+precheckIfaceNativeDomain name possible
+  = do { valid <- evaluateIfaceNativeDomain name possible
+       ; unless valid $ failIfM (name $$ text "Unsupported retained domain shape.") }
+
+{- Note [Checking native domain shapes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Inspect the raw view before coreFullView or constructor-field decoding. Data
+back-edges are valid, but each queued field must pass. Keep a separate active
+synonym stack. Reset it on data edges: Alias = A; data A = MkA Alias is valid.
+An alias-only cycle is not a supported domain.
+
+Fields permit One or Many. Function arrows and retained binders require Many.
+Resolve those multiplicities by wired TyCon identity, including nullary aliases.
+A raw Pi is not scalar, but its function shape is unknown: mkDepFunTy converts
+a vacuous Pi to an ordinary arrow. Applied synonyms and casts also remain
+unknown. The precheck must not reject their possible normalization results.
+
+True means only that this view cannot reject the domain. Run the existing
+typed predicate afterward, inside the M54 exception boundary. No unchecked
+Type escapes. Keep the Id guards before domain inspection. The raw named-field
+precheck runs before decoding that field; the existing field checks still run
+in their original order. Parent kinds and binder headers must already exist.
+This is not a termination guarantee for those headers or unclassified forms.
+See Note [Native interface domain shapes] in GHC.Core.TyCon.
+-}
+
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
@@ -1658,6 +1805,9 @@ tcIfaceType = go
     go (IfaceTermAppTy fun arg)
       -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
       = do { f <- tcIfaceLclId fun
+           ; precheckIfaceNativeDomain
+               (text "Invalid retained call head in interface:" <+> ppr fun)
+               (nativeIdDomainShapePossible NativeFunctionUse f)
            ; fun_tys <- evaluateIfaceNativeDomain (ppr fun)
                           (nativeIndexFunctionTys_maybe f)
            ; case fun_tys of
@@ -1675,6 +1825,9 @@ tcIfaceType = go
                     ; return (TermAppTy f arg') } }
     go (IfaceTermVar n)
       = do { v <- tcIfaceLclId n
+           ; precheckIfaceNativeDomain
+               (text "Invalid retained index in interface:" <+> ppr n)
+               (nativeIdDomainShapePossible NativeScalarUse v)
            ; valid <- evaluateIfaceNativeDomain (ppr n) (isNativeIndexId v)
            ; unless valid $
                failIfM (text "Invalid retained index in interface:" <+> ppr n
@@ -1687,7 +1840,10 @@ tcIfaceType = go
       -- See Note [Retained binders in interfaces].
       -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
       = bindIfaceId bndr $ \ v ->
-        do { valid <- evaluateIfaceNativeDomain (ppr name) (isNativeRetainedBinder v)
+        do { precheckIfaceNativeDomain
+               (text "Invalid retained binder in interface:" <+> ppr name)
+               (nativeIdDomainShapePossible NativeRetainedUse v)
+           ; valid <- evaluateIfaceNativeDomain (ppr name) (isNativeRetainedBinder v)
            ; unless valid $
                failIfM (text "Invalid retained binder in interface:" <+> ppr v
                         $$ text "Expected a local identifier with multiplicity Many"
@@ -1748,7 +1904,7 @@ termination. The runtime does not guarantee detection of every loop. A
 shape-first loader needs independent declaration and synonym information.
 Merely deferring validation into Type children is insufficient: typeKind can
 inspect a Type head without forcing those children. See Note [Retained binders
-in interfaces] and Note [Positioning of forkM].
+in interfaces], Note [Checking native domain shapes] and Note [Positioning of forkM].
 -}
 
 {- Note [Retained binders in interfaces]
