@@ -108,6 +108,36 @@ Time getMonotonicTime(void)
     return time;
 }
 
+Time getHighResolutionTime(void)
+{
+    /* Number of ticks per second, provided by QueryPerformanceFrequency */
+    static uint64_t ticks_per_sec = 0;
+
+    /* Initialize ticks_per_sec on the first call. It should not matter if two
+       threads race to do this. The result should be the same. */
+    if (RTS_UNLIKELY(RELAXED_LOAD_ALWAYS(&ticks_per_sec) == 0)) {
+        LARGE_INTEGER qpc_frequency; // a 64-bit union type
+        if (QueryPerformanceFrequency(&qpc_frequency)) {
+            RELAXED_STORE_ALWAYS(&ticks_per_sec, qpc_frequency.QuadPart);
+        } else {
+            /* This should be impossible now. */
+            sysErrorBelch("getMonotonicNSec: high res timestamps not available");
+            stg_exit(EXIT_FAILURE);
+        }
+    }
+
+    /* Get the tick count. */
+    LARGE_INTEGER tick_count;
+    QueryPerformanceCounter(&tick_count);
+
+    /* Compute elapsed time in nanoseconds. If avoiding float, we must multiply
+     * by nanoseconds first (1e9) and then divide by ticks per sec. The
+     * intermediate result can overflow a 64bit integer. So we use 128bit.
+     */
+    return ((__uint128_t)tick_count.QuadPart * (__uint128_t)1000000000ull)
+         / (__uint128_t)ticks_per_sec;
+}
+
 Time getWallClockTime(void)
 {
     /* Windows has a bunch of time APIs but none that directly give

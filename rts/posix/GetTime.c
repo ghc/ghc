@@ -63,6 +63,11 @@ Time getMonotonicTime(void)
     return getClockTime(RTS_CLOCK_MONOTONIC);
 }
 
+Time getHighResolutionTime(void)
+{
+    return getClockTime(RTS_CLOCK_HIGHRES);
+}
+
 Time getWallClockTime(void)
 {
     return getClockTime(RTS_CLOCK_REALTIME);

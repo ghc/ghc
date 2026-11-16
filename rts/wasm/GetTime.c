@@ -40,6 +40,11 @@ Time getMonotonicTime(void)
     return getClockTime(CLOCK_MONOTONIC);
 }
 
+Time getHighResolutionTime(void)
+{
+    return getClockTime(CLOCK_MONOTONIC);
+}
+
 Time getWallClockTime(void)
 {
     struct timeval tv;
