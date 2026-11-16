@@ -1686,7 +1686,6 @@ tcIfaceDomainShape (IfaceTupleTy BoxedTuple NotPromoted IA_Nil)
 tcIfaceDomainShape (IfaceFunTy FTF_T_T mult arg res)
   = NativeFunctionDomain <$> tcIfaceDomainShape mult
                          <*> tcIfaceDomainShape arg <*> tcIfaceDomainShape res
-tcIfaceDomainShape IfaceFunTy{} = return NativeInvalidDomain
 tcIfaceDomainShape IfaceDepFunTy{} = return NativePiDomain
 tcIfaceDomainShape IfaceForAllTy{} = return NativeInvalidDomain
 tcIfaceDomainShape IfaceLitTy{} = return NativeInvalidDomain
@@ -1781,6 +1780,8 @@ Resolve those multiplicities by wired TyCon identity, including nullary aliases.
 A raw Pi is not scalar, but its function shape is unknown: mkDepFunTy converts
 a vacuous Pi to an ordinary arrow. Applied synonyms and casts also remain
 unknown. The precheck must not reject their possible normalization results.
+Leave constraint arrows unknown so that their decoders check scoped indices
+in predicates before the typed domain check rejects the arrow visibility.
 Leave raw variable and call-index forms unknown so that their decoders check
 lexical scope.
 
