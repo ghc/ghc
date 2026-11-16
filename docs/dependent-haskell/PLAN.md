@@ -17,13 +17,13 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The current increment is [M59](#m59-bodies-beneath-fixed-function-domains), owned
-by [R03 dependent products](roadmap/R03-dependent-products.md). It exercises
-existing R05 evidence rules. Both compiler stages and the independent audit
-pass. The next increment measures closed-list indexing. The user
+The current increment is [M60](#m60-closed-list-safe-indexing), owned by
+[R03 dependent products](roadmap/R03-dependent-products.md). It composes existing
+R05 rules with an ordinary finite-position GADT. M59 is audited and published.
+The user
 resumed GHC execution on 2026-11-16 at 17:53 CET.
 
-The queue then measures closed-list indexing, probes opaque Pi application,
+The queue then probes opaque Pi application,
 and completes a bounded type-argument position. The next substantial foundation
 is [R23 matchability](roadmap/R23-unsaturated-type-families.md), followed by
 [R05 generic-domain metadata](roadmap/R05-dependent-core.md). The roadmap
@@ -4083,3 +4083,61 @@ All `native-function-body-comparison-*` paths are permanently frozen.
 Two earlier auditor failures remain recorded. They concerned historical fixture
 pins and trace formatting. The final audit checks each execution against its
 own source commit. This publication checkpoint changes only status documents.
+
+## M60: closed-list safe indexing
+
+Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
+Status: specified. The isolated bootstrap candidate passes nineteen observations.
+Both stages agree on its five source rejections. Maintained-source integration
+and its verification remain open.
+
+Compose the existing retained `[Bool]` domain and saturated `Count` family with
+an ordinary `Fin` GADT. Agda's finite-position datatype is the prior art; see
+[REFERENCES.md](REFERENCES.md#closed-list-safe-indexing). Use the existing
+`ParameterizedIndexLibrary`. Do not add a compiler rule or a singleton layer.
+
+```haskell
+data Fin :: Nat -> Type where
+    FZ :: forall (n :: Nat). Fin ('S n)
+    FS :: forall (n :: Nat). Fin n -> Fin ('S n)
+
+indexClosed :: foreach (xs :: [Bool]) -> Fin (Count xs) -> Bool
+mkFinClosed :: foreach (xs :: [Bool]) -> Int -> Maybe (Fin (Count xs))
+lookupRuntime :: [Bool] -> Int -> Maybe Bool
+```
+
+`mkFinClosed` checks the signed position at runtime. It returns `Nothing` for
+negative or out-of-range requests. Its negative branch must not inspect the
+list. `lookupRuntime` uses the same actual list to construct and consume the
+position. Static checking verifies both operations for every accepted input.
+It does not evaluate an IO result during compilation.
+
+The bound is a list length. It is not a proof of list identity. A proof of equal
+counts permits position reuse. It must not imply equality of the lists.
+The empty-list equation uses the ordinary empty case on `Fin Z`. A bottom
+witness must still be bottom. Haskell remains partial.
+
+- [ ] Add `Fin`, `indexClosed`, `mkFinClosed` and `lookupRuntime` to the existing
+      library. Explain bounds, family reduction and demand in one owning Note.
+      Use explicit `FZ @(Count rest)` and `FS @(Count rest)` applications.
+      The measured implicit `FZ` route cannot select its native-dependent bound.
+- [ ] Append five observations to Showcase's existing 79-line prefix. Include
+      runtime list and position inputs, invalid bounds, ignored tails and finite
+      access to a cyclic list. Keep fourteen source modules.
+- [ ] Compile the producer separately with both compiler stages. Compile the
+      nineteen-observation client with only copied interfaces available.
+      Run bounds, lazy-field, cyclic-input and empty-case demand checks.
+- [ ] Check rejection of `Fin Z`, a position at an unrelated bound, and list
+      equality inferred from equal counts. Check the current generic-domain
+      and implicit-constructor restrictions separately. Accept explicit reuse
+      under equal-count evidence. Preserve located diagnostics.
+- [ ] Run the maintained Showcase with both compilers and Core/STG Lint.
+      Check unchanged compiler inputs. Record the exact sources and outcomes.
+- [ ] Update the roadmap, references and example instructions. Publish the
+      bounded result. Keep R03 and the whole program open.
+
+No compiler rebuild is required when only these examples and documents change.
+The existing API and registered compiler checks remain M59 evidence. This
+increment adds no generic `[a]` domain, ordinary `length` promotion, totality,
+single-pass algorithm or bounds-check elimination. Construction and selection
+traverse the required prefix separately. General optimization remains gated.
