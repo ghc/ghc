@@ -1,0 +1,14 @@
+ok: concurrent requests each get their own reply
+ok: killed threads stop waiting for their replies
+ok: a request made alongside cancelled ones gets its reply
+ok: the interpreter still answers
+ok: a running splice does not hold up other requests
+ok: the thread running the splice is killed
+ok: the splice is cancelled in the interpreter
+ok: the interpreter still answers
+ok: a thread waiting on a dead interpreter gets PipeClosedException
+ok: a thread running a splice in a dead interpreter fails
+ok: the dead interpreter is stopped
+ok: its process is reaped
+ok: the next request starts a new interpreter
+ok: the new interpreter is a different process
