@@ -342,7 +342,7 @@ mkTypeableBinds
        { -- Create a binding for $trModule.
          -- Do this before processing any data type declarations,
          -- which need tcg_tr_module to be initialised
-       ; (tcg_env, mod_id) <- mkModIdBindings this_mod "$trModule"
+       ; (tcg_env, mod_id) <- mkModIdBindings this_mod this_mod "$trModule"
 
          -- Now we can generate the TyCon representations...
          -- First we handle the primitive TyCons if we are compiling GHC.Types
@@ -377,14 +377,15 @@ mkTypeableBinds
 *                                                                      *
 ********************************************************************* -}
 
-mkModIdBindings :: Module -> String -> TcM (TcGblEnv, Id)
+mkModIdBindings :: Module -> Module -> String -> TcM (TcGblEnv, Id)
 -- The String is typically "$trModule"
 -- The returned Id is for $trModule :: Module
 -- A binding giving a runtime representation for the name of the module
-mkModIdBindings mod occ_str
-  = do { mod_rhs <- mkModIdRHS mod
+-- See Note [Primitive Typeable module identity].
+mkModIdBindings bind_mod rep_mod occ_str
+  = do { mod_rhs <- mkModIdRHS rep_mod
        ; loc    <- getSrcSpanM
-       ; mod_nm <- newGlobalBinder mod (mkVarOcc occ_str) Nothing loc
+       ; mod_nm <- newGlobalBinder bind_mod (mkVarOcc occ_str) Nothing loc
        ; trModuleTyCon <- tcLookupKnownOccTyCon trModuleTyConOcc
 
        ; let mod_id = mkExportedVanillaId mod_nm (mkTyConTy trModuleTyCon)
@@ -395,6 +396,22 @@ mkModIdBindings mod occ_str
        ; tcg_env <- tcExtendGlobalValEnv [mod_id] getGblEnv
        ; let tcg_env' = tcg_env `addTypecheckedBinds` [[mod_bind]]
        ; return (tcg_env', mod_id) }
+
+{- Note [Primitive Typeable module identity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC.Internal.Prim is a virtual module. It has no object code. We therefore
+emit its Typeable bindings in GHC.Internal.Types. The binding's module and
+the represented module are different in this case.
+
+The stored Module must agree with the module used by mkTyConRepTyConRHS to
+compute the TyCon fingerprint. Binary decoding reconstructs that fingerprint
+from the stored package, module, and name. If the stored module is
+GHC.Internal.Types but the fingerprint uses GHC.Internal.Prim, a binary
+round trip changes the identity of TYPE and FUN. In the observed TYPE
+failure, the decoded TYPE application did not become TrType. Function
+decoding then rejected Int because its kind Type differed from the decoded
+TYPE LiftedRep.
+-}
 
 mkModIdRHS :: Module -> TcM (LHsExpr GhcTc)
 mkModIdRHS mod
@@ -509,7 +526,8 @@ mkPrimTypeableTodos :: Module -> Id -> TcM (TcGblEnv, [TypeRepTodo])
 mkPrimTypeableTodos mod this_mod_id
   | mod == gHC_TYPES
   = do { -- Build Module binding for GHC.Prim
-         (gbl_env',  ghc_prim_module_id) <- mkModIdBindings mod "tr$ModuleGHCPrim"
+         -- See Note [Primitive Typeable module identity].
+         (gbl_env',  ghc_prim_module_id) <- mkModIdBindings mod gHC_PRIM "tr$ModuleGHCPrim"
 
          -- Build TypeRepTodos for types in GHC.Prim
        ; todo2 <- todoForTyCons gHC_PRIM ghc_prim_module_id
