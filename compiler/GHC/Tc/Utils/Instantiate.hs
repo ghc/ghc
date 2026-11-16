@@ -922,7 +922,7 @@ addLocalInst (home_ie, my_insts) ispec
              --            specific than the new one
              -- 'dups'     are those 'matches' that are equal to the new one
          ; isGHCi <- getIsGHCi
-         ; eps    <- getEps
+         ; global_ie <- liftIO . eps_getInstEnv =<< getEps
          ; tcg_env <- getGblEnv
            -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
          ; loaded_ie <- liftIO . HUG.loadedInstEnv . hsc_HUG =<< getTopEnv
@@ -934,7 +934,6 @@ addLocalInst (home_ie, my_insts) ispec
                  | isGHCi    = deleteFromInstEnv home_ie ispec
                  | otherwise = home_ie
 
-               global_ie = eps_inst_env eps
                inst_envs = InstEnvs { ie_global  = global_ie
                                     , ie_local   = home_ie' `unionInstEnv` loaded_ie
                                     , ie_visible = tcVisibleOrphanMods tcg_env }

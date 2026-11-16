@@ -981,6 +981,8 @@ Library
         GHC.Unit.Env
         GHC.Unit.External
         GHC.Unit.External.Iface
+        GHC.Unit.External.InMemory
+        GHC.Unit.External.Store
         GHC.Unit.External.Database
         GHC.Unit.External.Index
         GHC.Unit.External.ModuleOrigin

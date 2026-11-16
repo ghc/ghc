@@ -158,10 +158,11 @@ hugCompleteSigs = HUG.allCompleteSigs . ue_home_unit_graph
 --------------------------------------------------------------------------------
 
 data UnitEnv = UnitEnv
-    { ue_eps :: {-# UNPACK #-} !ExternalUnitCache
+    { ue_eps :: !ExternalUnitCache
         -- ^ Information about the currently loaded external packages.
         -- This is mutable because packages will be demand-loaded during
-        -- a compilation run as required.
+        -- a compilation run as required. Its implementation can be replaced
+        -- by GHC API users, see Note [Abstract External Package State].
 
     , ue_current_unit    :: UnitId
 
@@ -188,7 +189,7 @@ data UnitEnv = UnitEnv
         -- See Note [Sharing 'UnitInfo's across the 'UnitEnv'] for details.
     }
 
-ueEPS :: UnitEnv -> IO ExternalPackageState
+ueEPS :: UnitEnv -> ExternalPackageState
 ueEPS = eucEPS . ue_eps
 
 ueEUD :: UnitEnv -> IO (ExternalUnitDatabases UnitId)

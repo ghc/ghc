@@ -671,11 +671,13 @@ findWholeCoreBindings hsc_env mod = do
                  mod ImportBySystem
       -- Home modules are demand-loaded into the HPT in one-shot mode.
       -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
-      iface_bytecode <-
+      mb_bytecode <-
         if HUG.memberHugUnitId (moduleUnitId mod) (hsc_HUG hsc_env)
-          then hls_iface_bytecode <$> HUG.readHugLoadedState (moduleUnitId mod) (hsc_HUG hsc_env)
-          else eps_iface_bytecode <$> hscEPS hsc_env
-      sequence (lookupModuleEnv iface_bytecode mod)
+          then lookupModuleEnv . hls_iface_bytecode
+                 <$> HUG.readHugLoadedState (moduleUnitId mod) (hsc_HUG hsc_env)
+                 <*> pure mod
+          else eps_lookupBytecode (hscEPS hsc_env) mod
+      sequence mb_bytecode
 
 
 findBytecodeLinkableMaybe :: HscEnv -> ModLocation -> IO (Maybe Linkable)

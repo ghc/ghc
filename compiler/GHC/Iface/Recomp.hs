@@ -1286,8 +1286,8 @@ addAbiHashes :: HscEnv -> IfaceModInfo -> PartialIfacePublic -> Dependencies -> 
 addAbiHashes hsc_env info
   iface_public
   deps = do
-  eps <- hscEPS hsc_env
   let
+      eps = hscEPS hsc_env
       -- If you have arrived here by accident then congratulations,
       -- you have discovered the ABI hash. Your reward is to update the ABI hash to
       -- account for your change to the interface file. Omitting your field using a

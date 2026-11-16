@@ -72,6 +72,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.Finder
+import GHC.Unit.External ( eps_getStats )
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
@@ -268,13 +269,13 @@ ioMsgMaybe' ioA = do
 
 dumpIfaceStats :: HscEnv -> IO ()
 dumpIfaceStats hsc_env = do
-  eps <- hscEPS hsc_env
   let
     logger = hsc_logger hsc_env
     dump_rn_stats = logHasDumpFlag logger Opt_D_dump_rn_stats
     dump_if_trace = logHasDumpFlag logger Opt_D_dump_if_trace
   when (dump_if_trace || dump_rn_stats) $
-    logDumpMsg logger "Interface statistics" (ifaceStats eps)
+    logDumpMsg logger "Interface statistics" . ifaceStats
+      =<< eps_getStats (hscEPS hsc_env)
 
 
 

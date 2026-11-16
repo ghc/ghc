@@ -1,0 +1,30 @@
+section: ghc-lib
+synopsis:
+  The External Package State is an abstract, query-only handle; GHC API users
+  can install their own implementation with ``GHC.setExternalPackageStore``
+description:
+  ``GHC.Unit.External.ExternalPackageState`` is now an abstract record of
+  operations rather than a record of maps. The rest of GHC only queries it
+  (``eps_lookupTyThing``, ``eps_lookupIface``, ``eps_getInstEnv``, ...) and adds
+  freshly loaded modules to it (``eps_addModule`` with an ``EpsModule``). GHC's
+  own implementation still keeps everything in memory
+  (``GHC.Unit.External.InMemory``).
+
+  GHC API users can implement their own store (for example one that keeps the
+  declarations of loaded modules on disk and typechecks them again on demand
+  with ``epm_rehydrate``, trading speed for memory) with the constructor
+  exported by ``GHC.Unit.External.Store``. They install it with
+  ``GHC.setExternalPackageStore`` (or ``GHC.Driver.Env.hscSetEPS``) before
+  anything is loaded. ``GHC.Unit.External.Iface.setExternalIfaceHashFn`` and
+  ``GHC.Iface.Load.readIfaceCopying`` are exported for such stores.
+
+  Breaking changes:
+
+  * The fields ``eps_PTE``, ``eps_ext_ifaces``, ``eps_inst_env``,
+    ``eps_fam_inst_env``, ``eps_rule_base``, ... are gone; use the query
+    functions of ``GHC.Unit.External``.
+  * ``GHC.Driver.Env.hscEPS`` and ``GHC.Unit.Env.ueEPS`` are pure, and
+    ``lookupExternalIface`` is in ``IO``.
+  * ``GHC.Tc.Utils.Monad.updateEps``, ``updateEps_`` and ``getEpsVar`` are
+    removed, as is ``GHC.Driver.Env.lookupTypeInPTE``.
+  * ``GHC.Iface.Load.ifaceStats`` takes an ``EpsStats``.

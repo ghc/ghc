@@ -81,7 +81,6 @@ import System.FilePath
 import Data.Version
 
 -- for the unification
-import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -321,8 +320,17 @@ buildUnit session cid insts lunit = do
             TcSession -> return ()
             _ -> compileInclude (length deps) (i, dep)
 
+    -- A TcSession typechecks against interfaces of indefinite units that
+    -- must not stay in the EPS afterwards: use a fresh EPS for it, and
+    -- reinstate the old one at the end. (The EPS is abstract, so we cannot
+    -- take a snapshot of it and restore that.)
+    -- See Note [Abstract External Package State] in GHC.Unit.External.Store
     mb_old_eps <- case session of
-                    TcSession -> fmap Just getEpsGhc
+                    TcSession -> do
+                      old_eps <- hscEPS <$> getSession
+                      fresh_eps <- liftIO newInMemoryEps
+                      modifySession (hscSetEPS fresh_eps)
+                      return (Just old_eps)
                     _ -> return Nothing
 
     conf <- withBkpSession cid insts deps_w_rns session $ do
@@ -411,7 +419,7 @@ buildUnit session cid insts lunit = do
 
     addUnit conf
     case mb_old_eps of
-        Just old_eps -> updateEpsGhc_ (const old_eps)
+        Just old_eps -> modifySession (hscSetEPS old_eps)
         _ -> return ()
 
 compileExe :: LHsUnit HsComponentId -> BkpM ()
@@ -545,18 +553,6 @@ innerBkpM do_this =
     -- NB: withTempSession mutates, so we don't have to worry
     -- about bkp_session being stale.
     updEnv (\env -> env { bkp_level = bkp_level env + 1 }) do_this
-
--- | Update the EPS from a 'GhcMonad'. TODO move to appropriate library spot.
-updateEpsGhc_ :: GhcMonad m => (ExternalPackageState -> ExternalPackageState) -> m ()
-updateEpsGhc_ f = do
-    hsc_env <- getSession
-    liftIO $ atomicModifyIORef' (euc_eps (ue_eps (hsc_unit_env hsc_env))) (\x -> (f x, ()))
-
--- | Get the EPS from a 'GhcMonad'.
-getEpsGhc :: GhcMonad m => m ExternalPackageState
-getEpsGhc = do
-    hsc_env <- getSession
-    liftIO $ hscEPS hsc_env
 
 -- | Run 'BkpM' in 'Ghc'.
 initBkpM :: FilePath -> [LHsUnit HsComponentId] -> BkpM a -> Ghc a

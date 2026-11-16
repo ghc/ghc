@@ -104,8 +104,7 @@ getModuleInfo mdl = withSession $ \hsc_env -> do
 
 getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getPackageModuleInfo hsc_env mdl
-  = do  eps <- hscEPS hsc_env
-        iface <- hscGetModuleInterface hsc_env mdl
+  = do  iface <- hscGetModuleInterface hsc_env mdl
         -- The EPS does not keep the full ModIface of package modules
         -- (see Note [The EPS does not keep ModIfaces]); API users of
         -- 'modInfoIface' get it re-read from disk.
@@ -114,11 +113,9 @@ getPackageModuleInfo hsc_env mdl
           Nothing -> readFullIfaceFromDisk hsc_env mdl >>= \case
             Succeeded i -> pure (Just i)
             Failed _    -> pure Nothing
-        let
-            avails = li_exports iface
-            pte    = eps_PTE eps
-            tys    = [ ty | name <- concatMap availNames avails,
-                            Just ty <- [lookupTypeEnv pte name] ]
+        let avails = li_exports iface
+        tys <- catMaybes <$> mapM (eps_lookupTyThing (hscEPS hsc_env))
+                                  (concatMap availNames avails)
 
         return (Just (ModuleInfo {
                         minf_type_env  = mkTypeEnv tys,

@@ -9,6 +9,7 @@ module GHC.Unit.External.Iface
    , mkExternalIface
    , emptyExternalIface
    , ei_module
+   , setExternalIfaceHashFn
      -- * Interfaces returned by 'GHC.Iface.Load.loadInterface'
    , LoadedIface (..)
    , loadedFullIface
@@ -68,8 +69,9 @@ ModIface) with the (trimmed) ModIface of every external module loaded.  That
 retained the lazily deserialised ModIface, and with it (via the lazy
 deserialisation thunks) the whole byte buffer of the .hi file.
 
-Instead the EPS now keeps an 'ExternalIface' per loaded module in
-'eps_ext_ifaces'.  It contains only what is needed of an external module after
+Instead the EPS now keeps an 'ExternalIface' per loaded module (see
+'eps_lookupIface', and Note [Abstract External Package State] in
+GHC.Unit.External.Store).  It contains only what is needed of an external module after
 its declarations, instances, rules etc. have been put into the EPS pools:
 exports, fixities, warnings, ABI hashes, dependencies, trust and docs.  No
 field may capture the ModIface it was made from:
@@ -132,18 +134,21 @@ data ExternalIface = ExternalIface
 -- before they are replaced by panics), since the hash cache is rebuilt from
 -- them.  The result does not retain the 'ModIface'.
 mkExternalIface :: ModIface -> ExternalIface
-mkExternalIface iface =
+mkExternalIface iface@ModIface { mi_exports = exports, mi_hash_fn = hash_fn } =
+  -- NB: the lazy fields are bound by this match, which happens when the
+  -- 'ExternalIface' is built: they are then the (unevaluated) fields of the
+  -- 'ModIface' themselves. A thunk like @mi_exports iface@ would retain the
+  -- whole 'ModIface' (with its declarations, instances, rules, ...) until it
+  -- is forced. 'ModIface' is a pattern synonym over nested records, so such
+  -- a thunk is not a selector thunk which the GC could short-circuit.
   let !fixities  = force (mi_fixities iface)
       !fix_env   = mkOccEnv fixities
       !warns     = force (mi_warns iface)
       !warns_rn  = fromIfaceWarnings warns
-      -- Lazy fields: we take the (unevaluated) fields out of the ModIface
-      -- by matching on its constructor, so that the thunks we keep do not
-      -- retain the ModIface. The exports were read with 'lazyGetCopy', so
-      -- their thunk only retains their own bytes. The hash cache retains the
-      -- (already forced) declarations, as it did in the PIT.
-      exports   = lazyExports iface
-      hash_fn   = lazyHashFn iface
+      -- Lazy fields ('exports', 'hash_fn'): taken out of the ModIface by the
+      -- match above. The exports were read with 'lazyGetCopy', so their thunk
+      -- only retains their own bytes. The hash cache retains the
+      -- declarations, as it did in the PIT.
       !deps      = force (mi_deps iface)
       !abi       = mi_abi_hashes iface
       !trust     = force (mi_trust iface)
@@ -166,16 +171,24 @@ mkExternalIface iface =
       , ei_docs           = docs
       }
 
+-- | Replace the hash cache ('mi_hash_fn') of an 'ExternalIface'.
+--
+-- For EPS stores which don't keep the declarations of a module in memory: the
+-- hash cache built by 'mkExternalIface' retains them until it is forced.
+--
+-- The replacement must agree with 'mkIfaceHashCache': in particular, implicit
+-- binders map to themselves and their own hash ('ifaceDeclFingerprints'), not
+-- to their parent declaration. Otherwise the ABI hashes of modules which use
+-- this module change.
+-- See Note [Abstract External Package State] in GHC.Unit.External.Store
+setExternalIfaceHashFn :: (OccName -> Maybe (OccName, Fingerprint))
+                       -> ExternalIface -> ExternalIface
+setExternalIfaceHashFn hash_fn ei = ei { ei_hash_fn = hash_fn }
+
 -- | Extract the (possibly unevaluated) docs field without leaving a selector
 -- thunk that would retain the whole 'ModIface'.
 lazyDocs :: ModIface -> Maybe Docs
 lazyDocs ModIface { mi_docs = d } = d
-
-lazyExports :: ModIface -> [IfaceExport]
-lazyExports ModIface { mi_exports = e } = e
-
-lazyHashFn :: ModIface -> OccName -> Maybe (OccName, Fingerprint)
-lazyHashFn ModIface { mi_hash_fn = f } = f
 
 strictDeclWarnFn :: Warnings GhcRn -> OccName -> Maybe (WarningTxt GhcRn)
 strictDeclWarnFn (WarnAll t)    = \_ -> Just t

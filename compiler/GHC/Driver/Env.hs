@@ -26,6 +26,7 @@ module GHC.Driver.Env
    , mkInteractiveHscEnv
    , runInteractiveHsc
    , hscEPS
+   , hscSetEPS
    , hscEUD
    , hscUIC
    , hscInterp
@@ -83,7 +84,6 @@ import GHC.Data.Maybe
 
 import GHC.Utils.Exception as Ex
 import GHC.Utils.Outputable
-import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Logger
@@ -95,8 +95,6 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 
 
-import Control.Applicative ((<|>))
-import Data.IORef
 import qualified Data.Set as Set
 import GHC.Types.Name.Reader (ExactRdrName(..))
 
@@ -241,8 +239,19 @@ another day.
 -}
 
 -- | Retrieve the ExternalPackageState cache.
-hscEPS :: HscEnv -> IO ExternalPackageState
-hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
+hscEPS :: HscEnv -> ExternalPackageState
+hscEPS hsc_env = euc_eps (ue_eps (hsc_unit_env hsc_env))
+
+-- | Replace the External Package State of the session, e.g. by a store that
+-- uses less memory. Must be called before anything is loaded: interfaces
+-- loaded into the old store are not copied over, and nothing in the old
+-- store may be referenced by the session any more.
+--
+-- See Note [Abstract External Package State] in GHC.Unit.External.Store
+hscSetEPS :: ExternalPackageState -> HscEnv -> HscEnv
+hscSetEPS eps hsc_env
+  = hsc_env { hsc_unit_env = (hsc_unit_env hsc_env)
+                               { ue_eps = ExternalUnitCache eps } }
 
 hscEUD :: HscEnv -> IO (ExternalUnitDatabases UnitId)
 hscEUD = readExternalUnitDatabases . hscUIC
@@ -334,7 +343,7 @@ hugSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
 --   and combining them into a single 'AnnEnv'
 prepareAnnotations :: HscEnv -> Maybe ModGuts -> IO AnnEnv
 prepareAnnotations hsc_env mb_guts = do
-    eps <- hscEPS hsc_env
+    other_pkg_anns <- eps_getAnnEnv (hscEPS hsc_env)
     let -- Extract annotations from the module being compiled if supplied one
         mb_this_module_anns = fmap (mkAnnEnv . mg_anns) mb_guts
         -- Extract dependencies of the module if we are supplied one,
@@ -353,24 +362,17 @@ prepareAnnotations hsc_env mb_guts = do
                       $ anns_below
                       . get_mod <$> mb_guts
     let
-        other_pkg_anns = eps_ann_env eps
         !ann_env       = maybe id plusAnnEnv mb_this_module_anns $!
             plusAnnEnv home_pkg_anns other_pkg_anns
     return ann_env
 
 -- | Find the 'TyThing' for the given 'Name' by using all the resources
 -- at our disposal: the compiled modules in the 'HomePackageTable' and the
--- compiled modules in other packages that live in 'PackageTypeEnv'. Note
+-- compiled modules in other packages that were loaded into the EPS. Note
 -- that this does NOT look up the 'TyThing' in the module being compiled: you
 -- have to do that yourself, if desired
 lookupType :: HscEnv -> Name -> IO (Maybe TyThing)
-lookupType hsc_env name = do
-   eps <- liftIO $ hscEPS hsc_env
-   let pte = eps_PTE eps
-   lookupTypeInPTE hsc_env pte name
-
-lookupTypeInPTE :: HscEnv -> PackageTypeEnv -> Name -> IO (Maybe TyThing)
-lookupTypeInPTE hsc_env pte name = ty
+lookupType hsc_env name = ty
   where
     hpt = hsc_HUG hsc_env
     mod = assertPpr (isExternalName name) (ppr name) $
@@ -388,9 +390,11 @@ lookupTypeInPTE hsc_env pte name = ty
                -- don't read the HomeLoadedState otherwise.
                | isOneShot (ghcMode (hsc_dflags hsc_env)) -> do
                    hls <- HUG.readHugLoadedState (moduleUnitId mod) hpt
-                   pure $! lookupNameEnv (hls_boot_types hls) name
-                       <|> lookupNameEnv pte name
-               | otherwise -> pure $! lookupNameEnv pte name
+                   case lookupNameEnv (hls_boot_types hls) name of
+                     Just thing -> pure (Just thing)
+                     Nothing    -> eps_lookupTyThing eps name
+               | otherwise -> eps_lookupTyThing eps name
+    eps = hscEPS hsc_env
 
 -- | Find the interface of a 'Module', searching in both the loaded home
 -- modules (HUG) and the interfaces loaded into the EPS.
@@ -401,9 +405,9 @@ lookupIfaceByModule
         -> Module
         -> IO (Maybe LoadedIface)
 lookupIfaceByModule hug eps mod
-  = HUG.lookupHugByModule mod hug >>= pure . \case
-       Just hm -> Just (LoadedHome (hm_iface hm))
-       Nothing -> LoadedExternal <$> lookupExternalIface eps mod
+  = HUG.lookupHugByModule mod hug >>= \case
+       Just hm -> pure $ Just (LoadedHome (hm_iface hm))
+       Nothing -> fmap LoadedExternal <$> eps_lookupIface eps mod
    -- Home-unit modules are never in the EPS: in --make mode and GHCi they are
    -- in the HUG because we compile or load them in dependency order, and in
    -- OneShot mode demand-loaded home modules go to the HUG too (see
@@ -411,9 +415,8 @@ lookupIfaceByModule hug eps mod
    -- This includes GHC.Prim when compiling ghc-internal.
 
 lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe LoadedIface)
-lookupIfaceByModuleHsc hsc_env mod = do
-  eps <- hscEPS hsc_env
-  lookupIfaceByModule (hsc_HUG hsc_env) eps mod
+lookupIfaceByModuleHsc hsc_env mod
+  = lookupIfaceByModule (hsc_HUG hsc_env) (hscEPS hsc_env) mod
 
 mainModIs :: HomeUnitEnv -> Module
 mainModIs hue = mkHomeModule (expectJust $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))

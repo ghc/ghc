@@ -384,14 +384,14 @@ tcLookupInstance cls tys
 tcGetClsDefaults :: [Module] -> TcM [DefaultEnv]
 tcGetClsDefaults mods = do
   hug <- hsc_HUG <$> getTopEnv
-  module_env_defaults <- eps_defaults <$> getEps
-  liftIO $ mapMaybeM (lookupClsDefault hug module_env_defaults) mods
+  eps <- getEps
+  liftIO $ mapMaybeM (lookupClsDefault hug eps) mods
 
-lookupClsDefault :: HomeUnitGraph -> ModuleEnv DefaultEnv -> Module -> IO (Maybe DefaultEnv)
-lookupClsDefault hug module_env_defaults mod =
+lookupClsDefault :: HomeUnitGraph -> ExternalPackageState -> Module -> IO (Maybe DefaultEnv)
+lookupClsDefault hug eps mod =
   lookupHugByModule mod hug >>= \case
              Just hm -> pure $ Just $ md_defaults $ hm_details hm
-             Nothing -> pure $ lookupModuleEnv module_env_defaults mod
+             Nothing -> eps_lookupDefaults eps mod
 
 tcGetInstEnvs :: TcM InstEnvs
 -- Gets both the external-package inst-env
@@ -399,10 +399,11 @@ tcGetInstEnvs :: TcM InstEnvs
 -- and demand-loaded home modules in one-shot mode,
 -- see Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState)
 tcGetInstEnvs = do { eps <- getEps
+                   ; eps_ie <- liftIO $ eps_getInstEnv eps
                    ; env <- getGblEnv
                    ; hug <- hsc_HUG <$> getTopEnv
                    ; loaded_ie <- liftIO $ loadedInstEnv hug
-                   ; return (InstEnvs { ie_global  = eps_inst_env eps
+                   ; return (InstEnvs { ie_global  = eps_ie
                                       , ie_local   = tcg_inst_env env `unionInstEnv` loaded_ie
                                       , ie_visible = tcVisibleOrphanMods env }) }
 

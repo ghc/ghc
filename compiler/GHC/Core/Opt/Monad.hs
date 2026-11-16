@@ -260,7 +260,7 @@ initRuleEnv guts
        ; return (mkRuleEnv guts (eps_rules `withLoadedHomeRules` loaded_rules) hpt_rules) }
 
 getExternalRuleBase :: CoreM RuleBase
-getExternalRuleBase = eps_rule_base <$> get_eps
+getExternalRuleBase = liftIO . eps_getRuleBase =<< get_eps
 
 -- | The rules of the home modules that were demand-loaded in one-shot mode.
 --
@@ -311,7 +311,7 @@ getInteractiveContext :: CoreM InteractiveContext
 getInteractiveContext = hsc_IC <$> getHscEnv
 
 getPackageFamInstEnv :: CoreM PackageFamInstEnv
-getPackageFamInstEnv = eps_fam_inst_env <$> get_eps
+getPackageFamInstEnv = liftIO . eps_getFamInstEnv =<< get_eps
 
 -- | The family instances of the home modules that were demand-loaded in
 -- one-shot mode.
@@ -323,9 +323,7 @@ getLoadedHomeFamInstEnv = do
     liftIO $ HUG.loadedFamInstEnv (hsc_HUG hsc_env)
 
 get_eps :: CoreM ExternalPackageState
-get_eps = do
-    hsc_env <- getHscEnv
-    liftIO $ hscEPS hsc_env
+get_eps = hscEPS <$> getHscEnv
 
 {-
 ************************************************************************

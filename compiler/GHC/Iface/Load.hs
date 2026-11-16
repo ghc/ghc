@@ -33,7 +33,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
-        findAndReadIface, readIface, writeIface,
+        findAndReadIface, readIface, readIfaceCopying, writeIface,
         flagsToIfCompression,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
@@ -84,6 +84,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 
 import GHC.Utils.Binary   ( BinData(..) )
+import GHC.Utils.Fingerprint ( fingerprint0 )
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
@@ -315,15 +316,12 @@ loadKnownKeyOccMaps
       = do { iface <- loadInterfaceWithException doc mod ImportBySystem
            ; let !abi_hash = li_mod_hash iface
            ; eps <- getEps
-           ; case lookupModuleEnv (eps_known_keys eps) mod of
+           ; liftIO (eps_lookupKnownKeys eps mod) >>= \case
                Just (cached_hash, kk_maps)
                  | cached_hash == abi_hash
                  -> return kk_maps
                _ -> do { let kk_maps = build_maps iface
-                       ; updateEps_ $ \ eps ->
-                           eps { eps_known_keys =
-                                   extendModuleEnv (eps_known_keys eps) mod
-                                     (abi_hash, kk_maps) }
+                       ; liftIO $ eps_addKnownKeys eps mod (abi_hash, kk_maps)
                        ; return kk_maps } }
 
     build_maps :: LoadedIface -> KnownKeyNameMaps
@@ -523,13 +521,14 @@ importDecl name
             Just thing -> return $ Succeeded thing
             Nothing    -> do
               { eps <- getEps
+              ; eps_things <- liftIO $ eps_moduleTyThings eps (nameModule name)
               ; home_things <- liftIO $
                   HUG.lookupHugByModule (nameModule name) (hsc_HUG hsc_env) >>= pure . \case
                     Just hmi -> nonDetNameEnvElts (md_types (hm_details hmi))
                     Nothing  -> []
               ; return $ Failed $
                   Can'tFindNameInInterface name
-                  (filter is_interesting $ home_things ++ nonDetNameEnvElts (eps_PTE eps))
+                  (filter is_interesting $ home_things ++ eps_things)
               }
     }}}
   where
@@ -771,7 +770,7 @@ loadInterface :: SDoc -> Module -> WhereFrom
 -- Note [The EPS does not keep ModIfaces] in GHC.Unit.External.Iface.
 
 -- If it can't find a suitable interface file, we
---      a) modify 'eps_ext_ifaces' to have an empty entry (not for home modules)
+--      a) give the module an empty entry in the EPS ('eps_addFailed'; not for home modules)
 --              (to avoid repeated complaints)
 --      b) return (Left message)
 --
@@ -820,16 +819,13 @@ loadInterface doc_str mod from
                              liftIO $ computeInterface hsc_env doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
-                { let !fake_iface = emptyExternalIface mod
-
-                  -- Not found, so add an empty iface to
+                { -- Not found, so add an empty iface ('emptyExternalIface') to
                   -- the EPS map so that we don't look again.
                   -- We don't do this for home modules: their interfaces never
                   -- go into the EPS, and we must not put a bogus entry into
                   -- the HPT.
                 ; unless is_home_mod $
-                    updateEps_ $ \eps ->
-                      eps { eps_ext_ifaces = extendModuleEnv (eps_ext_ifaces eps) mod fake_iface }
+                    liftIO $ eps_addFailed eps mod
 
                 ; return (Failed err) } ;
 
@@ -916,17 +912,22 @@ loadInterface doc_str mod from
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
 
+              -- For EPS stores that typecheck declarations again later
+              -- ('epm_rehydrate'). Its arguments are evaluated, so that it
+              -- doesn't retain 'iface'.
+              !sem_mod   = mi_semantic_module iface
+              !hi_boot   = mi_boot iface
+              !rehydrate = rehydrateDecl purged_hsc_env ignore_prags sem_mod loc_doc hi_boot
+
               -- Create an IO action that loads and compiles bytecode from Core
-              -- bindings.
+              -- bindings. Nothing if the iface doesn't have 'extra_decls', so
+              -- that 'get_link_deps' knows that it should load object code.
               --
               -- See Note [Interface Files with Core Definitions]
+              bytecode = loadIfaceByteCode purged_hsc_env iface loc (mkNameEnv new_eps_decls)
               add_bytecode old
-                | Just action <- loadIfaceByteCode purged_hsc_env iface loc (mkNameEnv new_eps_decls)
-                = extendModuleEnv old mod action
-                -- Don't add an entry if the iface doesn't have 'extra_decls'
-                -- so 'get_link_deps' knows that it should load object code.
-                | otherwise
-                = old
+                | Just action <- bytecode = extendModuleEnv old mod action
+                | otherwise               = old
 
         ; if is_home_mod
           then
@@ -974,46 +975,49 @@ loadInterface doc_str mod from
           else
           warnPprTrace bad_boot "loadInterface" (ppr mod) $
           ext_iface `seq`
-          updateEps_  $ \ eps ->
-           if elemModuleEnv mod (eps_ext_ifaces eps) || is_external_sig mhome_unit iface
-                then eps
-           else if bad_boot
-                -- See Note [Loading your own hi-boot file]
-                then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
-           else
-                eps {
-                  eps_ext_ifaces   = extendModuleEnv (eps_ext_ifaces eps) mod ext_iface,
-                  eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
-                  eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
-                  eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
-                                                        new_eps_rules,
-                  eps_complete_matches
-                                   = eps_complete_matches eps ++ new_eps_complete_matches,
-                  eps_inst_env     = extendInstEnvList (eps_inst_env eps)
-                                                       new_eps_insts,
-                  eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
-                                                          new_eps_fam_insts,
-                  eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
-                                                      new_eps_anns,
-                  eps_mod_fam_inst_env
-                                   = let
-                                       fam_inst_env =
-                                         extendFamInstEnvList emptyFamInstEnv
-                                                              new_eps_fam_insts
-                                     in
-                                     extendModuleEnv (eps_mod_fam_inst_env eps)
-                                                     mod
-                                                     fam_inst_env,
-                  eps_stats        = addEpsInStats (eps_stats eps)
-                                                   (length new_eps_decls)
-                                                   (length new_eps_insts)
-                                                   (length new_eps_rules),
-                  eps_defaults    =  extendModuleEnv (eps_defaults eps) mod new_eps_defaults
-                                                   }
+          liftIO (if is_external_sig mhome_unit iface
+                  then return ()
+                  else if bad_boot
+                       -- See Note [Loading your own hi-boot file]
+                  then eps_addBootDecls eps mod new_eps_decls
+                  else eps_addModule eps EpsModule
+                          { epm_module           = mod
+                          , epm_location         = loc
+                          , epm_ext_iface        = ext_iface
+                          , epm_decls            = new_eps_decls
+                          , epm_insts            = new_eps_insts
+                          , epm_fam_insts        = new_eps_fam_insts
+                          , epm_rules            = new_eps_rules
+                          , epm_anns             = new_eps_anns
+                          , epm_complete_matches = new_eps_complete_matches
+                          , epm_defaults         = new_eps_defaults
+                          , epm_bytecode         = bytecode
+                          , epm_iface_decls      = mi_decls iface
+                          , epm_rehydrate        = rehydrate
+                          })
 
-        ; return $ Succeeded $
-            if is_home_mod then LoadedHome home_iface else LoadedExternal ext_iface
+        ; if is_home_mod
+            then return $ Succeeded $ LoadedHome home_iface
+            else do
+              -- Return what the EPS store remembers, which need not be
+              -- 'ext_iface' (a store may have replaced its hash cache, or
+              -- another thread may have been faster), so that callers don't
+              -- retain a second copy.
+              -- See Note [Abstract External Package State] in GHC.Unit.External.Store
+              { stored <- liftIO $ eps_lookupIface eps mod
+              ; return $ Succeeded $ LoadedExternal (fromMaybe ext_iface stored) }
     }}}}
+
+-- | Typecheck a declaration of an interface again, for an EPS store which
+-- does not keep the 'TyThing's of 'epm_decls' (see 'epm_rehydrate').
+--
+-- Must not capture the 'ModIface' the declaration comes from.
+rehydrateDecl :: HscEnv -> Bool -> Module -> SDoc -> IsBootInterface
+              -> IfaceDecl -> IO [(Name, TyThing)]
+rehydrateDecl hsc_env ignore_prags !mod loc_doc !hi_boot decl
+  = initIfaceLoad hsc_env $
+    initIfaceLcl mod loc_doc hi_boot $
+    tcIfaceDecls ignore_prags [(fingerprint0, decl)]
 
 {- Note [Loading your own hi-boot file]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1214,7 +1218,8 @@ moduleFreeHolesPrecise doc_str mod
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHug
         result <- tryEpsAndHpt eps hpt
-        case result `firstJust` tryDepsCache eps imod insts of
+        cached <- liftIO $ tryDepsCache eps imod insts
+        case result `firstJust` cached of
           Just r -> return (Succeeded r)
           Nothing -> readAndCache imod insts
     (_, Nothing) -> return (Succeeded emptyUniqDSet)
@@ -1222,9 +1227,7 @@ moduleFreeHolesPrecise doc_str mod
     tryEpsAndHpt eps hpt =
         fmap li_free_holes <$> liftIO (lookupIfaceByModule hpt eps mod)
     tryDepsCache eps imod insts =
-        case lookupInstalledModuleEnv (eps_free_holes eps) imod of
-            Just ifhs  -> Just (renameFreeHoles ifhs insts)
-            _otherwise -> Nothing
+        fmap (\ifhs -> renameFreeHoles ifhs insts) <$> eps_lookupFreeHoles eps imod
     readAndCache imod insts = do
         hsc_env <- getTopEnv
         mb_iface <- liftIO $ findAndReadIface hsc_env
@@ -1234,8 +1237,8 @@ moduleFreeHolesPrecise doc_str mod
             Succeeded (iface, _) -> do
                 let ifhs = mi_free_holes iface
                 -- Cache it
-                updateEps_ (\eps ->
-                    eps { eps_free_holes = extendInstalledModuleEnv (eps_free_holes eps) imod ifhs })
+                eps <- getEps
+                liftIO $ eps_addFreeHoles eps imod ifhs
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
@@ -1637,11 +1640,10 @@ as though they were written in a source module.
 *********************************************************
 -}
 
-ifaceStats :: ExternalPackageState -> SDoc
-ifaceStats eps
+ifaceStats :: EpsStats -> SDoc
+ifaceStats stats
   = hcat [text "Renamer stats: ", msg]
   where
-    stats = eps_stats eps
     msg = vcat
         [int (n_ifaces_in stats) <+> text "interfaces read",
          hsep [ int (n_decls_out stats), text "type/class/variable imported, out of",

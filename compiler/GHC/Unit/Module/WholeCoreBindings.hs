@@ -95,7 +95,8 @@ settings.
    others with bottom values.
 
    In order to avoid keeping around all of the interface's components needed for
-   compiling bytecode, we instead store an IO action in 'eps_iface_bytecode'.
+   compiling bytecode, we instead store an IO action in the EPS
+   ('epm_bytecode', see 'eps_lookupBytecode').
    When 'get_link_deps' evaluates this action, the result is not retained in the
    EPS, but stored in 'LoaderState', where it may eventually get evicted to free
    up the memory.

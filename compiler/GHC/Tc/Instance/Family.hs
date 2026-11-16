@@ -413,8 +413,7 @@ getFamInsts hpt_fam_insts mod
                    ; liftIO (HUG.lookupHugByModule mod hug) >>= \case
                        Just hmi -> return $ extendFamInstEnvList emptyFamInstEnv
                                               (md_fam_insts (hm_details hmi))
-                       Nothing  -> return (expectJust $
-                                     lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
+                       Nothing  -> expectJust <$> liftIO (eps_lookupModFamInstEnv eps mod) }
   where
     doc = ppr mod <+> text "is a family-instance module"
 
@@ -620,10 +619,10 @@ addLocalFamInst (home_fie, my_fis) fam_inst
            -- those instances which are transitively imported
            -- by the current module, rather than every instance
            -- we've ever seen. Fixing this is part of #13102.
-       ; eps <- getEps
+       ; eps_fie <- liftIO . eps_getFamInstEnv =<< getEps
          -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
        ; loaded_fie <- liftIO . HUG.loadedFamInstEnv . hsc_HUG =<< getTopEnv
-       ; let inst_envs = (eps_fam_inst_env eps, home_fie `unionFamInstEnv` loaded_fie)
+       ; let inst_envs = (eps_fie, home_fie `unionFamInstEnv` loaded_fie)
              home_fie' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls and injectivity violations
@@ -958,8 +957,7 @@ tcGetFamInstEnvs :: TcM FamInstEnvs
 -- and demand-loaded home modules in one-shot mode,
 -- see Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState)
 tcGetFamInstEnvs
-  = do { eps <- getEps; env <- getGblEnv
+  = do { pkg_env <- liftIO . eps_getFamInstEnv =<< getEps; env <- getGblEnv
        ; loaded_fie <- liftIO . HUG.loadedFamInstEnv . hsc_HUG =<< getTopEnv
-       ; let !pkg_env  = eps_fam_inst_env eps
-             !home_env = tcg_fam_inst_env env `unionFamInstEnv` loaded_fie
+       ; let !home_env = tcg_fam_inst_env env `unionFamInstEnv` loaded_fie
        ; return (pkg_env, home_env) }

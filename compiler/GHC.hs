@@ -42,6 +42,10 @@ module GHC (
         normaliseInteractiveDynFlags, initialiseInteractiveDynFlags,
         interpretPackageEnv,
 
+        -- * The External Package State
+        ExternalPackageState,
+        setExternalPackageStore,
+
         -- * Logging
         Logger, getLogger,
         pushLogHook, popLogHook,
@@ -348,6 +352,7 @@ import GHC.Platform
 import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
                            , isSourceFilename, startPhase )
 import GHC.Driver.Env
+import GHC.Unit.External ( ExternalPackageState )
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.CmdLine
@@ -660,6 +665,17 @@ initGhcMonad mb_top_dir = setSession =<< liftIO ( do
 --
 -- 'setSessionDynFlags' sets both @DynFlags@, and 'getSessionDynFlags'
 -- retrieves the program @DynFlags@ (for backwards compatibility).
+
+-- | Replace the External Package State (EPS) of the session by the given
+-- store, e.g. one which keeps less in memory than GHC's own in-memory store
+-- ('GHC.Unit.External.newInMemoryEps').
+--
+-- Call this before anything is loaded (i.e. right after the session is set
+-- up): interfaces loaded into the previous store are not copied over.
+--
+-- See Note [Abstract External Package State] in "GHC.Unit.External.Store".
+setExternalPackageStore :: GhcMonad m => ExternalPackageState -> m ()
+setExternalPackageStore eps = modifySession (hscSetEPS eps)
 
 -- This is a compatibility function which sets dynflags for the top session
 -- as well as the unit.

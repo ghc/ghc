@@ -74,10 +74,10 @@ simplifyExpr :: Logger
 -- See 'simplExprGently' for details.
 simplifyExpr logger unit_env opts expr
   = withTiming logger (text "Simplify [expr]") (const ()) $
-    do  { eps <- ueEPS unit_env ;
+    do  { eps_fam_env <- eps_getFamInstEnv (ueEPS unit_env) ;
           -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
         ; loaded_fam_env <- HUG.loadedFamInstEnv (ue_home_unit_graph unit_env)
-        ; let fam_envs = ( eps_fam_inst_env eps
+        ; let fam_envs = ( eps_fam_env
                          , extendFamInstEnvList loaded_fam_env $ se_fam_inst opts
                          )
               -- See Note [Seed the in-scope set for open expressions]
@@ -116,7 +116,7 @@ simplifyExpr logger unit_env opts expr
 -- unit, no demand-loaded rules) we allocate nothing but the 'RuleEnv'.
 readRuleEnv :: [IORef HomeLoadedState] -> UnitEnv -> RuleEnv -> IO RuleEnv
 readRuleEnv loaded_refs unit_env rule_env = do
-    eps_rules <- eps_rule_base <$> ueEPS unit_env
+    eps_rules <- eps_getRuleBase (ueEPS unit_env)
     -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
     case loaded_refs of
       []    -> return $! updExternalPackageRules rule_env eps_rules
@@ -304,7 +304,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 -- Hence just before attempting to match a rule we read the EPS
                 -- value (via read_rule_env) and then combine it with the existing rule base.
                 -- See `GHC.Core.Opt.Simplify.Monad.getSimplRules`.
-          eps <- ueEPS unit_env ;
+          eps_fam_env <- eps_getFamInstEnv (ueEPS unit_env) ;
           -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
           loaded_fam_env <- HUG.loadedFamInstEnv (ue_home_unit_graph unit_env) ;
            let  { -- base_rule_env contains
@@ -318,7 +318,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 ; !loaded_refs = HUG.hugLoadedStateRefs (ue_home_unit_graph unit_env)
                 ; read_rule_env = readRuleEnv loaded_refs unit_env base_rule_env
 
-                ; fam_envs = (eps_fam_inst_env eps, fam_inst_env `unionFamInstEnv` loaded_fam_env)
+                ; fam_envs = (eps_fam_env, fam_inst_env `unionFamInstEnv` loaded_fam_env)
                 ; simpl_env = mkSimplEnv mode fam_envs } ;
 
                 -- Simplify the program

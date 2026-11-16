@@ -1103,8 +1103,8 @@ tc_iface_decl_fingerprint ignore_prags (_version, decl)
 bumpDeclStats :: Name -> IfL ()         -- Record that one more declaration has actually been used
 bumpDeclStats name
   = do  { traceIf (text "Loading decl for" <+> ppr name)
-        ; updateEps_ (\eps -> let stats = eps_stats eps
-                              in eps { eps_stats = stats { n_decls_out = n_decls_out stats + 1 } })
+        ; eps <- getEps
+        ; liftIO $ eps_bumpDeclsOut eps
         }
 
 tc_fd :: FunDep IfLclName -> IfL (FunDep TyVar)

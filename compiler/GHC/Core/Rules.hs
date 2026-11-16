@@ -119,7 +119,7 @@ Note [Overall plumbing for rules]
   are treated by the "external" route, discussed next, regardless of
   which package they come from.
 
-* The ExternalPackageState has a single eps_rule_base :: RuleBase for
+* The ExternalPackageState has a single RuleBase ('eps_getRuleBase') for
   Ids in other packages.  This RuleBase simply grow monotonically, as
   ghc --make compiles one module after another.
 

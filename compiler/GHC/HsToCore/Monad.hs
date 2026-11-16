@@ -385,8 +385,8 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
        ; statics_var <- liftIO $ newIORef nilOL
            -- ToDo: what becomes of the values put into these ref-cells?
 
-       ; eps <- liftIO $ hscEPS hsc_env
-       ; let unit_env = hsc_unit_env hsc_env
+       ; let eps = hscEPS hsc_env
+             unit_env = hsc_unit_env hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
              rdr_env  = tcg_rdr_env tcg_env
@@ -469,8 +469,8 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
        ; msg_var          <- newIORef emptyMessages
        ; statics_var      <- newIORef nilOL
        ; known_key_maps_var <- newIORef Nothing
-       ; eps <- liftIO $ hscEPS hsc_env
-       ; let unit_env = hsc_unit_env hsc_env
+       ; let eps = hscEPS hsc_env
+             unit_env = hsc_unit_env hsc_env
              type_env = typeEnvFromEntities ids tycons patsyns fam_insts
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
              bindsToIds (NonRec v _)   = [v]
@@ -843,10 +843,10 @@ dsGetFamInstEnvs :: DsM FamInstEnvs
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
 dsGetFamInstEnvs
-  = do { eps <- getEps; env <- getGblEnv
+  = do { eps_fie <- liftIO . eps_getFamInstEnv =<< getEps; env <- getGblEnv
          -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
        ; loaded_fie <- liftIO . HUG.loadedFamInstEnv . hsc_HUG =<< getTopEnv
-       ; return (eps_fam_inst_env eps, ds_fam_inst_env env `unionFamInstEnv` loaded_fie) }
+       ; return (eps_fie, ds_fam_inst_env env `unionFamInstEnv` loaded_fie) }
 
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }

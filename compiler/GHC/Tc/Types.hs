@@ -417,7 +417,10 @@ data IfLclEnv
         -- Whether or not the IfaceDecl came from a boot
         -- file or not; we'll use this to choose between
         -- NoUnfolding and BootUnfolding
-        if_boot :: IsBootInterface,
+        if_boot :: !IsBootInterface,
+          -- Strict: in GHC.Iface.Load.loadInterface it is @mi_boot iface@,
+          -- and forkM thunks capture this environment; a thunk would
+          -- retain the whole interface (see Note [The EPS does not keep ModIfaces]).
 
         -- The field is used only for error reporting
         -- if (say) there's a Lint error in it

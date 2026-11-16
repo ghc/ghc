@@ -27,9 +27,7 @@ module GHC.Tc.Utils.Monad(
   whenXOptM, unlessXOptM,
   getGhcMode,
   withoutDynamicNow,
-  getEpsVar,
   getEps,
-  updateEps, updateEps_,
   getHpt, getEpsAndHug,
 
   -- * Initialising TcM plugins
@@ -710,40 +708,17 @@ withoutDynamicNow = updTopFlags (\dflags -> dflags { dynamicNow = False})
 updTopFlags :: (DynFlags -> DynFlags) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 updTopFlags f = updTopEnv (hscUpdateFlags f)
 
-getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
-getEpsVar = do
-  env <- getTopEnv
-  return (euc_eps (ue_eps (hsc_unit_env env)))
-
+-- | The handle of the External Package State.
+-- See Note [Abstract External Package State] in GHC.Unit.External.Store
 getEps :: TcRnIf gbl lcl ExternalPackageState
-getEps = do { env <- getTopEnv; liftIO $ hscEPS env }
-
--- | Update the external package state.  Returns the second result of the
--- modifier function.
---
--- This is an atomic operation and forces evaluation of the modified EPS in
--- order to avoid space leaks.
-updateEps :: (ExternalPackageState -> (ExternalPackageState, a))
-          -> TcRnIf gbl lcl a
-updateEps upd_fn = do
-  traceIf (text "updating EPS")
-  eps_var <- getEpsVar
-  atomicUpdMutVar' eps_var upd_fn
-
--- | Update the external package state.
---
--- This is an atomic operation and forces evaluation of the modified EPS in
--- order to avoid space leaks.
-updateEps_ :: (ExternalPackageState -> ExternalPackageState)
-           -> TcRnIf gbl lcl ()
-updateEps_ upd_fn = updateEps (\eps -> (upd_fn eps, ()))
+getEps = hscEPS <$> getTopEnv
 
 getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
 
 getEpsAndHug :: TcRnIf gbl lcl (ExternalPackageState, HomeUnitGraph)
-getEpsAndHug = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
-                  ; return (eps, hsc_HUG env) }
+getEpsAndHug = do { env <- getTopEnv
+                  ; return (hscEPS env, hsc_HUG env) }
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.
@@ -2739,17 +2714,17 @@ liftZonkM (ZonkM f) =
 getCompleteMatchesTcM :: TcM CompleteMatches
 getCompleteMatchesTcM
   = do { hsc_env <- getTopEnv
-       ; eps <- liftIO $ hscEPS hsc_env
        ; tcg_env <- getGblEnv
        ; let tcg_comps = tcg_complete_match_env tcg_env
-       ; liftIO $ localAndImportedCompleteMatches tcg_comps (hsc_HUG hsc_env) eps
+       ; liftIO $ localAndImportedCompleteMatches tcg_comps (hsc_HUG hsc_env) (hscEPS hsc_env)
        }
 
 localAndImportedCompleteMatches :: CompleteMatches -> HomeUnitGraph -> ExternalPackageState -> IO CompleteMatches
 localAndImportedCompleteMatches tcg_comps hug eps = do
   -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
   loaded_comps <- HUG.loadedCompleteSigs hug
+  eps_comps <- eps_getCompleteMatches eps
   return $
        tcg_comps                -- from the current modulea and from the home package
     ++ loaded_comps             -- from demand-loaded home modules (one-shot mode)
-    ++ eps_complete_matches eps -- from external packages
+    ++ eps_comps                -- from external packages
