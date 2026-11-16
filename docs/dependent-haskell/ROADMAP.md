@@ -227,6 +227,11 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   cover scope, exact types, type-only dependencies and demand. Both stages
   preserve the 106 raw/public and 562 vector observations. Ordinary inlining,
   occurrence analysis and general unfolding handling remain gated.
+  M53 adds a restricted dead-local analysis from GHC's deep FV annotations.
+  It retains type-only dependencies and removes eligible unused lifted Many
+  locals. It preserves remaining nodes and metadata and adds no occurrence
+  counts. Both stages pass source19 and Showcase53. General occurrence
+  analysis, native unfolding export and the full optimizer remain gated.
   M42 extends the checked alias and traversal rules to eligible function heads.
   Direct CorePrep checks consume call proofs and preserve argument demand.
   Top-level Tidy protection is implemented and reviewed. It has no separate

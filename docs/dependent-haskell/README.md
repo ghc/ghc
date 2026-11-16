@@ -126,6 +126,7 @@ optimization support or full roadmap completion.
 | Multi-constructor packages | Constructor-local retained fields work beside ordinary constructors, ordinary GADT siblings and a different retained telescope; no Core or interface format changes |
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
+| Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
 | Maintained showcase | `Showcase.hs` passes both compilers with 53 finite output lines; R22/C1/C2 remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
@@ -223,6 +224,12 @@ increment kept machine-code compilation behind the program gate. All commits
 are local.
 
 ## Restricted simplification
+
+The native entry first uses GHC's deep free-variable annotations to remove
+unused lifted, unrestricted local bindings. References in surviving types,
+coercions or stable metadata keep their bindings. The pass preserves all
+other nodes and infers no new occurrence counts. See the
+[M53 contract](CORE.md#native-dead-local-bindings).
 
 The native SimpleOpt entry substitutes supported Boolean beta arguments in
 terms and types together. Exact Boolean cases replace their virtual proof with
@@ -4521,3 +4528,36 @@ C1, C2 and R22 remain open. See the
 [contract](CORE.md#exported-function-valued-retained-value-signatures),
 [plan](PLAN.md#m52-exported-function-valued-retained-value-signatures), and
 [prior art](REFERENCES.md#exported-function-valued-retained-signatures-prior-art).
+
+## M53: native dead local bindings
+
+A checked expression with an unused ordinary `Int` let around an opaque
+`Nat` binding now loses the `Int` let. The `Nat` binding stays because a
+surviving erased type argument refers to it. The new native entry reuses
+GHC's deep FV annotation tree. It preserves all remaining nodes and infers
+no occurrence counts. Unlifted, `One`, token and protected metadata cases
+keep their bindings. This increment changes the compiler pass, not source
+syntax or the interface format.
+
+Both compiler builds pass from compiler
+`d740b247a8bae21bbf741e8b24fdbf1c54f871f4` and source
+`2225c8f09c52b74556d34e87d19afa2ff4f5b176`, with 85 compiler inputs and 114
+source paths. The API controls pass with unchanged 1/37-line goldens. Both
+stages preserve the 19-result separate-module program and the 53-line
+Showcase from 13 source modules. The registered selfhosted run has 39 cases,
+34 skips and five expected passes, with no unexpected results or framework
+failures or warnings.
+
+A direct API probe checks an index referenced only by a retained stable
+unfolding before SimpleOpt cleans metadata. Its third attempt passes. The
+first omitted two imports. The second used a comparison helper that does
+not compare lambdas. Both failures and the original mixed cohort result
+remain recorded. The compiler and tracked source did not change for those
+probe repairs.
+
+Artifact audit and publication are pending. General occurrence analysis,
+native unfolding export and `-O1` stay gated. C1, C2, R22 and malformed
+recursive interface validation remain open. See the
+[contract](CORE.md#native-dead-local-bindings),
+[checklist](PLAN.md#m53-native-dead-local-binding-analysis), and
+[prior art](REFERENCES.md#native-dead-local-binding-analysis-prior-art).

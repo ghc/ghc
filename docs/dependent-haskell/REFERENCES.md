@@ -3461,9 +3461,10 @@ Note [The FVAnn invariant] in `GHC.Core.FVs`. That code includes deep Id
 types, multiplicities, binder telescopes, case results, coercions and stable
 metadata. Note [Controlling elimination of dead bindings in occurrence
 analysis] in `GHC.Core.Opt.OccurAnal` describes the `oa_can_drop` policy and
-bindings used only by Liquid Haskell refinement types. The new entry will
-use absence from the original body annotation. It will preserve the
-metadata on retained binders and infer no new occurrence counts.
+bindings used only by Liquid Haskell refinement types. M53 tests membership
+in the original body annotation. It preserves metadata on retained binders
+and infers no new occurrence counts. It adds no FV walker or `ManyOccs`
+tags. The general occurrence analyser stays gated.
 
 The local reading bundle is
 `native-occurrence-analysis-primary-reading-v1/reading.json`. It records ten

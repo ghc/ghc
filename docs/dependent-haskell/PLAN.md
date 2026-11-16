@@ -3559,7 +3559,7 @@ encoding, native unfoldings, general optimization, C1, C2 and R22 stay open.
 
 ### M53: native dead local binding analysis
 
-Status: implementation committed; compiler validation pending.
+Status: implemented and validated; final artifact audit and publication pending.
 
 Run a restricted native analysis before `simpleOptNativeExpr`. Use
 `GHC.Core.FVs.freeVars` and its existing deep `FVAnn` invariant. Reconstruct
@@ -3593,16 +3593,34 @@ Haskell eta reduction or a claim about totality. See the
   `native-occurrence-analysis-baseline-v1/results.json` preserves that result.
 - [x] Add the native entry and its owning GHC-style Note. Use existing deep
   FV annotations and the existing removal policy. Add no new FV algorithm.
-- [ ] Update the existing API fixture without new test files or golden lines.
+- [x] Update the existing API fixture without new test files or golden lines.
   Check dead-let removal and retained scalar/function-head dependencies in
   erased arguments, later binder types, case results and coercions. Check
   scope masking, recursive order, metadata and unlifted/token exclusions.
   Lint input and output and compare the exact expression type.
-- [ ] Build both compiler stages. Run the existing API, source, Showcase and
+- [x] Build both compiler stages. Run the existing API, source, Showcase and
   selected registered regressions. Preserve type-only laziness and strict
   case demand. Record structure separately from runtime observations.
-- [ ] Update current contracts and status. Record actual source provenance,
-  failed attempts and limits. Freeze, audit and publish the increment.
+- [x] Update current contracts and status. Record actual source provenance,
+  failed attempts and limits.
+- [ ] Freeze, audit and publish the increment. Keep the full program goal active.
+
+Validation uses compiler `d740b247a8bae21bbf741e8b24fdbf1c54f871f4` and source
+`2225c8f09c52b74556d34e87d19afa2ff4f5b176`: 85 compiler inputs and 114 source
+paths. Both compiler builds pass. The API goldens stay at 1/37 lines. Actual
+input hashes are unchanged after the selfhost build, so those API results
+remain valid. Both stages pass the 19-result object program and the 53-line
+Showcase from 13 modules. Registered selfhosted validation has 39 cases,
+34 skips and five expected passes, with no unexpected results or framework
+warnings or failures. The ten new API expressions include the Core-only
+`One` control; no source linearity acceptance follows from that control.
+
+The direct stable-metadata probe passes on attempt3. Attempt1 omitted two
+imports. Attempt2 used `cheapEqExpr`, which does not compare lambda nodes.
+Attempt3 checks the template constructors and actual binder/index identities.
+All attempts remain. The original final cohort's metadata failure stays
+recorded alongside its five successful independent source checks. No compiler
+or tracked source change was needed for the probe repairs.
 
 Use `native-occurrence-analysis-*` for this increment. M52 and earlier
 namespaces remain frozen. C1, C2, R22 and the full program goal stay open.

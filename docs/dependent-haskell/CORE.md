@@ -1026,8 +1026,10 @@ It adds `simpleOptNativeExpr` as a separate entry. It does not enable the full
 simplifier or the ordinary program optimization pipeline.
 
 The native mode reuses the SimpleOpt traversal with restricted rewrites. It
-skips occurrence analysis, general inlining, general compulsory unfolding, binding
-dropping, eta reduction, and cast pushing through lambdas. It also disables
+skips general occurrence analysis, general inlining, general compulsory
+unfolding, SimpleOpt binding dropping, eta reduction, and cast pushing through
+lambdas. M53 adds a separate restricted dead-local pass before this traversal.
+See [Native dead local bindings](#native-dead-local-bindings). It also disables
 generic known-constructor case elimination.
 It creates no rules, Core unfoldings, or join points. Unfolding construction
 would invoke ordinary occurrence analysis again. Existing join points remain.
@@ -1040,7 +1042,7 @@ syntactic Boolean constructor. The substituted proof must be nominal primitive
 equality whose endpoints are that same promoted constructor. Replace that proof
 with checked reflexivity before substituting into the selected branch.
 
-Keep variable cases and lazy source lets. Do not inspect unfoldings to decide an
+Keep variable cases and other lazy source lets. Do not inspect unfoldings to decide an
 opaque index. The current mode permits the existing compulsory templates for
 wired tuple sections and native newtype wrappers. These exceptions expose
 required wrappers; they do not authorize arbitrary unfolding. These rules
@@ -2101,3 +2103,47 @@ establish totality or a preservation theorem.
 See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType,
 [the checkpoint](README.md#m52-exported-function-valued-retained-value-signatures),
 and [primary sources](REFERENCES.md#exported-function-valued-retained-signatures-prior-art).
+
+## Native dead local bindings
+
+M53 runs `occurAnalyseNativeExpr` before the existing native SimpleOpt
+traversal. It reuses `GHC.Core.FVs.freeVars` and Note [The FVAnn invariant].
+Each annotation contains deep local free variables. These include variables
+in Id types, multiplicities, binder telescopes, case result types, coercions,
+rules and stable unfoldings. A reference in a type records scope. It does
+not require evaluation of the referenced value.
+
+The pass removes a `NonRec` only if its binder is absent from the original
+body annotation. The `oa_can_drop` policy also requires a lifted `Many`
+local Id. It excludes CoVars, exported Ids, joins, stable unfoldings, rules,
+inactive bindings and loop breakers. TyVars remain. The domain of a scalar
+or function local does not itself prevent removal. A surviving reference
+to that local in a type or metadata does prevent removal.
+
+The pass reconstructs every other node with its original binders, types,
+coercions, ticks and alternative positions. It preserves recursive groups
+and their order while visiting their RHSs. It preserves binder metadata
+and infers no occurrence counts. The existing SimpleOpt traversal can still
+remove fragile metadata afterward. The direct metadata probe checks the new
+pass before that later cleanup. The program entry still processes each RHS
+separately and preserves top-level identities.
+
+Original annotations can retain an outer binding after removal of an inner
+binding. This pass does not compute a fixed point. It does not enable
+ordinary occurrence analysis, binder swapping, joins, general inlining, eta
+reduction, native unfolding export or `-O1`. Unlifted bindings remain because
+they can be strict. The `One` and state-token exclusions are Core policy
+checks. They do not establish source linearity acceptance.
+
+The existing API fixture checks the dead ordinary let, type-only scalar and
+function-head uses, later lambda types, a case-result-only dependency and
+six protected-binding cases. It checks input/output Lint and exact types.
+The direct stable-unfolding probe retains an outer Boolean index whose only
+surviving reference is in an inner binding's template. Both compiler stages
+preserve the 19-result separate-module program and 53-line Showcase.
+These observations do not prove general optimizer preservation or totality.
+C1, C2, R22 and malformed recursive interface validation remain open.
+
+See Note [Native dead local bindings] in `GHC.Core.Opt.OccurAnal`, the
+[plan](PLAN.md#m53-native-dead-local-binding-analysis), and the
+[Agda and GHC prior art](REFERENCES.md#native-dead-local-binding-analysis-prior-art).
