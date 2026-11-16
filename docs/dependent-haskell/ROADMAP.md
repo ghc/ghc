@@ -181,11 +181,17 @@ own small spec and validation boundary in PLAN.md before compiler edits.
 - [x] **S2: Cross module and IO boundaries.** Separate interfaces, retained
   closures, runtime IO indices, scoped local types, and measured lazy fields.
   Evidence: the public examples and the M23–M35 checkpoints in PLAN.md.
+  M52 also exports complete ordinary function-retained signatures through the
+  existing interface type forms. Both stages pass the19-line imported worker
+  program and53-line showcase. This does not complete the general product or
+  transformation tasks.
 - [x] **S3: Instantiate known native workers.** Expected types, visible type
   arguments, and declared monomorphic arguments select immutable erased choices.
   ImpredicativeTypes controls pass at M38. General mutable native instantiation
   stays gated. Evidence: `KnownArgumentClient.hs`, M36–M38, and the two source
-  matrices above.
+  matrices above. M52 calls an imported `idCall @a f n xs` with actual stored
+  function/input fields. Exact local function operands and ordinary one-time
+  argument/usage checks remain required. No new inference rule is added.
 - [ ] **C1: Reconcile the Core contract with the research.** Depends on the
   measured S0–S3 baseline. Map each native form and coercion to the relevant
   rules in the 2017 specification, 2019 roles paper, and 2021 graded paper.
@@ -289,8 +295,12 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   interfaces. Matching retains actual function/input scope and lazy fields.
   Four logical body errors and two policy guards pass per stage. The maintained
   `docs/dependent-haskell/Showcase.hs` now passes both stages with51 lines and
-  twelve actual source modules. Generic exported function Pi, coercion codec
-  and native unfoldings remain separate gates.
+  twelve actual source modules. M52 admits complete ordinary exported function
+  Pi signatures. Public19 and the updated53-line showcase pass both stages.
+  The source permission remains separate from class, instance, foreign,
+  partial and hs-boot contexts. Native coercion encoding, unfolding handling
+  and general optimization remain separate gates. The malformed ordinary-
+  domain interface-knot gap remains open. C1, C2 and R22 stay unchecked.
 - [ ] **E1: Specify and implement closed evaluation.** Depends on a typed
   representation from C1 and an explicit compile-time evaluation boundary.
   Select the smallest closed pure expression subset. Specify constraint,

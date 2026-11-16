@@ -3472,8 +3472,8 @@ follow-up, not a failed compiler check.
 
 ### M52: exported function-valued retained value signatures
 
-Status: specified; implementation and validation pending.
-The target is an ordinary exported value with a complete signature:
+Status: implemented and validated; final audit and publication pending.
+The exported value has a complete ordinary signature:
 
 ```haskell
 idCall :: forall a. foreach (f :: Nat -> Nat)
@@ -3487,9 +3487,9 @@ Use ordinary object imports with O0, omitted unfoldings, Core Lint and STG
 Lint. Reuse `DepFunTy`, `TermAppTy`, tags10/12 and the three-argument runtime
 ABI. The erased payload parameter stays erased. Add no singleton or Core node.
 
-- [ ] Preserve the actual M51 compiler/reader before rebuilding. Measure the
+- [x] Preserve the actual M51 compiler/reader before rebuilding. Measure the
   current producer rejection after its real dependencies compile.
-- [ ] Replace the private signature Name permission with an ordinary-value
+- [x] Replace the private signature Name permission with an ordinary-value
   signature flag. Grant it only in the complete named branch of
   `tcUserTypeSig`. `FunSigCtxt` is a diagnostic context, not a permission:
   instance method signatures and `SPECIALISE` also use it. Pass `False` from
@@ -3497,31 +3497,31 @@ ABI. The erased payload parameter stays erased. Add no singleton or Core node.
   path, general type-argument checks, staging, partial signatures, captured
   indices and result-kind checks unchanged. Use the existing closed visible
   Many `A -> B` function-domain policy. Update the diagnostic and owning Note.
-- [ ] Reconstruct generic `IfaceDepFunTy` through `isNativeRetainedBinder`.
+- [x] Reconstruct generic `IfaceDepFunTy` through `isNativeRetainedBinder`.
   Allocate the actual local Id before decoding its body. Preserve the exact
   result-kind check. Keep bare `IfaceTermVar` scalar-only and reject diagnostic
   free heads. Keep Pi/call coercion encoding and native unfoldings gated.
-- [ ] Keep `VERSION_DATE` at20261115.1. The wire layout and tags do not change.
+- [x] Keep `VERSION_DATE` at20261115.1. The wire layout and tags do not change.
   State the admission boundary accurately: an old reader can display the raw
   signature but must reject its typed import at the old function-binder gate.
   Force the imported Id type in that control; an unused import is insufficient.
-- [ ] Update existing API fixtures without adding test files or golden lines.
+- [x] Update existing API fixtures without adding test files or golden lines.
   Replace the generic function-Pi rejection with both-compression round trips,
   two fresh imports, alpha equality and nested same-spelling scope controls.
   Retain malformed domain, multiplicity, missing/forward head, bare function
   index and coercion-codec negatives. Replace only obsolete source negatives.
-- [ ] Compile and link the actual producer/client with both compilers. Check
+- [x] Compile and link the actual producer/client with both compilers. Check
   finite IORef inputs, generic Char payloads, exact head/input scope, payload
   sharing, partial application and ignored/demanded bottoms. Record a separate
   literal oracle. A dependency/producer failure cannot count as a client error.
-- [ ] Measure omitted VTA and an explicitly typed local alias separately. Do
+- [x] Measure omitted VTA and an explicitly typed local alias separately. Do
   not widen `App.isRetainedValueType`, imported-worker case activation or
   native metavariable assignment solely to bypass the direct target.
-- [ ] Add a small maintained Showcase example. Run the relevant API, source,
+- [x] Add a small maintained Showcase example. Run the relevant API, source,
   native pipeline and registered regressions. Keep exact input provenance and
   historical failures. Record actual diagnostic codes and source spans.
-- [ ] Update current contracts, references and status. Audit and publish the
-  source milestone. Keep the full program goal active.
+- [x] Update current contracts, references and status.
+- [ ] Audit and publish the source milestone. Keep the full program goal active.
 
 Use `native-exported-function-signature-*` for new evidence. M51's frozen
 namespace and external repair files remain unchanged. The next-research cache
@@ -3529,3 +3529,26 @@ is prior read-only evidence. Record its original reading context separately.
 The primary comparison is
 [with the references](REFERENCES.md#exported-function-valued-retained-signatures-prior-art).
 This increment does not close R22, C1 or C2 or establish totality.
+
+Validation uses source `d8c605b6c63dd8f68920bcd83103fcd2ca389009` and compiler
+`3d4994c68ba42b8fb1bd43d3f780780384edd0da`: 84 compiler inputs and 113 source
+paths. Both stages pass the 19-result object program and the 53-line Showcase
+from 13 actual source modules. Existing API goldens stay at 1/37 lines, with
+19 additional quiet object observations. The final registered run has 39
+cases, 34 skips, five expected passes and no unexpected results or framework
+failures or warnings. Nine source context controls reject with GHC-83605; two
+logical clients reject at the payload with GHC-83865 in each stage. Omitted
+visible type application and a complete local alias compile in separate
+probes. No optional-probe runtime result is claimed.
+
+The first registered run exposed a partial-list warning. An explicit list
+case removes that warning in the public and embedded clients. Both completed
+compiler builds use the same 84 compiler bytes after this source-only change.
+The final cohort reruns against snapshot2. Historical launcher, context and
+reader setup failures remain recorded.
+
+Six synthetic ordinary-domain interface knots raise `<<loop>>`. Three scalar
+comparisons reach the unchanged scalar domain check. No old executable ran
+these synthetic cases. This malformed-interface validation gap remains open;
+these observations are not successful defensive rejections. Native coercion
+encoding, native unfoldings, general optimization, C1, C2 and R22 stay open.

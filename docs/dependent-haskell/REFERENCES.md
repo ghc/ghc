@@ -3401,3 +3401,33 @@ closed Many function domain and does not implement that broader rule. These
 sources support the scope/substitution design. They do not specify GHC's wire
 codec, lazy runtime ABI or restricted optimizer. See
 [the implementation plan](PLAN.md#m52-exported-function-valued-retained-value-signatures).
+
+
+The M52 source-permission check uses the complete named-value path, not the
+general `FunSigCtxt` diagnostic label. Its measured separate producer/client
+calls preserve actual imported function/input binders. The same interface
+version and type tags encode the telescope. No runtime function equality or
+inverse call rule follows from this change. See the
+[contract](CORE.md#exported-function-valued-retained-value-signatures) and
+[checkpoint](README.md#m52-exported-function-valued-retained-value-signatures).
+
+The selected Agda v2.8.0 manual reading now also covers
+[function domains and telescopes, lines20–55](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/function-types.lagda.rst#L20-L55).
+Its Git blob is `f4cd92271648ed191d4daa565e7487a121846bfb`. It states that
+application substitutes the actual argument in the codomain. The selected
+[Pi formation code113–134](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L113-L134)
+checks the body in the telescope context. The
+[telescope code264–315](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L264-L315)
+checks domains sequentially and extends the context before later domains and
+the codomain. The Term.hs blob is `02991c9fa0085315cc854d2833a9080af14a7740`.
+`native-exported-function-signature-primary-reading-v1/reading.json` records
+these actual selected ranges, the fresh tagged manual fetch and reused source
+copies. Only those ranges were read for this comparison.
+
+These are scope and substitution precedents. They do not specify GHC's complete-
+signature permission, local Many operands, same-version interface compatibility,
+Haskell bottom behavior or malformed interface validation. The synthetic
+ordinary-domain knot observations retain their unresolved `<<loop>>` outcome.
+They are not Agda counterexamples or successful defensive-import tests. The
+seven-work/nine-PDF reading ledger is unchanged. The selected reread of the
+existing 2017 author PDF14–16 adds no paper or whole-paper reading claim.

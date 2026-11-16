@@ -179,5 +179,51 @@ demanded errors.
 The maintained [Showcase.hs](../../Showcase.hs) imports this library and shows
 three function-field observations in its `functionFields` group. Use the
 [showcase recipe](../../README.md#run-the-showcase) to build the combined
-program. Generic exported function-valued Pi signatures and native coercion
-encoding remain gated. See the [contract](../../CORE.md#function-valued-retained-package-fields).
+program. M52 adds complete ordinary exported function-valued Pi signatures as
+described below. Native coercion encoding remains gated. See the
+[contract](../../CORE.md#function-valued-retained-package-fields).
+
+
+## Exported retained function signatures
+
+[FunctionSignatureLibrary.hs](FunctionSignatureLibrary.hs) exports:
+
+```haskell
+idCall :: forall a. foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec a (f n) -> Vec a (f n)
+idCall f n xs = xs
+```
+
+The separate [FunctionSignatureClient.hs](FunctionSignatureClient.hs) consumes
+the actual function package and imported worker type:
+
+```haskell
+payloadThrough :: forall a. FunctionPack a -> [a]
+payloadThrough (FunctionPack f n xs) = toList (idCall @a f n xs)
+```
+
+The call keeps the actual stored `f`, `n` and `xs`. The callee is exported;
+its retained function operand remains an eligible local variable of the exact
+closed Many domain. The compiler does not infer input equality from equal
+function results.
+
+Both compiler stages pass19 observations through separately compiled objects.
+Independent runtime inputs0/2/3 test identity, successor and constant heads.
+Generic Char payloads and an evaluated vector constructor's `StableName` check
+contents and sharing. Partial applications ignore a bottom function and input.
+An ignored result leaves a bottom payload lazy; observing it raises the
+original payload error. A constant head ignores bottom and cyclic inputs.
+A successor exposes the head before demanding a partial predecessor.
+
+The maintained showcase imports the library and adds two labeled observations
+in `functionFields`. It passes53 lines from thirteen actual source modules in
+both stages. Its old51 observations remain in order. The separate qualified
+program and its runner retain106 observations; this addition does not change
+that runner's output.
+
+Complete ordinary named signatures supply the new source permission. Class,
+instance, foreign, expression, partial and hs-boot signatures and general type
+arguments retain their restrictions. No singleton, new interface tag or wire
+version is added. Native coercion encoding, unfoldings and general optimization
+remain gated. See the
+[contract](../../CORE.md#exported-function-valued-retained-value-signatures) and
+[checkpoint](../../README.md#m52-exported-function-valued-retained-value-signatures).

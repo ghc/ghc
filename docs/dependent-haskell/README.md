@@ -6,7 +6,7 @@ from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
 The current source subset includes runtime Peano naturals and length-indexed vectors.
 
-Last updated: 2026-11-15.
+Last updated: 2026-11-16.
 
 ## Project documents
 
@@ -48,12 +48,12 @@ _build/showcase/showcase
 | Saved IO actions, tuple sections and scoped local signatures | `vectors` |
 | Qualified native functions, erased choices and equality transport | `vectors`, with the imported Ground/Known providers |
 | Opaque calls, index beta reduction and retained function arguments | `vectors`, `functions` |
-| Function fields, call-indexed generic payloads and lazy storage | `functionFields` |
+| Function fields, exported retained workers, generic payloads and lazy storage | `functionFields` |
 | Later retained arguments, dictionaries, equality contexts and shadowing | `laterArguments` |
 | Multiple package constructors, nested fields and guard fallback | `alternatives` |
 
-Both bootstrap and self-hosted compilers produce the expected 51 lines with
-Core Lint and STG Lint enabled. Both runs preserve all twelve source inputs.
+Both bootstrap and self-hosted compilers produce the expected 53 lines with
+Core Lint and STG Lint enabled. Both runs preserve all thirteen source inputs.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
 GroundApplicationClient checks native function types as equality operands
@@ -86,7 +86,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M50 snapshot3 passes both-stage builds, API2, public17/Sigma3/mixed17/twin17, legacy8, constructor11 and final9; compile-only lazy/linear clients reject normally; registered results are39 cases,34 skips and five expected passes |
+| Compiler validation | M52 passes both-stage public19 and Showcase53; API goldens remain1/37 with19 quiet object observations; selected reader, context and final regression records are separate |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -125,7 +125,8 @@ optimization support or full roadmap completion.
 | Constructed worker activation | Known local retained workers accept scalar constructor trees during metadata discovery; ordinary application and row evidence checks remain unchanged |
 | Multi-constructor packages | Constructor-local retained fields work beside ordinary constructors, ordinary GADT siblings and a different retained telescope; no Core or interface format changes |
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
-| Maintained showcase | `Showcase.hs` passes both compilers with 51 finite output lines; R22/C1/C2 remain open |
+| Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
+| Maintained showcase | `Showcase.hs` passes both compilers with 53 finite output lines; R22/C1/C2 remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -4428,3 +4429,87 @@ or observation totals. The original auditor-v2 report remains failed because
 its historical baseline schema omitted the successful third reader step. An
 external repair record, exact diff and manifest preserve that history without
 changing the frozen checkpoint or compiler/source inputs.
+
+
+## M52: exported function-valued retained value signatures
+
+[FunctionSignatureLibrary.hs](examples/qualified-pi/FunctionSignatureLibrary.hs)
+exports the worker that was previously limited to complete local signatures:
+
+```haskell
+idCall :: forall a. foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec a (f n) -> Vec a (f n)
+idCall f n xs = xs
+```
+
+[FunctionSignatureClient.hs](examples/qualified-pi/FunctionSignatureClient.hs)
+opens `FunctionPack`, then calls `idCall @a f n xs` through the actual imported
+Id type. The function actual is still a local variable with the exact closed
+Many domain. Exporting the worker adds no function equality, injectivity or
+function evaluation rule.
+
+Only the complete ordinary named-value signature path grants this permission.
+Class, instance, foreign, expression, partial, visible-type-argument and
+hs-boot contexts retain their restrictions. `FunSigCtxt` alone is insufficient:
+instance signatures and specialization pragmas also use that context. The
+generic signature entry point keeps the function-domain permission disabled.
+Some unsupported forms reject earlier during renaming. The scalar retained
+signature paths retain their existing policy.
+
+The interface reuses `IfaceDepFunTy` and `IfaceTermAppTy`. It reconstructs each
+actual binder before its body. Bare `IfaceTermVar` remains scalar-only. The
+version stays10.1.20261115.1, with header1001202611151. Raw interface display
+and typed import are separate checks. Both reader matrices pass raw
+old/new combinations at the same header, while the old executable rejects the
+used new retained Id type with `Invalid retained binder in interface:`.
+Typed old-reader checks use compatible current standard libraries. They do
+not claim preservation of the full old toolchain. The first typed attempt
+failed package lookup before reaching the native check; that attempt remains
+in the evidence.
+
+Both stages pass19 finite public observations through separate object modules.
+Independent IORef inputs0/2/3 select identity, successor and constant heads.
+The checks cover generic Char payloads, the original vector constructor's
+`StableName`, partial application, ignored and demanded payloads, and partial
+or cyclic inputs. The partial-WHNF controls already supply the function actual;
+they do not pass a whole function-retained Pi value to generic `evaluate`.
+The API runs the same19 observations quietly, with unchanged1/37 goldens.
+The maintained showcase passes53 lines from thirteen actual source modules.
+These overlapping programs are not an aggregate observation count.
+
+Wrong-head and wrong-input clients reject at `xs` with GHC-83865 in both
+stages. The bootstrap context run has an independent review of eight actual
+rejections and two scalar controls. Its two original message mismatches remain
+recorded; they are not compiler failures. A fresh self-hosted context run
+passes. A separate old-form SPECIALISE control rejects in both stages; it adds
+a ninth negative context and does not change the original eight-case review.
+Omitted-VTA and local-callee-alias probes compile in both stages; no runtime
+result is claimed for those optional probes.
+
+Synthetic malformed ordinary-domain interface knots raise `<<loop>>` for
+three function and three scalar variants. The scalar comparison also loops
+through the unchanged scalar check. No old executable ran these synthetic
+knots. These outcomes expose an unsupported malformed-interface validation
+gap and are not successful defensive rejections. Source checking rejects the
+unsupported function-domain shapes; M52 does not repair malformed recursive
+interface types.
+
+The first registered run had four passes and one stderr mismatch from the
+new consumer's partial-list warning. The client and embedded copy now use an
+explicit nonempty/empty case. The19 observed values and1/37 goldens did not
+change. The build-reuse record confirms that both84-file compiler archives
+are identical; the source observation fix requires no compiler rebuild.
+
+The final snapshot2 cohort passes both stages. It preserves the 19 public
+results, the 53 Showcase lines and the 1/37 API goldens. Registered validation
+has 39 cases, 34 skips and five expected passes, with no unexpected results
+or framework failures or warnings. Final audit and publication remain pending.
+
+The selected compiler is3d4994c68ba42b8fb1bd43d3f780780384edd0da. The measured
+source head isd8c605b6c63dd8f68920bcd83103fcd2ca389009. Its snapshot records84
+compiler inputs and113 source paths. Final document bytes have their own
+revision. Native coercion encoding, native unfoldings and general optimization
+remain gated. Freeze and independent audit must pass before publication.
+C1, C2 and R22 remain open. See the
+[contract](CORE.md#exported-function-valued-retained-value-signatures),
+[plan](PLAN.md#m52-exported-function-valued-retained-value-signatures), and
+[prior art](REFERENCES.md#exported-function-valued-retained-signatures-prior-art).

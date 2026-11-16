@@ -1797,8 +1797,8 @@ isNativeRetainedBinder accepts a scalar index Id or an existing eligible opaque
 head Id. isNativeRetainedBinderType checks the domain without a fabricated Id.
 A function head has a closed ordinary visible Many arrow A -> B. Both A and B
 are independently supported scalar domains. The Id is local, unrestricted and
-not a join point. Scalar predicates, TermVarTy and constructor-field metadata
-keep their old domain policy.
+not a join point. Scalar predicates and TermVarTy remain scalar-only. M51
+adds function-valued constructor fields under the separate policy below.
 
 DepFunTy f body scopes f over calls in body. The body has kind Type. Within types and coercions, f occurs only in TermAppTy/TermAppCo head slots.
 It is not a scalar index or a matchable type function. A vacuous retained binder still becomes an ordinary
@@ -1820,13 +1820,15 @@ CorePrep substitutes a supported Var directly. It does not form TermVarTy g or
 add a strict scalar DEFAULT alias. A signed local lazy function alias can remain
 shared. Unsupported non-variable substitutions keep the existing gate.
 
-The source permission applies only to complete local value signatures. One
-equation uses bare variables in retained columns. Source actuals must be
+M46 first limited source permission to complete local value signatures. M52
+also admits complete ordinary named value signatures, including exported
+bindings. One equation uses bare variables in retained columns. Source actuals must be
 already-bound unrestricted local function variables of the exact checked type.
 An actual variable does not need its own written local signature. Bare function
 indices, global or applied actuals, unsupported domains, staging and native
-mutable-meta assignments keep their gates. No export or expression codec is
-added. The public client instantiates caller = idCall f n outside a case.
+mutable-meta assignments keep their gates. M46 added no export or expression
+codec. M52 reuses the existing interface type forms. The M46 public client
+instantiates caller = idCall f n outside a case.
 Direct in-branch probes2/3 reject two payloads with GHC-83865 in each stage
 at lines 33/37. These M46 probes have no runtime result. The M47 section below
 records later direct checking.
@@ -2041,8 +2043,61 @@ object programs check lazy storage and matching with two function domains and
 a plain sibling constructor. Both stages pass Core and STG Lint. These checks
 do not provide a preservation theorem.
 
-The generic `IfaceDepFunTy` function-domain reader remains gated. Native
-coercion encoding and native unfoldings remain gated. Primitive constructor
+M51 left the generic `IfaceDepFunTy` function-domain reader gated. M52 admits
+the bounded signature form described below. Native coercion encoding and
+native unfoldings remain gated. Primitive constructor
 field telescopes do not implement first-class dependent sums or projections.
 See [the checkpoint](README.md#m51-function-valued-retained-package-fields)
 and [primary sources](REFERENCES.md#function-valued-retained-package-fields-prior-art).
+
+
+## Exported function-valued retained value signatures
+
+M52 permits a retained function binder in a complete ordinary named value
+signature. `tcUserTypeSig` grants the permission in its complete named branch;
+`tcHsSigWcType` carries it to the existing retained signature walker. A
+`FunSigCtxt` by itself grants no permission. The generic `tcHsSigType` entry,
+instance and class contexts, specialization paths, and hs-boot checking keep
+that permission disabled. Partial signatures retain the complete-signature
+check before function domains are admitted.
+
+Each function domain must be a closed ordinary visible Many `A -> B`. The
+existing scalar checks validate `A` and `B` independently. Within a type or
+coercion, the bound function remains a dedicated call head. It is never a bare
+scalar `TermVarTy`. Application accepts an already-bound eligible local Var
+of the exact function type, then substitutes its actual identity. A global
+callee does not permit a global function operand. Ordinary argument checking
+and usage checking still run once.
+
+The interface writer and reader reuse `IfaceDepFunTy` and `IfaceTermAppTy`.
+The reader checks `isNativeRetainedBinder` for the former, binds that actual
+Id, then reads and kind-checks its body. It keeps `isNativeIndexId` for a bare
+`IfaceTermVar`. Bound-head scope, alpha freshening and deep free variables
+retain their existing rules. No tag, byte layout or version changes. The
+fork remains10.1.20261115.1 with header1001202611151.
+
+Raw display does not perform the typed binder check. Therefore an old reader
+can display the new same-version signature while rejecting its used Id type
+during typed import. A positive old-interface control is required before and
+after the semantic negative. The typed compatibility experiment uses the
+saved executable with pinned current standard libraries. The raw experiment
+retains the copied settings and its original pre-build display check.
+
+The source/object programs preserve actual function/input scope and vector
+constructor identity. Ignoring the worker result leaves its fields lazy.
+Demanding a vector may execute its original function or input producer. No
+call inversion, computed function equality or mutable native-meta assignment
+is added. Native coercion serialization, arbitrary unfoldings and ordinary
+optimization remain unsupported.
+
+Malformed recursive ordinary-domain interface types remain a known validation
+gap: three function-shaped and three scalar-shaped synthetic knots raise
+`<<loop>>`. The scalar comparison also loops through the unchanged scalar
+check. No old executable ran these synthetic knots. These outcomes are not
+successful checked rejections. Source-domain checks
+exclude the tested unsupported function shapes. The observations do not
+establish totality or a preservation theorem.
+
+See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType,
+[the checkpoint](README.md#m52-exported-function-valued-retained-value-signatures),
+and [primary sources](REFERENCES.md#exported-function-valued-retained-signatures-prior-art).
