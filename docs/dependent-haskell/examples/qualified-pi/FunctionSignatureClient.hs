@@ -93,5 +93,7 @@ main = do
     expectMarker "function-pack-payload" (evaluate (length (payloadThrough (lazyPack @Int f n))))
     check "constant ignores bottom input" ([] :: [Int]) (payloadThrough (buildPack @Int zero n 13))
     check "constant ignores cyclic input" ([] :: [Int]) (payloadThrough (buildPack @Int zero cyclic 13))
-    check "partial input head" 7 (head (payloadThrough (buildPack @Int successor n 7)))
+    case payloadThrough (buildPack @Int successor n 7) of
+        first : _ -> check "partial input head" 7 first
+        [] -> error "expected a successor prefix"
     expectMarker "exported-input" (evaluate (length (payloadThrough (buildPack @Int successor n 7))))
