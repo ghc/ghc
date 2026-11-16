@@ -86,7 +86,8 @@ import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
-import GHC.Core.Dependent ( hasNativeDependentType )
+import qualified GHC.Core as Core
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.FamInstEnv ( normaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
@@ -1047,7 +1048,7 @@ matchExpectedTyConApp tc orig_ty
     go ty@(TyConApp tycon args)
        | tc == tycon  -- Common case
        = return (mkNomReflCo ty, args)
-       | isTypeFamilyTyCon tycon, hasNativeDependentType ty
+       | isTypeFamilyTyCon tycon, hasNativeDependentExpr (Core.Type ty)
        = do { fam_envs <- tcGetFamInstEnvs
             ; let Reduction co reduced = normaliseType fam_envs Nominal ty
             ; case tcSplitTyConApp_maybe reduced of
