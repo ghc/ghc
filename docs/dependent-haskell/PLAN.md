@@ -3840,6 +3840,9 @@ Use the existing `CastTy` form for converted index kinds. A runtime index cast
 must retain its nominal justification when it becomes a representational Core
 value cast. Do not treat arbitrary representational evidence as nominal.
 Extend the shared expression/index bridge and apply-once substitution together.
+Substitute embedded conversion proofs during beta exposure. Permit independent
+closed scalar input and result domains after checking both. Preserve nominal
+evidence through value-cast substitution and native cast composition.
 Check scope, capture avoidance, actual Id metadata and the cast direction.
 Function-valued binder domains retain their fixed-domain restriction.
 

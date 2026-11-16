@@ -38,6 +38,7 @@ import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSub
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType, getEqPredTys_maybe )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.TyCo.Rep ( Coercion(SubCo) )
 import GHC.Core.TyCo.Compare ( eqType )
 
 import GHC.Types.Literal
@@ -559,7 +560,7 @@ simple_opt_expr env expr = go expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
-    go_co co = optCoercion (so_co_opts (soe_opts env)) subst co
+    go_co co = mapNativeIndexCastCo (optCoercion (so_co_opts (soe_opts env)) subst) co
 
     ----------------------
     go_alt env (Alt con bndrs rhs)
@@ -704,12 +705,17 @@ add_cast env co1 as
   = as
   | otherwise
   = case as of
-      CastIt co2:rest -> CastIt (optTransCo opts in_scope opt_co1 co2):rest
+      CastIt co2:rest -> CastIt (compose_cast opt_co1 co2):rest
       _               -> CastIt opt_co1:as
   where
     opts     = so_co_opts (soe_opts env)
     in_scope = soeInScope env
-    opt_co1  = optCoercion opts (soe_subst env) co1
+    opt_co1  = mapNativeIndexCastCo (optCoercion opts (soe_subst env)) co1
+    compose_cast first second
+      | Just first_n <- nativeIndexCastCo_maybe first
+      , Just second_n <- nativeIndexCastCo_maybe second
+      = SubCo (optTransCo opts in_scope first_n second_n)
+      | otherwise = optTransCo opts in_scope first second
 
 rebuild_app :: HasDebugCallStack
             => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr

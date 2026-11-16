@@ -900,8 +900,9 @@ almost_devoid_co_var_of_co (AppCo co arg) cv
 almost_devoid_co_var_of_co (TermAppCo f co) cv
   = almost_devoid_co_var_of_type (varType f) cv
   && almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_co (DepFunCo v co) cv
+almost_devoid_co_var_of_co (DepFunCo v domain co) cv
   = almost_devoid_co_var_of_type (varType v) cv
+  && almost_devoid_co_var_of_mco domain cv
   && almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_co (ForAllCo { fco_tcv = v, fco_kind = kind_co, fco_body = co }) cv
   = almost_devoid_co_var_of_mco kind_co cv
@@ -1323,7 +1324,7 @@ tyConsOfType ty
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
      go_co (TermAppCo f co)        = go (varType f) `unionUniqSets` go_co co
-     go_co (DepFunCo v co)         = go (varType v) `unionUniqSets` go_co co
+     go_co (DepFunCo v domain co)  = go (varType v) `unionUniqSets` go_mco domain `unionUniqSets` go_co co
      go_co (ForAllCo { fco_kind = kind_co, fco_body = co })
                                    = go_mco kind_co `unionUniqSets` go_co co
      go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
@@ -1546,13 +1547,14 @@ occCheckExpand vs_to_avoid ty
       | bad_var_occ as f = Nothing
       | otherwise = TermAppCo (lookupVarEnv env f `orElse` f) <$> go_co cxt arg_co
 
-    go_co cxt@(as, env) (DepFunCo v body_co)
+    go_co cxt@(as, env) (DepFunCo v domain body_co)
       = do { arg_ty <- go cxt (varType v)
+           ; domain' <- go_mco cxt domain
            ; let v' = setVarType v arg_ty
                  env' = extendVarEnv env v v'
                  as' = as `delVarSet` v
            ; body' <- go_co (as', env') body_co
-           ; return (DepFunCo v' body') }
+           ; return (DepFunCo v' domain' body') }
 
     go_co cxt@(as, env) co@(ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = body_co })
       = do { ki' <- go cxt (varType tcv)

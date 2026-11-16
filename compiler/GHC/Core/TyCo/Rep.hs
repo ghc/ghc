@@ -275,30 +275,40 @@ docs/dependent-haskell/REFERENCES.md.
 
 {- Note [Retained dependent function coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-DepFunCo b co binds one unrestricted runtime binder throughout co. Its domain
-is the unchanged closed type of b. This can be a supported scalar domain or
-an eligible opaque function-head type. See Note [Function-valued retained
-binders] in GHC.Core.Type. If co relates s and t at role r,
-the result relates mkDepFunTy b s and mkDepFunTy b t at that role. Both body
-endpoints must have kind Type. Each endpoint can independently become an
-ordinary arrow when its result does not use b.
+DepFunCo b domain co binds one unrestricted runtime binder throughout co.
+The optional domain proof is outside that binder. MRefl keeps its closed
+domain A. MCo delta requires nominal evidence A ~ B between supported scalar
+domains. The type of b is A. Both body endpoints have kind Type.
+
+If co relates S and T at role r, the left endpoint is foreach (b :: A) -> S.
+The right endpoint binds a fresh Id at type B and substitutes its backward
+conversion for the old b in T. Freshen against the domain proof's deep free
+variables and the body's free variables other than b. The domain proof is
+outside b's scope and can refer to an outer Id with the same Unique. CastTy carries this nominal kind
+conversion. The runtime bridge uses Cast value (SubCo (sym delta)). Preserve
+the nominal proof structure. See Note [Nominal native index casts] in GHC.Core.
+Function-valued binders retain MRefl: their occurrences are fixed-type Id heads.
+Each endpoint can independently become an ordinary arrow when b is unused.
 
 The binder scopes over the proof as well as its endpoints. Keep DepFunCo even
 when both endpoints omit b: an intermediate proof can still use that index.
-The smart constructor simplifies a reflexive body to reflexivity. Substitution,
-lifting, free variables, and tidying use the runtime binder callbacks.
+The smart constructor simplifies a reflexive body only at a fixed domain.
+Substitution, lifting, free variables and tidying use runtime binder callbacks.
 ForAllCo continues to bind only erased type and coercion variables.
 
-This is the fixed-domain specialization of D/DC's An-PiCong rule. Agda compares
-Pi codomains under one shared context after checking their domains and
-modalities. See the pinned provenance in docs/dependent-haskell/REFERENCES.md.
-This rule compares types. It does not establish function eta equality for
-Haskell. Preserve a value cast; eta expansion can hide a bottom function.
+This follows D/DC's asymmetric An-PiCong rule. The right body needs the inverse
+domain conversion. Agda compares Pi domains before codomains under a shared
+context. See the pinned provenance in docs/dependent-haskell/REFERENCES.md.
+The body inherits an FC role; domain evidence remains nominal at every role.
+The comparison does not supply a preservation theorem for this implementation.
 
-The first rule changes neither the domain nor the binder multiplicity. It adds
-no selector or erased InstCo rule. Native application and ordinary optimizer
-boundaries remain separate checks. Interface conversion supports diagnostics;
-native coercion serialization remains gated.
+Checked application of explicit congruence casts the actual argument back to A
+and substitutes that same argument in co. Symmetry reverses the transport.
+Transitivity composes the checked argument and result conversions. Preserve a
+cast on a function value until application: eta expansion can hide bottom.
+The Arity and CorePrep paths implement this selected An-Push specialization.
+Opaque coercion projections, changed multiplicities, native coercion encoding
+and general optimization remain separate gates.
 -}
 
 {- Note [Opaque native call indices]
@@ -1026,8 +1036,8 @@ data Coercion
   | TermAppCo Id CoercionN
       -- ^ Nominal argument congruence for the same runtime function.
 
-  | DepFunCo Id Coercion
-      -- DepFunCo :: _ -> e -> e
+  | DepFunCo Id MCoercionN Coercion
+      -- The optional nominal domain proof is outside the runtime binder scope.
       -- See Note [Retained dependent function coercions].
 
   -- See Note [ForAllCo]
@@ -2284,13 +2294,16 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_cos []     = mempty
     go_cos (c:cs) = go_co c M.<> go_cos cs
 
+    go_mco MRefl = mempty
+    go_mco (MCo proof) = go_co proof
+
     go_co (Refl ty)                = go_ty ty
     go_co (GRefl ro ty MRefl)      = lit ro M.<> go_ty ty
     go_co (GRefl ro ty (MCo co))   = lit ro M.<> go_ty ty M.<> go_co co
     go_co (TyConAppCo ro tc args)  = lit ro M.<> lit tc M.<> go_cos args
     go_co (AppCo c1 c2)            = go_co c1 M.<> go_co c2
     go_co (TermAppCo f co)         = termvar f M.<> go_co co
-    go_co (DepFunCo b co)          = go_ty (varType b) M.<> termbinder b (go_co co)
+    go_co (DepFunCo b domain co)   = go_ty (varType b) M.<> go_mco domain M.<> termbinder b (go_co co)
     go_co (CoVarCo cv)             = covar cv
     go_co (AxiomCo ax cos)         = lit ax M.<> go_cos cos
     go_co (HoleCo hole)            = cohole hole
@@ -2377,7 +2390,7 @@ coercionSize (GRefl _ ty mco)      = typeSize ty + mCoercionSize mco
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
 coercionSize (TermAppCo f co)      = 1 + typeSize (varType f) + coercionSize co
-coercionSize (DepFunCo b co)       = 1 + typeSize (varType b) + coercionSize co
+coercionSize (DepFunCo b domain co) = 1 + typeSize (varType b) + mCoercionSize domain + coercionSize co
 coercionSize (ForAllCo { fco_kind = h, fco_body = co })
                                    = 1 + coercionSize co + mCoercionSize h
 coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2

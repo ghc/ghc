@@ -215,7 +215,7 @@ scanType (CoercionTy co) = scanCo co
 
 -- | Inspect coercion annotations and dependencies.
 scanCo :: Coercion -> NativeScan
-scanCo (DepFunCo _ _) = NativeScan (pure True)
+scanCo (DepFunCo {}) = NativeScan (pure True)
 scanCo (TermAppCo _ _) = NativeScan (pure True)
 scanCo (Refl ty) = scanType ty
 scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco

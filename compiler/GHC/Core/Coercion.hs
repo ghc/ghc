@@ -37,7 +37,8 @@ module GHC.Core.Coercion (
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
-        mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo, mkTermAppCo,
+        mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo, mkDepFunCoWithDomain, mkTermAppCo,
+        nativeIndexCastCo_maybe, mapNativeIndexCastCo,
         mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkUnivCoFromDeps, mkUnivCoAddTypeDeps,
         checkUnivCoDepsInv,
@@ -132,6 +133,8 @@ module GHC.Core.Coercion (
 import {-# SOURCE #-} GHC.CoreToIface (toIfaceTyCon, tidyToIfaceTcArgs)
 
 import GHC.Prelude
+
+import {-# SOURCE #-} GHC.Core (varToCoreExpr, mapNativeIndex)
 
 import GHC.Iface.Type
 import GHC.Core.TyCo.Rep
@@ -992,6 +995,26 @@ mkInstCo co arg = InstCo co arg
 %************************************************************************
 -}
 
+-- | Recover nominal evidence for a runtime cast between closed scalar domains.
+-- See Note [Nominal native index casts] in GHC.Core.
+nativeIndexCastCo_maybe :: CoercionR -> Maybe CoercionN
+nativeIndexCastCo_maybe co
+  | coercionRole co == Representational
+  , Just delta <- setNominalRole_maybe Representational co
+  , coercionRole delta == Nominal
+  , isNativeIndexType (coercionLKind delta)
+  , isNativeIndexType (coercionRKind delta)
+  = Just delta
+  | otherwise = Nothing
+
+-- | Rewrite a value cast while retaining its recoverable nominal evidence.
+-- The callback preserves the role of its input. Ordinary casts use it directly.
+-- See Note [Nominal native index casts] in GHC.Core.
+mapNativeIndexCastCo :: (Coercion -> Coercion) -> CoercionR -> CoercionR
+mapNativeIndexCastCo rewrite co
+  | Just delta <- nativeIndexCastCo_maybe co = SubCo (rewrite delta)
+  | otherwise = rewrite co
+
 -- | Converts a coercion to be nominal, if possible.
 -- See Note [Role twiddling functions]
 setNominalRole_maybe :: Role -- of input coercion
@@ -1019,8 +1042,8 @@ setNominalRole_maybe r co
     setNominalRole_maybe_helper (AppCo co1 co2)
       = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
     setNominalRole_maybe_helper co@(TermAppCo {}) = Just co
-    setNominalRole_maybe_helper (DepFunCo b co)
-      = mkDepFunCo b <$> setNominalRole_maybe_helper co
+    setNominalRole_maybe_helper (DepFunCo b domain co)
+      = mkDepFunCoWithDomain b domain <$> setNominalRole_maybe_helper co
     setNominalRole_maybe_helper co@(ForAllCo { fco_visL = visL, fco_visR = visR, fco_body = body_co })
       | visL `eqForAllVis` visR -- See (FC3) in Note [ForAllCo] in GHC.Core.TyCo.Rep
       = do { body_co' <- setNominalRole_maybe_helper body_co
@@ -2102,7 +2125,19 @@ coercion_lr_kind which orig_co
     go (TyConAppCo _ tc cos)  = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)        = mkAppTy (go co1) (go co2)
     go (TermAppCo f co)       = TermAppTy f (go co)
-    go (DepFunCo b co)        = mkDepFunTy b (go co)
+    go (DepFunCo b MRefl co)  = mkDepFunTy b (go co)
+    go (DepFunCo b (MCo delta) co)
+      | CLeft <- which = mkDepFunTy b (go co)
+      | otherwise
+      = let body = go co
+            free = tyCoVarsOfCo delta `unionVarSet` (tyCoVarsOfType body `delVarSet` b)
+            target = uniqAway (mkInScopeSet free) (setVarType b (coercionRKind delta))
+            argument = mapNativeIndex (\index -> mkCastTy index (mkSymCo delta))
+                                     (varToCoreExpr target)
+            scope = mkInScopeSet (extendVarSet
+                      (tyCoVarsOfType body `unionVarSet` tyCoVarsOfCo delta) target)
+            subst = extendIdSubst (mkEmptySubst scope) b argument
+        in mkDepFunTy target (substTy subst body)
     go (CoVarCo cv)           = go_covar cv
     go (HoleCo h)             = go_covar (coHoleCoVar h)
     go (SymCo co)             = pickLR which (coercionRKind co, coercionLKind co)
@@ -2263,7 +2298,7 @@ coercionRole = go
     go (TyConAppCo r _ _)           = r
     go (AppCo co1 _)                = go co1
     go (TermAppCo {})               = Nominal
-    go (DepFunCo _ co)              = go co
+    go (DepFunCo _ _ co)            = go co
     go (ForAllCo { fco_body = co }) = go co
     go (FunCo { fco_role = r })     = r
     go (CoVarCo cv)                 = coVarRole cv

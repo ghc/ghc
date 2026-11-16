@@ -899,8 +899,8 @@ rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty
 rnIfaceCo (IfaceGReflCo role ty mco)    = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
 rnIfaceCo (IfaceFunCo role w co1 co2)   = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTermAppCo fun co) = IfaceTermAppCo fun <$> rnIfaceCo co
-rnIfaceCo (IfaceDepFunCo bndr co)
-    = IfaceDepFunCo <$> rnIfaceIdBndr bndr <*> rnIfaceCo co
+rnIfaceCo (IfaceDepFunCo bndr domain co)
+    = IfaceDepFunCo <$> rnIfaceIdBndr bndr <*> rnIfaceMCo domain <*> rnIfaceCo co
 rnIfaceCo (IfaceTyConAppCo role tc cos) = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)          = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceFreeCoVar c)            = pure (IfaceFreeCoVar c)

@@ -341,8 +341,8 @@ tidyCo env co
     go (TyConAppCo r tc cos) = TyConAppCo r tc $! strictMap go cos
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
     go (TermAppCo fun co)    = (TermAppCo $! tidyTyCoVarOcc env fun) $! go co
-    go (DepFunCo var co)
-      = (DepFunCo $! var') $! tidyCo body_env co
+    go (DepFunCo var domain co)
+      = ((DepFunCo $! var') $! go_mco domain) $! tidyCo body_env co
       where (body_env, var') = tidyVarBndr env var
     go (ForAllCo tv visL visR h co)
       = ((((ForAllCo $! tvp) $! visL) $! visR) $! (go_mco h)) $! (tidyCo envp co)

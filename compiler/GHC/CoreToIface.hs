@@ -340,8 +340,8 @@ toIfaceCoercionX fr co
     go (TermAppCo fun co)
       = IfaceTermAppCo (mkIfLclName (occNameFS (getOccName fun))) (go co)
 
-    go (DepFunCo var co)
-      = IfaceDepFunCo bndr
+    go (DepFunCo var domain co)
+      = IfaceDepFunCo bndr (go_mco domain)
                       (toIfaceCoercionX (fr `delVarSet` var) co)
       where
         bndr | isId var = toIfaceIdBndrX fr var

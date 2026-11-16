@@ -2627,9 +2627,20 @@ lintCoercion (TermAppCo f arg_co)
            (text "Opaque runtime call congruence has the wrong argument kinds."
             $$ ppr arg_co) }
 
-lintCoercion co@(DepFunCo b body_co)
+lintCoercion co@(DepFunCo b domain body_co)
   = do { lintL (isNativeRetainedBinder b)
            (text "Invalid retained coercion binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
+       ; case domain of
+           MRefl -> return ()
+           MCo delta ->
+             do { lintCoercion delta
+                ; lintL (coercionRole delta == Nominal)
+                    (text "Retained domain conversion requires nominal evidence:" <+> ppr delta)
+                ; let Pair source target = coercionKind delta
+                ; lintL (source `eqType` varType b)
+                    (text "Retained domain conversion has the wrong source domain:" <+> ppr delta)
+                ; lintL (isNativeIndexId b && isNativeIndexType target)
+                    (text "Retained domain conversion requires scalar index domains:" <+> ppr delta) }
        ; lintBinder LambdaBind b $
          do { lintCoercion body_co
             ; let Pair left right = coercionKind body_co

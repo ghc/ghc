@@ -44,7 +44,7 @@ import GHC.Core.Seq
 import GHC.Core.Utils
 
 import GHC.Core.Type
-import GHC.Core.Coercion( mkCoVarCo, substCoVarBndr )
+import GHC.Core.Coercion( mkCoVarCo, substCoVarBndr, mapNativeIndexCastCo )
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Subst ( isEmptyTypeSubst )
 
@@ -262,7 +262,7 @@ substExpr subst expr
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)     = Cast (go e) (substCo subst co)
+    go (Cast e co)     = Cast (go e) (mapNativeIndexCastCo (substCo subst) co)
        -- Do not optimise even identity coercions
        -- Reason: substitution applies to the LHS of RULES, and
        --         if you "optimise" an identity coercion, you may

@@ -1526,9 +1526,10 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (TermAppCo f co)
       = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType f)
            ; go_co dv1 co }
-    go_co dv (DepFunCo v co)
+    go_co dv (DepFunCo v domain co)
       = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType v)
-           ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` v) dv1 co }
+           ; dv2 <- go_mco dv1 domain
+           ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` v) dv2 co }
     go_co dv (Refl ty)               = collect_cand_qtvs orig_ty True cur_lvl bound dv ty
     go_co dv (GRefl _ ty mco)        = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv ty
                                           ; go_mco dv1 mco }

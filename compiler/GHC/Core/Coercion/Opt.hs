@@ -387,13 +387,17 @@ opt_co4' opts env@(LC subst _) sym _rep r (TermAppCo f co)
         mkTermAppCo f' (opt_co4 opts env sym False Nominal co)
       ty -> pprPanic "opt_co4: native function substitution" (ppr ty)
 
-opt_co4' opts (LC subst lift_env) sym rep r (DepFunCo b co)
-  -- The closed domain is unchanged. Keep the runtime binder scoped over the
-  -- proof, even when it does not occur in either result endpoint.
+opt_co4' opts env@(LC subst lift_env) sym rep r (DepFunCo b domain co)
+  -- Domain evidence is outside the binder. Keep symmetry outside the whole
+  -- proof: its body is checked at the original domain.
   -- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
-  = mkDepFunCo b' (opt_co4 opts (LC subst' lift_env) sym rep r co)
+  = wrapSym sym $ mkDepFunCoWithDomain b' domain'
+      (opt_co4 opts (LC subst' lift_env) NotSwapped rep r co)
   where
     !(subst', b') = substNativeIndexBndr subst b
+    domain' = case domain of
+      MRefl -> MRefl
+      MCo delta -> MCo (opt_co4 opts env NotSwapped False Nominal delta)
 
 opt_co4' opts env sym rep r (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
                                  , fco_kind = k_co, fco_body = co })
@@ -655,7 +659,7 @@ mkDeepSymCo = go
     go (TyConAppCo r tc cos)                      = TyConAppCo r tc $ map go cos
     go (AppCo co1 co2)                            = AppCo (go co1) (go co2)
     go (TermAppCo f co)                          = mkTermAppCo f (go co)
-    go (DepFunCo b co)                           = mkDepFunCo b (go co)
+    go co@(DepFunCo {})                         = mkSymCo co
     go (FunCo r afl afr cow co1 co2)              = FunCo r afr afl (go cow) (go co1) (go co2)
     go (TransCo co1 co2)                          = TransCo (go co2) (go co1)
     go (SelCo cs co)                              = SelCo cs $ go co

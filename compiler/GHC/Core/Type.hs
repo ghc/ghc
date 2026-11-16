@@ -2394,7 +2394,9 @@ A bound function occurs only in the head slot of TermAppTy or TermAppCo.
 It cannot occur as TermVarTy or as a matchable AppTy function. Applying its
 retained binder requires an eligible local Var with exactly the same type.
 Use the existing head-only Id substitution. Do not unfold that Var or transport
-the function domain through a coercion. DepFunCo keeps the domain unchanged.
+the function domain through a coercion. DepFunCo keeps function-valued domains
+unchanged. Scalar domain conversion uses nominal evidence; see
+Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 
 The binder scopes over calls in the result and its proofs. Existing runtime
 binder renaming masks outer substitutions and avoids capture in both places.

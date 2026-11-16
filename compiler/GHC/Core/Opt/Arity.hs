@@ -65,7 +65,7 @@ import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 import GHC.Core.TyCo.Compare( eqType, eqTypeIgnoringMultiplicity )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy), Coercion(..) )
 
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
@@ -2901,6 +2901,8 @@ pushCoArg co arg
   | Type ty <- arg
   = do { (_, ty', m_co') <- pushCoTyArg co ty
        ; return (Type ty', m_co') }
+  | Just result <- pushCoRetainedArg co arg
+  = Just result
   | otherwise
   = do { (_, arg_mco, m_co') <- pushCoValArg co
        ; let arg_mco' = checkReflexiveMCo arg_mco
@@ -2908,6 +2910,67 @@ pushCoArg co arg
              -- The coercion is very often (arg_co -> res_co), but without
              -- the argument coercion actually being ReflCo
        ; return (arg `mkCastMCo` arg_mco', m_co') }
+
+-- | Push explicit retained congruence through one checked runtime argument.
+-- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+pushCoRetainedArg :: Coercion -> CoreArg -> Maybe (CoreArg, MCoercion)
+pushCoRetainedArg = go
+  where
+    go (DepFunCo b domain body) arg = instantiate False b domain body arg
+    go (SymCo (DepFunCo b domain body)) arg = instantiate True b domain body arg
+    go (SymCo (SymCo co)) arg = go co arg
+    go (SymCo (TransCo first second)) arg
+      = go (TransCo (mkSymCo second) (mkSymCo first)) arg
+    go (SymCo (SubCo co)) arg = go (SubCo (mkSymCo co)) arg
+    go (TransCo first second) arg
+      = do { (middle, result_second) <- go second arg
+           ; (source, result_first) <- go first middle
+           ; return (source, compose result_first result_second) }
+    go (SubCo co) arg
+      = do { (source, result) <- go co arg
+           ; return (source, case result of
+                       MRefl -> MRefl
+                       MCo proof -> MCo (mkSubCo proof)) }
+    go co arg | Just {} <- isReflCo_maybe co = Just (arg, MRefl)
+    go _ _ = Nothing
+
+    instantiate symmetric b domain body arg
+      = do { delta <- case domain of
+               MRefl -> Just (mkNomReflCo (varType b))
+               MCo proof
+                 | coercionRole proof == Nominal
+                 , coercionLKind proof `eqType` varType b
+                 , isNativeIndexId b
+                 , isNativeIndexType (coercionRKind proof)
+                 -> Just proof
+               _ -> Nothing
+           ; let source_domain = if symmetric then coercionLKind delta
+                                              else coercionRKind delta
+           ; if exprType arg `eqType` source_domain then pure () else Nothing
+           ; let converted = case domain of
+                   MRefl -> arg
+                   MCo _ -> Cast arg (SubCo (if symmetric then delta else mkSymCo delta))
+                 replacement = if symmetric then arg else converted
+           ; if valid_argument b replacement then pure () else Nothing
+           ; let scope = mkInScopeSet (exprFreeVars replacement `unionVarSet` tyCoVarsOfCo body)
+                 subst = Core.extendIdSubst (Core.mkEmptySubst scope) b replacement
+                 proof = Core.substCo subst body
+           ; return (converted, MCo (if symmetric then mkSymCo proof else proof)) }
+
+    valid_argument b arg
+      | isNativeIndexId b
+      = case exprToNativeIndex arg of
+          Just index -> typeKind index `eqType` varType b
+          Nothing -> False
+      | isNativeIndexFunctionId b
+      = case nativeIndexFunctionVar_maybe arg of
+          Just actual -> varType actual `eqType` varType b
+          Nothing -> False
+      | otherwise = False
+
+    compose MRefl second = second
+    compose first MRefl = first
+    compose (MCo first) (MCo second) = MCo (mkTransCo first second)
 
 pushCoTyArg :: CoercionR -> Type -> Maybe (Type, Type, MCoercionR)
 -- We have (fun |> co) @ty

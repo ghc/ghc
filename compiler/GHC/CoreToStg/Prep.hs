@@ -40,7 +40,7 @@ import GHC.Core.Dependent
 import GHC.Core.Subst
 import GHC.Core.Make
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep ( Type(..) )
+import GHC.Core.TyCo.Rep ( Type(..), Coercion(SubCo) )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCo.Subst ( isEmptyTypeSubst )
 import GHC.Core.Coercion
@@ -1108,6 +1108,12 @@ which is unproblematic.
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
 nameNativeConstructorArgs :: CoreExpr -> UniqSM (Maybe CoreExpr)
 nameNativeConstructorArgs expr
+  | Cast inner co <- fun
+  , hasNativeDependentExpr (Coercion co)
+  , arg : rest <- args
+  , Just (arg', result_co) <- pushCoArg co arg
+  = return (Just (mkApps (mkCastMCo (App inner arg') result_co) rest))
+  | otherwise
   = do { head' <- case fun of
            Cast inner co -> fmap (`mkCast` co) <$> nameNativeConstructorArgs inner
            Tick tick inner -> fmap (Tick tick) <$> nameNativeConstructorArgs inner
@@ -1170,7 +1176,17 @@ nameNativeIndexArg :: CoreExpr
                    -> UniqSM (CoreExpr, CoercionN, CoreExpr -> CoreExpr)
 nameNativeIndexArg arg
   | Just (normal, index) <- normaliseNativeIndexExpr arg
-  = case collectArgs normal of
+  = case normal of
+      Cast inner (SubCo delta)
+        -> do { (atom, proof, wrap) <- nameNativeIndexArg inner
+              ; let left_cast = mkGReflCo Nominal (coercionLKind proof) (MCo delta)
+                    right_cast = mkGReflCo Nominal (coercionRKind proof) (MCo delta)
+                    converted = mkTransCo (mkSymCo left_cast) (mkTransCo proof right_cast)
+              ; return (Cast atom (SubCo delta), converted, wrap) }
+      _ -> name_constructor normal index
+  | otherwise = nativeIndexTransportError "an unsupported retained argument"
+  where
+    name_constructor normal index = case collectArgs normal of
       (Var worker, args)
         | Just con <- isDataConWorkId_maybe worker
         , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
@@ -1193,7 +1209,6 @@ nameNativeIndexArg arg
                   return (Var value, co, wrap) }
       (Var _, args) | all isTypeArg args -> return (normal, mkReflCo Nominal index, id)
       _ -> nativeIndexTransportError "an unsupported normalized retained argument"
-  | otherwise = nativeIndexTransportError "an unsupported retained argument"
 
 -- | Preserve strict call evidence when ANF naming changes its scalar argument.
 -- See Note [Opaque call arguments in CorePrep].
@@ -1611,7 +1626,9 @@ CoreToStg erases the checked proof and retains the case binder and real fields.
 For a remaining dependent function, lift the result equality under its unchanged
 closed domain with DepFunCo. Preserve a cast around the partial application.
 Do not eta-expand it: a lambda could hide a bottom function. Dependent erased
-binder kinds and transport through a changed runtime domain remain unsupported.
+binder kinds remain unsupported. Explicit scalar-domain congruence uses checked
+application transport before this naming pass. Converted index arguments keep
+their nominal evidence and their underlying field demand.
 See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 
 Agda substitutes local lets and does not preserve their sharing. The dependent
@@ -3010,7 +3027,7 @@ cpSubstTy :: CorePrepEnv -> Type -> Type
 cpSubstTy (CPE { cpe_subst = subst }) ty = substTy subst ty
 
 cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
-cpSubstCo (CPE { cpe_subst = subst }) co = substCo subst co
+cpSubstCo (CPE { cpe_subst = subst }) co = mapNativeIndexCastCo (substCo subst) co
 
 -- | See Note [Binder context]
 pushBinderContext :: Id -> CorePrepEnv -> CorePrepEnv

@@ -554,7 +554,7 @@ data IfaceCoercion
   = IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
-  | IfaceDepFunCo     IfaceIdBndr IfaceCoercion
+  | IfaceDepFunCo     IfaceIdBndr IfaceMCoercion IfaceCoercion
       -- Diagnostic form only. The runtime binder scopes over the body.
       -- The interface writer and importer reject this form.
   | IfaceTermAppCo    IfLclName IfaceCoercion -- Diagnostic form; no wire encoding
@@ -2206,10 +2206,13 @@ ppr_co ctxt_prec (IfaceGReflCo r ty (IfaceMCo co))
 ppr_co ctxt_prec (IfaceTermAppCo fun co)
   = maybeParen ctxt_prec appPrec (text "TermAppCo" <+> ppr fun <+> ppr_co appPrec co)
 
-ppr_co ctxt_prec (IfaceDepFunCo (_, var, arg) co)
+ppr_co ctxt_prec (IfaceDepFunCo (_, var, arg) domain co)
   = maybeParen ctxt_prec funPrec $
-    sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
+    sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg <+> ppr_domain domain)
         , arrow <+> pprIfaceCoercion co ]
+  where
+    ppr_domain IfaceMRefl = empty
+    ppr_domain (IfaceMCo proof) = text "|>" <+> pprIfaceCoercion proof
 
 ppr_co ctxt_prec (IfaceFunCo r co_mult co1 co2)
   = maybeParen ctxt_prec funPrec $
@@ -2818,7 +2821,7 @@ instance NFData IfaceTyLit where
 
 instance NFData IfaceCoercion where
   rnf = \case
-    IfaceDepFunCo bndr co -> rnf bndr `seq` rnf co
+    IfaceDepFunCo bndr domain co -> rnf bndr `seq` rnf domain `seq` rnf co
     IfaceTermAppCo fun co -> rnf fun `seq` rnf co
     IfaceReflCo f1 -> rnf f1
     IfaceGReflCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
