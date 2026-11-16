@@ -3911,3 +3911,58 @@ The independent audit passes 101,598 static checks over 47,184 pinned paths.
 All 96 cumulative manifests are preserved. The complete
 `native-domain-conversion-*` namespace is permanently frozen. Publication changes
 only README and PLAN. C1, C2 and the full program goal remain open.
+
+
+## M58: scoped source domain conversion
+
+Status: specified; implementation and validation remain open.
+
+The M57 compiler accepts the unchanged-domain source control. It rejects
+`adapt f original = original` when its retained domain changes from
+`Token (F Bool)` to `Token Bool`, although `F Bool` reduces to `Bool`.
+The explicit form `adapt f original y = original y` reaches a substitution
+panic. Preserve these three observations in
+`_build/verification/native-source-domain-conversion-baseline-v1/results.json`.
+The baseline does not execute an adapted worker.
+
+Use the existing nominal `DepFunCo` rule. Do not add a new Core constructor.
+This follows D/DC An-PiCong and the domain-before-body context discipline in
+Agda. Neither source proves preservation for this combined implementation.
+See [nominal domain conversion](REFERENCES.md#nominal-domain-conversion).
+
+- [ ] Check both complete binder domains with the closed scalar admission rule.
+      Use ordinary nominal family reduction outside the new runtime binder.
+      Require the normal domains to agree. Keep changed function domains gated.
+- [ ] Freshen a shared runtime binder against both types and the domain proof.
+      Align the target body with the forward nominal cast of that binder.
+- [ ] Compare the bodies with ordinary unification in a private nested solve.
+      Follow `can_eq_nc_forall`: track unifications, retain used Given evidence,
+      and return a proof only when all body Wanteds are solved. On failure,
+      retain the original whole equality. Do not emit a residual constraint
+      with an unbound runtime index. Exact body equality can remain a fast path.
+- [ ] Propagate the active runtime-binder scope through `TcS` into rewriting.
+      Keep the native meta-assignment, family-cache and external evidence
+      restrictions. Suppress solver plugins within this scope. Do not put a
+      runtime Id in `ic_skols`, which binds type variables.
+- [ ] Preserve nominal provenance in scalar source value casts through wrappers
+      and zonking. Do not decide scalar admission from unzonked metadata.
+      Keep composition order and ordinary representational coercions unchanged.
+- [ ] Resolve a retained source variable at its expected domain with a checked
+      nominal cast. Do not substitute a variable of a different domain directly.
+      Report a located error when its domains cannot be equated.
+- [ ] Run real source workers at runtime. Check nominal family conversion,
+      result transport, ignored bottom indices, and bottom function WHNF.
+      Check unrelated scalar domains and payloads with located rejections.
+      Extend the maintained Showcase only after these source runs pass.
+- [ ] Build the bootstrap compiler and the compiler built by that compiler.
+      Run the focused API, runtime, source and registered checks. Parse changed
+      Haskell files and check the existing Cabal formatting boundary.
+- [ ] Update the contract, roadmap and references. Pin the selected inputs,
+      producer metadata, commands and outputs. Audit and publish the result.
+
+General dependent inference, open dependent domains, opaque Pi projection,
+changed function-valued domains and native coercion serialization remain open.
+M58 does not complete C1 or the complete roadmap. It replaces the earlier
+research suggestion to restrict the body comparison to exact equality with a
+scoped ordinary body solve. The existing forall solver supplies the control
+pattern; runtime binders still need their own solver scope.
