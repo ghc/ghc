@@ -242,6 +242,8 @@ This declaration is important for :info (->) command (issue #10145)
 -}
 
 -- | The regular function type
+type (->) :: forall (ma :: Matchability) {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+             TYPE rep1 -> TYPE rep2 -> Type
 type (->) @ma = FUN @ma 'Many
 -- See Note [Linear types] in Multiplicity
 
