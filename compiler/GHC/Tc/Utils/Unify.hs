@@ -85,7 +85,6 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
-import GHC.Core.DataCon ( dataConTyCon )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs
@@ -3646,8 +3645,8 @@ tcRetainedCoercion index branch_co original_ty
     is_constructor ty
       | TyConApp tc _ <- coreFullView ty
       , Just con <- isPromotedDataCon_maybe tc
-      = mkTyConTy (dataConTyCon con) `eqType` varType index
-        && typeKind ty `eqType` varType index
+      , Just _ <- nativeIndexDataConTyArgs (varType index) con
+      = typeKind ty `eqType` varType index
       | otherwise = False
 
 -- | Find an exact free call index. Unsupported proof and kind dependencies
@@ -3736,7 +3735,9 @@ tcRetainedIndexCoercion index_ty occurs branch_co original_ty
 {- Note [Transport through a retained index]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A checked constructor pattern provides n ~# 'S k, for example. Its actual
-field identities are in scope when the branch body is checked. Abstract the
+field identities are in scope when the branch body is checked. Check the
+constructor against the full ground parent, including its ordinary type arguments.
+See Note [Algebraic runtime index domains] in GHC.Core.Type. Abstract the
 free occurrences of n in a supported value type to one fresh, immutable TyVar
 of the index domain. Use liftCoSubstWith to transport that template along
 the branch proof. Existing FC lifting supplies the required congruence.
