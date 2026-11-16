@@ -23,7 +23,12 @@ This release of GHC supports LLVM versions 13 through 19.
 - ffi: collapse void pointer chains in capi wrappers (:ghc-ticket:`26852`)
 - aarch64: fix ``MOVK reguUsageOfInstr``  to mark dst as both read and written (:ghc-ticket:`26980`)
 - Fix ``dsuppress-uniques`` for free variables in demand signatures (:ghc-ticket:`27106`)
-- demand analysis: take stable unfoldings into account when determining argument demands (:ghc-ticket:`26416`)
+- Fix multiple demand analysis bugs (:ghc-ticket:`26416`, :ghc-ticket:`27845`, :ghc-ticket: `27626`)
+- Fix multiple tag inference bugs: (:ghc-ticket:`27831`, :ghc-ticket:`27841`, :ghc-ticket:`27842`, :ghc-ticket:`27005`)
+- Fix a scoping error in specialise (:ghc-ticket:`27766`)
+- Fix multiple specialiser bugs related to absent fillers (:ghc-ticket: `27717`, :ghc-ticket: `27703`, :ghc-ticket: `27704`, :ghc-ticket: `27627`, :ghc-ticket: `25924`)
+- Desugar a ``case`` scrutinee only once (:ghc-ticket:`27383`, :ghc-ticket:`20251`)
+- Fix missing handling of CmmUnsafeForeignCall node in LayoutStack  (:ghc-ticket:`27447)
 
 Runtime System
 ~~~~~~~~~~~~~~
@@ -34,11 +39,12 @@ Runtime System
 - add a few missing i386 relocations in the rts linker
 - handle heap allocation failures in I/O primops (:ghc-ticket:`24105`)
 - small fixes to allow more configurations to succesfully build (debugging RTS with optimizations)
-- fix race conditions between ``flushEventLog`` acquiring/releasing the ``state_change`` mutex
+- Fix race conditions between ``flushEventLog`` acquiring/releasing the ``state_change`` mutex
 - align stack to 64-byte boundary in StgRun on x65 (:ghc-ticket:`26595`, ghc-ticket:`26822`)
 - carefully SLIDE off the end of a stack chunk (:ghc-ticket:`27001`)
 - Fix missing profiling header for origin_thunk frame (:ghc-ticket:`27007`)
-
+- move stack check to the start of the stg_unpack_cstring thunks (:ghc-ticket: `27272`)
+- Fix missing memory barrier in ``eval_thunk_selector`` (:ghc-ticket: `27477`)
 
 Code Generation
 ~~~~~~~~~~~~~~~
@@ -51,6 +57,8 @@ Bytecode Compiler
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
+
+- don't drop exception context in ``SomeException``
 
 ``ghc-internal`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,6 +83,7 @@ Packaging and Build System
 - accept ``happy`` version 2.2
 - hadrian: don't include package hash in haddock library
 - configure: fix check for ``--target`` support in stage0 ``CC`` (:ghc-ticket:`26999`)
+- fix build error with glibc 2.43 (:ghc-ticket:`27076`)
 
 Wasm Backend
 ~~~~~~~~~~~~
@@ -103,6 +112,7 @@ for further change information.
     libraries/exceptions/exceptions.cabal:               Dependency of ``ghc`` and ``haskeline`` library
     libraries/file-io/file-io.cabal:                     Dependency of ``directory`` library
     libraries/filepath/filepath.cabal:                   Dependency of ``ghc`` library
+    libraries/ghc-bignum/ghc-bignum.cabal:               Internal compiler library
     libraries/ghc-boot/ghc-boot.cabal:                   Internal compiler library
     libraries/ghc-boot-th/ghc-boot-th.cabal:             Internal compiler library
     libraries/ghc-compact/ghc-compact.cabal:             Core library
@@ -132,3 +142,5 @@ for further change information.
     libraries/xhtml/xhtml.cabal:                         Dependency of ``haddock`` executable
     utils/haddock/haddock-api/haddock-api.cabal:         Dependency of ``haddock`` executable
     utils/haddock/haddock-library/haddock-library.cabal: Dependency of ``haddock`` executable
+    utils/ghc-toolchain/ghc-toolchain.cabal:             Dependency of ``ghc-toolchain`` executable and ``ghc`` library
+    mk/system-cxx-std-lib-1.0.conf.in:                   Core library
