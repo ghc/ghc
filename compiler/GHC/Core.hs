@@ -105,7 +105,6 @@ import GHC.Platform
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare ( eqType )
-import GHC.Core.TyCo.FVs ( tyCoVarsOfCo, tyCoVarsOfTypes )
 import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, TyConApp, CastTy), Coercion(SubCo), Scaled(..) )
 import qualified GHC.Core.TyCo.Subst as TyCoSubst
 import GHC.Builtin.KnownKeys ( boolTyConKey )
