@@ -3631,7 +3631,7 @@ program goal stay open.
 
 ### M54: diagnostics for detected recursive interface-domain failures
 
-Status: planned. Keep the full program goal active.
+Status: implemented; fixture and validation pending. Keep the full program goal active.
 
 Force the existing native interface eligibility results inside an IO exception
 boundary. Catch only `NonTermination`. Report the failure through `failIfM`.
@@ -3650,8 +3650,11 @@ construction boundary. Their guarantees do not justify unchecked Type heads.
 The research and primary-source provenance are in
 `native-domain-loader-next-research-v1` and `native-domain-loader-review-v1`.
 
-- [ ] Record the current six failures without modifying frozen M52 evidence.
-- [ ] Add the narrow boundary and its owning GHC-style Note.
+- [x] Record the current six failures without modifying frozen M52 evidence.
+  The current M53 library produces six actual `NonTermination` exceptions.
+  `native-recursive-domain-diagnostics-baseline-v1/results.json` records the
+  typed classification, source/library hashes and unchanged inputs.
+- [x] Add the narrow boundary and its owning GHC-style Note.
 - [ ] Update the existing API fixture. Require the normal interface error and
   diagnostic text. A timeout, raw `NonTermination` or unrelated exception fails
   the check. Include valid recursive domains, a synonym-hidden failure and an

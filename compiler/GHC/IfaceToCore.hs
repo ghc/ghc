@@ -90,6 +90,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
+import GHC.Utils.Exception ( NonTermination(..), evaluate, try )
 
 import GHC.Data.Bag
 import GHC.Data.Maybe
@@ -1294,13 +1295,15 @@ tcIfaceDataCons tycon_name tycon if_cons
       = do { ~(mult, field_ty) <- forkM (mk_doc name <+> text "retained field") $
                do { mult <- tcIfaceType w
                   ; field_ty <- tcIfaceType ty
-                  ; unless (typeKind mult `eqType` multiplicityTy
+                  ; valid <- evaluateIfaceNativeDomain (ppr name) $
+                            typeKind mult `eqType` multiplicityTy
                             && isLiftedTypeKind (typeKind field_ty)
                             && not (anyFreeVarsOfType
                                  (\v -> isId v && not (v `elemVarSet` scope)) field_ty)
                             && case mb of
                                  Nothing -> True
-                                 Just _  -> isManyTy mult && isNativeRetainedBinderType field_ty) $
+                                 Just _  -> isManyTy mult && isNativeRetainedBinderType field_ty
+                  ; unless valid $
                       failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
                                $$ text "Expected a lifted field with only earlier runtime indices;"
                                $$ text "a named field must have multiplicity Many and a supported retained domain.")
@@ -1353,7 +1356,8 @@ Its domain remains independently closed. A later TermAppTy resolves its head
 from this actual lexical Id environment. The complete field-type check still
 rejects every runtime Id outside the earlier-field prefix. Keep these checks
 deferred for recursive function domains too. See Note [Opaque call indices in
-interfaces] in GHC.Iface.Type.
+interfaces] in GHC.Iface.Type. See Note [Detected recursive native interface
+domains] for the boundary around each field eligibility result.
 
 The ordinary field decoder keeps its existing lazy boundary. No new field
 name scopes over the constructor result, context, or erased binders. This
@@ -1654,7 +1658,9 @@ tcIfaceType = go
     go (IfaceTermAppTy fun arg)
       -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
       = do { f <- tcIfaceLclId fun
-           ; case nativeIndexFunctionTys_maybe f of
+           ; fun_tys <- evaluateIfaceNativeDomain (ppr fun)
+                          (nativeIndexFunctionTys_maybe f)
+           ; case fun_tys of
                Nothing ->
                  failIfM (text "Invalid retained call head in interface:" <+> ppr fun
                           $$ text "Expected a local unrestricted function with closed supported domains."
@@ -1669,18 +1675,20 @@ tcIfaceType = go
                     ; return (TermAppTy f arg') } }
     go (IfaceTermVar n)
       = do { v <- tcIfaceLclId n
-           ; unless (isNativeIndexId v) $
+           ; valid <- evaluateIfaceNativeDomain (ppr n) (isNativeIndexId v)
+           ; unless valid $
                failIfM (text "Invalid retained index in interface:" <+> ppr n
                         $$ text "Expected a local identifier with multiplicity Many"
                         $$ text "and a supported algebraic index domain."
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
-    go (IfaceDepFunTy bndr body)
+    go (IfaceDepFunTy bndr@(_, name, _) body)
       -- See Note [Retained binders in interfaces].
       -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
       = bindIfaceId bndr $ \ v ->
-        do { unless (isNativeRetainedBinder v) $
+        do { valid <- evaluateIfaceNativeDomain (ppr name) (isNativeRetainedBinder v)
+           ; unless valid $
                failIfM (text "Invalid retained binder in interface:" <+> ppr v
                         $$ text "Expected a local identifier with multiplicity Many"
                         $$ text "and a supported scalar or closed function domain."
@@ -1709,6 +1717,40 @@ tcIfaceType = go
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
+-- | Evaluate native interface eligibility and report detected recursive knots.
+-- See Note [Detected recursive native interface domains].
+evaluateIfaceNativeDomain :: SDoc -> a -> IfL a
+evaluateIfaceNativeDomain name result
+  = do { checked <- liftIO (try (evaluate result))
+       ; case checked of
+           Left NonTermination ->
+             failIfM (text "Cannot validate retained type in interface:" <+> name
+                      $$ text "Validation encountered recursive type information.")
+           Right value -> return value }
+
+{- Note [Detected recursive native interface domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The native domain predicate follows algebraic constructor fields. A generic
+IfaceDepFunTy in an ordinary field can force this predicate before its field
+Type exists. Following that field again can raise NonTermination. The visited
+TyCon set handles available recursive field Types, not an active decoder.
+
+Keep validation before returning the decoded Type. Evaluate each existing
+eligibility result inside IO and catch only NonTermination. Bool guards and
+the outer Maybe constructor force the native domain checks. Preserve their
+order. On a detected knot, fail through the existing interface error path.
+Do not return a placeholder Type, skip a check, or retry the active thunk.
+Use the encoded name in the diagnostic; printing a recursive field Type can
+force the same failed computation. Other exceptions propagate unchanged.
+
+This boundary improves diagnostics. It does not stage the loader or guarantee
+termination. The runtime does not guarantee detection of every loop. A
+shape-first loader needs independent declaration and synonym information.
+Merely deferring validation into Type children is insufficient: typeKind can
+inspect a Type head without forcing those children. See Note [Retained binders
+in interfaces] and Note [Positioning of forkM].
+-}
+
 {- Note [Retained binders in interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained binder is a runtime Id, not a TyVar or an erased forall binder.
@@ -1726,6 +1768,8 @@ Domain validation can force constructor argument types. Keep it within the
 existing deferred declaration decoding. See Note [Positioning of forkM].
 The domain predicate tracks visited TyCons before it follows their fields.
 Thus a recursive Nat domain does not require an infinite field traversal.
+An unfinished field decoder is a separate case. See Note [Detected recursive
+native interface domains] for the diagnostic boundary around eligibility.
 
 IfaceFreeTermVar preserves an open Id only for diagnostics. It cannot enter
 this decoding path. Boolean branch proof reconstruction is described in
