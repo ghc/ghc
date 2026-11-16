@@ -4006,6 +4006,11 @@ The existing Core and Arity rules already support this fixed-domain case.
       `ImpredicativeTypes` still rejects a known function-Pi value.
       Classify eligible fixed function binders with `isNativeRetainedBinder`.
       Keep the existing immutable matching, kind, scope and usage checks.
+      Use an ordinary lifted forcing helper to check full worker WHNF.
+      Direct `seq` retains its existing concrete RuntimeRep restriction.
+      Under `ImpredicativeTypes`, annotate the complete action as `IO ()`
+      before outer Quick Look examines its native function signature.
+      Direct function-Pi visible type arguments remain outside this step.
       Test an explicit ordinary payload wildcard separately, so the completed
       value selection path cannot hide the body solver in the trace.
 - [ ] Check imported worker specialization at runtime with identity, successor
