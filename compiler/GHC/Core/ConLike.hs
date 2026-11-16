@@ -35,9 +35,10 @@ import GHC.Prelude
 import GHC.Core.DataCon
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
+import GHC.Core.TyCo.FVs (tyCoVarsOfCo)
 import GHC.Core.TyCo.Rep (Type(..), ThetaType)
 import GHC.Core.TyCon (tyConDataCons, tyConArity)
-import GHC.Core.Type(mkTyConApp, tyCoVarsOfType, tyCoVarsOfCo, typeKind, isMatchableFunTy)
+import GHC.Core.Type(mkTyConApp, tyCoVarsOfType, typeKind, isMatchableFunTy)
 import GHC.Types.Unique
 import GHC.Types.Name
 import GHC.Types.Name.Reader
