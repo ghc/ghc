@@ -482,6 +482,23 @@ fixedFunctionDomains = do
     expectError "function body preserves index demand" "showcase-function-body-index"
         (evaluate (length (toList (FunctionSignatures.specializedCall f bottomIndex))))
 
+-- | Check runtime positions and preserve finite access to lazy lists.
+closedListIndexing :: IO ()
+closedListIndexing = do
+    listCell <- newIORef [True, False, True]
+    positionCell <- newIORef 1
+    xs <- readIORef listCell
+    position <- readIORef positionCell
+    observe "runtime checked list position" (Parameterized.lookupRuntime xs position)
+    observe "negative position ignores list"
+        (Parameterized.lookupRuntime (error "unused negative-position list") (-1))
+    observe "out-of-range list position" (Parameterized.lookupRuntime xs 3)
+    observe "checked first position ignores tail"
+        (Parameterized.lookupRuntime (True : error "unused checked-position tail") 0)
+    let cyclic :: [Bool]
+        cyclic = True : False : cyclic
+    observe "checked position in cyclic list" (Parameterized.lookupRuntime cyclic 5)
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -496,3 +513,4 @@ main = do
     parameterizedDomains
     domainConversion
     fixedFunctionDomains
+    closedListIndexing

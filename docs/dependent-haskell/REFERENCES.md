@@ -630,6 +630,29 @@ runtime index`. Its log is retained as
 implementation handles singleton equality and trie lookup, update, mapping,
 filtering, and folding with the same scope rules.
 
+### Closed-list safe indexing
+
+Agda v2.8.0's [finite-position example](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#constructor-instances)
+defines `Fin` with zero and successor constructors. Its `mkFin` requires
+evidence of a bound. The reviewed source is
+[`instance-arguments.lagda.rst`, lines 353–377](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/instance-arguments.lagda.rst#L353-L377),
+blob `69c52629a737a8670fe11286a705111b7ba99e9d`. The versioned manual was
+rechecked on 2026-11-16. This is the datatype precedent for M60.
+
+M60 uses an ordinary Haskell GADT with the existing saturated `Count` family.
+`mkFinClosed` validates signed runtime input and returns `Maybe (Fin (Count xs))`.
+It does not use Agda's instance search to discharge that runtime bound.
+`indexClosed` consumes the witness after retained list refinement. Equal-count
+evidence permits reuse; it cannot establish equality of list values. The
+explicit constructor applications follow the existing visible-type-application
+design. The measured implicit `FZ` variant rejects its unsolved bound.
+See Note [Closed-list positions] in `ParameterizedIndexLibrary`.
+
+The nineteen-observation bootstrap candidate and both-stage comparison reports
+are under `_build/verification/native-closed-list-indexing-*`. Those runs precede
+integration into the maintained library. They establish no totality, optimizer,
+generic-domain or bounds-check-elimination result.
+
 ### Source retained constraints
 
 Agda v2.8.0 gives a direct example of an instance argument after a visible Nat

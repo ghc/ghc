@@ -1,5 +1,6 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
@@ -18,6 +19,60 @@ import PackedVecLibrary
 type family Count (bs :: [Bool]) :: Nat where
     Count '[] = 'Z
     Count (b ': bs) = 'S (Count bs)
+
+{- Note [Closed-list positions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Fin is the ordinary finite-position GADT used in Agda. Its bound is a promoted
+Nat. Count reduces after a retained list constructor refines the actual list.
+The inner Fin case then supplies the ordinary successor equality for recursion.
+Explicit constructor type arguments name Count rest. An unconstrained meta
+cannot stand for that native-dependent bound in the current source checker.
+
+The bound proves a position is below the list length. It does not identify the
+list. Equal-count evidence permits reuse with another list. It does not imply
+equal list values. lookupRuntime uses one actual list for both operations.
+
+mkFinClosed rejects negative positions before inspecting the list. Construction
+and selection traverse only the required prefix. Neither needs the full length,
+so finite access to a cyclic list can terminate. indexClosed inspects the chosen
+head only when its result is demanded. The empty case still forces its witness.
+These functions do not establish totality or eliminate runtime bounds checks.
+-}
+
+-- | Carry a position below an ordinary promoted natural bound.
+data Fin :: Nat -> Type where
+    FZ :: forall (n :: Nat). Fin ('S n)
+    FS :: forall (n :: Nat). Fin n -> Fin ('S n)
+
+-- | Select an element with a position below the retained list's length.
+-- See Note [Closed-list positions].
+indexClosed :: foreach (xs :: [Bool]) -> Fin (Count xs) -> Bool
+indexClosed [] impossible = case impossible of {}
+indexClosed (value : rest) position = case position of
+    FZ -> value
+    FS smaller -> indexClosed rest smaller
+
+-- | Check a signed position and return its finite-bound witness.
+-- See Note [Closed-list positions].
+mkFinClosed :: foreach (xs :: [Bool]) -> Int -> Maybe (Fin (Count xs))
+mkFinClosed xs position =
+    if position < 0
+        then Nothing
+        else case xs of
+            [] -> Nothing
+            _value : rest ->
+                if position == 0
+                    then Just (FZ @(Count rest))
+                    else case mkFinClosed rest (position - 1) of
+                        Nothing -> Nothing
+                        Just smaller -> Just (FS @(Count rest) smaller)
+
+-- | Construct and consume a checked position with the same actual list.
+-- See Note [Closed-list positions].
+lookupRuntime :: [Bool] -> Int -> Maybe Bool
+lookupRuntime xs position = case mkFinClosed xs position of
+    Nothing -> Nothing
+    Just checked -> Just (indexClosed xs checked)
 
 -- | Build a vector whose length follows the actual runtime list.
 listVector :: foreach (bs :: [Bool]) -> Vec Int (Count bs)
