@@ -30,7 +30,7 @@ import GHC.Core.TyCo.FVs (isInjectiveInType, tyCoVarsOfCo, tyCoVarsOfType)
 import GHC.Core.TyCo.Rep (Coercion (..), Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
-import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, tyConDataCons, tyConSingleDataCon)
+import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
@@ -1068,11 +1068,12 @@ package through its compiled object and interface.
 
 Call-coercion imports remain rejected. The constructor-field checks use the
 prefix decoder and its scoped call-type codec. The generic Pi checks demand
-ordinary field types after all imported parent knots exist. Recursive classifier
-information must produce the normal interface diagnostic. Finite first-order
-recursive declarations and nullary synonyms remain valid. A timeout or any
-unexpected exception is a test failure. These checks do not prove termination
-for arbitrary interface data.
+ordinary field types after all imported parent knots exist. Unsupported raw
+domains must fail before typed field reconstruction recurses. Normalization
+remains subject to typed checks when the raw view is inconclusive. Finite
+first-order recursive declarations and nullary synonyms remain valid.
+A timeout or an unexpected exception fails. These checks do not prove
+termination for arbitrary interface data.
 -}
 
 -- | Check retained types and closed expressions through binary interface tables.
@@ -1254,6 +1255,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     diagnostics <- unlines <$> readIORef messages
                     forM_ fragments $ \fragment ->
                         check (label ++ "; diagnostic: " ++ diagnostics) (fragment `isInfixOf` diagnostics)
+                    check (label ++ "; no recursive-information fallback") $
+                        not ("recursive type information" `isInfixOf` diagnostics)
             -- | Force valid knots in the supplied order and check scalar-domain eligibility.
             acceptsImportedKnots :: String -> [(IfaceDecl, Bool)] -> IO ()
             acceptsImportedKnots label declarations =
@@ -1560,7 +1563,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 ordinaryField
                     (IfaceDepFunTy (many, firstName, reference nonvacuousSelf) (nonvacuousBody nonvacuousSelf))
                     (recursiveDeclaration 9990 "IfaceGenericNonvacuousSelf")
-            recursiveDiagnostic = ["Cannot validate retained type in interface:", "Validation encountered recursive type information."]
+            shapeDiagnostic = ["Unsupported retained domain shape."]
         forM_
             [ ("generic Pi ordinary self input", [genericSelfInput])
             , ("generic Pi ordinary self output", [genericSelfOutput])
@@ -1572,7 +1575,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             , ("generic Pi hidden in a nullary field synonym", [fieldAlias, hiddenSelf])
             , ("generic Pi nonvacuous self cycle", [nonvacuousSelf])
             ]
-            $ \(label, declarations) -> rejectsImportedKnots label recursiveDiagnostic declarations
+            $ \(label, declarations) -> rejectsImportedKnots label shapeDiagnostic declarations
         let -- | Build a base constructor and a constructor with lazy fields.
             ordinaryRecursive base label fieldTypes =
                 let owner = ordinaryField bool (recursiveDeclaration base label)
@@ -1618,6 +1621,78 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             , ("ordinary field holds a nonvacuous Bool Pi", [(boolHolder, False)])
             ]
             $ \(label, declarations) -> acceptsImportedKnots label declarations
+        let dataAlias = synonym 10200 "IfaceDataBackEdgeAlias" (reference aliasData)
+            aliasData = ordinaryField (reference dataAlias) (recursiveDeclaration 10210 "IfaceDataBackEdge")
+            aliasDataHolder = genericScalarDomain dataAlias (recursiveDeclaration 10220 "IfaceDataBackEdgeHolder")
+            oneAlias = (synonym 10230 "IfaceOneAlias" (toIfaceType OneTy)){ifKind = toIfaceType multiplicityTy, ifResKind = toIfaceType multiplicityTy}
+            manyAlias = (synonym 10240 "IfaceManyAlias" many){ifKind = toIfaceType multiplicityTy, ifResKind = toIfaceType multiplicityTy}
+            mixedFields = changePackage
+                (\con -> con{ifConArgTys = [(reference oneAlias, reference boolAlias), (reference manyAlias, reference boolAlias)], ifConStricts = [IfNoBang, IfNoBang], ifConSrcStricts = replicate 2 (IfSrcBang NoSrcUnpack NoSrcStrict)})
+                (ordinaryField bool (recursiveDeclaration 10250 "IfaceMixedMultiplicityFields"))
+            mixedHolder = genericScalarDomain mixedFields (recursiveDeclaration 10260 "IfaceMixedMultiplicityHolder")
+            functionAlias = synonym 10270 "IfaceVacuousFunctionAlias" (IfaceDepFunTy (many, firstName, bool) bool)
+            functionAliasHolder = genericScalarDomain functionAlias (recursiveDeclaration 10280 "IfaceVacuousFunctionHolder")
+            ignoredParameter = mkTyVar (mkSystemName (unique 10290) (mkTyVarOcc "ignored")) liftedTypeKind
+            ignoredBinders = [mkAnonTyConBinder ignoredParameter]
+            forgetful = mkSynonymTyCon
+                (mkExternalName (unique 10300) (nameModule (ifName declaration)) (mkTcOcc "IfaceForgetfulDomain") noSrcSpan)
+                (mkTyConKind ignoredBinders liftedTypeKind) ignoredBinders liftedTypeKind [Phantom] boolTy True True True True
+            forgetfulDeclaration = tyThingToIfaceDecl (ATyCon forgetful)
+            appliedForgetful = toIfaceType (mkTyConApp forgetful [intTy])
+            forgetfulHolder = ordinaryField (IfaceDepFunTy (many, firstName, appliedForgetful) (toIfaceType intTy)) (recursiveDeclaration 10310 "IfaceForgetfulHolder")
+            aliasCycle = synonym 10320 "IfaceAliasOnlyCycle" (reference aliasCycle)
+            aliasCycleHolder = genericScalarDomain aliasCycle (recursiveDeclaration 10330 "IfaceAliasOnlyHolder")
+            badMultDomain = changePackage
+                (\con -> con{ifConArgTys = [(scalarPi badMultDomain, bool)]})
+                (ordinaryField bool (recursiveDeclaration 10340 "IfacePiMultiplicityDomain"))
+            badMultHolder = genericScalarDomain badMultDomain (recursiveDeclaration 10350 "IfacePiMultiplicityHolder")
+            contextDomain = changePackage
+                (\con -> con{ifConCtxt = [scalarPi contextDomain]})
+                (ordinaryField bool (recursiveDeclaration 10360 "IfaceContextDomain"))
+            contextHolder = genericScalarDomain contextDomain (recursiveDeclaration 10370 "IfaceContextHolder")
+            sessionDomain = ordinaryField bool (recursiveDeclaration 10380 "IfaceRepeatedSessionDomain")
+            sessionHolder = genericScalarDomain sessionDomain (recursiveDeclaration 10390 "IfaceRepeatedSessionHolder")
+            malformedSession = ordinaryField (scalarPi sessionDomain) sessionDomain
+            invalidSibling = ordinaryRecursive 10410 "IfaceInvalidSibling" [reference invalidSibling, scalarPi invalidSibling]
+            invalidSiblingHolder = genericScalarDomain invalidSibling (recursiveDeclaration 10420 "IfaceInvalidSiblingHolder")
+        check "forgetful domain retains an applied raw synonym" $ case appliedForgetful of
+            IfaceTyConApp _ IA_Arg{} -> True
+            _ -> False
+        forM_
+            [ ("alias data back edge alias first", [(dataAlias, True), (aliasData, True), (aliasDataHolder, False)])
+            , ("alias data back edge holder first", [(aliasDataHolder, False), (aliasData, True), (dataAlias, True)])
+            , ("One and Many nullary aliases", [(mixedHolder, False), (mixedFields, True), (boolAlias, True), (oneAlias, False), (manyAlias, False)])
+            , ("vacuous Pi alias admits function mode", [(functionAliasHolder, False), (functionAlias, False)])
+            , ("applied forgetful alias uses typed fallback", [(forgetfulHolder, False), (forgetfulDeclaration, False)])
+            , ("same Names valid session before", [(sessionHolder, False), (sessionDomain, True)])
+            ]
+            $ \(label, declarations) -> acceptsImportedKnots label declarations
+        -- Demand holders first. A direct typed query on the alias-only cycle
+        -- would bypass the raw precheck and exercise an unrelated loop.
+        forM_
+            [ ("alias-only cycle rejects before expansion", [aliasCycleHolder, aliasCycle])
+            , ("raw Pi in field multiplicity rejects early", [badMultHolder, badMultDomain])
+            , ("deferred constructor context rejects early", [contextHolder, contextDomain])
+            , ("visited data edge does not hide invalid sibling", [invalidSiblingHolder, invalidSibling])
+            , ("same Names malformed session", [sessionHolder, malformedSession])
+            ]
+            $ \(label, declarations) -> rejectsImportedKnots label shapeDiagnostic declarations
+        acceptsImportedKnots "same Names valid session after" [(sessionHolder, False), (sessionDomain, True)]
+        let cachedDomain = setTyConNativeDomainShape boolTyCon NativeInvalidDomain
+            cachedIndex = local 10400 "cached_domain_index" (mkTyConTy cachedDomain)
+            uncachedIndex = local 10401 "uncached_domain_index" boolTy
+        check "nullary cache retains its attached raw view" $ case mkTyConTy cachedDomain of
+            TyConApp actual [] -> case tyConNativeDomainShape actual of
+                Just NativeInvalidDomain -> True
+                _ -> False
+            _ -> False
+        rejectsIface "cached raw view rejects before typed Bool eligibility" "Unsupported retained domain shape." [cachedIndex] $
+            IfaceTermVar (mkIfLclName (fsLit "cached_domain_index"))
+        check "wired Bool has no imported raw view" $ case tyConNativeDomainShape boolTyCon of
+            Nothing -> True
+            _ -> False
+        uncached <- restore [uncachedIndex] (IfaceTermVar (mkIfLclName (fsLit "uncached_domain_index")))
+        checkType dflags "absent raw view retains typed Bool eligibility" (TermVarTy uncachedIndex) uncached
         promotionMessages <- newIORef []
         temporaryTypes <- newIORef (mkTypeEnv [AConLike (RealDataCon firstParameterizedCon)])
         let promotionModule = nameModule (dataConName firstParameterizedCon)
