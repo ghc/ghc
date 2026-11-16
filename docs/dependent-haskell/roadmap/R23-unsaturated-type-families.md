@@ -2,7 +2,8 @@
 
 Upstream: [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families).
 Upstream status: accepted, awaiting implementation. Local status: research and
-integration planning. No matchability implementation is claimed in this fork.
+integration planning. M63 specifies the ordinary-arrow stage. Its compiler
+port has not passed a build. No completed matchability implementation is claimed.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Goal and dependencies
@@ -39,6 +40,13 @@ Current function-occurrence gates reject the starting input. No executed
 counterexample against the current closed subset is claimed.
 
 ## Next increments
+
+The [M63 contract](../PLAN.md#m63-ordinary-arrow-matchability) selects an
+ordinary-arrow stage with complete transport, interface and reflection work.
+The next stage adds forall metadata and preserves explicit invisible U.
+Keep generic-domain widening gated until both stages and field/telescope
+transport are complete. Do not describe a syntax-only classification refactor
+as a matchability implementation.
 
 - [ ] Write the kernel specification before porting. Classify constructor,
       family and runtime-function applications. State which equality rules

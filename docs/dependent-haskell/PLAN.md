@@ -4403,3 +4403,112 @@ The paper ledger remains sixteen works and twenty-two PDF versions with the
 same reading scopes. This publication changes status documents only. R03,
 R05 and the full goal remain open. The work queue next selects the R23
 matchability foundation before generic index domains.
+
+
+## M63: ordinary-arrow matchability
+
+Roadmap owner: R23 unsaturated type families. Related card: R05 dependent Core.
+Status: specified. M62 remains the last built and published compiler checkpoint.
+
+The next foundation has two stages. M63 gives ordinary arrows explicit
+matchability through their complete pipeline. A later stage gives dependent
+erased quantifiers the corresponding metadata. Neither stage alone permits
+unrestricted generic runtime domains. Keep those gates until both contracts
+and the separate field/telescope transport obligations are satisfied.
+
+Use proposal #242 and the reviewed prototype as the implementation reference.
+The later proposal assigns U to ordinary runtime functions. The 2019 FCM paper
+supplies the nominal inverse-application premise. Its earlier convention for
+ordinary term arrows differs. Do not transfer the paper's preservation theorem
+to this native kernel. Agda remains the source reference for telescope scope
+and substitution. It does not supply the FC projection rule or a Haskell eta law.
+
+### Representation and formation
+
+Store type-valued matchability in FunTy and its congruence in FunCo. Use the
+prototype's Matchability datatype and promoted M/U constants. Keep metadata
+well-kinded, scoped and explicit. Bound metadata variables and explicit type
+computation must survive maps and substitution. This is not permission to
+infer a new matchability quantifier. The initial unannotated elaboration path
+chooses the context's concrete classification.
+
+Ordinary runtime arrows are U. Constructor kind arrows are M. Classify each
+declared family or synonym argument by arity; preserve its independently
+specified result kind. Visit makers that preserve a supplied full kind as
+well as mkTyConKind. Keep runtime constructor workers/wrappers separate from
+promoted constructor kinds. Determine their actual elaboration from the
+prototype before changing the worker contract.
+
+FUN gains the specified invisible matchability parameter before required
+multiplicity. Its Core arguments are [matchability,mult,rep1,rep2,arg,res],
+with roles N,N,N,N,R,R. Ordinary FUN One still applies One to multiplicity.
+The implicit matchability insertion needs an explicit TypeLevel/KindLevel
+policy; it must not leave an unresolved default in final Core. The other
+three wired arrow constructors retain their four arguments and fixed U/Many.
+Do not copy the superseded argument-shift claim from the first research draft.
+
+ForAllTy and ForAllCo keep their current representation in M63. No new U
+forall is formed. Current family-saturation and native polymorphic-value
+gates remain. The later forall stage must preserve explicit invisible U,
+nominal matchability evidence at all outer roles and the existing required/
+invisible representational visibility bridge. Visibility cannot choose
+matchability. The prototype's forced invisible-M shortcut is not the plan.
+
+### Equality and transport
+
+Permit application syntax inspection independently of inverse equality.
+Given application projection, raw LRCo Lint and optimizer-created LRCo require
+M at the consumed kind arrow. Forward AppCo congruence remains valid for U.
+Stuck U application yields conservative uncertainty in immutable unification
+and apartness. It cannot justify surely-apart or injective-variable analysis.
+Classify oversaturated family applications by the result arrow being applied,
+not by the family name. Preserve structural SelFun decomposition of the arrow
+TYPE itself, including FUN U; this differs from inverting function results.
+
+The FunCo matchability child follows N/N/P at outer N/R/P, as multiplicity does.
+Normalization starts with nominal evidence and explicitly weakens for a phantom
+parent. Selectors, endpoint recovery and coercion optimization use the same
+rule. Do not obtain nominal metadata equality from an opaque phantom proof.
+
+Account for metadata in kinds, equality, FVs, maps, folds, substitution, tidy,
+sequencing, size, TypeMap keys, normalization, zonking, role inference and all
+smart makers. Metadata proofs can contain outer runtime/coercion variables.
+Preserve these dependencies until the existing erasure boundary.
+
+Native TermAppTy/TermAppCo remain opaque, nominal and noninjective. They retain
+the same scoped actual head. Native eligible function heads require U, Many
+and the existing independently supported scalar input/output domains. A
+vacuous DepFunTy becomes the same U arrow as an ordinary runtime lambda.
+Preserve nominal DepFunCo domain evidence and the fixed-function-domain gate.
+
+### Persistence, reflection and exit checks
+
+Migrate the common interface payloads and readers together. Change the
+interface wire version before writing new fields. Old payloads must reject
+at the header. All existing ordinary source libraries must remain usable;
+blanket rejection of ordinary arrow persistence is not a source compiler port.
+Migrate TypeRep/KindRepFun, raw FUN decomposition, binary reflection and
+fingerprints. Distinct well-formed metadata must not have identical reflected
+identity. Keep current native Typeable and unfolding/codec restrictions.
+
+- [ ] Implement type-valued arrow metadata, wired constants and actual makers.
+- [ ] Select and implement concrete source insertion/defaults. Check supplied
+      kind signatures, ordinary FUN One, partial FUN, explicit metadata and
+      data constructor worker/wrapper use. Add no inferred polymorphism.
+- [ ] Preserve metadata and proofs throughout traversals and transformations.
+- [ ] Gate all inverse application evidence and injective/apartness consumers.
+      Preserve forward congruence and structural arrow decomposition.
+- [ ] Migrate interfaces with a changed wire version, reflection and native
+      lazy shape summaries. Preserve closed-domain gates and alias behavior.
+- [ ] Extend the existing API fixtures. Pair M/U inversion and forward cases;
+      test malformed roles, explicit substitutions, proof-only FVs, metadata
+      fingerprints and wire incompatibility. Keep the previous runtime checks.
+- [ ] Build both stages under the established resource caps. Run the selected
+      API/source/Showcase/registered checks and meaningful M/U source controls.
+      Update Showcase only when a source feature is completed.
+- [ ] Audit and publish actual results. Keep R23 and the full goal open. Then
+      specify and implement forall matchability before generic-domain widening.
+
+Use a fresh native-arrow-matchability-* evidence prefix. All M57-M62 prefixes
+remain frozen. This specification introduces no new source extension, family
+unsaturation, ordinary function promotion or runtime evaluation in types.

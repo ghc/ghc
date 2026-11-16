@@ -3779,3 +3779,41 @@ The versioned decision and primary-source hashes are in
 `native-source-domain-conversion-research-v2`. The selected reading scope remains
 seven works and nine PDFs. No new whole-paper reading, mechanization, Haskell eta
 law, combined preservation theorem or sharing theorem is claimed.
+
+## Ordinary-arrow matchability port
+
+M63 implements the ordinary-arrow stage of the R23 foundation. The next stage
+must add matchability to erased dependent quantifiers. The selected
+[contract](PLAN.md#m63-ordinary-arrow-matchability) does not enable unrestricted
+generic runtime domains between these stages.
+
+The main sources are [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html),
+its reviewed [prototype commit](https://gitlab.haskell.org/mmzk1526/ghc/-/commit/d65f4c6cc039385184c6d28ba5420a7a2b3ebc4f),
+and Kiss, Field, Eisenbach and Peyton Jones,
+[Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf),
+DOI 10.1145/3341706. The later proposal assigns U to ordinary runtime arrows.
+The 2019 paper's earlier term-arrow convention differs. Its Figure 5 permits
+forward application congruence for either metadata value but restricts inverse
+projection to M. Its substitution discussion explains why a proof created
+before substitution needs the same typed distinction afterwards.
+
+Current source review at `70f61c21e6` identifies the corresponding consumers:
+`Tc.Solver.Equality.can_eq_app`, LRCo checking in `Core.Lint`,
+`Core.Coercion.Opt.etaAppCo_maybe`, immutable unification in `Core.Unify`, and
+injective-variable analysis in `Core.TyCo.FVs`. Current native TermAppTy is
+already opaque in these operations. Adding a classifier with no stored
+metadata would preserve the old behavior and would not establish R23.
+
+The port must account for supplied full kinds in mkAlgTyCon, mkTcTyCon,
+mkSynonymTyCon and mkFamilyTyCon. Updating mkTyConKind alone misses those
+paths. The new specified invisible FUN parameter preserves ordinary visible
+One binding. It still needs a concrete elaboration/defaulting policy. The
+other three wired arrows retain the prototype's four-argument fixed-U layout.
+The existing addendum supersedes contrary claims in the first ignored draft.
+
+The prototype's forced invisible-M forall maker is not selected. A later
+forall stage must preserve explicit invisible U, its outer metadata scope,
+nominal evidence and modern required/invisible representational casts.
+Agda supplies the separately recorded telescope/substitution comparison; its
+eta and totality policies do not establish the FC projection rule. No new
+paper version, whole-paper reading or preservation proof is claimed here.
