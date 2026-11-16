@@ -76,6 +76,12 @@ toFdHandleIfNeeded h
 toFdHandleIfNeeded = return
 #endif
 
+-- | Workaround for locking prone closeCommunicationHandle on windows
+--
+-- Called after a createProcess: the subprocess might start reading from the
+-- inherited raw handle before this close is scheduled, and, on windows,
+-- closeCommunicationHandle will block on a pending read during its conversion
+-- to Handle. Calling Win32.closeHandle directly avoids the blocking.
 closeTheirEnd :: CommunicationHandle -> IO ()
 #if defined(mingw32_HOST_OS)
 closeTheirEnd (CommunicationHandle h) = Win32.closeHandle h
