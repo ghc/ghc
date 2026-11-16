@@ -3466,6 +3466,8 @@ getAmode :: CmmExpr -> NatM Amode
 getAmode e = do
    platform <- getPlatform
    let is32Bit = target32Bit platform
+       -- See Note [Displacements fit in 32 bits]
+       fits_disp n = is32BitInteger (narrowS (wordWidth platform) n)
 
    case e of
       CmmRegOff r n
@@ -3477,12 +3479,14 @@ getAmode e = do
 
       -- This is all just ridiculous, since it carefully undoes
       -- what mangleIndexTree has just done.
-      CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
-         | is32BitLit platform lit
+      -- The displacement is -i: check that it fits, not i. See
+      -- Note [Displacements fit in 32 bits].
+      CmmMachOp (MO_Sub _rep) [x, CmmLit (CmmInt i _)]
+         | fits_disp (negate i)
          -- assert (rep == II32)???
          -> do
             (x_reg, x_code) <- getSomeReg x
-            let off = ImmInt (-(fromInteger i))
+            let off = litToImm (CmmInt (negate i) (wordWidth platform))
             return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
       CmmMachOp (MO_Add _rep) [x, CmmLit lit]
@@ -3499,18 +3503,21 @@ getAmode e = do
          -> getAmode (CmmMachOp (MO_Add rep) [b,a])
 
       -- Matches: (x + offset) + (y << shift)
+      -- See Note [Displacements fit in 32 bits].
       CmmMachOp (MO_Add _) [CmmRegOff x offset, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
-         | shift == 0 || shift == 1 || shift == 2 || shift == 3
+         | is_scale shift
+         , fits_disp (fromIntegral offset)
          -> x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
 
       CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
-         | shift == 0 || shift == 1 || shift == 2 || shift == 3
+         | is_scale shift
          -> x86_complex_amode x y shift 0
 
+      -- See Note [Displacements fit in 32 bits].
       CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Add _) [CmmMachOp (MO_Shl _)
                                                     [y, CmmLit (CmmInt shift _)], CmmLit (CmmInt offset _)]]
-         | shift == 0 || shift == 1 || shift == 2 || shift == 3
-         && is32BitInteger offset
+         | is_scale shift
+         , fits_disp offset
          -> x86_complex_amode x y shift offset
 
       CmmMachOp (MO_Add _) [x,y]
@@ -3556,6 +3563,36 @@ getAmode e = do
     is_label (CmmLabelDiffOff{}) = True
     is_label _ = False
 
+    -- the scales an index register can have: 1, 2, 4, 8
+    is_scale shift = shift >= 0 && shift <= 3
+
+{- Note [Displacements fit in 32 bits]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An x86-64 address with a base or an index register has a 32-bit sign-extended
+displacement. The assembler rejects a larger one:
+
+    movq 4294967296(%rbx,%r14,4),%rbx
+    Error: 0x100000000 out of range of signed 32bit displacement
+
+So each clause of getAmode that puts a constant in the displacement must check
+that it fits (fits_disp). When the check fails, the clause does not match and
+a later clause computes the constant in a register instead (#15570, #28105).
+This is independent of the code model: the constant is added to a pointer in
+a register, which can point anywhere. Labels are the concern of is32BitLit,
+see Note [%rip-relative addressing on x86-64].
+
+Two details:
+
+- For x - lit the displacement is -lit, so the check is on -lit: lit = -2^31
+  fits but -lit does not.
+
+- The Integer of a CmmInt can be out of the range of its width (see CmmLit).
+  So the check and the emitted immediate both narrow the constant to the
+  word width of the target, as litToImm does. On a 32-bit target every
+  narrowed constant fits. Narrowing with the host Int (fromInteger) is not
+  enough: a 64-bit host that compiles for a 32-bit target would emit the
+  constant unchanged.
+-}
 
 -- | Like 'getAmode', but the amode stays valid across the code of other
 -- expressions: if a register of the amode could be clobbered, the
@@ -3600,7 +3637,8 @@ getSimpleAmode addr = is32BitPlatform >>= \case
 
 x86_complex_amode :: CmmExpr -> CmmExpr -> Integer -> Integer -> NatM Amode
 x86_complex_amode base index shift offset
-  = do (x_reg, x_code) <- getNonClobberedReg base
+  = do platform <- getPlatform
+       (x_reg, x_code) <- getNonClobberedReg base
         -- x must be in a temp, because it has to stay live over y_code
         -- we could compare x_reg and y_reg and do something better here...
        (y_reg, y_code) <- getSomeReg index
@@ -3608,7 +3646,10 @@ x86_complex_amode base index shift offset
            code = x_code `appOL` y_code
            base = case shift of 0 -> 1; 1 -> 2; 2 -> 4; 3 -> 8;
                                 n -> panic $ "x86_complex_amode: unhandled shift! (" ++ show n ++ ")"
-       return (Amode (AddrBaseIndex (EABaseReg x_reg) (EAIndex y_reg base) (ImmInt (fromIntegral offset)))
+           -- narrow the offset to the word width, like litToImm: a CmmInt
+           -- can be out of range. See Note [Displacements fit in 32 bits].
+           off = ImmInteger (narrowS (wordWidth platform) offset)
+       return (Amode (AddrBaseIndex (EABaseReg x_reg) (EAIndex y_reg base) off)
                code)
 
 

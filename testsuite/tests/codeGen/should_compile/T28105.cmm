@@ -1,0 +1,19 @@
+#include "Cmm.h"
+
+// Each procedure exercises a clause of getAmode in the x86-64 NCG that put
+// a constant outside the signed 32-bit range in the address displacement.
+
+// x + ((y << shift) + offset), shift below 3
+shifted (W_ p, W_ i) {
+    return (I64[((p - 4294967296) + (i << 2)) + 4294967296]);
+}
+
+// CmmRegOff x offset + (y << shift)
+regoff (W_ p, W_ i) {
+    return (I64[(p + 4294967296) + (i << 2)]);
+}
+
+// x - lit, with -lit outside the range
+subneg (W_ p) {
+    return (I64[I64[p] - (-2147483648)]);
+}

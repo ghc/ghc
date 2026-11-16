@@ -156,3 +156,6 @@ test('T27979', [req_cmm, check_errmsg('stg_ap_0_fast')], compile, ['-O -ddump-cm
 test('T27694', normal, compile, ['-dasm-lint'])
 test('T27694c', normal, compile, ['-O -dasm-lint'])
 test('T27694d', normal, compile, ['-O2 -dasm-lint'])
+
+test('T28105', [cmm_src, when(unregisterised(), skip), when(wordsize(32), skip)], compile, ['-no-hs-main'])
+test('T28105b', [when(unregisterised(), skip), when(wordsize(32), skip)], compile, ['-O -Wno-overflowed-literals'])

@@ -1,0 +1,10 @@
+section: codegen
+synopsis: x86-64 NCG: never emit an address displacement that does not fit in 32 bits
+issues: #28105
+mrs: !17002
+description: {
+  Three address forms in the x86-64 native code generator put a constant into
+  the displacement of an address without checking that it fits in a signed
+  32-bit integer, so the assembler rejected the module. The constant is now
+  computed in a register when it does not fit.
+}
