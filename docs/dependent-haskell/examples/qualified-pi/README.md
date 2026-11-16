@@ -23,6 +23,28 @@ specialize = exposeQ
 argument. The compiler keeps their visibility, scope and evidence separate.
 No singleton conversion is required.
 
+`ParameterizedIndexLibrary` also provides safe indexing for a retained Boolean
+list. Its ordinary `Fin` GADT records a position below a promoted Nat bound:
+
+```haskell
+indexClosed :: foreach (xs :: [Bool]) -> Fin (Count xs) -> Bool
+mkFinClosed :: foreach (xs :: [Bool]) -> Int -> Maybe (Fin (Count xs))
+lookupRuntime :: [Bool] -> Int -> Maybe Bool
+```
+
+`lookupRuntime [True, False] 1` returns `Just False`. Negative and out-of-range
+requests return `Nothing`. The negative branch does not inspect the list.
+Construction and selection inspect only the required prefix. Finite access to
+a cyclic list can therefore terminate. `Count` remains a saturated type family.
+A finite-position witness proves a bound, not list identity. Equal-count evidence
+permits reuse. Static checking verifies construction and use of the witness;
+the signed runtime input is checked when `mkFinClosed` runs.
+
+The maintained [Showcase](../../Showcase.hs) includes five labeled observations.
+Both stages also pass a separate nineteen-observation client and five rejection
+controls through copied interfaces. Generic `[a]`, ordinary `length` promotion,
+totality and bounds-check elimination remain outside this example.
+
 Run from the repository root with this fork's built compiler:
 
 ```sh

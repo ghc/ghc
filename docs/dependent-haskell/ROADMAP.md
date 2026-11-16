@@ -27,7 +27,7 @@ The supported static subset and native pipeline remain restricted.
 | Area | Demonstrated in this fork | Work before the roadmap task is complete |
 | --- | --- | --- |
 | Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
-| Dependent products (`R03`) | Visible `foreach (n :: Nat) -> ...`, dependent equations and checked lambdas, runtime indices from IO, and qualified higher-order values | General domains and applications, invisible retained quantification, and predictable inference beyond the measured subset. |
+| Dependent products (`R03`) | Visible `foreach (n :: Nat) -> ...`, dependent equations and checked lambdas, runtime indices from IO, qualified higher-order values, and checked positions for retained `[Bool]` | General domains and applications, invisible retained quantification, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
 | Type computation (`R06`, `R13`) | Existing promoted constructors and saturated type families, with explicit equality proofs | Ordinary function promotion, closed and open evaluation, and lambda/let/case expressions in types. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
@@ -60,6 +60,9 @@ Its compiler checkpoint is `5c527cd8b92a`; its source fixture checkpoint is
 The canonical audit is
 `_build/verification/dependent-haskell-M59-final-audit-v1.json`.
 See [the M59 specification](PLAN.md#m59-bodies-beneath-fixed-function-domains).
+M60 composes safe indexing with the existing compiler. Both stages pass its
+nineteen runtime observations, five rejections, equal-count reuse and the
+84-observation Showcase. Its separate audit and publication remain pending.
 Observation counts measure those programs. They do not count roadmap features.
 
 ## Current work queue
@@ -78,7 +81,7 @@ can advance a card while the card remains open.
 | Order | Owner and contribution | State | Gate and next result |
 | --- | --- | --- | --- |
 | 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Complete bounded increment: M59 | Both stages and independent audit pass. The larger R03/R05 features remain open. |
-| 2 | R03: safe indexing over a retained `[Bool]` | M60 specified; bootstrap candidate passes nineteen observations | Integrate the existing `Count` family with an ordinary `Fin` GADT. Check bounds, demand and both-stage separate imports. |
+| 2 | R03: safe indexing over a retained `[Bool]` | M60 implemented; both stages pass | Finish its bounded evidence audit and publication. The next compiler task is the R05 opaque-cast probe. |
 | 3 | R05: application through opaque whole-function evidence | Research complete enough to specify a probe | Keep genuinely abstract payloads and a scoped coercion variable. Check Lint, CorePrep and object execution before choosing a new coercion rule. |
 | 4 | R03: explicit complete retained-function type arguments | Scoped source task identified | Use the existing lifted consumer. Preserve kind, scope, complete-type and native-meta checks. |
 | 5 | R23: matchability foundation; also advances R05 | Prior implementation and native integration reviewed; spec needed | Specify kinds, substitution, coercions, roles, interfaces and reflection before admitting unrestricted function-valued fields. |

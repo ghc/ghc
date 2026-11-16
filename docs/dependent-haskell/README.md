@@ -56,12 +56,13 @@ _build/showcase/showcase
 | Runtime list indices, optional indices and heterogeneous tree payloads | `parameterizedDomains` |
 | Nominal domain conversion, ordinary payload inference and cast demand | `domainConversion` |
 | Whole-worker specialization, payload inference and function demand | `fixedFunctionDomains` |
+| Runtime bounds, finite-position witnesses and lazy list access | `closedListIndexing` |
 
-The M59 program produces the expected 79 lines in both compiler stages with
-Core Lint and STG Lint enabled. It adds eleven fixed function-domain observations
-to M58's 68-line prefix. Both versions use fourteen source modules. The
-independent M59 audit passes. See [the work queue](ROADMAP.md#current-work-queue)
-for the next increments.
+The M60 program produces the expected 84 lines in both compiler stages with
+Core Lint and STG Lint enabled. It appends five safe-indexing observations to
+M59's 79-line prefix. Both versions use fourteen source modules. The independent
+M59 compiler audit passes. M60 adds source composition with that compiler.
+See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
 GroundApplicationClient checks native function types as equality operands
@@ -86,6 +87,7 @@ optimization support or full roadmap completion.
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
 | Native interface domain shapes | M55 checks derived raw views before fields and generic binder allocation; M54 remains the detected-loop fallback |
 | Parameterized index domains | M56 retains closed `[Bool]`, `Maybe Nat` and `Tree Bool` values through source, Core, interfaces and native lowering |
+| Safe list indexing | M60 combines `Fin (Count xs)` with a retained `[Bool]`; both stages pass runtime bounds, lazy access and equal-count reuse |
 | Source domain conversion | M58 checks nominal scalar-domain conversion and ordinary payload inference in a private body solve; recursive domain reduction uses the solver depth limit |
 | Configured fork version | `10.1.20261115.1`, with interface header `1001202611151`; matching compiler and libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
@@ -98,6 +100,7 @@ optimization support or full roadmap completion.
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
 | Compiler validation | Audited M59 passes both builds, both-stage public19, parameterized14 and Showcase79/14, fresh API1/37 and five registered tests |
+| Example validation | M60 passes both-stage hidden-interface source19, five rejection controls, equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |

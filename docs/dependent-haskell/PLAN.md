@@ -4087,9 +4087,8 @@ own source commit. This publication checkpoint changes only status documents.
 ## M60: closed-list safe indexing
 
 Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
-Status: specified. The isolated bootstrap candidate passes nineteen observations.
-Both stages agree on its five source rejections. Maintained-source integration
-and its verification remain open.
+Status: implemented and checked with both compiler stages at `d26e6a2fb4`.
+The source composition adds no compiler rule.
 
 Compose the existing retained `[Bool]` domain and saturated `Count` family with
 an ordinary `Fin` GADT. Agda's finite-position datatype is the prior art; see
@@ -4117,27 +4116,45 @@ counts permits position reuse. It must not imply equality of the lists.
 The empty-list equation uses the ordinary empty case on `Fin Z`. A bottom
 witness must still be bottom. Haskell remains partial.
 
-- [ ] Add `Fin`, `indexClosed`, `mkFinClosed` and `lookupRuntime` to the existing
+- [x] Add `Fin`, `indexClosed`, `mkFinClosed` and `lookupRuntime` to the existing
       library. Explain bounds, family reduction and demand in one owning Note.
       Use explicit `FZ @(Count rest)` and `FS @(Count rest)` applications.
       The measured implicit `FZ` route cannot select its native-dependent bound.
-- [ ] Append five observations to Showcase's existing 79-line prefix. Include
+- [x] Append five observations to Showcase's existing 79-line prefix. Include
       runtime list and position inputs, invalid bounds, ignored tails and finite
       access to a cyclic list. Keep fourteen source modules.
-- [ ] Compile the producer separately with both compiler stages. Compile the
+- [x] Compile the producer separately with both compiler stages. Compile the
       nineteen-observation client with only copied interfaces available.
       Run bounds, lazy-field, cyclic-input and empty-case demand checks.
-- [ ] Check rejection of `Fin Z`, a position at an unrelated bound, and list
+- [x] Check rejection of `Fin Z`, a position at an unrelated bound, and list
       equality inferred from equal counts. Check the current generic-domain
       and implicit-constructor restrictions separately. Accept explicit reuse
       under equal-count evidence. Preserve located diagnostics.
-- [ ] Run the maintained Showcase with both compilers and Core/STG Lint.
+- [x] Run the maintained Showcase with both compilers and Core/STG Lint.
       Check unchanged compiler inputs. Record the exact sources and outcomes.
-- [ ] Update the roadmap, references and example instructions. Publish the
-      bounded result. Keep R03 and the whole program open.
+- [x] Update the roadmap, references and example instructions.
+- [ ] Complete the separate evidence audit and publish the bounded result.
+      Keep R03 and the whole program open.
 
 No compiler rebuild is required when only these examples and documents change.
 The existing API and registered compiler checks remain M59 evidence. This
 increment adds no generic `[a]` domain, ordinary `length` promotion, totality,
 single-pass algorithm or bounds-check elimination. Construction and selection
 traverse the required prefix separately. General optimization remains gated.
+
+The selected verification is
+`_build/verification/native-closed-list-indexing-verification-v2/results.json`.
+Both stages pass nineteen runtime observations through copied interfaces,
+five located rejections, equal-count reuse and Showcase84/14. The rejections
+are GHC-83865 for the empty bound, unrelated bound and implicit `FZ`;
+GHC-05617 for list equality from count equality; and GHC-83605 for generic `[a]`.
+The generic-domain and implicit-constructor restrictions remain separate from
+ordinary bound safety. Equal-count reuse is a compile-only control.
+All 173 recorded inputs remain unchanged. The serial 4 GiB/no-swap run peaks
+at 243 MiB and returns zero. The earlier runner's interface-path failure remains
+recorded. No source change was needed for the retry.
+
+The installed Fourmolu parser rejects `ExperimentalDependentTypes` before it
+can format either changed Haskell file. The added code follows the surrounding
+layout. No Cabal file changes, compiler rebuild, API rerun or full-suite run
+belongs to this example-only increment.

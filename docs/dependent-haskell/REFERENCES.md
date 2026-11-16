@@ -648,10 +648,12 @@ explicit constructor applications follow the existing visible-type-application
 design. The measured implicit `FZ` variant rejects its unsolved bound.
 See Note [Closed-list positions] in `ParameterizedIndexLibrary`.
 
-The nineteen-observation bootstrap candidate and both-stage comparison reports
-are under `_build/verification/native-closed-list-indexing-*`. Those runs precede
-integration into the maintained library. They establish no totality, optimizer,
-generic-domain or bounds-check-elimination result.
+The candidate, comparisons and integrated verification reports are under
+`_build/verification/native-closed-list-indexing-*`. Integrated version 2 passes
+nineteen runtime observations with both stages through copied interfaces.
+Five source rejections and accepted equal-count reuse keep the boundaries
+explicit. Neither these checks nor Agda's example establish totality, optimizer,
+generic-domain or bounds-check-elimination results for this implementation.
 
 ### Source retained constraints
 

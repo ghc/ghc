@@ -24,8 +24,11 @@ all Core transformations. Normal optimization remains a broader release gate.
 - Fixed function-domain body comparison and payload selection at M59.
   Both stages pass the selected source, runtime and rejection controls.
   Its independent audit passes.
+- Closed-list safe indexing at M60. Both stages pass bounds, lazy-field and
+  finite cyclic-input checks through separately compiled interfaces.
 
 The published M59 checkpoint has 79 Showcase observations in both stages.
+M60 appends five observations and passes all 84 with both compilers.
 See [the current evidence](../ROADMAP.md#where-this-fork-stands) and
 [the M59 specification](../PLAN.md#m59-bodies-beneath-fixed-function-domains).
 M56's domain representation and M57's conversion rules belong primarily to R05.
@@ -35,14 +38,15 @@ M58 and M59 expose those rules through source checking.
 
 - [x] Finish M59's final audit and prepare publication. Preserve the existing
       compiler and fixture identities when documentation changes.
-- [ ] Measure closed-list safe indexing:
+- [x] Measure closed-list safe indexing:
       `indexClosed :: foreach (xs :: [Bool]) -> Fin (Count xs) -> Bool`.
       Use an ordinary `Fin` GADT and the existing saturated `Count` family.
-      Check negative and out-of-range runtime requests, list identity,
+      Check negative and out-of-range runtime requests, distinct list names,
       empty-case demand, lazy fields and finite access to cyclic input.
-      The bootstrap candidate passes nineteen observations. Both stages agree
-      on five source rejections, including the explicit-constructor boundary.
-      Integration into the maintained examples remains open.
+      The integrated library passes nineteen runtime observations with both
+      stages. Both agree on five rejections and accept equal-count reuse.
+      Fin proves a bound. It does not identify list values.
+- [ ] Finish M60's separate evidence audit and publication.
 - [ ] Admit a complete retained-function type in the existing lifted
       consumer's explicit type-argument position. Preserve complete-type,
       kind, scope and native-meta checks. Check full worker WHNF separately
