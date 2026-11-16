@@ -4169,7 +4169,8 @@ This publication checkpoint changes only status documents.
 ## M61: opaque whole-function cast lowering
 
 Roadmap owner: R05 dependent Core. Related card: R03 dependent products.
-Status: specified. The prepared research candidate has not run.
+Status: scratch probe measured. Abstract CorePrep passes. Closed bytecode
+execution rejects the one-argument control during native simplification.
 
 Determine whether the existing whole-function cast already supports application
 through opaque nominal evidence. `pushCoRetainedArg` can decline a coercion
@@ -4198,6 +4199,12 @@ the cast-only expression. It must preserve a bottom worker's WHNF behavior.
 - [ ] Run the prepared candidate in scratch first. Check input/output Lint,
       exact expression types and scoped opaque evidence after direct CorePrep.
       Close it with `a = b = Int` and legitimate reflexivity only for execution.
+- [ ] Fix the measured native function beta-reduction failure. A bare eligible
+      function argument must substitute through terms and native types together.
+      Require the same complete function type. Retain the application when the
+      optimized argument is not an eligible bare function variable. Do not
+      introduce a let alias that escapes through the partial result type.
+      This is the function-head counterpart of existing scalar beta substitution.
 - [ ] Extend the existing API fixture with nine quiet bytecode observations:
       three good-worker WHNF checks, three bottom-worker WHNF checks, ignored
       bottom inputs returning 42, vector demand, and scalar-index demand.
@@ -4220,3 +4227,11 @@ domain. It establishes no normal-optimizer, sharing or preservation theorem.
 Opaque evidence projection remains a separate typed transformation obligation
 even if whole-cast execution succeeds. Compiler rebuilds depend on a compiler
 change; fixture-only checks use the existing matching compiler and libraries.
+
+Scratch discovery v1 stops at missing explicit coercion-constructor imports.
+Version 2 corrects those imports, compiles, and reaches the bytecode pipeline.
+Core Lint then reports a let-bound function index in the partial result type.
+The current scalar-only beta guard lets the function binder enter ordinary
+`simple_bind_pair`, which creates that escaping alias. The measured logs are in
+`_build/verification/native-opaque-whole-cast-discovery-v2/`. They do not show a
+need for opaque coercion projection. All nine runtime checks remain uncompleted.
