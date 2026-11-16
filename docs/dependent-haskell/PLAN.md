@@ -3748,3 +3748,50 @@ It covers the complete frozen namespace. All `native-interface-domain-shapes-*`
 files and directories are permanently frozen. The canonical record is
 `dependent-haskell-M55-final-audit-v1.json`, SHA256
 `67c0af1483bffda59b9fc577ba30dfbcb78da11a34fcec6839a0d96b39b30877`.
+
+### M56: retain closed parameterized algebraic values
+
+Status: planned. This increment addresses C1's domain and constructor contract.
+Keep C1, C2, R22 and the full program goal open.
+
+Use a runtime `[Bool]` as a retained index. A closed `Count` family maps its
+promoted constructors to the length of a `Vec`. Check ordinary `[]` and `b:bs`
+source patterns. Add `Maybe Nat` and `Tree Bool` controls. Export a builder and
+its package through a real interface and object file. Keep the static `Count`
+family explicit; this increment does not evaluate arbitrary term definitions
+in types.
+
+Accept saturated boxed data types with closed monotype arguments of kind
+`Type`. Instantiate constructor universals with those arguments. Require each
+runtime field to have a supported scalar domain. A phantom function parameter
+can qualify; an actual function field cannot. Keep existential variables,
+equality specifications, constructor contexts, wrappers, newtypes and retained
+constructor telescopes outside index domains.
+
+Check recursion along the active declaration path. A return to the same
+`TyCon` must have nominally equal type arguments. Separate siblings can use
+different instances. This is uniform recursion. It rejects growing instances
+and parameter permutations; it does not establish runtime termination.
+
+Constructor indices retain ordinary type arguments before runtime indices.
+Branch evidence relates the actual scrutinee index to that complete promoted
+constructor application. Instantiate pattern fields and Core Lint checks from
+the same parent arguments. CorePrep keeps ordinary type applications erased,
+preserves actual field identifiers, and transports only checked nominal
+evidence. Keep opaque call congruence forward and nominal. Add no Core type,
+coercion form, interface tag or inverse call rule. Keep M55's raw applied
+interface shapes unknown and retain the typed eligibility check.
+
+The prior-art comparison uses the existing D/DC, System DR and GraD reading
+ledger. Their conversion, role and usage rules do not prove this datatype
+extension. Record the selected Agda parameter-instantiation and erasure source
+alongside the implementation. Review substitution, scope, constructor identity,
+runtime demand and erasure together before extending each affected path.
+
+- [x] Record the domain, recursion, constructor and erasure contract.
+- [ ] Extend domain checking and constructor-index conversion together.
+- [ ] Instantiate source patterns, nominal proofs, Lint and backend lowering.
+- [ ] Check source construction, recursion, separate imports and lazy fields.
+- [ ] Update existing rejection/API controls and the maintained Showcase.
+- [ ] Build both stages and run focused source/API/registered checks.
+- [ ] Record evidence and references, review the change and publish it.
