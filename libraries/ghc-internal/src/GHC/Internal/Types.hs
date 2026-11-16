@@ -7,6 +7,7 @@
              TypeApplications, StandaloneKindSignatures, GADTs,
              FlexibleInstances, UndecidableInstances, UnboxedSums,
              BangPatterns, UnliftedFFITypes #-}
+{-# LANGUAGE CUSKs #-} -- Required after StandaloneKindSignatures for (->).
 -- NegativeLiterals: see Note [Fixity of (->)]
 
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
@@ -254,6 +255,7 @@ This complete user-specified kind gives ma a specified invisible binder.
 The runtime representations stay inferred in the result kind. Do not move
 them to the declaration head. That would change the synonym's arity.
 This kind must match unrestrictedFunTyCon in GHC.Builtin.WiredIn.Types.
+Enable CUSKs after StandaloneKindSignatures, which disables CUSKs.
 -}
 
 {- *********************************************************************
