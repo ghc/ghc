@@ -40,6 +40,8 @@ Add a small, labeled example when a source feature is completed. Keep the
 examples finite. Reuse the checked example libraries and show their types here
 when the signature explains the feature. Compiler-only invariants remain in
 CORE.md and the existing tests. A passing example does not prove totality.
+The API fixture checks native dead-local removal structurally. This program
+checks evaluation and sharing through the same native compiler path.
 
 This module uses ordinary application checking. Imported providers keep their
 own language extensions. GroundApplicationClient checks the native function
@@ -56,8 +58,8 @@ Run from the repository root with this fork's matching compiler and libraries:
     -o _build/showcase/showcase
   _build/showcase/showcase
 
-General optimization, arbitrary dependent evaluation and exported function
-indices remain outside the completed source subset. See README.md and CORE.md.
+General optimization, arbitrary dependent evaluation and bare function values
+as indices remain outside the completed source subset. See README.md and CORE.md.
 -}
 
 -- | Select different ordinary result types with a runtime Boolean.

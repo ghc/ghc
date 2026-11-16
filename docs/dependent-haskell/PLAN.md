@@ -3559,7 +3559,7 @@ encoding, native unfoldings, general optimization, C1, C2 and R22 stay open.
 
 ### M53: native dead local binding analysis
 
-Status: specified; implementation and measurements pending.
+Status: implementation committed; compiler validation pending.
 
 Run a restricted native analysis before `simpleOptNativeExpr`. Use
 `GHC.Core.FVs.freeVars` and its existing deep `FVAnn` invariant. Reconstruct
@@ -3586,9 +3586,12 @@ supports the separation of scope from runtime demand. It does not justify
 Haskell eta reduction or a claim about totality. See the
 [prior art](REFERENCES.md#native-dead-local-binding-analysis-prior-art).
 
-- [ ] Measure the current compiler's structural failure to remove an ordinary
+- [x] Measure the current compiler's structural failure to remove an ordinary
   dead lifted let. Require valid input Core and the exact expected failure.
-- [ ] Add the native entry and its owning GHC-style Note. Use existing deep
+  The source fixture at `cf21b7ac8af3452dc0459335fe737b0aa80c4dce` compiles
+  against M52. Both Lint checks pass before the expected structural failure.
+  `native-occurrence-analysis-baseline-v1/results.json` preserves that result.
+- [x] Add the native entry and its owning GHC-style Note. Use existing deep
   FV annotations and the existing removal policy. Add no new FV algorithm.
 - [ ] Update the existing API fixture without new test files or golden lines.
   Check dead-let removal and retained scalar/function-head dependencies in
