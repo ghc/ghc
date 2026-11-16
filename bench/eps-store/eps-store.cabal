@@ -1,0 +1,48 @@
+cabal-version:      3.0
+name:               eps-store
+version:            0.1.0.0
+synopsis:           Alternative, low-memory External Package State stores for GHC
+description:
+  Implementations of GHC's abstract External Package State (see
+  Note [Abstract External Package State] in GHC.Unit.External.Store) which keep
+  the declarations of loaded interfaces out of memory and rehydrate them on
+  demand: in an SQLite database, or by re-reading the .hi files.
+  Must be built with the GHC of this source tree (it uses the ghc library).
+build-type:         Simple
+
+common warnings
+  ghc-options: -Wall -Wno-name-shadowing
+
+library
+  import:           warnings
+  hs-source-dirs:   src
+  default-language: GHC2021
+  exposed-modules:
+    EpsStore.DeclStore
+    EpsStore.LowMem
+    EpsStore.Sqlite
+    EpsStore.HiFile
+  build-depends:
+    , base
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , ghc
+    , direct-sqlite
+    , text
+    , array
+
+executable ghc-eps-store
+  import:           warnings
+  hs-source-dirs:   app
+  main-is:          Main.hs
+  default-language: GHC2021
+  ghc-options:      -rtsopts -threaded "-with-rtsopts=-T"
+  build-depends:
+    , base
+    , directory
+    , filepath
+    , ghc
+    , eps-store
+    , unix

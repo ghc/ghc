@@ -1,0 +1,6 @@
+-- Must be built with the compiler of this source tree, because the stores use
+-- the (abstract EPS) API of its ghc library. Use ./cabal.sh, which passes it
+-- (with absolute paths, as build tools are configured in other directories).
+packages: .
+-- Hackage dependencies don't know about this GHC version yet.
+allow-newer: all
