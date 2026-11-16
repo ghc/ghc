@@ -1506,7 +1506,7 @@ tcRetainedArg domain arg
                   ; return (foldr (\value rest -> Core.mkApps cons [value, rest]) nil values) }
           HsVar _ lname
             | Just arg_id <- lookupNameEnv env (unLocWithUserRdr lname)
-            -> index_var expected arg_id
+            -> tcRetainedArgVar expected arg_id
             | isDataOcc (nameOccName (unLocWithUserRdr lname))
             -> do { con <- tcLookupConLike (unLoc lname)
                   ; case con of
@@ -1518,18 +1518,10 @@ tcRetainedArg domain arg
                       Just arg_id
                         -> do { arg_id <- liftZonkM (zonkId arg_id)
                               ; if isNativeIndexId arg_id
-                                then index_var expected arg_id
+                                then tcRetainedArgVar expected arg_id
                                 else unsupported }
                       _ -> unsupported }
           _ -> unsupported
-
-    -- | Preserve nominal transport before the index substitution checks its kind.
-    index_var :: TcType -> Id -> TcM Core.CoreExpr
-    index_var expected arg_id
-      | varType arg_id `tcEqType` expected = return (Core.Var arg_id)
-      | otherwise
-      = do { co <- unifyType Nothing (varType arg_id) expected
-           ; return (Core.Cast (Core.Var arg_id) (SubCo co)) }
 
     -- Instantiate the erased parameters from the complete expected domain.
     constructor expected dc = case nativeIndexDataConTyArgs expected dc of
@@ -1566,6 +1558,15 @@ tcRetainedArg domain arg
 
     unsupported :: TcM a
     unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)
+
+-- | Resolve a scalar variable at the expected nominal index domain.
+-- See Note [Retained argument application].
+tcRetainedArgVar :: TcType -> Id -> TcM Core.CoreExpr
+tcRetainedArgVar expected arg_id
+  | varType arg_id `tcEqType` expected = return (Core.Var arg_id)
+  | otherwise
+  = do { co <- unifyType Nothing (varType arg_id) expected
+       ; return (Core.Cast (Core.Var arg_id) (SubCo co)) }
 
 {- Note [Retained argument application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
