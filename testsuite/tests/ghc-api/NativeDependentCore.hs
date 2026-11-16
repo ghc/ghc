@@ -1236,7 +1236,12 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     messages <- newIORef []
                     let quietEnv = env{hsc_logger = pushLogHook (\_ _ _ _ message -> modifyIORef' messages (showSDoc dflags message :)) (hsc_logger env)}
                     outcome <- try @IOEnvFailure $ try @GhcException $ do
-                        completed <- timeout 2000000 $ restoreImportedKnots compression quietEnv declarations >>= mapM_ forcePackage
+                        completed <- timeout 2000000 $ do
+                            imported <- restoreImportedKnots compression quietEnv declarations
+                            forM_ imported $ \package -> do
+                                forcePackage package
+                                _ <- evaluate (isNativeIndexType (mkTyConTy package))
+                                pure ()
                         case completed of
                             Just () -> pure ()
                             Nothing -> fail ("FAIL: " ++ label ++ "; imported domain validation did not terminate")
@@ -1544,6 +1549,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     rhs
             selfAlias = synonym 9970 "IfaceGenericSelfAlias" (reference aliasSelf)
             aliasSelf = genericScalarDomain selfAlias (recursiveDeclaration 9980 "IfaceGenericAliasSelf")
+            fieldAlias = synonym 10100 "IfaceGenericFieldAlias" (scalarPi hiddenSelf)
+            hiddenSelf = ordinaryField (reference fieldAlias) (recursiveDeclaration 10110 "IfaceGenericHiddenSelf")
             -- | Keep the retained scalar in both equality operands.
             nonvacuousBody domain = case snd dependent of
                 IfaceFunTy flag mult (IfaceTyConApp eqCon (IA_Arg _ visibility rest)) result ->
@@ -1562,6 +1569,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             , ("generic Pi ordinary scalar mutual left first", [scalarLeft, scalarRight])
             , ("generic Pi ordinary scalar mutual right first", [scalarRight, scalarLeft])
             , ("generic Pi nullary alias self cycle", [selfAlias, aliasSelf])
+            , ("generic Pi hidden in a nullary field synonym", [fieldAlias, hiddenSelf])
             , ("generic Pi nonvacuous self cycle", [nonvacuousSelf])
             ]
             $ \(label, declarations) -> rejectsImportedKnots label recursiveDiagnostic declarations
