@@ -4624,6 +4624,7 @@ boolIndex :: Bool -> Type
 boolIndex value = mkTyConTy (promoteDataCon (if value then trueDataCon else falseDataCon))
 
 -- | Construct the two ordinary closed-family equations for Select.
+-- See Note [Native API arrow classification] in NativeDependentCore.hs.
 selectFamily :: (TyCon, CoAxiom Branched)
 selectFamily = (family, axiom)
   where
@@ -4632,7 +4633,7 @@ selectFamily = (family, axiom)
     family =
         mkFamilyTyCon
             (mkSystemName (unique 101) (mkTcOcc "Select"))
-            (mkTyConKind binders liftedTypeKind)
+            (mkTyConKindWithMatchability unmatchableDataConTy binders liftedTypeKind)
             binders
             0
             liftedTypeKind
@@ -4719,7 +4720,7 @@ partialKeepKernel force = Lam b (Let (NonRec keepId keepSelect) observation)
   where
     b = local 1 "runtime_b" boolTy
     keepId = local 31 "keep" (exprType keepSelect)
-    resultType = mkFunctionType ManyTy (selected (TermVarTy b)) (selected (TermVarTy b))
+    resultType = mkFunctionType unmatchableDataConTy ManyTy (selected (TermVarTy b)) (selected (TermVarTy b))
     observation = mkApps (Var force) [Type resultType, App (Var keepId) (Var b)]
 
 -- | Keep a lazy local index whose producer is a global Boolean thunk.
@@ -4729,7 +4730,7 @@ localIndexKeep force producer =
   where
     b = local 60 "local_index" boolTy
     keepId = local 61 "keep" (exprType keepSelect)
-    resultType = mkFunctionType ManyTy (selected (TermVarTy b)) (selected (TermVarTy b))
+    resultType = mkFunctionType unmatchableDataConTy ManyTy (selected (TermVarTy b)) (selected (TermVarTy b))
     observation = mkApps (Var force) [Type resultType, App (Var keepId) (Var b)]
 
 -- | Preserve a lazy local index used only in erased annotations.
@@ -4765,7 +4766,7 @@ strictChooseKernel intPayload force = Lam b (Let (NonRec chooseId chooseExpr) ob
 
 -- | Build an indexed function type inhabited without constructor information.
 indexed :: Type -> Type
-indexed index = mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, index, index]) intTy
+indexed index = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, index, index]) intTy
 
 -- | Apply retained keep fully and consume its result using reflexive evidence.
 dictionaryKeepKernel :: CoreExpr -> Id -> CoreExpr
@@ -4812,7 +4813,7 @@ natReplication nat vec zero successor nil cons = do
     caseBinder = local 203 "replicate_case" natTy
     index = TermVarTy n
     result = mkTyConApp vec [intTy, index]
-    worker = local 204 "replicate_native" (mkDepFunTy n (mkFunctionType ManyTy intTy result))
+    worker = local 204 "replicate_native" (mkDepFunTy n (mkFunctionType unmatchableDataConTy ManyTy intTy result))
     zeroProof = proof 205 index (mkTyConTy (promoteDataCon zero))
     succProof = proof 206 index (mkTyConApp (promoteDataCon successor) [TermVarTy predecessor])
     recursive = mkApps (Var worker) [Var predecessor, Var value]
@@ -4879,7 +4880,7 @@ nativeVecHead nat vec successor cons = do
     vectorTy = mkTyConApp vec [intTy, successorIndex]
     vector = local 221 "head_vector" vectorTy
     caseBinder = local 222 "head_case" vectorTy
-    worker = local 223 "head_native" (mkDepFunTy n (mkFunctionType ManyTy vectorTy intTy))
+    worker = local 223 "head_native" (mkDepFunTy n (mkFunctionType unmatchableDataConTy ManyTy vectorTy intTy))
     (existentials, arguments) = dataConRepInstPat (map unique [230 .. 239]) ManyTy cons [intTy, successorIndex]
 
 {- Note [Opaque call runtime checks]
@@ -5046,7 +5047,7 @@ runNatChecks environment flags bindings tycons = do
                 appendN
                 ( mkDepFunTy
                     appendM
-                    (mkFunctionType ManyTy leftType (mkFunctionType ManyTy rightType resultType))
+                    (mkFunctionType unmatchableDataConTy ManyTy leftType (mkFunctionType unmatchableDataConTy ManyTy rightType resultType))
                 )
         appendWorker = local 244 "append_native" appendType
         secondInput = local 245 "second_runtime_nat" natTy
@@ -5186,7 +5187,7 @@ runNatChecks environment flags bindings tycons = do
         Right value -> fail ("FAIL: beta argument hid a bottom function: " ++ show value)
     let natTy = mkTyConTy nat
         keepN = local 211 "unused_nat" natTy
-        indexedNat index = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy
+        indexedNat index = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy
         keepValue = local 212 "keep_value" (indexedNat (TermVarTy keepN))
         keepExpr = Lam keepN (Lam keepValue (Var keepValue))
         keepId = local 213 "keep_nat" (exprType keepExpr)
@@ -5264,7 +5265,7 @@ runNatChecks environment flags bindings tycons = do
         Left exception | "native-bottom-function" `isInfixOf` displayException exception -> pure ()
         Left exception -> fail ("FAIL: variable alias changed bottom function demand: " ++ displayException exception)
         Right value' -> fail ("FAIL: variable alias hid a bottom function: " ++ show value')
-    let opaqueHead = local 3300 "opaque_head" (mkFunctionType ManyTy natTy natTy)
+    let opaqueHead = local 3300 "opaque_head" (mkFunctionType unmatchableDataConTy ManyTy natTy natTy)
         opaqueResult = local 3301 "opaque_result" natTy
         opaquePredecessor = local 3302 "opaque_predecessor" natTy
         predecessorIndex = TermVarTy opaquePredecessor
@@ -5381,7 +5382,7 @@ runNatChecks environment flags bindings tycons = do
         fail "FAIL: type-only opaque call lost its head or argument dependency"
     expect "type-only opaque call ignores its bottom function and argument" "42" $
         callWith bottomHead typeOnlyKernel (Var (helper bindings "bottomNat"))
-    let mixedHead = local 3310 "mixed_opaque_head" (mkFunctionType ManyTy boolTy natTy)
+    let mixedHead = local 3310 "mixed_opaque_head" (mkFunctionType unmatchableDataConTy ManyTy boolTy natTy)
         mixedInput = local 3311 "mixed_opaque_input" boolTy
         mixedKernel = opaqueKernel False mixedHead mixedInput (Var mixedInput) "observeVec"
     expect "opaque Bool-to-Nat call preserves distinct domains" "[42]:1\n[]:0" $
@@ -5438,7 +5439,7 @@ domainConversionCases flags bindings tycons = do
         family =
             mkFamilyTyCon
                 (mkSystemName (unique 12001) (mkTcOcc "RuntimeDomainF"))
-                (mkTyConKind parameters liftedTypeKind)
+                (mkTyConKindWithMatchability unmatchableDataConTy parameters liftedTypeKind)
                 parameters
                 0
                 liftedTypeKind
@@ -5458,12 +5459,12 @@ domainConversionCases flags bindings tycons = do
         natTy = mkTyConTy nat
         x = local 12003 "domain_source" domainA
         y = local 12004 "domain_actual" domainB
-        function = local 12005 "domain_opaque_head" (mkFunctionType ManyTy domainA natTy)
+        function = local 12005 "domain_opaque_head" (mkFunctionType unmatchableDataConTy ManyTy domainA natTy)
         headInput = local 12006 "domain_head_input" domainA
         headRhs = Lam headInput (Var (dataConWorkId zero))
         call index = TermAppTy function index
         predicate index = mkTyConApp eqTyCon [natTy, call index, call index]
-        result index = mkFunctionType ManyTy (predicate index) intTy
+        result index = mkFunctionType unmatchableDataConTy ManyTy (predicate index) intTy
         dictionary = local 12007 "domain_dictionary" (predicate (TermVarTy x))
         answer = mkIntExpr (targetPlatform flags) 42
         ignoredWorker = local 12009 "domain_ignored_worker" originalType
@@ -5628,7 +5629,7 @@ runDomainConversionObjectCheck libdir = do
                 Just tycon -> pure tycon
                 Nothing -> fail "FAIL: missing opaque object Vec"
             let natTy = mkTyConTy nat
-                fnTy = mkFunctionType ManyTy natTy natTy
+                fnTy = mkFunctionType unmatchableDataConTy ManyTy natTy natTy
                 a = mkTyVar (mkSystemName (unique 16100) (mkTyVarOcc "opaque_obj_a")) liftedTypeKind
                 b = mkTyVar (mkSystemName (unique 16101) (mkTyVarOcc "opaque_obj_b")) liftedTypeKind
                 templateF = local 16102 "object_phi_f" fnTy
@@ -5638,8 +5639,8 @@ runDomainConversionObjectCheck libdir = do
                 phi element =
                     mkDepFunTy templateF
                         $ mkDepFunTy templateN
-                        $ mkFunctionType ManyTy (vector element templateF templateN)
-                        $ mkFunctionType ManyTy element element
+                        $ mkFunctionType unmatchableDataConTy ManyTy (vector element templateF templateN)
+                        $ mkFunctionType unmatchableDataConTy ManyTy element element
                 q = proof 16104 (phi (mkTyVarTy a)) (phi (mkTyVarTy b))
                 h = local 16105 "object_opaque_h" (phi (mkTyVarTy a))
                 f = local 16106 "object_actual_f" fnTy
@@ -5649,8 +5650,8 @@ runDomainConversionObjectCheck libdir = do
                         mkApps (Cast (Var h) (SubCo (mkCoVarCo q))) [Var f, Var n]
                 kernelTy =
                     mkInfForAllTys [a, b]
-                        $ mkFunctionType ManyTy (varType q)
-                        $ mkFunctionType ManyTy (phi (mkTyVarTy a)) (phi (mkTyVarTy b))
+                        $ mkFunctionType unmatchableDataConTy ManyTy (varType q)
+                        $ mkFunctionType unmatchableDataConTy ManyTy (phi (mkTyVarTy a)) (phi (mkTyVarTy b))
                 kernelName =
                     mkExternalName
                         (unique 16108)
@@ -6337,7 +6338,7 @@ runOpaquePiWholeCastChecks environment flags bindings tycons = do
                 , cp_specEvalDFun = False
                 }
         natTy = mkTyConTy nat
-        fnTy = mkFunctionType ManyTy natTy natTy
+        fnTy = mkFunctionType unmatchableDataConTy ManyTy natTy natTy
         a = mkTyVar (mkSystemName (unique 16000) (mkTyVarOcc "opaque_a")) liftedTypeKind
         b = mkTyVar (mkSystemName (unique 16001) (mkTyVarOcc "opaque_b")) liftedTypeKind
         -- Endpoint templates and actual operands have DIFFERENT Uniques.
@@ -6348,8 +6349,8 @@ runOpaquePiWholeCastChecks environment flags bindings tycons = do
         phi element =
             mkDepFunTy templateF
                 $ mkDepFunTy templateN
-                $ mkFunctionType ManyTy (vector element templateF templateN)
-                $ mkFunctionType ManyTy element element
+                $ mkFunctionType unmatchableDataConTy ManyTy (vector element templateF templateN)
+                $ mkFunctionType unmatchableDataConTy ManyTy element element
         q = proof 16004 (phi (mkTyVarTy a)) (phi (mkTyVarTy b))
         h = local 16005 "opaque_h" (phi (mkTyVarTy a))
         f = local 16006 "actual_f" fnTy

@@ -8,7 +8,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (find, foldl', isInfixOf, sort)
 import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags)
-import GHC.Builtin.WiredIn.Prim (intPrimTy, realWorldStatePrimTy)
+import GHC.Builtin.WiredIn.Prim (fUNTyCon, intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
 import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
@@ -28,10 +28,10 @@ import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
 import GHC.Core.TyCo.FVs (isInjectiveInType, tyCoVarsOfCo, tyCoVarsOfType)
-import GHC.Core.TyCo.Rep (Coercion (..), Scaled (..), TyLit (..), Type (..))
+import GHC.Core.TyCo.Rep (Coercion (..), CoSel (..), FunSel (..), Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
-import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
+import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, mkTyConKindWithMatchability, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
@@ -60,7 +60,7 @@ import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Tc.Utils.Monad (initIfaceCheck, initIfaceLcl, initIfaceLoad)
 import GHC.Tc.Utils.TcType (noConcreteTyVars)
-import GHC.Types.Basic (OccInfo (..), PromotionFlag (IsPromoted, NotPromoted), TailCallInfo (..))
+import GHC.Types.Basic (LeftOrRight (..), OccInfo (..), PromotionFlag (IsPromoted, NotPromoted), TailCallInfo (..))
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.Id.Make (mkDataConWorkId)
@@ -99,6 +99,7 @@ main = do
             runAliasChecks dflags
             runOpaqueCallChecks dflags
             runFunctionBinderChecks dflags
+            runArrowMatchabilityChecks dflags
             runMatchingChecks dflags
             runTypeMapChecks
             runCaseChecks dflags
@@ -118,9 +119,17 @@ unique = mkUniqueGrimilyWithTag 'N' . fromIntegral
 local :: Int -> String -> Type -> Id
 local n label = mkSysLocal (fsLit label) (unique n) ManyTy
 
+{- Note [Native API arrow classification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These fixtures construct runtime arrows with U. Their function coercions carry
+reflexive U evidence before multiplicity evidence. Family and synonym makers
+preserve supplied kinds, so their declared argument prefixes also need U.
+Algebraic constructor kind prefixes keep M. Keep each result kind unchanged.
+-}
+
 -- | Build a lifted result that retains the Boolean index in a dictionary type.
 indexed :: Type -> Type
-indexed index = mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, index, index]) intTy
+indexed index = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, index, index]) intTy
 
 -- | Build an identity function at a supplied type.
 identity :: Int -> Type -> CoreExpr
@@ -132,7 +141,7 @@ keep b n = Lam b (identity n (indexed (TermVarTy b)))
 
 -- | Build the expected ordinary result of applying keep to an index.
 keepResult :: Type -> Type
-keepResult index = mkFunctionType ManyTy (indexed index) (indexed index)
+keepResult index = mkFunctionType unmatchableDataConTy ManyTy (indexed index) (indexed index)
 
 -- | Check native type keys against equality and exercise all public trie operations.
 runTypeMapChecks :: IO ()
@@ -147,9 +156,9 @@ runTypeMapChecks = do
         natTy = mkTyConTy nat
         n = local 706 "n" natTy
         tv = mkTyVar (mkSystemName (unique 700) (mkTyVarOcc "b")) boolTy
-        at v = mkFunctionType ManyTy (mkTyConApp eqTyCon [varType v, TermVarTy v, TermVarTy v]) intTy
+        at v = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [varType v, TermVarTy v, TermVarTy v]) intTy
         atB = at b
-        body x y = mkFunctionType ManyTy x y
+        body x y = mkFunctionType unmatchableDataConTy ManyTy x y
         piB = mkDepFunTy b (body atB atB)
         piC = mkDepFunTy c (body (at c) (at c))
         boundFree = mkDepFunTy c (body (at c) atB)
@@ -296,7 +305,7 @@ runRetainedFieldChecks dflags = do
         template = local 2400 "index_template" natTy
         n = local 2401 "n" natTy
         m = local 2402 "m" natTy
-        payloadTy ix = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, ix, ix]) intTy
+        payloadTy ix = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [natTy, ix, ix]) intTy
         originalArgs = [Scaled ManyTy natTy, Scaled ManyTy (payloadTy (TermVarTy template))]
         modu = mkModule mainUnit (mkModuleName "NativeRetainedFieldAPI")
         name i occurrence = mkExternalName (unique i) modu occurrence noSrcSpan
@@ -343,11 +352,11 @@ runRetainedFieldChecks dflags = do
                     []
                     (mkDataConWorkId (name (base + 2) (mkDataConWorkerOcc occurrence)) con)
                     NoDataConRep
-        expected = mkDepFunTy template (mkFunctionType ManyTy (payloadTy (TermVarTy template)) packageTy)
+        expected = mkDepFunTy template (mkFunctionType unmatchableDataConTy ManyTy (payloadTy (TermVarTy template)) packageTy)
         payload = local 2408 "payload" (payloadTy (TermVarTy n))
         otherPayload = local 2409 "other_payload" (payloadTy (TermVarTy m))
         answer = local 2410 "answer" intTy
-        consumer = local 2413 "consumer" (mkDepFunTy m (mkFunctionType ManyTy (payloadTy (TermVarTy m)) intTy))
+        consumer = local 2413 "consumer" (mkDepFunTy m (mkFunctionType unmatchableDataConTy ManyTy (payloadTy (TermVarTy m)) intTy))
         scrutinee = local 2411 "package" packageTy
         caseBinder = local 2412 "package_case" packageTy
         construction = mkApps (Var (dataConWorkId constructor)) [Var n, Var payload]
@@ -358,7 +367,7 @@ runRetainedFieldChecks dflags = do
         nestedBinder = local 2450 "nested_index" natTy
         nestedPayload =
             mkDepFunTy nestedBinder $
-                mkFunctionType ManyTy (payloadTy (TermVarTy template)) (payloadTy (TermVarTy nestedBinder))
+                mkFunctionType unmatchableDataConTy ManyTy (payloadTy (TermVarTy template)) (payloadTy (TermVarTy nestedBinder))
         nestedPackage =
             mkAlgTyCon
                 (name 2460 (mkTcOcc "NestedNativePackage"))
@@ -412,7 +421,7 @@ runRetainedFieldChecks dflags = do
                 checkType
                     dflags
                     "nested Pi preserves its outer field dependency and inner identity"
-                    (mkFunctionType ManyTy (payloadTy (TermVarTy field)) (payloadTy (TermVarTy inner)))
+                    (mkFunctionType unmatchableDataConTy ManyTy (payloadTy (TermVarTy field)) (payloadTy (TermVarTy inner)))
                     body
                 check "nested Pi substitution removes the retained template identity" $
                     not (anyFreeVarsOfType (== template) (idType dependent))
@@ -466,10 +475,10 @@ runRetainedFieldChecks dflags = do
     rejectsMetadata "retained metadata must align with fields" [Just template] originalArgs packageTy
     rejectsMetadata "retained metadata must use the declared field domain" [Just (setIdType template boolTy), Nothing] originalArgs packageTy
     rejectsMetadata "retained metadata must use unrestricted binders" [Just (setIdMult template OneTy), Nothing] originalArgs packageTy
-    let functionField = local 6299 "function_field" (mkFunctionType ManyTy natTy natTy)
+    let functionField = local 6299 "function_field" (mkFunctionType unmatchableDataConTy ManyTy natTy natTy)
         functionConstructor = build [Just functionField] [Scaled ManyTy (idType functionField)] packageTy
         functionWorkerType = idType (dataConWorkId functionConstructor)
-        innerLinearFunction = setIdType functionField (mkFunctionType OneTy natTy natTy)
+        innerLinearFunction = setIdType functionField (mkFunctionType unmatchableDataConTy OneTy natTy natTy)
     check "vacuous function field preserves its retained metadata" $
         case dataConRepArgBinders functionConstructor of
             [Just field] -> field == functionField && isNativeIndexFunctionId field
@@ -478,7 +487,7 @@ runRetainedFieldChecks dflags = do
         FunTy{} -> True
         _ -> False
     checkType dflags "vacuous function field worker retains its exact domain"
-        (mkFunctionType ManyTy (idType functionField) packageTy) functionWorkerType
+        (mkFunctionType unmatchableDataConTy ManyTy (idType functionField) packageTy) functionWorkerType
     check "vacuous function field occupies one runtime slot" $
         dataConRepArity functionConstructor == 1
             && countFunRepArgs 1 functionWorkerType == 1
@@ -591,8 +600,8 @@ retainedIfaceParameterizedPackage base = package
     otherField = local (base + 10) "package_index" boolTy
     field = local base "package_index" boolTy
     payloadTy =
-        mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy field, TermVarTy field]) $
-            mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy otherField, TermVarTy otherField]) (mkTyVarTy parameter)
+        mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy field, TermVarTy field]) $
+            mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy otherField, TermVarTy otherField]) (mkTyVarTy parameter)
     args = [Scaled ManyTy boolTy, Scaled ManyTy boolTy, Scaled ManyTy payloadTy]
     package =
         mkAlgTyCon
@@ -728,7 +737,7 @@ runParameterizedDomainChecks dflags = do
             check "constructor reconstruction preserves worker and actual fields" (worker == dataConWorkId consDataCon && headId == b && restId == tailId)
             checkType dflags "constructor reconstruction preserves erased Bool argument" boolTy argument
         _ -> fail "FAIL: parameterized constructor reconstruction lost its erased argument"
-    let listPayload = local 12015 "list_payload" (mkFunctionType ManyTy (mkTyConApp eqTyCon [listBool, TermVarTy xs, TermVarTy xs]) intTy)
+    let listPayload = local 12015 "list_payload" (mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [listBool, TermVarTy xs, TermVarTy xs]) intTy)
         listKeep = Lam xs (Lam listPayload (Var listPayload))
     lintAccepts dflags "retained list-domain worker" [] listKeep
     lintRejects dflags "retained application rejects List Nat at List Bool" [natTail] (App listKeep (Var natTail))
@@ -753,7 +762,7 @@ runParameterizedDomainChecks dflags = do
         wrongProof = proof 12011 (TermVarTy xs) (mkTyConApp (promoteDataCon consDataCon) [natTy, TermVarTy headId, TermVarTy restId])
     lintAccepts dflags "list constructor branch evidence has erased arguments and actual fields" [xs] (listCase consProof)
     lintRejects dflags "list branch evidence cannot change the static parameter" [xs] (listCase wrongProof)
-    let f = local 12012 "list_function" (mkFunctionType ManyTy listBool maybeNat)
+    let f = local 12012 "list_function" (mkFunctionType unmatchableDataConTy ManyTy listBool maybeNat)
         g = local 12013 "list_function" (idType f)
         call = TermAppTy f (TermVarTy xs)
         subst = CoreSubst.extendIdSubst (CoreSubst.mkEmptySubst (mkInScopeSet (mkVarSet [f, g, xs]))) f (Var g)
@@ -764,14 +773,14 @@ runParameterizedDomainChecks dflags = do
     lintAccepts dflags "applied-domain forward nominal call congruence" [f, xs, ys, cv] (Coercion co)
     checkType dflags "applied-domain call result kind" maybeNat (coercionLKind (mkKindCo co))
     let phantom = parameterizedDomainFixture 13000 [liftedTypeKind] (\_ _ -> [[]])
-        actualFunction = parameterizedDomainFixture 14000 [liftedTypeKind] (\[a] _ -> [[mkFunctionType ManyTy (mkTyVarTy a) (mkTyVarTy a)]])
+        actualFunction = parameterizedDomainFixture 14000 [liftedTypeKind] (\[a] _ -> [[mkFunctionType unmatchableDataConTy ManyTy (mkTyVarTy a) (mkTyVarTy a)]])
         tree = parameterizedDomainFixture 15000 [liftedTypeKind] (\[a] self -> [[mkTyVarTy a], [mkTyConApp self [mkTyVarTy a], mkTyConApp self [mkTyVarTy a]]])
         growing = parameterizedDomainFixture 16000 [liftedTypeKind] (\[a] self -> [[mkTyConApp self [mkListTy (mkTyVarTy a)]]])
         permuting = parameterizedDomainFixture 17000 [liftedTypeKind, liftedTypeKind] (\[a, c] self -> [[mkTyConApp self [mkTyVarTy c, mkTyVarTy a]]])
         siblings = parameterizedDomainFixture 18000 [liftedTypeKind, liftedTypeKind] (\[a, c] _ -> [[mkTyConApp maybeTyCon [mkTyVarTy a], mkTyConApp maybeTyCon [mkTyVarTy c]]])
         empty = parameterizedDomainFixture 19000 [liftedTypeKind] (\_ _ -> [])
         wrongKind = parameterizedDomainFixture 20000 [boolTy] (\_ _ -> [])
-        fnTy = mkFunctionType ManyTy boolTy boolTy
+        fnTy = mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy
         domains =
             [ ("phantom closed function parameter", mkTyConApp phantom [fnTy], True)
             , ("actual function field", mkTyConApp actualFunction [boolTy], False)
@@ -802,9 +811,9 @@ runNatChecks dflags = do
         payload = local 533 "payload" intTy
         caseBinder = local 534 "nat_case" natTy
         index = TermVarTy n
-        indexedNat ty = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, ty, ty]) intTy
+        indexedNat ty = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [natTy, ty, ty]) intTy
         keepNat = Lam n (identity 535 (indexedNat index))
-        keepNatResult ty = mkFunctionType ManyTy (indexedNat ty) (indexedNat ty)
+        keepNatResult ty = mkFunctionType unmatchableDataConTy ManyTy (indexedNat ty) (indexedNat ty)
         zeroProof = proof 536 index zeroTy
         succProof = proof 537 index (succTy (TermVarTy field))
         branch number concrete cv = Cast body (mkSymCo transport)
@@ -813,7 +822,7 @@ runNatChecks dflags = do
             body = Lam dictionary (Var payload)
             co = mkCoVarCo cv
             predicateCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo natTy, co, co]
-            transport = mkFunCoNoFTF Representational (mkNomReflCo ManyTy) (mkSubCo predicateCo) (mkReflCo Representational intTy)
+            transport = mkFunCoNoFTF Representational (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) (mkSubCo predicateCo) (mkReflCo Representational intTy)
         zeroBranch = branch 538 zeroTy zeroProof
         succBranch = branch 539 (succTy (TermVarTy field)) succProof
         alternatives =
@@ -861,7 +870,7 @@ runNatChecks dflags = do
                 (unfolding (error "forced a beta index unfolding"))
         opaqueProducer =
             setIdUnfolding
-                (local 3104 "opaque_beta_producer" (mkFunctionType ManyTy natTy natTy))
+                (local 3104 "opaque_beta_producer" (mkFunctionType unmatchableDataConTy ManyTy natTy natTy))
                 (unfolding (error "forced a beta producer unfolding"))
         betaIdentity argument = App (Lam beta (Var beta)) argument
         betaSuccessor argument = App (Lam beta (succExpr (Var beta))) argument
@@ -959,7 +968,7 @@ runNatChecks dflags = do
         addition =
             mkFamilyTyCon
                 (mkSystemName (unique 552) (mkTcOcc "Add"))
-                (mkTyConKind binders natTy)
+                (mkTyConKindWithMatchability unmatchableDataConTy binders natTy)
                 binders
                 0
                 natTy
@@ -1032,7 +1041,7 @@ runNatChecks dflags = do
         forgetFamily =
             mkFamilyTyCon
                 (mkSystemName (unique 1701) (mkTcOcc "ForgetNat"))
-                (mkTyConKind forgetBinders liftedTypeKind)
+                (mkTyConKindWithMatchability unmatchableDataConTy forgetBinders liftedTypeKind)
                 forgetBinders
                 0
                 liftedTypeKind
@@ -1056,15 +1065,15 @@ runNatChecks dflags = do
                 "normalization removes retained dependence"
                 []
                 (mkDepFunTy n forgotten)
-                (if role == Phantom then mkDepFunTy n forgotten else mkFunctionType ManyTy natTy intTy)
+                (if role == Phantom then mkDepFunTy n forgotten else mkFunctionType unmatchableDataConTy ManyTy natTy intTy)
         checkNormalization
             role
             "ordinary forall kind normalizes above retained body"
             []
             (mkForAllTy (Bndr erased Specified) (mkDepFunTy n (indexedNat (add zeroTy index))))
             (mkForAllTy (Bndr erasedNormalized Specified) (mkDepFunTy n (indexedNat (if role == Phantom then add zeroTy index else index))))
-    let originalShadow = mkFunctionType ManyTy (indexedNat index) (mkDepFunTy n (indexedNat (add zeroTy index)))
-        expectedShadow = mkFunctionType ManyTy (indexedNat index) (mkDepFunTy n (indexedNat index))
+    let originalShadow = mkFunctionType unmatchableDataConTy ManyTy (indexedNat index) (mkDepFunTy n (indexedNat (add zeroTy index)))
+        expectedShadow = mkFunctionType unmatchableDataConTy ManyTy (indexedNat index) (mkDepFunTy n (indexedNat index))
     freshened <- checkNormalization Nominal "retained normalization avoids a free outer Id" [n] originalShadow expectedShadow
     case freshened of
         FunTy{ft_res = DepFunTy fresh body} -> do
@@ -1086,14 +1095,14 @@ runNatChecks dflags = do
     forM_ [("unlifted", intPrimTy), ("constraint", mkNomEqPred index index)] $ \(label, body) ->
         rejectsWith ("normalization rejects a retained " ++ label ++ " result") "normalise_type: invalid retained function" $
             evaluate (normaliseType emptyFamInstEnvs Nominal (DepFunTy n body))
-    let captured = mkDepFunTy m (mkFunctionType ManyTy (indexedNat (TermVarTy m)) (indexedNat index))
+    let captured = mkDepFunTy m (mkFunctionType unmatchableDataConTy ManyTy (indexedNat (TermVarTy m)) (indexedNat index))
     case Subst.substTy replace captured of
         DepFunTy fresh body -> do
             check "Nat substitution avoids capturing a field Id" (fresh /= m)
             checkType
                 dflags
                 "Nat substitution preserves both binder identities"
-                (mkFunctionType ManyTy (indexedNat (TermVarTy fresh)) (indexedNat (succTy (TermVarTy m))))
+                (mkFunctionType unmatchableDataConTy ManyTy (indexedNat (TermVarTy fresh)) (indexedNat (succTy (TermVarTy m))))
                 body
         _ -> fail "FAIL: Nat substitution lost its retained binder"
     lintAccepts dflags "retained Nat identity" [] keepNat
@@ -1167,7 +1176,7 @@ runNatChecks dflags = do
         aliasProof = proof 561 aliasIndex successorIndex
         aliasDictionary = local 562 "alias_dictionary" (mkTyConApp eqTyCon [natTy, aliasIndex, aliasIndex])
         predicateCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo natTy, mkCoVarCo aliasProof, mkCoVarCo aliasProof]
-        transport = mkFunCoNoFTF Representational (mkNomReflCo ManyTy) (mkSubCo predicateCo) (mkReflCo Representational intTy)
+        transport = mkFunCoNoFTF Representational (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) (mkSubCo predicateCo) (mkReflCo Representational intTy)
         aliasBody = Cast (Lam aliasDictionary (Var payload)) transport
         aliasCase = Case (succExpr (Var n)) alias (indexedNat successorIndex) [Alt DEFAULT [aliasProof] aliasBody]
         literalAliasProof = proof 563 aliasIndex zeroTy
@@ -1494,7 +1503,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             bool = toIfaceType boolTy
             invalid = "Invalid retained constructor"
         -- See Note [Function field constructor interface checks] below.
-        let functionTy = mkFunctionType ManyTy boolTy boolTy
+        let functionTy = mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy
             scalarName = mkIfLclName (fsLit "function_package_scalar")
             functionTemplate = mkSysLocal (ifLclNameFS firstName) (unique 9500) ManyTy functionTy
             scalarTemplate = mkSysLocal (ifLclNameFS scalarName) (unique 9501) ManyTy boolTy
@@ -1532,7 +1541,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                             checkType dflags "function field imported scalar domain" boolTy nTy
                             checkType dflags "function field payload uses both imported fields" (indexed (TermAppTy f (TermVarTy n))) payloadTy
                             case payloadTy of
-                                FunTy _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
+                                FunTy _ _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
                                     check "constructor call endpoints share actual field identities" (left == f && right == f && ln == n && rn == n)
                                 _ -> fail "FAIL: constructor call payload lost repeated endpoints"
                         _ -> fail "FAIL: function-field constructor changed source arity"
@@ -1560,8 +1569,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             check "vacuous function codec worker uses ordinary arrows" $ case idType (dataConWorkId vacuousCon) of
                 FunTy{} -> True
                 _ -> False
-        let badFunctionDomain = toIfaceType (mkFunctionType ManyTy boolTy intTy)
-            innerLinearFunction = toIfaceType (mkFunctionType OneTy boolTy boolTy)
+        let badFunctionDomain = toIfaceType (mkFunctionType unmatchableDataConTy ManyTy boolTy intTy)
+            innerLinearFunction = toIfaceType (mkFunctionType unmatchableDataConTy OneTy boolTy boolTy)
         forM_
             [ ("function field metadata cannot duplicate names", invalid, functionConstructor{ifConArgBinders = [Just firstName, Just firstName, Nothing]})
             , ("function field payload cannot precede its head", "Iface id out of scope", functionConstructor{ifConArgBinders = [Nothing, Just firstName, Just scalarName], ifConArgTys = [(many, functionPayload), (many, toIfaceType functionTy), (many, bool)]})
@@ -1641,8 +1650,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
         let leftIndex = local 2880 "left_index" boolTy
             rightIndex = local 2881 "right_index" boolTy
             pairPayloadTy =
-                mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy leftIndex, TermVarTy leftIndex]) $
-                    mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy rightIndex, TermVarTy rightIndex]) intTy
+                mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy leftIndex, TermVarTy leftIndex]) $
+                    mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy rightIndex, TermVarTy rightIndex]) intTy
             pairPayload = local 2882 "pair_payload" pairPayloadTy
         lintAccepts dflags "imported parameterized package construction" [leftIndex, rightIndex, pairPayload] $
             mkApps (Var (dataConWorkId firstParameterizedCon)) [Type intTy, Var leftIndex, Var rightIndex, Var pairPayload]
@@ -1662,9 +1671,9 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
         -- Check the domain graph only after all imported parent knots exist.
         let withFunctionDomain domain inputSide = changePackage $ \con ->
                 let reference = IfaceTyConApp (IfaceTyCon (ifName domain) (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
-                    arrow = case toIfaceType (mkFunctionType ManyTy boolTy boolTy) of
-                        IfaceFunTy flag mult _ _ ->
-                            if inputSide then IfaceFunTy flag mult reference bool else IfaceFunTy flag mult bool reference
+                    arrow = case toIfaceType (mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy) of
+                        IfaceFunTy flag ma mult _ _ ->
+                            if inputSide then IfaceFunTy flag ma mult reference bool else IfaceFunTy flag ma mult bool reference
                         _ -> error "FAIL: ordinary interface function changed shape"
                  in con{ifConArgTys = [(many, arrow), (many, bool)]}
             selfInputFunction = withFunctionDomain selfInputFunction True (recursiveDeclaration 9800 "IfaceFunctionSelfInput")
@@ -1686,9 +1695,9 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             scalarPi domain = IfaceDepFunTy (many, firstName, reference domain) (toIfaceType intTy)
             -- | Place an input or output domain in a retained function field.
             genericFunctionDomain domain inputSide =
-                let arrow = case toIfaceType (mkFunctionType ManyTy boolTy boolTy) of
-                        IfaceFunTy flag mult _ _ ->
-                            if inputSide then IfaceFunTy flag mult (reference domain) bool else IfaceFunTy flag mult bool (reference domain)
+                let arrow = case toIfaceType (mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy) of
+                        IfaceFunTy flag ma mult _ _ ->
+                            if inputSide then IfaceFunTy flag ma mult (reference domain) bool else IfaceFunTy flag ma mult bool (reference domain)
                         _ -> error "FAIL: ordinary interface function changed shape"
                  in ordinaryField (IfaceDepFunTy (many, firstName, arrow) (toIfaceType intTy))
             -- | Put the scalar binder in an ordinary constructor field.
@@ -1715,8 +1724,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             hiddenSelf = ordinaryField (reference fieldAlias) (recursiveDeclaration 10110 "IfaceGenericHiddenSelf")
             -- | Keep the retained scalar in both equality operands.
             nonvacuousBody domain = case snd dependent of
-                IfaceFunTy flag mult (IfaceTyConApp eqCon (IA_Arg _ visibility rest)) result ->
-                    IfaceFunTy flag mult (IfaceTyConApp eqCon (IA_Arg (reference domain) visibility rest)) result
+                IfaceFunTy flag ma mult (IfaceTyConApp eqCon (IA_Arg _ visibility rest)) result ->
+                    IfaceFunTy flag ma mult (IfaceTyConApp eqCon (IA_Arg (reference domain) visibility rest)) result
                 _ -> error "FAIL: interface equality payload changed shape"
             nonvacuousSelf =
                 ordinaryField
@@ -1795,7 +1804,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             ignoredBinders = [mkAnonTyConBinder ignoredParameter]
             forgetful = mkSynonymTyCon
                 (mkExternalName (unique 10300) (nameModule (ifName declaration)) (mkTcOcc "IfaceForgetfulDomain") noSrcSpan)
-                (mkTyConKind ignoredBinders liftedTypeKind) ignoredBinders liftedTypeKind [Phantom] boolTy True True True True
+                (mkTyConKindWithMatchability unmatchableDataConTy ignoredBinders liftedTypeKind) ignoredBinders liftedTypeKind [Phantom] boolTy True True True True
             forgetfulDeclaration = tyThingToIfaceDecl (ATyCon forgetful)
             appliedForgetful = toIfaceType (mkTyConApp forgetful [intTy])
             forgetfulHolder = ordinaryField (IfaceDepFunTy (many, firstName, appliedForgetful) (toIfaceType intTy)) (recursiveDeclaration 10310 "IfaceForgetfulHolder")
@@ -1876,7 +1885,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
         forcePackage ordinary
         check "ordinary constructor interface has no retained metadata" (all (null . dataConRepArgBinders) (tyConDataCons ordinary))
         -- Check call types under the actual lexical Id environment.
-        let callF = local 9100 "wire_call" (mkFunctionType ManyTy boolTy boolTy)
+        let callF = local 9100 "wire_call" (mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy)
             callN = local 9101 "wire_arg" boolTy
             callM = local 9102 "wire_arg_other" boolTy
             callCv = proof 9103 (TermVarTy callN) (TermVarTy callM)
@@ -1892,7 +1901,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             restored <- restore [callF, callN] wire
             checkType dflags "open call codec preserves its type" (indexed (callAt callN)) restored
             case restored of
-                FunTy _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
+                FunTy _ _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
                     check "repeated call nodes reuse actual scoped head and index" (left == callF && right == callF && ln == callN && rn == callN)
                 _ -> fail "FAIL: open call codec lost repeated endpoints"
             other <- restore [callF, callM] =<< roundtrip compression (toIfaceType (indexed (callAt callM)))
@@ -1916,17 +1925,17 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     check "function Pi imports freshen both actual binders" (firstHead /= secondHead && firstIndex /= secondIndex)
                     forM_ [(firstHead, firstIndex, firstBody), (secondHead, secondIndex, secondBody)] $ \(headId, indexId, body) ->
                         case body of
-                            FunTy _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
+                            FunTy _ _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
                                 check "function Pi endpoints share actual imported head and index" (left == headId && right == headId && ln == indexId && rn == indexId)
                             _ -> fail "FAIL: function Pi codec lost repeated call endpoints"
                 _ -> fail "FAIL: function Pi codec lost its runtime telescope"
             let shadowHead = local 9110 "wire_call" (idType callF)
                 shadowCalls = mkDepFunTy callF (mkDepFunTy shadowHead (mkDepFunTy callN $
-                    mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermAppTy callF (TermVarTy callN), TermAppTy shadowHead (TermVarTy callN)]) intTy))
+                    mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, TermAppTy callF (TermVarTy callN), TermAppTy shadowHead (TermVarTy callN)]) intTy))
             shadowRestored <- restore [] =<< roundtrip compression (toIfaceType (tidyTopType shadowCalls))
             checkType dflags "same-spelling function Pi binders avoid capture" shadowCalls shadowRestored
             case shadowRestored of
-                DepFunTy outer (DepFunTy inner (DepFunTy argument (FunTy _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _))) ->
+                DepFunTy outer (DepFunTy inner (DepFunTy argument (FunTy _ _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _))) ->
                     check "shadowed call heads retain distinct actual identities" (outer /= inner && left == outer && right == inner && ln == argument && rn == argument)
                 _ -> fail "FAIL: shadowed function Pi codec changed shape"
             case functionPiWire of
@@ -1935,15 +1944,15 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     rejectsIface "function Pi rejects outer multiplicity One" "Invalid retained binder" [] $
                         IfaceDepFunTy (toIfaceType OneTy, name, domain) body
                     rejectsIface "function Pi rejects an inner linear arrow" "Invalid retained binder" [] $
-                        badDomain (toIfaceType (mkFunctionType OneTy boolTy boolTy))
+                        badDomain (toIfaceType (mkFunctionType unmatchableDataConTy OneTy boolTy boolTy))
                     rejectsIface "function Pi rejects an unsupported result domain" "Invalid retained binder" [] $
-                        badDomain (toIfaceType (mkFunctionType ManyTy boolTy intTy))
+                        badDomain (toIfaceType (mkFunctionType unmatchableDataConTy ManyTy boolTy intTy))
                     let missingType = mkTyVar (mkSystemName (unique 9111) (mkTyVarOcc "missing_domain")) liftedTypeKind
                     rejectsIface "function Pi cannot import a free domain variable" "Iface type variable out of scope" [] $
-                        badDomain (toIfaceType (mkFunctionType ManyTy (mkTyVarTy missingType) boolTy))
+                        badDomain (toIfaceType (mkFunctionType unmatchableDataConTy ManyTy (mkTyVarTy missingType) boolTy))
                     let boundDomainName = mkIfLclName (fsLit "bound_domain")
                         nonclosedDomain = case domain of
-                            IfaceFunTy flag arrowMult _ result -> IfaceFunTy flag arrowMult (IfaceTyVar boundDomainName) result
+                            IfaceFunTy flag ma arrowMult _ result -> IfaceFunTy flag ma arrowMult (IfaceTyVar boundDomainName) result
                             _ -> error "FAIL: function Pi domain is not an ordinary arrow"
                         boundDomainPi = IfaceForAllTy
                             (mkIfaceForAllTvBndr Specified (boundDomainName, toIfaceType liftedTypeKind))
@@ -2113,7 +2122,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     tidyTopType
                         $ DepFunTy outer
                         $ DepFunTy inner
-                        $ mkFunctionType ManyTy (indexed (TermVarTy outer)) (indexed (TermVarTy inner))
+                        $ mkFunctionType unmatchableDataConTy ManyTy (indexed (TermVarTy outer)) (indexed (TermVarTy inner))
             nestedIface <- roundtrip compression (toIfaceType nested)
             nestedResult <- restore [] nestedIface
             checkType dflags (label ++ " (nested alpha equality)") nested nestedResult
@@ -2124,7 +2133,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     checkType
                         dflags
                         (label ++ " (nested lexical references)")
-                        (mkFunctionType ManyTy (indexed (TermVarTy outer')) (indexed (TermVarTy inner')))
+                        (mkFunctionType unmatchableDataConTy ManyTy (indexed (TermVarTy outer')) (indexed (TermVarTy inner')))
                         body
                 _ -> fail ("FAIL: " ++ label ++ "; nested retained binders were lost")
             let literal = LitTy (NumTyLit 7)
@@ -2207,7 +2216,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     checkType dflags "interface identity beta proof exact type" (exprType variableCase) (exprType restored)
                 let ifaceOpaqueProducer =
                         setIdUnfolding
-                            (local 3108 "opaque_interface_producer" (mkFunctionType ManyTy boolTy boolTy))
+                            (local 3108 "opaque_interface_producer" (mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy))
                             (unfolding (error "forced an interface producer unfolding"))
                 opaqueProofCase <-
                     roundtrip NormalCompression $
@@ -2303,11 +2312,11 @@ runOpaqueCallChecks dflags = do
         succTy ty = mkTyConApp (promoteDataCon successor) [ty]
         n = local 6200 "call_n" natTy
         m = local 6201 "call_m" natTy
-        f = local 6202 "call_head" (mkFunctionType ManyTy natTy boolTy)
-        constraintHead = setIdType f (FunTy FTF_T_C ManyTy natTy boolTy)
+        f = local 6202 "call_head" (mkFunctionType unmatchableDataConTy ManyTy natTy boolTy)
+        constraintHead = setIdType f (FunTy FTF_T_C unmatchableDataConTy ManyTy natTy boolTy)
         g = local 6203 "call_head" (idType f)
         h = local 6204 "call_head" (idType f)
-        reverseHead = local 6205 "reverse_head" (mkFunctionType ManyTy boolTy natTy)
+        reverseHead = local 6205 "reverse_head" (mkFunctionType unmatchableDataConTy ManyTy boolTy natTy)
         b = local 6206 "call_bool" boolTy
         call = TermAppTy f (TermVarTy n)
         cv = proof 6207 (TermVarTy n) (TermVarTy m)
@@ -2357,12 +2366,12 @@ runOpaqueCallChecks dflags = do
     checkType dflags "stored head substitution range is used once" (TermAppTy g (TermVarTy n)) (Subst.substTy simultaneous call)
     check "head substitution range records its free function" (g `elemVarSet` Subst.getSubstRangeTyCoFVs replaceF)
     check "coercion substitution preserves the actual chosen head" (eqCoercion (mkTermAppCo g (mkCoVarCo cv)) (Subst.substCo (indexSubst [g, n, m, cv] f (Var g)) co))
-    let body = mkFunctionType ManyTy (indexed (TermAppTy f (TermVarTy n))) (indexed (TermAppTy f (TermVarTy m)))
+    let body = mkFunctionType unmatchableDataConTy ManyTy (indexed (TermAppTy f (TermVarTy n))) (indexed (TermAppTy f (TermVarTy m)))
         captured = Subst.substTy (indexSubst [f, n] m (Var n)) (mkDepFunTy n body)
     case captured of
         DepFunTy fresh result -> do
             check "call substitution freshens a reused runtime Unique" (fresh /= n)
-            checkType dflags "call substitution separates bound and free arguments" (mkFunctionType ManyTy (indexed (TermAppTy f (TermVarTy fresh))) (indexed call)) result
+            checkType dflags "call substitution separates bound and free arguments" (mkFunctionType unmatchableDataConTy ManyTy (indexed (TermAppTy f (TermVarTy fresh))) (indexed call)) result
             lintAccepts dflags "capture-avoiding call substitution" [f, n] (Coercion (mkNomReflCo captured))
         _ -> fail "FAIL: call substitution lost its retained binder"
     let headProof = proof 6211 call call
@@ -2381,7 +2390,7 @@ runOpaqueCallChecks dflags = do
         _ -> fail "FAIL: Core substitution changed the head capture control shape"
     let unused = mkTyVar (mkSystemName (unique 6212) (mkTyVarOcc "unused_head_parameter")) liftedTypeKind
         unusedBinders = [mkAnonTyConBinder unused]
-        erasedHead = mkSynonymTyCon (mkSystemName (unique 6213) (mkTcOcc "ErasedHeadParameter")) (mkTyConKind unusedBinders liftedTypeKind) unusedBinders liftedTypeKind [Phantom] (idType f) True True True False
+        erasedHead = mkSynonymTyCon (mkSystemName (unique 6213) (mkTcOcc "ErasedHeadParameter")) (mkTyConKindWithMatchability unmatchableDataConTy unusedBinders liftedTypeKind) unusedBinders liftedTypeKind [Phantom] (idType f) True True True False
         hiddenFree = mkTyConApp erasedHead [mkTyVarTy unused]
         hiddenHead = local 6214 "hidden_free_head" hiddenFree
         escapedPayload = local 6215 "head_dependent_payload" (indexed call)
@@ -2393,13 +2402,13 @@ runOpaqueCallChecks dflags = do
     lintAccepts dflags "type-node call argument need not be an atomic runtime value" [f] (Coercion (mkNomReflCo symbolic))
     let familyParameter = mkTyVar (mkSystemName (unique 6209) (mkTyVarOcc "call_family_arg")) boolTy
         familyBinders = [mkAnonTyConBinder familyParameter]
-        stuckFamily = mkFamilyTyCon (mkSystemName (unique 6210) (mkTcOcc "CallArgument")) (mkTyConKind familyBinders natTy) familyBinders 0 natTy Nothing OpenTypeFamilyTyCon Nothing NotInjective
+        stuckFamily = mkFamilyTyCon (mkSystemName (unique 6210) (mkTcOcc "CallArgument")) (mkTyConKindWithMatchability unmatchableDataConTy familyBinders natTy) familyBinders 0 natTy Nothing OpenTypeFamilyTyCon Nothing NotInjective
         familyArgument = mkTyConApp stuckFamily [TermVarTy b]
         nestedCall = TermAppTy f (TermAppTy reverseHead (TermVarTy b))
         poisoned = setIdUnfolding f (unfolding (error "opaque call inspected its head unfolding"))
     lintAccepts dflags "call type permits a well-kinded stuck family argument" [f, b] (Coercion (mkNomReflCo (TermAppTy f familyArgument)))
     lintAccepts dflags "call type permits nested mixed-domain calls" [f, reverseHead, b] (Coercion (mkNomReflCo nestedCall))
-    let reducedFamily = mkFamilyTyCon (mkSystemName (unique 6216) (mkTcOcc "ReducedCallArgument")) (mkTyConKind familyBinders natTy) familyBinders 0 natTy Nothing (ClosedTypeFamilyTyCon (CTF (Just reducedAxiom))) Nothing NotInjective
+    let reducedFamily = mkFamilyTyCon (mkSystemName (unique 6216) (mkTcOcc "ReducedCallArgument")) (mkTyConKindWithMatchability unmatchableDataConTy familyBinders natTy) familyBinders 0 natTy Nothing (ClosedTypeFamilyTyCon (CTF (Just reducedAxiom))) Nothing NotInjective
         reducedAxiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 6217) (mkTcOcc "ReducedCallArgumentAx")) reducedFamily [mkCoAxBranch [] [] [] [constructorIndex trueDataCon] zeroTy [] noSrcSpan]
         reducibleCall = TermAppTy f (mkTyConApp reducedFamily [constructorIndex trueDataCon])
         reducedCall = TermAppTy f zeroTy
@@ -2420,7 +2429,7 @@ runOpaqueCallChecks dflags = do
         , ("global head", globaliseId f, [n])
         , ("missing head", f, [n])
         , ("stale head metadata", f, [setIdType f (idType reverseHead), n])
-        , ("linear function arrow", setIdType f (mkFunctionType OneTy natTy boolTy), [setIdType f (mkFunctionType OneTy natTy boolTy), n])
+        , ("linear function arrow", setIdType f (mkFunctionType unmatchableDataConTy OneTy natTy boolTy), [setIdType f (mkFunctionType unmatchableDataConTy OneTy natTy boolTy), n])
         , ("constraint result classification", constraintHead, [constraintHead, n])
         ]
         $ \(label, badHead, badScope) -> lintRejects dflags ("call rejects " ++ label) badScope (Coercion (mkNomReflCo (TermAppTy badHead (TermVarTy n))))
@@ -2438,7 +2447,7 @@ runFunctionBinderChecks dflags = do
     let (nat, zero, _) = peanoNat
         natTy = mkTyConTy nat
         zeroTy = mkTyConTy (promoteDataCon zero)
-        arrow = mkFunctionType ManyTy
+        arrow = mkFunctionType unmatchableDataConTy ManyTy
         f = local 6300 "retained_head" (arrow natTy natTy)
         g = local 6301 "retained_head" (idType f)
         cross = local 6302 "mixed_head" (arrow boolTy natTy)
@@ -2497,7 +2506,7 @@ runFunctionBinderChecks dflags = do
     let cv = proof 6308 (TermVarTy n) (TermVarTy m)
         callCo = mkTermAppCo f (mkCoVarCo cv)
         dictionaryCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo natTy, callCo, callCo]
-        bodyCo = mkFunCoNoFTF Nominal (mkNomReflCo ManyTy) dictionaryCo (mkNomReflCo intTy)
+        bodyCo = mkFunCoNoFTF Nominal (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) dictionaryCo (mkNomReflCo intTy)
     forM_ [(Nominal, bodyCo), (Representational, mkSubCo bodyCo), (Phantom, mkReflCo Phantom (atN f))] $ \(role, evidence) -> do
         let scoped = mkDepFunCo f evidence
         check "function binder coercion preserves its body role" (coercionRole scoped == role)
@@ -2519,15 +2528,15 @@ runFunctionBinderChecks dflags = do
     lintAccepts dflags "lifting ordinary evidence under a function binder" [n, given] (Coercion lifted)
     let familyParameter = mkTyVar (mkSystemName (unique 6311) (mkTyVarOcc "head_family_arg")) natTy
         familyBinders = [mkAnonTyConBinder familyParameter]
-        family = mkFamilyTyCon (mkSystemName (unique 6312) (mkTcOcc "HeadArgument")) (mkTyConKind familyBinders natTy) familyBinders 0 natTy Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
+        family = mkFamilyTyCon (mkSystemName (unique 6312) (mkTcOcc "HeadArgument")) (mkTyConKindWithMatchability unmatchableDataConTy familyBinders natTy) familyBinders 0 natTy Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
         axiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 6313) (mkTcOcc "HeadArgumentAx")) family [mkCoAxBranch [] [] [] [zeroTy] zeroTy [] noSrcSpan]
         original = mkDepFunTy f (at f (mkTyConApp family [zeroTy]))
         normalized = mkDepFunTy f (at f zeroTy)
         multParameter = mkTyVar (mkSystemName (unique 6315) (mkTyVarOcc "multiplicity_arg")) boolTy
         multBinders = [mkAnonTyConBinder multParameter]
-        multFamily = mkFamilyTyCon (mkSystemName (unique 6316) (mkTcOcc "ArrowMultiplicity")) (mkTyConKind multBinders multiplicityTy) multBinders 0 multiplicityTy Nothing (ClosedTypeFamilyTyCon (CTF (Just multAxiom))) Nothing NotInjective
+        multFamily = mkFamilyTyCon (mkSystemName (unique 6316) (mkTcOcc "ArrowMultiplicity")) (mkTyConKindWithMatchability unmatchableDataConTy multBinders multiplicityTy) multBinders 0 multiplicityTy Nothing (ClosedTypeFamilyTyCon (CTF (Just multAxiom))) Nothing NotInjective
         multAxiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 6317) (mkTcOcc "ArrowMultiplicityAx")) multFamily [mkCoAxBranch [] [] [] [constructorIndex trueDataCon] ManyTy [] noSrcSpan]
-        ordinary = mkFunTy FTF_T_T (mkTyConApp multFamily [constructorIndex trueDataCon]) intTy intTy
+        ordinary = mkFunTy FTF_T_T unmatchableDataConTy (mkTyConApp multFamily [constructorIndex trueDataCon]) intTy intTy
     -- The ordinary arrow has no retained binder or runtime index.
     forM_ [Nominal, Representational, Phantom] $ \role -> do
         let Reduction evidence actual = normaliseType emptyFamInstEnvs role ordinary
@@ -2569,6 +2578,102 @@ runFunctionBinderChecks dflags = do
         case tcMatchRetainedTyX_BM (\var _ -> if var == indexParameter then BindMe else DontBindMe) (initial opaqueTemplate opaqueTarget) opaqueTemplate opaqueTarget of
             Nothing -> True
             Just _ -> False
+
+{- Note [Arrow matchability kernel controls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary arrow can describe an unmatchable type function. AppCo still
+supports forward congruence. LRCo must not invert that application. SelFun
+projects the structure of the arrow itself, so it does not require M.
+Use raw coercions here. Smart constructors can remove reflexive children and
+hide a malformed role before Lint sees it. Native calls keep their separate
+opaque representation and must not acquire LRCo projections.
+-}
+
+-- | Check matchability at substitution, normalization and coercion boundaries.
+runArrowMatchabilityChecks :: DynFlags -> IO ()
+runArrowMatchabilityChecks dflags = do
+    let ma = mkTyVar (mkSystemName (unique 6400) (mkTyVarOcc "arrow_ma")) matchabilityTy
+        mb = mkTyVar (mkSystemName (unique 6401) (mkTyVarOcc "arrow_mb")) matchabilityTy
+        arrow metadata = mkFunctionType metadata ManyTy intTy boolTy
+        arrowM = arrow matchableDataConTy
+        arrowU = arrow unmatchableDataConTy
+        arrowV = arrow (mkTyVarTy ma)
+        quantified v = mkForAllTy (Bndr v Specified) (arrow (mkTyVarTy v))
+        entries = [(arrowM, 1), (arrowU, 2), (arrowV, 3), (quantified ma, 4)]
+        table :: TypeMap Int
+        table = foldl' (\m (ty, value) -> Trie.insertTM ty value m) emptyTypeMap entries
+    forM_ [(arrowM, arrowU), (arrowM, arrowV), (arrowU, arrowV)] $ \(lhs, rhs) -> do
+        check "arrow metadata changes equality" (not (eqType lhs rhs))
+        check "arrow metadata changes ordering" (nonDetCmpType lhs rhs /= EQ)
+    forM_ entries $ \(ty, value) ->
+        check "type map preserves distinct arrow metadata" (Trie.lookupTM ty table == Just value)
+    check "metadata binders are alpha-equivalent type map keys" (Trie.lookupTM (quantified mb) table == Just 4)
+    check "metadata occurrence is free before abstraction" (ma `elemVarSet` tyCoVarsOfType arrowV)
+    check "metadata binder scopes its occurrence" (not (ma `elemVarSet` tyCoVarsOfType (quantified ma)))
+    checkType dflags "metadata variable survives binder instantiation" (arrow (mkTyVarTy mb)) (piResultTy (quantified ma) (mkTyVarTy mb))
+    checkType dflags "metadata substitution can select M" arrowM (Subst.substTyWith [ma] [matchableDataConTy] arrowV)
+    checkType dflags "metadata substitution can select U" arrowU (Subst.substTyWith [ma] [unmatchableDataConTy] arrowV)
+    lintAccepts dflags "metadata abstraction" [] (Coercion (mkNomReflCo (quantified ma)))
+    forM_ (zip [6410, 6420, 6430] [matchableDataConTy, unmatchableDataConTy, mkTyVarTy ma]) $ \(base, metadata) -> do
+        let kind = mkVisFunTyMany metadata liftedTypeKind liftedTypeKind
+            f = mkTyVar (mkSystemName (unique base) (mkTyVarOcc "arrow_f")) kind
+            g = mkTyVar (mkSystemName (unique (base + 1)) (mkTyVarOcc "arrow_g")) kind
+            a = mkTyVar (mkSystemName (unique (base + 2)) (mkTyVarOcc "arrow_a")) liftedTypeKind
+            b = mkTyVar (mkSystemName (unique (base + 3)) (mkTyVarOcc "arrow_b")) liftedTypeKind
+            lhs = AppTy (mkTyVarTy f) (mkTyVarTy a)
+            rhs = AppTy (mkTyVarTy g) (mkTyVarTy b)
+            fg = proof (base + 4) (mkTyVarTy f) (mkTyVarTy g)
+            ab = proof (base + 5) (mkTyVarTy a) (mkTyVarTy b)
+            applied = proof (base + 6) lhs rhs
+            scope = [ma, f, g, a, b, fg, ab, applied]
+            matchable = eqType metadata matchableDataConTy
+        lintAccepts dflags "forward application congruence permits any matchability" scope (Coercion (AppCo (mkCoVarCo fg) (mkCoVarCo ab)))
+        check "application injectivity requires M" (isInjectiveInType a lhs == matchable)
+        forM_ [CLeft, CRight] $ \side ->
+            if matchable
+                then lintAccepts dflags "M application inversion" scope (Coercion (LRCo side (mkCoVarCo applied)))
+                else lintRejects dflags "U or unknown application inversion" scope (Coercion (LRCo side (mkCoVarCo applied)))
+    forM_ [Nominal, Representational, Phantom] $ \role -> do
+        let metadataRole = if role == Phantom then Phantom else Nominal
+            structural = FunCo role FTF_T_T FTF_T_T (mkReflCo metadataRole unmatchableDataConTy) (mkReflCo metadataRole ManyTy) (mkReflCo role intTy) (mkReflCo role boolTy)
+        lintAccepts dflags "raw U function coercion" [] (Coercion structural)
+        forM_ [(SelMatch, metadataRole, unmatchableDataConTy), (SelMult, metadataRole, ManyTy), (SelArg, role, intTy), (SelRes, role, boolTy)] $ \(selector, expectedRole, expectedType) -> do
+            let selected = SelCo (SelFun selector) structural
+            check "structural arrow projection preserves its role" (coercionRole selected == expectedRole)
+            checkType dflags "structural arrow projection endpoint" expectedType (coercionLKind selected)
+            lintAccepts dflags "structural projection permits U" [] (Coercion selected)
+    let phantom = FunCo Phantom FTF_T_T FTF_T_T (mkReflCo Phantom unmatchableDataConTy) (mkReflCo Phantom ManyTy) (mkReflCo Phantom intTy) (mkReflCo Phantom boolTy)
+        forged = FunCo Phantom FTF_T_T FTF_T_T (mkNomReflCo unmatchableDataConTy) (mkReflCo Phantom ManyTy) (mkReflCo Phantom intTy) (mkReflCo Phantom boolTy)
+        consumer = mkTyVar (mkSystemName (unique 6440) (mkTyVarOcc "metadata_consumer")) (mkVisFunTyManyM matchabilityTy liftedTypeKind)
+        phantomMetadata = SelCo (SelFun SelMatch) phantom
+    lintRejects dflags "phantom function cannot contain nominal metadata evidence" [] (Coercion forged)
+    lintRejects dflags "phantom metadata projection cannot supply nominal application evidence" [consumer] (Coercion (AppCo (mkNomReflCo (mkTyVarTy consumer)) phantomMetadata))
+    let parameter = mkTyVar (mkSystemName (unique 6441) (mkTyVarOcc "metadata_parameter")) boolTy
+        binders = [mkAnonTyConBinder parameter]
+        family = mkFamilyTyCon (mkSystemName (unique 6442) (mkTcOcc "ArrowMatchability")) (mkTyConKindWithMatchability unmatchableDataConTy binders matchabilityTy) binders 0 matchabilityTy Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
+        axiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 6443) (mkTcOcc "ArrowMatchabilityAx")) family [mkCoAxBranch [] [] [] [constructorIndex trueDataCon] unmatchableDataConTy [] noSrcSpan]
+        reducible = arrow (mkTyConApp family [constructorIndex trueDataCon])
+    forM_ [Nominal, Representational, Phantom] $ \role -> do
+        let Reduction evidence normalized = normaliseType emptyFamInstEnvs role reducible
+        checkType dflags "normalization reduces arrow metadata" arrowU normalized
+        checkType dflags "metadata normalization proof source" reducible (coercionLKind evidence)
+        checkType dflags "metadata normalization proof target" arrowU (coercionRKind evidence)
+        check "metadata normalization has nonreflexive evidence at the requested role" (not (isReflCo evidence) && coercionRole evidence == role)
+        lintAccepts dflags "metadata normalization evidence" [] (Coercion evidence)
+    let f = local 6450 "opaque_arrow_head" (mkVisFunTyManyU boolTy boolTy)
+        n = local 6451 "opaque_arrow_n" boolTy
+        m = local 6452 "opaque_arrow_m" boolTy
+        lhs = TermAppTy f (TermVarTy n)
+        rhs = TermAppTy f (TermVarTy m)
+        argument = proof 6453 (TermVarTy n) (TermVarTy m)
+        applied = proof 6454 lhs rhs
+        scope = [f, n, m, argument, applied]
+    lintAccepts dflags "native call retains forward nominal congruence" scope (Coercion (mkTermAppCo f (mkCoVarCo argument)))
+    forM_ [CLeft, CRight] $ \side ->
+        lintRejects dflags "native call remains opaque to LRCo" scope (Coercion (LRCo side (mkCoVarCo applied)))
+    let printPartial metadata = showSDoc dflags (ppr (TyConApp fUNTyCon [metadata, ManyTy]))
+        printed = map printPartial [matchableDataConTy, unmatchableDataConTy, mkTyVarTy ma]
+    check "partial FUN diagnostics retain M, U and variable metadata" (and [lhs /= rhs | (i, lhs) <- zip [0 :: Int ..] printed, (j, rhs) <- zip [0 :: Int ..] printed, i < j])
 
 -- | Check rigid index matching and conservative constructor apartness.
 runMatchingChecks :: DynFlags -> IO ()
@@ -2612,8 +2717,8 @@ runMatchingChecks dflags = do
         wholeTy = mkTyVarTy whole
         closedPi = mkDepFunTy b (indexed index)
         alphaPi = mkDepFunTy other (indexed otherIndex)
-        differentPi = mkDepFunTy other (mkFunctionType ManyTy (indexed otherIndex) boolTy)
-        occursPi = mkDepFunTy b (mkFunctionType ManyTy (indexed index) wholeTy)
+        differentPi = mkDepFunTy other (mkFunctionType unmatchableDataConTy ManyTy (indexed otherIndex) boolTy)
+        occursPi = mkDepFunTy b (mkFunctionType unmatchableDataConTy ManyTy (indexed index) wholeTy)
         retainedApart lhs rhs = case fine lhs rhs of
             MaybeApart MARRetainedFunction _ -> True
             _ -> False
@@ -2648,7 +2753,7 @@ runMatchingChecks dflags = do
         captureTemplate = mkForAllTy (Bndr outer Specified) wholeTy
         captureTarget =
             mkForAllTy (Bndr inner Specified) $
-                mkDepFunTy b (mkFunctionType ManyTy (mkTyVarTy inner) (indexed index))
+                mkDepFunTy b (mkFunctionType unmatchableDataConTy ManyTy (mkTyVarTy inner) (indexed index))
     check
         "a whole-type template cannot capture a forall variable through a retained function"
         (not (matches captureTemplate captureTarget))
@@ -2662,8 +2767,8 @@ runMatchingChecks dflags = do
         n = local 208 "n" (mkTyConTy nat)
         m = local 209 "m" (mkTyConTy nat)
         at payload var =
-            mkFunctionType ManyTy (mkTyConApp eqTyCon [varType var, TermVarTy var, TermVarTy var]) payload
-        arrow = mkFunctionType ManyTy
+            mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [varType var, TermVarTy var, TermVarTy var]) payload
+        arrow = mkFunctionType unmatchableDataConTy ManyTy
         telescope var payload = mkDepFunTy var (arrow (at payload var) (at payload var))
         openPi = telescope b payloadTy
         intPi = telescope other intTy
@@ -2759,12 +2864,12 @@ runDepFunCoChecks dflags = do
         equation = mkAxInstCo Nominal (BranchedAxiom (snd selectFamily) 0) [] []
         concrete = selected (constructorIndex trueDataCon)
         cv = proof 703 concrete intTy
-        argument = mkFunctionType ManyTy (indexed (TermVarTy b)) (indexed (TermVarTy free))
-        body = mkFunCoNoFTF Nominal (mkNomReflCo ManyTy) (mkNomReflCo argument) (mkCoVarCo cv)
+        argument = mkFunctionType unmatchableDataConTy ManyTy (indexed (TermVarTy b)) (indexed (TermVarTy free))
+        body = mkFunCoNoFTF Nominal (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) (mkNomReflCo argument) (mkCoVarCo cv)
         raw = DepFunCo b MRefl body
         lifted = mkDepFunCo b body
-        left = mkDepFunTy b (mkFunctionType ManyTy argument concrete)
-        right = mkDepFunTy b (mkFunctionType ManyTy argument intTy)
+        left = mkDepFunTy b (mkFunctionType unmatchableDataConTy ManyTy argument concrete)
+        right = mkDepFunTy b (mkFunctionType unmatchableDataConTy ManyTy argument intTy)
     check "retained coercion inherits nominal role" (coercionRole lifted == Nominal)
     checkType dflags "retained coercion left endpoint" left (coercionLKind lifted)
     checkType dflags "retained coercion right endpoint" right (coercionRKind lifted)
@@ -2793,11 +2898,11 @@ runDepFunCoChecks dflags = do
     case captured of
         DepFunCo fresh MRefl _ -> do
             check "coercion substitution freshens a capturing runtime binder" (fresh /= b)
-            let expectedArgument = mkFunctionType ManyTy (indexed (TermVarTy fresh)) (indexed (TermVarTy b))
+            let expectedArgument = mkFunctionType unmatchableDataConTy ManyTy (indexed (TermVarTy fresh)) (indexed (TermVarTy b))
             checkType
                 dflags
                 "coercion substitution keeps free and bound indices distinct"
-                (mkDepFunTy fresh (mkFunctionType ManyTy expectedArgument concrete))
+                (mkDepFunTy fresh (mkFunctionType unmatchableDataConTy ManyTy expectedArgument concrete))
                 (coercionLKind captured)
             check "coercion substitution retains the free replacement" (b `elemVarSet` tyCoVarsOfCo captured)
             check "coercion substitution removes the renamed binder" (not (fresh `elemVarSet` tyCoVarsOfCo captured))
@@ -2808,7 +2913,7 @@ runDepFunCoChecks dflags = do
         forgetful =
             mkSynonymTyCon
                 (mkSystemName (unique 705) (mkTcOcc "ForgetIndex"))
-                (mkTyConKind binders liftedTypeKind)
+                (mkTyConKindWithMatchability unmatchableDataConTy binders liftedTypeKind)
                 binders
                 liftedTypeKind
                 [Phantom]
@@ -2821,10 +2926,10 @@ runDepFunCoChecks dflags = do
         forgetting = TransCo (Refl forgotten) equation
         disappearing = mkDepFunCo b forgetting
     checkType dflags "one-sided retained endpoint preserves syntactic dependence" (DepFunTy b forgotten) (coercionLKind disappearing)
-    checkType dflags "one-sided retained endpoint canonicalizes the ordinary arrow" (mkFunctionType ManyTy boolTy intTy) (coercionRKind disappearing)
+    checkType dflags "one-sided retained endpoint canonicalizes the ordinary arrow" (mkFunctionType unmatchableDataConTy ManyTy boolTy intTy) (coercionRKind disappearing)
     lintAccepts dflags "a family equation removes one endpoint's retained dependence" [] (Coercion disappearing)
     let proofOnly = mkDepFunCo b (TransCo (SymCo forgetting) forgetting)
-        ordinaryEndpoint = mkFunctionType ManyTy boolTy intTy
+        ordinaryEndpoint = mkFunctionType unmatchableDataConTy ManyTy boolTy intTy
     check "proof-only dependence keeps the retained coercion binder" $ case proofOnly of
         DepFunCo{} -> True
         _ -> False
@@ -2889,7 +2994,7 @@ runDepFunCoChecks dflags = do
         family =
             mkFamilyTyCon
                 (mkSystemName (unique 30501) (mkTcOcc "DomainF"))
-                (mkTyConKind parameters liftedTypeKind)
+                (mkTyConKindWithMatchability unmatchableDataConTy parameters liftedTypeKind)
                 parameters
                 0
                 liftedTypeKind
@@ -2907,8 +3012,8 @@ runDepFunCoChecks dflags = do
         natTy = mkTyConTy (let (tc, _, _) = peanoNat in tc)
         x = local 31000 "domain_x" domainA
         y = local 31001 "domain_y" domainB
-        fn = local 31002 "domain_fn" (mkFunctionType ManyTy domainA natTy)
-        at first second = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, TermAppTy fn first, TermAppTy fn second]) intTy
+        fn = local 31002 "domain_fn" (mkFunctionType unmatchableDataConTy ManyTy domainA natTy)
+        at first second = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [natTy, TermAppTy fn first, TermAppTy fn second]) intTy
         bodyType = at (TermVarTy x) (TermVarTy x)
         back = mkCastTy (TermVarTy y) (mkSymCo delta)
         expectedLeft = mkDepFunTy x bodyType
@@ -2924,7 +3029,7 @@ runDepFunCoChecks dflags = do
         checkType dflags "domain conversion right endpoint" expectedRight (coercionRKind co)
         lintAccepts dflags "nominal domain conversion" [fn] (Coercion co)
     case coercionRKind converted of
-        DepFunTy binder (FunTy _ _ (TyConApp _ [_, TermAppTy headId (CastTy (TermVarTy occurrence) co), _]) _) -> do
+        DepFunTy binder (FunTy _ _ _ (TyConApp _ [_, TermAppTy headId (CastTy (TermVarTy occurrence) co), _]) _) -> do
             check "converted endpoint uses its actual binder and original head" (occurrence == binder && headId == fn)
             checkType dflags "converted occurrence metadata" domainB (varType occurrence)
             check "converted index cast is nominal" (coercionRole co == Nominal)
@@ -2959,7 +3064,7 @@ runDepFunCoChecks dflags = do
         forgottenCon =
             mkSynonymTyCon
                 (mkSystemName (unique 31007) (mkTcOcc "ForgetDomainIndex"))
-                (mkTyConKind [mkAnonTyConBinder forgottenParameter] liftedTypeKind)
+                (mkTyConKindWithMatchability unmatchableDataConTy [mkAnonTyConBinder forgottenParameter] liftedTypeKind)
                 [mkAnonTyConBinder forgottenParameter]
                 liftedTypeKind
                 [Phantom]
@@ -2971,15 +3076,15 @@ runDepFunCoChecks dflags = do
         forgottenType = mkTyConApp forgottenCon [TermVarTy x]
         forgettingCo = TransCo (mkNomReflCo forgottenType) (mkNomReflCo intTy)
         proofOnlyCo = mkDepFunCoWithDomain x (MCo delta) (TransCo (SymCo forgettingCo) forgettingCo)
-    checkType dflags "domain conversion proof-only left endpoint" (mkFunctionType ManyTy domainA intTy) (coercionLKind proofOnlyCo)
-    checkType dflags "domain conversion proof-only right endpoint" (mkFunctionType ManyTy domainB intTy) (coercionRKind proofOnlyCo)
+    checkType dflags "domain conversion proof-only left endpoint" (mkFunctionType unmatchableDataConTy ManyTy domainA intTy) (coercionLKind proofOnlyCo)
+    checkType dflags "domain conversion proof-only right endpoint" (mkFunctionType unmatchableDataConTy ManyTy domainB intTy) (coercionRKind proofOnlyCo)
     check "proof-only converted binder stays scoped" (not (x `elemVarSet` tyCoVarsOfCo proofOnlyCo))
     lintAccepts dflags "proof-only dependency in a converted domain" [] (Coercion proofOnlyCo)
     check "reflexive explicit domain uses the fixed-domain representation" $
         case mkDepFunCoWithDomain b (MCo (mkNomReflCo boolTy)) body of
             DepFunCo _ MRefl _ -> True
             _ -> False
-    let functionDelta = mkFunCoNoFTF Nominal (mkNomReflCo ManyTy) delta (mkNomReflCo natTy)
+    let functionDelta = mkFunCoNoFTF Nominal (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) delta (mkNomReflCo natTy)
     forM_
         [ ("representational domain evidence", DepFunCo x (MCo (mkSubCo delta)) (mkNomReflCo bodyType), [fn])
         , ("reversed domain evidence", DepFunCo x (MCo (mkSymCo delta)) (mkNomReflCo bodyType), [fn])
@@ -2991,7 +3096,7 @@ runDepFunCoChecks dflags = do
     -- Keep a nonreflexive result proof as well as the domain conversion.
     -- Each worker is an actual scoped assumption with the source Pi type.
     let applicationBody role =
-            mkFunCoNoFTF role (mkNomReflCo ManyTy) (mkReflCo role bodyType)
+            mkFunCoNoFTF role (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) (mkReflCo role bodyType)
                 (if role == Nominal then equation else mkSubCo equation)
         applicationR = mkDepFunCoWithDomain x (MCo delta) (applicationBody Representational)
         applicationN = mkDepFunCoWithDomain x (MCo delta) (applicationBody Nominal)
@@ -3005,12 +3110,12 @@ runDepFunCoChecks dflags = do
         firstBinder = local 31210 "domain_chain_first" firstDomain
         middleBinder = local 31211 "domain_chain_middle" domainA
         firstArgument = local 31212 "domain_chain_input" firstDomain
-        chainHead = local 31213 "domain_chain_head" (mkFunctionType ManyTy firstDomain natTy)
-        chainAt index = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, TermAppTy chainHead index, TermAppTy chainHead index]) intTy
-        firstBody = mkFunCoNoFTF Representational (mkNomReflCo ManyTy) (mkReflCo Representational (chainAt (TermVarTy firstBinder))) (mkSubCo equation)
+        chainHead = local 31213 "domain_chain_head" (mkFunctionType unmatchableDataConTy ManyTy firstDomain natTy)
+        chainAt index = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [natTy, TermAppTy chainHead index, TermAppTy chainHead index]) intTy
+        firstBody = mkFunCoNoFTF Representational (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) (mkReflCo Representational (chainAt (TermVarTy firstBinder))) (mkSubCo equation)
         firstCo = mkDepFunCoWithDomain firstBinder (MCo firstDelta) firstBody
         middleIndex = mkCastTy (TermVarTy middleBinder) (mkSymCo firstDelta)
-        secondCo = mkDepFunCoWithDomain middleBinder (MCo delta) (mkReflCo Representational (mkFunctionType ManyTy (chainAt middleIndex) intTy))
+        secondCo = mkDepFunCoWithDomain middleBinder (MCo delta) (mkReflCo Representational (mkFunctionType unmatchableDataConTy ManyTy (chainAt middleIndex) intTy))
         chainCo = TransCo firstCo secondCo
         backwardChain = Cast backward (SubCo (mkSymCo firstDelta))
         forwardChain = Cast (Cast (Var firstArgument) (SubCo firstDelta)) (SubCo delta)
@@ -3053,7 +3158,7 @@ runDepFunCoChecks dflags = do
                 checkType dflags (prefix ++ " full result type") targetResult (exprType pushed)
                 lintAccepts dflags (prefix ++ " pushed") scope pushed
                 case targetResult of
-                    FunTy _ _ payloadType _ -> do
+                    FunTy _ _ _ payloadType _ -> do
                         let payload = local (31250 + number) "domain_later_payload" payloadType
                             originalFull = App original (Var payload)
                             pushedFull = App pushed (Var payload)
@@ -3081,7 +3186,7 @@ runDepFunCoChecks dflags = do
         outerAlias =
             mkSynonymTyCon
                 (mkSystemName (unique 31021) (mkTcOcc "ForgetOuterDomain"))
-                (mkTyConKind outerBinders liftedTypeKind)
+                (mkTyConKindWithMatchability unmatchableDataConTy outerBinders liftedTypeKind)
                 outerBinders
                 liftedTypeKind
                 [Phantom]
@@ -3237,10 +3342,10 @@ runOccurrenceChecks dflags = do
         natTy = mkTyConTy nat
         dead = local 6000 "ordinary_dead" intTy
         intSeed = local 6001 "ordinary_seed" intTy
-        intProducer = local 6002 "ordinary_producer" (mkVisFunTyMany intTy intTy)
+        intProducer = local 6002 "ordinary_producer" (mkVisFunTyManyU intTy intTy)
         index = local 6003 "type_only_index" natTy
         seed = local 6004 "index_seed" natTy
-        producer = local 6005 "index_producer" (mkVisFunTyMany natTy natTy)
+        producer = local 6005 "index_producer" (mkVisFunTyManyU natTy natTy)
         parameter = mkTyVar (mkSystemName (unique 6006) (mkTyVarOcc "index")) natTy
         consume = local 6007 "consume_index_type" (mkForAllTy (Bndr parameter Specified) intTy)
         expression =
@@ -3256,8 +3361,8 @@ runOccurrenceChecks dflags = do
             retained == index && actual == index && rhsProducer == producer && rhsSeed == seed && worker == consume
         _ -> False
 
-    let headId = local 6010 "type_only_head" (mkVisFunTyMany natTy natTy)
-        makeHead = local 6011 "opaque_head_producer" (mkVisFunTyMany intTy (idType headId))
+    let headId = local 6010 "type_only_head" (mkVisFunTyManyU natTy natTy)
+        makeHead = local 6011 "opaque_head_producer" (mkVisFunTyManyU intTy (idType headId))
         call = TermAppTy headId (TermVarTy index)
         headExpression =
             Let (NonRec headId (App (Var makeHead) (Var intSeed)))
@@ -3269,7 +3374,7 @@ runOccurrenceChecks dflags = do
             retainedHead == headId && actualHead == headId && retainedIndex == index && actualIndex == index && worker == consume
         _ -> False
 
-    let payloadType = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, call, call]) intTy
+    let payloadType = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [natTy, call, call]) intTy
         payloadBinder = local 6012 "later_payload" payloadType
         answer = mkIntExprInt (targetPlatform dflags) 42
         telescope = Lam headId (Lam index (Lam payloadBinder answer))
@@ -3343,10 +3448,10 @@ runAliasChecks dflags = do
         alias = local 4201 "alias" natTy
         inner = local 4202 "inner_alias" natTy
         parameter = mkTyVar (mkSystemName (unique 4203) (mkTyVarOcc "index")) natTy
-        consume = local 4204 "consume_index" (mkForAllTy (Bndr parameter Specified) (mkVisFunTyMany natTy (mkVisFunTyMany natTy intTy)))
+        consume = local 4204 "consume_index" (mkForAllTy (Bndr parameter Specified) (mkVisFunTyManyU natTy (mkVisFunTyManyU natTy intTy)))
         consumeType = local 4205 "consume_index_type" (mkForAllTy (Bndr parameter Specified) intTy)
         seed = local 4206 "opaque_seed" natTy
-        producer = local 4207 "opaque_producer" (mkVisFunTyMany natTy natTy)
+        producer = local 4207 "opaque_producer" (mkVisFunTyManyU natTy natTy)
         zeroExpr = Var (dataConWorkId zero)
         successorExpr = App (Var (dataConWorkId successor)) (Var actual)
         repeated index left right = mkApps (Var consume) [Type index, Var left, Var right]
@@ -3396,16 +3501,16 @@ runAliasChecks dflags = do
             fresh /= actual && worker == consume && index == actual && outer == actual && bound == fresh
         _ -> False
 
-    let at index = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy
+    let at index = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy
         typeParameter = mkTyVar (mkSystemName (unique 4208) (mkTyVarOcc "result")) liftedTypeKind
         consumePi = local 4209 "consume_pi" (mkForAllTy (Bndr typeParameter Specified) intTy)
         dependentCapture =
             Let (NonRec alias (Var actual))
                 $ App (Var consumePi)
-                $ Type (mkDepFunTy actual (mkVisFunTyMany (at (TermVarTy alias)) (at (TermVarTy actual))))
+                $ Type (mkDepFunTy actual (mkVisFunTyManyU (at (TermVarTy alias)) (at (TermVarTy actual))))
     capturedType <- simplifyAccepts dflags "native alias avoids reused-Unique type capture" [actual, consumePi] dependentCapture
     case capturedType of
-        App (Var worker) (Type (DepFunTy fresh (FunTy _ _ argument result))) -> do
+        App (Var worker) (Type (DepFunTy fresh (FunTy _ _ _ argument result))) -> do
             check "retained type binder is fresh" (worker == consumePi && fresh /= actual)
             checkType dflags "type argument retains the outer actual index" (at (TermVarTy actual)) argument
             checkType dflags "type result uses its fresh retained binder" (at (TermVarTy fresh)) result
@@ -3550,7 +3655,7 @@ runChecks dflags = do
     lintAccepts dflags "unknown runtime variable application" [c] (App worker (Var c))
     check "alpha-equivalent retained functions" (eqType workerTy (exprType (keep c 7)))
 
-    let sharedBody = mkFunctionType ManyTy (indexed (TermVarTy b)) (indexed (TermVarTy c))
+    let sharedBody = mkFunctionType unmatchableDataConTy ManyTy (indexed (TermVarTy b)) (indexed (TermVarTy c))
         bindsB = DepFunTy b sharedBody
         bindsC = DepFunTy c sharedBody
     check "shared body pointer does not equate bound and free indices" (not (eqType bindsB bindsC))
@@ -3576,7 +3681,7 @@ runChecks dflags = do
             checkType
                 dflags
                 "substitution preserves free and bound index identities"
-                (mkFunctionType ManyTy (indexed (TermVarTy c)) (indexed (TermVarTy renamed)))
+                (mkFunctionType unmatchableDataConTy ManyTy (indexed (TermVarTy c)) (indexed (TermVarTy renamed)))
                 body
             check "capture avoidance retains the free replacement" (c `elemVarSet` tyCoVarsOfType captured)
             check "capture avoidance removes the renamed bound index" (not (renamed `elemVarSet` tyCoVarsOfType captured))
@@ -3595,7 +3700,7 @@ runChecks dflags = do
     checkType
         dflags
         "vacuous retained binder canonicalizes to an arrow"
-        (mkFunctionType ManyTy boolTy intTy)
+        (mkFunctionType unmatchableDataConTy ManyTy boolTy intTy)
         (mkDepFunTy b intTy)
     lintRejects dflags "raw vacuous retained type is rejected" [] (identity 10 (DepFunTy b intTy))
     lintRejects dflags "wrong retained argument type is rejected" [n] (App worker (Var n))
@@ -3646,7 +3751,7 @@ runChecks dflags = do
         unusedSynonym =
             mkSynonymTyCon
                 (mkSystemName (unique 72) (mkTcOcc "Ignore"))
-                (mkTyConKind unusedBinders liftedTypeKind)
+                (mkTyConKindWithMatchability unmatchableDataConTy unusedBinders liftedTypeKind)
                 unusedBinders
                 liftedTypeKind
                 [Phantom]
@@ -3662,7 +3767,7 @@ runChecks dflags = do
         identitySynonym =
             mkSynonymTyCon
                 (mkSystemName (unique 74) (mkTcOcc "Identity"))
-                (mkTyConKind identityBinders liftedTypeKind)
+                (mkTyConKindWithMatchability unmatchableDataConTy identityBinders liftedTypeKind)
                 identityBinders
                 liftedTypeKind
                 [Representational]
@@ -3673,7 +3778,7 @@ runChecks dflags = do
                 False
         nestedOrdinary = iterate (mkTyConApp identitySynonym . (: [])) boolTy !! 12
     check "scanner expands a hidden retained function synonym" (hasNativeDependentExpr (Type hiddenType))
-    check "scanner expands synonyms inside ordinary types" (hasNativeDependentExpr (Type (mkVisFunTyMany intTy hiddenType)))
+    check "scanner expands synonyms inside ordinary types" (hasNativeDependentExpr (Type (mkVisFunTyManyU intTy hiddenType)))
     check "scanner expands synonyms inside coercions" (hasNativeDependentExpr (Coercion (mkNomReflCo hiddenType)))
     check "scanner preserves unused native synonym arguments" (hasNativeDependentExpr (Type ignoredType))
     check "scanner expands synonyms in unused synonym arguments" (hasNativeDependentExpr (Type ignoredHiddenType))
@@ -3747,7 +3852,7 @@ dictionaryBranch n payload con cv = Cast body (mkSymCo funCo)
     body = Lam dict (Var payload)
     indexCo = mkCoVarCo cv
     predCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo boolTy, indexCo, indexCo]
-    funCo = mkFunCoNoFTF Representational (mkNomReflCo ManyTy) (mkSubCo predCo) (mkReflCo Representational intTy)
+    funCo = mkFunCoNoFTF Representational (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) (mkSubCo predCo) (mkReflCo Representational intTy)
 
 -- | Build exhaustive alternatives in the wired Boolean constructor tag order.
 dictionaryAlts :: Id -> CoVar -> CoVar -> [CoreAlt]
@@ -3765,7 +3870,7 @@ selectFamily = (family, axiom)
     family =
         mkFamilyTyCon
             (mkSystemName (unique 101) (mkTcOcc "Select"))
-            (mkTyConKind binders liftedTypeKind)
+            (mkTyConKindWithMatchability unmatchableDataConTy binders liftedTypeKind)
             binders
             0
             liftedTypeKind
@@ -3868,7 +3973,7 @@ runCaseChecks dflags = do
     check
         "an unfolding cannot turn an opaque index proof into reflexivity"
         (case optimizedKnown of Case (Var _) _ _ _ -> True; _ -> False)
-    let producer = local 82 "producer" (mkFunctionType ManyTy boolTy boolTy)
+    let producer = local 82 "producer" (mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy)
         producerArgument = App (Var producer) trueExpr
         closedResult =
             Lam b $
@@ -3895,7 +4000,7 @@ runCaseChecks dflags = do
     checkType
         dflags
         "keepSelect has a retained dependent function type"
-        (mkDepFunTy keepBool (mkFunctionType ManyTy (selected keepIndex) (selected keepIndex)))
+        (mkDepFunTy keepBool (mkFunctionType unmatchableDataConTy ManyTy (selected keepIndex) (selected keepIndex)))
         (exprType keepSelect)
     lintAccepts dflags "choose and keepSelect compose at one shared runtime index" [payload] again
     checkType
