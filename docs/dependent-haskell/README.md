@@ -101,7 +101,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M61 passes both builds, fresh API1/37, both-stage public19, parameterized14 and Showcase84/14, plus five registered tests; final audit/publication pending |
+| Compiler validation | Audited M61 passes both builds, fresh API1/37, both-stage public19, parameterized14 and Showcase84/14, plus five registered tests |
 | Example validation | Audited M60 passes both-stage hidden-interface source19, five rejection controls, compile-only equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
@@ -4879,6 +4879,9 @@ API goldens stay 1/37. Both stages pass public19, parameterized14 with three
 rejections, and Showcase84 through fourteen modules. Registered tests report
 five expected passes with zero unexpected failures or framework warnings.
 The first self-host attempt's package-registration failure remains recorded;
-the unchanged-input retry passes. Final evidence audit and publication remain
-pending. The records use `native-opaque-whole-cast-*`. This closes no general
+the unchanged-input retry passes. The independent audit passes 218,015 checks
+over 46,963 pinned paths. All 491 `native-opaque-whole-cast-*` files are frozen.
+The canonical record is `dependent-haskell-M61-final-audit-v1.json`; its digest
+and source identities are in [the M61 plan](PLAN.md#m61-opaque-whole-function-cast-lowering).
+This closes no general
 Core, inference or optimizer obligation. Opaque proof projection remains open.

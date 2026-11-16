@@ -27,13 +27,13 @@ The user selected a native Core extension based on Eisenberg's historical
   M58 source checking uses those Core rules. M59 extends frontend comparison
   beneath unchanged function domains using the existing congruence rule.
 
-The [published M59 checkpoint](../ROADMAP.md#where-this-fork-stands) passes its
+The [published M61 checkpoint](../ROADMAP.md#where-this-fork-stands) passes its
 selected checks with both compiler stages and its independent artifact audit.
 Restricted pipelines and Lint checks do not establish general preservation.
 
 ## Next increments
 
-- [ ] Specify and run an opaque whole-function cast probe. Use genuinely
+- [x] Specify and run an opaque whole-function cast probe. Use genuinely
       abstract payload types and a scoped coercion variable. Check type
       recovery, Lint, CorePrep and object execution with full and partial
       applications. Measure bottom demand and ignored arguments.
@@ -43,10 +43,12 @@ Restricted pipelines and Lint checks do not establish general preservation.
       The bounded specification is [M61](../PLAN.md#m61-opaque-whole-function-cast-lowering).
       Scratch checks pass after function-head beta substitution is corrected.
       The actual NCG dump retains the abstract cast. The self-hosted build and
-      selected regression cohort pass. Final audit and publication remain open.
-- [ ] Determine whether a required transformation needs an opaque Pi
-      instantiation rule. Whole-cast lowering may already work. Specify a new
-      proof operation only when a measured or calculus obligation requires it.
+      selected regression cohort pass. The independent audit passes.
+      Partial-WHNF and demand checks use bytecode. NCG checks a fully applied
+      keep caller and the preserved scalar-domain caller.
+- [ ] Specify an opaque Pi instantiation rule if a typed transformation needs
+      one. M61's measured whole-cast lowering needs no new primitive. Add a proof
+      operation only when a measured or calculus obligation requires it.
 - [ ] Integrate the [R23 matchability foundation](R23-unsaturated-type-families.md)
       with native types and coercions. Preserve forward congruence and restrict
       inverse projection to the permitted function kinds.

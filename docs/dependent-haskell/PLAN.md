@@ -4169,8 +4169,7 @@ This publication checkpoint changes only status documents.
 ## M61: opaque whole-function cast lowering
 
 Roadmap owner: R05 dependent Core. Related card: R03 dependent products.
-Status: implemented and checked with both compiler stages. The selected cohort
-passes. Final evidence audit and publication remain pending.
+Status: implemented, checked with both compiler stages, and independently audited.
 
 Determine whether the existing whole-function cast already supports application
 through opaque nominal evidence. `pushCoRetainedArg` can decline a coercion
@@ -4223,7 +4222,7 @@ the cast-only expression. It must preserve a bottom worker's WHNF behavior.
 - [x] Record actual compiler/package inputs, diagnostic or runtime failures,
       and the limits of abstract structural checks versus closed execution.
       Update R05, CORE and references. Keep general R05 work open.
-- [ ] Audit the complete evidence and publish the bounded checkpoint.
+- [x] Audit the complete evidence and prepare its publication checkpoint.
 
 This increment adds no source syntax, evaluator, function equality or generic
 domain. It establishes no normal-optimizer, sharing or preservation theorem.
@@ -4264,3 +4263,12 @@ Showcase84/14 modules. Registered tests report five expected passes across
 behavior is not claimed: those three checks and demand markers are bytecode
 observations. NCG checks the fully applied keep caller and prior scalar entry.
 No full GHC suite or general optimizer validation was run.
+
+Audited documentation is `f8ce379bdd`. The independent audit passes 218,015
+checks over 46,963 pinned paths. Its external canonical record is
+`_build/verification/dependent-haskell-M61-final-audit-v1.json`, SHA256
+`610bbc45c5abd78ccd48da01edc587adbc2b6f82766429ea3466c8903a2af615`.
+The evidence manifest freezes all 491 files in `native-opaque-whole-cast-*`.
+The unchanged 16-work, 22-version paper ledger retains its reading scopes.
+This publication checkpoint changes only status documents. R05 and the main
+goal remain open.
