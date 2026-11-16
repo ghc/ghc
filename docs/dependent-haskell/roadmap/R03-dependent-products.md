@@ -1,0 +1,88 @@
+# R03: Dependent products
+
+Upstream: [Dependent products](https://ghc.serokell.io/dh#dependent-products).
+Local status: partial implementation. The source subset is restricted.
+Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
+
+## Goal and dependencies
+
+A retained function's result type can refer to its runtime argument. Support
+source formation, checking, application and conversion with explicit scope,
+visibility and retention rules. The proposed visible spelling is
+`foreach (n :: Nat) -> Vec a n`.
+
+The upstream graph relates R03 to R05 and the completed visible-forall card
+R39. Each local increment needs the relevant Core rule. It need not wait for
+all Core transformations. Normal optimization remains a broader release gate.
+
+## Supported subset and evidence
+
+- Runtime Bool and Peano Nat indices, checked equations and bounded lambdas.
+- Closed parameterized domains such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
+- Retained workers and function fields through separate interfaces.
+- Nominal scalar-domain conversion with scoped source body solving at M58.
+- Fixed function-domain body comparison and payload selection at M59.
+  Implementation and bootstrap controls pass. Selected self-hosted source
+  checks, final audit and publication remain pending.
+
+The last published checkpoint is M58. Its Showcase has 68 observations in both
+stages. The M59 candidate has 79 observations checked with the bootstrap
+compiler. See [the current evidence](../ROADMAP.md#where-this-fork-stands) and
+[the M59 specification](../PLAN.md#m59-bodies-beneath-fixed-function-domains).
+M56's domain representation and M57's conversion rules belong primarily to R05.
+M58 and M59 expose those rules through source checking.
+
+## Next increments
+
+- [ ] Finish M59's selected checks and publication. Preserve the existing
+      compiler and fixture identities when documentation changes.
+- [ ] Measure closed-list safe indexing:
+      `indexClosed :: foreach (xs :: [Bool]) -> Fin (Count xs) -> Bool`.
+      Use an ordinary `Fin` GADT and the existing saturated `Count` family.
+      Check negative and out-of-range runtime requests, list identity,
+      empty-case demand, lazy fields and finite access to cyclic input.
+      The candidate and its nineteen expected observations are unexecuted.
+- [ ] Admit a complete retained-function type in the existing lifted
+      consumer's explicit type-argument position. Preserve complete-type,
+      kind, scope and native-meta checks. Check full worker WHNF separately
+      from direct `seq` representation polymorphism and outer Quick Look.
+- [ ] After the R05 generic-domain work, measure
+      `forall a. foreach (xs :: [a]) -> Fin (CountAny xs) -> a`.
+      Include function-valued elements. Keep the family saturated.
+- [ ] Specify invisible retained binders and explicit runtime overrides.
+      Keep retention independent of visibility. Do not infer a new `foreach`.
+- [ ] Specify runtime `Type` operands and their universe representation.
+      Existing `TypeRep` and required erased `forall` leave a bridge to define.
+
+Running safe indexing after M59 is a scheduling choice. Closed `[Bool]` does
+not require generic domains, new evaluation or bounds-check elimination.
+Generic `[a]` needs the matchability invariant described in
+[R23](R23-unsaturated-type-families.md). It does not require the whole R23
+surface feature or ordinary function promotion. Runtime-dependent later domains,
+such as `[Vec Int n]`, need an additional telescope contract.
+
+## Completion boundary
+
+Keep R03 open until the supported domain judgment is stable under substitution
+and the full retained-quantifier contract is implemented. Check annotations,
+visibility, scope, interfaces, diagnostics, runtime demand and ordinary programs.
+A closed-list example or another application-inference case cannot close R03.
+
+## Research
+
+- [Design for Dependent Types, #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html):
+  quantifiers, known result types and runtime-name identity.
+- [The `singletons` repository](https://github.com/goldfirere/singletons):
+  singleton and defunctionalization comparisons. The reviewed source is commit
+  `8c9221c164832bfd17878af94d50d8ade706932d`. Arbitrary-closure reification
+  uses trusted casts; it does not establish native function equality.
+- [Agda v2.8.0](https://github.com/agda/agda/tree/3d04bacca842729f9c0869b9287256321b5f450f):
+  selected telescope, substitution and pattern-refinement code. Transport later entries together.
+  Preserve Haskell's separate laziness and evidence rules.
+
+The dated research records are in
+`_build/verification/native-roadmap-research-2026-11-16/`:
+`syntax-safe-index-v1/`, `syntax-agda-telescope-v1/`, and
+`syntax-singletons-functions-v1/`. Their provenance files state what was read.
+The cache is ignored. The task boundaries above and the reference ledger must
+remain usable without it.

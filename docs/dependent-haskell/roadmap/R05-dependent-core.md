@@ -1,0 +1,90 @@
+# R05: Dependent Core language
+
+Upstream: [Dependent Core language](https://ghc.serokell.io/dh#dependent-core-language).
+Local status: restricted native implementation. General transformations remain
+open. Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
+
+## Goal and dependencies
+
+Provide a coherent typed Core representation for dependent types. Define
+substitution, conversion, scoped evidence, roles, runtime usage and erasure.
+Preserve the compiler transformations and ordinary GHC behavior that depend on
+those rules. The upstream graph gives R05 no outgoing feature edge. That does
+not remove its research or implementation obligations.
+
+The user selected a native Core extension based on Eisenberg's historical
+`nokinds-pi` work. The current representation is specified in
+[CORE.md](../CORE.md). Keep `singletons` as a comparison implementation.
+
+## Supported subset and evidence
+
+- `TermVarTy`, `TermAppTy`, `DepFunTy` and scoped native coercions.
+- Closed first-order constructor domains, retained field telescopes and
+  opaque function heads. A function head is not a general term expression.
+- Scoped constructor refinement, Core Lint, interfaces and checked lowering.
+- Bounded beta exposure, alias substitution and dead-local removal.
+- M56 closed parameterized domains and M57 nominal scalar-domain conversion.
+  M58 source checking uses those Core rules. M59 extends frontend comparison
+  beneath unchanged function domains using the existing congruence rule.
+
+The [published M58 checkpoint](../ROADMAP.md#where-this-fork-stands) supplies
+the last final audit. The M59 implementation has bootstrap evidence and a
+self-hosted build; its selected self-hosted source checks remain pending.
+Restricted pipelines and Lint checks do not establish general preservation.
+
+## Next increments
+
+- [ ] Specify and run an opaque whole-function cast probe. Use genuinely
+      abstract payload types and a scoped coercion variable. Check type
+      recovery, Lint, CorePrep and object execution with full and partial
+      applications. Measure bottom demand and ignored arguments.
+- [ ] Determine whether a required transformation needs an opaque Pi
+      instantiation rule. Whole-cast lowering may already work. Specify a new
+      proof operation only when a measured or calculus obligation requires it.
+- [ ] Integrate the [R23 matchability foundation](R23-unsaturated-type-families.md)
+      with native types and coercions. Preserve forward congruence and restrict
+      inverse projection to the permitted function kinds.
+- [ ] Specify generic domain metadata for `[a]`. Update binder types,
+      occurrence types, multiplicities, substitution and zonking together.
+      Constructor fields at arbitrary `a` need an opaque-field rule. Include
+      `a = Nat -> Nat`; then use a separate R03 source increment to check it.
+- [ ] Specify transport through later runtime-dependent telescope entries.
+      Freshen binders and transport remaining fields, targets and evidence
+      together. Preserve the distinction between lexical scope and active
+      retained-body comparison scope.
+- [ ] Extend one ordinary Core transformation with a measured benefit.
+      Preserve deep type dependencies, index identity, demand and sharing.
+      Keep other unsupported transformations gated.
+- [ ] Complete native unfolding and coercion-interface handling. Broaden
+      optimizer and ordinary GHC compatibility checks before release.
+
+Do not derive nominal domain equality from arbitrary representational Pi
+equality. `DepFunCo` can have the role of its body proof; its domain evidence
+is nominal. `TermAppCo` has a separate nominal restriction. Ordinary `InstCo`
+assumes erased quantification and needs a rule review before reuse here.
+
+## Completion boundary
+
+The historical C1 package is the representation and calculus contract.
+C2 is the transformation and compatibility work. Both belong to R05 and remain
+open. A paper correspondence is not an implementation proof. A passing probe
+closes only its stated behavior. Complete scope, metadata, roles, interfaces,
+normal optimization, demand and compatibility obligations before closing R05.
+
+## Research
+
+- [A Specification for Dependently-Typed Haskell (2017)](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf):
+  explicit equality, substitution and erasure with nontermination.
+- [A Role for Dependent Types in Haskell (2019)](https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf):
+  nominal and representational dependent equality.
+- [A Graded Dependent Type System with a Usage-Aware Semantics (2021)](https://richarde.dev/papers/2021/grad/grad-extended.pdf):
+  usage and dependent typing. Its assumptions do not combine automatically with
+  the other calculi or prove this implementation.
+- [System FC as implemented in GHC](https://gitlab.haskell.org/ghc/ghc/-/blob/master/docs/core-spec/core-spec.pdf):
+  compare native rules with the current compiler contract.
+
+See [the reference ledger](../REFERENCES.md) and [paper records](../papers/README.md)
+for reading scope. The dated ignored research cache has
+`core/opaque-pi-elimination-v1.md`, `core/generic-domain-obligations-v1.md`,
+`core/generic-matchability-v1.md`, and the Agda telescope review. These are
+research records; proposed controls remain unexecuted.

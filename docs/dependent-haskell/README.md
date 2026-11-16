@@ -11,9 +11,10 @@ Last updated: 2026-11-16.
 
 ## Project documents
 
-- [Runnable showcase](Showcase.hs): completed source features in one maintained program.
-- [Program roadmap](ROADMAP.md): the full Serokell task graph, dependencies, and a separate checklist for this fork.
-- [Implementation plan](PLAN.md): Core extension, port tasks, and acceptance checks.
+- [Program roadmap](ROADMAP.md): the main work queue, all fifty upstream cards, dependencies and local completion boundaries.
+- Active feature pages: [R03 dependent products](roadmap/R03-dependent-products.md), [R05 dependent Core](roadmap/R05-dependent-core.md), and [R23 unsaturated type families](roadmap/R23-unsaturated-type-families.md).
+- [Implementation plan](PLAN.md): bounded specifications, acceptance checks and historical `M` checkpoints. Each new increment names its owning roadmap card.
+- [Runnable showcase](Showcase.hs): source features in one maintained program. The verification state is recorded below.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
 - [Paper reading ledger](papers/README.md): conference-paper findings, thesis sections and version hashes.
 - [Packed vector source example](examples/packed-vector/README.md): producer, consumer, runtime observations, and a separate-module runner.
@@ -55,8 +56,12 @@ _build/showcase/showcase
 | Runtime list indices, optional indices and heterogeneous tree payloads | `parameterizedDomains` |
 | Nominal domain conversion, ordinary payload inference and cast demand | `domainConversion` |
 
-Both bootstrap and self-hosted compilers produce the expected 68 lines with
-Core Lint and STG Lint enabled. Both runs preserve all fourteen source inputs.
+The published M58 checkpoint produces the expected 68 lines in both compiler
+stages with Core Lint and STG Lint enabled. The M59 candidate adds eleven
+fixed function-domain observations. Its 79 lines pass the bootstrap compiler;
+the selected self-hosted source run remains pending. Both versions use fourteen
+source modules. See [the work queue](ROADMAP.md#current-work-queue) for the
+remaining checks and the current build pause.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
 GroundApplicationClient checks native function types as equality operands
@@ -92,7 +97,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M57 passes both builds and both-stage public19, parameterized14 and Showcase59/14; API goldens remain1/37, with seven new bytecode controls and one new native-object control |
+| Compiler validation | Published M58 passes both builds and both-stage public19, parameterized14 and Showcase68/14; M59 has bootstrap evidence and a self-hosted build, with selected checks and final audit pending |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -3708,7 +3713,7 @@ took 17m18s and peaked at 5221 MiB. Both used a 16 GiB cap. Final validation
 peaked at 1317 MiB under 4 GiB, with no swap. The full GHC suite and older
 standalone corpora were not rerun. M41 checks variable-alias propagation in
 native Core below. General transformations and the other
-[roadmap gates](ROADMAP.md#work-sequence-for-this-fork) remain open.
+[roadmap gates](ROADMAP.md#remaining-work-by-roadmap-area) remain open.
 
 See the [source contract](CORE.md#bounded-source-beta-applications),
 [M40 plan](PLAN.md#m40-bounded-source-lambda-index-applications) and

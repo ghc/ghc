@@ -2,10 +2,12 @@
 
 Use this file to plan the whole program. Use [PLAN.md](PLAN.md) for individual
 compiler increments, [CORE.md](CORE.md) for the current Core contract, and
-[REFERENCES.md](REFERENCES.md) for design provenance.
+[REFERENCES.md](REFERENCES.md) for design provenance. The work queue below owns
+project priorities. The `M` checkpoints in PLAN.md record implementation and
+evidence; their numbers do not define the program's structure.
 
 The primary map is [Serokell's Dependent Haskell roadmap](https://ghc.serokell.io/dh),
-dated **2026-11-12** and reviewed on **2026-11-15**. This checklist records its
+dated **2026-11-12** and reviewed on **2026-11-16**. This checklist records its
 50 feature cards and all 67 feature-to-feature graph edges. Layout nodes are
 excluded. The graph describes prerequisites **or subtasks**. It is not a build
 order. In particular, two edges below are explicitly loose ends of a completed
@@ -48,22 +50,76 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-At M38, the selected compiler is `0e6d2f5ebcdcb231f7f5c42a27da563d049ac8af`.
-Both stages build. Each stage passes two source matrices: 41 clients with
-27 compilations and 14 located errors, and 64 prior clients with 43 compilations
-and 21 located errors. All 47 predefined outcome controls pass. Each stage also
-passes 94 qualified-function runtime observations and the previous 562 vector
-observations. The API fixture passes 322 rejection programs and 95 quiet positive
-programs. All five focused registered regressions pass. The full GHC suite has
-not run for M38. These checks establish the measured subset, not general type
-soundness or production readiness.
+The last published checkpoint is M58 at `2b34a0224efe`. Both compiler stages
+pass the 68-observation Showcase through fourteen source modules. M56 provides
+the closed parameterized domains. M57 provides nominal scalar-domain conversion
+in Core. M58 exposes that conversion and scoped body solving from source.
+Its canonical audit is
+`_build/verification/dependent-haskell-M58-final-audit-v1.json`.
 
-M40 also accepts bounded immediate lambda applications as retained source
-arguments. Both stages pass its 41-client matrix, with 16 compilations and
-25 located errors. The public and raw examples now pass 106 observations per
-stage; the old 94-line prefix and 562 packed-vector observations remain.
-Actual zonked lambda metadata passes before desugaring on both stages.
-This adds no general term evaluation or ordinary optimizer support.
+M59 is implemented and has bootstrap evidence. Both compiler stages build.
+The updated 79-observation Showcase passes the bootstrap compiler. Selected
+self-hosted source checks, final audit and publication remain open. Its compiler
+checkpoint is `5c527cd8b92a`; its source fixture checkpoint is `5e33b194f1e6`.
+See [the M59 specification](PLAN.md#m59-bodies-beneath-fixed-function-domains).
+Observation counts measure those programs. They do not count roadmap features.
+
+## Current work queue
+
+Use the roadmap card as the unit of work. Each active card has a feature page
+with its goal, supported subset, next increments and completion boundary:
+
+- [R05: Dependent Core language](roadmap/R05-dependent-core.md).
+- [R03: Dependent products](roadmap/R03-dependent-products.md).
+- [R23: Unsaturated type families](roadmap/R23-unsaturated-type-families.md).
+
+The following order is our implementation plan. These gates are separate from
+the upstream graph's prerequisites-or-subtasks relation. A completed increment
+can advance a card while the card remains open.
+
+| Order | Owner and contribution | State | Gate and next result |
+| --- | --- | --- | --- |
+| 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Pending final verification: M59 | Finish the selected checks and audit. Preserve exact compiler and source checkpoints. |
+| 2 | R03: safe indexing over a retained `[Bool]` | Candidate written; unexecuted | After M59, measure composition of the existing `Count` family with an ordinary `Fin` GADT. Check bounds and demand. |
+| 3 | R05: application through opaque whole-function evidence | Research complete enough to specify a probe | Keep genuinely abstract payloads and a scoped coercion variable. Check Lint, CorePrep and object execution before choosing a new coercion rule. |
+| 4 | R03: explicit complete retained-function type arguments | Scoped source task identified | Use the existing lifted consumer. Preserve kind, scope, complete-type and native-meta checks. |
+| 5 | R23: matchability foundation; also advances R05 | Prior implementation and native integration reviewed; spec needed | Specify kinds, substitution, coercions, roles, interfaces and reflection before admitting unrestricted function-valued fields. |
+| 6 | R05: generic domain metadata and dependent telescopes; enables R03 source work | Research obligations identified | After the matchability foundation, target generic `[a]`. Transport binder types, occurrences and later fields together. State the policy for runtime-dependent domains separately. |
+
+GHC builds and compiler checks remain paused until **2026-11-16 18:00 CET**
+for benchmarks. Research and documentation can proceed during the pause.
+The pause is an execution constraint; it does not change the task dependencies.
+
+### Remaining work by roadmap area
+
+Keep these tasks visible when selecting the next increment. The first six
+increments do not complete the program.
+
+| Roadmap area | Remaining local work | Main obligations before completion |
+| --- | --- | --- |
+| R03: dependent products | General domains, invisible retained binders, runtime `Type` operands | Separate retention from visibility. Define a runtime universe bridge. Required erased `forall` and existing `TypeRep` do not supply that bridge. |
+| R04 and R22: sums and existentials | First-class erased `exists` and retained `some` | Specify formation, introduction, elimination, scope and representation. Existing retained ADT fields provide a storage baseline. |
+| R05: dependent Core | Typed conversion, proof operations, transformations, unfoldings and normal optimization | Reconcile the native forms with the calculi. Preserve roles, scope, demand, sharing and ordinary GHC behavior. |
+| R15 and R16: closed and open evaluation | Computation in types over closed inputs and rigid variables | Specify staging, divergence, stuck terms and diagnostics. Reuse ordinary term definitions without parallel handwritten families. |
+| R13, R17–R19 and R21: function promotion | Type-level lambda, let and case; mixed declaration dependencies | Integrate typed evaluation and matchability. Demonstrate one source function used at both levels across an interface. |
+| R23 and R24: type families | Source unsaturation, inference/defaulting and family constraints | Complete the family design beyond the internal matchability foundation. Preserve noninjective application and evidence validity. |
+| R07, R10–R12 and R14: promotion domains | General literals, unboxed types, homogeneous equality, classes and data families | Define each domain and its representation separately. Reuse inherited Char and Natural support. |
+| R20, R27, R34–R36 and R41: language preparation | Remaining accepted cleanup and binder work | Follow each proposal and its current implementation. Track loose ends without reopening an entire completed upstream card. |
+| R01, R02 and R06: aggregate goals | Integrate retained quantification, promotion and language preparation | Complete their required feature scope and broader compatibility checks. A single example cannot close an aggregate goal. |
+
+### Rules for the next increment
+
+1. Name one owning roadmap card. List related cards when the increment crosses
+   layers. Keep the existing `M` identifiers for historical checkpoints.
+2. Add the bounded specification to [PLAN.md](PLAN.md) before compiler changes.
+   State the contribution, required prerequisites, acceptance checks and limits.
+3. Use the owning feature page to find the research and open obligations.
+   Record new sources and their reading scope in [REFERENCES.md](REFERENCES.md).
+4. Record compiler, source, runtime and rejection evidence separately. Extend
+   [Showcase.hs](Showcase.hs) when a source feature is checked.
+5. Update the feature page and this queue after verification. Mark the increment
+   complete only within its measured scope. Close a roadmap card only when its
+   full goal and compatibility requirements are supported.
 
 ## Main relationships
 
@@ -166,11 +222,12 @@ arguments already exist while syntax unification and nested GADT quantifiers
 remain incomplete. Do not infer completion by propagating checkmarks through
 the graph.
 
-## Work sequence for this fork
+## Historical work packages
 
-These boxes track our work. They are separate from the upstream boxes above.
-Dependencies below are proposed implementation order. Each open task needs its
-own small spec and validation boundary in PLAN.md before compiler edits.
+These names predate the roadmap-aligned work queue. Keep them as references for
+the recorded increments. S0–S3 map to R03/R05; C1/C2 to R05; Q1 to R03; Q2 to
+R04/R22; E1/E2 to R15/R16; P1 to R13; P2 to the remaining promotion domains;
+L1 to R20; and I1 to R01. The current queue above owns the next work.
 
 - [x] **S0: Retain a runtime index.** Native Bool functions, checked case
   refinement, and `choose`/`keep` execution. `keep` does not force its index.
@@ -366,16 +423,16 @@ check runtime behavior. The object control preserves native forms through
 SimpleOpt and ignores a bottom token. This increment adds no source observation.
 C1, C2 and R22 remain open.
 
-The next source slice can use nominal family evidence between closed scalar
-domains during retained-Pi comparison. Preserve that evidence before desugaring.
-Check a named adapted worker from source before extending the Showcase.
-Opaque Pi instantiation and domain projection need separate kernel rules.
-Representational Pi equality alone cannot supply nominal domain equality.
-
-C1 is the next program task. More application-inference cases can support a
-specific task, but they must not replace work on Core or type computation.
-C2, Q1, Q2, and the evaluator tasks can be split into smaller increments after
-C1 identifies their actual shared requirements.
+M58 uses that nominal rule from source. A private body solve preserves ordinary
+payload inference and keeps runtime indices local. Source wrappers retain the
+nominal proof through zonking. Both compilers run the 68-observation Showcase,
+including nine new conversion and demand observations. Three located rejection
+controls prevent unrelated domains, mismatched payloads and local-index escape.
+The older parameterized-domain rejection controls remain in force.
+This is progress within R05/C1. It completes none of C1, C2 or R22.
+M59 addresses fixed function-domain body comparison. Opaque Pi instantiation
+and domain projection remain separate obligations. Representational Pi equality
+alone cannot supply nominal domain equality.
 
 ## Research constraints and references
 
@@ -420,13 +477,3 @@ relations so that it remains usable without the cache. Refresh the source date
 and evidence when upstream changes. At each compiler checkpoint, update the
 relevant local box, record the narrower completed behavior in PLAN.md, and leave
 an upstream box open until its full stated task is supported.
-
-
-M58 uses that nominal rule from source. A private body solve preserves ordinary
-payload inference and keeps runtime indices local. Source wrappers retain the
-nominal proof through zonking. Both compilers run the 68-observation Showcase,
-including nine new conversion and demand observations. Three located rejection
-controls prevent unrelated domains, mismatched payloads and local-index escape.
-The older parameterized-domain rejection controls also remain in force.
-This is progress within C1. It completes none of C1, C2 or R22. Fixed function-domain
-body comparison and opaque nominal Pi application remain separate next steps.

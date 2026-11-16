@@ -2,15 +2,37 @@
 
 Implement dependent types in Haskell through a native extension to Core. Base the
 work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful changes
-to current GHC and complete the missing rules. The first working target is a
-retained Boolean argument whose value determines the result type.
+to current GHC and complete the missing rules. The initial retained Boolean
+experiment is implemented. The current work follows the roadmap below.
 
-Last updated: 2026-11-15. Upstream compiler base:
+Last updated: 2026-11-16. Upstream compiler base:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
 
-## Current priority: execute from source
+## Current priority: roadmap-aligned increments
+
+Use [ROADMAP.md](ROADMAP.md#current-work-queue) as the main work queue. These
+specifications record bounded increments and their historical checkpoints.
+Each new increment must name one owning roadmap card, related cards, required
+prerequisites, acceptance checks and the behavior that remains unsupported.
+
+The current increment is [M59](#m59-bodies-beneath-fixed-function-domains), owned
+by [R03 dependent products](roadmap/R03-dependent-products.md). It exercises
+existing R05 evidence rules. The implementation and bootstrap controls pass.
+Both compiler stages build. Selected self-hosted source checks, final audit
+and publication remain pending. GHC execution is paused for benchmarks until
+2026-11-16 18:00 CET.
+
+The queue then measures closed-list indexing, probes opaque Pi application,
+and completes a bounded type-argument position. The next substantial foundation
+is [R23 matchability](roadmap/R23-unsaturated-type-families.md), followed by
+[R05 generic-domain metadata](roadmap/R05-dependent-core.md). The roadmap
+separates this chosen order from actual feature prerequisites. Keep ordinary
+evaluation, function promotion, first-class sums and the remaining promotion
+domains visible there.
+
+## Historical source checkpoints
 
 The source constructor checkpoint is verified at `8e90e0386b`; the source filter
 is verified at `c9aa3545c0`. Both compiler stages run the
@@ -3974,7 +3996,13 @@ pattern; runtime binders still need their own solver scope.
 
 ## M59: bodies beneath fixed function domains
 
-Status: specified; implementation and validation remain open.
+Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
+
+Status: implemented; bootstrap controls pass and both compiler stages build.
+Selected self-hosted source checks, final audit and publication remain open.
+The implementation checkpoint is `5c527cd8b92a`; source fixtures are at
+`5e33b194f1e6`. The checkboxes below separate implemented steps from final
+verification. Documentation updates do not replace those source identities.
 
 M58 rejects `specialize = polyBuild` when `polyBuild` has type
 `forall a. Num a => foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec a (f n)`
@@ -3993,15 +4021,15 @@ This follows the same D/DC An-PiCong and Agda shared-context comparison rules
 recorded in [REFERENCES.md](REFERENCES.md#nominal-retained-domain-conversion).
 The existing Core and Arity rules already support this fixed-domain case.
 
-- [ ] Add a distinct fixed-function-domain branch before the scalar branch.
+- [x] Add a distinct fixed-function-domain branch before the scalar branch.
       Keep changed function domains outside nominal domain normalization.
-- [ ] Make domain evidence optional in the shared body solver. Use `MRefl`
+- [x] Make domain evidence optional in the shared body solver. Use `MRefl`
       for unchanged domains. Use the same bare variable on both sides in that
       case. Include deep domain-proof free variables when freshening.
-- [ ] Retain the private body solve, active function-head scope, nominal body
+- [x] Retain the private body solve, active function-head scope, nominal body
       proof, zonked endpoint checks, evidence liveness and escape checks.
       Do not infer function equality or emit a body constraint outside its scope.
-- [ ] Measure the independent known-value selection gate before changing it.
+- [x] Measure the independent known-value selection gate before changing it.
       The measured implicit `seq` and error consumer under
       `ImpredicativeTypes` still rejects a known function-Pi value.
       Classify eligible fixed function binders with `isNativeRetainedBinder`.

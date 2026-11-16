@@ -17,6 +17,24 @@ plan](PLAN.md) for scope, decisions, and acceptance criteria. The first experime
 extends Core from Eisenberg's historical branch. The singleton translation remains
 a comparison implementation. External solvers remain later work.
 
+## References by roadmap feature
+
+The [program roadmap](ROADMAP.md) owns the work queue and the upstream task
+index. The 2026-11-16 review adds feature pages that connect research to the
+next implementation obligations:
+
+| Feature | Research to use for the next specification |
+| --- | --- |
+| [R03: dependent products](roadmap/R03-dependent-products.md#research) | Proposal #378, pinned `singletons` source, and Agda telescope substitution and refinement. Separate source checking from runtime demand. |
+| [R05: dependent Core](roadmap/R05-dependent-core.md#research) | The D/DC specification, dependent roles, GraD and current Core. Review opaque Pi elimination and substitution of generic domain metadata. |
+| [R23: unsaturated type families](roadmap/R23-unsaturated-type-families.md#prior-art-and-current-boundary) | Proposal #242, the higher-order type-level paper and the pinned 2024 implementation. Read the native integration correction with the draft. |
+
+These pages record the selected implementation sources, open questions and
+unexecuted controls. They do not change the reading scope of the older survey
+or the canonical PDF manifest. The dated ignored research cache retains the
+larger link inventory and exact retrieval records. Keep the tracked summaries
+and primary links usable without that cache.
+
 ## Reading order
 
 1. Read [the Agda provenance](#agda-provenance) and
