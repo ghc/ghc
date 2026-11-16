@@ -34,7 +34,7 @@ import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, mkTyConKindWithMatchability, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
-import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
+import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyKi, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (applyTypeToArgs, cheapEqExpr, dataConRepFSInstPat, dataConRepInstPat, exprType)
 import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
@@ -2587,6 +2587,10 @@ projects the structure of the arrow itself, so it does not require M.
 Use raw coercions here. Smart constructors can remove reflexive children and
 hide a malformed role before Lint sees it. Native calls keep their separate
 opaque representation and must not acquire LRCo projections.
+Binding a template variable to a whole application does not invert that
+application. Matchability must not block this binding before variable matching.
+If that variable is rigid, a U or unknown application can still reduce to it.
+The lack of a permitted binding does not establish definite apartness.
 -}
 
 -- | Check matchability at substitution, normalization and coercion boundaries.
@@ -2625,8 +2629,30 @@ runArrowMatchabilityChecks dflags = do
             fg = proof (base + 4) (mkTyVarTy f) (mkTyVarTy g)
             ab = proof (base + 5) (mkTyVarTy a) (mkTyVarTy b)
             applied = proof (base + 6) lhs rhs
+            whole = mkTyVar (mkSystemName (unique (base + 7)) (mkTyVarOcc "whole_arrow_application")) liftedTypeKind
+            wholeTy = mkTyVarTy whole
             scope = [ma, f, g, a, b, fg, ab, applied]
             matchable = eqType metadata matchableDataConTy
+        forM_ [("tcMatchTy", tcMatchTy), ("tcMatchTyKi", tcMatchTyKi)] $ \(label, match) ->
+            case match wholeTy lhs >>= (`Subst.lookupTyVar` whole) of
+                Just actual -> checkType dflags (label ++ " binds a whole application at any matchability") lhs actual
+                Nothing -> fail ("FAIL: " ++ label ++ " rejected whole-application template binding")
+        forM_ [(wholeTy, lhs), (lhs, wholeTy)] $ \(left, right) ->
+            case tcUnifyTysFG alwaysBindFam alwaysBindTv [left] [right] of
+                Unifiable subst -> case Subst.lookupTyVar subst whole of
+                    Just actual -> checkType dflags "unification binds a whole application in either direction" lhs actual
+                    Nothing -> fail "FAIL: whole-application unification omitted the variable binding"
+                _ -> fail "FAIL: unification rejected whole-application variable binding"
+        unless matchable $
+            forM_ [(wholeTy, lhs), (lhs, wholeTy)] $ \(left, right) ->
+                check "rigid variable versus opaque application is only maybe apart" $
+                    case tcUnifyTysFG alwaysBindFam (\_ _ -> DontBindMe) [left] [right] of
+                        MaybeApart{} -> True
+                        _ -> False
+        check "matching inside an application still requires M" $
+            case tcMatchTy lhs (AppTy (mkTyVarTy f) (mkTyVarTy b)) of
+                Just subst -> matchable && eqType (Subst.substTy subst (mkTyVarTy a)) (mkTyVarTy b)
+                Nothing -> not matchable
         lintAccepts dflags "forward application congruence permits any matchability" scope (Coercion (AppCo (mkCoVarCo fg) (mkCoVarCo ab)))
         check "application injectivity requires M" (isInjectiveInType a lhs == matchable)
         forM_ [CLeft, CRight] $ \side ->

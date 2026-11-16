@@ -4409,7 +4409,13 @@ matchability foundation before generic index domains.
 
 Roadmap owner: R23 unsaturated type families. Related card: R05 dependent Core.
 Status: implementation in progress. Bootstrap attempt v8 passes after seven
-failed integration attempts. Self-hosting and runtime checks remain pending.
+failed integration attempts. Self-hosting attempts v1 to v3 expose and correct
+the source kind annotation and extension requirements for `(->)`. Attempt v4
+reaches TypeRep and exposes an overbroad application-matching gate. Binding a
+variable to a whole opaque application must remain possible. Inverse
+application still requires M. Preserve uncertain apartness for rigid variables
+and repeated opaque targets. The correction and its quiet API controls need a
+fresh bootstrap build. Self-hosting and runtime checks remain pending.
 M62 remains the last validated and published compiler checkpoint.
 
 The next foundation has two stages. M63 gives ordinary arrows explicit

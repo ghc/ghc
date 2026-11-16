@@ -1612,6 +1612,23 @@ type OutCoercion = Coercion   -- After applying the RnEnv2
 hasRuntimeIndex :: Type -> Bool
 hasRuntimeIndex = anyFreeVarsOfType (\v -> isId v && not (isCoVar v))
 
+-- | Detect applications whose consumed kind is not known to be matchable.
+-- See Note [Unmatchable applications in immutable unification].
+hasUnmatchableApplication :: Type -> Bool
+hasUnmatchableApplication = go
+  where
+    go ty
+      | Just ty' <- coreView ty = go ty'
+      | Just (fun, _) <- tcSplitAppTyNoView_maybe ty
+      , not (isMatchableFunTy (typeKind fun)) = True
+    go (AppTy fun arg) = go fun || go arg
+    go (TyConApp _ args) = any go args
+    go (FunTy _ ma mult arg res) = any go [ma, mult, arg, res]
+    go (ForAllTy (Bndr tv _) body) = go (varType tv) || go body
+    go (CastTy ty _) = go ty
+    go (DepFunTy binder body) = go (varType binder) || go body
+    go _ = False
+
 -- | Detect retained binders, including those with no free runtime indices.
 hasRetainedFunction :: Type -> Bool
 hasRetainedFunction = getAny . go_ty
@@ -1745,6 +1762,15 @@ unify_ty env ty1 (CastTy ty2 co2) kco
   = unify_ty env ty1 ty2 (kco `mkTransCo` mkSymCo co2)
     -- NB: co2 does not mention forall-bound variables
 
+-- Whole-variable binding does not invert an application.
+-- See Note [Unmatchable applications in immutable unification].
+unify_ty env (TyVarTy tv1) ty2 kco
+  = uVarOrFam env (TyVarLHS tv1) ty2 kco
+
+unify_ty env ty1 (TyVarTy tv2) kco
+  | Unifying <- um_unif env  -- If unifying, can swap args; but not when matching
+  = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
+
 -- Applications need a bit of care!
 -- They can match FunTy and TyConApp, so use splitAppTy_maybe
 unify_ty env ty1@(AppTy fun _) ty2 _
@@ -1793,13 +1819,6 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
                 else extendCvEnv cv rhs_co
 
            _ -> return () }
-
-unify_ty env (TyVarTy tv1) ty2 kco
-  = uVarOrFam env (TyVarLHS tv1) ty2 kco
-
-unify_ty env ty1 (TyVarTy tv2) kco
-  | Unifying <- um_unif env  -- If unifying, can swap args; but not when matching
-  = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
 
 -- See Note [Matching retained function types].
 unify_ty env (DepFunTy b1 body1) (DepFunTy b2 body2) kco
@@ -1924,6 +1943,21 @@ unify_opaque_app env ty1 ty2
 -- See (M1) in Note [Specification of unification]. Whole-type template
 -- variables are handled before this check. Keep native call rules separate.
 
+{- Note [Unmatchable applications in immutable unification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An immutable substitution can bind a whole variable to an application at U or
+unknown matchability. This does not invert equality of application results.
+Process casts first, then whole variables, then opaque application guards.
+For example, match the result template TypeRep a against TypeRep (f x) by
+binding a to f x, even when f has an unmatchable kind arrow.
+
+When binding fails, an opaque application does not establish apartness. The
+same rule applies to a repeated template variable. Its targets can contain
+opaque applications under an injective constructor, as in Maybe (f x) and
+Maybe (f y). Unequal syntax does not establish that these targets differ.
+Keep MaybeApart in these cases. Do not decompose the opaque application.
+-}
+
 -----------------------------
 unify_ty_app :: UMEnv -> Type -> [Type] -> Type -> [Type] -> UM ()
 -- Deal with (t1 t1args) ~ (t2 t2args)
@@ -1999,6 +2033,8 @@ uVarOrFam env ty1 ty2 kco
                -> maybeApart MARRuntimeIndex
            | hasRetainedFunction ty1' || hasRetainedFunction ty2
                -> maybeApart MARRetainedFunction
+           | hasUnmatchableApplication ty1' || hasUnmatchableApplication ty2
+               -> maybeApart MARTypeFamily
            | otherwise                            -> surelyApart
            -- Unifying: recurse into unify_ty
            -- Matching: we /don't/ want to just recurse here, because the range of
@@ -2043,6 +2079,7 @@ uVarOrFam env ty1 ty2 kco
       | occurs_check = maybeApart MARInfinite   -- Occurs check
       | hasRuntimeIndex ty2 = maybeApart MARRuntimeIndex
       | hasRetainedFunction ty2 = maybeApart MARRetainedFunction
+      | hasUnmatchableApplication ty2 = maybeApart MARTypeFamily
       | otherwise    = surelyApart
 
       where
