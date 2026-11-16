@@ -4276,13 +4276,14 @@ goal remain open.
 ## M62: complete retained-function type arguments
 
 Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
-Status: implemented; final validation is in progress. The lifted-consumer baseline rejects two complete explicit
-type arguments with located GHC-83605 errors in both rebuilt stages.
+Status: validated with both stages; independent audit is pending. The original
+lifted-consumer baseline rejected two complete explicit type arguments with
+located GHC-83605 errors in both rebuilt stages.
 
 Retained function types already have kind Type. Named complete signatures can
 form them, and immutable known-value matching can select them. A written type
-argument currently rejects its function binder in `tcHsType` because that path
-always calls `tcCheckRetainedType False`. The baseline uses ordinary lifted
+argument rejected its function binder in the baseline `tcHsType` path, which
+called `tcCheckRetainedType False`. The baseline uses ordinary lifted
 `forceValue` and `raise` helpers. It isolates this formation gate from direct
 `seq` representation checking. Its records are in
 `_build/verification/native-complete-function-type-arguments-baseline-v1/`.
@@ -4326,18 +4327,18 @@ forceFull worker =
 - [x] Permit complete retained-function binders through this path, including
       nested ordinary type applications and kind-annotated value types.
       Retain closed-domain, Many, staging, body-kind and native-meta checks.
-- [ ] Report incomplete native type arguments accurately. Check anonymous and
+- [x] Report incomplete native type arguments accurately. Check anonymous and
       named wildcards before, inside and after a retained telescope. Keep
       ordinary visible wildcards, unsupported contexts and wrong kinds separate.
       Include required-type-argument translation with an outside wildcard;
       that case must reach the new type-checker completeness guard.
-- [ ] Measure lifted good/bottom worker WHNF, ignored function arguments and
+- [x] Measure lifted good/bottom worker WHNF, ignored function arguments and
       runtime applications after explicit selection. Check nested container
       demand, ambient runtime indices, distinct names and scope rejection.
       Measure direct `seq` and outer Quick Look as separate controls.
-- [ ] Extend the existing example library, API fixture and maintained Showcase.
+- [x] Extend the existing example library, API fixture and maintained Showcase.
       Preserve the old output prefixes and add no committed test files.
-- [ ] Build both stages and run the selected API, source, runtime, rejection,
+- [x] Build both stages and run the selected API, source, runtime, rejection,
       Showcase and registered checks. Bind records to their actual inputs.
 - [ ] Update the roadmap, Core contract and references. Audit and publish the
       bounded result. Keep R03 and the full goal open.
@@ -4348,3 +4349,45 @@ the selected VTA paper, and Agda's Pi formation and expected-type rules. See
 This increment adds no inferred runtime quantifier, mutable native-meta
 assignment, general Quick Look, generic index domain, singleton layer or Core
 constructor. Existing matchability and generic-domain obligations stay open.
+
+### M62 validation
+
+Compiler `dc8d5635a8` and source checkpoint `4c31ce0145` pass both builds.
+Bootstrap takes 253.31 seconds and peaks at 3,338 MiB. Self-hosting takes
+868.72 seconds and peaks at 6,289 MiB. Both use six jobs, a 16 GiB limit and
+no swap. Their selected input hashes remain unchanged.
+
+Both stages pass the same eighteen focused source cases. Six programs produce
+fourteen exact runtime observations per stage. They check Maybe, list and
+tuple field demand, kind-annotated value types, ambient scalar and function
+capture, actual IO inputs, complete required type arguments and ordinary
+wildcards. Twelve programs reject with located diagnostics. The three T2T
+cases reject an outside hole before, after or around an embedded complete Pi.
+The other cases check direct holes, unsupported domains, kinds, scope,
+distinct actual heads and partial signatures.
+
+The fifteen compatibility cases agree in both stages: five runtime programs,
+one compile-only Given control and nine rejections. Direct explicit `seq`
+works with NoImpredicativeTypes. The separate outer Quick Look controls still
+reject. This does not implement general Quick Look checking.
+
+All nine selected cohort rows pass after self-hosting. API goldens stay 1/37
+with 45,837 fresh target-library file pins. Both stages pass public19,
+parameterized14 with three rejections, and Showcase88 through fourteen source
+modules. The Showcase preserves its 84-line prefix. Five registered tests
+pass across 39 cases with 34 skips and zero unexpected, framework or missing
+library outcomes. The serial cohort uses 4 GiB with no swap and peaks at
+3,092 MiB. The final focused controls peak at 303 MiB under the same limit.
+
+The first Showcase runner had an incorrect expected exception marker. The
+first focused oracle expected the generic domain message instead of the
+specific unsupported-function-domain message. Both failed records remain.
+Corrected versions pass without compiler changes. Fourmolu cannot parse the
+experimental extension in the source examples. The existing fixture has
+unrelated formatting differences; its new block uses Fourmolu output.
+Cabal-gild reports existing template formatting differences. No Cabal file
+changed. No new test file, full GHC suite or proof replay is claimed.
+
+Records use the fresh `native-complete-function-type-arguments-*` prefix.
+The compiler snapshot has 95 files. The selected source snapshot has 128.
+The M61 canonical record and 106 inherited manifest hashes remain pinned.

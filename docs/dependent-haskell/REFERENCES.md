@@ -3705,12 +3705,20 @@ Existing lexical scope, staged-code checks and native-meta restrictions remain.
 
 Current `GHC.Tc.Gen.App.tcVDQ` calls `expr_to_type`, then `tc_inst_forall_arg`.
 A required argument can contain a nested `HsEmbTy` plus a separate expression
-`HsHole`.
-The translation builds one `HsWC []` and changes the hole to `HsWildCardTy`.
+`HsHole`. The translation builds one `HsWC []` and changes the hole to
+`HsWildCardTy`.
 The renamer checked the nested embedded type, not this combined type. This
 existing RequiredTypeArguments path is the concrete reason to check the whole
-renamed argument in `tcHsTypeApp`. See Note [RequiredTypeArguments and the T2T mapping] in that
-module and the retained-type-argument Note in `GHC.Tc.Gen.HsType`.
+renamed argument in `tcHsTypeApp`. See Note [RequiredTypeArguments and the T2T
+mapping] in that module and Note [Retained Pi type arguments] in
+`GHC.Tc.Gen.HsType`.
+
+Compiler `dc8d5635a8` and source `4c31ce0145` pass both-stage source controls.
+All three T2T hole placements reach located completeness diagnostics. The
+corrected eighteen-case oracle also checks kinds, scope, container demand and
+ordinary wildcards. Direct explicit `seq` works in NoImpredicativeTypes;
+separate outer Quick Look controls still reject. These are source and runtime
+observations. They do not prove the new context permission sound in general.
 
 ## Opaque whole-function cast lowering
 

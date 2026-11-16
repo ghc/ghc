@@ -94,7 +94,7 @@ can advance a card while the card remains open.
 | 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Complete bounded increment: M59 | Both stages and independent audit pass. The larger R03/R05 features remain open. |
 | 2 | R03: safe indexing over a retained `[Bool]` | Complete bounded increment: M60 | Both stages and the evidence audit pass. The next compiler task is the R05 opaque-cast probe. |
 | 3 | R05: application through opaque whole-function evidence | Complete bounded increment: M61 | Both builds, selected cohort and independent audit pass. Typed opaque proof projection remains separate. |
-| 4 | R03: explicit complete retained-function type arguments | M62 implemented; final validation in progress | Check nested complete arguments, required-type-argument holes, worker WHNF and both compiler stages. Preserve kind, scope and native-meta checks. |
+| 4 | R03: explicit complete retained-function type arguments | M62 validated with both stages; audit pending | Nested arguments, required-type-argument holes, worker WHNF and the selected cohort pass. Preserve the evidence, then start R23. |
 | 5 | R23: matchability foundation; also advances R05 | Prior implementation and native integration reviewed; spec needed | Specify kinds, substitution, coercions, roles, interfaces and reflection before admitting unrestricted function-valued fields. |
 | 6 | R05: generic domain metadata and dependent telescopes; enables R03 source work | Research obligations identified | After the matchability foundation, target generic `[a]`. Transport binder types, occurrences and later fields together. State the policy for runtime-dependent domains separately. |
 

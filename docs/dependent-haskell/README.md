@@ -64,6 +64,7 @@ Core Lint and STG Lint enabled. It appends five safe-indexing observations to
 M59's 79-line prefix. Both versions use fourteen source modules. The independent
 M59 compiler audit passes. M60 adds source composition with that compiler.
 M61 also passes the unchanged 84-line program with both rebuilt stages.
+M62 extends the program to 88 lines through the same fourteen modules.
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
@@ -102,7 +103,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | Audited M61 passes both builds, fresh API1/37, both-stage public19, parameterized14 and Showcase84/14, plus five registered tests |
+| Compiler validation | M62 passes both builds, fresh API1/37, both-stage public19, parameterized14 and Showcase88/14, plus five registered tests; final audit is pending |
 | Example validation | Audited M60 passes both-stage hidden-interface source19, five rejection controls, compile-only equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
@@ -4886,3 +4887,37 @@ The canonical record is `dependent-haskell-M61-final-audit-v1.json`; its digest
 and source identities are in [the M61 plan](PLAN.md#m61-opaque-whole-function-cast-lowering).
 This closes no general
 Core, inference or optimizer obligation. Opaque proof projection remains open.
+
+## Complete retained-function type arguments
+
+M62 permits a complete written worker type in an explicit type argument.
+The checked [example library](examples/qualified-pi/FunctionSignatureLibrary.hs)
+includes this ordinary lifted consumer:
+
+```haskell
+forceExplicitCall ::
+    (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n)) -> IO ()
+forceExplicitCall worker =
+    seq @(foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n))
+        worker (pure ())
+```
+
+`selectCall` uses `id` with the same explicit type, then permits runtime
+application. `forceNestedCall` selects `Maybe` of that type and forces only
+the outer constructor. The source controls also check list and tuple fields,
+ordinary kind annotations, captured runtime indices and required type
+arguments. A hole outside an embedded complete type still makes the whole
+argument partial. The type checker rejects it after T2T translation.
+
+Both rebuilt stages pass eighteen focused cases and fifteen compatibility
+cases. The selected API goldens remain 1/37. Public19, parameterized14 with
+three rejections, Showcase88/14 modules and five registered tests pass.
+The existing fixture and Showcase contain the new observations. No test file
+was added. The independent evidence audit is pending.
+
+This uses the existing GHC completeness and type-application paths. It adds
+no Core constructor or singleton layer. NoImpredicativeTypes direct `seq`
+passes; the separate outer Quick Look controls still reject. General
+inference, matchability and generic index domains remain open. See
+[the M62 plan](PLAN.md#m62-complete-retained-function-type-arguments) and
+[the R03 card](roadmap/R03-dependent-products.md).

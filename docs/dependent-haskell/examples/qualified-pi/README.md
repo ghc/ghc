@@ -215,6 +215,12 @@ idCall :: forall a. foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec a (f 
 idCall f n xs = xs
 ```
 
+M62 also exports `selectCall`, `forceExplicitCall` and `forceNestedCall`.
+They use complete retained-function types as explicit arguments to `id`,
+`seq` and a lifted consumer of `Maybe`. Complete types can contain supported
+function binders. The lazy container keeps its worker field unevaluated.
+The maintained Showcase adds four observations for these operations.
+
 The separate [FunctionSignatureClient.hs](FunctionSignatureClient.hs) consumes
 the actual function package and imported worker type:
 

@@ -26,6 +26,9 @@ all Core transformations. Normal optimization remains a broader release gate.
   Its independent audit passes.
 - Closed-list safe indexing at M60. Both stages pass bounds, lazy-field and
   finite cyclic-input checks through separately compiled interfaces.
+- Complete retained-function type arguments at M62. Both stages pass nested
+  container formation, worker demand, ambient indices and located partial-type
+  rejection. Required type arguments also check holes combined after renaming.
 
 The published M60 checkpoint appends five observations to M59's 79-line prefix
 and passes all 84 with both compilers. Its separate evidence audit passes.
@@ -47,7 +50,7 @@ M58 and M59 expose those rules through source checking.
       stages. Both agree on five rejections and accept equal-count reuse.
       Fin proves a bound. It does not identify list values.
 - [x] Finish M60's separate evidence audit and prepare publication.
-- [ ] Admit a complete retained-function type in the existing lifted
+- [x] Admit a complete retained-function type in the existing lifted
       consumer's explicit type-argument position. Preserve complete-type,
       kind, scope and native-meta checks. Check full worker WHNF separately
       from direct `seq` representation polymorphism and outer Quick Look.
