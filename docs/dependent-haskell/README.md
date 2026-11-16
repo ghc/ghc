@@ -4489,26 +4489,34 @@ Synthetic malformed ordinary-domain interface knots raise `<<loop>>` for
 three function and three scalar variants. The scalar comparison also loops
 through the unchanged scalar check. No old executable ran these synthetic
 knots. These outcomes expose an unsupported malformed-interface validation
-gap and are not successful defensive rejections. Source checking rejects the
-unsupported function-domain shapes; M52 does not repair malformed recursive
+gap and are not successful defensive rejections. These raw shapes are outside
+the supported source contract. M52 does not repair malformed recursive
 interface types.
 
 The first registered run had four passes and one stderr mismatch from the
 new consumer's partial-list warning. The client and embedded copy now use an
-explicit nonempty/empty case. The19 observed values and1/37 goldens did not
-change. The build-reuse record confirms that both84-file compiler archives
+explicit nonempty/empty case. The 19 observed values and 1/37 goldens did not
+change. The build-reuse record confirms that both 84-file compiler archives
 are identical; the source observation fix requires no compiler rebuild.
 
 The final snapshot2 cohort passes both stages. It preserves the 19 public
 results, the 53 Showcase lines and the 1/37 API goldens. Registered validation
 has 39 cases, 34 skips and five expected passes, with no unexpected results
-or framework failures or warnings. Final audit and publication remain pending.
+or framework failures or warnings. The independent artifact audit passes
+6,247 checks over 1,772 unique pinned paths. The first audit attempt required
+the same keys in both hash maps. The corrected auditor checks that each
+original input hash stays unchanged. It also checks that each added file is
+in the phase directory and matches the sealed file hash.
+Both attempts remain recorded.
 
-The selected compiler is3d4994c68ba42b8fb1bd43d3f780780384edd0da. The measured
-source head isd8c605b6c63dd8f68920bcd83103fcd2ca389009. Its snapshot records84
-compiler inputs and113 source paths. Final document bytes have their own
+The selected compiler is `3d4994c68ba42b8fb1bd43d3f780780384edd0da`. The measured
+source head is `d8c605b6c63dd8f68920bcd83103fcd2ca389009`. Its snapshot records 84
+compiler inputs and 113 source paths. Final document bytes have their own
 revision. Native coercion encoding, native unfoldings and general optimization
-remain gated. Freeze and independent audit must pass before publication.
+remain gated. The evidence namespace is frozen. The audited revision
+`00b128403ce1e31b15bd960b89690f1d6e99fc1f` is published on the fork.
+The canonical record is `dependent-haskell-M52-final-audit-v1.json`, SHA256
+`6af17c2536a0aba1f41d3ec413a246c4120157ddef94b2d44d0fcda92b5614da`.
 C1, C2 and R22 remain open. See the
 [contract](CORE.md#exported-function-valued-retained-value-signatures),
 [plan](PLAN.md#m52-exported-function-valued-retained-value-signatures), and

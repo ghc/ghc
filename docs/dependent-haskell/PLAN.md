@@ -3472,7 +3472,8 @@ follow-up, not a failed compiler check.
 
 ### M52: exported function-valued retained value signatures
 
-Status: implemented and validated; final audit and publication pending.
+Status: complete. The source is validated, independently audited and published
+at `00b128403ce1e31b15bd960b89690f1d6e99fc1f`. The full program goal stays active.
 The exported value has a complete ordinary signature:
 
 ```haskell
@@ -3521,10 +3522,13 @@ ABI. The erased payload parameter stays erased. Add no singleton or Core node.
   native pipeline and registered regressions. Keep exact input provenance and
   historical failures. Record actual diagnostic codes and source spans.
 - [x] Update current contracts, references and status.
-- [ ] Audit and publish the source milestone. Keep the full program goal active.
+- [x] Audit and publish the source milestone. Keep the full program goal active.
+  The canonical record is `dependent-haskell-M52-final-audit-v1.json`, SHA256
+  `6af17c2536a0aba1f41d3ec413a246c4120157ddef94b2d44d0fcda92b5614da`.
 
-Use `native-exported-function-signature-*` for new evidence. M51's frozen
-namespace and external repair files remain unchanged. The next-research cache
+M52 evidence uses `native-exported-function-signature-*`. This namespace is
+permanently frozen. M51's frozen namespace and external repair files remain
+unchanged. The next-research cache
 is prior read-only evidence. Record its original reading context separately.
 The primary comparison is
 [with the references](REFERENCES.md#exported-function-valued-retained-signatures-prior-art).
