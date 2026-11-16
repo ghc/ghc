@@ -104,7 +104,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core.Type
-import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType )
+import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, TyConApp), Scaled(..) )
 import GHC.Builtin.KnownKeys ( boolTyConKey )
 import GHC.Core.Coercion
