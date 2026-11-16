@@ -2136,7 +2136,7 @@ coercion_lr_kind which orig_co
                                      (varToCoreExpr target)
             scope = mkInScopeSet (extendVarSet
                       (tyCoVarsOfType body `unionVarSet` tyCoVarsOfCo delta) target)
-            subst = extendIdSubst (mkEmptySubst scope) b argument
+            subst = mkIdSubst scope (unitVarEnv b argument)
         in mkDepFunTy target (substTy subst body)
     go (CoVarCo cv)           = go_covar cv
     go (HoleCo h)             = go_covar (coHoleCoVar h)
