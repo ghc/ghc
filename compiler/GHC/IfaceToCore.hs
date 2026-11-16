@@ -1775,6 +1775,11 @@ back-edges are valid, but each queued field must pass. Keep a separate active
 synonym stack. Reset it on data edges: Alias = A; data A = MkA Alias is valid.
 An alias-only cycle is not a supported domain.
 
+For a generic Pi, check the raw multiplicity and domain before bindIfaceId.
+Its mkLocalIdOrCoVar call expands aliases to choose an Id or a CoVar. An Id
+precheck alone would reach an alias-only cycle after that expansion had begun.
+Keep the Id precheck and the typed checks after allocation as well.
+
 Fields permit One or Many. Function arrows and retained binders require Many.
 Resolve those multiplicities by wired TyCon identity, including nullary aliases.
 A raw Pi is not scalar, but its function shape is unknown: mkDepFunTy converts
@@ -1837,10 +1842,16 @@ tcIfaceType = go
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
-    go (IfaceDepFunTy bndr@(_, name, _) body)
+    go (IfaceDepFunTy bndr@(mult, name, domain) body)
       -- See Note [Retained binders in interfaces].
       -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
-      = bindIfaceId bndr $ \ v ->
+      = do { mult_shape <- tcIfaceDomainShape mult
+           ; domain_shape <- tcIfaceDomainShape domain
+           ; precheckIfaceNativeDomain
+               (text "Invalid retained binder in interface:" <+> ppr name)
+               (nativeDomainShapePossible NativeManyMultUse mult_shape
+                && nativeDomainShapePossible NativeRetainedUse domain_shape)
+           ; bindIfaceId bndr $ \ v ->
         do { precheckIfaceNativeDomain
                (text "Invalid retained binder in interface:" <+> ppr name)
                (nativeIdDomainShapePossible NativeRetainedUse v)
@@ -1856,7 +1867,7 @@ tcIfaceType = go
                failIfM (text "Invalid retained function result in interface for:" <+> ppr v
                         $$ text "Expected kind Type."
                         $$ text "Actual kind:" <+> ppr (typeKind body'))
-           ; return (mkDepFunTy v body') }
+           ; return (mkDepFunTy v body') } }
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
