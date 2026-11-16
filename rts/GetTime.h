@@ -52,6 +52,8 @@
  * See Note [Meaning of clocks].
  *
  * The time is represented as nanoseconds since an arbitrary epoch.
+ *
+ * This is the clock used for user timeouts like threadDelay.
  */
 Time getMonotonicTime(void);
 
@@ -65,6 +67,9 @@ Time getMonotonicTime(void);
  * It is not necessarily accurate at keeping time over long time periods (i.e.
  * may be subject to time drift). It is not necessarily steady: it may or may
  * not include time while the system is suspend.
+ *
+ * This is the clock used for measuring timing of activities within the RTS:
+ * RTS stats, profiling and eventlog timestamps.
  */
 Time getHighResolutionTime(void);
 
@@ -73,6 +78,9 @@ Time getHighResolutionTime(void);
  *
  * The time is represented as nanoseconds since the Unix epoch
  * (1970-01-01 00:00).
+ *
+ * This clock is not used much, but is emitted into eventlogs on start to
+ * enable matching the eventlog timestamps with wall clock time.
  */
 Time getWallClockTime(void);
 
