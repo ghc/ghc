@@ -50,8 +50,9 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-The published checkpoint is M59. Both compiler stages pass the 79-observation
-Showcase through fourteen source modules. M56 provides
+The published example checkpoint is M60. Both compiler stages pass the
+84-observation Showcase through fourteen source modules. Its compiler is the
+audited M59 implementation. M56 provides
 the closed parameterized domains. M57 provides nominal scalar-domain conversion
 in Core. M58 exposes that conversion and scoped body solving from source.
 M59 compares bodies beneath fixed function domains and selects ordinary payloads.
@@ -61,8 +62,10 @@ The canonical audit is
 `_build/verification/dependent-haskell-M59-final-audit-v1.json`.
 See [the M59 specification](PLAN.md#m59-bodies-beneath-fixed-function-domains).
 M60 composes safe indexing with the existing compiler. Both stages pass its
-nineteen runtime observations, five rejections, equal-count reuse and the
-84-observation Showcase. Its separate audit and publication remain pending.
+nineteen runtime observations, five rejections, compile-only equal-count reuse
+and the 84-observation Showcase. Its separate audit passes 616 checks.
+The canonical record is
+`_build/verification/dependent-haskell-M60-final-audit-v1.json`.
 Observation counts measure those programs. They do not count roadmap features.
 
 ## Current work queue
@@ -81,7 +84,7 @@ can advance a card while the card remains open.
 | Order | Owner and contribution | State | Gate and next result |
 | --- | --- | --- | --- |
 | 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Complete bounded increment: M59 | Both stages and independent audit pass. The larger R03/R05 features remain open. |
-| 2 | R03: safe indexing over a retained `[Bool]` | M60 implemented; both stages pass | Finish its bounded evidence audit and publication. The next compiler task is the R05 opaque-cast probe. |
+| 2 | R03: safe indexing over a retained `[Bool]` | Complete bounded increment: M60 | Both stages and the evidence audit pass. The next compiler task is the R05 opaque-cast probe. |
 | 3 | R05: application through opaque whole-function evidence | Research complete enough to specify a probe | Keep genuinely abstract payloads and a scoped coercion variable. Check Lint, CorePrep and object execution before choosing a new coercion rule. |
 | 4 | R03: explicit complete retained-function type arguments | Scoped source task identified | Use the existing lifted consumer. Preserve kind, scope, complete-type and native-meta checks. |
 | 5 | R23: matchability foundation; also advances R05 | Prior implementation and native integration reviewed; spec needed | Specify kinds, substitution, coercions, roles, interfaces and reflection before admitting unrestricted function-valued fields. |

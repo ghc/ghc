@@ -27,8 +27,8 @@ all Core transformations. Normal optimization remains a broader release gate.
 - Closed-list safe indexing at M60. Both stages pass bounds, lazy-field and
   finite cyclic-input checks through separately compiled interfaces.
 
-The published M59 checkpoint has 79 Showcase observations in both stages.
-M60 appends five observations and passes all 84 with both compilers.
+The published M60 checkpoint appends five observations to M59's 79-line prefix
+and passes all 84 with both compilers. Its separate evidence audit passes.
 See [the current evidence](../ROADMAP.md#where-this-fork-stands) and
 [the M59 specification](../PLAN.md#m59-bodies-beneath-fixed-function-domains).
 M56's domain representation and M57's conversion rules belong primarily to R05.
@@ -46,7 +46,7 @@ M58 and M59 expose those rules through source checking.
       The integrated library passes nineteen runtime observations with both
       stages. Both agree on five rejections and accept equal-count reuse.
       Fin proves a bound. It does not identify list values.
-- [ ] Finish M60's separate evidence audit and publication.
+- [x] Finish M60's separate evidence audit and prepare publication.
 - [ ] Admit a complete retained-function type in the existing lifted
       consumer's explicit type-argument position. Preserve complete-type,
       kind, scope and native-meta checks. Check full worker WHNF separately

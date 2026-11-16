@@ -4133,7 +4133,7 @@ witness must still be bottom. Haskell remains partial.
 - [x] Run the maintained Showcase with both compilers and Core/STG Lint.
       Check unchanged compiler inputs. Record the exact sources and outcomes.
 - [x] Update the roadmap, references and example instructions.
-- [ ] Complete the separate evidence audit and publish the bounded result.
+- [x] Complete the separate evidence audit and prepare the publication checkpoint.
       Keep R03 and the whole program open.
 
 No compiler rebuild is required when only these examples and documents change.
@@ -4158,3 +4158,11 @@ The installed Fourmolu parser rejects `ExperimentalDependentTypes` before it
 can format either changed Haskell file. The added code follows the surrounding
 layout. No Cabal file changes, compiler rebuild, API rerun or full-suite run
 belongs to this example-only increment.
+
+The separate evidence audit passes 616 checks. It binds executable source bytes
+to `d26e6a2fb4` and audited documentation to `286a1592ed`. The canonical record is
+`_build/verification/dependent-haskell-M60-final-audit-v1.json`, SHA256
+`cbdbd39de43703ddb258faba8ef67f10731ddc035c6b7ca78dbe433ac339da8e`.
+Its manifest freezes all 316 files in `native-closed-list-indexing-*`.
+The unchanged compiler's full package/API provenance remains M59 evidence.
+This publication checkpoint changes only status documents.
