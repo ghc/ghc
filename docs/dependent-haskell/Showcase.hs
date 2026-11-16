@@ -27,6 +27,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
+import GHC.Exts (FUN, M, U, Multiplicity (Many))
 import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
 import qualified NativeMultiPackage as Packages
@@ -34,6 +35,7 @@ import qualified OpaqueCallClient as Opaque
 import qualified ParameterizedIndexLibrary as Parameterized
 import PackedVecLibrary
 import qualified QualifiedPiLibrary as Qualified
+import qualified Type.Reflection as Reflection
 
 {- Note [Maintaining the Dependent Haskell showcase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -519,6 +521,24 @@ completeFunctionArguments = do
     FunctionSignatures.forceNestedCall bottomWorker
     observe "explicit nested type ignores bottom worker" ()
 
+-- | Observe constructor and runtime arrow matchability through public reflection.
+arrowMatchability :: IO ()
+arrowMatchability = do
+    let ordinary = Reflection.typeRep @(Int -> Bool)
+    observe "constructor kind arrow is matchable" $
+        case Reflection.typeRepKind (Reflection.typeRep @Maybe) of
+            Reflection.Fun' metadata _ _ ->
+                Reflection.SomeTypeRep metadata == Reflection.SomeTypeRep (Reflection.typeRep @M)
+            _ -> False
+    observe "runtime function arrow is unmatchable" $
+        case ordinary of
+            Reflection.Fun' metadata _ _ ->
+                Reflection.SomeTypeRep metadata == Reflection.SomeTypeRep (Reflection.typeRep @U)
+            _ -> False
+    observe "matchability distinguishes function types" $
+        Reflection.SomeTypeRep (Reflection.typeRep @(FUN @M 'Many Int Bool))
+            /= Reflection.SomeTypeRep ordinary
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -535,3 +555,4 @@ main = do
     fixedFunctionDomains
     closedListIndexing
     completeFunctionArguments
+    arrowMatchability
