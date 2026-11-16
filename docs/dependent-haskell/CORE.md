@@ -215,14 +215,14 @@ equate separately bound runtime producers.
 Existing type variables, coercion variables, and their substitutions keep their
 current meanings. The new forms must use separate mapper and folder callbacks.
 
-## Fixed-domain retained congruence
+## Retained congruence and nominal domain conversion
 
-`DepFunCo b co` binds one runtime index throughout its body proof. The binder
-has an unchanged supported closed algebraic domain and `Many` multiplicity.
-If `co :: s ~r t`, then:
+`DepFunCo b domain co` binds one unrestricted runtime index in its body proof.
+`MRefl` keeps the binder's eligible scalar or function domain unchanged.
+If `co :: s ~r t`, this specialization gives:
 
 ```text
-DepFunCo b co :: mkDepFunTy b s ~r mkDepFunTy b t
+DepFunCo b MRefl co :: mkDepFunTy b s ~r mkDepFunTy b t
 ```
 
 Both body endpoints must have kind `Type`. The coercion inherits the body's
@@ -232,16 +232,36 @@ when both final endpoints omit the index. `mkDepFunCo` simplifies a syntacticall
 reflexive body; endpoint independence alone does not remove the proof binder.
 Substitution, free variables, lifting, zonking, and tidying preserve that scope.
 
-This rule specializes D/DC's An-PiCong to an unchanged domain. Agda supplies
-the shared-context comparison precedent. See
-[the pinned provenance](REFERENCES.md#agda-provenance) and Note
-[Retained dependent function coercions] in `GHC.Core.TyCo.Rep`.
-These sources do not prove preservation for the current GHC extension.
+`MCo delta` adds nominal evidence `delta : A ~N B` outside the binder's scope.
+The binder has domain `A`. Both domains must be eligible closed scalar domains.
+The right endpoint binds a fresh `y : B` and substitutes `y |> sym delta` for
+`b` in the right body. Freshening includes free variables in the domain proof.
+Use `mkDepFunCoWithDomain` for this form. A reflexive domain proof specializes
+to `MRefl`.
+
+`CastTy` records the converted index kind. Its runtime Core expression uses
+`Cast argument (SubCo delta)`. Preserve the nominal child during expression
+substitution, native cast composition, and CorePrep substitution. Arbitrary
+representational evidence cannot justify an index conversion. Beta exposure
+substitutes the embedded proof as well as the operand. Stored substitution
+ranges are used once. Beta exposure accepts independent closed scalar input and result domains.
+
+Checked application converts the actual argument back to `A` and substitutes
+that same converted index in the body proof. Explicit congruence, symmetry,
+transitivity, and nominal-to-representational weakening use this rule. Opaque
+coercion variables have no retained-Pi projection rule.
+
+D/DC's An-PiCong and An-Push supply the asymmetric conversion and application
+precedent. Agda supplies the domain and shared-context comparison precedent.
+See [the pinned provenance](REFERENCES.md#agda-provenance) and Note
+[Retained dependent function coercions] in `GHC.Core.TyCo.Rep`. These sources
+do not prove preservation for the current GHC extension.
 
 Transport a function value with a cast. Do not replace that cast with a lambda:
-eta expansion can hide a bottom function in Haskell. Changed domains or
-multiplicities, dependent erased binder kinds, and the ordinary optimizer
-remain unsupported. Eligible ambient Givens can normalize retained bodies;
+eta expansion can hide a bottom function in Haskell. Changed function-valued
+domains or multiplicities, dependent erased binder kinds, and the ordinary
+optimizer remain unsupported. Eligible ambient Givens can normalize retained
+bodies;
 the later Given-normalization sections specify that restricted path.
 `ForAllCo` still binds only erased type and coercion variables. No new selector
 or erased `InstCo` rule is added. Diagnostic interface conversion can print the

@@ -3826,8 +3826,9 @@ program goal remains active.
 
 ## M57: nominal domain conversion for retained functions
 
-Status: planned. This increment addresses C1's conversion and substitution
-contract. Keep C1, C2 and the full program goal open.
+Status: in progress. The bootstrap compiler builds. Runtime verification is
+in progress. This increment addresses C1's conversion and substitution contract.
+Keep C1, C2 and the full program goal open.
 
 Extend retained Pi congruence with nominal evidence `delta : A ~N B`.
 Its body proof uses one actual unrestricted binder `x : A`. The left endpoint
@@ -3871,6 +3872,7 @@ hashes and deviations. No combined preservation theorem is claimed.
 - [ ] Implement nominal index conversion, substitution, endpoints and Lint.
 - [ ] Lower checked casted applications without changing runtime demand.
 - [ ] Update existing API/runtime controls, including symmetry and composition.
+- [ ] Run seven bytecode observations and one injected-Core native object control.
 - [ ] Check wrong role/direction, capture, proof-only dependencies and bottoms.
 - [ ] Build both stages and run focused API/source/registered checks.
 - [ ] Update contracts, references and progress records; audit and publish.
