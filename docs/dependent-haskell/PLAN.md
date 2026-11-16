@@ -3971,3 +3971,50 @@ M58 does not complete C1 or the complete roadmap. It replaces the earlier
 research suggestion to restrict the body comparison to exact equality with a
 scoped ordinary body solve. The existing forall solver supplies the control
 pattern; runtime binders still need their own solver scope.
+
+## M59: bodies beneath fixed function domains
+
+Status: specified; implementation and validation remain open.
+
+M58 rejects `specialize = polyBuild` when `polyBuild` has type
+`forall a. Num a => foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec a (f n)`
+and `specialize` selects `Int`. The saturated form
+`specialize f = polyBuild f` compiles and returns `[42,42]` at a runtime length.
+The two observations are recorded in
+`_build/verification/native-function-body-comparison-baseline-v1/results.json`.
+The nonreflexive function-Pi equality still reaches a scalar-only solver guard.
+
+Use the existing `DepFunCo` rule with `MRefl` for an unchanged function domain.
+Both source binders must qualify as opaque native call heads. Their complete
+function types must agree. Substitute one fresh bare function variable into
+both bodies. A cast around that variable is not a supported call head.
+Changed scalar domains retain the M58 nominal proof and argument cast.
+This follows the same D/DC An-PiCong and Agda shared-context comparison rules
+recorded in [REFERENCES.md](REFERENCES.md#nominal-retained-domain-conversion).
+The existing Core and Arity rules already support this fixed-domain case.
+
+- [ ] Add a distinct fixed-function-domain branch before the scalar branch.
+      Keep changed function domains outside nominal domain normalization.
+- [ ] Make domain evidence optional in the shared body solver. Use `MRefl`
+      for unchanged domains. Use the same bare variable on both sides in that
+      case. Include deep domain-proof free variables when freshening.
+- [ ] Retain the private body solve, active function-head scope, nominal body
+      proof, zonked endpoint checks, evidence liveness and escape checks.
+      Do not infer function equality or emit a body constraint outside its scope.
+- [ ] Measure the independent known-value selection gate before changing it.
+      Do not widen Quick Look or immutable matching to bypass the new solver.
+- [ ] Check imported worker specialization at runtime with identity, successor
+      and constant local functions. Check ignored bottom functions and indices,
+      returned function WHNF, function-head demand order and scoped shadowing.
+      Keep wrong payloads, local-index escape and changed domains rejected.
+- [ ] Trace payload allocation and assignment inside the new function-body
+      solve. Extend the existing fixtures and maintained Showcase after the
+      new source programs pass. Keep old goldens and observations unchanged.
+- [ ] Build both compiler stages. Run the focused API, source, runtime and
+      registered checks. Record exact selected inputs and actual executions.
+- [ ] Update the Core contract, references and roadmap. Audit and publish the
+      checked result. Keep the longer-term goal active.
+
+This step adds no Core constructor, wire form, singleton translation or
+function eta expansion. Open domains, changed function domains, opaque Pi
+projection, native coercion serialization and ordinary optimization remain open.
