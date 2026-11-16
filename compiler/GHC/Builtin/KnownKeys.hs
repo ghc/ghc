@@ -643,6 +643,10 @@ typeSymbolAppendFamNameKey = mkPreludeTyConUnique 195
 unsafeEqualityTyConKey :: KnownKey
 unsafeEqualityTyConKey = mkPreludeTyConUnique 196
 
+-- Arrow matchability
+matchabilityTyConKey :: KnownKey
+matchabilityTyConKey = mkPreludeTyConUnique 127
+
 -- Linear types
 multiplicityTyConKey :: KnownKey
 multiplicityTyConKey = mkPreludeTyConUnique 197
@@ -800,6 +804,11 @@ unsafeReflDataConKey      = mkPreludeDataConUnique 116
 oneDataConKey, manyDataConKey :: KnownKey
 oneDataConKey = mkPreludeDataConUnique 117
 manyDataConKey = mkPreludeDataConUnique 118
+
+-- Arrow matchability
+matchableDataConKey, unmatchableDataConKey :: KnownKey
+matchableDataConKey = mkPreludeDataConUnique 129
+unmatchableDataConKey = mkPreludeDataConUnique 130
 
 -- ghc-bignum
 integerISDataConKey, integerINDataConKey, integerIPDataConKey,

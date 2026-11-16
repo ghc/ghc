@@ -440,11 +440,12 @@ orphNamesOfType (TyConApp tycon tys) = func
                                        `unionNameSet` orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
         where func = case tys of
-                       arg:_ | tycon == fUNTyCon -> orph_names_of_fun_ty_con arg
+                       _ma:mult:_ | tycon == fUNTyCon -> orph_names_of_fun_ty_con mult
                        _ -> emptyNameSet
 
-orphNamesOfType (FunTy af w arg res) =  func
+orphNamesOfType (FunTy af ma w arg res) =  func
                                        `unionNameSet` unitNameSet fun_tc
+                                       `unionNameSet` orphNamesOfType ma
                                        `unionNameSet` orphNamesOfType w
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res

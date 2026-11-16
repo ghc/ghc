@@ -730,7 +730,7 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
         -- 'view_expr' must be a function; expose its argument/result types
         -- using 'matchActualFunTy'.
       ; let herald = ExpectedFunTyViewPat $ unLoc view_expr
-      ; (view_expr_co1, Scaled _mult view_arg_ty, view_res_ty)
+      ; (view_expr_co1, _ma, Scaled _mult view_arg_ty, view_res_ty)
           <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc view_expr)
                (1, view_expr_rho) view_expr_rho
              -- See Note [View patterns and polymorphism]

@@ -122,7 +122,7 @@ hsExprType (SectionL v _ _) = dataConCantHappen v
 hsExprType (SectionR v _ _) = dataConCantHappen v
 hsExprType (ExplicitTuple _ args box) =
   -- Deal with tuple sections: one function arrow per missing argument
-  mkScaledFunTys [s | Missing s <- args] $
+  mkScaledFunTysU [s | Missing s <- args] $
     -- Use 'mkTupleTy1' to avoid flattening 1-tuples, as per
     -- Note [Don't flatten tuples from HsSyn] in GHC.Core.Make.
     mkTupleTy1 box (map hsTupArgType args)
@@ -133,7 +133,7 @@ hsExprType (HsMultiIf ty _) = ty
 hsExprType (HsLet _ _ body) = lhsExprType body
 hsExprType (HsDo ty _ _) = ty
 hsExprType (ExplicitList ty _) = mkListTy ty
-hsExprType (RecordCon con_expr _ _) = snd (splitFunTys (hsExprType con_expr))
+hsExprType (RecordCon con_expr _ _) = let (_, _, res) = splitFunTys (hsExprType con_expr) in res
 hsExprType (RecordUpd v _ _) = dataConCantHappen v
 hsExprType (HsGetField { gf_ext = v }) = dataConCantHappen v
 hsExprType (HsProjection { proj_ext = v }) = dataConCantHappen v
@@ -220,7 +220,7 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
       let act_res = funResultTy t
           exp_res = hsWrapperType w2 act_res
           mult = subMultCoRKind mult_co
-      in mkFunctionType mult exp_arg exp_res
+      in mkFunctionType unmatchableDataConTy mult exp_arg exp_res
     go (WpCast co)        = liftPRType $ \_ -> coercionRKind co
     go (WpEvLam v)        = liftPRType $ mkInvisFunTy (idType v)
     go (WpEvApp _)        = liftPRType $ funResultTy
@@ -229,4 +229,4 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
     go (WpLet _)          = id
 
 matchGroupTcType :: MatchGroupTc -> Type
-matchGroupTcType (MatchGroupTc args res _) = mkScaledFunTys args res
+matchGroupTcType (MatchGroupTc args res _) = mkScaledFunTysU args res

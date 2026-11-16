@@ -2614,7 +2614,7 @@ typeableInfo_maybe item
          | isForAllTy ty -> return $ Just $ NoTypeableForPolytype ty
 
          -- Qualified types like (Num a => blah) are not typeable
-         | Just (af,_mult_,_arg,_ret) <- splitFunTy_maybe ty
+         | Just (af,_ma,_mult_,_arg,_ret) <- splitFunTy_maybe ty
          , not $ isVisibleFunArg af
          -> return $ Just $ NoTypeableForQualifiedType ty
 

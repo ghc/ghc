@@ -287,7 +287,7 @@ deBindComp pat core_list1 quals core_list2 = do
     let u2_ty = hsLPatType pat
 
     let res_ty = exprType core_list2
-        h_ty   = u1_ty `mkVisFunTyMany` res_ty
+        h_ty   = u1_ty `mkVisFunTyManyU` res_ty
 
        -- no representation polymorphism here, as list comprehensions
        -- don't work with RebindableSyntax. NB: These are *not* monad comps.
@@ -429,7 +429,7 @@ mkZipBind elt_tys = do
     elt_tuple_ty      = mkBigCoreTupTy elt_tys
     elt_tuple_list_ty = mkListTy elt_tuple_ty
 
-    zip_fn_ty         = mkVisFunTysMany elt_list_tys elt_tuple_list_ty
+    zip_fn_ty         = mkVisFunTysManyU elt_list_tys elt_tuple_list_ty
 
     mk_case (as, a', as') rest
           = Case (Var as) as elt_tuple_list_ty
@@ -475,7 +475,7 @@ mkUnzipBind _ elt_tys
     elt_list_tys       = map mkListTy elt_tys
     elt_list_tuple_ty  = mkBigCoreTupTy elt_list_tys
 
-    unzip_fn_ty        = elt_tuple_list_ty `mkVisFunTyMany` elt_list_tuple_ty
+    unzip_fn_ty        = elt_tuple_list_ty `mkVisFunTyManyU` elt_list_tuple_ty
 
     mkConcatExpression (list_element_ty, head, tail) = mkConsExpr list_element_ty head tail
 
@@ -704,7 +704,7 @@ mkBuildExpr :: Type                                       -- ^ Type of list elem
 mkBuildExpr elt_ty mk_build_inside = do
     n_tyvar <- newTyVar alphaTyVar
     let n_ty = mkTyVarTy n_tyvar
-        c_ty = mkVisFunTysMany [elt_ty, n_ty] n_ty
+        c_ty = mkVisFunTysManyU [elt_ty, n_ty] n_ty
     [c, n] <- sequence [mkSysLocalM (fsLit "c") ManyTy c_ty, mkSysLocalM (fsLit "n") ManyTy n_ty]
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)

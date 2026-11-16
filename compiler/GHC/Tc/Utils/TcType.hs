@@ -147,7 +147,8 @@ module GHC.Tc.Utils.TcType (
   mkSpecForAllTys, mkTyCoInvForAllTy,
   mkInfForAllTy, mkInfForAllTys,
   mkVisFunTy, mkVisFunTyMany, mkVisFunTysMany,
-  mkScaledFunTys,
+  mkVisFunTyManyM, mkVisFunTyManyU, mkVisFunTysManyM, mkVisFunTysManyU,
+  mkScaledFunTys, mkScaledFunTysM, mkScaledFunTysU,
   mkInvisFunTy, mkInvisFunTys,
   mkTyConApp, mkAppTy, mkAppTys,
   mkTyConTy, mkTyVarTy, mkTyVarTys,
@@ -1017,7 +1018,8 @@ tcTyFamInstsAndVisX = go
     go _            (LitTy {})         = []
     go is_invis_arg (ForAllTy bndr ty) = go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
-    go is_invis_arg (FunTy _ w ty1 ty2)  =  go is_invis_arg ty1
+    go is_invis_arg (FunTy _ ma w ty1 ty2) = go True ma
+                                         ++ go is_invis_arg ty1
                                          ++ go is_invis_arg w
                                          ++ go is_invis_arg ty2
     go is_invis_arg ty@(AppTy _ _)     =
@@ -1103,8 +1105,9 @@ any_rewritable role tv_pred tc_pred ty
       = go uf bvs NomEq (varType v) || go uf (bvs `extendVarSet` v) rl ty
     go uf bvs rl (TyVarTy tv)        = go_tv uf bvs rl tv
     go _  _    _ (LitTy {})          = False
-    go uf bvs rl (AppTy fun arg)     = go uf bvs rl fun || go uf bvs NomEq arg
-    go uf bvs rl (FunTy _ w arg res) = go uf bvs NomEq arg_rep || go uf bvs NomEq res_rep ||
+    go uf bvs rl (AppTy fun arg)     = go under bvs rl fun || go under bvs NomEq arg
+      where under = uf || not (isMatchableFunTy (typeKind fun))
+    go uf bvs rl (FunTy _ ma w arg res) = go uf bvs NomEq ma || go uf bvs NomEq arg_rep || go uf bvs NomEq res_rep ||
                                        go uf bvs rl arg || go uf bvs rl res || go uf bvs NomEq w
       where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
             res_rep = getRuntimeRep res
@@ -1503,20 +1506,20 @@ getDFunTyLitKey (CharTyLit n) = mkOccName Name.varName (show n)
 
 -- | Splits a forall type into a list of 'PiTyVarBinder's and the inner type.
 -- Always succeeds, even if it returns an empty list.
-tcSplitPiTys :: Type -> ([PiTyVarBinder], Type)
+tcSplitPiTys :: Type -> ([Type], [PiTyVarBinder], Type)
 tcSplitPiTys ty
-  = assert (all isTyBinder (fst sty))   -- No CoVar binders here
+  = assert (all isTyBinder bndrs)   -- No CoVar binders here
     sty
-  where sty = splitPiTys ty
+  where sty@(_, bndrs, _) = splitPiTys ty
 
 -- | Splits a type into a PiTyVarBinder and a body, if possible.
-tcSplitPiTy_maybe :: Type -> Maybe (PiTyVarBinder, Type)
+tcSplitPiTy_maybe :: Type -> Maybe (Type, PiTyVarBinder, Type)
 tcSplitPiTy_maybe ty
   = assert (isMaybeTyBinder sty)  -- No CoVar binders here
     sty
   where
     sty = splitPiTy_maybe ty
-    isMaybeTyBinder (Just (t,_)) = isTyBinder t
+    isMaybeTyBinder (Just (_,t,_)) = isTyBinder t
     isMaybeTyBinder _            = True
 
 tcSplitForAllTyVarBinder_maybe :: Type -> Maybe (TyVarBinder, Type)
@@ -1621,11 +1624,11 @@ tcSplitNestedSigmaTys :: Type -> ([TyVar], ThetaType, Type)
 tcSplitNestedSigmaTys ty
     -- If there's a forall, split it apart and try splitting the rho type
     -- underneath it.
-  | (arg_tys, body_ty)   <- tcSplitFunTys ty
+  | (mas, arg_tys, body_ty) <- tcSplitFunTys ty
   , (tvs1, theta1, rho1) <- tcSplitSigmaTy body_ty
   , not (null tvs1 && null theta1)
   = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
-    in (tvs1 ++ tvs2, theta1 ++ theta2, mkScaledFunTys arg_tys rho2)
+    in (tvs1 ++ tvs2, theta1 ++ theta2, mkScaledFunTys (zip mas arg_tys) rho2)
 
     -- If there's no forall, we're done.
   | otherwise = ([], [], ty)
@@ -1677,19 +1680,19 @@ tcTyConAppArgs ty = case tcSplitTyConApp_maybe ty of
                         Nothing        -> pprPanic "tcTyConAppArgs" (pprType ty)
 
 -----------------------
-tcSplitFunTys :: Type -> ([Scaled Type], Type)
+tcSplitFunTys :: Type -> ([Type], [Scaled Type], Type)
 tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
-                        Nothing        -> ([], ty)
-                        Just (arg,res) -> (arg:args, res')
+                        Nothing           -> ([], [], ty)
+                        Just (ma,arg,res) -> (ma:mas, arg:args, res')
                                        where
-                                          (args,res') = tcSplitFunTys res
+                                          (mas,args,res') = tcSplitFunTys res
 
-tcSplitFunTy_maybe :: Type -> Maybe (Scaled Type, Type)
+tcSplitFunTy_maybe :: Type -> Maybe (Type, Scaled Type, Type)
 -- Only splits function (->) and (-=>), not (=>) or (==>)
 tcSplitFunTy_maybe ty
   | Just ty' <- coreView ty = tcSplitFunTy_maybe ty'
-tcSplitFunTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
-  | isVisibleFunArg af = Just (Scaled w arg, res)
+tcSplitFunTy_maybe (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res })
+  | isVisibleFunArg af = Just (ma, Scaled w arg, res)
 tcSplitFunTy_maybe _   = Nothing
         -- Note the isVisibleFunArg guard
         -- Consider     (?x::Int) => Bool
@@ -1702,35 +1705,36 @@ tcSplitFunTy_maybe _   = Nothing
 tcSplitFunTysN :: Arity                      -- n: Number of desired args
                -> TcRhoType
                -> Either Arity               -- Number of missing arrows
-                        ([Scaled TcSigmaType],-- Arg types (always N types)
+                        ([Type],              -- Matchabilities (always N types)
+                         [Scaled TcSigmaType],-- Arg types (always N types)
                          TcSigmaType)        -- The rest of the type
 -- ^ Split off exactly the specified number argument types
 -- Returns
 --  (Left m) if there are 'm' missing arrows in the type
---  (Right (tys,res)) if the type looks like t1 -> ... -> tn -> res
+--  (Right (mas,tys,res)) includes each arrow matchability.
 tcSplitFunTysN n ty
  | n == 0
- = Right ([], ty)
- | Just (arg,res) <- tcSplitFunTy_maybe ty
+ = Right ([], [], ty)
+ | Just (ma,arg,res) <- tcSplitFunTy_maybe ty
  = case tcSplitFunTysN (n-1) res of
      Left m            -> Left m
-     Right (args,body) -> Right (arg:args, body)
+     Right (mas,args,body) -> Right (ma:mas, arg:args, body)
  | otherwise
  = Left n
 
-tcSplitFunTy :: Type -> (Scaled Type, Type)
+tcSplitFunTy :: Type -> (Type, Scaled Type, Type)
 tcSplitFunTy  ty = expectJust (tcSplitFunTy_maybe ty)
 
 tcFunArgTy :: Type -> Scaled Type
-tcFunArgTy ty = fst (tcSplitFunTy ty)
+tcFunArgTy ty = case tcSplitFunTy ty of (_,arg,_) -> arg
 
 tcFunResultTy :: Type -> Type
-tcFunResultTy ty = snd (tcSplitFunTy ty)
+tcFunResultTy ty = case tcSplitFunTy ty of (_,_,res) -> res
 
 -- | Strips off n *visible* arguments and returns the resulting type
 tcFunResultTyN :: HasDebugCallStack => Arity -> Type -> Type
 tcFunResultTyN n ty
-  | Right (_, res_ty) <- tcSplitFunTysN n ty
+  | Right (_, _, res_ty) <- tcSplitFunTysN n ty
   = res_ty
   | otherwise
   = pprPanic "tcFunResultTyN" (ppr n <+> ppr ty)
@@ -1771,7 +1775,7 @@ tcSplitQuantPredTy :: Type -> ([TyVar], [Type], PredType)
 -- and we don't want to do that here
 tcSplitQuantPredTy ty
   = case tcSplitForAllInvisTyVars ty of { (tvs, rho)    ->
-    case splitFunTys rho             of { (theta, head) ->
+    case splitFunTys rho             of { (_, theta, head) ->
     (tvs, map scaledThing theta, head) }}
 
 tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
@@ -2219,7 +2223,8 @@ tyConVisibilities :: TyCon -> [Bool]
 tyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
   where
     tc_binder_viss      = map isVisibleTyConBinder (tyConBinders tc)
-    tc_return_kind_viss = map isVisiblePiTyBinder (fst $ tcSplitPiTys (tyConResKind tc))
+    tc_return_kind_viss = let (_, bndrs, _) = tcSplitPiTys (tyConResKind tc)
+                          in map isVisiblePiTyBinder bndrs
 
 -- | If the tycon is applied to the types, is the next argument visible?
 isNextTyConArgVisible :: TyCon -> [Type] -> Bool
@@ -2230,7 +2235,7 @@ isNextTyConArgVisible tc tys
 -- E.g. (s t): is `t` a visible argument of `s`?
 isNextArgVisible :: TcType -> Bool
 isNextArgVisible ty
-  | Just (bndr, _) <- tcSplitPiTy_maybe (typeKind ty) = isVisiblePiTyBinder bndr
+  | Just (_, bndr, _) <- tcSplitPiTy_maybe (typeKind ty) = isVisiblePiTyBinder bndr
   | otherwise                                         = True
     -- this second case might happen if, say, we have an unzonked TauTv.
     -- But TauTvs can't range over types that take invisible arguments
@@ -2410,7 +2415,7 @@ pSizeTypeX bvs (TyVarTy tv)
 pSizeTypeX _   (LitTy {})                = pSizeOne
 pSizeTypeX bvs (TyConApp tc tys)         = pSizeTyConAppX bvs tc tys
 pSizeTypeX bvs (AppTy fun arg)           = pSizeTypeX bvs fun `addPSize` pSizeTypeX bvs arg
-pSizeTypeX bvs (FunTy _ w arg res)       = pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
+pSizeTypeX bvs (FunTy _ ma w arg res)    = pSizeTypeX bvs ma `addPSize` pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
                                            pSizeTypeX bvs res
 pSizeTypeX bvs (ForAllTy (Bndr tv _) ty) = pSizeTypeX bvs (tyVarKind tv) `addPSize`
                                            pSizeTypeX (bvs `extendVarSet` tv) ty

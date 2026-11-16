@@ -101,7 +101,7 @@ synonymTyConsOfType ty
      go (LitTy _)         = emptyNameEnv
      go (TyVarTy _)       = emptyNameEnv
      go (AppTy a b)       = go a `plusNameEnv` go b
-     go (FunTy _ w a b)   = go w `plusNameEnv` go a `plusNameEnv` go b
+     go (FunTy _ ma w a b) = go ma `plusNameEnv` go w `plusNameEnv` go a `plusNameEnv` go b
      go (ForAllTy _ ty)   = go ty
      go (CastTy ty co)    = go ty `plusNameEnv` go_co co
      go (CoercionTy co)   = go_co co
@@ -138,8 +138,8 @@ synonymTyConsOfType ty
      go_co (AppCo co co')       = go_co co `plusNameEnv` go_co co'
      go_co (ForAllCo { fco_kind = kind_co, fco_body = body_co })
                                 = go_mco kind_co `plusNameEnv` go_co body_co
-     go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
-                                = go_co m `plusNameEnv` go_co a `plusNameEnv` go_co r
+     go_co (FunCo { fco_ma = ma, fco_mult = m, fco_arg = a, fco_res = r })
+                                = go_co ma `plusNameEnv` go_co m `plusNameEnv` go_co a `plusNameEnv` go_co r
      go_co (CoVarCo _)          = emptyNameEnv
      go_co (HoleCo {})          = emptyNameEnv
      go_co (AxiomCo _ cs)       = go_co_s cs
@@ -626,7 +626,7 @@ irType = go
                                           lcls' = extendVarSet lcls tv
                                     ; markNominal lcls (tyVarKind tv)
                                     ; go lcls' ty }
-    go lcls (FunTy _ w arg res)  = markNominal lcls w >> go lcls arg >> go lcls res
+    go lcls (FunTy _ ma w arg res) = markNominal lcls ma >> markNominal lcls w >> go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
     go lcls (CastTy ty _)      = go lcls ty
@@ -675,8 +675,8 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
       | otherwise = pprPanic "markNominal: invalid retained binder" (ppr ty)
     get_ty_vars _ (TyVarTy tv) = unitVarSet tv
     get_ty_vars scope (AppTy t1 t2) = get_ty_vars scope t1 `unionVarSet` get_ty_vars scope t2
-    get_ty_vars scope (FunTy _ w t1 t2)
-      = mapUnionVarSet (get_ty_vars scope) [w,t1,t2]
+    get_ty_vars scope (FunTy _ ma w t1 t2)
+      = mapUnionVarSet (get_ty_vars scope) [ma,w,t1,t2]
     get_ty_vars scope (TyConApp _ tys) = mapUnionVarSet (get_ty_vars scope) tys
     get_ty_vars scope (ForAllTy (Bndr v _) ty)
       = get_ty_vars scope (varType v) `unionVarSet`
@@ -976,7 +976,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                           mkPhiTy (conLikeStupidTheta con1) $
                           -- req_theta is empty for normal DataCon
                           mkPhiTy req_theta                 $
-                          mkVisFunTyMany data_ty            $
+                          mkVisFunTyManyU data_ty            $
                             -- Record selectors are always typed with Many. We
                             -- could improve on it in the case where all the
                             -- fields in all the constructor have multiplicity Many.

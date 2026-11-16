@@ -2217,7 +2217,7 @@ mkDummyLiteral platform pr
 maybe_getCCallReturnRep :: Type -> PrimOrVoidRep
 maybe_getCCallReturnRep fn_ty
    = let
-       (_a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
+       (_mas, _a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
      in
        case typePrimRep r_ty of
          [] -> VoidRep

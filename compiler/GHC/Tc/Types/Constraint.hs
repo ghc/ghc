@@ -1427,9 +1427,10 @@ userTypeError_maybe look_everywhere = go
       | not look_everywhere = Nothing
       | otherwise = go arg
     go (DepFunTy v ty) = go (varType v) `firstJust` go ty
-    go (FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
+    go (FunTy { ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res })
       = firstJusts
-          [ go mult
+          [ go ma
+          , go mult
           , go (typeKind arg)
           , go (typeKind res)
           , go arg

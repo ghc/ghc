@@ -1251,7 +1251,7 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
         DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
-                 mkScaledFunctionTys rep_arg_tys $
+                 mkScaledFunctionTysU rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
                  -- res_arg_tys is a mixture of TypeLike and ConstraintLike,
                  -- so we don't know which FunTyFlag to use
@@ -1624,10 +1624,10 @@ dataConRepArgBinders = dcOrigArgBinders
 
 -- | Rebuild a constructor field telescope without erasing runtime binders.
 mkRetainedArgTys :: [Maybe Id] -> [Scaled Type] -> Type -> Type
-mkRetainedArgTys [] args res = mkScaledFunTys args res
+mkRetainedArgTys [] args res = mkScaledFunTysU args res
 mkRetainedArgTys (mb : bs) (arg : args) res
   = case mb of
-      Nothing -> mkScaledFunTys [arg] body
+      Nothing -> mkScaledFunTysU [arg] body
       Just b  -> mkDepFunTy b body
   where
     body = mkRetainedArgTys bs args res

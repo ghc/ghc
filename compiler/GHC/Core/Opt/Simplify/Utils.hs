@@ -562,7 +562,7 @@ contHoleScaling (Select { sc_bndr = id, sc_cont = k })
 contHoleScaling (StrictArg { sc_fun_ty = fun_ty, sc_cont = k })
   = w `mkMultMul` contHoleScaling k
   where
-    (w, _, _) = splitFunTy fun_ty
+    (_, w, _, _) = splitFunTy fun_ty
 contHoleScaling (ApplyToTy { sc_cont = k }) = contHoleScaling k
 contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
@@ -771,7 +771,7 @@ mkArgInfo env fun rules_for_fun cont
       | Just (_, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
       = add_type_strictness fun_ty' dmds     -- Look through foralls
 
-      | Just (_, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
+      | Just (_, _, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       , dmd : rest_dmds <- dmds
       , let dmd'
              | definitelyUnliftedType arg_ty

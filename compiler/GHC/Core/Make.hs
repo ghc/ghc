@@ -922,7 +922,7 @@ aBSENT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
  where
    -- absentError :: forall (a :: Type). Addr# -> a
    absent_ty = mkSpecForAllTys [alphaTyVar] $
-               mkVisFunTyMany addrPrimTy (mkTyVarTy alphaTyVar)
+               mkVisFunTyManyU addrPrimTy (mkTyVarTy alphaTyVar)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils
 
@@ -932,7 +932,7 @@ aBSENT_CONSTRAINT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
  where
    -- absentConstraintError :: forall (a :: Constraint). Addr# -> a
    absent_ty = mkSpecForAllTys [alphaConstraintTyVar] $
-               mkFunTy visArgConstraintLike ManyTy
+               mkFunTy visArgConstraintLike unmatchableDataConTy ManyTy
                        addrPrimTy (mkTyVarTy alphaConstraintTyVar)
 
 
@@ -970,7 +970,7 @@ mkRuntimeErrorTy :: TypeOrConstraint -> Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
 --   See Note [Error and friends have an "open-tyvar" forall]
 mkRuntimeErrorTy torc = mkSpecForAllTys [runtimeRep1TyVar, tyvar] $
-                        mkFunctionType ManyTy addrPrimTy (mkTyVarTy tyvar)
+                        mkFunctionType unmatchableDataConTy ManyTy addrPrimTy (mkTyVarTy tyvar)
   where
     tyvar:|_ = expectNonEmpty $ mkTemplateTyVars [kind]
     kind = case torc of

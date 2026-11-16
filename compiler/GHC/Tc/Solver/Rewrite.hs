@@ -51,7 +51,7 @@ import GHC.Data.Maybe
 import GHC.Exts (oneShot)
 import Control.Monad
 import Control.Applicative (liftA3)
-import GHC.Builtin.WiredIn.Types (tYPETyCon)
+import GHC.Builtin.WiredIn.Types (tYPETyCon, matchableDataConTy)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
 import GHC.Data.Bag( listToBag, bagToList, isEmptyBag )
@@ -598,17 +598,10 @@ rewrite_args_tc tc = rewrite_args all_bndrs any_named_bndrs inner_ki emptyVarSet
   -- greatly improve performance of an optimized build.
   -- The T9872 test cases are good witnesses of this fact.
 
-    (bndrs, named)
-      = ty_con_binders_ty_binders' (tyConBinders tc)
-    -- it's possible that the result kind has arrows (for, e.g., a type family)
-    -- so we must split it
-    (inner_bndrs, inner_ki, inner_named) = split_pi_tys' (tyConResKind tc)
-    !all_bndrs                           = bndrs `chkAppend` inner_bndrs
-    !any_named_bndrs                     = named || inner_named
-    -- NB: Those bangs there drop allocations in T9872{a,c,d} by 8%.
+    (all_bndrs, inner_ki, any_named_bndrs) = split_pi_tys' (tyConKind tc)
 
 {-# INLINE rewrite_args #-}
-rewrite_args :: [PiTyBinder] -> Bool -- Binders, and True iff any of them are
+rewrite_args :: [(Type, PiTyBinder)] -> Bool -- Binders, and True iff any of them are
                                      -- named.
              -> Kind -> TcTyCoVarSet -- function kind; kind's free vars
              -> Maybe (Infinite Role) -> [Type]    -- these are in 1-to-1 correspondence
@@ -656,7 +649,7 @@ rewrite_args_fast orig_tys
 {-# INLINE rewrite_args_slow #-}
 -- | Slow path, compared to rewrite_args_fast, because this one must track
 -- a lifting context.
-rewrite_args_slow :: [PiTyBinder] -> Kind -> TcTyCoVarSet
+rewrite_args_slow :: [(Type, PiTyBinder)] -> Kind -> TcTyCoVarSet
                   -> Infinite Role -> [Type]
                   -> RewriteM ArgsReductions
 rewrite_args_slow binders inner_ki fvs roles tys
@@ -791,8 +784,9 @@ rewrite_one (TyConApp tc tys)
               -- See Note [Do not rewrite newtypes]
   = rewrite_ty_con_app tc tys
 
-rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
-  = do { arg_redn <- rewrite_one ty1
+rewrite_one (FunTy { ft_af = vis, ft_ma = ma, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
+  = do { ma_redn <- setEqRel NomEq $ rewrite_one ma
+       ; arg_redn <- rewrite_one ty1
        ; res_redn <- rewrite_one ty2
 
         -- Important: look at the *reduced* type, so that any unzonked variables
@@ -822,7 +816,7 @@ rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
           -- be done if we used TyConApp instead of FunTy. These rewritten
           -- representations are seen only in casts of the arg and res, below.
           -- Forgetting this caused #19677.
-       ; return $! mkFunRedn role vis w_redn casted_arg_redn casted_res_redn }
+       ; return $! mkFunRedn role vis ma_redn w_redn casted_arg_redn casted_res_redn }
 
 rewrite_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't rewrite the kind of
@@ -2074,31 +2068,19 @@ the new story.
 
 -- | Like 'splitPiTys'' but comes with a 'Bool' which is 'True' iff there is at
 -- least one named binder.
-split_pi_tys' :: Type -> ([PiTyBinder], Type, Bool)
+split_pi_tys' :: Type -> ([(Type, PiTyBinder)], Type, Bool)
 split_pi_tys' ty = split ty ty
   where
      -- put common cases first
   split _       (ForAllTy b res) = let -- This bang is necessary lest we see rather
                                        -- terrible reboxing, as noted in #19102.
                                        !(bs, ty, _) = split res res
-                                   in  (Named b : bs, ty, True)
-  split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+                                   in  ((matchableDataConTy, Named b) : bs, ty, True)
+  split _       (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res })
                                  = let -- See #19102
                                        !(bs, ty, named) = split res res
-                                   in  (Anon (mkScaled w arg) af : bs, ty, named)
+                                   in  ((ma, Anon (mkScaled w arg) af) : bs, ty, named)
 
   split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
-
--- | Like 'tyConBindersPiTyBinders' but you also get a 'Bool' which is true iff
--- there is at least one named binder.
-ty_con_binders_ty_binders' :: [TyConBinder] -> ([PiTyBinder], Bool)
-ty_con_binders_ty_binders' = foldr go ([], False)
-  where
-    go (Bndr tv (NamedTCB vis)) (bndrs, _)
-      = (Named (Bndr tv vis) : bndrs, True)
-    go (Bndr tv AnonTCB)   (bndrs, n)
-      = (Anon (tymult (tyVarKind tv)) FTF_T_T : bndrs, n)
-    {-# INLINE go #-}
-{-# INLINE ty_con_binders_ty_binders' #-}

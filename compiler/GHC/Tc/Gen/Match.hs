@@ -196,7 +196,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     has_function_binder :: Type -> Bool
     has_function_binder ty = case coreFullView ty of
       DepFunTy binder body -> isNativeIndexFunctionId binder || has_function_binder body
-      FunTy _ _ _ body -> has_function_binder body
+      FunTy _ _ _ _ body -> has_function_binder body
       _ -> False
 
     one_variable_equation :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
@@ -210,7 +210,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
       DepFunTy _ body -> case unLoc pat of
         VarPat{} -> variable_retained_patterns body pats
         _ -> False
-      FunTy af _ _ body
+      FunTy af _ _ _ body
         | isVisibleFunArg af -> variable_retained_patterns body pats
         | otherwise -> variable_retained_patterns body (pat : pats)
       _ -> False
@@ -263,7 +263,7 @@ with ordinary leading constructor patterns remain separate work.
 hasRetainedFunTy :: Type -> Bool
 hasRetainedFunTy ty = case coreFullView ty of
   DepFunTy{} -> True
-  FunTy _ _ _ result -> hasRetainedFunTy result
+  FunTy _ _ _ _ result -> hasRetainedFunTy result
   _ -> False
 
 -- | Elaborate a checked dependent case through a retained pattern function.
@@ -858,7 +858,7 @@ tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty init
                  pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
            ; go (pat_ty : acc) (applyTypeToArgs ty [Var index]) pats thing_inside }
       | FunTy{} <- coreFullView ty
-      = do { (co, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (length initial_pats, initial_ty) ty
+      = do { (co, _ma, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (length initial_pats, initial_ty) ty
            ; unless (isIdHsWrapper (mkWpCastN co)) $
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
            ; go (mkCheckExpFunPatTy arg_ty : acc) rhs_ty pats thing_inside }
@@ -929,7 +929,7 @@ tcRetainedConArgs herald ctxt = go [] []
            ; go (pat_ty : acc) (RetainedConIndex index : argument_plan) (n-1)
                 (applyTypeToArgs ty [Var index]) }
       | FunTy{} <- coreFullView ty
-      = do { (co, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (n, ty) ty
+      = do { (co, _ma, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (n, ty) ty
            ; unless (isIdHsWrapper (mkWpCastN co)) $
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
            ; go (mkCheckExpFunPatTy arg_ty : acc) (RetainedConValue : argument_plan) (n-1) rhs_ty }
@@ -2037,14 +2037,14 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              by_arrow :: Type -> Type     -- Wraps 'ty' to '(a->t) -> ty' if the By is present
              by_arrow = case by' of
                           Nothing       -> \ty -> ty
-                          Just (_,e_ty) -> \ty -> (alphaTy `mkVisFunTyMany` e_ty) `mkVisFunTyMany` ty
+                          Just (_,e_ty) -> \ty -> (alphaTy `mkVisFunTyManyU` e_ty) `mkVisFunTyManyU` ty
 
              tup_ty        = mkBigCoreVarTupTy bndr_ids
              poly_arg_ty   = m_app alphaTy
              poly_res_ty   = m_app (n_app alphaTy)
              using_poly_ty = mkInfForAllTy alphaTyVar $
                              by_arrow $
-                             poly_arg_ty `mkVisFunTyMany` poly_res_ty
+                             poly_arg_ty `mkVisFunTyManyU` poly_res_ty
 
        ; using' <- tcCheckPolyExpr using using_poly_ty
        ; let final_using = fmap (mkHsWrap (WpTyApp tup_ty)) using'
@@ -2187,7 +2187,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
              --                          or res                    ('by' absent)
              by_arrow = case by of
                           Nothing -> \res -> res
-                          Just {} -> \res -> (alphaTy `mkVisFunTyMany` by_e_ty) `mkVisFunTyMany` res
+                          Just {} -> \res -> (alphaTy `mkVisFunTyManyU` by_e_ty) `mkVisFunTyManyU` res
 
              poly_arg_ty  = m1_ty `mkAppTy` alphaTy
              using_arg_ty = m1_ty `mkAppTy` tup_ty
@@ -2195,7 +2195,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
              using_res_ty = m2_ty `mkAppTy` n_app tup_ty
              using_poly_ty = mkInfForAllTy alphaTyVar $
                              by_arrow $
-                             poly_arg_ty `mkVisFunTyMany` poly_res_ty
+                             poly_arg_ty `mkVisFunTyManyU` poly_res_ty
 
              -- 'stmts' returns a result of type (m1_ty tuple_ty),
              -- typically something like [(Int,Bool,Int)]
@@ -2225,7 +2225,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        ; new_res_ty <- newFlexiTyVarTy liftedTypeKind
        ; (_, bind_op')  <- tcSyntaxOp MCompOrigin bind_op
                              [ synKnownType using_res_ty
-                             , synKnownType (n_app tup_ty `mkVisFunTyMany` new_res_ty) ]
+                             , synKnownType (n_app tup_ty `mkVisFunTyManyU` new_res_ty) ]
                              res_ty $ \ _ _ -> return ()
 
        --------------- Typecheck the 'fmap' function -------------
@@ -2234,9 +2234,9 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
                        _ -> fmap unLoc . tcCheckPolyExpr (noLocA fmap_op) $
                             mkInfForAllTy alphaTyVar $
                             mkInfForAllTy betaTyVar  $
-                            (alphaTy `mkVisFunTyMany` betaTy)
-                            `mkVisFunTyMany` (n_app alphaTy)
-                            `mkVisFunTyMany` (n_app betaTy)
+                            (alphaTy `mkVisFunTyManyU` betaTy)
+                            `mkVisFunTyManyU` (n_app alphaTy)
+                            `mkVisFunTyManyU` (n_app betaTy)
 
        --------------- Typecheck the 'using' function -------------
        -- using :: ((a,b,c)->t) -> m1 (a,b,c) -> m2 (n (a,b,c))
@@ -2299,9 +2299,9 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
 
        ; let mzip_ty  = mkInfForAllTys [alphaTyVar, betaTyVar] $
                         (m_ty `mkAppTy` alphaTy)
-                        `mkVisFunTyMany`
+                        `mkVisFunTyManyU`
                         (m_ty `mkAppTy` betaTy)
-                        `mkVisFunTyMany`
+                        `mkVisFunTyManyU`
                         (m_ty `mkAppTy` mkBoxedTupleTy [alphaTy, betaTy])
        ; mzip_op' <- unLoc `fmap` tcCheckPolyExpr (noLocA mzip_op) mzip_ty
 
@@ -2431,7 +2431,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
         ; ((_, mfix_op'), mfix_res_ty)
             <- runInferRho $ \ exp_ty ->
                tcSyntaxOp DoStmtOrigin mfix_op
-                          [synKnownType (mkVisFunTyMany tup_ty stmts_ty)] exp_ty $
+                          [synKnownType (mkVisFunTyManyU tup_ty stmts_ty)] exp_ty $
                \ _ _ -> return ()
 
         ; ((thing, new_res_ty), bind_op')
@@ -2558,7 +2558,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
       ; ts <- replicateM (arity-1) $ newInferExpType IIF_DeepRho
       ; exp_tys <- replicateM arity $ newFlexiTyVarTy liftedTypeKind
       ; pat_tys <- replicateM arity $ newFlexiTyVarTy liftedTypeKind
-      ; let fun_ty = mkVisFunTysMany pat_tys body_ty
+      ; let fun_ty = mkVisFunTysManyU pat_tys body_ty
 
        -- NB. do the <$>,<*> operators first, we don't want type errors here
        --     i.e. goOps before goArgs

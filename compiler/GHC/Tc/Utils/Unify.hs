@@ -117,6 +117,7 @@ import GHC.Utils.Panic
 
 import GHC.Driver.DynFlags
 
+import Data.List (foldl')
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.Maybe (firstJusts)
@@ -152,7 +153,7 @@ matchActualFunTy
       -- (Both are used only for error messages)
   -> TcRhoType
       -- ^ Type to analyse: a TcRhoType
-  -> TcM (TcCoercion, Scaled TcSigmaTypeFRR, TcSigmaType)
+  -> TcM (TcCoercion, Type, Scaled TcSigmaTypeFRR, TcSigmaType)
 -- This function takes in a type to analyse (a RhoType) and returns
 -- an argument type and a result type (splitting apart a function arrow).
 -- The returned argument type is a SigmaType with a fixed RuntimeRep;
@@ -160,8 +161,8 @@ matchActualFunTy
 --
 -- See Note [matchActualFunTy error handling] for the first three arguments
 
--- If   (wrap, arg_ty, res_ty) = matchActualFunTy ... fun_ty
--- then wrap :: fun_ty ~~> (arg_ty -> res_ty)
+-- If   (wrap, ma, arg_ty, res_ty) = matchActualFunTy ... fun_ty
+-- then wrap preserves ma in the argument arrow.
 -- and NB: res_ty is an (uninstantiated) SigmaType
 
 matchActualFunTy herald mb_thing err_info fun_ty
@@ -176,17 +177,18 @@ matchActualFunTy herald mb_thing err_info fun_ty
     -- hide the forall inside a meta-variable
     go :: TcRhoType   -- The type we're processing, perhaps after
                       -- expanding type synonyms
-       -> TcM (TcCoercion, Scaled TcSigmaTypeFRR, TcSigmaType)
+       -> TcM (TcCoercion, Type, Scaled TcSigmaTypeFRR, TcSigmaType)
     go ty | Just ty' <- coreView ty = go ty'
 
-    go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
+    go (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
       do { (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald 1) arg_ty
          ; let fun_co = mkFunCo Nominal af
+                          (mkNomReflCo ma)
                           (mkReflCo Nominal w)
                           arg_co
                           (mkReflCo Nominal res_ty)
-         ; return (fun_co, Scaled w arg_ty, res_ty) }
+         ; return (fun_co, ma, Scaled w arg_ty, res_ty) }
 
     go ty@(TyVarTy tv)
       | isMetaTyVar tv
@@ -216,9 +218,9 @@ matchActualFunTy herald mb_thing err_info fun_ty
     defer fun_ty
       = do { arg_ty <- new_check_arg_ty herald 1
            ; res_ty <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkScaledFunTys [arg_ty] res_ty
+           ; let unif_fun_ty = mkScaledFunTysU [arg_ty] res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (co, arg_ty, res_ty) }
+           ; return (co, unmatchableDataConTy, arg_ty, res_ty) }
 
     ------------
     mk_ctxt :: TcType -> HsCtxt
@@ -256,10 +258,10 @@ matchActualFunTys :: ExpectedFunTyCtxt -- ^ See Note [Herald for matchExpectedFu
                   -> CtOrigin
                   -> Arity
                   -> TcSigmaType
-                  -> TcM (HsWrapper, [Scaled TcSigmaTypeFRR], TcRhoType)
+                  -> TcM (HsWrapper, [Type], [Scaled TcSigmaTypeFRR], TcRhoType)
 -- NB: Called only from `tcSynArgA`, and hence scheduled for destruction
 --
--- If    matchActualFunTys n fun_ty = (wrap, [t1,..,tn], res_ty)
+-- If    matchActualFunTys n fun_ty = (wrap, mas, [t1,..,tn], res_ty)
 -- then  wrap : fun_ty ~~>  (t1 -> ... -> tn -> res_ty)
 --       and res_ty is a RhoType
 -- NB: the returned type is top-instantiated; it's a RhoType
@@ -269,19 +271,28 @@ matchActualFunTys herald ct_orig n_val_args_wanted top_ty
     go n fun_ty
       | not (isRhoTy fun_ty)
       = do { (wrap1, rho) <- topInstantiate ct_orig fun_ty
-           ; (wrap2, arg_tys, res_ty) <- go n rho
-           ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
+           ; (wrap2, mas, arg_tys, res_ty) <- go n rho
+           ; return (wrap2 <.> wrap1, mas, arg_tys, res_ty) }
 
-    go 0 fun_ty = return (idHsWrapper, [], fun_ty)
+    go 0 fun_ty = return (idHsWrapper, [], [], fun_ty)
 
     go n fun_ty
-      = do { (co1, scaled_arg1_ty_frr@(Scaled arg1_mult arg1_ty_frr), res_ty1) <-
+      = do { (co1, ma, scaled_arg1_ty_frr@(Scaled arg1_mult arg1_ty_frr), res_ty1) <-
                 matchActualFunTy herald Nothing (n_val_args_wanted, top_ty) fun_ty
-           ; (wrap_res, arg_tys, res_ty) <- go (n-1) res_ty1
-           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res (EqMultCo $ mkNomReflCo arg1_mult, arg1_ty_frr) res_ty
-              -- This call to mkWpFun satisfies WpFun-FRR-INVARIANT:
-              -- 'arg1_ty_frr' comes from matchActualFunTy, so is FRR.
-           ; return (wrap_fun2 <.> mkWpCastN co1, scaled_arg1_ty_frr:arg_tys, res_ty) }
+           ; (wrap_res, mas, arg_tys, res_ty) <- go (n-1) res_ty1
+           ; wrap_fun2 <- case getWpCo_maybe wrap_res res_ty1 of
+               Just res_co -> return $ mkWpCastR $
+                 mkFunCoNoFTF Representational (mkNomReflCo ma)
+                   (mkNomReflCo arg1_mult) (mkRepReflCo arg1_ty_frr) res_co
+               Nothing -> do
+                 { ma_co <- unifyType Nothing ma unmatchableDataConTy
+                 ; let input_co = mkArrowMatchabilityCo [ma_co] [scaled_arg1_ty_frr] res_ty1
+                       output_co = mkArrowMatchabilityCo [mkSymCo ma_co] [scaled_arg1_ty_frr] res_ty
+                 ; return $ mkWpCastN output_co
+                       <.> mkWpFun idHsWrapper wrap_res
+                             (EqMultCo $ mkNomReflCo arg1_mult, arg1_ty_frr) res_ty
+                       <.> mkWpCastN input_co }
+           ; return (wrap_fun2 <.> mkWpCastN co1, ma:mas, scaled_arg1_ty_frr:arg_tys, res_ty) }
 
 {-
 ************************************************************************
@@ -832,9 +843,9 @@ matchExpectedFunTys herald _ctxt arity (Infer inf_res) thing_inside
          --  1. use tcMkScaledFunTys rather than mkScaledFunTys, as we might
          --     have res_ty :: kappa[tau] for a meta ty-var kappa, in which case
          --     mkScaledFunTys would crash. See #26277.
-         --  2. tcMkScaledFunTys arg_tys res_ty does not contain any foralls
+         --  2. tcMkScaledFunTysU arg_tys res_ty does not contain any foralls
          --     (even nested ones), so no need to instantiate.
-       ; co <- fillInferResultNoInst (tcMkScaledFunTys arg_tys res_ty) inf_res
+       ; co <- fillInferResultNoInst (tcMkScaledFunTysU arg_tys res_ty) inf_res
        ; return (mkWpCastN co, result) }
 
 matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
@@ -884,10 +895,11 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
 
     ----------------------------
     -- Function types
-    check n_req rev_pat_tys (FunTy { ft_af = af, ft_mult = mult
+    check n_req rev_pat_tys (FunTy { ft_af = af, ft_ma = ma, ft_mult = mult
                                    , ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
-        do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
+        do { ma_co <- unifyType Nothing unmatchableDataConTy ma
+           ; let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
            ; (arg_co, arg_ty_frr) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
            ; let scaled_arg_ty_frr = Scaled mult arg_ty_frr
            ; (res_wrap, result) <- check (n_req - 1)
@@ -901,7 +913,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
                        -- Satisfies WpFun-FRR-INVARIANT because arg_sty_frr is FRR
 
                  fun_wrap2 -- :: (arg_ty_frr -> res_ty) ~~> (arg_ty -> res_ty)
-                   = mkWpCastN (mkFunCo Nominal af (mkNomReflCo mult) (mkSymCo arg_co) (mkNomReflCo res_ty))
+                   = mkWpCastN (mkFunCo Nominal af ma_co (mkNomReflCo mult) (mkSymCo arg_co) (mkNomReflCo res_ty))
 
                  fun_wrap -- :: (arg_ty_frr -> act_res_ty) ~~> (arg_ty -> res_ty)
                    = fun_wrap2 <.> fun_wrap1
@@ -957,7 +969,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
            ; res_ty <- newOpenFlexiTyVarTy
            ; result <- thing_inside all_pats (mkCheckExpType res_ty)
 
-           ; co <- unifyType Nothing (mkScaledFunTys more_arg_tys res_ty) fun_ty
+           ; co <- unifyType Nothing (mkScaledFunTysU more_arg_tys res_ty) fun_ty
            ; return (mkWpCastN co, result) }
 
 new_infer_arg_ty :: ExpectedFunTyCtxt -> Int -> TcM (Scaled ExpRhoTypeFRR)
@@ -977,7 +989,7 @@ mkFunTysMsg :: ExpectedFunTyCtxt
             -> HsCtxt
 -- See Note [Reporting application arity errors]
 mkFunTysMsg herald (n_vis_args_in_call, fun_ty)
-  = do { let (pi_ty_bndrs, _) = splitPiTys fun_ty
+  = do { let (_, pi_ty_bndrs, _) = splitPiTys fun_ty
              n_fun_args = count isVisiblePiTyBinder pi_ty_bndrs
 
        ; FunTysCtxt herald fun_ty n_vis_args_in_call n_fun_args }
@@ -1133,7 +1145,7 @@ matchExpectedAppTy orig_ty
            ; return (co, (ty1, ty2)) }
 
     orig_kind = typeKind orig_ty
-    kind1 = mkVisFunTyMany liftedTypeKind orig_kind
+    kind1 = mkVisFunTyManyM liftedTypeKind orig_kind
     kind2 = liftedTypeKind    -- m :: * -> k
                               -- arg type :: *
 
@@ -2230,35 +2242,35 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
            ; return (body_wrap <.> in_wrap) }
 
     -- Main case: FunTy vs FunTy. go_fun does the work.
-    go1 (FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
-        (FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+    go1 (FunTy { ft_af = af1, ft_ma = act_ma, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
+        (FunTy { ft_af = af2, ft_ma = exp_ma, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
       | isVisibleFunArg af1
       , isVisibleFunArg af2
-      = go_fun af1 act_mult act_arg act_res
-               af2 exp_mult exp_arg exp_res
+      = go_fun af1 act_ma act_mult act_arg act_res
+               af2 exp_ma exp_mult exp_arg exp_res
 
     -- See Note [FunTy vs non-FunTy case in tc_sub_type_deep]
-    go1 (FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }) ty_e
+    go1 (FunTy { ft_af = af1, ft_ma = act_ma, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }) ty_e
       | isVisibleFunArg af1
       = do { exp_mult <- newMultiplicityVar
            ; exp_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
            ; exp_res  <- newOpenFlexiTyVarTy
-           ; let exp_funTy = FunTy { ft_af = af1, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res }
+           ; let exp_funTy = FunTy { ft_af = af1, ft_ma = unmatchableDataConTy, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res }
              -- Recur before unifying; see Wrinkle [Avoiding a loop in tc_sub_type_deep]
-           ; fun_wrap <- go_fun af1 act_mult act_arg act_res af1 exp_mult exp_arg exp_res
+           ; fun_wrap <- go_fun af1 act_ma act_mult act_arg act_res af1 unmatchableDataConTy exp_mult exp_arg exp_res
            ; unify_wrap <- just_unify exp_funTy ty_e
            ; return $ unify_wrap <.> fun_wrap
              -- unify_wrap :: exp_funTy ~~> ty_e
              -- fun_wrap :: ty_a ~~> exp_funTy
            }
-    go1 ty_a (FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+    go1 ty_a (FunTy { ft_af = af2, ft_ma = exp_ma, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
       | isVisibleFunArg af2
       = do { act_mult <- newMultiplicityVar
            ; act_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
            ; act_res  <- newOpenFlexiTyVarTy
-           ; let act_funTy = FunTy { ft_af = af2, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }
+           ; let act_funTy = FunTy { ft_af = af2, ft_ma = unmatchableDataConTy, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }
              -- Recur before unifying; see Wrinkle [Avoiding a loop in tc_sub_type_deep]
-           ; fun_wrap <- go_fun af2 act_mult act_arg act_res af2 exp_mult exp_arg exp_res
+           ; fun_wrap <- go_fun af2 unmatchableDataConTy act_mult act_arg act_res af2 exp_ma exp_mult exp_arg exp_res
            ; unify_wrap <- just_unify ty_a act_funTy
            ; return $ fun_wrap <.> unify_wrap
              -- unify_wrap :: ty_a ~~> act_funTy
@@ -2272,10 +2284,10 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
                               ; return (mkWpCastN cow) }
 
     -- FunTy/FunTy case: this is where we insert any necessary eta-expansions.
-    go_fun :: FunTyFlag -> Mult -> TcType -> TcType -- actual FunTy
-           -> FunTyFlag -> Mult -> TcType -> TcType -- expected FunTy
+    go_fun :: FunTyFlag -> Type -> Mult -> TcType -> TcType -- actual FunTy
+           -> FunTyFlag -> Type -> Mult -> TcType -> TcType -- expected FunTy
            -> TcM HsWrapper
-    go_fun act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res
+    go_fun act_af act_ma act_mult act_arg act_res exp_af exp_ma exp_mult exp_arg exp_res
       -- See Note [FunTy vs FunTy case in tc_sub_type_deep]
       = do { arg_wrap  <- tc_sub_type_ds (tc_fun, Argument pos) (recurInArgumentDSFlag ds_depth) unify given_orig GenSigCtxt exp_arg act_arg
                           -- GenSigCtxt: See Note [Setting the argument context]
@@ -2294,8 +2306,8 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
            ; fun_wrap <- mkWpFun_FRR
                fun_pos
                wp_mult
-               act_af act_mult act_arg act_res
-               exp_af exp_mult exp_arg exp_res
+               act_af act_ma act_mult act_arg act_res
+               exp_af exp_ma exp_mult exp_arg exp_res
                arg_wrap res_wrap
 
            ; traceTc "tc_sub_type_deep go_fun" $
@@ -2345,18 +2357,19 @@ recurInArgumentDSFlag = \case
 mkWpFun_FRR
   :: (Maybe (HsExpr GhcTc), Position p)
   -> SubMultCo -- ^ act_mult ~# exp_mult
-  -> FunTyFlag -> Mult -> TcType -> Type --   actual FunTy
-  -> FunTyFlag -> Mult -> TcType -> Type -- expected FunTy
+  -> FunTyFlag -> Type -> Mult -> TcType -> Type --   actual FunTy
+  -> FunTyFlag -> Type -> Mult -> TcType -> Type -- expected FunTy
   -> HsWrapper -- ^ exp_arg ~~> act_arg
   -> HsWrapper -- ^ act_res ~~> exp_res
   -> TcM HsWrapper -- ^ (act_arg->act_res) ~~> (exp_arg->exp_res)
-mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res arg_wrap res_wrap
+mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_ma act_mult act_arg act_res exp_af exp_ma exp_mult exp_arg exp_res arg_wrap res_wrap
   | Just arg_co <- getWpCo_maybe arg_wrap act_arg   -- arg_co :: exp_arg ~R# act_arg
   , Just res_co <- getWpCo_maybe res_wrap act_res   -- res_co :: act_res ~R# exp_res
   = -- The argument and result wrappers are both hole or cast;
     -- so we can make do with a FunCo
     -- See Note [Representation-polymorphism checking during subtyping]
-    do { let the_co = mkSubMultFunCo act_af exp_af sub_mult (mkSymCo arg_co) res_co
+    do { ma_co <- unifyType Nothing act_ma exp_ma
+       ; let the_co = mkSubMultFunCo act_af exp_af ma_co sub_mult (mkSymCo arg_co) res_co
        ; traceTc "mkWpFun_FRR: cast" $
            vcat [ text "act_mult:" <+> ppr act_mult
                 , text "exp_mult:" <+> ppr exp_mult
@@ -2369,7 +2382,9 @@ mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp
   = -- We need a full WpFun, with the eta-expansion that it entails
     -- And hence we must add fixed-runtime-rep checks so that the eta-expansion is OK
     -- See Note [Representation-polymorphism checking during subtyping]
-    do { (exp_arg_co, exp_arg_frr)  <- hasFixedRuntimeRep (frr_ctxt True ) exp_arg
+    do { act_ma_co <- unifyType Nothing act_ma unmatchableDataConTy
+       ; exp_ma_co <- unifyType Nothing unmatchableDataConTy exp_ma
+       ; (exp_arg_co, exp_arg_frr)  <- hasFixedRuntimeRep (frr_ctxt True ) exp_arg
        ; (act_arg_co, _act_arg_frr) <- hasFixedRuntimeRep (frr_ctxt False) act_arg
        -- exp_arg_frr, act_arg_frr :: Type   have fixed runtime-reps
        -- exp_arg_co :: exp_arg ~ exp_arg_frr      Usually Refl
@@ -2378,11 +2393,13 @@ mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp
        ; let
             exp_arg_fun_co =  -- (exp_arg_frr -> exp_res) ~ (exp_arg -> exp_res)
               mkFunCo Nominal exp_af
+                 exp_ma_co
                  (mkNomReflCo exp_mult)
                  (mkSymCo exp_arg_co)
                  (mkNomReflCo exp_res)
             act_arg_fun_co =  -- (act_arg -> act_res) ~ (act_arg_frr -> act_res)
               mkFunCo Nominal act_af
+                 act_ma_co
                  (mkReflCo Nominal act_mult)
                  act_arg_co
                  (mkNomReflCo act_res)
@@ -2406,13 +2423,6 @@ mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp
             mkWpCastN act_arg_fun_co    -- (act_arg->act_res) ~~> (act_arg_frr->act_res)
        }
   where
-    getWpCo_maybe :: HsWrapper -> Type -> Maybe CoercionR
-    -- See if a HsWrapper is just a coercion
-    getWpCo_maybe WpHole        ty = Just (mkRepReflCo ty)
-    getWpCo_maybe (WpCast co)   _  = Just co
-    getWpCo_maybe (WpSubType w) ty = getWpCo_maybe w ty
-    getWpCo_maybe _             _  = Nothing
-
     frr_ctxt :: Bool -> FixedRuntimeRepContext
     frr_ctxt is_exp_ty =
       FRRDeepSubsumption
@@ -2420,6 +2430,13 @@ mkWpFun_FRR (mb_tc_fun, pos) sub_mult act_af act_mult act_arg act_res exp_af exp
         , frrDSPosition = pos
         , frrAppHead    = mb_tc_fun
         }
+
+-- | Recover coercion evidence from a wrapper with no term operation.
+getWpCo_maybe :: HsWrapper -> Type -> Maybe CoercionR
+getWpCo_maybe WpHole        ty = Just (mkRepReflCo ty)
+getWpCo_maybe (WpCast co)   _  = Just co
+getWpCo_maybe (WpSubType w) ty = getWpCo_maybe w ty
+getWpCo_maybe _             _  = Nothing
 
 -----------------------
 deeplySkolemise :: SkolemInfo -> TcSigmaType
@@ -2434,21 +2451,27 @@ deeplySkolemise skol_info ty
     init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
 
     go subst ty
-      | Just (arg_tys, bndrs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
+      | Just (mas, arg_tys, bndrs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
       = do { let arg_tys' = substScaledTys subst arg_tys
-           ; ids1             <- newSysLocalIds (fsLit "dk") arg_tys'
+                 mas' = substTys subst mas
+           ; ma_cos <- mapM (\ma -> unifyType Nothing ma unmatchableDataConTy) mas'
+           ; ids1 <- newSysLocalIds (fsLit "dk") arg_tys'
            ; (subst', bndrs1) <- tcInstSkolTyVarBndrsX skol_info subst bndrs
            ; ev_vars1         <- newEvVars (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
            ; let tvs     = binderVars bndrs
                  tvs1    = binderVars bndrs1
                  tv_prs1 = map tyVarName tvs `zip` bndrs1
-           ; return ( mkWpEta ty ids1 (mkWpTyLams tvs1
-                                      <.> mkWpEvLams ev_vars1
-                                      <.> wrap)
+                 input_body = foldl' (\fun_ty _ -> funResultTy fun_ty) (substTy subst ty) arg_tys'
+                 input_co = mkArrowMatchabilityCo ma_cos arg_tys' input_body
+                 output_co = mkArrowMatchabilityCo (map mkSymCo ma_cos) arg_tys' rho
+           ; return ( mkWpCastN output_co
+                        <.> mkWpEta (coercionRKind input_co) ids1
+                              (mkWpTyLams tvs1 <.> mkWpEvLams ev_vars1 <.> wrap)
+                        <.> mkWpCastN input_co
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
-                    , mkScaledFunTys arg_tys' rho ) }
+                    , mkScaledFunTys (zip mas' arg_tys') rho ) }
 
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
@@ -2463,19 +2486,27 @@ deeplyInstantiate orig ty
     init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
 
     go subst ty
-      | Just (arg_tys, bndrs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
+      | Just (mas, arg_tys, bndrs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
       = do { let tvs = binderVars bndrs
+                 input_args = substScaledTys subst arg_tys
               -- As per Note [Multiplicity in deep subsumption],
               -- we treat (a %1 -> b) as if it were forall m. a %m -> b.
            ; arg_tys <- traverse oneToMeta arg_tys
            ; (subst', tvs') <- newMetaTyVarsX subst tvs
-           ; let arg_tys' = substScaledTys   subst' arg_tys
+           ; let arg_tys' = substScaledTys subst' arg_tys
+                 mas' = substTys subst' mas
                  theta'   = substTheta subst' theta
-           ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
+           ; ma_cos <- mapM (\ma -> unifyType Nothing ma unmatchableDataConTy) mas'
+           ; ids1 <- newSysLocalIds (fsLit "di") arg_tys'
            ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
            ; (wrap2, rho2) <- go subst' rho
-           ; return (mkWpEta ty ids1 (wrap2 <.> wrap1),
-                     mkScaledFunTys arg_tys' rho2) }
+           ; let input_body = foldl' (\fun_ty _ -> funResultTy fun_ty) (substTy subst ty) input_args
+                 input_co = mkArrowMatchabilityCo ma_cos input_args input_body
+                 output_co = mkArrowMatchabilityCo (map mkSymCo ma_cos) arg_tys' rho2
+           ; return (mkWpCastN output_co
+                       <.> mkWpEta (coercionRKind input_co) ids1 (wrap2 <.> wrap1)
+                       <.> mkWpCastN input_co,
+                     mkScaledFunTys (zip mas' arg_tys') rho2) }
 
       | otherwise
       = do { let ty' = substTy subst ty
@@ -2488,8 +2519,16 @@ deeplyInstantiate orig ty
     oneToMeta ty = return ty
 
 
+-- | Build a nominal arrow coercion that changes only matchability.
+mkArrowMatchabilityCo :: [CoercionN] -> [Scaled Type] -> Type -> CoercionN
+mkArrowMatchabilityCo mas args body
+  = foldr step (mkNomReflCo body) (zip mas args)
+  where
+    step (ma_co, Scaled mult arg) res_co
+      = mkFunCoNoFTF Nominal ma_co (mkNomReflCo mult) (mkNomReflCo arg) res_co
+
 tcDeepSplitSigmaTy_maybe
-  :: TcSigmaType -> Maybe ([Scaled TcType], [TcInvisTVBinder], ThetaType, TcSigmaType)
+  :: TcSigmaType -> Maybe ([Type], [Scaled TcType], [TcInvisTVBinder], ThetaType, TcSigmaType)
 -- Looks for a *non-trivial* quantified type, under zero or more function arrows
 -- By "non-trivial" we mean either tyvars or constraints are non-empty
 tcDeepSplitSigmaTy_maybe ty
@@ -2497,20 +2536,20 @@ tcDeepSplitSigmaTy_maybe ty
   where
   -- As per Note [Multiplicity in deep subsumption],
   -- we treat (a %1 -> b) as if it were forall m. a %m -> b.
-  go ty | Just (arg_ty@(Scaled OneTy _), res_ty) <- tcSplitFunTy_maybe ty
+  go ty | Just (ma, arg_ty@(Scaled OneTy _), res_ty) <- tcSplitFunTy_maybe ty
         = case go res_ty of
             Nothing ->
-              Just ([arg_ty], [], [], res_ty)
-            Just (arg_tys, tvs, theta, rho) ->
-              Just (arg_ty:arg_tys, tvs, theta, rho)
+              Just ([ma], [arg_ty], [], [], res_ty)
+            Just (mas, arg_tys, tvs, theta, rho) ->
+              Just (ma:mas, arg_ty:arg_tys, tvs, theta, rho)
 
-        | Just (arg_ty, res_ty) <- tcSplitFunTy_maybe ty
-        , Just (arg_tys, tvs, theta, rho) <- go res_ty
-        = Just (arg_ty:arg_tys, tvs, theta, rho)
+        | Just (ma, arg_ty, res_ty) <- tcSplitFunTy_maybe ty
+        , Just (mas, arg_tys, tvs, theta, rho) <- go res_ty
+        = Just (ma:mas, arg_ty:arg_tys, tvs, theta, rho)
 
         | (tvs, theta, rho) <- tcSplitSigmaTyBndrs ty
         , not (null tvs && null theta)
-        = Just ([], tvs, theta, rho)
+        = Just ([], [], tvs, theta, rho)
 
         | otherwise = Nothing
 
@@ -2526,7 +2565,7 @@ isDeeplySkolemised ty
   | not (isRhoTy ty)
   -- Foralls or (=>) at top
   = False
-  | Just (_, res) <- tcSplitFunTy_maybe ty
+  | Just (_, _, res) <- tcSplitFunTy_maybe ty
   = isDeeplySkolemised res
   | otherwise
   = True   -- No forall, (=>), or (->) at top
@@ -2549,7 +2588,7 @@ isDeepRhoTy ty
   | not (isRhoTy ty)
   -- Foralls or (=>) at top
   = False
-  | Just (Scaled m _, res) <- tcSplitFunTy_maybe ty
+  | Just (_, Scaled m _, res) <- tcSplitFunTy_maybe ty
   = case m of
       OneTy -> False -- (%1 ->) at top
       _ -> isDeepRhoTy res
@@ -2922,14 +2961,15 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
       | ty1 `tcEqType` ty2 = return $ mkReflCo role ty1
 
     -- Functions (t1 -> t2) just check the two parts
-    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+    go (FunTy { ft_af = af1, ft_ma = ma1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_af = af2, ft_ma = ma2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
       | isVisibleFunArg af1  -- Do not attempt (c => t); just defer
       , af1 == af2           -- Important!  See #21530
-      = do { co_w <- uType (env { u_role = funRole role SelMult }) w1   w2
+      = do { co_ma <- uType (env { u_role = funRole role SelMatch }) ma1 ma2
+           ; co_w <- uType (env { u_role = funRole role SelMult }) w1   w2
            ; co_l <- uType (env { u_role = funRole role SelArg })  arg1 arg2
            ; co_r <- uType (env { u_role = funRole role SelRes })  res1 res2
-           ; return $ mkNakedFunCo role af1 co_w co_l co_r }
+           ; return $ mkNakedFunCo role af1 co_ma co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -3604,10 +3644,10 @@ matchExpectedFunKind hs_ty n k = go n k
                 Indirect fun_kind -> go n fun_kind
                 Flexi ->             defer n k }
 
-    go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+    go n (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res })
       | isVisibleFunArg af
       = do { co <- go (n-1) res
-           ; return (mkNakedFunCo Nominal af (mkNomReflCo w) (mkNomReflCo arg) co) }
+           ; return (mkNakedFunCo Nominal af (mkNomReflCo ma) (mkNomReflCo w) (mkNomReflCo arg) co) }
 
     go n other
      = defer n other
@@ -3615,7 +3655,7 @@ matchExpectedFunKind hs_ty n k = go n k
     defer n k
       = do { arg_kinds <- newMetaKindVars n
            ; res_kind  <- newMetaKindVar
-           ; let new_fun = mkVisFunTysMany arg_kinds res_kind
+           ; let new_fun = mkVisFunTysManyM arg_kinds res_kind
                  origin  = TypeEqOrigin { uo_actual    = k
                                         , uo_expected  = new_fun
                                         , uo_thing     = Just hs_ty
@@ -3690,7 +3730,7 @@ retainedCallOccurs call_ty = go
       | Just expanded <- coreView ty = go expanded
     go (TyConApp _ args) = any go args
     go (AppTy fun arg) = go fun || go arg
-    go (FunTy _ mult arg res) = any go [mult, arg, res]
+    go (FunTy _ ma mult arg res) = any go [ma, mult, arg, res]
     go (DepFunTy binder body)
       = go (varType binder) || (binder `notElem` dependencies && go body)
     go (ForAllTy (Bndr binder _) body) = go (varType binder) || go body
@@ -3748,8 +3788,9 @@ tcRetainedIndexCoercion index_ty occurs branch_co original_ty
     abstract_index template_ty (AppTy fun arg)
       = mkAppTy <$> abstract_index template_ty fun
                 <*> abstract_index template_ty arg
-    abstract_index template_ty (FunTy af mult arg res)
-      = FunTy af <$> abstract_index template_ty mult
+    abstract_index template_ty (FunTy af ma mult arg res)
+      = FunTy af <$> abstract_index template_ty ma
+                 <*> abstract_index template_ty mult
                  <*> abstract_index template_ty arg
                  <*> abstract_index template_ty res
     abstract_index template_ty (DepFunTy binder body)
@@ -3881,9 +3922,9 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     rhs_is_bad (DepFunTy {})  = True
     rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
-    rhs_is_bad (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
+    rhs_is_bad (FunTy {ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = a, ft_res = r})
       | not forall_ok, isInvisibleFunArg af = True
-      | otherwise                           = rhs_is_bad w || rhs_is_bad a || rhs_is_bad r
+      | otherwise                           = rhs_is_bad ma || rhs_is_bad w || rhs_is_bad a || rhs_is_bad r
 
     rhs_is_bad (TyConApp tc tys)
       | lhs_tv_is_concrete, not (isConcreteTyCon tc) = True
@@ -4574,15 +4615,16 @@ check_ty_eq_rhs flags ty
         -- Nor can we expand synonyms; see Note [Occurrence checking: look inside kinds]
         --                             in GHC.Core.FVs
 
-      FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r}
+      FunTy {ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = a, ft_res = r}
        | isInvisibleFunArg af  -- e.g.  Num a => blah
        , not native_given     -- See Note [Rigid retained indices]
        -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
        | otherwise
-       -> do { w_res <- check_ty_eq_rhs flags w
+       -> do { ma_res <- check_ty_eq_rhs flags ma
+             ; w_res <- check_ty_eq_rhs flags w
              ; a_res <- check_ty_eq_rhs flags a
              ; r_res <- check_ty_eq_rhs flags r
-             ; return (mkFunRedn Nominal af <$> w_res <*> a_res <*> r_res) }
+             ; return (mkFunRedn Nominal af <$> ma_res <*> w_res <*> a_res <*> r_res) }
 
       AppTy fun arg -> do { fun_res <- check_ty_eq_rhs flags fun
                           ; arg_res <- check_ty_eq_rhs flags arg

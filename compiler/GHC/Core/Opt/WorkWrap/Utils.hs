@@ -1442,7 +1442,7 @@ findTypeShape fam_envs ty
        -- to look deep into such products -- see #18034
   where
     go rec_tc ty
-       | Just (_, _, _, res) <- splitFunTy_maybe ty
+       | Just (_, _, _, _, res) <- splitFunTy_maybe ty
        = TsFun (go rec_tc res)
 
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty

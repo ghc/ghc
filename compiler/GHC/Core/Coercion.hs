@@ -161,6 +161,7 @@ import GHC.Types.SrcLoc
 
 import GHC.Types.Unique.FM
 
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Data.FastString
@@ -357,19 +358,20 @@ decomposeCo arity co rs
 
 decomposeFunCo :: HasDebugCallStack
                => Coercion  -- Input coercion
-               -> (CoercionN, Coercion, Coercion)
+               -> (Coercion, Coercion, Coercion, Coercion)
 -- Expects co :: (s1 %m1-> t1) ~ (s2 %m2-> t2)
--- Returns (cow :: m1 ~N m2, co1 :: s1~s2, co2 :: t1~t2)
--- actually cow will be a Phantom coercion if the input is a Phantom coercion
+-- Returns matchability, multiplicity, argument and result evidence.
+-- The metadata children are phantom when the input coercion is phantom.
 
-decomposeFunCo (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 })
-  = (w, co1, co2)
+decomposeFunCo (FunCo { fco_ma = ma, fco_mult = w, fco_arg = co1, fco_res = co2 })
+  = (ma, w, co1, co2)
    -- Fast path that short-circuits the calls to mkSelCo,
    -- even though they would give the exact same answers
 
 decomposeFunCo co
   = assertPpr all_ok (ppr co) $
-    ( mkSelCo (SelFun SelMult) co
+    ( mkSelCo (SelFun SelMatch) co
+    , mkSelCo (SelFun SelMult) co
     , mkSelCo (SelFun SelArg) co
     , mkSelCo (SelFun SelRes) co )
   where
@@ -445,17 +447,17 @@ decomposePiCosK orig_co (Pair orig_k1 orig_k2) orig_args
         in
         go (arg_co : acc_arg_cos) (subst1', t1) res_co (subst2', t2) tys
 
-      | Just (af1, _w1, _s1, t1) <- splitFunTy_maybe k1
-      , Just (af2, _w1, _s2, t2) <- splitFunTy_maybe k2
+      | Just (af1, _ma1, _w1, _s1, t1) <- splitFunTy_maybe k1
+      , Just (af2, _ma2, _w2, _s2, t2) <- splitFunTy_maybe k2
       , af1 == af2  -- Same sort of arrow
         -- know     co :: (s1 -> t1) ~ (s2 -> t2)
         --    function :: s1 -> t1
         --          ty :: s2
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1 ~ t2
-      = let (_, sym_arg_co, res_co) = decomposeFunCo co
-            -- It should be fine to ignore the multiplicity bit
-            -- of the coercion for a Nominal coercion.
+      = let (_, _, sym_arg_co, res_co) = decomposeFunCo co
+            -- Application consumes the arrow. Its matchability and multiplicity
+            -- proofs do not affect the argument or result transport.
             arg_co = mkSymCo sym_arg_co
         in
         go (arg_co : acc_arg_cos) (subst1,t1) res_co (subst2,t2) tys
@@ -715,10 +717,10 @@ mkTyConAppCo r tc cos
 
   | otherwise = TyConAppCo r tc cos
 
-mkFunCoNoFTF :: HasDebugCallStack => Role -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCoNoFTF :: HasDebugCallStack => Role -> Coercion -> Coercion -> Coercion -> Coercion -> Coercion
 -- This version of mkFunCo takes no FunTyFlags; it works them out
-mkFunCoNoFTF r w arg_co res_co
-  = mkFunCo2 r afl afr w arg_co res_co
+mkFunCoNoFTF r ma w arg_co res_co
+  = mkFunCo2 r afl afr ma w arg_co res_co
   where
     afl = chooseFunTyFlag argl_ty resl_ty
     afr = chooseFunTyFlag argr_ty resr_ty
@@ -867,8 +869,8 @@ mkSelCo_maybe cs co
       -- If co :: (forall a1:t1 ~ t2. t1) ~ (forall a2:t3 ~ t4. t2)
       -- then (nth SelForAll co :: (t1 ~ t2) ~N (t3 ~ t4))
 
-    go (SelFun fs) (FunCo _ _ _ w arg res)
-      = Just (getNthFun fs w arg res)
+    go (SelFun fs) (FunCo _ _ _ ma w arg res)
+      = Just (getNthFun fs ma w arg res)
 
     go (SelTyCon i r) (TyConAppCo r0 tc arg_cos)
       = assertPpr (r == tyConRole r0 tc i)
@@ -939,18 +941,20 @@ mkSelCoResRole (SelFun fs)     r = funRole r fs
 
 -- | Extract the nth field of a FunCo
 getNthFun :: FunSel
+          -> a    -- ^ matchability
           -> a    -- ^ multiplicity
           -> a    -- ^ argument
           -> a    -- ^ result
-          -> a    -- ^ One of the above three
-getNthFun SelMult mult _   _   = mult
-getNthFun SelArg _     arg _   = arg
-getNthFun SelRes _     _   res = res
+          -> a    -- ^ One of the above four
+getNthFun SelMatch ma _    _   _   = ma
+getNthFun SelMult  _  mult _   _   = mult
+getNthFun SelArg   _  _    arg _   = arg
+getNthFun SelRes   _  _    _   res = res
 
 selectFromType :: HasDebugCallStack => CoSel -> Type -> Type
 selectFromType (SelFun fs) ty
-  | Just (_af, mult, arg, res) <- splitFunTy_maybe ty
-  = getNthFun fs mult arg res
+  | Just (_af, ma, mult, arg, res) <- splitFunTy_maybe ty
+  = getNthFun fs ma mult arg res
 
 selectFromType (SelTyCon n _) ty
   | Just args <- tyConAppArgs_maybe ty
@@ -1431,10 +1435,10 @@ mkFunResCo role id res_co
     then mkDepFunCo id res_co
     else pprPanic "mkFunResCo: unsupported dependent runtime binder" (ppr id)
   | otherwise
-  = mkFunCoNoFTF role mult arg_co res_co
+  = mkFunCoNoFTF role (mkReflCo (funRole role SelMatch) unmatchableDataConTy) mult arg_co res_co
   where
     arg_co = mkReflCo role (varType id)
-    mult   = multToCo (idMult id)
+    mult   = mkReflCo (funRole role SelMult) (idMult id)
 
 -- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
 -- The first coercion might be lifted or unlifted; thus the ~? above
@@ -1859,7 +1863,7 @@ ty_co_subst !lc role ty
       = pprPanic "ty_co_subst: invalid retained binder" (ppr b)
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
-    go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
+    go r (FunTy af ma w t1 t2) = mkFunCo r af (go (funRole r SelMatch) ma) (go (funRole r SelMult) w) (go r t1) (go r t2)
     go r t@(ForAllTy (Bndr v vis) ty)
        = let (lc', v', k_co) = liftCoSubstVarBndr lc v
              body_co = ty_co_subst lc' r ty
@@ -2194,10 +2198,10 @@ coercion_lr_kind which orig_co
 
     go (UnivCo { uco_lty = lty, uco_rty = rty})
       = pickLR which (lty, rty)
-    go (FunCo { fco_afl = afl, fco_afr = afr, fco_mult = mult
+    go (FunCo { fco_afl = afl, fco_afr = afr, fco_ma = ma, fco_mult = mult
               , fco_arg = arg, fco_res = res})
       = -- See Note [FunCo]
-        FunTy { ft_af = pickLR which (afl, afr), ft_mult = go mult
+        FunTy { ft_af = pickLR which (afl, afr), ft_ma = go ma, ft_mult = go mult
               , ft_arg = go arg, ft_res = go res }
 
     go co@(ForAllCo { fco_tcv = tv1, fco_visL = visL, fco_visR = visR
@@ -2409,10 +2413,10 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
       | otherwise = pprPanic "buildCoercion: native dependent congruence not implemented"
                       (ppr ty1 $$ ppr ty2)
 
-    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+    go (FunTy { ft_af = af1, ft_ma = ma1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_af = af2, ft_ma = ma2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
       = assert (af1 == af2) $
-        mkFunCo Nominal af1 (go w1 w2) (go arg1 arg2) (go res1 res2)
+        mkFunCo Nominal af1 (go ma1 ma2) (go w1 w2) (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)
       = assertPpr (tc1 == tc2) (vcat [ ppr tc1 <+> ppr tc2

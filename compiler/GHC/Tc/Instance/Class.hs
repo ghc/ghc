@@ -652,6 +652,7 @@ matchDataToTag dataToTagClass [levity, dty] = do
             methodRep = Var whichOp `App` Type levity `App` Type repTy
             methodCo = mkFunCo Representational
                                FTF_T_T
+                               (mkNomReflCo unmatchableDataConTy)
                                (mkNomReflCo ManyTy)
                                (mkSymCo repCo)
                                (mkReflCo Representational intPrimTy)
@@ -952,9 +953,9 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | isForAllTy k = return NoInstance
 
   -- Functions; but only with a visible argment
-  | Just (af,mult,arg,ret) <- splitFunTy_maybe t
+  | Just (af,ma,mult,arg,ret) <- splitFunTy_maybe t
   = if isVisibleFunArg af
-    then doFunTy clas t mult arg ret
+    then doFunTy clas t ma mult arg ret
     else return NoInstance
       -- 'else' case: qualified types like (Num a => blah) are not typeable
       -- see Note [No Typeable for polytypes or qualified types]
@@ -970,17 +971,18 @@ matchTypeable clas [k,t]  -- clas = Typeable
 
 matchTypeable _ _ = return NoInstance
 
--- | Representation for a type @ty@ of the form @arg -> ret@.
-doFunTy :: Class -> Type -> Mult -> Type -> Type -> TcM ClsInstResult
-doFunTy clas ty mult arg_ty ret_ty
+-- | Build 'Typeable' evidence for an arrow and its metadata.
+doFunTy :: Class -> Type -> Matchability -> Mult -> Type -> Type -> TcM ClsInstResult
+doFunTy clas ty ma mult arg_ty ret_ty
   = return $ OneInst { cir_new_theta   = preds
                      , cir_mk_ev       = mk_ev
                      , cir_canonical   = EvCanonical
                      , cir_what        = BuiltinInstance }
   where
-    preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
-    mk_ev [mult_ev, arg_ev, ret_ev]
-       = evTypeable ty $ EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
+    preds = map (mk_typeable_pred clas) [ma, mult, arg_ty, ret_ty]
+    mk_ev [ma_ev, mult_ev, arg_ev, ret_ev]
+       = evTypeable ty $ EvTypeableTrFun (EvExpr ma_ev) (EvExpr mult_ev)
+                                         (EvExpr arg_ev) (EvExpr ret_ev)
     mk_ev _ = panic "GHC.Tc.Instance.Class.doFunTy"
 
 
@@ -1228,7 +1230,7 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                          -- typically be empty, but if the datatype has a
                          -- "stupid theta" then we have to include it here.
                    ; let tvs   = mkTyVarTys (map snd tv_prs)
-                         theta = mkNomEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
+                         theta = mkNomEqPred sel_ty (mkVisFunTyManyU r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use evUnaryDictAppE to turn it

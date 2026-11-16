@@ -242,10 +242,12 @@ tidyType env (TyConApp tycon tys)   = TyConApp tycon $! tidyTypes env tys
 tidyType env (AppTy fun arg)        = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env (CastTy ty co)         = (CastTy $! tidyType env ty) $! (tidyCo env co)
 tidyType env (CoercionTy co)        = CoercionTy $! (tidyCo env co)
-tidyType env ty@(FunTy _ w arg res) = let { !w'   = tidyType env w
-                                          ; !arg' = tidyType env arg
-                                          ; !res' = tidyType env res }
-                                      in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
+tidyType env ty@(FunTy _ ma w arg res)
+  = let { !ma'  = tidyType env ma
+        ; !w'   = tidyType env w
+        ; !arg' = tidyType env arg
+        ; !res' = tidyType env res }
+    in ty { ft_ma = ma', ft_mult = w', ft_arg = arg', ft_res = res' }
 tidyType env (ty@(ForAllTy{}))      = tidyForAllType env ty
 
 
@@ -349,7 +351,8 @@ tidyCo env co
       where (envp, tvp) = tidyVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r afl afr w co1 co2) = ((FunCo r afl afr $! go w) $! go co1) $! go co2
+    go (FunCo r afl afr ma w co1 co2)
+      = (((FunCo r afl afr $! go ma) $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = CoVarCo $! go_cv cv
     go (HoleCo h)            = HoleCo $! go_hole h
     go (AxiomCo ax cos)      = AxiomCo ax $ strictMap go cos

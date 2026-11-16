@@ -607,7 +607,7 @@ tcRetainedKnownArgPlan expected fun sigma args
   , not (any is_type_arg args)
   , (tvs, _, tau) <- tcRetainedInstTelescope sigma
   , not (null tvs), isRetainedValueType tau
-  , let (domains, result) = splitFunTys tau
+  , let (_mas, domains, result) = splitFunTys tau
         values = [arg | EValArg { ea_arg = arg } <- args]
   , not (null domains), not (null values)
   = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
@@ -1339,12 +1339,12 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
        -- See Note [Representation-polymorphism checks for unsaturated unlifted newtypes]
        -- in GHC.Tc.Utils.Concrete.
        , not $ typeHasFixedRuntimeRep orig_arg_ty
-       = do { (wrap_co, arg_ty, res_ty) <-
+       = do { (wrap_co, ma, arg_ty, res_ty) <-
                   matchActualFunTy (FRRRepPolyUnliftedNewtype dc)
                     (Just $ HsExprTcThing tc_fun)
                     (n_val_args, fun_sigma) fun_ty
              ; let acc' = addArgWrap (mkWpCastN wrap_co) acc
-             ; return (reverse acc', tcMkScaledFunTy arg_ty res_ty) }
+             ; return (reverse acc', tcMkScaledFunTy ma arg_ty res_ty) }
       | otherwise
       = return (reverse acc, fun_ty)
 
@@ -1401,7 +1401,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
         -- It's easier just to do the job directly here.
         do { arg_tys <- zipWithM (new_arg_ty fun_orig) (leadingValArgs args) [pos..]
            ; res_ty  <- newOpenFlexiTyVarTyQL do_ql TauTv
-           ; let fun_ty' = mkScaledFunTys arg_tys res_ty
+           ; let fun_ty' = mkScaledFunTysU arg_tys res_ty
 
            -- Fill in kappa := nu_1 -> .. -> nu_n -> res_nu
            -- NB: kappa is uninstantiated ('go' already checked that)
@@ -1421,7 +1421,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       = do { let herald = mk_herald fun_orig tc_fun (unLoc arg)
-           ; (fun_co, arg_ty, res_ty) <-
+           ; (fun_co, _ma, arg_ty, res_ty) <-
                 -- NB: matchActualFunTy does the rep-poly check.
                 -- For example, suppose we have f :: forall r (a::TYPE r). a -> Int
                 -- In an application (f x), we need 'x' to have a fixed runtime
@@ -1552,7 +1552,7 @@ tcRetainedArg domain arg
     resolve_app env expected fun arg
       = do { fun' <- resolve env expected fun
            ; case splitFunTy_maybe (exprType fun') of
-               Just (_, _, arg_ty, _)
+               Just (_, _, _, arg_ty, _)
                  -> Core.App fun' <$> resolve env arg_ty arg
                _ -> unsupported }
 
@@ -1876,7 +1876,7 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
     constructor_result (Just _ : fields) (DepFunTy _ body)
       = constructor_result fields body
     constructor_result (Just index : fields) ty
-      | FunTy flag mult domain body <- coreFullView ty
+      | FunTy flag _ma mult domain body <- coreFullView ty
       , isVisibleFunArg flag
       , isManyTy mult
       , eqType domain (varType index)
@@ -1898,7 +1898,7 @@ isRetainedValueType = go False
       DepFunTy index body -> isNativeRetainedBinder index
                          && typeKind body `eqType` liftedTypeKind
                          && go True body
-      FunTy flag mult arg res -> isTauTy mult
+      FunTy flag ma mult arg res -> isTauTy ma && isTauTy mult
                               && (isVisibleFunArg flag || under_pi)
                               && go under_pi arg && go under_pi res
       TyConApp tc args
@@ -2212,7 +2212,7 @@ tcRetainedDollarInst (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)
   , [lhs, rhs] <- [arg | EValArg { ea_arg = arg } <- args]
   , (tvs, body) <- tcSplitForAllInvisTyVars sigma
   , not (null tvs)
-  , ([_, domain], result) <- splitFunTys body
+  , (_, [_, domain], result) <- splitFunTys body
   , isTauTy body, not (hasNativeDependentExpr (Core.Type body))
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
        ; result_ty <- if not enabled then return Nothing else
@@ -2456,7 +2456,7 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
         native_worker = hasNativeDependentExpr (Core.Type body)
   , not (null tvs)
   , null theta || hasNoConcreteTyVars fun
-  , let (domains, result) = splitFunTys tau
+  , let (_mas, domains, result) = splitFunTys tau
         arity = length domains
         value_args = [arg | EValArg { ea_arg = arg } <- args]
         overapplied = arity < length value_args
@@ -2708,7 +2708,7 @@ tcRetainedCallbackArgs tvs domains args subst cache
                failWithTc (TcRnRetainedQuantificationError (RetainedCallbackResult result))
            ; unless (isTauTy result) $ setSrcSpanA body_span $
                failWithTc (TcRnRetainedQuantificationError (RetainedInference result))
-           ; let actual = mkVisFunTyMany input result
+           ; let actual = mkVisFunTyManyU input result
                  typed = build (HsLam annotation LamSingle matches')
                  cache' = cache ++ [(pos, (typed, actual, usage))]
                  candidate = case match_type subst output result of
@@ -3955,7 +3955,7 @@ qlArgHasRhoType ty
                Flexi            -> return True }
 
       | Deep {} <- ds_flag
-      , Just (_, res_ty) <- tcSplitFunTy_maybe ty
+      , Just (_, _, res_ty) <- tcSplitFunTy_maybe ty
       = go ds_flag res_ty
 
       | otherwise
@@ -4280,10 +4280,11 @@ qlUnify ty1 ty2
     -- Decompose (arg1 -> res1) ~ (arg2 -> res2)
     -- and         (c1 => res1) ~   (c2 => res2)
     -- But for the latter we only learn instantiation info from res1~res2
-    go' (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = af2, ft_arg = arg2, ft_res = res2 })
+    go' (FunTy { ft_af = af1, ft_ma = ma1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_af = af2, ft_ma = ma2, ft_arg = arg2, ft_res = res2 })
       | af1 == af2 -- Match the arrow TyCon
       = do { traceTc "go_fun" (ppr arg1 $$ ppr arg2)
+           ; go ma1 ma2
            ; when (isVisibleFunArg af1) (go arg1 arg2)
 
         -- NB: we do not unify the multiplicities; that would be too strong.

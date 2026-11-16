@@ -33,7 +33,8 @@ import GHC.Builtin.WiredIn.Prim ( primTyCons )
 import GHC.Builtin.WiredIn.Types
                   ( runtimeRepTyCon
                   , levityTyCon, vecCountTyCon, vecElemTyCon
-                  , nilDataCon, consDataCon )
+                  , nilDataCon, consDataCon
+                  , matchableDataConTy )
 
 import GHC.Types.Basic ( TypeOrConstraint(..) )
 import GHC.Types.InlinePragma ( neverInlinePragma )
@@ -628,7 +629,8 @@ kindIsTypeable (TermVarTy {})       = False
 kindIsTypeable (TermAppTy {})       = False
 kindIsTypeable (DepFunTy {})        = False
 kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
-kindIsTypeable (FunTy _ w a b)      = kindIsTypeable w &&
+kindIsTypeable (FunTy _ ma w a b)   = kindIsTypeable ma &&
+                                      kindIsTypeable w &&
                                       kindIsTypeable a &&
                                       kindIsTypeable b
 kindIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
@@ -661,8 +663,8 @@ builtInKindReps :: [(Kind, KnownOcc)]
 builtInKindReps =
     [ (star,                              mkVarOcc "krepStar")
     , (constraintKind,                    mkVarOcc "krepConstraint")
-    , (mkVisFunTyMany star star,          mkVarOcc "krepStarArr")
-    , (mkVisFunTysMany [star, star] star, mkVarOcc "krepStarArrStarArr")
+    , (mkVisFunTyManyM star star,          mkVarOcc "krepStarArr")
+    , (mkVisFunTysManyM [star, star] star, mkVarOcc "krepStarArrStarArr")
     ]
   where
     star = liftedTypeKind
@@ -790,11 +792,18 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
     new_kind_rep (ForAllTy (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
-    new_kind_rep (FunTy _ _ t1 t2)
+    new_kind_rep ty@(FunTy af ma mult t1 t2)
+      -- See Note [Matchability in reflection] in
+      -- GHC.Internal.Data.Typeable.Internal.
+      | af == FTF_T_T, ma `eqType` matchableDataConTy, isManyTy mult
       = do rep1 <- getKindRep stuff in_scope t1
            rep2 <- getKindRep stuff in_scope t2
            return $ nlHsDataCon kindRepFunDataCon
                     `nlHsApp` rep1 `nlHsApp` rep2
+      | Just (tc, args) <- funTyConAppTy_maybe af ma mult t1 t2
+      = new_kind_rep (TyConApp tc args)
+      | otherwise
+      = pprPanic "mkKindRepRhs: unsupported arrow kind" (ppr ty)
 
     new_kind_rep (LitTy (NumTyLit n))
       = return $ nlHsDataCon kindRepTypeLitSDataCon

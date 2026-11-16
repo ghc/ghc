@@ -408,12 +408,13 @@ opt_co4' opts env sym rep r (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR 
     !(env', tv', k_co') = optForAllCoBndr opts env sym tv k_co
     !(visL', visR') = swapSym sym (visL, visR)
 
-opt_co4' opts env sym rep r (FunCo _r afl afr cow co1 co2)
+opt_co4' opts env sym rep r (FunCo _r afl afr coma cow co1 co2)
   = assert (r == _r) $
-    mkFunCo2 r' afl' afr' cow' co1' co2'
+    mkFunCo2 r' afl' afr' coma' cow' co1' co2'
   where
     co1' = opt_co4 opts env sym rep r co1
     co2' = opt_co4 opts env sym rep r co2
+    coma' = opt_co1 opts env sym coma
     cow' = opt_co1 opts env sym cow
     !r' | rep       = Representational
         | otherwise = r
@@ -660,7 +661,7 @@ mkDeepSymCo = go
     go (AppCo co1 co2)                            = AppCo (go co1) (go co2)
     go (TermAppCo f co)                          = mkTermAppCo f (go co)
     go co@(DepFunCo {})                         = mkSymCo co
-    go (FunCo r afl afr cow co1 co2)              = FunCo r afr afl (go cow) (go co1) (go co2)
+    go (FunCo r afl afr coma cow co1 co2)         = FunCo r afr afl (go coma) (go cow) (go co1) (go co2)
     go (TransCo co1 co2)                          = TransCo (go co2) (go co1)
     go (SelCo cs co)                              = SelCo cs $ go co
     go (LRCo lr co)                               = LRCo lr $ go co
@@ -959,12 +960,12 @@ opt_trans_rule opts is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2
     fireTransRule "PushTyConApp" in_co1 in_co2 $
     mkTyConAppCo r1 tc1 (opt_transList opts is cos1 cos2)
 
-opt_trans_rule opts is in_co1@(FunCo r1 afl1 afr1 w1 co1a co1b)
-                  in_co2@(FunCo r2 afl2 afr2 w2 co2a co2b)
+opt_trans_rule opts is in_co1@(FunCo r1 afl1 afr1 ma1 w1 co1a co1b)
+                  in_co2@(FunCo r2 afl2 afr2 ma2 w2 co2a co2b)
   = assert (r1 == r2)     $     -- Just like the TyConAppCo/TyConAppCo case
     assert (afr1 == afl2) $
     fireTransRule "PushFun" in_co1 in_co2 $
-    mkFunCo2 r1 afl1 afr2 (opt_trans opts is w1 w2)
+    mkFunCo2 r1 afl1 afr2 (opt_trans opts is ma1 ma2) (opt_trans opts is w1 w2)
                           (opt_trans opts is co1a co2a)
                           (opt_trans opts is co1b co2b)
 
@@ -1626,8 +1627,10 @@ etaAppCo_maybe co
   | Just (co1,co2) <- splitAppCo_maybe co
   = Just (co1,co2)
   | (Pair ty1 ty2, Nominal) <- coercionKindRole co
-  , Just (_,t1) <- splitAppTy_maybe ty1
-  , Just (_,t2) <- splitAppTy_maybe ty2
+  , Just (f1,t1) <- splitAppTy_maybe ty1
+  , isMatchableFunTy (typeKind f1)
+  , Just (f2,t2) <- splitAppTy_maybe ty2
+  , isMatchableFunTy (typeKind f2)
   , let isco1 = isCoercionTy t1
   , let isco2 = isCoercionTy t2
   , isco1 == isco2

@@ -1178,7 +1178,10 @@ ignoreTyCon env tycon
 forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTyCoVars . varType $ var
 
 forceSpecFunTy :: ScEnv -> Type -> Bool
-forceSpecFunTy env = any (forceSpecArgTy env) . map scaledThing . fst . splitFunTys
+forceSpecFunTy env ty
+  = any (forceSpecArgTy env . scaledThing) args
+  where
+    (_, args, _) = splitFunTys ty
 
 forceSpecArgTy :: ScEnv -> Type -> Bool
 forceSpecArgTy env ty
@@ -2685,7 +2688,8 @@ argsToPats env in_scope val_env = go
            ; pats <- go (applyTypeToArgs fun_ty [sndOf3 pat]) args occs strs'
            ; return (pat : pats) }
       where
-        arg_ty = piTyBinderType (fst (splitPiTy fun_ty))
+        (_, arg_bndr, _) = splitPiTy fun_ty
+        arg_ty = piTyBinderType arg_bndr
 
 -- | 'argToPat' takes an actual argument, and returns an abstracted
 -- version, consisting of just the "constructor skeleton" of the

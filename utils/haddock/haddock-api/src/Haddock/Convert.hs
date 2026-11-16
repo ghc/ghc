@@ -33,10 +33,12 @@ import Data.Maybe (catMaybes, mapMaybe)
 import GHC.Builtin.KnownKeys
   ( boxedRepDataConKey
   , eqTyConKey
+  , fUNTyConKey
   , hasKey
   , ipClassKey
   , liftedDataConKey
   , tYPETyConKey
+  , unrestrictedFunTyConKey
   )
 import GHC.Builtin.WiredIn.Types
   ( eqTyConName
@@ -45,16 +47,17 @@ import GHC.Builtin.WiredIn.Types
   , promotedConsDataCon
   , promotedNilDataCon
   , unitTy
+  , unmatchableDataConTy
   )
 
-import GHC.Builtin.WiredIn.Prim (alphaTyVars)
+import GHC.Builtin.WiredIn.Prim (alphaTyVars, fUNTyConName)
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
 import GHC.Core.PatSyn
-import GHC.Core.TyCo.Compare (eqTypes)
+import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -301,7 +304,7 @@ synifyTyCon prr _coax tc
                          then HsBndrNoKind noExtField
                          else HsBndrKind noExtField (synifyKindSig realKind) }
     conKind = defaultType prr (tyConKind tc)
-    tyVarKinds = fst . splitFunTys . snd . splitInvisPiTys $ conKind
+    tyVarKinds = let (_, kinds, _) = splitFunTys (snd (splitInvisPiTys conKind)) in kinds
 synifyTyCon _prr _coax tc
   | Just flav <- famTyConFlav_maybe tc =
       case flav of
@@ -759,7 +762,9 @@ tyConArgsPolyKinded tc =
     tc_vis_tvs = tyConVisibleTyVars tc
 
     tc_res_kind_vis_bndrs :: [PiTyBinder]
-    tc_res_kind_vis_bndrs = filter isVisiblePiTyBinder $ fst $ splitPiTys $ tyConResKind tc
+    tc_res_kind_vis_bndrs =
+      let (_, binders, _) = splitPiTys (tyConResKind tc)
+       in filter isVisiblePiTyBinder binders
 
 -- states of what to do with foralls:
 data SynifyTypeState
@@ -797,6 +802,21 @@ defaultType :: PrintRuntimeReps -> Type -> Type
 defaultType ShowRuntimeRep = id
 defaultType HideRuntimeRep = defaultRuntimeRepVars
 
+{- Note [Arrow matchability in Haddock]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The source HsFunTy node has no matchability field. Keep ordinary U arrows in
+arrow notation. Print other metadata as FUN @ma mult arg res. The explicit
+application retains metadata variables and computations without changing the
+runtime argument list. HIE recovery uses IfaceFunTy, which stores metadata.
+Partial FUN and (->) applications remain TyConApps. Preserve their leading
+specified metadata with HsAppKindTy before filtering invisible arguments.
+See Note [Printing partial arrow matchability] in GHC.Iface.Type.
+
+Include metadata in type-name collection and runtime-representation defaulting.
+Instance sorting keeps its existing argument and result keys before metadata.
+This distinguishes arrows with the same endpoints and different metadata.
+-}
+
 -- | Convert a core type into an 'HsType'.
 synifyType
   :: SynifyTypeState
@@ -814,6 +834,14 @@ synifyType _ boundTvs (TyConApp tc tys) =
   where
     res_ty :: LHsType GhcRn
     res_ty
+      -- See Note [Arrow matchability in Haddock].
+      | tc `hasKey` fUNTyConKey || tc `hasKey` unrestrictedFunTyConKey
+      , ma : _ <- tys =
+          foldl (\f a -> noLocA $ HsAppTy noExtField f a)
+            (noLocA $ HsAppKindTy noExtField
+              (noLocA $ HsTyVar noAnn NotPromoted (noLocA $ noUserRdr $ getName tc))
+              (synifyType WithinType boundTvs ma))
+            (map (synifyType WithinType boundTvs) vis_tys)
       -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
       | tc `hasKey` tYPETyConKey
       , [TyConApp rep [TyConApp lev []]] <- tys
@@ -917,9 +945,15 @@ synifyType _ boundTvs ty@(AppTy{}) =
             ty_args
    in
     foldl (\t1 t2 -> noLocA $ HsAppTy noExtField t1 t2) ty_head' ty_args'
-synifyType s boundTvs funty@(FunTy af w t1 t2)
+synifyType s boundTvs funty@(FunTy af ma w t1 t2)
   | isInvisibleFunArg af = synifySigmaType s boundTvs funty
-  | otherwise = noLocA $ HsFunTy noExtField w' s1 s2
+  | ma `eqType` unmatchableDataConTy = noLocA $ HsFunTy noExtField w' s1 s2
+  -- See Note [Arrow matchability in Haddock].
+  | otherwise = foldl (\f a -> noLocA $ HsAppTy noExtField f a)
+      (noLocA $ HsAppKindTy noExtField
+        (noLocA $ HsTyVar noAnn NotPromoted (noLocA $ noUserRdr fUNTyConName))
+        (synifyType WithinType boundTvs ma))
+      [synifyType WithinType boundTvs w, s1, s2]
   where
     s1 = synifyType WithinType boundTvs t1
     s2 = synifyType WithinType boundTvs t2
@@ -1070,7 +1104,7 @@ noKindSigTyVars ty
   -- i-th argument of the kind of 'T' is monomorphic, then the kind of 'tv'
   -- is fully determined by its occurrence in the TyConApp.
   | Just (tc, args) <- splitTyConApp_maybe ty
-  , let (tcArgBndrs, _tcResKi) = splitPiTys (tyConKind tc)
+  , let (_, tcArgBndrs, _tcResKi) = splitPiTys (tyConKind tc)
         tcArgKis = map (\case { Named (Bndr b _) -> tyVarKind b; Anon (Scaled _ t) _ -> t}) tcArgBndrs
   = mono_tvs tcArgKis args `unionVarSet` (mapUnionVarSet noKindSigTyVars args)
   -- If we have 'f ty_1 ... ty_n' where 'f :: ki_1 -> ... -> ki_n -> Type'
@@ -1080,7 +1114,7 @@ noKindSigTyVars ty
   -- with type signatures such as '(a -> b) -> (f a -> f b)'.
   | (TyVarTy fun, args) <- splitAppTys ty
   , not (null args)
-  , (funArgKinds, funResKind) <- splitFunTys (tyVarKind fun)
+  , (_, funArgKinds, funResKind) <- splitFunTys (tyVarKind fun)
   , map scaledThing funArgKinds `eqTypes` map typeKind args
   , isLiftedTypeKind funResKind
   = ( `extendVarSet` fun ) $ mapUnionVarSet noKindSigTyVars args
@@ -1167,7 +1201,7 @@ Remarks:
             prov_theta
             (synifyType WithinType)
         )
-        (mkScaledFunTys arg_tys res_ty)
+        (mkScaledFunTysU arg_tys res_ty)
 
 synifyTyLit :: TyLit -> HsLit GhcRn
 synifyTyLit (NumTyLit n) = HsNatural noExtField (mkIntegralLit n)
@@ -1321,6 +1355,6 @@ tcSplitPhiTyPreserveSynonyms ty0 = split ty0 []
 
 -- | See Note [Invariant: Never expand type synonyms]
 tcSplitPredFunTyPreserveSynonyms_maybe :: Type -> Maybe (PredType, Type)
-tcSplitPredFunTyPreserveSynonyms_maybe (FunTy af _ arg res)
+tcSplitPredFunTyPreserveSynonyms_maybe (FunTy af _ _ arg res)
   | isInvisibleFunArg af = Just (arg, res)
 tcSplitPredFunTyPreserveSynonyms_maybe _ = Nothing

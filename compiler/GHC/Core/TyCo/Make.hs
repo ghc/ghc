@@ -18,8 +18,11 @@ module GHC.Core.TyCo.Make (
     -- FunTy
     , mkFunTy, mkVisFunTy
     , mkVisFunTyMany, mkVisFunTysMany
+    , mkVisFunTyManyM, mkVisFunTyManyU, mkVisFunTysManyM, mkVisFunTysManyU
     , mkScaledFunTys, mkInvisFunTy, mkInvisFunTys
+    , mkScaledFunTysM, mkScaledFunTysU
     , tcMkVisFunTy, tcMkScaledFunTys, tcMkInvisFunTy
+    , tcMkScaledFunTysM, tcMkScaledFunTysU
 
     -- TyConApp
     , mkTyConApp, mkTyConTy
@@ -97,7 +100,7 @@ import {-# SOURCE #-} GHC.Core.Type
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( liftedTypeKind, unliftedTypeKind
    , constraintKind, zeroBitTypeKind
-   , manyDataConTy, liftedRepTy, unliftedRepTy, zeroBitRepTy
+   , manyDataConTy, unmatchableDataConTy, liftedRepTy, unliftedRepTy, zeroBitRepTy
    )
 
 import GHC.Core.TyCon
@@ -245,12 +248,12 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_ty (CastTy ty co)  = mkCastTy <$> go_ty ty <*> go_co co
     go_ty (CoercionTy co) = CoercionTy <$> go_co co
 
-    go_ty ty@(FunTy _ w arg res)
-      = do { arg' <- go_ty arg; w' <- go_ty w; res' <- go_ty res
+    go_ty ty@(FunTy _ ma w arg res)
+      = do { ma' <- go_ty ma; arg' <- go_ty arg; w' <- go_ty w; res' <- go_ty res
              -- As per #23764, ordering is [arg, w, res]
              -- Probably doesn't matter for mapping,
              -- but it seems sensible to be consistend with foldTyCo
-           ; return (ty { ft_mult = w', ft_arg = arg', ft_res = res' }) }
+           ; return (ty { ft_ma = ma', ft_mult = w', ft_arg = arg', ft_res = res' }) }
 
     go_ty ty@(TyConApp tc tys)
       = do { tys' <- go_tys tys; tcapp_ty ty tc tys' }
@@ -275,8 +278,8 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_co (DepFunCo b domain co)     = do { domain' <- go_mco domain
                                          ; termbinder b $ \b' ->
                                            mkDepFunCoWithDomain b' domain' <$> go_co co }
-    go_co (FunCo r afl afr cw c1 c2) = mkFunCo2 r afl afr <$> go_co cw
-                                       <*> go_co c1 <*> go_co c2
+    go_co (FunCo r afl afr cm cw c1 c2) = mkFunCo2 r afl afr <$> go_co cm <*> go_co cw
+                                          <*> go_co c1 <*> go_co c2
     go_co (CoVarCo cv)               = covar cv
     go_co (HoleCo hole)              = cohole hole
     go_co (UnivCo { uco_prov = p, uco_role = r
@@ -518,26 +521,27 @@ mkTyConApp tycon tys@(ty1:rest)
 tyConAppFunTy_maybe :: HasDebugCallStack => TyCon -> [Type] -> Maybe Type
 -- ^ Return Just if this TyConApp should be represented as a FunTy
 tyConAppFunTy_maybe tc tys
-  | Just (af, mult, arg, res) <- ty_con_app_fun_maybe manyDataConTy tc tys
-  = Just (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
+  | Just (af, ma, mult, arg, res) <- ty_con_app_fun_maybe unmatchableDataConTy manyDataConTy tc tys
+  = Just (FunTy { ft_af = af, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res })
   | otherwise = Nothing
 
 tyConAppFunCo_maybe :: HasDebugCallStack => Role -> TyCon -> [Coercion]
                     -> Maybe Coercion
 -- ^ Return Just if this TyConAppCo should be represented as a FunCo
 tyConAppFunCo_maybe r tc cos
-  | Just (af, mult, arg, res) <- ty_con_app_fun_maybe mult_refl tc cos
-  = Just (mkFunCo r af mult arg res)
+  | Just (af, ma, mult, arg, res) <- ty_con_app_fun_maybe ma_refl mult_refl tc cos
+  = Just (mkFunCo r af ma mult arg res)
   | otherwise
   = Nothing
   where
+    ma_refl = mkReflCo (funRole r SelMatch) unmatchableDataConTy
     mult_refl = mkReflCo (funRole r SelMult) manyDataConTy
 
-ty_con_app_fun_maybe :: (HasDebugCallStack, Outputable a) => a -> TyCon -> [a]
-                     -> Maybe (FunTyFlag, a, a, a)
+ty_con_app_fun_maybe :: (HasDebugCallStack, Outputable a) => a -> a -> TyCon -> [a]
+                     -> Maybe (FunTyFlag, a, a, a, a)
 {-# INLINE ty_con_app_fun_maybe #-}
 -- Specialise this function for its two call sites
-ty_con_app_fun_maybe many_ty_co tc args
+ty_con_app_fun_maybe unmatchable_ty_co many_ty_co tc args
   | tc_uniq == fUNTyConKey     = fUN_case
   | tc_uniq == tcArrowTyConKey = non_FUN_case FTF_T_C
   | tc_uniq == ctArrowTyConKey = non_FUN_case FTF_C_T
@@ -549,9 +553,9 @@ ty_con_app_fun_maybe many_ty_co tc args
     -- There is a multiplicity argument, `w`
     -- See Note [Function type constructors and FunTy]
     fUN_case
-      | (w:_r1:_r2:a1:a2:rest) <- args
+      | (ma:w:_r1:_r2:a1:a2:rest) <- args
       = assertPpr (null rest) (ppr tc <+> ppr args) $
-        Just (FTF_T_T, w, a1, a2)
+        Just (FTF_T_T, ma, w, a1, a2)
       | otherwise = Nothing
 
     -- No multiplicity argument
@@ -559,7 +563,7 @@ ty_con_app_fun_maybe many_ty_co tc args
     non_FUN_case ftf
       | (_r1:_r2:a1:a2:rest) <- args
       = assertPpr (null rest) (ppr tc <+> ppr args) $
-        Just (ftf, many_ty_co, a1, a2)
+        Just (ftf, unmatchable_ty_co, many_ty_co, a1, a2)
       | otherwise
       = Nothing
 
@@ -685,7 +689,7 @@ mkTyCoForAllTy tv vis ty
   , not (tv `elemVarSet` tyCoVarsOfType ty)
    -- Maintain ForAllTy's invariants
     -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
-  = mkVisFunTyMany (varType tv) ty
+  = mkVisFunTyManyU (varType tv) ty
   | otherwise
   = ForAllTy (mkForAllTyBinder vis tv) ty
 
@@ -813,28 +817,29 @@ mkNomReflCo = Refl
 -- or @(a => x) ~ (b => y)@, depending on the kind of @a@/@b@.
 -- This (most common) version takes a single FunTyFlag, which is used
 --   for both fco_afl and ftf_afr of the FunCo
-mkFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
-mkFunCo r af w arg_co res_co
-  = mkFunCo2 r af af w arg_co res_co
+mkFunCo :: Role -> FunTyFlag -> Coercion -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCo r af ma w arg_co res_co
+  = mkFunCo2 r af af ma w arg_co res_co
 
-mkNakedFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
+mkNakedFunCo :: Role -> FunTyFlag -> Coercion -> CoercionN -> Coercion -> Coercion -> Coercion
 -- This version of mkFunCo does not check FunCo invariants (checkFunCo)
 -- It's a historical vestige; See Note [No assertion check on mkFunCo]
 mkNakedFunCo = mkFunCo
 
 mkFunCo2 :: Role -> FunTyFlag -> FunTyFlag
-         -> CoercionN -> Coercion -> Coercion -> Coercion
+         -> Coercion -> CoercionN -> Coercion -> Coercion -> Coercion
 -- This is the smart constructor for FunCo; it checks invariants
-mkFunCo2 r afl afr w arg_co res_co
+mkFunCo2 r afl afr ma w arg_co res_co
   -- See Note [No assertion check on mkFunCo]
-  | Just (ty1, _) <- isReflCo_maybe arg_co
+  | Just (ma_ty, _) <- isReflCo_maybe ma
+  , Just (ty1, _) <- isReflCo_maybe arg_co
   , Just (ty2, _) <- isReflCo_maybe res_co
   , Just (w, _)   <- isReflCo_maybe w
-  = mkReflCo r (mkFunTy afl w ty1 ty2)  -- See Note [Refl invariant]
+  = mkReflCo r (mkFunTy afl ma_ty w ty1 ty2)  -- See Note [Refl invariant]
 
   | otherwise
   = FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
-          , fco_mult = w, fco_arg = arg_co, fco_res = res_co }
+          , fco_ma = ma, fco_mult = w, fco_arg = arg_co, fco_res = res_co }
 
 
 {- Note [No assertion check on mkFunCo]
@@ -1242,6 +1247,7 @@ funRole Phantom          _  = Phantom
 funRole Representational fs = funRoleRepresentational fs
 
 funRoleRepresentational :: FunSel -> Role
+funRoleRepresentational SelMatch = Nominal
 funRoleRepresentational SelMult = Nominal
 funRoleRepresentational SelArg  = Representational
 funRoleRepresentational SelRes  = Representational

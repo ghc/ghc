@@ -208,7 +208,8 @@ scanType (DepFunTy _ _) = NativeScan (pure True)
 scanType (LitTy _) = mempty
 scanType (TyConApp tc args) = foldMap scanType args <> scanSynonym tc
 scanType (AppTy fun arg) = scanType fun <> scanType arg
-scanType (FunTy _ mult arg res) = scanType arg <> scanType mult <> scanType res
+scanType (FunTy _ ma mult arg res) =
+    scanType ma <> scanType arg <> scanType mult <> scanType res
 scanType (ForAllTy (Bndr var _) body) = scanType (varType var) <> scanType body
 scanType (CastTy ty co) = scanType ty <> scanCo co
 scanType (CoercionTy co) = scanCo co
@@ -233,8 +234,8 @@ scanCo (KindCo co) = scanCo co
 scanCo (SubCo co) = scanCo co
 scanCo (UnivCo{uco_lty = left, uco_rty = right, uco_deps = deps}) =
     scanType left <> scanType right <> scanDeps deps
-scanCo (FunCo{fco_mult = mult, fco_arg = arg, fco_res = res}) =
-    scanCo mult <> scanCo arg <> scanCo res
+scanCo (FunCo{fco_ma = ma, fco_mult = mult, fco_arg = arg, fco_res = res}) =
+    scanCo ma <> scanCo mult <> scanCo arg <> scanCo res
 scanCo (ForAllCo{fco_tcv = var, fco_kind = kind, fco_body = body}) =
     scanMCo kind <> scanType (varType var) <> scanCo body
 

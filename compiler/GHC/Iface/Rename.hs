@@ -897,7 +897,7 @@ rnIfaceMCo (IfaceMCo co) = IfaceMCo <$> rnIfaceCo co
 rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty
 rnIfaceCo (IfaceGReflCo role ty mco)    = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
-rnIfaceCo (IfaceFunCo role w co1 co2)   = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceFunCo role ma w co1 co2) = IfaceFunCo role <$> rnIfaceCo ma <*> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTermAppCo fun co) = IfaceTermAppCo fun <$> rnIfaceCo co
 rnIfaceCo (IfaceDepFunCo bndr domain co)
     = IfaceDepFunCo <$> rnIfaceIdBndr bndr <*> rnIfaceMCo domain <*> rnIfaceCo co
@@ -949,8 +949,8 @@ rnIfaceType (IfaceDepFunTy bndr body)
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceAppArgs t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)
-rnIfaceType (IfaceFunTy af w t1 t2)
-    = IfaceFunTy af <$> rnIfaceType w <*> rnIfaceType t1 <*> rnIfaceType t2
+rnIfaceType (IfaceFunTy af ma w t1 t2)
+    = IfaceFunTy af <$> rnIfaceType ma <*> rnIfaceType w <*> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceType (IfaceTupleTy s i tks)
     = IfaceTupleTy s i <$> rnIfaceAppArgs tks
 rnIfaceType (IfaceTyConApp tc tks)

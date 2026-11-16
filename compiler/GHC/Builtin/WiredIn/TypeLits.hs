@@ -35,7 +35,7 @@ import GHC.Core.Unify      ( tcMatchTys )
 import GHC.Data.Pair
 import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon, tyConArity
                          , Injectivity(..), builtInClosedTyFamTyCon_maybe
-                         , mkTyConKind )
+                         , mkTyConKindWithMatchability )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Compare   ( tcEqType )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
@@ -670,7 +670,7 @@ axLogRewrites
 
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon
-  = mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
+  = mkFamilyTyCon name (mkTyConKindWithMatchability unmatchableDataConTy bndrs orderingKind)
       bndrs 0
       orderingKind
       Nothing
@@ -705,7 +705,7 @@ axCmpNatInjectivity
 
 typeSymbolCmpTyCon :: TyCon
 typeSymbolCmpTyCon =
-  mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
+  mkFamilyTyCon name (mkTyConKindWithMatchability unmatchableDataConTy bndrs orderingKind)
     bndrs 0
     orderingKind
     Nothing
@@ -790,7 +790,7 @@ axAppendInjectivity
 
 typeConsSymbolTyCon :: TyCon
 typeConsSymbolTyCon =
-  mkFamilyTyCon name (mkTyConKind bndrs typeSymbolKind)
+  mkFamilyTyCon name (mkTyConKindWithMatchability unmatchableDataConTy bndrs typeSymbolKind)
     bndrs 0
     typeSymbolKind
     Nothing
@@ -834,7 +834,7 @@ axConsInjectivity
 
 typeUnconsSymbolTyCon :: TyCon
 typeUnconsSymbolTyCon =
-  mkFamilyTyCon name (mkTyConKind bndrs res_kind)
+  mkFamilyTyCon name (mkTyConKindWithMatchability unmatchableDataConTy bndrs res_kind)
     bndrs 0
     res_kind
     Nothing
@@ -888,7 +888,7 @@ axUnconsInjectivity
 
 typeCharToNatTyCon :: TyCon
 typeCharToNatTyCon =
-  mkFamilyTyCon name (mkTyConKind bndrs naturalTy)
+  mkFamilyTyCon name (mkTyConKindWithMatchability unmatchableDataConTy bndrs naturalTy)
     bndrs 0
     naturalTy
     Nothing
@@ -921,7 +921,7 @@ axCharToNatInjectivity
 
 typeNatToCharTyCon :: TyCon
 typeNatToCharTyCon =
-  mkFamilyTyCon name (mkTyConKind bndrs charTy)
+  mkFamilyTyCon name (mkTyConKindWithMatchability unmatchableDataConTy bndrs charTy)
     bndrs 0
     charTy
     Nothing
@@ -955,7 +955,7 @@ axNatToCharInjectivity
 
 typeCharCmpTyCon :: TyCon
 typeCharCmpTyCon =
-  mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
+  mkFamilyTyCon name (mkTyConKindWithMatchability unmatchableDataConTy bndrs orderingKind)
     bndrs 0
     orderingKind
     Nothing
@@ -1067,7 +1067,7 @@ isOrderingLitTy tc =
 -- Make a unary built-in constructor of kind: Nat -> Nat
 mkTypeNatFunTyCon1 :: Name -> BuiltinClosedTyFam -> TyCon
 mkTypeNatFunTyCon1 op tcb =
-  mkFamilyTyCon op (mkTyConKind bndrs naturalTy)
+  mkFamilyTyCon op (mkTyConKindWithMatchability unmatchableDataConTy bndrs naturalTy)
     bndrs 0
     naturalTy
     Nothing
@@ -1080,7 +1080,7 @@ mkTypeNatFunTyCon1 op tcb =
 -- Make a binary built-in constructor of kind: Nat -> Nat -> Nat
 mkTypeNatFunTyCon2 :: Name -> BuiltinClosedTyFam -> TyCon
 mkTypeNatFunTyCon2 op tcb =
-  mkFamilyTyCon op (mkTyConKind bndrs naturalTy)
+  mkFamilyTyCon op (mkTyConKindWithMatchability unmatchableDataConTy bndrs naturalTy)
     bndrs 0
     naturalTy
     Nothing
@@ -1093,7 +1093,7 @@ mkTypeNatFunTyCon2 op tcb =
 -- Make a binary built-in constructor of kind: Symbol -> Symbol -> Symbol
 mkTypeSymbolFunTyCon2 :: Name -> BuiltinClosedTyFam -> TyCon
 mkTypeSymbolFunTyCon2 op tcb =
-  mkFamilyTyCon op (mkTyConKind bndrs typeSymbolKind)
+  mkFamilyTyCon op (mkTyConKindWithMatchability unmatchableDataConTy bndrs typeSymbolKind)
     bndrs 0
     typeSymbolKind
     Nothing

@@ -1683,8 +1683,9 @@ tcIfaceDomainShape (IfaceTyConApp tc IA_Nil)
   = NativeTyConDomain <$> forkM (text "Native domain shape") (tcIfaceTyCon tc)
 tcIfaceDomainShape (IfaceTupleTy BoxedTuple NotPromoted IA_Nil)
   = return (NativeTyConDomain unitTyCon)
-tcIfaceDomainShape (IfaceFunTy FTF_T_T mult arg res)
-  = NativeFunctionDomain <$> tcIfaceDomainShape mult
+tcIfaceDomainShape (IfaceFunTy FTF_T_T ma mult arg res)
+  = NativeFunctionDomain <$> tcIfaceDomainShape ma
+                         <*> tcIfaceDomainShape mult
                          <*> tcIfaceDomainShape arg <*> tcIfaceDomainShape res
 tcIfaceDomainShape IfaceDepFunTy{} = return NativePiDomain
 tcIfaceDomainShape IfaceForAllTy{} = return NativeInvalidDomain
@@ -1693,15 +1694,16 @@ tcIfaceDomainShape _ = return NativeUnknownDomain
 
 -- | Select the existing eligibility policy for a shape precheck.
 data NativeDomainUse = NativeScalarUse | NativeFunctionUse | NativeRetainedUse
-                     | NativeFieldMultUse | NativeManyMultUse
+                     | NativeFieldMultUse | NativeManyMultUse | NativeUnmatchableUse
   deriving Eq
 
 -- | Project an available Type head without expanding synonyms.
 -- See Note [Checking native domain shapes].
 nativeTypeDomainShape :: Type -> NativeDomainShape
 nativeTypeDomainShape (TyConApp tc []) = NativeTyConDomain tc
-nativeTypeDomainShape (FunTy FTF_T_T mult arg res)
-  = NativeFunctionDomain (nativeTypeDomainShape mult)
+nativeTypeDomainShape (FunTy FTF_T_T ma mult arg res)
+  = NativeFunctionDomain (nativeTypeDomainShape ma)
+                         (nativeTypeDomainShape mult)
                          (nativeTypeDomainShape arg) (nativeTypeDomainShape res)
 nativeTypeDomainShape FunTy{} = NativeInvalidDomain
 nativeTypeDomainShape DepFunTy{} = NativePiDomain
@@ -1716,6 +1718,8 @@ nativeDomainShapePossible NativeRetainedUse shape
 nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
   where
     go seen aliases mode (NativeTyConDomain tc)
+      | mode == NativeUnmatchableUse, tc == unmatchableDataConTyCon = True
+      | mode == NativeUnmatchableUse, tc == matchableDataConTyCon = False
       | mode == NativeFieldMultUse || mode == NativeManyMultUse
       , tc == manyDataConTyCon = True
       | mode == NativeFieldMultUse, tc == oneDataConTyCon = True
@@ -1739,8 +1743,9 @@ nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
       where
         field (mult, ty) = go seen emptyTyConSet NativeFieldMultUse mult
                        && go seen emptyTyConSet NativeScalarUse ty
-    go seen aliases mode (NativeFunctionDomain mult arg res)
+    go seen aliases mode (NativeFunctionDomain ma mult arg res)
       = mode == NativeFunctionUse
+        && go seen aliases NativeUnmatchableUse ma
         && go seen aliases NativeManyMultUse mult
         && go seen aliases NativeScalarUse arg
         && go seen aliases NativeScalarUse res
@@ -1781,7 +1786,8 @@ precheck alone would reach an alias-only cycle after that expansion had begun.
 Keep the Id precheck and the typed checks after allocation as well.
 
 Fields permit One or Many. Function arrows and retained binders require Many.
-Resolve those multiplicities by wired TyCon identity, including nullary aliases.
+Function arrows require U matchability. Resolve metadata by wired TyCon
+identity, including nullary aliases.
 A raw Pi is not scalar, but its function shape is unknown: mkDepFunTy converts
 a vacuous Pi to an ordinary arrow. Applied synonyms and casts also remain
 unknown. The precheck must not reject their possible normalization results.
@@ -1869,7 +1875,7 @@ tcIfaceType = go
                         $$ text "Actual kind:" <+> ppr (typeKind body'))
            ; return (mkDepFunTy v body') } }
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
+    go (IfaceFunTy flag ma w t1 t2) = FunTy flag <$> go ma <*> go w <*> go t1 <*> go t2
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t
@@ -2002,7 +2008,7 @@ tcIfaceCo = go
 
     go (IfaceReflCo t)           = Refl <$> tcIfaceType t
     go (IfaceGReflCo r t mco)    = GRefl r <$> tcIfaceType t <*> go_mco mco
-    go (IfaceFunCo r w c1 c2)    = mkFunCoNoFTF r <$> go w <*> go c1 <*> go c2
+    go (IfaceFunCo r ma w c1 c2) = mkFunCoNoFTF r <$> go ma <*> go w <*> go c1 <*> go c2
     go (IfaceDepFunCo {})
       = failIfM (text "Native dependent coercion interfaces are not implemented.")
     go (IfaceTermAppCo {})

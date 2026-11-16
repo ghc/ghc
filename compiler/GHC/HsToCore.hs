@@ -803,7 +803,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
              ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                                   , openAlphaTyVar, openBetaTyVar ] $
-                  mkVisFunTyMany openAlphaTy openBetaTy
+                  mkVisFunTyManyU openAlphaTy openBetaTy
 
              arity = 1
 

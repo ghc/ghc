@@ -76,6 +76,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Tickish
 
+import GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
 import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.Uniques
 
@@ -186,6 +187,21 @@ When we come to an application we check that the arg is trivial.
 ********************************************************************* -}
 
 
+{- Note [Ordinary arrow metadata and eta]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary runtime lambda has U matchability. Eta expansion can introduce
+that lambda only when the consumed arrow has U. typeOneShots and mkEtaWW use
+the same condition so that typeArity does not promise unsupported expansion.
+Join-point eta expansion and eta reduction use this condition as well.
+
+Pushing a cast through a lambda must retain its U result classification.
+Both lambda-pushing paths require reflexive matchability evidence before
+they remove an outer arrow coercion. Applying a function consumes the arrow
+instead, so pushCoValArg can project argument and result evidence at any
+matchability. This uses structural arrow decomposition, not inverse
+application equality.
+-}
+
 typeArity :: Type -> Arity
 -- ^ (typeArity ty) says how many arrows GHC can expose in 'ty', after
 -- looking through newtypes.  More generally, (typeOneShots ty) returns
@@ -206,7 +222,8 @@ typeOneShots ty
         then idOneShotInfo tcv : go rec_nts ty'
         else go rec_nts ty'
 
-      | Just (_,_,arg,res) <- splitFunTy_maybe ty
+      | Just (_,ma,_,arg,res) <- splitFunTy_maybe ty
+      , ma `eqType` unmatchableDataConTy
       = typeOneShot arg : go rec_nts res
 
       | DepFunTy _ res <- coreFullView ty
@@ -2339,7 +2356,9 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
          -- Later argument types must use this eta binder's identity.
 
        ----------- Function types  (t1 -> t2)
-       | Just (_af, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+       -- See Note [Ordinary arrow metadata and eta].
+       | Just (_af, ma, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+       , Type.substTyUnchecked subst ma `eqType` unmatchableDataConTy
        , typeHasFixedRuntimeRep arg_ty
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- See also test case typecheck/should_run/EtaExpandLevPoly
@@ -2823,7 +2842,8 @@ tryEtaReduce rec_ids bndrs body eval_sd
            -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
                                --   (and similarly for tyvars, coercion args)
                     , [CoreTickish])
-    -- See Note [Eta reduction with casted arguments]
+    -- See Note [Eta reduction with casted arguments].
+    -- See Note [Ordinary arrow metadata and eta].
     ok_arg bndr (Type arg_ty) co fun_ty
        | Just tv <- getTyVar_maybe arg_ty
        , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
@@ -2839,15 +2859,17 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let mult = idMult bndr
-       , Just (_af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_af, ma, fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , ma `eqType` unmatchableDataConTy
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
        = Just (mkFunResCo Representational bndr co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_, ma, fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , ma `eqType` unmatchableDataConTy
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       = Just (mkFunCoNoFTF Representational (mkNomReflCo ma) (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty
@@ -3037,7 +3059,7 @@ pushCoValArg co
   | isFunTy tyL, isFunTy tyR
   -- A retained coercion can have only one ordinary function endpoint.
   -- Keep that cast intact; SelFun does not project retained functions.
-  , (_, co1, co2) <- decomposeFunCo co
+  , (_, _, co1, co2) <- decomposeFunCo co
       -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
       -- then co1 :: tyL1 ~ tyR1
       --      co2 :: tyL2 ~ tyR2
@@ -3075,12 +3097,16 @@ pushCoercionIntoLambda
 --    (\x. e) |> co
 -- ===>
 --    (\x'. e |> co')
+-- See Note [Ordinary arrow metadata and eta].
 pushCoercionIntoLambda in_scope x e co
     | assert (not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
-    , Just {}              <- splitFunTy_maybe s1s2
-    , Just (_, w1, t1,_t2) <- splitFunTy_maybe t1t2
-    , (_, co1, co2)  <- decomposeFunCo co
+    , Just (_, maL, _, _, _) <- splitFunTy_maybe s1s2
+    , Just (_, maR, w1, t1,_t2) <- splitFunTy_maybe t1t2
+    , maL `eqType` unmatchableDataConTy
+    , maR `eqType` unmatchableDataConTy
+    , (co_ma, _, co1, co2) <- decomposeFunCo co
+    , isReflCo co_ma
     , typeHasFixedRuntimeRep t1
       -- We can't push the coercion into the lambda if it would create
       -- a representation-polymorphic binder.
@@ -3246,7 +3272,8 @@ collectBindersPushingCo e
       , let Pair tyL tyR = coercionKind co
       , isFunTy tyL, isFunTy tyR
       -- Retained function casts must keep their scoped runtime binder.
-      , (co_mult, co_arg, co_res) <- decomposeFunCo co
+      , (co_ma, co_mult, co_arg, co_res) <- decomposeFunCo co
+      , isReflCo co_ma   -- See Note [Ordinary arrow metadata and eta].
       , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e co_res
@@ -3307,6 +3334,7 @@ etaExpandToJoinPointRule join_arity rule@(Rule { ru_bndrs = bndrs, ru_rhs = rhs
 
 -- Adds as many binders as asked for; assumes expr is not a lambda
 etaBodyForJoinPoint :: Int -> CoreExpr -> ([CoreBndr], CoreExpr)
+-- See Note [Ordinary arrow metadata and eta].
 etaBodyForJoinPoint need_args body
   = go need_args body_ty (mkEmptySubst in_scope) [] body
   where
@@ -3318,7 +3346,8 @@ etaBodyForJoinPoint need_args body
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
         -- The varToCoreExpr is important: `tv` might be a coercion variable
 
-      | Just (_, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+      | Just (_, ma, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+      , Type.substTyUnchecked subst ma `eqType` unmatchableDataConTy
       , let (subst', b) = freshEtaId n subst (Scaled mult arg_ty)
       = go (n-1) res_ty subst' (b : rev_bs) (e `App` varToCoreExpr b)
         -- The varToCoreExpr is important: `b` might be a coercion variable

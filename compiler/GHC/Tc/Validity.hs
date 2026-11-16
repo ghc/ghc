@@ -266,14 +266,15 @@ withRetainedAmbiguityType ty thing_inside
     go ty@(DepFunTy index _)
       = do { fresh <- newSysLocalId (getOccFS index) ManyTy (varType index)
            ; (indices, body) <- go (applyTypeToArgs ty [Var fresh])
-           ; return (fresh : indices, mkVisFunTyMany (varType index) body) }
+           ; return (fresh : indices, mkVisFunTyManyU (varType index) body) }
     go (ForAllTy binder body)
       = do { (indices, body) <- go body
            ; return (indices, mkForAllTy binder body) }
-    go (FunTy flag mult arg res)
-      = do { (arg_indices, arg) <- go arg
+    go (FunTy flag ma mult arg res)
+      = do { (ma_indices, ma) <- go ma
+           ; (arg_indices, arg) <- go arg
            ; (res_indices, res) <- go res
-           ; return (arg_indices ++ res_indices, FunTy flag mult arg res) }
+           ; return (ma_indices ++ arg_indices ++ res_indices, FunTy flag ma mult arg res) }
     go ty = return ([], ty)
 
 {- Note [Ambiguity checking retained signatures]
@@ -905,9 +906,10 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
 
 check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank })
-           ty@(FunTy _ mult arg_ty res_ty)
+           ty@(FunTy _ ma mult arg_ty res_ty)
   = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyTy mult))
                      (env, TcRnLinearFuncInKind (tidyType env ty))
+        ; check_type (ve{ve_rank = MustBeMonoType}) ma
         ; check_type (ve{ve_rank = arg_rank}) arg_ty
         ; check_type (ve{ve_rank = res_rank}) res_ty }
   where
@@ -1847,7 +1849,9 @@ dropCasts :: Type -> Type
 -- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)       = dropCasts ty
 dropCasts (AppTy t1 t2)       = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts ty@(FunTy _ w t1 t2)  = ty { ft_mult = dropCasts w, ft_arg = dropCasts t1, ft_res = dropCasts t2 }
+dropCasts ty@(FunTy _ ma w t1 t2)
+  = ty { ft_ma = dropCasts ma, ft_mult = dropCasts w
+       , ft_arg = dropCasts t1, ft_res = dropCasts t2 }
 dropCasts (TyConApp tc tys)   = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)     = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy

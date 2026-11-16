@@ -1910,11 +1910,13 @@ zonkEvTypeable (EvTypeableTyApp t1 t2)
   = do { t1' <- zonkEvTerm t1
        ; t2' <- zonkEvTerm t2
        ; return (EvTypeableTyApp t1' t2') }
-zonkEvTypeable (EvTypeableTrFun tm t1 t2)
-  = do { tm' <- zonkEvTerm tm
+zonkEvTypeable (EvTypeableTrFun ma tm t1 t2)
+  -- See Note [Typeable evidence terms] in GHC.Tc.Types.Evidence.
+  = do { ma' <- zonkEvTerm ma
+       ; tm' <- zonkEvTerm tm
        ; t1' <- zonkEvTerm t1
        ; t2' <- zonkEvTerm t2
-       ; return (EvTypeableTrFun tm' t1' t2') }
+       ; return (EvTypeableTrFun ma' tm' t1' t2') }
 zonkEvTypeable (EvTypeableTyLit t1)
   = do { t1' <- zonkEvTerm t1
        ; return (EvTypeableTyLit t1') }

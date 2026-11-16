@@ -182,12 +182,13 @@ zonkEqTypes ev eq_rel ty1 ty2
     -- so we may run into an unzonked type variable while trying to compute the
     -- RuntimeReps of the argument and result types. This can be observed in
     -- testcase tc269.
-    go (FunTy af1 w1 arg1 res1) (FunTy af2 w2 arg2 res2)
+    go (FunTy af1 ma1 w1 arg1 res1) (FunTy af2 ma2 w2 arg2 res2)
       | af1 == af2
+      , eqType ma1 ma2
       , eqType w1 w2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev (FunTy af1 w1) res_b res_a }
+           ; return $ combine_rev (FunTy af1 ma1 w1) res_b res_a }
 
     go ty1@(FunTy {}) ty2 = bale_out ty1 ty2
     go ty1 ty2@(FunTy {}) = bale_out ty1 ty2
@@ -597,10 +598,10 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
 can_eq_nc _ces _rdr_env _envs ev eq_rel
-           ty1@(FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
-           ty2@(FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
+           ty1@(FunTy { ft_ma = ma1, ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
+           ty2@(FunTy { ft_ma = ma2, ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
   | af1 == af2  -- See Note [Decomposing FunTy]
-  = canDecomposableFunTy ev eq_rel af1 (ty1,am1,ty1a,ty1b) (ty2,am2,ty2a,ty2b)
+  = canDecomposableFunTy ev eq_rel af1 (ty1,ma1,am1,ty1a,ty1b) (ty2,ma2,am2,ty2a,ty2b)
 
 -- (EQNC4) TyCon
 -- Decompose type constructor applications
@@ -1107,10 +1108,12 @@ can_eq_app ev s1 t1 s2 t2
     -- Test case: typecheck/should_run/Typeable1
     -- We could also include this mismatch check above (for W and D), but it's slow
     -- and we'll get a better error message not doing it
-  | s1k `mismatches` s2k
+  | isMatchableFunTy (typeKind s1), isMatchableFunTy (typeKind s2)
+  , s1k `mismatches` s2k
   = canEqHardFailure ev (s1 `mkAppTy` t1) (s2 `mkAppTy` t2)
 
   | CtGiven (GivenCt { ctev_evar = evar }) <- ev
+  , isMatchableFunTy (typeKind s1), isMatchableFunTy (typeKind s2)
   = do { let co   = mkCoVarCo evar
              co_s = mkLRCo CLeft  co
              co_t = mkLRCo CRight co
@@ -1120,6 +1123,9 @@ can_eq_app ev s1 t1 s2 t2
                                 , evCoercion co_t )
        ; emitWorkNC [CtGiven ev_t]
        ; startAgainWith (mkNonCanonical $ CtGiven ev_s) }
+
+  | otherwise
+  = finishCanWithIrred IrredShapeReason ev
 
   where
     loc = ctEvLoc ev
@@ -1720,12 +1726,19 @@ Note [Decomposing TyConApp equalities]. We have
 
     s1 ~r s2,  t1 ~N t2   ==>   s1 t1 ~r s2 t2       (rule CO_APP)
     s1 t1 ~N s2 t2        ==>   s1 ~N s2,  t1 ~N t2  (CO_LEFT, CO_RIGHT)
+                              only at matchable consumed kind arrows
+
+The split helpers inspect application syntax. They do not establish matchability.
+A Given requires the inverse rule and therefore requires M. A Wanted can use
+forward AppCo congruence at U, but this strategy can be incomplete. An opaque
+U application does not establish that its arguments or head are equal.
+Structural comparison of arrow types through SelFun remains valid at U.
 
 In the first of these, why do we need Nominal equality in (t1 ~N t2)?
 See (APT3) below.
 
 For sound and complete solving, we need both directions to decompose. So:
-* At nominal role, all is well: we have both directions.
+* At nominal role, matchable kind arrows supply both directions.
 * At representational role, decomposition of Givens is unsound
   (see (APT1) below), and decomposition of Wanteds is incomplete.
 
@@ -1760,7 +1773,7 @@ which can then (assuming MkPhant is in scope) be simplified to Int ~R Int,
 and all will be well. See also Note [Unwrap newtypes first].
 
 Bottom line:
-* Always decompose AppTy at nominal role: can_eq_app
+* Nominal Given AppTy decomposes only at matchable kind arrows: can_eq_app
 * Never decompose AppTy at representational role (neither Given nor Wanted):
   the lack of an equation in can_eq_nc
 
@@ -1865,10 +1878,10 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
       in adjustCtLocTyConBinder mb_bndr mb_role_expln loc
 
 canDecomposableFunTy :: CtEvidence -> EqRel -> FunTyFlag
-                     -> (Type,Type,Type,Type)   -- (fun_ty,multiplicity,arg,res)
-                     -> (Type,Type,Type,Type)   -- (fun_ty,multiplicity,arg,res)
+                     -> (Type,Type,Type,Type,Type) -- (fun_ty,matchability,multiplicity,arg,res)
+                     -> (Type,Type,Type,Type,Type) -- (fun_ty,matchability,multiplicity,arg,res)
                      -> TcS (StopOrContinue a)
-canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
+canDecomposableFunTy ev eq_rel af f1@(ty1,ma1,m1,a1,r1) f2@(ty2,ma2,m2,a2,r2)
   = do { traceTcS "canDecomposableFunTy"
                   (ppr ev $$ ppr eq_rel $$ ppr f1 $$ ppr f2)
        ; case ev of
@@ -1876,13 +1889,14 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
              -> do { co_plus_holes <- wrapUnifierAndEmit ev Nominal $ \ uenv ->
                         do { let mult_env = uenv `updUEnvLoc` toInvisibleLoc InvisibleMultiplicity
                                                  `setUEnvRole` funRole role SelMult
+                           ; ma <- uType (uenv `setUEnvRole` funRole role SelMatch) ma1 ma2
                            ; mult <- uType mult_env m1 m2
                              -- TODO: it would be good to set an environment for
                              -- RuntimeRep mismatches, but it's difficult to do so because
                              -- we don't explicit call uType on the RuntimeReps here.
                            ; arg  <- uType (uenv `setUEnvRole` funRole role SelArg) a1 a2
                            ; res  <- uType (uenv `setUEnvRole` funRole role SelRes) r1 r2
-                           ; return (mkNakedFunCo role af mult arg res) }
+                           ; return (mkNakedFunCo role af ma mult arg res) }
                    ; setWantedEq dest co_plus_holes }
 
            CtGiven (GivenCt { ctev_evar = evar })
@@ -1893,7 +1907,7 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
                    --           See the call to canonicaliseEquality in solveEquality.
              -> emitNewGivens loc
                        [ (funRole role fs, mkSelCo (SelFun fs) ev_co)
-                       | fs <- [SelMult, SelArg, SelRes] ]
+                       | fs <- [SelMatch, SelMult, SelArg, SelRes] ]
 
     ; stopWith ev "Decomposed TyConApp" }
 

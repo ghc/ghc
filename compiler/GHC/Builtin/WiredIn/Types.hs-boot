@@ -82,3 +82,8 @@ cTupleSelIdName :: ConTag -> Arity -> Name
 
 sumDataCon :: ConTag -> Arity -> DataCon
 sumTyCon :: Arity -> TyCon
+
+matchabilityTyCon :: TyCon
+matchabilityTy :: Type
+matchableDataConTy, unmatchableDataConTy :: Type
+matchableDataConTyCon, unmatchableDataConTyCon :: TyCon

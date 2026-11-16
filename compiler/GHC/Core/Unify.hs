@@ -1747,12 +1747,21 @@ unify_ty env ty1 (CastTy ty2 co2) kco
 
 -- Applications need a bit of care!
 -- They can match FunTy and TyConApp, so use splitAppTy_maybe
+unify_ty env ty1@(AppTy fun _) ty2 _
+  | not (isMatchableFunTy (typeKind fun))
+  = unify_opaque_app env ty1 ty2
+unify_ty env ty1 ty2@(AppTy fun _) _
+  | not (isMatchableFunTy (typeKind fun))
+  = unify_opaque_app env ty1 ty2
+
 unify_ty env (AppTy ty1a ty1b) ty2 _kco
   | Just (ty2a, ty2b) <- tcSplitAppTyNoView_maybe ty2
+  , isMatchableFunTy (typeKind ty2a)
   = unify_ty_app env ty1a [ty1b] ty2a [ty2b]
 
 unify_ty env ty1 (AppTy ty2a ty2b) _kco
   | Just (ty1a, ty1b) <- tcSplitAppTyNoView_maybe ty1
+  , isMatchableFunTy (typeKind ty1a)
   = unify_ty_app env ty1a [ty1b] ty2a [ty2b]
 
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
@@ -1770,7 +1779,7 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
            CoVarCo cv
              | Matching <- um_unif env
              , not (cv `elemVarEnv` c_subst)   -- Not forall-bound
-             , let (_mult_co, co_l, co_r) = decomposeFunCo kco
+             , let (_match_co, _mult_co, co_l, co_r) = decomposeFunCo kco
                      -- Because the coercion is used in a type, it should be safe to
                      -- ignore the multiplicity coercion, _mult_co
                       -- cv :: t1 ~ t2
@@ -1827,6 +1836,15 @@ unify_ty _ _ (TermVarTy {}) _ = maybeApart MARRuntimeIndex
 
 -- Deal with TyConApps
 unify_ty env ty1 ty2 kco
+  -- Inspect the applied result arrow, rather than the family name.
+  | Just (fun, _) <- tcSplitAppTyNoView_maybe ty1
+  , not (isMatchableFunTy (typeKind fun))
+  = unify_opaque_app env ty1 ty2
+
+  | Just (fun, _) <- tcSplitAppTyNoView_maybe ty2
+  , not (isMatchableFunTy (typeKind fun))
+  = unify_opaque_app env ty1 ty2
+
   -- Handle non-oversaturated type families first
   -- See Note [Unifying type applications]
   | Just (tc,tys) <- mb_sat_fam_app1
@@ -1880,17 +1898,31 @@ unify_tc_app :: UMEnv -> TyCon -> [Type] -> [Type] -> UM ()
 unify_tc_app env tc tys1 tys2
   | tc == fUNTyCon
   , IgnoreMultiplicities <- um_arr_mult env
-  , (_mult1 : no_mult_tys1) <- tys1
-  , (_mult2 : no_mult_tys2) <- tys2
+  , (ma1 : _mult1 : no_mult_tys1) <- tys1
+  , (ma2 : _mult2 : no_mult_tys2) <- tys2
   = -- We're comparing function arrow types here (not constraint arrow
-    -- types!), and they have at least one argument, which is the arrow's
-    -- multiplicity annotation. The flag `um_arr_mult` instructs us to
+    -- types!), and the matchability precedes the multiplicity. Preserve
+    -- matchability while ignoring the multiplicity annotation. The flag `um_arr_mult` instructs us to
     -- ignore multiplicities in this very case. This is a little tricky: see
     -- point (3) in Note [Rewrite rules ignore multiplicities in FunTy].
-     unify_tys env no_mult_tys1 no_mult_tys2
+     unify_tys env (ma1 : no_mult_tys1) (ma2 : no_mult_tys2)
 
   | otherwise
   = unify_tys env tys1 tys2
+
+-- | Check closed reflexivity for an unmatchable application.
+-- Other comparisons remain uncertain. Do not invert their results.
+unify_opaque_app :: UMEnv -> Type -> Type -> UM ()
+unify_opaque_app env ty1 ty2
+  | not (anyFreeVarsOfTypes isTyCoVar [ty1, ty2])
+  , eqTypeX (um_rn_env env) ty1 ty2
+  = return ()
+  | otherwise
+  = maybeApart MARTypeFamily
+
+-- An open reflexivity shortcut could omit a template self-substitution.
+-- See (M1) in Note [Specification of unification]. Whole-type template
+-- variables are handled before this check. Keep native call rules separate.
 
 -----------------------------
 unify_ty_app :: UMEnv -> Type -> [Type] -> Type -> [Type] -> UM ()
@@ -1899,6 +1931,7 @@ unify_ty_app :: UMEnv -> Type -> [Type] -> Type -> [Type] -> UM ()
 unify_ty_app env ty1 ty1args ty2 ty2args
   | Just (ty1', ty1a) <- splitAppTyNoView_maybe ty1
   , Just (ty2', ty2a) <- splitAppTyNoView_maybe ty2
+  , isMatchableFunTy (typeKind ty1'), isMatchableFunTy (typeKind ty2')
   = unify_ty_app env ty1' (ty1a : ty1args) ty2' (ty2a : ty2args)
 
   | otherwise
@@ -2157,7 +2190,7 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
                         = go bvs (tyVarKind tv)
     go bvs (AppTy ty1 ty2)           = go bvs ty1 || go bvs ty2
     go _   (LitTy {})                = False
-    go bvs (FunTy _ w arg res)       = go bvs w || go bvs arg || go bvs res
+    go bvs (FunTy _ ma w arg res)    = go bvs ma || go bvs w || go bvs arg || go bvs res
     go bvs (TyConApp tc tys)         = go_tc bvs tc tys
 
     go bvs (ForAllTy (Bndr tv _) ty)
@@ -2557,10 +2590,10 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
 
-ty_co_match menv subst (FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
-            (FunCo { fco_mult = co_w, fco_arg = co1, fco_res = co2 }) _lkco _rkco
-  = ty_co_match_args menv subst [w,    rep1,    rep2,    ty1, ty2]
-                                [co_w, co1_rep, co2_rep, co1, co2]
+ty_co_match menv subst (FunTy { ft_ma = ma, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
+            (FunCo { fco_ma = co_ma, fco_mult = co_w, fco_arg = co1, fco_res = co2 }) _lkco _rkco
+  = ty_co_match_args menv subst [ma, w,    rep1,    rep2,    ty1, ty2]
+                                [co_ma, co_w, co1_rep, co2_rep, co1, co2]
   where
      rep1    = getRuntimeRep ty1
      rep2    = getRuntimeRep ty2
@@ -2674,8 +2707,8 @@ pushRefl co =
   case (isReflCo_maybe co) of
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
-    Just (FunTy af w ty1 ty2, r)
-      ->  Just (FunCo r af af (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
+    Just (FunTy af ma w ty1 ty2, r)
+      ->  Just (FunCo r af af (mkReflCo (funRole r SelMatch) ma) (mkReflCo (funRole r SelMult) w) (mkReflCo r ty1) (mkReflCo r ty2))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRoleListX r tc) tys))
     Just (ForAllTy (Bndr tv vis) ty, r)

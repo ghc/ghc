@@ -714,7 +714,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
     mkRefTy refLvl = (wrapWithVars &&& id) <$> newTyVars
       where newTyVars = replicateM refLvl $ setLvl <$> newOpenFlexiTyVar
             setLvl = flip setMetaTyVarTcLevel hole_lvl
-            wrapWithVars vars = mkVisFunTysMany (map mkTyVarTy vars) hole_ty
+            wrapWithVars vars = mkVisFunTysManyU (map mkTyVarTy vars) hole_ty
 
     sortFits :: HoleFitSortingAlg    -- How we should sort the hole fits
              -> [TcHoleFit]     -- The subs to sort

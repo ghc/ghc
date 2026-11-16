@@ -1432,7 +1432,7 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
            ; collect_cand_qtvs orig_ty is_dep cur_lvl (bound `extendVarSet` v) dv1 ty }
     go dv (AppTy t1 t2)       = foldlM go dv [t1, t2]
     go dv (TyConApp tc tys)   = go_tc_args dv (tyConBinders tc) tys
-    go dv (FunTy _ w arg res) = foldlM go dv [arg, w, res]
+    go dv (FunTy _ ma w arg res) = foldlM go dv [ma, arg, w, res]
     go dv (LitTy {})          = return dv
     go dv (CastTy ty co)      = do { dv1 <- go dv ty
                                    ; collect_cand_qtvs_co orig_ty cur_lvl bound dv1 co }
@@ -1535,7 +1535,7 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
                                           ; go_mco dv1 mco }
     go_co dv (TyConAppCo _ _ cos)    = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)         = foldlM go_co dv [co1, co2]
-    go_co dv (FunCo _ _ _ w co1 co2) = foldlM go_co dv [w, co1, co2]
+    go_co dv (FunCo _ _ _ ma w co1 co2) = foldlM go_co dv [ma, w, co1, co2]
     go_co dv (AxiomCo _ cos)         = foldlM go_co dv cos
     go_co dv (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
                                      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv t1

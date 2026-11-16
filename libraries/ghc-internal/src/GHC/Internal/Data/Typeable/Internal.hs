@@ -62,7 +62,7 @@ module GHC.Internal.Data.Typeable.Internal (
     -- * TypeRep
     TypeRep,
     data TypeRep,
-    data App, data Con, data Con', data Fun,
+    data App, data Con, data Con', data Fun, data Fun',
     typeRep,
     typeOf,
     typeRepTyCon,
@@ -214,36 +214,57 @@ data TypeRep a where
 
     -- | Invariant: Saturated arrow types (e.g. things of the form @a -> b@)
     -- are represented with @'TrFun' a b@, not @TrApp (TrApp funTyCon a) b@.
-    TrApp   :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
+    TrApp   :: forall {ma :: Matchability} k1 k2
+                      (a :: FUN @ma 'Many k1 k2) (b :: k1).
                { -- See Note [TypeRep fingerprints]
                  trAppFingerprint :: {-# UNPACK #-} !Fingerprint
 
                  -- The TypeRep represents the application of trAppFun
                  -- to trAppArg. For Maybe Int, the trAppFun will be Maybe
                  -- and the trAppArg will be Int.
-               , trAppFun :: !(TypeRep (a :: k1 -> k2))
+               , trAppFun :: !(TypeRep (a :: FUN @ma 'Many k1 k2))
                , trAppArg :: !(TypeRep (b :: k1))
                , trAppKind :: !(TypeRep k2) }   -- See Note [Kind caching]
             -> TypeRep (a b)
 
-    -- | @TrFun fpr m a b@ represents a function type @a % m -> b@. We use this for
-    -- the sake of efficiency as functions are quite ubiquitous.
+    -- | A function representation with explicit matchability and multiplicity.
+    -- See Note [Matchability in reflection].
     -- A TrFun can represent `t1 -> t2` or `t1 -= t2`; but not  (a => b) or (a ==> b).
     -- See Note [No Typeable for polytypes or qualified types] in GHC.Tc.Instance.Class
     -- and Note [Function type constructors and FunTy] in GHC.Builtin.WiredIn.Prim
     -- We do not represent the function TyCon (i.e. (->) vs (-=>)) explicitly;
     -- instead, the TyCon is implicit in the kinds of the arguments.
-    TrFun   :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+    TrFun   :: forall (ma :: Matchability) (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (a :: TYPE r1) (b :: TYPE r2).
                { -- See Note [TypeRep fingerprints]
                  trFunFingerprint :: {-# UNPACK #-} !Fingerprint
 
                  -- The TypeRep represents a function from trFunArg to
                  -- trFunRes.
+               , trFunMatch :: !(TypeRep ma)
                , trFunMul :: !(TypeRep m)
                , trFunArg :: !(TypeRep a)
                , trFunRes :: !(TypeRep b) }
-            -> TypeRep (FUN m a b)
+            -> TypeRep (FUN @ma m a b)
+
+{- Note [Matchability in reflection]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TrFun stores matchability and includes it in its fingerprint. Its bare FUN
+constructor has kind arguments [matchability, multiplicity, rep1, rep2].
+
+KindRepFun is an optimization for M/Many arrows. The compiler represents
+other arrows as a full KindRepTyConApp FUN application. The KindRep reader
+uses mkTrAppChecked to reconstruct the same TrFun and fingerprint in both
+cases. A generic application must not produce a second reflected identity
+for a saturated FUN type.
+
+The Fun pattern keeps its runtime U/Many contract. Fun' exposes the
+matchability of any Many arrow. Kind checks must use Fun' because constructor
+kind arrows have M. The application decoder retains metadata in the FUN kind
+arguments; it does not encode an M arrow with the runtime Fun constructor.
+splitApps omits kind arguments, including matchability. Fun' and the App/Con'
+decomposition retain that metadata.
+-}
 
 -- | A 'TypeableInstance' wraps up a 'Typeable' instance for explicit
 -- handling. For internal use: for defining 'TypeRep' pattern.
@@ -411,8 +432,21 @@ pattern Fun :: forall k (fun :: k). ()
             => TypeRep arg
             -> TypeRep res
             -> TypeRep fun
-pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res, trFunMul = (eqTypeRep trMany -> Just HRefl)}
-  where Fun arg res = mkTrFun trMany arg res
+pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res,
+                             trFunMatch = (eqTypeRep trUnmatchable -> Just HRefl),
+                             trFunMul = (eqTypeRep trMany -> Just HRefl)}
+  where Fun arg res = mkTrFun trUnmatchable trMany arg res
+
+-- | An unrestricted function arrow with explicit matchability metadata.
+pattern Fun' :: forall k (fun :: k). ()
+             => forall (ma :: Matchability) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                       (arg :: TYPE r1) (res :: TYPE r2).
+                (k ~ Type, fun ~~ FUN @ma 'Many arg res)
+             => TypeRep ma -> TypeRep arg -> TypeRep res -> TypeRep fun
+pattern Fun' ma arg res <- TrFun {trFunMatch = ma, trFunArg = arg,
+                                 trFunRes = res,
+                                 trFunMul = (eqTypeRep trMany -> Just HRefl)}
+  where Fun' ma arg res = mkTrFun ma trMany arg res
 
 -- | Observe the 'Fingerprint' of a type representation
 --
@@ -467,13 +501,22 @@ trLiftedRep = typeRep
 trMany :: TypeRep 'Many
 trMany = typeRep
 
+-- | The matchability of an ordinary runtime arrow.
+trUnmatchable :: TypeRep 'Unmatchable
+trUnmatchable = typeRep
+
+-- | The matchability of a constructor kind arrow.
+trMatchable :: TypeRep 'Matchable
+trMatchable = typeRep
+
 -- | Construct a representation for a type application that is
 -- NOT a saturated arrow type. This is not checked!
 
 -- Note that this is known-key to the compiler, which uses it in desugar
 -- 'Typeable' evidence.
-mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
-           TypeRep (a :: k1 -> k2)
+mkTrApp :: forall {ma :: Matchability} k1 k2
+                  (a :: FUN @ma 'Many k1 k2) (b :: k1).
+           TypeRep a
         -> TypeRep (b :: k1)
         -> TypeRep (a b)
 mkTrApp a b -- See Note [Kind caching], Wrinkle 2
@@ -498,18 +541,23 @@ mkTrApp a b -- See Note [Kind caching], Wrinkle 2
 -- | Construct a representation for a type application that
 -- may be a saturated arrow type. This is renamed to mkTrApp in
 -- Type.Reflection.Unsafe
-mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
-                  TypeRep (a :: k1 -> k2)
-               -> TypeRep (b :: k1)
-               -> TypeRep (a b)
-mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x@TypeRep :: TypeRep x})
-               (y :: TypeRep y)
-  | TrTyCon {trTyCon=con} <- p
-  , con == funTyCon  -- cheap check first
-  , Just (IsTYPE TypeRep) <- isTYPE (typeRepKind x)
-  , Just (IsTYPE (TypeRep :: TypeRep ry)) <- isTYPE (typeRepKind y)
-  , Just HRefl <- typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
-  = mkTrFun trMany x y
+mkTrAppChecked :: forall {ma :: Matchability} k1 k2
+                         (a :: FUN @ma 'Many k1 k2) (b :: k1).
+                  TypeRep a -> TypeRep b -> TypeRep (a b)
+mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x}) y
+  | TrTyCon {trTyCon=con, trKindVars=ks} <- p
+  , con == funTyCon
+  , [ SomeTypeRep (match :: TypeRep match)
+    , SomeTypeRep (mul :: TypeRep mul), _, _ ] <- ks
+  , Just HRefl <- typeRepKind match `eqTypeRep` typeRep @Matchability
+  , Just HRefl <- typeRepKind mul `eqTypeRep` typeRep @Multiplicity
+  , Just (IsTYPE (rx :: TypeRep rx)) <- isTYPE (typeRepKind x)
+  , Just (IsTYPE (ry :: TypeRep ry)) <- isTYPE (typeRepKind y)
+  , let arr :: TypeRep (FUN @match mul :: TYPE rx -> TYPE ry -> Type)
+        arr = mkTrCon funTyCon
+                [SomeTypeRep match, SomeTypeRep mul, SomeTypeRep rx, SomeTypeRep ry]
+  , Just HRefl <- mkTrApp arr x `eqTypeRep` rep
+  = mkTrFun match mul x y
 mkTrAppChecked a b = mkTrApp a b
 
 -- | A type application.
@@ -531,13 +579,15 @@ mkTrAppChecked a b = mkTrApp a b
 -- where @arrow :: TypeRep ((->) :: TYPE IntRep -> Type -> Type)@.
 --
 pattern App :: forall k2 (t :: k2). ()
-            => forall k1 (a :: k1 -> k2) (b :: k1). (t ~ a b)
+            => forall (ma :: Matchability) k1
+                      (a :: FUN @ma 'Many k1 k2) (b :: k1). (t ~ a b)
             => TypeRep a -> TypeRep b -> TypeRep t
 pattern App f x <- (splitApp -> IsApp f x)
   where App f x = mkTrAppChecked f x
 
 data AppOrCon (a :: k) where
-    IsApp :: forall k k' (f :: k' -> k) (x :: k'). ()
+    IsApp :: forall {ma :: Matchability} k k'
+                    (f :: FUN @ma 'Many k' k) (x :: k'). ()
           => TypeRep f %1 -> TypeRep x %1 -> AppOrCon (f x)
     -- See Note [Con evidence]
     IsCon :: NotApplication a => TyCon %1 -> [SomeTypeRep] %1 -> AppOrCon a
@@ -727,14 +777,15 @@ instantiateKindRep vars = go
             applyTy :: SomeTypeRep -> KindRep -> SomeTypeRep
             applyTy (SomeTypeRep acc) ty
               | SomeTypeRep ty' <- go ty
-              = SomeTypeRep $ mkTrApp (unsafeCoerce acc) ty'
+              = SomeTypeRep $ mkTrAppChecked (unsafeCoerce acc) ty'
         in foldl' applyTy tycon_app ty_args
     go (KindRepVar var)
       = vars A.! var
     go (KindRepApp f a)
-      = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
+      = SomeTypeRep $ mkTrAppChecked (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
+    -- See Note [Matchability in reflection].
     go (KindRepFun a b)
-      = SomeTypeRep $ mkTrFun trMany (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
+      = SomeTypeRep $ mkTrFun trMatchable trMany (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
 
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
@@ -745,12 +796,12 @@ instantiateKindRep vars = go
 unsafeCoerceRep :: SomeTypeRep -> TypeRep a
 unsafeCoerceRep (SomeTypeRep r) = unsafeCoerce r
 
-bareArrow :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+bareArrow :: forall (ma :: Matchability) (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                     (a :: TYPE r1) (b :: TYPE r2). ()
-          => TypeRep (FUN m a b)
-          -> TypeRep (FUN m :: TYPE r1 -> TYPE r2 -> Type)
-bareArrow (TrFun _ m a b) =
-    mkTrCon funTyCon [SomeTypeRep m, SomeTypeRep rep1, SomeTypeRep rep2]
+          => TypeRep (FUN @ma m a b)
+          -> TypeRep (FUN @ma m :: TYPE r1 -> TYPE r2 -> Type)
+bareArrow (TrFun _ ma m a b) =
+    mkTrCon funTyCon [SomeTypeRep ma, SomeTypeRep m, SomeTypeRep rep1, SomeTypeRep rep2]
   where
     rep1 = getRuntimeRep $ typeRepKind a :: TypeRep r1
     rep2 = getRuntimeRep $ typeRepKind b :: TypeRep r2
@@ -850,9 +901,14 @@ showTypeable p (TrTyCon {trTyCon = tycon, trKindVars = args})
     showTyCon tycon .
     showChar ' ' .
     showArgs (showChar ' ') args
-showTypeable p (TrFun {trFunArg = x, trFunRes = r})
+showTypeable p (TrFun {trFunMatch = ma, trFunMul = mul, trFunArg = x, trFunRes = r})
   = showParen (p > 8) $
-    showsPrec 9 x . showString " -> " . showsPrec 8 r
+    showsPrec 9 x . show_mult . showString " -> " . show_match . showsPrec 8 r
+  where
+    show_mult | Just HRefl <- eqTypeRep trMany mul = id
+              | otherwise = showString " %" . showsPrec 10 mul
+    show_match | Just HRefl <- eqTypeRep trUnmatchable ma = id
+               | otherwise = showString "@(" . shows ma . showString ") "
 showTypeable p (TrApp {trAppFun = f, trAppArg = x})
   = showParen (p > 9) $
     showsPrec 8 f .
@@ -1078,15 +1134,17 @@ typeLitTypeRep :: forall k (a :: k). (Typeable k) =>
 typeLitTypeRep nm kind_tycon = mkTrCon (mkTypeLitTyCon nm kind_tycon) []
 
 -- | For compiler use.
-mkTrFun :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+mkTrFun :: forall (ma :: Matchability) (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                   (a :: TYPE r1) (b :: TYPE r2).
-           TypeRep m -> TypeRep a -> TypeRep b -> TypeRep ((FUN m a b) :: Type)
-mkTrFun mul arg res = TrFun
+           TypeRep ma -> TypeRep m -> TypeRep a -> TypeRep b -> TypeRep ((FUN @ma m a b) :: Type)
+mkTrFun ma mul arg res = TrFun
     { trFunFingerprint = fpr
+    , trFunMatch = ma
     , trFunMul = mul
     , trFunArg = arg
     , trFunRes = res }
-  where fpr = fingerprintFingerprints [ typeRepFingerprint mul
+  where fpr = fingerprintFingerprints [ typeRepFingerprint ma
+                                      , typeRepFingerprint mul
                                       , typeRepFingerprint arg
                                       , typeRepFingerprint res]
 

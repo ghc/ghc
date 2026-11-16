@@ -130,7 +130,7 @@ mkFCall uniq the_fcall val_args res_ty
     mkApps (mkVarApps (Var the_fcall_id) tyvars) val_args
   where
     arg_tys = map exprType val_args
-    body_ty = (mkVisFunTysMany arg_tys res_ty)
+    body_ty = (mkVisFunTysManyU arg_tys res_ty)
     tyvars  = tyCoVarsOfTypeWellScoped body_ty
     ty      = mkInfForAllTys tyvars body_ty
     the_fcall_id = mkFCallId uniq the_fcall ty
@@ -251,7 +251,7 @@ boxResult result_ty
                                              [the_alt]
                                      ]
 
-        ; return (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap) }
+        ; return (realWorldStatePrimTy `mkVisFunTyManyU` ccall_res_ty, wrap) }
 
 boxResult result_ty
   = do -- It isn't IO, so do unsafePerformIO
@@ -263,7 +263,7 @@ boxResult result_ty
                                            (unrestricted ccall_res_ty)
                                            (coreAltType the_alt)
                                            [the_alt]
-       return (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap)
+       return (realWorldStatePrimTy `mkVisFunTyManyU` ccall_res_ty, wrap)
   where
     return_result _ ans = ans
 

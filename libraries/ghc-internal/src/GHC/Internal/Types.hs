@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE Trustworthy #-}  -- So that we can import in into Safe modules
                               -- like GHC.Internal.System.Mem.StableName
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
@@ -62,6 +63,7 @@ module GHC.Internal.Types (
 
         -- * Multiplicity types
         Multiplicity(..), MultMul,
+        Matchability(..), M, U,
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
@@ -240,7 +242,7 @@ This declaration is important for :info (->) command (issue #10145)
 -}
 
 -- | The regular function type
-type (->) = FUN 'Many
+type (->) @ma = FUN @ma 'Many
 -- See Note [Linear types] in Multiplicity
 
 {- *********************************************************************
@@ -276,6 +278,16 @@ type UnliftedType = TYPE UnliftedRep
 type ZeroBitType = TYPE ZeroBitRep
 
 -------------------------
+-- | Matchability of an arrow in a type or kind.
+-- See Note [Ordinary arrow matchability] in GHC.Core.TyCo.Rep.
+data Matchability = Matchable | Unmatchable
+
+-- | The matchable arrow annotation.
+type M = 'Matchable
+
+-- | The unmatchable arrow annotation.
+type U = 'Unmatchable
+
 data Multiplicity = Many | One
 
 type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity where

@@ -859,9 +859,9 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
          traceTR (text "Following a MutVar")
          let contents_kind = mkTYPEapp (mkTyConApp boxedRepDataConTyCon [lev])
          contents_tv <- newVar contents_kind
-         (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTyMany
+         (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTyManyU
                             contents_ty (mkTyConApp tycon [lev, world,contents_ty])
-         addConstraint (mkVisFunTyMany contents_tv my_ty) mutvar_ty
+         addConstraint (mkVisFunTyManyU contents_tv my_ty) mutvar_ty
          x <- go (pred max_depth) contents_tv contents_ty contents
          return (RefWrap my_ty x)
 
@@ -1332,7 +1332,7 @@ If that is not the case, then we consider two conditions.
 check1 :: [TyVar] -> Bool
 check1 tvs = not $ any isHigherKind (map tyVarKind tvs)
  where
-   isHigherKind = not . null . fst . splitPiTys
+   isHigherKind = \ty -> let (_, binders, _) = splitPiTys ty in not (null binders)
 
 check2 :: Type -> Type -> Bool
 check2 rtti_ty old_ty = check2' (tauPart rtti_ty) (tauPart old_ty)
@@ -1405,13 +1405,14 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                           ppr tv, equals, ppr ty_v]
          go ty_v r
 -- FunTy inductive case
-    | Just (af1,w1,l1,l2) <- splitFunTy_maybe l
-    , Just (af2,w2,r1,r2) <- splitFunTy_maybe r
+    | Just (af1,ma1,w1,l1,l2) <- splitFunTy_maybe l
+    , Just (af2,ma2,w2,r1,r2) <- splitFunTy_maybe r
     , af1==af2
+    , ma1 `eqType` ma2
     , w1 `eqType` w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
-         return (mkFunTy af1 w1 r1' r2')
+         return (mkFunTy af1 ma1 w1 r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs
@@ -1476,7 +1477,7 @@ isMonomorphicOnNonPhantomArgs ty
   , concrete_args <- [ arg | (tyv,arg) <- tyConTyVars tc `zip` all_args
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
-  | Just (_, _, ty1, ty2) <- splitFunTy_maybe ty
+  | Just (_, _, _, ty1, ty2) <- splitFunTy_maybe ty
   = all isMonomorphicOnNonPhantomArgs [ty1,ty2]
   | otherwise = isMonomorphic ty
 

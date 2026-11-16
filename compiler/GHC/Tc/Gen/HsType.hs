@@ -575,7 +575,7 @@ tcCheckRetainedType allow_function = go
       = setSrcSpanA loc $
         do { theta <- tc_hs_context mode ctxt
            ; body_ty <- go mode body liftedTypeKind
-           ; checkExpKind ty (tcMkPhiTy theta body_ty) liftedTypeKind (Check kind) }
+           ; checkExpKind mode ty (tcMkPhiTy theta body_ty) liftedTypeKind (Check kind) }
     go mode (L loc (HsFunTy _ mult arg res)) kind
       = setSrcSpanA loc $
         tc_fun_type_x (go mode) mode mult arg res (Check kind)
@@ -588,7 +588,7 @@ tcCheckRetainedType allow_function = go
            ; when (null bndrs) $
                failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
            ; body_ty <- check_bndrs mode bndrs
-           ; checkExpKind ty body_ty liftedTypeKind (Check kind) }
+           ; checkExpKind mode ty body_ty liftedTypeKind (Check kind) }
       where
         check_bndrs :: TcTyMode -> [LHsTyVarBndr () GhcRn] -> TcM TcType
         check_bndrs mode [] = go mode body liftedTypeKind
@@ -659,7 +659,7 @@ tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
         do { arg_ty <- tc_check_lhs_type mode arg liftedTypeKind
            ; mult_ty <- tc_field_mult mult
            ; (binders, body_ty) <- go mode res
-           ; return (Nothing : binders, tcMkVisFunTy mult_ty arg_ty body_ty) }
+           ; return (Nothing : binders, tcMkVisFunTy unmatchableDataConTy mult_ty arg_ty body_ty) }
     go _ (L loc HsForAllTy{}) = unsupported loc
     go _ (L loc HsQualTy{})   = unsupported loc
     go mode body@(L loc _)
@@ -897,10 +897,11 @@ top level of a signature.
 -}
 
 -- Does validity checking and zonking.
-tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
-tcStandaloneKindSig (L _ (StandaloneKindSig _ (L _ name) ksig))
+tcStandaloneKindSig :: TyClDecl GhcRn
+                    -> LStandaloneKindSig GhcRn -> TcM (Name, Kind)
+tcStandaloneKindSig decl (L _ (StandaloneKindSig _ (L _ name) ksig))
   = addSigCtxt ctxt (UserLHsSigType ksig) $
-    do { kind <- tc_top_lhs_type KindLevel ctxt ksig
+    do { kind <- tc_top_lhs_type_x (Just decl) KindLevel ctxt ksig
        ; checkValidType ctxt kind
        ; return (name, kind) }
   where
@@ -919,7 +920,13 @@ tc_top_lhs_type :: TypeOrKind -> UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 --   for things (like deriving and instances) that aren't
 --   ordinary types
 -- Used for both types and kinds
-tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
+tc_top_lhs_type = tc_top_lhs_type_x Nothing
+
+-- | Check a top-level signature with optional declaration-prefix constraints.
+-- See Note [Checked declaration-kind matchability].
+tc_top_lhs_type_x :: Maybe (TyClDecl GhcRn)
+                  -> TypeOrKind -> UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
+tc_top_lhs_type_x decl tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
                                                , sig_body = body }))
   = setSrcSpanA loc $
     do { traceTc "tc_top_lhs_type {" (ppr sig_ty)
@@ -927,13 +934,18 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
        ; (tclvl, wanted, (outer_bndrs, ty))
               <- pushLevelAndSolveEqualitiesX "tc_top_lhs_type"    $
                  do { kind <- newExpectedKind (expectedKindInCtxt ctxt)
-                    ; tcOuterTKBndrs skol_info hs_outer_bndrs $
-                      tc_check_lhs_type (mkMode tyki) body kind }
+                    ; (outer_bndrs, ty) <- tcOuterTKBndrs skol_info hs_outer_bndrs $
+                        tc_check_lhs_type mode body kind
+                    ; forM_ decl $ \ decl ->
+                        checkDeclKindMatchability decl $
+                          mkInvisForAllTys (outerTyVarBndrs outer_bndrs) ty
+                    ; return (outer_bndrs, ty) }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs
        ; let outer_tv_bndrs = outerTyVarBndrs outer_bndrs
              ty1 = mkInvisForAllTys outer_tv_bndrs ty
 
+       ; when (isJust decl) $ defaultDeclKindMatchabilities ty1
        ; kvs <- kindGeneralizeAll skol_info ty1  -- "All" because it's a top-level type
        ; reportUnsolvedEqualities skol_info kvs tclvl wanted
 
@@ -943,6 +955,80 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
        ; return final_ty }
   where
     skol_info_anon = SigTypeSkol ctxt
+    mode = (mkMode tyki) { mode_declaration = isJust decl }
+
+{- Note [Checked declaration-kind matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A declaration's anonymous argument prefix is M for data, data families and
+classes. It is U for type families and synonyms. Its result kind is independent.
+Explicit metadata must satisfy this rule. Do not replace it in mkTyCon.
+
+During a standalone kind signature check, omitted metadata gets a local
+metavariable. checkDeclKindMatchability constrains only the consumed anonymous
+prefix. It uses the elaborated kind, so it also checks aliases and computed
+metadata. Data and class declarations also consume their eta-expanded prefix.
+The solver checks explicit metadata with ordinary equality constraints.
+defaultDeclKindMatchabilities then defaults remaining local metavariables to M
+before generalization. Explicit bound metadata variables remain bound.
+No new matchability quantifier is inferred.
+
+Inline data-kind signatures use etaExpandAlgTyCon. It checks the metadata of
+each anonymous arrow that becomes a declared argument. This also rejects U
+arrows in data signatures without a standalone kind signature.
+
+The earlier matchability prototype used a declaration-wide M/U default for
+standalone signatures. That default also changed nested and result arrows.
+This check instead constrains the declared prefix before it applies the M
+kind default. Existing aliases retain their metadata and their source shape.
+-}
+
+-- | Check the anonymous arrows consumed by the declaration header.
+checkDeclKindMatchability :: TyClDecl GhcRn -> TcKind -> TcM ()
+checkDeclKindMatchability decl kind
+  = do { kind <- liftZonkM $ zonkTcType kind
+       ; go hs_bndrs kind }
+  where
+    flav = tyClDeclFlavour decl
+    expected_ma = tyConFlavourMatchability flav
+    HsQTvs { hsq_explicit = hs_bndrs } = tyClDeclTyVars decl
+
+    go [] kind
+      | needsEtaExpansion flav = check_eta kind
+      | otherwise = return ()
+    go hs_bndrs@(hs_bndr : rest) kind
+      | Just (ma, bndr, body) <- splitPiTy_maybe kind
+      = case bndr of
+          Named (Bndr _ Inferred) -> go hs_bndrs body
+          Named (Bndr _ Specified)
+            | isHsBndrInvisible (hsTyVarBndrFlag (unLoc hs_bndr))
+            -> go rest body
+            | otherwise -> go hs_bndrs body
+          Named (Bndr _ Required)
+            | not (isHsBndrInvisible (hsTyVarBndrFlag (unLoc hs_bndr)))
+            -> go rest body
+          Anon _ _
+            | not (isHsBndrInvisible (hsTyVarBndrFlag (unLoc hs_bndr)))
+            -> do { discardResult $ unifyType Nothing ma expected_ma
+                  ; go rest body }
+          _ -> return () -- The header matcher reports incompatible visibility.
+      | otherwise = return () -- The header matcher reports missing binders.
+
+    check_eta kind
+      | Just (ma, bndr, body) <- splitPiTy_maybe kind
+      = do { case bndr of
+               Anon _ _ -> discardResult $ unifyType Nothing ma matchableDataConTy
+               Named _ -> return ()
+           ; check_eta body }
+      | otherwise = return ()
+
+-- | Default unresolved local arrow metadata before kind generalization.
+defaultDeclKindMatchabilities :: TcKind -> TcM ()
+defaultDeclKindMatchabilities kind
+  = do { candidates <- candidateQTyVarsOfKind kind
+       ; forM_ (dVarSetElems (dv_kvs candidates)) $ \ tv ->
+           when (isMetaTyVar tv && not (isTyVarTyVar tv)
+                 && tcEqType (tyVarKind tv) matchabilityTy) $
+             liftZonkM $ writeMetaTyVar tv matchableDataConTy }
 
 -- | Typecheck the class in a default declaration, checking that:
 --
@@ -989,7 +1075,7 @@ tcHsDeriv hs_ty
   = do { ty <- tcTopLHsType DerivClauseCtxt hs_ty
 
        ; let (tvs, pred)    = splitForAllTyCoVars ty
-             (kind_args, _) = splitFunTys (typeKind pred)
+             (_, kind_args, _) = splitFunTys (typeKind pred)
       -- Checking that `pred` a is type class application
 
        ; case splitTyConApp_maybe pred of
@@ -1213,7 +1299,7 @@ tcInferLHsTypeKind lhs_ty@(L loc hs_ty)
   = addTypeCtxt lhs_ty $
     setSrcSpanA loc    $  -- Cover the tcInstInvisibleTyBinders
     do { (res_ty, res_kind) <- tc_infer_hs_type typeLevelMode hs_ty
-       ; tcInstInvisibleTyBinders res_ty res_kind }
+       ; tcInstInvisibleTyBinders (Just TypeLevel) res_ty res_kind }
   -- See Note [Do not always instantiate eagerly in types]
 
 -- Used to check the argument of GHCi :kind
@@ -1316,6 +1402,7 @@ tcModifiersMult = tc_modifiers_mult typeLevelMode
 -- This data type is purely local, not exported from this module
 data TcTyMode
   = TcTyMode { mode_tyki :: TypeOrKind
+             , mode_declaration :: Bool
              , mode_holes :: HoleInfo
              , mode_indices :: NameEnv Id
              , mode_complete_type_arg :: Maybe Bool }
@@ -1340,6 +1427,7 @@ data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
 
 mkMode :: TypeOrKind -> TcTyMode
 mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
+                      , mode_declaration = False
                       , mode_indices = emptyNameEnv
                       , mode_complete_type_arg = Nothing }
 
@@ -1352,6 +1440,7 @@ mkHoleMode :: TypeOrKind -> HoleMode -> TcM TcTyMode
 mkHoleMode tyki hm
   = do { lvl <- getTcLevel
        ; return (TcTyMode { mode_tyki  = tyki
+                          , mode_declaration = False
                           , mode_holes = Just (lvl,hm)
                           , mode_indices = emptyNameEnv
                           , mode_complete_type_arg = Nothing }) }
@@ -1364,10 +1453,16 @@ instance Outputable HoleMode where
 
 instance Outputable TcTyMode where
   ppr (TcTyMode { mode_tyki = tyki, mode_holes = hm, mode_indices = indices
-               , mode_complete_type_arg = complete })
+               , mode_complete_type_arg = complete, mode_declaration = declaration })
     = text "TcTyMode" <+> braces (sep [ ppr tyki <> comma
                                       , ppr hm, ppr (nonDetNameEnvElts indices)
-                                      , ppr complete ])
+                                      , ppr complete, ppr declaration ])
+
+-- | Defer implicit metadata only while a declaration kind is checked.
+matchabilityInstantiationMode :: TcTyMode -> Maybe TypeOrKind
+matchabilityInstantiationMode mode
+  | mode_declaration mode = Nothing
+  | otherwise = Just (mode_tyki mode)
 
 {-
 Note [Bidirectional type checking]
@@ -1498,7 +1593,7 @@ tcHsType mode ty@HsForEachTy{} exp_kind
        ; unless experimental $ failWithTc TcRnRetainedQuantificationNotImplemented
        ; ty' <- tcCheckRetainedType (mode_complete_type_arg mode == Just True)
                                     mode (noLocA ty) liftedTypeKind
-       ; checkExpKind ty ty' liftedTypeKind exp_kind }
+       ; checkExpKind mode ty ty' liftedTypeKind exp_kind }
   | otherwise
   = failWithTc TcRnRetainedQuantificationNotImplemented
 
@@ -1516,7 +1611,7 @@ tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
   | HsForAllVis{} <- tele
   = do { ek <- newOpenTypeKind
        ; r <- tc_hs_forall_ty tele ty (Check ek)
-       ; checkExpKind t r ek exp_kind }
+       ; checkExpKind mode t r ek exp_kind }
                  -- For a visible forall, we require that the body is of kind TYPE r.
                  -- See Note [Body kind of a HsForAllTy]
 
@@ -1541,7 +1636,7 @@ tcHsType mode t@(HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
          -- See Note [Body kind of a HsQualTy], point (BK2)
        ; ty'   <- tc_check_lhs_type mode rn_ty constraintKind
        ; let res_ty = tcMkDFunPhiTy ctxt' ty'
-       ; checkExpKind t res_ty constraintKind exp_kind }
+       ; checkExpKind mode t res_ty constraintKind exp_kind }
 
   | otherwise
   = do { ctxt' <- tc_hs_context mode ctxt
@@ -1550,13 +1645,13 @@ tcHsType mode t@(HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
                                 -- be TYPE r, for any r, hence newOpenTypeKind
       ; ty' <- tc_check_lhs_type mode rn_ty ek
       ; let res_ty = tcMkPhiTy ctxt' ty'
-      ; checkExpKind t res_ty liftedTypeKind exp_kind }
+      ; checkExpKind mode t res_ty liftedTypeKind exp_kind }
 
 --------- Lists, arrays, and tuples
 tcHsType mode rn_ty@(HsListTy _ elt_ty) exp_kind
   = do { tau_ty <- tc_check_lhs_type mode elt_ty liftedTypeKind
        ; checkWiredInTyCon listTyCon
-       ; checkExpKind rn_ty (mkListTy tau_ty) liftedTypeKind exp_kind }
+       ; checkExpKind mode rn_ty (mkListTy tau_ty) liftedTypeKind exp_kind }
 
 tcHsType mode rn_ty@(HsTupleTy _ tup_sort tys) exp_kind
   = do k <- expTypeToType exp_kind
@@ -1570,7 +1665,7 @@ tcHsType mode rn_ty@(HsSumTy _ hs_tys) exp_kind
              arg_tys  = arg_reps ++ tau_tys
              sum_ty   = mkTyConApp (sumTyCon arity) arg_tys
              sum_kind = unboxedSumKind arg_reps
-       ; checkExpKind rn_ty sum_ty sum_kind exp_kind
+       ; checkExpKind mode rn_ty sum_ty sum_kind exp_kind
        }
 
 --------- Promoted lists and tuples
@@ -1580,13 +1675,13 @@ tcHsType mode rn_ty@(HsExplicitListTy _ _ tys) exp_kind
   | null tys
   = do let ty = mkTyConTy promotedNilDataCon
        let kind = mkSpecForAllTys [alphaTyVar] $ mkListTy alphaTy
-       checkExpKind rn_ty ty kind exp_kind
+       checkExpKind mode rn_ty ty kind exp_kind
 
   | otherwise
   = do { tks <- mapM (tc_infer_lhs_type mode) tys
-       ; (taus', kind) <- unifyKinds tys tks
+       ; (taus', kind) <- unifyKinds mode tys tks
        ; let ty = (foldr (mk_cons kind) (mk_nil kind) taus')
-       ; checkExpKind rn_ty ty (mkListTy kind) exp_kind }
+       ; checkExpKind mode rn_ty ty (mkListTy kind) exp_kind }
   where
     mk_cons k a b = mkTyConApp (promoteDataCon consDataCon) [k, a, b]
     mk_nil  k     = mkTyConApp (promoteDataCon nilDataCon) [k]
@@ -1600,7 +1695,7 @@ tcHsType mode rn_ty@(HsExplicitTupleTy _ _ tys) exp_kind
              ty_con     = promotedTupleDataCon Boxed arity
              tup_k      = mkTyConApp kind_con ks
        ; checkTupSize arity
-       ; checkExpKind rn_ty (mkTyConApp ty_con (ks ++ taus)) tup_k exp_kind }
+       ; checkExpKind mode rn_ty (mkTyConApp ty_con (ks ++ taus)) tup_k exp_kind }
   where
     arity = length tys
 
@@ -1610,17 +1705,17 @@ tcHsType mode rn_ty@(HsIParamTy _ (L _ n) ty) exp_kind
        ; ty' <- tc_check_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n
        ; ipClass <- tcLookupKnownKeyClass ipClassKey
-       ; checkExpKind rn_ty (mkClassPred ipClass [n',ty'])
+       ; checkExpKind mode rn_ty (mkClassPred ipClass [n',ty'])
                            constraintKind exp_kind }
 
-tcHsType _ rn_ty@(HsStarTy _) exp_kind
+tcHsType mode rn_ty@(HsStarTy _) exp_kind
   -- Desugaring 'HsStarTy' to 'Data.Kind.Type' here means that we don't
   -- have to handle it in 'coreView'
-  = checkExpKind rn_ty liftedTypeKind liftedTypeKind exp_kind
+  = checkExpKind mode rn_ty liftedTypeKind liftedTypeKind exp_kind
 
 --------- Literals
-tcHsType _ rn_ty@(HsTyLit _ lit) exp_kind
-  = tc_hs_lit_ty rn_ty lit exp_kind
+tcHsType mode rn_ty@(HsTyLit _ lit) exp_kind
+  = tc_hs_lit_ty mode rn_ty lit exp_kind
 
 --------- Wildcards
 
@@ -1649,10 +1744,10 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
        ; traceTc "tcHsType:sig" (ppr ty $$ ppr sig')
        ; ty' <- tcAddKindSigPlaceholders sig $
                 tc_check_lhs_type mode ty sig'
-       ; checkExpKind rn_ty ty' sig' exp_kind }
+       ; checkExpKind mode rn_ty ty' sig' exp_kind }
 
 -- See Note [Typechecking HsCoreTys]
-tcHsType _ rn_ty@(XHsType ty) exp_kind
+tcHsType mode rn_ty@(XHsType ty) exp_kind
   = do env <- getLclEnv
        -- Raw uniques since we go from NameEnv to TvSubstEnv.
        let subst_prs :: [(Unique, TcType)]
@@ -1662,26 +1757,27 @@ tcHsType _ rn_ty@(XHsType ty) exp_kind
                       tyCoVarsOfTypes (ty : map snd subst_prs)
            subst = mkTvSubst in_scope (listToUFM_Directly subst_prs)
            ty'   = substTy subst ty
-       checkExpKind rn_ty ty' (typeKind ty') exp_kind
+       checkExpKind mode rn_ty ty' (typeKind ty') exp_kind
 
-tc_hs_lit_ty :: HsType GhcRn
+tc_hs_lit_ty :: TcTyMode
+             -> HsType GhcRn
              -> HsLit GhcRn
              -> ExpKind
              -> TcM TcType
-tc_hs_lit_ty rn_ty (HsNatural _ lit) exp_kind
+tc_hs_lit_ty mode rn_ty (HsNatural _ lit) exp_kind
   = do let n = il_value lit
        -- Ensure that a type-level integer is nonnegative (#8306, #8412, #26861)
        when (n < 0) $
          addErr $ TcRnNegativeNumTypeLiteral lit
        checkWiredInTyCon naturalTyCon
-       checkExpKind rn_ty (mkNumLitTy n) naturalTy exp_kind
-tc_hs_lit_ty rn_ty (HsString _ s) exp_kind
+       checkExpKind mode rn_ty (mkNumLitTy n) naturalTy exp_kind
+tc_hs_lit_ty mode rn_ty (HsString _ s) exp_kind
   = do checkWiredInTyCon typeSymbolKindCon
-       checkExpKind rn_ty (mkStrLitTy $ mkFastStringShortText s) typeSymbolKind exp_kind
-tc_hs_lit_ty rn_ty (HsChar _ c) exp_kind
+       checkExpKind mode rn_ty (mkStrLitTy $ mkFastStringShortText s) typeSymbolKind exp_kind
+tc_hs_lit_ty mode rn_ty (HsChar _ c) exp_kind
   = do checkWiredInTyCon charTyCon
-       checkExpKind rn_ty (mkCharLitTy c) charTy exp_kind
-tc_hs_lit_ty _ lit _
+       checkExpKind mode rn_ty (mkCharLitTy c) charTy exp_kind
+tc_hs_lit_ty _mode _ lit _
   = failWithTc $ TcRnUnpromotableLit lit
 
 tc_hs_tuple_ty :: HsType GhcRn
@@ -1714,10 +1810,10 @@ tc_hs_tuple_ty rn_ty mode HsBoxedOrConstraintTuple hs_tys exp_kind
          -- In the [] case, it's not clear what the kind is, so guess *
 
        ; tys' <- sequence [ setSrcSpanA loc $
-                            checkExpectedKind hs_ty ty kind arg_kind
+                            checkExpectedKind mode hs_ty ty kind arg_kind
                           | ((L loc hs_ty),ty,kind) <- zip3 hs_tys tys kinds ]
 
-       ; finish_tuple rn_ty tup_sort tys' (map (const arg_kind) tys') exp_kind }
+       ; finish_tuple mode rn_ty tup_sort tys' (map (const arg_kind) tys') exp_kind }
 tc_hs_tuple_ty rn_ty mode HsUnboxedTuple tys exp_kind =
     tc_tuple rn_ty mode UnboxedTuple tys exp_kind
 
@@ -1915,15 +2011,18 @@ tc_fun_type_x check mode mult ty1 ty2 exp_kind = case mode_tyki mode of
        ; ty1'  <- check ty1 arg_k
        ; ty2'  <- check ty2 res_k
        ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
-       ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
-                      (tcMkVisFunTy mult' ty1' ty2')
+       ; checkExpKind mode (HsFunTy noExtField mult ty1 ty2)
+                      (tcMkVisFunTy unmatchableDataConTy mult' ty1' ty2')
                       liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1'  <- check ty1 liftedTypeKind
        ; ty2'  <- check ty2 liftedTypeKind
        ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
-       ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
-                      (tcMkVisFunTy mult' ty1' ty2')
+       ; ma <- if mode_declaration mode
+               then newFlexiTyVarTy matchabilityTy
+               else return matchableDataConTy
+       ; checkExpKind mode (HsFunTy noExtField mult ty1 ty2)
+                      (tcMkVisFunTy ma mult' ty1' ty2')
                       liftedTypeKind exp_kind }
 
 {- Note [Skolem escape and forall-types]
@@ -1980,17 +2079,18 @@ tc_tuple rn_ty mode tup_sort tys exp_kind
            UnboxedTuple    -> replicateM arity newOpenTypeKind
            ConstraintTuple -> return (replicate arity constraintKind)
        ; tau_tys <- zipWithM (tc_check_lhs_type mode) tys arg_kinds
-       ; finish_tuple rn_ty tup_sort tau_tys arg_kinds exp_kind }
+       ; finish_tuple mode rn_ty tup_sort tau_tys arg_kinds exp_kind }
   where
     arity   = length tys
 
-finish_tuple :: HsType GhcRn
+finish_tuple :: TcTyMode
+             -> HsType GhcRn
              -> TupleSort
              -> [TcType]    -- ^ argument types
              -> [TcKind]    -- ^ of these kinds
              -> TcKind      -- ^ expected kind of the whole tuple
              -> TcM TcType
-finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
+finish_tuple mode rn_ty tup_sort tau_tys tau_kinds exp_kind = do
   traceTc "finish_tuple" (ppr tup_sort $$ ppr tau_kinds $$ ppr exp_kind)
   case tup_sort of
     ConstraintTuple -> do
@@ -2013,7 +2113,7 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
   where
     arity = length tau_tys
     check_expected_kind ty act_kind =
-      checkExpectedKind rn_ty ty act_kind exp_kind
+      checkExpectedKind mode rn_ty ty act_kind exp_kind
 
 {- *********************************************************************
 *                                                                      *
@@ -2080,7 +2180,7 @@ tc_app_ty mode rn_ty exp_kind
                [HsValArg _ arg] -> return arg
                _ -> invalid_call
        ; arg_ty <- tc_check_lhs_type mode arg domain
-       ; checkExpKind rn_ty (TermAppTy head_id arg_ty) result exp_kind }
+       ; checkExpKind mode rn_ty (TermAppTy head_id arg_ty) result exp_kind }
     -- See Note [Source opaque call indices].
   where
     is_par HsArgPar{} = True
@@ -2091,7 +2191,7 @@ tc_app_ty mode rn_ty exp_kind
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
        ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty hs_args
-       ; checkExpKind rn_ty ty infered_kind exp_kind }
+       ; checkExpKind mode rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
 
@@ -2140,9 +2240,38 @@ tcInferTyApps, tcInferTyApps_nosat
     -> TcType               -- ^ Function
     -> [LHsTypeArg GhcRn]   -- ^ Args
     -> TcM (TcType, TcKind) -- ^ (f args, result kind)
+{- Note [Implicit ordinary-arrow matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FUN has a specified invisible matchability parameter before multiplicity.
+When a source application must instantiate an omitted Matchability binder,
+use U at TypeLevel and M at KindLevel. This rule also applies to user-defined
+Matchability binders. An explicit @ argument is checked normally.
+
+Checked declaration kinds defer omitted metadata until the declaration prefix
+has supplied its constraints. See Note [Checked declaration-kind matchability].
+
+Do not instantiate trailing binders in the application loop. First compare
+actual and expected kinds in checkExpectedKind. Instantiate only the excess
+invisible binders. This preserves a polymorphic argument when the expected
+kind has the same invisible forall prefix. For example, P must retain its
+binder when P :: forall (m :: Matchability). Type is passed to a constructor
+that expects this kind. The same rule preserves bare FUN in that position.
+
+Use the same mode-aware instantiation in the application loop when a real
+source argument requires it, and when family saturation requires it. The
+fully instantiated inference entry point tcInferLHsTypeKind uses TypeLevel.
+The unsaturated inference entry point keeps its invisible forall binders.
+See Note [Do not always instantiate eagerly in types].
+
+This is the initial concrete policy for the ordinary-arrow port. It does not
+infer or generalize a new matchability quantifier. The forall stage must
+revisit the broader polymorphic inference policy from proposal #242. See
+Note [Ordinary arrow matchability] in GHC.Core.TyCo.Rep.
+-}
+
 tcInferTyApps mode hs_ty fun hs_args
   = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args
-       ; saturateFamApp f_args res_k }
+       ; saturateFamApp mode f_args res_k }
 
 tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
   = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
@@ -2192,7 +2321,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
       (HsArgPar _ : args, _) -> go n fun subst fun_ki args
 
       ---------------- HsTypeArg: a kind application (fun @ki)
-      (HsTypeArg _ hs_ki_arg : hs_args, Just (ki_binder, inner_ki)) ->
+      (HsTypeArg _ hs_ki_arg : hs_args, Just (_ma, ki_binder, inner_ki)) ->
         case ki_binder of
 
         -- FunTy with PredTy on LHS, or ForAllTy with Inferred
@@ -2225,7 +2354,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                                            ty_app_err ki_arg substed_fun_ki
 
       ---------------- HsValArg: a normal argument (fun ty)
-      (HsValArg _ arg : args, Just (ki_binder, inner_ki))
+      (HsValArg _ arg : args, Just (_ma, ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
         | Named (Bndr kv flag) <- ki_binder
         , isInvisibleForAllTyFlag flag   -- ForAllTy with Inferred or Specified
@@ -2266,7 +2395,8 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
         instantiate ki_binder inner_ki
           = do { traceTc "tcInferTyApps (need to instantiate)"
                          (vcat [ ppr ki_binder, ppr subst])
-               ; (subst', arg') <- tcInstInvisibleTyBinder subst ki_binder
+               ; (subst', arg') <-
+                   tcInstInvisibleTyBinder (matchabilityInstantiationMode mode) subst ki_binder
                ; go n (mkAppTy fun arg') subst' inner_ki all_args }
                  -- Because tcInvisibleTyBinder instantiate ki_binder,
                  -- the kind of arg' will have the same shape as the kind
@@ -2429,19 +2559,19 @@ bound variable has a pi-type.  Hence isTrickyTvBinder.
 -}
 
 
-saturateFamApp :: TcType -> TcKind -> TcM (TcType, TcKind)
--- Precondition for (saturateFamApp ty kind):
+saturateFamApp :: TcTyMode -> TcType -> TcKind -> TcM (TcType, TcKind)
+-- Precondition for (saturateFamApp mode ty kind):
 --     typeKind ty = kind
 --
 -- If 'ty' is an unsaturated family application with trailing
 -- invisible arguments, instantiate them.
 -- See Note [saturateFamApp]
 
-saturateFamApp ty kind
+saturateFamApp mode ty kind
   | Just (tc, args) <- tcSplitTyConApp_maybe ty
   , tyConMustBeSaturated tc
   , let n_to_inst = tyConArity tc - length args
-  = do { (extra_args, ki') <- tcInstInvisibleTyBindersN n_to_inst kind
+  = do { (extra_args, ki') <- tcInstInvisibleTyBindersN (matchabilityInstantiationMode mode) n_to_inst kind
        ; return (ty `mkAppTys` extra_args, ki') }
   | otherwise
   = return (ty, kind)
@@ -2489,16 +2619,17 @@ appTypeToArg f (HsTypeArg _ arg  : args)
 -- be saturated and is not yet saturated. It then calls and uses the result
 -- from checkExpectedKindX to build the final type
 checkExpectedKind :: HasDebugCallStack
-                  => HsType GhcRn       -- ^ type we're checking (for printing)
+                  => TcTyMode
+                  -> HsType GhcRn       -- ^ type we're checking (for printing)
                   -> TcType             -- ^ type we're checking
                   -> TcKind             -- ^ the known kind of that type
                   -> TcKind             -- ^ the expected kind
                   -> TcM TcType
 -- Just a convenience wrapper to save calls to 'ppr'
-checkExpectedKind hs_ty ty act_kind exp_kind
+checkExpectedKind mode hs_ty ty act_kind exp_kind
   = do { traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind)
 
-       ; (new_args, act_kind') <- tcInstInvisibleTyBindersN n_to_inst act_kind
+       ; (new_args, act_kind') <- tcInstInvisibleTyBindersN (matchabilityInstantiationMode mode) n_to_inst act_kind
 
        ; let origin = TypeEqOrigin { uo_actual    = act_kind'
                                    , uo_expected  = exp_kind
@@ -2529,15 +2660,15 @@ checkExpectedKind hs_ty ty act_kind exp_kind
       n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
 
 
--- tyr <- checkExpKind hs_ty ty (act_ki :: Kind) (exp_ki :: ExpKind)
+-- tyr <- checkExpKind mode hs_ty ty (act_ki :: Kind) (exp_ki :: ExpKind)
 --     requires that `ty` has kind `act_ki`
 -- It checks that the actual kind `act_ki` matches the expected kind `exp_ki`
 -- and returns `tyr`, a possibly-casted form of `ty`, that has precisely kind `exp_ki`
 -- `hs_ty` is purely for error messages
-checkExpKind :: HsType GhcRn -> TcType -> TcKind -> ExpKind -> TcM TcType
-checkExpKind rn_ty ty ki (Check ki') =
-  checkExpectedKind rn_ty ty ki ki'
-checkExpKind _rn_ty ty ki (Infer cell) = do
+checkExpKind :: TcTyMode -> HsType GhcRn -> TcType -> TcKind -> ExpKind -> TcM TcType
+checkExpKind mode rn_ty ty ki (Check ki') =
+  checkExpectedKind mode rn_ty ty ki ki'
+checkExpKind _mode _rn_ty ty ki (Infer cell) = do
   -- NB: do not instantiate.
   -- See Note [Do not always instantiate eagerly in types]
   co <- fillInferResultNoInst ki cell
@@ -2829,7 +2960,7 @@ newNamedWildTyVar _name   -- Currently ignoring the "_x" wildcard name used in t
 ---------------------------
 tcAnonWildCardOcc :: IsExtraConstraint
                   -> TcTyMode -> HsType GhcRn -> Kind -> TcM TcType
-tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) })
+tcAnonWildCardOcc is_extra mode@(TcTyMode { mode_holes = Just (hole_lvl, hole_mode) })
                   ty exp_kind
     -- hole_lvl: see Note [Checking partial type signatures]
     --           esp the bullet on nested forall types
@@ -2851,7 +2982,7 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
        -- wc_kind with exp_kind, so we could avoid even creating kv
        -- But the level numbers might not allow that unification,
        -- so we have to do it properly (T14140a)
-       ; checkExpectedKind ty (mkTyVarTy wc_tv) wc_kind exp_kind }
+       ; checkExpectedKind mode ty (mkTyVarTy wc_tv) wc_kind exp_kind }
   where
      -- See Note [Wildcard names]
      wc_nm = case hole_mode of
@@ -3045,7 +3176,8 @@ kcCheckDeclHeader_cusk name flav
 
              -- The user-written kind, before eta-expansion
              user_kind :: TcKind
-             user_kind = mkTyConKind all_tcbs res_kind
+             user_kind = mkTyConKindWithMatchability
+                           (tyConFlavourMatchability flav) all_tcbs res_kind
 
        -- Eta expand if necessary; we are building a PolyTyCon
        ; (eta_tcbs, res_kind) <- maybeEtaExpandAlgTyCon flav skol_info all_tcbs res_kind
@@ -3146,7 +3278,8 @@ kcInferDeclHeader name flav
                --     ditto Implicit
                -- See Note [Cloning for type variable binders]
 
-             kind = mkTyConKind tc_binders res_kind
+             kind = mkTyConKindWithMatchability
+                      (tyConFlavourMatchability flav) tc_binders res_kind
              tycon = mkTcTyCon name kind tc_binders 0 res_kind all_tv_prs
                                False -- Make a MonoTcTyCon
                                flav
@@ -3195,9 +3328,10 @@ kcCheckDeclHeader_sig sig_kind name flav
   = addErrCtxt (TyConDeclCtxt name flav) $
     do { skol_info <- mkSkolemInfo (TyConSkol flav name)
        ; let avoid_occs = map nameOccName (hsLTyVarNames hs_tv_bndrs)
-       ; (sig_tcbs :: [TcTyConBinder], sig_res_kind :: Kind)
+       ; (sig_ma_tcbs :: [(Type, TcTyConBinder)], sig_res_kind :: Kind)
              <- splitTyConKind skol_info emptyInScopeSet
                                avoid_occs sig_kind
+       ; let sig_tcbs = map snd sig_ma_tcbs
 
        ; traceTc "kcCheckDeclHeader_sig {" $
            vcat [ text "sig_kind:" <+> ppr sig_kind
@@ -3209,7 +3343,7 @@ kcCheckDeclHeader_sig sig_kind name flav
        ; (tclvl, wanted, (implicit_tvs, (skol_tcbs, skol_scoped_tvs, (extra_tcbs, tycon_res_kind))))
            <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_sig" $  -- #16687
               bindImplicitTKBndrs_Q_Tv implicit_nms                $  -- Q means don't clone
-              matchUpSigWithDecl name sig_tcbs sig_res_kind hs_tv_bndrs $ \ excess_sig_tcbs sig_res_kind ->
+              matchUpSigWithDecl name sig_ma_tcbs sig_res_kind hs_tv_bndrs $ \ excess_ma_tcbs sig_res_kind ->
               do { -- Kind-check the result kind annotation, if present:
                    --    data T a b :: res_ki where ...
                    --               ^^^^^^^^^
@@ -3219,7 +3353,9 @@ kcCheckDeclHeader_sig sig_kind name flav
                    -- Also see Note [Arity of type families and type synonyms]
                  ; res_kind :: ContextKind <- kc_res_ki
 
-                 ; let sig_res_kind' = mkTyConKind excess_sig_tcbs sig_res_kind
+                 ; let (excess_mas, excess_sig_tcbs) = unzip excess_ma_tcbs
+                       sig_res_kind' = mkPiTys
+                         (zip excess_mas (tyConBindersPiTyBinders excess_sig_tcbs)) sig_res_kind
 
                  ; traceTc "kcCheckDeclHeader_sig 2" $
                     vcat [ text "excess_sig_tcbs" <+> ppr excess_sig_tcbs
@@ -3325,10 +3461,10 @@ checkExpectedResKind sig_kind res_ki
 
 matchUpSigWithDecl
   :: Name                        -- Name of the type constructor for error messages
-  -> [TcTyConBinder]             -- TcTyConBinders (with skolem TcTyVars) from the separate kind signature
+  -> [(Type, TcTyConBinder)]     -- Metadata and skolem binders from the separate kind signature
   -> TcKind                      -- The tail end of the kind signature
   -> [LHsTyVarBndr (HsBndrVis GhcRn) GhcRn]     -- User-written binders in decl
-  -> ([TcTyConBinder] -> TcKind -> TcM a)  -- All user-written binders are in scope
+  -> ([(Type, TcTyConBinder)] -> TcKind -> TcM a)  -- All user-written binders are in scope
                                            --   Argument is excess TyConBinders and tail kind
   -> TcM ( [TcTyConBinder]       -- Skolemised binders, with TcTyVars
          , [TcTyVar]             -- Skolem tyvars brought into lexical scope by this matching-up
@@ -3336,18 +3472,20 @@ matchUpSigWithDecl
 -- See Note [Matching a kind signature with a declaration]
 -- Invariant: Length of returned TyConBinders + length of excess TyConBinders
 --            = length of incoming TyConBinders
-matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
-  = go emptySubst sig_tcbs hs_bndrs
+matchUpSigWithDecl name sig_ma_tcbs sig_res_kind hs_bndrs thing_inside
+  = go emptySubst sig_ma_tcbs hs_bndrs
   where
-    go subst tcbs []
-      = do { let (subst', tcbs') = substTyConBindersX subst tcbs
-           ; res <- thing_inside tcbs' (substTy subst' sig_res_kind)
+    go subst ma_tcbs []
+      = do { let (mas, tcbs) = unzip ma_tcbs
+                 (subst', tcbs') = substTyConBindersX subst tcbs
+           ; res <- thing_inside (zip (map (substTy subst') mas) tcbs')
+                                  (substTy subst' sig_res_kind)
            ; return ([], [], res) }
 
     go _ [] hs_bndrs
       = failWithTc (TcRnTooManyBinders sig_res_kind hs_bndrs)
 
-    go subst (tcb : tcbs') hs_bndrs@(hs_bndr : hs_bndrs')
+    go subst ((_ma, tcb) : ma_tcbs') hs_bndrs@(hs_bndr : hs_bndrs')
       | zippable (binderFlag tcb) (hsTyVarBndrFlag (unLoc hs_bndr))
       = -- Visible TyConBinder, so match up with the hs_bndrs
         do { let Bndr tv vis = tcb
@@ -3360,7 +3498,7 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
            ; tc_hs_bndr (unLoc hs_bndr) (tyVarKind tv')
            ; traceTc "musd1" (ppr tcb $$ ppr hs_bndr $$ ppr tv')
            ; (tcbs', tvs, res) <- tcExtendTyVarEnv [tv'] $
-                                  go subst' tcbs' hs_bndrs'
+                                  go subst' ma_tcbs' hs_bndrs'
            ; return (Bndr tv' vis : tcbs', tv':tvs, res) }
              -- We do a tcExtendTyVarEnv [tv'], so we return tv' in
              -- the list of lexically-scoped skolem type variables
@@ -3369,7 +3507,7 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
       = -- Invisible TyConBinder, so do not consume one of the hs_bndrs
         do { let (subst', tcb') = substTyConBinderX subst tcb
            ; traceTc "musd2" (ppr tcb $$ ppr hs_bndr $$ ppr tcb')
-           ; (tcbs', tvs, res) <- go subst' tcbs' hs_bndrs
+           ; (tcbs', tvs, res) <- go subst' ma_tcbs' hs_bndrs
                    -- NB: pass on hs_bndrs unchanged; we do not consume a
                    --     HsTyVarBndr for an invisible TyConBinder
            ; return (tcb' : tcbs', tvs, res) }
@@ -4105,6 +4243,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
        ; go hs_tvs }
   where
     tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info
+                         , mode_declaration = False
                          , mode_indices = emptyNameEnv
                          , mode_complete_type_arg = Nothing }
                  -- Inherit the HoleInfo from the context
@@ -4543,7 +4682,12 @@ etaExpandAlgTyCon :: SkolemInfo
                   -> [TcTyConBinder] -> Kind
                   -> TcM ([TcTyConBinder], Kind)
 etaExpandAlgTyCon skol_info tcbs res_kind
-  = splitTyConKind skol_info in_scope avoid_occs res_kind
+  = do { (ma_tcbs, res_kind) <- splitTyConKind skol_info in_scope avoid_occs res_kind
+       ; solveEqualities "etaExpandAlgTyCon matchability" $
+           forM_ ma_tcbs $ \ (ma, bndr) ->
+             unless (isNamedTyConBinder bndr) $
+               discardResult $ unifyType Nothing ma matchableDataConTy
+       ; return (map snd ma_tcbs, res_kind) }
   where
     tyvars     = binderVars tcbs
     in_scope   = mkInScopeSetList tyvars
@@ -4559,7 +4703,7 @@ splitTyConKind :: SkolemInfo
                -> InScopeSet
                -> [OccName]  -- Avoid these OccNames
                -> Kind       -- Must be zonked
-               -> TcM ([TcTyConBinder], TcKind)
+               -> TcM ([(Type, TcTyConBinder)], TcKind)
 -- ^ GADT decls can have a (perhaps partial) kind signature
 --      e.g.  data T a :: * -> * -> * where ...
 -- This function makes up suitable (kinded) TyConBinders for the
@@ -4586,9 +4730,9 @@ splitTyConKind skol_info in_scope avoid_occs kind
                 = case splitPiTy_maybe kind of
                     Nothing -> (reverse acc, substTy subst kind)
 
-                    Just (Anon arg af, kind')
+                    Just (ma, Anon arg af, kind')
                       -> assert (af == FTF_T_T) $
-                         go occs' uniqs' subst' (tcb : acc) kind'
+                         go occs' uniqs' subst' ((substTy subst ma, tcb) : acc) kind'
                       where
                         tcb    = Bndr tv AnonTCB
                         arg'   = substTy subst (scaledThing arg)
@@ -4600,8 +4744,8 @@ splitTyConKind skol_info in_scope avoid_occs kind
                             _           -> panic "impossible"
                         Inf occ occs' = occs
 
-                    Just (Named (Bndr tv vis), kind')
-                      -> go occs uniqs subst' (tcb : acc) kind'
+                    Just (_, Named (Bndr tv vis), kind')
+                      -> go occs uniqs subst' ((matchableDataConTy, tcb) : acc) kind'
                       where
                         tcb           = Bndr tv' (NamedTCB vis)
                         tc_tyvar      = mkTcTyVar (tyVarName tv) (tyVarKind tv) details
@@ -4641,7 +4785,7 @@ checkDataKindSig data_sort kind
        ; checkTc (tYPE_ok dflags || is_kind_var)
                  (err_msg dflags) }
   where
-    res_kind = snd (tcSplitPiTys kind)
+    (_, _, res_kind) = tcSplitPiTys kind
        -- Look for the result kind after
        -- peeling off any foralls and arrows
 
@@ -4731,7 +4875,7 @@ tcbVisibilities tc orig_args
       = []
 
     go fun_kind subst all_args@(arg : args)
-      | Just (tcb, inner_kind) <- splitPiTy_maybe fun_kind
+      | Just (_, tcb, inner_kind) <- splitPiTy_maybe fun_kind
       = case tcb of
           Anon _ af           -> assert (af == FTF_T_T) $
                                  AnonTCB      : go inner_kind subst  args
@@ -5327,11 +5471,11 @@ together.  Hence the new_implicit_tv function in tcHsPatSigType.
 
 -}
 
-unifyKinds :: [LHsType GhcRn] -> [(TcType, TcKind)] -> TcM ([TcType], TcKind)
-unifyKinds rn_tys act_kinds
+unifyKinds :: TcTyMode -> [LHsType GhcRn] -> [(TcType, TcKind)] -> TcM ([TcType], TcKind)
+unifyKinds mode rn_tys act_kinds
   = do { kind <- newMetaKindVar
        ; let check rn_ty (ty, act_kind)
-               = checkExpectedKind (unLoc rn_ty) ty act_kind kind
+               = checkExpectedKind mode (unLoc rn_ty) ty act_kind kind
        ; tys' <- zipWithM check rn_tys act_kinds
        ; return (tys', kind) }
 

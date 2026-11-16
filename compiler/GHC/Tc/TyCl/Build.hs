@@ -285,9 +285,9 @@ buildPatSyn src_name declared_infix matcher@(_, matcher_ty,_) builder
              matcher builder field_labels
   where
     ((_:_:univ_tvs1), req_theta1, tau) = tcSplitSigmaTy $ matcher_ty
-    ([pat_ty1, cont_sigma, _], _)      = tcSplitFunTys tau
+    (_, [pat_ty1, cont_sigma, _], _) = tcSplitFunTys tau
     (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy (scaledThing cont_sigma)
-    (arg_tys1, _) = (tcSplitFunTys cont_tau)
+    (_, arg_tys1, _) = tcSplitFunTys cont_tau
     twiddle = char '~'
     subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)
                        (mkTyVarTys (binderVars (univ_tvs ++ ex_tvs)))

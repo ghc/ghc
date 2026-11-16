@@ -1632,6 +1632,10 @@ instance Diagnostic TcRnMessage where
       hang (text "Pattern synonym" <+> quotes (ppr name) <+> text "has"
             <+> speakNOf decl_arity (text "argument"))
          2 (text "but its type signature has" <+> int missing <+> text "fewer arrows")
+    TcRnPatSynUnsupportedMatchability name ma -> mkSimpleDecorated $
+      vcat [ text "Pattern synonym" <+> quotes (ppr name)
+               <+> text "has unsupported arrow matchability:" <+> ppr ma
+           , text "Declaration arrows must reduce to Unmatchable (U)." ]
     TcRnPatSynInvalidRhs ps_name lpat _ reason -> mkSimpleDecorated $
       vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
                    <+> quotes (ppr ps_name) <> colon)
@@ -2569,6 +2573,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPatSynArityMismatch{}
       -> ErrorWithoutFlag
+    TcRnPatSynUnsupportedMatchability{}
+      -> ErrorWithoutFlag
     TcRnPatSynInvalidRhs{}
       -> ErrorWithoutFlag
     TcRnTyFamDepsDisabled{}
@@ -3272,6 +3278,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnPatSynArityMismatch{}
       -> noHints
+    TcRnPatSynUnsupportedMatchability{}
+      -> noHints
     TcRnPatSynInvalidRhs name pat args (PatSynNotInvertible _)
       -> [SuggestExplicitBidiPatSyn name pat args]
     TcRnPatSynInvalidRhs{}
@@ -3842,7 +3850,7 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
 deepInvisTvBinders :: TcSigmaType -> [ForAllTyBinder]
 deepInvisTvBinders = go
   where
-    go ty | Just (_arg_ty, res_ty) <- tcSplitFunTy_maybe ty
+    go ty | Just (_ma, _arg_ty, res_ty) <- tcSplitFunTy_maybe ty
           = go res_ty
           | (tvs, body) <- splitForAllForAllTyBinders ty
           , not (null tvs)
@@ -4856,7 +4864,7 @@ pprMismatchMsg ctxt
 
     maybe_num_args_msg = num_args_msg `orElse` empty
 
-    count_args ty = count isVisiblePiTyBinder $ fst $ splitPiTys ty
+    count_args ty = let (_, binders, _) = splitPiTys ty in count isVisiblePiTyBinder binders
 
     ppr_torc TypeLike       = text "type";
     ppr_torc ConstraintLike = text "constraint"
@@ -6031,9 +6039,10 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env ty@(FunTy { ft_mult = w, ft_arg = arg, ft_res = res })
+    tidy_ty env ty@(FunTy { ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res })
       = -- Look under  c => t and t1 -> t2
-        ty { ft_mult = tidy_ty env w
+        ty { ft_ma   = tidy_ty env ma
+           , ft_mult = tidy_ty env w
            , ft_arg  = tidyType env arg
            , ft_res  = tidy_ty env res }
 
@@ -6230,7 +6239,8 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
           (t1_2', t2_2') = go t1_2 t2_2
        in (mkAppTy t1_1' t1_2', mkAppTy t2_1' t2_2')
 
-    go ty1@(FunTy _ w1 t1_1 t1_2) ty2@(FunTy _ w2 t2_1 t2_2) | w1 `eqType` w2 =
+    go ty1@(FunTy _ ma1 w1 t1_1 t1_2) ty2@(FunTy _ ma2 w2 t2_1 t2_2)
+      | ma1 `eqType` ma2, w1 `eqType` w2 =
       let (t1_1', t2_1') = go t1_1 t2_1
           (t1_2', t2_2') = go t1_2 t2_2
        in ( ty1 { ft_arg = t1_1', ft_res = t1_2' }
@@ -6961,7 +6971,7 @@ pprSynAbstractDataError = \case
            Just $ text "Invalid type family" <+> quotes (ppr tc) <> dot
       ty@(ForAllTy {})
         -> Just $ text "Invalid polymorphic type" <> colon <+> ppr ty <> dot
-      ty@(FunTy af _ _ _)
+      ty@(FunTy af _ _ _ _)
         | not (af == FTF_T_T)
         -> Just $ text "Invalid qualified type" <> colon <+> ppr ty <> dot
       _ -> Nothing
@@ -8058,8 +8068,8 @@ pprHsCtxt = \case
 
       (_,_,fun_tau)   = tcSplitNestedSigmaTys fun_res_ty
       (_, _, env_tau) = tcSplitNestedSigmaTys (getCheckExpType env_ty)
-      (args_fun, res_fun) = tcSplitFunTys fun_tau
-      (args_env, res_env) = tcSplitFunTys env_tau
+      (_mas_fun, args_fun, res_fun) = tcSplitFunTys fun_tau
+      (_mas_env, args_env, res_env) = tcSplitFunTys env_tau
       n_fun = length args_fun
       n_env = length args_env
 

@@ -493,7 +493,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
                   do { expected <- liftZonkM (zonkTcType expected)
                      ; let known
                              | hasNativeDependentExpr (Core.Type expected)
-                             , Right (missing, result) <- tcSplitFunTysN
+                             , Right (_mas, missing, result) <- tcSplitFunTysN
                                  (count (not . tupArgPresent) tup_args) expected
                              , Just (tc, tys) <- tcSplitTyConApp_maybe result
                              , tc == tupleTyCon Boxed (length tup_args)
@@ -512,7 +512,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
 
              -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
              -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
-             act_res_ty = mkScaledFunTys missing_tys (mkTupleTy1 boxity arg_tys)
+             act_res_ty = mkScaledFunTysU missing_tys (mkTupleTy1 boxity arg_tys)
 
        ; traceTc "ExplicitTuple" (ppr act_res_ty $$ ppr res_ty)
 
@@ -743,7 +743,7 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
               -- a shallow instantiation should really be enough for
               -- a data constructor.
         ; let arity = conLikeArity con_like
-              Right (arg_tys, actual_res_ty) = tcSplitFunTysN arity con_tau
+              Right (_mas, arg_tys, actual_res_ty) = tcSplitFunTysN arity con_tau
 
         ; checkTc (conLikeHasBuilder con_like) $
           nonBidirectionalErr (conLikeName con_like)
@@ -1326,7 +1326,7 @@ tcSynArgA :: CtOrigin
             -- wrappers to be applied to arguments
             -- and a wrapper to be applied to the overall expression
 tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
-  = do { (match_wrapper, arg_tys, res_ty)
+  = do { (match_wrapper, _mas, arg_tys, res_ty)
            <- matchActualFunTys herald orig (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty ~~> (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)

@@ -46,7 +46,7 @@ mkPrimOpId prim_op
   = id
   where
     (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
-    ty   = mkForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
+    ty   = mkForAllTys tyvars (mkVisFunTysManyU arg_tys res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
                          (AnId id) UserSyntax
@@ -114,7 +114,7 @@ computePrimOpConcTyVarsFromType nm tyvars arg_tys _res_ty = mkNameEnv concs
 -- its type, see 'computePrimOpConcTyVarsFromType'.
 negativeKindPos_maybe :: TcTyVar -> TcType -> Maybe (Position Neg)
 negativeKindPos_maybe tv ty
-  | (args, res) <- splitFunTys ty
+  | (_, args, res) <- splitFunTys ty
   = listToMaybe $ catMaybes $
       ( (if null args then Nothing else Result <$> negativeKindPos_maybe tv res)
       : map recur (zip [1..] args)
@@ -135,7 +135,7 @@ negativeKindPos_maybe tv ty
 -- its type, see 'computePrimOpConcTyVarsFromType'.
 positiveKindPos_maybe :: TcTyVar -> TcType -> Maybe (Position Pos)
 positiveKindPos_maybe tv ty
-  | (args, res) <- splitFunTys ty
+  | (_, args, res) <- splitFunTys ty
   = listToMaybe $ catMaybes $
       ( (if null args then finish res else Result <$> positiveKindPos_maybe tv res)
       : map recur (zip [1..] args)

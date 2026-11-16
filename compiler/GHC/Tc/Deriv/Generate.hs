@@ -1462,7 +1462,7 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
 
 kind1, kind2 :: Kind
 kind1 = typeToTypeKind
-kind2 = liftedTypeKind `mkVisFunTyMany` kind1
+kind2 = liftedTypeKind `mkVisFunTyManyM` kind1
 
 {-
 ************************************************************************
@@ -2111,7 +2111,7 @@ genAuxBindSpecSig loc spec = case spec of
   DerivTag2Con tycon _
     -> mk_sig $ L (noAnnSrcSpan loc) $
        XHsType $ HsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
-       intTy `mkVisFunTyMany` mkParentType tycon
+       intTy `mkVisFunTyManyU` mkParentType tycon
   DerivMaxTag _ _
     -> mk_sig (L (noAnnSrcSpan loc) (XHsType (HsCoreTy intTy)))
   DerivDataDataType _ _ _

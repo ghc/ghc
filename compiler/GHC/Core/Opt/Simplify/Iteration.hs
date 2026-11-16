@@ -2381,9 +2381,9 @@ simplOutId env fun cont
                             -- See Note [No eta-expansion in runRW#]
 
            _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
-                   ; let (m,_,_) = splitFunTy fun_ty
+                   ; let (ma,m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
-                         hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty
+                         hole_ty = mkVisFunTy ma m realWorldStatePrimTy new_runrw_res_ty
                    ; cont' <- pushCastMCo env' arg_mco $
                               ApplyToVal { sc_arg = Var s', sc_cast = MRefl
                                          , sc_env = Simplified OkDup
@@ -4181,7 +4181,7 @@ mkDupableContWithDmds env _
     --   K[ f a b <> ]   -->   join j x = K[ f a b x ]
     --                         j <>
     do { let rhs_ty       = contResultType cont
-             (m,arg_ty,_) = splitFunTy fun_ty
+             (_,m,arg_ty,_) = splitFunTy fun_ty
        ; arg_bndr <- newId (fsLit "arg") m arg_ty
        ; let env' = env `addNewInScopeIds` [arg_bndr]
        ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (Var arg_bndr) fun_ty) cont

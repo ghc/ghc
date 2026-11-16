@@ -552,7 +552,7 @@ dsExpr (RecordCon { rcon_con  = L _ con_like
 -- See Note [Desugaring record construction]
   = do { con_expr' <- dsExpr con_expr
        ; let
-             (arg_tys, _) = tcSplitFunTys (exprType con_expr')
+             (_, arg_tys, _) = tcSplitFunTys (exprType con_expr')
              -- A newtype in the corner should be opaque;
              -- hence TcType.tcSplitFunTys
 
@@ -888,8 +888,9 @@ ds_app_finish :: Id -> [CoreExpr] -> DsM CoreExpr
 ds_app_finish fun_id core_args
   = do { mb_unspecables <- getUnspecables
        ; let fun_ty = idType fun_id
+             (_, pi_bndrs, _) = splitPiTys fun_ty
              free_dicts = exprsFreeVarsList
-                            [ e | (e,pi_bndr) <- core_args `zip` fst (splitPiTys fun_ty)
+                            [ e | (e,pi_bndr) <- core_args `zip` pi_bndrs
                                 , isInvisibleAnonPiTyBinder pi_bndr ]
 
              fun | Just unspecables <- mb_unspecables

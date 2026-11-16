@@ -243,7 +243,7 @@ seqId = pcRepPolyId seqName ty concs info
     ty  =
       mkInfForAllTy runtimeRep2TyVar
       $ mkSpecForAllTys [alphaTyVar, openBetaTyVar]
-      $ mkVisFunTyMany alphaTy (mkVisFunTyMany openBetaTy openBetaTy)
+      $ mkVisFunTyManyU alphaTy (mkVisFunTyManyU openBetaTy openBetaTy)
 
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
     rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
@@ -259,7 +259,7 @@ lazyId :: Id    -- See Note [lazyId magic]
 lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo
-    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyManyU alphaTy alphaTy)
 
 ------------------------------------------------
 noinlineIdName, noinlineConstraintIdName :: Name
@@ -273,21 +273,21 @@ noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo
     ty  = mkSpecForAllTys [alphaTyVar] $
-          mkVisFunTyMany alphaTy alphaTy
+          mkVisFunTyManyU alphaTy alphaTy
 
 noinlineConstraintId :: Id -- See Note [noinlineId magic]
 noinlineConstraintId = pcMiscPrelId noinlineConstraintIdName ty info
   where
     info = noCafIdInfo
     ty   = mkSpecForAllTys [alphaConstraintTyVar] $
-           mkFunTy visArgConstraintLike ManyTy alphaTy alphaConstraintTy
+           mkFunTy visArgConstraintLike unmatchableDataConTy ManyTy alphaTy alphaConstraintTy
 
 ------------------------------------------------
 nospecId :: Id -- See Note [nospecId magic]
 nospecId = pcMiscPrelId nospecIdName ty info
   where
     info = noCafIdInfo
-    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyManyU alphaTy alphaTy)
 
 oneShotId :: Id -- See Note [oneShot magic]
 oneShotId = pcRepPolyId oneShotName ty concs info
@@ -298,8 +298,8 @@ oneShotId = pcRepPolyId oneShotName ty concs info
     -- oneShot :: forall {r1 r2} (a :: TYPE r1) (b :: TYPE r2). (a -> b) -> (a -> b)
     ty  = mkInfForAllTys  [ runtimeRep1TyVar, runtimeRep2TyVar ] $
           mkSpecForAllTys [ openAlphaTyVar, openBetaTyVar ]      $
-          mkVisFunTyMany fun_ty fun_ty
-    fun_ty = mkVisFunTyMany openAlphaTy openBetaTy
+          mkVisFunTyManyU fun_ty fun_ty
+    fun_ty = mkVisFunTyManyU openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
     x' = setOneShotLambda x  -- Here is the magic bit!
     rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
@@ -343,7 +343,7 @@ leftSectionId = pcRepPolyId leftSectionName ty concs info
     ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar, multiplicityTyVar1] $
           mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar]    $
           exprType body
-    [f,x] = mkTemplateLocals [mkVisFunTy mult openAlphaTy openBetaTy, openAlphaTy]
+    [f,x] = mkTemplateLocals [mkVisFunTy unmatchableDataConTy mult openAlphaTy openBetaTy, openAlphaTy]
 
     mult = mkTyVarTy multiplicityTyVar1 :: Mult
     xmult = setIdMult x mult
@@ -375,7 +375,7 @@ rightSectionId = pcRepPolyId rightSectionName ty concs info
     mult1 = mkTyVarTy multiplicityTyVar1
     mult2 = mkTyVarTy multiplicityTyVar2
 
-    [f,x,y] = mkTemplateLocals [ mkScaledFunTys [ Scaled mult1 openAlphaTy
+    [f,x,y] = mkTemplateLocals [ mkScaledFunTysU [ Scaled mult1 openAlphaTy
                                                 , Scaled mult2 openBetaTy ] openGammaTy
                                , openAlphaTy, openBetaTy ]
     xmult = setIdMult x mult1
@@ -409,7 +409,7 @@ boxId = pcRepPolyId boxIdName ty concs info
     info = noCafIdInfo
     ty  = mkInfForAllTys  [ runtimeRep1TyVar ] $
           mkSpecForAllTys [ openAlphaTyVar ]   $
-          mkVisFunTyMany openAlphaTy
+          mkVisFunTyManyU openAlphaTy
           (mkTyConApp boxTyCon [runtimeRep1Ty, openAlphaTy])
     concs = mkRepPolyIdConcreteTyVars
           [((openAlphaTy, mkArgPos 1 Top), runtimeRep1TyVar)]
@@ -425,7 +425,7 @@ unboxId = pcRepPolyId unboxIdName ty concs info
     info = noCafIdInfo
     ty  = mkInfForAllTys  [ runtimeRep1TyVar ] $
           mkSpecForAllTys [ openAlphaTyVar ]   $
-          mkVisFunTyMany
+          mkVisFunTyManyU
             (mkTyConApp boxTyCon [runtimeRep1Ty, openAlphaTy])
             openAlphaTy
     concs = mkRepPolyIdConcreteTyVars
@@ -447,7 +447,7 @@ coerceId = pcRepPolyId coerceName ty concs info
                                  , Bndr av SpecifiedSpec
                                  , Bndr bv SpecifiedSpec ] $
                 mkInvisFunTy eqRTy $
-                mkVisFunTyMany a b
+                mkVisFunTyManyU a b
 
     bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeRepTy
                         (\r -> [mkTYPEapp r, mkTYPEapp r])

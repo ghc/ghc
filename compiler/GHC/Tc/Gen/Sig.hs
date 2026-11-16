@@ -75,6 +75,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 
+import GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 import GHC.Builtin( mkUnboundName )
 import GHC.Unit.Module( Module, getModule )
 
@@ -427,7 +428,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        -- Note that, in practice, reducible type family applications will have
        -- been reduced already, due to the logic described in
        -- Note [Prevent unification with type families] in GHC.Tc.Utils.Unify.
-       ; let (arg_tys, res_ty) = tcSplitFunTys body_ty
+       ; let (_mas, arg_tys, res_ty) = tcSplitFunTys body_ty
        ; mapM_
            (\(Scaled _ arg_ty) -> checkTypeHasFixedRuntimeRep FixedRuntimeRepPatSynSigArg arg_ty)
            arg_tys
@@ -466,7 +467,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
     -- (We also called build_patsyn_type on the fully zonked type, so mkPhiTy
     --  would work; but it doesn't seem worth duplicating the code.)
     mk_naked_phi_ty :: [TcPredType] -> TcType -> TcType
-    mk_naked_phi_ty theta body = foldr (mkNakedFunTy invisArgTypeLike) body theta
+    mk_naked_phi_ty theta body = foldr (mkNakedFunTy unmatchableDataConTy invisArgTypeLike) body theta
 
 ppr_tvs :: [TyVar] -> SDoc
 ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)

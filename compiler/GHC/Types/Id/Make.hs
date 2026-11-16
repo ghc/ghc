@@ -382,7 +382,7 @@ mkDictSelId name clas
     pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
     res_ty  = scaledThing (getNth arg_tys val_index)
     sel_ty  = mkForAllTys tyvars $
-              mkFunctionType ManyTy pred_ty res_ty
+              mkFunctionType unmatchableDataConTy ManyTy pred_ty res_ty
              -- See Note [Type classes and linear types]
 
     terminating = isTerminatingType res_ty || definitelyUnliftedType res_ty
@@ -1828,7 +1828,7 @@ wrapFamInstBody tycon args mb_fun_arg body
           let af = case typeTypeOrConstraint ty of
                      TypeLike -> FTF_T_T
                      ConstraintLike -> FTF_C_T
-          in mkFunCo Representational af (mkNomReflCo m) (mkRepReflCo ty)
+          in mkFunCo Representational af (mkNomReflCo unmatchableDataConTy) (mkNomReflCo m) (mkRepReflCo ty)
 
 {-
 ************************************************************************
@@ -1865,7 +1865,7 @@ mkFCallId uniq fcall ty
            `setDmdSigInfo` strict_sig
            `setCprSigInfo` topCprSig
 
-    (bndrs, _) = tcSplitPiTys ty
+    (_, bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonPiTyBinder bndrs
     strict_sig = mkVanillaDmdSig arity topDiv
     -- the call does not claim to be strict in its arguments, since they

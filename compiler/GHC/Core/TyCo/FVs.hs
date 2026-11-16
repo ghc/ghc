@@ -65,7 +65,9 @@ module GHC.Core.TyCo.FVs
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Core.Type( partitionInvisibleTypes, coreView, rewriterView )
+import {-# SOURCE #-} GHC.Core.Type
+  ( partitionInvisibleTypes, coreView, coreFullView, rewriterView
+  , typeKind, isMatchableFunTy )
 
 import GHC.Builtin.WiredIn.Prim( funTyFlagTyCon )
 
@@ -907,8 +909,9 @@ almost_devoid_co_var_of_co (DepFunCo v domain co) cv
 almost_devoid_co_var_of_co (ForAllCo { fco_tcv = v, fco_kind = kind_co, fco_body = co }) cv
   = almost_devoid_co_var_of_mco kind_co cv
   && (v == cv || almost_devoid_co_var_of_co co cv)
-almost_devoid_co_var_of_co (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 }) cv
-  =  almost_devoid_co_var_of_co w   cv
+almost_devoid_co_var_of_co (FunCo { fco_ma = ma, fco_mult = w, fco_arg = co1, fco_res = co2 }) cv
+  =  almost_devoid_co_var_of_co ma  cv
+  && almost_devoid_co_var_of_co w   cv
   && almost_devoid_co_var_of_co co1 cv
   && almost_devoid_co_var_of_co co2 cv
 almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
@@ -958,8 +961,9 @@ almost_devoid_co_var_of_type (LitTy {}) _ = True
 almost_devoid_co_var_of_type (AppTy fun arg) cv
   = almost_devoid_co_var_of_type fun cv
   && almost_devoid_co_var_of_type arg cv
-almost_devoid_co_var_of_type (FunTy _ w arg res) cv
-  = almost_devoid_co_var_of_type w cv
+almost_devoid_co_var_of_type (FunTy _ ma w arg res) cv
+  = almost_devoid_co_var_of_type ma cv
+  && almost_devoid_co_var_of_type w cv
   && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
 almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
@@ -1004,7 +1008,8 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
         invisible (tyCoVarsOfType $ varType v)
     go (AppTy t1 t2)     = go t1 `mappend` go t2
     go (TyConApp tc tys) = go_tc tc tys
-    go (FunTy _ w t1 t2) = go w `mappend` go t1 `mappend` go t2
+    go (FunTy _ ma w t1 t2) = invisible (tyCoVarsOfType ma) `mappend`
+                               go w `mappend` go t1 `mappend` go t2
     go (ForAllTy (Bndr tv _) ty)
       = ((`delVarSet` tv) <$> go ty) `mappend`
         (invisible (tyCoVarsOfType $ varType tv))
@@ -1027,6 +1032,30 @@ visVarsOfTypes = foldMap visVarsOfType
 *                                                                      *
 ********************************************************************* -}
 
+{- Note [Matchability and injective variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An application determines its function and argument only when the consumed
+kind binder is matchable. A U arrow does not permit this inversion. A forall
+keeps its existing implicit M classification in this stage.
+
+For an oversaturated TyConApp, inspect the residual kind of each application.
+The declared family prefix and its result kind have separate rules. Rebuild
+only the excess arguments as AppTy nodes, then use the same check as AppTy.
+Do not treat every excess family argument as injective.
+
+A FunTy is a structural application of the FUN constructor. Its metadata is
+injective even when that metadata is U. This does not invert a U function's
+result.
+-}
+
+-- | Test whether an application permits inverse function and argument evidence.
+-- See Note [Matchability and injective variables].
+injectiveAppTy :: Type -> Bool
+injectiveAppTy fun
+  = case coreFullView (typeKind fun) of
+      ForAllTy {} -> True
+      kind        -> isMatchableFunTy kind
+
 isInjectiveInType :: TyVar -> Type -> Bool
 -- True <=> tv /definitely/ appears injectively in ty
 -- A bit more efficient that (tv `elemVarSet` injectiveTyVarsOfType ty)
@@ -1040,8 +1069,9 @@ isInjectiveInType tv ty
     go (TermAppTy {})                   = False
     go (TermVarTy v)                    = v == tv
     go (DepFunTy v ty)                  = go (varType v) || (tv /= v && go ty)
-    go (AppTy f a)                      = go f || go a
-    go (FunTy _ w ty1 ty2)              = go w || go ty1 || go ty2
+    -- See Note [Matchability and injective variables].
+    go (AppTy f a)                      = injectiveAppTy f && (go f || go a)
+    go (FunTy _ ma w ty1 ty2)           = go ma || go w || go ty1 || go ty2
     go (TyConApp tc tys)                = go_tc tc tys
     go (ForAllTy (Bndr tv' _) ty)       = go (tyVarKind tv')
                                           || (tv /= tv' && go ty)
@@ -1049,8 +1079,12 @@ isInjectiveInType tv ty
     go (CastTy ty _)                    = go ty
     go CoercionTy{}                     = False
 
-    go_tc tc tys | isTypeFamilyTyCon tc = False
-                 | otherwise            = any go tys
+    -- See Note [Matchability and injective variables].
+    go_tc tc tys
+      | (args, extra@(_:_)) <- splitAt (tyConArity tc) tys
+      = go (foldl AppTy (TyConApp tc args) extra)
+      | isTypeFamilyTyCon tc = False
+      | otherwise           = any go tys
 
 -- | Returns the free variables of a 'Type' that are in injective positions.
 -- Specifically, it finds the free variables while:
@@ -1108,8 +1142,11 @@ inj_vars_of_type look_under_tfs = go
     go (TermVarTy v)                    = deepUnitFV (go . varType) v
     go (DepFunTy v ty)                  = go (varType v) `mappend`
                                           addBndrFV v (go ty)
-    go (AppTy f a)                      = go f `mappend` go a
-    go (FunTy _ w ty1 ty2)              = go w `mappend` go ty1 `mappend` go ty2
+    -- See Note [Matchability and injective variables].
+    go (AppTy f a)
+      | injectiveAppTy f               = go f `mappend` go a
+      | otherwise                     = mempty
+    go (FunTy _ ma w ty1 ty2)           = go ma `mappend` go w `mappend` go ty1 `mappend` go ty2
     go (TyConApp tc tys)                = go_tc tc tys
     go (ForAllTy (Bndr tv _) ty)        = go (tyVarKind tv) `mappend`
                                           addBndrFV tv (go ty)
@@ -1117,14 +1154,15 @@ inj_vars_of_type look_under_tfs = go
     go (CastTy ty _)                    = go ty
     go CoercionTy{}                     = mempty
 
+    -- See Note [Matchability and injective variables].
     go_tc tc tys
+      | (args, extra@(_:_)) <- splitAt (tyConArity tc) tys
+      = go (foldl AppTy (TyConApp tc args) extra)
       | isTypeFamilyTyCon tc
       = if | look_under_tfs
            , Injective flags <- tyConInjectivityInfo tc
            -> mapUnionFV go $
-              filterByList (flags ++ repeat True) tys
-                         -- Oversaturated arguments to a tycon are
-                         -- always injective, hence the repeat True
+              filterByList flags tys
            | otherwise   -- No injectivity info for this type family
            -> mempty
 
@@ -1159,8 +1197,9 @@ invisibleVarsOfType = go
     go (DepFunTy v ty)
       = tyCoVarsOfType (varType v) `unionVarSet` (go ty `delVarSet` v)
     go (AppTy f a)         = go f `unionVarSet` go a
-    go (FunTy _ w ty1 ty2) = go ty1 `unionVarSet` go w `unionVarSet` go ty2
-                             -- As per #23764, order is: arg, mult, res.
+    go (FunTy _ ma w ty1 ty2)
+      = go ty1 `unionVarSet` tyCoVarsOfType ma `unionVarSet` go w `unionVarSet` go ty2
+                             -- Keep the arg, mult, res order from #23764.
     go (TyConApp tc tys)   = tyCoVarsOfTypes invisibles `unionVarSet`
                              invisibleVarsOfTypes visibles
       where (invisibles, visibles) = partitionInvisibleTypes tc tys
@@ -1312,7 +1351,7 @@ tyConsOfType ty
      go (LitTy {})                  = emptyUniqSet
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` tyConsOfTypes tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
-     go (FunTy af w a b)            = go w `unionUniqSets`
+     go (FunTy af ma w a b)         = go ma `unionUniqSets` go w `unionUniqSets`
                                       go a `unionUniqSets` go b
                                       `unionUniqSets` go_tc (funTyFlagTyCon af)
      go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varType tv)
@@ -1327,8 +1366,8 @@ tyConsOfType ty
      go_co (DepFunCo v domain co)  = go (varType v) `unionUniqSets` go_mco domain `unionUniqSets` go_co co
      go_co (ForAllCo { fco_kind = kind_co, fco_body = co })
                                    = go_mco kind_co `unionUniqSets` go_co co
-     go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
-                                   = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
+     go_co (FunCo { fco_ma = ma, fco_mult = m, fco_arg = a, fco_res = r })
+                                   = go_co ma `unionUniqSets` go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
      go_co (AxiomCo ax args)       = go_ax ax `unionUniqSets` go_cos args
      go_co (UnivCo { uco_lty = t1, uco_rty = t2 })
                                    = go t1 `unionUniqSets` go t2
@@ -1472,11 +1511,12 @@ occCheckExpand vs_to_avoid ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
                                 ; ty2' <- go cxt ty2
                                 ; return (AppTy ty1' ty2') }
-    go cxt ty@(FunTy _ w ty1 ty2)
-       = do { w'   <- go cxt w
+    go cxt ty@(FunTy _ ma w ty1 ty2)
+       = do { ma'  <- go cxt ma
+            ; w'   <- go cxt w
             ; ty1' <- go cxt ty1
             ; ty2' <- go cxt ty2
-            ; return (ty { ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
+            ; return (ty { ft_ma = ma', ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
     go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
        = do { ki' <- go cxt (varType tv)
             ; let tv'  = setVarType tv ki'
@@ -1565,11 +1605,12 @@ occCheckExpand vs_to_avoid ty
            ; body' <- go_co (as', env') body_co
            ; return (co { fco_tcv = tcv', fco_kind = kind_co', fco_body = body' }) }
 
-    go_co cxt co@(FunCo { fco_mult = w, fco_arg = co1 ,fco_res = co2 })
-      = do { co1' <- go_co cxt co1
+    go_co cxt co@(FunCo { fco_ma = ma, fco_mult = w, fco_arg = co1 ,fco_res = co2 })
+      = do { ma' <- go_co cxt ma
+           ; co1' <- go_co cxt co1
            ; co2' <- go_co cxt co2
            ; w' <- go_co cxt w
-           ; return (co { fco_mult = w', fco_arg = co1', fco_res = co2' })}
+           ; return (co { fco_ma = ma', fco_mult = w', fco_arg = co1', fco_res = co2' })}
 
     go_co cxt (CoVarCo c)               = CoVarCo <$> go_cv cxt c
     go_co cxt co@(HoleCo h)             = co <$ go_hole cxt h

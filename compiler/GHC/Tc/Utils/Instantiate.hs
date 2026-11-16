@@ -41,7 +41,8 @@ import GHC.Driver.Session
 import GHC.Driver.Env
 
 import GHC.Builtin.KnownOccs( rationalTyConOcc )
-import GHC.Builtin.WiredIn.Types( boolTy, eqClass, integerTy )
+import GHC.Builtin.WiredIn.Types( boolTy, eqClass, integerTy, matchabilityTy,
+                                matchableDataConTy, unmatchableDataConTy )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type   ( hsLitType )
@@ -488,9 +489,9 @@ instStupidTheta orig theta
 -- | Given ty::forall k1 k2. k, instantiate all the invisible forall-binders
 --   returning ty @kk1 @kk2 :: k[kk1/k1, kk2/k1]
 -- Called only to instantiate kinds, in user-written type signatures
-tcInstInvisibleTyBinders :: TcType -> TcKind -> TcM (TcType, TcKind)
-tcInstInvisibleTyBinders ty kind
-  = do { (extra_args, kind') <- tcInstInvisibleTyBindersN n_invis kind
+tcInstInvisibleTyBinders :: Maybe TypeOrKind -> TcType -> TcKind -> TcM (TcType, TcKind)
+tcInstInvisibleTyBinders mode ty kind
+  = do { (extra_args, kind') <- tcInstInvisibleTyBindersN mode n_invis kind
        ; return (mkAppTys ty extra_args, kind') }
   where
     n_invis = invisibleBndrCount kind
@@ -499,11 +500,11 @@ tcInstInvisibleTyBinders ty kind
        -- is big enough! Does not matter if it is too big.
        -- 10,000 would do equally well :-)
 
-tcInstInvisibleTyBindersN :: Int -> TcKind -> TcM ([TcType], TcKind)
+tcInstInvisibleTyBindersN :: Maybe TypeOrKind -> Int -> TcKind -> TcM ([TcType], TcKind)
 -- Called only to instantiate kinds, in user-written type signatures
-tcInstInvisibleTyBindersN 0 kind
+tcInstInvisibleTyBindersN _ 0 kind
   = return ([], kind)
-tcInstInvisibleTyBindersN n ty
+tcInstInvisibleTyBindersN mode n ty
   = go n empty_subst ty
   where
     empty_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
@@ -512,16 +513,25 @@ tcInstInvisibleTyBindersN n ty
       | n > 0
       , Just (bndr, body) <- tcSplitForAllTyVarBinder_maybe kind
       , isInvisibleForAllTyFlag (binderFlag bndr)
-      = do { (subst', arg) <- tcInstInvisibleTyBinder subst (binderVar bndr)
+      = do { (subst', arg) <- tcInstInvisibleTyBinder mode subst (binderVar bndr)
            ; (args, inner_ty) <- go (n-1) subst' body
            ; return (arg:args, inner_ty) }
       | otherwise
       = return ([], substTy subst kind)
 
-tcInstInvisibleTyBinder :: Subst -> TyVar -> TcM (Subst, TcType)
+tcInstInvisibleTyBinder :: Maybe TypeOrKind -> Subst -> TyVar -> TcM (Subst, TcType)
 -- Called only to instantiate kinds, in user-written type signatures
 
-tcInstInvisibleTyBinder subst tv
+tcInstInvisibleTyBinder mode subst tv
+  -- See Note [Implicit ordinary-arrow matchability] in GHC.Tc.Gen.HsType.
+  -- Nothing defers the default for a checked declaration kind.
+  | tcEqType (substTy subst (tyVarKind tv)) matchabilityTy
+  , Just tyki <- mode
+  = let ma = case tyki of
+               TypeLevel -> unmatchableDataConTy
+               KindLevel -> matchableDataConTy
+    in return (extendTvSubstAndInScope subst tv ma, ma)
+  | otherwise
   = do { (subst', tv') <- newMetaTyVarX subst tv
        ; return (subst', mkTyVarTy tv') }
 

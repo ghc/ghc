@@ -81,7 +81,7 @@ dsCFExport:: Id                 -- Either the exported Id,
 dsCFExport fn_id co ext_name cconv isDyn = do
     let
        ty                     = coercionRKind co
-       (bndrs, orig_res_ty)   = tcSplitPiTys ty
+       (_, bndrs, orig_res_ty)   = tcSplitPiTys ty
        fe_arg_tys'            = mapMaybe anonPiTyBinderType_maybe bndrs
        -- We must use tcSplits here, because we want to see
        -- the (IO t) in the corner of the type!
@@ -182,7 +182,7 @@ dsCFExportDynamic id co0 cconv = do
     stable_ptr_tycon <- dsLookupKnownKeyTyCon stablePtrTyConKey
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
-        export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
+        export_ty     = mkVisFunTyManyU stable_ptr_ty arg_ty
     bindIOId <- dsLookupKnownOccId bindIOIdOcc
     stbl_value <- newSysLocalMDs stable_ptr_ty
     (h_code, c_code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv ExportIsDynamic
@@ -223,7 +223,7 @@ dsCFExportDynamic id co0 cconv = do
  where
   ty                           = coercionLKind co0
   (tvs,sans_foralls)           = tcSplitForAllInvisTyVars ty
-  ([scaled_arg_ty], fn_res_ty) = tcSplitFunTys sans_foralls
+  (_, [scaled_arg_ty], fn_res_ty) = tcSplitFunTys sans_foralls
   arg_ty                       = scaledThing scaled_arg_ty
   Just (io_tc, res_ty)         = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
@@ -236,10 +236,10 @@ dsFCall fn_id co fcall mDeclHeader = do
     let
         (ty,ty1)             = (coercionLKind co, coercionRKind co)
         (tv_bndrs, rho)      = tcSplitForAllTyVarBinders ty
-        (arg_tys, io_res_ty) = tcSplitFunTys rho
+        (_, arg_tys, io_res_ty) = tcSplitFunTys rho
 
     let constQual -- provide 'const' qualifier (#22043)
-          | (_, res_ty1) <- tcSplitFunTys ty1
+          | (_, _, res_ty1) <- tcSplitFunTys ty1
           , newty <- maybe res_ty1 snd (tcSplitIOType_maybe res_ty1)
           , Just (ptr, _) <- splitTyConApp_maybe newty
           , tyConName ptr `hasKnownKey` constPtrTyConKey
@@ -308,7 +308,7 @@ dsFCall fn_id co fcall mDeclHeader = do
     dflags <- getDynFlags
     let
         -- Build the worker
-        worker_ty     = mkForAllTys tv_bndrs (mkVisFunTysMany (map idType work_arg_ids) ccall_result_ty)
+        worker_ty     = mkForAllTys tv_bndrs (mkVisFunTysManyU (map idType work_arg_ids) ccall_result_ty)
         tvs           = map binderVar tv_bndrs
         the_ccall_app = mkFCall ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)

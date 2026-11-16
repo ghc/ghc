@@ -90,6 +90,7 @@ import GHC.Core.Multiplicity
 
 import GHC.Builtin.KnownKeys ( makeStaticKey, unsafeEqualityProofIdKey, unsafeReflDataConKey )
 import GHC.Builtin.PrimOps
+import GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 
 import GHC.Types.Var
 import GHC.Types.SrcLoc
@@ -202,7 +203,7 @@ mkLamType v body_ty
        (ppr v $$ ppr body_ty)
 
    | otherwise
-   = mkFunctionType (idMult v) (idType v) body_ty
+   = mkFunctionType unmatchableDataConTy (idMult v) (idType v) body_ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 
@@ -258,7 +259,7 @@ applyTypeToArgs op_ty args
       , retained_arg b arg
       = let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)
         in go (substTy (Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv) res_ty) args
-    go op_ty (_ : args)           | Just (_, _, _, res_ty) <- splitFunTy_maybe op_ty
+    go op_ty (_ : args)           | Just (_, _, _, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
     go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
 
@@ -2029,7 +2030,7 @@ isExpandableApp fn n_val_args
        | n_val_args == 0
        = True
 
-       | Just (bndr, ty) <- splitPiTy_maybe ty
+       | Just (_, bndr, ty) <- splitPiTy_maybe ty
        = case bndr of
            Named {}  -> all_pred_args n_val_args ty
            Anon _ af -> isInvisibleFunArg af && all_pred_args (n_val_args-1) ty

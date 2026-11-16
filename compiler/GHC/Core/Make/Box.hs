@@ -477,7 +477,7 @@ boxDictTy c = mkTyConApp dictBoxTyCon [liftConstraint c]
 --
 -- See [Boxing constraints] in GHC.Builtin.WiredIn.Types.Box.
 liftConstraint :: Type -> Type
-liftConstraint c = mkFunTy visArgConstraintLike ManyTy unboxedUnitTy c
+liftConstraint c = mkFunTy visArgConstraintLike unmatchableDataConTy ManyTy unboxedUnitTy c
 
 -- | Recover the original constraint from one made lifted via 'liftConstraint',
 -- by applying it to @(##)@.

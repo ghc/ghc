@@ -6,7 +6,9 @@ import GHC.Prelude
 import GHC.Settings.Config
 
 hiVersion :: Integer
-hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
+-- The suffix changes when the fork changes a common interface payload.
+-- Reject older ordinary-arrow payloads before decoding their fields.
+hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "63") :: Integer
 
 -- All pretty arbitrary:
 

@@ -12,7 +12,7 @@
 -- type representations.
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE PolyKinds, DataKinds, ScopedTypeVariables, Unsafe #-}
+{-# LANGUAGE PolyKinds, DataKinds, ScopedTypeVariables, TypeApplications, Unsafe #-}
 
 module GHC.Internal.Type.Reflection.Unsafe (
       -- * Type representations
@@ -24,12 +24,14 @@ module GHC.Internal.Type.Reflection.Unsafe (
   ) where
 
 import GHC.Internal.Types -- For known-occ names
+import GHC.Internal.Prim (FUN)
 import GHC.Internal.Data.Typeable.Internal hiding (mkTrApp)
 import qualified GHC.Internal.Data.Typeable.Internal as TI
 
 -- | Construct a representation for a type application.
-mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
-           TypeRep (a :: k1 -> k2)
+mkTrApp :: forall {ma :: Matchability} k1 k2
+                  (a :: FUN @ma 'Many k1 k2) (b :: k1).
+           TypeRep a
         -> TypeRep (b :: k1)
         -> TypeRep (a b)
 mkTrApp = TI.mkTrAppChecked

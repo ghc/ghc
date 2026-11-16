@@ -68,7 +68,7 @@ bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
           letExp = StgLet noExtFieldSilent bnd (StgApp id [])
       pure letExp
   | otherwise = do
-      id <- newId (mkVisFunTyMany realWorldStatePrimTy tick_ty)
+      id <- newId (mkVisFunTyManyU realWorldStatePrimTy tick_ty)
       rhs' <- bcPrepExpr rhs
       let expr' = StgTick bp rhs'
           bnd = StgNonRec id (StgRhsClosure noExtFieldSilent
@@ -140,7 +140,7 @@ isNNLJoinPoint x = isJoinId x && mightBeUnliftedType (idType x)
 protectNNLJoinPointId :: Id -> Id
 protectNNLJoinPointId x
   = assert (isNNLJoinPoint x )
-    updateIdTypeButNotMult (unboxedUnitTy `mkVisFunTyMany`) x
+    updateIdTypeButNotMult (unboxedUnitTy `mkVisFunTyManyU`) x
 
 newUnique :: BcPrepM Unique
 newUnique = state $

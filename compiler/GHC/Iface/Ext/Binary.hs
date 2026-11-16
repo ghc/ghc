@@ -139,19 +139,20 @@ type HieHeader = (Integer, ByteString)
 
 -- | Read a `HieFile` from a `FilePath`. Can use
 -- an existing `NameCache`. Allows you to specify
--- which versions of hieFile to attempt to read.
--- `Left` case returns the failing header versions.
+-- which files with the current HIE format to read.
+-- `Left` case returns the rejected header versions.
 readHieFileWithVersion :: (HieHeader -> Bool) -> NameCache -> FilePath -> IO (Either HieHeader HieFileResult)
 readHieFileWithVersion readVersion name_cache file = do
   bh0 <- readBinMem file
 
-  (hieVersion, ghcVersion) <- readHieFileHeader file bh0
+  (readHieVersion, ghcVersion) <- readHieFileHeader file bh0
 
-  if readVersion (hieVersion, ghcVersion)
+  -- See Note [HIE arrow matchability] in GHC.Iface.Ext.Types.
+  if readHieVersion == hieVersion && readVersion (readHieVersion, ghcVersion)
   then do
     hieFile <- readHieFileContents bh0 name_cache
-    return $ Right (HieFileResult hieVersion ghcVersion hieFile)
-  else return $ Left (hieVersion, ghcVersion)
+    return $ Right (HieFileResult readHieVersion ghcVersion hieFile)
+  else return $ Left (readHieVersion, ghcVersion)
 
 
 -- | Read a `HieFile` from a `FilePath`. Can use
@@ -164,6 +165,7 @@ readHieFile name_cache file = do
   (readHieVersion, ghcVersion) <- readHieFileHeader file bh0
 
   -- Check if the versions match
+  -- See Note [HIE arrow matchability] in GHC.Iface.Ext.Types.
   when (readHieVersion /= hieVersion) $
     panic $ unwords ["readHieFile: hie file versions don't match for file:"
                     , file

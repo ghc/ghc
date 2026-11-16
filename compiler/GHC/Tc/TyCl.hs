@@ -537,7 +537,11 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
        ; (tyclss_with_validity_infos, data_deriv_info, kindless) <-
            tcExtendKindEnv (mkPromotionErrorEnv tyclds) $ -- See Note [Type environment evolution]
-           do { kisig_env <- mkNameEnv <$> traverse tcStandaloneKindSig kisigs
+           do { let decl_env = mkNameEnv [ (tcdName decl, decl)
+                                         | L _ decl <- tyclds ]
+                    check_kisig kisig@(L _ (StandaloneKindSig _ (L _ name) _))
+                      = tcStandaloneKindSig (lookupNameEnv_NF decl_env name) kisig
+              ; kisig_env <- mkNameEnv <$> traverse check_kisig kisigs
               ; tcTyClDecls tyclds kisig_env role_annots }
        ; let tyclss = map fst tyclss_with_validity_infos
            -- Step 1.5: Make sure we don't have any type synonym cycles
@@ -1554,11 +1558,12 @@ generaliseTcTyConKind inferred_tvs sorted_spec_tvs req_bndrs0 ki0 =
       = ty
     mk_req_foralls (Bndr tv vis:bndrs) ty =
       case ty of
-        FunTy af w arg res ->
+        FunTy af ma w arg res ->
           case vis of
             NamedTCB ftf ->
+              -- Named quantifiers keep implicit M. Family saturation still applies.
               mkForAllTy (Bndr tv ftf) $ mk_req_foralls bndrs res
-            _ -> mkFunTy af w arg $ mk_req_foralls bndrs res
+            _ -> mkFunTy af ma w arg $ mk_req_foralls bndrs res
         ForAllTy bndr' ty' ->
           mkForAllTy bndr' $ mk_req_foralls bndrs ty'
         _ ->
@@ -4137,7 +4142,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
              fake_ty  = mkSpecForAllTys  tc_tvs      $
                         mkInvisForAllTys exp_tvbndrs $
                         tcMkPhiTy ctxt               $
-                        tcMkScaledFunTys arg_tys     $
+                        tcMkScaledFunTysU arg_tys     $
                         unitTy
              -- That type is a lie, of course. (It shouldn't end in ()!)
              -- And we could construct a proper result type from the info
@@ -4219,7 +4224,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
               ; (retained, suffix_ty) <-
                   tcCheckRetainedConType True (tcDataConMult IsPrefixConGADT) hs_res_ty
               ; return (replicate (length prefix) Nothing ++ retained,
-                        tcMkScaledFunTys (map fst prefix) suffix_ty) }
+                        tcMkScaledFunTysU (map fst prefix) suffix_ty) }
        ; inf_tkvs <- kindGeneralizeAll skol_info (mkForAllTys tvbs full_ty)
        ; reportUnsolvedEqualities skol_info inf_tkvs tclvl wanted
        ; let inf_bndrs = mkTyVarBinders Inferred inf_tkvs
@@ -4290,7 +4295,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; inf_tkvs <- kindGeneralizeAll skol_info
                     (mkForAllTys tvbs         $
                      tcMkPhiTy ctxt           $
-                     tcMkScaledFunTys arg_tys $
+                     tcMkScaledFunTysU arg_tys $
                      res_ty)
        ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr inf_tkvs)
        ; reportUnsolvedEqualities skol_info inf_tkvs tclvl wanted
@@ -6080,8 +6085,9 @@ checkValidRoles tc
       =  check_ty_roles env role    ty1
       >> check_ty_roles env Nominal ty2
 
-    check_ty_roles env role (FunTy _ w ty1 ty2)
-      =  check_ty_roles env Nominal w
+    check_ty_roles env role (FunTy _ ma w ty1 ty2)
+      =  check_ty_roles env Nominal ma
+      >> check_ty_roles env Nominal w
       >> check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 

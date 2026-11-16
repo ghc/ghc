@@ -1727,7 +1727,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  (rule_rhs_args1, spec_rhs1, spec_fn_ty1)
                    | add_void_arg = ( voidPrimId : rule_rhs_args
                                     , Lam voidArgId spec_rhs
-                                    , mkVisFunTyMany unboxedUnitTy spec_fn_ty )
+                                    , mkVisFunTyManyU unboxedUnitTy spec_fn_ty )
                    | otherwise    = (rule_rhs_args, spec_rhs, spec_fn_ty)
 
                  --------------------------------------
@@ -3028,7 +3028,7 @@ mkCallUDs' env f args
 
   where
     _trace_doc = vcat [ppr f, ppr args, ppr ci_key]
-    pis                = fst $ splitPiTys $ idType f
+    (_, pis, _)        = splitPiTys (idType f)
     constrained_tyvars = tyCoVarsOfTypes $ getTheta pis
 
     ci_key :: [SpecArg]

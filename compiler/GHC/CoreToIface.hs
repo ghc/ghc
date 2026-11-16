@@ -217,8 +217,8 @@ toIfaceTypeX fr ty@(AppTy {})  =
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllTyBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
-toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mult = w, ft_res = t2, ft_af = af })
-  = IfaceFunTy af (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+toIfaceTypeX fr (FunTy { ft_arg = t1, ft_ma = ma, ft_mult = w, ft_res = t2, ft_af = af })
+  = IfaceFunTy af (toIfaceTypeX fr ma) (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
@@ -334,8 +334,8 @@ toIfaceCoercionX fr co
       =  assertPpr (isNothing (tyConAppFunCo_maybe r tc cos)) (ppr co) $
          IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
 
-    go (FunCo { fco_role = r, fco_mult = w, fco_arg = co1, fco_res = co2 })
-      = IfaceFunCo r (go w) (go co1) (go co2)
+    go (FunCo { fco_role = r, fco_ma = ma, fco_mult = w, fco_arg = co1, fco_res = co2 })
+      = IfaceFunCo r (go ma) (go w) (go co1) (go co2)
 
     go (TermAppCo fun co)
       = IfaceTermAppCo (mkIfLclName (occNameFS (getOccName fun))) (go co)

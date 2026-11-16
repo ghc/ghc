@@ -508,7 +508,7 @@ findSatArity :: VisArity -> Type -> Arity
 findSatArity vis_arity ty
   = go vis_arity pi_bndrs
   where
-    (pi_bndrs, _) = splitPiTys ty
+    (_, pi_bndrs, _) = splitPiTys ty
 
     go vis_arity (bndr : bndrs)
       | isInvisiblePiTyBinder bndr = add_bndr bndr (go vis_arity     bndrs)
@@ -1842,28 +1842,28 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
   = do { e1  <- getRep ev1 t1
        ; e2  <- getRep ev2 t2
        ; mkTrAppChecked <- dsLookupKnownOccId mkTrAppCheckedOcc
-                    -- mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
-                    --                   TypeRep a -> TypeRep b -> TypeRep (a b)
-       ; let (_, k1, k2) = splitFunTy (typeKind t1)  -- drop the multiplicity,
-                                                     -- since it's a kind
-       ; let expr =  mkApps (mkTyApps (Var mkTrAppChecked) [ k1, k2, t1, t2 ])
+                    -- The first type argument is the consumed kind arrow's
+                    -- matchability. The value arguments remain unchanged.
+       ; let (ma, _, k1, k2) = splitFunTy (typeKind t1)
+       ; let expr =  mkApps (mkTyApps (Var mkTrAppChecked) [ ma, k1, k2, t1, t2 ])
                             [ e1, e2 ]
        -- ; pprRuntimeTrace "Trace mkTrAppChecked" (ppr expr) expr
        ; return expr
        }
 
-ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
-  | Just (_af,m,t1,t2) <- splitFunTy_maybe ty
+ds_ev_typeable ty (EvTypeableTrFun evma evm ev1 ev2)
+  | Just (_af,ma,m,t1,t2) <- splitFunTy_maybe ty
   = do { e1 <- getRep ev1 t1
        ; e2 <- getRep ev2 t2
        ; em <- getRep evm m
+       ; ema <- getRep evma ma
        ; mkTrFun <- dsLookupKnownOccId mkTrFunOcc
-                    -- mkTrFun :: forall (m :: Multiplicity) r1 r2 (a :: TYPE r1) (b :: TYPE r2).
-                    --            TypeRep m -> TypeRep a -> TypeRep b -> TypeRep (a % m -> b)
+                    -- See Note [Matchability in reflection] in
+                    -- GHC.Internal.Data.Typeable.Internal.
        ; let r1 = getRuntimeRep t1
              r2 = getRuntimeRep t2
-       ; return $ mkApps (mkTyApps (Var mkTrFun) [m, r1, r2, t1, t2])
-                         [ em, e1, e2 ]
+       ; return $ mkApps (mkTyApps (Var mkTrFun) [ma, m, r1, r2, t1, t2])
+                         [ ema, em, e1, e2 ]
        }
 
 ds_ev_typeable ty (EvTypeableTyLit ev)

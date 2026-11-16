@@ -62,7 +62,7 @@ module GHC.Core.TyCo.Rep (
 
         TyLit(..),
         KindOrType, Kind,
-        RuntimeRepType, LevityType,
+        RuntimeRepType, LevityType, Matchability,
         KnotTied,
         PredType, ThetaType, FRRType,     -- Synonyms
         ForAllTyFlag(..), FunTyFlag(..),
@@ -92,6 +92,9 @@ module GHC.Core.TyCo.Rep (
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys, mkDepFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
+        mkVisFunTyManyM, mkVisFunTyManyU, mkVisFunTysManyM, mkVisFunTysManyU,
+        mkScaledFunTysM, mkScaledFunTysU, tcMkScaledFunTysM, tcMkScaledFunTysU,
+        mkPiTysM, mkPiTysU,
         nonDetCmpTyLit, cmpTyLit,
 
         -- * Functions over coercions
@@ -219,13 +222,14 @@ data Type
            --            See Note [Unused coercion variable in ForAllTy]
            -- See Note [Why ForAllTy can quantify over a coercion variable]
 
-  | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
+  | FunTy      -- ^ FUN @ma m t1 t2. A common special case.
                 -- See Note [Function types]
      { ft_af   :: FunTyFlag    -- Is this (->/FUN) or (=>) or (==>)?
                                  -- This info is fully specified by the kinds in
                                  --      ft_arg and ft_res
                                  -- Note [FunTyFlag] in GHC.Types.Var
 
+     , ft_ma   :: Matchability   -- See Note [Ordinary arrow matchability]
      , ft_mult :: Mult           -- Multiplicity; always Many for (=>) and (==>)
      , ft_arg  :: Type           -- Argument type
      , ft_res  :: Type }         -- Result type
@@ -382,7 +386,7 @@ FunTy is the constructor for a function type.  Here are the details:
             TYPE r2 ->
             Type
   mkTyConApp ensures that we convert a saturated application
-    TyConApp FUN [m,r1,r2,t1,t2] into FunTy FTF_T_T m t1 t2
+    TyConApp FUN [ma,m,r1,r2,t1,t2] into FunTy FTF_T_T ma m t1 t2
   dropping the 'r1' and 'r2' arguments; they are easily recovered
   from 't1' and 't2'. The FunTyFlag is always FTF_T_T, because
   we build constraint arrows (=>) with e.g. mkPhiTy and friends,
@@ -620,8 +624,8 @@ These invariants are all documented above, in the declaration for Type.
 
 Note [Equality on FunTys]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-A (FunTy vis mult arg res) is just an abbreviation for a
-  TyConApp funTyCon [mult, arg_rep, res_rep, arg, res]
+A (FunTy vis ma mult arg res) is just an abbreviation for a
+  TyConApp funTyCon [ma, mult, arg_rep, res_rep, arg, res]
 where
   arg :: TYPE arg_rep
   res :: TYPE res_rep
@@ -831,60 +835,95 @@ mkTyCoVarTys = map mkTyCoVarTy
 
 infixr 3 `mkFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`
 
-mkNakedFunTy :: FunTyFlag -> Kind -> Kind -> Kind
--- See Note [Naked FunTy] in GHC.Builtin.WiredIn.Types
--- Always Many multiplicity; kinds have no linearity
-mkNakedFunTy af arg res
- =  FunTy { ft_af   = af, ft_mult = manyDataConTy
-          , ft_arg  = arg, ft_res  = res }
+{- Note [Ordinary arrow matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An arrow carries a type of kind Matchability independently of visibility and
+multiplicity. Matchable permits nominal inverse application evidence.
+Unmatchable permits forward congruence, but not inverse projection. A stuck
+metadata type does not establish matchability. See isMatchableFunTy in
+GHC.Core.Type and the consumers in GHC.Core.Lint and GHC.Tc.Solver.Equality.
 
-mkFunTy :: HasDebugCallStack => FunTyFlag -> Mult -> Type -> Type -> Type
-mkFunTy af mult arg res
+Use type-valued metadata, as in proposal #242 and its prototype. Maps and
+substitution must retain its variables and proof dependencies. Ordinary
+runtime arrows use U. Constructor kind arrows use M. Constraint arrows use
+fixed U/Many. DepFunTy is intrinsically U; removing vacuous dependence must
+produce the same arrow as an ordinary runtime lambda.
+
+This stage leaves ForAllTy unchanged. Its existing implicit M classification
+must not be used to form a new U forall. That needs a separate quantifier
+representation and coercion migration. Keep current native polymorphic-value
+and family-saturation gates until that stage is complete.
+-}
+
+-- | Build a kind arrow without inspecting its endpoints' kinds.
+mkNakedFunTy :: Matchability -> FunTyFlag -> Kind -> Kind -> Kind
+mkNakedFunTy ma af arg res
+ = FunTy { ft_af = af, ft_ma = ma, ft_mult = manyDataConTy
+         , ft_arg = arg, ft_res = res }
+
+mkFunTy :: HasDebugCallStack => FunTyFlag -> Matchability -> Mult -> Type -> Type -> Type
+mkFunTy af ma mult arg res
   = assertPpr (af == chooseFunTyFlag arg res) (vcat
       [ text "af" <+> ppr af
       , text "chooseAAF" <+> ppr (chooseFunTyFlag arg res)
       , text "arg" <+> ppr arg <+> dcolon <+> ppr (typeKind arg)
       , text "res" <+> ppr res <+> dcolon <+> ppr (typeKind res) ]) $
-    FunTy { ft_af   = af
-          , ft_mult = mult
-          , ft_arg  = arg
-          , ft_res  = res }
+    FunTy { ft_af = af, ft_ma = ma, ft_mult = mult
+          , ft_arg = arg, ft_res = res }
 
 mkInvisFunTy :: HasDebugCallStack => Type -> Type -> Type
 mkInvisFunTy arg res
-  = mkFunTy (invisArg (typeTypeOrConstraint res)) manyDataConTy arg res
+  = mkFunTy (invisArg (typeTypeOrConstraint res)) unmatchableDataConTy manyDataConTy arg res
 
 mkInvisFunTys :: HasDebugCallStack => [Type] -> Type -> Type
 mkInvisFunTys args res
-  = foldr (mkFunTy af manyDataConTy) res args
+  = foldr (mkFunTy af unmatchableDataConTy manyDataConTy) res args
   where
     af = invisArg (typeTypeOrConstraint res)
 
-mkVisFunTy :: HasDebugCallStack => Mult -> Type -> Type -> Type
--- Always TypeLike, user-specified multiplicity.
+mkVisFunTy :: HasDebugCallStack => Matchability -> Mult -> Type -> Type -> Type
 mkVisFunTy = mkFunTy visArgTypeLike
 
--- | Make nested arrow types
--- | Special, common, case: Arrow type with mult Many
-mkVisFunTyMany :: HasDebugCallStack => Type -> Type -> Type
--- Always TypeLike, multiplicity Many
-mkVisFunTyMany = mkVisFunTy manyDataConTy
+-- | Build a visible unrestricted arrow with explicit matchability.
+mkVisFunTyMany :: HasDebugCallStack => Matchability -> Type -> Type -> Type
+mkVisFunTyMany ma = mkVisFunTy ma manyDataConTy
 
-mkVisFunTysMany :: [Type] -> Type -> Type
--- Always TypeLike, multiplicity Many
-mkVisFunTysMany tys ty = foldr mkVisFunTyMany ty tys
+-- | Build a matchable unrestricted arrow.
+mkVisFunTyManyM :: HasDebugCallStack => Type -> Type -> Type
+mkVisFunTyManyM = mkVisFunTyMany matchableDataConTy
+
+-- | Build an ordinary runtime unrestricted arrow.
+mkVisFunTyManyU :: HasDebugCallStack => Type -> Type -> Type
+mkVisFunTyManyU = mkVisFunTyMany unmatchableDataConTy
+
+-- | Build visible arrows with their individual matchabilities.
+mkVisFunTysMany :: [(Matchability, Type)] -> Type -> Type
+mkVisFunTysMany tys ty = foldr (uncurry mkVisFunTyMany) ty tys
+
+-- | Build matchable unrestricted arrows.
+mkVisFunTysManyM :: [Type] -> Type -> Type
+mkVisFunTysManyM tys ty = foldr mkVisFunTyManyM ty tys
+
+-- | Build ordinary runtime unrestricted arrows.
+mkVisFunTysManyU :: [Type] -> Type -> Type
+mkVisFunTysManyU tys ty = foldr mkVisFunTyManyU ty tys
 
 ---------------
-mkScaledFunTy :: HasDebugCallStack => FunTyFlag -> Scaled Type -> Type -> Type
-mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
+mkScaledFunTy :: HasDebugCallStack => FunTyFlag -> Matchability -> Scaled Type -> Type -> Type
+mkScaledFunTy af ma (Scaled mult arg) res = mkFunTy af ma mult arg res
 
-mkScaledFunTys :: HasDebugCallStack => [Scaled Type] -> Type -> Type
--- All visible args
--- Result type can be TypeLike or ConstraintLike
--- Example of the latter: dataConWrapperType for the data con of a class
-mkScaledFunTys tys ty = foldr (mkScaledFunTy af) ty tys
+mkScaledFunTys :: HasDebugCallStack => [(Matchability, Scaled Type)] -> Type -> Type
+mkScaledFunTys tys ty = foldr (uncurry (mkScaledFunTy af)) ty tys
   where
     af = visArg (typeTypeOrConstraint ty)
+
+-- | Build matchable arrows from scaled arguments.
+mkScaledFunTysM :: HasDebugCallStack => [Scaled Type] -> Type -> Type
+mkScaledFunTysM tys = mkScaledFunTys [(matchableDataConTy,ty) | ty <- tys]
+
+-- | Build runtime arrows from scaled arguments.
+mkScaledFunTysU :: HasDebugCallStack => [Scaled Type] -> Type -> Type
+mkScaledFunTysU tys = mkScaledFunTys [(unmatchableDataConTy,ty) | ty <- tys]
 
 ---------------
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
@@ -910,18 +949,32 @@ mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
 mkInvisForAllTys tyvars = mkForAllTys (tyVarSpecToBinders tyvars)
 
-mkPiTy :: HasDebugCallStack => PiTyBinder -> Type -> Type
-mkPiTy (Anon ty1 af) ty2  = mkScaledFunTy af ty1 ty2
-mkPiTy (Named bndr) ty    = mkForAllTy bndr ty
+mkPiTy :: HasDebugCallStack => Matchability -> PiTyBinder -> Type -> Type
+mkPiTy ma (Anon ty1 af) ty2 = mkScaledFunTy af ma ty1 ty2
+mkPiTy ma (Named bndr) ty
+  | TyConApp tc [] <- ma, tc `hasKey` matchableDataConKey = mkForAllTy bndr ty
+  | otherwise = pprPanic "mkPiTy: unmatchable forall is not implemented" (ppr ma)
 
-mkPiTys :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
-mkPiTys tbs ty = foldr mkPiTy ty tbs
+mkPiTys :: HasDebugCallStack => [(Matchability, PiTyBinder)] -> Type -> Type
+mkPiTys tbs ty = foldr (uncurry mkPiTy) ty tbs
+
+-- | Build a matchable telescope under the current forall invariant.
+mkPiTysM :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
+mkPiTysM tbs = mkPiTys [(matchableDataConTy,tb) | tb <- tbs]
+
+-- | Build runtime anonymous arrows while retaining existing erased foralls.
+-- See Note [Ordinary arrow matchability].
+mkPiTysU :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
+mkPiTysU tbs = mkPiTys [(ma tb,tb) | tb <- tbs]
+  where
+    ma Named{} = matchableDataConTy
+    ma Anon{} = unmatchableDataConTy
 
 -- | Construct a retained dependent function. Remove vacuous dependence.
 mkDepFunTy :: Id -> Type -> Type
 mkDepFunTy b body
   | b `elemVarSet` tyCoVarsOfType body = DepFunTy b body
-  | otherwise = mkVisFunTyMany (varType b) body
+  | otherwise = mkVisFunTyManyU (varType b) body
 
 -- | 'mkNakedTyConTy' creates a nullary 'TyConApp'. In general you
 -- should rather use 'GHC.Core.Type.mkTyConTy', which picks the shared
@@ -931,30 +984,29 @@ mkDepFunTy b body
 mkNakedTyConTy :: TyCon -> Type
 mkNakedTyConTy tycon = TyConApp tycon []
 
-tcMkVisFunTy :: Mult -> Type -> Type -> Type
--- Always TypeLike result, user-specified multiplicity.
--- Does not have the assert-checking in mkFunTy: used by the typechecker
--- to avoid looking at the result kind, which may not be zonked
-tcMkVisFunTy mult arg res
-  = FunTy { ft_af = visArgTypeLike, ft_mult = mult
+tcMkVisFunTy :: Matchability -> Mult -> Type -> Type -> Type
+tcMkVisFunTy ma mult arg res
+  = FunTy { ft_af = visArgTypeLike, ft_ma = ma, ft_mult = mult
           , ft_arg = arg, ft_res = res }
 
 tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
--- Always invisible (constraint) argument, result specified by res_torc
--- Does not have the assert-checking in mkFunTy: used by the typechecker
--- to avoid looking at the result kind, which may not be zonked
 tcMkInvisFunTy res_torc arg res
-  = FunTy { ft_af = invisArg res_torc, ft_mult = manyDataConTy
-          , ft_arg = arg, ft_res = res }
+  = FunTy { ft_af = invisArg res_torc, ft_ma = unmatchableDataConTy
+          , ft_mult = manyDataConTy, ft_arg = arg, ft_res = res }
 
-tcMkScaledFunTys :: [Scaled Type] -> Type -> Type
--- All visible args
--- Result type must be TypeLike
--- No mkFunTy assert checking; result kind may not be zonked
-tcMkScaledFunTys tys ty = foldr tcMkScaledFunTy ty tys
+tcMkScaledFunTys :: [(Matchability, Scaled Type)] -> Type -> Type
+tcMkScaledFunTys tys ty = foldr (uncurry tcMkScaledFunTy) ty tys
 
-tcMkScaledFunTy :: Scaled Type -> Type -> Type
-tcMkScaledFunTy (Scaled mult arg) res = tcMkVisFunTy mult arg res
+tcMkScaledFunTy :: Matchability -> Scaled Type -> Type -> Type
+tcMkScaledFunTy ma (Scaled mult arg) res = tcMkVisFunTy ma mult arg res
+
+-- | Build checked matchable arrows without inspecting endpoint kinds.
+tcMkScaledFunTysM :: [Scaled Type] -> Type -> Type
+tcMkScaledFunTysM tys = tcMkScaledFunTys [(matchableDataConTy,ty) | ty <- tys]
+
+-- | Build checked runtime arrows without inspecting endpoint kinds.
+tcMkScaledFunTysU :: [Scaled Type] -> Type -> Type
+tcMkScaledFunTysU tys = tcMkScaledFunTys [(unmatchableDataConTy,ty) | ty <- tys]
 
 {-
 %************************************************************************
@@ -1050,11 +1102,12 @@ data Coercion
       , fco_body :: Coercion }
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo  -- FunCo :: "e" -> N/P -> e -> e -> e
+  | FunCo  -- Congruence for matchability, multiplicity and both endpoints.
            -- See Note [FunCo] for fco_afl, fco_afr
         { fco_role         :: Role
         , fco_afl          :: FunTyFlag   -- Arrow for coercionLKind
         , fco_afr          :: FunTyFlag   -- Arrow for coercionRKind
+        , fco_ma           :: Coercion
         , fco_mult         :: CoercionN
         , fco_arg, fco_res :: Coercion }
        -- (if the role "e" is Phantom, the first coercion is, too)
@@ -1135,7 +1188,8 @@ data CoSel  -- See Note [SelCo]
   deriving( Eq, Data.Data, Ord )
 
 data FunSel  -- See Note [SelCo]
-  = SelMult  -- Multiplicity
+  = SelMatch -- Matchability
+  | SelMult  -- Multiplicity
   | SelArg   -- Argument of function
   | SelRes   -- Result of function
   deriving( Eq, Data.Data, Ord )
@@ -1157,11 +1211,13 @@ pprOneCharRole Representational = char 'R'
 pprOneCharRole Phantom          = char 'P'
 
 instance Outputable FunSel where
+  ppr SelMatch = text "match"
   ppr SelMult = text "mult"
   ppr SelArg  = text "arg"
   ppr SelRes  = text "res"
 
 instance NFData FunSel where
+  rnf SelMatch = ()
   rnf SelMult = ()
   rnf SelArg  = ()
   rnf SelRes  = ()
@@ -1172,6 +1228,7 @@ instance Binary CoSel where
    put_ bh (SelFun SelMult) = putByte bh 2
    put_ bh (SelFun SelArg)  = putByte bh 3
    put_ bh (SelFun SelRes)  = putByte bh 4
+   put_ bh (SelFun SelMatch) = putByte bh 5
 
    get bh = do { h <- getByte bh
                ; case h of
@@ -1179,6 +1236,7 @@ instance Binary CoSel where
                    1 -> return SelForAll
                    2 -> return (SelFun SelMult)
                    3 -> return (SelFun SelArg)
+                   5 -> return (SelFun SelMatch)
                    _ -> return (SelFun SelRes) }
 
 instance NFData CoSel where
@@ -2280,8 +2338,8 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty (CastTy ty co)      = go_ty ty M.<> go_co co
     go_ty (CoercionTy co)     = go_co co
     go_ty (TyConApp tc tys)   = lit tc M.<> go_tys tys
-    go_ty (FunTy { ft_af = af, ft_mult =  w, ft_arg = arg, ft_res = res })
-      = lit af M.<> go_ty arg M.<> go_ty w M.<> go_ty res
+    go_ty (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res })
+      = lit af M.<> go_ty ma M.<> go_ty arg M.<> go_ty w M.<> go_ty res
         -- As per #23764, ordering is [arg, w, res]
     go_ty (ForAllTy (Bndr tv _) inner)
       = go_ty (varType tv) M.<> tycobinder tv (go_ty inner)
@@ -2317,8 +2375,8 @@ foldTyCo (TyCoFolder { tcf_view       = view
       -- due to Note [UnivCoDepsInv].
        = lit prov M.<> lit ro M.<> go_ty t1 M.<> go_ty t2 M.<> go_deps deps
     go_co (FunCo { fco_role = ro, fco_afl = afl, fco_afr = afr
-                 , fco_mult = cw, fco_arg = c1, fco_res = c2 })
-       = lit ro M.<> lit afl M.<> lit afr M.<> go_co cw M.<> go_co c1 M.<> go_co c2
+                 , fco_ma = cm, fco_mult = cw, fco_arg = c1, fco_res = c2 })
+       = lit ro M.<> lit afl M.<> lit afr M.<> go_co cm M.<> go_co cw M.<> go_co c1 M.<> go_co c2
 
     go_co (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
                     , fco_kind = kind_co, fco_body = co })
@@ -2369,7 +2427,7 @@ typeSize :: Type -> Int
 typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
+typeSize (FunTy _ ma _ t1 t2)       = typeSize ma + typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
 typeSize (TermAppTy f arg)         = 1 + typeSize (varType f) + typeSize arg
 typeSize (TermVarTy v)             = 1 + typeSize (varType v)
@@ -2390,7 +2448,7 @@ coercionSize (TermAppCo f co)      = 1 + typeSize (varType f) + coercionSize co
 coercionSize (DepFunCo b domain co) = 1 + typeSize (varType b) + mCoercionSize domain + coercionSize co
 coercionSize (ForAllCo { fco_kind = h, fco_body = co })
                                    = 1 + coercionSize co + mCoercionSize h
-coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
+coercionSize (FunCo _ _ _ ma w c1 c2) = 1 + coercionSize ma + coercionSize c1 + coercionSize c2
                                                          + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
@@ -2464,4 +2522,7 @@ Multiplicities can be formed with:
 So that Mult feels a bit more structured, we provide pattern synonyms and smart
 constructors for these.
 -}
+-- | Type-valued arrow matchability. See Note [Ordinary arrow matchability].
+type Matchability = Type
+
 type Mult = Type

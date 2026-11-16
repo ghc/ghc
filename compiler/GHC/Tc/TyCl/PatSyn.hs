@@ -33,8 +33,11 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..) )
+import GHC.Tc.Solver.Monad (runTcSEqualities)
+import GHC.Tc.Solver.Rewrite (rewriteFamilyAxioms)
 import GHC.Tc.TyCl.Build
 
+import GHC.Core.Reduction (reductionReducedType)
 import GHC.Core.Multiplicity
 import GHC.Core.Type ( typeKind, isManyTy, mkTYPEapp, definitelyLiftedType )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
@@ -369,9 +372,20 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; let decl_arity = length arg_names
              (arg_names, is_infix) = collectPatSynArgInfo details
 
-       ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
+       ; (mas, arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
                                  Right stuff  -> return stuff
                                  Left missing -> wrongNumberOfParmsErr name decl_arity missing
+
+       -- Check only declaration arrows. The scrutinee can itself be a function.
+       -- Pattern-synonym workers use U. Do not default unknown metadata.
+       -- Reduce family axioms with the solver reduction-depth limit.
+       ; setSrcSpan (getLocA lname) $ mapM_
+           (\ma -> do { loc <- getCtLocM PatCheckOrigin Nothing
+                      ; redn <- runTcSEqualities (rewriteFamilyAxioms loc ma)
+                      ; let normalized = reductionReducedType redn
+                      ; checkTc (normalized `tcEqType` unmatchableDataConTy) $
+                          TcRnPatSynUnsupportedMatchability name normalized })
+           mas
 
        -- Complain about:  pattern P :: () => forall x. x -> P x
        -- The existential 'x' should not appear in the result type
@@ -826,9 +840,9 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                | is_unlifted = ([nlHsDataCon unboxedUnitDataCon], [unboxedUnitTy])
                | otherwise   = (args,                             arg_tys)
              cont_ty = mkInfSigmaTy ex_tvs prov_theta $
-                       mkVisFunTysMany cont_arg_tys res_ty
+                       mkVisFunTysManyU cont_arg_tys res_ty
 
-             fail_ty  = mkVisFunTyMany unboxedUnitTy res_ty
+             fail_ty  = mkVisFunTyManyU unboxedUnitTy res_ty
 
        ; matcher_name <- newImplicitBinder ps_name mkMatcherOcc
        ; scrutinee    <- newSysLocalId (fsLit "scrut") ManyTy pat_ty
@@ -837,7 +851,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
 
        ; is_strict    <- xoptM LangExt.Strict
        ; comps        <- getCompleteMatchesTcM
-       ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty
+       ; let matcher_tau   = mkVisFunTysManyU [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
              patsyn_id     = mkExportedVanillaId ps_name matcher_sigma
@@ -939,7 +953,7 @@ mkPatSynBuilder dir (L _ name)
                               mkInvisForAllTys univ_bndrs $
                               mkInvisForAllTys ex_bndrs $
                               mkPhiTy theta $
-                              mkVisFunTysMany arg_tys $
+                              mkVisFunTysManyU arg_tys $
                               pat_ty
 
        ; return (Just (builder_name, builder_sigma, need_dummy_arg)) }
@@ -1041,7 +1055,7 @@ patSynBuilderOcc ps
 
 add_void :: Bool -> Type -> Type
 add_void need_dummy_arg ty
-  | need_dummy_arg = mkVisFunTyMany unboxedUnitTy ty
+  | need_dummy_arg = mkVisFunTyManyU unboxedUnitTy ty
   | otherwise      = ty
 
 tcPatToExpr :: Name -> [LocatedN Name] -> LPat GhcRn -> TcM (LHsExpr GhcRn)

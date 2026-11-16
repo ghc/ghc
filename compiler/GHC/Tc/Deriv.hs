@@ -843,7 +843,7 @@ deriveTyData :: TyCon -> [Type] -- LHS of data or data instance
 deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
    = do {  -- Given data T a b c = ... deriving( C d ),
            -- we want to drop type variables from T so that (C d (T a)) is well-kinded
-          let (arg_kinds, _)  = splitFunTys cls_arg_kind
+          let (_mas, arg_kinds, _)  = splitFunTys cls_arg_kind
               n_args_to_drop  = length arg_kinds
               n_args_to_keep  = length tc_args - n_args_to_drop
                                 -- See Note [tc_args and tycon arity]

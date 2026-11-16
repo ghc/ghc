@@ -82,7 +82,7 @@ import GHC.Types.Var.FV
 import GHC.Types.Basic
 
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.WiredIn.Types( unitTy )
+import GHC.Builtin.WiredIn.Types( unitTy, unmatchableDataConTy )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -367,25 +367,29 @@ subMultCoRKind (OneSubMult w) = w
 -- | Like 'mkFunCo2' except that it allows for sub-multiplicity instead of
 -- a multiplicity coercion.
 mkSubMultFunCo :: FunTyFlag -> FunTyFlag
+               -> TcCoercionN -- ^ act_matchability ~N exp_matchability
                -> SubMultCo   -- ^ act_mult ~~> exp_mult
                -> TcCoercionR -- ^ act_arg  ~~> exp_arg
                -> TcCoercionR -- ^ act_res  ~~> exp_res
                -> TcCoercionR
-mkSubMultFunCo act_af exp_af (EqMultCo w_co) arg_co res_co =
+mkSubMultFunCo act_af exp_af ma_co (EqMultCo w_co) arg_co res_co =
   mkFunCo2 Representational act_af exp_af
+    ma_co
     w_co
     arg_co
     res_co
-mkSubMultFunCo act_af exp_af (OneSubMult w2) arg_co res_co =
+mkSubMultFunCo act_af exp_af ma_co (OneSubMult w2) arg_co res_co =
   mkUnivCo SubMultProv [] Representational
-    (mkFunTy act_af OneTy act_arg act_res)
-    (mkFunTy exp_af w2    act_arg act_res)
+    (mkFunTy act_af act_ma OneTy act_arg act_res)
+    (mkFunTy exp_af act_ma w2 act_arg act_res)
     `mkTransCo`
   mkFunCo2 Representational act_af exp_af
+    ma_co
     (mkNomReflCo w2)
     arg_co
     res_co
   where
+    act_ma  = coercionLKind ma_co
     act_arg = coercionLKind arg_co
     act_res = coercionLKind res_co
 
@@ -416,7 +420,8 @@ mkWpFun w1 w2 (wp_mult, t1) t2
                  , arg_wrap = w1, res_wrap = w2
                  , arg_type = t1, res_type = t2 }
   where
-    mk_wp_fun_co = mkSubMultFunCo FTF_T_T FTF_T_T wp_mult
+    mk_wp_fun_co = mkSubMultFunCo FTF_T_T FTF_T_T
+                    (mkNomReflCo unmatchableDataConTy) wp_mult
       -- FTF_T_T: WpFun is always (->)
 
 mkWpSubType :: HsWrapper -> HsWrapper
@@ -613,6 +618,7 @@ optSubTypeHsWrapper wrap
       = opt_co fun_co (opt_ev_lam ev ws)
       where
         fun_co = mkFunCo Representational FTF_C_T
+                        (mkNomReflCo unmatchableDataConTy)
                         (mkNomReflCo ManyTy)
                         (mkRepReflCo (idType ev))
                         co
@@ -1008,9 +1014,9 @@ data EvTypeable
     -- ^ Dictionary for @Typeable (s t)@,
     -- given a dictionaries for @s@ and @t@.
 
-  | EvTypeableTrFun EvTerm EvTerm EvTerm
-    -- ^ Dictionary for @Typeable (s % w -> t)@,
-    -- given a dictionaries for @w@, @s@, and @t@.
+  | EvTypeableTrFun EvTerm EvTerm EvTerm EvTerm
+    -- ^ Dictionary for an arrow. The evidence fields represent matchability,
+    -- multiplicity, argument and result, in that order.
 
   | EvTypeableTyLit EvTerm
     -- ^ Dictionary for a type literal,
@@ -1070,6 +1076,11 @@ evidence
 where
     d :: Typeable a
 is the lambda-bound dictionary passed into f.
+
+EvTypeableTrFun includes evidence for matchability before multiplicity. Its
+producer, free-variable traversal, zonker and desugarer preserve all four
+fields. See Note [Matchability in reflection] in
+GHC.Internal.Data.Typeable.Internal.
 
 Note [Coercion evidence terms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1359,7 +1370,7 @@ evFVsOfTypeable ev =
   case ev of
     EvTypeableTyCon _ e      -> mapUnionFV evTermFVs e
     EvTypeableTyApp e1 e2    -> evTermFVss [e1,e2]
-    EvTypeableTrFun em e1 e2 -> evTermFVss [em,e1,e2]
+    EvTypeableTrFun ema em e1 e2 -> evTermFVss [ema,em,e1,e2]
     EvTypeableTyLit e        -> evTermFVs e
 
 {- Note [Free vars of EvFun]
@@ -1463,9 +1474,10 @@ instance Outputable EvTypeable where
   ppr (EvTypeableTyCon ts _)     = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2)    = parens (ppr t1 <+> ppr t2)
   ppr (EvTypeableTyLit t1)       = text "TyLit" <> ppr t1
-  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
+  ppr (EvTypeableTrFun ma tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
     where
       arr = pprArrowWithModifiers [ppr tm] visArgTypeLike Many
+            <+> char '@' <> parens (ppr ma)
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

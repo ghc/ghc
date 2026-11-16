@@ -634,6 +634,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPatSynEscapedCoercion"                     = 88986
   GhcDiagnosticCode "TcRnPatSynExistentialInResult"                 = 33973
   GhcDiagnosticCode "TcRnPatSynArityMismatch"                       = 18365
+  GhcDiagnosticCode "TcRnPatSynUnsupportedMatchability"            = 83606
   GhcDiagnosticCode "TcRnTyFamDepsDisabled"                         = 43991
   GhcDiagnosticCode "TcRnAbstractClosedTyFamDecl"                   = 60012
   GhcDiagnosticCode "TcRnPartialFieldSelector"                      = 82712

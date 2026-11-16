@@ -19,6 +19,7 @@ data Scaled a
 scaledThing :: Scaled a -> a
 
 type Mult = Type
+type Matchability = Type
 
 type PredType = Type
 type RuntimeRepType = Type
@@ -30,7 +31,7 @@ type KindMCoercion = MCoercionN
 
 mkForAllTy       :: VarBndr Var ForAllTyFlag -> Type -> Type
 mkNakedTyConTy   :: TyCon -> Type
-mkNakedFunTy     :: FunTyFlag -> Type -> Type -> Type
+mkNakedFunTy     :: Matchability -> FunTyFlag -> Type -> Type -> Type
 
 
 -- To support Data instances in GHC.Core.Coercion.Axiom

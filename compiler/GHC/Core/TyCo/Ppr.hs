@@ -235,7 +235,7 @@ debugPprType :: Type -> SDoc
 -- as the normal route, but it's much more direct, and that can
 -- be useful for debugging.  E.g. with -dppr-debug it prints the
 -- kind on type-variable /occurrences/ which the normal route
--- fundamentally cannot do.
+-- fundamentally cannot do. Arrow metadata is explicit in this printer.
 debugPprType ty = debug_ppr_ty topPrec ty
 
 debug_ppr_ty :: PprPrec -> Type -> SDoc
@@ -256,9 +256,10 @@ debug_ppr_ty prec (DepFunTy var res)
     sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> debug_ppr_ty topPrec (varType var))
         , arrow <+> debug_ppr_ty topPrec res ]
 
-debug_ppr_ty prec (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
+debug_ppr_ty prec (FunTy { ft_af = af, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res })
   = maybeParen prec funPrec $
-    sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
+    sep [debug_ppr_ty funPrec arg, arr <+> brackets (debug_ppr_ty topPrec ma)
+                                       <+> debug_ppr_ty prec res]
   where
     arr = case mult of
       OneTy  -> pprArrowWithModifiers [] af One

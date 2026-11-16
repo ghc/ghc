@@ -45,9 +45,10 @@ import Language.Haskell.Syntax.Module.Name
 
 type Span = RealSrcSpan
 
--- | Current version of @.hie@ files
+-- | Current version of @.hie@ files.
+-- See Note [HIE arrow matchability].
 hieVersion :: Integer
-hieVersion = read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
+hieVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "63") :: Integer
 
 {- |
 GHC builds up a wealth of information about Haskell source as it compiles it.
@@ -132,7 +133,7 @@ making an effort to deduplicate this shared structure. The trick is to define
 a new data type that is a flattened version of 'Type':
 
     data HieType a = HAppTy a a  -- data Type = AppTy Type Type
-                   | HFunTy a a  --           | FunTy Type Type
+                   | HFunTy a a a a  --       | FunTy Matchability Mult Type Type
                    | ...
 
     type TypeIndex = Int
@@ -145,6 +146,20 @@ form with sharing of subtrees.
 
 type TypeIndex = Int
 
+{- Note [HIE arrow matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+HFunTy stores matchability before multiplicity, argument and result. Include
+matchability in equality, traversal and binary serialization. Otherwise HIE
+sharing can identify different arrow types or omit metadata dependencies.
+
+The new field changes the payload of the existing HFunTy tag. The suffix in
+hieVersion rejects earlier files before their type tables are decoded. This
+version is separate from the ordinary interface version. Both HIE readers
+check it. The predicate passed to readHieFileWithVersion can further restrict
+accepted files, but it cannot enable an unsupported payload. HQualTy keeps
+its fixed U matchability and Many multiplicity.
+-}
+
 -- | A flattened version of 'Type'.
 --
 -- See Note [Efficient serialization of redundant type info]
@@ -153,7 +168,9 @@ data HieType a
   | HAppTy a (HieArgs a)
   | HTyConApp IfaceTyCon (HieArgs a)
   | HForAllTy ((Name, a),ForAllTyFlag) a
-  | HFunTy a a a
+  | HFunTy a a a a
+    -- ^ Matchability, multiplicity, argument and result.
+    -- See Note [HIE arrow matchability].
   | HQualTy a a           -- ^ type with constraint: @t1 => t2@ (see 'IfaceDFunTy')
   | HLitTy IfaceTyLit
   | HCastTy a
@@ -172,7 +189,7 @@ instance Eq a => Eq (HieType a) where
   HForAllTy ((n1,k1),vis1) b1 == HForAllTy ((n2,k2),vis2) b2
     = n1 == n2 && k1 == k2 && b1 == b2
       && cmpForAllTyFlagExactly vis1 vis2 == EQ
-  HFunTy w1 a1 r1     == HFunTy w2 a2 r2     = w1 == w2 && a1 == a2 && r1 == r2
+  HFunTy m1 w1 a1 r1  == HFunTy m2 w2 a2 r2  = m1 == m2 && w1 == w2 && a1 == a2 && r1 == r2
   HQualTy c1 t1       == HQualTy c2 t2       = c1 == c2 && t1 == t2
   HLitTy l1           == HLitTy l2           = l1 == l2
   HCastTy t1          == HCastTy t2          = t1 == t2
@@ -185,7 +202,8 @@ instance Outputable a => Outputable (HieType a) where
   ppr (HTyConApp tc args) = parens $ ppr tc <+> ppr args
   ppr (HForAllTy ((name, ty), flag) body) =
     text "forall" <+> ppr flag <+> ppr name O.<> text ":" <+> ppr ty O.<> text "." <+> ppr body
-  ppr (HFunTy mult arg res) = parens $ ppr arg <+> arrow <+> ppr res <+> ppr mult
+  ppr (HFunTy ma mult arg res)
+    = parens $ ppr arg <+> arrow <+> brackets (ppr ma) <+> ppr res <+> ppr mult
   ppr (HQualTy ctxt ty) = parens $ ppr ctxt <+> text "=>" <+> ppr ty
   ppr (HLitTy lit) = ppr lit
   ppr (HCastTy ty) = text "cast" <+> ppr ty
@@ -213,8 +231,9 @@ instance Binary (HieType TypeIndex) where
     putByte bh 3
     put_ bh bndr
     put_ bh a
-  put_ bh (HFunTy w a b) = do
+  put_ bh (HFunTy ma w a b) = do
     putByte bh 4
+    put_ bh ma
     put_ bh w
     put_ bh a
     put_ bh b
@@ -237,7 +256,7 @@ instance Binary (HieType TypeIndex) where
       1 -> HAppTy <$> get bh <*> get bh
       2 -> HTyConApp <$> get bh <*> get bh
       3 -> HForAllTy <$> get bh <*> get bh
-      4 -> HFunTy <$> get bh <*> get bh <*> get bh
+      4 -> HFunTy <$> get bh <*> get bh <*> get bh <*> get bh
       5 -> HQualTy <$> get bh <*> get bh
       6 -> HLitTy <$> get bh
       7 -> HCastTy <$> get bh

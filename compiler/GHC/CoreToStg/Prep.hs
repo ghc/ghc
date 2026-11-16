@@ -1158,7 +1158,7 @@ nameNativeConstructorArgs expr
       | Coercion {} <- arg
       = do { check_erased_binder ty transport
            ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
-      | Just (_, _, arg_ty, res_ty) <- splitFunTy_maybe ty
+      | Just (_, _, _, arg_ty, res_ty) <- splitFunTy_maybe ty
       = do { co <- liftNativeIndexTransport "a later argument" transport arg_ty
            ; let arg' = mkCast arg (mkSymCo (mkSubCo co))
            ; build res_ty (App app arg') transport wrap rest }
@@ -1319,8 +1319,9 @@ liftNativeIndexTransport context transport ty
       = mkDepFunTy index <$> abstract (delVarEnv env index) body
     abstract env (TyConApp con args) = mkTyConApp con <$> mapM (abstract env) args
     abstract env (AppTy fun arg) = mkAppTy <$> abstract env fun <*> abstract env arg
-    abstract env (FunTy flag mult arg res)
-      = FunTy flag <$> abstract env mult <*> abstract env arg <*> abstract env res
+    abstract env (FunTy flag ma mult arg res)
+      = FunTy flag <$> abstract env ma <*> abstract env mult
+                   <*> abstract env arg <*> abstract env res
     abstract _ _ = Nothing
 
 -- | Report the remaining coercion boundary without fabricating index evidence.

@@ -263,14 +263,14 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
              --        "unacceptable result Eq a => a -> blah"
              -- Not a big deal.  We could make a better error message specially
              -- for overloaded functions, but doesn't seem worth it
-             (arg_tys, res_ty) = splitFunTys (dropForAlls norm_sig_ty)
+             (mas, arg_tys, res_ty) = splitFunTys (dropForAlls norm_sig_ty)
 
              id = mkLocalId nm ManyTy sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Zonk.Type.zonkForeignExports ignores it).
 
-       ; imp_decl' <- tcCheckFIType arg_tys res_ty imp_decl
+       ; imp_decl' <- tcCheckFIType mas arg_tys res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
 
@@ -288,19 +288,19 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 
 -- ------------ Checking types for foreign import ----------------------
 
-tcCheckFIType :: [Scaled Type] -> Type -> ForeignImport GhcRn -> TcM (ForeignImport GhcTc)
+tcCheckFIType :: [Type] -> [Scaled Type] -> Type -> ForeignImport GhcRn -> TcM (ForeignImport GhcTc)
 
-tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh (CLabel cLabel))
+tcCheckFIType mas arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh (CLabel cLabel))
   -- Foreign import label
   = do checkCg (Right idecl) backendValidityOfCImport
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy (mkScaledFunTys arg_tys res_ty))
+       check (isFFILabelTy (mkScaledFunTys (zip mas arg_tys) res_ty))
              (TcRnIllegalForeignType Nothing)
        cconv' <- checkCConv (Right idecl) cconv
        return $ CImport src (L lc cconv') safety (typeCheckHeader <$> mh) (CLabel cLabel)
 
-tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh CWrapper) = do
+tcCheckFIType _mas arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh CWrapper) = do
         -- Foreign wrapper (former foreign export dynamic)
         -- The type must be of the form ft -> IO (FunPtr ft), where ft is a valid
         -- foreign type.  For legacy reasons ft -> IO (Ptr ft) is accepted, too.
@@ -314,11 +314,11 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh CWrapper)
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
                         checkForeignRes mustBeIO checkSafe (isFFIDynTy arg1_ty) res_ty
                   where
-                     (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
+                     (_mas1, arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (TcRnIllegalForeignType Nothing OneArgExpected)
     return (CImport src (L lc cconv') safety (typeCheckHeader <$> mh) CWrapper)
 
-tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
+tcCheckFIType mas arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
                                             (CFunction target))
   | isDynamicTarget target = do -- Foreign import dynamic
       checkCg (Right idecl) backendValidityOfCImport
@@ -328,7 +328,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
           addErrTc (TcRnIllegalForeignType Nothing AtLeastOneArgExpected)
         (Scaled arg1_mult arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
-          let curried_res_ty = mkScaledFunTys arg_tys res_ty
+          let curried_res_ty = mkScaledFunTys (zip (drop 1 mas) arg_tys) res_ty
           checkNoLinearFFI arg1_mult
           check (isFFIDynTy curried_res_ty arg1_ty)
                 (TcRnIllegalForeignType (Just Arg))
@@ -470,7 +470,7 @@ tcCheckFEType sig_ty edecl@(CExport src (L l (CExportStatic str cconv))) = do
   where
       -- Drop the foralls before inspecting
       -- the structure of the foreign type.
-    (arg_tys, res_ty) = tcSplitFunTys (dropForAlls sig_ty)
+    (_mas, arg_tys, res_ty) = tcSplitFunTys (dropForAlls sig_ty)
 
 {-
 ************************************************************************

@@ -42,6 +42,7 @@ module Type.Reflection
      pattern Con,
      pattern Con',
      pattern Fun,
+     pattern Fun',
      typeRepTyCon,
      rnfTypeRep,
      eqTypeRep,

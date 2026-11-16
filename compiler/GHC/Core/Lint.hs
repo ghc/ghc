@@ -83,6 +83,7 @@ import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
 
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Types (matchabilityTy, unmatchableDataConTy)
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Data.Bag
@@ -1107,7 +1108,7 @@ lintJoinBndrType :: Type -- Type of the body
 lintJoinBndrType body_ty bndr
   | JoinPoint arity <- idJoinPointHood bndr
   , let bndr_ty = idType bndr
-  , (bndrs, res) <- splitPiTys bndr_ty
+  , (mas, bndrs, res) <- splitPiTys bndr_ty
   = do let
           ty_msg =
             hang (text "Join point returns different type than body")
@@ -1130,7 +1131,7 @@ lintJoinBndrType body_ty bndr
            -- See Note [Linting join points with casts or ticks] for why
            -- we skip this check if there is an intervening cast.
            unless (occ_info == JoinOccUnderCast) $
-             ensureEqTys body_ty (mkPiTys (drop arity bndrs) res) ty_msg
+             ensureEqTys body_ty (mkPiTys (drop arity (zip mas bndrs)) res) ty_msg
   | otherwise
   = return ()
 
@@ -1559,7 +1560,7 @@ lintValApp arg fun_ty arg_ty fun_ue arg_ue
        ; let subst = Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv
        ; return (substTy subst res_ty, addUE fun_ue (scaleUE ManyTy arg_ue)) }
     -- See Note [Linting retained constructor fields].
-  | Just (_, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
+  | Just (_, _, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg_ty' arg_ty (mkAppMsg arg_ty' arg_ty arg)
        ; let app_ue =  addUE fun_ue (scaleUE w arg_ue)
        ; return (res_ty', app_ue) }
@@ -2185,11 +2186,14 @@ lintType ty@(TyConApp tc tys)
 
 -- arrows can related *unlifted* kinds, so this has to be separate from
 -- a dependent forall.
-lintType ty@(FunTy af tw t1 t2)
+lintType ty@(FunTy af ma tw t1 t2)
   = do { lintType t1
        ; lintType t2
        ; lintType tw
-       ; lintArrow (text "type or kind" <+> quotes (ppr ty)) af t1 t2 tw }
+       ; lintType ma
+       ; lintL (typeKind ma `eqType` matchabilityTy)
+           (text "Invalid function matchability:" <+> ppr ma)
+       ; lintArrow (text "type or kind" <+> quotes (ppr ty)) af ma t1 t2 tw }
 
 lintType ty@(ForAllTy {})
   = go [] ty
@@ -2275,10 +2279,10 @@ checkValueType kind doc
            text "when checking" <+> doc)
 
 -----------------
-lintArrow :: SDoc -> FunTyFlag -> Type -> Type -> Type -> LintM ()
+lintArrow :: SDoc -> FunTyFlag -> Type -> Type -> Type -> Type -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintArrow what af t1 t2 tw  -- Eg lintArrow "type or kind `blah'" k1 k2 kw
+lintArrow what af ma t1 t2 tw  -- Eg lintArrow "type or kind `blah'" k1 k2 kw
                             -- or lintArrow "coercion `blah'" k1 k2 kw
   = do { let k1 = typeKind t1
              k2 = typeKind t2
@@ -2286,6 +2290,8 @@ lintArrow what af t1 t2 tw  -- Eg lintArrow "type or kind `blah'" k1 k2 kw
        ; unless (isTYPEorCONSTRAINT k1) (report (text "argument")     t1 k1)
        ; unless (isTYPEorCONSTRAINT k2) (report (text "result")       t2 k2)
        ; unless (isMultiplicityTy kw)   (report (text "multiplicity") tw kw)
+       ; unless (af == FTF_T_T || ma `eqType` unmatchableDataConTy) $
+           addErrL (text "Constraint arrow must be unmatchable:" <+> ppr ma)
 
        ; let real_af = chooseFunTyFlag t1 t2
        ; unless (real_af == af) $ addErrL $
@@ -2388,7 +2394,7 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                              subst' = Subst in_scope (extendVarEnv ids b arg_expr) tvs cvs
                        ; go subst' body_ty acc' args }
 
-               go subst fun_ty@(FunTy _ mult exp_arg_ty res_ty) acc (arg:args)
+               go subst fun_ty@(FunTy _ _ mult exp_arg_ty res_ty) acc (arg:args)
                  = do { (arg_ty, acc') <- lint_arrow_arg arg (substTy subst mult) acc
                       ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
                         lint_app_fail_msg msg orig_fun_ty all_args
@@ -2704,21 +2710,26 @@ lintCoercion co@(ForAllCo {})
 
 
 lintCoercion (FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
-                    , fco_mult = cow, fco_arg = co1, fco_res = co2 })
+                    , fco_ma = coma, fco_mult = cow, fco_arg = co1, fco_res = co2 })
   = do { lintCoercion co1
        ; lintCoercion co2
        ; lintCoercion cow
+       ; lintCoercion coma
+       ; let Pair lma rma = coercionKind coma
+       ; lintL (typeKind lma `eqType` matchabilityTy && typeKind rma `eqType` matchabilityTy)
+           (text "Invalid function coercion matchability:" <+> ppr coma)
        ; let Pair lt1 rt1 = coercionKind co1
              Pair lt2 rt2 = coercionKind co2
              Pair ltw rtw = coercionKind cow
-       ; lintArrow (bad_co_msg "arrowl") afl lt1 lt2 ltw
-       ; lintArrow (bad_co_msg "arrowr") afr rt1 rt2 rtw
+       ; lintArrow (bad_co_msg "arrowl") afl lma lt1 lt2 ltw
+       ; lintArrow (bad_co_msg "arrowr") afr rma rt1 rt2 rtw
        ; lintRole co1 r (coercionRole co1)
        ; lintRole co2 r (coercionRole co2)
        ; let expected_mult_role = case r of
                                     Phantom -> Phantom
                                     _ -> Nominal
-       ; lintRole cow expected_mult_role (coercionRole cow) }
+       ; lintRole cow expected_mult_role (coercionRole cow)
+       ; lintRole coma expected_mult_role (coercionRole coma) }
   where
     bad_co_msg s = hang (text "Bad coercion" <+> parens (text s))
                       2 (vcat [ text "afl:" <+> ppr afl
@@ -2848,7 +2859,8 @@ lintCoercion the_co@(LRCo _lr co)
        ; let Pair s t = coercionKind co
        ; lintRole co Nominal (coercionRole co)
        ; case (splitAppTy_maybe s, splitAppTy_maybe t) of
-           (Just {}, Just {}) -> return ()
+           (Just (f, _), Just (g, _))
+             | isMatchableFunTy (typeKind f), isMatchableFunTy (typeKind g) -> return ()
            _ -> failWithL (hang (text "Bad LRCo:")
                               2 (ppr the_co $$ ppr s $$ ppr t)) }
 

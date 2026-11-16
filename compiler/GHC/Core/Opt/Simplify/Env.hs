@@ -1307,11 +1307,11 @@ adjustJoinPointType mult new_res_ty join_id
       | n == 0
       = new_res_ty
 
-      | Just (arg_bndr, body_ty) <- splitPiTy_maybe ty
+      | Just (ma, arg_bndr, body_ty) <- splitPiTy_maybe ty
       , let body_ty' = go (n-1) body_ty
       = case arg_bndr of
           Named b                          -> mkForAllTy b body_ty'
-          Anon (Scaled arg_mult arg_ty) af -> mkFunTy af' arg_mult' arg_ty body_ty'
+          Anon (Scaled arg_mult arg_ty) af -> mkFunTy af' ma arg_mult' arg_ty body_ty'
               where
                 -- Using "!": See Note [Bangs in the Simplifier]
                 -- mkMultMul: see Note [Scaling join point arguments]

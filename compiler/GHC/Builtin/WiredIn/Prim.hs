@@ -40,7 +40,7 @@ module GHC.Builtin.WiredIn.Prim(
         levPolyAlphaTyVarSpec, levPolyBetaTyVarSpec,
         levPolyAlphaTy, levPolyBetaTy,
 
-        multiplicityTyVar1, multiplicityTyVar2,
+        multiplicityTyVar1, multiplicityTyVar2, matchabilityTyVar,
 
         -- Kind constructors...
         tYPETyCon, tYPETyConName, tYPEKind,
@@ -126,7 +126,7 @@ import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , multiplicityTy
+  , multiplicityTy, matchabilityTy
   , constraintKind )
 
 import {-# SOURCE #-} GHC.Types.TyThing( mkATyCon )
@@ -553,6 +553,10 @@ levPolyAlphaTy, levPolyBetaTy :: Type
 levPolyAlphaTy = mkTyVarTy levPolyAlphaTyVar
 levPolyBetaTy  = mkTyVarTy levPolyBetaTyVar
 
+-- | A template metadata binder distinct from multiplicity and RuntimeRep.
+matchabilityTyVar :: TyVar
+(matchabilityTyVar : _) = drop 12 (mkTemplateTyVars (repeat matchabilityTy))
+
 multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 (multiplicityTyVar1 : multiplicityTyVar2 : _)
    = drop 13 (mkTemplateTyVars (repeat multiplicityTy))  -- selects 'n', 'm'
@@ -583,10 +587,10 @@ We have four distinct function type constructors, and a type synonym
  (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
           TYPE rep1 -> CONSTRAINT rep2 -> Constraint
 
- type (->) = FUN Many
+ type (->) @ma = FUN @ma Many
 
 For efficiency, all four are always represented by
-  FunTy { ft_af :: FunTyFlag, ft_mult :: Mult
+  FunTy { ft_af :: FunTyFlag, ft_ma :: Matchability, ft_mult :: Mult
         , ft_arg :: Type, ft_res :: Type }
 rather than by using a TyConApp.
 
@@ -600,7 +604,11 @@ rather than by using a TyConApp.
 * The ft_af field is redundant: it can always be gleaned from
   the kinds of ft_arg and ft_res.  See Note [FunTyFlag] in GHC.Types.Var.
 
-* The ft_mult :: Mult field gives the first argument for FUN
+* The ft_ma :: Matchability field gives the first argument for FUN.
+  The other three constructors have fixed U matchability.
+  See Note [Ordinary arrow matchability] in GHC.Core.TyCo.Rep.
+
+* The ft_mult :: Mult field gives the second argument for FUN.
   For the other three cases ft_mult is redundant; it is always Many.
   Note that of the four type constructors, only `FUN` takes a Multiplicity.
 
@@ -638,7 +646,7 @@ tcArrowTyConName = mkBuiltInPrimTc (fsLit "-=>") tcArrowTyConKey tcArrowTyCon
 -- | The @FUN@ type constructor.
 --
 -- @
--- FUN :: forall (m :: Multiplicity) ->
+-- FUN :: forall (ma :: Matchability). forall (m :: Multiplicity) ->
 --        forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --        TYPE rep1 -> TYPE rep2 -> Type
 -- @
@@ -652,12 +660,13 @@ fUNTyCon :: TyCon
 fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
-    tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar1
+    tc_bndrs = [ mkNamedTyConBinder Specified matchabilityTyVar
+               , mkNamedTyConBinder Required multiplicityTyVar1
                , mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
                ++ mkTemplateAnonTyConBinders [ mk_TYPE_app runtimeRep1Ty
                                              , mk_TYPE_app runtimeRep2Ty ]
-    tc_roles = [Nominal, Nominal, Nominal, Representational, Representational]
+    tc_roles = [Nominal, Nominal, Nominal, Nominal, Representational, Representational]
 
 -- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --         CONSTRAINT rep1 -> TYPE rep2 -> Type

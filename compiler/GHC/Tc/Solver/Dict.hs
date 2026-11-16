@@ -1780,7 +1780,7 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
       = (swizzled_pred, EvExpr swizzled_evterm)
       where
         (sc_tvs, sc_rho)          = splitForAllTyCoVars sc_pred
-        (sc_theta, sc_inner_pred) = splitFunTys sc_rho
+        (_sc_mas, sc_theta, sc_inner_pred) = splitFunTys sc_rho
 
         all_tvs       = tvs `chkAppend` sc_tvs
         all_theta     = theta `chkAppend` (map scaledThing sc_theta)

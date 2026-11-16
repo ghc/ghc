@@ -3609,6 +3609,14 @@ data TcRnMessage where
                           -> !Arity -- ^ The difference
                           -> TcRnMessage
 
+  {-| A pattern synonym declaration arrow has unsupported matchability.
+      Its matchability must reduce to U.
+      This check does not restrict arrows in the scrutinee type.
+  -}
+  TcRnPatSynUnsupportedMatchability :: !Name -- ^ The pattern synonym name
+                                    -> !Type -- ^ The normalized matchability
+                                    -> TcRnMessage
+
   {-| TcRnPatSynInvalidRhs is an error group indicating that the pattern on the
     right hand side of a pattern synonym is invalid.
 

@@ -835,7 +835,7 @@ ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 ppType (TyUTup ts) = "(mkTupleTy Unboxed "
                      ++ listify (map ppType ts) ++ ")"
 
-ppType (TyF s d) = "(mkVisFunTyMany ("   ++ ppType s ++ ") (" ++ ppType d ++ "))"
+ppType (TyF s d) = "(mkVisFunTyManyU ("  ++ ppType s ++ ") (" ++ ppType d ++ "))"
 ppType (TyC s d) = "(mkInvisFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
 
 ppType other

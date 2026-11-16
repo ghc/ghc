@@ -156,7 +156,7 @@ classifyPredType ev_ty
         -> ClassPred clas tys
 
       _ | (tvs, rho) <- splitForAllTyCoVars ev_ty
-        , (theta, pred) <- splitFunTys rho
+        , (_mas, theta, pred) <- splitFunTys rho
         , not (null tvs && null theta)
         -> ForAllPred tvs (map scaledThing theta) pred
 

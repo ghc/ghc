@@ -740,7 +740,7 @@ primOpType op
     Compare _occ ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
-        mkForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
+        mkForAllTys tyvars (mkVisFunTysManyU arg_tys res_ty)
 
 primOpResultType :: PrimOp -> Type
 primOpResultType op
@@ -912,7 +912,7 @@ commutableOp :: PrimOp -> Bool
 -- Utils:
 
 compare_fun_ty :: Type -> Type
-compare_fun_ty ty = mkVisFunTysMany [ty, ty] intPrimTy
+compare_fun_ty ty = mkVisFunTysManyU [ty, ty] intPrimTy
 
 -- Output stuff:
 

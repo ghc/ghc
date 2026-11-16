@@ -957,7 +957,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)
-                      <- tcInstInvisibleTyBinders lhs_ty lhs_kind
+                      <- tcInstInvisibleTyBinders (Just TypeLevel) lhs_ty lhs_kind
                       -- See Note [Data family/instance return kinds]
                       -- in GHC.Tc.TyCl point (DF3)
 

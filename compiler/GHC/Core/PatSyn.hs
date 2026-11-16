@@ -517,5 +517,5 @@ pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
   where
     sigma_ty = mkInvisForAllTys ex_tvs $
                mkInvisFunTys prov_theta $
-               mkVisFunTysMany orig_args orig_res_ty
+               mkVisFunTysManyU orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

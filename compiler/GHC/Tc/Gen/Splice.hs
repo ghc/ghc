@@ -767,7 +767,7 @@ tcUntypedBracket rn_expr brack ps res_ty
 -- | A type variable with kind * -> * named "m"
 mkMetaTyVar :: TcM TyVar
 mkMetaTyVar =
-  newNamedFlexiTyVar (fsLit "m") (mkVisFunTyMany liftedTypeKind liftedTypeKind)
+  newNamedFlexiTyVar (fsLit "m") (mkVisFunTyManyM liftedTypeKind liftedTypeKind)
 
 
 -- | For a type 'm', emit the constraint 'Quote m'.
@@ -2549,7 +2549,8 @@ tyConArgsPolyKinded tc =
     tc_vis_tvs = tyConVisibleTyVars tc
 
     tc_res_kind_vis_bndrs :: [PiTyBinder]
-    tc_res_kind_vis_bndrs = filter isVisiblePiTyBinder $ fst $ splitPiTys $ tyConResKind tc
+    tc_res_kind_vis_bndrs = let (_, bndrs, _) = splitPiTys (tyConResKind tc)
+                            in filter isVisiblePiTyBinder bndrs
 
 {-
 Note [Reified instances and explicit kind signatures]
@@ -2746,6 +2747,11 @@ reifyType ty@(AppTy {})     = do
     filter_out_invisible_args ty_head ty_args =
       filterByList (map isVisibleForAllTyFlag $ appTyForAllTyFlags ty_head ty_args)
                    ty_args
+-- Explicit metadata preserves arrows in both type and kind quotation contexts.
+reifyType (FunTy { ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res })
+  = do { [ma',mult',arg',res'] <- reifyTypes [ma,mult,arg,res]
+       ; let fun = TH.AppKindT (TH.ConT (reifyName (funTyFlagTyCon FTF_T_T))) ma'
+       ; return (mkThAppTs fun [mult',arg',res']) }
 reifyType ty@(FunTy { ft_af = af, ft_mult = ManyTy, ft_arg = t1, ft_res = t2 })
   | isInvisibleFunArg af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise            = do { [r1,r2] <- reifyTypes [t1,t2]
@@ -2791,7 +2797,7 @@ reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
        ; req'        <- reifyCxt req
        ; exTyVars'   <- reifyTyVarBndrs exTyVars
        ; prov'       <- reifyCxt prov
-       ; tau'        <- reifyType (mkScaledFunTys argTys resTy)
+       ; tau'        <- reifyType (mkScaledFunTysU argTys resTy)
        ; return $ TH.ForallT univTyVars' req'
                 $ TH.ForallT exTyVars' prov' tau' }
 
@@ -2873,6 +2879,12 @@ reifyTyVarsToMaybe tys = Just <$> reifyTyVars tys
 
 reify_tc_app :: TyCon -> [Type.Type] -> TcM TH.Type
 reify_tc_app tc tys
+  | tc `hasKey` fUNTyConKey
+  , ma : _ <- tys
+  = do { ma' <- reifyType ma
+       ; tys' <- reifyTypes (filterOutInvisibleTypes tc tys)
+       ; maybe_sig_t (mkThAppTs (TH.AppKindT (TH.ConT (reifyName tc)) ma') tys') }
+  | otherwise
   = do { tys' <- reifyTypes (filterOutInvisibleTypes tc tys)
        ; maybe_sig_t (mkThAppTs r_tc tys') }
   where

@@ -113,7 +113,8 @@ module GHC.Core.TyCon(
         ExpandSynResult(..),
         expandSynTyCon_maybe,
         newTyConCo, newTyConCo_maybe,
-        pprPromotionQuote, mkTyConKind,
+        pprPromotionQuote, mkTyConKind, mkTyConKindWithMatchability,
+        tyConFlavourMatchability,
 
         -- ** Predicated on TyConFlavours
         tcFlavourIsOpen,
@@ -149,7 +150,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( runtimeRepTyCon, constraintKind, levityTyCon
-   , multiplicityTyCon
+   , multiplicityTyCon, matchabilityTyCon, matchableDataConTy, unmatchableDataConTy
    , vecCountTyCon, vecElemTyCon )
 import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConFieldLabels
@@ -540,13 +541,26 @@ isInferredTyConBinder (Bndr _ tcb_vis) = isInvisInferTcbVis tcb_vis
 
 -- Build the 'tyConKind' from the binders and the result kind.
 -- Keep in sync with 'mkTyConKind' in GHC.Iface.Type.
+-- See Note [Declared arrow matchability].
 mkTyConKind :: [TyConBinder] -> Kind -> Kind
-mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
+mkTyConKind = mkTyConKindWithMatchability matchableDataConTy
+
+-- | Build a constructor kind with the supplied anonymous-arrow matchability.
+-- Named binders keep their ordinary matchable quantifier in this stage.
+mkTyConKindWithMatchability :: Type -> [TyConBinder] -> Kind -> Kind
+mkTyConKindWithMatchability ma bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy (Bndr tv vis) k
-    mk (Bndr tv AnonTCB)        k = mkNakedFunTy FTF_T_T (varType tv) k
+    mk (Bndr tv AnonTCB)        k = mkNakedFunTy ma FTF_T_T (varType tv) k
     -- mkNakedFunTy: see Note [Naked FunTy] in GHC.Builtin.WiredIn.Types
+
+-- | Matchability of the anonymous binders in a declaration's argument prefix.
+-- See Note [Declared arrow matchability].
+tyConFlavourMatchability :: TyConFlavour tc -> Type
+tyConFlavourMatchability flav
+  | tcFlavourMustBeSaturated flav = unmatchableDataConTy
+  | otherwise = matchableDataConTy
 
 -- | (mkTyConTy tc) returns (TyConApp tc [])
 -- but arranges to share that TyConApp among all calls
@@ -637,7 +651,7 @@ All TyCons have this group of fields
                               --   NB: Currently (Aug 2018), TyCons that own this
                               --   field really only contain TyVars. So it is
                               --   [TyVar] instead of [TyCoVar].
-  tyConKind      :: Kind      -- Equal to 'mkTyConKind tyConBinders tyConResKind' up to type synonym expansion
+  tyConKind      :: Kind      -- Full supplied kind, including arrow metadata
                               -- See Note [Preserve user-written TyCon kind]
   tyConArity     :: Arity     -- Cached = length tyConBinders
 
@@ -677,8 +691,9 @@ They fit together like so:
 
   tyConKind is the full kind of the TyCon, not just the result kind
 
-  Note that 'mkTyConKind tyConBinders tyConResKind' is only equal to 'tyConKind'
-  up to type synonym expansion, as explained in Note [Preserve user-written TyCon kind].
+  Reconstruct the prefix with the declaration's matchability. The supplied
+  kind can retain synonyms and computed metadata. See
+  Note [Preserve user-written TyCon kind] and Note [Declared arrow matchability].
 
 * For type families, tyConArity is the arguments this TyCon must be
   applied to, to be considered saturated.  Here we mean "applied to in
@@ -789,8 +804,8 @@ data TyCon = TyCon {
         tyConKind             :: Kind,
           -- ^ Kind of this TyCon
           --
-          -- Equal to @mkTyConKind tyConBinders tyConResKind@ only up to
-          -- type synonym expansion, see Note [Preserve user-written TyCon kind]
+          -- Preserve the supplied kind and its arrow metadata.
+          -- See Note [Preserve user-written TyCon kind].
         tyConHasClosedResKind :: Bool,
         tyConEtaBinders :: Int,
           -- ^ How many of the binders were introduced by eta expansion?
@@ -821,7 +836,7 @@ data NativeDomainShape
   | NativeDataDomain [(NativeDomainShape, NativeDomainShape)]
   | NativeSynonymDomain NativeDomainShape
   | NativeTyConDomain TyCon
-  | NativeFunctionDomain NativeDomainShape NativeDomainShape NativeDomainShape
+  | NativeFunctionDomain NativeDomainShape NativeDomainShape NativeDomainShape NativeDomainShape
   | NativePiDomain
 
 -- | Attach a derived interface view and update the cached nullary type.
@@ -2111,6 +2126,21 @@ mkTyCon name kind binders nb_eta_bndrs res_kind roles details
                , tyConHasClosedResKind = noFreeVarsOfType res_kind
                , tyConTyVars           = binderVars binders }
 
+{- Note [Declared arrow matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A type family or synonym has U anonymous arrows in its declared argument
+prefix. Data type constructors, promoted constructors and data families
+have M arrows in that prefix.
+The independent result kind can contain either classification. Do not rewrite
+its arrows. Named binders retain the implicit-M invariant in this stage.
+
+The general mkTyCon maker receives full user-written kinds. Preserve these
+kinds. The source checker must reject incompatible explicit metadata before
+it calls this maker. Generated kinds must use the declaration's classification.
+See Note [Checked declaration-kind matchability] in GHC.Tc.Gen.HsType.
+Runtime data-constructor workers use U arrows separately.
+-}
+
 {- Note [Preserve user-written TyCon kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is important to preserve the user-written kind of a TyCon, for error messages
@@ -2770,7 +2800,7 @@ kindTyConKeys = fromListUniqueSet $
   --   of these can successfully be used without DataKinds.
   [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey, cONSTRAINTTyConKey ]
   ++ concatMap tycon_with_datacons [ runtimeRepTyCon, levityTyCon
-                                   , multiplicityTyCon
+                                   , multiplicityTyCon, matchabilityTyCon
                                    , vecCountTyCon, vecElemTyCon ]
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)

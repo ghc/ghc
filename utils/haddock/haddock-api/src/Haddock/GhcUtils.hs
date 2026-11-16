@@ -798,7 +798,8 @@ typeNames ty = go ty Set.empty
         TermVarTy v -> go (varType v) acc
         DepFunTy b body -> go body $ go (varType b) acc
         AppTy t1 t2 -> go t2 $ go t1 acc
-        FunTy _ _ t1 t2 -> go t2 $ go t1 acc
+        -- See Note [Arrow matchability in Haddock] in Haddock.Convert.
+        FunTy _ ma w t1 t2 -> go t2 $ go t1 $ go w $ go ma acc
         TyConApp tcon args -> List.foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
         ForAllTy bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) acc
         LitTy _ -> acc
@@ -874,8 +875,9 @@ defaultRuntimeRepVars = go emptyVarEnv
     go _ (DepFunTy{}) = panic "defaultRuntimeRepVars: native dependent function is not supported"
     go subs (TyConApp tc tc_args) =
       TyConApp tc (map (go subs) tc_args)
-    go subs (FunTy af w arg res) =
-      FunTy af (go subs w) (go subs arg) (go subs res)
+    go subs (FunTy af ma w arg res) =
+      -- See Note [Arrow matchability in Haddock] in Haddock.Convert.
+      FunTy af (go subs ma) (go subs w) (go subs arg) (go subs res)
     go subs (AppTy t u) =
       AppTy (go subs t) (go subs u)
     go subs (CastTy x co) =

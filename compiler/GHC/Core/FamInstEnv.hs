@@ -1598,13 +1598,14 @@ normalise_type ty
            ; return $ mkReflRedn r ty }
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
-    go (FunTy { ft_af = vis, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
+    go (FunTy { ft_af = vis, ft_ma = ma, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
       -- See Note [Function reduction multiplicity roles] in GHC.Core.Reduction.
       = do { arg_redn <- go ty1
            ; res_redn <- go ty2
+           ; ma_redn <- withRole Nominal $ go ma
            ; w_redn <- withRole Nominal $ go w
            ; r <- getRole
-           ; return $ mkFunRedn r vis w_redn arg_redn res_redn }
+           ; return $ mkFunRedn r vis ma_redn w_redn arg_redn res_redn }
     go (ForAllTy (Bndr tcvar vis) ty)
       = do { (lc', tv', k_redn) <- normalise_var_bndr tcvar
            ; redn <- withLC lc' $ normalise_type ty
@@ -1662,9 +1663,9 @@ normalise_args :: Kind    -- of the function
 -- cf. GHC.Tc.Solver.Rewrite.rewrite_args_slow
 normalise_args fun_ki roles args
   = do { normed_args <- zipWithM normalise1 (Inf.toList roles) args
-       ; return $ simplifyArgsWorker ki_binders inner_ki fvs roles args normed_args }
+       ; return $ simplifyArgsWorker (zip ki_mas ki_binders) inner_ki fvs roles args normed_args }
   where
-    (ki_binders, inner_ki) = splitPiTys fun_ki
+    (ki_mas, ki_binders, inner_ki) = splitPiTys fun_ki
     fvs = tyCoVarsOfTypes args
 
     normalise1 role ty

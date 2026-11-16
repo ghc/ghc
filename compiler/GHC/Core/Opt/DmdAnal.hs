@@ -1199,7 +1199,7 @@ addUnfoldingDemands env rhs_sd id rhs_dmd_ty
 -- when the type doesn't have exactly 'idArity' many arrows.
 resultType_maybe :: Id -> Maybe Type
 resultType_maybe id
-  | (pis,ret_ty) <- splitPiTys (idType id)
+  | (_,pis,ret_ty) <- splitPiTys (idType id)
   , count isAnonPiTyBinder pis == idArity id
   = Just $! ret_ty
   | otherwise
