@@ -17,14 +17,13 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The current increment is [M60](#m60-closed-list-safe-indexing), owned by
-[R03 dependent products](roadmap/R03-dependent-products.md). It composes existing
-R05 rules with an ordinary finite-position GADT. M59 is audited and published.
+The current increment is [M61](#m61-opaque-whole-function-cast-lowering), owned by
+[R05 dependent Core](roadmap/R05-dependent-core.md). It measures application
+through opaque whole-function evidence. M59 and M60 are audited and published.
 The user
 resumed GHC execution on 2026-11-16 at 17:53 CET.
 
-The queue then probes opaque Pi application,
-and completes a bounded type-argument position. The next substantial foundation
+The queue then completes a bounded type-argument position. The next substantial foundation
 is [R23 matchability](roadmap/R23-unsaturated-type-families.md), followed by
 [R05 generic-domain metadata](roadmap/R05-dependent-core.md). The roadmap
 separates this chosen order from actual feature prerequisites. Keep ordinary
@@ -4166,3 +4165,58 @@ to `d26e6a2fb4` and audited documentation to `286a1592ed`. The canonical record 
 Its manifest freezes all 316 files in `native-closed-list-indexing-*`.
 The unchanged compiler's full package/API provenance remains M59 evidence.
 This publication checkpoint changes only status documents.
+
+## M61: opaque whole-function cast lowering
+
+Roadmap owner: R05 dependent Core. Related card: R03 dependent products.
+Status: specified. The prepared research candidate has not run.
+
+Determine whether the existing whole-function cast already supports application
+through opaque nominal evidence. `pushCoRetainedArg` can decline a coercion
+without rejecting the program. CorePrep can keep a whole cast; CoreToStg erases
+casts. Measure that path before adding a dependent instantiation primitive.
+The selected D/DC An-PiSnd and An-Push rules supply the prior comparison.
+See [the evidence references](REFERENCES.md#nominal-retained-domain-conversion).
+They do not establish this implementation's preservation or demand behavior.
+
+Use the following mathematical abbreviation. It is not a new source synonym:
+
+```text
+Phi a = foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
+     -> Vec a (f n) -> a -> a
+Lambda a. Lambda b. lambda (q :: Phi a ~N Phi b). lambda (h :: Phi a).
+    (h |> SubCo q)
+```
+
+The vector input makes both retained binders nonvacuous. Keep `a` and `b`
+distinct and abstract during typed preparation. The proof must remain a scoped
+nominal `CoVar`, not a visible `DepFunCo` or reflexivity proof. Use actual `f`
+and `n` identifiers distinct from the endpoint templates. Test the cast alone,
+one retained application, and both retained applications. Do not eta-expand
+the cast-only expression. It must preserve a bottom worker's WHNF behavior.
+
+- [ ] Run the prepared candidate in scratch first. Check input/output Lint,
+      exact expression types and scoped opaque evidence after direct CorePrep.
+      Close it with `a = b = Int` and legitimate reflexivity only for execution.
+- [ ] Extend the existing API fixture with nine quiet bytecode observations:
+      three good-worker WHNF checks, three bottom-worker WHNF checks, ignored
+      bottom inputs returning 42, vector demand, and scalar-index demand.
+      Preserve the existing 1/37 goldens. Add no committed test file.
+- [ ] Extend the existing cast object control with a distinct abstract
+      `NOINLINE` top-level kernel and a separate runtime entry. Check scope
+      after simplification and tidying. Retain actual CorePrep dump evidence
+      for that binding. Execute its legitimate closed caller through NCG.
+      Preserve the earlier scalar-domain object's 42 observation separately.
+- [ ] Check whether any required operation fails. Retain a working whole cast
+      when possible. Specify a new proof primitive only for a measured or
+      separately established calculus obligation. Do not reinterpret `InstCo`
+      or derive nominal domains from representational function equality.
+- [ ] Record actual compiler/package inputs, diagnostic or runtime failures,
+      and the limits of abstract structural checks versus closed execution.
+      Update R05, CORE and references. Keep general R05 work open.
+
+This increment adds no source syntax, evaluator, function equality or generic
+domain. It establishes no normal-optimizer, sharing or preservation theorem.
+Opaque evidence projection remains a separate typed transformation obligation
+even if whole-cast execution succeeds. Compiler rebuilds depend on a compiler
+change; fixture-only checks use the existing matching compiler and libraries.
