@@ -1093,12 +1093,37 @@ so that the later type-check will add them to the environment, and they'll be
 exported.  The function is never called, because the typechecker spots the
 sel_naughty field.
 
-To determine naughtiness we distingish two cases:
+To determine naughtiness we distinguish two cases:
 
 * For RealDataCons, a field is "naughty" if its type mentions a
-  type variable that isn't in the (original, user-written) result type
-  of the constructor. Note that this *allows* GADT record selectors
-  (Note [GADT record selectors]) whose types may look like sel :: T [a] -> a
+  variable that is absent from recordSelectorResultVars of the original result
+  type. This function uses the existing syntactic free-variable rule, but it
+  skips AppTy subtrees whose consumed kind arrow is U or unknown. It also checks
+  oversaturated TyConApp arguments through their consumed result-kind arrows.
+  It preserves binder scopes, kind dependencies, and coercion free variables.
+  Ordinary GADT selectors such as sel :: T [a] -> a remain available.
+  See Note [GADT record selectors].
+
+  A variable can occur in the result without being recoverable. For example,
+  T (f a) does not determine f or a when f consumes a U or unknown kind arrow.
+  A selector must not obtain these variables by inverting a Given equality of
+  application results. Matching the constructor can still expose the field
+  inside its existential scope. See Note [Matchability and injective variables]
+  in GHC.Core.TyCo.FVs.
+
+  Keep the existing treatment of saturated type families and synonyms. For
+  example, a field of type F a in a constructor result T (F a) can be selected
+  by transporting the complete field type. This does not require inverse
+  evidence for a. Using injectiveVarsOfType here would reject this selector.
+  The generated selector binding still has to typecheck. A user-defined family
+  injectivity annotation alone does not provide Given inverse evidence; see
+  (INJFAM:Given) in Note [Type inference for type families with injectivity]
+  in GHC.Tc.Solver.FunDeps.
+
+  This is a bounded extension of the existing classification. It can reject a
+  new U application field whose complete type could be transported without
+  recovering its free variables. It does not implement a complete field-type
+  transport analysis.
 
 * For a PatSynCon, a field is "naughty" if its type mentions a type variable
   that isn't in the universal type variables.

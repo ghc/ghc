@@ -35,9 +35,9 @@ import GHC.Prelude
 import GHC.Core.DataCon
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
-import GHC.Core.TyCo.Rep (Type, ThetaType)
-import GHC.Core.TyCon (tyConDataCons)
-import GHC.Core.Type(mkTyConApp, tyCoVarsOfType)
+import GHC.Core.TyCo.Rep (Type(..), ThetaType)
+import GHC.Core.TyCon (tyConDataCons, tyConArity)
+import GHC.Core.Type(mkTyConApp, tyCoVarsOfType, tyCoVarsOfCo, typeKind, isMatchableFunTy)
 import GHC.Types.Unique
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -260,5 +260,29 @@ isExistentialRecordField field_ty con =
        -- GHC.Core.PatSyn, so no need to check them.
   where
     field_ty_tvs = tyCoVarsOfType field_ty
-    res_ty_tvs   = tyCoVarsOfType data_ty
+    res_ty_tvs   = recordSelectorResultVars data_ty
     (univ_tvs, _, _, _, _, _, data_ty) = conLikeFullSig con
+
+-- | Collect result variables for the record-selector classification.
+-- See Note [Naughty record selectors] in GHC.Tc.TyCl.Utils.
+recordSelectorResultVars :: Type -> VarSet
+recordSelectorResultVars = go
+  where
+    go (AppTy fun arg)
+      | isMatchableFunTy (typeKind fun) = go fun `unionVarSet` go arg
+      | otherwise = emptyVarSet
+    go (TyConApp tc args)
+      | (prefix, extra@(_:_)) <- splitAt (tyConArity tc) args
+      = go (foldl AppTy (mkTyConApp tc prefix) extra)
+      | otherwise = unionVarSets (map go args)
+    go (TyVarTy tv) = unitVarSet tv `unionVarSet` go (varType tv)
+    go (FunTy _ ma mult arg res) = unionVarSets (map go [ma, mult, arg, res])
+    go (ForAllTy (Bndr tv _) body)
+      = go (varType tv) `unionVarSet` (go body `delVarSet` tv)
+    go (CastTy ty co) = go ty `unionVarSet` tyCoVarsOfCo co
+    go (DepFunTy binder body)
+      = go (varType binder) `unionVarSet` (go body `delVarSet` binder)
+    go (TermAppTy fun arg)
+      = go (TermVarTy fun) `unionVarSet` go arg
+    go (TermVarTy var) = unitVarSet var `unionVarSet` go (varType var)
+    go ty = tyCoVarsOfType ty

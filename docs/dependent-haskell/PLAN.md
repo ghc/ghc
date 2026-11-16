@@ -4415,7 +4415,10 @@ reaches TypeRep and exposes an overbroad application-matching gate. Binding a
 variable to a whole opaque application must remain possible. Inverse
 application still requires M. Preserve uncertain apartness for rigid variables
 and repeated opaque targets. The correction and its quiet API controls need a
-fresh bootstrap build. Self-hosting and runtime checks remain pending.
+fresh bootstrap build. Bootstrap v9 passes. Self-host v5 exposes generated
+selectors and reflection code that relied on inverse application. The next
+correction checks actual reflected heads and limits selector classification
+at opaque applications. Self-hosting and runtime checks remain pending.
 M62 remains the last validated and published compiler checkpoint.
 
 The next foundation has two stages. M63 gives ordinary arrows explicit
@@ -4534,3 +4537,11 @@ identity. Keep current native Typeable and unfolding/codec restrictions.
 Use a fresh native-arrow-matchability-* evidence prefix. All M57-M62 prefixes
 remain frozen. This specification introduces no new source extension, family
 unsaturation, ordinary function promotion or runtime evaluation in types.
+
+Record selectors need a separate classification check. Ignore variables found
+only under a U or unknown application in the result. Keep the existing
+saturated-family and synonym treatment; a whole field type can be transported
+without recovering each variable. Preserve the ordinary GADT list selector.
+The initial rule can still reject a new opaque whole-field selector that could
+support transport. General field-type transport remains open. Reflection must
+compare the actual head with FUN or TYPE before it uses constructor injectivity.

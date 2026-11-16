@@ -264,6 +264,13 @@ kind arrows have M. The application decoder retains metadata in the FUN kind
 arguments; it does not encode an M arrow with the runtime Fun constructor.
 splitApps omits kind arguments, including matchability. Fun' and the App/Con'
 decomposition retain that metadata.
+
+A TrApp stores an application whose head can have U matchability. An equality
+between its result and a known application cannot identify that head or its
+argument. First compare the actual head representation with the known head.
+mkTrAppChecked compares the bare FUN heads. isTYPE and getRuntimeRep compare
+the head with TYPE. These whole-head equalities establish the M kind arrows
+before constructor injectivity supplies the argument equalities.
 -}
 
 -- | A 'TypeableInstance' wraps up a 'Typeable' instance for explicit
@@ -541,10 +548,11 @@ mkTrApp a b -- See Note [Kind caching], Wrinkle 2
 -- | Construct a representation for a type application that
 -- may be a saturated arrow type. This is renamed to mkTrApp in
 -- Type.Reflection.Unsafe
+-- See Note [Matchability in reflection].
 mkTrAppChecked :: forall {ma :: Matchability} k1 k2
                          (a :: FUN @ma 'Many k1 k2) (b :: k1).
                   TypeRep a -> TypeRep b -> TypeRep (a b)
-mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x}) y
+mkTrAppChecked (TrApp {trAppFun = p, trAppArg = x}) y
   | TrTyCon {trTyCon=con, trKindVars=ks} <- p
   , con == funTyCon
   , [ SomeTypeRep (match :: TypeRep match)
@@ -556,7 +564,7 @@ mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x}) y
   , let arr :: TypeRep (FUN @match mul :: TYPE rx -> TYPE ry -> Type)
         arr = mkTrCon funTyCon
                 [SomeTypeRep match, SomeTypeRep mul, SomeTypeRep rx, SomeTypeRep ry]
-  , Just HRefl <- mkTrApp arr x `eqTypeRep` rep
+  , Just HRefl <- p `eqTypeRep` arr
   = mkTrFun match mul x y
 mkTrAppChecked a b = mkTrApp a b
 
@@ -819,8 +827,11 @@ isTYPE (TrApp {trAppFun=f, trAppArg=r})
 isTYPE _ = Nothing
 
 getRuntimeRep :: forall (r :: RuntimeRep). TypeRep (TYPE r) -> TypeRep r
+-- See Note [Matchability in reflection].
 getRuntimeRep TrType = trLiftedRep
-getRuntimeRep (TrApp {trAppArg=r}) = r
+getRuntimeRep (TrApp {trAppFun=f, trAppArg=r})
+  | Just HRefl <- f `eqTypeRep` trTYPE
+  = r
 getRuntimeRep _ = error "Data.Typeable.Internal.getRuntimeRep: impossible"
 
 
