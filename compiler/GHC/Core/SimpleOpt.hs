@@ -329,9 +329,12 @@ substitution. See
 docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance for the
 demand restriction.
 
-Boolean beta reduction substitutes an optimized local variable or exact
-constructor into terms and types together. Retain the redex for an unsupported
-producer. A lazy let for a retained argument could let its index escape.
+Scalar beta reduction substitutes an optimized local variable or exact
+constructor into terms and types together. A retained function head substitutes
+only an eligible bare function variable of the same complete type. Its dedicated
+TermAppTy head slot cannot contain a constructor, cast, or arbitrary expression.
+Retain the redex for an unsupported producer. A lazy let for a retained argument
+could let its index escape through a partial application's result type.
 Disable general compulsory unfolding too: unfolding a valid variable index can
 expose an unsupported producer. Do not push casts through native lambdas.
 
@@ -615,6 +618,16 @@ simple_app env e0@(Lam {}) as0@(_:_)
              Just _ -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
                                body as
              Nothing -> rebuild_app env (simple_opt_expr env e) args
+
+      | soe_native env
+      , isNativeIndexFunctionId b'
+      = let arg = simple_opt_clo (soeInScope env') a
+        in case nativeIndexFunctionVar_maybe arg of
+             Just actual
+               | idType b' `eqType` idType actual
+               -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
+                          body as
+             _ -> rebuild_app env (simple_opt_expr env e) args
 
       | -- simpl binder before looking at its type
         -- See Note [Dark corner with representation polymorphism]
