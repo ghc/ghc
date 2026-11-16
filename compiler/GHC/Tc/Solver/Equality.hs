@@ -34,6 +34,7 @@ import GHC.Core.DataCon ( dataConName )
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
+import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
 import GHC.Core.Reduction
@@ -481,13 +482,21 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1@DepFunTy{} _ ty2@DepFunTy{} _
 can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
   | bothRewritten ces
   , isWanted ev
+  , isNativeIndexFunctionId b1, isNativeIndexFunctionId b2
+  , varType b1 `tcEqType` varType b2
+  = can_eq_nc_depfun ev eq_rel ty1 ty2 MRefl
+
+-- See Note [Solving retained function equalities].
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
+  | bothRewritten ces
+  , isWanted ev
   , isNativeIndexId b1, isNativeIndexId b2
   = if domain1 `tcEqType` domain2
-    then can_eq_nc_depfun ev eq_rel ty1 ty2 (mkNomReflCo domain1)
+    then can_eq_nc_depfun ev eq_rel ty1 ty2 MRefl
     else do { Reduction co1 normal1 <- rewriteFamilyAxioms (ctEvLoc ev) domain1
             ; Reduction co2 normal2 <- rewriteFamilyAxioms (ctEvLoc ev) domain2
             ; if normal1 `tcEqType` normal2
-              then can_eq_nc_depfun ev eq_rel ty1 ty2 (co1 `mkTransCo` mkSymCo co2)
+              then can_eq_nc_depfun ev eq_rel ty1 ty2 (MCo (co1 `mkTransCo` mkSymCo co2))
               else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
   where
     domain1 = varType b1
@@ -745,17 +754,20 @@ Missing this point is what caused #15431
 ---------------------------------
 -- | Compare retained bodies in a private runtime-binder scope.
 -- See Note [Solving retained function equalities].
-can_eq_nc_depfun :: CtEvidence -> EqRel -> Type -> Type -> CoercionN
+can_eq_nc_depfun :: CtEvidence -> EqRel -> Type -> Type -> MCoercionN
                  -> TcS (StopOrContinue (Either IrredCt EqCt))
-can_eq_nc_depfun ev eq_rel ty1@(DepFunTy b1 body1) ty2@(DepFunTy b2 body2) delta
+can_eq_nc_depfun ev eq_rel ty1@(DepFunTy b1 body1) ty2@(DepFunTy b2 body2) domain
   | CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
   = do { binder <- wrapTcS $ TcM.newSysLocalId (fsLit "retained") ManyTy (varType b1)
        ; let in_scope = mkInScopeSet $
                           extendVarSet (tyCoVarsOfTypes [ty1,ty2]
-                                        `unionVarSet` tyCoVarsOfCo delta) binder
+                                        `unionVarSet` tyCoVarsOfMCo domain) binder
              subst b arg = Subst.mkIdSubst in_scope (unitVarEnv b arg)
+             right_arg = case domain of
+                           MRefl -> Var binder
+                           MCo delta -> Cast (Var binder) (SubCo delta)
              left_body = Subst.substTy (subst b1 (Var binder)) body1
-             right_body = Subst.substTy (subst b2 (Cast (Var binder) (SubCo delta))) body2
+             right_body = Subst.substTy (subst b2 right_arg) body2
        ; nested_binds <- newNoTcEvBinds
        ; (unifs, (body_co, solved)) <- reportFineGrainUnifications $
            do { (level, (body_co, wanteds)) <-
@@ -768,7 +780,7 @@ can_eq_nc_depfun ev eq_rel ty1@(DepFunTy b1 body1) ty2@(DepFunTy b2 body2) delta
               ; return (body_co, isSolvedWC residual) }
        ; kickOutAfterUnification unifs
        ; if solved
-         then do { all_co <- zonkCo (mkDepFunCoWithDomain binder (MCo delta) body_co)
+         then do { all_co <- zonkCo (mkDepFunCoWithDomain binder domain body_co)
                  ; left <- zonkTcType ty1
                  ; right <- zonkTcType ty2
                  ; if coercionLKind all_co `tcEqType` left
@@ -786,10 +798,15 @@ can_eq_nc_depfun _ _ ty1 ty2 _
 
 {- Note [Solving retained function equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Compare two retained functions using nominal DepFunCo. First normalize their
-closed scalar domains outside the runtime binder. The resulting proof delta
-has kind A ~N B. Use a fresh x :: A in both bodies. Replace the target binder
-by x cast through delta. The body proof then has the scope that DepFunCo needs.
+Compare two retained functions using nominal DepFunCo. Use MRefl when their
+complete eligible scalar or function domains agree. Substitute the same fresh
+bare variable into both bodies. A function head must remain a Var; a reflexive
+cast around that variable is not a supported native call head.
+
+For unequal closed scalar domains, normalize them outside the runtime binder.
+The resulting proof delta has kind A ~N B. Use a fresh x :: A in both bodies.
+Replace the target binder by x cast through delta. The body proof then has the
+scope that DepFunCo needs.
 See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 
 Use reflexivity when the domains already agree. Otherwise use rewriteFamilyAxioms
