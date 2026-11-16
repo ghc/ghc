@@ -761,16 +761,19 @@ can_eq_nc_depfun ev eq_rel ty1@(DepFunTy b1 body1) ty2@(DepFunTy b2 body2) delta
                     solveSimpleWanteds wanteds
               ; return (body_co, isSolvedWC residual) }
        ; kickOutAfterUnification unifs
-       ; let all_co = mkDepFunCoWithDomain binder (MCo delta) body_co
-             endpoints_match = coercionLKind all_co `tcEqType` ty1
-                               && coercionRKind all_co `tcEqType` ty2
-       ; if solved && endpoints_match
-         then do { -- Keep outer Given evidence live after the local solve.
-                   outer_binds <- getTcEvBindsVar
-                 ; combineTcEvBinds outer_binds nested_binds
-                 ; setWantedEq dest (CPH { cph_co = downgradeRole (eqRelRole eq_rel) Nominal all_co
-                                        , cph_holes = emptyCoHoleSet })
-                 ; stopWith ev "Retained function equality: solved" }
+       ; if solved
+         then do { all_co <- zonkCo (mkDepFunCoWithDomain binder (MCo delta) body_co)
+                 ; left <- zonkTcType ty1
+                 ; right <- zonkTcType ty2
+                 ; if coercionLKind all_co `tcEqType` left
+                      && coercionRKind all_co `tcEqType` right
+                   then do { -- Keep outer Given evidence live after the local solve.
+                             outer_binds <- getTcEvBindsVar
+                           ; combineTcEvBinds outer_binds nested_binds
+                           ; setWantedEq dest (CPH { cph_co = downgradeRole (eqRelRole eq_rel) Nominal all_co
+                                                  , cph_holes = emptyCoHoleSet })
+                           ; stopWith ev "Retained function equality: solved" }
+                   else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
          else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
 can_eq_nc_depfun _ _ ty1 ty2 _
   = pprPanic "can_eq_nc_depfun" (ppr ty1 $$ ppr ty2)
@@ -790,6 +793,8 @@ Do not encode it in ic_skols: an Id is not a TcTyVar. Do not emit an implication
 or a residual body Wanted. If any Wanted remains, keep the original whole
 equality instead. Track outer unifications and used Given evidence as the
 forall solver does. Existing native meta-assignment checks still apply.
+Zonk the completed proof and its expected endpoints before checking them.
+Ordinary body unification can assign payload metavariables.
 
 The body proof is nominal even for a representational Wanted. Downgrade the
 complete nominal proof only after constructing DepFunCo. A representational

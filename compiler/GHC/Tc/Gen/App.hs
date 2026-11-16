@@ -1523,7 +1523,8 @@ tcRetainedArg domain arg
                       _ -> unsupported }
           _ -> unsupported
 
-    -- Preserve nominal transport before the index substitution checks its kind.
+    -- | Preserve nominal transport before the index substitution checks its kind.
+    index_var :: TcType -> Id -> TcM Core.CoreExpr
     index_var expected arg_id
       | varType arg_id `tcEqType` expected = return (Core.Var arg_id)
       | otherwise
