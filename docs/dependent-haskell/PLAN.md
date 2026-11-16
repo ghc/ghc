@@ -4169,8 +4169,9 @@ This publication checkpoint changes only status documents.
 ## M61: opaque whole-function cast lowering
 
 Roadmap owner: R05 dependent Core. Related card: R03 dependent products.
-Status: scratch probe measured. Abstract CorePrep passes. Closed bytecode
-execution rejects the one-argument control during native simplification.
+Status: compiler fix and fixture implemented. The rebuilt bootstrap passes the
+three abstract preparation cases, nine bytecode observations and two object
+observations in scratch. Self-hosting and the selected cohort remain pending.
 
 Determine whether the existing whole-function cast already supports application
 through opaque nominal evidence. `pushCoRetainedArg` can decline a coercion
@@ -4196,28 +4197,30 @@ and `n` identifiers distinct from the endpoint templates. Test the cast alone,
 one retained application, and both retained applications. Do not eta-expand
 the cast-only expression. It must preserve a bottom worker's WHNF behavior.
 
-- [ ] Run the prepared candidate in scratch first. Check input/output Lint,
+- [x] Run the prepared candidate in scratch first. Check input/output Lint,
       exact expression types and scoped opaque evidence after direct CorePrep.
       Close it with `a = b = Int` and legitimate reflexivity only for execution.
-- [ ] Fix the measured native function beta-reduction failure. A bare eligible
+- [x] Fix the measured native function beta-reduction failure. A bare eligible
       function argument must substitute through terms and native types together.
       Require the same complete function type. Retain the application when the
       optimized argument is not an eligible bare function variable. Do not
       introduce a let alias that escapes through the partial result type.
       This is the function-head counterpart of existing scalar beta substitution.
-- [ ] Extend the existing API fixture with nine quiet bytecode observations:
+- [x] Extend the existing API fixture with nine quiet bytecode observations:
       three good-worker WHNF checks, three bottom-worker WHNF checks, ignored
       bottom inputs returning 42, vector demand, and scalar-index demand.
       Preserve the existing 1/37 goldens. Add no committed test file.
-- [ ] Extend the existing cast object control with a distinct abstract
+- [x] Extend the existing cast object control with a distinct abstract
       `NOINLINE` top-level kernel and a separate runtime entry. Check scope
       after simplification and tidying. Retain actual CorePrep dump evidence
       for that binding. Execute its legitimate closed caller through NCG.
       Preserve the earlier scalar-domain object's 42 observation separately.
-- [ ] Check whether any required operation fails. Retain a working whole cast
+- [x] Check whether any required operation fails. Retain a working whole cast
       when possible. Specify a new proof primitive only for a measured or
       separately established calculus obligation. Do not reinterpret `InstCo`
       or derive nominal domains from representational function equality.
+- [ ] Build the self-hosted compiler. Run fresh API goldens, both-stage public
+      source and Showcase controls, and the existing registered tests.
 - [ ] Record actual compiler/package inputs, diagnostic or runtime failures,
       and the limits of abstract structural checks versus closed execution.
       Update R05, CORE and references. Keep general R05 work open.
@@ -4234,4 +4237,12 @@ Core Lint then reports a let-bound function index in the partial result type.
 The current scalar-only beta guard lets the function binder enter ordinary
 `simple_bind_pair`, which creates that escaping alias. The measured logs are in
 `_build/verification/native-opaque-whole-cast-discovery-v2/`. They do not show a
-need for opaque coercion projection. All nine runtime checks remain uncompleted.
+need for opaque coercion projection. Version 3 passes all nine runtime checks
+after compiler `f0b45ad34b` substitutes eligible bare function arguments.
+Bootstrap build 1 passes in 30.12 seconds under 16 GiB/swap0/-j6.
+
+Object discovery v1 stops at a misspelled dump flag. Version 2 corrects it to
+`-fno-dump-with-ways`. Its actual NCG pass keeps the abstract kernel and scoped
+`Sub cv` cast in the recorded CorePrep dump. The executable prints `42` for
+the scalar entry and `42` for the opaque entry. Fixture checkpoint `b03cfae43b`
+contains both paths. Goldens remain unchanged but await the selected full run.

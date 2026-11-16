@@ -3680,6 +3680,31 @@ step, not completed dependent subsumption. The seven-work, nine-PDF ledger is
 unchanged. No new whole-paper reading or theorem replay is claimed.
 
 
+## Opaque whole-function cast lowering
+
+M61 first measures the existing whole-cast path. It uses the selected D/DC
+An-PiSnd discussion on author-PDF page 17 and An-Push on page 19, the 2013 FC
+instantiation discussion on PDF pages 6–8, and Pico's relevant/irrelevant
+instantiation discussion on thesis PDF pages 127–129. The paper ledger retains
+the exact versions and reading limits. No new whole-paper reading is claimed.
+
+These rules distinguish evidence elimination from execution through a cast.
+They do not require a new primitive for every application. The measured kernel
+keeps opaque nominal evidence between distinct abstract payloads through typed
+preparation. Only its caller closes both payloads to Int with reflexivity.
+The actual NCG dump retains the abstract cast. Nine bytecode controls and two
+object observations pass in scratch after native beta substitution is corrected.
+This does not implement general Pi projection or establish a preservation theorem.
+
+The substitution correction follows the existing Agda context/substitution
+precedent and this fork's scalar beta rule. Substitute an eligible bare function
+argument through terms, types and coercions together. Ordinary let insertion can
+make the alias escape in a partial result type. Keep Haskell's existing demand
+and unsupported-argument restrictions. See Note [Restricted dependent
+simplification] in `GHC.Core.SimpleOpt` and Note [Opaque retained function casts]
+in the existing API fixture. The measured records use the new
+`native-opaque-whole-cast-*` namespace. No singleton translation or eta law is added.
+
 ## Scoped source comparison
 
 M58 constructs the existing M57 rule from source. It retains D/DC An-PiCong and

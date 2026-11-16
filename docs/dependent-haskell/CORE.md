@@ -1863,6 +1863,13 @@ CorePrep substitutes a supported Var directly. It does not form TermVarTy g or
 add a strict scalar DEFAULT alias. A signed local lazy function alias can remain
 shared. Unsupported non-variable substitutions keep the existing gate.
 
+Restricted simplification must use the same bare-variable substitution for
+function beta reduction. Check the complete function type after substitution.
+Substitute through terms, types and coercions together. Ordinary beta reduction
+can create a lazy local alias whose name escapes through a partial result type.
+Retain unsupported applications instead. See Note [Restricted dependent
+simplification] in `GHC.Core.SimpleOpt`.
+
 M46 first limited source permission to complete local value signatures. M52
 also admits complete ordinary named value signatures, including exported
 bindings. One equation uses bare variables in retained columns. Source actuals must be
@@ -2132,6 +2139,29 @@ Demanding a vector may execute its original function or input producer. No
 call inversion, computed function equality or mutable native-meta assignment
 is added. Native coercion serialization, arbitrary unfoldings and ordinary
 optimization remain unsupported.
+
+## Opaque whole-function cast lowering
+
+An opaque nominal equality between two complete retained function types can
+remain in a whole value cast. Application uses the target function type.
+CorePrep need not project a body proof merely to retain this cast. CoreToStg
+erases the cast in the checked lowering path. This does not supply a general
+typed cast-pushing or opaque Pi-instantiation operation.
+
+M61's abstract kernel has distinct payload types and a scoped nominal CoVar.
+Direct CorePrep checks the cast alone and one or two retained applications.
+Its separate object kernel stays abstract through simplification and tidying.
+The dump from the actual NCG CorePrep pass retains `Sub cv` between the two
+payload types. Structured checks precede that pass; dump inspection is textual.
+Only the executable caller supplies `Int` and legitimate reflexivity.
+
+Nine scratch bytecode controls check partial WHNF and ignored or demanded
+operands. The NCG control returns 42 without forcing bottom function, scalar
+index or vector arguments. It preserves the earlier scalar-domain control's
+separate 42 result. Native function beta reduction needs the substitution rule
+above to prevent an escaping partial-result alias. The bootstrap compiler is
+rebuilt; the selected self-hosted regression cohort remains pending.
+See Note [Opaque retained function casts] in the existing API fixture.
 
 Malformed recursive ordinary-domain interface types remain a known validation
 gap: three function-shaped and three scalar-shaped synthetic knots raise
