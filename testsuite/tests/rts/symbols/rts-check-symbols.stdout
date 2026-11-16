@@ -446,6 +446,7 @@ Observed> verifyGot Code
 Observed> verrorBelch Code
 Observed> vsysErrorBelch Code
 Observed> waitCondition Code
+Observed> waitConditionTimedAbsolute Code
 Observed> waitConditionTimedRelative Code
 Observed> warnMissingKBLibraryPaths Code
 Observed> yieldThread Code
