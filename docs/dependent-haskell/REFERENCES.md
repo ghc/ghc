@@ -3864,12 +3864,18 @@ a termination check alone does not supply that logical guarantee.
 
 Casinghino, Sjoberg and Weirich's
 [Combining Proofs and Programs in a Dependently Typed Language (POPL 2014)](https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf)
-is direct mixed-fragment prior art. The abstract and opening examples were read.
-Its potentially nonterminating solver returns checked evidence if it succeeds.
-Its calculus is call-by-value. Its results do not establish a theorem for lazy
-Haskell. Only a web extraction was retained for this reading, not verified PDF
-bytes. Safe Haskell supplies a separate module-trust comparison; it is not a
-totality checker.
+is direct mixed-fragment prior art. The author PDF is now archived and hashed.
+Read its introduction, relevant examples and technical sections on PDF pages
+4 to 11. Its potentially nonterminating solver can supply logical evidence
+after evaluation returns a suitable value. Corollary 9 proves closed logical
+CBV termination. It does not prove normalization of arbitrary open terms.
+Contradictory equality assumptions can type a looping logical expression.
+The completed core proof omits several features implemented in Zombie.
+The authors report Coq checking with functional extensionality. No proof was
+replayed. Value restrictions, total inputs and imported assumptions need a
+separate account for lazy Haskell. See the version-specific reading scope in
+the paper manifest. Safe Haskell supplies a separate module-trust comparison;
+it is not a totality checker.
 
 The ignored `native-arrow-matchability-boundary-research-v1` directory records
 source pins, selected line ranges and twelve verified Git blobs: eight

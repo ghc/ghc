@@ -154,6 +154,8 @@ can still preserve an index invariant when it returns. Totality remains a
 separate promise. A termination checker alone does not establish logical
 consistency; positivity, universes, proof elimination and unsafe operations
 also need rules.
+Specify the required inputs as well as the result. A checked function on total
+inputs does not certify a result obtained from an unchecked lazy argument.
 
 Use linear-base as the library and adapter reference. Use Idris and Agda as
 references for conservative totality checks and imported assumptions. Their

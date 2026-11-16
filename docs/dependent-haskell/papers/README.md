@@ -1,12 +1,13 @@
 # Dependent Haskell paper reading
 
 Read on 2026-11-14 through 2026-11-16. The [manifest](manifest.json) records
-twenty works and twenty-six downloaded PDF versions. It contains source URLs,
+twenty-one works and twenty-seven downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
 observational-equality PDFs are in the sibling directory
-`native-arrow-matchability-observational-papers-v1/`.
+`native-arrow-matchability-observational-papers-v1/`. The POPL 2014 Trellys PDF
+and reading records are in `native-arrow-matchability-trellys-research-v1/`.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -38,6 +39,8 @@ versions and several selective readings.
 | [Observational Equality: Now for Good](https://pujet.fr/pdf/OTT_now_for_good.pdf) | Pujet and Tabareau, POPL 2022 | R05, R23 | TTobs, proof irrelevance and conversion metatheory. No proof was replayed. |
 | [Implementing a Type Theory with Observational Equality, Using Normalisation by Evaluation](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.TYPES.2024.5) | Sirman, Lennon-Bertrand and Krishnaswami, TYPES 2024; published 2025 | R05, R23 | Implementation experience in Haskell. The object-language prototype deliberately uses inconsistent U:U. It is not dependent Haskell. |
 | [Observational Equality Meets CIC](https://pujet.fr/pdf/toplas25_cicobs.pdf) | Pujet, Leray and Tabareau, TOPLAS 2025 | R05, R23 | Indexed transport and cast computation. The formalized conversion proof covers the natural-number fragment. |
+
+| [Combining Proofs and Programs in a Dependently Typed Language](https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf) | Casinghino, Sjöberg and Weirich, POPL 2014 | R05 | Logical and programmatic fragments. The core proves closed logical CBV termination. Open-term normalization, Zombie's richer feature set and lazy-Haskell totality are separate boundaries. |
 
 ## Singletons, Haskell 2012
 
@@ -612,3 +615,23 @@ These sources inform explicit equality and transport. They do not equate
 pointwise function equality with contextual equivalence of partial Haskell
 programs. Haskell's seq and divergence remain separate obligations. No OTT
 design is selected. See REFERENCES.md for the proposed research task.
+
+## Combining Proofs and Programs, POPL 2014
+
+Read the introduction, relevant examples and Figure 1. Read the technical text
+and displayed rules on PDF pages 4 to 11. These pages cover evaluation, fragment
+interaction, metatheory, the implementation boundary, partial types and future
+work. The author PDF has 13 pages. The archive records its URL, redirect, access
+time, hash, byte count and extraction method.
+
+The logical fragment has a closed-term CBV termination result. This result does
+not prove normalization of arbitrary open terms. Contradictory equality
+assumptions can type a looping logical expression. The completed core proof
+excludes several features implemented in Zombie. The authors report Coq
+checking with functional extensionality. No proof was replayed for this reading.
+
+The interaction rules restrict values and inputs. A lazy Haskell binding or an
+outer constructor does not establish those premises. A total Haskell subset
+needs its own property and import rules. No total-subset design is selected by
+this reading. No theorem is transferred to GHC. See the version-specific scope
+in the manifest and REFERENCES.md.

@@ -3,27 +3,39 @@
   "cache_directory": "_build/verification/dependent-haskell-papers-2026-11-14",
   "storage_note": "PDFs and extraction artifacts remain in the ignored cache. This manifest records references and reading coverage only.",
   "verification": {
-    "verified_utc": "2026-11-16T20:43:00.045082+00:00",
+    "verified_utc": "2026-11-16T21:40:51.784454+00:00",
     "pdf_reader": "pypdf 7.1.0",
-    "checks": "All 26 PDF hashes and byte counts verify. The original 22 version records are unchanged. Four new page counts and per-page text extractions are checked in the separate archive-verification record. No formalization or implementation was run.",
-    "work_count": 20,
-    "pdf_count": 26,
-    "previous_manifest_sha256": "60911e88f9652bb5ba74050798519123724662221000079c9611c4ada00f9d12",
-    "reviewed_additions": "_build/verification/native-arrow-matchability-observational-papers-v1/proposed-manifest-additions.json",
-    "reviewed_additions_sha256": "0f53ae3457dec0e7ff3d0a6564f2cfbbc877bb8d781d78c200818de61322159b",
-    "archive_verification": "_build/verification/native-arrow-matchability-observational-papers-v1/archive-verification.json",
-    "archive_verification_sha256": "0e7c4527eb095d924ac4d225419090b5305cd615a31a74bdfd35082084adb616",
+    "checks": "All 27 PDF hashes and byte counts verify. The previous 20 work records and 26 version records are unchanged. The new paper has 13 extracted pages. Technical sections were read selectively; no formal proof or implementation was replayed.",
+    "work_count": 21,
+    "pdf_count": 27,
+    "previous_manifest_sha256": "c070a48d521a690854816320f55cda6a4f12b1516fa7f348f370640286d1b1cb",
+    "reviewed_additions": "_build/verification/native-arrow-matchability-trellys-research-v1/proposed-manifest-additions.json",
+    "reviewed_additions_sha256": "b0f98c67c425e1b89654c977e1ba6c427d390d71854dc21679ae57175f96609b",
+    "archive_verification": "_build/verification/native-arrow-matchability-trellys-research-v1/archive-verification.json",
+    "archive_verification_sha256": "e09e311d61e70fd63c926b19cf0f77d07b92195bacdb5c88dcf7f4b3cde5aee1",
     "previous_verification": {
-      "verified_utc": "2026-11-16T15:47:48.646942+00:00",
+      "verified_utc": "2026-11-16T20:43:00.045082+00:00",
       "pdf_reader": "pypdf 7.1.0",
-      "checks": "The 21 versions checked in integration-v1 are unchanged. The additional 28-page PDF matches its original fetch hash, byte count and checked page count. All 22 copies are retained.",
-      "work_count": 16,
-      "pdf_count": 22,
-      "previous_manifest_sha256": "2ee4f1780814aa221bd959815e1d7da2b1a96cd4682e288599b3045f36e69098",
-      "reviewed_additions": "_build/verification/native-roadmap-research-2026-11-16/paper-additions-v3.json",
-      "reviewed_additions_sha256": "1388565957fb418449ace53e41cc0d1bf99dccbf128664f52dafc3930f0eeec3",
-      "original_manifest_sha256": "6a6de95f86aded49c2bb52dde88694cccd66f7e2c06813648b8cb283bf859270",
-      "additional_historical_version": "icfp2017-constrained-families/author-paper"
+      "checks": "All 26 PDF hashes and byte counts verify. The original 22 version records are unchanged. Four new page counts and per-page text extractions are checked in the separate archive-verification record. No formalization or implementation was run.",
+      "work_count": 20,
+      "pdf_count": 26,
+      "previous_manifest_sha256": "60911e88f9652bb5ba74050798519123724662221000079c9611c4ada00f9d12",
+      "reviewed_additions": "_build/verification/native-arrow-matchability-observational-papers-v1/proposed-manifest-additions.json",
+      "reviewed_additions_sha256": "0f53ae3457dec0e7ff3d0a6564f2cfbbc877bb8d781d78c200818de61322159b",
+      "archive_verification": "_build/verification/native-arrow-matchability-observational-papers-v1/archive-verification.json",
+      "archive_verification_sha256": "0e7c4527eb095d924ac4d225419090b5305cd615a31a74bdfd35082084adb616",
+      "previous_verification": {
+        "verified_utc": "2026-11-16T15:47:48.646942+00:00",
+        "pdf_reader": "pypdf 7.1.0",
+        "checks": "The 21 versions checked in integration-v1 are unchanged. The additional 28-page PDF matches its original fetch hash, byte count and checked page count. All 22 copies are retained.",
+        "work_count": 16,
+        "pdf_count": 22,
+        "previous_manifest_sha256": "2ee4f1780814aa221bd959815e1d7da2b1a96cd4682e288599b3045f36e69098",
+        "reviewed_additions": "_build/verification/native-roadmap-research-2026-11-16/paper-additions-v3.json",
+        "reviewed_additions_sha256": "1388565957fb418449ace53e41cc0d1bf99dccbf128664f52dafc3930f0eeec3",
+        "original_manifest_sha256": "6a6de95f86aded49c2bb52dde88694cccd66f7e2c06813648b8cb283bf859270",
+        "additional_historical_version": "icfp2017-constrained-families/author-paper"
+      }
     }
   },
   "reading_scope_note": "Reading scopes are version-specific. They include selected books, theses, paper text and partial pages. No full-book, full-thesis, full-appendix audit or formal proof replay is claimed. The readings do not certify the compiler implementation.",
@@ -1474,6 +1486,53 @@
         "R23"
       ],
       "application_boundary": "Section 5 explicitly limits the formalized conversion proof to the natural-number fragment, rather than the full inductive scheme of section 4."
+    },
+    {
+      "id": "popl2014-combining-proofs-and-programs",
+      "title": "Combining Proofs and Programs in a Dependently Typed Language",
+      "authors": [
+        "Chris Casinghino",
+        "Vilhelm Sjöberg",
+        "Stephanie Weirich"
+      ],
+      "year": 2014,
+      "venue": "POPL 2014",
+      "doi": "10.1145/2535838.2535883",
+      "versions": [
+        {
+          "id": "primary-paper",
+          "description": "Author-hosted 13-page POPL 2014 paper.",
+          "pdf_filename": "../native-arrow-matchability-trellys-research-v1/popl14-trellys.pdf",
+          "source_url": "https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf",
+          "sha256": "cee649595cb01bdb8cce1eaa68ee124a434e99db0e2b7388b9bcc515789f2fab",
+          "bytes": 335506,
+          "pdf_pages": 13,
+          "accessed_utc": "2026-11-16T21:33:39.582298+00:00",
+          "reading_scope": {
+            "summary": "Read the technical sections and displayed rules on PDF pages 4–11, plus the introduction and relevant page 3 examples. No proof or implementation replay.",
+            "sections": [
+              "Section 2 opening and Figure 1",
+              "Sections 2.1–3.3: evaluation, equality and fragment interaction",
+              "Section 4: preservation, value-substitution soundness, closed logical CBV termination and progress",
+              "Section 5: formal-core and Zombie implementation boundary",
+              "Section 6: partial types and fixpoint induction",
+              "Section 7: proposed extensions and remaining reasoning limits"
+            ],
+            "excluded": [
+              "Bibliography audit",
+              "Omitted rules in companion technical report",
+              "Coq source audit or replay",
+              "Zombie source audit or execution",
+              "Transfer theorem for lazy Haskell or GHC"
+            ]
+          }
+        }
+      ],
+      "reading_metadata": "../native-arrow-matchability-trellys-research-v1/reading-scope.json",
+      "roadmap_cards": [
+        "R05"
+      ],
+      "application_boundary": "The proved λθ core has closed logical CBV termination, not arbitrary open-term normalization. Zombie adds features outside the completed core proof. The logical/terminating fragment requires a separate lazy-Haskell input/import account; no theorem is transferred."
     }
   ]
 }
