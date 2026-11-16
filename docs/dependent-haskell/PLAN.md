@@ -4002,7 +4002,12 @@ The existing Core and Arity rules already support this fixed-domain case.
       proof, zonked endpoint checks, evidence liveness and escape checks.
       Do not infer function equality or emit a body constraint outside its scope.
 - [ ] Measure the independent known-value selection gate before changing it.
-      Do not widen Quick Look or immutable matching to bypass the new solver.
+      The measured implicit `seq` and error consumer under
+      `ImpredicativeTypes` still rejects a known function-Pi value.
+      Classify eligible fixed function binders with `isNativeRetainedBinder`.
+      Keep the existing immutable matching, kind, scope and usage checks.
+      Test an explicit ordinary payload wildcard separately, so the completed
+      value selection path cannot hide the body solver in the trace.
 - [ ] Check imported worker specialization at runtime with identity, successor
       and constant local functions. Check ignored bottom functions and indices,
       returned function WHNF, function-head demand order and scoped shadowing.
