@@ -53,8 +53,9 @@ _build/showcase/showcase
 | Later retained arguments, dictionaries, equality contexts and shadowing | `laterArguments` |
 | Multiple package constructors, nested fields and guard fallback | `alternatives` |
 | Runtime list indices, optional indices and heterogeneous tree payloads | `parameterizedDomains` |
+| Nominal domain conversion, ordinary payload inference and cast demand | `domainConversion` |
 
-Both bootstrap and self-hosted compilers produce the expected 59 lines with
+Both bootstrap and self-hosted compilers produce the expected 68 lines with
 Core Lint and STG Lint enabled. Both runs preserve all fourteen source inputs.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
@@ -80,6 +81,7 @@ optimization support or full roadmap completion.
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
 | Native interface domain shapes | M55 checks derived raw views before fields and generic binder allocation; M54 remains the detected-loop fallback |
 | Parameterized index domains | M56 retains closed `[Bool]`, `Maybe Nat` and `Tree Bool` values through source, Core, interfaces and native lowering |
+| Source domain conversion | M58 checks nominal scalar-domain conversion and ordinary payload inference in a private body solve; recursive domain reduction uses the solver depth limit |
 | Configured fork version | `10.1.20261115.1`, with interface header `1001202611151`; matching compiler and libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
@@ -4769,3 +4771,71 @@ It preserves 96 cumulative manifests. The independent audit passes 101,598
 static checks across 47,184 pinned paths. This audit executes no compiler or
 test target. The complete `native-domain-conversion-*` evidence namespace is
 permanently frozen. The later publication commit changes only README and PLAN.
+
+
+## Source nominal domain conversion checkpoint
+
+M58 checks nominal retained-function conversion directly from Haskell source.
+The selected compiler is `c3bb19372c96753cd6ccca915894fc46202c3abb`. The phase source is `b1a97f28c22b34e7e66ff2249a191f8d63e5e0b4`.
+`ParameterizedIndexLibrary` defines `SourceToken` with a family application and
+`TargetToken` with its nominal normal form. `adaptTokenVector f original = original`
+checks without a singleton translation or function eta expansion.
+`applyTokenVector` converts an actual argument before result instantiation.
+`specializedTokenVector` infers the ordinary numeric payload during body comparison.
+
+The body solve uses the existing forall solver's private-scope pattern. Runtime
+Ids keep a separate lexical solver scope. Unresolved body Wanteds do not escape.
+The original whole equality remains when the body cannot be solved. Native meta
+checks still reject assignments that contain a runtime index, including proof
+metadata. Nominal cast evidence survives wrappers and final zonking even for a
+phantom datatype parameter. Wrapper composition keeps its existing order.
+
+Domain reduction uses the existing solver reduction-depth limit. The recursive
+changed-domain control now reports a located GHC-40404 error at depth 11 with
+`-freduction-depth=10`. It previously timed out after eight seconds. An identical
+recursive domain needs only reflexivity and remains accepted. These controls pass
+in both compiler stages. The existing API fixture records both cases.
+
+Both compiler stages build under 16 GiB, no swap and unchanged `-j6`. The focused
+Core API goldens pass 1/37. In both stages, public source checks pass 19 observations,
+parameterized clients pass 14 plus three rejections, and the Showcase passes 68
+observations across 14 actual modules. The new standalone source controls pass
+11 runtime observations and two located rejections per stage. The payload-inference
+controls pass three runtime observations and one index-escape rejection per stage.
+These controls overlap with the Showcase; do not add them as distinct feature totals.
+The five registered tests pass across 39 cases, with 34 skips and no unexpected or
+framework outcomes.
+
+The three original probe sources now compile. These are compile-only observations.
+The old compiler rejected the function conversion and panicked on the explicit
+argument conversion. The actual type-checker trace now shows the ordinary payload
+meta assigned `Int` at the deeper body-comparison level. It records an empty local
+residual and a completed nominal retained-function proof. The trace uses
+`-fno-zap-coercions`. Runtime controls check ignored indices, demanded indices,
+function WHNF, head-before-index order and reverse conversion.
+
+Snapshot 7 pins 95 selected compiler leaves and 128 phase-source paths. Each build
+keeps its own producer metadata. All final checks use the selected phase source.
+Final documentation has its own commit and manifest. The nine-phase cohort only
+aggregates actual executions. The first registered wrapper lacked its argument
+file and launched no tests. Its separate retry supplies the selected registered
+result. The six successful source phases retain their original execution records. The API records pin the full target libdir, and a
+separate artifact check validates both compiler hashes and the original input maps.
+Older builds, fixture failures and parser failures remain in the evidence tree.
+
+The ten changed compiler modules pass parsing, including both branches at the
+existing statement-level CPP boundary. Fourmolu cannot parse the experimental
+source extension in either the parent or current examples. Both compilers check
+those examples with Core and STG Lint instead. The generated Cabal formatting
+check retains its existing failure; no Cabal input changed.
+
+Selected evidence is under `_build/verification/native-source-domain-conversion-*`.
+Independent auditing and publication remain pending at this documentation commit.
+The existing seven-work, nine-PDF reading ledger is unchanged. D/DC supplies the
+nominal congruence rule. Agda supplies the domain-before-body comparison precedent.
+Neither supplies a preservation or sharing theorem for this combined implementation.
+
+Next, compare bodies beneath fixed function-valued retained domains with `MRefl`.
+Opaque nominal Pi equality application needs a separate checked projection rule.
+Open domains, general dependent inference, native coercion serialization and normal
+optimization remain open. M58 completes none of C1, C2 or R22.

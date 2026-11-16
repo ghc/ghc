@@ -275,3 +275,22 @@ Only closed monotype parameters of kind `Type` qualify. Constructor parameters
 are erased. Stored fields retain their ordinary runtime representation and lazy
 demand. The family definitions remain explicit. General term evaluation in
 types and full dependent-Haskell optimization remain open.
+
+
+## Nominal source domain conversion
+
+`ParameterizedIndexLibrary` now defines a phantom `DomainToken` parameter and
+nominally equal `SourceToken` and `TargetToken` aliases. One alias contains
+`NormalizeTokenTag Bool`. The other contains `Bool`.
+`adaptTokenVector` converts the retained function domain. Its definition returns
+the original function value with a cast. `adaptTokenVectorBack` converts in the
+opposite direction. `applyTokenVector` checks an actual converted argument.
+`specializedTokenVector` infers its ordinary numeric payload inside body comparison.
+
+The maintained `Showcase.hs` imports these definitions through the library's
+interface. Its nine new observations check runtime vectors, ordinary inference,
+ignored and demanded indices, function WHNF and function-head demand order.
+The complete Showcase has 68 observations and the same 14 source modules.
+Run it with the matching compiler, `-O0`, `-fomit-interface-pragmas`, Core Lint and
+STG Lint as shown in the project README. Native coercion unfolding serialization
+and general optimization remain gated.

@@ -3915,7 +3915,7 @@ only README and PLAN. C1, C2 and the full program goal remain open.
 
 ## M58: scoped source domain conversion
 
-Status: specified; implementation and validation remain open.
+Status: implemented and checked; independent auditing and publication remain open.
 
 The M57 compiler accepts the unchanged-domain source control. It rejects
 `adapt f original = original` when its retained domain changes from
@@ -3930,7 +3930,7 @@ This follows D/DC An-PiCong and the domain-before-body context discipline in
 Agda. Neither source proves preservation for this combined implementation.
 See [nominal domain conversion](REFERENCES.md#nominal-retained-domain-conversion).
 
-- [ ] Check both complete binder domains with the closed scalar admission rule.
+- [x] Check both complete binder domains with the closed scalar admission rule.
       Use ordinary nominal family reduction outside the new runtime binder.
       Use the solver reduction-depth limit. Disable inert evidence, plugins and
       the family cache for this reduction. Use reflexivity when the original
@@ -3938,28 +3938,28 @@ See [nominal domain conversion](REFERENCES.md#nominal-retained-domain-conversion
       `native-source-domain-conversion-domain-depth-v1` times out after eight
       seconds with the pure normalizer, despite `-freduction-depth=10`.
       Require the normal domains to agree. Keep changed function domains gated.
-- [ ] Freshen a shared runtime binder against both types and the domain proof.
+- [x] Freshen a shared runtime binder against both types and the domain proof.
       Align the target body with the forward nominal cast of that binder.
-- [ ] Compare the bodies with ordinary unification in a private nested solve.
+- [x] Compare the bodies with ordinary unification in a private nested solve.
       Follow `can_eq_nc_forall`: track unifications, retain used Given evidence,
       and return a proof only when all body Wanteds are solved. On failure,
       retain the original whole equality. Do not emit a residual constraint
       with an unbound runtime index. Exact body equality can remain a fast path.
-- [ ] Propagate the active runtime-binder scope through `TcS` into rewriting.
+- [x] Propagate the active runtime-binder scope through `TcS` into rewriting.
       Keep the native meta-assignment, family-cache and external evidence
       restrictions. Suppress solver plugins within this scope. Do not put a
       runtime Id in `ic_skols`, which binds type variables.
-- [ ] Preserve nominal provenance in scalar source value casts through wrappers
+- [x] Preserve nominal provenance in scalar source value casts through wrappers
       and zonking. Do not decide scalar admission from unzonked metadata.
       Keep composition order and ordinary representational coercions unchanged.
-- [ ] Resolve a retained source variable at its expected domain with a checked
+- [x] Resolve a retained source variable at its expected domain with a checked
       nominal cast. Do not substitute a variable of a different domain directly.
       Report a located error when its domains cannot be equated.
-- [ ] Run real source workers at runtime. Check nominal family conversion,
+- [x] Run real source workers at runtime. Check nominal family conversion,
       result transport, ignored bottom indices, and bottom function WHNF.
       Check unrelated scalar domains and payloads with located rejections.
       Extend the maintained Showcase only after these source runs pass.
-- [ ] Build the bootstrap compiler and the compiler built by that compiler.
+- [x] Build the bootstrap compiler and the compiler built by that compiler.
       Run the focused API, runtime, source and registered checks. Parse changed
       Haskell files and check the existing Cabal formatting boundary.
 - [ ] Update the contract, roadmap and references. Pin the selected inputs,

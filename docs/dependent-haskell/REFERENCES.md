@@ -3618,3 +3618,38 @@ rule can normalize closed domains nominally and compare aligned bodies exactly.
 It must retain nominal evidence before desugaring. This is a proposed source
 step, not completed dependent subsumption. The seven-work, nine-PDF ledger is
 unchanged. No new whole-paper reading or theorem replay is claimed.
+
+
+## Scoped source comparison
+
+M58 constructs the existing M57 rule from source. It retains D/DC An-PiCong and
+Agda's domain-before-body discipline from the preceding section. The new reuse is
+GHC's `can_eq_nc_forall` control pattern: generate body Wanteds at a deeper level,
+solve them synchronously in private state, track unifications, and retain used
+Given evidence. A runtime Id cannot enter `ic_skols`. The retained counterpart
+adds a lexical runtime-binder scope for rewriting and solver-plugin restrictions.
+See Note [Solving retained function equalities] in `GHC.Tc.Solver.Equality`.
+
+A complete forall-template translation would also need capture-safe abstraction
+through cast and proof metadata. This increment uses a direct runtime scope instead.
+Exact body equality remains a fast path. Ordinary payload inference is not restricted
+to that path. The checked trace assigns its payload meta `Int` inside the deeper
+body comparison. The escape control rejects a payload that contains its local index.
+
+Source review found direct nominal-proof loss at `mkWpCastN` and at generic
+`SubCo` reconstruction during zonking. Wrapper composition already retains the
+children and their order. M58 preserves the nominal child before zonking and checks
+scalar admission afterward. This corrects the earlier suspicion about composition.
+No arbitrary representational coercion becomes nominal evidence.
+
+Domain comparison reuses the solver family rewriter and its reduction-depth limit.
+A family-axiom-only mode excludes inert evidence, plugins, family caches and zapping.
+This preserves the closed-domain proof contract. Identical domains use reflexivity.
+The pure Core normalizer did not enforce the source limit. The recursive-family
+probe exposed that difference. See `native-source-domain-conversion-domain-depth-v1`
+for the old timeout and `domain-depth-v4` for the selected bounded checks.
+
+The versioned decision and primary-source hashes are in
+`native-source-domain-conversion-research-v2`. The selected reading scope remains
+seven works and nine PDFs. No new whole-paper reading, mechanization, Haskell eta
+law, combined preservation theorem or sharing theorem is claimed.

@@ -420,3 +420,13 @@ relations so that it remains usable without the cache. Refresh the source date
 and evidence when upstream changes. At each compiler checkpoint, update the
 relevant local box, record the narrower completed behavior in PLAN.md, and leave
 an upstream box open until its full stated task is supported.
+
+
+M58 uses that nominal rule from source. A private body solve preserves ordinary
+payload inference and keeps runtime indices local. Source wrappers retain the
+nominal proof through zonking. Both compilers run the 68-observation Showcase,
+including nine new conversion and demand observations. Three located rejection
+controls prevent unrelated domains, mismatched payloads and local-index escape.
+The older parameterized-domain rejection controls also remain in force.
+This is progress within C1. It completes none of C1, C2 or R22. Fixed function-domain
+body comparison and opaque nominal Pi application remain separate next steps.
