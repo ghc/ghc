@@ -3559,7 +3559,8 @@ encoding, native unfoldings, general optimization, C1, C2 and R22 stay open.
 
 ### M53: native dead local binding analysis
 
-Status: implemented and validated; final artifact audit and publication pending.
+Status: complete. The source is validated, independently audited and published
+at `a50950d55c50625cc4fb962bb1d35045944299f3`. The full program goal stays active.
 
 Run a restricted native analysis before `simpleOptNativeExpr`. Use
 `GHC.Core.FVs.freeVars` and its existing deep `FVAnn` invariant. Reconstruct
@@ -3603,7 +3604,9 @@ Haskell eta reduction or a claim about totality. See the
   case demand. Record structure separately from runtime observations.
 - [x] Update current contracts and status. Record actual source provenance,
   failed attempts and limits.
-- [ ] Freeze, audit and publish the increment. Keep the full program goal active.
+- [x] Freeze, audit and publish the increment. Keep the full program goal active.
+  The canonical record is `dependent-haskell-M53-final-audit-v1.json`, SHA256
+  `ece09f9d7fb15fb96766138e324ac22201076efdc8d57536c6dbea5f3d3ed8aa`.
 
 Validation uses compiler `d740b247a8bae21bbf741e8b24fdbf1c54f871f4` and source
 `2225c8f09c52b74556d34e87d19afa2ff4f5b176`: 85 compiler inputs and 114 source
@@ -3622,5 +3625,6 @@ All attempts remain. The original final cohort's metadata failure stays
 recorded alongside its five successful independent source checks. No compiler
 or tracked source change was needed for the probe repairs.
 
-Use `native-occurrence-analysis-*` for this increment. M52 and earlier
-namespaces remain frozen. C1, C2, R22 and the full program goal stay open.
+M53 evidence uses `native-occurrence-analysis-*`. This namespace is permanently
+frozen. M52 and earlier namespaces remain frozen. C1, C2, R22 and the full
+program goal stay open.

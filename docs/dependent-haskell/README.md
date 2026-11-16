@@ -4555,7 +4555,12 @@ not compare lambdas. Both failures and the original mixed cohort result
 remain recorded. The compiler and tracked source did not change for those
 probe repairs.
 
-Artifact audit and publication are pending. General occurrence analysis,
+The independent artifact audit passes 2,359 checks over 599 pinned paths.
+The evidence namespace is frozen. The audited revision
+`a50950d55c50625cc4fb962bb1d35045944299f3` is published on the fork.
+The canonical record is `dependent-haskell-M53-final-audit-v1.json`, SHA256
+`ece09f9d7fb15fb96766138e324ac22201076efdc8d57536c6dbea5f3d3ed8aa`.
+General occurrence analysis,
 native unfolding export and `-O1` stay gated. C1, C2, R22 and malformed
 recursive interface validation remain open. See the
 [contract](CORE.md#native-dead-local-bindings),
