@@ -267,6 +267,27 @@ the later Given-normalization sections specify that restricted path.
 or erased `InstCo` rule is added. Diagnostic interface conversion can print the
 coercion; serialization in native unfolding bodies remains gated.
 
+Source checking can construct this nominal congruence for two eligible closed
+scalar domains. Normalize their domains with ordinary nominal family reduction.
+Require the normal domains to agree. Compare the bodies under a fresh source
+index, with the target index cast forward through the domain proof.
+
+Solve ordinary body Wanteds in a private solver scope. Propagate its runtime
+binder into rewriting. Block external solver evidence and family-cache paths
+in this scope. Return a proof only when all body Wanteds are solved. Otherwise,
+retain the original whole equality. Do not emit a residual implication with an
+unbound runtime Id. Ordinary payload metavariables can be assigned; assignments
+that contain runtime indices remain rejected. Zonk the completed proof and
+expected types before comparing their endpoints. See Note [Solving retained
+function equalities] in `GHC.Tc.Solver.Equality`.
+
+A source scalar argument can also need a nominal domain cast. Keep its nominal
+proof before the retained index substitution. Preserve this proof through value
+wrappers and final zonking. Check scalar admission after zonking. A phantom
+parameter can otherwise erase the nominal proof during representational
+weakening. Keep ordinary representational evidence on its existing path.
+See Note [Zonking nominal native index casts] in `GHC.Core.Coercion`.
+
 ## Family-axiom normalization under retained binders
 
 The Core normalizer recurses through `DepFunTy` under its unchanged supported

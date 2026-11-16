@@ -398,6 +398,44 @@ parameterizedDomains = do
     observe "opaque call ignores retained list"
         (Parameterized.observeListCall (\ignored -> S (S Z)) (error "unused opaque call list"))
 
+-- | Convert nominally equal scalar domains and preserve function demand.
+domainConversion :: IO ()
+domainConversion = do
+    lengthCell <- newIORef (S (S Z))
+    n <- readIORef lengthCell
+    tokenCell <- newIORef (Parameterized.DomainToken :: Parameterized.TargetToken)
+    token <- readIORef tokenCell
+    let f :: Parameterized.SourceToken -> Nat
+        f ignored = n
+    let source :: Parameterized.SourceToken
+        source = Parameterized.DomainToken
+        ignoredToken :: Parameterized.TargetToken
+        ignoredToken = bottomValue "showcase-domain-index"
+        demanding :: Parameterized.SourceToken -> Nat
+        demanding Parameterized.DomainToken = Z
+        bottomHead :: Parameterized.SourceToken -> Nat
+        bottomHead = bottomValue "showcase-domain-head"
+        bottomWorker :: foreach (x :: Parameterized.SourceToken) -> Vec Int (f x)
+        bottomWorker = bottomValue "showcase-domain-function"
+        roundtrip :: foreach (x :: Parameterized.SourceToken) -> Vec Int (f x)
+        roundtrip = Parameterized.adaptTokenVectorBack f
+            (Parameterized.adaptTokenVector f (Parameterized.tokenVector f 9))
+    observe "nominal domain conversion from source"
+        (toList (Parameterized.adaptTokenVector f (Parameterized.tokenVector f 42) token))
+    observe "converted argument application" (toList (Parameterized.applyTokenVector f token))
+    observe "payload inference below retained binder" (toList (Parameterized.specializedTokenVector f token))
+    observe "nominal domain conversion in both directions" (toList (roundtrip source))
+    observe "domain cast ignores bottom index"
+        (toList (Parameterized.adaptTokenVector f (Parameterized.tokenVector f 5) ignoredToken))
+    Parameterized.forceTokenFunction f (Parameterized.tokenVector f 42)
+    observe "converted partial function WHNF" ()
+    expectError "converted bottom function WHNF" "showcase-domain-function"
+        (Parameterized.forceTokenFunction f bottomWorker)
+    expectError "domain cast preserves demanded index" "showcase-domain-index"
+        (evaluate (length (toList (Parameterized.applyTokenVector demanding ignoredToken))))
+    expectError "domain conversion preserves function demand order" "showcase-domain-head"
+        (evaluate (length (toList (Parameterized.applyTokenVector bottomHead ignoredToken))))
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -410,3 +448,4 @@ main = do
     laterArguments
     alternatives
     parameterizedDomains
+    domainConversion
