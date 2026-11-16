@@ -43,7 +43,7 @@ Restricted pipelines and Lint checks do not establish general preservation.
       The bounded specification is [M61](../PLAN.md#m61-opaque-whole-function-cast-lowering).
       Scratch checks pass after function-head beta substitution is corrected.
       The actual NCG dump retains the abstract cast. The self-hosted build and
-      selected regression cohort remain pending.
+      selected regression cohort pass. Final audit and publication remain open.
 - [ ] Determine whether a required transformation needs an opaque Pi
       instantiation rule. Whole-cast lowering may already work. Specify a new
       proof operation only when a measured or calculus obligation requires it.

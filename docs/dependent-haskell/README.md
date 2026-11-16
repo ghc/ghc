@@ -62,6 +62,7 @@ The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
 M59's 79-line prefix. Both versions use fourteen source modules. The independent
 M59 compiler audit passes. M60 adds source composition with that compiler.
+M61 also passes the unchanged 84-line program with both rebuilt stages.
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
@@ -82,6 +83,7 @@ optimization support or full roadmap completion.
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
 | Native Core | M57 adds nominal scalar-domain conversion to `DepFunCo`, with checked application, substitution and backend lowering |
+| Opaque retained-function casts | M61 checks abstract whole casts through CorePrep and NCG; native function beta reduction substitutes bare actuals without an escaping let |
 | Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
@@ -99,7 +101,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | Audited M59 passes both builds, both-stage public19, parameterized14 and Showcase79/14, fresh API1/37 and five registered tests |
+| Compiler validation | M61 passes both builds, fresh API1/37, both-stage public19, parameterized14 and Showcase84/14, plus five registered tests; final audit/publication pending |
 | Example validation | Audited M60 passes both-stage hidden-interface source19, five rejection controls, compile-only equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
@@ -4852,6 +4854,31 @@ nominal congruence rule. Agda supplies the domain-before-body comparison precede
 Neither supplies a preservation or sharing theorem for this combined implementation.
 
 Next, compare bodies beneath fixed function-valued retained domains with `MRefl`.
-Opaque nominal Pi equality application needs a separate checked projection rule.
+Typed projection from opaque nominal Pi equality needs a separate checked rule.
 Open domains, general dependent inference, native coercion serialization and normal
 optimization remain open. M58 completes none of C1, C2 or R22.
+
+## Opaque retained-function cast lowering
+
+M61 checks a whole cast between two dependent functions while its payload types
+and nominal equality proof remain abstract. Existing CorePrep and CoreToStg
+support the measured path. It adds no coercion constructor or eta expansion.
+The probe exposed an escaping let alias during partial application. Native
+function beta reduction now substitutes an eligible bare function variable
+through terms, types and coercions together. Other arguments retain their redex.
+
+Compiler `f0b45ad34b` and fixture `b03cfae43b` pass both builds and the selected
+cohort at source checkpoint `c45b0b7bf0`. The existing fixture checks three
+abstract preparation shapes, nine quiet bytecode observations, and a separate
+abstract `NOINLINE` kernel in actual NCG. Its CorePrep dump retains `Sub cv`
+between distinct abstract payloads. The object executable checks an opaque keep
+caller returning 42 and preserves the earlier scalar control's separate 42.
+Partial-WHNF and vector/index-demand checks are bytecode observations.
+
+API goldens stay 1/37. Both stages pass public19, parameterized14 with three
+rejections, and Showcase84 through fourteen modules. Registered tests report
+five expected passes with zero unexpected failures or framework warnings.
+The first self-host attempt's package-registration failure remains recorded;
+the unchanged-input retry passes. Final evidence audit and publication remain
+pending. The records use `native-opaque-whole-cast-*`. This closes no general
+Core, inference or optimizer obligation. Opaque proof projection remains open.

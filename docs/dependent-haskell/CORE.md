@@ -2159,8 +2159,10 @@ Nine scratch bytecode controls check partial WHNF and ignored or demanded
 operands. The NCG control returns 42 without forcing bottom function, scalar
 index or vector arguments. It preserves the earlier scalar-domain control's
 separate 42 result. Native function beta reduction needs the substitution rule
-above to prevent an escaping partial-result alias. The bootstrap compiler is
-rebuilt; the selected self-hosted regression cohort remains pending.
+above to prevent an escaping partial-result alias. Both compiler stages are
+rebuilt. The fresh API, both-stage source/Showcase and registered cohort pass.
+The object control checks the fully applied keep caller. Partial-WHNF and
+vector/index-demand observations belong to bytecode, not NCG.
 See Note [Opaque retained function casts] in the existing API fixture.
 
 Malformed recursive ordinary-domain interface types remain a known validation

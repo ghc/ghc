@@ -4169,9 +4169,8 @@ This publication checkpoint changes only status documents.
 ## M61: opaque whole-function cast lowering
 
 Roadmap owner: R05 dependent Core. Related card: R03 dependent products.
-Status: compiler fix and fixture implemented. The rebuilt bootstrap passes the
-three abstract preparation cases, nine bytecode observations and two object
-observations in scratch. Self-hosting and the selected cohort remain pending.
+Status: implemented and checked with both compiler stages. The selected cohort
+passes. Final evidence audit and publication remain pending.
 
 Determine whether the existing whole-function cast already supports application
 through opaque nominal evidence. `pushCoRetainedArg` can decline a coercion
@@ -4219,11 +4218,12 @@ the cast-only expression. It must preserve a bottom worker's WHNF behavior.
       when possible. Specify a new proof primitive only for a measured or
       separately established calculus obligation. Do not reinterpret `InstCo`
       or derive nominal domains from representational function equality.
-- [ ] Build the self-hosted compiler. Run fresh API goldens, both-stage public
+- [x] Build the self-hosted compiler. Run fresh API goldens, both-stage public
       source and Showcase controls, and the existing registered tests.
-- [ ] Record actual compiler/package inputs, diagnostic or runtime failures,
+- [x] Record actual compiler/package inputs, diagnostic or runtime failures,
       and the limits of abstract structural checks versus closed execution.
       Update R05, CORE and references. Keep general R05 work open.
+- [ ] Audit the complete evidence and publish the bounded checkpoint.
 
 This increment adds no source syntax, evaluator, function equality or generic
 domain. It establishes no normal-optimizer, sharing or preservation theorem.
@@ -4245,4 +4245,22 @@ Object discovery v1 stops at a misspelled dump flag. Version 2 corrects it to
 `-fno-dump-with-ways`. Its actual NCG pass keeps the abstract kernel and scoped
 `Sub cv` cast in the recorded CorePrep dump. The executable prints `42` for
 the scalar entry and `42` for the opaque entry. Fixture checkpoint `b03cfae43b`
-contains both paths. Goldens remain unchanged but await the selected full run.
+contains both paths. The selected API and registered runs pass the unchanged
+goldens and execute the new quiet controls.
+
+Snapshot 2 selects compiler `f0b45ad34b`, fixture `b03cfae43b`, and source/docs
+checkpoint `c45b0b7bf0`. Its 95 compiler and 128 source inputs remain unchanged.
+Selfhost attempt 1 stops during concurrent package configuration because
+`ghc-pkg` cannot stat a `ghc-platform` registration file. The file is present
+after the failed run. Attempt 2 uses identical source and resource settings
+and passes in 194.13 seconds, with peak 5,696 MiB under 16 GiB/swap0/-j6.
+
+All nine selected cohort results are fresh and run after selfhosting. API
+goldens 1/37 pass in 27.79/39.70 seconds and pin all 45,837 target-library files.
+Both stages pass public19, parameterized14 with three rejections, and
+Showcase84/14 modules. Registered tests report five expected passes across
+39 cases, with 34 skips and no unexpected or framework outcomes. The serial
+4 GiB/no-swap cohort peaks at 1,557 MiB and returns zero. Object partial-WHNF
+behavior is not claimed: those three checks and demand markers are bytecode
+observations. NCG checks the fully applied keep caller and prior scalar entry.
+No full GHC suite or general optimizer validation was run.

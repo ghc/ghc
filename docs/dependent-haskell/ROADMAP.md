@@ -68,6 +68,12 @@ The canonical record is
 `_build/verification/dependent-haskell-M60-final-audit-v1.json`.
 Observation counts measure those programs. They do not count roadmap features.
 
+M61 checks opaque whole-function casts with both rebuilt compilers and the
+selected API/source/registered cohort. A bounded native beta-substitution fix
+prevents a function alias from escaping through a partial result type. The
+existing cast supports the measured lowering path. Its final audit and
+publication remain pending. General opaque proof projection stays open.
+
 ## Current work queue
 
 Use the roadmap card as the unit of work. Each active card has a feature page
@@ -85,7 +91,7 @@ can advance a card while the card remains open.
 | --- | --- | --- | --- |
 | 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Complete bounded increment: M59 | Both stages and independent audit pass. The larger R03/R05 features remain open. |
 | 2 | R03: safe indexing over a retained `[Bool]` | Complete bounded increment: M60 | Both stages and the evidence audit pass. The next compiler task is the R05 opaque-cast probe. |
-| 3 | R05: application through opaque whole-function evidence | M61 scratch probes pass after a bounded beta fix | Self-host and run the selected cohort. Abstract CorePrep, nine bytecode checks and actual NCG pass without a new coercion primitive. |
+| 3 | R05: application through opaque whole-function evidence | M61 builds and selected cohort pass | Finish audit and publication. Abstract CorePrep, nine bytecode checks and actual NCG pass without a new coercion primitive. |
 | 4 | R03: explicit complete retained-function type arguments | Scoped source task identified | Use the existing lifted consumer. Preserve kind, scope, complete-type and native-meta checks. |
 | 5 | R23: matchability foundation; also advances R05 | Prior implementation and native integration reviewed; spec needed | Specify kinds, substitution, coercions, roles, interfaces and reflection before admitting unrestricted function-valued fields. |
 | 6 | R05: generic domain metadata and dependent telescopes; enables R03 source work | Research obligations identified | After the matchability foundation, target generic `[a]`. Transport binder types, occurrences and later fields together. State the policy for runtime-dependent domains separately. |

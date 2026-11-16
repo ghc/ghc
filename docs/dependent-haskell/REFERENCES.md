@@ -3693,7 +3693,8 @@ They do not require a new primitive for every application. The measured kernel
 keeps opaque nominal evidence between distinct abstract payloads through typed
 preparation. Only its caller closes both payloads to Int with reflexivity.
 The actual NCG dump retains the abstract cast. Nine bytecode controls and two
-object observations pass in scratch after native beta substitution is corrected.
+object observations pass after native beta substitution is corrected. The
+selected API and registered runs execute the controls from the existing fixture.
 This does not implement general Pi projection or establish a preservation theorem.
 
 The substitution correction follows the existing Agda context/substitution
