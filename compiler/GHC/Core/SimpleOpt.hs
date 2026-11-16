@@ -30,7 +30,8 @@ import GHC.Core.FVs
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Make
-import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
+import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalyseNativeExpr,
+                             occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
 import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
@@ -276,7 +277,7 @@ simpleOptExprNoInline opts expr
 -- See Note [Restricted dependent simplification].
 simpleOptNativeExpr :: HasDebugCallStack => CoreExpr -> CoreExpr
 simpleOptNativeExpr expr
-  = simple_opt_expr init_env expr
+  = simple_opt_expr init_env (occurAnalyseNativeExpr expr)
   where
     opts = defaultSimpleOpts { so_inline = const False
                              , so_can_drop = const False
@@ -294,11 +295,14 @@ simpleOptNativeProgram = map simplify_bind
 
 {- Note [Restricted dependent simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-simpleOptNativeExpr reuses the simple optimiser without occurrence analysis,
-general inlining, or eta reduction. Runtime index occurrences record scope
-dependencies, not runtime usage. Ordinary occurrence analysis can discard a
-binding that an index still needs. Preserve source lets until backend lowering,
-except for the checked variable aliases described below.
+simpleOptNativeExpr first removes unused lifted local bindings through
+occurAnalyseNativeExpr. See Note [Native dead local bindings] in
+GHC.Core.Opt.OccurAnal. Its deep free-variable annotations preserve bindings
+used only by native types. It retains all other nodes and infers no new
+occurrence counts. General occurrence analysis, inlining and eta reduction
+remain disabled. Runtime index occurrences record scope dependencies, not
+runtime usage. Keep other source lets until backend lowering, except for
+the checked variable aliases described below.
 Do not create new rules or Core unfoldings. mkUnfolding would run occurrence
 analysis again. Do not create join points from pre-existing occurrence metadata.
 

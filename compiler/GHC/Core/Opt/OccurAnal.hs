@@ -29,6 +29,7 @@ module GHC.Core.Opt.OccurAnal (
     OccurAnalOpts(..),
     occurAnalysePgm,
     occurAnalyseExpr, occurAnalyseBndrsAndExpr,
+    occurAnalyseNativeExpr,
     occurAnalyseExpr_Prep,
     zapLambdaBndrs
   ) where
@@ -86,6 +87,71 @@ occurAnalyseExpr :: CoreExpr -> CoreExpr
 occurAnalyseExpr expr = expr'
   where
     WUD _ expr' = occAnal initOccEnv expr
+
+-- | Remove unused lazy local bindings without rewriting dependent scope.
+-- See Note [Native dead local bindings].
+occurAnalyseNativeExpr :: CoreExpr -> CoreExpr
+occurAnalyseNativeExpr = go . freeVars
+  where
+    opts = (occ_opts initOccEnv) { oa_can_drop = can_drop }
+
+    -- | Keep strict bindings and bindings with protected metadata.
+    can_drop b = isId b && not (isCoVar b) && isLocalId b
+              && definitelyLiftedType (idType b) && isManyTy (idMult b)
+              && not (isExportedId b) && not (isJoinId b)
+              && not (isStableUnfolding (idUnfolding b))
+              && not (idHasRules b)
+              && isAlwaysActive (idInlineActivation b)
+              && not (isWeakLoopBreaker (idOccInfo b))
+
+    -- | Rebuild the tree and remove eligible dead local bindings.
+    go :: CoreExprWithFVs -> CoreExpr
+    go (_, AnnLet (AnnNonRec b _) body)
+      | oa_can_drop opts b
+      , not (b `elemDVarSet` freeVarsOf body)
+      = go body
+    go (_, AnnLet bind body) = Let (go_bind bind) (go body)
+    go (_, AnnVar v) = Var v
+    go (_, AnnLit lit) = Lit lit
+    go (_, AnnLam b body) = Lam b (go body)
+    go (_, AnnApp fun arg) = App (go fun) (go arg)
+    go (_, AnnCase scrut b ty alts)
+      = Case (go scrut) b ty [Alt con bs (go rhs) | AnnAlt con bs rhs <- alts]
+    go (_, AnnCast expr (_, co)) = Cast (go expr) co
+    go (_, AnnTick tick expr) = Tick tick (go expr)
+    go (_, AnnType ty) = Type ty
+    go (_, AnnCoercion co) = Coercion co
+
+    -- | Keep binding group order and visit each retained RHS.
+    go_bind :: CoreBindWithFVs -> CoreBind
+    go_bind (AnnNonRec b rhs) = NonRec b (go rhs)
+    go_bind (AnnRec pairs) = Rec [(b, go rhs) | (b, rhs) <- pairs]
+
+{- Note [Native dead local bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Native index occurrences in types record scope dependencies, not runtime
+demand. Use the existing freeVars annotations and Note [The FVAnn invariant]
+in GHC.Core.FVs. They include deep types, multiplicities, case results,
+coercions, binder telescopes, rules and stable unfoldings. A runtime-only
+collector would discard bindings that surviving annotations still need.
+
+Remove a NonRec only if its Id is absent from the original body annotation
+and oa_can_drop permits removal. See Note [Controlling elimination of dead
+bindings in occurrence analysis]. Require a lifted Many binding. Unlifted
+bindings can be strict. Protect joins and stable or rule-bearing metadata.
+The same rule applies to an unused scalar index or function head: their
+eligible domains do not make an unused lazy binding necessary.
+
+Reconstruct every other node with its original binders and annotations.
+Do not infer occurrence counts, swap case binders, create joins or split
+recursive groups. Keep the original annotations after removing an inner
+binding. They can retain extra outer bindings; they cannot omit a surviving
+dependency. This is one conservative pass, not a fixed-point analysis.
+
+Agda separates complete free-variable queries from later Treeless usage
+analysis. See the pinned M53 references in docs/dependent-haskell/REFERENCES.md.
+That distinction does not justify changing Haskell evaluation or eta rules.
+-}
 
 occurAnalyseBndrsAndExpr :: [Var] -> CoreExpr -> ([Var], CoreExpr)
 -- Occur-anal (\bs.e), but taking and returning `bs` and `e` separately
