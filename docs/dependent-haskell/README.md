@@ -74,7 +74,7 @@ optimization support or full roadmap completion.
 | Project branch | `dependent-haskell` |
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
-| Native Core | Closed algebraic domains, field-scoped Nat proofs, and fixed-domain `DepFunCo` pass the bootstrap API regression |
+| Native Core | M57 adds nominal scalar-domain conversion to `DepFunCo`, with checked application, substitution and backend lowering |
 | Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
@@ -90,7 +90,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M56 passes both-stage public19, parameterized14 and Showcase 59 from 14 modules; API goldens remain1/37 with19 inherited quiet runtime observations |
+| Compiler validation | M57 passes both builds and both-stage public19, parameterized14 and Showcase59/14; API goldens remain1/37, with seven new bytecode controls and one new native-object control |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -4710,3 +4710,54 @@ SHA256 `f9af3265afcfea79878ecc87886d7cfcb915a0e417df21a081695ea092269d66`. It pr
 All `_build/verification/native-parameterized-domains-*` files and directories
 are permanently frozen. This publication update changes only README and PLAN.
 C1 remains the next program priority.
+
+
+## M57: nominal retained domain conversion
+
+The selected compiler is `0c5699265f14826a0294d7a2b0ca9be2fefd0cbe`.
+The fixture source is `cd304ad0d1af2f4f7a5502de3601fe0aaf080111`.
+Both builds and the focused controls pass. Independent audit and publication
+remain pending.
+
+`DepFunCo` now has optional nominal domain evidence. Its body proof binds one
+actual argument in the source domain. Its right endpoint binds a fresh target
+argument and casts it backward in the dependent result. Explicit congruence,
+symmetry, transitivity and role weakening support checked application.
+An ordinary family equation relates `Token (F Bool)` and `Token Bool`.
+The controls retain an opaque call in a later payload type.
+
+Runtime casts retain the nominal proof inside `SubCo`. Expression substitution,
+native SimpleOpt composition and CorePrep preserve that proof. Beta exposure
+substitutes embedded proofs and accepts independent closed scalar input and
+result domains. The controls check proof-only dependencies, capture avoidance,
+two distinct conversions, later payloads and genuinely representational-only
+rejections. A function cast remains a cast until application. No eta expansion
+is added.
+
+Seven quiet bytecode observations check values, demanded and ignored bottoms,
+partial application and function WHNF. One separate control injects converted
+`keep` into an actual `Main.entry`. It requires native forms after SimpleOpt,
+then generates assembly, assembles and links an object, and executes it.
+It returns `42` without forcing its bottom token. These observations are
+separate from the nineteen inherited object observations and the 1/37 goldens.
+
+The final bootstrap build took 24.54s and peaked at 1844 MiB. The self-hosted
+build took 15m25s and peaked at 7276 MiB. Both used the unchanged six-job build
+under a 16 GiB cap. Checks used 4 GiB with zero swap. Both stages pass public19,
+parameterized14 with three rejections, and Showcase59 from fourteen modules.
+Registered results are five expected passes, 39 cases and 34 skips. There are
+no unexpected or framework failures, warnings, or missing libraries.
+
+Evidence uses `native-domain-conversion-*`. The final source snapshot covers
+92 compiler inputs and 125 source paths. The final API replay pins 45,837
+logical target-library files in each phase. Artifact revalidation checks
+46,199 unique inputs and both recorded compiler binaries. Earlier bootstrap,
+fixture and Showcase-harness failures remain in the evidence. Fourmolu parses
+all current Haskell edits. Cabal-gild still reports the existing formatting
+failure in generated `compiler/ghc.cabal`; no Cabal input changed.
+
+The Showcase stays at 59 source observations. The source checker does not yet
+construct general domain congruence. Closed scalar source conversion is the
+next experiment. Changed function domains, opaque Pi projections, native
+coercion serialization, general optimization and the full GHC suite remain
+outside this validation. C1, C2 and the full program goal stay open.

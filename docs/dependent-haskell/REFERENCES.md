@@ -3567,3 +3567,54 @@ type for selection and reconstructs the coercion through subsumption. M56
 uses that pattern for cached argument views. It preserves the original cache
 and usage. The D/DC, System DR and GraD limits in the paper ledger still
 apply. No theorem or proof artifact was replayed for this extension.
+
+
+## Nominal retained domain conversion
+
+M57 follows the asymmetric Pi rules in the
+[2017 D/DC author specification](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf).
+An-PiCong is in Figure 8 on PDF page 16. An-Push is in Figure 10 on page 19.
+The body proof uses the source binder. The target body substitutes the target
+argument cast through inverse domain evidence. This supplies the conversion
+and application precedent. It supplies no Haskell function eta law.
+
+The selected Agda v2.8.0 comparison is
+[Conversion.hs 746–761](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L746-L761)
+and [827–849](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849).
+Agda compares the domain and modalities before it checks bodies in one context.
+The cached file has Git blob `69423e2c11b6f35bc5eee2d502cf2830efbc005a` and
+SHA256 `1c4680f328a55518df9e7b23e360760f439b5d2d6a7d6fba8d1c539758d15a09`.
+The D/DC author PDF has SHA256
+`86c8496096a036aa6662ef9369de8ba668f977110759a744da7e723c5c2cd18e`.
+Its 30 PDF pages differ from the published 29-page extent. Keep the versions
+separate. Selected reading and scope are recorded in
+`native-domain-conversion-research-v1/provenance.json`.
+
+The implementation adds optional nominal domain evidence to `DepFunCo`.
+`MRefl` preserves its existing fixed-domain specialization. Existing `CastTy`
+records the converted index kind. Runtime casts preserve the nominal child
+inside raw `SubCo`, including phantom datatype parameters. No arbitrary
+representational proof becomes nominal evidence. The 2019 roles and 2021
+usage limits in the paper ledger still apply. This extension has no combined
+preservation theorem or replayed mechanization.
+
+Review found three scope obligations: freshen the target binder against the
+domain proof, preserve nominal evidence during value-cast rewriting, and
+substitute proofs during beta exposure. Existing API controls now check these
+cases. Runtime controls include seven bytecode observations and one separately
+linked native executable. The source Showcase has no new observation yet.
+
+Further C1 work remains unimplemented. D/DC An-PiFst and An-PiSnd on PDF page 17
+supply the opaque projection and instantiation precedent. Start with nominal
+opaque evidence; arbitrary representational Pi equality cannot provide nominal
+domain equality. A phantom `Token` parameter gives a concrete counterexample.
+Constant families can reduce two genuine Pis to ordinary representationally
+related arrows over `Token Bool` and `Token Int`. Their domains still lack
+nominal equality. Agda supplies context discipline, not FC proof projections.
+
+Source review identifies earlier proof loss in `mkWpCastN` and `WpCompose`.
+The current retained-Pi unifier accepts already-equal types. A future bounded
+rule can normalize closed domains nominally and compare aligned bodies exactly.
+It must retain nominal evidence before desugaring. This is a proposed source
+step, not completed dependent subsumption. The seven-work, nine-PDF ledger is
+unchanged. No new whole-paper reading or theorem replay is claimed.

@@ -3826,8 +3826,9 @@ program goal remains active.
 
 ## M57: nominal domain conversion for retained functions
 
-Status: in progress. The bootstrap compiler builds. Runtime verification is
-in progress. This increment addresses C1's conversion and substitution contract.
+Status: implementation and focused verification pass. Independent audit and
+publication remain pending. This increment addresses C1's conversion and
+substitution contract.
 Keep C1, C2 and the full program goal open.
 
 Extend retained Pi congruence with nominal evidence `delta : A ~N B`.
@@ -3868,16 +3869,38 @@ boundaries in the paper ledger still apply. Record selected source ranges,
 hashes and deviations. No combined preservation theorem is claimed.
 
 - [x] Specify the domain, index-cast, congruence and application contract.
-- [ ] Extend the coercion representation and all structural traversals.
-- [ ] Implement nominal index conversion, substitution, endpoints and Lint.
-- [ ] Lower checked casted applications without changing runtime demand.
-- [ ] Update existing API/runtime controls, including symmetry and composition.
-- [ ] Run seven bytecode observations and one injected-Core native object control.
-- [ ] Check wrong role/direction, capture, proof-only dependencies and bottoms.
-- [ ] Build both stages and run focused API/source/registered checks.
+- [x] Extend the coercion representation and all structural traversals.
+- [x] Implement nominal index conversion, substitution, endpoints and Lint.
+- [x] Lower checked casted applications without changing runtime demand.
+- [x] Update existing API/runtime controls, including symmetry and composition.
+- [x] Run seven bytecode observations and one injected-Core native object control.
+- [x] Check wrong role/direction, capture, proof-only dependencies and bottoms.
+- [x] Build both stages and run focused API/source/registered checks.
 - [ ] Update contracts, references and progress records; audit and publish.
 
 M56 remains frozen at canonical SHA256
 `f9af3265afcfea79878ecc87886d7cfcb915a0e417df21a081695ea092269d66`.
 The maintained Showcase keeps its 59 source observations until a new source
 feature uses this conversion rule. The Core controls cover this increment.
+
+The selected compiler is `0c5699265f14826a0294d7a2b0ca9be2fefd0cbe` and fixture
+source is `cd304ad0d1af2f4f7a5502de3601fe0aaf080111`. Snapshot6 covers
+92 compiler inputs and 125 source paths. Bootstrap4 and selfhost1 use their own
+producer metadata; both have the same selected compiler leaves. Final API3
+replays both fixtures and pins the actual target libdir. Source checks pass
+public19, parameterized14 plus three rejections, and Showcase59/14 in both
+stages. Registered checks pass five tests across 39 cases with 34 skips and no
+unexpected or framework failures. The nine-phase cohort only aggregates actual
+executions. It reruns no target.
+
+Preserve bootstrap1/2 failures, intermediate bootstrap3, the first API fixture
+failures, the narrower API2 pass, and the Showcase baseline preflight failure.
+The last failure used an obsolete inherited53/13 assertion; fresh helper2 checks
+the unchanged59/14 oracle. The final artifact check passes 46,199 unique input
+hashes. Earlier failure reports are not compared against current source files.
+All seven formatter attempts remain; generated Cabal formatting is unchanged.
+
+Next, specify a source conversion that uses ordinary nominal family reduction
+between closed scalar domains. Preserve the proof in wrappers before desugaring.
+Require an exact aligned-body comparison and a real adapted worker from source.
+Keep opaque projection and general dependent inference as separate tasks.

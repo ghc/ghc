@@ -357,6 +357,21 @@ Uniform recursive declarations qualify. General promotion, arbitrary term
 computation in types, native unfoldings and normal optimization remain open.
 This increment does not complete C1, C2 or R22.
 
+M57 adds nominal domain conversion to retained congruence. Its body proof uses
+one source-domain binder. Its right endpoint substitutes a backward-converted
+target argument. Checked application uses that same actual argument. Scope,
+substitution, role weakening, symmetry and distinct-domain composition pass
+the Core controls. Seven bytecode observations and one native object control
+check runtime behavior. The object control preserves native forms through
+SimpleOpt and ignores a bottom token. This increment adds no source observation.
+C1, C2 and R22 remain open.
+
+The next source slice can use nominal family evidence between closed scalar
+domains during retained-Pi comparison. Preserve that evidence before desugaring.
+Check a named adapted worker from source before extending the Showcase.
+Opaque Pi instantiation and domain projection need separate kernel rules.
+Representational Pi equality alone cannot supply nominal domain equality.
+
 C1 is the next program task. More application-inference cases can support a
 specific task, but they must not replace work on Core or type computation.
 C2, Q1, Q2, and the evaluator tasks can be split into smaller increments after
