@@ -242,10 +242,19 @@ This declaration is important for :info (->) command (issue #10145)
 -}
 
 -- | The regular function type
-type (->) :: forall (ma :: Matchability) {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
-             TYPE rep1 -> TYPE rep2 -> Type
-type (->) @ma = FUN @ma 'Many
+-- See Note [Source kind of the ordinary arrow].
+type (->) @(ma :: Matchability) =
+  FUN @ma 'Many :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+                  TYPE rep1 -> TYPE rep2 -> Type
 -- See Note [Linear types] in Multiplicity
+
+{- Note [Source kind of the ordinary arrow]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This complete user-specified kind gives ma a specified invisible binder.
+The runtime representations stay inferred in the result kind. Do not move
+them to the declaration head. That would change the synonym's arity.
+This kind must match unrestrictedFunTyCon in GHC.Builtin.WiredIn.Types.
+-}
 
 {- *********************************************************************
 *                                                                      *
