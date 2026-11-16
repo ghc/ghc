@@ -2248,9 +2248,87 @@ runNatSourceChecks = do
     runConstructorCallSourceChecks
     runBetaCallSourceChecks
     runFunctionBinderSourceChecks
+    runFunctionBodyComparisonSourceChecks
     runCallApplicationSourceChecks
     runCallActivationSourceChecks
     runConstructedCallActivationSourceChecks
+
+-- | Add fixed-function-domain payload comparisons to the existing Nat source.
+retainedFunctionBodyComparisonSource :: String -> [String] -> String -> String
+retainedFunctionBodyComparisonSource moduleName extra observation =
+    unlines $ "{-# LANGUAGE NoImpredicativeTypes, RankNTypes, TypeOperators #-}" : concatMap insert (lines (retainedNatSource moduleName observation))
+  where
+    insert line@"      run :: Nat -> IO String" = map ("      " ++) (declarations ++ extra) ++ [line]
+    insert line = [line]
+    declarations =
+        [ "polyWorker :: forall a. Num a => foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec a (f n)"
+        , "polyWorker f n = case f n of"
+        , "    Z -> let { xs :: Vec a (f n); xs = VNil } in xs"
+        , "    S k -> let { xs :: Vec a (f n); xs = VCons 42 (replicateNative @a k 42) } in xs"
+        , "specialize :: foreach (g :: Nat -> Nat) -> foreach (m :: Nat) -> Vec Int (g m)"
+        , "specialize = polyWorker"
+        , "specializeAllocated :: foreach (g :: Nat -> Nat) -> foreach (m :: Nat) -> Vec Int (g m)"
+        , "specializeAllocated = polyWorker @_"
+        , "givenTransport :: forall a b. a ~ b => (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec a (f n)) -> (foreach (g :: Nat -> Nat) -> foreach (m :: Nat) -> Vec b (g m))"
+        , "givenTransport original = original"
+        , "polyUnknown :: forall a. foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec a (f n)"
+        , "polyUnknown f n = polyUnknown @a f n"
+        ]
+
+{- Note [Fixed function-domain source comparisons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The default comparison can select an ordinary payload from its expected type.
+The wildcard comparison allocates that payload choice before retained-body
+comparison. The function domain stays Nat -> Nat. Each runtime head is a
+signed local Var. The existing Nat driver supplies the actual scalar Id.
+
+The Given control can become reflexive through existing rewriting. It is not
+evidence that the nonreflexive body solver ran. The escape control keeps the
+payload choice outside the inner runtime head and scalar scopes. Do not fill
+that choice with a type that contains those bound Ids.
+-}
+
+-- | Check ordinary payload choices and reject escaping native body choices.
+runFunctionBodyComparisonSourceChecks :: GHC.Ghc ()
+runFunctionBodyComparisonSourceChecks = do
+    let moduleName = "NativeSourceFunctionBodyComparisons"
+        observation =
+            unlines
+                [ "do defaults <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (vecList (specialize f n))))"
+                , "        allocated <- driveNats (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (vecList (specializeAllocated f n))))"
+                , "        given <- driveNat (\\n -> let { f :: Nat -> Nat; f = opaqueNat } in pure (show (vecList (givenTransport @Int @Int (polyWorker @Int) f n)))) (S (S Z))"
+                , "        pure (defaults ++ allocated ++ unlines [given])"
+                ]
+        expected = ["[]", "[42,42]", "[42,42,42]", "[]", "[42,42]", "[42,42,42]", "[42,42]"]
+    expression <- sourceEntry moduleName (retainedFunctionBodyComparisonSource moduleName [] observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "fixed function-domain body comparison" expression
+    unless (lines actual == expected) $
+        fail ("FAIL: fixed function-domain source payloads: " ++ show actual)
+    forM_
+        [ ( "NativeFunctionBodyWrongPayload"
+          , "original"
+          , [ "bad :: (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n)) -> (foreach (g :: Nat -> Nat) -> foreach (m :: Nat) -> Vec Bool (g m))"
+            , "bad original = original"
+            ]
+          )
+        , ( "NativeFunctionBodyEscapingPayload"
+          , "polyUnknown"
+          , [ "bad :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec (Vec Int (f n)) (f n)"
+            , "bad f = polyUnknown @_ f"
+            ]
+          )
+        , ( "NativeFunctionBodyChangedDomain"
+          , "original"
+          , [ "bad :: (foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n)) -> (foreach (g :: Bool -> Nat) -> foreach (b :: Bool) -> Vec Int (g b))"
+            , "bad original = original"
+            ]
+          )
+        ]
+        $ \(name, fragment, declarations) ->
+            sourceModuleRejects name 83865 fragment name $
+                retainedFunctionBodyComparisonSource name declarations "pure \"unused\""
 
 -- | Add head-only retained function workers as a separate source corpus.
 retainedFunctionBinderSource :: String -> String -> String

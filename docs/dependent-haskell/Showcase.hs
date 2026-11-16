@@ -436,6 +436,52 @@ domainConversion = do
     expectError "domain conversion preserves function demand order" "showcase-domain-head"
         (evaluate (length (toList (Parameterized.applyTokenVector bottomHead ignoredToken))))
 
+-- | Compare complete workers and retain their runtime function demand.
+fixedFunctionDomains :: IO ()
+fixedFunctionDomains = do
+    lengthCell <- newIORef (S (S Z))
+    n <- readIORef lengthCell
+    identityCell <- newIORef (id :: Nat -> Nat)
+    selectedIdentity <- readIORef identityCell
+    successorCell <- newIORef (S :: Nat -> Nat)
+    selectedSuccessor <- readIORef successorCell
+    constantCell <- newIORef (const (S (S Z)) :: Nat -> Nat)
+    selectedConstant <- readIORef constantCell
+    let f :: Nat -> Nat
+        f = selectedIdentity
+        successor :: Nat -> Nat
+        successor = selectedSuccessor
+        constant :: Nat -> Nat
+        constant = selectedConstant
+        bottomIndex :: Nat
+        bottomIndex = bottomValue "showcase-function-body-index"
+        bottomHead :: Nat -> Nat
+        bottomHead = bottomValue "showcase-function-body-head"
+        bottomWorker :: foreach (g :: Nat -> Nat) -> foreach (m :: Nat) -> Vec Int (g m)
+        bottomWorker = bottomValue "showcase-function-body-worker"
+    observe "whole function worker selects Int"
+        (toList (FunctionSignatures.specializedCall f n))
+    observe "preallocated payload below function binder"
+        (toList (FunctionSignatures.allocatedCall f n))
+    observe "runtime successor determines vector length"
+        (toList (FunctionSignatures.specializedCall successor n))
+    observe "runtime constant ignores bottom index"
+        (toList (FunctionSignatures.specializedCall constant bottomIndex))
+    observe "ordinary equality below function binder"
+        (toList (FunctionSignatures.transportCall @Int @Int (FunctionSignatures.numericCall @Int) f n))
+    observe "shadowed retained function binders"
+        (toList (FunctionSignatures.shadowedCall constant n))
+    FunctionSignatures.forceCall FunctionSignatures.specializedCall
+    observe "whole function worker WHNF" ()
+    expectError "bottom whole function worker WHNF" "showcase-function-body-worker"
+        (FunctionSignatures.forceCall bottomWorker)
+    FunctionSignatures.forcePartialCall bottomHead (FunctionSignatures.specializedCall bottomHead)
+    observe "partial worker ignores bottom function" ()
+    expectError "function body preserves head demand order" "showcase-function-body-head"
+        (evaluate (length (toList (FunctionSignatures.specializedCall bottomHead bottomIndex))))
+    expectError "function body preserves index demand" "showcase-function-body-index"
+        (evaluate (length (toList (FunctionSignatures.specializedCall f bottomIndex))))
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -449,3 +495,4 @@ main = do
     alternatives
     parameterizedDomains
     domainConversion
+    fixedFunctionDomains
