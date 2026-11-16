@@ -64,6 +64,9 @@ module GHC.Runtime.Interpreter
   -- * Reexport for convenience
   , Message (..)
   , module GHC.Runtime.Interpreter.Process
+
+  -- * High-level interface to the interpreter
+  , withInterp
   ) where
 
 import GHC.Prelude
@@ -107,6 +110,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (mask, handle, MonadThrow (..))
+import Control.Monad.STM
 import Data.Binary
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Short as SBS
@@ -198,7 +202,7 @@ interpCmd interp msg = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> run msg -- Just run it directly
 #endif
-  ExternalInterp ext -> withExtInterp interp ext $ \inst ->
+  ExternalInterp ext -> withExtInterp ext $ \inst ->
     sendMessage inst msg
 
 -- | Calls `interpCmd` and the continuation while masked.
@@ -208,13 +212,22 @@ interpCmd interp msg = case interpInstance interp of
 withInterpCmdMasked :: Binary a => Interp -> Message a -> (a -> IO b) -> IO b
 withInterpCmdMasked interp msg own = mask_ $ interpCmd interp msg >>= own
 
-withExtInterp :: ExceptionMonad m => Interp -> ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
-withExtInterp interp ext action = stopInterpOnPipeClosed $ case ext of
+-- | Passes the `Interp` to the continuation while setting up a
+--  'PipeClosedException' handler that calls 'stopInterp'.
+--
+--  Will take the 'interpLoader' lock on a 'PipeClosedException'.
+withInterp :: ExceptionMonad m => SafeInterp -> (Interp -> m a) -> m a
+withInterp interp0@(SafeInterp interp) k = stopInterpOnPipeClosed $ k interp
+  where
+    stopInterpOnPipeClosed = MC.handle $ \ (e :: PipeClosedException) -> do
+      liftIO $ stopInterpWhen (atomically . fmap not . isPipeOpen . interpPipe) interp0
+      MC.throwM e
+
+withExtInterp :: ExceptionMonad m => ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
+withExtInterp ext action = case ext of
   ExtJS    i -> withJSInterp i action
   ExtWasm  i -> withWasmInterp i action
   ExtIServ i -> withIServ    i action
-  where
-    stopInterpOnPipeClosed = MC.handle $ \ (e :: PipeClosedException) -> liftIO (stopInterp interp) >> MC.throwM e
 
 withExtInterpStatus :: ExtInterp -> (forall d. ExtInterpStatusVar d -> m a) -> m a
 withExtInterpStatus ext action = case ext of
@@ -294,11 +307,11 @@ withExtInterpMaybe ext action = withExtInterpStatus ext $ \mstate -> do
 -- | Execute an action of type @IO [a]@, returning 'ForeignHValue's for
 -- each of the results.
 evalStmt
-  :: Interp
+  :: SafeInterp
   -> EvalOpts
   -> EvalExpr ForeignHValue
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-evalStmt interp opts foreign_expr = do
+evalStmt interp0 opts foreign_expr = withInterp interp0 $ \ interp -> do
   status <- withExpr foreign_expr $ \expr ->
     interpCmd interp (EvalStmt opts expr)
   handleEvalStatus interp status
@@ -312,17 +325,17 @@ evalStmt interp opts foreign_expr = do
     cont (EvalApp fl' fr')
 
 resumeStmt
-  :: Interp
+  :: SafeInterp
   -> EvalOpts
   -> ForeignRef (ResumeContext [HValueRef])
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-resumeStmt interp opts resume_ctxt = do
+resumeStmt interp0 opts resume_ctxt = withInterp interp0 $ \interp -> do
   status <- withForeignRef resume_ctxt $ \rhv ->
     interpCmd interp (ResumeStmt opts rhv)
   handleEvalStatus interp status
 
-abandonStmt :: Interp -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
-abandonStmt interp resume_ctxt =
+abandonStmt :: SafeInterp -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
+abandonStmt interp0 resume_ctxt = withInterp interp0 $ \ interp ->
   withForeignRef resume_ctxt $ \rhv ->
     interpCmd interp (AbandonStmt rhv)
 
@@ -341,20 +354,20 @@ handleEvalStatus interp status =
     EvalSuccess <$> mapM (mkFinalizedHValue interp) rs
 
 -- | Execute an action of type @IO ()@
-evalIO :: Interp -> ForeignHValue -> IO ()
-evalIO interp fhv =
+evalIO :: SafeInterp -> ForeignHValue -> IO ()
+evalIO interp0 fhv = withInterp interp0 $ \ interp ->
   liftIO $ withForeignRef fhv $ \fhv ->
     interpCmd interp (EvalIO fhv) >>= fromEvalResult
 
 -- | Execute an action of type @IO String@
-evalString :: Interp -> ForeignHValue -> IO String
-evalString interp fhv =
+evalString :: SafeInterp -> ForeignHValue -> IO String
+evalString interp0 fhv = withInterp interp0 $ \ interp ->
   liftIO $ withForeignRef fhv $ \fhv ->
     interpCmd interp (EvalString fhv) >>= fromEvalResult
 
 -- | Execute an action of type @String -> IO String@
-evalStringToIOString :: Interp -> ForeignHValue -> String -> IO String
-evalStringToIOString interp fhv str =
+evalStringToIOString :: SafeInterp -> ForeignHValue -> String -> IO String
+evalStringToIOString interp0 fhv str = withInterp interp0 $ \ interp ->
   liftIO $ withForeignRef fhv $ \fhv ->
     interpCmd interp (EvalStringToString fhv str) >>= fromEvalResult
 
@@ -388,44 +401,44 @@ addHpcModule :: Interp -> SBS.ShortByteString -> Int -> Int -> SBS.ShortByteStri
 addHpcModule interp modLabel tickNo hash tickboxes  =
   interpCmd interp (AddHpcModule modLabel tickNo hash tickboxes)
 
-costCentreStackInfo :: Interp -> RemotePtr CostCentreStack -> IO [String]
-costCentreStackInfo interp ccs =
+costCentreStackInfo :: SafeInterp -> RemotePtr CostCentreStack -> IO [String]
+costCentreStackInfo interp0 ccs = withInterp interp0 $ \interp ->
   interpCmd interp (CostCentreStackInfo ccs)
 
 newBreakArray :: Interp -> Int -> IO (ForeignRef BreakArray)
 newBreakArray interp size =
   withInterpCmdMasked interp (NewBreakArray size) (mkFinalizedHValue interp)
 
-storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
-storeBreakpoint interp ref ix cnt = do                               -- #19157
+storeBreakpoint :: SafeInterp -> ForeignRef BreakArray -> Int -> Int -> IO ()
+storeBreakpoint interp0 ref ix cnt = withInterp interp0 $ \ interp -> do -- #19157
   withForeignRef ref $ \breakarray ->
     interpCmd interp (SetupBreakpoint breakarray ix cnt)
 
-breakpointStatus :: Interp -> ForeignRef BreakArray -> Int -> IO Bool
-breakpointStatus interp ref ix =
+breakpointStatus :: SafeInterp -> ForeignRef BreakArray -> Int -> IO Bool
+breakpointStatus interp0 ref ix = withInterp interp0 $ \ interp ->
   withForeignRef ref $ \breakarray ->
     interpCmd interp (BreakpointStatus breakarray ix)
 
-getBreakpointVar :: Interp -> ForeignHValue -> Int -> IO (Maybe ForeignHValue)
-getBreakpointVar interp ref ix =
+getBreakpointVar :: SafeInterp -> ForeignHValue -> Int -> IO (Maybe ForeignHValue)
+getBreakpointVar interp0 ref ix = withInterp interp0 $ \ interp ->
   withForeignRef ref $ \apStack ->
     withInterpCmdMasked interp (GetBreakpointVar apStack ix)
                     (mapM (mkFinalizedHValue interp))
 
-getClosure :: Interp -> ForeignHValue -> IO (Heap.GenClosure ForeignHValue)
-getClosure interp ref =
+getClosure :: SafeInterp -> ForeignHValue -> IO (Heap.GenClosure ForeignHValue)
+getClosure interp0 ref = withInterp interp0 $ \ interp ->
   withForeignRef ref $ \hval ->
     withInterpCmdMasked interp (GetClosure hval) $
       mapM (mkFinalizedHValue interp)
 
-whereFrom :: Interp -> ForeignHValue -> IO (Maybe InfoProv.InfoProv)
-whereFrom interp ref =
+whereFrom :: SafeInterp -> ForeignHValue -> IO (Maybe InfoProv.InfoProv)
+whereFrom interp0 ref = withInterp interp0 $ \ interp ->
   withForeignRef ref $ \hval -> do
     interpCmd interp (WhereFrom hval)
 
 -- | Send a Seq message to the iserv process to force a value      #2950
-seqHValue :: Interp -> UnitEnv -> Logger -> ForeignHValue -> IO (EvalResult ())
-seqHValue interp unit_env logger ref =
+seqHValue :: SafeInterp -> UnitEnv -> Logger -> ForeignHValue -> IO (EvalResult ())
+seqHValue interp0 unit_env logger ref = withInterp interp0 $ \ interp ->
   withForeignRef ref $ \hval -> do
     status <- interpCmd interp (Seq hval)
     handleSeqHValueStatus interp unit_env logger status
@@ -649,23 +662,35 @@ spawnIServ conf = do
   pure inst
 
 -- | Stop the interpreter
-stopInterp :: Interp -> IO ()
-stopInterp interp = case interpInstance interp of
+stopInterp :: SafeInterp -> IO ()
+stopInterp = stopInterpWhen (const $ pure True)
+
+-- | Stop the interpreter if predicate returns 'True'.
+stopInterpWhen :: (InterpProcess -> IO Bool) -> SafeInterp -> IO ()
+stopInterpWhen shouldStop (SafeInterp interp) = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> pure ()
 #endif
-    ExternalInterp ext -> (maybe (pure ()) throwIO =<<) $ withExtInterpStatus ext $ \mstate -> do
-      MC.mask $ \restore -> modifyMVar mstate $ \state -> do
+    ExternalInterp ext -> (maybe (pure ()) throwIO =<<) $ withExtInterpStatus ext $ \mstate -> MC.mask $ \restore -> do
+      -- takes interpLoader lock before ExternalInterp lock to avoid deadlocks.
+      -- commits emptied values before 'gracefulShutdown' so we don't hold locks
+      -- more than necessary.
+      mi <- modifyMVar (loader_state (interpLoader interp)) $ \l_st -> do
+       modifyMVar mstate $ \state -> do
         case state of
-          InterpPending    -> pure (state, Nothing) -- already stopped
-          InterpRunning i  -> do
-            e <- getProcessExitCode (interpHandle (instProcess i)) >>= \case
-                   Just _exitCode -> closePipe (interpPipe (instProcess i)) >> pure Nothing
-                   Nothing        -> gracefulShutdown i restore
-            modifyMVar_ (loader_state (interpLoader interp)) (const $ pure Nothing)
-            purgeInterpSymbolCache (interpSymbolCache interp)
-            modifyMVar_ (interpStringCache interp) (const $ pure emptyFsEnv)
-            pure (InterpPending,e)
+          InterpPending    -> pure (state, (l_st, Nothing)) -- already stopped
+          InterpRunning i  -> shouldStop (instProcess i) >>= \case
+            False -> pure (state, (l_st, Nothing))
+            True  -> do
+              purgeInterpSymbolCache (interpSymbolCache interp)
+              modifyMVar_ (interpStringCache interp) (const $ pure emptyFsEnv)
+              pure (InterpPending,(Nothing,Just i))
+      case mi of
+        Nothing -> pure Nothing
+        Just i  -> getProcessExitCode (interpHandle (instProcess i)) >>= \case
+          Just _exitCode -> closePipe (interpPipe (instProcess i)) >> pure Nothing
+          Nothing        -> gracefulShutdown i restore
+
   where
     gracefulShutdown i restore = do
       x <- try (liftM2 (>>) (timeLimited restore (sendMessage i Shutdown)) (timeLimited restore (closePipe (interpPipe (instProcess i)))))
@@ -731,7 +756,7 @@ principle it would probably be ok, but it seems less hairy this way.
 
 -- | Creates a 'ForeignRef' that will automatically release the
 -- 'RemoteRef' when it is no longer referenced.
-mkFinalizedHValue :: Interp -> RemoteRef a -> IO (ForeignRef a)
+mkFinalizedHValue :: HasInterpInstance i => i -> RemoteRef a -> IO (ForeignRef a)
 mkFinalizedHValue interp rref = do
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
@@ -754,13 +779,13 @@ freeHValueRefs interp refs = interpCmd interp (FreeHValueRefs refs)
 -- | Convert a 'ForeignRef' to the value it references directly.  This
 -- only works when the interpreter is running in the same process as
 -- the compiler, so it fails when @-fexternal-interpreter@ is on.
-wormhole :: Interp -> ForeignRef a -> IO a
+wormhole :: SafeInterp -> ForeignRef a -> IO a
 wormhole interp r = wormholeRef interp (unsafeForeignRefToRemoteRef r)
 
 -- | Convert an 'RemoteRef' to the value it references directly.  This
 -- only works when the interpreter is running in the same process as
 -- the compiler, so it fails when @-fexternal-interpreter@ is on.
-wormholeRef :: Interp -> RemoteRef a -> IO a
+wormholeRef :: SafeInterp -> RemoteRef a -> IO a
 wormholeRef interp _r = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp -> localRef _r

@@ -4,6 +4,8 @@
 -- | Types used by the runtime interpreter
 module GHC.Runtime.Interpreter.Types
    ( Interp(..)
+   , SafeInterp(..)
+   , HasInterpInstance(..)
    , InterpInstance(..)
    , InterpProcess (..)
    , ExtInterp (..)
@@ -66,9 +68,36 @@ import System.Process   ( ProcessHandle, CreateProcess )
 import System.IO
 import GHC.Unit.Finder.Types (FinderCache, FinderOpts)
 
+{-
+Note [Interpreter locks order]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To avoid deadlocks, the 'interpLoader' lock should be taken before the lock that
+contains the 'InterpStatus'.
+
+Further, you should wrap the code that takes the 'interpLoader' lock with
+'withInterp', as it will cleanup the whole interpreter state in case the
+external interpreter pipe died:
+```
+withInterp :: ExceptionMonad m => SafeInterp -> (Interp -> m a) -> m a
+```
+
+'SafeInterp' is a newtype introduced to aid with the discipline: only code that
+has ownership over a 'SafeInterp' should take its 'interpLoader' lock.
+
+-}
+
+
+
+
+-- | An 'Interp' where we have not taken the 'interpLoader' lock in this thread.
+--
+-- See Note [Interpreter locks order]
+newtype SafeInterp = SafeInterp Interp
+
 -- | Interpreter
 data Interp = Interp
-  { interpInstance :: !InterpInstance
+  { _interpInstance :: !InterpInstance
       -- ^ Interpreter instance (internal, external)
 
   , interpLoader   :: !Loader
@@ -80,6 +109,13 @@ data Interp = Interp
   , interpStringCache :: !(MVar (FastStringEnv (RemotePtr ())))
       -- ^ MallocStrings cache
   }
+
+class HasInterpInstance a where
+  interpInstance :: a -> InterpInstance
+instance HasInterpInstance SafeInterp where
+  interpInstance (SafeInterp interp) = interpInstance interp
+instance HasInterpInstance Interp where
+  interpInstance = _interpInstance
 
 data InterpInstance
    = ExternalInterp !ExtInterp -- ^ External interpreter
@@ -143,7 +179,7 @@ data ExtInterpInstance c = ExtInterpInstance
   }
 
 -- | Interpreter uses Profiling way
-interpreterProfiled :: Interp -> Bool
+interpreterProfiled :: HasInterpInstance a => a -> Bool
 interpreterProfiled interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> hostIsProfiled
@@ -154,7 +190,7 @@ interpreterProfiled interp = case interpInstance interp of
     ExtWasm i -> wasmInterpProfiled $ interpConfig i
 
 -- | Interpreter uses Dynamic way
-interpreterDynamic :: Interp -> Bool
+interpreterDynamic :: HasInterpInstance a => a -> Bool
 interpreterDynamic interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> hostIsDynamic

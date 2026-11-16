@@ -29,7 +29,9 @@ import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.Utils.Error
+
 import Control.Concurrent
+import Data.Coerce
 import System.Process
 
 data InterpOpts = InterpOpts
@@ -67,8 +69,8 @@ initInterpreter
   -> FinderCache
   -> UnitEnv
   -> InterpOpts
-  -> IO (Maybe Interp)
-initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
+  -> IO (Maybe SafeInterp)
+initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = coerce $ do
 
   lookup_cache  <- liftIO $ mkInterpSymbolCache
 

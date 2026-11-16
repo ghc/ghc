@@ -837,7 +837,7 @@ pruneCache hpt summ
 -- ---------------------------------------------------------------------------
 --
 -- | Unloading
-unload :: Interp -> HscEnv -> IO ()
+unload :: SafeInterp -> HscEnv -> IO ()
 unload interp hsc_env
   = case ghcLink (hsc_dflags hsc_env) of
         LinkInMemory -> Linker.unload interp hsc_env

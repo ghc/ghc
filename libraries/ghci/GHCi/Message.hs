@@ -27,7 +27,7 @@ module GHCi.Message
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
 
-  , Pipe(..), mkPipeFromHandles, mkPipeFromContinuations, closePipe
+  , Pipe(..), mkPipeFromHandles, mkPipeFromContinuations, closePipe, isPipeOpen
   , remoteCall, remoteCallInterleaving, remoteTHCall
   , handleRemoteCall, handleRemoteTHCall, writeReply
   , RemoteProcessException(..), PipeClosedException(..)

@@ -170,19 +170,19 @@ import Foreign.Ptr (nullPtr)
 uninitialised :: a
 uninitialised = panic "Loader not initialised"
 
-modifyLoaderState_ :: Interp -> (LoaderState -> IO LoaderState) -> IO ()
-modifyLoaderState_ interp f =
+modifyLoaderState_ :: SafeInterp -> (Interp -> LoaderState -> IO LoaderState) -> IO ()
+modifyLoaderState_ interp0 f = withInterp interp0 $ \ interp ->
   modifyMVar_ (loader_state (interpLoader interp))
-    (fmap pure . f . fromMaybe uninitialised)
+    (fmap pure . f interp . fromMaybe uninitialised)
 
-modifyLoaderState :: Interp -> (LoaderState -> IO (LoaderState, a)) -> IO a
-modifyLoaderState interp f =
+modifyLoaderState :: SafeInterp -> (Interp -> LoaderState -> IO (LoaderState, a)) -> IO a
+modifyLoaderState interp0 f = withInterp interp0 $ \ interp ->
   modifyMVar (loader_state (interpLoader interp))
-    (fmapFst pure . f . fromMaybe uninitialised)
+    (fmapFst pure . f interp . fromMaybe uninitialised)
   where fmapFst f = fmap (\(x, y) -> (f x, y))
 
-getLoaderState :: Interp -> IO (Maybe LoaderState)
-getLoaderState interp = readMVar (loader_state (interpLoader interp))
+getLoaderState :: SafeInterp -> IO (Maybe LoaderState)
+getLoaderState (SafeInterp interp) = readMVar (loader_state (interpLoader interp))
 
 
 emptyLoaderState :: UnitEnv -> LoaderState
@@ -206,21 +206,21 @@ emptyLoaderState unit_env = LoaderState
                        pkg_to_dfm rtsUnitId
                      ] ++ fmap pkg_to_dfm deps
 
-extendLoadedEnv :: Interp -> BytecodeLoaderStateModifier -> [(Name,ForeignHValue)] -> IO ()
+extendLoadedEnv :: SafeInterp -> BytecodeLoaderStateModifier -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp modify_bytecode_loader_state new_bindings =
-  modifyLoaderState_ interp $ \pls -> do
+  modifyLoaderState_ interp $ \_ pls -> do
     return $! modifyBytecodeLoaderState modify_bytecode_loader_state pls $ \bco_loader_state ->
       modifyClosureEnv bco_loader_state $ \ce -> extendClosureEnv ce new_bindings
     -- strictness is important for not retaining old copies of the pls
 
-deleteFromLoadedHomeEnv :: Interp -> [Name] -> IO ()
+deleteFromLoadedHomeEnv :: SafeInterp -> [Name] -> IO ()
 deleteFromLoadedHomeEnv interp to_remove =
-  modifyLoaderState_ interp $ \pls -> do
+  modifyLoaderState_ interp $ \_ pls -> do
     return $ modifyBytecodeLoaderState modifyHomePackageBytecodeState pls $ \bco_state ->
       modifyClosureEnv bco_state $ \ce -> delListFromNameEnv ce to_remove
 
 -- | Have we already loaded a name into the interpreter?
-lookupFromLoadedEnv :: Interp -> Name -> IO (Maybe ForeignHValue)
+lookupFromLoadedEnv :: SafeInterp -> Name -> IO (Maybe ForeignHValue)
 lookupFromLoadedEnv interp name = do
   mstate <- getLoaderState interp
   return $ do
@@ -231,10 +231,10 @@ lookupFromLoadedEnv interp name = do
 -- | Load the module containing the given Name and get its associated 'HValue'.
 --
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
-loadName :: Interp -> HscEnv -> Name -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
-loadName interp hsc_env name = do
-  initLoaderState interp hsc_env
-  modifyLoaderState interp $ \pls0 -> do
+loadName :: SafeInterp -> HscEnv -> Name -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
+loadName interp0 hsc_env name = do
+  initLoaderState interp0 hsc_env
+  modifyLoaderState interp0 $ \interp pls0 -> do
     (pls, links, pkgs) <- if not (isExternalName name)
        then return (pls0, [], emptyUDFM)
        else do
@@ -248,6 +248,7 @@ loadName interp hsc_env name = do
       Just (_,aa) -> return (pls,(aa, links, pkgs))
       Nothing     -> assertPpr (isExternalName name) (ppr name) $
                      do let sym_to_find = IClosureSymbol name
+                        -- TODO: does not take loader state lock
                         m <- lookupClosure interp sym_to_find
                         r <- case m of
                           Just fhv -> return fhv
@@ -295,7 +296,7 @@ loadDependencies interp hsc_env pls span needed_mods = do
 -- | Temporarily extend the loaded env.
 withExtendedLoadedEnv
   :: (ExceptionMonad m)
-  => Interp
+  => SafeInterp
   -> [(Name,ForeignHValue)]
   -> m a
   -> m a
@@ -314,9 +315,9 @@ withExtendedLoadedEnv interp new_env action
 
 
 -- | Display the loader state.
-showLoaderState :: Interp -> IO SDoc
+showLoaderState :: SafeInterp -> IO SDoc
 showLoaderState interp = do
-  ls <- readMVar (loader_state (interpLoader interp))
+  ls <- getLoaderState interp
   let docs = case ls of
         Nothing  -> [ text "Loader not initialised"]
         Just pls -> [ text "Pkgs:" <+> ppr (map loaded_pkg_uid $ eltsUDFM $ pkgs_loaded pls)
@@ -352,8 +353,8 @@ showLoaderState interp = do
 -- nothing.  This is useful in Template Haskell, where we call it before
 -- trying to link.
 --
-initLoaderState :: Interp -> HscEnv -> IO ()
-initLoaderState interp hsc_env = do
+initLoaderState :: SafeInterp -> HscEnv -> IO ()
+initLoaderState interp0 hsc_env = withInterp interp0 $ \ interp -> do
   modifyMVar_ (loader_state (interpLoader interp)) $ \pls -> do
     case pls of
       Just  _ -> return pls
@@ -382,10 +383,10 @@ reallyInitLoaderState interp hsc_env = do
       loadCmdLineLibs' interp hsc_env pls
 
 
-loadCmdLineLibs :: Interp -> HscEnv -> IO ()
-loadCmdLineLibs interp hsc_env = do
-  initLoaderState interp hsc_env
-  modifyLoaderState_ interp $ \pls ->
+loadCmdLineLibs :: SafeInterp -> HscEnv -> IO ()
+loadCmdLineLibs interp0 hsc_env = do
+  initLoaderState interp0 hsc_env
+  modifyLoaderState_ interp0 $ \interp pls ->
     loadCmdLineLibs' interp hsc_env pls
 
 
@@ -730,13 +731,13 @@ get_reachable_nodes hsc_env mods
   ********************************************************************* -}
 
 -- | Load the dependencies of a linkable, and then load the linkable itself.
-loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([LinkableUsage], PkgsLoaded)
-loadDecls interp hsc_env span linkable = do
+loadDecls :: SafeInterp -> HscEnv -> SrcSpan -> Linkable -> IO ([LinkableUsage], PkgsLoaded)
+loadDecls interp0 hsc_env span linkable = do
     -- Initialise the linker (if it's not been done already)
-    initLoaderState interp hsc_env
+    initLoaderState interp0 hsc_env
 
     -- Take lock for the actual work.
-    modifyLoaderState interp $ \pls0 -> do
+    modifyLoaderState interp0 $ \interp pls0 -> do
       -- Link the packages and modules required
       (pls, ok, links_needed, units_needed) <- loadDependencies interp hsc_env pls0 span needed_mods
       if failed ok
@@ -770,10 +771,10 @@ loadDecls interp hsc_env span linkable = do
 
   ********************************************************************* -}
 
-loadModule :: Interp -> HscEnv -> Module -> IO ()
-loadModule interp hsc_env mod = do
-  initLoaderState interp hsc_env
-  modifyLoaderState_ interp $ \pls -> do
+loadModule :: SafeInterp -> HscEnv -> Module -> IO ()
+loadModule interp0 hsc_env mod = do
+  initLoaderState interp0 hsc_env
+  modifyLoaderState_ interp0 $ \interp pls -> do
     (pls', ok, _, _) <- loadDependencies interp hsc_env pls noSrcSpan [mod]
     if failed ok
       then throwGhcExceptionIO (ProgramError "could not load module")
@@ -1158,16 +1159,16 @@ gets actually written to the loader state, the failure to do so is tracked by
 --   * we also implicitly unload all temporary bindings at this point.
 --
 unload
-  :: Interp
+  :: SafeInterp
   -> HscEnv
   -> IO ()
-unload interp hsc_env
+unload interp0 hsc_env
   = mask_ $ do -- mask, so we're safe from Ctrl-C in here
 
         -- Initialise the linker (if it's not been done already)
-        initLoaderState interp hsc_env
+        initLoaderState interp0 hsc_env
 
-        _new_pls <- modifyLoaderState interp $ \pls -> do
+        _new_pls <- modifyLoaderState interp0 $ \interp pls -> do
                  pls1 <- unload_wkr interp pls
                  return (pls1, pls1)
 
@@ -1234,7 +1235,7 @@ showLS (BytecodeLibrary nm) = "(bytecode) " ++ nm
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-loadPackages :: Interp -> HscEnv -> [UnitId] -> IO ()
+loadPackages :: SafeInterp -> HscEnv -> [UnitId] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1243,11 +1244,11 @@ loadPackages :: Interp -> HscEnv -> [UnitId] -> IO ()
 -- perhaps makes the error message a bit more localised if we get a link
 -- failure.  So the dependency walking code is still here.
 
-loadPackages interp hsc_env new_pkgs = do
+loadPackages interp0 hsc_env new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
-  initLoaderState interp hsc_env
-  modifyLoaderState_ interp $ \pls ->
+  initLoaderState interp0 hsc_env
+  modifyLoaderState_ interp0 $ \interp pls ->
     loadPackages' interp hsc_env new_pkgs pls
 
 -- | Compute 'LoadedPkgInfo' metadata (with transitive deps) for new packages,
