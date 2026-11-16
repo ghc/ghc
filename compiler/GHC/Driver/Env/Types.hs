@@ -14,7 +14,7 @@ import GHC.Driver.LlvmConfigCache (LlvmConfigCache)
 
 import GHC.Prelude
 import GHC.Runtime.Context
-import GHC.Runtime.Interpreter.Types ( Interp )
+import GHC.Runtime.Interpreter.Types ( SafeInterp )
 import GHC.Types.Error ( Messages )
 import GHC.Types.Name.Cache
 import GHC.Types.Target
@@ -88,7 +88,7 @@ data HscEnv
                 -- the 'IfGblEnv'. See 'tcg_knot_vars' in 'GHC.Tc.Utils.TcGblEnv'.
                 -- See also Note [hsc_type_env_var hack]
 
-        , hsc_interp :: Maybe Interp
+        , hsc_interp :: Maybe SafeInterp
                 -- ^ target code interpreter (if any) to use for TH and GHCi.
                 -- See Note [Target code interpreter]
 

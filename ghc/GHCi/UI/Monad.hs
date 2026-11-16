@@ -475,8 +475,8 @@ printStats dflags ActionStats{actionAllocs = mallocs, actionElapsedTime = secs}
 
 revertCAFs :: GhciMonad m => m ()
 revertCAFs = do
-  interp <- hscInterp <$> GHC.getSession
-  liftIO $ interpCmd interp RtsRevertCAFs
+  interp0 <- hscInterp <$> GHC.getSession
+  liftIO $ withInterp interp0 $ \interp -> interpCmd interp RtsRevertCAFs
   s <- getGHCiState
   when (not (ghc_e s)) turnOffBuffering
      -- Have to turn off buffering again, because we just

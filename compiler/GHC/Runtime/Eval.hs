@@ -468,7 +468,7 @@ resumeExec step mbCnt r = do
                    | otherwise -> pure prevHistoryLst
           handleRunStatus step eval_opts expr bindings final_ids status =<< hist'
 
-setupBreakpoint :: GhcMonad m => Interp -> InternalBreakpointId -> Int -> m ()   -- #19157
+setupBreakpoint :: GhcMonad m => SafeInterp -> InternalBreakpointId -> Int -> m ()   -- #19157
 setupBreakpoint interp ibi cnt = do
   hug <- hsc_HUG <$> getSession
   liftIO $ do
@@ -476,18 +476,18 @@ setupBreakpoint interp ibi cnt = do
     breakArray <- getBreakArray interp ibi modBreaks
     GHCi.storeBreakpoint interp breakArray (ibi_info_index ibi) cnt
 
-getBreakArray :: Interp -> InternalBreakpointId -> InternalModBreaks -> IO (ForeignRef BreakArray)
+getBreakArray :: SafeInterp -> InternalBreakpointId -> InternalModBreaks -> IO (ForeignRef BreakArray)
 getBreakArray interp InternalBreakpointId{ibi_info_mod} imbs = do
   breaks0 <- bco_linked_breaks . homePackage_loaded . bco_loader_state . fromMaybe (panic "Loader not initialised") <$> getLoaderState interp
   case lookupModuleEnv (breakarray_env breaks0) ibi_info_mod of
     Just ba -> return ba
     Nothing -> do
-      modifyLoaderState interp $ \ld_st -> do
+      modifyLoaderState interp $ \interp' ld_st -> do
         let lb = bco_linked_breaks . homePackage_loaded . bco_loader_state $ ld_st
 
         -- Recall that BreakArrays are allocated only at BCO link time, so if we
         -- haven't linked the BCOs we intend to break at yet, we allocate the arrays here.
-        ba_env <- allocateBreakArrays interp (breakarray_env lb) [imbs]
+        ba_env <- allocateBreakArrays interp' (breakarray_env lb) [imbs]
 
         let ld_st' = modifyBytecodeLoaderState modifyHomePackageBytecodeState ld_st $ \bco_state -> bco_state { bco_linked_breaks = (bco_linked_breaks bco_state) { breakarray_env = ba_env } }
         let ba = expectJust {- just computed -} $ lookupModuleEnv ba_env ibi_info_mod

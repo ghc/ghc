@@ -1604,10 +1604,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   let (stg_binds, _stg_deps) = unzip stg_binds_with_deps
 
   let interp = hscInterp hsc_env
-
-  case interp of
+  case interpInstance interp of
     -- always generate JS code for the JS interpreter (no bytecode!)
-    Interp { interpInstance = ExternalInterp (ExtJS i) } ->
+    ExternalInterp (ExtJS i) ->
       jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id
 
     _ -> do
@@ -1645,7 +1644,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   let logger           = hsc_logger hsc_env
       tmpfs            = hsc_tmpfs hsc_env
       dflags           = hsc_dflags hsc_env
-      interp           = hscInterp hsc_env
+      interp0          = hscInterp hsc_env
       tmp_dir          = tmpDir dflags
       unit_env         = hsc_unit_env hsc_env
       js_config        = initStgToJSConfig dflags
@@ -1671,10 +1670,10 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     -- by default, so we can safely ignore them here.
 
   -- Initialise the linker (if it's not been done already)
-  initLoaderState interp hsc_env
+  initLoaderState interp0 hsc_env
 
   -- Take lock for the actual work.
-  (dep_linkables, needed_units, this_pkgs_loaded) <- modifyLoaderState interp $ \pls -> do
+  (dep_linkables, needed_units, this_pkgs_loaded) <- modifyLoaderState interp0 $ \interp pls -> do
     let link_opts = initLinkDepsOpts hsc_env
 
     -- Find what packages and linkables are required
@@ -1715,7 +1714,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     jsLinkObject logger tmpfs tmp_dir js_config unit_env (hsc_FC hsc_env) inst out_obj roots needed_units
 
   -- look up "id_sym" closure and create a StablePtr (HValue) from it
-  binding_fref <- lookupClosure interp (IFaststringSymbol id_sym) >>= \case
+  binding_fref <- withInterp interp0 $ \interp -> lookupClosure interp (IFaststringSymbol id_sym) >>= \case
     Nothing -> pprPanic "Couldn't find just linked TH closure" (ppr id_sym)
     Just r  -> pure r
 

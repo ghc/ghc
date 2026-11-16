@@ -283,7 +283,7 @@ getValueSafely hsc_env val_name expected_type = do
     logger = hsc_logger hsc_env
     hooks  = hsc_hooks hsc_env
 
-getHValueSafely :: Interp -> HscEnv -> Name -> Type -> IO (Either Type (HValue, [LinkableUsage], PkgsLoaded))
+getHValueSafely :: SafeInterp -> HscEnv -> Name -> Type -> IO (Either Type (HValue, [LinkableUsage], PkgsLoaded))
 getHValueSafely interp hsc_env val_name expected_type = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment

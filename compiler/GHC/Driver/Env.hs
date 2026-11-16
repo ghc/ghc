@@ -56,7 +56,7 @@ import GHC.Driver.Config.Diagnostic (initDiagOpts, initPrintConfig)
 import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..) )
 
 import GHC.Runtime.Context
-import GHC.Runtime.Interpreter.Types (Interp)
+import GHC.Runtime.Interpreter.Types (SafeInterp)
 
 import GHC.Unit
 import GHC.Unit.External.Database
@@ -410,7 +410,7 @@ mainModIs hue = mkHomeModule (expectJust $ homeUnitEnv_home_unit hue) (mainModul
 -- | Retrieve the target code interpreter
 --
 -- Fails if no target code interpreter is available
-hscInterp :: HscEnv -> Interp
+hscInterp :: HscEnv -> SafeInterp
 hscInterp hsc_env = case hsc_interp hsc_env of
    Nothing -> throw (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
    Just i  -> i

@@ -1151,16 +1151,16 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
   let withForeignRefs [] f = f []
       withForeignRefs (x : xs) f = withForeignRef x $ \r ->
         withForeignRefs xs $ \rs -> f (r : rs)
-  interp <- tcGetInterp
+  interp0 <- tcGetInterp
 
-  case interpInstance interp of
+  withInterp interp0 $ \interp -> case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> do
       qs <- liftIO (withForeignRefs finRefs $ mapM localRef)
       runQinTcM $ sequence_ qs
 #endif
 
-    ExternalInterp ext -> withExtInterp interp ext $ \inst -> do
+    ExternalInterp ext -> withExtInterp ext $ \inst -> do
       tcg <- getGblEnv
       th_state <- readTcRef (tcg_th_remote_state tcg)
       case th_state of
@@ -1807,17 +1807,17 @@ runTHDec = runTH THDec
 
 runTH :: Binary a => THResultType -> ForeignHValue -> TcM a
 runTH ty fhv = do
-  interp <- tcGetInterp
-  case interpInstance interp of
+  interp0 <- tcGetInterp
+  withInterp interp0 $ \ interp -> case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> do
        -- Run it in the local TcM
-      hv <- liftIO $ wormhole interp fhv
+      hv <- liftIO $ wormhole interp0 fhv
       r <- runQinTcM (unsafeCoerce hv :: TH.Q a)
       return r
 #endif
 
-    ExternalInterp ext -> withExtInterp interp ext $ \inst -> do
+    ExternalInterp ext -> withExtInterp ext $ \inst -> do
       -- Run it on the server.  For an overview of how TH works with
       -- Remote GHCi, see Note [Remote Template Haskell] in
       -- libraries/ghci/GHCi/TH.hs.
@@ -3031,7 +3031,7 @@ mkThAppTs fun_ty arg_tys = foldl' TH.AppT fun_ty arg_tys
 noTH :: UnrepresentableTypeDescr -> Type -> TcM a
 noTH s d = failWithTc $ TcRnTHError $ THReifyError $ CannotRepresentType s d
 
-tcGetInterp :: TcM Interp
+tcGetInterp :: TcM SafeInterp
 tcGetInterp = do
    hsc_env <- getTopEnv
    case hsc_interp hsc_env of
