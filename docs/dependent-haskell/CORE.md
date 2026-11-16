@@ -2165,7 +2165,7 @@ uses the encoded name. Printing the incomplete Type could force it again.
 The reader returns no placeholder and does not retry the active decoder.
 Other exceptions, including asynchronous exceptions, propagate unchanged.
 
-The fixture requires these normal interface errors for nine declaration
+The M54 fixture required these normal interface errors for nine declaration
 graphs in both compression modes: 18 negative cases. Nine valid declaration
 and forcing-order cases give 18 positive cases. They include self-recursive
 and mutually recursive first-order domains, nullary synonyms, and an ordinary
@@ -2173,7 +2173,56 @@ field containing a valid nonvacuous Boolean Pi. The six earlier retained-field
 rejection graphs also run in both modes. Raw exceptions and timeouts fail.
 
 This reports detected failures. It does not stage the loader or guarantee
-loop detection or termination. Shape-first loading, C1, C2 and R22 remain open.
+loop detection or termination. M55 below adds bounded raw shape prechecks.
+C1, C2, R22 and general termination remain open.
 It adds no source feature, Core rule or interface encoding. See Note
 [Detected recursive native interface domains] in GHC.IfaceToCore and the
 [primary sources](REFERENCES.md#detected-recursive-interface-domains-prior-art).
+
+## Native interface domain shapes
+
+M55 derives a lazy `NativeDomainShape` view from each imported data declaration
+and nullary synonym. The view belongs to that reconstructed `TyCon`. Its
+references use `forkM` and `tcIfaceTyCon` in the original interface environment.
+Attaching the view rebuilds `tyConNullaryTy` so that `mkTyConTy` keeps the view.
+Existing builders default to no view. These are internal GHC API additions.
+The interface encoding and Core type forms stay unchanged.
+
+The precheck reads this view before expanding synonyms or decoding fields.
+It distinguishes scalar domains, closed function domains, ordinary field
+multiplicities (`One` or `Many`) and unrestricted multiplicities (`Many`).
+Data cycles are allowed. Each queued field must still pass. A separate active
+synonym stack rejects alias-only cycles. Reset that stack at data edges, so
+`type Alias = A; data A = MkA Alias` remains valid.
+
+Generic Pi import checks the raw multiplicity and domain before `bindIfaceId`.
+The allocator calls `mkLocalIdOrCoVar`, which expands aliases through
+`isCoVarType`. A check after allocation reaches an alias-only cycle too late.
+Named constructor fields also get a raw precheck before decoding. The Id-based
+prechecks and all existing typed eligibility checks remain mandatory afterward.
+An early failure uses the encoded name and this diagnostic:
+
+```text
+Unsupported retained domain shape.
+```
+
+An unknown shape uses the typed path with M54's detected-loop boundary.
+Applied synonyms, casts, constraint arrows and raw variable/call-index forms
+remain unclassified. Their decoders retain scope checks. A raw retained Pi is
+not scalar. Its function classification is unknown because a vacuous Pi can
+become an ordinary eligible arrow. No positive shape result validates a Type.
+
+The existing API fixture checks 28 early generic rejection cases, 12 separate
+named-field rejection cases and 32 valid graph scenarios across both compression
+modes. Five direct controls check the cache, absent views and applied syntax.
+The negative graph helper excludes the detected-loop fallback text. Valid
+controls include mixed multiplicity aliases, alias/data cycles in both orders,
+a vacuous Pi function alias and a genuinely applied forgetful synonym.
+
+The trace isolated a nonallocating alias-expansion loop before Id allocation.
+Its internal timeout did not interrupt that loop; the diagnostic probe used an
+OS timeout. This is bounded loader staging. Parent kinds and constructor binder
+headers must already exist. Unclassified normalization paths still use the
+typed fallback. There is no general termination or preservation proof.
+C1, C2 and R22 remain open. See Note [Native interface domain shapes] in
+GHC.Core.TyCon and Note [Checking native domain shapes] in GHC.IfaceToCore.

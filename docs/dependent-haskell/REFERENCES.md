@@ -3490,8 +3490,8 @@ The Decl.hs blob is `0f1b76bbfe65bc8c1a93c4ad77a8539752196861`.
 [Datatype checking, lines129–204](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Data.hs#L129-L204)
 installs datatype information before adding constructors. The Data.hs blob is
 `349a3c508d8a77d8f86b41decedec6de9a4d7afc`. These are staging precedents.
-They do not prove progress for GHC's lazy loader or implement a shape-first
-loader in this fork.
+They do not prove progress for GHC's lazy loader. M54 uses them for diagnostic
+containment. M55 below uses their declaration construction order.
 
 The local [runtime definition, lines384–395](../../libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs#L384-L395)
 defines `NonTermination` and its `<<loop>>` display. It explicitly gives no
@@ -3506,3 +3506,39 @@ The selected readings and verified source hashes are recorded in
 `native-domain-loader-review-v1/exception-boundary-addendum.md` records the
 separate exception-boundary review. No new paper or whole-file reading is
 claimed. The seven-work/nine-PDF ledger is unchanged.
+
+### Native interface domain shapes: provenance
+
+M55 follows the declaration-staging order in the
+[GHC and Agda sources above](#detected-recursive-interface-domains-prior-art).
+GHC's lazy interface Notes require deferred reference lookup and independent
+implicit-name enumeration. Agda v2.8.0 installs datatype information before it
+checks constructors. This is a construction-order precedent. It supplies no
+termination theorem for this loader. A temporary empty constructor list is
+not evidence that a native domain is checked and empty.
+
+The fork stores a compact derived view on each reconstructed `TyCon`. This
+keeps the view with the actual boot, real or reconstructed object. A global
+Name cache could retain a view from a different reconstruction. The nullary
+cache update follows `setTcTyConKind`. Synonym flags such as `synIsTau` and
+`synIsFamFree` depend on the decoded RHS, so they cannot supply this raw view.
+These ownership and rejection policies are choices in this fork.
+
+The alias-cycle probe exposed an earlier boundary in
+[`bindIfaceId`](../../compiler/GHC/IfaceToCore.hs),
+[`mkLocalIdOrCoVar`](../../compiler/GHC/Types/Id.hs) and
+[`isCoVarType`](../../compiler/GHC/Core/Predicate.hs). The allocator expands
+synonyms before an Id-based precheck can run. M55 therefore checks the raw
+domain and multiplicity first. It preserves the existing allocator and typed
+checks. The selected snapshot includes the two unchanged allocator/predicate
+dependencies. The trace records compile success, OS termination of the loop
+and unchanged inputs. It is not a successful test run.
+
+`native-shape-first-loader-design-v1` records the representation and header
+addendum. `native-shape-first-loader-review-v1` records static reviews and their
+limits. The initial review missed diagnostic priority for scoped indices.
+Actual API failures led to the raw variable/call-index and constraint-arrow
+fallbacks. `native-interface-domain-shapes-unit-trace-v1` records the allocator
+boundary. All accepted domains still pass the original typed predicates.
+The seven-work/nine-PDF ledger is unchanged. No new whole-paper reading or
+proof replay is claimed.

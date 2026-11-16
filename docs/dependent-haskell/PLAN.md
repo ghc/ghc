@@ -3690,7 +3690,8 @@ frozen. The full program goal stays active.
 
 ### M55: inspect native interface domains before decoding fields
 
-Status: planned. M54 remains the diagnostic fallback.
+Status: implemented and validated. Independent audit and publication pending.
+M54 remains the detected-loop fallback for unclassified forms.
 
 Derive a small domain-shape view from each raw data declaration and nullary
 synonym. Attach the view to the reconstructed `TyCon` before fields are forced.
@@ -3699,11 +3700,14 @@ the nullary type cache when attaching the view. Add no interface tag, trusted
 wire flag, global name cache or unchecked `Type` head.
 
 Before each native interface eligibility check, inspect the reachable shapes.
+For generic Pi import, check raw multiplicity and domain before `bindIfaceId`.
+Its allocator expands aliases to distinguish Ids from coercion variables.
 Reject only shapes that cannot satisfy the existing domain rules. Distinguish
 scalar domains, closed function domains and the two multiplicity policies.
 Allow data cycles. Track synonym expansion separately and reset that stack
 when entering data fields. Keep the existing typed checks after this precheck.
-Unclassified shapes, including applied synonyms and casts, use the typed path.
+Applied synonyms, casts, constraint arrows and raw variable/call-index forms
+use the typed path. This preserves the existing scoped-index diagnostics.
 A raw retained Pi is not scalar. Its function classification stays unknown,
 because a vacuous Pi can become an ordinary eligible arrow.
 
@@ -3716,10 +3720,24 @@ before the declaration header exists or for unclassified normalization paths.
 C1, C2, R22 and the full program goal stay open.
 
 - [x] Record the shape representation, ownership, fallback and limits.
-- [ ] Add lazy `TyCon` metadata and rebuild its nullary cache on attachment.
-- [ ] Derive raw views and check them before the four typed eligibility sites.
-- [ ] Update the existing API fixture. Distinguish early shape rejection from
+- [x] Add lazy `TyCon` metadata and rebuild its nullary cache on attachment.
+- [x] Derive raw views and check them before the four typed eligibility sites.
+- [x] Update the existing API fixture. Distinguish early shape rejection from
   M54's detected-loop diagnostic. Keep recursive data, alias and multiplicity
   controls. Keep the existing golden output.
-- [ ] Build both stages. Run focused API, source, Showcase and registered checks.
+- [x] Build both stages. Run focused API, source, Showcase and registered checks.
 - [ ] Update contracts and references. Freeze, audit and publish this increment.
+
+Validation selects compiler and source
+`b0b876db25e087b286022931df03223abd499059`: 90 compiler inputs and 119 source
+paths. Both compiler stages pass.
+The two exact API goldens remain 1/37 lines. All 346 own inputs per API phase
+are unchanged after self-hosting. Both stages pass the 19-result one-shot
+interface client and the 53-line Showcase from 13 modules. Registered self-hosted
+checks report 39 cases, 34 skips and five expected passes, with no unexpected
+results or framework failures or warnings. C1, C2, R22 and the full goal stay open.
+
+The earlier scope failures and OS-interrupted alias cycle remain in the evidence.
+The trace isolated alias expansion before Id allocation. The final raw precheck
+runs before that operation. This does not prove termination for arbitrary
+interfaces. No old executable, full GHC suite or broad historical matrix was run.

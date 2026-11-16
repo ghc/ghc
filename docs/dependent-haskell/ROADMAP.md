@@ -209,6 +209,11 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   interface diagnostic path. It preserves valid first-order recursive domains
   and ordinary fields containing valid retained Pi types. This is not a
   shape-first loader, guaranteed loop detection or a termination proof.
+  M55 adds derived data and synonym views before field decoding and generic
+  binder allocation. Known unsupported graphs fail before typed recursion.
+  Valid data cycles remain supported. Unclassified normalization keeps the
+  typed fallback. Missing headers and general termination remain open.
+  C1 remains open.
   M42 adds scoped opaque call indices with independently closed scalar input
   and result domains. It checks forward nominal congruence, conservative
   noninjectivity, function-head substitution and actual strict-call lowering.

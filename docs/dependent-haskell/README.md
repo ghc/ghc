@@ -76,7 +76,7 @@ optimization support or full roadmap completion.
 | Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
-| Detected recursive interface domains | M54 reports detected `NonTermination` through normal interface errors; loader staging and termination remain open |
+| Native interface domain shapes | M55 checks derived raw views before fields and generic binder allocation; M54 remains the detected-loop fallback |
 | Configured fork version | `10.1.20261115.1`, with interface header `1001202611151`; matching compiler and libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
@@ -4607,3 +4607,42 @@ The evidence namespace is frozen. The audited revision
 `91d582bb945cd0f37c4dede7ee168e24c2ba4d81` is published on the fork.
 The canonical record is `dependent-haskell-M54-final-audit-v1.json`, SHA256
 `6843fd43d979a85acecfa2b5f1cd74cca0eec0427c8fda94ce01833aaa341073`.
+
+## M55: native interface domain shapes
+
+Imported data and nullary synonyms now carry an independent domain-shape view.
+The reader checks it before it decodes recursive fields. Generic retained Pi
+import checks raw multiplicity and domain before allocating the binder, because
+that allocator expands aliases. Valid data cycles and alias/data back-edges
+remain supported. Alias-only cycles and known unsupported shapes report a
+normal interface error. The original typed checks still run after a positive
+precheck. The interface encoding and Core type forms stay unchanged.
+
+Unclassified forms use the typed path with M54's detected-loop boundary.
+They include applied synonyms, casts, constraint arrows and raw variable/call
+indices. This preserves existing scope diagnostics. A vacuous raw Pi can become
+an eligible ordinary function, so its function shape remains unclassified.
+Parent and binder headers must already exist. There is no general termination
+or preservation proof. This increment adds no source feature or Showcase label.
+
+Validation selects `b0b876db25e087b286022931df03223abd499059`, with 90 compiler
+inputs and 119 source paths. Both stages build. The API goldens remain 1/37
+lines; both phases retain all 346 actual inputs after self-hosting. Both stages
+pass the 19-result hidden-source interface client and the 53-line Showcase from
+13 modules. Registered self-hosted checks have 39 cases, 34 skips and five
+expected passes, with no unexpected results or framework warnings or failures.
+The API covers 28 generic rejection cases, 12 named-field rejection cases,
+32 valid graph scenarios and five direct cache/fallback controls.
+
+The initial two API attempts preserve a scoped-index diagnostic regression.
+The third preserves an alias-expansion loop. A temporary traced copy isolated
+the allocator boundary under an OS timeout. The final checks pass after the
+raw precheck moved before allocation. Build warnings in unchanged modules
+remain in the logs. No full GHC suite, old executable or broad historical
+matrix was replayed. C1, C2, R22 and the full program goal stay open.
+
+The owning Notes are [Native interface domain shapes] in GHC.Core.TyCon and
+[Checking native domain shapes] in GHC.IfaceToCore. See the
+[contract](CORE.md#native-interface-domain-shapes) and
+[provenance](REFERENCES.md#native-interface-domain-shapes-provenance).
+Independent audit and publication are pending.
