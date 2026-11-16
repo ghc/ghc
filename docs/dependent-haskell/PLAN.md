@@ -3631,8 +3631,8 @@ program goal stay open.
 
 ### M54: diagnostics for detected recursive interface-domain failures
 
-Status: implemented and validated; artifact audit and publication pending.
-Keep the full program goal active.
+Status: complete. The source is validated, independently audited and published
+at `91d582bb945cd0f37c4dede7ee168e24c2ba4d81`. The full program goal stays active.
 
 Force the existing native interface eligibility results inside an IO exception
 boundary. Catch only `NonTermination`. Report the failure through `failIfM`.
@@ -3662,8 +3662,10 @@ The research and primary-source provenance are in
   ordinary field with a valid retained function type.
 - [x] Build both stages and run focused API, source, Showcase and registered
   checks. Keep the existing goldens and separate structural/runtime evidence.
-- [ ] Update references, contracts and publication status. Preserve failed
+- [x] Update references, contracts and publication status. Preserve failed
   attempts. Keep shape-first loading, C1, C2 and R22 open.
+  The canonical record is `dependent-haskell-M54-final-audit-v1.json`, SHA256
+  `6843fd43d979a85acecfa2b5f1cd74cca0eec0427c8fda94ce01833aaa341073`.
 
 Validation uses compiler `4ab0e9f75a469fc4384d04f9cd18656216757a64` and source
 `a75239d10b109f3608da6c2e133c01b7c3ffc0bb`: 86 selected compiler inputs and
@@ -3681,3 +3683,7 @@ six earlier rejection graphs remain. The initial bootstrap warning and
 successful API attempt remain recorded. Final validation includes the later
 field-synonym case and its explicit domain-classification demand. No old
 executable, broad historical matrix or full GHC suite was run.
+
+The independent static artifact audit passes 2,733 checks over 735 pinned paths.
+All `native-recursive-domain-diagnostics-*` files and directories are permanently
+frozen. The full program goal stays active.

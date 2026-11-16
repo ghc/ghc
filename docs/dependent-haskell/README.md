@@ -4602,4 +4602,8 @@ API run remains historical evidence. The final fixture also forces domain
 classification for a dependent function hidden in a field synonym. Raw field
 free variables alone do not demand that synonym's RHS. The final API run,
 both source stages and the registered run use this final fixture.
-Artifact audit and publication are pending.
+The independent artifact audit passes 2,733 checks over 735 pinned paths.
+The evidence namespace is frozen. The audited revision
+`91d582bb945cd0f37c4dede7ee168e24c2ba4d81` is published on the fork.
+The canonical record is `dependent-haskell-M54-final-audit-v1.json`, SHA256
+`6843fd43d979a85acecfa2b5f1cd74cca0eec0427c8fda94ce01833aaa341073`.
