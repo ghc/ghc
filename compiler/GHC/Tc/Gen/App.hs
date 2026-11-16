@@ -44,6 +44,8 @@ import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.FamInstEnv ( normaliseType )
+import GHC.Core.Reduction ( reductionReducedType )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
 import GHC.Core.FVs ( exprFreeVarsList )
 import GHC.Core.TyCon
@@ -2417,6 +2419,7 @@ docs/dependent-haskell/REFERENCES.md#native-worker-argument-inference.
 -- See Note [Generic retained argument inference] for overapplication.
 -- See Note [Native inference after visible type applications] for the mode argument.
 -- See Note [Native worker argument inference] for native templates.
+-- See Note [Family views in native argument inference] for cached type matching.
 tcRetainedArgInstEnabled :: Maybe Int -> QLFlag -> Maybe TcRhoType -> (HsExpr GhcRn, SrcSpan)
                          -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                          -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
@@ -2476,8 +2479,12 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
        ; case eligible of
            Nothing -> return (fun, sigma, [], Nothing)
            Just inferable -> do
-             { initial_cache <- infer_args needed_tvs inferable domains 1 args
-             ; initial_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) initial_cache
+             { let matching_type entry
+                     = do { ty <- liftZonkM (zonkTcType (actual_type entry))
+                          ; fam_envs <- tcGetFamInstEnvs
+                          ; return (reductionReducedType (normaliseType fam_envs Nominal ty)) }
+             ; initial_cache <- infer_args needed_tvs inferable domains 1 args
+             ; initial_tys <- mapM (matching_type . snd) initial_cache
              ; let initial_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- initial_cache ]
                    match_args subst pairs = foldM (\subst (formal, actual) ->
                                         if native_worker
@@ -2504,13 +2511,13 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
                               remaining = zipWith (\pos eligible -> eligible && isNothing (lookup pos initial_cache))
                                                   [1..] inferable
                         ; extra_cache <- infer_args missing remaining domains 1 args
-                        ; extra_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) extra_cache
+                        ; extra_tys <- mapM (matching_type . snd) extra_cache
                         ; let extra_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- extra_cache ]
                         ; return (match_args subst (zip extra_templates extra_tys), initial_cache ++ extra_cache) }
                    Just subst | not index_route, not native_worker ->
                      tcRetainedCallbackArgs tvs domains args subst initial_cache
                    _ -> return (initial_match, initial_cache)
-             ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
+             ; actual_tys <- mapM (matching_type . snd) cache
              ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
              ; choices <- case matched of
                             Just subst | native_worker
@@ -2575,6 +2582,23 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstEnabled _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+{- Note [Family views in native argument inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A cached argument can have type OptionalPayload (Just n), with a nominal
+family equation reducing it to Vec Int n. Structural matching against the
+formal Vec a index cannot select index from the unreduced family head.
+Normalize cached actual types at Nominal role for immutable selection.
+Use the same normalized views for initial matching, extra matching and the
+final exact-domain check. This does not unwrap newtypes or invert families.
+
+Keep the original expression, inferred type and usage in each cache entry.
+tcValArgsWithCache checks that original type against the selected domain with
+tcSubTypeSigma. That check constructs the family coercion and emits the saved
+usage once. This follows mkInferredPolyId in GHC.Tc.Gen.Bind, which normalizes
+an inferred type and reconstructs its coercion through subsumption. A stuck
+family still uses the existing fallback. No native meta assignment is added.
+-}
 
 -- | Match complete generic argument candidates after ordinary head inference.
 -- See Note [Ordinary action heads in native inference].

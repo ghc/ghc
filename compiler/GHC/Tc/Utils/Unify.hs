@@ -81,10 +81,13 @@ import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..), ReportRedundantConstraints(..)
                            , pprUserTypeCtxt  )
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Utils.TcMType qualified as TcM
+import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
+import GHC.Core.Dependent ( hasNativeDependentType )
+import GHC.Core.FamInstEnv ( normaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs
@@ -1044,6 +1047,13 @@ matchExpectedTyConApp tc orig_ty
     go ty@(TyConApp tycon args)
        | tc == tycon  -- Common case
        = return (mkNomReflCo ty, args)
+       | isTypeFamilyTyCon tycon, hasNativeDependentType ty
+       = do { fam_envs <- tcGetFamInstEnvs
+            ; let Reduction co reduced = normaliseType fam_envs Nominal ty
+            ; case tcSplitTyConApp_maybe reduced of
+                Just (actual, args) | actual == tc -> return (mkSymCo co, args)
+                _ -> defer }
+         -- See Note [Matching native family result shapes].
 
     go (TyVarTy tv)
        | isMetaTyVar tv
@@ -1071,6 +1081,23 @@ matchExpectedTyConApp tc orig_ty
                  tc_template = mkTyConApp tc args
            ; co <- unifyType Nothing tc_template orig_ty
            ; return (co, args) }
+
+{- Note [Matching native family result shapes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A known family result can contain runtime indices. For example,
+TreePayload ('Node left right) reduces to (TreePayload left, TreePayload right).
+The ordinary fallback allocates fresh tuple parameters before emitting equality
+constraints. Those parameters cannot hold native types. Reduce a native family
+head with GHC's existing nominal family normalizer before this fallback.
+
+Use the reduced parameters only when the result has the required algebraic
+TyCon. Return the inverse reduction as the required nominal coercion. Do not
+unwrap a newtype, recheck an expression, or assign a native type to a metavariable.
+Other shapes keep the existing fallback and diagnostic context. This evaluates
+type-family equations, not term definitions. Cached argument selection uses the
+same nominal matching view; see Note [Family views in native argument inference] in
+GHC.Tc.Gen.App.
+-}
 
 ----------------------
 matchExpectedAppTy :: TcRhoType                         -- orig_ty
