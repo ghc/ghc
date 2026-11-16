@@ -4545,3 +4545,6 @@ without recovering each variable. Preserve the ordinary GADT list selector.
 The initial rule can still reject a new opaque whole-field selector that could
 support transport. General field-type transport remains open. Reflection must
 compare the actual head with FUN or TYPE before it uses constructor injectivity.
+Inspect transparent aliases for hidden opaque applications. Preserve ordinary
+phantom and whole-field aliases. Scan the uninstantiated synonym definitions
+before expansion, so ordinary repeated aliases retain their compact syntax.

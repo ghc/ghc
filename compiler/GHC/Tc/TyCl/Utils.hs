@@ -1111,7 +1111,22 @@ To determine naughtiness we distinguish two cases:
   inside its existential scope. See Note [Matchability and injective variables]
   in GHC.Core.TyCo.FVs.
 
-  Keep the existing treatment of saturated type families and synonyms. For
+  A type synonym can hide an opaque application. For example, A f a = f a
+  must not make a field of type a selectable from T f (A f a) at U. The walker
+  returns a flag with its variable set. It uses a synonym expansion when that
+  expansion reports an opaque application. Otherwise it keeps the original
+  syntactic argument variables. Thus S a = Int retains a in T (S a), as before.
+  Expanding every synonym would lose this variable and reject an existing
+  selector whose field type is S a.
+
+  Before expansion, scan the uninstantiated synonym bodies for a possible
+  opaque application. Visit each referenced synonym once in this scan. If
+  none exists, keep the compact applied synonym and visit its arguments only.
+  For example, Twice a = (a,a) must not duplicate an argument that contains
+  more Twice applications. See Note [Using synonyms to compress types] in
+  GHC.Core.Type. The scan does not substitute arguments into synonym bodies.
+
+  Keep the existing treatment of saturated type families. For
   example, a field of type F a in a constructor result T (F a) can be selected
   by transporting the complete field type. This does not require inverse
   evidence for a. Using injectiveVarsOfType here would reject this selector.

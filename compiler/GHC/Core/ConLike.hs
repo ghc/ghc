@@ -37,8 +37,9 @@ import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.FVs (tyCoVarsOfCo)
 import GHC.Core.TyCo.Rep (Type(..), ThetaType)
-import GHC.Core.TyCon (tyConDataCons, tyConArity)
-import GHC.Core.Type(mkTyConApp, tyCoVarsOfType, typeKind, isMatchableFunTy)
+import GHC.Core.TyCon (TyCon, tyConDataCons, tyConArity, synTyConRhs_maybe)
+import GHC.Core.TyCon.Set
+import GHC.Core.Type(mkTyConApp, tyCoVarsOfType, typeKind, isMatchableFunTy, coreView)
 import GHC.Types.Unique
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -267,23 +268,66 @@ isExistentialRecordField field_ty con =
 -- | Collect result variables for the record-selector classification.
 -- See Note [Naughty record selectors] in GHC.Tc.TyCl.Utils.
 recordSelectorResultVars :: Type -> VarSet
-recordSelectorResultVars = go
+recordSelectorResultVars = snd . go
   where
+    go :: Type -> (Bool, VarSet)
+    go ty@(TyConApp tc _)
+      | synonymMayHideOpaqueApplication tc
+      , Just rhs <- coreView ty
+      , result@(True, _) <- go rhs
+      = result
     go (AppTy fun arg)
-      | isMatchableFunTy (typeKind fun) = go fun `unionVarSet` go arg
-      | otherwise = emptyVarSet
+      | isMatchableFunTy (typeKind fun) = unions [go fun, go arg]
+      | otherwise = (True, emptyVarSet)
     go (TyConApp tc args)
       | (prefix, extra@(_:_)) <- splitAt (tyConArity tc) args
       = go (foldl AppTy (mkTyConApp tc prefix) extra)
-      | otherwise = unionVarSets (map go args)
-    go (TyVarTy tv) = unitVarSet tv `unionVarSet` go (varType tv)
-    go (FunTy _ ma mult arg res) = unionVarSets (map go [ma, mult, arg, res])
+      | otherwise = unions (map go args)
+    go (TyVarTy tv) = unions [(False, unitVarSet tv), go (varType tv)]
+    go (FunTy _ ma mult arg res) = unions (map go [ma, mult, arg, res])
     go (ForAllTy (Bndr tv _) body)
-      = go (varType tv) `unionVarSet` (go body `delVarSet` tv)
-    go (CastTy ty co) = go ty `unionVarSet` tyCoVarsOfCo co
+      = let (opaque, vars) = go body
+        in unions [go (varType tv), (opaque, vars `delVarSet` tv)]
+    go (CastTy ty co) = unions [go ty, (False, tyCoVarsOfCo co)]
     go (DepFunTy binder body)
-      = go (varType binder) `unionVarSet` (go body `delVarSet` binder)
+      = let (opaque, vars) = go body
+        in unions [go (varType binder), (opaque, vars `delVarSet` binder)]
     go (TermAppTy fun arg)
-      = go (TermVarTy fun) `unionVarSet` go arg
-    go (TermVarTy var) = unitVarSet var `unionVarSet` go (varType var)
-    go ty = tyCoVarsOfType ty
+      = unions [go (TermVarTy fun), go arg]
+    go (TermVarTy var) = unions [(False, unitVarSet var), go (varType var)]
+    go ty = (False, tyCoVarsOfType ty)
+
+    unions results = (any fst results, unionVarSets (map snd results))
+
+-- | Inspect synonym bodies without substituting their application arguments.
+-- See Note [Naughty record selectors] in GHC.Tc.TyCl.Utils.
+synonymMayHideOpaqueApplication :: TyCon -> Bool
+synonymMayHideOpaqueApplication tc
+  | Just rhs <- synTyConRhs_maybe tc
+  = snd (scan (extendTyConSet emptyTyConSet tc) rhs)
+  | otherwise = False
+  where
+    scan seen (AppTy fun arg)
+      | not (isMatchableFunTy (typeKind fun)) = (seen, True)
+      | otherwise = scan_many seen [fun, arg]
+    scan seen (TyConApp tc args)
+      | (prefix, extra@(_:_)) <- splitAt (tyConArity tc) args
+      = scan seen (foldl AppTy (mkTyConApp tc prefix) extra)
+      | not (tc `elemTyConSet` seen)
+      , Just rhs <- synTyConRhs_maybe tc
+      = scan_many (extendTyConSet seen tc) (rhs : args)
+      | otherwise = scan_many seen args
+    scan seen (TyVarTy tv) = scan seen (varType tv)
+    scan seen (FunTy _ ma mult arg res) = scan_many seen [ma, mult, arg, res]
+    scan seen (ForAllTy (Bndr tv _) body) = scan_many seen [varType tv, body]
+    scan seen (CastTy ty _) = scan seen ty
+    scan seen (DepFunTy binder body) = scan_many seen [varType binder, body]
+    scan seen (TermAppTy fun arg) = scan_many seen [varType fun, arg]
+    scan seen (TermVarTy var) = scan seen (varType var)
+    scan seen _ = (seen, False)
+
+    scan_many seen [] = (seen, False)
+    scan_many seen (ty : tys)
+      = case scan seen ty of
+          (seen', False) -> scan_many seen' tys
+          result -> result
