@@ -27,9 +27,8 @@ The user selected a native Core extension based on Eisenberg's historical
   M58 source checking uses those Core rules. M59 extends frontend comparison
   beneath unchanged function domains using the existing congruence rule.
 
-The [published M58 checkpoint](../ROADMAP.md#where-this-fork-stands) supplies
-the last final audit. M59 passes its selected checks with both compiler stages;
-its final audit and publication remain pending.
+The [published M59 checkpoint](../ROADMAP.md#where-this-fork-stands) passes its
+selected checks with both compiler stages and its independent artifact audit.
 Restricted pipelines and Lint checks do not establish general preservation.
 
 ## Next increments

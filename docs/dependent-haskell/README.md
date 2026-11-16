@@ -55,12 +55,13 @@ _build/showcase/showcase
 | Multiple package constructors, nested fields and guard fallback | `alternatives` |
 | Runtime list indices, optional indices and heterogeneous tree payloads | `parameterizedDomains` |
 | Nominal domain conversion, ordinary payload inference and cast demand | `domainConversion` |
+| Whole-worker specialization, payload inference and function demand | `fixedFunctionDomains` |
 
 The M59 program produces the expected 79 lines in both compiler stages with
 Core Lint and STG Lint enabled. It adds eleven fixed function-domain observations
-to M58's 68-line prefix. Both versions use fourteen source modules. See
-[the work queue](ROADMAP.md#current-work-queue) for the remaining audit and
-publication work.
+to M58's 68-line prefix. Both versions use fourteen source modules. The
+independent M59 audit passes. See [the work queue](ROADMAP.md#current-work-queue)
+for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
 GroundApplicationClient checks native function types as equality operands
@@ -96,7 +97,7 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M59 passes both builds, both-stage public19, parameterized14 and Showcase79/14, fresh API1/37 and five registered tests; final audit and publication remain pending |
+| Compiler validation | Audited M59 passes both builds, both-stage public19, parameterized14 and Showcase79/14, fresh API1/37 and five registered tests |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |

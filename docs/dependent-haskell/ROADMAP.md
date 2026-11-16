@@ -50,16 +50,15 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-The last published checkpoint is M58 at `2b34a0224efe`. Both compiler stages
-pass the 68-observation Showcase through fourteen source modules. M56 provides
+The published checkpoint is M59. Both compiler stages pass the 79-observation
+Showcase through fourteen source modules. M56 provides
 the closed parameterized domains. M57 provides nominal scalar-domain conversion
 in Core. M58 exposes that conversion and scoped body solving from source.
-Its canonical audit is
-`_build/verification/dependent-haskell-M58-final-audit-v1.json`.
-
-M59 is implemented and checked with both compiler stages. The 79-observation
-Showcase passes in both stages. Final audit and publication remain open. Its compiler
-checkpoint is `5c527cd8b92a`; its source fixture checkpoint is `5e33b194f1e6`.
+M59 compares bodies beneath fixed function domains and selects ordinary payloads.
+Its compiler checkpoint is `5c527cd8b92a`; its source fixture checkpoint is
+`5e33b194f1e6`. Its independently audited documentation is `a5bdd43f6764`.
+The canonical audit is
+`_build/verification/dependent-haskell-M59-final-audit-v1.json`.
 See [the M59 specification](PLAN.md#m59-bodies-beneath-fixed-function-domains).
 Observation counts measure those programs. They do not count roadmap features.
 
@@ -78,8 +77,8 @@ can advance a card while the card remains open.
 
 | Order | Owner and contribution | State | Gate and next result |
 | --- | --- | --- | --- |
-| 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Selected verification passed: M59 | Finish the final audit and publication. Preserve exact compiler and source checkpoints. |
-| 2 | R03: safe indexing over a retained `[Bool]` | Candidate written; unexecuted | After M59, measure composition of the existing `Count` family with an ordinary `Fin` GADT. Check bounds and demand. |
+| 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Complete bounded increment: M59 | Both stages and independent audit pass. The larger R03/R05 features remain open. |
+| 2 | R03: safe indexing over a retained `[Bool]` | Bootstrap candidate passes nineteen observations; integration next | Use the existing `Count` family with an ordinary `Fin` GADT. Check bounds, demand and both-stage integration. |
 | 3 | R05: application through opaque whole-function evidence | Research complete enough to specify a probe | Keep genuinely abstract payloads and a scoped coercion variable. Check Lint, CorePrep and object execution before choosing a new coercion rule. |
 | 4 | R03: explicit complete retained-function type arguments | Scoped source task identified | Use the existing lifted consumer. Preserve kind, scope, complete-type and native-meta checks. |
 | 5 | R23: matchability foundation; also advances R05 | Prior implementation and native integration reviewed; spec needed | Specify kinds, substitution, coercions, roles, interfaces and reflection before admitting unrestricted function-valued fields. |

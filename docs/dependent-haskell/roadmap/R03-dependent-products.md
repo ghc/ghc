@@ -23,10 +23,9 @@ all Core transformations. Normal optimization remains a broader release gate.
 - Nominal scalar-domain conversion with scoped source body solving at M58.
 - Fixed function-domain body comparison and payload selection at M59.
   Both stages pass the selected source, runtime and rejection controls.
-  Final audit and publication remain pending.
+  Its independent audit passes.
 
-The last published checkpoint is M58. Its Showcase has 68 observations in both
-stages. M59 has 79 observations checked with both compilers.
+The published M59 checkpoint has 79 Showcase observations in both stages.
 See [the current evidence](../ROADMAP.md#where-this-fork-stands) and
 [the M59 specification](../PLAN.md#m59-bodies-beneath-fixed-function-domains).
 M56's domain representation and M57's conversion rules belong primarily to R05.
@@ -34,14 +33,16 @@ M58 and M59 expose those rules through source checking.
 
 ## Next increments
 
-- [ ] Finish M59's final audit and publication. Preserve the existing
+- [x] Finish M59's final audit and prepare publication. Preserve the existing
       compiler and fixture identities when documentation changes.
 - [ ] Measure closed-list safe indexing:
       `indexClosed :: foreach (xs :: [Bool]) -> Fin (Count xs) -> Bool`.
       Use an ordinary `Fin` GADT and the existing saturated `Count` family.
       Check negative and out-of-range runtime requests, list identity,
       empty-case demand, lazy fields and finite access to cyclic input.
-      The candidate and its nineteen expected observations are unexecuted.
+      The bootstrap candidate passes nineteen observations. Both stages agree
+      on five source rejections, including the explicit-constructor boundary.
+      Integration into the maintained examples remains open.
 - [ ] Admit a complete retained-function type in the existing lifted
       consumer's explicit type-argument position. Preserve complete-type,
       kind, scope and native-meta checks. Check full worker WHNF separately

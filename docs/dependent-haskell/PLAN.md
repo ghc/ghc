@@ -19,8 +19,8 @@ prerequisites, acceptance checks and the behavior that remains unsupported.
 
 The current increment is [M59](#m59-bodies-beneath-fixed-function-domains), owned
 by [R03 dependent products](roadmap/R03-dependent-products.md). It exercises
-existing R05 evidence rules. The implementation and selected checks pass with
-both compiler stages. Final audit and publication remain pending. The user
+existing R05 evidence rules. Both compiler stages and the independent audit
+pass. The next increment measures closed-list indexing. The user
 resumed GHC execution on 2026-11-16 at 17:53 CET.
 
 The queue then measures closed-list indexing, probes opaque Pi application,
@@ -3997,8 +3997,7 @@ pattern; runtime binders still need their own solver scope.
 
 Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
 
-Status: implemented and checked with both compiler stages.
-Final audit and publication remain open.
+Status: implemented, checked with both compiler stages, and independently audited.
 The implementation checkpoint is `5c527cd8b92a`; source fixtures are at
 `5e33b194f1e6`. The checkboxes below separate implemented steps from final
 verification. Documentation updates do not replace those source identities.
@@ -4050,7 +4049,8 @@ The existing Core and Arity rules already support this fixed-domain case.
 - [x] Build both compiler stages. Run the focused API, source, runtime and
       registered checks. Record exact selected inputs and actual executions.
 - [x] Update the Core contract, references and roadmap with the measured scope.
-- [ ] Audit and publish the checked result. Keep the longer-term goal active.
+- [x] Audit the checked result and prepare its publication checkpoint.
+      Keep the longer-term goal active.
 
 This step adds no Core constructor, wire form, singleton translation or
 function eta expansion. Open domains, changed function domains, opaque Pi
@@ -4073,3 +4073,13 @@ artifacts; its cumulative 414-input/product map remains valid. Revalidation
 checks 46,346 unique paths and permits only exact project-documentation deltas.
 The two final specialization baselines each return `[42,42]`.
 No broader GHC suite or general preservation theorem is claimed.
+
+The frozen checkpoint is `a5bdd43f6764`. The independent audit passes 408,573
+static checks over 47,517 pinned paths and preserves 104 cumulative manifests.
+The canonical record is
+`_build/verification/dependent-haskell-M59-final-audit-v1.json`, SHA256
+`1e844411bfd7420dbabae96f71d0e3857f0b436946958100f037da3b2e018601`.
+All `native-function-body-comparison-*` paths are permanently frozen.
+Two earlier auditor failures remain recorded. They concerned historical fixture
+pins and trace formatting. The final audit checks each execution against its
+own source commit. This publication checkpoint changes only status documents.
