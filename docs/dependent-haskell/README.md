@@ -4658,8 +4658,8 @@ SHA256 `67c0af1483bffda59b9fc577ba30dfbcb78da11a34fcec6839a0d96b39b30877`.
 ## M56: closed parameterized index domains
 
 Implementation checks pass at source and compiler commit
-`3131ebc644c580632b8ba6f8776d3dab512c95f3`. The evidence audit and publication
-are pending in this documentation snapshot. The full program remains active.
+`3131ebc644c580632b8ba6f8776d3dab512c95f3`. M56 is independently audited and published on
+`dependent-haskell` in the fork. The full program remains active.
 
 Ordinary datatype parameters now pass through native index formation, constructor
 conversion, substitution, branch evidence, Lint and CorePrep. The representation
@@ -4702,3 +4702,11 @@ nominal type arguments. Growing or permuting recursion, GADTs, constructor
 contexts, newtypes and actual function fields remain outside this domain.
 Runtime bottoms and cycles remain possible. Native unfoldings, general
 optimization and the full C1/C2 contracts remain open.
+
+The audited documentation commit is `0d9c1a1a0b935c8caed53bf44b31591362b2f45a`.
+The static audit passes 7,138 checks across 1,710 pinned paths. The canonical
+record is `_build/verification/dependent-haskell-M56-final-audit-v1.json`,
+SHA256 `f9af3265afcfea79878ecc87886d7cfcb915a0e417df21a081695ea092269d66`. It preserves 92 cumulative manifests.
+All `_build/verification/native-parameterized-domains-*` files and directories
+are permanently frozen. This publication update changes only README and PLAN.
+C1 remains the next program priority.

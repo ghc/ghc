@@ -3751,7 +3751,7 @@ files and directories are permanently frozen. The canonical record is
 
 ### M56: retain closed parameterized algebraic values
 
-Status: implementation validated; evidence audit and publication pending.
+Status: complete, independently audited and published.
 This increment addresses C1's domain and constructor contract.
 Keep C1, C2, R22 and the full program goal open.
 
@@ -3795,7 +3795,7 @@ runtime demand and erasure together before extending each affected path.
 - [x] Check source construction, recursion, separate imports and lazy fields.
 - [x] Update existing rejection/API controls and the maintained Showcase.
 - [x] Build both stages and run focused source/API/registered checks.
-- [ ] Record evidence and references, review the change and publish it.
+- [x] Record evidence and references, review the change and publish it.
 
 Selected source and compiler: `3131ebc644c580632b8ba6f8776d3dab512c95f3`.
 Both builds pass. Both stages pass the 14 source observations and three domain
@@ -3815,3 +3815,11 @@ outside this selected constructor-pattern subset.
 The M55 shape-first interface classifier retains its unknown fallback for applied
 domains. The typed eligibility check enforces the full instantiated contract.
 Keep C1, C2 and R22 open. C1 remains the next program priority.
+
+Audited documentation: `0d9c1a1a0b935c8caed53bf44b31591362b2f45a`. The final static audit passes
+7,138 checks across 1,710 pinned paths. Canonical evidence is
+`_build/verification/dependent-haskell-M56-final-audit-v1.json`, SHA256
+`f9af3265afcfea79878ecc87886d7cfcb915a0e417df21a081695ea092269d66`. It preserves 92 cumulative manifests.
+The complete `native-parameterized-domains-*` evidence namespace is permanently
+frozen. The later publication commit changes only README and PLAN. The full
+program goal remains active.
