@@ -90,7 +90,7 @@ import qualified GHC.Parser.Header as Header
 import GHC.Types.UnresolvedImport ( ImportDeclOrigin(..) )
 import GHC.Types.PkgQual
 
-import GHC.Unit
+import GHC.Unit hiding (mkModuleName)
 import GHC.Unit.Finder as Finder
 import GHC.Unit.Module.Graph (filterToposortToModules)
 import GHC.Unit.Module.ModSummary
@@ -132,6 +132,7 @@ import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Containers.ListUtils (nubOrd)
+import Data.Either (partitionEithers)
 import Data.Function
 import qualified Data.Foldable as Foldable
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
@@ -2437,7 +2438,7 @@ reloadModule m = do
           pure $ LoadUpTo []
       | otherwise = do
           mod_graph <- GHC.getModuleGraph
-          mods <- traverse (lookupHomeUnitModuleName mod_graph) [mkModuleName modl | modl <- modls]
+          mods <- traverse (lookupHomeUnitModuleName mod_graph) [GHC.mkModuleName modl | modl <- modls]
           pure $ LoadUpTo mods
 
 reloadModuleDefer :: GhciMonad m => String -> m ()
@@ -3071,26 +3072,26 @@ browseModule bang modl exports_only = do
 -- "remembered_ctx" and "transient_ctx" in GhciMonad.
 
 moduleCmd :: GhciMonad m => String -> m ()
-moduleCmd str
-  | all sensible strs = cmd
-  | otherwise = reportError (GhciCommandSyntaxError "module [+/-] [*]M1 ... [*]Mn")
+moduleCmd str =
+  case mode of
+    Just m ->
+      case m of
+        AddModules starMods unstarredMods ->    addModulesToContext   starMods unstarredMods
+        RemoveModules starMods unstarredMods -> remModulesFromContext starMods unstarredMods
+        SetModules starMods unstarredMods ->    setContext            starMods unstarredMods
+    Nothing -> reportError (GhciCommandSyntaxError "module [+/-] [*]M1 ... [*]Mn")
   where
-    (cmd, strs) =
-        case str of
-          '+':stuff -> rest addModulesToContext   stuff
-          '-':stuff -> rest remModulesFromContext stuff
-          stuff     -> rest setContext            stuff
+    mode =
+      case str of
+        '+':stuff -> uncurry AddModules <$> validateModules stuff
+        '-':stuff -> uncurry RemoveModules <$> validateModules stuff
+        stuff -> uncurry SetModules <$> validateModules stuff
 
-    rest op stuff = (op as bs, stuffs)
-       where (as,bs) = partitionWith starred stuffs
-             stuffs  = words stuff
+    validateModules strs =
+      fmap partitionEithers $ sequenceA starred str
 
-    sensible ('*':m) = looksLikeModuleName m
-    sensible m       = looksLikeModuleName m
-
-    starred ('*':m) = Left  (GHC.mkModuleName m)
-    starred m       = Right (GHC.mkModuleName m)
-
+    starred ('*':m) = fmap Left  (parseModuleNameWithOptionalUnitId m)
+    starred m       = fmap Right (parseModuleNameWithOptionalUnitId m)
 
 -- -----------------------------------------------------------------------------
 -- Four ways to manipulate the context:
@@ -3099,25 +3100,25 @@ moduleCmd str
 --   (c) :module <stuff>:      setContext
 --   (d) import <module>...:   addImportToContext
 
-addModulesToContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
+addModulesToContext :: GhciMonad m => [InteractiveModuleName] -> [InteractiveModuleName] -> m ()
 addModulesToContext starred unstarred = restoreContextOnFailure $ do
    addModulesToContext_ starred unstarred
 
-addModulesToContext_ :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
+addModulesToContext_ :: GhciMonad m => [InteractiveModuleName] -> [InteractiveModuleName] -> m ()
 addModulesToContext_ starred unstarred = do
   starredModules <- traverse lookupModuleName starred
   mapM_ addII (map mkIIModule starredModules ++ map mkIIDecl unstarred)
   setGHCContextFromGHCiState
 
-remModulesFromContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
-remModulesFromContext  starred unstarred = do
+remModulesFromContext :: GhciMonad m => [InteractiveModuleName] -> [InteractiveModuleName] -> m ()
+remModulesFromContext starred unstarred = do
    -- we do *not* call restoreContextOnFailure here.  If the user
    -- is trying to fix up a context that contains errors by removing
    -- modules, we don't want GHC to silently put them back in again.
    mapM_ rm (starred ++ unstarred)
    setGHCContextFromGHCiState
  where
-   rm :: GhciMonad m => ModuleName -> m ()
+   rm :: GhciMonad m => InteractiveModuleName -> m ()
    rm str = do
      m <- moduleName <$> lookupModuleName str
      let filt = filter ((/=) m . iiModuleName)
@@ -3125,7 +3126,7 @@ remModulesFromContext  starred unstarred = do
         st { remembered_ctx = filt (remembered_ctx st)
            , transient_ctx  = filt (transient_ctx st) }
 
-setContext :: GhciMonad m => [ModuleName] -> [ModuleName] -> m ()
+setContext :: GhciMonad m => [InteractiveModuleName] -> [InteractiveModuleName] -> m ()
 setContext starred unstarred = restoreContextOnFailure $ do
   modifyGHCiState $ \st -> st { remembered_ctx = [], transient_ctx = [] }
                                 -- delete the transient context
@@ -3164,6 +3165,24 @@ restoreContextOnFailure do_this = do
   let rc = remembered_ctx st; tc = transient_ctx st
   do_this `MC.onException` (modifyGHCiState $ \st' ->
      st' { remembered_ctx = rc, transient_ctx = tc })
+
+
+type InteractiveModuleName = GenModule (Maybe UnitId)
+
+mkModuleName :: String -> InteractiveModuleName
+mkModuleName mn = Module Nothing (GHC.mkModuleName mn)
+
+mkModuleNameWithUnitId :: String -> UnitId -> InteractiveModuleName
+mkModuleNameWithUnitId mn uid = Module (Just uid) (GHC.mkModuleName mn)
+
+parseModuleNameWithOptionalUnitId :: String -> Maybe InteractiveModuleName
+parseModuleNameWithOptionalUnitId m =
+  case split ':' m of
+    [mn]           -> mkModuleName mn <$ guard (looksLikeModuleName mn)
+    [part1, part2] ->
+          mkModuleNameWithUnitId part1 (stringToUnitId part2) <$ guard (looksLikeModuleName part1)
+      <|> mkModuleNameWithUnitId part2 (stringToUnitId part1) <$ guard (looksLikeModuleName part2)
+    _ -> Nothing
 
 -- -----------------------------------------------------------------------------
 -- Validate a module that we want to add to the context
@@ -4824,6 +4843,14 @@ listAround pan do_highlight = do
            indent = BS.pack ("  " ++ replicate (length (show no)) ' ')
            nl = BS.singleton '\n'
 
+-- --------------------------------------------------------------------------
+-- Module Context manipulation types
+
+data ContextAction
+  = AddModules [InteractiveModuleName] [InteractiveModuleName]
+  | RemoveModules [InteractiveModuleName] [InteractiveModuleName]
+  | SetModules [InteractiveModuleName] [InteractiveModuleName]
+
 
 -- --------------------------------------------------------------------------
 -- Tick arrays
@@ -4993,10 +5020,10 @@ tryBool m = do
 lookupModule :: GHC.GhcMonad m => String -> m Module
 lookupModule mName = lookupModuleName (GHC.mkModuleName mName)
 
-lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
+lookupModuleName :: GHC.GhcMonad m => InteractiveModuleName -> m Module
 lookupModuleName mName = lookupQualifiedModuleName NoPkgQual mName
 
-lookupQualifiedModuleName :: GHC.GhcMonad m => PkgQual -> ModuleName -> m Module
+lookupQualifiedModuleName :: GHC.GhcMonad m => PkgQual -> InteractiveModuleName -> m Module
 lookupQualifiedModuleName qual modl = do
   GHC.lookupAllQualifiedModuleNames qual modl >>= \case
     [] -> throwGhciCommandError (GhciModuleError $ GhciModuleNameNotFound modl)
