@@ -3932,6 +3932,11 @@ See [nominal domain conversion](REFERENCES.md#nominal-retained-domain-conversion
 
 - [ ] Check both complete binder domains with the closed scalar admission rule.
       Use ordinary nominal family reduction outside the new runtime binder.
+      Use the solver reduction-depth limit. Disable inert evidence, plugins and
+      the family cache for this reduction. Use reflexivity when the original
+      domains already agree. The recursive-family probe in
+      `native-source-domain-conversion-domain-depth-v1` times out after eight
+      seconds with the pure normalizer, despite `-freduction-depth=10`.
       Require the normal domains to agree. Keep changed function domains gated.
 - [ ] Freshen a shared runtime binder against both types and the domain proof.
       Align the target body with the forward nominal cast of that binder.
