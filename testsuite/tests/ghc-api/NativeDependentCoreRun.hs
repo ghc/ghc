@@ -36,7 +36,7 @@ import GHC.Driver.Config.CoreToStg.Prep (initCorePrepConfig)
 import GHC.Driver.DynFlags (DynFlags (..), ExecutableLinkMode (Dynamic), GhcLink (LinkExecutable, NoLink), GhcMode (OneShot), gopt_set, targetProfile)
 import GHC.Driver.Env (HscEnv, hscInterp, hsc_NC, hsc_logger)
 import GHC.Driver.Flags (GeneralFlag (Opt_ExternalInterpreter))
-import GHC.Driver.Main (hscCompileCoreExpr, hscSimplify)
+import GHC.Driver.Main (hscCompileCoreExpr, hscGenHardCode, hscSimplify, hscTidy)
 import GHC.Driver.Phases (Phase (StopLn), StopPhase (NoStop))
 import GHC.Driver.Pipeline (compileFile, oneShot)
 import GHC.Driver.Ppr (showSDoc)
@@ -52,10 +52,10 @@ import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env (mkInScopeSet)
 import GHC.Types.Var.Set (elemVarSet)
-import GHC.Unit.Module.ModGuts (ModGuts (mg_binds))
+import GHC.Unit.Module.ModGuts (ModGuts (mg_binds, mg_tcs))
 import GHC.Unit.Module.ModIface (mi_hash_fn, mi_mod_hash)
 import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
-import GHC.Utils.Outputable (vcat)
+import GHC.Utils.Outputable (ppr, vcat)
 import GHC.Utils.Panic (GhcException (..))
 import System.Directory (createDirectoryIfMissing, doesFileExist, getModificationTime, makeAbsolute, setModificationTime)
 import System.Environment (getArgs)
@@ -72,6 +72,7 @@ main = do
         [libdir] -> do
             GHC.runGhc (Just libdir) runChecks
             runProgramChecks libdir
+            runDomainConversionObjectCheck libdir
             runModuleChecks libdir
             runRecompilationChecks libdir
             putStrLn "native-core-run-ok"
@@ -84,6 +85,7 @@ helperSource =
         [ "{-# LANGUAGE DataKinds, FlexibleInstances, GADTs, KindSignatures, TypeFamilies #-}"
         , "module NativeRuntimeHelpers where"
         , "import Data.IORef"
+        , "import Data.Kind (Type)"
         , "{-# NOINLINE drive #-}"
         , "drive :: (Bool -> IO String) -> Bool -> IO String"
         , "drive k seed = newIORef seed >>= readIORef >>= k"
@@ -98,7 +100,7 @@ helperSource =
         , "{-# NOINLINE bottomBool #-}"
         , "bottomBool :: Bool"
         , "bottomBool = error \"native-bottom-bool\""
-        , "data DomainToken a = DomainToken"
+        , "data DomainToken (a :: Type) = DomainToken"
         , "{-# NOINLINE bottomDomainToken #-}"
         , "bottomDomainToken :: DomainToken Bool"
         , "bottomDomainToken = error \"native-bottom-domain-token\""
@@ -5274,12 +5276,15 @@ Use an actual compiled token constructor and nominal family evidence between
 its two closed instances. The retained result mentions an opaque call, so
 its argument cannot disappear from the function type. Prepare the raw casted
 applications before the ordinary execution entry can simplify their lambdas.
+Keep the ignored worker as a lazy let. Native SimpleOpt cannot inline it.
+The object control requires native forms after simplification.
 These quiet checks preserve the existing stdout golden.
 -}
 
--- | Execute nominal domain conversions without eta expansion or extra demand.
-runDomainConversionChecks :: HscEnv -> DynFlags -> [Id] -> [TyCon] -> IO ()
-runDomainConversionChecks environment flags bindings tycons = do
+-- | Build closed conversion controls against the actual module identifiers.
+-- The first list has values; the second list has expected exception markers.
+domainConversionCases :: DynFlags -> [Id] -> [TyCon] -> IO ([(String, String, CoreExpr)], [(String, String, CoreExpr)])
+domainConversionCases flags bindings tycons = do
     token <- named "DomainToken"
     nat <- named "Nat"
     tokenCon <- case tyConDataCons token of
@@ -5321,7 +5326,8 @@ runDomainConversionChecks environment flags bindings tycons = do
         result index = mkFunctionType ManyTy (predicate index) intTy
         dictionary = local 12007 "domain_dictionary" (predicate (TermVarTy x))
         answer = mkIntExpr (targetPlatform flags) 42
-        ignored = Lam x (Lam dictionary answer)
+        ignoredWorker = local 12009 "domain_ignored_worker" originalType
+        ignored = Let (NonRec ignoredWorker (Lam x (Lam dictionary answer))) (Var ignoredWorker)
         caseBinder = local 12008 "domain_demand" domainA
         demanded =
             Lam
@@ -5344,10 +5350,34 @@ runDomainConversionChecks environment flags bindings tycons = do
         bottomToken = Var (helper bindings "bottomDomainToken")
         force body = mkApps (Var (helper bindings "force")) [Type (exprType body), body]
         bottomFunction = App (Var (helper bindings "bottomFunction")) (Type originalType)
-    unless (isNativeIndexType domainA && isNativeIndexType domainB && not (eqType domainA domainB)) $
-        fail "FAIL: runtime domain conversion lost its nominal distinction"
+    unless (isNativeIndexType domainA) $
+        fail ("FAIL: runtime domain A is unsupported; token arity " ++ show (tyConArity token) ++ "; kind " ++ showSDoc flags (ppr (tyConKind token)))
+    unless (isNativeIndexType domainB) $
+        fail "FAIL: runtime domain B is unsupported"
+    unless (not (eqType domainA domainB)) $
+        fail "FAIL: runtime domain conversion became reflexive"
     unless (exprType (App (converted ignored) (Var y)) `eqType` result back) $
         fail "FAIL: converted retained application has the wrong dependent result"
+    pure
+        ( [ ("converted retained function accepts an actual token", "42", apply ignored realToken)
+          , ("converted retained function ignores bottom token", "42", apply ignored bottomToken)
+          , ("converted retained function demands an actual token", "42", apply demanded realToken)
+          , ("converted retained partial application ignores bottom token", "forced", closed (App (Lam y (force (App (converted ignored) (Var y)))) bottomToken))
+          , ("converted retained function remains a function at WHNF", "forced", closed (force (converted ignored)))
+          ]
+        , [ ("converted retained function demands bottom token", "native-bottom-domain-token", apply demanded bottomToken)
+          , ("converted bottom function remains bottom at WHNF", "native-bottom-function", closed (force (converted bottomFunction)))
+          ]
+        )
+  where
+    named label = case find ((== label) . occNameString . nameOccName . tyConName) tycons of
+        Just tycon -> pure tycon
+        Nothing -> fail ("FAIL: missing domain conversion type: " ++ label)
+
+-- | Execute nominal domain conversions without eta expansion or extra demand.
+runDomainConversionChecks :: HscEnv -> DynFlags -> [Id] -> [TyCon] -> IO ()
+runDomainConversionChecks environment flags bindings tycons = do
+    (values, bottoms) <- domainConversionCases flags bindings tycons
     config <- initCorePrepConfig environment
     let nativeConfig = config{cp_allowNativeDependent = True, cp_arityOpts = Nothing, cp_specEval = False, cp_specEvalDFun = False}
         prepare label expression = do
@@ -5369,18 +5399,83 @@ runDomainConversionChecks environment flags bindings tycons = do
                 Left exception | marker `isInfixOf` displayException exception -> pure ()
                 Left exception -> fail ("FAIL: " ++ label ++ "; wrong exception: " ++ displayException exception)
                 Right actual -> fail ("FAIL: " ++ label ++ "; returned " ++ show actual)
-    expect "converted retained function accepts an actual token" "42" (apply ignored realToken)
-    expect "converted retained function ignores bottom token" "42" (apply ignored bottomToken)
-    expect "converted retained function demands an actual token" "42" (apply demanded realToken)
-    expectBottom "converted retained function demands bottom token" "native-bottom-domain-token" (apply demanded bottomToken)
-    expect "converted retained partial application ignores bottom token" "forced" $
-        closed (App (Lam y (force (App (converted ignored) (Var y)))) bottomToken)
-    expect "converted retained function remains a function at WHNF" "forced" (closed (force (converted ignored)))
-    expectBottom "converted bottom function remains bottom at WHNF" "native-bottom-function" (closed (force (converted bottomFunction)))
-  where
-    named label = case find ((== label) . occNameString . nameOccName . tyConName) tycons of
-        Just tycon -> pure tycon
-        Nothing -> fail ("FAIL: missing domain conversion type: " ++ label)
+    forM_ values $ \(label, expected, expression) -> expect label expected expression
+    forM_ bottoms $ \(label, marker, expression) -> expectBottom label marker expression
+
+-- | Compile one converted keep application through native object generation.
+runDomainConversionObjectCheck :: FilePath -> IO ()
+runDomainConversionObjectCheck libdir = do
+    directory <- makeAbsolute "NativeDependentCoreRun.domain-object"
+    createDirectoryIfMissing True directory
+    let sourcePath = directory </> "Main.hs"
+        assemblyPath = directory </> "domain-conversion.s"
+        executablePath = directory </> ("domain-conversion" ++ if os == "mingw32" then ".exe" else "")
+        source = unlines (map mainHeader (lines helperSource)) ++ unlines
+            [ "{-# NOINLINE entry #-}"
+            , "entry :: IO String"
+            , "entry = pure \"placeholder\""
+            , "main :: IO ()"
+            , "main = entry >>= putStrLn"
+            ]
+        mainHeader "module NativeRuntimeHelpers where" = "module Main where"
+        mainHeader line = line
+    writeFile sourcePath source
+    GHC.runGhc (Just libdir) $ do
+        flags <- GHC.getSessionDynFlags
+        logger <- GHC.getLogger
+        (configured, leftovers, _) <- GHC.parseDynamicFlags logger flags $
+            map noLoc ["-O0", "-fasm", "-fomit-interface-pragmas", "-fno-write-if-simplified-core", "-dcore-lint", "-dstg-lint", "-fforce-recomp", "-v0", "-odir", directory, "-hidir", directory]
+        unless (null leftovers && backendWritesFiles (backend configured)) $
+            fail "FAIL: domain conversion object backend flags"
+        void $ GHC.setSessionDynFlags configured{ghcLink = LinkExecutable Dynamic, outputFile_ = Just executablePath}
+        target <- GHC.guessTarget sourcePath Nothing Nothing
+        GHC.setTargets [target]
+        void (GHC.depanal [] False)
+        summary <- GHC.getModSummary (mkModule mainUnit (mkModuleName "Main"))
+        parsed <- GHC.parseModule summary
+        checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
+        desugared <- GHC.desugarModule checked
+        environment <- GHC.getSession
+        let guts = GHC.coreModule desugared
+            bindings = map fst (flattenBinds (mg_binds guts))
+            isEntry binder = occNameString (nameOccName (idName binder)) == "entry"
+        unless (length (filter isEntry bindings) == 1) $
+            fail "FAIL: domain conversion object entry is not unique"
+        liftIO $ do
+            (values, _) <- domainConversionCases configured bindings (mg_tcs guts)
+            expression <- case find (\(label, _, _) -> label == "converted retained function ignores bottom token") values of
+                Just (_, _, expression) -> pure expression
+                Nothing -> fail "FAIL: missing domain conversion object control"
+            unless (hasNativeDependentExpr expression) $
+                fail "FAIL: domain conversion object entry lost its native forms"
+            case lintExpr (initLintConfig configured bindings) expression of
+                Nothing -> pure ()
+                Just errors -> fail ("FAIL: domain conversion object entry Lint: " ++ showSDoc configured (vcat (bagToList errors)))
+            let replacePair (binder, rhs)
+                    | isEntry binder = (setIdUnfolding binder NoUnfolding, expression)
+                    | otherwise = (binder, rhs)
+                replace (NonRec binder rhs) = uncurry NonRec (replacePair (binder, rhs))
+                replace (Rec pairs) = Rec (map replacePair pairs)
+                injected = guts{mg_binds = map replace (mg_binds guts)}
+            unless (exprType expression `eqType` idType (helper bindings "entry")) $
+                fail "FAIL: domain conversion object entry type mismatch"
+            simplified <- hscSimplify environment [] injected
+            unless (any (\(binder, rhs) -> isEntry binder && hasNativeDependentExpr rhs) (flattenBinds (mg_binds simplified))) $
+                fail "FAIL: domain conversion object entry lost native forms before CorePrep"
+            (code, _) <- hscTidy environment simplified
+            (assembly, stub, foreigns, _, _) <- hscGenHardCode environment code (GHC.ms_location summary) assemblyPath
+            unless (isNothing stub && null foreigns) $
+                fail "FAIL: unexpected domain conversion object foreign output"
+            object <- compileFile environment NoStop (assembly, Nothing)
+            case object of
+                Just path -> do
+                    exists <- doesFileExist path
+                    unless exists (fail "FAIL: domain conversion produced no object file")
+                    oneShot environment NoStop [(path, Just StopLn)]
+                Nothing -> fail "FAIL: domain conversion assembly produced no object path"
+    (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
+    unless (status == ExitSuccess && actual == "42\n" && null errors) $
+        fail ("FAIL: domain conversion object result: " ++ show (status, actual, errors))
 
 -- | Lint a closed native expression before it reaches the backend API.
 lintNative :: DynFlags -> String -> CoreExpr -> IO ()

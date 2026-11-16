@@ -919,8 +919,11 @@ runNatChecks dflags = do
             Just _ -> False
     lintRejects dflags "beta cannot admit an out-of-scope runtime argument" [] (App keepNat (betaIdentity (Var m)))
     lintRejects dflags "beta cannot erase an ignored out-of-scope argument" [] (App keepNat (betaConstant (Var m)))
-    lintRejects dflags "beta does not push a representational cast" [m] $
-        App keepNat (betaIdentity (Cast (Var m) (mkReflCo Representational natTy)))
+    let representationalProof = mkCoVar (mkSystemName (unique 3106) (mkVarOcc "beta_repr")) (mkReprEqPred natTy natTy)
+        representationalBeta = betaIdentity (Cast (Var m) (mkCoVarCo representationalProof))
+    lintAccepts dflags "ordinary beta permits a scoped representational cast" [m, representationalProof] representationalBeta
+    lintRejects dflags "beta index conversion requires nominal evidence" [m, representationalProof] $
+        App keepNat representationalBeta
     lintRejects dflags "beta does not unfold an opaque producer" [m, opaqueProducer] $
         App keepNat (betaIdentity (App (Var opaqueProducer) (Var m)))
     let replace = indexSubst [m] n (succExpr (Var m))
