@@ -3,7 +3,7 @@ module Main (main) where
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (forM_, unless, void)
 import Control.Monad.IO.Class (liftIO)
-import Data.List (find, isInfixOf)
+import Data.List (find, isInfixOf, isPrefixOf)
 import Data.Maybe (isNothing)
 import Data.Time.Clock (getCurrentTime)
 import qualified GHC
@@ -22,7 +22,7 @@ import GHC.Core.Predicate (mkNomEqPred)
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType)
-import GHC.Core.TyCo.Rep (Type (..), scaledThing)
+import GHC.Core.TyCo.Rep (Type (..), Coercion (..), scaledThing)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Utils (dataConRepInstPat, exprIsTrivial, exprType)
@@ -44,20 +44,24 @@ import GHC.Iface.Binary (CheckHiWay (CheckHiWay), TraceBinIFace (QuietBinIFace),
 import GHC.Runtime.Interpreter (evalString)
 import GHC.Types.Error (Diagnostic (diagnosticCode), DiagnosticCode (..), MsgEnvelope (..), getMessages, pprDiagnostic)
 import GHC.Types.Id
-import GHC.Types.Name (mkSystemName, nameOccName)
+import GHC.Types.InlinePragma (neverInlinePragma)
+import GHC.Types.Name (mkExternalName, mkSystemName, nameOccName)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameString)
 import GHC.Types.SourceError (SourceError, srcErrorMessages)
 import GHC.Types.SrcLoc (isGoodSrcSpan, noLoc, noSrcSpan)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env (mkInScopeSet)
-import GHC.Types.Var.Set (elemVarSet)
-import GHC.Unit.Module.ModGuts (ModGuts (mg_binds, mg_tcs))
+import GHC.Types.Var.Set
+    ( CoVarSet, TyVarSet, allVarSet, delVarSet, disjointVarSet, elemVarSet
+    , emptyVarSet, extendVarSet, filterVarSet, lookupVarSet, sizeVarSet, unionVarSet
+    )
+import GHC.Unit.Module.ModGuts (CgGuts (cg_binds), ModGuts (mg_binds, mg_tcs))
 import GHC.Unit.Module.ModIface (mi_hash_fn, mi_mod_hash)
 import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
 import GHC.Utils.Outputable (ppr, vcat)
 import GHC.Utils.Panic (GhcException (..))
-import System.Directory (createDirectoryIfMissing, doesFileExist, getModificationTime, makeAbsolute, setModificationTime)
+import System.Directory (createDirectoryIfMissing, doesFileExist, getModificationTime, makeAbsolute, removeFile, setModificationTime)
 import System.Environment (getArgs)
 import System.Exit (ExitCode (..))
 import System.FilePath (replaceExtension, (</>))
@@ -5482,7 +5486,7 @@ runDomainConversionChecks environment flags bindings tycons = do
     forM_ values $ \(label, expected, expression) -> expect label expected expression
     forM_ bottoms $ \(label, marker, expression) -> expectBottom label marker expression
 
--- | Compile one converted keep application through native object generation.
+-- | Compile scalar-domain conversion and an opaque whole-Pi cast through NCG.
 runDomainConversionObjectCheck :: FilePath -> IO ()
 runDomainConversionObjectCheck libdir = do
     directory <- makeAbsolute "NativeDependentCoreRun.domain-object"
@@ -5490,21 +5494,54 @@ runDomainConversionObjectCheck libdir = do
     let sourcePath = directory </> "Main.hs"
         assemblyPath = directory </> "domain-conversion.s"
         executablePath = directory </> ("domain-conversion" ++ if os == "mingw32" then ".exe" else "")
-        source = unlines (map mainHeader (lines helperSource)) ++ unlines
-            [ "{-# NOINLINE entry #-}"
-            , "entry :: IO String"
-            , "entry = pure \"placeholder\""
-            , "main :: IO ()"
-            , "main = entry >>= putStrLn"
-            ]
+        prepDumpPrefix = directory </> "opaque-whole-pi"
+        prepDumpPath = prepDumpPrefix ++ ".dump-prep"
+        source =
+            unlines (map mainHeader (lines helperSource))
+                ++ unlines
+                    [ "{-# NOINLINE entry #-}"
+                    , "entry :: IO String"
+                    , "entry = pure \"placeholder\""
+                    , "{-# NOINLINE opaqueEntry #-}"
+                    , "opaqueEntry :: IO String"
+                    , "opaqueEntry = pure \"opaque-placeholder\""
+                    , "main :: IO ()"
+                    , "main = do entry >>= putStrLn; opaqueEntry >>= putStrLn"
+                    ]
         mainHeader "module NativeRuntimeHelpers where" = "module Main where"
         mainHeader line = line
     writeFile sourcePath source
+    previousDump <- doesFileExist prepDumpPath
+    if previousDump then removeFile prepDumpPath else pure ()
     GHC.runGhc (Just libdir) $ do
         flags <- GHC.getSessionDynFlags
         logger <- GHC.getLogger
-        (configured, leftovers, _) <- GHC.parseDynamicFlags logger flags $
-            map noLoc ["-O0", "-fasm", "-fomit-interface-pragmas", "-fno-write-if-simplified-core", "-dcore-lint", "-dstg-lint", "-fforce-recomp", "-v0", "-odir", directory, "-hidir", directory]
+        (configured, leftovers, _) <-
+            GHC.parseDynamicFlags logger flags $
+                map
+                    noLoc
+                    [ "-O0"
+                    , "-fasm"
+                    , "-fomit-interface-pragmas"
+                    , "-fno-write-if-simplified-core"
+                    , "-dcore-lint"
+                    , "-dstg-lint"
+                    , "-fforce-recomp"
+                    , "-v0"
+                    , "-odir"
+                    , directory
+                    , "-hidir"
+                    , directory
+                    , "-ddump-prep"
+                    , "-ddump-to-file"
+                    , "-ddump-file-prefix"
+                    , prepDumpPrefix
+                    , "-fno-dump-with-ways"
+                    , "-dsuppress-uniques"
+                    , "-dsuppress-module-prefixes"
+                    , "-dno-suppress-coercions"
+                    , "-dno-suppress-type-signatures"
+                    ]
         unless (null leftovers && backendWritesFiles (backend configured)) $
             fail "FAIL: domain conversion object backend flags"
         void $ GHC.setSessionDynFlags configured{ghcLink = LinkExecutable Dynamic, outputFile_ = Just executablePath}
@@ -5518,32 +5555,135 @@ runDomainConversionObjectCheck libdir = do
         environment <- GHC.getSession
         let guts = GHC.coreModule desugared
             bindings = map fst (flattenBinds (mg_binds guts))
-            isEntry binder = occNameString (nameOccName (idName binder)) == "entry"
-        unless (length (filter isEntry bindings) == 1) $
-            fail "FAIL: domain conversion object entry is not unique"
+            named label binder = occNameString (nameOccName (idName binder)) == label
+            isEntry = named "entry"
+            isOpaqueEntry = named "opaqueEntry"
+        unless (length (filter isEntry bindings) == 1 && length (filter isOpaqueEntry bindings) == 1) $
+            fail "FAIL: domain conversion object entries are not unique"
         liftIO $ do
             (values, _) <- domainConversionCases configured bindings (mg_tcs guts)
             expression <- case find (\(label, _, _) -> label == "converted retained function ignores bottom token") values of
                 Just (_, _, expression) -> pure expression
                 Nothing -> fail "FAIL: missing domain conversion object control"
-            unless (hasNativeDependentExpr expression) $
-                fail "FAIL: domain conversion object entry lost its native forms"
-            case lintExpr (initLintConfig configured bindings) expression of
-                Nothing -> pure ()
-                Just errors -> fail ("FAIL: domain conversion object entry Lint: " ++ showSDoc configured (vcat (bagToList errors)))
+            nat <- case find ((== "Nat") . occNameString . nameOccName . tyConName) (mg_tcs guts) of
+                Just tycon -> pure tycon
+                Nothing -> fail "FAIL: missing opaque object Nat"
+            vec <- case find ((== "Vec") . occNameString . nameOccName . tyConName) (mg_tcs guts) of
+                Just tycon -> pure tycon
+                Nothing -> fail "FAIL: missing opaque object Vec"
+            let natTy = mkTyConTy nat
+                fnTy = mkFunctionType ManyTy natTy natTy
+                a = mkTyVar (mkSystemName (unique 16100) (mkTyVarOcc "opaque_obj_a")) liftedTypeKind
+                b = mkTyVar (mkSystemName (unique 16101) (mkTyVarOcc "opaque_obj_b")) liftedTypeKind
+                templateF = local 16102 "object_phi_f" fnTy
+                templateN = local 16103 "object_phi_n" natTy
+                vector element function index =
+                    mkTyConApp vec [element, TermAppTy function (TermVarTy index)]
+                phi element =
+                    mkDepFunTy templateF
+                        $ mkDepFunTy templateN
+                        $ mkFunctionType ManyTy (vector element templateF templateN)
+                        $ mkFunctionType ManyTy element element
+                q = proof 16104 (phi (mkTyVarTy a)) (phi (mkTyVarTy b))
+                h = local 16105 "object_opaque_h" (phi (mkTyVarTy a))
+                f = local 16106 "object_actual_f" fnTy
+                n = local 16107 "object_actual_n" natTy
+                kernelRhs =
+                    mkLams [a, b, q, h, f, n] $
+                        mkApps (Cast (Var h) (SubCo (mkCoVarCo q))) [Var f, Var n]
+                kernelTy =
+                    mkInfForAllTys [a, b]
+                        $ mkFunctionType ManyTy (varType q)
+                        $ mkFunctionType ManyTy (phi (mkTyVarTy a)) (phi (mkTyVarTy b))
+                kernelName =
+                    mkExternalName
+                        (unique 16108)
+                        (mkModule mainUnit (mkModuleName "Main"))
+                        (mkVarOcc "opaqueWholePiKernel")
+                        noSrcSpan
+                kernel =
+                    setIdUnfolding
+                        (setInlinePragma (mkExportedVanillaId kernelName kernelTy) neverInlinePragma)
+                        NoUnfolding
+                workerF = local 16109 "object_worker_f" fnTy
+                workerN = local 16110 "object_worker_n" natTy
+                workerVector = local 16111 "object_worker_vector" (vector intTy workerF workerN)
+                workerAnswer = local 16112 "object_worker_answer" intTy
+                keep = mkLams [workerF, workerN, workerVector, workerAnswer] (Var workerAnswer)
+                actualF = local 16113 "object_closed_f" fnTy
+                actualN = local 16114 "object_closed_n" natTy
+                bottomF = App (Var (helper bindings "bottomFunction")) (Type fnTy)
+                bottomVector =
+                    App
+                        (Var (helper bindings "bottomVec"))
+                        (Type (TermAppTy actualF (TermVarTy actualN)))
+                closedCall =
+                    mkApps
+                        (Var kernel)
+                        [ Type intTy
+                        , Type intTy
+                        , Coercion (mkNomReflCo (phi intTy))
+                        , keep
+                        , Var actualF
+                        , Var actualN
+                        , bottomVector
+                        , mkIntExpr (targetPlatform configured) 42
+                        ]
+                opaqueExpression =
+                    Let (NonRec actualF bottomF)
+                        $ Let (NonRec actualN (Var (helper bindings "bottomNat")))
+                        $ App (Var (helper bindings "observeInt")) closedCall
+                checkKernel stage program = case filter (named "opaqueWholePiKernel" . fst) (flattenBinds program) of
+                    [(binder, rhs)] ->
+                        unless
+                            ( idType binder `eqType` kernelTy
+                                && exprType rhs `eqType` kernelTy
+                                && hasNativeDependentExpr rhs
+                                && opaquePiCastIsScoped rhs
+                            )
+                            $ fail ("FAIL: opaque object kernel type or scoped cast after " ++ stage)
+                    _ -> fail ("FAIL: opaque object kernel is not unique after " ++ stage)
+            unless (templateF /= f && templateN /= n && a /= b) $
+                fail "FAIL: opaque object endpoint and actual binders are not distinct"
+            forM_ [("scalar entry", expression), ("opaque kernel", kernelRhs), ("opaque entry", opaqueExpression)] $ \(label, rhs) -> do
+                unless (hasNativeDependentExpr rhs) $
+                    fail ("FAIL: " ++ label ++ " lost native forms")
+                case lintExpr (initLintConfig configured (kernel : bindings)) rhs of
+                    Nothing -> pure ()
+                    Just errors -> fail ("FAIL: " ++ label ++ " Lint: " ++ showSDoc configured (vcat (bagToList errors)))
+            unless
+                ( exprType expression `eqType` idType (helper bindings "entry")
+                    && exprType opaqueExpression `eqType` idType (helper bindings "opaqueEntry")
+                    && exprType kernelRhs `eqType` kernelTy
+                )
+                $ fail "FAIL: domain conversion object entry or abstract kernel type mismatch"
             let replacePair (binder, rhs)
                     | isEntry binder = (setIdUnfolding binder NoUnfolding, expression)
+                    | isOpaqueEntry binder = (setIdUnfolding binder NoUnfolding, opaqueExpression)
                     | otherwise = (binder, rhs)
                 replace (NonRec binder rhs) = uncurry NonRec (replacePair (binder, rhs))
                 replace (Rec pairs) = Rec (map replacePair pairs)
-                injected = guts{mg_binds = map replace (mg_binds guts)}
-            unless (exprType expression `eqType` idType (helper bindings "entry")) $
-                fail "FAIL: domain conversion object entry type mismatch"
+                injected = guts{mg_binds = NonRec kernel kernelRhs : map replace (mg_binds guts)}
+            checkKernel "injection" (mg_binds injected)
             simplified <- hscSimplify environment [] injected
             unless (any (\(binder, rhs) -> isEntry binder && hasNativeDependentExpr rhs) (flattenBinds (mg_binds simplified))) $
                 fail "FAIL: domain conversion object entry lost native forms before CorePrep"
+            checkKernel "simplification" (mg_binds simplified)
             (code, _) <- hscTidy environment simplified
+            checkKernel "tidying" (cg_binds code)
             (assembly, stub, foreigns, _, _) <- hscGenHardCode environment code (GHC.ms_location summary) assemblyPath
+            existsDump <- doesFileExist prepDumpPath
+            unless existsDump $ fail "FAIL: opaque object actual CorePrep dump is missing"
+            actualPrepDump <- readFile prepDumpPath
+            let startsKernel line = line == "opaqueWholePiKernel" || "opaqueWholePiKernel =" `isPrefixOf` line
+                kernelDump = unlines $ takeWhile (not . null) $ dropWhile (not . startsKernel) (lines actualPrepDump)
+            unless
+                ( all
+                    (`isInfixOf` kernelDump)
+                    ["opaqueWholePiKernel", "@opaque_obj_a", "@opaque_obj_b", "foreach", "`cast`", "Sub"]
+                )
+                $ fail "FAIL: actual object CorePrep dump lost the abstract opaque kernel cast"
+            writeFile (directory </> "opaque-whole-pi-prep-binding.core") kernelDump
             unless (isNothing stub && null foreigns) $
                 fail "FAIL: unexpected domain conversion object foreign output"
             object <- compileFile environment NoStop (assembly, Nothing)
@@ -5554,7 +5694,7 @@ runDomainConversionObjectCheck libdir = do
                     oneShot environment NoStop [(path, Just StopLn)]
                 Nothing -> fail "FAIL: domain conversion assembly produced no object path"
     (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
-    unless (status == ExitSuccess && actual == "42\n" && null errors) $
+    unless (status == ExitSuccess && actual == "42\n42\n" && null errors) $
         fail ("FAIL: domain conversion object result: " ++ show (status, actual, errors))
 
 -- | Lint a closed native expression before it reaches the backend API.
@@ -5620,6 +5760,7 @@ runChecks = do
             Right actual -> fail ("FAIL: choose bottom returned " ++ show actual)
     liftIO $ runNatChecks environment flags bindings tycons
     liftIO $ runDomainConversionChecks environment flags bindings tycons
+    liftIO $ runOpaquePiWholeCastChecks environment flags bindings tycons
     runSourceChecks
     runSourceRejectChecks
 
@@ -6111,3 +6252,206 @@ runExportedFunctionSignatureModuleChecks libdir = do
     unless (not (null declaration) && ") where" `elem` declaration) $
         fail "FAIL: PackedVecLibrary module header changed"
     runModuleCase libdir "exported-function-signature-source" "NativeFunctionSignatureAPI" producer consumer expected
+
+{- Note [Opaque retained function casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Keep the two payload types distinct while checking the abstract kernel. The
+nominal proof is a scoped CoVar. Its value cast must survive direct CorePrep
+without becoming a structured congruence proof. Check the full expression type
+and the actual lexical binders after preparation. The cast-only kernel has no
+new runtime lambda. It must preserve a bottom worker's WHNF behavior.
+
+Only the runtime caller supplies Int at both payloads and a reflexivity proof.
+That execution cannot by itself establish opacity during typed preparation.
+The object control checks a separate abstract NOINLINE binding in the actual
+object pipeline. These checks add no function eta equality or proof projection.
+-}
+
+-- | Check an opaque whole-function cast before closing its abstract payload types.
+runOpaquePiWholeCastChecks :: HscEnv -> DynFlags -> [Id] -> [TyCon] -> IO ()
+runOpaquePiWholeCastChecks environment flags bindings tycons = do
+    vec <- named "Vec"
+    nat <- named "Nat"
+    config <- initCorePrepConfig environment
+    let nativeConfig =
+            config
+                { cp_allowNativeDependent = True
+                , cp_arityOpts = Nothing
+                , cp_specEval = False
+                , cp_specEvalDFun = False
+                }
+        natTy = mkTyConTy nat
+        fnTy = mkFunctionType ManyTy natTy natTy
+        a = mkTyVar (mkSystemName (unique 16000) (mkTyVarOcc "opaque_a")) liftedTypeKind
+        b = mkTyVar (mkSystemName (unique 16001) (mkTyVarOcc "opaque_b")) liftedTypeKind
+        -- Endpoint templates and actual operands have DIFFERENT Uniques.
+        templateF = local 16002 "phi_f" fnTy
+        templateN = local 16003 "phi_n" natTy
+        vector element function index =
+            mkTyConApp vec [element, TermAppTy function (TermVarTy index)]
+        phi element =
+            mkDepFunTy templateF
+                $ mkDepFunTy templateN
+                $ mkFunctionType ManyTy (vector element templateF templateN)
+                $ mkFunctionType ManyTy element element
+        q = proof 16004 (phi (mkTyVarTy a)) (phi (mkTyVarTy b))
+        h = local 16005 "opaque_h" (phi (mkTyVarTy a))
+        f = local 16006 "actual_f" fnTy
+        n = local 16007 "actual_n" natTy
+        prefix = [a, b, q, h]
+        casted = Cast (Var h) (SubCo (mkCoVarCo q))
+        raws =
+            [ (0, mkLams prefix casted)
+            , (1, mkLams (prefix ++ [f]) (App casted (Var f)))
+            , (2, mkLams (prefix ++ [f, n]) (mkApps casted [Var f, Var n]))
+            ]
+        wf = local 16008 "worker_f" fnTy
+        wn = local 16009 "worker_n" natTy
+        vx = local 16010 "worker_vec" (vector intTy wf wn)
+        answer = local 16011 "worker_answer" intTy
+        vecCase = local 16012 "worker_vec_case" (varType vx)
+        nCase = local 16013 "worker_n_case" natTy
+        keep = mkLams [wf, wn, vx, answer] (Var answer)
+        demandVec =
+            mkLams [wf, wn, vx, answer] $
+                Case (Var vx) vecCase intTy [Alt DEFAULT [] (Var answer)]
+        demandN =
+            mkLams [wf, wn, vx, answer] $
+                Case (Var wn) nCase intTy [Alt DEFAULT [] (Var answer)]
+        runtimeH = local 16014 "closed_h" (phi intTy)
+        bottom ty = App (Var (helper bindings "bottomFunction")) (Type ty)
+        bottomVector =
+            App
+                (Var (helper bindings "bottomVec"))
+                (Type (TermAppTy f (TermVarTy n)))
+        instantiate count prepared =
+            mkApps prepared $
+                [Type intTy, Type intTy, Coercion (mkNomReflCo (phi intTy)), Var runtimeH]
+                    ++ take count [Var f, Var n]
+        force expression =
+            mkApps
+                (Var (helper bindings "force"))
+                [Type (exprType expression), expression]
+        observe expression = App (Var (helper bindings "observeInt")) expression
+        close worker actualHead seed action =
+            Let (NonRec runtimeH worker)
+                $ Let (NonRec f actualHead)
+                $ mkApps (Var (helper bindings "driveNat")) [Lam n action, seed]
+        expectBottom :: String -> String -> CoreExpr -> IO ()
+        expectBottom label marker expression = do
+            outcome <- try (execute environment flags label expression) :: IO (Either SomeException String)
+            case outcome of
+                Left exception | marker `isInfixOf` displayException exception -> pure ()
+                Left exception -> fail ("FAIL: " ++ label ++ "; wrong exception: " ++ displayException exception)
+                Right actual -> fail ("FAIL: " ++ label ++ "; returned " ++ show actual)
+        -- Actual runtime operands are local variables; globals occur only in RHSs/seeds.
+        bottomN = Var (helper bindings "bottomNat")
+        bottomF = bottom fnTy
+        identityF = Var (helper bindings "opaqueNat")
+        payload = mkIntExpr (targetPlatform flags) 42
+    forM_ raws $ \(count, raw) -> do
+        lintNative flags ("opaque whole-Pi raw " ++ show count) raw
+        prepared <- corePrepExpr (hsc_logger environment) nativeConfig raw
+        lintNative flags ("opaque whole-Pi prepared " ++ show count) prepared
+        unless (eqType (exprType raw) (exprType prepared)) $
+            fail "FAIL: opaque whole-Pi preparation changed its type"
+        unless (opaquePiCastIsScoped raw && opaquePiCastIsScoped prepared) $
+            fail "FAIL: opaque whole-Pi cast lost its scoped abstract evidence"
+        let application = instantiate count prepared
+        actual <-
+            execute environment flags "opaque whole-Pi keep WHNF" $
+                close keep bottomF bottomN (force application)
+        unless (actual == "forced") $ fail "FAIL: opaque whole-Pi keep WHNF"
+        expectBottom ("opaque whole-Pi bottom worker WHNF " ++ show count) "native-bottom-function" $
+            close (bottom (phi intTy)) identityF bottomN (force application)
+        if count /= 2
+            then pure ()
+            else do
+                let observed = observe (mkApps application [bottomVector, payload])
+                actualValue <-
+                    execute environment flags "opaque whole-Pi ignored operands" $
+                        close keep bottomF bottomN observed
+                unless (actualValue == "42") $ fail "FAIL: opaque whole-Pi ignored operands"
+                expectBottom "opaque whole-Pi demanded vector" "native-bottom-vector" $
+                    close demandVec identityF bottomN observed
+                expectBottom "opaque whole-Pi demanded index" "native-bottom-nat" $
+                    close demandN identityF bottomN observed
+  where
+    named :: String -> IO TyCon
+    named label = case find ((== label) . occNameString . nameOccName . tyConName) tycons of
+        Just tycon -> pure tycon
+        Nothing -> fail ("FAIL: opaque whole-Pi missing type constructor " ++ label)
+
+{- | Find nominal CoVar evidence between two distinct scoped payload types.
+This accepts only the expected SubCo/CoVarCo value cast. Input Lint is mandatory.
+-}
+opaquePiCastIsScoped :: CoreExpr -> Bool
+opaquePiCastIsScoped = go emptyVarSet emptyVarSet
+  where
+    -- \| Replace a shadowed Unique before extending the lexical binder sets.
+    extend :: (TyVarSet, CoVarSet) -> Var -> (TyVarSet, CoVarSet)
+    extend (typeScope, coScope) binder
+        | isTyVar binder = (extendVarSet types binder, cos)
+        | isCoVar binder = (types, extendVarSet cos binder)
+        | otherwise = (types, cos)
+      where
+        types = delVarSet typeScope binder
+        cos = delVarSet coScope binder
+
+    -- \| Inspect a cast only under the binders that scope over that expression.
+    candidate :: TyVarSet -> CoVarSet -> Coercion -> Bool
+    candidate types cos (SubCo nominal@(CoVarCo actualQ)) =
+        case lookupVarSet cos actualQ of
+            Just scopedQ ->
+                varType scopedQ `eqType` varType actualQ
+                    && coercionRole nominal == Nominal
+                    && retainedEndpoint left
+                    && retainedEndpoint right
+                    && not (left `eqType` right)
+                    && sizeVarSet leftPayloads == 1
+                    && sizeVarSet rightPayloads == 1
+                    && disjointVarSet leftPayloads rightPayloads
+                    && allVarSet scopedPayload (leftPayloads `unionVarSet` rightPayloads)
+            Nothing -> False
+      where
+        left = coercionLKind nominal
+        right = coercionRKind nominal
+        leftPayloads = filterVarSet isTyVar (tyCoVarsOfType left)
+        rightPayloads = filterVarSet isTyVar (tyCoVarsOfType right)
+        scopedPayload variable = case lookupVarSet types variable of
+            Just bound ->
+                tyVarKind bound `eqType` tyVarKind variable
+                    && tyVarKind bound `eqType` liftedTypeKind
+            Nothing -> False
+    candidate _ _ _ = False
+
+    -- \| Require the two retained binder layers used by this fixture.
+    retainedEndpoint :: Type -> Bool
+    retainedEndpoint (DepFunTy function (DepFunTy index _)) =
+        isNativeIndexFunctionId function && isNativeIndexId index
+    retainedEndpoint _ = False
+
+    -- \| Traverse term children with the lexical scope of each child.
+    go :: TyVarSet -> CoVarSet -> CoreExpr -> Bool
+    go types cos expression = case expression of
+        Lam binder body ->
+            let (types', cos') = extend (types, cos) binder
+             in go types' cos' body
+        App function argument -> go types cos function || go types cos argument
+        Let (NonRec binder rhs) body ->
+            let (types', cos') = extend (types, cos) binder
+             in go types cos rhs || go types' cos' body
+        Let (Rec pairs) body ->
+            let (types', cos') = foldl extend (types, cos) (map fst pairs)
+             in any (go types' cos' . snd) pairs || go types' cos' body
+        Case scrut binder _ alternatives ->
+            go types cos scrut || any (alternative (extend (types, cos) binder)) alternatives
+        Cast body co -> candidate types cos co || go types cos body
+        Tick _ body -> go types cos body
+        _ -> False
+
+    -- \| Keep alternative fields local to their own branch.
+    alternative :: (TyVarSet, CoVarSet) -> CoreAlt -> Bool
+    alternative scope (Alt _ binders body) =
+        let (types, cos) = foldl extend scope binders
+         in go types cos body
