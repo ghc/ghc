@@ -17,14 +17,14 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The current increment is [M61](#m61-opaque-whole-function-cast-lowering), owned by
-[R05 dependent Core](roadmap/R05-dependent-core.md). It measures application
-through opaque whole-function evidence. M59 and M60 are audited and published.
+The current increment is [M62](#m62-complete-retained-function-type-arguments),
+owned by [R03 dependent products](roadmap/R03-dependent-products.md). It admits
+complete retained-function types in explicit type arguments. M61 is audited
+and published.
 The user
 resumed GHC execution on 2026-11-16 at 17:53 CET.
 
-The queue then completes a bounded type-argument position. The next substantial foundation
-is [R23 matchability](roadmap/R23-unsaturated-type-families.md), followed by
+The next substantial foundation is [R23 matchability](roadmap/R23-unsaturated-type-families.md), followed by
 [R05 generic-domain metadata](roadmap/R05-dependent-core.md). The roadmap
 separates this chosen order from actual feature prerequisites. Keep ordinary
 evaluation, function promotion, first-class sums and the remaining promotion
@@ -4272,3 +4272,70 @@ The evidence manifest freezes all 491 files in `native-opaque-whole-cast-*`.
 The unchanged 16-work, 22-version paper ledger retains its reading scopes.
 This publication checkpoint changes only status documents. R05 and the main
 goal remain open.
+
+## M62: complete retained-function type arguments
+
+Roadmap owner: R03 dependent products. Related card: R05 dependent Core.
+Status: specified. The lifted-consumer baseline rejects two complete explicit
+type arguments with located GHC-83605 errors in both rebuilt stages.
+
+Retained function types already have kind Type. Named complete signatures can
+form them, and immutable known-value matching can select them. A written type
+argument currently rejects its function binder in `tcHsType` because that path
+always calls `tcCheckRetainedType False`. The baseline uses ordinary lifted
+`forceValue` and `raise` helpers. It isolates this formation gate from direct
+`seq` representation checking. Its records are in
+`_build/verification/native-complete-function-type-arguments-baseline-v1/`.
+
+Use the caller's existing type-checking mode and lexical index environment.
+Record whether the complete visible type argument has named or anonymous
+wildcards. Grant function-binder permission only for a complete explicit
+argument in TypeLevel mode. Carry this context through ordinary nested type
+checking. Do not select permission from the outer printed syntax alone.
+Kinds and other signature contexts retain their current policies.
+
+Move the existing anonymous-wildcard syntax predicates from `Tc.Gen.Sig` to
+`GHC.Hs.Type`. Reuse them for signatures and type arguments. Keep their complete
+walk through binder kinds, multiplicities, contexts and nested types. Named
+wildcards remain a separate check of the renamer's wildcard list.
+An ordinary visible wildcard argument without native indices or function
+binders must retain its existing behavior.
+
+```haskell
+forceValue :: forall a. a -> IO ()
+forceFull :: (foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
+             -> Vec Int (f n)) -> IO ()
+forceFull worker =
+    forceValue @(foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
+                 -> Vec Int (f n)) worker
+```
+
+- [ ] Share the existing anonymous-wildcard predicates. Preserve ordinary
+      signature completeness. Add no second syntax traversal for the same rule.
+- [ ] Carry whole-argument completeness in the private `TcTyMode`. Default it
+      to absent outside the visible type-argument entry point. Keep it distinct
+      from the wildcard mode and runtime-index environment. Reset it in fresh
+      kind-checking modes. Preserve caller scope and source spans.
+- [ ] Permit complete retained-function binders through this path, including
+      nested ordinary type applications and kind-annotated value types.
+      Retain closed-domain, Many, staging, body-kind and native-meta checks.
+- [ ] Report incomplete native type arguments accurately. Check anonymous and
+      named wildcards before, inside and after a retained telescope. Keep
+      ordinary visible wildcards, unsupported contexts and wrong kinds separate.
+- [ ] Measure lifted good/bottom worker WHNF, ignored function arguments and
+      runtime applications after explicit selection. Check nested container
+      demand, ambient runtime indices, distinct names and scope rejection.
+      Measure direct `seq` and outer Quick Look as separate controls.
+- [ ] Extend the existing example library, API fixture and maintained Showcase.
+      Preserve the old output prefixes and add no committed test files.
+- [ ] Build both stages and run the selected API, source, runtime, rejection,
+      Showcase and registered checks. Bind records to their actual inputs.
+- [ ] Update the roadmap, Core contract and references. Audit and publish the
+      bounded result. Keep R03 and the full goal open.
+
+The prior art is GHC's existing type-application and completeness checking,
+the selected VTA paper, and Agda's Pi formation and expected-type rules. See
+[the reference ledger](REFERENCES.md#complete-retained-function-type-arguments).
+This increment adds no inferred runtime quantifier, mutable native-meta
+assignment, general Quick Look, generic index domain, singleton layer or Core
+constructor. Existing matchability and generic-domain obligations stay open.

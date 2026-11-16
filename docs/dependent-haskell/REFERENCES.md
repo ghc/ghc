@@ -3680,6 +3680,29 @@ step, not completed dependent subsumption. The seven-work, nine-PDF ledger is
 unchanged. No new whole-paper reading or theorem replay is claimed.
 
 
+## Complete retained-function type arguments
+
+M62 reuses GHC's visible type-application entry point and anonymous-wildcard
+syntax walk. The original `Tc.Gen.Sig` file at the M61 checkpoint has Git blob
+`e646bd1b26ca74404542d1734b3ff1410243e070`. Its lines 299–344 inspect nested
+type arguments, binder kinds, multiplicities and constraints. The new shared
+predicate retains that rule. Named wildcard binders remain the renamer's list.
+
+The selected [Visible Type Application paper](https://doi.org/10.1007/978-3-662-49498-1_10)
+provides the explicit-choice and bidirectional-checking comparison. The earlier
+[retained-type-argument discussion](#retained-function-types-as-equality-operands)
+records Agda Pi formation and expected-type checking. Neither supplies a proof
+for this fork's inference or runtime representation. This pass claims no new
+paper reading. The version-specific reading scopes remain in the paper ledger.
+
+The permission belongs to a complete explicit type argument. It is carried
+through the existing checker so nested type-constructor operands use the same
+formation rule. It does not grant permission in a kind, method signature,
+SPECIALISE pragma, hs-boot declaration or other unsupported signature context.
+Whole-argument completeness includes wildcards outside the retained telescope.
+Do not infer permission from the wildcard mode or an outer syntax shape alone.
+Existing lexical scope, staged-code checks and native-meta restrictions remain.
+
 ## Opaque whole-function cast lowering
 
 M61 first measures the existing whole-cast path. It uses the selected D/DC
