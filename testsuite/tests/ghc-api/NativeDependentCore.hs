@@ -102,6 +102,7 @@ main = do
             runTypeMapChecks
             runCaseChecks dflags
             runNatChecks dflags
+            runParameterizedDomainChecks dflags
             runRetainedFieldChecks dflags
             runDepFunCoChecks dflags
             runIfaceChecks libdir
@@ -630,6 +631,160 @@ retainedIfaceParameterizedPackage base = package
             []
             (mkDataConWorkId (name (base + 5) (mkDataConWorkerOcc occurrence)) constructor)
             NoDataConRep
+
+{- Note [Parameterized domain API controls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The domain query checks each recursive path at its full static arguments.
+The sibling control uses two distinct Maybe instances on separate paths.
+The growing and permuting controls change the arguments on one active path.
+A closed function type is permitted as a phantom parameter. A function field
+is not a scalar index. These controls test that distinction separately.
+-}
+
+-- | Build an ordinary parameterized domain with independently specified fields.
+parameterizedDomainFixture :: Int -> [Kind] -> ([TyVar] -> TyCon -> [[Type]]) -> TyCon
+parameterizedDomainFixture base kinds fieldTypes = owner
+  where
+    modu = mkModule mainUnit (mkModuleName "ParameterizedIndexAPI")
+    name n occ = mkExternalName (unique n) modu occ noSrcSpan
+    parameters = zipWith (\n kind -> mkTyVar (mkSystemName (unique n) (mkTyVarOcc ("a" ++ show n))) kind) [base + 10 ..] kinds
+    binders = map mkAnonTyConBinder parameters
+    owner =
+        mkAlgTyCon
+            (name base (mkTcOcc ("Domain" ++ show base)))
+            (mkTyConKind binders liftedTypeKind)
+            binders
+            0
+            liftedTypeKind
+            (map (const Nominal) parameters)
+            Nothing
+            []
+            (mkDataTyConRhs constructors)
+            (VanillaAlgTyCon (name (base + 1) (mkVarOcc ("domain_rep" ++ show base))))
+            False
+    constructors = zipWith constructor [1 ..] (fieldTypes parameters owner)
+    constructor tag fields = con
+      where
+        n = base + 100 + 10 * tag
+        label = "C" ++ show n
+        occurrence = mkDataOcc label
+        con =
+            mkDataCon
+                (name n occurrence)
+                False
+                (name (n + 2) (mkVarOcc (label ++ "_rep")))
+                (map (const (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)) fields)
+                (map (const HsLazy) fields)
+                (map (const NotMarkedStrict) fields)
+                []
+                parameters
+                []
+                noConcreteTyVars
+                (map (`Bndr` Specified) parameters)
+                []
+                []
+                (map (Scaled OneTy) fields)
+                (mkTyConApp owner (map mkTyVarTy parameters))
+                NoPromInfo
+                owner
+                tag
+                []
+                (mkDataConWorkId (name (n + 1) (mkDataConWorkerOcc occurrence)) con)
+                NoDataConRep
+
+{- | Check ground domain instantiation, constructor indices and nominal branches.
+These quiet controls preserve the existing one-line golden output.
+-}
+runParameterizedDomainChecks :: DynFlags -> IO ()
+runParameterizedDomainChecks dflags = do
+    let (nat, _, _) = peanoNat
+        natTy = mkTyConTy nat
+        listBool = mkListTy boolTy
+        listNat = mkListTy natTy
+        maybeNat = mkTyConApp maybeTyCon [natTy]
+        xs = local 12000 "list_index" listBool
+        ys = local 12001 "other_list_index" listBool
+        b = local 12002 "list_head" boolTy
+        tailId = local 12003 "list_tail" listBool
+        natTail = local 12004 "nat_tail" listNat
+        binder = local 12005 "list_beta" listBool
+        nilExpr = mkApps (Var (dataConWorkId nilDataCon)) [Type boolTy]
+        nilIndex = mkTyConApp (promoteDataCon nilDataCon) [boolTy]
+        consExpr = mkApps (Var (dataConWorkId consDataCon)) [Type boolTy, Var b, Var tailId]
+        consIndex = mkTyConApp (promoteDataCon consDataCon) [boolTy, TermVarTy b, TermVarTy tailId]
+        scope = [xs, ys, b, tailId]
+    forM_ [("ground List Bool", listBool), ("ground Maybe Nat", maybeNat)] $ \(label, domain) ->
+        check label (isNativeIndexType domain)
+    check "ground List instances retain their full static domain" (not (eqType listBool listNat))
+    forM_ [("empty list", nilExpr, nilIndex), ("cons list", consExpr, consIndex), ("polymorphic nullary beta", App (Lam binder (Var binder)) nilExpr, nilIndex)] $ \(label, expr, index) -> do
+        lintAccepts dflags label scope expr
+        checkType dflags (label ++ " runtime type") listBool (exprType expr)
+        check (label ++ " index conversion") (maybe False (eqType index) (exprToNativeIndex expr))
+        checkType dflags (label ++ " index kind") listBool (typeKind index)
+    let rebuilt = mapNativeIndex id consExpr
+    case collectArgs rebuilt of
+        (Var worker, [Type argument, Var headId, Var restId]) -> do
+            check "constructor reconstruction preserves worker and actual fields" (worker == dataConWorkId consDataCon && headId == b && restId == tailId)
+            checkType dflags "constructor reconstruction preserves erased Bool argument" boolTy argument
+        _ -> fail "FAIL: parameterized constructor reconstruction lost its erased argument"
+    let listPayload = local 12015 "list_payload" (mkFunctionType ManyTy (mkTyConApp eqTyCon [listBool, TermVarTy xs, TermVarTy xs]) intTy)
+        listKeep = Lam xs (Lam listPayload (Var listPayload))
+    lintAccepts dflags "retained list-domain worker" [] listKeep
+    lintRejects dflags "retained application rejects List Nat at List Bool" [natTail] (App listKeep (Var natTail))
+    let wrongCons = mkApps (Var (dataConWorkId consDataCon)) [Type natTy, Var b, Var natTail]
+    lintRejects dflags "constructor static argument checks its instantiated fields" [b, natTail] wrongCons
+    check "index conversion rejects a mismatched instantiated field" (case exprToNativeIndex wrongCons of Nothing -> True; _ -> False)
+    check "constructor lookup rejects the wrong parent" (case nativeIndexDataConTyArgs maybeNat consDataCon of Nothing -> True; _ -> False)
+    let caseBinder = local 12006 "list_case" listBool
+        headId = local 12007 "pattern_head" boolTy
+        restId = local 12008 "pattern_tail" listBool
+        nilProof = proof 12009 (TermVarTy xs) nilIndex
+        consPattern = mkTyConApp (promoteDataCon consDataCon) [boolTy, TermVarTy headId, TermVarTy restId]
+        consProof = proof 12010 (TermVarTy xs) consPattern
+        listCase cv =
+            Case
+                (Var xs)
+                caseBinder
+                boolTy
+                [ Alt (DataAlt nilDataCon) [nilProof] (Var (dataConWorkId falseDataCon))
+                , Alt (DataAlt consDataCon) [headId, restId, cv] (Var headId)
+                ]
+        wrongProof = proof 12011 (TermVarTy xs) (mkTyConApp (promoteDataCon consDataCon) [natTy, TermVarTy headId, TermVarTy restId])
+    lintAccepts dflags "list constructor branch evidence has erased arguments and actual fields" [xs] (listCase consProof)
+    lintRejects dflags "list branch evidence cannot change the static parameter" [xs] (listCase wrongProof)
+    let f = local 12012 "list_function" (mkFunctionType ManyTy listBool maybeNat)
+        g = local 12013 "list_function" (idType f)
+        call = TermAppTy f (TermVarTy xs)
+        subst = CoreSubst.extendIdSubst (CoreSubst.mkEmptySubst (mkInScopeSet (mkVarSet [f, g, xs]))) f (Var g)
+        cv = proof 12014 (TermVarTy xs) (TermVarTy ys)
+        co = mkTermAppCo f (mkCoVarCo cv)
+    check "opaque head accepts applied scalar input and output" (isNativeIndexFunctionId f)
+    checkType dflags "function head substitution preserves the full applied domain" (TermAppTy g (TermVarTy xs)) (CoreSubst.substTy subst call)
+    lintAccepts dflags "applied-domain forward nominal call congruence" [f, xs, ys, cv] (Coercion co)
+    checkType dflags "applied-domain call result kind" maybeNat (coercionLKind (mkKindCo co))
+    let phantom = parameterizedDomainFixture 13000 [liftedTypeKind] (\_ _ -> [[]])
+        actualFunction = parameterizedDomainFixture 14000 [liftedTypeKind] (\[a] _ -> [[mkFunctionType ManyTy (mkTyVarTy a) (mkTyVarTy a)]])
+        tree = parameterizedDomainFixture 15000 [liftedTypeKind] (\[a] self -> [[mkTyVarTy a], [mkTyConApp self [mkTyVarTy a], mkTyConApp self [mkTyVarTy a]]])
+        growing = parameterizedDomainFixture 16000 [liftedTypeKind] (\[a] self -> [[mkTyConApp self [mkListTy (mkTyVarTy a)]]])
+        permuting = parameterizedDomainFixture 17000 [liftedTypeKind, liftedTypeKind] (\[a, c] self -> [[mkTyConApp self [mkTyVarTy c, mkTyVarTy a]]])
+        siblings = parameterizedDomainFixture 18000 [liftedTypeKind, liftedTypeKind] (\[a, c] _ -> [[mkTyConApp maybeTyCon [mkTyVarTy a], mkTyConApp maybeTyCon [mkTyVarTy c]]])
+        empty = parameterizedDomainFixture 19000 [liftedTypeKind] (\_ _ -> [])
+        wrongKind = parameterizedDomainFixture 20000 [boolTy] (\_ _ -> [])
+        fnTy = mkFunctionType ManyTy boolTy boolTy
+        domains =
+            [ ("phantom closed function parameter", mkTyConApp phantom [fnTy], True)
+            , ("actual function field", mkTyConApp actualFunction [boolTy], False)
+            , ("uniform recursive Tree Bool", mkTyConApp tree [boolTy], True)
+            , ("growing recursive arguments", mkTyConApp growing [boolTy], False)
+            , ("permuting recursive arguments", mkTyConApp permuting [boolTy, natTy], False)
+            , ("independent sibling specializations", mkTyConApp siblings [boolTy, natTy], True)
+            , ("empty applied data domain", mkTyConApp empty [boolTy], True)
+            , ("unsaturated empty domain", mkTyConTy empty, False)
+            , ("empty non-Type parameter kind", mkTyConApp wrongKind [constructorIndex trueDataCon], False)
+            ]
+    forM_ domains $ \(label, domain, expected) -> do
+        outcome <- timeout 2000000 (evaluate (isNativeIndexType domain))
+        check (label ++ "; bounded domain query") (outcome == Just expected)
 
 -- | Check recursive constructor indices, substitutions, and field-scoped proofs.
 runNatChecks :: DynFlags -> IO ()

@@ -31,6 +31,7 @@ import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
 import qualified NativeMultiPackage as Packages
 import qualified OpaqueCallClient as Opaque
+import qualified ParameterizedIndexLibrary as Parameterized
 import PackedVecLibrary
 import qualified QualifiedPiLibrary as Qualified
 
@@ -379,6 +380,24 @@ laterArguments = do
     case equalPair of
         (equalFirst, separateLast) -> observe "equality context before a later retained index" (toList equalFirst, toList separateLast)
 
+-- | Retain ordinary parameterized values and check package and call demand.
+parameterizedDomains :: IO ()
+parameterizedDomains = do
+    listCell <- newIORef [True, False, True]
+    bs <- readIORef listCell
+    observe "runtime list as retained index" (toList (Parameterized.listVector bs))
+    observe "list-indexed package" (Parameterized.openListVector (Parameterized.packListVector bs))
+    natCell <- newIORef (S (S Z))
+    n <- readIORef natCell
+    observe "optional retained Nat" (Parameterized.optionalRoundtrip n)
+    treeCell <- newIORef (Parameterized.Node (Parameterized.Leaf True) (Parameterized.Leaf False))
+    tree <- readIORef treeCell
+    observe "runtime tree selects nested payload" (Parameterized.renderTree tree (Parameterized.treePayload tree))
+    _ <- evaluate (Parameterized.packListVector (error "unused retained list"))
+    observe "list package does not force its index" ()
+    observe "opaque call ignores retained list"
+        (Parameterized.observeListCall (\ignored -> S (S Z)) (error "unused opaque call list"))
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -390,3 +409,4 @@ main = do
     functionFields
     laterArguments
     alternatives
+    parameterizedDomains
