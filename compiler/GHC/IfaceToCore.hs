@@ -90,7 +90,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
-import GHC.Utils.Exception ( NonTermination(..), evaluate, try )
+import GHC.Utils.Exception ( NonTermination(..), evaluate )
 
 import GHC.Data.Bag
 import GHC.Data.Maybe
