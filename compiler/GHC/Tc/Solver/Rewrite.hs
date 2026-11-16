@@ -10,7 +10,7 @@
 
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteForErrors, rewriteArgsNom,
-   rewriteType
+   rewriteType, rewriteFamilyAxioms
  ) where
 
 import GHC.Prelude
@@ -118,6 +118,7 @@ runRewrite loc flav eq_rel thing_inside
                         , re_rewriters = rewriters_ref
                         , re_used_cos  = used_cos_ref
                         , re_native_binders = native_binders
+                        , re_fam_axioms_only = False
                         , re_zap_coercions = isEmptyVarSet native_binders
                                              && gopt Opt_ZapCoercions dflags }
        ; res <- runRewriteM thing_inside fmode
@@ -170,14 +171,15 @@ withNativeBinder b thing_inside
            , re_zap_coercions = False })
 {-# INLINE withNativeBinder #-}
 
--- | Skip an external evidence path beneath a retained runtime binder.
-withoutNativeBinder :: a -> RewriteM a -> RewriteM a
-withoutNativeBinder fallback thing_inside
+-- | Skip external evidence during axiom-only reduction or under a runtime binder.
+-- See Note [Solving retained function equalities] in GHC.Tc.Solver.Equality.
+withoutExternalEvidence :: a -> RewriteM a -> RewriteM a
+withoutExternalEvidence fallback thing_inside
   = mkRewriteM $ \env ->
-    if isEmptyVarSet (re_native_binders env)
+    if not (re_fam_axioms_only env) && isEmptyVarSet (re_native_binders env)
     then runRewriteM thing_inside env
     else return fallback
-{-# INLINE withoutNativeBinder #-}
+{-# INLINE withoutExternalEvidence #-}
 
 bumpReductionDepthRM :: Type -> RewriteM a -> RewriteM a
 bumpReductionDepthRM ty (RewriteM thing_inside)
@@ -329,6 +331,17 @@ rewriteType loc ty
                      -- (Shouldn't matter, if only Givens are present
                      -- anyway)
        ; return $ reductionReducedType redn }
+
+-- | Reduce family axioms at nominal role with the solver reduction-depth limit.
+-- See Note [Solving retained function equalities] in GHC.Tc.Solver.Equality.
+rewriteFamilyAxioms :: CtLoc -> TcType -> TcS Reduction
+rewriteFamilyAxioms loc ty
+  = do { (redn, rewriters) <- runRewrite loc Given NomEq $
+           mkRewriteM $ \env ->
+             runRewriteM (rewrite_one ty)
+               (env { re_fam_axioms_only = True, re_zap_coercions = False })
+       ; massert (isEmptyCoHoleSet rewriters)
+       ; return redn }
 
 {- *********************************************************************
 *                                                                      *
@@ -1099,7 +1112,7 @@ rewriteExactFamApp tc tys =
                      && not (univCoDepsHasHoles deps) -- (FAC_Holes)
                      ) $
                   -- NB: (FAC_Flag) is checked in 'extendFamAppCache'.
-                  withoutNativeBinder () $
+                  withoutExternalEvidence () $
                     liftTcS $ extendFamAppCache tc tys zapped_redn
 
               ; return zapped_redn
@@ -1193,7 +1206,7 @@ rewrite_exact_fam_app_step tc tys
 
          -- STEP 3: try the inerts
        ; flavour <- getFlavour
-       ; mb_eq <- withoutNativeBinder Nothing $
+       ; mb_eq <- withoutExternalEvidence Nothing $
                     liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
        ; case mb_eq of
          { Just (EqCt { eq_ev = inert_ev, eq_rhs = inert_rhs, eq_eq_rel = inert_eq_rel })
@@ -1846,7 +1859,8 @@ try_to_reduce tc tys tc_rewriters
                = return mb_redn
 
        ; result <- liftTcS $
-           if not (isEmptyVarSet (re_native_binders rewrite_env))
+           if re_fam_axioms_only rewrite_env
+              || not (isEmptyVarSet (re_native_binders rewrite_env))
            -- Global family axioms do not emit constraints or update caches.
            -- See Note [Rewriting retained dependent functions].
            then matchFam tc tys
@@ -1882,7 +1896,7 @@ try_to_reduce tc tys tc_rewriters
 -- headed by the given 'TyCon`.
 getTcPluginRewritersForTyCon :: TyCon -> RewriteM [TcPluginRewriter]
 getTcPluginRewritersForTyCon tc
-  = withoutNativeBinder [] $
+  = withoutExternalEvidence [] $
     liftTcS $ do { tcg_env <- getGblEnv
                  ; plugins <- readTcRef (tcg_plugins tcg_env)
                  ; let rewriters = rewriterTcMPlugins plugins
@@ -1978,11 +1992,13 @@ rewrite_tyvar2 :: TcTyVar -> CtFlavourRole -> RewriteM RewriteTvResult
 -- See Note [Stability of rewriting] in GHC.Tc.Solver.Monad
 
 rewrite_tyvar2 tv fr@(_, eq_rel)
-  = do { native_binders <- getRewriteEnvField re_native_binders
+  = do { axioms_only <- getRewriteEnvField re_fam_axioms_only
+       ; native_binders <- getRewriteEnvField re_native_binders
        ; ieqs <- liftTcS $ getInertEqs
        ; case lookupDVarEnv ieqs tv of
            Just equal_ct_list
-             | Just ct <- find (can_rewrite native_binders) equal_ct_list
+             | not axioms_only
+             , Just ct <- find (can_rewrite native_binders) equal_ct_list
              , EqCt { eq_ev = ctev, eq_lhs = TyVarLHS tv
                     , eq_rhs = rhs_ty, eq_eq_rel = ct_eq_rel } <- ct
              -> do { traceRewriteM "Following inert tyvar" $

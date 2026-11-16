@@ -377,6 +377,11 @@ data RewriteEnv
           -- See Note [Rewriting retained dependent functions]
           -- in GHC.Tc.Solver.Rewrite.
 
+       , re_fam_axioms_only :: !Bool
+          -- ^ Reduce family axioms without inert evidence, plugins or caches.
+          -- See Note [Solving retained function equalities]
+          -- in GHC.Tc.Solver.Equality.
+
        , re_zap_coercions :: !Bool
           -- ^ Whether to perform coercion zapping.
           --

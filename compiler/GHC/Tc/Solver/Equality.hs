@@ -37,7 +37,7 @@ import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness c
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
 import GHC.Core.Reduction
-import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
+import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Core
 
 import GHC.Types.Var
@@ -478,14 +478,20 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1@DepFunTy{} _ ty2@DepFunTy{} _
   = canEqReflexive ev eq_rel ty1
 
 -- See Note [Solving retained function equalities].
-can_eq_nc ces _rdr_env envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
   | bothRewritten ces
   , isWanted ev
   , isNativeIndexId b1, isNativeIndexId b2
-  , Reduction co1 domain1 <- normaliseType envs Nominal (varType b1)
-  , Reduction co2 domain2 <- normaliseType envs Nominal (varType b2)
-  , domain1 `tcEqType` domain2
-  = can_eq_nc_depfun ev eq_rel ty1 ty2 (co1 `mkTransCo` mkSymCo co2)
+  = if domain1 `tcEqType` domain2
+    then can_eq_nc_depfun ev eq_rel ty1 ty2 (mkNomReflCo domain1)
+    else do { Reduction co1 normal1 <- rewriteFamilyAxioms (ctEvLoc ev) domain1
+            ; Reduction co2 normal2 <- rewriteFamilyAxioms (ctEvLoc ev) domain2
+            ; if normal1 `tcEqType` normal2
+              then can_eq_nc_depfun ev eq_rel ty1 ty2 (co1 `mkTransCo` mkSymCo co2)
+              else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
+  where
+    domain1 = varType b1
+    domain2 = varType b2
 
 -- (EQNC2) Eager newtype decomposition (ReprEq only).
 -- Look for (N s1 .. sn) ~R# (N t1 .. tn)
@@ -785,6 +791,13 @@ closed scalar domains outside the runtime binder. The resulting proof delta
 has kind A ~N B. Use a fresh x :: A in both bodies. Replace the target binder
 by x cast through delta. The body proof then has the scope that DepFunCo needs.
 See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+
+Use reflexivity when the domains already agree. Otherwise use rewriteFamilyAxioms
+to reduce nominal family axioms with the solver reduction-depth limit. Do not
+use the pure normaliseType here: whole-Pi rewriting does not traverse the binder
+domain, and a recursive family in that domain can make normaliseType diverge.
+Disable inert evidence, plugins, caches and coercion zapping during this reduction.
+The domain proof must not introduce holes that the body solve does not track.
 
 Follow can_eq_nc_forall for ordinary body unification. Generate Wanteds at a
 deeper level and solve them synchronously in private inerts and a private work
