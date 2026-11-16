@@ -7,9 +7,11 @@ Later changes to proposal status, package bounds, branches, or documentation nee
 verification. A link to a mutable branch identifies the inspected source, not a
 permanent compatibility guarantee.
 The Pi normalization sources below were checked on 2026-11-13.
-Seven research works were fetched and read on 2026-11-14. See the
+The first seven research works were fetched and read on 2026-11-14. The
+roadmap review extends the collection on 2026-11-16 to sixteen works and
+twenty-two PDF versions. See the
 [paper reading ledger](papers/README.md) for page-specific findings and the
-[version manifest](papers/manifest.json) for all nine PDF hashes and reading
+[version manifest](papers/manifest.json) for PDF hashes and reading
 scopes. This includes selected thesis chapters, not the full thesis.
 
 See [the project overview](README.md) for the objective. See [the implementation
@@ -30,8 +32,9 @@ next implementation obligations:
 | [R23: unsaturated type families](roadmap/R23-unsaturated-type-families.md#prior-art-and-current-boundary) | Proposal #242, the higher-order type-level paper and the pinned 2024 implementation. Read the native integration correction with the draft. |
 
 These pages record the selected implementation sources, open questions and
-unexecuted controls. They do not change the reading scope of the older survey
-or the canonical PDF manifest. The dated ignored research cache retains the
+unexecuted controls. The paper ledger records additional versions and selective
+readings. It preserves the older version records and their reading scopes.
+The dated ignored research cache retains the
 larger link inventory and exact retrieval records. Keep the tracked summaries
 and primary links usable without that cache.
 

@@ -1,23 +1,36 @@
 # Dependent Haskell paper reading
 
-Read on 2026-11-14. The [manifest](manifest.json) records seven works and nine
-downloaded PDF versions. It contains source URLs, checksums, page counts and
+Read on 2026-11-14 through 2026-11-16. The [manifest](manifest.json) records
+sixteen works and twenty-two downloaded PDF versions. It contains source URLs,
+checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
 sections. No Coq development was rebuilt for this reading.
+Historical checkpoint notes below preserve the ledger counts at those dates.
+The counts above describe the current collection. A work can have several
+versions and several selective readings.
 
-| Work | Publication | Use in this project |
-| --- | --- | --- |
-| [Dependently Typed Programming with Singletons](https://richarde.dev/papers/2012/singletons/paper.pdf) | Eisenberg and Weirich, Haskell 2012 | Comparison encoding, promotion and the original native-Pi alternative |
-| [System FC with Explicit Kind Equality](https://richarde.dev/papers/2013/fckinds/fckinds.pdf) | Weirich, Hsu and Eisenberg, ICFP 2013 | Explicit kind evidence and scoped congruence |
-| [Dependent Types in Haskell: Theory and Practice](https://richarde.dev/papers/2016/thesis/eisenberg-thesis.pdf) | Eisenberg, PhD thesis, 2016; supervised by Weirich | Binder properties, Pico and Bake |
-| [A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf) | Weirich, Voizard, de Amorim and Eisenberg, ICFP 2017 | D/DC, equality assumptions, erasure and nontermination |
-| [A Role for Dependent Types in Haskell](https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf) | Weirich, Choudhury, Voizard and Eisenberg, ICFP 2019 | Nominal and representational dependent equality |
-| [A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf) | Serrano, Hage, Peyton Jones and Vytiniotis, ICFP 2020 | Instantiation, known variables and ordinary final checking |
-| [A Graded Dependent Type System with a Usage-Aware Semantics](https://richarde.dev/papers/2021/grad/grad.pdf) | Choudhury, Eades, Eisenberg and Weirich, POPL 2021 | Runtime usage, erasure and the limits of resource claims |
+| Work | Publication | Roadmap | Use in this project |
+| --- | --- | --- | --- |
+| [Dependently Typed Programming with Singletons](https://richarde.dev/papers/2012/singletons/paper.pdf) | Eisenberg and Weirich, Haskell 2012 | R03, R04, R05, R13 | Comparison encoding, promotion and the original native-Pi alternative |
+| [System FC with Explicit Kind Equality](https://richarde.dev/papers/2013/fckinds/fckinds.pdf) | Weirich, Hsu and Eisenberg, ICFP 2013 | R05 | Explicit kind evidence and scoped congruence |
+| [Dependent Types in Haskell: Theory and Practice](https://richarde.dev/papers/2016/thesis/eisenberg-thesis.pdf) | Eisenberg, PhD thesis, 2016; supervised by Weirich | R03, R04, R05, R23 | Binder properties, Pico and Bake |
+| [A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf) | Weirich, Voizard, de Amorim and Eisenberg, ICFP 2017 | R05 | D/DC, equality assumptions, erasure and nontermination |
+| [A Role for Dependent Types in Haskell](https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf) | Weirich, Choudhury, Voizard and Eisenberg, ICFP 2019 | R05 | Nominal and representational dependent equality |
+| [A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf) | Serrano, Hage, Peyton Jones and Vytiniotis, ICFP 2020 | R03 | Instantiation, known variables and ordinary final checking |
+| [A Graded Dependent Type System with a Usage-Aware Semantics](https://richarde.dev/papers/2021/grad/grad.pdf) | Choudhury, Eades, Eisenberg and Weirich, POPL 2021 | R03, R05 | Runtime usage, erasure and the limits of resource claims |
+| [Homotopy Type Theory](https://hott.github.io/book/hott-online-82-g578b85c.pdf) | The Univalent Foundations Program, 2013 | R03, R04, R05 | Dependent application, pairs and identity elimination |
+| [Type Inference, Haskell and Dependent Types](https://adam.gundry.co.uk/pub/thesis/) | Gundry, PhD thesis, 2013 | R03, R05, R22 | Phase-indexed contexts, conversion and erasure |
+| [An Existential Crisis Resolved](https://richarde.dev/papers/2021/exists/exists.pdf) | Eisenberg, Duboc, Weirich and Lee, ICFP 2021 | R04, R22 | First-class erased witnesses and lazy projection |
+| [Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf) | Kiss, Field, Eisenbach and Peyton Jones, ICFP 2019 | R05, R13, R23 | Matchability and restricted inverse application |
+| [Constrained Type Families](https://richarde.dev/papers/2017/partiality/partiality.pdf) | Morris and Eisenberg, ICFP 2017 | R07, R12, R24 | Family domains and partial computation |
+| [Visible Type Application](https://richarde.dev/papers/2016/type-app/visible-type-app-extended.pdf) | Eisenberg, Weirich and Ahmed, ESOP 2016 | R03, R28, R32 | Specified quantifiers and source instantiation |
+| [The Thoralf Plugin](https://richarde.dev/papers/2018/thoralf/thoralf.pdf) | Otwani and Eisenberg, Haskell 2018 | R05 | Solver translation and trusted equality evidence |
+| [Promoting Functions to Type Families in Haskell](https://richarde.dev/papers/2014/promotion/promotion.pdf) | Eisenberg and Stolarek, Haskell 2014 | R13, R17, R18, R21 | Lambda lifting, declaration order and defunctionalization |
+| [A Reflection on Types](https://richarde.dev/papers/2016/dynamic/dynamic.pdf) | Peyton Jones, Weirich, Eisenberg and Vytiniotis, WadlerFest 2016 | R03, R05 | Runtime type codes, equality and dynamic application |
 
 ## Singletons, Haskell 2012
 
@@ -41,8 +54,8 @@ historical; it is not a claim about the current package API.
 
 ## Kind equality, ICFP 2013
 
-Read all 12 pages and inspect Figure 4 on PDF page 6. The extended proofs were
-not read. Types and kinds share syntax, but runtime expressions remain separate.
+The 2026-11-14 reading covers all 12 main-paper pages and Figure 4 on PDF page 6.
+Types and kinds share syntax, but runtime expressions remain separate.
 Section 8 leaves direct expressions in types for future work.
 
 The heterogeneous `CT_ALLT` rule checks separate endpoint scopes and transports
@@ -54,6 +67,13 @@ Our fixed-domain `DepFunCo` follows the simpler congruence shape. It does not
 implement general domain conversion. The later `nokinds-pi` branch is a distinct
 implementation experiment. Neither the paper nor that unfinished branch proves
 our runtime-index extension correct.
+
+The 2026-11-16 reading adds the 25-page
+[extended version](https://richarde.dev/papers/2013/fckinds/fckinds-extended.pdf).
+Read selected text on PDF pages 5, 9 and 11, plus part of page 7.
+Dependent lifting and aligned congruence inform R05 telescope transport.
+The extended figures and appendix proofs were not audited. These rules do not
+supply arbitrary runtime-index typing or Haskell sharing guarantees.
 
 ## Pico and Bake, thesis 2016
 
@@ -152,8 +172,8 @@ It does not certify our runtime indices, `DepFunTy` or `DepFunCo`.
 
 Read selected sections on heap reduction, irrelevance, dependent typing,
 soundness and Haskell integration. Exact pages are in the manifest. Inspect
-Figure 3 on PDF page 20. The extended version and Coq artifact were not read
-or rebuilt in this increment. Printed page `50:n` is PDF page `n`.
+Figure 3 on PDF page 20. This 2026-11-14 reading used the 32-page version.
+Printed page `50:n` is PDF page `n`. The Coq artifact was not rebuilt.
 
 The Pi rule separates runtime argument usage from use in the codomain
 (section 7, pages 19–21). Type checking does not add those uses to the runtime
@@ -169,12 +189,131 @@ The existing [artifact review](../REFERENCES.md#roles-and-graded-usage) records
 which syntactic properties are mechanized. Runtime observations remain separate
 implementation evidence.
 
+The 2026-11-16 reading adds selected text from the 39-page
+[extended version](https://richarde.dev/papers/2021/grad/grad-extended.pdf):
+PDF pages 2–3, 19–21 and 27–28. Application scales usage, and substitution
+affects later contexts. Usage soundness needs the paper's resource semantics.
+Its November 2020 author header and POPL 2021 publication identify different
+dates. No new appendix audit or Coq replay is claimed.
+
+## HoTT, book 2013
+
+Read sections 1.4 and 1.6 on PDF pages 37–38 and 42–44, printed pages 25–26
+and 30–32. Read selected parts of sections 1.11 and 1.12 on PDF pages 55–56
+and 60–62, printed pages 43–44 and 48–50. The pinned book has 492 PDF pages.
+
+These passages explain dependent application, dependent-pair elimination and
+identity elimination. They guide R03, R04 and R05 formation and elimination
+rules. They do not specify Haskell evaluation, usage, erasure or sharing.
+Only these selected passages were read. No full-book or proof audit is claimed.
+
+## Inference and dependency, thesis 2013
+
+Read Gundry's PDF pages 108–109, 124, 127, 129–130 and 149–150, printed pages
+96–97, 112, 115, 117–118 and 137–138. These are selected passages from sections
+5.2, 6.2, 6.3, 6.5.4 and 6.6. The thesis has 286 PDF pages. Read the published
+errata as a separate source.
+
+Phase-indexed contexts, explicit coercions and erasure inform R03 and R05.
+The existential comparison also informs R22. The errata qualify pruning and
+rigid-occurrence reasoning. The reading does not validate the complete
+metatheory or establish that this fork implements its inference system.
+
+## First-class existentials, ICFP 2021
+
+Read PDF pages 3, 6–8, 17 and 24–25 of the 58-page author document.
+Printed coordinates use the article prefix `64:`. These include the opening
+of section 3.1; not all of section 3 was read.
+
+Strong existentials permit lazy projection of erased witnesses. Inserting a
+strict package match can change productivity. Runtime dictionaries can still
+require evaluation and sharing. This guides R22 and the comparison for R04.
+Section 9.3 excludes relevant first components from the presented Core.
+Retained `some` therefore needs a separate contract. The full algorithm and
+appendix proofs were not audited. No native-Pi preservation result follows.
+
+## Matchability, ICFP 2019
+
+Read sections 1–3 on PDF pages 1–9; selected section 4 rules and discussion
+on pages 9–16; section 5.1 on pages 17–18; and selected sections 7–8 on pages
+22–24. The author PDF has 26 pages, numbered `102:1` through `102:26`.
+
+Matchability restricts inverse application projection while preserving forward
+congruence. This guides R23 and the R05 foundation for generic fields.
+The paper's initial term-arrow convention differs from the later proposal and
+prototype. Its consistency argument assumes restricted family axioms and
+termination. No proof replay or current-GHC port correctness is established.
+
+## Constrained families, ICFP 2017
+
+Keep both author files. The 28-page
+[main paper](https://richarde.dev/papers/2017/partiality/partiality.pdf)
+was read at PDF pages 1–2 on 2026-11-15. The distinct 38-page
+[extended paper](https://richarde.dev/papers/2017/partiality/partiality-extended.pdf)
+was read selectively on pages 1–4, 7–16 and 20–25 on 2026-11-16.
+The manifest preserves the narrower section-level descriptions.
+
+Family-domain predicates constrain formation and separate proper types from
+family-bearing pretypes. This informs R24 and its promotion dependencies R07
+and R12. CFC omits kinds and source classes. The appendix was not fully read
+or replayed. The extended file's January boilerplate is not publication evidence.
+Neither author file is asserted to match publisher bytes.
+
+## Visible application, ESOP 2016
+
+Read the 75-page extended author PDF at pages 5–8, 16–18, 21 and 24–25,
+plus the first 2,200 extracted characters of page 1. The published chapter
+has pages 229–254 and DOI `10.1007/978-3-662-49498-1_10`.
+These are separate edition and page records.
+
+Specified and generalized quantifiers give visible instantiation a stable
+meaning. The checking systems preserve known polymorphism. This guides R32,
+R28 and our R03 source work. Visibility does not imply retention. The results
+do not establish native Pi representation, coercions, Quick Look policy or
+runtime lowering. Appendix proofs and rendered figures were not audited.
+
+## Thoralf, Haskell 2018
+
+Read body pages 1–12 of the 13-page author PDF, including sections 3.1–3.4,
+4.1–4.5 and related work. The reference page was not substantively read.
+
+Thoralf translates supported type constraints into SMT queries and supplies
+trusted GHC equality evidence. This informs R05's solver boundary. It does not
+provide runtime index formation or general evaluation. Its trusted translation
+requires separate checks; SMT expressiveness does not establish support for
+retained Pi, scoped runtime Ids or native opaque calls. No plugin execution,
+SMT invocation, compatibility build or performance comparison ran for this
+reading. The implementation review has its own pinned source records.
+
+## Function promotion, Haskell 2014
+
+Keep the 12-page June 30 author submission and the 21-page technical report.
+The published paper has pages 95–106. Read main-PDF pages 3–8 and 11, plus
+selected lines on pages 1 and 12. Read selected extended-PDF lines on pages
+1 and 14–16, plus extracted page 21. Exact line ranges are in the manifest.
+
+Lambda lifting and defunctionalization encode lambdas, lets, cases and partial
+application as type families. This guides R13, R17, R18 and R21. The full
+preservation claim depends on an unproved lifting result. It does not establish
+arbitrary runtime-closure promotion or a general open evaluator. Publisher-byte
+identity and a complete appendix audit are not claimed.
+
+## Type reflection, WadlerFest 2016
+
+Read author-PDF pages 6–12 and 14–17, plus part of page 18. This covers selected
+sections 5.2–5.6, 5.8–5.9, 6–7 and the opening of section 8. The author PDF has
+26 pages. Published pages 292–317 use a separate coordinate system.
+
+Indexed runtime type codes, heterogeneous equality and dynamic application
+inform the runtime-universe work within R03/R05. They do not establish native
+Pi or runtime-index reflection. The June author-PDF creation metadata differs
+from the March first-online date. Neither the full paper nor the publisher PDF
+was read. A runtime universe bridge remains an implementation obligation.
+
 ## Next reading
 
 Follow the primary bibliography and keep unread work marked as queued:
 
-- [Visible Type Application](https://richarde.dev/papers/2016/type-app/visible-type-app.pdf),
-  ESOP 2016: specified arguments and source inference.
 - [Kinds are Calling Conventions](https://richarde.dev/papers/2020/kinds-are-cc/kinds-are-cc.pdf),
   ICFP 2020: representation restrictions before broader retained domains.
 - Oury and Swierstra, *The Power of Pi*, ICFP 2008: source examples that connect
@@ -186,7 +325,7 @@ for this GHC fork. See [the implementation plan](../PLAN.md) for the tested subs
 ## Roadmap review, 2026-11-15
 
 The [whole-program roadmap](../ROADMAP.md) prompted additional source reading.
-The seven-work manifest above preserves the earlier implementation readings.
+The seven-work manifest at that checkpoint preserved the earlier readings.
 The additional downloads and extracts are in
 `_build/verification/native-known-arguments-roadmap-research-v1/`.
 Its `research-provenance.json`, `reading-scope.json`, and `SHA256SUMS` record
@@ -204,7 +343,7 @@ reading from a fresh audit of an entire paper or its proofs.
   Read PDF pages 1–3, including the vector filter and lazy projection examples.
   An inserted strict package match can change productivity. The full inference
   algorithm and appendices were not audited.
-- [Constrained Type Families](https://richarde.dev/papers/2017/partiality/partiality-extended.pdf),
+- [Constrained Type Families](https://richarde.dev/papers/2017/partiality/partiality.pdf),
   ICFP 2017, DOI `10.1145/3110286`. The 28-page author PDF was fetched.
   Read the abstract and introduction on PDF pages 1–2. Its domain predicates
   address partial type computations. Ordinary qualified native functions do

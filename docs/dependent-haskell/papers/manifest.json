@@ -3,13 +3,18 @@
   "cache_directory": "_build/verification/dependent-haskell-papers-2026-11-14",
   "storage_note": "PDFs and extraction artifacts remain in the ignored cache. This manifest records references and reading coverage only.",
   "verification": {
-    "verified_utc": "2026-11-14T22:32:03Z",
+    "verified_utc": "2026-11-16T15:47:48.646942+00:00",
     "pdf_reader": "pypdf 7.1.0",
-    "checks": "All nine cached PDFs match the recorded SHA256 and byte counts. PDF page counts were checked with pypdf.",
-    "work_count": 7,
-    "pdf_count": 9
+    "checks": "The 21 versions checked in integration-v1 are unchanged. The additional 28-page PDF matches its original fetch hash, byte count and checked page count. All 22 copies are retained.",
+    "work_count": 16,
+    "pdf_count": 22,
+    "previous_manifest_sha256": "2ee4f1780814aa221bd959815e1d7da2b1a96cd4682e288599b3045f36e69098",
+    "reviewed_additions": "_build/verification/native-roadmap-research-2026-11-16/paper-additions-v3.json",
+    "reviewed_additions_sha256": "1388565957fb418449ace53e41cc0d1bf99dccbf128664f52dafc3930f0eeec3",
+    "original_manifest_sha256": "6a6de95f86aded49c2bb52dde88694cccd66f7e2c06813648b8cb283bf859270",
+    "additional_historical_version": "icfp2017-constrained-families/author-paper"
   },
-  "reading_scope_note": "Reading scopes come from the seven cached metadata records. No full-thesis reading, full-appendix audit or formal proof replay is claimed. These readings do not certify the compiler implementation.",
+  "reading_scope_note": "Reading scopes are version-specific. They include selected books, theses, paper text and partial pages. No full-book, full-thesis, full-appendix audit or formal proof replay is claimed. The readings do not certify the compiler implementation.",
   "works": [
     {
       "id": "haskell2012-singletons",
@@ -94,6 +99,12 @@
           },
           "printed_pages": "117–129"
         }
+      ],
+      "roadmap_cards": [
+        "R03",
+        "R04",
+        "R05",
+        "R13"
       ]
     },
     {
@@ -133,7 +144,55 @@
               "The extended paper and full proofs were not read."
             ]
           }
+        },
+        {
+          "id": "author-extended",
+          "pdf_filename": "icfp2013-fckinds-extended.pdf",
+          "source_url": "https://richarde.dev/papers/2013/fckinds/fckinds-extended.pdf",
+          "sha256": "bcf3b28ce0497d766b9f540faadf54335b35fc9dcf71c80966234d2735df34a4",
+          "bytes": 465362,
+          "pdf_pages": 25,
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "acquisition_note": "See the pinned source ledger. Cache verification does not assert a fresh remote byte comparison.",
+          "reading_scope": {
+            "shorter_author_paper_sections": [
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ],
+            "extended_pdf_selected_text_pages": [
+              5,
+              9,
+              11
+            ],
+            "extended_pdf_partial_text_pages": [
+              7
+            ],
+            "whole_pdf_read": false,
+            "rendered_figures_inspected": false,
+            "appendix_proofs_audited": false
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/fundamentals/reading-v2.json",
+              "sha256": "1fa31ce00894fa9c3fc8ac8bbe0a675da973956217046a567f2a0ff7ede12227"
+            },
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/fundamentals/extraction-v1.json",
+              "sha256": "8ae65caf6a5e17c17894e6a1968baf35104b8a41e66fc721d2df39a9809d6a31"
+            },
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/fundamentals/reading-notes-v1.md",
+              "sha256": "11f97c41c1713717ff2615f3345f342576171ca13a7cc181e5f787cd5e5f4b36"
+            }
+          ]
         }
+      ],
+      "roadmap_cards": [
+        "R05"
       ]
     },
     {
@@ -289,6 +348,12 @@
             ]
           }
         }
+      ],
+      "roadmap_cards": [
+        "R03",
+        "R04",
+        "R05",
+        "R23"
       ]
     },
     {
@@ -333,6 +398,9 @@
           },
           "printed_pages": "31:1–31:30"
         }
+      ],
+      "roadmap_cards": [
+        "R05"
       ]
     },
     {
@@ -434,6 +502,9 @@
           },
           "printed_pages": "1:1–1:42"
         }
+      ],
+      "roadmap_cards": [
+        "R05"
       ]
     },
     {
@@ -517,6 +588,9 @@
           },
           "printed_pages": "89:1–89:33"
         }
+      ],
+      "roadmap_cards": [
+        "R03"
       ]
     },
     {
@@ -578,7 +652,640 @@
               "The Coq artifact was not audited or replayed."
             ]
           }
+        },
+        {
+          "id": "author-extended",
+          "pdf_filename": "popl2021-usage-extended.pdf",
+          "source_url": "https://richarde.dev/papers/2021/grad/grad-extended.pdf",
+          "sha256": "a3e3b6816c4ca75e7c5b4c0b084ce47bc430f9b21b63f3f72c277caabef44ef7",
+          "bytes": 935675,
+          "pdf_pages": 39,
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "acquisition_note": "Reused pinned cached author PDF; local digest verified. The linked primary URL was opened; fresh remote byte equality is not asserted.",
+          "reading_scope": {
+            "pdf_pages_one_based": [
+              2,
+              3,
+              19,
+              20,
+              21,
+              27,
+              28
+            ],
+            "whole_document_read": false
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/core/bibliography.json",
+              "sha256": "cbc0f6c46d6a199bcc5183cdf5d4f8e89d0708d7485035a9bc2382e202e045d8"
+            }
+          ]
         }
+      ],
+      "roadmap_cards": [
+        "R03",
+        "R05"
+      ]
+    },
+    {
+      "id": "hott2013-book",
+      "title": "Homotopy Type Theory: Univalent Foundations of Mathematics",
+      "authors": [
+        "The Univalent Foundations Program"
+      ],
+      "year": 2013,
+      "venue": "Book, The Univalent Foundations Program",
+      "doi": null,
+      "bibliography_source_url": "https://hott.github.io/book/hott-online.pdf.html",
+      "versions": [
+        {
+          "id": "pinned-author-copy",
+          "pdf_filename": "hott2013-book.pdf",
+          "source_url": "https://hott.github.io/book/hott-online-82-g578b85c.pdf",
+          "sha256": "89bfbed17259573dcdc1c1f0e14347030aa42902baba7e0a395fcd7493594aac",
+          "bytes": 3169950,
+          "pdf_pages": 492,
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "acquisition_note": "See the pinned source ledger. Cache verification does not assert a fresh remote byte comparison.",
+          "reading_scope": {
+            "sections": [
+              "1.4",
+              "1.6",
+              "selected1.11",
+              "selected1.12"
+            ],
+            "pdf_pages_one_based": [
+              37,
+              38,
+              42,
+              43,
+              44,
+              55,
+              56,
+              60,
+              61,
+              62
+            ],
+            "printed_pages": [
+              "25-26",
+              "30-32",
+              "43-44",
+              "48-50"
+            ],
+            "whole_book_read": false
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/core/bibliography.json",
+              "sha256": "cbc0f6c46d6a199bcc5183cdf5d4f8e89d0708d7485035a9bc2382e202e045d8"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R03",
+        "R04",
+        "R05"
+      ]
+    },
+    {
+      "id": "gundry2013-thesis",
+      "title": "Type Inference, Haskell and Dependent Types",
+      "authors": [
+        "Adam Michael Gundry"
+      ],
+      "year": 2013,
+      "venue": "PhD thesis, University of Strathclyde",
+      "doi": null,
+      "bibliography_source_url": "https://adam.gundry.co.uk/pub/thesis/",
+      "versions": [
+        {
+          "id": "pinned-author-copy",
+          "pdf_filename": "gundry2013-thesis.pdf",
+          "source_url": "https://adam.gundry.co.uk/pub/thesis/thesis-2013-12-03.pdf",
+          "sha256": "ba1ae24a561461324983402bfb96e78d4db1fd9a7a2fad300a4ebdb90be91c4a",
+          "bytes": 1377414,
+          "pdf_pages": 286,
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "acquisition_note": "See the pinned source ledger. Cache verification does not assert a fresh remote byte comparison.",
+          "reading_scope": {
+            "pdf_pages_one_based": [
+              108,
+              109,
+              124,
+              127,
+              129,
+              130,
+              149,
+              150
+            ],
+            "printed_pages": [
+              "96-97",
+              "112",
+              "115",
+              "117-118",
+              "137-138"
+            ],
+            "whole_thesis_read": false,
+            "landing_page": "read",
+            "errata": "read_all54web_lines"
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/core/bibliography.json",
+              "sha256": "cbc0f6c46d6a199bcc5183cdf5d4f8e89d0708d7485035a9bc2382e202e045d8"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R03",
+        "R05",
+        "R22"
+      ]
+    },
+    {
+      "id": "icfp2021-existentials",
+      "title": "An Existential Crisis Resolved: Type inference for first-class existential types",
+      "authors": [
+        "Richard A. Eisenberg",
+        "Guillaume Duboc",
+        "Stephanie Weirich",
+        "Daniel Lee"
+      ],
+      "year": 2021,
+      "venue": "ICFP 2021; PACMPL 5, article 64",
+      "doi": "10.1145/3473569",
+      "bibliography_source_url": "https://richarde.dev/papers/2021/exists/exists.pdf",
+      "versions": [
+        {
+          "id": "pinned-author-copy",
+          "pdf_filename": "icfp2021-existentials-author.pdf",
+          "source_url": "https://richarde.dev/papers/2021/exists/exists.pdf",
+          "sha256": "e787af5075266b1f08166c9f8c6f94a44678f9023f5ccb94bddf4c0979e17bc3",
+          "bytes": 964715,
+          "pdf_pages": 58,
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "acquisition_note": "Reused pinned cached author PDF; local digest verified. The linked primary URL was opened; fresh remote byte equality is not asserted.",
+          "reading_scope": {
+            "pdf_pages_one_based": [
+              3,
+              6,
+              7,
+              8,
+              17,
+              24,
+              25
+            ],
+            "whole_document_read": false
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/core/bibliography.json",
+              "sha256": "cbc0f6c46d6a199bcc5183cdf5d4f8e89d0708d7485035a9bc2382e202e045d8"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R04",
+        "R22"
+      ]
+    },
+    {
+      "id": "icfp2019-higher-order",
+      "title": "Higher-Order Type-Level Programming in Haskell",
+      "authors": [
+        "Csongor Kiss",
+        "Tony Field",
+        "Susan Eisenbach",
+        "Simon Peyton Jones"
+      ],
+      "year": 2019,
+      "venue": "ICFP 2019; PACMPL 3, article 102",
+      "doi": "10.1145/3341706",
+      "bibliography_source_url": "https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf",
+      "versions": [
+        {
+          "id": "pinned-author-copy",
+          "pdf_filename": "icfp2019-higher-order.pdf",
+          "source_url": "https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf",
+          "sha256": "0ce92f75dac3e64956fb6373af7e371709c52cd4e7afd144a4ec7a17e293ada0",
+          "bytes": 294870,
+          "pdf_pages": 26,
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "acquisition_note": "See the pinned source ledger. Cache verification does not assert a fresh remote byte comparison.",
+          "reading_scope": [
+            "Sections 1–3, PDF/printed pages 1–9 (102:1–102:9).",
+            "Section 4: kinding, coercion projections, substitution and consistency discussion, PDF pages 9–16; selected rules rather than a complete proof audit.",
+            "Section 5.1, including5.1.1–5.1.3, PDF pages 17–18; related-work and future-work passages, sections 7–8, pages 22–24."
+          ],
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/promotion/bibliography.json",
+              "sha256": "49b02bcb58cc2df2832e42ca52eb4225b21c7ad74cc4fc8b9a3daeebf6f29d46"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R05",
+        "R13",
+        "R23"
+      ]
+    },
+    {
+      "id": "icfp2017-constrained-families",
+      "title": "Constrained Type Families",
+      "authors": [
+        "J. Garrett Morris",
+        "Richard A. Eisenberg"
+      ],
+      "year": 2017,
+      "venue": "ICFP 2017; PACMPL 1, article 42",
+      "doi": "10.1145/3110286",
+      "bibliography_source_url": "https://richarde.dev/papers/2017/partiality/partiality-extended.pdf",
+      "versions": [
+        {
+          "id": "author-paper",
+          "pdf_filename": "icfp2017-constrained-families.pdf",
+          "description": "Distinct 28-page author paper. Publisher-byte identity is not asserted.",
+          "source_url": "https://richarde.dev/papers/2017/partiality/partiality.pdf",
+          "sha256": "f1fd9ff8d6fc2f39ad592fbe92ddaa86f40bf998e48fc0215338e1250088b46c",
+          "bytes": 741811,
+          "pdf_pages": 28,
+          "accessed_utc": "2026-11-15T04:10:56.466047+00:00",
+          "access_time_basis": "The original fetch metadata records this access_utc value.",
+          "cache_verified_utc": "2026-11-16T15:47:48.646942+00:00",
+          "reading_scope": {
+            "pdf_pages_one_based": [
+              1,
+              2
+            ],
+            "sections": [
+              "Abstract",
+              "Introduction"
+            ],
+            "whole_document_read": false,
+            "appendix_proofs_audited": false,
+            "recorded_scope": "Full abstract and introduction PDF1–2 / printed42:1–2. Remaining calculus/proofs not audited."
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-known-arguments-roadmap-research-v1/fetch-metadata.json",
+              "sha256": "377b16cfbd31a28c744c69436ee2bd272f4d4a26fb6d9e67b62c4724650ede6c"
+            },
+            {
+              "path": "_build/verification/native-known-arguments-roadmap-research-v1/reading-scope.json",
+              "sha256": "cca2c4e04ac6a9cd38611db7b4e241da6870ff1c84300ef7c7cda4db29b1ccf2"
+            }
+          ]
+        },
+        {
+          "id": "author-extended",
+          "pdf_filename": "icfp2017-constrained-families-extended.pdf",
+          "source_url": "https://richarde.dev/papers/2017/partiality/partiality-extended.pdf",
+          "sha256": "6bea6ac03992ee65b031802aea48f4a969428d8bc1c2b8641637f87c8b2f9084",
+          "bytes": 813928,
+          "pdf_pages": 38,
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "acquisition_note": "See the pinned source ledger. Cache verification does not assert a fresh remote byte comparison.",
+          "reading_scope": [
+            "Abstract/introduction and selected totality-trap examples, PDF pages 1–4.",
+            "Sections 4–5: domain predicates, closure and totality, PDF/printed pages 7–14 (42:7–42:14).",
+            "Section 6.1 and selected regularity discussion, pages 14–16; sections 6.3–6.4, pages 20–23; section 7, pages 23–25.",
+            "Appendix proof derivations were not read in full or replayed."
+          ],
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/promotion/bibliography.json",
+              "sha256": "49b02bcb58cc2df2832e42ca52eb4225b21c7ad74cc4fc8b9a3daeebf6f29d46"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R07",
+        "R12",
+        "R24"
+      ],
+      "version_note": "The 28-page author paper and 38-page author extended paper are distinct files. Publisher-byte identity is not asserted for either file."
+    },
+    {
+      "id": "esop2016-visible-type-application",
+      "title": "Visible Type Application",
+      "authors": [
+        "Richard A. Eisenberg",
+        "Stephanie Weirich",
+        "Hamidhasan G. Ahmed"
+      ],
+      "year": 2016,
+      "venue": "ESOP 2016; LNCS 9632, pages 229–254",
+      "doi": "10.1007/978-3-662-49498-1_10",
+      "bibliography_source_url": "https://link.springer.com/chapter/10.1007/978-3-662-49498-1_10",
+      "versions": [
+        {
+          "id": "author-extended",
+          "pdf_filename": "esop2016-visible-type-app-extended.pdf",
+          "source_url": "https://richarde.dev/papers/2016/type-app/visible-type-app-extended.pdf",
+          "sha256": "7816d0a3705d8b594112f70b85eda631602ce009ffa9accaeda3bd85729261f4",
+          "bytes": 884339,
+          "pdf_pages": 75,
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "acquisition_note": "See the pinned source ledger. Cache verification does not assert a fresh remote byte comparison.",
+          "reading_scope": {
+            "full_pdf_and_printed_pages_read": [
+              5,
+              6,
+              7,
+              8,
+              16,
+              17,
+              18,
+              21,
+              24,
+              25
+            ],
+            "partial_page_read": {
+              "pdf_page": 1,
+              "extracted_character_range": [
+                1,
+                2200
+              ]
+            },
+            "extracted_but_unread_pages": [
+              2,
+              3,
+              4,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14
+            ],
+            "proofs": "appendix proofs unread; theorem statements do not transfer to fork",
+            "reading_medium": "pypdf extracted page text; rendered mathematical figures not independently inspected"
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/syntax-issue-read-v2/provenance.json",
+              "sha256": "768164a6e41026c9d812e9f95a3ccd02d879748ee72775b4a155788691a02b9d"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R03",
+        "R28",
+        "R32"
+      ]
+    },
+    {
+      "id": "haskell2018-thoralf",
+      "title": "The Thoralf Plugin: For Your Fancy Type Needs",
+      "authors": [
+        "Divesh Otwani",
+        "Richard A. Eisenberg"
+      ],
+      "year": 2018,
+      "venue": "Proceedings of the 11th ACM SIGPLAN International Haskell Symposium, 2018",
+      "doi": "10.1145/3242744.3242754",
+      "bibliography_source_url": "https://repository.brynmawr.edu/compsci_pubs/82/",
+      "versions": [
+        {
+          "id": "author-paper",
+          "pdf_filename": "haskell2018-thoralf.pdf",
+          "source_url": "https://richarde.dev/papers/2018/thoralf/thoralf.pdf",
+          "sha256": "545fda51f419ff91514d9f8071d0e93da28fb9c084497b8e8b9ba8174ad16292",
+          "bytes": 782438,
+          "pdf_pages": 13,
+          "accessed_utc": "2026-11-16T13:47:39.623463+00:00",
+          "cache_verified_utc": "2026-11-16T14:18:56.103624+00:00",
+          "reading_scope": {
+            "pages_actually_read": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "reading_scope": "Main paper body: examples, sections 3.1–3.4, 4.1–4.5 and related work. The reference page was not substantively read.",
+            "excluded": [
+              "No proof replay",
+              "No plugin execution",
+              "No SMT invocation",
+              "No performance comparison"
+            ]
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/promotion/thoralf-evidence-readpins-v1.json",
+              "sha256": "bc95f9c2f500b42581a03ebbc75f1cc646d73cdfde2d59096696d30e015ae7c6"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R05"
+      ]
+    },
+    {
+      "id": "haskell2014-function-promotion",
+      "title": "Promoting Functions to Type Families in Haskell",
+      "authors": [
+        "Richard A. Eisenberg",
+        "Jan Stolarek"
+      ],
+      "year": 2014,
+      "venue": "Haskell Symposium 2014",
+      "doi": "10.1145/2633357.2633361",
+      "bibliography_source_url": "https://www.research.ed.ac.uk/en/publications/promoting-functions-to-type-families-in-haskell/",
+      "published_extent": [
+        95,
+        106
+      ],
+      "version_note": "Do not identify June30 author PDFs with final publisher bytes or paper-model claims with current implementation correctness",
+      "versions": [
+        {
+          "id": "author-final-submission",
+          "description": "Final draft submitted for Haskell Symposium 2014, footer 2014/6/30",
+          "pdf_filename": "haskell2014-promotion.pdf",
+          "source_url": "https://richarde.dev/papers/2014/promotion/promotion.pdf",
+          "sha256": "fc08204d025b1000243569e5f9eda0fcaae711e4c5da062455042ebbc26ca5c4",
+          "bytes": 356645,
+          "pdf_pages": 12,
+          "cache_verified_utc": "2026-11-16T14:51:48.447253+00:00",
+          "reading_scope": {
+            "extent": {
+              "full_extracted_text_pages": [
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                11
+              ],
+              "selected_text_ranges": {
+                "1": [
+                  [
+                    1,
+                    48
+                  ]
+                ],
+                "12": [
+                  [
+                    1,
+                    48
+                  ]
+                ]
+              }
+            },
+            "rendered_figures": false,
+            "whole_work_read": false
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/syntax-function-promotion-v1/provenance.json",
+              "sha256": "b78a47fff35affa98deda5e0cb3e4e184cacfeae9ebad58e9fa61b49b413169e"
+            }
+          ]
+        },
+        {
+          "id": "author-extended-technical-report",
+          "description": "University of Pennsylvania Technical Report MS-CIS-14-09; footer 2014/6/30",
+          "pdf_filename": "haskell2014-promotion-extended.pdf",
+          "source_url": "https://richarde.dev/papers/2014/promotion/promotion-ext.pdf",
+          "sha256": "8dfbdb7aae13ef3d708c6613b1c0ba724d1a12e1e8077616ad763ac3e9e8274e",
+          "bytes": 455829,
+          "pdf_pages": 21,
+          "cache_verified_utc": "2026-11-16T14:51:48.447253+00:00",
+          "reading_scope": {
+            "extent": {
+              "selected_text_ranges": {
+                "1": [
+                  [
+                    1,
+                    12
+                  ]
+                ],
+                "14": [
+                  [
+                    1,
+                    99
+                  ]
+                ],
+                "15": [
+                  [
+                    1,
+                    70
+                  ]
+                ],
+                "16": [
+                  [
+                    1,
+                    85
+                  ]
+                ],
+                "21": "full extracted text"
+              },
+              "scope": "Selected formal contexts, proof premises, final theorem statements; not all appendix proofs"
+            },
+            "rendered_figures": false,
+            "whole_work_read": false
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/syntax-function-promotion-v1/provenance.json",
+              "sha256": "b78a47fff35affa98deda5e0cb3e4e184cacfeae9ebad58e9fa61b49b413169e"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R13",
+        "R17",
+        "R18",
+        "R21"
+      ]
+    },
+    {
+      "id": "wadlerfest2016-reflection",
+      "title": "A Reflection on Types",
+      "authors": [
+        "Simon Peyton Jones",
+        "Stephanie Weirich",
+        "Richard A. Eisenberg",
+        "Dimitrios Vytiniotis"
+      ],
+      "year": 2016,
+      "venue": "WadlerFest2016; A List of Successes That Can Change the World; LNCS9600",
+      "doi": "10.1007/978-3-319-30936-1_16",
+      "bibliography_source_url": "https://link.springer.com/chapter/10.1007/978-3-319-30936-1_16",
+      "published_extent": [
+        292,
+        317
+      ],
+      "version_note": "Author PDF coordinates1–26; not equated to published292–317 or publisher byte identity.",
+      "versions": [
+        {
+          "id": "author-june-2016",
+          "description": "Author PDF with June2016 creation metadata; publisher byte identity is not asserted.",
+          "pdf_filename": "wadlerfest2016-reflection.pdf",
+          "source_url": "https://richarde.dev/papers/2016/dynamic/dynamic.pdf",
+          "sha256": "cad609b30b1a64e014d66508f97d663d0bf018111f2d9e09a3fce5a63267f324",
+          "bytes": 506936,
+          "pdf_pages": 26,
+          "cache_verified_utc": "2026-11-16T14:51:48.447253+00:00",
+          "acquisition_note": "Download mtime is recorded in the released provenance; it is not an HTTP response timestamp.",
+          "reading_scope": {
+            "selected_pdf_pages_read_one_based": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              14,
+              15,
+              16,
+              17
+            ],
+            "additional_partial_page_read": 18,
+            "selected_sections": [
+              "5.2–5.6",
+              "5.8–5.9/Figure1",
+              "6",
+              "7",
+              "opening of8"
+            ],
+            "page_openings_inspected_range_one_based": [
+              1,
+              26
+            ],
+            "full_paper_read": false,
+            "edition_caution": "Author PDF coordinates1–26; not equated to published292–317 or publisher byte identity."
+          },
+          "reading_provenance": [
+            {
+              "path": "_build/verification/native-roadmap-research-2026-11-16/core/runtime-universe-prior-art-v1/provenance.json",
+              "sha256": "d8cde0374ae933a4ca488b5ddb2144d65d263b73a4c418842bf51c5420eecc88"
+            }
+          ]
+        }
+      ],
+      "roadmap_cards": [
+        "R03",
+        "R05"
       ]
     }
   ]
