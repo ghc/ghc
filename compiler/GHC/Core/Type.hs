@@ -59,7 +59,7 @@ module GHC.Core.Type (
         getRuntimeArgTys,
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys, mkDepFunTy, isBoolIndexId,
-        isNativeIndexId, isNativeIndexType,
+        isNativeIndexId, isNativeIndexType, nativeIndexDataConTyArgs,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
         isNativeRetainedBinder, isNativeRetainedBinderType,
         piResultTy, piResultTys,
@@ -231,10 +231,11 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Make
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
+import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType, eqTypes )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.Set
 import {-# SOURCE #-} GHC.Core.DataCon
-   ( dataConFullSig, dataConRepArgTys, dataConStupidTheta
+   ( DataCon, dataConTyCon, dataConFullSig, dataConRepArgTys, dataConStupidTheta
    , dataConWrapId_maybe, dataConRepArgBinders )
 import GHC.Core.Coercion.Axiom
 
@@ -2282,46 +2283,62 @@ See #14939.
 -- | Test whether a closed, lifted algebraic type is a supported index domain.
 -- See Note [Algebraic runtime index domains].
 isNativeIndexType :: Type -> Bool
-isNativeIndexType ty = go emptyTyConSet [ty]
+isNativeIndexType = go []
   where
-    go _ [] = True
-    go seen (ty : rest)
-      | TyConApp tc [] <- coreFullView ty
-      , tc `elemTyConSet` seen
-      = go seen rest
-      | TyConApp tc [] <- coreFullView ty
+    go path ty
+      | TyConApp tc args <- coreFullView ty
+      , Just previous <- lookup tc path
+      = eqTypes args previous
+      | TyConApp tc args <- coreFullView ty
       , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
-      , not (isTypeDataTyCon tc), tyConArity tc == 0
-      , tcIsLiftedTypeKind (tyConKind tc)
+      , not (isTypeDataTyCon tc), tyConArity tc == length args
+      , all (tcIsLiftedTypeKind . tyVarKind) (tyConTyVars tc)
+      , tcIsLiftedTypeKind (typeKind ty)
+      , all closed_argument args
       , null (tyConStupidTheta tc)
-      , Just fields <- concat <$> traverse (con_fields tc) (tyConDataCons tc)
-      = go (extendTyConSet seen tc) (fields ++ rest)
+      , Just fields <- concat <$> traverse (con_fields ty args) (tyConDataCons tc)
+      = all (go ((tc, args) : path)) fields
       | otherwise = False
 
-    con_fields tc con
+    closed_argument arg = noFreeVarsOfType arg && isTauTy arg
+                          && tcIsLiftedTypeKind (typeKind arg)
+
+    con_fields domain args con
       | null (dataConRepArgBinders con)
-      , ([], [], [], [], orig_args, res) <- dataConFullSig con
+      , (univs, [], [], [], orig_args, res) <- dataConFullSig con
+      , univs `equalLength` args
+      , all (tcIsLiftedTypeKind . tyVarKind) univs
       , null (dataConStupidTheta con)
       , Nothing <- dataConWrapId_maybe con
-      , TyConApp res_tc [] <- coreFullView res, res_tc == tc
+      , substTyWith univs args res `eqType` domain
       , orig_args `equalLength` rep_args
-      , and (zipWith same_field orig_args rep_args)
-      = Just (map scaledThing rep_args)
+      , and (zipWith same_field (instantiate orig_args) (instantiate rep_args))
+      = Just (map scaledThing (instantiate rep_args))
       | otherwise = Nothing
       where
         rep_args = dataConRepArgTys con
+        (univs, _, _, _, _, _) = dataConFullSig con
+        instantiate = map (mapScaledType (substTyWith univs args))
 
     same_field (Scaled orig_mult orig) (Scaled rep_mult rep)
       | closed_mult orig_mult, closed_mult rep_mult
-      , TyConApp orig_tc [] <- coreFullView orig
-      , TyConApp rep_tc [] <- coreFullView rep
-      = orig_tc == rep_tc
+      = orig `eqType` rep
       | otherwise = False
 
     closed_mult ty = case coreFullView ty of
       OneTy -> True
       ManyTy -> True
       _ -> False
+
+-- | Recover the ordinary universal arguments of a supported index constructor.
+-- See Note [Algebraic runtime index domains].
+nativeIndexDataConTyArgs :: Type -> DataCon -> Maybe [Type]
+nativeIndexDataConTyArgs domain con
+  | isNativeIndexType domain
+  , TyConApp tc args <- coreFullView domain
+  , tc == dataConTyCon con
+  = Just args
+  | otherwise = Nothing
 
 -- | Return the independently closed argument and result domains of a native head.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
@@ -2394,11 +2411,19 @@ head-only-function-valued-retained-binders-prior-art.
 {- Note [Algebraic runtime index domains]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A runtime index has a closed, first-order, lifted data type. Inspect ordinary
-TyCons and DataCons; Nat has no wired identity. Follow all constructor fields
-with one worklist and a visited set. This admits recursive and mutually recursive
-domains without assuming that their runtime values are finite or total.
+TyCons and DataCons; Nat has no wired identity. Instantiate ordinary universal
+parameters with closed monotypes of kind Type. Check the instantiated original
+and representation fields. Static parameters need not themselves be scalar
+domains: Proxy (Bool -> Bool) has no function field, but Maybe (Bool -> Bool) does.
 
-Reject parameters, existential variables, constructor constraints, datatype
+Track full datatype applications along the active path. A return to the same
+TyCon must have nominally equal arguments. Use ordinary eqType, which requires
+a SOURCE import because type comparison uses this module. Separate siblings can
+use different instances. This uniform-recursion rule admits List Bool and
+mutually recursive uniform domains. It rejects growing arguments and parameter
+permutations. It does not assume finite or total runtime values.
+
+Reject existential variables, constructor constraints, datatype
 contexts, newtypes, type data, and wrappers. Retained field constructors need a
 separate promotion rule, even when a named field is unused by the later types.
 Inspect their metadata before the full signature. A recursive interface field

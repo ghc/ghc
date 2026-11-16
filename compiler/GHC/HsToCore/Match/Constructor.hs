@@ -23,7 +23,7 @@ import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
 import GHC.Core.DataCon ( dataConTyCon, dataConRepArgBinders )
-import GHC.Core.Type ( isNativeIndexType, isManyTy )
+import GHC.Core.Type ( isNativeIndexType, isManyTy, mkTyConApp )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo )
 import GHC.Tc.Types.Evidence ( isEmptyTcEvBinds, isIdHsWrapper )
 import GHC.Tc.Utils.TcType
@@ -147,9 +147,10 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     has_native_proof :: EquationInfoNE -> Bool
     has_native_proof eqn
       | ConPat { pat_con = L _ (RealDataCon con)
-               , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv] } }
+               , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv]
+                                       , cpt_arg_tys = tys } }
           <- firstPat eqn
-      = isCoVar cv && isNativeIndexType (mkTyConTy (dataConTyCon con))
+      = isCoVar cv && isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
       | otherwise = False
 
     toRealAlt alt = case alt_pat alt of
@@ -365,7 +366,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                               alt_bndrs = case con1 of
                                 RealDataCon con
                                   | null tvs1, [_] <- dicts1
-                                  , isNativeIndexType (mkTyConTy (dataConTyCon con))
+                                  , isNativeIndexType (mkTyConApp (dataConTyCon con) arg_tys)
                                   -- See Note [Retained constructor field scope].
                                   -> arg_vars ++ dicts1
                                 _ -> tvs1 ++ dicts1 ++ arg_vars,

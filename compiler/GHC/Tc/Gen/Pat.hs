@@ -15,7 +15,7 @@ module GHC.Tc.Gen.Pat
    , LetBndrSpec(..)
    , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcMatchPats
-   , tcRetainedCon
+   , tcRetainedCon, retainedConPat, retainedConIndex
    , addDataConStupidTheta
    , zipPatsBndrs
    )
@@ -1292,27 +1292,71 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
         } }
 
--- | Resolve a closed index constructor and its bare runtime field binders.
+-- | Expose the ordinary constructor syntax of a selected retained pattern.
+-- See Note [Parameterized retained constructor patterns].
+retainedConPat :: LPat GhcRn -> LPat GhcRn
+retainedConPat (L loc (ParPat x pat))
+  = L loc (ParPat x (retainedConPat pat))
+retainedConPat (L loc (ListPat _ []))
+  = L loc (unLoc (nlConPatName (dataConName nilDataCon) []))
+retainedConPat (L loc pat@(ConPat { pat_args = InfixCon _ left right }))
+  = L loc (pat { pat_args = PrefixCon noExtField [left, right] })
+retainedConPat pat = pat
+
+-- | Form the complete promoted constructor index of checked runtime fields.
+-- See Note [Parameterized retained constructor patterns].
+retainedConIndex :: Type -> DataCon -> [Id] -> Type
+retainedConIndex domain con fields
+  = case nativeIndexDataConTyArgs domain con of
+      Just args -> mkTyConApp (promoteDataCon con) (args ++ map TermVarTy fields)
+      Nothing -> pprPanic "retainedConIndex: unchecked domain" (ppr domain $$ ppr con)
+
+-- | Resolve an index constructor and instantiate its bare runtime field types.
+-- See Note [Parameterized retained constructor patterns].
 tcRetainedCon :: Type -> LPat GhcRn -> TcM (Maybe (DataCon, [Id]))
-tcRetainedCon domain (L _ (ParPat _ pat)) = tcRetainedCon domain pat
-tcRetainedCon domain (L _ (ConPat { pat_con = L _ name
-                              , pat_args = PrefixCon _ pats }))
-  = do { con_like <- tcLookupConLike name
+tcRetainedCon domain source_pat = case unLoc (retainedConPat source_pat) of
+  ParPat _ pat -> tcRetainedCon domain pat
+  ConPat { pat_con = L _ name, pat_args = PrefixCon _ pats } ->
+    do { con_like <- tcLookupConLike name
        ; case con_like of
            RealDataCon con
-             | isNativeIndexType domain
-             , mkTyConTy (dataConTyCon con) `eqType` domain
-             , pats `equalLength` dataConOrigArgTys con ->
-               do { fields <- zipWithM field pats (dataConOrigArgTys con)
+             | Just args <- nativeIndexDataConTyArgs domain con
+             , let field_tys = dataConInstOrigArgTys con args
+             , pats `equalLength` field_tys ->
+               do { fields <- zipWithM field pats field_tys
                   ; return (Just (con, fields)) }
            _ -> return Nothing }
+  _ -> return Nothing
   where
     field (L loc (VarPat _ (L _ name))) (Scaled _ ty)
       = setSrcSpanA loc $ return (mkLocalId name ManyTy ty)
     field (L loc _) _
       = setSrcSpanA loc $
         failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
-tcRetainedCon _ _ = return Nothing
+
+{- Note [Parameterized retained constructor patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check the complete closed domain before instantiating a constructor's ordinary
+universals. Runtime field Ids use those instantiated types. A promoted index
+contains the ordinary type arguments before the actual runtime field indices.
+Use the same domain check for patterns and constructor argument metadata.
+
+The renamer retains built-in list patterns and infix constructor patterns.
+Expose only the selected empty list as nil and an infix constructor as its
+ordinary prefix form before checking it. Keep the original source span and
+MatchInCtxt. The ordinary pattern checker then produces ConPatTc, which can
+bind the nominal constructor proof. Nonempty list patterns have nested fields
+and remain outside this bare-field subset. Overloaded-list view expansions
+remain outside it too. Other patterns keep their existing checking path.
+
+This reuses GHC's constructor instantiation and pattern checking. The D/DC and
+System DR comparisons require well-formed endpoints and nominal constructor
+evidence; they do not prove this extension. Agda checks an application before
+substituting its codomain. See the pinned application provenance at
+docs/dependent-haskell/REFERENCES.md#strict-opaque-call-refinement-prior-art
+and the role comparison at
+docs/dependent-haskell/REFERENCES.md#roles-and-graded-usage.
+-}
 
 -- | Check a package constructor's fields in their runtime telescope order.
 -- See Note [Checking retained package patterns].
@@ -1387,11 +1431,10 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                                  failWithTc $ TcRnRetainedQuantificationError RetainedVariablePattern
                              ; info <- tcRetainedCon (varType index) pat
                              ; (index_con, fields) <- maybe bad_pattern return info
-                             ; let constructor_index = mkTyConApp (promoteDataCon index_con)
-                                                         (map TermVarTy fields)
+                             ; let constructor_index = retainedConIndex (varType index) index_con fields
                              ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
                              ; (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
-                                     (position, pat, scaled_ty) $
+                                     (position, retainedConPat pat, scaled_ty) $
                                      check_fields subst' (refinements ++ [(index, mkCoVarCo cv)])
                                        (position + 1) args pats
                              ; let L loc checked = pat'

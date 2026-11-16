@@ -109,7 +109,7 @@ import GHC.Builtin.KnownKeys ( boolTyConKey )
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.DataCon
-import GHC.Core.TyCon ( isPromotedDataCon_maybe )
+import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon, isBoxedDataTyCon )
 import GHC.Unit.Module
 
 import GHC.Types.InlinePragma
@@ -2637,9 +2637,10 @@ normaliseNativeIndexExpr = go emptyVarEnv
       | App (Lam binder body) arg <- expr
       , isNativeIndexId binder
       = do { arg_result@(arg', arg_index) <- go env arg
-           ; case arg' of
-               Var {}
-                 | sameNativeIndexDomain (varType binder) (typeKind arg_index)
+           ; case collectArgs arg' of
+               (Var {}, type_args)
+                 | all isTypeArg type_args
+                 , sameNativeIndexDomain (varType binder) (typeKind arg_index)
                  -> do { body_result@(_, body_index)
                            <- go (extendVarEnv env binder arg_result) body
                        ; if sameNativeIndexDomain (varType binder) (typeKind body_index)
@@ -2648,22 +2649,31 @@ normaliseNativeIndexExpr = go emptyVarEnv
                _ -> Nothing }
       | (Var worker, args) <- collectArgs expr
       , Just con <- isDataConWorkId_maybe worker
-      , isNativeIndexType (mkTyConTy (dataConTyCon con))
-      , args `lengthIs` dataConSourceArity con
-      = do { results <- traverse (go env) args
-           ; let (args', indices) = unzip results
-           ; if nativeIndexArgKinds con indices
-             then Just (mkApps (Var worker) args',
-                        mkTyConApp (promoteDataCon con) indices)
+      , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
+      , Just tys <- traverse type_arg type_args
+      , Just _ <- nativeIndexDataConTyArgs (mkTyConApp (dataConTyCon con) tys) con
+      , fields `lengthIs` dataConSourceArity con
+      = do { results <- traverse (go env) fields
+           ; let (fields', indices) = unzip results
+           ; if nativeIndexArgKinds con tys indices
+             then Just (mkApps (Var worker) (type_args ++ fields'),
+                        mkTyConApp (promoteDataCon con) (tys ++ indices))
              else Nothing }
       | otherwise = Nothing
+
+    type_arg (Type ty) = Just ty
+    type_arg _ = Nothing
 
 {- Note [Checked native index beta exposure]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A native index normal form is a local runtime variable or a saturated ordinary
-constructor tree. Also accept an immediate (\b -> body) arg when b is an
+constructor tree. Keep erased universal arguments before runtime fields in
+both the expression and promoted index. Instantiate field domains at those
+arguments. See Note [Algebraic runtime index domains] in GHC.Core.Type.
+Also accept an immediate (\b -> body) arg when b is an
 eligible local Many index binder. The argument must normalize to an atom:
-an eligible variable or a nullary constructor worker. Require the argument,
+an eligible variable or a nullary constructor worker with erased applications.
+Require the argument,
 binder, and body result to have the same supported closed algebraic domain.
 Every constructor field must have its declared domain.
 
@@ -2692,16 +2702,17 @@ No general evaluator, nominal proof from Coercible, or new coercion is added.
 -- | Compare supported closed domains after expanding type synonyms.
 sameNativeIndexDomain :: Type -> Type -> Bool
 sameNativeIndexDomain left right
-  | TyConApp left_tc [] <- coreFullView left
-  , TyConApp right_tc [] <- coreFullView right
-  = left_tc == right_tc
+  | TyConApp {} <- coreFullView left
+  , TyConApp {} <- coreFullView right
+  = left `eqType` right
   | otherwise = False
 
 -- | Check the domains of a saturated promoted constructor's field indices.
-nativeIndexArgKinds :: DataCon -> [Type] -> Bool
-nativeIndexArgKinds con indices
-  = and (zipWith same_domain indices (dataConRepArgTys con))
+nativeIndexArgKinds :: DataCon -> [Type] -> [Type] -> Bool
+nativeIndexArgKinds con tys indices
+  = indices `equalLength` fields && and (zipWith same_domain indices fields)
   where
+    fields = dataConInstOrigArgTys con tys
     same_domain index (Scaled _ ty)
       = sameNativeIndexDomain (typeKind index) ty
 
@@ -2720,19 +2731,24 @@ mapNativeIndex subst expr
       | isNativeIndexId v = Just (Var v)
     from_index (TyConApp tc args)
       | Just con <- isPromotedDataCon_maybe tc
-      , isNativeIndexType (mkTyConTy (dataConTyCon con))
-      , args `lengthIs` dataConSourceArity con
-      , nativeIndexArgKinds con args
-      = do { args' <- traverse from_index args
-           ; return (mkConApp con args') }
+      , let (tys, fields) = splitAt (length (dataConUnivTyVars con)) args
+      , Just _ <- nativeIndexDataConTyArgs (mkTyConApp (dataConTyCon con) tys) con
+      , fields `lengthIs` dataConSourceArity con
+      , nativeIndexArgKinds con tys fields
+      = do { fields' <- traverse from_index fields
+           ; return (mkConApp con (map Type tys ++ fields')) }
     from_index _ = Nothing
 
--- | Detect extra proof slots on a supported algebraic alternative.
--- Core Lint checks their count, scope, and nominal equality type.
+-- | Detect extra proof slots on ordinary algebraic alternatives.
+-- Core Lint checks their instantiated domain, count, scope and nominal type.
 isNativeIndexAlt :: Alt b -> Bool
 isNativeIndexAlt (Alt (DataAlt con) args _)
-  = length args > dataConRepArity con
-    && isNativeIndexType (mkTyConTy (dataConTyCon con))
+  | length args > dataConRepArity con
+  , isVanillaAlgTyCon (dataConTyCon con)
+  , isBoxedDataTyCon (dataConTyCon con)
+  , null (dataConRepArgBinders con)
+  , (_, [], [], [], _, _) <- dataConFullSig con
+  = True
 isNativeIndexAlt _ = False
 
 -- | Detect proof binders on a DEFAULT alternative, including malformed proofs.

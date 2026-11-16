@@ -1171,25 +1171,27 @@ nameNativeIndexArg :: CoreExpr
 nameNativeIndexArg arg
   | Just (normal, index) <- normaliseNativeIndexExpr arg
   = case collectArgs normal of
-      (Var worker, fields)
+      (Var worker, args)
         | Just con <- isDataConWorkId_maybe worker
+        , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
         , not (null fields)
         -> do { named <- mapM nameNativeIndexArg fields
               ; let atoms = [atom | (atom, _, _) <- named]
                     field_cos = [co | (_, co, _) <- named]
                     wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
-                    scrut = mkConApp con atoms
+                    scrut = mkConApp con (type_args ++ atoms)
                     scrut_index = expectJust (exprToNativeIndex scrut)
+                    static_cos = [mkNomReflCo ty | Type ty <- type_args]
               ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
               ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
                            (mkNomEqPred (TermVarTy value) scrut_index)
               ; let co = mkTransCo (mkCoVarCo proof)
-                           (mkTyConAppCo Nominal (promoteDataCon con) field_cos)
+                           (mkTyConAppCo Nominal (promoteDataCon con) (static_cos ++ field_cos))
                     wrap body = wrap_fields $
                       Case scrut value (exprType body) [Alt DEFAULT [proof] body]
               ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
                   return (Var value, co, wrap) }
-      (Var _, []) -> return (normal, mkReflCo Nominal index, id)
+      (Var _, args) | all isTypeArg args -> return (normal, mkReflCo Nominal index, id)
       _ -> nativeIndexTransportError "an unsupported normalized retained argument"
   | otherwise = nativeIndexTransportError "an unsupported retained argument"
 
@@ -1210,7 +1212,8 @@ nameNativeCaseArgument fun arg bndr ty alts
       , (fields, [old_cv]) <- splitAt (dataConRepArity dc) args
       = do { cv <- mkSysLocalOrCoVarM (fsLit "native_call") ManyTy
                      (mkNomEqPred prepared_index
-                       (mkTyConApp (promoteDataCon dc) (map TermVarTy fields)))
+                       (mkTyConApp (promoteDataCon dc)
+                         (tyConAppArgs (coreFullView (varType bndr)) ++ map TermVarTy fields)))
            ; let old_co = mkTransCo (mkSymCo call_co) (mkCoVarCo cv)
            ; return (Alt con (fields ++ [cv]) (replace_proof old_cv old_co rhs)) }
       | DEFAULT <- con

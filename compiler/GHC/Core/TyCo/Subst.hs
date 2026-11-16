@@ -64,6 +64,7 @@ import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToNativeIndex, mapNativeIndex, va
 import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, nativeIndexFunctionTys_maybe, coreFullView )
 
 import GHC.Core.TyCo.Make
+import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCon( TyCon )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -857,9 +858,7 @@ substNativeIndexFunction (Subst in_scope ids _ _) f
         Just g -> g
         Nothing -> pprPanic "substTy: unsupported native function range"
                      (ppr f <+> text ":=" <+> ppr rhs)
-    same_domain ty ty' = case (coreFullView ty, coreFullView ty') of
-      (TyConApp tc [], TyConApp tc' []) -> tc == tc'
-      _ -> False
+    same_domain = eqType
 
 -- | Rename a closed-domain runtime binder and mask its outer substitution.
 -- Use the resulting substitution only inside the binder's scope.

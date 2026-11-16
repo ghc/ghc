@@ -61,14 +61,14 @@ import GHC.Rename.Env ( irrefutableConLikeTc )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
-import GHC.Core ( Expr(Var, App), exprToNativeIndex )
+import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeIndexId, isNativeIndexType )
+                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeIndexId, nativeIndexDataConTyArgs )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
-import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon, dataConTyCon, dataConOrigArgTys, dataConFullSig, dataConWorkId )
+import GHC.Core.DataCon ( DataCon, dataConName, dataConInstOrigArgTys, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Utils ( applyTypeToArgs )
@@ -223,7 +223,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
           _ -> False
       | otherwise = False
     constructor_pat (L _ (ParPat _ pat)) = constructor_pat pat
-    constructor_pat (L _ ConPat{}) = True
+    constructor_pat pat | ConPat{} <- unLoc (retainedConPat pat) = True
     constructor_pat _ = False
 
 {- Note [Checked retained lambdas]
@@ -284,7 +284,7 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
                   failWithTc (TcRnRetainedQuantificationError (RetainedResultKind result_ty))
               ; constructors <- mapM constructor alternatives
               ; let domain_cons = case splitTyConApp_maybe (coreFullView (varType index)) of
-                      Just (tc, []) -> tyConDataCons tc
+                      Just (tc, _) -> tyConDataCons tc
                       _ -> []
                     cons = map fst constructors
               ; unless (cons `equalLength` domain_cons && all (`elem` cons) domain_cons) case_error
@@ -335,10 +335,11 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
            ; con <- tcRetainedCon (varType index) pat
            ; maybe case_error return con }
     constructor (L match_loc _) = setSrcSpanA match_loc case_error
-    case_pattern (L _ (ParPat _ pat)) = case_pattern pat
-    case_pattern (L _ ConPat { pat_args = PrefixCon _ fields })
-      = all (\(L _ pat) -> case pat of VarPat{} -> True; _ -> False) fields
-    case_pattern _ = False
+    case_pattern pat = case unLoc (retainedConPat pat) of
+      ParPat _ inner -> case_pattern inner
+      ConPat { pat_args = PrefixCon _ fields }
+        -> all (\(L _ field) -> case field of VarPat{} -> True; _ -> False) fields
+      _ -> False
     case_error :: TcM a
     case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
 tcRetainedCase _ _ _ = return Nothing
@@ -369,7 +370,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                   failWithTc (TcRnRetainedQuantificationError (RetainedResultKind result_ty))
               ; constructors <- mapM constructor alternatives
               ; let domain_cons = case splitTyConApp_maybe (coreFullView domain) of
-                      Just (tc, []) -> tyConDataCons tc
+                      Just (tc, _) -> tyConDataCons tc
                       _ -> []
                     cons = map fst constructors
               ; unless (not (null cons) && cons `equalLength` domain_cons
@@ -454,10 +455,11 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
            ; con <- tcRetainedCon domain pat
            ; maybe case_error return con }
     constructor (L match_loc _) = setSrcSpanA match_loc case_error
-    case_pattern (L _ (ParPat _ pat)) = case_pattern pat
-    case_pattern (L _ ConPat { pat_args = PrefixCon _ fields })
-      = all (\(L _ pat) -> case pat of VarPat{} -> True; _ -> False) fields
-    case_pattern _ = False
+    case_pattern pat = case unLoc (retainedConPat pat) of
+      ParPat _ inner -> case_pattern inner
+      ConPat { pat_args = PrefixCon _ fields }
+        -> all (\(L _ field) -> case field of VarPat{} -> True; _ -> False) fields
+      _ -> False
     case_error :: TcM a
     case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
 
@@ -479,8 +481,9 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
       | Just con <- isPromotedDataCon_maybe tc
       = case split_apps [] ty of
           (HsTyVar _ _ (L _ (WithUserRdr _ name)), source_args)
-            -> name == dataConName con && args `equalLength` source_args
-               && and (zipWith is_index args source_args)
+            -> let indices = drop (length (dataConUnivTyVars con)) args
+               in name == dataConName con && indices `equalLength` source_args
+                  && and (zipWith is_index indices source_args)
           _ -> False
     is_index _ _ = False
 
@@ -489,6 +492,10 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                -> (HsType GhcRn, [HsType GhcRn])
     split_apps args (HsParTy _ ty) = split_apps args (unLoc ty)
     split_apps args (HsAppTy _ fun arg) = split_apps (unLoc arg : args) (unLoc fun)
+    split_apps args (HsOpTy _ left op right)
+      = split_apps (unLoc left : unLoc right : args) (unLoc op)
+    split_apps args (HsExplicitListTy _ _ [])
+      = (HsTyVar noAnn IsPromoted (noLocA (noUserRdr (dataConName nilDataCon))), args)
     split_apps args ty = (ty, args)
 
     call_names :: [Name]
@@ -499,7 +506,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
     complete_constructor_rows
       = do { rows <- mapM row_constructor alternatives
            ; let expected = case splitTyConApp_maybe (coreFullView domain) of
-                   Just (tc, []) -> tyConDataCons tc
+                   Just (tc, _) -> tyConDataCons tc
                    _ -> []
            ; return $ case sequence rows of
                Just cons -> not (null cons) && cons `equalLength` expected
@@ -510,17 +517,17 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                                     , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
           = pattern_constructor pat
         row_constructor _ = return Nothing
-        pattern_constructor (L _ (ParPat _ pat)) = pattern_constructor pat
-        pattern_constructor (L _ (ConPat { pat_con = L _ name
-                                         , pat_args = PrefixCon _ fields }))
-          | all (\(L _ pat) -> case pat of VarPat{} -> True; _ -> False) fields
-          = do { con_like <- tcLookupConLike name
-               ; return $ case con_like of
-                   RealDataCon con
-                     | mkTyConTy (dataConTyCon con) `eqType` domain
-                     , fields `equalLength` dataConOrigArgTys con -> Just con
-                   _ -> Nothing }
-        pattern_constructor _ = return Nothing
+        pattern_constructor pat = case unLoc (retainedConPat pat) of
+          ParPat _ inner -> pattern_constructor inner
+          ConPat { pat_con = L _ name, pat_args = PrefixCon _ fields }
+            | all (\(L _ field) -> case field of VarPat{} -> True; _ -> False) fields
+            -> do { con_like <- tcLookupConLike name
+                  ; return $ case con_like of
+                      RealDataCon con
+                        | Just args <- nativeIndexDataConTyArgs domain con
+                        , fields `equalLength` dataConInstOrigArgTys con args -> Just con
+                      _ -> Nothing }
+          _ -> return Nothing
 
     -- | Inspect existing checked worker types without elaborating source values.
     known_application :: Data a => a -> TcM Bool
@@ -556,6 +563,8 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
         -- | Read the source application without checking its arguments.
         spine args (HsPar _ expr) = spine args (unLoc expr)
         spine args (HsApp _ fun arg) = spine (arg : args) (unLoc fun)
+        spine args (OpApp _ left op right) = spine (left : right : args) (unLoc op)
+        spine args (ExplicitList _ []) = Just (dataConName nilDataCon, args)
         spine args (HsVar _ (L _ (WithUserRdr _ name))) = Just (name, args)
         spine _ _ = Nothing
 
@@ -586,15 +595,14 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
           = do { con_like <- tcLookupConLike (noUserRdr name)
                ; case con_like of
                    RealDataCon con
-                     | isNativeIndexType expected
-                     , mkTyConTy (dataConTyCon con) `eqType` expected
-                     , ([], [], [], [], fields, _) <- dataConFullSig con
+                     | Just type_args <- nativeIndexDataConTyArgs expected con
+                     , let fields = dataConInstOrigArgTys con type_args
                      , fields `equalLength` args ->
                        do { values <- zipWithM
                               (\(Scaled _ ty) arg -> scalar_argument ty (unLoc arg)) fields args
                           ; return $ do
                               actuals <- sequence values
-                              let value = foldl' App (Var (dataConWorkId con)) actuals
+                              let value = foldl' App (Var (dataConWorkId con)) (map Type type_args ++ actuals)
                               _ <- exprToNativeIndex value
                               return value }
                    _ -> return Nothing }
@@ -989,7 +997,7 @@ retainedMatrixColumn plan (MG { mg_alts = L _ rows })
     source_argument _ = True
     constructor_pattern :: LPat GhcRn -> Bool
     constructor_pattern (L _ (ParPat _ pat)) = constructor_pattern pat
-    constructor_pattern (L _ ConPat{}) = True
+    constructor_pattern pat | ConPat{} <- unLoc (retainedConPat pat) = True
     constructor_pattern _ = False
 
 -- | Check a two-index matrix with an optional variable or wildcard fallback.
@@ -1024,7 +1032,7 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
     dictionary RetainedConDict{} = True
     dictionary _ = False
     domain_cons index = case splitTyConApp_maybe (coreFullView (varType index)) of
-      Just (tc, []) -> tyConDataCons tc
+      Just (tc, _) -> tyConDataCons tc
       _ -> []
     coverage_error = failWithTc (TcRnRetainedQuantificationError RetainedMatrixCoverage)
     pattern_error = failWithTc (TcRnRetainedQuantificationError RetainedMatrixPattern)
@@ -1096,9 +1104,9 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                Nothing -> return Nothing
                Just ((first_con, first_fields), (second_con, second_fields)) ->
                  do { first_cv <- newEvVar (mkNomEqPred (TermVarTy first_index)
-                                   (mkTyConApp (promoteDataCon first_con) (map TermVarTy first_fields)))
+                                   (retainedConIndex (varType first_index) first_con first_fields))
                     ; second_cv <- newEvVar (mkNomEqPred (TermVarTy second_index)
-                                    (mkTyConApp (promoteDataCon second_con) (map TermVarTy second_fields)))
+                                    (retainedConIndex (varType second_index) second_con second_fields))
                     ; return (Just (first_cv, second_cv)) }
            ; let transport ty = case cvs of
                    Nothing -> return (mkNomReflCo ty)
@@ -1118,9 +1126,10 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                  first_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType first_index))
                  renamed@(Match { m_pats = L renamed_loc renamed_pats })
                    = renameRetainedMatch names match
-                 prepared = case row of
-                   Just _ -> renamed
-                   Nothing -> renamed { m_pats = L renamed_loc (bind_wildcards 0 renamed_pats) }
+                 prepared = renamed { m_pats = L renamed_loc
+                   (retainedConPats [0, second_column+1] $ case row of
+                      Just _ -> renamed_pats
+                      Nothing -> bind_wildcards 0 renamed_pats) }
            ; L checked_loc checked <- tcMatchWithSource tcBody
                  (invis_pat_tys ++ first_arg : refined_args)
                  (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc prepared)
@@ -1251,7 +1260,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
     do { constructors <- mapM constructor matches
        ; let cons = map fst constructors
              domain_cons = case splitTyConApp_maybe (coreFullView (varType index)) of
-               Just (tc, []) -> tyConDataCons tc
+               Just (tc, _) -> tyConDataCons tc
                _ -> []
        ; unless (cons `equalLength` domain_cons && all (`elem` cons) domain_cons) $
            failWithTc (TcRnRetainedQuantificationError RetainedConstructorCoverage)
@@ -1313,7 +1322,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
            ; mapM_ (\pat -> unless (bare_variable pat) $
                         setSrcSpanA (getLoc pat) argument_error)
                (drop 1 (filter isVisArgLPat pats))
-           ; let constructor_index = mkTyConApp (promoteDataCon con) (map TermVarTy fields)
+           ; let constructor_index = retainedConIndex (varType index) con fields
            ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
            ; arg_cos <- mapM (tcRetainedCoercion index (mkCoVarCo cv) . scaledThing) arg_tys
            ; result_co <- tcRetainedCoercion index (mkCoVarCo cv) result_ty
@@ -1329,7 +1338,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                                  argument_plan arg_tys arg_cos
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
                  renamed = renameRetainedMatch names match
-                 match' = renamed { m_pats = fmap (insert_dictionaries argument_plan) (m_pats renamed) }
+                 match' = renamed { m_pats = fmap (insert_dictionaries argument_plan . retainedConPats [0]) (m_pats renamed) }
                  check = tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
                            (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc match')
            ; (ev_binds, L checked_loc checked) <- if null refined_givens
@@ -1393,6 +1402,17 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
 
     bare_variable (L _ VarPat{}) = True
     bare_variable _ = False
+
+-- | Expose constructor syntax at selected visible retained columns only.
+-- See Note [Parameterized retained constructor patterns] in GHC.Tc.Gen.Pat.
+retainedConPats :: [Int] -> [LPat GhcRn] -> [LPat GhcRn]
+retainedConPats columns = go 0
+  where
+    go _ [] = []
+    go column (pat : pats)
+      | not (isVisArgLPat pat) = pat : go column pats
+      | otherwise = (if column `elem` columns then retainedConPat pat else pat)
+                    : go (column+1) pats
 
 -- | Bind checked nominal constructor evidence on its actual pattern fields.
 addRetainedConProof :: EvVar -> TcEvBinds -> Pat GhcTc -> Pat GhcTc

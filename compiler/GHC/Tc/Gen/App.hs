@@ -57,7 +57,7 @@ import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv )
 import GHC.Core.Coercion
 
-import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy )
+import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
@@ -1495,13 +1495,20 @@ tcRetainedArg domain arg
           HsPar _ arg -> resolve env expected arg
           XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> resolve env expected arg
           HsApp _ fun arg -> resolve_app env expected fun arg
+          OpApp _ left op right -> resolve_app env expected (nlHsApp op left) right
+          ExplicitList _ elements
+            | Just [element_ty] <- nativeIndexDataConTyArgs expected nilDataCon
+            -> do { nil <- constructor expected nilDataCon
+                  ; cons <- constructor expected consDataCon
+                  ; values <- mapM (resolve env element_ty) elements
+                  ; return (foldr (\value rest -> Core.mkApps cons [value, rest]) nil values) }
           HsVar _ lname
             | Just arg_id <- lookupNameEnv env (unLocWithUserRdr lname)
             -> return (Core.Var arg_id)
             | isDataOcc (nameOccName (unLocWithUserRdr lname))
             -> do { con <- tcLookupConLike (unLoc lname)
                   ; case con of
-                      RealDataCon dc -> return (Core.Var (dataConWorkId dc))
+                      RealDataCon dc -> constructor expected dc
                       _ -> unsupported }
             | otherwise
             -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
@@ -1513,6 +1520,11 @@ tcRetainedArg domain arg
                                 else unsupported }
                       _ -> unsupported }
           _ -> unsupported
+
+    -- Instantiate the erased parameters from the complete expected domain.
+    constructor expected dc = case nativeIndexDataConTyArgs expected dc of
+      Just tys -> return (Core.mkTyApps (Core.Var (dataConWorkId dc)) tys)
+      Nothing -> unsupported
 
     resolve_app :: NameEnv Id -> Type -> LHsExpr GhcRn -> LHsExpr GhcRn
                 -> TcM Core.CoreExpr

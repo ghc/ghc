@@ -1641,7 +1641,7 @@ lintCaseExpr scrut case_bndr alt_ty alts
     is_default (Alt DEFAULT _ _) = True
     is_default _ = False
     covers_domain ty
-      | isNativeIndexType ty, Just (tc, []) <- splitTyConApp_maybe ty
+      | isNativeIndexType ty, Just (tc, _) <- splitTyConApp_maybe ty
       = all (\con -> any (has_con con) alts) (tyConDataCons tc)
       | otherwise = False
     has_con expected (Alt (DataAlt con) _ _) = con == expected
@@ -1803,13 +1803,14 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
     ; lintL (isCoVar cv && isLocalId cv && not (cv `elemInScopeSet` in_scope)
              && not (cv `elemVarSet` field_set))
         (text "Native index evidence requires a fresh local CoVar:" <+> ppr cv)
-    ; ensureEqTys scrut_ty (mkTyConTy (dataConTyCon con))
-        (mkBadPatMsg scrut_ty (mkTyConTy (dataConTyCon con)))
-    ; let payload_ty = dataConRepType con
-          multiplicities = map scaledMult (dataConRepArgTys con)
+    ; ty_args <- case nativeIndexDataConTyArgs scrut_ty con of
+        Just tys -> return tys
+        Nothing -> failWithL (text "Unsupported native index constructor domain:" <+> ppr scrut_ty)
+    ; let payload_ty = piResultTys (dataConRepType con) ty_args
+          multiplicities = map scaledMult (dataConInstArgTys con ty_args)
     ; lintBinders CasePatBind fields $ do
       { let expected = mkNomEqPred index
-                         (mkTyConApp (promoteDataCon con) (map TermVarTy fields))
+                         (mkTyConApp (promoteDataCon con) (ty_args ++ map TermVarTy fields))
       ; ensureEqTys (varType cv) expected
           (text "Invalid nominal index branch evidence:" <+> ppr cv <+> dcolon <+> ppr (varType cv))
       ; lintBinder CasePatBind cv $ do

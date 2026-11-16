@@ -883,12 +883,28 @@ checkedNativeCallArgument bound expr
                   Just core_fun -> do
                     { arg' <- checkedNativeCallArgument bound arg
                     ; return (Core.App core_fun <$> arg') } }
-      XExpr (WrapExpr WpHole inner)
-        -> checkedNativeCallArgument bound (noLocA inner)
+      XExpr (WrapExpr wrapper inner)
+        | Just tys <- type_arguments wrapper
+        -> do { tys <- mapM (liftZonkM . zonkTcType) tys
+              ; value <- checkedNativeCallArgument bound (noLocA inner)
+              ; return ((`Core.mkTyApps` tys) <$> value) }
+      ExplicitList element_ty elements
+        -> do { element_ty <- liftZonkM (zonkTcType element_ty)
+              ; values <- mapM (checkedNativeCallArgument bound) elements
+              ; let nil = Core.mkConApp nilDataCon [Core.Type element_ty]
+                    cons value rest = Core.mkConApp consDataCon [Core.Type element_ty, value, rest]
+              ; return (foldr cons nil <$> sequence values) }
       XExpr (ExpandedThingTc (HSE _ inner))
         -> checkedNativeCallArgument bound inner
       _ -> return Nothing
   where
+    -- Read only erased type application wrappers, in application order.
+    type_arguments WpHole = Just []
+    type_arguments (WpTyApp ty) = Just [ty]
+    type_arguments (WpCompose outer inner)
+      = (++) <$> type_arguments inner <*> type_arguments outer
+    type_arguments _ = Nothing
+
     -- | Read only the existing transparent checked expression forms.
     strip_checked :: LHsExpr GhcTc -> LHsExpr GhcTc
     strip_checked expr = case unLoc (stripParensLHsExpr expr) of
