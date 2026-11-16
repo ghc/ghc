@@ -3631,7 +3631,8 @@ program goal stay open.
 
 ### M54: diagnostics for detected recursive interface-domain failures
 
-Status: implemented; validation pending. Keep the full program goal active.
+Status: implemented and validated; artifact audit and publication pending.
+Keep the full program goal active.
 
 Force the existing native interface eligibility results inside an IO exception
 boundary. Catch only `NonTermination`. Report the failure through `failIfM`.
@@ -3659,7 +3660,24 @@ The research and primary-source provenance are in
   diagnostic text. A timeout, raw `NonTermination` or unrelated exception fails
   the check. Include valid recursive domains, a synonym-hidden failure and an
   ordinary field with a valid retained function type.
-- [ ] Build both stages and run focused API, source, Showcase and registered
+- [x] Build both stages and run focused API, source, Showcase and registered
   checks. Keep the existing goldens and separate structural/runtime evidence.
 - [ ] Update references, contracts and publication status. Preserve failed
   attempts. Keep shape-first loading, C1, C2 and R22 open.
+
+Validation uses compiler `4ab0e9f75a469fc4384d04f9cd18656216757a64` and source
+`a75239d10b109f3608da6c2e133c01b7c3ffc0bb`: 86 selected compiler inputs and
+115 source paths. The final bootstrap build passes in 16.88 seconds. The
+self-hosted build passes in 6 minutes 54 seconds, with peak memory 4,492 MiB
+under the 16 GiB cap and zero swap. API goldens stay at 1/37 lines. The 334
+actual inputs per API phase are unchanged after self-hosting. Both stages
+pass the 19-result object program and the 53-line Showcase from 13 modules.
+Registered self-hosted validation has 39 cases, 34 skips and five expected
+passes. It has no unexpected results or framework warnings or failures.
+
+The fixture checks nine invalid declaration graphs in both compression modes.
+It also checks nine valid graph and forcing-order cases in both modes. The
+six earlier rejection graphs remain. The initial bootstrap warning and
+successful API attempt remain recorded. Final validation includes the later
+field-synonym case and its explicit domain-classification demand. No old
+executable, broad historical matrix or full GHC suite was run.

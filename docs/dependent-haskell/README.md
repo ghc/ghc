@@ -76,6 +76,7 @@ optimization support or full roadmap completion.
 | Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
+| Detected recursive interface domains | M54 reports detected `NonTermination` through normal interface errors; loader staging and termination remain open |
 | Configured fork version | `10.1.20261115.1`, with interface header `1001202611151`; matching compiler and libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
@@ -4566,3 +4567,39 @@ recursive interface validation remain open. See the
 [contract](CORE.md#native-dead-local-bindings),
 [checklist](PLAN.md#m53-native-dead-local-binding-analysis), and
 [prior art](REFERENCES.md#native-dead-local-binding-analysis-prior-art).
+
+## M54: diagnostics for detected recursive interface-domain failures
+
+A generic retained Pi in an ordinary imported field could force its own
+unfinished domain information. The runtime raised `NonTermination` for the
+six measured function-shaped and scalar-shaped knots. M54 catches that
+exception at the four native interface classifier sites and reports a normal
+interface error. It keeps the predicates and their order. It does not return
+an unchecked Type or retry an active decoder.
+
+Nine negative declaration graphs require both diagnostic sentences in each
+compression mode: 18 negative cases. Nine valid declaration and forcing-order
+cases give 18 positive cases. They cover first-order recursive domains,
+nullary synonyms and an ordinary field containing a nonvacuous Boolean Pi.
+The six earlier retained-field rejection graphs remain and now use both modes.
+A raw exception or timeout does not satisfy a negative check.
+
+Both compiler builds and both API fixtures pass. Their 334 actual inputs per
+API phase are unchanged after self-hosting. Both stages pass the 19-result
+separate-module source program and the 53-line Showcase from 13 modules.
+The registered self-hosted run has 39 cases, 34 skips and five expected passes.
+It has no unexpected results or framework warnings or failures.
+This increment adds no source runtime feature or interface format.
+The runtime does not guarantee detection of every loop. Shape-first loading,
+C1, C2 and R22 remain open. See the
+[contract](CORE.md#detected-recursive-interface-domains),
+[plan](PLAN.md#m54-diagnostics-for-detected-recursive-interface-domain-failures),
+and [prior art](REFERENCES.md#detected-recursive-interface-domains-prior-art).
+
+The first bootstrap build passed with a redundant-import warning. The final
+bootstrap build removes that import and passes without warnings. The first
+API run remains historical evidence. The final fixture also forces domain
+classification for a dependent function hidden in a field synonym. Raw field
+free variables alone do not demand that synonym's RHS. The final API run,
+both source stages and the registered run use this final fixture.
+Artifact audit and publication are pending.

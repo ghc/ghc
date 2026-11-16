@@ -205,6 +205,10 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   scope, multiplicity and Strict-mode boundaries. Its
   [source contract](CORE.md#bounded-source-beta-applications) preserves ordinary
   usage checking. The full C1 obligation remains open.
+  M54 reports detected recursive interface-domain failures through the normal
+  interface diagnostic path. It preserves valid first-order recursive domains
+  and ordinary fields containing valid retained Pi types. This is not a
+  shape-first loader, guaranteed loop detection or a termination proof.
   M42 adds scoped opaque call indices with independently closed scalar input
   and result domains. It checks forward nominal congruence, conservative
   noninjectivity, function-head substitution and actual strict-call lowering.

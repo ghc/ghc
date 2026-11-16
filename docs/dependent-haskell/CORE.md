@@ -2147,3 +2147,33 @@ C1, C2, R22 and malformed recursive interface validation remain open.
 See Note [Native dead local bindings] in `GHC.Core.Opt.OccurAnal`, the
 [plan](PLAN.md#m53-native-dead-local-binding-analysis), and the
 [Agda and GHC prior art](REFERENCES.md#native-dead-local-binding-analysis-prior-art).
+
+## Detected recursive interface domains
+
+M54 evaluates each existing native interface eligibility result inside IO.
+`evaluateIfaceNativeDomain` catches only `NonTermination` and calls `failIfM`:
+
+```text
+Cannot validate retained type in interface: <encoded name>
+Validation encountered recursive type information.
+```
+
+The boundary covers generic retained binders, scalar indices, opaque call
+heads and retained constructor fields. Existing predicates and guard order
+remain unchanged. Validation stays at each reader boundary. The diagnostic
+uses the encoded name. Printing the incomplete Type could force it again.
+The reader returns no placeholder and does not retry the active decoder.
+Other exceptions, including asynchronous exceptions, propagate unchanged.
+
+The fixture requires these normal interface errors for nine declaration
+graphs in both compression modes: 18 negative cases. Nine valid declaration
+and forcing-order cases give 18 positive cases. They include self-recursive
+and mutually recursive first-order domains, nullary synonyms, and an ordinary
+field containing a valid nonvacuous Boolean Pi. The six earlier retained-field
+rejection graphs also run in both modes. Raw exceptions and timeouts fail.
+
+This reports detected failures. It does not stage the loader or guarantee
+loop detection or termination. Shape-first loading, C1, C2 and R22 remain open.
+It adds no source feature, Core rule or interface encoding. See Note
+[Detected recursive native interface domains] in GHC.IfaceToCore and the
+[primary sources](REFERENCES.md#detected-recursive-interface-domains-prior-art).

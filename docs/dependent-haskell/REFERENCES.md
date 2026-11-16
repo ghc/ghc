@@ -3472,3 +3472,37 @@ full source fetches with verified Git blobs and 22 selected reading ranges.
 The selected reading covers 1,360 lines. It does not claim full-file reading,
 a new paper, a proof replay or a preservation theorem for this GHC pass.
 The seven-work/nine-PDF ledger stays unchanged.
+
+### Detected recursive interface domains prior art
+
+GHC's pinned [interface knot Note, lines170–208](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/IfaceToCore.hs#L170-L208)
+makes the caller responsible for tying the environment knot. The
+[lazy argument discussion, lines660–702](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/IfaceToCore.hs#L660-L702)
+explains why loading constructor arguments eagerly can loop. The
+[implicit-name invariant, lines1031–1068](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/IfaceToCore.hs#L1031-L1068)
+requires name lookup to avoid suspended type checks. The file's Git blob is
+`a6997bcc145e4ea36b78e0cb144ece139c34dffd`.
+
+Agda v2.8.0 registers
+[`DataOrRecSig`, lines681–710](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Decl.hs#L681-L710)
+and performs [post-mutual checks, lines265–280](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Decl.hs#L265-L280).
+The Decl.hs blob is `0f1b76bbfe65bc8c1a93c4ad77a8539752196861`.
+[Datatype checking, lines129–204](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Data.hs#L129-L204)
+installs datatype information before adding constructors. The Data.hs blob is
+`349a3c508d8a77d8f86b41decedec6de9a4d7afc`. These are staging precedents.
+They do not prove progress for GHC's lazy loader or implement a shape-first
+loader in this fork.
+
+The local [runtime definition, lines384–395](../../libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs#L384-L395)
+defines `NonTermination` and its `<<loop>>` display. It explicitly gives no
+guarantee that the runtime will detect an arbitrary loop. M54 catches this
+specific exception at the existing four native interface classifier sites.
+It changes diagnostic containment, not staging or the accepted domain rules.
+
+The selected readings and verified source hashes are recorded in
+`native-domain-loader-next-research-v1/reading.json`. Its bundle manifest
+`SHA256SUMS` has SHA256
+`804ddefdc5d64191fb5214f9a5acca7099a5c877e6805e65274ecd371cabc5ba`.
+`native-domain-loader-review-v1/exception-boundary-addendum.md` records the
+separate exception-boundary review. No new paper or whole-file reading is
+claimed. The seven-work/nine-PDF ledger is unchanged.
