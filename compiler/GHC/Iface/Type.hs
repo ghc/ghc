@@ -1909,6 +1909,8 @@ application remains a TyConApp, so it does not use the FunTy arrow printer.
 Print that argument even when other invisible arguments are hidden. Otherwise
 FUN @M Many and FUN @U Many print alike. The same rule preserves variables
 and computed metadata. Keep the remaining argument visibilities unchanged.
+Render the matchability argument directly. ppr_app_arg hides specified arguments
+when explicit kind printing is off, even if its caller retains the argument.
 See Note [Arrow matchability in Haddock] in Haddock.Convert for source ASTs.
 -}
 
@@ -1957,7 +1959,7 @@ pprTyTcApp ctxt_prec tc tys =
        , IA_Arg ma ma_flag args <- tys
        , isInvisibleForAllTyFlag (ifaceForAllTyFlag ma_flag)
        -> pprIfacePrefixApp ctxt_prec (pprParendIfaceTyCon tc) $
-          ppr_app_arg appPrec (ma, ifaceForAllTyFlag ma_flag) :
+          (char '@' <> ppr_ty appPrec ma) :
           map (ppr_app_arg appPrec) (appArgsIfaceTypesForAllTyFlags $
             stripInvisArgs (PrintExplicitKinds print_kinds) args)
 
