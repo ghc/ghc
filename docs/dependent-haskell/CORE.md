@@ -462,6 +462,39 @@ checking, singletons proof values, and GHC's equality datatype. Agda selects
 datatype parameters before checking the target. This fallback selects candidates
 per result argument and keeps full ordinary subsumption. The algorithms differ.
 
+## Ordinary callers of retained APIs
+
+Explicit dependent source syntax requires ExperimentalDependentTypes. An
+imported native type retains its contract in a module without that extension.
+M68 selects the existing application helpers from the source flag or an
+available native type. Inspect the zonked head and expected types. Reuse the
+declared argument anchors from tcRetainedInferableArg. These probes do not
+check occurrences, record usage, instantiate a signature or expand source.
+
+Pass this application capability through immutable index selection, post-VTA
+caching, dollar applications and evidence capture. A known native callback
+type also enables its existing checking path. Keep complete substitutions,
+kind and concreteness checks, exact domains, runtime Id scope, IALL order,
+cached usage and final subsumption. Preserve the original imported signature.
+Never assign a native type to an ordinary mutable meta-variable.
+
+Capture a native class Wanted below the runtime binder on which its predicate
+depends. The source flag does not change this evidence obligation. Incomplete
+immutable choices can retain DoQL. Reject actual zonked native types before
+Quick Look traverses or assigns them, in either language mode. This check does
+not add native Quick Look support.
+
+The ordinary example exports Nat -> a -> [a] and [a] -> [a]. Its implementation
+uses replicateNative and genericVector, then toList. These ordinary result
+types come from written API signatures. They do not erase an imported indexed
+contract. See Note [Imported native application contracts] in GHC.Tc.Gen.App
+and [the M68 plan](PLAN.md#m68-ordinary-callers-of-retained-apis).
+
+Container and dependent-case inference in GHC.Tc.Gen.Expr keep their existing
+source-flag policy. Native Core detection still controls the restricted
+pipeline, including for ordinary callers. General optimization, unfolding
+serialization, invisible retained binders and totality checking remain open.
+
 ## Generic retained argument inference
 
 An ordinary erased argument can denote a whole type that contains a runtime

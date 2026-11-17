@@ -10,11 +10,12 @@ functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
 Last updated: 2026-11-17.
 
-M67 passes both compiler builds and the selected checks. It supports generic
-nil/cons refinement and nominal transport when an earlier runtime index changes
-a later domain. Both stages run the 116-observation Showcase through sixteen
-modules. Seven selected registered tests pass; the full GHC suite was not run.
-See [the implementation record](PLAN.md#m67-generic-domains-source-and-self-hosted-validation).
+M68 passes both compiler builds and the selected checks. Ordinary modules can
+use imported retained contracts through the supported application paths. Their
+source flag does not remove indexed type or dictionary-scope checks. Both stages
+run the Showcase with 118 output lines through seventeen modules. This count
+includes the banner. Seven selected registered tests pass; the full GHC suite
+was not run. See [the implementation record](PLAN.md#m68-ordinary-callers-of-retained-apis).
 
 ## Project documents
 
@@ -69,6 +70,7 @@ _build/showcase/showcase
 | Complete explicit worker types, runtime application and lazy containers | `completeFunctionArguments` |
 | Constructor and runtime arrow matchability, with distinct reflection identities | `arrowMatchability` |
 | Generic lists, opaque elements, dependent element domains and lazy prefixes | `genericListIndexing` |
+| Retained imports used by a module without dependent source syntax | `ordinaryModuleCalls` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -77,18 +79,24 @@ M59 compiler audit passes. M60 adds source composition with that compiler.
 M61 also passes the unchanged 84-line program with both rebuilt stages.
 M62 extends the program to 88 lines through the same fourteen modules.
 M63 passes 91 lines through those fourteen modules in both compiler stages.
-It appends three public matchability observations. Publication remains pending.
+It appends three public matchability observations.
 M65 adds five observations and two provider modules for function values in
 algebraic indices. Both rebuilt stages pass all 100 lines from sixteen modules.
 Each stage also passes twelve runtime observations through a separate producer
 and interface-only client. The seven selected registered tests pass.
-M67 extends the program to 116 observations through those sixteen modules.
+M67 extends the program to 116 output lines through those sixteen modules.
 Its maintained source fixture separately checks twenty generic observations
 and two located rejections. Old compilers reject the new generic interface at
 the typed gate between ordinary positive controls. The encoding is unchanged.
 General source domains, function promotion, native unfoldings, ordinary
 optimization and totality remain open. Opaque function identity retains the
 separate fixed native-call policy.
+M68 appends two observations through OrdinaryVecClient, which explicitly
+disables ExperimentalDependentTypes. Its exported list functions use the
+retained replicateNative and genericVector contracts internally. Both stages
+pass 118 output lines through seventeen modules. The maintained fixture also
+checks twelve paired positive clients and four paired rejections quietly.
+These checks overlap with the Showcase. Do not add them as feature totals.
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
@@ -127,7 +135,8 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M66 passes the full self-hosted build, both-stage source and diagnostic checks, Showcase100/16 and seven registered tests including API1/37; M62 remains the published checkpoint |
+| Compiler validation | M68 passes both builds, paired source and diagnostic checks, Showcase118/17 and seven selected registered tests. API stdout goldens remain 1/37. |
+| Ordinary callers of retained APIs | M68 selects application checking from imported native contracts. Erased-index inference, scoped callback dictionaries, linear argument rejection and native Quick Look exclusion pass in both language modes. |
 | Ordinary-arrow matchability | M63 retains type-valued metadata through Core, coercions, interfaces and reflection; M64 extends this foundation to foralls; source family unsaturation remains open |
 | Forall matchability | M64 carries per-binder annotations and nominal evidence through Core, source, interfaces, HIE, TH and supported reflection; runtime abstractions require U; selected source, scope, role and printer checks pass |
 | Function values in algebraic indices | M65 stores eligible fixed U/Many functions in closed domains, preserves family application proofs and later fields, and checks runtime demand across interfaces |
@@ -173,7 +182,7 @@ optimization support or full roadmap completion.
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | `Showcase.hs` passes both compilers with 100 finite output lines through sixteen modules; R22/C1/C2 remain open |
+| Maintained showcase | `Showcase.hs` passes both compilers with 118 output lines, including the banner, through seventeen modules. R03, R05 and R23 remain open. |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -191,7 +200,7 @@ values in closed algebraic indices. Its [validation record](PLAN.md#m65-validati
 separates the two compiler stages, interface controls and registered tests.
 The [M66 validation](PLAN.md#final-m66-validation) checks bounded native family
 views in both stages. It preserves nominal proofs and cached usage. The
-maintained Showcase remains at 100 observations through sixteen modules.
+maintained Showcase at M66 has 100 output lines through sixteen modules.
 
 ## Native Core implementation
 

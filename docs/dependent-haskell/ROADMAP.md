@@ -50,8 +50,9 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-The published compiler checkpoint is M62. Both stages pass the 88-observation
-Showcase through fourteen source modules. M62 supplies its latest source group.
+The latest validated checkpoint is M68. Both stages pass the Showcase with 118
+output lines through seventeen source modules. The count includes the banner.
+M62 supplied the earlier 88-line source group through fourteen modules.
 M56 provides
 the closed parameterized domains. M57 provides nominal scalar-domain conversion
 in Core. M58 exposes that conversion and scoped body solving from source.
@@ -95,11 +96,12 @@ can advance a card while the card remains open.
 | 2 | R03: safe indexing over a retained `[Bool]` | Complete bounded increment: M60 | Both stages and the evidence audit pass. The next compiler task is the R05 opaque-cast probe. |
 | 3 | R05: application through opaque whole-function evidence | Complete bounded increment: M61 | Both builds, selected cohort and independent audit pass. Typed opaque proof projection remains separate. |
 | 4 | R03: explicit complete retained-function type arguments | Complete bounded increment: M62 | Both builds, nested source arguments, worker demand, the selected cohort and independent audit pass. Next: the R23 foundation. |
-| 5 | R23: matchability foundation; also advances R05 | M63/M64 foundation passes selected builds and checks; publication pending | Explicit arrow and forall metadata pass Core, source, interface, TH and reflection checks. The generic native client and source family unsaturation remain open. |
+| 5 | R23: matchability foundation; also advances R05 | M63/M64 foundation integrated and published | Explicit arrow and forall metadata pass Core, source, interface, TH and reflection checks. The generic native client and source family unsaturation remain open. |
 | 6 | R05: function values in closed algebraic indices; enables R03 source work | Complete bounded increment: M65 | Both rebuilt stages pass source/interface controls and Showcase100/16. Seven registered tests pass. Generic `[a]`, higher-order endpoints and changed dependent domains remain open. |
 | 7 | R05: bounded family views in native frontend inference | Complete bounded increment: M66 | Both builds, exact source diagnostics, finite controls, Showcase100/16 and seven registered tests pass. Other pure normalization paths remain separate. |
 | 8 | R05: structural generic domains and dependent-domain transport; enables R03 | Complete bounded increment: M67 | Both builds, selected API/source controls, Showcase116/16 and seven registered tests pass. Generic elements include arbitrary lifted and runtime-index-bearing values. Old readers reject the new typed signature cleanly. R05 and general source domains remain open. See M67 in PLAN.md. |
-| 9 | R03: ordinary callers of imported retained APIs; preserves R05 evidence | M68 baseline measured; implementation pending | Direct calls already pass without the extension. Three ordinary consumers need contextual index inference. Preserve dictionary scope, callback scope, multiplicities and native Quick Look exclusion. See M68 in PLAN.md. |
+| 9 | R03: ordinary callers of imported retained APIs; preserves R05 evidence | Complete bounded increment: M68 | Both rebuilt stages pass source/interface checks, scope and multiplicity controls, Showcase118/17 and seven registered tests. Published M67 readers accept the interfaces. Explicit syntax, Expr inference modes and native pipeline policies retain their scope. |
+| 10 | R03: safe indexing over a generic retained list | Prepared source candidate; unexecuted | Reuse M60 Fin and M67 GenericCount/transport. Check function-valued and runtime-index-bearing elements. No new compiler rule is selected. See the R03 feature page. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -118,11 +120,13 @@ complete R05, R03 or R23.
 
 M67 adds generic `[a]` constructor refinement and nominal transport through
 later dependent domains. M68 measures direct retained API use without the
-dependent extension. Direct calls pass; three ordinary consumers reject when
-their erased index cannot be inferred. The selected increment uses imported
-type contracts to enable the existing application checker. Explicit dependent
+dependent extension. At baseline, three ordinary consumers reject because
+their erased index cannot be inferred. M68 uses imported type contracts to
+enable the existing application checker. Explicit dependent
 syntax and the restricted native pipeline keep their current policies.
-The local subset and dependent-base tasks below retain their own scope.
+Both rebuilt stages and the selected tests pass that bounded application change.
+The next R03 source candidate is generic safe indexing. The local subset and
+dependent-base tasks below retain their own scope.
 
 The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks
 serially under the configured memory cap. This execution policy does not add

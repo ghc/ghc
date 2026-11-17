@@ -19,8 +19,9 @@ prerequisites, acceptance checks and the behavior that remains unsupported.
 
 The current increment is [M68](#m68-ordinary-callers-of-retained-apis), owned by
 [R03 dependent products](roadmap/R03-dependent-products.md), with R05 scope and
-evidence obligations. M67 is published at d430f27102. Both main compilers build
-and pass Showcase116/16. The user resumed GHC execution on 2026-11-16 at
+evidence obligations. Both rebuilt compilers pass the selected checks and
+Showcase118/17. Its published predecessor is M67 at d430f27102.
+The user resumed GHC execution on 2026-11-16 at
 17:53 CET.
 
 The [R23 matchability foundation](roadmap/R23-unsaturated-type-families.md)
@@ -5405,8 +5406,7 @@ the extension boundary or adding a requested-length list adapter.
 ## M68: ordinary callers of retained APIs
 
 Roadmap owner: R03. Related card: R05. Prerequisite: validated M67.
-Status: source baseline measured; type-aware application checking selected.
-Implementation and self-hosted validation remain pending.
+Status: implemented. Both rebuilt stages and the selected checks pass.
 
 Keep explicit dependent source syntax opt-in. An imported retained signature
 already states an indexed contract. Ordinary callers can use its runtime
@@ -5477,20 +5477,20 @@ native unfolding serialization remain R05 work.
 
 - [x] Measure direct calls and ordinary consumers separately in paired source
       clients. Keep the exact compiler, source, interface and stdout evidence.
-- [ ] Pass all six pairs through separate producer and interface-only consumer
+- [x] Pass all six pairs through separate producer and interface-only consumer
       modules in both rebuilt compiler stages: thirteen observations per mode.
-- [ ] Preserve the located n/m mismatch in both modes after their positives.
+- [x] Preserve the located n/m mismatch in both modes after their positives.
       Keep original imported signatures and nominal equality requirements.
-- [ ] Check a native class dictionary and a retained callback with an actual
+- [x] Check a native class dictionary and a retained callback with an actual
       runtime length. Reject callback index escape and linear retained actuals.
       Establish their corresponding positives before interpreting failures.
-- [ ] Add a small NoEDT source provider to the example library. Export ordinary
+- [x] Add a small NoEDT source provider to the example library. Export ordinary
       replicate and generic round-trip functions using retained imports. Extend
       Showcase by two observations through this seventeenth source module.
-- [ ] Build both compilers and utilities. Preserve the selected API/source
-      cohort, registered tests, typed reader controls and current diagnostics.
+- [x] Build both compilers and utilities. Preserve the selected API/source
+      cohort, registered tests, published-reader controls and current diagnostics.
       Record formatter results separately from executable checks.
-- [ ] Update the owning roadmap pages, source contract and references. Keep R03,
+- [x] Update the owning roadmap pages, source contract and references. Keep R03,
       R05, the remaining expression modes and the full project goal open.
 
 ### Prior art and boundary
@@ -5506,3 +5506,73 @@ See the M68 entry in REFERENCES.md. This work adds no equality rule, source
 universe, term evaluator, totality checker or wire encoding. It does not erase
 a dependency at a module boundary. A passing client establishes only its stated
 application, inference, scope and runtime behavior.
+
+### M68 bootstrap validation
+
+The isolated bootstrap build v2 passes in 302.01 seconds at a 3705 MiB peak.
+The expanded Showcase matches 118 output lines through seventeen source
+modules. This count includes the banner. The two appended observations call
+OrdinaryVecClient, which explicitly disables the source extension. The prior
+116 output lines remain byte-for-byte identical to the authored oracle.
+
+The paired interface-only source collection accepts twenty clients and checks
+forty finite observations. Each mode passes the six original cases, dictionary
+and callback positives, and the complete-native and ordinary Quick Look
+controls. Both modes retain the located n/m mismatch at 10:75. The callback
+escape rejects at 11:52 with GHC-25897. Its inferred result r cannot contain
+Vec Int n. The linear argument rejects at 13:35 with GHC-83605: Many is required
+and One is supplied. The incomplete const rightZero rejects at 11:20 with the
+existing native Quick Look diagnostic, GHC-83605. These rejections have their
+same-mode positive prerequisites. No parser or missing-interface failure is
+counted as semantic evidence.
+
+The executed reports preserve source and artifact hashes. A separate diagnostic
+review pins the report and each new rejection. The original collection remains
+unchanged. Receipts use native-module-interoperability-* under
+_build/verification. Both rebuilt stages and the maintained fixture remain
+required before publication.
+
+### M68 self-hosted validation
+
+The full isolated build v1 passes in 948.17 seconds at a 7544 MiB peak. It builds
+both compilers, target libraries and the selected utilities. Both stages pass
+the paired source collection: forty clients and eighty finite observations.
+The separate diagnostic review confirms twelve new rejection events. The four
+n/m mismatch events already have strict semantic checks in the execution
+report. No new equality or Quick Look admission rule is used.
+
+The maintained fixture compiles twelve positive pairs through interfaces.
+It checks 52 data lines and 24 labels. The callback dictionary case checks both
+direct measure and partial-VTA measureVia inside withPacked. All four rejection
+pairs pass after these positives. The visible API goldens remain 1/37.
+Both rebuilt stages match all 118 Showcase output lines through seventeen modules.
+The seven selected registered tests pass with 54 skipped ways and no unexpected
+results or framework warnings. The complete GHC suite was not run.
+
+The first maintained run finds only a test assertion difference: the API prints
+promoted 'One, while the CLI prints One. The corrected check retains the code,
+real source span, Many requirement and actual One. Build v2 verifies that this
+single literal is the only changed source. Its compiler binaries are identical
+to v1. All 9551 compiler/library artifacts pinned by the raw source checks still
+match. Regression v2 and the registered self-hosted test execute the correction.
+The first failed receipt remains available.
+
+Published M67 readers accept new generic interfaces and the new ordinary wrapper
+interface. Each stage passes eight compile-only commands. Ordinary interfaces
+load before and after the native interface. These are positive compatibility
+checks. The older f315 typed-gate rejection remains historical M67 evidence.
+No wire field, tag or header changes in M68.
+
+Fourmolu parses App.hs when supplied with the compiler package's GHC2024 setting.
+It reports style differences there and in the existing API fixture. It does not
+recognize the two example modules' custom extension names. Cabal-gild reports
+the unchanged compiler template's formatting difference. These read-only results
+are observations. No formatting pass is claimed.
+
+Receipts use native-module-interoperability-* under _build/verification:
+selfhost-build-v2, source-both-v1 and its separate diagnostic review,
+regression-v2, kernel-v1, showcase-v1, registered-v1 and published-reader-v1.
+The final source review must permit only Markdown changes after this validation.
+Rebuild the exact committed HEAD in the main checkout before publication. Run
+the matching both-stage Showcase and retain a separate publication receipt.
+R03, R05 and the full project goal remain open.

@@ -4226,3 +4226,25 @@ is native-module-interoperability-baseline-stage0-v1. It distinguishes direct
 retained calls from an ordinary consumer's erased-index inference. Source and
 artifact hashes, conditional rejection controls and authored stdout oracles
 remain in those records. See [the bounded plan](PLAN.md#m68-ordinary-callers-of-retained-apis).
+
+The App-only implementation is pinned by
+native-module-interoperability-app-preparation-v2. Its proposed App.hs SHA256
+is 0db8b4f3c5ea1e8d41ad012aa53c51fd34d67aed8d700815f97d1dc0e936e461.
+The bootstrap build v2 and source-bootstrap-v1 execute those bytes. The separate
+source-bootstrap-diagnostic-review-v1 confirms the callback, multiplicity and
+Quick Look diagnostics after their positives. These are application and scope
+checks. They do not establish a preservation theorem for the extended Core.
+
+The full M68 evidence is recorded in PLAN.md. The API printer adds a promotion
+tick to One in the multiplicity diagnostic. Its test checks the same code,
+source span and semantic fragments independently of that display choice.
+The corrected fixture changes one literal. Both compiler binaries and the 9551
+source-check runtime artifacts remain identical. Published M67 interface readers
+accept the new interfaces. This is compile-only compatibility evidence.
+
+The next R03 candidate uses existing Fin and GenericCount. The ignored
+native-generic-safe-index-next-candidate-v1 report pins the current libraries
+and the previously read Agda telescope and pattern code. It proposes generic
+safe indexing, including function-valued and runtime-index-bearing elements.
+It is a static source-composition review. No implementation, execution or new
+compiler rule is claimed by that report.

@@ -29,7 +29,11 @@ all Core transformations. Normal optimization remains a broader release gate.
 - Complete retained-function type arguments at M62. Both stages pass nested
   container formation, worker demand, ambient indices and located partial-type
   rejection. Required type arguments also check holes combined after renaming.
-  Its independent audit passes. The maintained Showcase now has 88 observations.
+  Its independent audit passes. The M62 Showcase has 88 output lines.
+- Generic structural lists and runtime-index-bearing element domains at M67.
+- Imported retained application contracts in ordinary modules at M68. Both
+  rebuilt stages pass paired clients, scoped callback dictionaries and located
+  rejections. The Showcase has 118 output lines through seventeen modules.
 
 The published M60 checkpoint appends five observations to M59's 79-line prefix
 and passes all 84 with both compilers. Its separate evidence audit passes.
@@ -56,13 +60,17 @@ M58 and M59 expose those rules through source checking.
       kind, scope and native-meta checks. Check full worker WHNF separately
       from direct `seq` representation polymorphism and outer Quick Look.
 - [ ] After the R05 generic-domain work, measure
-      `forall a. foreach (xs :: [a]) -> Fin (CountAny xs) -> a`.
-      Include function-valued elements. Keep the family saturated.
+      `forall a. foreach (xs :: [a]) -> Fin (GenericCount xs) -> a`.
+      Reuse Fin from ParameterizedIndexLibrary and GenericCount from
+      PackedVecLibrary. Include function-valued and runtime-index-bearing
+      elements, signed bounds, lazy fields and finite cyclic access. Keep the
+      family saturated. Static review selects library composition first.
+      Source acceptance remains unmeasured.
 - [ ] Specify invisible retained binders and explicit runtime overrides.
       Keep retention independent of visibility. Do not infer a new `foreach`.
 - [ ] Specify runtime `Type` operands and their universe representation.
       Existing `TypeRep` and required erased `forall` leave a bridge to define.
-- [ ] Finish [M68 ordinary callers](../PLAN.md#m68-ordinary-callers-of-retained-apis).
+- [x] Finish [M68 ordinary callers](../PLAN.md#m68-ordinary-callers-of-retained-apis).
       Imported retained contracts must preserve inference and evidence scope
       without requiring dependent source syntax. Keep the application change
       separate from container and dependent-case inference.
