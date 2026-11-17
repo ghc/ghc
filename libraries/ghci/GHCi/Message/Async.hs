@@ -8,6 +8,7 @@ module GHCi.Message.Async
     -- * Pipes
     Pipe(..), mkPipeFromHandles, mkPipeFromContinuations
   , closePipe, PipeClosedException(..)
+  , closingPipe, isPipeOpen
 
     -- * Interface for async bidirectional RPC
   , remoteAsyncReq, handleAsyncReq
@@ -31,7 +32,7 @@ module GHCi.Message.Async
 
     -- * Serializable exceptions
   , SerializableException(..)
-  , toSerializableException, fromSerializableException, closingPipe
+  , toSerializableException, fromSerializableException
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -158,6 +159,11 @@ closePipe :: Pipe -> IO ()
 closePipe Pipe{..} = do
   throwTo (asyncFillTid pipeAsyncMngr) PipeWriteClosedException
     `finally` throwTo (asyncDrainTid pipeAsyncMngr) PipeReadClosedException
+
+isPipeOpen :: Pipe -> STM Bool
+isPipeOpen pipe = liftM2 (&&)
+  (isOpen <$> readTVar (pipeReadStatus  pipe))
+  (isOpen <$> readTVar (pipeWriteStatus pipe))
 
 closingPipeEnd :: TVar PipeEndStatus -> STM PipeEndStatus
 closingPipeEnd v = readTVar v >>= \ s -> do

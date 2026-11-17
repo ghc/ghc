@@ -110,6 +110,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (mask, handle, MonadThrow (..))
+import Control.Monad.STM
 import Data.Binary
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Short as SBS
@@ -218,7 +219,9 @@ withInterpCmdMasked interp msg own = mask_ $ interpCmd interp msg >>= own
 withInterp :: ExceptionMonad m => SafeInterp -> (Interp -> m a) -> m a
 withInterp interp0@(SafeInterp interp) k = stopInterpOnPipeClosed $ k interp
   where
-    stopInterpOnPipeClosed = MC.handle $ \ (e :: PipeClosedException) -> liftIO (stopInterp interp0) >> MC.throwM e
+    stopInterpOnPipeClosed = MC.handle $ \ (e :: PipeClosedException) -> do
+      liftIO $ stopInterpWhen (atomically . fmap not . isPipeOpen . interpPipe) interp0
+      MC.throwM e
 
 withExtInterp :: ExceptionMonad m => ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
 withExtInterp ext action = case ext of
@@ -660,7 +663,11 @@ spawnIServ conf = do
 
 -- | Stop the interpreter
 stopInterp :: SafeInterp -> IO ()
-stopInterp (SafeInterp interp) = case interpInstance interp of
+stopInterp = stopInterpWhen (const $ pure True)
+
+-- | Stop the interpreter if predicate returns 'True'.
+stopInterpWhen :: (InterpProcess -> IO Bool) -> SafeInterp -> IO ()
+stopInterpWhen shouldStop (SafeInterp interp) = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> pure ()
 #endif
@@ -672,10 +679,12 @@ stopInterp (SafeInterp interp) = case interpInstance interp of
        modifyMVar mstate $ \state -> do
         case state of
           InterpPending    -> pure (state, (l_st, Nothing)) -- already stopped
-          InterpRunning i  -> do
-            purgeInterpSymbolCache (interpSymbolCache interp)
-            modifyMVar_ (interpStringCache interp) (const $ pure emptyFsEnv)
-            pure (InterpPending,(Nothing,Just i))
+          InterpRunning i  -> shouldStop (instProcess i) >>= \case
+            False -> pure (state, (l_st, Nothing))
+            True  -> do
+              purgeInterpSymbolCache (interpSymbolCache interp)
+              modifyMVar_ (interpStringCache interp) (const $ pure emptyFsEnv)
+              pure (InterpPending,(Nothing,Just i))
       case mi of
         Nothing -> pure Nothing
         Just i  -> getProcessExitCode (interpHandle (instProcess i)) >>= \case
