@@ -5,14 +5,16 @@ retained Boolean argument whose value determines the result type. Extend Core
 from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
 The current source subset includes runtime Peano naturals, length-indexed vectors,
-and closed parameterized indices such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
+and structural parameterized indices. Generic `[a]` indices can contain Int,
+functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
 Last updated: 2026-11-17.
 
-The M67 metadata foundation passes both builds and the selected checks.
-It prepares generic structural domains by preserving runtime Id metadata.
-Generic `[a]` source and changed-domain transport remain open. See
-[the implementation record](PLAN.md#m67-metadata-foundation).
+M67 passes both compiler builds and the selected checks. It supports generic
+nil/cons refinement and nominal transport when an earlier runtime index changes
+a later domain. Both stages run the 116-observation Showcase through sixteen
+modules. Seven selected registered tests pass; the full GHC suite was not run.
+See [the implementation record](PLAN.md#m67-generic-domains-source-and-self-hosted-validation).
 
 ## Project documents
 
@@ -66,6 +68,7 @@ _build/showcase/showcase
 | Runtime bounds, finite-position witnesses and lazy list access | `closedListIndexing` |
 | Complete explicit worker types, runtime application and lazy containers | `completeFunctionArguments` |
 | Constructor and runtime arrow matchability, with distinct reflection identities | `arrowMatchability` |
+| Generic lists, opaque elements, dependent element domains and lazy prefixes | `genericListIndexing` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -79,6 +82,13 @@ M65 adds five observations and two provider modules for function values in
 algebraic indices. Both rebuilt stages pass all 100 lines from sixteen modules.
 Each stage also passes twelve runtime observations through a separate producer
 and interface-only client. The seven selected registered tests pass.
+M67 extends the program to 116 observations through those sixteen modules.
+Its maintained source fixture separately checks twenty generic observations
+and two located rejections. Old compilers reject the new generic interface at
+the typed gate between ordinary positive controls. The encoding is unchanged.
+General source domains, function promotion, native unfoldings, ordinary
+optimization and totality remain open. Opaque function identity retains the
+separate fixed native-call policy.
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,

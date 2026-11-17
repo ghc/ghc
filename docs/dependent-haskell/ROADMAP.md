@@ -98,7 +98,7 @@ can advance a card while the card remains open.
 | 5 | R23: matchability foundation; also advances R05 | M63/M64 foundation passes selected builds and checks; publication pending | Explicit arrow and forall metadata pass Core, source, interface, TH and reflection checks. The generic native client and source family unsaturation remain open. |
 | 6 | R05: function values in closed algebraic indices; enables R03 source work | Complete bounded increment: M65 | Both rebuilt stages pass source/interface controls and Showcase100/16. Seven registered tests pass. Generic `[a]`, higher-order endpoints and changed dependent domains remain open. |
 | 7 | R05: bounded family views in native frontend inference | Complete bounded increment: M66 | Both builds, exact source diagnostics, finite controls, Showcase100/16 and seven registered tests pass. Other pure normalization paths remain separate. |
-| 8 | R05: structural generic domains and dependent-domain transport; enables R03 | M67 metadata foundation validated; generic source open | Bound metadata substitution and both zonkers pass full build, API fixtures, Showcase100/16 and seven registered tests. Add target-preserving scope construction, opaque fields and nominal later-domain transport. The full target includes arbitrary lifted and runtime-index-bearing elements. See M67 in PLAN.md. |
+| 8 | R05: structural generic domains and dependent-domain transport; enables R03 | Complete bounded increment: M67 | Both builds, selected API/source controls, Showcase116/16 and seven registered tests pass. Generic elements include arbitrary lifted and runtime-index-bearing values. Old readers reject the new typed signature cleanly. R05 and general source domains remain open. See M67 in PLAN.md. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -114,6 +114,12 @@ application proof. Later package fields retain the actual function identity.
 See [the Core contract](CORE.md#function-values-in-algebraic-indices) and
 [the validation record](PLAN.md#m65-validation). This increment does not
 complete R05, R03 or R23.
+
+M67 adds generic `[a]` constructor refinement and nominal transport through
+later dependent domains. The next source candidate is direct retained API use
+without the dependent extension. Ordinary wrapper clients are already checked.
+Measure explicit and inferred direct calls before changing that boundary.
+The local subset and dependent-base tasks below retain their own scope.
 
 The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks
 serially under the configured memory cap. This execution policy does not add

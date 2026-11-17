@@ -5,7 +5,7 @@ work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful chan
 to current GHC and complete the missing rules. The initial retained Boolean
 experiment is implemented. The current work follows the roadmap below.
 
-Last updated: 2026-11-16. Upstream compiler base:
+Last updated: 2026-11-17. Upstream compiler base:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
@@ -17,16 +17,15 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The current increment is [M62](#m62-complete-retained-function-type-arguments),
-owned by [R03 dependent products](roadmap/R03-dependent-products.md). It admits
-complete retained-function types in explicit type arguments. M61 is audited
-and published.
-The user
-resumed GHC execution on 2026-11-16 at 17:53 CET.
+The current increment is [M67](#m67-structural-generic-domains-and-dependent-domain-transport),
+owned by [R05 dependent Core](roadmap/R05-dependent-core.md). Its generic
+structural source domains, opaque fields and nominal later-domain transport
+pass both builds and the selected checks. The user resumed GHC execution on
+2026-11-16 at 17:53 CET.
 
-The next substantial foundation is [R23 matchability](roadmap/R23-unsaturated-type-families.md), followed by
-[R05 generic-domain metadata](roadmap/R05-dependent-core.md). The roadmap
-separates this chosen order from actual feature prerequisites. Keep ordinary
+The [R23 matchability foundation](roadmap/R23-unsaturated-type-families.md)
+precedes this R05 increment. The roadmap separates this chosen order from
+actual feature prerequisites. Keep ordinary
 evaluation, function promotion, first-class sums and the remaining promotion
 domains visible there.
 
@@ -5117,8 +5116,9 @@ normalization paths are outside this increment.
 ## M67: structural generic domains and dependent-domain transport
 
 Roadmap owner: R05. Related cards: R03 and R23. Prerequisite: validated M66.
-Status: metadata foundation validated. Generic admission and nominal
-later-domain transport remain open.
+Status: complete within this bounded contract. Generic source and nominal
+later-domain transport pass both compiler builds, the selected registered
+tests, interface controls and the expanded Showcase. General R05 remains open.
 
 The full source target is `forall (a :: Type). foreach (xs :: [a]) -> ...`.
 Constructor matching must bind the actual cons head at `a` and tail at `[a]`.
@@ -5163,28 +5163,28 @@ Do not mark this increment complete from those controls.
 
 Acceptance checks:
 
-- [ ] Update actual binder and occurrence types, multiplicities and deep free
+- [x] Update actual binder and occurrence types, multiplicities and deep free
   variables for erased substitution. Check same-Unique updates, alpha cloning,
   capture, masking, apply-once ranges, composition and deep kind substitution.
-- [ ] Zonk filled ordinary metas in native binder and occurrence metadata.
+- [x] Zonk filled ordinary metas in native binder and occurrence metadata.
   Check original TcId inputs, ambient earlier indices and ordinary recursive
   expression groups without consulting their knot-tied IdInfo environment.
-- [ ] Preserve an explicit source/target preparation contract for free Ids.
+- [x] Preserve an explicit source/target preparation contract for free Ids.
   Do not infer metadata freshness from Unique membership or type shape.
-- [ ] Compile generic nil/cons refinement with an explicit saturated Count
+- [x] Compile generic nil/cons refinement with an explicit saturated Count
   family. Instantiate at Bool, Int, functions, IO and another opaque lifted
   type. Preserve existing closed constructor actuals and call-head rules.
-- [ ] Compile `a := Vec Int n`. Refine list shape and the earlier runtime `n`
+- [x] Compile `a := Vec Int n`. Refine list shape and the earlier runtime `n`
   in separate controls. Check exact nominal endpoints and later binder domains.
-- [ ] Check inferred instantiation, later payload scope and proof-only
+- [x] Check inferred instantiation, later payload scope and proof-only
   dependencies. Reject own/later-binder capture and sibling-branch escape with
   located diagnostics. Keep ordinary payload metas distinct from index choices.
-- [ ] Keep bottom heads and tails lazy when only cons shape is required.
+- [x] Keep bottom heads and tails lazy when only cons shape is required.
   Check explicit head demand, partial applications and finite cyclic prefixes.
-- [ ] Round-trip generic signatures and actual field identities through
+- [x] Round-trip generic signatures and actual field identities through
   interfaces. Check old-reader rejection when the representation permits it.
   Bump versions if the final encoding changes fields or tags.
-- [ ] Build both stages. Run the selected existing API/source cohort and
+- [x] Build both stages. Run the selected existing API/source cohort and
   Showcase. Record the remaining boundary after each preparatory commit.
 
 Agda's ordered substitution and constructor telescope refinement are the
@@ -5280,7 +5280,123 @@ right binder through the inverse cast. Preserve cast composition, exact kinds
 and the fixed native-call policy. Update normalization, solver prefix scope,
 source abstraction, Lint and backend application together.
 
-These next changes remain unimplemented at this checkpoint. Their pinned
-source reviews are recorded in REFERENCES.md. The prepared generic producer,
-thirteen-observation client and wrong-list negative are unexecuted candidates.
-They do not close any source or interface acceptance check above.
+These requirements defined the next implementation group. Their pinned source
+reviews are recorded in REFERENCES.md. Keep the original thirteen-observation
+candidate as preparation evidence. The following section records current
+implementation and validation results.
+
+### M67 generic domains: source and self-hosted validation
+
+The isolated patch now implements the next coherent group. It derives opaque
+parameter fields from constructor telescopes. It preserves target scope entries
+at forall instantiation. A separate runtime lifting environment stores source
+Id provenance and nominal domain relations. Source and backend abstraction share
+one scoped traversal. Source matches keep incoming retained Ids at their original
+types and convert them on use. Backend naming converts later domains before
+passing their arguments. Core Lint and typed interface checks use the same value
+and domain judgments. Fixed native function-call endpoints retain their policy.
+
+Bootstrap build v12 passes in 186.52 seconds. Kernel v5 passes the unchanged
+one-line golden against the earlier v7 bootstrap snapshot.
+The quiet API controls check generic interfaces, opaque element specializations,
+earlier runtime metadata and nominal later-domain transport at N/R/P roles.
+Those API checks do not establish a self-hosted generic build.
+
+The published metadata compiler rejects the five generic producer signatures
+with located GHC-83605 diagnostics. The source baseline receipt is
+`native-generic-domain-baseline-v1`. Source check v3 then rejected the generic
+producer in its `S k` branch with GHC-05617 and GHC-83865. Actual lexical
+constructor Givens now supply immutable declaration views. The incoming Id
+keeps its original type and converts on use.
+
+Source check `native-generic-domain-source-stage0-v9` passes all seven commands
+against bootstrap v12. Separate producers and an interface-only client compile
+with Core/STG Lint. The client runs sixteen exact observations. They cover Bool,
+Int, functions, IO, boxed and newtype elements, inferred and explicit type
+arguments, runtime-indexed vector elements and earlier-index refinement.
+They also cover a constructed earlier index, bottom-head and tail laziness,
+explicit head demand, a finite cyclic prefix and partial dependent-worker WHNF.
+The wrong-list control reports GHC-83865 for Count ys versus Count xs.
+The linear control reports one located GHC-83605 with its Many requirement and
+actual One multiplicity. Source inputs and compiler artifacts remain unchanged.
+
+List inference selects a declared native element before allocating an element
+meta-variable. Named callback inference uses a known input to select complete
+erased arguments before IALL. It preserves earlier choices and records usage
+once. Both paths retain ordinary final checking and scope checks. Retained
+argument resolution constrains fresh ordinary multiplicities with tcSubMult.
+Known One and rigid multiplicities receive the specific retained diagnostic.
+Restricted simplification expands coerceId's existing compulsory template.
+Without that expansion, derived newtype Eq code retained a pseudo-function
+call and code generation queried an open runtime representation.
+
+Earlier failures remain recorded. Source v5 selected an empty client hiDir.
+V6 fixes that one-shot fixture configuration. The v8 runtime and wrong-list
+checks pass, but its linear diagnostic oracle fails. V9 checks the corrected
+diagnostic. Annotated probes did not replace the unannotated acceptance target.
+Temporary arity traces were removed before bootstrap v11.
+
+The existing source fixture contains twenty quiet observations and two located
+negatives. The extra controls cover named callbacks, explicit callback inputs,
+a later declared list element, and a closed Element family. Showcase adds
+sixteen observations to its previous hundred through the same sixteen modules.
+
+Whole-Pi normalization keeps a closed binder domain unchanged. For example,
+an identical Token (Loop Bool) domain needs reflexivity, not evaluation of
+Loop. Open domains still receive nominal normalization and transport. Unequal
+domain comparison retains bounded reduction and its GHC-40404 diagnostic.
+When Element reduces to Int in the body, keep the kind cast on the index
+occurrence. Do not change the binder's declared [Element] domain.
+
+Declared-argument selection stops at the written value-argument prefix.
+A remaining retained telescope can be the result value. Preserve expected-result
+choices there, then let ordinary subsumption diagnose different scoped indices.
+Constructor Givens now also permit forward transport of a supported polymorphic
+payload. This uses ForAllCo. It adds no polytype reflection or inverse rule.
+
+A raw Shape b argument can pass unchanged to forall a. a -> () even when
+Shape b contains a looping family. The maintained positive checks both bottom
+inputs without forcing them. The cached-view negatives require list-shaped
+formals. They still check the current full-normalization strategy and the
+second- and fourth-argument error positions. They do not claim that such
+programs must remain untypable under a future weaker normalization strategy.
+
+Bootstrap snapshot v25 passes. The full self-hosted build v3 passes in
+981.15 seconds, with peak 8004 MiB under 16 GiB, swap0 and -j6. Its 27,299
+source inputs remain unchanged at base f315ea64aa plus source patch SHA256
+ac4bacd83c8d9dafdcbf5f5335cc88ccb311f29bdf52979fd29495f4fb17ac45.
+It rebuilds target libraries, both compilers and the selected utilities.
+
+The matching kernel and source/runtime checks preserve their 1/37-line goldens.
+Those wrappers use host GHC 9.14, the stage0 GHC API and the stage1 library
+directory. The registered tests separately compile both fixtures with the
+self-hosted compiler. All seven selected normal-way tests pass, with 54 ways
+skipped and no unexpected result or framework warning. The full GHC suite was
+not run. Test prerequisites pass in 84.43 seconds.
+
+Both stages pass all 116 Showcase observations through sixteen modules.
+Each stage also passes a six-command old-reader control. The new compiler
+loads the generic interface. The published metadata compiler rejects its
+[a] binder at the typed interface gate. Ordinary interfaces load before and
+after that rejection. No wire field, tag or header changes in this increment.
+
+The read-only formatter run observes 29 changed Haskell files and the unchanged
+compiler Cabal template. It reports eleven style differences, sixteen parser
+failures, two timeouts and the Cabal template difference. No formatting pass is
+claimed. After the tests, documentation changes correct two Rep Notes and four
+invalid local Haddock markers. The final provenance check verifies every byte
+outside those comments and records the six Markdown status changes separately.
+Receipts are under _build/verification/native-generic-domain-*.
+
+Input coercion evidence that depends on the abstracted index remains outside
+the scoped abstraction grammar. Do not claim general proof abstraction.
+
+The main metadata build and both-stage Showcase pass after publication at
+`f315ea64aa8eebcc9268f09a509afe0a12c4d8f6`. The build takes 493.68 seconds.
+Each stage runs 100 observations through sixteen modules. These results cover
+the metadata foundation, not the new isolated generic-domain patch.
+
+The next source candidate is direct use of retained APIs from a module without
+ExperimentalDependentTypes. Existing ordinary wrapper clients already pass.
+Direct calls and generic inference need separate measurements before changing
+the extension boundary or adding a requested-length list adapter.

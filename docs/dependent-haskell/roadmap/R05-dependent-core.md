@@ -33,9 +33,11 @@ M63/M64 add ordinary-arrow and forall matchability. Their selected source,
 Core, reflection and compatibility checks pass in both stages. Publication
 and the full R23 scope remain open. M65 adds closed function-value indices.
 M66 bounds the selected native family views and preserves diagnostic context.
-The M67 metadata foundation passes both builds, API fixtures, Showcase100/16
-and seven registered tests. Generic admission and later-domain transport remain
-open. See [the checkpoint](../PLAN.md#m67-metadata-foundation).
+M67 adds structural generic admission, opaque parameter fields and nominal
+later-domain transport. Both builds, the selected API/source controls,
+Showcase116/16 and seven registered tests pass. Generic elements include
+`Vec Int n` for an earlier runtime index. Source roots retain their structural
+or fixed native-call-head policy. See [the checkpoint](../PLAN.md#m67-generic-domains-source-and-self-hosted-validation).
 Restricted pipelines and Lint checks do not establish general preservation.
 
 ## Next increments
@@ -59,13 +61,14 @@ Restricted pipelines and Lint checks do not establish general preservation.
 - [ ] Integrate the [R23 matchability foundation](R23-unsaturated-type-families.md)
       with native types and coercions. Preserve forward congruence and restrict
       inverse projection to the permitted function kinds.
-- [ ] Implement M67 generic domain metadata for `[a]`. Update binder types,
+- [x] Implement M67 generic domain metadata for `[a]`. Update binder types,
       occurrence types, multiplicities, substitution and zonking together.
       Constructor fields at arbitrary `a` need an opaque-field rule. Include
       Int, functions, arbitrary lifted types and `a = Vec Int n`. The last
       case also needs later-domain transport through the earlier runtime n.
       Separate structural containers, opaque values and call permission.
-      Complete the R05 rules before the R03 generic source increment.
+      The bounded source, interface and self-hosted checks pass. General R05
+      transformations and broader source domains remain open.
 - [x] Admit fixed function leaves in closed algebraic indices. Preserve
       canonical call endpoints, forward family proofs and later package fields.
       M65 passes both builds, separate-module demand controls, Showcase100/16
@@ -80,7 +83,9 @@ Restricted pipelines and Lint checks do not establish general preservation.
 - [ ] Specify transport through later runtime-dependent telescope entries.
       Freshen binders and transport remaining fields, targets and evidence
       together. Preserve the distinction between lexical scope and active
-      retained-body comparison scope.
+      retained-body comparison scope. M67 supplies nominal transport for its
+      generic retained-domain contract. General expression and proof
+      abstraction remain separate obligations.
 - [ ] Extend one ordinary Core transformation with a measured benefit.
       Preserve deep type dependencies, index identity, demand and sharing.
       Keep other unsupported transformations gated.

@@ -11,16 +11,18 @@ specify the full dependent-Haskell language.
 The internal `Type` datatype has three new constructors:
 
 ```text
-TermVarTy b       -- The algebraic index of a runtime identifier.
+TermVarTy b       -- The opaque value index of a runtime identifier.
 DepFunTy b result -- A retained dependent function.
 TermAppTy f arg   -- A scoped opaque runtime call index.
 ```
 
-`b` is a local non-coercion `Id` with multiplicity `Many`. In TermVarTy its
-type is a supported closed algebraic domain. DepFunTy can also bind an eligible
-opaque function head. See [function-valued retained binders](#function-valued-retained-binders).
-It keeps its identity as a runtime variable. It is not a `TyVar` or a `CoVar`.
-The term binder and every reference to its index use the same `Unique`.
+`b` is a local non-coercion, non-join `Id` with multiplicity `Many`.
+`TermVarTy` and Core `DepFunTy` accept its complete lifted value type. This
+includes an outer type variable, a function value, and `Vec Int n` for an
+earlier runtime index `n`. Check its actual lexical binding and exact metadata.
+The source `foreach` root keeps the separate structural-domain or eligible
+native-call-head rule. See [generic structural domains](#generic-structural-domains-and-nominal-transport).
+The runtime binder remains an `Id`, with the same `Unique` at each occurrence.
 
 `TermVarTy b` has kind `varType b`. Constructor indices use ordinary promoted
 constructors, including `True`, `False`, `Z`, and `S n`. `promoteDataCon` supplies
@@ -34,17 +36,20 @@ an ordinary unrestricted arrow over its domain. This preserves one representatio
 vacuous retained binder. Lambda typing detects dependence from the result type.
 No retainedness flag is added to every ordinary identifier.
 
-`isNativeIndexType` validates a closed graph of lifted, first-order data domains.
-Its worklist admits recursive and mutually recursive constructor fields. Exclude
-parameters, existential variables, constraints, datatype contexts, newtypes,
-type data, unboxed fields, and constructor wrappers. Original and representation
-fields must have the same domain. Field multiplicities may be `One` or `Many`.
-This policy bounds the Core increment. It is not an Agda language restriction.
-The source checker and signature reader now use this structural policy. Nat
-source execution and signature imports pass the M9 regression checks.
+`isNativeIndexType` validates a lifted structural datatype schema. Ordinary
+parameters have kind `Type`. After instantiation, a field whose original type
+is a universal parameter stays opaque. Thus `[Int]`, `[IO Int]` and
+`[Vec Int n]` retain the same list schema. Fixed concrete fields keep structural
+traversal or the separate eligible function-field rule. Track full datatype
+applications through regular recursion. Reject changed recursive arguments,
+existentials, constraints, datatype contexts, newtypes, type data, constructor
+wrappers, and unsupported concrete fields. Original and representation field
+types must agree. Field multiplicities may be `One` or `Many`.
+Nat source execution and signature imports pass the M9 regression checks.
 
-`TermAppTy` has a separate head policy. It does not make a function-valued
-`TermVarTy` valid. See [opaque native call indices](#opaque-native-call-indices).
+`TermAppTy` keeps its separate fixed native-call policy. Opaque function-value
+identity does not grant call permission. See
+[opaque native call indices](#opaque-native-call-indices).
 
 ## Retained constructor fields
 
@@ -138,8 +143,8 @@ the parent datatype knot is incomplete. Validate the constructor result and its
 erased universals after the parent exists.
 
 Role inference and role checking traverse field scope in order. A runtime index
-has a closed domain and cannot become a datatype parameter. Ordinary payload
-parameters keep their inferred roles. Source patterns substitute the actual field
+remains a runtime field; it does not become an erased datatype parameter.
+Ordinary parameters can occur in its domain and keep their inferred roles. Source patterns substitute the actual field
 Id into later field types. Retained fields accept bare variables or a closed
 constructor with bare variable subfields. Ordinary fields use GHC's pattern
 checker and can contain nested GADT patterns. Desugar
@@ -218,7 +223,7 @@ current meanings. The new forms must use separate mapper and folder callbacks.
 ## Retained congruence and nominal domain conversion
 
 `DepFunCo b domain co` binds one unrestricted runtime index in its body proof.
-`MRefl` keeps the binder's eligible scalar or function domain unchanged.
+`MRefl` keeps the binder's complete lifted value domain unchanged.
 If `co :: s ~r t`, this specialization gives:
 
 ```text
@@ -233,8 +238,10 @@ reflexive body; endpoint independence alone does not remove the proof binder.
 Substitution, free variables, lifting, zonking, and tidying preserve that scope.
 
 `MCo delta` adds nominal evidence `delta : A ~N B` outside the binder's scope.
-The binder has domain `A`. Both domains must be eligible closed scalar domains.
-The right endpoint binds a fresh `y : B` and substitutes `y |> sym delta` for
+The binder has domain `A`. Both domains must be lifted value types. If either
+is an eligible native-call function type, require identical complete types.
+Other opaque domains can contain outer erased variables and earlier runtime
+indices. The right endpoint binds a fresh `y : B` and substitutes `y |> sym delta` for
 `b` in the right body. Freshening includes free variables in the domain proof.
 Use `mkDepFunCoWithDomain` for this form. A reflexive domain proof specializes
 to `MRefl`.
@@ -244,7 +251,8 @@ to `MRefl`.
 substitution, native cast composition, and CorePrep substitution. Arbitrary
 representational evidence cannot justify an index conversion. Beta exposure
 substitutes the embedded proof as well as the operand. Stored substitution
-ranges are used once. Beta exposure accepts independent closed scalar input and result domains.
+ranges are used once. The existing beta-exposure grammar still requires
+structural input and result domains.
 
 Checked application converts the actual argument back to `A` and substitutes
 that same converted index in the body proof. Explicit congruence, symmetry,
@@ -258,18 +266,19 @@ See [the pinned provenance](REFERENCES.md#agda-provenance) and Note
 do not prove preservation for the current GHC extension.
 
 Transport a function value with a cast. Do not replace that cast with a lambda:
-eta expansion can hide a bottom function in Haskell. Changed function-valued
-domains or multiplicities, dependent erased binder kinds, and the ordinary
-optimizer remain unsupported. Eligible ambient Givens can normalize retained
+eta expansion can hide a bottom function in Haskell. Changes to eligible native-call
+domains or multiplicities and the ordinary optimizer remain unsupported.
+CorePrep still rejects application through an erased binder kind that depends
+on a newly named runtime index. Eligible ambient Givens can normalize retained
 bodies;
 the later Given-normalization sections specify that restricted path.
 `ForAllCo` still binds only erased type and coercion variables. No new selector
 or erased `InstCo` rule is added. Diagnostic interface conversion can print the
 coercion; serialization in native unfolding bodies remains gated.
 
-Source checking can construct this nominal congruence for two eligible closed
-scalar domains. Normalize their domains with ordinary nominal family reduction.
-Require the normal domains to agree. Compare the bodies under a fresh source
+Source checking can construct this nominal congruence for structural source
+domains. Use reflexivity when their complete types already agree. Otherwise
+use bounded nominal family reduction and require the reduced domains to agree. Compare the bodies under a fresh source
 index, with the target index cast forward through the domain proof.
 
 Solve ordinary body Wanteds in a private solver scope. Propagate its runtime
@@ -290,15 +299,22 @@ See Note [Zonking nominal native index casts] in `GHC.Core.Coercion`.
 
 ## Family-axiom normalization under retained binders
 
-The Core normalizer recurses through `DepFunTy` under its unchanged supported
-closed domain and `Many` binder. `substNativeIndexBndr` masks an outer Id
-substitution and avoids capture. The lifting context can map an index to the
-same valid same-domain variable on both endpoints. It must not infer an index
-equation or evaluate the runtime variable.
+The Core normalizer processes an open `DepFunTy` domain nominally before its
+body. `liftCoSubstNativeBndrUsing` installs the source Id, target binder and
+nominal domain proof in a separate runtime lifting relation. Keep the domain
+proof outside its own binder. Do not infer a runtime equation or evaluate the
+indexed value.
 
-Normalize the body with the existing family reducer. `mkDepFunRedn` wraps its
-proof in `mkDepFunCo` and its result in `mkDepFunTy`. This preserves the proof
-binder even when an intermediate type alone needs it. Each endpoint separately
+A closed domain uses nominal reflexivity during whole-Pi normalization. No
+inherited substitution can affect it. Still freshen the binder, install its
+relation and normalize the body. This preserves identical domains such as
+`Token (Loop Bool)` without reducing `Loop Bool`. It makes no termination claim.
+Explicit comparison of unequal domains still uses bounded family reduction.
+See Note [Closed retained domains] in `GHC.Core.FamInstEnv`.
+
+Normalize the body with the existing family reducer and construct
+`mkDepFunCoWithDomain`. This preserves the proof binder even when an
+intermediate type alone needs it. Each endpoint separately
 canonicalizes a vacuous binder to an ordinary arrow. For example, `Add Z n`
 reduces to `n`; `Add (S n) Z` reduces to `S (Add n Z)` while its inner family
 application stays stuck. A constant family can remove the retained dependency.
@@ -352,7 +368,7 @@ Agda's conversion and eta rules do not add a Haskell function eta law.
 Checked retained Pi expressions can appear in ordinary type arguments and
 equality operands. Renaming and typechecking share their existing retained
 telescope workers. Preserve the caller's mode and index environment. Require
-complete types, supported closed domains, `Many` binders and lifted bodies.
+complete types, supported structural source domains, `Many` binders and lifted bodies.
 No equality constructor name receives a special case. Check the whole visible
 type argument for named, anonymous and generated holes. A hole beside the Pi
 is also incomplete. Inspect expanded type-splice types without revisiting
@@ -693,7 +709,7 @@ receive the already known retained function type without eta expansion.
 For a native worker template, use an opt-in immutable matching entry point.
 Require a known head without concreteness variables, NoQL, no pending type
 applications, supported value types, and a complete expected result. Corresponding
-retained binders must have equal closed domains, `Many`, and bodies of kind
+retained binders must have equal complete domains, `Many`, and bodies of kind
 `Type`. Seed the matching scope with free variables of both input types.
 Compare their bodies under paired binder renaming. Register each shared
 binder in the existing escape check. An outer erased parameter must not capture
@@ -717,10 +733,11 @@ route neither chooses a stored runtime index nor supplies equality evidence.
 See Note [Expected retained worker instantiation] in `GHC.Tc.Gen.App`.
 
 A constructor branch can transport a captured closure type through a retained
-binder with an unchanged domain. Abstract the outer index only in the body.
-Preserve the inner index scope. Existing FC lifting builds the fixed-domain
-`DepFunCo` from the checked branch proof. Cast the function value without eta
-expansion. Keep changed domains and dependent erased foralls gated.
+binder whose domain depends on an earlier index. Abstract that domain before
+entering the binder, then preserve its scope through the body. Existing FC
+lifting builds `DepFunCo` with nominal domain evidence. Cast the closure without
+eta expansion. Preserve forall metadata outside its own binder. Input cast or
+coercion evidence that depends on the abstracted index remains unsupported.
 
 For signature ambiguity checking only, open retained binders in ordinary arrow
 arguments as well as results. Use one fresh opaque runtime Id on both sides of
@@ -750,9 +767,10 @@ complete supplied telescope, casts later payloads back to their expected types,
 and casts the final result to its original type. SimpleOpt and CorePrep preserve
 the proof scope. CoreToStg erases the virtual proof explicitly.
 
-Transport through a remaining retained function uses `DepFunCo` under its
-unchanged closed domain and `Many` binder. Keep the cast on the partial function
-value. Eta expansion must not hide a bottom function.
+Transport through a remaining retained function uses `DepFunCo` with its
+nominal domain relation and `Many` binder. CorePrep converts each later retained
+argument to its prepared domain and composes its index proof in telescope
+order. Keep the cast on the partial function value. Eta expansion must not hide a bottom function.
 Erased binder kinds that depend on a named index are still gated. Alias proof
 expressions have no interface codec. See Notes [Native index alias evidence]
 and [Retained constructor arguments in CorePrep] and the provenance in
@@ -1331,11 +1349,14 @@ free-name sets. It preserves source spans and `WithUserRdr` spelling. It stops
 at embedded Core types. Quotations reject at their expression spans before
 renaming. Error contexts retain the original source equation.
 
-Shared index patterns remain outermost variable patterns. Their closed domains
-require reflexive constructor transport. A coercion pattern would allocate a
-fresh outer lambda Id and lose runtime identity. Evidence keeps its separate
-specialised Givens. Ordinary payloads and results keep nominal constructor
-transport. All source argument and dictionary lambdas precede discrimination.
+Shared index patterns remain outermost variable patterns at their incoming
+domains. A coercion pattern there would allocate a different lambda Id.
+Check the constructor proof as a scoped Given. A later occurrence can use
+`Cast (Var xs) (SubCo delta)` at its required domain. Keep the original Id type.
+Store the resulting evidence below the constructor that binds its proof.
+A matrix row stores combined evidence below its second constructor. Ordinary
+payloads, dictionaries and results keep their nominal transports. All source
+argument and dictionary lambdas precede discrimination.
 
 A qualified signature can contain another retained binder. The syntax selector,
 renamer and kind checker continue through its body. Existing context routines
@@ -1505,8 +1526,8 @@ complete terminating equality procedure for arbitrary Haskell.
 
 `normaliseNativeIndexExpr` returns a normalized runtime expression and its
 checked index. It accepts an immediate `App (Lam b body) arg`. Require an
-eligible local Many binder and the same supported closed domain for the
-binder, argument, and body result. Normalize the argument first. Its result
+eligible local Many structural binder and an argument of its exact domain.
+The body result must have a supported structural domain. Normalize the argument first. Its result
 must be an eligible variable or a nullary constructor worker. The body must
 normalize within the existing variable/constructor grammar. Nested accepted
 beta steps can occur in either operand. Other expression forms remain gated.
@@ -1846,9 +1867,10 @@ admits function-value indices under the fixed-domain policy below.
 
 ### Function-valued retained binders
 
-isNativeRetainedBinder accepts a scalar index Id or an existing eligible opaque
-head Id. isNativeRetainedBinderType checks the domain without a fabricated Id.
-A function head has a closed ordinary visible Many arrow A -> B. Both A and B
+isNativeRetainedBinder accepts a structural source index Id or an eligible
+native head Id. isNativeRetainedBinderType checks the domain without a
+fabricated Id. Core opaque value identity has a separate rule.
+A native function head has a closed ordinary visible U/Many arrow A -> B. Both A and B
 are independently supported scalar domains. The Id is local, unrestricted and
 not a join point. M51 adds function-valued constructor fields under the
 separate policy below. M65 also admits these function Ids as value indices.
@@ -2618,10 +2640,68 @@ Keep the Name and Unique. Do not inspect the recursive IdInfo environment.
 Input prototypes must have equivalent zonked metadata and acyclic earlier-index
 dependencies. Final zonking must not use its own unfinished output as new input.
 
-These operations supply no domain coercion or new admission rule. Generic
-structural lists still need opaque fields and nominal later-domain transport.
-Free-source scope construction and lifting need their own prefix contracts.
+These metadata operations alone supply no domain coercion or admission rule.
+The current structural schema and proof transport are specified below.
 See Note [Substituting runtime Id metadata] in GHC.Core.TyCo.Subst and
 Note [Zonking runtime index metadata] in GHC.Tc.Zonk.TcType. The
 [validation record](PLAN.md#m67-metadata-foundation) separates raw metadata
 controls from the closed specialization checked with Lint.
+
+## Generic structural domains and nominal transport
+
+This section states the current M67 behavioral contract. See
+[PLAN.md](PLAN.md#m67-generic-domains-source-and-self-hosted-validation) for
+the bounded validation cohort and its remaining limits.
+
+Keep three judgments separate. Source `foreach` roots use the structural schema
+or fixed native-call-head policy. Core opaque value indices accept actual local,
+non-CoVar, non-join `Many` Ids of arbitrary lifted value type. Native application
+heads keep the closed visible U/Many function policy and independently closed,
+function-free structural endpoints. Opaque identity supplies no function equality
+or inverse U application rule.
+
+Derive parameter-field origin before instantiating a constructor telescope.
+A field that expands to an ordinary universal variable stays opaque after
+instantiation. The cons head can therefore have type `Int`, `IO Int`, an
+ineligible function type, or `Vec Int n`. Its tail still follows the list
+schema. A fixed concrete field does not obtain this permission from its final
+type. Check original and representation fields for exact agreement. Keep the
+existing uniform-recursion and worker restrictions.
+
+Substitution distinguishes source prototypes from completed target Ids and
+stored ranges. Normal and deep mappers update source binder metadata before
+freshening. Source free-variable augmentation preserves existing target scope
+entries. Ordered constructor instantiation installs each actual runtime range
+before later fields. Return target representatives and ranges once; do not
+refresh them from the source substitution. Runtime metadata can mention earlier
+indices, but cannot form a recursive metadata knot.
+
+Lifting has a separate runtime map. For source binder `b`, lift its domain in
+the earlier prefix to `delta : A ~N B`. Bind `bL : A` in the common body context
+and relate the source occurrence to `GRefl N bL delta`. Its endpoint ranges
+are `bL` and `bL |> delta`. `DepFunCo` binds the right endpoint at `B` and uses
+the inverse domain cast there. Preserve deep proof free variables and the
+original source metadata when freshening. Completed relations remain apply-once.
+See Note [Lifting runtime binder domains] in `GHC.Core.Coercion`.
+
+`abstractNativeIndices` abstracts domains before bodies and freshens their
+binders. Forall matchability stays outside its own binder. Ordinary nominal FC
+lifting transports the resulting template, including a supported polymorphic
+payload. This is forward congruence; it does not reflect a polytype into a
+runtime value. Input `CastTy` or `CoercionTy` evidence that depends on a selected
+index remains unsupported. An eligible native function head cannot change its
+complete fixed type. See Note [Scoped native index abstraction] in
+`GHC.Core.Coercion`.
+
+Closed retained domains stay unchanged during whole-Pi normalization. Open
+domains retain nominal normalization and transport. If a closed `Element`
+family reduces to `Int` in the body, argument normalization can retain
+`xs |> [Element ~ Int]` while its binder keeps type `[Element]`. Keep that kind
+cast. Do not retype the original Id. Unequal-domain checking still uses its
+bounded reducer. Other pure normalization paths have no general bound.
+
+These rules use existing casts, `GRefl`, `ForAllCo` and `DepFunCo`. They add no
+Core constructor, wire tag, proof primitive, term evaluator or totality rule.
+Preserve lazy values and bottom functions. Ordinary optimization, unrestricted
+expression indices and general normalization guarantees remain outside this
+contract.

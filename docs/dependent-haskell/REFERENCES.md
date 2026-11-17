@@ -4122,3 +4122,67 @@ These reviews ran no compiler or executable control. Their proposed source
 clients and transport oracles remain unexecuted. The comparisons use the
 previously pinned Agda telescope rules and current FC kind-binder lifting.
 They do not establish preservation or transfer a totality guarantee.
+
+The subsequent implementation preparation keeps the same provenance:
+`native-generic-structural-schema-implementation-preparation-v1` derives the
+parameter-field rule from current DataCon telescopes. The source-scope patch is
+`native-generic-domain-scope-preparation-v1`. The existing FC lifting context,
+GRefl and asymmetric DepFunCo supply the basis for
+`native-generic-domain-transport-patch-preparation-v1`. The backend correction
+is `native-generic-domain-coreprep-correction-preparation-v1`. Each preparation
+records its base source bytes and patch hash. Root integration adds source,
+Lint, interface and backend changes to that group. These are implementation
+choices, not a new calculus proof. See the validation section in PLAN.md.
+
+The completed bounded implementation is recorded in
+[PLAN.md](PLAN.md#m67-generic-domains-source-and-self-hosted-validation).
+Keep the earlier unexecuted research controls separate from that evidence.
+The final compiled source uses base f315ea64aa and patch SHA256
+ac4bacd83c8d9dafdcbf5f5335cc88ccb311f29bdf52979fd29495f4fb17ac45.
+Its source manifest covers 27,299 files. The final provenance receipt relates
+the later status documents and comment corrections to those unchanged code
+bytes. No calculus correspondence or totality theorem is established.
+
+The implementation follows these existing mechanisms:
+
+- Agda's previously pinned ordered telescope substitution and constructor
+  refinement guide scope and prefix order. The source views use actual lexical
+  constructor Givens. They preserve the incoming Id and cast its occurrences.
+  See Note [Declared retained argument refinement] in GHC.Tc.Gen.App.
+- Existing FC lifting, GRefl and asymmetric DepFunCo supply nominal transport.
+  A separate native relation records source Id provenance. Its common body
+  uses the left binder and its forward cast. The right endpoint uses the
+  inverse domain conversion. See Notes [Lifting runtime binder domains] and
+  [Scoped native index abstraction] in GHC.Core.Coercion. The D/DC and roles
+  papers supply comparisons; they do not prove this implementation.
+- Existing IALL, cached usage and final subsumption support immutable choices
+  from declared domains and named callbacks. List inference can use an actual
+  declared native element. These are local inference rules, not a claim of
+  Agda completeness. See the owning Notes in Tc.Gen.App, Tc.Gen.Expr and
+  Tc.Gen.HsType.
+- GHC's wired-in coerceId already has a compulsory cast template and no runtime
+  definition. The restricted simplifier must expand it in ordinary derived
+  code too. The change reuses that template and adds no eta rule. See
+  Note [Restricted dependent simplification] in GHC.Core.SimpleOpt.
+- Existing family reduction supplies the selected finite-depth diagnostics.
+  Closed retained domains use reflexivity during whole-Pi normalization.
+  Unequal-domain comparison keeps bounded reduction. An unchanged family type
+  can pass to an unconstrained polymorphic argument without normalization.
+  The cached list-view negatives measure the current normalization strategy.
+  See Note [Closed retained domains] in GHC.Core.FamInstEnv.
+
+The ignored correction preparations retain base bytes and patch hashes.
+They cover App refinement v2, pending-substitution Lint, multiplicity checking,
+native list inference, named callbacks, compulsory coerce expansion, closed
+domain relevance and written argument prefixes. The final source patch above
+includes integration corrections. The final receipt pins executed reports,
+outputs, interfaces, compiler binaries and the two comment-only source deltas.
+The four invalid local Haddock markers become ordinary comments. Two Rep Notes
+state the current domain rules. All bytes outside those comments are unchanged.
+
+The next boundary review is
+`native-generic-module-interoperability-research-v1`. It checks the existing
+source clients and the previously pinned linear-base sources. Ordinary clients
+already use wrapper APIs. Direct retained calls without the dependent extension
+remain unmeasured. Its proposed call matrix and requested-length list adapter
+are unexecuted candidates. Imported type contracts must not be silently erased.
