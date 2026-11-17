@@ -4619,6 +4619,47 @@ The scoped compiler review found no actionable defect. These checks do not
 establish source reachability of the original malformed selector or a
 preservation theorem. Phase 0 is complete. The full forall port remains open.
 
+### Phase 1: explicit Core forall metadata
+
+Use `ForAllTy ma binder body`. The annotation is outside the binder scope.
+Generic makers take explicit metadata. Plural makers and forall splitters use
+per-binder `(ma, binder)` pairs. Observation-only callers can discard metadata
+explicitly. Reconstruction callers must preserve it. Keep the existing
+metadata vector on the Pi views. No visibility-based overwrite is permitted.
+
+Add nominal metadata evidence before binder-kind evidence in `ForAllCo`.
+Both proofs are outside the binder scope. A structural forall proof can expose
+its stored children at any body role. A residual opaque kind or metadata
+selector requires an N/R parent and actual forall-shaped endpoints. Optimize
+metadata before entering the binder. Preserve forward instantiation at U.
+
+CoVar metadata depends on context. Runtime abstractions use U. Generic makers
+preserve M, U or an unresolved expression. Convert a vacuous known-U CoVar to
+a sort-aware anonymous arrow. Retain a vacuous M or unresolved forall. Revise
+the occurrence invariant and its Lint check together. Endpoints of a structural
+ForAllCo can then normalize to different syntactic forms. Smart child extraction
+must precede the residual selector shape check.
+
+The baseline CoVar probe records a rejected cached FunTyFlag from the current
+unused-binder maker and an accepted sort-aware control. Its inputs remain
+unchanged in `native-forall-matchability-covar-probe-v1`. This is API evidence;
+no source reachability claim is made. The contract follows the proposal and
+the pinned FC/role reviews in the research record. It is not a preservation
+theorem.
+
+- [ ] Migrate Core representation, makers, complete views, FV analysis,
+      substitution, tidying, comparison, normalization and transformations.
+- [ ] Migrate coercion formation, selectors, role checks, lifting, reduction,
+      transitivity and nominal metadata equality before binder introduction.
+- [ ] Preserve metadata in interfaces and HIE. Read it outside binder scope.
+      Bump both compatibility versions before emitting the new payload.
+- [ ] Check metadata variables, aliases, substitution, vacuous CoVars and
+      structural versus opaque projection in the existing API fixture.
+- [ ] Build the migrated compiler and check ordinary polymorphic programs.
+
+These tasks do not complete the source annotation, TH or reflection work below.
+Keep the complete M64 goal open until those paths and the source showcase pass.
+
 ### Remaining forall port
 
 - [ ] Select the CoVar-forall metadata contract. A CoVar passes a zero-width
