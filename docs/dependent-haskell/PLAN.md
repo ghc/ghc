@@ -5811,3 +5811,42 @@ The isolated receipts use the `native-higher-order-result-` prefix under
 `_build/verification`. See `baseline-v1`, `selfhost-build-v1`, `source-v1`
 and `source-review-v1.json`, `regression-v1`, `showcase-v1`,
 `registered-v1`, and `format-v1`.
+
+## M71: visibility of retained binders in Core
+
+Roadmap owner: R05. This work enables the invisible retained quantifier in R03.
+Start from M70's visible retained functions and the existing object interface.
+
+Store source visibility on a retained function type. Both variants take a
+runtime argument. Keep the invisible binder even when its result type does
+not mention it. A vacuous visible binder still has an ordinary arrow type.
+Compare visibility in nominal equality and type maps. Preserve it when
+rewriting, copying or serializing types.
+
+Use the canonical visible Core lambda type. Give a lambda an invisible type
+with a representational coercion. The existing nominal domain proof and
+scoped body proof still determine the endpoints. A change of visibility
+requires different endpoint flags. Nominal coercions require matching
+visibility. Coercion optimization must preserve the two endpoints and can
+remove a cast only when the remaining proof and visibility are reflexive.
+
+Eisenberg's [nokinds-pi binder](https://github.com/goldfirere/ghc/blob/b64ef80f8002727422c05092f429c38d0527ed0b/compiler/types/TyCoRep.lhs#L195-L274)
+keeps dependence, relevance and visibility separate and carries the binder
+on a lambda. The `TyCoRep.lhs` blob is
+0f8d92e8cd82cb3dd8cc51d174c027f1eba0f9f4. Modern GHC uses a checked cast
+to expose declared visibility for a Core type lambda. The retained bridge
+uses that structure with a separate runtime obligation. Both endpoints
+consume the same argument with the same demand and multiplicity.
+[Agda's implicit function space](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+provides source prior art for an argument that can be supplied by the checker
+or written explicitly. [Proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#quantifiers)
+separates visibility from retention.
+
+- [ ] Check dependent and vacuous invisible types, exact cast endpoints,
+      reflexivity, optimization and scope in the existing Core API fixture.
+- [ ] Round-trip the invisible type in a versioned object interface.
+- [ ] Compare visible and invisible workers through object execution. Check
+      bottom at function WHNF and ignored and inspected runtime operands.
+- [ ] Add source formation, definition checking and an explicit override,
+      then test omission from a later declared vector. Check ambiguous
+      selection and a wrong explicit runtime index.
