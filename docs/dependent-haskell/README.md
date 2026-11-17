@@ -109,6 +109,7 @@ optimization support or full roadmap completion.
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
 | Compiler validation | M63 passes both builds, API1/37, both-stage public19, parameterized14 and Showcase91/14, plus five registered tests; M62 remains the published checkpoint |
 | Ordinary-arrow matchability | M63 retains type-valued metadata through Core, coercions, interfaces and reflection; thirteen focused wrappers pass; forall metadata and source family unsaturation remain open |
+| Forall selector prerequisite | M64 phase 0 rejects residual phantom-parent binder-kind selectors; both isolated builds, API1/37, both-stage source/Showcase controls and five registered tests pass; the full forall metadata port remains open |
 | Example validation | Audited M60 passes both-stage hidden-interface source19, five rejection controls, compile-only equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |

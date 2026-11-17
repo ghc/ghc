@@ -4604,8 +4604,20 @@ Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
 - [x] Verify the new rejection against the unchanged M63 API before rebuilding.
       Red attempt v4 reaches the intended raw-selector assertion after the
       positive controls pass. Earlier fixture failures remain separate records.
-- [ ] Build the correction in an isolated checkout. Run the kernel fixture,
+- [x] Build the correction in an isolated checkout. Run the kernel fixture,
       required-type-argument controls and the maintained source/runtime cohort.
+
+Source commit `28708e467e16263213a215e0ec234700fe3b4bf1` passes both isolated
+builds and the final `native-forall-selector-boundary-cohort-v2` checks.
+Bootstrap API goldens 1/37 pass against the isolated target libraries. Both
+stages pass public19, parameterized14 plus three located rejections,
+Showcase91/14, two higher-rank compile controls and required-visibility runtime42.
+The standard Hadrian selection passes five tests: 39 cases, 34 skips and no
+unexpected, framework or missing-library result. Inputs remain unchanged.
+Builds use 16 GiB with no swap. Verification uses 4 GiB with no swap and runs serially.
+The scoped compiler review found no actionable defect. These checks do not
+establish source reachability of the original malformed selector or a
+preservation theorem. Phase 0 is complete. The full forall port remains open.
 
 ### Remaining forall port
 
