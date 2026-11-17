@@ -58,7 +58,7 @@ import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv )
 import GHC.Core.Coercion
 
-import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon )
+import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
@@ -691,6 +691,7 @@ tcRetainedKnownArgPlan expected fun sigma args
     declared_arg _ _ = return Nothing
 
     declared_type (L _ (HsPar _ arg)) = declared_type arg
+    declared_type (L _ (ExplicitList _ fields)) = declared_list fields
     declared_type (L loc (HsVar _ lname))
       | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
       = setSrcSpan (locA loc) $
@@ -708,6 +709,19 @@ tcRetainedKnownArgPlan expected fun sigma args
                    else return Nothing }
                Nothing -> return Nothing }
     declared_type _ = return Nothing
+
+    -- | Read one declared native element type without checking the literal.
+    declared_list [] = return Nothing
+    declared_list (L _ (HsPar _ field) : fields) = declared_list (field : fields)
+    declared_list (field@(L _ HsVar{}) : fields)
+      = do { actual <- declared_type field
+           ; case actual of
+               Just ty | hasNativeDependentExpr (Core.Type ty)
+                       , isTauTy ty
+                       , typeKind ty `eqType` liftedTypeKind
+                 -> return (Just (mkListTy ty))
+               _ -> declared_list fields }
+    declared_list (_ : fields) = declared_list fields
 tcRetainedKnownArgPlan _ _ _ _ = return Nothing
 
 -- | Refine a declared argument type with actual lexical constructor Givens.
@@ -815,6 +829,16 @@ checking the occurrence or consuming its usage. The complete immutable IALL
 plan and its existing kind, exact-domain, Quick Look and lexical-scope checks
 remain authoritative.
 
+A built-in list literal such as [vector] can also supply [Vec Int n] from a
+field's declared type. Read the first bare or parenthesized variable field
+whose declared view is native, monomorphic and lifted. Form its list type
+without inferring the literal or checking any occurrence. Skip empty lists,
+fields without such a declaration, polymorphic fields and checking-only forms.
+Applications, splices and nested literals cannot supply this advice. The
+ordinary argument checker must still check the literal and every element at
+the selected type and record their usage. This advice only selects complete
+outer erased arguments; it adds no type equality or mutable meta assignment.
+
 Include a retained binder's own domain, which is outside that binder's scope.
 Do not match a later domain or result that mentions a crossed runtime binder.
 Such a match would need the actual runtime argument, which this declaration
@@ -853,6 +877,8 @@ Reading this declaration does not check the occurrence or consume its usage.
 Do not call tcInferId: it emits usage. Global lookup may load an interface.
 Keep applications, constructors, signatures and polymorphic values on their
 existing paths. Look through parentheses without expanding source syntax.
+A built-in list literal can use a declared native variable field as element
+advice. See Note [Declared retained-domain choices].
 
 Match known types against declared independent visible argument domains.
 Include retained domains without choosing their runtime arguments. See
