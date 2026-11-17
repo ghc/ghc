@@ -60,6 +60,8 @@ module GHC.Tc.Utils.Unify (
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Tc.Solver ( tcRewriteFamilyAxioms )
+
 import GHC.Hs
 import GHC.Tc.Errors.Types ( HsCtxt(..), TcRnMessage(TcRnRetainedQuantificationError)
                            , RetainedQuantificationError(RetainedPatternType) )
@@ -81,14 +83,12 @@ import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..), ReportRedundantConstraints(..)
                            , pprUserTypeCtxt  )
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Utils.TcMType qualified as TcM
-import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
-import GHC.Core.FamInstEnv ( normaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs
@@ -1119,8 +1119,9 @@ matchExpectedTyConApp tc orig_ty
        | tc == tycon  -- Common case
        = return (mkNomReflCo ty, args)
        | isTypeFamilyTyCon tycon, hasNativeDependentExpr (Core.Type ty)
-       = do { fam_envs <- tcGetFamInstEnvs
-            ; let Reduction co reduced = normaliseType fam_envs Nominal ty
+       = do { ty <- liftZonkM (zonkTcType ty)
+            ; loc <- getCtLocM (OccurrenceOf (tyConName tycon)) (Just TypeLevel)
+            ; Reduction co reduced <- tcRewriteFamilyAxioms loc ty
             ; case tcSplitTyConApp_maybe reduced of
                 Just (actual, args) | actual == tc -> return (mkSymCo co, args)
                 _ -> defer }
@@ -1159,7 +1160,8 @@ A known family result can contain runtime indices. For example,
 TreePayload ('Node left right) reduces to (TreePayload left, TreePayload right).
 The ordinary fallback allocates fresh tuple parameters before emitting equality
 constraints. Those parameters cannot hold native types. Reduce a native family
-head with GHC's existing nominal family normalizer before this fallback.
+head with the solver's bounded nominal family rewrite before this fallback.
+See Note [Bounded frontend family views] in GHC.Tc.Solver.
 
 Use the reduced parameters only when the result has the required algebraic
 TyCon. Return the inverse reduction as the required nominal coercion. Do not

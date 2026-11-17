@@ -24,6 +24,7 @@ import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env ( tcLookupIdMaybe, tcLookupConLike, tcLookupLcl_maybe )
@@ -44,7 +45,6 @@ import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
-import GHC.Core.FamInstEnv ( normaliseType )
 import GHC.Core.Reduction ( reductionReducedType )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
 import GHC.Core.FVs ( exprFreeVarsList )
@@ -64,6 +64,7 @@ import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
 import GHC.Types.TyThing ( TyThing(AnId) )
+import GHC.Types.Basic ( TypeOrKind(TypeLevel) )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
 import GHC.Types.Id ( mkLocalId )
@@ -2521,12 +2522,14 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
        ; case eligible of
            Nothing -> return (fun, sigma, [], Nothing)
            Just inferable -> do
-             { let matching_type entry
-                     = do { ty <- liftZonkM (zonkTcType (actual_type entry))
-                          ; fam_envs <- tcGetFamInstEnvs
-                          ; return (reductionReducedType (normaliseType fam_envs Nominal ty)) }
+             { let matching_type (pos, entry)
+                     = let arg = value_args !! (pos-1) in
+                       addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
+                       do { ty <- liftZonkM (zonkTcType (actual_type entry))
+                          ; loc <- getCtLocM (lexprCtOrigin arg) (Just TypeLevel)
+                          ; reductionReducedType <$> tcRewriteFamilyAxioms loc ty }
              ; initial_cache <- infer_args needed_tvs inferable domains 1 args
-             ; initial_tys <- mapM (matching_type . snd) initial_cache
+             ; initial_tys <- mapM matching_type initial_cache
              ; let initial_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- initial_cache ]
                    match_args subst pairs = foldM (\subst (formal, actual) ->
                                         if native_worker
@@ -2553,13 +2556,13 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
                               remaining = zipWith (\pos eligible -> eligible && isNothing (lookup pos initial_cache))
                                                   [1..] inferable
                         ; extra_cache <- infer_args missing remaining domains 1 args
-                        ; extra_tys <- mapM (matching_type . snd) extra_cache
+                        ; extra_tys <- mapM matching_type extra_cache
                         ; let extra_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- extra_cache ]
                         ; return (match_args subst (zip extra_templates extra_tys), initial_cache ++ extra_cache) }
                    Just subst | not index_route, not native_worker ->
                      tcRetainedCallbackArgs tvs domains args subst initial_cache
                    _ -> return (initial_match, initial_cache)
-             ; actual_tys <- mapM (matching_type . snd) cache
+             ; actual_tys <- mapM matching_type cache
              ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
              ; choices <- case matched of
                             Just subst | native_worker
@@ -2631,6 +2634,10 @@ A cached argument can have type OptionalPayload (Just n), with a nominal
 family equation reducing it to Vec Int n. Structural matching against the
 formal Vec a index cannot select index from the unreduced family head.
 Normalize cached actual types at Nominal role for immutable selection.
+Use the solver's bounded family-only rewrite. Restore the original argument
+context before creating its location. Cache positions use the same value
+argument list and VTA offset as infer_args. The depth diagnostic must identify
+that argument. See Note [Bounded frontend family views] in GHC.Tc.Solver.
 Use the same normalized views for initial matching, extra matching and the
 final exact-domain check. This does not unwrap newtypes or invert families.
 

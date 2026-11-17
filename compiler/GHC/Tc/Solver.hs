@@ -13,6 +13,7 @@ module GHC.Tc.Solver(
        tcCheckGivens,
        tcCheckWanteds,
        tcNormalise,
+       tcRewriteFamilyAxioms,
        approximateWC,    -- Exported for plugins to use
 
        captureTopConstraints, emitResidualConstraints,
@@ -33,7 +34,7 @@ import GHC.Tc.Solver.Solve   ( solveSimpleGivens, solveSimpleWanteds
 import GHC.Tc.Solver.Default ( tryDefaulting, tryDefaultingForAmbiguityCheck
                              , isInteractiveClass )
 import GHC.Tc.Solver.Dict    ( makeSuperClasses )
-import GHC.Tc.Solver.Rewrite ( rewriteType )
+import GHC.Tc.Solver.Rewrite ( rewriteType, rewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcMType as TcM
 import GHC.Tc.Utils.Monad   as TcM
@@ -41,12 +42,13 @@ import GHC.Tc.Zonk.TcType     as TcM
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad  as TcS
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLoc( mkGivenLoc )
+import GHC.Tc.Types.CtLoc( CtLoc, mkGivenLoc )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
 import GHC.Core.Predicate
+import GHC.Core.Reduction ( Reduction )
 import GHC.Core.Type
 import GHC.Core.Ppr
 import GHC.Core.TyCon    ( TyConBinder )
@@ -79,6 +81,31 @@ import GHC.Data.Maybe     ( mapMaybe )
 *                           External interface                                  *
 *                                                                               *
 *********************************************************************************
+-}
+
+-- | Reduce family axioms with nominal evidence and the solver depth limit.
+-- See Note [Bounded frontend family views].
+tcRewriteFamilyAxioms :: CtLoc -> TcType -> TcM Reduction
+tcRewriteFamilyAxioms loc ty
+  = runTcSEqualities (rewriteFamilyAxioms loc ty)
+
+{- Note [Bounded frontend family views]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Native shape matching and cached argument selection need a nominal family
+view before ordinary unification. The pure family normalizer has no solver
+reduction-depth state. Use the existing family-only rewrite instead.
+Its proof relates the original type to the reduced type. It uses no ambient
+Given equality, plugin rewrite or family-cache evidence.
+
+Create the location inside the original source context. The depth diagnostic
+restores that location, including its span and error context. In particular,
+cached argument selection must restore addArgCtxt before creating the location.
+runRewrite starts each view at depth zero. Family RHS reduction increments
+that same location. This is a per-view limit, not a global work budget.
+
+Keep the wrapper in TcM. GHC.Tc.Utils.Unify SOURCE-imports its narrow boot
+signature because the solver normally imports the unifier. Do not expose TcS
+internals through two boot interfaces for this frontend operation.
 -}
 
 captureTopConstraints :: TcM a -> TcM (a, WantedConstraints)
