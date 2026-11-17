@@ -1517,7 +1517,7 @@ tcRetainedArg domain arg
                   ; case mb_id of
                       Just arg_id
                         -> do { arg_id <- liftZonkM (zonkId arg_id)
-                              ; if isNativeIndexId arg_id
+                              ; if isNativeRetainedBinder arg_id
                                 then tcRetainedArgVar expected arg_id
                                 else unsupported }
                       _ -> unsupported }
@@ -1559,10 +1559,16 @@ tcRetainedArg domain arg
     unsupported :: TcM a
     unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)
 
--- | Resolve a scalar variable at the expected nominal index domain.
+-- | Resolve an index variable at its expected domain. Function values keep
+-- their complete fixed type and lexical identity.
 -- See Note [Retained argument application].
 tcRetainedArgVar :: TcType -> Id -> TcM Core.CoreExpr
 tcRetainedArgVar expected arg_id
+  | isNativeIndexFunctionId arg_id
+  = if not (isExternalName (getName arg_id))
+       && varType arg_id `tcEqType` expected
+    then return (Core.Var arg_id)
+    else failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
   | varType arg_id `tcEqType` expected = return (Core.Var arg_id)
   | otherwise
   = do { co <- unifyType Nothing (varType arg_id) expected
@@ -1584,6 +1590,12 @@ worker arrows supply their actual field domains. Do not use a constructor's
 result domain for all its fields. The shared Core bridge validates domains,
 saturation, and atomic beta arguments. See Note [Checked native index beta
 exposure] in GHC.Core. No provisional lambda binder survives normalization.
+
+A closed algebraic argument can contain eligible function leaves. Resolve
+each leaf to its actual lexical Id at its complete fixed function type.
+Do not cast a function to another domain or admit a global function here.
+The promoted constructor index stores the same Id as TermVarTy. A saturated
+family can expose that value; canonical application then forms TermAppTy.
 
 Keep the lambda grammar narrow: one VarPat, one unguarded RHS, and no local
 binds or signatures. Strict can make this variable pattern force its argument,

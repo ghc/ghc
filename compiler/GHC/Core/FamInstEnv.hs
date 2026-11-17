@@ -1567,13 +1567,13 @@ normalise_type ty
       = pprPanic "normalise_type: invalid native call" (ppr ty)
     go ty@(TermVarTy v)
       -- See Note [Normalising retained runtime indices].
-      | isNativeIndexId v
+      | isNativeRetainedBinder v
       = do { lc <- getLC
            ; r <- getRole
            ; let lty = substTy (lcSubstLeft lc) ty
                  rty = substTy (lcSubstRight lc) ty
            ; case lty of
-               TermVarTy v' | isNativeIndexId v'
+               TermVarTy v' | isNativeRetainedBinder v'
                             , varType v' `eqType` varType v
                             , lty `eqType` rty
                  -> return $ mkReflRedn r lty
@@ -1676,6 +1676,8 @@ normalise_args fun_ki roles args
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained runtime index is a rigid local Id with a fixed closed domain and
 unrestricted multiplicity. See Note [Algebraic runtime index domains] in GHC.Core.Type.
+The Id can also denote an eligible function stored in a constructor field.
+See Note [Native function-value application] in GHC.Core.TyCo.Make.
 Preserve that Id and return reflexivity at the current role. Do not inspect
 its unfolding or evaluate its value. Family matching keeps an opaque index
 MaybeApart from constructor indices; see Note [Apartness of retained runtime indices]

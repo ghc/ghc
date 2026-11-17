@@ -821,7 +821,7 @@ check_type ve (TermAppTy head_id arg)
            Just (domain, _) | typeKind arg `eqType` domain -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex }
 check_type ve (TermVarTy v)
-  = do { unless (isNativeIndexId v) $
+  = do { unless (isNativeRetainedBinder v) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; check_retained_index ve v }
 check_type ve (DepFunTy v body)
@@ -954,8 +954,8 @@ Zonk the lexical binding's type and multiplicity before testing it. IO-bound
 indices can retain filled meta-variables in that metadata. Keep the same Unique
 and require the occurrence and binding domains to agree. This follows
 GHC.Tc.Gen.App, Note [Native index bindings during typechecking].
-Its domain must satisfy the retained-binder policy. A bound function Id can
-occur only as a dedicated call head. TermVarTy remains scalar-only. Bound-set
+Its domain must satisfy the retained-binder policy. An eligible function Id
+can occur as a dedicated call head or a function-value TermVarTy. Bound-set
 membership covers both binder domains; free function heads still need the
 actual lexical binding and internal Name.
 See Note [Function-valued retained binders] in GHC.Core.Type.
@@ -969,11 +969,10 @@ Those can contain runtime indices, including in an inferred local type.
 Reuse the deep free-variable list already needed for tidying. It excludes
 properly bound retained indices and follows kind and coercion metadata.
 Exclude CoVars: these Ids are erased evidence, not runtime indices.
-The deep check also accepts an eligible lexical opaque-call head. The
-structural check permits that Id only as a TermAppTy head, not TermVarTy.
-Check the symbolic argument at the head's declared domain. A retained Pi
-still binds only a scalar index. A function head must therefore resolve to
-an actual lexical binding; the retained-binder scope cannot introduce it.
+The deep check also accepts an eligible lexical opaque-call head or function
+value. Check the symbolic call argument at the head's declared domain.
+A retained Pi can bind an eligible function at its complete fixed type.
+See Note [Function fields in native index domains] in GHC.Core.Type.
 Keep both forms outside quotations. See Note [Source opaque call indices]
 in GHC.Tc.Gen.HsType.
 

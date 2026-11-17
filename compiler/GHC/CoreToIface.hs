@@ -305,6 +305,20 @@ toIfaceTyLit (StrTyLit x) = IfaceStrTyLit (LexicalFastString x)
 toIfaceTyLit (CharTyLit x) = IfaceCharTyLit x
 
 ----------------
+{- Note [Function-value call congruence in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TermAppCo f arg_co is forward nominal application congruence. Its endpoints
+are also the endpoints of AppCo (Refl (TermVarTy f)) arg_co. Encode that proof
+with the existing IfaceAppCo and IfaceReflCo tags. Preserve the argument proof.
+The reader resolves the actual function Id and canonical application restores
+the call endpoints. A general AppCo can carry a nonreflexive head proof, such
+as transport through a saturated family. Keep that proof in its own case.
+
+Use toIfaceTypeX for the function-value index. It retains the diagnostic free
+form when f is outside the telescope; the raw writer rejects that form.
+The wire encoding adds no axiom or tag. DepFunCo persistence remains gated.
+-}
+
 toIfaceCoercion :: Coercion -> IfaceCoercion
 toIfaceCoercion = toIfaceCoercionX emptyVarSet
 
@@ -346,7 +360,8 @@ toIfaceCoercionX fr co
       = IfaceFunCo r (go ma) (go w) (go co1) (go co2)
 
     go (TermAppCo fun co)
-      = IfaceTermAppCo (mkIfLclName (occNameFS (getOccName fun))) (go co)
+      -- See Note [Function-value call congruence in interfaces].
+      = IfaceAppCo (IfaceReflCo (toIfaceTypeX fr (TermVarTy fun))) (go co)
 
     go (DepFunCo var domain co)
       = IfaceDepFunCo bndr (go_mco domain)

@@ -718,14 +718,18 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
           -- rewrite, and the types involved here are already rewritten
   where
     -- See Note [Opaque runtime index equalities].
-    opaque_index_equality = case (ty1, ty2) of
+    opaque_index_equality = opaque_application ty1 || opaque_application ty2 || case (ty1, ty2) of
       (TermAppTy f _, ty) -> call_domain f ty
       (ty, TermAppTy f _) -> call_domain f ty
       (TermVarTy v, ty) -> same_domain v ty
       (ty, TermVarTy v) -> same_domain v ty
       _ -> False
 
-    same_domain v ty = isNativeIndexId v && typeKind ty `eqType` varType v
+    opaque_application ty
+      | Just (head, _) <- tcSplitAppTy_maybe ty
+      = not (isMatchableFunTy (typeKind head))
+      | otherwise = False
+    same_domain v ty = isNativeRetainedBinder v && typeKind ty `eqType` varType v
     call_domain f ty = case nativeIndexFunctionTys_maybe f of
       Just (_, result) -> typeKind ty `eqType` result
       Nothing -> False
@@ -736,6 +740,14 @@ A runtime index can equal a constructor or another index of the same domain.
 Failure to rewrite these well-kinded index forms does not establish
 a contradiction. Retain the equality as a non-insoluble IrredShapeReason.
 This also lets the pattern-match oracle retain a checked constructor proof.
+
+A family can return a U or unknown function before its head is exposed.
+For example, Stored container argument can still equal True. Split ordinary
+applications and oversaturated family applications with tcSplitAppTy_maybe.
+Only a consumed binder known to be M can justify a shape contradiction.
+Keep U and unknown applications irreducible. This adds no equality proof or
+inverse application rule. See Note [Ordinary arrow matchability] in
+GHC.Core.TyCo.Rep.
 
 This rule does not solve the equality or rewrite the runtime index. A Given
 remains an inert irreducible equality. addIrredToCans still calls updGivenEqs,

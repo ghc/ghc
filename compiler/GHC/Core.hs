@@ -2622,7 +2622,11 @@ exprToNativeCaseIndex (App (Var f) arg)
   , Just index <- exprToNativeIndex arg
   , sameNativeIndexDomain domain (typeKind index)
   = Just (TermAppTy f index)
-exprToNativeCaseIndex expr = exprToNativeIndex expr
+exprToNativeCaseIndex expr
+  | Just index <- exprToNativeIndex expr
+  , isNativeIndexType (typeKind index)
+  = Just index
+  | otherwise = Nothing
 
 -- | Return a supported runtime normal form together with its native index.
 -- The caller must check the original expression's typing and scope with Lint.
@@ -2632,7 +2636,7 @@ normaliseNativeIndexExpr = go emptyVarEnv
   where
     go :: IdEnv (CoreExpr, Type) -> CoreExpr -> Maybe (CoreExpr, Type)
     go env expr
-      | Var v <- expr, isNativeIndexId v
+      | Var v <- expr, isNativeRetainedBinder v
       = case lookupVarEnv env v of
           Just result@(_, index)
             | sameNativeIndexDomain (varType v) (typeKind index) -> Just result
@@ -2767,6 +2771,9 @@ sameNativeIndexDomain left right
   | TyConApp {} <- coreFullView left
   , TyConApp {} <- coreFullView right
   = left `eqType` right
+  | Just _ <- nativeIndexFunctionTypeTys_maybe left
+  , Just _ <- nativeIndexFunctionTypeTys_maybe right
+  = left `eqType` right
   | otherwise = False
 
 -- | Check the domains of a saturated promoted constructor's field indices.
@@ -2790,7 +2797,7 @@ mapNativeIndex subst expr
   | otherwise = expr
   where
     from_index (TermVarTy v)
-      | isNativeIndexId v = Just (Var v)
+      | isNativeRetainedBinder v = Just (Var v)
     from_index (CastTy index delta)
       | Just (source, _) <- nativeIndexCastDomains delta
       , sameNativeIndexDomain source (typeKind index)

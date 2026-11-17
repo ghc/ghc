@@ -456,6 +456,8 @@ mkReductions cos tys = Reductions cos tys
 {-# INLINE mkReductions #-}
 
 -- | Combines 'mkAppCos' and 'mkAppTys'.
+-- Both preserve canonical native call endpoints. See
+-- Note [Native function-value application] in GHC.Core.TyCo.Make.
 mkAppRedns :: Reduction -> Reductions -> Reduction
 mkAppRedns (Reduction co ty) (Reductions cos tys)
   = mkReduction (mkAppCos co cos) (mkAppTys ty tys)

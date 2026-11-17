@@ -61,7 +61,8 @@ import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyCo
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToNativeIndex, mapNativeIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
-import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, nativeIndexFunctionTys_maybe, typeKind )
+import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, isNativeIndexFunctionId
+                                 , nativeIndexFunctionTys_maybe, typeKind )
 
 import GHC.Core.TyCo.Make
 import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType )
@@ -825,13 +826,17 @@ substTyCoMapper
 
    -- Return a stored converted range once, including its nominal evidence.
    -- See Note [Nominal native index casts] in GHC.Core.
-   subst_index v = StrictReaderT $ \(Subst in_scope ids _ _) ->
-     return $ case lookupVarEnv ids v of
-       Nothing -> TermVarTy (lookupInScope in_scope v `orElse` v)
-       Just rhs -> case exprToNativeIndex rhs of
-         Just index | typeKind index `eqType` varType v -> index
-         _ -> pprPanic "substTy: unsupported runtime index or changed domain"
-                      (ppr v <+> text ":=" <+> ppr rhs)
+   subst_index v = StrictReaderT $ \subst@(Subst in_scope ids _ _) ->
+     return $ if isNativeIndexFunctionId v
+       then TermVarTy (substNativeIndexFunction subst v)
+         -- Keep the same Var-only ranges as a native call head.
+         -- See Note [Native function-value application] in GHC.Core.TyCo.Make.
+       else case lookupVarEnv ids v of
+         Nothing -> TermVarTy (lookupInScope in_scope v `orElse` v)
+         Just rhs -> case exprToNativeIndex rhs of
+           Just index | typeKind index `eqType` varType v -> index
+           _ -> pprPanic "substTy: unsupported runtime index or changed domain"
+                        (ppr v <+> text ":=" <+> ppr rhs)
 
    subst_fun f = StrictReaderT $ \subst -> return (substNativeIndexFunction subst f)
 

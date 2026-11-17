@@ -1797,7 +1797,7 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
         _ -> failWithL (text "Native index alternative must bind its fields followed by one CoVar")
     ; in_scope <- getInScope
     ; let field_set = mkVarSet fields
-    ; lintL (all isNativeIndexId fields
+    ; lintL (all isNativeRetainedBinder fields
              && all (\v -> not (v `elemInScopeSet` in_scope)) fields
              && sizeVarSet field_set == length fields)
         (text "Native index fields must be fresh unrestricted local identifiers:" <+> ppr fields)
@@ -1912,6 +1912,8 @@ constructor discrimination justifies this nominal equality. Bring the real
 fields into scope before checking the proof. The proof is not a worker argument.
 Check the fields through lintAltBinders and erase only the proof in CoreToStg.
 An ordinary S k alternative has no virtual proof and keeps its existing rule.
+An eligible function field keeps its local Id and complete fixed type.
+See Note [Function fields in native index domains] in GHC.Core.Type.
 
 Require fresh fields as well as a fresh CoVar. If k captured the scrutinee's
 identifier, the expected equality would refer to the field on both sides.
@@ -2134,8 +2136,8 @@ lintType (TyVarTy tv)
 
 lintType (TermVarTy v)
   = do { in_scope <- getInScope
-       ; lintL (isNativeIndexId v
-                 && maybe False (\b -> isNativeIndexId b && varType b `eqType` varType v)
+       ; lintL (isNativeRetainedBinder v
+                 && maybe False (\b -> isNativeRetainedBinder b && varType b `eqType` varType v)
                                 (lookupInScope in_scope v))
            (text "Invalid runtime index:" <+> ppr v <+> dcolon <+> ppr (varType v))
        ; lintVarOcc v }
@@ -2160,6 +2162,10 @@ lintType (DepFunTy b body)
 lintType ty@(AppTy t1 t2)
   | TyConApp {} <- t1
   = failWithL $ text "TyConApp to the left of AppTy:" <+> ppr ty
+  | TermVarTy f <- t1
+  , isNativeIndexFunctionId f
+  = failWithL $ text "Non-canonical native function application:" <+> ppr ty
+    -- See Note [Native function-value application] in GHC.Core.TyCo.Make.
   | otherwise
   = do { let (fun_ty, arg_tys) = collect t1 [t2]
        ; lintType fun_ty

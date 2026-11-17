@@ -65,6 +65,7 @@ module GHC.Core.Type (
         mkPiTysM, mkPiTysU,
         isNativeIndexId, isNativeIndexType, nativeIndexDataConTyArgs,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
+        nativeIndexFunctionTypeTys_maybe,
         isNativeRetainedBinder, isNativeRetainedBinderType,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
@@ -2309,7 +2310,12 @@ See #14939.
 -- | Test whether a closed, lifted algebraic type is a supported index domain.
 -- See Note [Algebraic runtime index domains].
 isNativeIndexType :: Type -> Bool
-isNativeIndexType = go []
+isNativeIndexType = nativeIndexType True
+
+-- | Check an algebraic domain with optional opaque function fields.
+-- See Note [Function fields in native index domains].
+nativeIndexType :: Bool -> Type -> Bool
+nativeIndexType function_fields = go []
   where
     go path ty
       | TyConApp tc args <- coreFullView ty
@@ -2323,8 +2329,15 @@ isNativeIndexType = go []
       , all closed_argument args
       , null (tyConStupidTheta tc)
       , Just fields <- concat <$> traverse (con_fields ty args) (tyConDataCons tc)
-      = all (go ((tc, args) : path)) fields
+      = all (field ((tc, args) : path)) fields
       | otherwise = False
+
+    field path ty
+      | function_fields
+      , isJust (nativeIndexFunctionTypeTys_maybe ty)
+      = True
+      | otherwise
+      = go path ty
 
     closed_argument arg = noFreeVarsOfType arg && isTauTy arg
                           && tcIsLiftedTypeKind (typeKind arg)
@@ -2385,7 +2398,7 @@ nativeIndexFunctionTypeTys_maybe ty
       <- coreFullView ty
   , af == FTF_T_T, eqType ma unmatchableDataConTy, isManyTy mult
   , noFreeVarsOfType mult
-  , isNativeIndexType arg, isNativeIndexType res
+  , nativeIndexType False arg, nativeIndexType False res
   = Just (arg, res)
   | otherwise = Nothing
 
@@ -2410,6 +2423,31 @@ isNativeRetainedBinderType :: Type -> Bool
 isNativeRetainedBinderType ty
   = isNativeIndexType ty || isJust (nativeIndexFunctionTypeTys_maybe ty)
 
+{- Note [Function fields in native index domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A closed algebraic index can contain an eligible opaque function field.
+For example, Maybe (Bool -> Bool) has a Nothing alternative and a Just field
+with a closed ordinary U/Many arrow. Keep all other algebraic-domain checks.
+The function remains a runtime Id. Its TermVarTy records identity without
+evaluating the function or comparing its behavior.
+
+Function arguments and results keep the old function-free algebraic policy.
+nativeIndexType False checks that policy. Do not call the broader public
+predicate from nativeIndexFunctionTypeTys_maybe: a domain such as
+
+  data Loop = Loop (Loop -> Bool)
+
+would then restart eligibility checking through its function argument.
+The function-free endpoint check rejects Loop without this recursive restart.
+This restriction is separate from regular algebraic recursion.
+
+Use isNativeRetainedBinder for function-valued TermVarTy occurrences.
+isNativeIndexId still checks algebraic-root identifiers. The existing retained
+predicate also checks local U/Many function heads, their complete fixed types,
+and the non-join restriction. See Note [Native function-value application] in
+GHC.Core.TyCo.Make for application and forward evidence.
+-}
+
 {- Note [Function-valued retained binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained binder can bind a scalar index or an eligible opaque call head.
@@ -2417,8 +2455,9 @@ The function head has a closed ordinary visible Many arrow A -> B. Both A and
 B are independently supported scalar domains. The Id is local, unrestricted,
 and not a join point. Reuse the head policy; do not widen the scalar policy.
 
-A bound function occurs only in the head slot of TermAppTy or TermAppCo.
-It cannot occur as TermVarTy or as a matchable AppTy function. Applying its
+A bound function can occur in the head slot of TermAppTy or TermAppCo, or as
+a TermVarTy stored in an algebraic index. Application of that TermVarTy uses
+the same opaque TermAppTy form. It is not a matchable function. Applying its
 retained binder requires an eligible local Var with exactly the same type.
 Use the existing head-only Id substitution. Do not unfold that Var or transport
 the function domain through a coercion. DepFunCo keeps function-valued domains
@@ -2438,11 +2477,13 @@ head-only-function-valued-retained-binders-prior-art.
 
 {- Note [Algebraic runtime index domains]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A runtime index has a closed, first-order, lifted data type. Inspect ordinary
+A runtime index has a closed, lifted algebraic data type. Inspect ordinary
 TyCons and DataCons; Nat has no wired identity. Instantiate ordinary universal
 parameters with closed monotypes of kind Type. Check the instantiated original
 and representation fields. Static parameters need not themselves be scalar
 domains: Proxy (Bool -> Bool) has no function field, but Maybe (Bool -> Bool) does.
+The latter uses the separate function-leaf policy. See
+Note [Function fields in native index domains].
 
 Track full datatype applications along the active path. A return to the same
 TyCon must have nominally equal arguments. Use ordinary eqType, which requires

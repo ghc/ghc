@@ -46,6 +46,9 @@ import GHC.Rename.Utils ( bindLocalNames )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
+import GHC.Tc.Solver.Monad ( runTcSEqualities )
+import GHC.Tc.Solver.Rewrite ( rewriteFamilyAxioms )
+import GHC.Tc.Zonk.TcType ( zonkTcType )
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Gen.Head( tcCheckId )
 import GHC.Tc.Utils.TcMType
@@ -65,11 +68,12 @@ import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeIndexId, nativeIndexDataConTyArgs )
+                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeRetainedBinder, nativeIndexDataConTyArgs )
 import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
 import GHC.Core.DataCon ( DataCon, dataConName, dataConInstOrigArgTys, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
+import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Utils ( applyTypeToArgs )
 -- Create chunkified tuple types for monad comprehensions
 import GHC.Core.Make.BigTuple
@@ -91,7 +95,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
-import GHC.Types.Var ( EvVar, varType, isCoVar, isVisibleFunArg )
+import GHC.Types.Var ( EvVar, varType, isId, isCoVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
@@ -352,9 +356,11 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                   matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
   = do { captures <- fmap catMaybes $ mapM capture
                        (nameSetElemsStable (retainedCaseNames matches))
-       ; givens <- filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; native_givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; givens <- filterM (depends . varType) native_givens
+       ; result_depends <- depends result_ty
        ; let existing_trigger = not (null captures) || not (null givens)
-                                || depends result_ty || has_annotation matches
+                                || result_depends || has_annotation matches
        ; metadata_trigger <- if existing_trigger || retainedCaseHasQuote matches
                              then return False
                              else do { complete <- complete_constructor_rows
@@ -381,9 +387,13 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
               ; alias <- newSysLocalId (fsLit "call_index") ManyTy domain
               ; proof <- newEvVar (mkNomEqPred (TermVarTy alias) call_ty)
               ; let alias_co = mkSymCo (mkCoVarCo proof)
-              ; result_co <- tcRetainedCallCoercion call_ty alias_co result_ty
-              ; capture_cos <- mapM (tcRetainedCallCoercion call_ty alias_co . varType) captures
-              ; given_cos <- mapM (tcRetainedCallCoercion call_ty alias_co . varType) givens
+                    transport ty = do
+                      { Reduction family_co family_ty <- family_view ty
+                      ; co <- tcRetainedCallCoercion call_ty alias_co family_ty
+                      ; return (family_co `mkTransCo` co) }
+              ; result_co <- transport result_ty
+              ; capture_cos <- mapM (transport . varType) captures
+              ; given_cos <- mapM (transport . varType) givens
               ; index <- newSysLocalId (fsLit "call_motive") ManyTy domain
               ; let in_scope = mkInScopeSetList
                       (alias : index : tyCoVarsOfTypesList
@@ -437,15 +447,29 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                                       (noLocA transported)))) } }
   where
     domain = typeKind call_ty
-    depends = retainedCallOccurs call_ty
+    call_ids = filter (\v -> isId v && not (isCoVar v)) (tyCoVarsOfTypeList call_ty)
+    depends ty
+      | retainedCallOccurs call_ty ty = return True
+      | all (\v -> anyFreeVarsOfType (== v) ty) call_ids
+      = do { Reduction _ view <- family_view ty
+           ; return (retainedCallOccurs call_ty view) }
+      | otherwise = return False
+    -- | Reduce family axioms with the ordinary solver depth limit.
+    family_view :: TcType -> TcM Reduction
+    family_view ty
+      = do { ty <- liftZonkM (zonkTcType ty)
+           ; loc <- getCtLocM PatCheckOrigin Nothing
+           ; runTcSEqualities (rewriteFamilyAxioms loc ty) }
     capture name
       = do { thing <- tcLookupLcl_maybe name
            ; case thing of
                Just (ATcId { tct_id = var })
-                 | isLocalId var, not (isCoVar var), depends (varType var) ->
-                   do { unless (isManyTy (idMult var)) $
-                          failWithTc (TcRnRetainedQuantificationError (RetainedPatternType (varType var)))
-                      ; return (Just var) }
+                 | isLocalId var, not (isCoVar var) ->
+                   do { dependent <- depends (varType var)
+                      ; if not dependent then return Nothing else
+                        do { unless (isManyTy (idMult var)) $
+                               failWithTc (TcRnRetainedQuantificationError (RetainedPatternType (varType var)))
+                           ; return (Just var) } }
                _ -> return Nothing }
     constructor (L match_loc (Match { m_pats = L _ [pat]
                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
@@ -583,9 +607,10 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                     Just value -> consume True (applyTypeToArgs ty [value]) rest
                     Nothing -> return False }
               [] -> return False
-          | otherwise = return (consumed && isTauTy ty && depends ty)
+          | otherwise = if consumed && isTauTy ty then depends ty else return False
 
-        -- | Reconstruct only resolved monomorphic scalar constructor trees.
+        -- | Reconstruct only resolved monomorphic index constructor trees.
+        -- Function leaves keep their actual lexical Id and exact fixed type.
         -- This metadata query does not check or evaluate a source argument.
         scalar_argument expected expr
           | HsPar _ arg <- expr = scalar_argument expected (unLoc arg)
@@ -608,7 +633,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
           | HsVar{} <- expr
           = do { actual <- local_variable expr
                ; return $ case actual of
-                   Just var | isNativeIndexId var
+                   Just var | isNativeRetainedBinder var
                             , varType var `eqType` expected -> Just (Var var)
                    _ -> Nothing }
           | otherwise = return Nothing
@@ -660,6 +685,14 @@ whole index without assuming that f is injective. Keep n and every Vec n
 capture unchanged. Generalize only the exact call in the result, captures,
 and incoming evidence. Abstract it to an immutable template and lift the
 checked alias proof with ordinary nominal FC congruence.
+
+An existing saturated family can expose the exact call. Normalize the family
+view when the original type contains every runtime dependency of that call.
+Use the view for activation and capture discovery. The solver rewrite enforces
+the ordinary reduction-depth limit. Compose the nominal family reduction with
+the alias transport from tcRetainedCallCoercion in GHC.Tc.Utils.Unify.
+Keep its complete head evidence. See Note [Native function-value
+application] in GHC.Core.TyCo.Make.
 
 Introduce a strict alias r with q :: r ~# f n. Check the constructor rows
 with the existing retained motive checker, applied to the scalar index r.

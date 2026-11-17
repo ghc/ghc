@@ -611,10 +611,10 @@ irType = go
       = markNominal lcls (varType f) >> markNominal lcls arg
       | otherwise = pprPanic "irType: invalid native call scope" (ppr ty)
     go lcls ty@(TermVarTy v)
-      | v `elemVarSet` lcls, isNativeIndexId v = markNominal lcls (varType v)
+      | v `elemVarSet` lcls, isNativeRetainedBinder v = markNominal lcls (varType v)
       | otherwise = pprPanic "irType: invalid runtime index scope" (ppr ty)
     go lcls ty@(DepFunTy v body)
-      | isNativeIndexId v
+      | isNativeRetainedBinder v
       = markNominal lcls (varType v) >> go (extendVarSet lcls v) body
       | otherwise = pprPanic "irType: invalid retained binder" (ppr ty)
     go lcls (TyVarTy tv)       = unless (tv `elemVarSet` lcls) $
@@ -668,10 +668,10 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
       = get_ty_vars scope (varType f) `unionVarSet` get_ty_vars scope arg
       | otherwise = pprPanic "markNominal: invalid native call scope" (ppr ty)
     get_ty_vars scope ty@(TermVarTy v)
-      | v `elemVarSet` scope, isNativeIndexId v = get_ty_vars scope (varType v)
+      | v `elemVarSet` scope, isNativeRetainedBinder v = get_ty_vars scope (varType v)
       | otherwise = pprPanic "markNominal: invalid runtime index scope" (ppr ty)
     get_ty_vars scope ty@(DepFunTy v body)
-      | isNativeIndexId v
+      | isNativeRetainedBinder v
       = get_ty_vars scope (varType v) `unionVarSet`
           get_ty_vars (extendVarSet scope v) body
       | otherwise = pprPanic "markNominal: invalid retained binder" (ppr ty)
@@ -693,6 +693,8 @@ Check constructor fields in telescope order. Extend the local scope after each
 named runtime field. A valid index has a closed native domain, so it contributes
 no ordinary type-parameter role. Check that domain and continue through the
 payload type. In particular, do not omit the element parameter of Vec a n.
+An eligible function-value index keeps the same scope and nominal domain
+traversal. See Note [Function fields in native index domains] in GHC.Core.Type.
 
 Use the same scope rule for retained Pi binders inside field types. Nominal
 traversal returns type variables only; a bound runtime Id is not a role variable.

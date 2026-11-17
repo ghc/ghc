@@ -836,7 +836,7 @@ data NativeDomainShape
   | NativeSynonymDomain NativeDomainShape
   | NativeTyConDomain TyCon
   | NativeFunctionDomain NativeDomainShape NativeDomainShape NativeDomainShape NativeDomainShape
-  | NativePiDomain
+  | NativePiDomain NativeDomainShape NativeDomainShape NativeDomainShape
 
 -- | Attach a derived interface view and update the cached nullary type.
 -- See Note [Native interface domain shapes].
@@ -859,7 +859,8 @@ Its fields must stay lazy. Existing TyCon builders default to no view.
 
 The view permits early rejection only. The typed checks remain mandatory.
 Unknown includes forms whose normalization is not represented here. In
-particular, a raw Pi can become an ordinary arrow when its binder is vacuous.
+contrast, a raw Pi retains endpoint shapes for the ordinary arrow that it can
+become when its binder is vacuous.
 An absent view is not evidence that a domain is valid or empty.
 
 Keep each view on its reconstructed TyCon. When attaching it, rebuild

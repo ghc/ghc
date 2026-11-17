@@ -535,7 +535,7 @@ tcRetainedAmbientIndices invalid_reason hs_ty
              Just (ATcId { tct_id = index }) ->
                do { index <- liftZonkM (zonkId index)
                   ; unless (not (isExternalName name)
-                            && (isNativeIndexId index || isNativeIndexFunctionId index)) invalid_index
+                            && isNativeRetainedBinder index) invalid_index
                   ; level <- getThLevel
                   ; case level of
                       Comp -> return ()
@@ -706,9 +706,9 @@ domain is a value type, so its annotation does not require KindSignatures.
 It must satisfy isNativeRetainedBinderType. Each runtime binder has multiplicity
 Many. See Note [Exported function-valued retained signatures] for the function
 domain permission. Check before mkDepFunTy can remove a vacuous binder.
-Register a function Id only for dedicated call-head lookup. tcTyVar still
-rejects bare function indices. Retained constructor fields use the same closed
-function-domain policy.
+An eligible function Id can also occur as a value index in a closed algebraic
+constructor. Its complete fixed type retains U matchability. Retained
+constructor fields use the same function-domain policy.
 See Note [Function-valued retained binders] in GHC.Core.Type.
 The ordinary outer-forall checker scopes erased type variables around the
 whole telescope. The result has kind Type. Retained binders in other type
@@ -742,11 +742,11 @@ use the separate permission in Note [Retained Pi type arguments].
 Check each domain before adding its Id to the telescope. The function must
 satisfy the closed visible Many A -> B policy.
 See Note [Function-valued retained binders] in GHC.Core.Type. A bare function
-is not a scalar index. Only the dedicated call syntax can use its Id.
+is a value index at its fixed type. Application keeps the opaque call policy.
 
 The interface already encodes this telescope with IfaceDepFunTy and
-IfaceTermAppTy. tcIfaceType uses isNativeRetainedBinder for the former.
-It still uses isNativeIndexId for a bare IfaceTermVar. Decode each binder
+IfaceTermAppTy. tcIfaceType uses isNativeRetainedBinder for both a binder
+and a bare IfaceTermVar value. Decode each binder
 before its body and check that the body has kind Type. No wire tag or layout
 changes. With the same header version, an old reader can display the raw
 signature. Its scalar-only binder check rejects a typed import. No new
@@ -2246,14 +2246,15 @@ tc_app_ty mode rn_ty exp_kind
   | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- hs_fun_ty
   , Just head_id <- lookupNameEnv (mode_indices mode) name
   , isNativeIndexFunctionId head_id
-  = do { (domain, result) <- case nativeIndexFunctionTys_maybe head_id of
-               Just domains -> return domains
-               Nothing -> invalid_call
-       ; arg <- case filterOut is_par hs_args of
-               [HsValArg _ arg] -> return arg
-               _ -> invalid_call
-       ; arg_ty <- tc_check_lhs_type mode arg domain
-       ; checkExpKind mode rn_ty (TermAppTy head_id arg_ty) result exp_kind }
+  = case filterOut is_par hs_args of
+      [] -> checkExpKind mode rn_ty (TermVarTy head_id) (varType head_id) exp_kind
+      [HsValArg _ arg] ->
+        do { (domain, result) <- case nativeIndexFunctionTys_maybe head_id of
+                   Just domains -> return domains
+                   Nothing -> invalid_call
+           ; arg_ty <- tc_check_lhs_type mode arg domain
+           ; checkExpKind mode rn_ty (TermAppTy head_id arg_ty) result exp_kind }
+      _ -> invalid_call
     -- See Note [Source opaque call indices].
   where
     is_par HsArgPar{} = True
@@ -2278,10 +2279,12 @@ Keep function-head eligibility separate from scalar-index eligibility.
 
 Recognize the registered head before tcInferTyApps. Check its sole value
 argument at the declared domain, then form TermAppTy at the result domain.
-Ignore parentheses, but reject kind arguments and other arities. A bare
-function head cannot form TermVarTy. Never send a registered runtime head
-through ordinary matchable AppTy formation. Erased type variables keep their
-ordinary application path and their existing lookup precedence.
+Ignore parentheses. With no arguments, form TermVarTy at the complete fixed
+U function type. Reject kind arguments and more than one value argument.
+Canonical ordinary
+application of that value forms TermAppTy, including after a saturated family
+exposes it. This adds no matchable application or inverse rule. Erased type
+variables keep their ordinary application path and lookup precedence.
 
 This rule checks a type. It does not admit f n as a retained runtime argument
 or evaluate the call. Strict source cases use the separate checked call
@@ -2802,7 +2805,7 @@ tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- This does not instantiate. See Note [Do not always instantiate eagerly in types]
 tcTyVar mode name
   | Just index <- lookupNameEnv (mode_indices mode) name
-  = if isNativeIndexId index
+  = if isNativeRetainedBinder index
     then pure (TermVarTy index, varType index)
     else failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
 tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon

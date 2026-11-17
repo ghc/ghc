@@ -365,6 +365,9 @@ mkAppTy (CastTy fun_ty co) arg_ty
   = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
 
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
+mkAppTy (TermVarTy f) arg
+  | isNativeIndexFunctionId f = TermAppTy f arg
+    -- See Note [Native function-value application].
 mkAppTy ty1               ty2 = AppTy ty1 ty2
         -- Note that the TyConApp could be an
         -- under-saturated type synonym.  GHC allows that; e.g.
@@ -385,13 +388,35 @@ mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
                                      -- Why do this? See (EQ1) of
                                      -- Note [Respecting definitional equality]
                                      -- in GHC.Core.TyCo.Rep
-  = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
+  = foldl' mkAppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
     (arg_cos, res_co) = decomposePiCos co arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
-mkAppTys ty1                tys2 = foldl' AppTy ty1 tys2
+mkAppTys ty1                tys2 = foldl' mkAppTy ty1 tys2
+
+{- Note [Native function-value application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An eligible local function can occur as a TermVarTy in a closed constructor
+index. A saturated type family can return that function. Its application must
+have the same representation as a direct native call:
+
+  mkAppTy (TermVarTy f) arg = TermAppTy f arg
+
+Use this rule in mkAppTys as well, including arguments left after a cast.
+Type and coercion substitution rebuild applications through mkAppTy.
+AppCo endpoint recovery also uses mkAppTy. Thus a pre-existing forward proof
+keeps its endpoints when a type variable is replaced by TermVarTy f.
+
+Keep ordinary AppCo when its head proof is nonreflexive. For example, a
+constructor proof and a saturated family equation can give
+  head_co :: Stored container ~N TermVarTy f
+Then AppCo head_co arg_co proves equality between the family application and
+the native call. TermAppCo f arg_co alone would discard head_co.
+Application congruence does not require M. Opaque inverse application still
+requires M; canonical native calls do not have an inverse projection.
+-}
 
 
 {- *********************************************************************

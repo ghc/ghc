@@ -730,6 +730,8 @@ mkFunCoNoFTF r ma w arg_co res_co
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
 -- If the first is Phantom, then the second can be either Phantom or Nominal.
+-- Keep a nonreflexive head proof when the result has native call endpoints.
+-- See Note [Native function-value application] in GHC.Core.TyCo.Make.
 mkAppCo :: Coercion     -- ^ :: t1 ~r t2
         -> Coercion     -- ^ :: s1 ~N s2, where s1 :: k1, s2 :: k2
         -> Coercion     -- ^ :: t1 s1 ~r t2 s2
@@ -2194,6 +2196,7 @@ coercion_lr_kind which orig_co
     go (GRefl _ ty (MCo co1)) = pickLR which (ty, mkCastTy ty co1)
     go (TyConAppCo _ tc cos)  = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)        = mkAppTy (go co1) (go co2)
+      -- See Note [Native function-value application] in GHC.Core.TyCo.Make.
     go (TermAppCo f co)       = TermAppTy f (go co)
     go (DepFunCo b MRefl co)  = mkDepFunTy b (go co)
     go (DepFunCo b (MCo delta) co)

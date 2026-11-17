@@ -1341,6 +1341,11 @@ universals. Runtime field Ids use those instantiated types. A promoted index
 contains the ordinary type arguments before the actual runtime field indices.
 Use the same domain check for patterns and constructor argument metadata.
 
+A closed algebraic domain can contain eligible function leaves. Keep each
+leaf's actual field Id in the promoted constructor index. The nominal whole
+constructor proof transports later fields through a family that exposes that
+Id. It does not project equality through an unmatchable function application.
+
 The renamer retains built-in list patterns and infix constructor patterns.
 Expose only the selected empty list as nil and an infix constructor as its
 ordinary prefix form before checking it. Keep the original source span and

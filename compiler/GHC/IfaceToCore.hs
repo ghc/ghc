@@ -1687,13 +1687,17 @@ tcIfaceDomainShape (IfaceFunTy FTF_T_T ma mult arg res)
   = NativeFunctionDomain <$> tcIfaceDomainShape ma
                          <*> tcIfaceDomainShape mult
                          <*> tcIfaceDomainShape arg <*> tcIfaceDomainShape res
-tcIfaceDomainShape IfaceDepFunTy{} = return NativePiDomain
+tcIfaceDomainShape (IfaceDepFunTy (mult, _, arg) res)
+  = NativePiDomain <$> tcIfaceDomainShape mult
+                   <*> tcIfaceDomainShape arg
+                   <*> tcIfaceDomainShape res
 tcIfaceDomainShape IfaceForAllTy{} = return NativeInvalidDomain
 tcIfaceDomainShape IfaceLitTy{} = return NativeInvalidDomain
 tcIfaceDomainShape _ = return NativeUnknownDomain
 
 -- | Select the existing eligibility policy for a shape precheck.
 data NativeDomainUse = NativeScalarUse | NativeFunctionUse | NativeRetainedUse
+                     | NativeFunctionEndpointUse
                      | NativeFieldMultUse | NativeManyMultUse | NativeUnmatchableUse
   deriving Eq
 
@@ -1706,17 +1710,20 @@ nativeTypeDomainShape (FunTy FTF_T_T ma mult arg res)
                          (nativeTypeDomainShape mult)
                          (nativeTypeDomainShape arg) (nativeTypeDomainShape res)
 nativeTypeDomainShape FunTy{} = NativeInvalidDomain
-nativeTypeDomainShape DepFunTy{} = NativePiDomain
+nativeTypeDomainShape (DepFunTy binder body)
+  = NativePiDomain (nativeTypeDomainShape (idMult binder))
+                   (nativeTypeDomainShape (varType binder))
+                   (nativeTypeDomainShape body)
 nativeTypeDomainShape _ = NativeUnknownDomain
 
 -- | Reject known unsupported shapes; True still requires the typed checks.
 -- See Note [Checking native domain shapes].
 nativeDomainShapePossible :: NativeDomainUse -> NativeDomainShape -> Bool
-nativeDomainShapePossible NativeRetainedUse shape
-  = nativeDomainShapePossible NativeScalarUse shape
-    || nativeDomainShapePossible NativeFunctionUse shape
 nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
   where
+    go seen aliases NativeRetainedUse shape
+      = go seen aliases NativeScalarUse shape
+        || go seen aliases NativeFunctionUse shape
     go seen aliases mode (NativeTyConDomain tc)
       | mode == NativeUnmatchableUse, tc == unmatchableDataConTyCon = True
       | mode == NativeUnmatchableUse, tc == matchableDataConTyCon = False
@@ -1730,26 +1737,34 @@ nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
             | tc `elemTyConSet` aliases -> False
             | otherwise -> go seen (extendTyConSet aliases tc) mode rhs
           NativeDataDomain{}
-            -> mode == NativeScalarUse
+            -> data_use mode
                && (tc `elemTyConSet` seen
                    || go (extendTyConSet seen tc) emptyTyConSet mode view)
           _ -> go seen aliases mode view
       | otherwise = True
     go _ _ _ NativeUnknownDomain = True
     go _ _ _ NativeInvalidDomain = False
-    go _ _ mode NativePiDomain = mode == NativeFunctionUse
+    go _ aliases mode (NativePiDomain mult arg res)
+      = mode == NativeFunctionUse
+        && go emptyTyConSet aliases NativeManyMultUse mult
+        && go emptyTyConSet aliases NativeFunctionEndpointUse arg
+        && go emptyTyConSet aliases NativeFunctionEndpointUse res
     go seen _ mode (NativeDataDomain fields)
-      = mode == NativeScalarUse && all field fields
+      = data_use mode && all field fields
       where
         field (mult, ty) = go seen emptyTyConSet NativeFieldMultUse mult
-                       && go seen emptyTyConSet NativeScalarUse ty
+                       && go seen emptyTyConSet field_use ty
+        field_use | mode == NativeScalarUse = NativeRetainedUse
+                  | otherwise = NativeFunctionEndpointUse
     go seen aliases mode (NativeFunctionDomain ma mult arg res)
       = mode == NativeFunctionUse
         && go seen aliases NativeUnmatchableUse ma
         && go seen aliases NativeManyMultUse mult
-        && go seen aliases NativeScalarUse arg
-        && go seen aliases NativeScalarUse res
+        && go emptyTyConSet aliases NativeFunctionEndpointUse arg
+        && go emptyTyConSet aliases NativeFunctionEndpointUse res
     go seen aliases mode (NativeSynonymDomain rhs) = go seen aliases mode rhs
+
+    data_use mode = mode == NativeScalarUse || mode == NativeFunctionEndpointUse
 
 -- | Preserve the Id guards before inspecting its imported domain view.
 nativeIdDomainShapePossible :: NativeDomainUse -> Id -> Bool
@@ -1788,8 +1803,15 @@ Keep the Id precheck and the typed checks after allocation as well.
 Fields permit One or Many. Function arrows and retained binders require Many.
 Function arrows require U matchability. Resolve metadata by wired TyCon
 identity, including nullary aliases.
-A raw Pi is not scalar, but its function shape is unknown: mkDepFunTy converts
-a vacuous Pi to an ordinary arrow. Applied synonyms and casts also remain
+An algebraic domain can contain an eligible function leaf. Check its fields
+with the retained union, but check each function endpoint with the old
+function-free algebraic policy. Start a separate data visited set for each
+endpoint. An enclosing data back-edge must not certify that endpoint.
+A raw Pi is not scalar. mkDepFunTy can convert a vacuous Pi to an ordinary
+arrow. Retain its multiplicity, argument and result shapes. Check its possible
+function endpoints with the function-free policy before decoding its binder.
+This rejects recursive domains through a Pi without forcing their Type knots.
+Applied synonyms and casts remain
 unknown. The precheck must not reject their possible normalization results.
 Leave constraint arrows unknown so that their decoders check scoped indices
 in predicates before the typed domain check rejects the arrow visibility.
@@ -1839,12 +1861,12 @@ tcIfaceType = go
       = do { v <- tcIfaceLclId n
            ; precheckIfaceNativeDomain
                (text "Invalid retained index in interface:" <+> ppr n)
-               (nativeIdDomainShapePossible NativeScalarUse v)
-           ; valid <- evaluateIfaceNativeDomain (ppr n) (isNativeIndexId v)
+               (nativeIdDomainShapePossible NativeRetainedUse v)
+           ; valid <- evaluateIfaceNativeDomain (ppr n) (isNativeRetainedBinder v)
            ; unless valid $
                failIfM (text "Invalid retained index in interface:" <+> ppr n
                         $$ text "Expected a local identifier with multiplicity Many"
-                        $$ text "and a supported algebraic index domain."
+                        $$ text "and a supported algebraic or fixed U function domain."
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
@@ -1880,7 +1902,7 @@ tcIfaceType = go
     go (IfaceAppTy t ts)
       = do { t'  <- go t
            ; ts' <- traverse go (appArgsIfaceTypes ts)
-           ; pure (foldl' AppTy t' ts') }
+           ; foldlM app t' ts' }
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc
            ; tks' <- mapM go (appArgsIfaceTypes tks)
@@ -1890,8 +1912,36 @@ tcIfaceType = go
            ; checkIfaceForAllMatchability ma'
            ; bindIfaceForAllBndr bndr $ \ tv' vis ->
         ForAllTy ma' (Bndr tv' (ifaceForAllTyFlag vis)) <$> go t }
-    go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
+    go (IfaceCastTy ty co)
+      = do { ty' <- go ty
+           ; co' <- tcIfaceCo co
+           ; case ty' of
+               TermVarTy f | isNativeIndexFunctionId f ->
+                 do { valid <- evaluateIfaceNativeDomain (ppr f) $
+                        coercionRole co' == Nominal
+                        && coercionLKind co' `eqType` varType f
+                        && coercionRKind co' `eqType` varType f
+                        && isJust (nativeIndexFunctionTypeTys_maybe (coercionRKind co'))
+                    ; unless valid $
+                        failIfM (text "A retained function-value cast changes its fixed domain:"
+                                 <+> ppr f)
+                    ; return (mkCastTy ty' co') }
+               _ -> return (CastTy ty' co') }
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
+
+    -- A raw ordinary application can expose a native function-value head.
+    -- Check its argument before the smart maker forms TermAppTy.
+    app fun@(TermVarTy f) arg
+      = do { domains <- evaluateIfaceNativeDomain (ppr f)
+                          (nativeIndexFunctionTys_maybe f)
+           ; case domains of
+               Just (domain, _) | typeKind arg `eqType` domain ->
+                 return (mkAppTy fun arg)
+               _ -> failIfM (text "Invalid retained function-value application in interface:"
+                             <+> ppr f) }
+    app TermAppTy{} _
+      = failIfM (text "A retained call result cannot be applied in an interface.")
+    app fun arg = return (mkAppTy fun arg)
 
 -- | Check a forall annotation before its binder enters scope.
 -- See Note [Forall interface metadata] in GHC.Iface.Type.

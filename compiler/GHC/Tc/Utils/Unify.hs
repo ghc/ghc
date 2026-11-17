@@ -3932,9 +3932,9 @@ escape its binder. General native unification remains unsupported.
 Checking an existing Given is different from assigning a metavariable.
 For a Given with a type-variable LHS and native syntax in its RHS,
 checkTypeEqNoUnification enables tefTyVar_allowNativeGivenRhs. Accept an opaque
-TermVarTy only when isNativeIndexId validates its closed unrestricted domain.
+TermVarTy only when isNativeRetainedBinder validates its closed unrestricted domain.
 For DepFunTy, require a valid retained binder and a lifted body. Function
-binders stay in call-head slots under the same fixed domain.
+binders keep the same fixed domain in call heads and stored function values.
 See Note [Function-valued retained binders] in GHC.Core.Type.
 Recurse through the body
 with the same flags and wrap its reduction with mkDepFunRedn. This keeps the
@@ -4688,7 +4688,7 @@ check_ty_eq_rhs flags ty
         -> return $ PuFail (cteProblem cteSkolemEscape)
       TermVarTy v
         | native_given
-        , isNativeIndexId v
+        , isNativeRetainedBinder v
         -> return $ okCheckRefl ty
         | otherwise
         -> return $ PuFail (cteProblem cteSkolemEscape)

@@ -3841,6 +3841,23 @@ Do not transfer Agda's normalization or eta policies to lazy Haskell. The source
 client performs an explicit strict call when it needs to refine the result.
 Function identity, call equality and function behavior remain distinct.
 
+The selected Agda v2.8.0 implementation reading is pinned to the previously
+recorded source bytes. In
+[Internal.hs](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/Syntax/Internal.hs#L221),
+a neutral variable retains ordered application and projection eliminations.
+[Substitute.hs](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Substitute.hs#L70)
+appends eliminations to neutral heads and selects a field of a known constructor
+before applying its remaining arguments. Its substitution code replaces the
+head and argument spine and lifts under binders. This is a scope comparison;
+Agda does not carry the explicit FC head proof used by this fork.
+
+The ignored `native-function-field-research-v1` records seven source files and
+the selected reading ranges. Four implementation files were checked against
+their existing Git blob and SHA256 pins. The other cached files have content
+pins. The local page-14 render of the archived author PDF was inspected after
+the web screenshot failed. No new PDF version, Agda execution or whole-source
+audit is claimed.
+
 The ignored `native-forall-matchability-next-client-research-v1` records the
 initial source review at M64 development head. The selected M65 contract is in
 [PLAN.md](PLAN.md#m65-function-valued-fields-in-closed-native-index-domains).

@@ -6077,11 +6077,11 @@ checkValidRoles tc
       = check_ty_roles env Nominal (varType f) >> check_ty_roles env Nominal arg
       | otherwise = pprPanic "check_ty_roles: invalid native call scope" (ppr ty)
     check_ty_roles env _ ty@(TermVarTy v)
-      | Just Nominal <- lookupVarEnv env v, isNativeIndexId v
+      | Just Nominal <- lookupVarEnv env v, isNativeRetainedBinder v
       = check_ty_roles env Nominal (varType v)
       | otherwise = pprPanic "check_ty_roles: invalid runtime index scope" (ppr ty)
     check_ty_roles env role ty@(DepFunTy v body)
-      | isNativeIndexId v
+      | isNativeRetainedBinder v
       = check_ty_roles env Nominal (varType v) >>
           check_ty_roles (extendVarEnv env v Nominal) role body
       | otherwise = pprPanic "check_ty_roles: invalid retained binder" (ppr ty)

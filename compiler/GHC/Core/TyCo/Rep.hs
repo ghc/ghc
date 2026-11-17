@@ -178,7 +178,7 @@ data Type
 
   | TermAppTy Id Type -- ^ An opaque runtime call index. See Note [Opaque native call indices].
 
-  | TermVarTy Id -- ^ The algebraic index of a local runtime identifier.
+  | TermVarTy Id -- ^ The value index of a local runtime identifier.
                  -- See Note [Restricted retained dependent types].
 
   | DepFunTy Id Type -- ^ A retained runtime binder and its dependent result.
@@ -258,7 +258,9 @@ TermVarTy and DepFunTy implement an internal experiment. A scalar runtime index
 remains a local, non-coercion, unrestricted Id with a supported closed algebraic
 type. See Note [Algebraic runtime index domains] in GHC.Core.Type.
 DepFunTy can also bind an eligible opaque call head. See Note [Function-valued
-retained binders] in GHC.Core.Type. Such a head occurs only in TermAppTy/TermAppCo.
+retained binders] in GHC.Core.Type. Such a head can occur as TermVarTy when it
+is stored in an algebraic index. Its application uses TermAppTy/TermAppCo.
+See Note [Native function-value application] in GHC.Core.TyCo.Make.
 TermVarTy has the identifier's type as its kind. A DepFunTy result has kind Type. Constraint
 also has a lifted representation, but is not a supported result kind here.
 
@@ -272,7 +274,8 @@ bytecode and module entries check these forms with Core Lint before and after
 preparation. Interface signatures use scoped local Ids. General expression
 substitution and the ordinary optimizer remain unsupported. Native interface
 templates have separate checks and a module writer gate. The restricted source
-checker accepts closed algebraic domains, including Bool and user-defined Nat.
+checker accepts closed algebraic domains, including Bool, user-defined Nat,
+and constructors with eligible opaque function fields.
 See docs/dependent-haskell/CORE.md and the Agda provenance in
 docs/dependent-haskell/REFERENCES.md.
 -}
@@ -325,7 +328,7 @@ Do not unfold f or infer argument equality from equality of calls.
 
 TermAppCo f co lifts a nominal argument proof through the same checked head.
 Both child endpoints have kind A. Both result endpoints have kind B. There
-is no inverse projection or function-value equality rule. The head is a free
+is no inverse projection or extensional function equality rule. The head is a free
 occurrence, not a binder. Substitution supports only eligible variable heads;
 the pipeline must retain bindings for other substitution ranges. Runtime
 reification is partial and has a narrower grammar than this Type constructor.
@@ -334,6 +337,13 @@ Require the raw head type and multiplicities to have no free variables. An
 unused synonym argument must not hide metadata which needs zonking or scope
 transport. Keep function-head eligibility separate from scalar index and
 retained-binder eligibility.
+
+TermVarTy can also record an eligible function value stored in a closed
+algebraic index. Applying this index through the smart makers produces the
+same TermAppTy. A generic AppCo can retain a nonreflexive proof for the head,
+such as transport through a saturated family. Do not replace that complete
+proof with argument-only TermAppCo. See Note [Native function-value application]
+in GHC.Core.TyCo.Make.
 
 Agda's neutral application and scoped substitution are the operational
 precedent. See Agda v2.8.0 Syntax/Internal.hs221-252 and
