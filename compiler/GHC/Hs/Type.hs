@@ -81,7 +81,7 @@ module GHC.Hs.Type (
         splitLHsSigmaTyInvis, splitLHsGadtTy,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
-        ignoreParens, hsHasForEachTy, hsSigWcType, hsPatSigType,
+        ignoreParens, hsHasForEachTy, hsForEachVisibility, hsSigWcType, hsPatSigType,
         hsTypeHasNoAnonWildcards, hsTyVarBndrHasNoAnonWildcards,
         hsTyKindSig,
         setHsTyVarBndrFlag, hsTyVarBndrFlag, updateHsTyVarBndrFlag,
@@ -113,7 +113,7 @@ import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..) )
-import GHC.Types.Var ( VarBndr, visArgTypeLike )
+import GHC.Types.Var ( DepFunTyFlag(..), VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.WiredIn.Types( mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
@@ -489,7 +489,7 @@ type instance XModifier GhcRn = ModifierPrintsAs
 type instance XModifier GhcTc = ModifierPrintsAs
 
 type instance XForAllTy        (GhcPass _) = NoExtField
-type instance XForEachTy       (GhcPass _) = (EpToken "foreach", TokRarrow)
+type instance XForEachTy       (GhcPass _) = (EpToken "foreach", Either TokRarrow (EpToken "."))
 type instance XQualTy          (GhcPass _) = NoExtField
 type instance XTyVar           (GhcPass _) = EpToken "'"
 type instance XAppTy           (GhcPass _) = NoExtField
@@ -728,6 +728,11 @@ hsHasForEachTy (HsQualTy _ _ ty) = hsHasForEachTy (unLoc ty)
 hsHasForEachTy (HsFunTy _ _ arg res)
   = hsHasForEachTy (unLoc arg) || hsHasForEachTy (unLoc res)
 hsHasForEachTy _ = False
+
+-- | Read a retained telescope's visibility from its delimiter.
+hsForEachVisibility :: XForEachTy (GhcPass p) -> DepFunTyFlag
+hsForEachVisibility (_, Left {}) = DepFunVisible
+hsForEachVisibility (_, Right {}) = DepFunInvisible
 
 -- | Check anonymous-wildcard absence throughout a renamed type.
 -- See Note [Anonymous wildcards in complete types].
@@ -1548,8 +1553,13 @@ ppr_mono_ty :: forall p. (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_tele = tele, hst_body = ty })
   = sep [pprHsForAll tele Nothing, ppr_mono_lty ty]
 
-ppr_mono_ty (HsForEachTy { hst_bndrs = bndrs, hst_body = ty })
-  = sep [text "foreach" <+> interppSP bndrs <+> arrow, ppr_mono_lty ty]
+ppr_mono_ty (HsForEachTy { hst_xforeach = ann, hst_bndrs = bndrs, hst_body = ty })
+  = sep [prefix, ppr_mono_lty ty]
+  where
+    binders = text "foreach" <+> interppSP bndrs
+    prefix = case hsForEachVisibility ann of
+      DepFunVisible   -> binders <+> arrow
+      DepFunInvisible -> binders <> dot
 
 ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
   = sep [pprLHsContextAlways ctxt, ppr_mono_lty ty]

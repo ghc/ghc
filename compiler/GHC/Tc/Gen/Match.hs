@@ -69,7 +69,9 @@ import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp)
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId, nativeIndexDataConTyArgs )
-import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, mkTransCo, mkNomReflCo )
+import GHC.Core.Coercion ( MCoercion(MRefl), mkCoVarCo, mkCoCast
+                         , mkSymCo, mkSubCo, coercionKind, coercionLKind
+                         , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
 import GHC.Core.DataCon ( DataCon, dataConName, dataConInstOrigArgTys, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
@@ -139,11 +141,19 @@ tcFunBindMatches :: UserTypeCtxt
                                     -- has skolemised any outer forall's
                  -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 -- See Note [Skolemisation overview] in GHC.Tc.Utils.Unify
-tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
-  = assertPpr (funBindPrecondition matches) (pprMatches matches) $
+tcFunBindMatches ctxt fun_name mult source_matches invis_pat_tys source_exp_ty
+  = assertPpr (funBindPrecondition source_matches) (pprMatches source_matches) $
     do  {  -- Check that they all have the same no of arguments
-          arity <- checkArgCounts matches
-        ; let herald = ExpectedFunTyMatches (NameThing fun_name) matches
+          source_arity <- checkArgCounts source_matches
+        ; let (visibility_wrap, matches, exp_ty, arity)
+                | Check ty <- source_exp_ty
+                , (indices@(_:_), co) <- expose_invisible ty
+                = ( mkWpCastR co
+                  , source_matches { mg_alts = fmap (map (add_patterns indices)) (mg_alts source_matches) }
+                  , mkCheckExpType (coercionLKind co)
+                  , source_arity + length indices )
+                | otherwise = (idHsWrapper, source_matches, source_exp_ty, source_arity)
+              herald = ExpectedFunTyMatches (NameThing fun_name) source_matches
               tc_matches pat_tys rhs_ty = tcScalingUsage mult $
                 do { traceTc "tcFunBindMatches 2" $
                      vcat [ text "ctxt:" <+> pprUserTypeCtxt ctxt
@@ -162,9 +172,39 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
                           ; return (idHsWrapper, result) }
                   _ -> matchExpectedFunTys herald ctxt arity exp_ty tc_matches
 
-        ; return (wrap_fun, r) }
+        ; return (visibility_wrap <.> wrap_fun, r) }
   where
     mctxt  = mkPrefixFunRhs (noLocA fun_name) noAnn
+
+    -- Keep the scoped body proof under each preceding runtime binder.
+    expose_invisible ty
+      | DepFunTy DepFunInvisible binder body <- coreFullView ty
+      = let (binders, co) = expose_invisible body
+        in ( binder : binders
+           , mkDepFunCoWithVis DepFunVisible DepFunInvisible binder MRefl co )
+      | otherwise = ([], mkRepReflCo ty)
+
+    add_patterns indices (L loc match@Match { m_pats = L pat_loc pats })
+      = L loc (match { m_pats = L pat_loc (erased ++ generated ++ values) })
+      where
+        (erased, values) = span (not . isVisArgLPat) pats
+        generated = map (noLocA . VarPat noExtField . noLocA . idName) indices
+
+{- Note [Invisible retained definition patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The signature binds each leading invisible retained name in the definition.
+See Note [Invisible retained definitions] in GHC.Rename.Bind. After outer
+skolemisation, add an ordinary runtime variable pattern for each such name.
+Keep written erased patterns first. Check the patterns against the visible
+endpoints of the telescope, then cast the complete value to its declared
+visibility. Keep the written equations for the arity check and its diagnostic.
+
+This is a binding form, including when the equation has no written arguments.
+The generated patterns follow ordinary Haskell argument demand, including
+Strict. Applying the visibility cast itself adds no lambda or new demand.
+Agda also adds implicit arguments to the clauses of a signed definition.
+See docs/dependent-haskell/REFERENCES.md#invisible-retained-binders-next-candidate.
+-}
 
 -- | Check source patterns against an expected retained function telescope.
 -- See Note [Checked retained lambdas].

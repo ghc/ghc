@@ -55,7 +55,7 @@ import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..) )
 import GHC.Core.Type
-import GHC.Core.UsageEnv ( UsageEnv )
+import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE )
 import GHC.Core.Coercion
 
 import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy )
@@ -646,72 +646,150 @@ tcRetainedKnownArgPlan expected fun sigma args
   , (tvs, _, tau) <- tcRetainedInstTelescope sigma
   , not (null tvs), isRetainedValueType tau
   , let values = [arg | EValArg { ea_arg = arg } <- args]
-        (domains, result) = retainedDeclaredDomains (length values) tau
-  , not (null domains), not (null values)
-  = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
-       ; let actuals = map snd pairs
-             seed | length domains == length values
-                  , Just result_ty <- result
-                  , Just rho <- expected
-                  = fromMaybe Subst.emptySubst $
-                      matchRetainedAppType tvs Subst.emptySubst result_ty rho
-                  | otherwise = Subst.emptySubst
-             match subst = foldM (\s (formal, actual) ->
-                                    matchRetainedAppType tvs s formal actual)
-                                 subst pairs
-             matched = case match seed of
-                         Nothing -> match Subst.emptySubst
-                         other -> other
-       ; case matched of
-           Just subst
-             | not (null pairs)
-             , any (hasNativeDependentExpr . Core.Type)
-                   (sigma : actuals ++ maybeToList expected)
-             , Just choices <- traverse (Subst.lookupTyVar subst) tvs
-             , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
-             , and (zipWith (\tv ty ->
-                      eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
-                    tvs choices)
-             , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
-             , all no_ql_vars (sigma : actuals ++ choices ++ maybeToList expected)
-             -> do { valid <- tcRetainedInstScope (sigma : actuals ++ choices ++ maybeToList expected)
-                   ; return (if valid then Just choices else Nothing) }
-           _ -> return Nothing }
+  , not (null values)
+  = case coreFullView tau of
+      DepFunTy DepFunInvisible binder body ->
+        fmap (fmap snd) (tcInferInvisibleRetained tvs binder body values)
+      _ -> choose_erased tvs values (retainedDeclaredDomains (length values) tau)
   where
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
-    no_ql_vars = not . any (\v -> isTcTyVar v && isQLInstTyVar v) . tyCoVarsOfTypeList
+
+    choose_erased tvs values (domains, result)
+      = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
+         ; let actuals = map snd pairs
+               seed | length domains == length values
+                    , Just result_ty <- result
+                    , Just rho <- expected
+                    = fromMaybe Subst.emptySubst $
+                        matchRetainedAppType tvs Subst.emptySubst result_ty rho
+                    | otherwise = Subst.emptySubst
+               match subst = foldM (\s (formal, actual) ->
+                                      matchRetainedAppType tvs s formal actual)
+                                   subst pairs
+               matched = case match seed of
+                           Nothing -> match Subst.emptySubst
+                           other -> other
+         ; case matched of
+             Just subst
+               | not (null pairs)
+               , any (hasNativeDependentExpr . Core.Type)
+                     (sigma : actuals ++ maybeToList expected)
+               , Just choices <- traverse (Subst.lookupTyVar subst) tvs
+               , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
+               , and (zipWith (\tv ty ->
+                        eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                      tvs choices)
+               , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
+               , all noQuickLookVars (sigma : actuals ++ choices ++ maybeToList expected)
+               -> do { valid <- tcRetainedInstScope (sigma : actuals ++ choices ++ maybeToList expected)
+                     ; return (if valid then Just choices else Nothing) }
+             _ -> return Nothing }
 
     declared_arg tvs (Just domain, arg)
       | let formal = scaledThing domain
       , any (`elemVarSet` tyCoVarsOfType formal) tvs
-      = do { actual <- declared_type arg
+      = do { actual <- tcRetainedDeclaredArgType arg
            ; return ((formal,) <$> actual) }
       | otherwise = return Nothing
     declared_arg _ _ = return Nothing
 
-    declared_type (L _ (HsPar _ arg)) = declared_type arg
-    declared_type (L _ (ExplicitList _ fields))
-      = fmap (fmap mkListTy) (tcRetainedListElementType declared_type fields)
-    declared_type (L loc (HsVar _ lname))
-      | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
-      = setSrcSpan (locA loc) $
-        do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
-           ; case mb_id of
-               Just var -> do
-                 { ty <- liftZonkM (zonkTcType (varType var))
-                 ; valid <- tcRetainedInstScope [ty]
-                 ; let (tvs, theta, _) = tcRetainedInstTelescope ty
-                 ; if valid && null tvs && null theta && isRetainedValueType ty
-                            && no_ql_vars ty
-                   then do { view <- tcRetainedDeclaredTypeView ty
-                           ; return (if isRetainedValueType view && no_ql_vars view
-                                     then Just view else Nothing) }
-                   else return Nothing }
-               Nothing -> return Nothing }
-    declared_type _ = return Nothing
-
 tcRetainedKnownArgPlan _ _ _ _ = return Nothing
+
+-- | Read a monomorphic declaration for immutable retained argument matching.
+-- See Note [Declared retained-domain choices].
+tcRetainedDeclaredArgType :: LHsExpr GhcRn -> TcM (Maybe Type)
+tcRetainedDeclaredArgType (L _ (HsPar _ arg)) = tcRetainedDeclaredArgType arg
+tcRetainedDeclaredArgType (L _ (ExplicitList _ fields))
+  = fmap (fmap mkListTy) (tcRetainedListElementType tcRetainedDeclaredArgType fields)
+tcRetainedDeclaredArgType (L loc (HsVar _ lname))
+  | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
+  = setSrcSpan (locA loc) $
+    do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+       ; case mb_id of
+           Just var -> do
+             { ty <- liftZonkM (zonkTcType (varType var))
+             ; valid <- tcRetainedInstScope [ty]
+             ; let (tvs, theta, _) = tcRetainedInstTelescope ty
+             ; if valid && null tvs && null theta && isRetainedValueType ty
+                        && noQuickLookVars ty
+               then do { view <- tcRetainedDeclaredTypeView ty
+                       ; return (if isRetainedValueType view && noQuickLookVars view
+                                 then Just view else Nothing) }
+               else return Nothing }
+           Nothing -> return Nothing }
+tcRetainedDeclaredArgType _ = return Nothing
+
+-- | Test whether a type is independent of Quick Look instantiation variables.
+noQuickLookVars :: Type -> Bool
+noQuickLookVars = not . any (\v -> isTcTyVar v && isQLInstTyVar v) . tyCoVarsOfTypeList
+
+-- | Select one invisible value operand and any outer erased parameters.
+-- See Note [Inferring an invisible retained argument].
+tcInferInvisibleRetained :: [TyVar] -> Id -> Type -> [LHsExpr GhcRn]
+                         -> TcM (Maybe (Id, [Type]))
+tcInferInvisibleRetained tvs binder body args
+  = do { name <- newSysName (mkTyVarOcc "retained_argument")
+       ; let template = mkTyVar name (varType binder)
+             (domains, _) = retainedDeclaredDomains (length args) body
+       ; pairs <- fmap catMaybes $ mapM (declared_pair template) (zip domains args)
+       ; let match subst (formal, actual) = matchRetainedAppType (template : tvs) subst formal actual
+       ; case foldM match Subst.emptySubst pairs of
+           Just subst
+             | Just (TermVarTy occurrence) <- Subst.lookupTyVar subst template
+             , Just choices <- traverse (Subst.lookupTyVar subst) tvs
+             , all noQuickLookVars choices
+             , not (any (`elemVarSet` tyCoVarsOfTypes choices) (template : tvs))
+             , and (zipWith (\tv ty ->
+                      eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                    tvs choices)
+             , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
+             -> do { thing <- tcLookupLcl_maybe (getName occurrence)
+                   ; case thing of
+                       Just (ATcId { tct_id = actual }) ->
+                         do { actual <- liftZonkM (zonkId actual)
+                            ; valid <- tcRetainedInstScope (TermVarTy actual : choices)
+                            ; return (if valid && occurrence == actual
+                                           && isNativeOpaqueValueId actual
+                                           && varType occurrence `eqType` varType actual
+                                           && varType actual `eqType` Subst.substTy subst (varType binder)
+                                      then Just (actual, choices) else Nothing) }
+                       _ -> return Nothing }
+           _ -> return Nothing }
+  where
+    declared_pair template (Just domain, arg)
+      | let formal = scaledThing domain
+      , any (`elemVarSet` tyCoVarsOfType formal) (binder : tvs)
+      , Just abstract <- abstractNativeIndices [(TermVarTy binder, template)] formal
+      = do { actual <- tcRetainedDeclaredArgType arg
+           ; return ((abstract,) <$> actual) }
+    declared_pair _ _ = return Nothing
+
+{- Note [Inferring an invisible retained argument]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a signature such as
+
+  f :: forall a. foreach (n :: Nat). Vec a n -> Int
+
+the declaration of xs in f xs can determine a := Int and n := the local
+runtime Id used in Vec Int n. Replace the formal index with an immutable
+template. Match the declared argument domains together. Require an exact
+match and a complete choice for the erased parameters. Recheck the runtime
+Id in the actual lexical environment. Treat an unavailable declaration as
+no advice. The normal argument checker still checks the written argument.
+
+Use this match before IALL can allocate native metavariable candidates.
+When the invisible binder is reached, match its instantiated type and
+insert the same runtime operand. Keep the written argument and its position
+for the usual cache and diagnostics. Emit usage once at Many and let the
+remaining application instantiate constraints with the chosen local Id.
+See Note [Retained application evidence].
+
+Agda inserts hidden argument terms from the expected telescope. Here the
+immutable match supplies a checked runtime occurrence. It leaves stuck
+families and opaque calls alone. See the pinned Agda sources in
+docs/dependent-haskell/REFERENCES.md#invisible-retained-binders-next-candidate.
+-}
 
 -- | Find a declared native element type without checking the literal.
 -- See Note [Declared retained-domain choices] and Note [Native list anchors].
@@ -1545,6 +1623,21 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
            ; go rest_plan fun_orig pos (addArgWrap wrap acc) fun_rho args }
                 -- Going around again means we deal easily with
                 -- nested  forall a. Eq a => forall b. Show b => blah
+
+    -- See Note [Inferring an invisible retained argument].
+    go1 plan fun_orig pos acc fun_ty args@(EValArg { ea_arg = first } : _)
+      | DepFunTy DepFunInvisible binder body <- coreFullView fun_ty
+      = do { actual <- addArgCtxt pos rn_head first $
+                 do { selected <- tcInferInvisibleRetained [] binder body
+                                    [arg | EValArg { ea_arg = arg } <- args]
+                    ; case selected of
+                        Just (actual, _) -> return actual
+                        Nothing -> failWithTc (TcRnRetainedQuantificationError
+                                                (RetainedInvisibleArgument binder)) }
+           ; tcScalingUsage ManyTy (tcEmitBindingUsage (singleUsageUE actual))
+           ; let operand = Core.Var actual
+                 wrap = mkWpEvApps [EvExpr operand]
+           ; go plan fun_orig pos (addArgWrap wrap acc) (applyTypeToArgs fun_ty [operand]) args }
 
     -- Rule IRESULT from Fig 4 of the QL paper; no more arguments
     go1 plan _fun_orig _pos acc fun_ty []

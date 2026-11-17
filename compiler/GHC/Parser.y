@@ -2295,10 +2295,10 @@ ctype   :: { LHsType GhcPs }
                                               HsForAllTy { hst_tele = unLoc $1
                                                          , hst_xforall = noExtField
                                                          , hst_body = $2 } }
-        | 'foreach' foreach_bndrs '->' ctype
+        | 'foreach' foreach_bndrs foreach_separator ctype
                                      {% do { bndrs <- fromSpecTyVarBndrs $2
                                            ; amsA' (sLL $1 $> $
-                                               HsForEachTy { hst_xforeach = (epTok $1, epUniTok $3)
+                                               HsForEachTy { hst_xforeach = (epTok $1, $3)
                                                            , hst_bndrs = bndrs
                                                            , hst_body = $4 }) } }
         | context '=>' ctype          {% acsA (comb2 $1 $>) (\loc cs -> (L loc $
@@ -2483,10 +2483,14 @@ tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
          : tv_bndr tv_bndrs             { $1 : $2 }
          | {- empty -}                  { [] }
 
--- Retained arguments are visible. Do not accept inferred type binders here.
+-- Do not accept inferred type binders in a retained telescope.
 foreach_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
          : tv_bndr_no_braces foreach_bndrs { $1 : $2 }
          | {- empty -}                    { [] }
+
+foreach_separator :: { Either TokRarrow (EpToken ".") }
+         : '->' { Left (epUniTok $1) }
+         | '.'  { Right (epTok $1) }
 
 tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
         : tv_bndr_no_braces             { $1 }

@@ -1113,6 +1113,7 @@ retainedNatConsumerSource =
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
 runModuleChecks :: FilePath -> IO ()
 runModuleChecks libdir = do
+    runInvisibleRetainedModuleChecks libdir
     runMultiPackageSourceChecks libdir
     runFunctionPackageModuleChecks libdir
     runFunctionFieldModuleChecks libdir
@@ -1843,6 +1844,71 @@ runModuleCases libdir label producers extraFlags consumer expected = do
     (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
     unless (status == ExitSuccess && lines actual == expected) $
         fail ("FAIL: native cross-module observations (" ++ label ++ "): " ++ show (status, actual, errors))
+
+-- | Infer an imported invisible runtime argument from a later vector.
+runInvisibleRetainedModuleChecks :: FilePath -> IO ()
+runInvisibleRetainedModuleChecks libdir = do
+    vectors <- readFile "PackedVecLibrary.hs"
+    let extensions = "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeApplications #-}"
+        library = unlines
+            [ extensions
+            , "module NativeInvisibleRetained where"
+            , "import PackedVecLibrary"
+            , "observeIndex :: forall a. foreach (n :: Nat). Bool -> Vec a n -> Int"
+            , "observeIndex _ _ = natToInt n"
+            , "ignoreIndex :: forall a. foreach (n :: Nat). Vec a n -> Int"
+            , "ignoreIndex _ = 42"
+            , "compareIndices :: foreach (n :: Nat). Vec Int n -> Vec Int n -> Int"
+            , "compareIndices _ _ = natToInt n"
+            , "missingIndex :: foreach (n :: Nat). Bool -> Int"
+            , "missingIndex _ = 42"
+            , "noWrittenArguments :: foreach (n :: Nat). Int"
+            , "noWrittenArguments = natToInt n"
+            , "shadowIndex :: foreach (n :: Nat). Nat -> Vec Int n -> Int"
+            , "shadowIndex n _ = natToInt n"
+            ]
+        consumer = unlines
+            [ extensions
+            , "module Main where"
+            , "import Data.IORef"
+            , "import NativeInvisibleRetained"
+            , "import PackedVecLibrary"
+            , "main :: IO ()"
+            , "main = do"
+            , "    n <- newIORef (S (S Z)) >>= readIORef"
+            , "    let xs :: Vec Int n"
+            , "        xs = replicateNative @Int n 7"
+            , "    print (observeIndex False xs)"
+            , "    print (observeIndex @Int False xs)"
+            , "    print (shadowIndex Z xs)"
+            , "    bottom <- newIORef (error \"invisible-index-bottom\" :: Nat) >>= readIORef"
+            , "    let ys :: Vec Int bottom"
+            , "        ys = replicateNative @Int bottom 9"
+            , "    print (ignoreIndex ys)"
+            ]
+        label = "invisible-retained"
+    runModuleCases libdir label
+        [("PackedVecLibrary", vectors), ("NativeInvisibleRetained", library)] []
+        consumer ["2", "2", "0", "42"]
+    directory <- makeAbsolute ("NativeDependentCoreRun.modules" </> label)
+    let artifacts = directory </> "artifacts"
+    forM_
+        [ ("MissingInvisibleIndex", ["bad :: Int", "bad = missingIndex False"])
+        , ("ConflictingInvisibleIndices",
+            [ "bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Int"
+            , "bad n m xs ys = compareIndices xs ys"
+            ])
+        ] $ \(moduleName, declarations) -> do
+            let path = directory </> (moduleName ++ ".hs")
+            writeFile path $ unlines $
+                [extensions, "module " ++ moduleName ++ " where", "import NativeInvisibleRetained", "import PackedVecLibrary"]
+                    ++ declarations
+            GHC.runGhc (Just libdir) $ do
+                environment <- nativeModuleEnvironment artifacts [] NoLink Nothing
+                result <- GHC.handleSourceError (pure . Left) $ do
+                    liftIO $ void $ compileFile environment NoStop (path, Nothing)
+                    pure (Right ())
+                checkSourceRejection moduleName 83605 "Cannot infer the invisible retained argument" result
 
 -- | Configure the shared one-shot compiler for object and diagnostic checks.
 nativeModuleEnvironment :: FilePath -> [String] -> GhcLink -> Maybe FilePath -> GHC.Ghc HscEnv

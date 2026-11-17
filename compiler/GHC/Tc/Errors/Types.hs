@@ -5320,6 +5320,8 @@ data RetainedQuantificationError
   = RetainedBinderCount
   | RetainedBinderNeedsName
   | RetainedBinderNeedsType
+  | RetainedInvisibleField
+  | RetainedInvisibleArgument Id
   | RetainedUnsupportedDomain Type
   | RetainedResultKind Type
   | RetainedSolverType Type

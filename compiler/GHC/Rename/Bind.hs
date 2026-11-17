@@ -65,6 +65,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
+import GHC.Types.Var           ( DepFunTyFlag(..) )
 
 import GHC.Types.CompleteMatch
 import GHC.Types.Hint ( SigLike(..) )
@@ -339,7 +340,7 @@ rnValBindsRHS ctxt (ValBinds _ vbinds)
        ; let localCompletePrags = localCompletePragmas sigs'
        ; updGblEnv (\gblEnv -> gblEnv { tcg_complete_matches = tcg_complete_matches gblEnv ++ localCompletePrags
                                       , tcg_complete_match_env = tcg_complete_match_env gblEnv ++ localCompletePrags }) $
-    do { binds_w_dus <- mapM (rnLBind (mkScopedTvFn sigs')) mbinds
+    do { binds_w_dus <- mapM (rnLBind (mkScopedSigBndrs sigs')) mbinds
        ; let !(anal_binds, anal_dus) = depAnalBinds binds_w_dus
 
        ; let patsyn_fvs = foldr (unionNameSet . psb_ext) emptyNameSet $
@@ -487,7 +488,7 @@ rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
 
 rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
 
-rnLBind :: (Name -> [Name])      -- Signature tyvar function
+rnLBind :: (Name -> ([Name], [Name]))  -- Scoped type and runtime names
         -> LHsBindLR GhcRn GhcPs
         -> RnM (LHsBind GhcRn, [Name], Uses)
 rnLBind sig_fn (L loc bind)
@@ -496,7 +497,7 @@ rnLBind sig_fn (L loc bind)
        ; return (L loc bind', bndrs, dus) }
 
 -- assumes the left-hands-side vars are in scope
-rnBind :: (Name -> [Name])        -- Signature tyvar function
+rnBind :: (Name -> ([Name], [Name]))  -- Scoped type and runtime names
        -> HsBindLR GhcRn GhcPs
        -> RnM (HsBind GhcRn, [Name], Uses)
 rnBind _ bind@(PatBind { pat_lhs = pat
@@ -530,11 +531,12 @@ rnBind sig_fn bind@(FunBind { fun_id = name
                             , fun_matches = matches })
        -- invariant: no free vars here when it's a FunBind
   = do  { let plain_name = unLoc name
+              (ty_names, runtime_names) = sig_fn plain_name
 
-        ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
-                                -- bindSigTyVars tests for LangExt.ScopedTyVars
-                                 rnMatchGroup (mkPrefixFunRhs name noAnn)
-                                              rnLExpr matches
+        ; (matches', rhs_fvs) <- bindSigTyVarsFV ty_names $
+                                  bindLocalNamesFV runtime_names $
+                                    rnMatchGroup (mkPrefixFunRhs name noAnn)
+                                                 rnLExpr matches
         ; let is_infix = isInfixFunBind bind
         ; when is_infix $ checkPrecMatch plain_name matches'
 
@@ -551,7 +553,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
       }
 
 rnBind sig_fn (PatSynBind x bind)
-  = do  { (bind', name, fvs) <- rnPatSynBind sig_fn bind
+  = do  { (bind', name, fvs) <- rnPatSynBind (fst . sig_fn) bind
         ; return (PatSynBind x bind', name, fvs) }
 
 rnBind _ (VarBind { var_ext = x }) = dataConCantHappen x
@@ -679,22 +681,43 @@ depAnalBinds binds_w_dus
 --           (x,y) = e
 --      In e, 'a' will be in scope, and it'll be the one from 'y'!
 
-mkScopedTvFn :: [LSig GhcRn] -> (Name -> [Name])
--- Return a lookup function that maps an Id Name to the names
--- of the type variables that should scope over its body.
-mkScopedTvFn sigs = \n -> lookupNameEnv env n `orElse` []
+-- | Find erased and invisible retained names that scope over a definition.
+-- See Note [Invisible retained definitions].
+mkScopedSigBndrs :: [LSig GhcRn] -> (Name -> ([Name], [Name]))
+mkScopedSigBndrs sigs = \n -> lookupNameEnv env n `orElse` ([], [])
   where
-    env = mkHsSigEnv get_scoped_tvs sigs
+    env = mkHsSigEnv get_scoped sigs
 
-    get_scoped_tvs :: LSig GhcRn -> Maybe ([LocatedN Name], [Name])
-    -- Returns (binders, scoped tvs for those binders)
-    get_scoped_tvs (L _ (ClassOpSig _ _ names sig_ty))
-      = Just (names, hsScopedTvs sig_ty)
-    get_scoped_tvs (L _ (TypeSig _ _ names sig_ty))
-      = Just (names, hsWcScopedTvs sig_ty)
-    get_scoped_tvs (L _ (PatSynSig _ names sig_ty))
-      = Just (names, hsScopedTvs sig_ty)
-    get_scoped_tvs _ = Nothing
+    get_scoped (L _ (ClassOpSig _ _ names sig_ty))
+      = Just (names, (hsScopedTvs sig_ty, []))
+    get_scoped (L _ (TypeSig _ _ names sig_ty))
+      = Just (names, (hsWcScopedTvs sig_ty, after_context (hsSigWcType sig_ty)))
+    get_scoped (L _ (PatSynSig _ names sig_ty))
+      = Just (names, (hsScopedTvs sig_ty, []))
+    get_scoped _ = Nothing
+
+    after_context ty
+      | L _ (HsQualTy _ _ body) <- ignoreParens ty = after_context body
+      | otherwise = invisible_prefix ty
+
+    invisible_prefix ty
+      | L _ (HsForEachTy ann bndrs body) <- ignoreParens ty
+      , hsForEachVisibility ann == DepFunInvisible
+      = mapMaybe hsLTyVarName bndrs ++ invisible_prefix body
+      | otherwise = []
+
+{- Note [Invisible retained definitions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Proposal #378 scopes a signature's invisible retained binder over its
+definition. Bind its existing term Name around the source equations. Written
+patterns can shadow it. The runtime Name follows retained quantification's
+scope rule. ScopedTypeVariables still controls the separate erased names.
+
+Use the prefix after the outer context because complete-signature checking
+skolemises that context before checking value patterns. GHC.Tc.Gen.Match
+adds runtime patterns for this prefix once it has the checked domains.
+The renamed equations keep their written pattern list.
+-}
 
 -- Process the fixity declarations, making a FastString -> (Located Fixity) map
 -- (We keep the location around for reporting duplicate fixity declarations.)
@@ -970,7 +993,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        -- type variables from the class/instance head are in scope.
        -- Answer no in Haskell 2010, but yes if you have -XScopedTypeVariables
        ; (binds'', bind_fvs) <- bindSigTyVarsFV ktv_names $
-              do { binds_w_dus <- mapM (rnLBind (mkScopedTvFn other_sigs')) binds'
+              do { binds_w_dus <- mapM (rnLBind (mkScopedSigBndrs other_sigs')) binds'
                  ; let bind_fvs = foldr (\(_,_,fv1) fv2 -> fv1 `plusFN` fv2)
                                            emptyFNs binds_w_dus
                  ; return (map fstOf3 binds_w_dus, bind_fvs) }

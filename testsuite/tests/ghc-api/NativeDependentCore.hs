@@ -23,7 +23,7 @@ import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, n
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Make (mkIntExprInt)
 import GHC.Core.Map.Type (LooseTypeMap, TypeMap, emptyTypeMap)
-import GHC.Core.Opt.Arity (pushCoArg, pushCoTyArg)
+import GHC.Core.Opt.Arity (etaExpand, pushCoArg, pushCoTyArg)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred, scopedSortWith)
 import GHC.Core.Reduction (Reduction (..))
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
@@ -52,7 +52,7 @@ import GHC.Driver.Env.KnotVars (KnotVars (KnotVars))
 import GHC.Driver.Flags (GeneralFlag (Opt_DoCoreLinting))
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Driver.Session (gopt_unset, parseDynamicFlagsCmdLine, targetPlatform)
-import GHC.Hs (HsType (..))
+import GHC.Hs (HsType (..), hsForEachVisibility)
 import GHC.Iface.Binary (CheckHiWay (CheckHiWay), CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData, readBinIface, writeBinIface)
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
@@ -3806,13 +3806,17 @@ runSyntaxChecks dflags = do
             case Lexer.unP Parser.parseType (Lexer.initParserState (initParserOpts flags) (stringToStringBuffer input) (mkRealSrcLoc (fsLit "retained-syntax") 1 1)) of
                 Lexer.POk _ ty -> pure ty
                 Lexer.PFailed _ -> fail ("FAIL: cannot parse type: " ++ input)
-        isRetained ty = case unLoc ty of
-            HsForEachTy{hst_bndrs = [_]} -> True
+        isRetained vis ty = case unLoc ty of
+            HsForEachTy{hst_xforeach = ann, hst_bndrs = [_]} -> hsForEachVisibility ann == vis
             _ -> False
     retained <- parseWith nativeFlags source
-    check "retained quantification has a distinct AST node" (isRetained retained)
+    check "retained quantification has a distinct AST node" (isRetained DepFunVisible retained)
     reparsed <- parseWith nativeFlags (showSDoc nativeFlags (ppr retained))
-    check "retained quantification printing round trip" (isRetained reparsed)
+    check "retained quantification printing round trip" (isRetained DepFunVisible reparsed)
+    invisible <- parseWith nativeFlags "foreach (b :: Bool). Select b -> Select b"
+    check "foreach-dot is retained and invisible" (isRetained DepFunInvisible invisible)
+    printedInvisible <- parseWith nativeFlags (showSDoc nativeFlags (ppr invisible))
+    check "foreach-dot printing round trip" (isRetained DepFunInvisible printedInvisible)
     check "retained binders reject inferred braces during parsing" $
         case Lexer.unP Parser.parseType (Lexer.initParserState (initParserOpts nativeFlags) (stringToStringBuffer "foreach {b} -> Bool") (mkRealSrcLoc (fsLit "retained-syntax") 1 1)) of
             Lexer.PFailed _ -> True
@@ -3862,6 +3866,10 @@ runDepFunVisibilityChecks dflags = do
         checkType dflags "symmetric retained visibility cast source" hidden (coercionLKind reverseBridge)
         checkType dflags "symmetric retained visibility cast target" visible (coercionRKind reverseBridge)
         checkType dflags "hidden retained application result" result (exprType application)
+        let hiddenWorker = local 17204 "hidden_visibility_worker" hidden
+            expanded = etaExpand 1 (Var hiddenWorker)
+        lintAccepts dflags "eta-expanded hidden retained type" [hiddenWorker] expanded
+        checkType dflags "eta expansion preserves hidden retained type" hidden (exprType expanded)
 
 -- | Check retained congruence with a family equation and scoped nominal evidence.
 runDepFunCoChecks :: DynFlags -> IO ()

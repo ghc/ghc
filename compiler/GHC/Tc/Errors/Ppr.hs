@@ -3549,6 +3549,12 @@ pprRetainedQuantificationError reason = case reason of
     text "A retained argument requires a variable name."
   RetainedBinderNeedsType ->
     text "A retained argument requires an explicit domain type."
+  RetainedInvisibleField ->
+    text "Invisible retained arguments are not supported in constructor signatures."
+  RetainedInvisibleArgument binder ->
+    vcat [ text "Cannot infer the invisible retained argument" <+> quotes (ppr binder)
+         , text "A later value argument must determine an unrestricted local value of type"
+           <+> ppr (varType binder) <> dot ]
   RetainedUnsupportedDomain ty ->
     vcat [ if isPiTy ty
            then text "This retained argument has an unsupported function domain."

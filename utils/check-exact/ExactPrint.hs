@@ -4039,7 +4039,9 @@ instance ExactPrint (HsType GhcPs) where
                     , hst_bndrs = bndrs, hst_body = ty }) = do
     f' <- markEpToken f
     bndrs' <- mapM markAnnotated bndrs
-    r' <- markEpUniToken r
+    r' <- case r of
+      Left arrow -> Left <$> markEpUniToken arrow
+      Right dot -> Right <$> markEpToken dot
     ty' <- markAnnotated ty
     return (HsForEachTy { hst_xforeach = (f',r')
                        , hst_bndrs = bndrs', hst_body = ty' })

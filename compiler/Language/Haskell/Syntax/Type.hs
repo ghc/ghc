@@ -926,8 +926,10 @@ Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type -}
 
 {- Note [Retained quantification syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-HsForEachTy represents the experimental syntax `foreach (b :: Bool) -> ty`.
-The binder denotes a retained runtime Id that can occur in the result type.
+HsForEachTy represents experimental retained quantification. An arrow makes
+the binder visible, as in `foreach (b :: Bool) -> ty`. A dot makes it
+invisible, as in `foreach (b :: Bool). ty`. Both bind a runtime Id that can
+occur in the result type. See proposal #378, section "Quantifiers".
 HsForAllTy denotes erased quantification, including visible `forall a -> ty`.
 Keep these constructors separate. Reuse HsTyVarBndr only for binder syntax.
 

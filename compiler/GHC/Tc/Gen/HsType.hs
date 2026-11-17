@@ -584,7 +584,7 @@ tcCheckRetainedType allow_function = go
     go mode (L loc (HsFunTy _ mult arg res)) kind
       = setSrcSpanA loc $
         tc_fun_type_x (go mode) mode mult arg res (Check kind)
-    go mode (L loc ty@(HsForEachTy _ bndrs body)) kind
+    go mode (L loc ty@(HsForEachTy ann bndrs body)) kind
       = setSrcSpanA loc $
         do { level <- getThLevel
            ; case level of
@@ -614,7 +614,7 @@ tcCheckRetainedType allow_function = go
                    ; let index = mkLocalId name ManyTy domain_ty
                          mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
                    ; body_ty <- check_bndrs mode' rest
-                   ; return (mkDepFunTy index body_ty) }
+                   ; return (mkDepFunTyWithVis (hsForEachVisibility ann) index body_ty) }
               _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
     go mode body kind = tc_check_lhs_type mode body kind
 
@@ -654,10 +654,12 @@ tcCheckRetainedConType :: Bool
 tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
   where
     go mode (L _ (HsParTy _ body)) = go mode body
-    go mode (L loc (HsForEachTy _ bndrs body))
+    go mode (L loc (HsForEachTy ann bndrs body))
       = setSrcSpanA loc $
         do { when (null bndrs) $
                failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+           ; when (hsForEachVisibility ann == DepFunInvisible) $
+               failWithTc $ TcRnRetainedQuantificationError RetainedInvisibleField
            ; bind_indices mode bndrs body }
     go mode (L loc (HsFunTy _ mult arg res))
       = setSrcSpanA loc $
@@ -716,6 +718,10 @@ The ordinary outer-forall checker scopes erased type variables around the
 whole telescope. The result has kind Type. Retained binders in other type
 positions use Note [Higher-order retained signatures]. Inner foralls and
 Template Haskell remain gated.
+
+The delimiter determines visibility. Keep a dot binder even when the body
+does not use the index. Both delimiters bind a runtime value. See
+Note [Retained function visibility] in GHC.Core.TyCo.Rep.
 
 This checks a dependent function directly. Agda's checkPiTelescope checks
 each domain before extending the context for the remaining telescope.

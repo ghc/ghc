@@ -14,6 +14,10 @@ keep b x = x
 nested :: (foreach (b :: Bool) -> Select b) -> Bool
 nested x = True
 
+invisible :: foreach (b :: Bool) -- Preserve this comment before the dot.
+    . Select b -> Select b
+invisible x = x
+
 identity :: forall a. {- Before metadata. -} @U a -> a
 identity x = x
 

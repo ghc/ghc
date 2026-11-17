@@ -2350,16 +2350,22 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Type.substTyUnchecked subst ma) (Bndr tcv' vis) (Type.substTyUnchecked subst' ty') mco))
 
        ----------- Retained dependent functions
-       | DepFunTy _ b res_ty <- coreFullView ty
+       | DepFunTy vis b res_ty <- coreFullView ty
        , (subst', eta_id) <- freshEtaId n subst (Scaled ManyTy (varType b))
        , let eta_id' = eta_id `setIdOneShotInfo` one_shot
              subst'' = Core.extendIdSubst subst' b (Var eta_id')
        , (in_scope, EI bs mco) <- go (n+1) oss1 subst'' res_ty
-       = case checkReflexiveMCo mco of
-           MRefl -> (in_scope, EI (eta_id' : bs) MRefl)
-           MCo co -> pprPanic "mkEtaWW: native dependent congruence not implemented"
-                       (ppr b $$ ppr co)
-         -- Later argument types must use this eta binder's identity.
+       = let binders = eta_id' : bs
+             -- This cast goes from the original type to the canonical visible
+             -- lambda type. Scope the body proof with the fresh eta Id.
+             -- See Note [The EtaInfo mechanism].
+             lift_body co = MCo (mkDepFunCoWithVis vis DepFunVisible eta_id' MRefl co)
+         in case checkReflexiveMCo mco of
+           MRefl | vis == DepFunVisible -> (in_scope, EI binders MRefl)
+                 | otherwise ->
+                     (in_scope, EI binders (lift_body
+                        (mkRepReflCo (Type.substTyUnchecked subst'' res_ty))))
+           MCo co -> (in_scope, EI binders (lift_body co))
 
        ----------- Function types  (t1 -> t2)
        -- See Note [Ordinary arrow metadata and eta].
