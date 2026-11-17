@@ -7,8 +7,12 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -22,14 +26,16 @@ import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
 import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.Kind (Type)
 import Data.List (isInfixOf)
 import Data.Type.Equality ((:~:) (Refl))
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
-import GHC.Exts (FUN, M, U, Multiplicity (Many))
+import GHC.Exts (FUN, M, U, Matchability (..), Multiplicity (Many))
 import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
+import qualified Language.Haskell.TH as TH
 import qualified NativeMultiPackage as Packages
 import qualified OpaqueCallClient as Opaque
 import qualified ParameterizedIndexLibrary as Parameterized
@@ -539,6 +545,65 @@ arrowMatchability = do
         Reflection.SomeTypeRep (Reflection.typeRep @(FUN @M 'Many Int Bool))
             /= Reflection.SomeTypeRep ordinary
 
+-- | Preserve an existing matchable forall without a new type lambda.
+reuseMatchable :: (forall a. @M a -> a) -> (forall a. @M a -> a)
+reuseMatchable f = f
+
+-- | Use explicit U for an ordinary runtime type abstraction.
+identityForallU :: forall a. @U a -> a
+identityForallU x = x
+
+-- | Keep the result kind matchable until the family consumes each argument.
+type ForallF0 :: forall k -> k -> Type
+type family ForallF0
+
+-- | Consume only the visible kind argument.
+type ForallF1 :: forall k -> k -> Type
+type family ForallF1 k
+
+-- | Consume both arguments and classify both as U.
+type ForallF2 :: forall k -> k -> Type
+type family ForallF2 k a
+
+-- | Compute the annotation without replacing it in the stored kind.
+type family StoredMatchability :: Matchability where
+    StoredMatchability = M
+
+-- | Use computed M on the erased constructor-kind binder.
+type ForallData :: forall k. @StoredMatchability k -> Type
+data ForallData (a :: k)
+
+-- End the declaration group before reification.
+$(pure [])
+
+-- | Observe source forall classification and public reflection.
+forallMatchability :: IO ()
+forallMatchability = do
+    observe "explicit runtime forall" (identityForallU (42 :: Int))
+    observe "family prefix matchability (M is True)" $(do
+        let tag ma
+                | ma `elem` [TH.ConT ''M, TH.PromotedT 'Matchable] = True
+                | ma `elem` [TH.ConT ''U, TH.PromotedT 'Unmatchable] = False
+                | otherwise = error ("Unexpected matchability: " ++ show ma)
+            metadata (TH.ForallMatchT ma (TH.ForallVisT [_] body)) = tag ma : metadata body
+            metadata (TH.AppT (TH.AppT (TH.AppT (TH.AppKindT (TH.ConT fun) ma) _) _) rest)
+                | fun == ''FUN = tag ma : metadata rest
+            metadata _ = []
+        kinds <- mapM TH.reifyType [''ForallF0, ''ForallF1, ''ForallF2]
+        pure $ TH.ListE
+            [TH.ListE [TH.ConE (if ma then 'True else 'False) | ma <- metadata kind] | kind <- kinds])
+    observe "computed forall metadata is retained" $(do
+        kind <- TH.reifyType ''ForallData
+        let retained = case kind of
+                TH.ForallMatchT (TH.ConT name) (TH.ForallT [_] [] _) -> name == ''StoredMatchability
+                _ -> False
+        pure (TH.ConE (if retained then 'True else 'False)))
+    observe "computed forall kind supports reflection" $
+        case Reflection.typeRep @(ForallData @Type Int) of
+            Reflection.App _ argument ->
+                Reflection.SomeTypeRep argument == Reflection.SomeTypeRep (Reflection.typeRep @Int)
+            _ -> False
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -556,3 +621,4 @@ main = do
     closedListIndexing
     completeFunctionArguments
     arrowMatchability
+    forallMatchability
