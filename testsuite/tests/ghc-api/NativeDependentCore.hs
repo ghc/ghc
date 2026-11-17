@@ -12,7 +12,7 @@ import GHC (DynFlags, InteractiveImport (IIDecl), getSession, getSessionDynFlags
 import GHC.Builtin.WiredIn.Prim (fUNTyCon, intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAppCo, mkAxInstCo, mkCoercionType, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkForAllCo, mkFunCoNoFTF, mkKindCo, mkInstCo, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo, splitAppCo_maybe)
+import GHC.Core.Coercion (MCoercion (..), abstractNativeIndices, coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAppCo, mkAxInstCo, mkCoercionType, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkForAllCo, mkFunCoNoFTF, mkKindCo, mkInstCo, mkLiftingContext, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo, prepareNativeLiftingContext, splitAppCo_maybe)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConRepArity, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
@@ -814,10 +814,10 @@ runParameterizedDomainChecks dflags = do
 
 {- Note [Native generic metadata controls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-These raw types prepare generic domain support. Their metadata is well-scoped,
-but their generic domains are outside the current native admission policy.
+These controls inspect runtime Id metadata. They do not establish source
+admission or dependent-domain transport on their own.
 Check actual Id metadata: eqType alone compares the runtime Id's identity.
-Only the closed List Bool specialization below is submitted to Core Lint.
+Only closed List Bool specializations below are submitted to Core Lint.
 The indexed element control checks metadata, not vector operations or transport.
 -}
 
@@ -920,6 +920,125 @@ runNativeMetadataChecks libdir dflags = do
                 pure ()
             _ -> fail "FAIL: deep metadata lost the applied family domain"
         _ -> fail "FAIL: deep metadata lost the raw binder"
+
+    let sigma = mkForAllTy unmatchableDataConTy (Bndr a Specified) raw
+        z = mkTyVar (mkSystemName (unique 81030) (mkTyVarOcc "metadata_result")) liftedTypeKind
+        reveal = mkForAllTy unmatchableDataConTy (Bndr z Specified) (mkTyVarTy z)
+        completeResults =
+            [ ("single forall result", piResultTy sigma boolTy)
+            , ("batched forall result", piResultTys sigma [boolTy])
+            , ("revealed forall restart", piResultTys reveal [sigma, boolTy])
+            ]
+    forM_ completeResults $ \(label, result) -> do
+        _ <- inspect label (mkListTy boolTy) result
+        checkType dflags (label ++ " result kind") liftedTypeKind (typeKind result)
+        check (label ++ " removes the consumed type variable") $
+            not (a `elemVarSet` tyCoVarsOfType result)
+        lintAccepts dflags label [] (identity 81033 result)
+    forM_
+        [ ("single apply-once forall", piResultTy sigma recursiveRange)
+        , ("batched apply-once forall", piResultTys sigma [recursiveRange])
+        , ("apply-once forall restart", piResultTys reveal [sigma, recursiveRange])
+        ]
+        $ \(label, result) -> do
+            _ <- inspect label (mkListTy recursiveRange) result
+            checkType dflags (label ++ " result kind") liftedTypeKind (typeKind result)
+    forM_
+        [ ("single runtime-bearing forall", piResultTy sigma elementTy)
+        , ("batched runtime-bearing forall", piResultTys sigma [elementTy])
+        , ("runtime-bearing forall restart", piResultTys reveal [sigma, elementTy])
+        ]
+        $ \(label, result) -> do
+            actual <- inspect label (mkListTy elementTy) result
+            checkType dflags (label ++ " result kind") liftedTypeKind (typeKind result)
+            check (label ++ " retains the earlier runtime index") $
+                n `elemVarSet` tyCoVarsOfType result
+            check (label ++ " removes the consumed type variable") $
+                not (a `elemVarSet` tyCoVarsOfType result)
+            case varType actual of
+                TyConApp _ [TyConApp _ [_, TermVarTy actualN]] -> do
+                    check (label ++ " keeps the actual earlier Id") (actualN == n)
+                    checkType dflags (label ++ " earlier Id type") natTy (varType actualN)
+                    checkType dflags (label ++ " earlier Id multiplicity") ManyTy (idMult actualN)
+                _ -> fail ("FAIL: " ++ label ++ " lost the runtime-bearing element")
+
+    let checkIndex label expected result = case result of
+            TermVarTy actual -> do
+                check (label ++ " actual Id") (actual == expected)
+                checkType dflags (label ++ " actual type") (varType expected) (varType actual)
+                checkType dflags (label ++ " actual multiplicity") ManyTy (idMult actual)
+                check (label ++ " deep metadata dependencies") $
+                    tyCoVarsOfType (varType actual) == tyCoVarsOfType (varType expected)
+            _ -> fail ("FAIL: " ++ label ++ " lost its runtime index")
+        sourceNames = tyCoVarsOfType (TermVarTy xs)
+        merged = Subst.extendSubstInScopeSetFromSource targetSubst sourceNames
+    checkIndex "source names preserve the target representative" out $
+        Subst.substTy merged (TermVarTy xs)
+    checkIndex "source-aware substitution preserves target metadata" out $
+        Subst.substTyAddInScope targetSubst (TermVarTy xs)
+
+    let later = local 81031 "metadata_later" (payload xs)
+        alias = local 81032 "metadata_alias" (varType xs)
+        (firstSubst, actualFirst) = Subst.substNativeIndexBndr recursiveSubst xs
+        (prefixSubst, actualLater) = Subst.substNativeIndexBndr firstSubst later
+        intermediateScope = mkInScopeSet (tyCoVarsOfTypes [TermVarTy xs, TermVarTy later])
+        aliasSubst = CoreSubst.extendIdSubst (Subst.mkEmptySubst intermediateScope) alias (Var xs)
+        composed = Subst.composeTCvSubst prefixSubst aliasSubst
+        sequential = Subst.substTy prefixSubst (Subst.substTy aliasSubst (TermVarTy alias))
+    check "ordered prefix keeps the first binder Unique" (actualFirst == xs)
+    check "ordered prefix keeps the later binder Unique" (actualLater == later)
+    checkType dflags "ordered prefix substitutes the first domain once" (mkListTy recursiveRange) (varType actualFirst)
+    checkType dflags "ordered prefix updates the later metadata" (payload actualFirst) (varType actualLater)
+    checkIndex "sequential prefix alias substitution" actualFirst sequential
+    checkIndex "composed prefix alias range stays apply-once" actualFirst $
+        Subst.substTy composed (TermVarTy alias)
+    checkIndex "composition preserves the final later representative" actualLater $
+        Subst.substTy composed (TermVarTy later)
+    case Subst.substTy composed (TermVarTy later) of
+        TermVarTy actual -> case varType actual of
+            FunTy {ft_arg = TyConApp _ [domain, TermVarTy left, TermVarTy right]} -> do
+                checkType dflags "later metadata has the updated index domain" (varType actualFirst) domain
+                forM_ [("left", left), ("right", right)] $ \(side, nested) ->
+                    checkIndex ("later metadata " ++ side ++ " index") actualFirst (TermVarTy nested)
+            _ -> fail "FAIL: later metadata lost its indexed payload"
+        _ -> fail "FAIL: composed prefix lost its later runtime index"
+
+    -- Check changed domains independently of source inference. The free head
+    -- keeps its runtime identity and receives an explicit nominal conversion.
+    let (_, _, successor) = peanoNat
+        k = local 81040 "transport_k" natTy
+        next = mkTyConApp (promoteDataCon successor) [TermVarTy k]
+        given = proof 81041 (TermVarTy n) next
+        template = mkTyVar (mkSystemName (unique 81042) (mkTyVarOcc "transport_n")) natTy
+        headValue = local 81043 "transport_head" elementTy
+        inputList = setIdType xs (mkListTy elementTy)
+        input = mkDepFunTy inputList (arrow (payload inputList) (payload headValue))
+        rightElement = mkTyConApp element [intTy, next]
+    abstracted <- case abstractNativeIndices [(TermVarTy n, template)] input of
+        Just result -> pure result
+        Nothing -> fail "FAIL: generic domain transport abstraction failed"
+    let lifting = prepareNativeLiftingContext (mkLiftingContext [(template, mkCoVarCo given)]) abstracted
+    forM_ [Nominal, Representational, Phantom] $ \role -> do
+        let evidence = liftCoSubst role lifting abstracted
+        check "generic domain transport preserves the requested role" (coercionRole evidence == role)
+        checkType dflags "generic domain transport source" input (coercionLKind evidence)
+        lintAccepts dflags "generic domain transport evidence" [n, k, headValue, given] (Coercion evidence)
+        case coercionRKind evidence of
+            DepFunTy binder FunTy{ft_res = FunTy{ft_arg = TyConApp _ [domain, left, right]}} -> do
+                checkType dflags "transported list binder domain" (mkListTy rightElement) (varType binder)
+                checkType dflags "transported captured value domain" rightElement domain
+                check "transport binds the later list" (not (binder `elemVarSet` tyCoVarsOfType (coercionRKind evidence)))
+                forM_ [left, right] $ \index -> do
+                    checkType dflags "transported captured index kind" rightElement (typeKind index)
+                    case index of
+                        CastTy (TermVarTy actual) delta -> do
+                            check "transport preserves the captured runtime identity" (actual == headValue)
+                            checkType dflags "captured runtime value keeps its source type" elementTy (varType actual)
+                            checkType dflags "captured domain proof source" elementTy (coercionLKind delta)
+                            checkType dflags "captured domain proof target" rightElement (coercionRKind delta)
+                            check "captured domain proof stays nominal" (coercionRole delta == Nominal)
+                        _ -> fail "FAIL: captured runtime value lost its explicit domain conversion"
+            _ -> fail "FAIL: generic domain transport lost its dependent telescope"
 
 -- | Check both zonkers on original native Id prototypes with filled metadata.
 runNativeZonkMetadataChecks :: FilePath -> IO ()
@@ -1263,11 +1382,15 @@ runNatChecks dflags = do
             check "retained normalization preserves its free outer Id" (n `elemVarSet` tyCoVarsOfType freshened)
             check "retained normalization binds the fresh Id" (not (fresh `elemVarSet` tyCoVarsOfType freshened))
         _ -> fail "FAIL: retained normalization lost its nested binder"
+    let opaqueInt = local 81034 "normalised_int_index" intTy
+        intPayload = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [intTy, TermVarTy opaqueInt, TermVarTy opaqueInt]) intTy
+        intTelescope = DepFunTy opaqueInt intPayload
+    _ <- checkNormalization Nominal "opaque Int retained domain" [] intTelescope intTelescope
     forM_
         [ ("type variable", mkTyVar (mkSystemName (unique 1704) (mkTyVarOcc "bad_index")) natTy)
         , ("coercion variable", proof 1705 zeroTy zeroTy)
         , ("linear Id", setIdMult n OneTy)
-        , ("unsupported domain", local 1706 "bad_index" intTy)
+        , ("join Id", asJoinId (local 1706 "bad_index" (mkVisFunTyManyU boolTy boolTy)) 1)
         , ("unlifted domain", local 1707 "bad_index" intPrimTy)
         ]
         $ \(label, bad) ->
@@ -1431,6 +1554,16 @@ runIfaceChecks :: FilePath -> IO ()
 runIfaceChecks libdir = runGhc (Just libdir) $ do
     initialFlags <- getSessionDynFlags
     _ <- setSessionDynFlags initialFlags
+    declaration <- parseImportDecl "import Prelude"
+    setContext [IIDecl declaration]
+    names <- parseName "IO"
+    ioTyCon <- case names of
+        name :| [] -> do
+            thing <- lookupName name
+            case thing of
+                Just (ATyCon tc) -> pure tc
+                _ -> liftIO $ fail "FAIL: IO interface control did not resolve a type constructor"
+        _ -> liftIO $ fail "FAIL: IO interface control did not resolve one name"
     env <- getSession
     dflags <- getSessionDynFlags
     liftIO $ do
@@ -1450,6 +1583,20 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 case expression of
                     Type ty -> pure ty
                     _ -> fail "FAIL: interface type reconstruction returned a term"
+            -- | Resolve an opaque element TyCon without loading a home module.
+            restoreWithElement :: TyCon -> IfaceType -> IO Type
+            restoreWithElement element input = do
+                types <- newIORef (mkTypeEnv [ATyCon element])
+                let modu = case toIfaceType (mkTyConTy element) of
+                        IfaceTyConApp (IfaceTyCon name _) _ -> nameModule name
+                        _ -> error "FAIL: opaque element does not have a TyCon name"
+                    elementEnv = env{hsc_type_env_vars = KnotVars [modu] (\candidate -> if candidate == modu then Just types else Nothing)}
+                expression <- initIfaceCheck (text "opaque element interface test") elementEnv $
+                    initIfaceLcl ifaceModule (text "opaque element interface test") NotBoot $
+                        tcIfaceExpr (IfaceType input)
+                case expression of
+                    Type ty -> pure ty
+                    _ -> fail "FAIL: opaque element reconstruction returned a term"
             roundtrip :: (Binary.Binary a) => CompressionIFace -> a -> IO a
             roundtrip compression input = do
                 writer <- Binary.openBinMem 1024
@@ -1617,6 +1764,72 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                             forcePackage package
                             check (label ++ "; scalar domain eligibility") (isNativeIndexType (mkTyConTy package) == eligible)
                     check (label ++ "; imported declarations terminate") (completed == Just ())
+        -- Parameter fields remain opaque after both erased and runtime-bearing
+        -- instantiation. Check actual imported Id metadata, not only eqType.
+        -- See Note [Opaque runtime index values] in GHC.Core.Type.
+        let elementVar = mkTyVar (mkSystemName (unique 110000) (mkTyVarOcc "wire_element")) liftedTypeKind
+            listTelescope base element =
+                let headId = local base "wire_head" element
+                    tailId = local (base + 1) "wire_tail" (mkListTy element)
+                    listId = local (base + 2) "wire_list" (mkListTy element)
+                    consIndex = mkTyConApp (promoteDataCon consDataCon) [element, TermVarTy headId, TermVarTy tailId]
+                    equality = mkTyConApp eqTyCon [mkListTy element, TermVarTy listId, consIndex]
+                 in mkDepFunTy headId $ mkDepFunTy tailId $ mkDepFunTy listId $
+                        mkFunctionType unmatchableDataConTy ManyTy equality intTy
+            genericList = tidyTopType $ mkForAllTy unmatchableDataConTy (Bndr elementVar Specified) $
+                listTelescope 110001 (mkTyVarTy elementVar)
+            checkListMetadata label element result = case result of
+                DepFunTy headId (DepFunTy tailId (DepFunTy listId FunTy{ft_arg = TyConApp _ [domain, TermVarTy left, TyConApp _ [actualElement, TermVarTy headIndex, TermVarTy tailIndex]]})) -> do
+                    checkType dflags (label ++ " head type") element (varType headId)
+                    forM_ [tailId, listId] $ \index ->
+                        checkType dflags (label ++ " list type") (mkListTy element) (varType index)
+                    checkType dflags (label ++ " proof domain") (mkListTy element) domain
+                    checkType dflags (label ++ " constructor parameter") element actualElement
+                    check (label ++ " actual field identities") (left == listId && headIndex == headId && tailIndex == tailId)
+                    check (label ++ " distinct field identities") (headId /= tailId && headId /= listId && tailId /= listId)
+                    forM_ [(left, mkListTy element), (headIndex, element), (tailIndex, mkListTy element)] $ \(occurrence, expected) -> do
+                        checkType dflags (label ++ " occurrence type") expected (varType occurrence)
+                        checkType dflags (label ++ " occurrence multiplicity") ManyTy (idMult occurrence)
+                    forM_ [headId, tailId, listId] $ \index ->
+                        checkType dflags (label ++ " field multiplicity") ManyTy (idMult index)
+                _ -> fail ("FAIL: " ++ label ++ "; imported list telescope changed shape")
+            earlier = local 110010 "wire_earlier" boolTy
+            elementPrototype = parameterizedDomainFixture 110020 [liftedTypeKind, boolTy] (\_ _ -> [[]])
+        importedElements <- restoreImportedKnots NormalCompression env [tyThingToIfaceDecl (ATyCon elementPrototype)]
+        elementOwner <- case importedElements of
+            [element] -> pure element
+            _ -> fail "FAIL: opaque element declaration did not reconstruct one TyCon"
+        let runtimeElement = mkTyConApp elementOwner [intTy, TermVarTy earlier]
+            runtimeList = tidyTopType $ mkDepFunTy earlier (listTelescope 110200 runtimeElement)
+        forM_ [NormalCompression, MaximumCompression] $ \compression -> do
+            restored <- restore [] =<< roundtrip compression (toIfaceType genericList)
+            checkType dflags "generic list interface alpha equality" genericList restored
+            check "generic list interface has no escaped dependencies" (isEmptyVarSet (tyCoVarsOfType restored))
+            case restored of
+                ForAllTy ma (Bndr actual _) body -> do
+                    checkType dflags "generic list forall metadata" unmatchableDataConTy ma
+                    check "generic list type binder is fresh" (actual /= elementVar)
+                    checkListMetadata "generic list interface" (mkTyVarTy actual) body
+                _ -> fail "FAIL: generic list interface lost its erased parameter"
+            forM_ [boolTy, intTy, mkTyConApp ioTyCon [intTy], mkVisFunTyManyU boolTy boolTy, mkFunctionType unmatchableDataConTy ManyTy boolTy intTy, mkFunctionType unmatchableDataConTy OneTy boolTy boolTy] $ \element -> do
+                let specialized = tidyTopType (listTelescope 110300 element)
+                actual <- restore [] =<< roundtrip compression (toIfaceType specialized)
+                checkType dflags "opaque list specialization alpha equality" specialized actual
+                checkListMetadata "opaque list specialization" element actual
+            runtime <- restoreWithElement elementOwner =<< roundtrip compression (toIfaceType runtimeList)
+            checkType dflags "runtime-bearing list interface alpha equality" runtimeList runtime
+            check "runtime-bearing list has no escaped dependencies" (isEmptyVarSet (tyCoVarsOfType runtime))
+            case runtime of
+                DepFunTy index body -> do
+                    let element = mkTyConApp elementOwner [intTy, TermVarTy index]
+                    check "runtime-bearing list prefix is fresh" (index /= earlier)
+                    checkType dflags "runtime-bearing list prefix type" boolTy (varType index)
+                    checkListMetadata "runtime-bearing list interface" element body
+                _ -> fail "FAIL: runtime-bearing list interface lost its earlier index"
+            let wrongHead = local 110310 "wire_wrong_head" boolTy
+                intTail = local 110311 "wire_int_tail" (mkListTy intTy)
+                malformed = toIfaceType $ mkTyConApp (promoteDataCon consDataCon) [intTy, TermVarTy wrongHead, TermVarTy intTail]
+            rejectsIface "Int cons cannot contain a Bool head" "Invalid retained constructor fields in interface" [wrongHead, intTail] =<< roundtrip compression malformed
         let package = retainedIfacePackage 2500 False
             vacuousPackage = retainedIfacePackage 2520 True
             declaration = tyThingToIfaceDecl (ATyCon package)
@@ -1845,6 +2058,11 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 con
                     { ifConArgTys = [(many, IfaceTyConApp (IfaceTyCon (ifName domain) (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil), (many, bool)]
                     }
+            -- | Require structural admission through a source retained field.
+            -- An ordinary opaque Pi can name these same nonstructural types.
+            structuralUse declarations = case declarations of
+                domain : _ -> withDomain domain (recursiveDeclaration 110400 "IfaceStructuralUse") : declarations
+                [] -> error "FAIL: structural interface control has no domain"
             selfDeclaration = withDomain selfDeclaration (recursiveDeclaration 2900 "IfaceSelfDomain")
             leftDeclaration = withDomain rightDeclaration (recursiveDeclaration 2910 "IfaceLeftDomain")
             rightDeclaration = withDomain leftDeclaration (recursiveDeclaration 2920 "IfaceRightDomain")
@@ -1925,7 +2143,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             , ("generic Pi hidden in a nullary field synonym", [fieldAlias, hiddenSelf])
             , ("generic Pi nonvacuous self cycle", [nonvacuousSelf])
             ]
-            $ \(label, declarations) -> rejectsImportedKnots label shapeDiagnostic declarations
+            $ \(label, declarations) -> rejectsImportedKnots ("structural use of " ++ label) shapeDiagnostic (structuralUse declarations)
         let -- | Build a base constructor and a constructor with lazy fields.
             ordinaryRecursive base label fieldTypes =
                 let owner = ordinaryField bool (recursiveDeclaration base label)
@@ -2036,7 +2254,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             , ("function endpoint cannot reuse an enclosing data back edge", [functionLoopHolder, functionLoop])
             , ("same Names malformed session", [sessionHolder, malformedSession])
             ]
-            $ \(label, declarations) -> rejectsImportedKnots label shapeDiagnostic declarations
+            $ \(label, declarations) -> rejectsImportedKnots ("structural use of " ++ label) shapeDiagnostic (structuralUse declarations)
         acceptsImportedKnots "same Names valid session after" [(sessionHolder, False), (sessionDomain, True)]
         let cachedDomain = setTyConNativeDomainShape boolTyCon NativeInvalidDomain
             cachedIndex = local 10400 "cached_domain_index" (mkTyConTy cachedDomain)
@@ -2046,8 +2264,11 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 Just NativeInvalidDomain -> True
                 _ -> False
             _ -> False
-        rejectsIface "cached raw view rejects before typed Bool eligibility" "Unsupported retained domain shape." [cachedIndex] $
-            IfaceTermVar (mkIfLclName (fsLit "cached_domain_index"))
+        cachedOpaque <- restore [cachedIndex] (IfaceTermVar (mkIfLclName (fsLit "cached_domain_index")))
+        checkType dflags "opaque identity does not inspect a structural raw view" (TermVarTy cachedIndex) cachedOpaque
+        let cachedHead = local 110420 "cached_domain_head" (mkVisFunTyManyU (mkTyConTy cachedDomain) boolTy)
+        rejectsIface "cached raw view rejects a fixed native endpoint" "Unsupported retained domain shape." [cachedHead, cachedIndex] $
+            IfaceTermAppTy (mkIfLclName (fsLit "cached_domain_head")) (IfaceTermVar (mkIfLclName (fsLit "cached_domain_index")))
         check "wired Bool has no imported raw view" $ case tyConNativeDomainShape boolTyCon of
             Nothing -> True
             _ -> False
@@ -2254,9 +2475,9 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     let badDomain replacement = IfaceDepFunTy (mult, name, replacement) body
                     rejectsIface "function Pi rejects outer multiplicity One" "Invalid retained binder" [] $
                         IfaceDepFunTy (toIfaceType OneTy, name, domain) body
-                    rejectsIface "function Pi rejects an inner linear arrow" "Invalid retained binder" [] $
+                    rejectsIface "native call rejects an opaque inner linear arrow" "Invalid retained call head" [] $
                         badDomain (toIfaceType (mkFunctionType unmatchableDataConTy OneTy boolTy boolTy))
-                    rejectsIface "function Pi rejects an unsupported result domain" "Invalid retained binder" [] $
+                    rejectsIface "native call rejects an opaque unsupported result domain" "Invalid retained call head" [] $
                         badDomain (toIfaceType (mkFunctionType unmatchableDataConTy ManyTy boolTy intTy))
                     let missingType = mkTyVar (mkSystemName (unique 9111) (mkTyVarOcc "missing_domain")) liftedTypeKind
                     rejectsIface "function Pi cannot import a free domain variable" "Iface type variable out of scope" [] $
@@ -2268,7 +2489,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         boundDomainPi = IfaceForAllTy (toIfaceType unmatchableDataConTy)
                             (mkIfaceForAllTvBndr Specified (boundDomainName, toIfaceType liftedTypeKind))
                             (badDomain nonclosedDomain)
-                    rejectsIface "function Pi rejects an in-scope nonclosed domain" "Invalid retained binder" [] boundDomainPi
+                    rejectsIface "native call rejects an opaque in-scope nonclosed domain" "Invalid retained call head" [] boundDomainPi
                     rejectsIface "function-value index cannot be a retained function result" "Invalid retained function result" [] $
                         IfaceDepFunTy (mult, name, domain) (IfaceTermVar name)
                     rejectsIface "call argument cannot refer to a later scalar binder" "Iface id out of scope" [] $
@@ -2602,16 +2823,18 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 let malformed label fragment binder = do
                         decoded <- roundtrip NormalCompression (IfaceDepFunTy binder body)
                         rejectsIface label fragment [] decoded
-                malformed "non-Bool interface binder" "Invalid retained binder" (multiplicity, name, toIfaceType intTy)
+                malformed "unlifted interface binder" "Invalid retained binder" (multiplicity, name, toIfaceType intPrimTy)
                 malformed "linear interface binder" "Invalid retained binder" (toIfaceType OneTy, name, domain)
                 malformed "interface binder outside its own domain scope" "Iface id out of scope" (multiplicity, name, IfaceTermVar name)
             _ -> fail "FAIL: interface conversion did not retain the Boolean binder"
         let constraintResult = DepFunTy b (mkTyConApp eqTyCon [boolTy, TermVarTy b, TermVarTy b])
         constraintIface <- roundtrip NormalCompression (toIfaceType (tidyTopType constraintResult))
         rejectsIface "Constraint interface result" "Invalid retained function result" [] constraintIface
-        let badType = local 305 "badType" intTy
+        let badType = local 305 "badType" intPrimTy
             badMultiplicity = mkSysLocal (fsLit "badMultiplicity") (unique 306) OneTy boolTy
-        forM_ [badType, badMultiplicity] $ \bad -> do
+            badJoin = asJoinId (local 110410 "badJoin" (mkVisFunTyManyU boolTy boolTy)) 1
+            badCoVar = proof 110411 (constructorIndex trueDataCon) (constructorIndex trueDataCon)
+        forM_ [badType, badMultiplicity, badJoin, badCoVar] $ \bad -> do
             decoded <- roundtrip NormalCompression (IfaceTermVar (mkIfLclName (occNameFS (getOccName bad))))
             rejectsIface "invalid local interface index" "Invalid retained index" [bad] decoded
         let diagnostic = toIfaceTypeX (unitVarSet b) (TermVarTy b)
@@ -2906,9 +3129,9 @@ runFunctionBinderChecks dflags = do
 
 {- Note [Closed native function-field checks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check the function value at a complete fixed type. It is an opaque leaf in a
-closed algebraic container. The original function-free endpoint policy must
-still reject a recursive function over its own container.
+Parameter fields hold opaque lifted values. This does not make those values
+eligible call heads. The original function-free endpoint policy must still
+reject a recursive function over its own container.
 
 Build forward application proofs before replacing their erased head variables
 with runtime function indices. Preserve each nonreflexive head proof and its
@@ -2917,7 +3140,7 @@ it does not justify projecting an opaque U or unknown application equality.
 The separate source client checks actual saturated-family constructor transport.
 -}
 
--- | Check closed function fields and preservation of their forward proofs.
+-- | Check opaque parameter fields and preservation of fixed-head forward proofs.
 runFunctionFieldChecks :: DynFlags -> IO ()
 runFunctionFieldChecks dflags = do
     let fnTy = mkVisFunTyManyU boolTy boolTy
@@ -2945,7 +3168,10 @@ runFunctionFieldChecks dflags = do
         , ("polymorphic", poly)
         , ("open", mkVisFunTyManyU boolTy (mkTyVarTy open))
         ]
-        $ \(label, ty) -> check ("function field rejects " ++ label ++ " leaves") (not (isNativeIndexType (maybeOf ty)))
+        $ \(label, ty) -> do
+            check ("parameter field accepts an opaque " ++ label ++ " value") (isNativeIndexType (maybeOf ty))
+            check ("opaque " ++ label ++ " value retains identity") (isNativeOpaqueValueId (setIdType f ty))
+            check ("opaque " ++ label ++ " value is not a fixed native call head") (not (isNativeIndexFunctionId (setIdType f ty)))
     bounded <- timeout 1000000 (evaluate (isNativeIndexType (mkTyConTy loop)))
     check "a recursive function over its container is rejected without looping" (bounded == Just False)
     lintAccepts dflags "function-value index has its actual lexical binding" [f] (Coercion (mkNomReflCo (TermVarTy f)))
@@ -3662,10 +3888,12 @@ runDepFunCoChecks dflags = do
         _ -> fail "FAIL: reflexive retained coercion did not simplify"
     let nat = local 706 "co_nat" (mkTyConTy (let (tc, _, _) = peanoNat in tc))
         erased = mkTyVar (mkSystemName (unique 707) (mkTyVarOcc "co_erased")) boolTy
-        wrongDomain = local 708 "co_int" intTy
+        wrongDomain = local 708 "co_unlifted" intPrimTy
+        opaqueInt = local 81035 "co_opaque_int" intTy
         linear = setIdMult b OneTy
     lintAccepts dflags "retained Nat coercion binder" [] (Coercion (DepFunCo nat MRefl (mkNomReflCo intTy)))
-    forM_ [("erased variable", erased), ("coercion variable", cv), ("unsupported domain", wrongDomain), ("linear runtime binder", linear)] $ \(label, binder) ->
+    lintAccepts dflags "opaque Int coercion binder" [] (Coercion (DepFunCo opaqueInt MRefl (mkNomReflCo intTy)))
+    forM_ [("erased variable", erased), ("coercion variable", cv), ("unlifted domain", wrongDomain), ("linear runtime binder", linear)] $ \(label, binder) ->
         lintRejects dflags ("retained coercion rejects " ++ label) [] (Coercion (DepFunCo binder MRefl (mkNomReflCo intTy)))
     lintRejects dflags "retained coercion rejects unlifted results" [] (Coercion (DepFunCo b MRefl (mkNomReflCo intPrimTy)))
     forM_ [("left", proof 709 intPrimTy intTy), ("right", proof 710 intTy intPrimTy)] $ \(side, evidence) -> do

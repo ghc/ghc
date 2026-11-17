@@ -1116,6 +1116,7 @@ runModuleChecks libdir = do
     runMultiPackageSourceChecks libdir
     runFunctionPackageModuleChecks libdir
     runFunctionFieldModuleChecks libdir
+    runGenericListModuleChecks libdir
     runBoundedFamilyModuleChecks libdir
     runExportedFunctionSignatureModuleChecks libdir
     forM_
@@ -2187,7 +2188,28 @@ runSourceChecks = do
                 liftIO $ putStrLn "source choose bottom: raised native-bottom-bool"
             | otherwise -> fail ("FAIL: source choose bottom raised another exception: " ++ displayException exception)
         Right actual -> fail ("FAIL: source choose bottom returned " ++ show actual)
+    runPolyPayloadSourceCheck
     runNatSourceChecks
+
+-- | Check nominal refinement through a rank-2 payload without forcing it.
+runPolyPayloadSourceCheck :: GHC.Ghc ()
+runPolyPayloadSourceCheck = do
+    expression <- sourceEntry "NativeSourcePolyPayload" $ unlines
+        [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeOperators #-}"
+        , "module NativeSourcePolyPayload where"
+        , "type Poly (b :: Bool) = forall (a :: Bool). (a ~ b) => Int"
+        , "keep :: foreach (b :: Bool) -> Poly b -> Int"
+        , "keep True x = 42"
+        , "keep False x = 42"
+        , "entry :: IO String"
+        , "entry = pure (show (keep True (error \"poly payload forced\" :: Poly True))"
+        , "              ++ \":\" ++ show (keep False (error \"poly payload forced\" :: Poly False)))"
+        ]
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source polymorphic payload" expression
+    unless (actual == "42:42") $
+        fail ("FAIL: source polymorphic payload refinement or laziness: " ++ show actual)
 
 -- | Observe source telescopes, constructor refinement, and lazy runtime indices.
 runNatSourceChecks :: GHC.Ghc ()
@@ -3027,7 +3049,7 @@ runCaseSourceChecks = do
         , ("NativeSourceCaseGuarded", 83605, "Dependent case refinement requires", "Z -> VNil; S k | True -> VCons x (replicateCaseNative k x)")
         , ("NativeSourceCaseWildcard", 83605, "Dependent case refinement requires", "Z -> VNil; S _ -> VCons x VNil")
         , ("NativeSourceCaseWrongLength", 83865, "Vec", "Z -> VNil; S k -> VNil")
-        , ("NativeSourceCaseEscapingPredecessor", 83865, "Vec", "Z -> VNil; S k -> replicateCaseNative k x")
+        , ("NativeSourceCaseEscapingPredecessor", 5617, "Vec", "Z -> VNil; S k -> replicateCaseNative k x")
         ]
         $ \(name, code, fragment, alternatives) -> do
             let original = "      replicateCaseNative n x = case n of { Z -> VNil; S k -> VCons x (replicateCaseNative k x) }"
@@ -3818,7 +3840,7 @@ runPackageSourceRejectChecks = do
         , ("ZipWithoutEquality", 83865, "zipVec xs ys", [], [], package ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = Just (PackVec n (zipVec xs ys))"])
         , ("ZipUnmatchedProof", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Nothing -> Nothing", "  Just proof -> Just (PackVec n (zipVec xs ys))"])
         , ("ZipNothingBranch", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Just Refl -> Just (PackVec n (zipVec xs ys))", "  Nothing -> Just (PackVec n (zipVec xs ys))"])
-        , ("LinearIndex", 83605, "local index variable", ["LinearTypes"], [], package ++ ["bad :: Nat %1 -> PackedVec Int", "bad n = PackVec n (error \"unused\")"])
+        , ("LinearIndex", 83605, "unrestricted multiplicity Many", ["LinearTypes"], [], package ++ ["bad :: Nat %1 -> PackedVec Int", "bad n = PackVec n (error \"unused\")"])
         , ("ReverseWrongLength", 83865, "reverseNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a (S n)", "bad n xs = reverseNative @a n xs"])
         , ("ReverseMissingStep", 5617, "reverseAppendNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)", "bad n m xs acc = case n of", "  Z -> case xs of VNil -> acc", "  S k -> case xs of VCons x rest -> reverseAppendNative @a k (S m) rest (VCons x acc)"])
         , ("ReverseMissingZero", 83865, "reverseAppendNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n", "bad n xs = reverseAppendNative @a n Z xs VNil"])
@@ -3834,7 +3856,7 @@ runPackageSourceRejectChecks = do
         , ("MatrixNestedField", 83605, "bare variable", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad Z (S (S right)) = Nothing", "bad (S left) Z = Nothing", "bad (S left) (S right) = Nothing"])
         , ("MatrixFalseZeroSuccessor", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Just Refl", "bad (S left) Z = Nothing", "bad (S left) (S right) = Nothing"])
         , ("MatrixFalseSuccessorZero", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Nothing", "bad (S left) Z = Just Refl", "bad (S left) (S right) = Nothing"])
-        , ("MatrixMissingRecursiveEvidence", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing", "bad (S left) (S right) = Just Refl"])
+        , ("MatrixMissingRecursiveEvidence", 5617, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing", "bad (S left) (S right) = Just Refl"])
         , ("MatrixContext", 83605, "Constraints within a retained constructor matrix", ["FlexibleContexts"], equalityImports, ["bad :: foreach (n :: Nat) -> Show Int => foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing", "bad (S left) (S right) = Nothing"])
         , ("MatrixFallbackNonterminal", 83605, "only one final equation", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad first second = Nothing", "bad (S left) (S right) = Nothing"])
         , ("MatrixFallbackRepeated", 83605, "only one final equation", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad first second = Nothing", "bad another final = Nothing"])
@@ -3945,7 +3967,7 @@ runPackageSourceRejectChecks = do
         , ("PiOperandDistinctOuterRuntimeIndices", 5617, "Could not deduce", ["TypeFamilies", "FlexibleContexts"], [], ["wrongOuterPi :: forall value. foreach (k :: Nat) -> foreach (m :: Nat) -> value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> (foreach (n :: Nat) -> (Vec Int m, Vec Bool n))", "wrongOuterPi k m f = f"])
         , ("PiOperandRepresentationalEvidenceCannotSupplyNominalProof", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts", "AllowAmbiguousTypes"], ["import Data.Coerce (Coercible)"], ["wrongRolePi :: forall left right. (Coercible left right, left ~ (foreach (n :: Nat) -> Vec Int n)) => right -> (foreach (n :: Nat) -> Vec Int n)", "wrongRolePi f = f"])
         , ("PiOperandLinearOuterIndexCaptureRejected", 83605, "already-bound unrestricted local value", ["TypeFamilies", "FlexibleContexts", "LinearTypes"], [], ["consumeNat :: Nat %1 -> Int", "consumeNat Z = 42", "consumeNat (S rest) = consumeNat rest", "bad :: Nat %1 -> Int", "bad k = let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in consumeNat k"])
-        , ("PiOperandUnsupportedPiDomainRejected", 83605, "supported closed algebraic domain", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Int) -> Int) => value -> Int -> Int", "bad f = f"])
+        , ("PiOperandUnsupportedPiDomainRejected", 83605, "supported structural algebraic domain", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Int) -> Int) => value -> Int -> Int", "bad f = f"])
         , ("PiOperandPartialPiOperandRejected", 83605, "complete type signature", ["TypeFamilies", "FlexibleContexts", "PartialTypeSignatures"], [], ["bad :: forall value. value ~ (foreach (n :: Nat) -> Vec _ n) => value -> (foreach (n :: Nat) -> Vec Int n)", "bad f = f"])
         , ("PiOperandQuotedPiOperandCaptureRejected", 83605, "Template Haskell", ["TypeFamilies", "FlexibleContexts", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in (42 :: Int) |]"])
         , ("PiOperandEqualityOperandKindMismatch", 83865, "Expected kind", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall (value :: Nat). value ~ (foreach (n :: Nat) -> Vec Int n) => Int", "bad = 42"])
@@ -3961,7 +3983,7 @@ runPackageSourceRejectChecks = do
         , ("PiVTAIndependentRuntimeIndexMismatch", 83865, "Couldn't match", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Nat -> Int", "bad k m = length (toListLocal (id @(Vec Int k) (localVector m)))"])
         , ("PiVTALexicalShadowRejectsOuter", 83865, "Couldn't match", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Nat -> Int", "bad k input = let { outer :: Vec Int k; outer = localVector k; apply :: Nat -> Int; apply k = length (toListLocal (id @(Vec Int k) outer)) } in apply input"])
         , ("PiVTASplicedWildcardCannotCaptureIndex", 83605, "must be complete", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Type(WildCardT))"], localActions ++ ["bad :: Nat -> Int", "bad k = length (toListLocal (id @(Vec $(pure WildCardT) k) (localVector k)))"])
-        , ("PiVTAUnsupportedRuntimeIndexDomain", 83605, "visible type argument", ["TypeApplications"], [], localActions ++ ["bad :: Int -> Int", "bad k = length (toListLocal (id @(Vec Int k) VNil))"])
+        , ("PiVTAWrongRuntimeIndexKind", 83865, "Expected kind", ["TypeApplications"], [], localActions ++ ["bad :: Int -> Int", "bad k = length (toListLocal (id @(Vec Int k) VNil))"])
         , ("PiVTAGlobalTermIsNotCaptured", 76037, "globalIndex", ["TypeApplications"], [], localActions ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: Int", "bad = length (toListLocal (id @(Vec Int globalIndex) VNil))"])
         , ("PiVTAUnavailableTermIsNotCaptured", 76037, "unavailableIndex", ["TypeApplications"], [], localActions ++ ["bad :: Int", "bad = length (toListLocal (id @(Vec Int unavailableIndex) VNil))"])
         , ("PiVTAPartialNativeTypeArgument", 83605, "must be complete", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Int", "bad k = length (toListLocal (id @(Vec _ k) (localVector k)))"])
@@ -3969,10 +3991,10 @@ runPackageSourceRejectChecks = do
         , ("PiVTAQuotationRuntimeCapture", 83605, "Template Haskell", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| id @(Vec Int k) undefined |]"])
         , ("PiVTALinearRuntimeIndexRejected", 83605, "visible type argument", ["TypeApplications", "LinearTypes"], [], localActions ++ ["bad :: Nat %1 -> Int", "bad k = length (toListLocal (id @(Vec Int k) (localVector k)))"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
-        , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
+        , ("LocalSignatureAliasIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
         , ("LocalSignatureGlobalIndex", 25897, "localVector globalIndex", [], [], localSignatures ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: PackedVec Int", "bad = let { xs :: Vec Int globalIndex; xs = localVector globalIndex } in PackVec globalIndex xs"])
-        , ("LocalSignatureUnsupportedDomain", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Int -> PackedVec Int", "bad n = let { xs :: Vec Int n; xs = VNil } in PackVec Z xs"])
+        , ("LocalSignatureWrongIndexKind", 83865, "Expected kind", [], [], localSignatures ++ ["bad :: Int -> PackedVec Int", "bad n = let { xs :: Vec Int n; xs = VNil } in PackVec Z xs"])
         , ("LocalSignatureLinearIndex", 83605, "already-bound unrestricted local value", ["LinearTypes"], [], localSignatures ++ ["bad :: Nat %1 -> PackedVec Int", "bad n = let { xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
         , ("LocalSignatureAnonymousPartial", 83605, "complete type signature", ["PartialTypeSignatures"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let { xs :: Vec _ n; xs = localVector n } in PackVec n xs"])
         , ("LocalSignatureUnderscoreNamedHole", 83865, "localVector _n", ["NamedWildCards", "PartialTypeSignatures"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad _n = let { xs :: Vec Int _n; xs = localVector _n } in PackVec _n xs"])
@@ -3990,10 +4012,10 @@ runPackageSourceRejectChecks = do
         , ("MatrixFallbackTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [|| 42 :: Int ||] in Nothing"])
         , ("LaterUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [| 42 :: Int |] in ys", "bad (S k) later xs ys = ys"])
         , ("LaterTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [|| 42 :: Int ||] in ys", "bad (S k) later xs ys = ys"])
-        , ("LaterWrongResult", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = xs", "bad (S k) later xs ys = ys"])
-        , ("LaterIndependentIndex", 83865, "ys", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (j :: Nat) -> Vec Int n -> Vec Int m -> Vec Int j -> Vec Int j", "bad Z first second xs ys zs = zs", "bad (S k) later final xs ys zs = ys"])
+        , ("LaterWrongResult", 5617, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = xs", "bad (S k) later xs ys = ys"])
+        , ("LaterIndependentIndex", 5617, "ys", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (j :: Nat) -> Vec Int n -> Vec Int m -> Vec Int j -> Vec Int j", "bad Z first second xs ys zs = zs", "bad (S k) later final xs ys zs = ys"])
         , ("LaterOrdinaryPattern", 83605, "unrestricted multiplicities", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right VNil ys = ys", "bad (S k) later xs ys = ys"])
-        , ("LaterForgedSuccessor", 83865, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)", "bad Z right = Refl", "bad (S predecessor) later = Refl"])
+        , ("LaterForgedSuccessor", 5617, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)", "bad Z right = Refl", "bad (S predecessor) later = Refl"])
         , ("SumForged", 83865, "Refl", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> Sum n m", "bad n m p = Sum p Refl"])
         , ("SumWrongEvidence", 83865, "proof", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> (p :~: n) -> Sum n m", "bad n m p proof = Sum p proof"])
         , ("AppendUnmatchedProof", 83865, "appendNative n m xs ys", ["TypeFamilies"], equalityImports, package ++ sums ++ ["bad :: PackedVec a -> PackedVec a -> PackedVec a", "bad (PackVec n xs) (PackVec m ys) = case sumNat n m of", "  Sum p proof -> PackVec p (appendNative n m xs ys)"])
@@ -4410,7 +4432,7 @@ runNatSourceRejectChecks = do
             )
         ,
             ( "NativeSourceNatPredecessor"
-            , 83865
+            , 5617
             , "Vec"
             , "      replicateNative (S k) x = VCons x (replicateNative k x)"
             , ["      replicateNative (S k) x = replicateNative k x"]
@@ -4490,7 +4512,7 @@ runSourceRejectChecks = do
                 ++ local [] consumer ["keep b x = 42"] "keep True 42"
     mapM_
         check
-        [ ("unsupported algebraic domain", 83605, "supported closed algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
+        [ ("unsupported algebraic domain", 83605, "supported structural algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
         , ("missing domain annotation", 83605, "explicit domain type", [], local [] "foreach b -> Int -> Int" identity "42")
         , ("anonymous retained binder", 83605, "requires a variable name", [], local [] "foreach (_ :: Bool) -> Int -> Int" identity "42")
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
@@ -4525,14 +4547,6 @@ runSourceRejectChecks = do
         , ("guarded constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
         , ("unsupported later constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", [], local [] selection ["keep True _ = 42", "keep False x = x"] "42")
         , ("linear constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
-        ,
-            ( "constructor argument with a synonym-hidden forall"
-            , 83605
-            , "Retained constructor refinement does not support this type"
-            , []
-            , ["type Poly (b :: Bool) = forall (a :: Bool). (a ~ b) => Int"]
-                ++ local [] "foreach (b :: Bool) -> Poly b -> Int" ["keep True x = 42", "keep False x = 42"] "42"
-            )
         ,
             ( "independent choose and keep indices"
             , 83865
@@ -6200,7 +6214,7 @@ runFunctionFieldModuleChecks libdir = do
                 , "    True -> error \"unreachable\""
                 ]
             )
-            , ("RejectCrossPayload", 83865, "consumeFlag", unlines
+            , ("RejectCrossPayload", 5617, "consumeFlag", unlines
                 [ "{-# LANGUAGE ExperimentalDependentTypes, GADTs #-}"
                 , "module RejectCrossPayload where"
                 , "import FunctionFieldLibrary"
@@ -6230,6 +6244,178 @@ runFunctionFieldModuleChecks libdir = do
                     pure (Right ())
                 checkSourceRejection moduleName code fragment result
 
+-- | Check generic list indices through separately compiled interfaces.
+runGenericListModuleChecks :: FilePath -> IO ()
+runGenericListModuleChecks libdir = do
+    library <- readFile "PackedVecLibrary.hs"
+    let warnings = ["-Werror=inaccessible-code", "-Werror=overlapping-patterns"]
+        consumer = unlines
+            [ "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE EmptyCase #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE RankNTypes #-}"
+            , "{-# LANGUAGE ScopedTypeVariables #-}"
+            , "{-# LANGUAGE TypeApplications #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE TypeOperators #-}"
+            , ""
+            , "{-# LANGUAGE PolyKinds #-}"
+            , ""
+            , "-- | Exercise actual runtime elements and dependent element domains."
+            , "module Main where"
+            , ""
+            , "import Control.Exception (ErrorCall, SomeException, displayException, evaluate, try)"
+            , "import Data.IORef"
+            , "import Data.List (isInfixOf)"
+            , "import PackedVecLibrary"
+            , ""
+            , "-- | Keep a boxed type outside the selected structural field policy."
+            , "data Opaque = Opaque Int deriving (Eq, Show)"
+            , ""
+            , "-- | Keep a newtype as an opaque list element."
+            , "newtype Hidden = Hidden Int deriving (Eq, Show)"
+            , ""
+            , "-- | Normalize the body without changing a closed binder domain."
+            , "type family Element where Element = Int"
+            , "closedVector :: foreach (xs :: [Element]) -> Vec Element (GenericCount xs)"
+            , "closedVector xs = genericVector xs"
+            , ""
+            , "-- | Run finite observations without assuming total inputs."
+            , "main :: IO ()"
+            , "main = do"
+            , "    flagRef <- newIORef True"
+            , "    flag <- readIORef flagRef"
+            , "    let bools = [flag, False]"
+            , "    print (toList (genericVector @Bool bools))"
+            , "    let integers = [11, 22] :: [Int]"
+            , "    print (toList (genericVector integers))"
+            , "    print (toList (genericVector @Int integers))"
+            , "    let functions = [not]"
+            , "    print (map ($ True) (toList (genericVector functions)))"
+            , "    let actions = [pure 7, pure 9] :: [IO Int]"
+            , "    sequence (toList (genericVector actions)) >>= print"
+            , "    let opaque = [Opaque 11]"
+            , "    print (toList (genericVector opaque))"
+            , "    let hidden = [Hidden 13]"
+            , "    print (toList (genericVector hidden))"
+            , "    let partial = (error \"opaque head forced\" :: Int) : error \"opaque tail forced\""
+            , "    print (genericTag partial)"
+            , "    print (length (take 1 (toList (genericVector partial))))"
+            , "    let cyclic = 17 : cyclic :: [Int]"
+            , "    print (take 3 (toList (genericVector cyclic)))"
+            , "    sizeRef <- newIORef (S (S Z))"
+            , "    n <- readIORef sizeRef"
+            , "    let vector = replicateNative @Int n 23"
+            , "    let vectors = [vector]"
+            , "    print (map toList (toList (genericNested n vectors)))"
+            , "    print (map toList (toList (genericRefinedNested n vectors)))"
+            , "    let emptyVector = replicateNative @Int Z 29"
+            , "    let emptyVectors = [emptyVector]"
+            , "    print (map toList (toList (genericRefinedNested Z emptyVectors)))"
+            , ""
+            , "    let constructed = replicateNative @Int (S n) 31"
+            , "    let constructedVectors = [constructed]"
+            , "    print (map toList (toList (genericNested (S n) constructedVectors)))"
+            , "    demanded <- try @ErrorCall (evaluate (case genericFirst partial of Nothing -> 0; Just x -> x))"
+            , "    case demanded of"
+            , "        Left err | \"opaque head forced\" `isInfixOf` displayException err -> print True"
+            , "        _ -> error \"genericFirst did not expose the expected opaque head\""
+            , "    let lazySize = error \"partial worker forced its index\" :: Nat"
+            , "    let suspended :: foreach (ys :: [Vec Int lazySize]) -> Vec (Vec Int lazySize) (GenericCount ys)"
+            , "        suspended = genericRefinedNested lazySize"
+            , "    suspendedResult <- try @SomeException"
+            , "        @(foreach (ys :: [Vec Int lazySize]) -> Vec (Vec Int lazySize) (GenericCount ys))"
+            , "        (evaluate @(foreach (ys :: [Vec Int lazySize]) -> Vec (Vec Int lazySize) (GenericCount ys)) suspended)"
+            , "    print (case suspendedResult of Left _ -> False; Right _ -> True)"
+            , "    print (map (toList) (toList (genericNested n vectors)))"
+            , "    print (map @(Vec Int n) @[Int] toList (toList (genericNested n vectors)))"
+            , "    let lateVectors = [error \"generic late head forced\", vector]"
+            , "    print (length (take 1 (toList (genericNested n lateVectors))))"
+            , "    let closed = [3] :: [Element]"
+            , "    print (toList (closedVector closed))"
+            ]
+        expected =
+            [ "[True,False]"
+            , "[11,22]"
+            , "[11,22]"
+            , "[False]"
+            , "[7,9]"
+            , "[Opaque 11]"
+            , "[Hidden 13]"
+            , "True"
+            , "1"
+            , "[17,17,17]"
+            , "[[23,23]]"
+            , "[[23,23]]"
+            , "[[]]"
+            , "[[31,31,31]]"
+            , "True"
+            , "True"
+            , "[[23,23]]"
+            , "[[23,23]]"
+            , "1"
+            , "[3]"
+            ]
+        rejection = unlines
+            [ "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE EmptyCase #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE RankNTypes #-}"
+            , "{-# LANGUAGE ScopedTypeVariables #-}"
+            , "{-# LANGUAGE TypeApplications #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE TypeOperators #-}"
+            , ""
+            , "{-# LANGUAGE PolyKinds #-}"
+            , ""
+            , "-- | Require evidence for the actual input list."
+            , "module RejectGenericList where"
+            , ""
+            , "import Data.Kind (Type)"
+            , "import PackedVecLibrary"
+            , ""
+            , "wrongList :: forall (a :: Type). foreach (xs :: [a]) -> foreach (ys :: [a]) -> Vec a (GenericCount xs)"
+            , "wrongList xs ys = genericVector ys"
+            ]
+        linearRejection = unlines
+            [ "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE LinearTypes #-}"
+            , "{-# LANGUAGE TypeApplications #-}"
+            , ""
+            , "-- | Reject a linear runtime value at an unrestricted retained argument."
+            , "module LinearRetainedArg where"
+            , ""
+            , "import PackedVecLibrary (genericVector)"
+            , "import PackedVecLibrary (Vec (..))"
+            , ""
+            , "bad :: [Bool] %1 -> Bool"
+            , "bad xs = case genericVector @Bool xs of"
+            , "    VNil -> False"
+            , "    VCons _ _ -> True"
+            ]
+    runModuleCases libdir "generic-list-source" [("PackedVecLibrary", library)] warnings consumer expected
+    artifacts <- makeAbsolute ("NativeDependentCoreRun.modules" </> "generic-list-source" </> "artifacts")
+    forM_
+        [ ("RejectGenericList", 83865, ["GenericCount"], rejection)
+        , ("LinearRetainedArg", 83605, ["Many", "One"], linearRejection)
+        ]
+        $ \(moduleName, code, fragments, source) -> do
+            let path = artifacts </> (moduleName ++ ".hs")
+            writeFile path source
+            GHC.runGhc (Just libdir) $ do
+                environment <- nativeModuleEnvironment artifacts warnings NoLink Nothing
+                result <- GHC.handleSourceError (pure . Left) $ do
+                    liftIO $ void $ compileFile environment NoStop (path, Nothing)
+                    pure (Right ())
+                forM_ fragments $ \fragment ->
+                    checkSourceRejection moduleName code fragment result
+
 {- Note [Bounded family diagnostic argument positions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Native argument caches count value arguments. Diagnostics count user-written
@@ -6237,6 +6423,13 @@ type arguments as well. In the VTA control, xs is the third value argument
 and the fourth written argument, after @Bool. Check its own source span and
 argument context in the same depth diagnostic. Do not check the reported
 depth size. That size can change when the rewrite implementation changes.
+
+The list domains in the cached negatives require a family view before the
+current matcher can select their element types. That path normalizes the
+complete actual type and must report its bounded depth failure. This tests
+the current matching strategy. It does not state that these programs are
+intrinsically untypable. A plain a -> () helper can select the unreduced type.
+Keep that case as a positive control with a recursive family and bottom inputs.
 -}
 
 -- | Check finite native family views and located reduction-depth failures.
@@ -6284,6 +6477,12 @@ runBoundedFamilyModuleChecks libdir = do
             , "-- | Select the cached argument type without evaluating either argument."
             , "cached :: foreach (n :: Nat) -> Shape n -> ()"
             , "cached n xs = ignore xs"
+            , ""
+            , "-- | Keep an unused recursive family type unreduced."
+            , "type family Spin (b :: Bool) :: Type where Spin b = Spin b"
+            , "type family LoopShape (b :: Bool) :: Type where LoopShape b = [Spin b]"
+            , "cachedLoop :: foreach (b :: Bool) -> LoopShape b -> ()"
+            , "cachedLoop b xs = ignore xs"
             ]
         consumer = unlines
             [ "{-# LANGUAGE DataKinds #-}"
@@ -6312,6 +6511,11 @@ runBoundedFamilyModuleChecks libdir = do
             , "    print (case payload (S Z) [error \"vector-demand\"] of"
             , "        Nothing -> (0 :: Int)"
             , "        Just _ -> 1)"
+            , "    let b :: Bool"
+            , "        b = error \"recursive-index-demand\""
+            , "    let ys :: LoopShape b"
+            , "        ys = error \"recursive-argument-demand\""
+            , "    case cachedLoop b ys of () -> pure ()"
             ]
         depthFlags = ["-freduction-depth=12"]
     runModuleCases libdir "bounded-family-source" [("FiniteNative", finite)]
@@ -6361,7 +6565,7 @@ runBoundedFamilyModuleChecks libdir = do
             , "type family Shape (b :: Bool) :: Type where"
             , "    Shape b = [Spin b]"
             , ""
-            , "ignore :: forall a. a -> ()"
+            , "ignore :: forall a. [a] -> ()"
             , "ignore _ = ()"
             , ""
             , "cached :: foreach (b :: Bool) -> Shape b -> ()"
@@ -6386,7 +6590,7 @@ runBoundedFamilyModuleChecks libdir = do
             , "type family Shape (b :: Bool) :: Type where"
             , "    Shape b = [Spin b]"
             , ""
-            , "ignore :: forall a c. a -> c -> ()"
+            , "ignore :: forall a c. a -> [c] -> ()"
             , "ignore _ _ = ()"
             , ""
             , "cached :: foreach (b :: Bool) -> Shape b -> ()"
@@ -6412,7 +6616,7 @@ runBoundedFamilyModuleChecks libdir = do
             , "type family Shape (b :: Bool) :: Type where"
             , "    Shape b = [Spin b]"
             , ""
-            , "ignore :: forall tag a c. tag -> a -> c -> ()"
+            , "ignore :: forall tag a c. tag -> a -> [c] -> ()"
             , "ignore _ _ _ = ()"
             , ""
             , "cached :: foreach (b :: Bool) -> Shape b -> ()"

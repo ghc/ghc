@@ -3,6 +3,7 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -55,8 +56,15 @@ module PackedVecLibrary (
     weakenRight,
     toList,
     natToInt,
+    GenericCount,
+    genericVector,
+    genericTag,
+    genericFirst,
+    genericNested,
+    genericRefinedNested,
 ) where
 
+import Data.Kind (Type)
 import Data.Type.Equality ((:~:) (Refl))
 
 -- | A runtime length. Each successor contains an ordinary lazy field.
@@ -397,3 +405,41 @@ toList (VCons x xs) = x : toList xs
 natToInt :: Nat -> Int
 natToInt Z = 0
 natToInt (S n) = 1 + natToInt n
+
+{- Note [Generic list indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GenericCount follows the list constructors. Each element keeps its identity
+as an opaque value. Its type can be Int, a function type, IO Int, or Vec Int n.
+The recursive tail keeps its structural list domain. These workers inspect
+only the list constructors. They do not prove totality for partial or cyclic
+inputs. genericFirst returns an ordinary value. Its caller controls demand.
+-}
+
+-- | Count constructors without inspecting the opaque elements.
+type family GenericCount (xs :: [a]) :: Nat where
+    GenericCount '[] = 'Z
+    GenericCount (x ': xs) = 'S (GenericCount xs)
+
+-- | Retain the list shape and construct a vector at its actual length.
+genericVector :: forall (a :: Type). foreach (xs :: [a]) -> Vec a (GenericCount xs)
+genericVector [] = VNil
+genericVector (x : xs) = VCons x (genericVector @a xs)
+
+-- | Observe only the outer constructor.
+genericTag :: forall (a :: Type). foreach (xs :: [a]) -> Bool
+genericTag [] = False
+genericTag (_ : _) = True
+
+-- | Return the head without demanding the tail.
+genericFirst :: forall (a :: Type). foreach (xs :: [a]) -> Maybe a
+genericFirst [] = Nothing
+genericFirst (x : _) = Just x
+
+-- | Instantiate the element type with an earlier runtime length.
+genericNested :: foreach (n :: Nat) -> foreach (xs :: [Vec Int n]) -> Vec (Vec Int n) (GenericCount xs)
+genericNested n xs = genericVector xs
+
+-- | Refine an earlier index before checking the later list domain.
+genericRefinedNested :: foreach (n :: Nat) -> foreach (xs :: [Vec Int n]) -> Vec (Vec Int n) (GenericCount xs)
+genericRefinedNested Z xs = genericVector xs
+genericRefinedNested (S k) xs = genericVector xs

@@ -623,6 +623,55 @@ forallMatchability = do
                 Reflection.SomeTypeRep argument == Reflection.SomeTypeRep (Reflection.typeRep @Int)
             _ -> False
 
+-- | Keep a boxed value opaque inside a structural list.
+data GenericOpaque = GenericOpaque Int deriving (Eq, Show)
+
+-- | Keep a newtype value opaque inside a structural list.
+newtype GenericHidden = GenericHidden Int deriving (Eq, Show)
+
+-- | Observe generic list indices without adding demand to their elements.
+genericListIndexing :: IO ()
+genericListIndexing = do
+    flagRef <- newIORef True
+    flag <- readIORef flagRef
+    let bools = [flag, False]
+    observe "generic Boolean list" (toList (genericVector @Bool bools))
+    let integers = [11, 22] :: [Int]
+    observe "generic inferred Int list" (toList (genericVector integers))
+    observe "generic explicit Int list" (toList (genericVector @Int integers))
+    let functions = [not]
+    observe "generic function elements" (map ($ True) (toList (genericVector functions)))
+    let actions = [pure 7, pure 9] :: [IO Int]
+    sequence (toList (genericVector actions)) >>= observe "generic IO elements"
+    let opaque = [GenericOpaque 11]
+    observe "generic boxed elements" (toList (genericVector opaque))
+    let hidden = [GenericHidden 13]
+    observe "generic newtype elements" (toList (genericVector hidden))
+    let partial = (error "opaque head forced" :: Int) : error "opaque tail forced"
+    observe "generic outer list constructor" (genericTag partial)
+    observe "generic partial vector prefix" (length (take 1 (toList (genericVector partial))))
+    let cyclic = 17 : cyclic :: [Int]
+    observe "generic cyclic list prefix" (take 3 (toList (genericVector cyclic)))
+    sizeRef <- newIORef (S (S Z))
+    n <- readIORef sizeRef
+    let vector = replicateNative @Int n 23
+    let vectors = [vector]
+    observe "generic runtime-indexed elements" (map toList (toList (genericNested n vectors)))
+    observe "generic refined runtime domain" (map toList (toList (genericRefinedNested n vectors)))
+    let emptyVector = replicateNative @Int Z 29
+    let emptyVectors = [emptyVector]
+    observe "generic zero runtime domain" (map toList (toList (genericRefinedNested Z emptyVectors)))
+    let constructed = replicateNative @Int (S n) 31
+    let constructedVectors = [constructed]
+    observe "generic constructed runtime domain" (map toList (toList (genericNested (S n) constructedVectors)))
+    expectError "generic opaque head demand" "opaque head forced" $
+        evaluate (case genericFirst partial of Nothing -> 0; Just x -> x)
+    let lazySize = error "partial worker forced its index" :: Nat
+    let suspended :: foreach (ys :: [Vec Int lazySize]) -> Vec (Vec Int lazySize) (GenericCount ys)
+        suspended = genericRefinedNested lazySize
+    _ <- evaluate @(foreach (ys :: [Vec Int lazySize]) -> Vec (Vec Int lazySize) (GenericCount ys)) suspended
+    observe "generic partial worker WHNF" True
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -642,3 +691,4 @@ main = do
     arrowMatchability
     forallMatchability
     algebraicFunctionFields
+    genericListIndexing
