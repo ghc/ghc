@@ -2566,9 +2566,39 @@ checks. The maintained API tests and seven registered regressions pass.
 Showcase passes 100 observations through sixteen modules in both stages.
 See [the M65 validation record](PLAN.md#m65-validation).
 Open domains, higher-order endpoints, nonreflexive function-domain transport,
-normal optimization and totality remain separate work. The inherited pure
-family views in native argument and shape inference still need a bounded API.
+normal optimization and totality remain separate work. M66 adds the bounded
+native argument and shape views described below.
 
 See Note [Function fields in native index domains] in GHC.Core.Type,
 Note [Native function-value application] in GHC.Core.TyCo.Make, and
 Note [Function-value call congruence in interfaces] in GHC.CoreToIface.
+
+## Bounded native frontend family views
+
+M66 replaces the two pure native family views with the existing nominal
+family-only solver rewrite. One `tcRewriteFamilyAxioms` wrapper exposes the
+operation in TcM. A narrow Solver.hs-boot signature breaks the Unify import
+cycle. The rewrite uses no ambient Given equality, plugin rewrite or cached
+family evidence.
+
+The native shape matcher returns the inverse reduction proof only when the
+required algebraic TyCon is exposed. Other shapes keep the existing fallback.
+Cached argument selection keeps the original expression, inferred type and
+usage. Its initial, extra and final views all use the bounded rewrite.
+Final subsumption still constructs the actual family proof.
+
+Restore the original argument context before creating CtLoc. The depth error
+uses its saved source span and context. Cache positions count value arguments;
+the existing VTA offset gives the full diagnostic argument number. A written
+type argument therefore counts in the displayed ordinal.
+
+Each view starts at depth zero and increments depth through recursive family
+RHS reduction. A finite configured limit produces GHC-40404. The explicit
+zero-depth flag still disables that limit. This is no global work or termination
+bound. Other pure normalization paths remain outside this change.
+
+Both rebuilt stages pass five depth errors and five finite observations.
+The exact argument-context checks, maintained API fixtures, seven registered
+tests and unchanged Showcase100/16 pass. See
+[the validation record](PLAN.md#final-m66-validation) and
+Note [Bounded frontend family views] in GHC.Tc.Solver.

@@ -4030,7 +4030,8 @@ It records the native Unify/App sites, proof directions and the import cycle.
 The separate `native-bounded-family-diagnostics-research-v1` pins twelve files
 at clean M65 commit `374d95b5e2994693c2898abd87b35d6bf3f91c97`.
 Its corrected note matches that recorded HEAD. The prior prose and registry
-remain archived. The selected source hashes still agree.
+remain archived. The selected source hashes agreed when read. The implementation
+changes the documented native Unify/App call sites.
 
 `getCtLocM` captures source and error context. Restore an original argument's
 `addArgCtxt` before creating its location. `solverDepthError` later restores
@@ -4039,6 +4040,38 @@ that location. Preserve the cache position and its existing VTA offset.
 steps then increment the same location. This is a per-view finite limit,
 not a global work bound. The explicit zero-depth flag retains its old policy.
 
-The source candidates and runtime oracle are prepared but unexecuted.
-Do not report a predicted timeout as a compiler result. These source reviews
-add no totality claim or change to the cross-language calculus provenance.
+M65 execution later records four runtime stack overflows despite a finite
+depth flag. The corrected finite client passes five observations.
+Both rebuilt M66 stages report located GHC-40404 for all five loop controls
+and preserve those five finite observations. The full self-hosted build,
+Showcase100/16 and seven registered tests pass. The VTA diagnostic counts its
+written type argument: the third
+value argument is the fourth displayed argument. This matches the existing
+`tcValArgsWithCache` source convention. These results change no totality or
+cross-language calculus claim.
+
+## Generic domains after matchability and function values
+
+The full R05 target includes structural `[a]` refinement with an opaque head
+at `a`. Ordinary instantiation must preserve that meaning at Int, functions,
+arbitrary lifted types and types such as `Vec Int n` with an earlier runtime
+index. A runtime-independent preparatory gate does not define the final policy.
+
+The ignored `native-generic-domain-metadata-research-v2` pins twenty-seven
+current source files. `native-generic-domain-policy-research-v2` pins nineteen
+source files, the prior reports and selected cached Agda/proposal passages.
+They extend the dated generic-domain research after M64/M65. Their source
+controls and implementation sequences remain unexecuted proposals.
+
+Separate structural container formation, opaque value identity and call
+permission. An element must not lose opaque support when its type is known.
+Update retained binder and occurrence metadata through ordinary substitution
+and both zonkers. Equality of runtime Ids alone can hide stale occurrence
+types; inspect kind, type, deep free variables and Lint as well.
+Then extend nominal transport through later dependent domains and opaque
+element-kind casts before source and interface admission.
+
+The selected Agda telescope-prefix substitution and proposal #378 neutral-value
+passages provide comparisons. Their assumptions do not prove this design.
+The full target, implementation order and remaining obligations belong to
+[R05](roadmap/R05-dependent-core.md).

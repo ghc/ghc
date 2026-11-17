@@ -97,7 +97,8 @@ can advance a card while the card remains open.
 | 4 | R03: explicit complete retained-function type arguments | Complete bounded increment: M62 | Both builds, nested source arguments, worker demand, the selected cohort and independent audit pass. Next: the R23 foundation. |
 | 5 | R23: matchability foundation; also advances R05 | M63/M64 foundation passes selected builds and checks; publication pending | Explicit arrow and forall metadata pass Core, source, interface, TH and reflection checks. The generic native client and source family unsaturation remain open. |
 | 6 | R05: function values in closed algebraic indices; enables R03 source work | Complete bounded increment: M65 | Both rebuilt stages pass source/interface controls and Showcase100/16. Seven registered tests pass. Generic `[a]`, higher-order endpoints and changed dependent domains remain open. |
-| 7 | R05: bounded family views in native frontend inference | M66 contract selected; baseline and implementation open | Replace the inherited pure native shape and argument views with the solver's depth-limited family API. Preserve proof direction and cached argument usage. |
+| 7 | R05: bounded family views in native frontend inference | Complete bounded increment: M66 | Both builds, exact source diagnostics, finite controls, Showcase100/16 and seven registered tests pass. Other pure normalization paths remain separate. |
+| 8 | R05: structural generic domains and dependent-domain transport; enables R03 | Updated research; implementation open | Preserve retained Id metadata through substitution and zonking. Add nominal later-domain transport, opaque element values and structural constructor refinement. The full target includes Int, functions, arbitrary lifted types and runtime-index-bearing types. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -120,8 +121,8 @@ feature dependencies.
 
 ### Remaining work by roadmap area
 
-Keep these tasks visible when selecting the next increment. The first six
-increments do not complete the program.
+Keep these tasks visible when selecting the next increment. Each completed
+increment has a bounded scope.
 
 | Roadmap area | Remaining local work | Main obligations before completion |
 | --- | --- | --- |

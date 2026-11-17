@@ -4992,18 +4992,20 @@ The inherited pure family normalizers in matchExpectedTyConApp and native
 argument inference remain a separate follow-up. The bounded strict-call view
 does not establish a bound for every native family-normalization path.
 The ignored `native-bounded-family-research-v1` note pins twenty source files,
-proposed trigger programs and the required nominal proof directions. Those
-programs are not executed results. No totality checker is implemented.
+proposed trigger programs and the required nominal proof directions.
+They were unexecuted at the M65 checkpoint. The M66 record below reports the
+later baseline and patched observations. No totality checker is implemented.
 
 ## M66: bounded family views in native frontend inference
 
 Roadmap owner: R05. Related card: R03. Prerequisite: validated M65.
-Status: contract selected; baseline execution and implementation remain open.
+Status: the bounded increment passes both builds, selected source checks,
+Showcase and the maintained registered selection. R05 remains open.
 
 The native shape matcher and immutable argument cache use a deep pure family
-normalizer. It has no solver reduction-depth state. First execute the prepared
-looping and finite controls on M65. Record actual outcomes before selecting a
-source change. A predicted timeout is not an executed result.
+normalizer. It has no solver reduction-depth state. On M65, both native views
+overflow the compiler runtime stack despite a finite reduction-depth flag.
+The ordinary solver control reports the expected GHC-40404 error.
 
 Use the existing nominal family-only solver rewrite. Add one narrow TcM wrapper
 in GHC.Tc.Solver and a corresponding hs-boot signature for the Unify import
@@ -5028,21 +5030,86 @@ same location. This is not a global rewrite-work budget. The explicit flag
 
 Acceptance:
 
-- [ ] Observe both original native loop candidates on the fixed M65 compiler.
-- [ ] Preserve ordinary GHC-40404 behavior for a nonnative recursive family.
-- [ ] Produce located GHC-40404 for both native views under a finite limit.
-- [ ] Check source argument context for the second cached argument and a leading
+- [x] Observe both original native loop candidates on the fixed M65 compiler.
+- [x] Preserve ordinary GHC-40404 behavior for a nonnative recursive family.
+- [x] Produce located GHC-40404 for both native views under a finite limit.
+- [x] Check source argument context for the second cached argument and a leading
   explicit type application. Assert the code, useful type and location/context.
   Do not depend on one exact depth counter value.
-- [ ] Preserve a terminating list shape whose element contains an actual runtime
+- [x] Preserve a terminating list shape whose element contains an actual runtime
   vector length. Check cached selection, returned payload scope and lazy fields.
-- [ ] Build both stages. Run the existing API/source and registered controls, plus
+- [x] Build both stages. Run the existing API/source and registered controls, plus
   the maintained Showcase. Add focused controls to an existing fixture.
-- [ ] Record source, diagnostic, runtime and artifact provenance separately.
+- [x] Record source, diagnostic, runtime and artifact provenance separately.
 
 Primary code evidence is in the ignored `native-bounded-family-research-v1`
 and corrected `native-bounded-family-diagnostics-research-v1` records.
-The proposed source programs are in `native-bounded-family-probes-preparation-v2`.
-The probe runner v3 adds dependency and inventory checks. All controls remain
-unexecuted. See [the reference ledger](REFERENCES.md#bounded-native-frontend-family-views).
-This draft changes no generic-domain, optimizer, totality or erasure policy.
+The corrected source programs are in `native-bounded-family-probes-preparation-v3`.
+Probe runner v4 records dependency and inventory checks and supports a separate
+finite-client run. Runner v5 adds exact CLI argument-context checks. See
+[the reference ledger](REFERENCES.md#bounded-native-frontend-family-views).
+This increment changes no generic-domain, optimizer, totality or erasure policy.
+
+### M66 bootstrap checkpoint
+
+Baseline v1 records four native runtime stack overflows, each after about
+thirteen seconds, under `-freduction-depth=12`. They cover shape matching,
+cached selection, a second cached argument and leading VTA. None has a located
+GHC diagnostic. The ordinary control reports located GHC-40404. The overall
+baseline receipt fails because its finite Main used an unsupported same-group
+local index signature. Keep that failure separate from the four loop results.
+Corrected finite-baseline v1 passes five observations with sequential local
+binding groups. A local signature index must already have a checked binding.
+
+Bootstrap build v1 fails for a missing TypeLevel constructor import.
+Build v2 passes after the explicit import. It rebuilds the bootstrap compiler
+only. At that checkpoint, the target libraries and self-hosted compiler still
+represented M65.
+
+Patched source-stage0 v1 passes nine commands. All five recursive-family
+clients report located GHC-40404. The finite library and separate object client
+pass the same five runtime observations. Pinned inputs remain unchanged.
+The second cached argument is located at its actual `xs` expression. The VTA
+client also points at `xs`: its third value argument is GHC's fourth displayed
+argument because the written `@Bool` counts in the full argument sequence.
+This follows the existing `tcValArgsWithCache` diagnostic numbering.
+
+The implementation keeps the original cache and uses one narrow solver-owned
+TcM wrapper. The independent static review finds no blocking proof-direction,
+position or import-interface issue. Maintained regression-stage0 v1 passes its
+unchanged 37-line golden with the bootstrap API and pinned target artifacts.
+It executes the five loop sources and five finite observations. The second
+and VTA controls require the actual full `xs` span and argument context in the
+same GHC-40404 envelope. No new test file, provider or golden is added.
+Read-only formatting v1 observes six files without changing them: three
+Fourmolu format differences, two parser failures and the unchanged Cabal
+template failure. No formatter pass is claimed.
+Evidence is under `_build/verification/native-bounded-family-*`.
+
+### Final M66 validation
+
+Full self-hosted build v1 passes in 585.75 seconds. It rebuilds the target
+libraries, self-hosted compiler and selected utilities. All 27,299 source inputs
+remain unchanged. The compiled source is spec commit
+`0d2a53ff48f916cc081314e75ee15eeb570a0a7f` plus the recorded patch with SHA256
+`6a7e6d92d7187675eaa6b8639d7b4861fc3e429320fe5c41bf768e110bb7b1d5`.
+The new boot file is also pinned in the complete source manifest.
+
+Source-both v1 passes eighteen commands. Each rebuilt stage reports located
+GHC-40404 for five loop controls and passes five finite observations through
+separate object modules. Both stages check the exact second/fourth argument
+locations and contexts. Showcase-both v1 passes 100 observations through
+sixteen modules in each stage.
+
+Test prerequisites v1 pass. Registered v1 reports seven expected normal-way
+passes, 54 skipped ways and no unexpected failures or framework warnings.
+It runs NativeDependentCore, NativeDependentCoreRun, RetainedKeywordOff,
+RetainedQuantification, RetainedPrint, HieVdq and EssentialsCoverage.
+The maintained API goldens remain 1/37. The new quiet source checks include
+the complete argument span and its context in the same diagnostic envelope.
+
+All selected runs preserve their source and consumed artifacts. Subsequent
+status edits change only Markdown. The final provenance receipt relates them
+to this compiled snapshot. R05, generic domains, dependent-domain transport,
+normal optimization and totality remain open. Other inherited pure family
+normalization paths are outside this increment.

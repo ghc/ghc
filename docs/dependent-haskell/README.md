@@ -112,10 +112,11 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M65 passes the full self-hosted build, both-stage source/interface checks and Showcase100/16, plus seven registered tests including API1/37; M62 remains the published checkpoint |
+| Compiler validation | M66 passes the full self-hosted build, both-stage source and diagnostic checks, Showcase100/16 and seven registered tests including API1/37; M62 remains the published checkpoint |
 | Ordinary-arrow matchability | M63 retains type-valued metadata through Core, coercions, interfaces and reflection; M64 extends this foundation to foralls; source family unsaturation remains open |
 | Forall matchability | M64 carries per-binder annotations and nominal evidence through Core, source, interfaces, HIE, TH and supported reflection; runtime abstractions require U; selected source, scope, role and printer checks pass |
 | Function values in algebraic indices | M65 stores eligible fixed U/Many functions in closed domains, preserves family application proofs and later fields, and checks runtime demand across interfaces |
+| Bounded native family views | M66 applies the configured family-depth limit to native shape and cached-argument inference; GHC-40404 retains the original argument location and context |
 | Example validation | Audited M60 passes both-stage hidden-interface source19, five rejection controls, compile-only equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
@@ -173,6 +174,9 @@ dependent evaluation and totality remain open.
 The [M65 contract](CORE.md#function-values-in-algebraic-indices) adds function
 values in closed algebraic indices. Its [validation record](PLAN.md#m65-validation)
 separates the two compiler stages, interface controls and registered tests.
+The [M66 validation](PLAN.md#final-m66-validation) checks bounded native family
+views in both stages. It preserves nominal proofs and cached usage. The
+maintained Showcase remains at 100 observations through sixteen modules.
 
 ## Native Core implementation
 

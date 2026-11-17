@@ -19,8 +19,8 @@ The user selected a native Core extension based on Eisenberg's historical
 ## Supported subset and evidence
 
 - `TermVarTy`, `TermAppTy`, `DepFunTy` and scoped native coercions.
-- Closed first-order constructor domains, retained field telescopes and
-  opaque function heads. A function head is not a general term expression.
+- Closed algebraic domains, retained field telescopes, fixed function-valued
+  fields and opaque function heads. A head is not a general term expression.
 - Scoped constructor refinement, Core Lint, interfaces and checked lowering.
 - Bounded beta exposure, alias substitution and dead-local removal.
 - M56 closed parameterized domains and M57 nominal scalar-domain conversion.
@@ -29,9 +29,10 @@ The user selected a native Core extension based on Eisenberg's historical
 
 The [published M62 checkpoint](../ROADMAP.md#where-this-fork-stands) passes its
 selected checks with both compiler stages and its independent artifact audit.
-M63 adds validated ordinary-arrow matchability. Its selected source, Core,
-reflection and compatibility checks pass in both stages. The forall stage
-and publication remain open.
+M63/M64 add ordinary-arrow and forall matchability. Their selected source,
+Core, reflection and compatibility checks pass in both stages. Publication
+and the full R23 scope remain open. M65 adds closed function-value indices.
+M66 bounds the selected native family views and preserves diagnostic context.
 Restricted pipelines and Lint checks do not establish general preservation.
 
 ## Next increments
@@ -58,16 +59,21 @@ Restricted pipelines and Lint checks do not establish general preservation.
 - [ ] Specify generic domain metadata for `[a]`. Update binder types,
       occurrence types, multiplicities, substitution and zonking together.
       Constructor fields at arbitrary `a` need an opaque-field rule. Include
-      `a = Nat -> Nat`; then use a separate R03 source increment to check it.
+      Int, functions, arbitrary lifted types and `a = Vec Int n`. The last
+      case also needs later-domain transport through the earlier runtime n.
+      Separate structural containers, opaque values and call permission.
+      Complete the R05 rules before the R03 generic source increment.
 - [x] Admit fixed function leaves in closed algebraic indices. Preserve
       canonical call endpoints, forward family proofs and later package fields.
       M65 passes both builds, separate-module demand controls, Showcase100/16
       and seven registered tests. Generic `[a]` and higher-order endpoints
       remain open. See [the contract](../CORE.md#function-values-in-algebraic-indices).
-- [ ] Bound the inherited family views in native shape and argument inference.
+- [x] Bound the inherited family views in native shape and argument inference.
       Use the solver's reduction-depth policy. Preserve the inverse nominal
       proof for shape matching and the original cached argument usage.
       The bounded contract is [M66](../PLAN.md#m66-bounded-family-views-in-native-frontend-inference).
+      Both stages, exact diagnostic spans/contexts, finite controls,
+      Showcase100/16 and the seven selected registered tests pass.
 - [ ] Specify transport through later runtime-dependent telescope entries.
       Freshen binders and transport remaining fields, targets and evidence
       together. Preserve the distinction between lexical scope and active
@@ -90,6 +96,13 @@ C2 is the transformation and compatibility work. Both belong to R05 and remain
 open. A paper correspondence is not an implementation proof. A passing probe
 closes only its stated behavior. Complete scope, metadata, roles, interfaces,
 normal optimization, demand and compatibility obligations before closing R05.
+
+For generic domains, preserve ordinary instantiation through constructor
+refinement. Metadata substitution and acyclic zonking come first. Opaque
+parameter fields must stay opaque after their type becomes known. Nominal
+later-domain transport must retain earlier runtime indices. A preparatory
+runtime-independent gate does not complete this generic target. See the
+[updated research](../REFERENCES.md#generic-domains-after-matchability-and-function-values).
 
 ## Research
 
