@@ -27,7 +27,7 @@ The supported static subset and native pipeline remain restricted.
 | Area | Demonstrated in this fork | Work before the roadmap task is complete |
 | --- | --- | --- |
 | Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
-| Dependent products (`R03`) | Visible `foreach (n :: Nat) -> ...`, dependent equations and checked lambdas, runtime indices from IO, qualified higher-order values, and checked positions for retained `[Bool]` | General domains and applications, invisible retained quantification, and predictable inference beyond the measured subset. |
+| Dependent products (`R03`) | Visible `foreach (n :: Nat) -> ...`, dependent equations and checked lambdas, runtime indices from IO, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, invisible retained quantification, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
 | Type computation (`R06`, `R13`) | Existing promoted constructors and saturated type families, with explicit equality proofs | Ordinary function promotion, closed and open evaluation, and lambda/let/case expressions in types. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
@@ -50,8 +50,10 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-The latest validated checkpoint is M68. Both stages pass the Showcase with 118
-output lines through seventeen source modules. The count includes the banner.
+The latest validated bounded increment is M69. Both isolated stages pass the
+Showcase with 124 output lines through seventeen source modules. The count
+includes the banner. API goldens stay 1/37. Exact-HEAD main validation and
+publication remain separate gates. R03, R05 and R23 remain open.
 M62 supplied the earlier 88-line source group through fourteen modules.
 M56 provides
 the closed parameterized domains. M57 provides nominal scalar-domain conversion
@@ -101,7 +103,7 @@ can advance a card while the card remains open.
 | 7 | R05: bounded family views in native frontend inference | Complete bounded increment: M66 | Both builds, exact source diagnostics, finite controls, Showcase100/16 and seven registered tests pass. Other pure normalization paths remain separate. |
 | 8 | R05: structural generic domains and dependent-domain transport; enables R03 | Complete bounded increment: M67 | Both builds, selected API/source controls, Showcase116/16 and seven registered tests pass. Generic elements include arbitrary lifted and runtime-index-bearing values. Old readers reject the new typed signature cleanly. R05 and general source domains remain open. See M67 in PLAN.md. |
 | 9 | R03: ordinary callers of imported retained APIs; preserves R05 evidence | Complete bounded increment: M68 | Both rebuilt stages pass source/interface checks, scope and multiplicity controls, Showcase118/17 and seven registered tests. Published M67 readers accept the interfaces. Explicit syntax, Expr inference modes and native pipeline policies retain their scope. |
-| 10 | R03: safe indexing over a generic retained list | Active bounded increment: M69; producer accepted, runtime gap measured | Reuse M60 Fin and M67 GenericCount/transport. Forty-six observations pass. A callback list literal needs declaration-based erased-argument advice. Keep the original runtime-vector source and all scope checks. No new Core rule is selected. |
+| 10 | R03: safe indexing over a generic retained list | Complete bounded increment: M69 | Reuses Fin and GenericCount with scoped list refinement. Both rebuilt stages pass the reviewed primary/focused source collections, API1/37, Showcase124/17 and seven registered tests. Guarded list-declaration advice preserves the original runtime-vector callback. Case-based ordinary clients pass. Measured literal-list/fmap and NoEDT native let-list inference retain their limits; named-list fmap is unmeasured. No new Core judgment or wire field. R03, R05 and R23 remain open. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

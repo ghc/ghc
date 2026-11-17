@@ -34,6 +34,12 @@ all Core transformations. Normal optimization remains a broader release gate.
 - Imported retained application contracts in ordinary modules at M68. Both
   rebuilt stages pass paired clients, scoped callback dictionaries and located
   rejections. The Showcase has 118 output lines through seventeen modules.
+- Generic safe indexing at M69. Fin (GenericCount xs) selects ordinary,
+  function-valued and runtime-index-bearing elements. Both stages pass reviewed
+  bounds, demand and scope controls through interfaces. The original PackedVec
+  callback keeps its literal list. Case-based ordinary clients pass. The NoEDT
+  native let-list and literal `fmap toList (lookupGeneric [vector] 0)` probes
+  reject. The named-list fmap variant is unmeasured.
 
 The published M60 checkpoint appends five observations to M59's 79-line prefix
 and passes all 84 with both compilers. Its separate evidence audit passes.
@@ -59,13 +65,13 @@ M58 and M59 expose those rules through source checking.
       consumer's explicit type-argument position. Preserve complete-type,
       kind, scope and native-meta checks. Check full worker WHNF separately
       from direct `seq` representation polymorphism and outer Quick Look.
-- [ ] After the R05 generic-domain work, measure
+- [x] Measure generic safe indexing at M69:
       `forall a. foreach (xs :: [a]) -> Fin (GenericCount xs) -> a`.
       Reuse Fin from ParameterizedIndexLibrary and GenericCount from
-      PackedVecLibrary. Include function-valued and runtime-index-bearing
+      PackedVecLibrary. Both stages pass function-valued and runtime-index-bearing
       elements, signed bounds, lazy fields and finite cyclic access. Keep the
-      family saturated. Static review selects library composition first.
-      Source acceptance remains unmeasured.
+      family saturated. Guarded declaration advice supports the original
+      callback list literal. No new Core judgment or native meta fill is added.
 - [ ] Specify invisible retained binders and explicit runtime overrides.
       Keep retention independent of visibility. Do not infer a new `foreach`.
 - [ ] Specify runtime `Type` operands and their universe representation.
@@ -80,7 +86,11 @@ not require generic domains, new evaluation or bounds-check elimination.
 Generic `[a]` needs the matchability invariant described in
 [R23](R23-unsaturated-type-families.md). It does not require the whole R23
 surface feature or ordinary function promotion. Runtime-dependent later domains,
-such as `[Vec Int n]`, need an additional telescope contract.
+such as `[Vec Int n]`, use M67's scoped metadata substitution and nominal
+telescope transport. M69 measures that contract with the finite-position client.
+Invisible retained binders and their explicit runtime overrides remain
+unimplemented. The [new research summary](../REFERENCES.md#invisible-retained-binders-next-candidate)
+records a candidate; it does not select syntax, representation or inference rules.
 
 ## Completion boundary
 

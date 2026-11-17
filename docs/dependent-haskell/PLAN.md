@@ -17,11 +17,12 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The current increment is [M69](#m69-generic-safe-list-indexing), owned by
+The latest bounded increment is [M69](#m69-generic-safe-list-indexing), owned by
 [R03 dependent products](roadmap/R03-dependent-products.md), with R05 telescope
-and scope obligations. It composes generic safe indexing from source. Its
-published predecessor is M68 at 2572748770. Both predecessor compilers pass
-Showcase118/17 and the selected checks. M69 source acceptance is unmeasured.
+and scope obligations. Both isolated compiler stages pass generic safe indexing,
+the selected checks and Showcase124/17. API stdout goldens remain 1/37.
+Validate the exact committed HEAD with a matching main-checkout build and a
+separate publication receipt. R03, R05 and R23 remain open.
 The user resumed GHC execution on 2026-11-16 at
 17:53 CET.
 
@@ -5583,10 +5584,10 @@ R03, R05 and the full project goal remain open.
 
 Roadmap owner: R03. Related card: R05. Prerequisites: M60 Fin and M67 generic
 list transport. M68 is the validated and published application baseline.
-Status: source producer accepted in both published compiler stages. The first
-runtime matrix exposes one list-literal argument-planning gap. The focused
-frontend correction and complete runtime acceptance remain pending.
-Keep R03, R05 and the full project goal open.
+Status: bounded implementation and selected isolated validation complete.
+Both rebuilt stages pass the library, source, runtime and diagnostic checks.
+Validate the final committed HEAD in the main checkout. Record publication
+separately. Keep R03, R05, R23 and the full project goal open.
 
 ### Contract and scope
 
@@ -5602,7 +5603,7 @@ lookupGeneric :: forall (a :: Type). [a] -> Int -> Maybe a
 
 Reuse the existing ordinary Fin GADT and imported saturated GenericCount family.
 Preserve Count, indexClosed, mkFinClosed and lookupRuntime. Keep their M60
-observations and rejections. Do not add a family, compiler rule, public Vec-only
+observations and rejections. Do not add a family, Core rule, public Vec-only
 helper, wire format or evaluator. The new functions compose M60's finite-position
 algorithm with M67's structural list schema and opaque parameter fields.
 
@@ -5621,35 +5622,35 @@ an unknown list.
 
 ### Acceptance gates
 
-- [ ] Compile the producer and a separate interface-only client with both
+- [x] Compile the producer and a separate interface-only client with both
       rebuilt stages. Pin the exact sources, interfaces and compiler artifacts.
       Extend existing fixtures and authored runtime oracles; add no tracked
       standalone test module solely for this increment.
-- [ ] Check direct indexing and the signed adapter at empty, first, later,
+- [x] Check direct indexing and the signed adapter at empty, first, later,
       negative and out-of-range positions. Keep explicit bound constructors in
       the primary source. Do not count a distinct inference experiment as a
       prerequisite for the explicit worker.
-- [ ] Select ordinary Int values, function values and an opaque lifted action.
+- [x] Select ordinary Int values, function values and an opaque lifted action.
       Apply the selected function as an ordinary runtime function. Run only the
       selected action. Check the independent value or effect. Require no Eq a
       or Show a constraint and no eligible-native-call restriction on a.
-- [ ] Select Vec Int n elements at an actual earlier runtime n. Include a client
+- [x] Select Vec Int n elements at an actual earlier runtime n. Include a client
       that refines n with Z/S before the generic call. Observe the vector with
       existing library operations. Preserve complete Id types and scoped nominal
       transport; reject a real n/m element-domain mismatch without equality.
-- [ ] Check demand: negative ignores bottom list; zero ignores bottom tail;
+- [x] Check demand: negative ignores bottom list; zero ignores bottom tail;
       later selection ignores an unused bottom head; forcing a selected bottom
       exposes its marker. Preserve bottom at selected-function WHNF. EmptyCase
       forces its witness. Finite access to a cyclic list needs only its prefix.
-- [ ] Reject an empty bound and an explicitly oversized finite witness. Reject
+- [x] Reject an empty bound and an explicitly oversized finite witness. Reject
       unrelated unknown bounds without equality. Accept deliberate equal-bound
       reuse across distinct lists. Keep list-identity and family-inversion
       rejections separate from bound compatibility.
-- [ ] Preserve M60's controls, source structural-root restrictions, actual local
+- [x] Preserve M60's controls, source structural-root restrictions, actual local
       Many value checks, lexical scope and M65 native-call endpoints. Preserve
       opaque U/unknown inverse rejection. Pin actual diagnostics after execution;
       do not assign diagnostic codes from this design.
-- [ ] Run the existing selected API, source, Showcase and registered-test gates.
+- [x] Run the existing selected API, source, Showcase and registered-test gates.
       Review any new source failure as an obligation at its actual instantiation
       or evidence scope before proposing a compiler change. Record build and
       runtime evidence separately from formatter limitations.
@@ -5673,8 +5674,9 @@ definitional equality or erasure theorem transfers to these functions.
 No general normalization, optimizer or bounds-check-elimination result is part
 of M69. Bottom and cyclic inputs retain ordinary Haskell behavior. R03, R05 and
 the full project goal remain open. The static report and source pins are under
-_build/verification/native-generic-safe-index-next-candidate-v1. The unapplied
-implementation preparation is separate from execution evidence.
+_build/verification/native-generic-safe-index-next-candidate-v1. Preparation
+records and execution receipts are distinct. The implementation preparation
+was applied before the execution gates.
 
 ### Measured application gap and selected correction
 
@@ -5708,3 +5710,52 @@ Check mixed native fields, scoped equality, linear fields and escaping callback
 results. Keep actual located diagnostics after their corresponding positives.
 Receipts begin with native-generic-safe-index-producer-v1 and source-both-v1.
 The latter is a preserved failed experiment, not a feature pass.
+
+### M69 validation and supported application paths
+
+The primary source collection passes eleven interface-only clients and 51
+finite observations per stage: 22 clients and 102 observations in total.
+Its ten rejection events have a separate manual review. The focused collection
+passes sixteen clients, twenty observations and sixteen reviewed rejections
+across both stages. These collections overlap; do not add their counts as
+feature totals. The original runtime-vector client remains unchanged, including
+its literal list inside the PackedVec callback.
+
+The declared-list correction preserves the exact App source
+(e0599d370a416780cd5be026a996b880b57a8b88d2c4f3f0f89eafcc296baf06).
+The library source is ad201353e88683f486e122ddda30e6d7a232f53eb5eb465636cd3c2f128e4163.
+The App correction supplies advice from a monomorphic native field declaration.
+It adds no equality evidence or native mutable-meta assignment.
+
+The final Showcase source is
+f4ed92ce257e4a29af2c086c47c62de29dfaceaa707dd63ca0b363d4762f826f.
+It selects a vector with case lookupGeneric before applying toList. Both stages
+match 124 output lines, including the banner, through seventeen modules. The
+six new lines retain the preceding 118-line oracle. The maintained fixture
+source is 62b12ac9e28e62f2c334fc05fdefcd3c72b4b7e073d536c54387b25889859c2b.
+It uses mkFinGeneric [vector] and indexGeneric [vector] directly, then converts
+the result before constructing Just. Each fixture run checks eight observations
+in each source mode. The existing 37-line stdout remains exact. The separate
+kernel golden remains one line. All seven selected registered tests pass,
+with 54 skipped ways. The full GHC suite was not run.
+
+The failed probes remain part of the record. A raw error application in the
+restricted operand grammar rejects with GHC-83605. A named field of type
+forall a. a also rejects, with GHC-83865. Both are failed probes. List advice
+requires a lifted tau declaration. A NoEDT standalone inferred let-list rejects
+with GHC-83865. The nested expression
+fmap toList (lookupGeneric [vector] 0) also rejects with GHC-83865: its fresh n0
+cannot contain the actual runtime n. This records the literal composition only.
+The named-list fmap variant was not measured by these M69 controls. It is not a
+reason to weaken the original retained callback client.
+The supported case-based source paths above preserve that client's actual n.
+
+The final build receipt is native-generic-safe-index-selfhost-build-v4.
+Its matching test dependencies are recorded in testdeps-v3. The selected
+execution receipts use the same native-generic-safe-index- prefix:
+regression-v3, showcase-v1, registered-v1, source-selfhost-v1 and
+focused-selfhost-v1. The source and focused diagnostic reviews are separate
+receipts. format-v1 records the read-only formatter observations; those
+non-passing observations are not counted as executable passes. No broad
+formatting change was made. Final main-checkout validation and publication
+remain separate from these isolated results.

@@ -322,3 +322,58 @@ The complete Showcase has 68 observations and the same 14 source modules.
 Run it with the matching compiler, `-O0`, `-fomit-interface-pragmas`, Core Lint and
 STG Lint as shown in the project README. Native coercion unfolding serialization
 and general optimization remain gated.
+
+
+## Generic safe list positions
+
+[ParameterizedIndexLibrary.hs](ParameterizedIndexLibrary.hs) adds three generic
+workers. They reuse the existing Fin datatype and the saturated GenericCount
+family imported from PackedVecLibrary:
+
+```haskell
+indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (GenericCount xs) -> a
+mkFinGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Int -> Maybe (Fin (GenericCount xs))
+lookupGeneric :: forall (a :: Type). [a] -> Int -> Maybe a
+```
+
+mkFinGeneric checks signed runtime positions. It rejects a negative position
+before inspecting the list. lookupGeneric constructs and consumes the witness
+with the same actual list. The workers inspect only the required list prefix.
+They preserve lazy unselected heads and tails and permit finite access to a
+cyclic list. A selected head is demanded only when the caller demands it.
+EmptyCase still forces an impossible witness. Fin records a bound, not list
+identity. Equal-bound reuse does not establish equality of list values.
+Count and its M60 workers remain unchanged; Count and GenericCount are separate
+families. These functions add no totality or bounds-check-elimination result.
+
+Elements can be ordinary values, functions, IO actions or Vec Int n at an earlier
+actual runtime n. Returning a function does not grant native call permission or
+function equality. The original PackedVec callback passes its literal [vector]
+directly to indexGeneric. Declaration advice preserves that actual element type.
+Both stages check it through producer interfaces.
+
+Ordinary clients can use the known retained-list contracts without enabling
+dependent source syntax. For a vector already bound at its actual runtime n,
+the maintained source checks:
+
+```haskell
+let selectedVector = case mkFinGeneric [vector] 0 of
+        Nothing -> Nothing
+        Just checked -> Just (toList (indexGeneric [vector] checked))
+```
+
+The Showcase instead cases on lookupGeneric before calling toList. Both paths
+convert the vector before constructing an ordinary result container. They do
+not require a standalone inferred native let-list in NoEDT. The measured literal-list composition
+`fmap toList (lookupGeneric [vector] 0)` rejects its fresh-index mismatch. The
+named-list fmap variant was not executed before the Showcase case edit and is
+unmeasured. These observations do not require case syntax for every consumer.
+They do not change the library's generic type or require an explicit element
+type in the original callback. The broader source matrix
+retains runtime n/m, scope, multiplicity and invalid-bound rejections.
+
+The maintained Showcase appends six observations, reaching 124 output lines
+through seventeen source modules in both stages. The API fixture's stdout stays
+1/37. See [M69's validation record](../../PLAN.md#m69-generic-safe-list-indexing)
+for the separate source, runtime and diagnostic evidence. R03, R05 and R23 stay
+open. The final exact-HEAD main rebuild and publication are separate gates.

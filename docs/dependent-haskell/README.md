@@ -10,12 +10,14 @@ functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
 Last updated: 2026-11-17.
 
-M68 passes both compiler builds and the selected checks. Ordinary modules can
-use imported retained contracts through the supported application paths. Their
-source flag does not remove indexed type or dictionary-scope checks. Both stages
-run the Showcase with 118 output lines through seventeen modules. This count
-includes the banner. Seven selected registered tests pass; the full GHC suite
-was not run. See [the implementation record](PLAN.md#m68-ordinary-callers-of-retained-apis).
+M69 passes both isolated compiler builds and the selected checks. Generic safe
+indexing returns ordinary, function-valued and runtime-index-bearing elements.
+Ordinary modules use the supported imported application paths without removing
+indexed type or dictionary-scope checks. Both stages pass 124 Showcase output
+lines through seventeen modules, including the banner. API stdout goldens stay
+1/37. Seven selected registered tests pass, with 54 skipped ways; the full GHC
+suite was not run. The exact committed HEAD still needs its main-checkout
+rebuild and publication receipt. See [the implementation record](PLAN.md#m69-generic-safe-list-indexing).
 
 ## Project documents
 
@@ -71,6 +73,7 @@ _build/showcase/showcase
 | Constructor and runtime arrow matchability, with distinct reflection identities | `arrowMatchability` |
 | Generic lists, opaque elements, dependent element domains and lazy prefixes | `genericListIndexing` |
 | Retained imports used by a module without dependent source syntax | `ordinaryModuleCalls` |
+| Generic finite positions, function elements, runtime-indexed payloads and lazy prefixes | `genericSafeIndexing` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -97,6 +100,15 @@ retained replicateNative and genericVector contracts internally. Both stages
 pass 118 output lines through seventeen modules. The maintained fixture also
 checks twelve paired positive clients and four paired rejections quietly.
 These checks overlap with the Showcase. Do not add them as feature totals.
+M69 appends six generic safe-indexing observations. Both stages pass 124 lines
+through the same seventeen modules. It reuses Fin and GenericCount and adds
+three library functions. A guarded list-declaration advice path supports the
+original runtime-vector callback. The NoEDT standalone native let-list and the literal
+`fmap toList (lookupGeneric [vector] 0)` reject in their measured probes. The
+named-list fmap variant is unmeasured; these results do not require case syntax
+for every ordinary consumer.
+The maintained fixture checks both source modes quietly; its golden stays 37
+lines. See [the M69 record](PLAN.md#m69-generic-safe-list-indexing).
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
@@ -135,8 +147,9 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M68 passes both builds, paired source and diagnostic checks, Showcase118/17 and seven selected registered tests. API stdout goldens remain 1/37. |
+| Compiler validation | M69 passes both isolated builds, reviewed source controls, Showcase124/17 and seven selected registered tests with 54 skipped ways. API stdout goldens remain 1/37. Exact-HEAD main rebuild and publication remain separate gates. |
 | Ordinary callers of retained APIs | M68 selects application checking from imported native contracts. Erased-index inference, scoped callback dictionaries, linear argument rejection and native Quick Look exclusion pass in both language modes. |
+| Generic safe indexing | M69 uses Fin (GenericCount xs), checked signed positions and scoped list refinement. Functions and Vec Int n remain ordinary payloads. Case-based ordinary clients pass. Measured literal-list/fmap and NoEDT native let-list inference retain their limits; named-list fmap is unmeasured. |
 | Ordinary-arrow matchability | M63 retains type-valued metadata through Core, coercions, interfaces and reflection; M64 extends this foundation to foralls; source family unsaturation remains open |
 | Forall matchability | M64 carries per-binder annotations and nominal evidence through Core, source, interfaces, HIE, TH and supported reflection; runtime abstractions require U; selected source, scope, role and printer checks pass |
 | Function values in algebraic indices | M65 stores eligible fixed U/Many functions in closed domains, preserves family application proofs and later fields, and checks runtime demand across interfaces |
@@ -182,7 +195,7 @@ optimization support or full roadmap completion.
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | `Showcase.hs` passes both compilers with 118 output lines, including the banner, through seventeen modules. R03, R05 and R23 remain open. |
+| Maintained showcase | `Showcase.hs` passes both compilers with 124 output lines, including the banner, through seventeen modules. R03, R05 and R23 remain open. |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and

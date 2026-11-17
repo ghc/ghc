@@ -4278,3 +4278,65 @@ extends that advice to a known native list field. It reuses the monomorphic
 field policy in Note [Inference of native list elements] in GHC.Tc.Gen.Expr.
 The existing Quick Look argument-advice and Agda current-context references
 remain the precedent. They do not permit filling GHC metas with runtime Ids.
+
+
+### M69 execution provenance and remaining inference limits
+
+The original primary runtime-vector source is preserved. After the App advice
+correction, source-selfhost-v1 accepts 22 clients and checks 102 finite
+observations across both stages. Ten rejection events have a separate manual
+review. focused-selfhost-v1 accepts sixteen clients, checks twenty observations
+and retains sixteen reviewed rejections. Each count belongs to its collection;
+the collections overlap. The source and focused review receipts use the same
+native-generic-safe-index- prefix and diagnostic-review-v1 suffix.
+
+selfhost-build-v4 pins the final compiler/example inputs. testdeps-v3 records
+its matching test dependencies. regression-v3 keeps API goldens 1/37 and checks
+the generic library quietly in both source modes. showcase-v1 matches 124 lines
+through seventeen modules with both compilers. registered-v1 records seven
+passing selected tests and 54 skipped ways. format-v1 records non-passing
+read-only formatter observations separately. These receipt names all use the
+native-generic-safe-index- prefix under _build/verification. They do not replace
+the final exact-HEAD main build or a publication receipt.
+
+Preserved source failures distinguish the supported path. A raw error operand
+rejects with GHC-83605. A named field of type forall a. a rejects with GHC-83865.
+Both are preserved failed probes. The NoEDT standalone inferred
+let-list also rejects with GHC-83865. The literal-list composition `fmap toList (lookupGeneric [vector] 0)` rejects with
+GHC-83865 because a fresh n0 cannot contain the actual runtime n. The named-list
+fmap variant was not executed before the Showcase case edit and is unmeasured.
+These probes do not establish a general fmap restriction. The final Showcase
+uses a lookupGeneric case before toList. The maintained fixture uses the known
+mkFinGeneric/indexGeneric retained-list contracts, then converts the selected
+vector before constructing Just. The original direct literal-list callback
+remains unchanged and passes. No compiler change is made for these expression
+inference limits. See [M69](PLAN.md#m69-generic-safe-list-indexing).
+
+## Invisible retained binders: next candidate
+
+The pinned [proposal #378 blob](https://api.github.com/repos/ghc-proposals/ghc-proposals/git/blobs/39a812b8154ee164e7de3ad9e27e21e012ebc000)
+separates dependence, visibility and erasure at lines 478-539. Its foreach-dot
+binder is invisible and retained. Lines 813-835 require a signature and show
+alternative explicit @ patterns. This is a design sketch, not this fork's
+current grammar or a runtime-override implementation.
+
+Agda v2.8.0 separates [implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+from [instance search](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#instance-resolution).
+Its pinned [Implicit.hs:70-102](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Implicit.hs#L70-L102),
+blob 55a03200d2300486c91a95798fc8e0c3c9c675cf, distinguishes their metas and
+substitutes inserted arguments through the telescope.
+[Application.hs:577-641](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Rules/Application.hs#L577-L641)
+and [774-808](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808),
+blob 82ba94ac864d19b947d4c92b9af252b0fe81347a, check hiding, expected Pi structure
+and domain modalities. Both source links pin commit
+3d04bacca842729f9c0869b9287256321b5f450f. These are scope and ordering precedents. They do not
+justify assigning GHC native runtime Ids to mutable type metas.
+
+The ignored native-invisible-retained-next-candidate-v1 report/readpins proposes
+a checked hidden Nat operand selected from a later vector's actual declaration,
+paired with an explicit runtime override. It remains unimplemented. Current
+DepFunTy and its interface node have no visibility field. mkDepFunTy turns a
+vacuous binder into a visible arrow. Persistent visibility, override syntax,
+complete immutable choices, dictionary scope and lazy runtime application need
+review before any source change. No representation or new rule is selected.
+R03, R05 and R23 remain open.

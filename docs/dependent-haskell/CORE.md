@@ -490,6 +490,21 @@ types come from written API signatures. They do not erase an imported indexed
 contract. See Note [Imported native application contracts] in GHC.Tc.Gen.App
 and [the M68 plan](PLAN.md#m68-ordinary-callers-of-retained-apis).
 
+M69 extends declaration advice to a finite built-in list argument. A bare or
+parenthesized variable field can supply its existing monomorphic native element
+type. Require a lifted tau type and reuse the current lexical-scope and nominal
+constructor-Given views. Propose mkListTy of that declaration as immutable erased
+argument advice. Check every original element at the selected type afterward.
+Do not infer an expression, collect usage, expand syntax or assign a native meta
+to select the advice. Empty lists and lists without an eligible declaration keep
+their existing paths. No Core judgment, proof primitive or wire field changes.
+See Note [Declared retained-domain choices] in GHC.Tc.Gen.App and
+[the M69 record](PLAN.md#m69-generic-safe-list-indexing). The M69 record
+pins the passing case paths and the failed literal
+`fmap toList (lookupGeneric [vector] 0)` probe. It makes no claim about the
+unmeasured named-list variant. NoEDT standalone native let-list inference keeps
+its source-flag boundary.
+
 Container and dependent-case inference in GHC.Tc.Gen.Expr keep their existing
 source-flag policy. Native Core detection still controls the restricted
 pipeline, including for ordinary callers. General optimization, unfolding
