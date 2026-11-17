@@ -4386,3 +4386,23 @@ cd2702e52a609806597890bea8f89a7bfd2fe28e8f3d158a40bf3ba894336f25.
 M70 selects the existing non-Quick-Look path for these native inputs.
 See [the M70 record](PLAN.md#m70-higher-order-calls-with-native-list-arguments)
 and Note [Native list anchors] in GHC.Tc.Gen.App.
+
+## Successive invisible arguments
+
+Agda v2.8.0 uses the next written argument's visibility to determine
+which hidden arguments precede it. It substitutes a checked argument
+before checking the suffix of the application. M74 follows this telescope
+order. The Agda source is blob `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+[Insertion in Application.hs, lines 605–641](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Rules/Application.hs#L605-L641)
+and [substitution, lines 774–808](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808).
+
+This fork selects runtime operands by matching declared argument types.
+A constructor tree in a declared index can supply the corresponding
+runtime term. Each constructor must be in the caller's term scope. Each
+leaf variable must identify an unrestricted lexical binding with the same
+type. The existing Core index judgment checks the reconstructed tree.
+GHC's built-in DataToTag instance checks constructor visibility and records
+import usage. M74 records each constructor it uses when it inserts the
+operand. See Note [DataToTag overview], especially DTW2, in
+[GHC.Tc.Instance.Class](../../compiler/GHC/Tc/Instance/Class.hs) and
+[the M74 tests](PLAN.md#m74-successive-invisible-retained-arguments).

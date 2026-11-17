@@ -5981,3 +5981,41 @@ Both compiler stages match 131 Showcase output lines through seventeen
 source modules. The seven selected normal-way tests pass, with 54 other
 cases skipped. The receipts use the `native-explicit-retained-` prefix under
 `_build/verification`.
+
+## M74: successive invisible retained arguments
+
+R03 depends on M72 declaration matching and M73 explicit operands. Check
+`appendHidden xs ys :: Vec a (Add n m)` with `xs :: Vec a n` and
+`ys :: Vec a m`. Each vector supplies its own runtime length. Supplying
+the first length explicitly leaves the second available for inference.
+
+Collect the consecutive invisible binders as immutable templates. Look
+through the group to the declared domains of the written arguments. Use
+the declarations to select the current operand. Substitute it before
+checking the next binder. Use the same order for runtime applications.
+An absent second length produces a diagnostic naming the second binder.
+For runtime insertion, use the existing injective-variable judgment to find
+determining argument positions. A declared `Vec Int (Forget n)` cannot supply
+a length if `Forget` discards its argument. A second `Vec Int n` can supply it.
+A written operand also allows the first vector to be checked.
+
+Prefer the argument's declared index. A case branch can give a captured
+vector a new declaration such as `Vec Int (S pred)`. Construct that index
+from the in-scope constructor and its fields. The existing Core judgment
+must map the reconstructed value back to the selected index. Record local
+term uses at Many and record constructor imports when inserting the
+operand. See Note [Inferring an invisible retained argument] in
+GHC.Tc.Gen.App and [the prior art](REFERENCES.md#successive-invisible-arguments).
+
+- [ ] Compile the library and a client that sees only its object interfaces.
+      Check both lengths omitted, erased `@Int` supplied, only the first
+      length supplied, and both lengths supplied.
+- [ ] Check source order with runtime lengths 2 and 1. Reverse them and
+      use the same length twice. Check the sum-indexed append result.
+- [ ] Check both constructor branches and an ignored successor with a bottom
+      field. Check a constructor import used only by inference and reject
+      the same call when the constructor is outside the client's scope.
+- [ ] Reject omission when the only occurrence is under the non-injective
+      `Forget` family. Check both the explicit operand and the independent
+      vector argument that determines the length.
+- [ ] Run both compiler stages on Showcase and the selected registered tests.
