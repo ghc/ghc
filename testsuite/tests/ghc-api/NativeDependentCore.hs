@@ -7,7 +7,8 @@ import Control.Monad (forM, forM_, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (find, foldl', isInfixOf, sort)
-import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags)
+import Data.List.NonEmpty (NonEmpty ((:|)))
+import GHC (DynFlags, InteractiveImport (IIDecl), getSession, getSessionDynFlags, lookupName, parseImportDecl, parseName, runGhc, setContext, setSessionDynFlags)
 import GHC.Builtin.WiredIn.Prim (fUNTyCon, intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
@@ -31,7 +32,7 @@ import GHC.Core.TyCo.FVs (isInjectiveInType, tyCoVarsOfCo, tyCoVarsOfType)
 import GHC.Core.TyCo.Rep (Coercion (..), CoSel (..), ForAllSel (..), FunSel (..), Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
-import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, mkTyConKindWithMatchability, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
+import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkNamedTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, mkTyConKindWithMatchability, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyKi, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
@@ -66,6 +67,8 @@ import GHC.Tc.Utils.Monad (initIfaceCheck, initIfaceLcl, initIfaceLoad)
 import qualified GHC.Tc.Utils.Monad as TcM
 import GHC.Tc.Utils.TcMType (isFilledMetaTyVar_maybe, newFlexiTyVar, newSkolemTyVar)
 import GHC.Tc.Utils.TcType (noConcreteTyVars)
+import qualified GHC.Tc.Zonk.TcType as TcZonk
+import qualified GHC.Tc.Zonk.Type as FinalZonk
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.Basic (LeftOrRight (..), OccInfo (..), PromotionFlag (IsPromoted, NotPromoted), TailCallInfo (..))
 import GHC.Types.Id
@@ -116,6 +119,8 @@ main = do
             runCaseChecks dflags
             runNatChecks dflags
             runParameterizedDomainChecks dflags
+            runNativeMetadataChecks libdir dflags
+            runNativeZonkMetadataChecks libdir
             runRetainedFieldChecks dflags
             runDepFunCoChecks dflags
             runIfaceChecks libdir
@@ -806,6 +811,171 @@ runParameterizedDomainChecks dflags = do
     forM_ domains $ \(label, domain, expected) -> do
         outcome <- timeout 2000000 (evaluate (isNativeIndexType domain))
         check (label ++ "; bounded domain query") (outcome == Just expected)
+
+{- Note [Native generic metadata controls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These raw types prepare generic domain support. Their metadata is well-scoped,
+but their generic domains are outside the current native admission policy.
+Check actual Id metadata: eqType alone compares the runtime Id's identity.
+Only the closed List Bool specialization below is submitted to Core Lint.
+The indexed element control checks metadata, not vector operations or transport.
+-}
+
+-- | Check source binder metadata, target ranges and deep kind substitution.
+runNativeMetadataChecks :: FilePath -> DynFlags -> IO ()
+runNativeMetadataChecks libdir dflags = do
+    ioTyCon <- runGhc (Just libdir) $ do
+        initialFlags <- getSessionDynFlags
+        _ <- setSessionDynFlags initialFlags
+        declaration <- parseImportDecl "import Prelude"
+        setContext [IIDecl declaration]
+        names <- parseName "IO"
+        case names of
+            name :| [] -> do
+                thing <- lookupName name
+                case thing of
+                    Just (ATyCon tc) -> pure tc
+                    _ -> liftIO $ fail "FAIL: IO metadata control did not resolve a type constructor"
+            _ -> liftIO $ fail "FAIL: IO metadata control did not resolve one name"
+    let a = mkTyVar (mkSystemName (unique 81000) (mkTyVarOcc "metadata_a")) liftedTypeKind
+        aTy = mkTyVarTy a
+        xs = local 81001 "metadata_xs" (mkListTy aTy)
+        arrow = mkFunctionType unmatchableDataConTy ManyTy
+        payload v = arrow (mkTyConApp eqTyCon [varType v, TermVarTy v, TermVarTy v]) intTy
+        telescope v = DepFunTy v (arrow (payload v) (payload v))
+        raw = telescope xs
+        boolSubst = Subst.mkTvSubstPrs [(a, boolTy)]
+        specialized = Subst.substTy boolSubst raw
+        inspect label expected result = case result of
+            DepFunTy binder FunTy {ft_arg = FunTy {ft_arg = TyConApp _ [domain, TermVarTy left, TermVarTy right]}} -> do
+                checkType dflags (label ++ " binder domain") expected (varType binder)
+                checkType dflags (label ++ " proof domain") expected domain
+                forM_ [left, right] $ \occurrence -> do
+                    check (label ++ " actual binding identity") (occurrence == binder)
+                    checkType dflags (label ++ " occurrence domain") expected (varType occurrence)
+                    checkType dflags (label ++ " occurrence multiplicity") ManyTy (idMult occurrence)
+                checkType dflags (label ++ " binder multiplicity") ManyTy (idMult binder)
+                pure binder
+            _ -> fail ("FAIL: " ++ label ++ " lost its raw dependent telescope")
+    binder <- inspect "erased substitution" (mkListTy boolTy) specialized
+    check "metadata-only update preserves the binder Unique" (binder == xs)
+    check "erased substitution removes the old deep type dependency" $
+        not (a `elemVarSet` tyCoVarsOfType specialized)
+    lintAccepts dflags "closed specialization has consistent binder and occurrence types" [] (identity 81002 specialized)
+    forM_ [("Int", intTy), ("function", arrow boolTy boolTy), ("IO", mkTyConApp ioTyCon [intTy])] $ \(label, actual) -> do
+        let result = Subst.substTy (Subst.mkTvSubstPrs [(a, actual)]) raw
+        _ <- inspect (label ++ " element metadata") (mkListTy actual) result
+        check (label ++ " specialization removes the erased variable") $
+            not (a `elemVarSet` tyCoVarsOfType result)
+    let recursiveRange = mkTyConApp maybeTyCon [aTy]
+        recursiveSubst = Subst.mkTvSubstPrs [(a, recursiveRange)]
+        rangeResult = Subst.substTy recursiveSubst raw
+        out = setIdType xs (mkListTy recursiveRange)
+        targetSubst = Subst.extendSubstInScope recursiveSubst out
+    _ <- inspect "apply-once binder metadata" (mkListTy recursiveRange) rangeResult
+    case Subst.substTy targetSubst (TermVarTy xs) of
+        TermVarTy actual -> checkType dflags "target metadata is not substituted again" (varType out) (varType actual)
+        _ -> fail "FAIL: target representative lost its runtime identity"
+    let collision = Subst.extendSubstInScope boolSubst xs
+    clone <- inspect "cloned binder metadata" (mkListTy boolTy) (Subst.substTy collision raw)
+    check "capture avoidance freshens the binder" (clone /= xs)
+    let other = local 81003 "metadata_outer" (mkListTy boolTy)
+        outer = CoreSubst.extendIdSubst (Subst.extendSubstInScope boolSubst other) xs (Var other)
+    masked <- inspect "bound Id masks an outer range" (mkListTy boolTy) (Subst.substTy outer raw)
+    check "the outer range does not replace the bound value" (masked == xs && masked /= other)
+    let mult = mkTyVar (mkSystemName (unique 81004) (mkTyVarOcc "metadata_mult")) multiplicityTy
+        scaled = setIdMult xs (mkTyVarTy mult)
+        scaleSubst = Subst.mkTvSubstPrs [(a, boolTy), (mult, ManyTy)]
+    _ <- inspect "binder multiplicity substitution" (mkListTy boolTy) (Subst.substTy scaleSubst (telescope scaled))
+    let (nat, _, _) = peanoNat
+        natTy = mkTyConTy nat
+        n = local 81005 "metadata_n" natTy
+        element = parameterizedDomainFixture 82000 [liftedTypeKind, natTy] (\_ _ -> [[]])
+        elementTy = mkTyConApp element [intTy, TermVarTy n]
+        elementSubst = Subst.extendSubstInScope (Subst.mkTvSubstPrs [(a, elementTy)]) n
+        indexedResult = Subst.substTy elementSubst raw
+    _ <- inspect "runtime-index-bearing element" (mkListTy elementTy) indexedResult
+    check "runtime index remains a deep dependency" (n `elemVarSet` tyCoVarsOfType indexedResult)
+    check "runtime-bearing specialization removes the erased variable" $
+        not (a `elemVarSet` tyCoVarsOfType indexedResult)
+    let k = mkTyVar (mkSystemName (unique 81006) (mkTyVarOcc "metadata_k")) liftedTypeKind
+        abstract = mkTyVar (mkSystemName (unique 81007) (mkTyVarOcc "metadata_abstract")) (mkTyVarTy k)
+        familyKind = mkTyVar (mkSystemName (unique 81008) (mkTyVarOcc "family_k")) liftedTypeKind
+        familyArg = mkTyVar (mkSystemName (unique 81009) (mkTyVarOcc "family_a")) (mkTyVarTy familyKind)
+        familyBinders = [mkNamedTyConBinder Inferred familyKind, mkAnonTyConBinder familyArg]
+        family = mkFamilyTyCon (mkSystemName (unique 81010) (mkTcOcc "MetadataFamily"))
+            (mkTyConKindWithMatchability unmatchableDataConTy familyBinders liftedTypeKind)
+            familyBinders 0 liftedTypeKind Nothing OpenTypeFamilyTyCon Nothing NotInjective
+        abstractId = local 81011 "metadata_abstract_index" (mkTyConApp family [mkTyVarTy k, mkTyVarTy abstract])
+        kindSubst = Subst.extendSubstInScope (Subst.mkTvSubstPrs [(k, boolTy)]) abstract
+        deepResult = Subst.deepSubstTy kindSubst (telescope abstractId)
+    check "deep substitution removes the old kind from all native metadata" $
+        not (k `elemVarSet` tyCoVarsOfType deepResult)
+    case deepResult of
+        DepFunTy deepBinder _ -> case varType deepBinder of
+            TyConApp _ [kind, TyVarTy actual] -> do
+                checkType dflags "deep metadata substitutes the explicit kind" boolTy kind
+                checkType dflags "deep metadata updates an unmapped variable kind" boolTy (tyVarKind actual)
+                _ <- inspect "deep binder and occurrence metadata" (varType deepBinder) deepResult
+                pure ()
+            _ -> fail "FAIL: deep metadata lost the applied family domain"
+        _ -> fail "FAIL: deep metadata lost the raw binder"
+
+-- | Check both zonkers on original native Id prototypes with filled metadata.
+runNativeZonkMetadataChecks :: FilePath -> IO ()
+runNativeZonkMetadataChecks libdir = runGhc (Just libdir) $ do
+    initialFlags <- getSessionDynFlags
+    _ <- setSessionDynFlags initialFlags
+    env <- getSession
+    dflags <- getSessionDynFlags
+    liftIO $ do
+        (_, outcome) <- TcM.initTcInteractive TcM.NoTcMPlugins env $ do
+            alpha <- newFlexiTyVar liftedTypeKind
+            mu <- newFlexiTyVar multiplicityTy
+            ma <- newFlexiTyVar matchabilityTy
+            let xs = setIdMult (local 81020 "zonk_metadata_xs" (mkListTy (mkTyVarTy alpha))) (mkTyVarTy mu)
+                same = mkTyConApp eqTyCon [varType xs, TermVarTy xs, TermVarTy xs]
+                raw = DepFunTy xs (mkFunctionType unmatchableDataConTy ManyTy same intTy)
+                f = setIdMult (local 81021 "zonk_metadata_head" (mkFunctionType (mkTyVarTy ma) (mkTyVarTy mu) boolTy boolTy)) (mkTyVarTy mu)
+                call = TermAppTy f (constructorIndex trueDataCon)
+                callCo = TermAppCo f (mkNomReflCo (constructorIndex trueDataCon))
+            TcM.liftZonkM $ do
+                TcZonk.writeMetaTyVar alpha intTy
+                TcZonk.writeMetaTyVar mu ManyTy
+                TcZonk.writeMetaTyVar ma unmatchableDataConTy
+            within <- TcM.liftZonkM (TcZonk.zonkTcType raw)
+            free <- TcM.liftZonkM (TcZonk.zonkTyCoVar xs)
+            final <- FinalZonk.zonkTcTypeToType raw
+            ambient <- FinalZonk.initZonkEnv FinalZonk.DefaultFlexi $ FinalZonk.ZonkT $ \ze ->
+                FinalZonk.runZonkT (FinalZonk.zonkTcTypeToTypeX (TermVarTy xs))
+                    ze {FinalZonk.ze_id_env = error "native metadata inspected the recursive Id environment"}
+            withinCall <- TcM.liftZonkM (TcZonk.zonkTcType call)
+            finalCall <- FinalZonk.zonkTcTypeToType call
+            withinCo <- TcM.liftZonkM (TcZonk.zonkCo callCo)
+            finalCo <- FinalZonk.initZonkEnv FinalZonk.DefaultFlexi (FinalZonk.zonkCoToCo callCo)
+            pure (xs, [alpha, mu], [within, final], [free, ambient], f,
+                  [withinCall, finalCall, coercionLKind withinCo, coercionLKind finalCo])
+        case outcome of
+            Nothing -> fail "FAIL: native metadata zonking controls could not initialize TcM"
+            Just (xs, metas, telescopes, freeIndices, f, calls) -> do
+                let checkId label expected original actual = do
+                        check (label ++ " retains the binding identity") (actual == original)
+                        checkType dflags (label ++ " stored domain") expected (varType actual)
+                        checkType dflags (label ++ " stored multiplicity") ManyTy (idMult actual)
+                forM_ telescopes $ \result -> do
+                    case result of
+                        DepFunTy binder FunTy {ft_arg = TyConApp _ [domain, TermVarTy left, TermVarTy right]} -> do
+                            checkType dflags "zonked proof domain" (mkListTy intTy) domain
+                            forM_ [binder, left, right] (checkId "zonked native Id" (mkListTy intTy) xs)
+                        _ -> fail "FAIL: zonking lost the raw dependent telescope"
+                    check "zonking removes filled metadata metas from deep dependencies" $
+                        all (\meta -> not (meta `elemVarSet` tyCoVarsOfType result)) metas
+                forM_ freeIndices $ \result -> case result of
+                    TermVarTy actual -> checkId "zonked ambient index" (mkListTy intTy) xs actual
+                    _ -> fail "FAIL: zonking lost the ambient runtime identity"
+                forM_ calls $ \result -> case result of
+                    TermAppTy actual _ -> checkId "zonked call head" (mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy) f actual
+                    _ -> fail "FAIL: zonking lost the actual call head"
 
 -- | Check recursive constructor indices, substitutions, and field-scoped proofs.
 runNatChecks :: DynFlags -> IO ()
