@@ -74,6 +74,56 @@ lookupRuntime xs position = case mkFinClosed xs position of
     Nothing -> Nothing
     Just checked -> Just (indexClosed xs checked)
 
+{- Note [Generic list positions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GenericCount records the list shape. It does not inspect the elements.
+Retained list refinement supplies the bound for the ordinary Fin case.
+The element type can contain an earlier runtime index. Keep that complete type
+when returning the selected head. A function element remains an ordinary value.
+Selection does not grant native call permission or function equality.
+
+Use the same actual list to construct and consume the witness in lookupGeneric.
+Write the constructor bound explicitly as GenericCount rest. Fin proves a bound;
+it does not identify the list. Count and GenericCount remain separate families.
+
+mkFinGeneric checks a negative position before inspecting the list. Both workers
+traverse only the required prefix. They do not compute the full length. They can
+select a finite position from a cyclic list. The caller controls demand on the
+selected head. The empty case still forces its witness. These functions do not
+establish totality or remove runtime bounds checks.
+See Note [Closed-list positions] for the ordinary Fin representation.
+-}
+
+-- | Select an element with a position below the retained list's length.
+-- See Note [Generic list positions].
+indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (GenericCount xs) -> a
+indexGeneric [] impossible = case impossible of {}
+indexGeneric (value : rest) position = case position of
+    FZ -> value
+    FS smaller -> indexGeneric @a rest smaller
+
+-- | Check a signed position without inspecting the list elements.
+-- See Note [Generic list positions].
+mkFinGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Int -> Maybe (Fin (GenericCount xs))
+mkFinGeneric xs position =
+    if position < 0
+        then Nothing
+        else case xs of
+            [] -> Nothing
+            _value : rest ->
+                if position == 0
+                    then Just (FZ @(GenericCount rest))
+                    else case mkFinGeneric @a rest (position - 1) of
+                        Nothing -> Nothing
+                        Just smaller -> Just (FS @(GenericCount rest) smaller)
+
+-- | Construct and consume a checked position with the same actual list.
+-- See Note [Generic list positions].
+lookupGeneric :: forall (a :: Type). [a] -> Int -> Maybe a
+lookupGeneric xs position = case mkFinGeneric @a xs position of
+    Nothing -> Nothing
+    Just checked -> Just (indexGeneric @a xs checked)
+
 -- | Build a vector whose length follows the actual runtime list.
 listVector :: foreach (bs :: [Bool]) -> Vec Int (Count bs)
 listVector [] = VNil

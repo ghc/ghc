@@ -1118,6 +1118,7 @@ runModuleChecks libdir = do
     runFunctionFieldModuleChecks libdir
     runGenericListModuleChecks libdir
     runOrdinaryRetainedModuleChecks libdir
+    runGenericSafeIndexModuleChecks libdir
     runBoundedFamilyModuleChecks libdir
     runExportedFunctionSignatureModuleChecks libdir
     forM_
@@ -6416,6 +6417,115 @@ runGenericListModuleChecks libdir = do
                     pure (Right ())
                 forM_ fragments $ \fragment ->
                     checkSourceRejection moduleName code fragment result
+
+{- Note [Generic safe index module controls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Compile the existing providers before each interface-only consumer. Check
+ordinary imported use with and without the dependent source extension.
+The first six results reuse the authored Showcase observations. The function
+list has an unused bottom head. Selecting it separately must expose bottom at
+function WHNF. Do not replace that function with an eta wrapper.
+
+The PackedVec callback keeps its literal [vector] argument. Its element type
+contains the callback's actual runtime n. Declaration advice must preserve
+that type before checking the list. An explicit element type or a let-bound
+list would bypass this source inference control. The other vector observation
+uses the known retained-list contracts of mkFinGeneric and indexGeneric.
+Convert the selected vector with toList before constructing Maybe [Int].
+This control does not require standalone native container inference or nested
+fmap toList inference. All typed values and evidence must remain under their
+existing lexical scope.
+-}
+
+-- | Check generic finite-position selection through producer interfaces.
+runGenericSafeIndexModuleChecks :: FilePath -> IO ()
+runGenericSafeIndexModuleChecks libdir = do
+    packed <- readFile "PackedVecLibrary.hs"
+    parameterized <- readFile "ParameterizedIndexLibrary.hs"
+    let warnings = ["-Werror=inaccessible-code", "-Werror=overlapping-patterns"]
+        body =
+            [ "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE RankNTypes #-}"
+            , "{-# LANGUAGE ScopedTypeVariables #-}"
+            , "{-# LANGUAGE TypeApplications #-}"
+            , "module Main (main) where"
+            , ""
+            , "import Control.Exception (SomeException, displayException, evaluate, try)"
+            , "import Control.Monad (unless)"
+            , "import Data.IORef"
+            , "import Data.List (isInfixOf)"
+            , "import PackedVecLibrary"
+            , "import ParameterizedIndexLibrary (Fin (FZ), indexGeneric, mkFinGeneric, lookupGeneric)"
+            , ""
+            , "-- | Check an independent result before printing its observation."
+            , "observe :: (Eq a, Show a) => String -> a -> a -> IO ()"
+            , "observe label expected actual = do"
+            , "    unless (actual == expected) (error (label ++ \": wrong value\"))"
+            , "    putStrLn (label ++ \": \" ++ show actual)"
+            , ""
+            , "-- | Keep the literal list inside the original retained callback scope."
+            , "observePacked :: PackedVec Int -> [Int]"
+            , "observePacked package = withPacked @Int package (\\n vector -> toList (indexGeneric [vector] (FZ @'Z)))"
+            , ""
+            , "main :: IO ()"
+            , "main = do"
+            , "    valuesRef <- newIORef ([11, 22] :: [Int])"
+            , "    positionRef <- newIORef (1 :: Int)"
+            , "    values <- readIORef valuesRef"
+            , "    position <- readIORef positionRef"
+            , "    let selected = case mkFinGeneric @Int values position of"
+            , "            Nothing -> Nothing"
+            , "            Just checked -> Just (indexGeneric @Int values checked)"
+            , "    observe \"generic checked Int position\" (Just 22) selected"
+            , "    observe \"generic negative position ignores list\" Nothing"
+            , "        (lookupGeneric (error \"m69-unused-negative-list\" :: [Int]) (-1))"
+            , "    let functions = [error \"m69-selected-function\", (* 2)] :: [Int -> Int]"
+            , "    observe \"generic checked function position\" (Just 42)"
+            , "        (fmap ($ 21) (lookupGeneric functions position))"
+            , "    sizeRef <- newIORef (S (S Z))"
+            , "    n <- readIORef sizeRef"
+            , "    let vector = replicateNative @Int n 7"
+            , "    let selectedVector = case mkFinGeneric [vector] 0 of"
+            , "            Nothing -> Nothing"
+            , "            Just checked -> Just (toList (indexGeneric [vector] checked))"
+            , "    observe \"generic checked runtime-indexed payload\" (Just [7, 7]) selectedVector"
+            , "    let partial :: [Int]"
+            , "        partial = error \"m69-unused-head\" : [29]"
+            , "    observe \"generic checked position ignores head\" (Just 29)"
+            , "        (lookupGeneric partial position)"
+            , "    let cyclic :: [Int]"
+            , "        cyclic = 31 : cyclic"
+            , "    observe \"generic checked position in cyclic list\" (Just 31)"
+            , "        (lookupGeneric cyclic 5)"
+            , "    observe \"generic literal list in retained callback\" [7, 7]"
+            , "        (observePacked (PackVec @Int n vector))"
+            , "    selectedFunction <- try (evaluate (case lookupGeneric functions 0 of"
+            , "        Nothing -> error \"m69-missing-function\""
+            , "        Just function -> function)) :: IO (Either SomeException (Int -> Int))"
+            , "    case selectedFunction of"
+            , "        Left exception"
+            , "            | \"m69-selected-function\" `isInfixOf` displayException exception ->"
+            , "                putStrLn \"generic selected function WHNF: forced\""
+            , "            | otherwise -> error \"m69-wrong-function-exception\""
+            , "        Right _ -> error \"m69-hidden-bottom-function\""
+            ]
+        expected =
+            [ "generic checked Int position: Just 22"
+            , "generic negative position ignores list: Nothing"
+            , "generic checked function position: Just 42"
+            , "generic checked runtime-indexed payload: Just [7,7]"
+            , "generic checked position ignores head: Just 29"
+            , "generic checked position in cyclic list: Just 31"
+            , "generic literal list in retained callback: [7,7]"
+            , "generic selected function WHNF: forced"
+            ]
+    forM_ [("edt", "ExperimentalDependentTypes"), ("ordinary", "NoExperimentalDependentTypes")] $
+        \(label, extension) -> do
+            let consumer = unlines (("{-# LANGUAGE " ++ extension ++ " #-}") : body)
+            runModuleCases libdir ("generic-safe-index-" ++ label)
+                [("PackedVecLibrary", packed), ("ParameterizedIndexLibrary", parameterized)]
+                warnings consumer expected
 
 {- Note [Ordinary clients of retained contracts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

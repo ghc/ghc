@@ -683,6 +683,39 @@ ordinaryModuleCalls = do
     values <- readIORef valuesRef
     observe "ordinary module generic round-trip" (Ordinary.ordinaryRoundTrip values)
 
+-- | Check finite positions in lists with opaque elements.
+genericSafeIndexing :: IO ()
+genericSafeIndexing = do
+    valuesRef <- newIORef ([11, 22] :: [Int])
+    positionRef <- newIORef (1 :: Int)
+    values <- readIORef valuesRef
+    position <- readIORef positionRef
+    let selected = case Parameterized.mkFinGeneric @Int values position of
+            Nothing -> Nothing
+            Just checked -> Just (Parameterized.indexGeneric @Int values checked)
+    observe "generic checked Int position" selected
+    observe "generic negative position ignores list"
+        (Parameterized.lookupGeneric (error "unused generic negative-position list" :: [Int]) (-1))
+    let functions = [id, (* 2)] :: [Int -> Int]
+    observe "generic checked function position"
+        (fmap ($ 21) (Parameterized.lookupGeneric functions position))
+    sizeRef <- newIORef (S (S Z))
+    n <- readIORef sizeRef
+    let vector = replicateNative @Int n 7
+    let vectors = [vector]
+    let selectedVector = case Parameterized.lookupGeneric vectors 0 of
+            Nothing -> Nothing
+            Just chosen -> Just (toList chosen)
+    observe "generic checked runtime-indexed payload" selectedVector
+    let partial :: [Int]
+        partial = error "unused generic safe-index head" : [29]
+    observe "generic checked position ignores head"
+        (Parameterized.lookupGeneric partial 1)
+    let cyclic :: [Int]
+        cyclic = 31 : cyclic
+    observe "generic checked position in cyclic list"
+        (Parameterized.lookupGeneric cyclic 5)
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -704,3 +737,4 @@ main = do
     algebraicFunctionFields
     genericListIndexing
     ordinaryModuleCalls
+    genericSafeIndexing
