@@ -437,11 +437,13 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        -- Step 1: Infer the type of `fun`, the head of the application
        ; let rn_head = (rn_fun, fun_lspan)
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
+       -- See Note [Imported native application contracts].
+       ; native_app <- tcRetainedAppCapability fun_sigma0 exp_res_ty rn_args
        -- See Note [Known native variables with ImpredicativeTypes].
-       ; head_ql <- tcRetainedKnownHeadQL wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
-       ; tcRetainedAppEvidence $
+       ; head_ql <- tcRetainedKnownHeadQL native_app wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
+       ; tcRetainedAppEvidence native_app $
          do { (prefix, prepared_ql, prepared_sigma, remaining_args, prepared_plan) <-
-                tcRetainedGroundApp head_ql exp_res_ty rn_head tc_fun0 fun_sigma0 rn_args
+                tcRetainedGroundApp native_app head_ql exp_res_ty rn_head tc_fun0 fun_sigma0 rn_args
             ; let infer_args = null prefix && isNothing prepared_plan
             ; (tc_fun1, fun_sigma1) <-
                 if infer_args
@@ -450,12 +452,12 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
                 else return (tc_fun0, prepared_sigma)
             ; (tc_fun2, fun_sigma2, initial_cache, inst_plan) <-
                 if infer_args
-                then tcRetainedArgInst prepared_ql exp_res_ty rn_head remaining_args
+                then tcRetainedArgInst native_app prepared_ql exp_res_ty rn_head remaining_args
                                       tc_fun1 fun_sigma1
                 else return (tc_fun1, fun_sigma1, [], prepared_plan)
             ; (dollar_inst, dollar_cache) <-
                 if infer_args
-                then tcRetainedDollarInst exp_res_ty rn_head remaining_args tc_fun2 fun_sigma2
+                then tcRetainedDollarInst native_app exp_res_ty rn_head remaining_args tc_fun2 fun_sigma2
                 else return (Nothing, [])
             ; let (tc_fun, fun_sigma) = fromMaybe (tc_fun2, fun_sigma2) dollar_inst
                   arg_cache = initial_cache ++ dollar_cache
@@ -480,10 +482,8 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
               -- at value arguments. Preserve the checked leading prefix.
               -- See Note [Quick Look for particular Ids].
               vta_cache <- case do_ql of
-                NoQL | not (null [() | ETypeArg{} <- rn_args])
-                  -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-                        ; if enabled then Just <$> newTcRef Nothing
-                          else return Nothing }
+                NoQL | native_app, not (null [() | ETypeArg{} <- rn_args])
+                  -> Just <$> newTcRef Nothing
                 _ -> return Nothing
             ; (inst_args, app_res_rho) <-
                 tcInstFunWithPrefix False prefix vta_cache expected_rho inst_plan
@@ -499,17 +499,56 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
             ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
                 rn_fun tc_fun inst_args app_res_rho exp_res_ty } }
 
+-- | Select native application checking from the flag or existing type contracts.
+-- See Note [Imported native application contracts].
+tcRetainedAppCapability :: TcSigmaType -> ExpRhoType -> [HsExprArg 'TcpRn]
+                        -> TcM Bool
+tcRetainedAppCapability sigma expected args
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; if enabled then return True else
+    do { sigma <- liftZonkM (zonkTcType sigma)
+       ; expected <- readExpType_maybe expected
+       ; expected <- mapM (liftZonkM . zonkTcType) expected
+       ; if any (hasNativeDependentExpr . Core.Type) (sigma : maybeToList expected)
+         then return True else
+    do { shapes <- mapM tcRetainedInferableArg [arg | EValArg { ea_arg = arg } <- args]
+       ; return (any snd shapes) } } }
+
+{- Note [Imported native application contracts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An imported type can contain a retained index when the client does not enable
+ExperimentalDependentTypes. For example, toList consumes Vec a n through an
+erased n. An argument with the declared type Vec Int n supplies that choice.
+The client flag must not remove the inference needed to use this contract.
+
+Compute one capability for the application. Enable it when the source flag is
+set, when the zonked head or an available expected type contains native syntax,
+or when tcRetainedInferableArg finds a declared native value anchor. This
+selection only reads existing types. It does not infer arguments, instantiate
+a signature, record occurrences or usage, or expand source syntax. Read an
+available expected type without allocating an inference cell.
+
+Pass the capability to the existing application helpers and evidence capture.
+Keep their Quick Look modes, complete immutable choices, scope checks, typed
+argument caches and final subsumption. A false capability keeps the original
+ordinary path. It does not disable checks triggered by an actual DepFunTy.
+
+A checked callback type can establish the same contract at tcValArg. The
+guarded paths in tcRetainedCallbackArgs also capture evidence at each callback
+instantiation or result check. This change does not enable source type syntax,
+container inference or dependent case refinement. It does not assign a native
+type to a mutable metavariable. See Note [Retained application evidence].
+-}
+
 -- | Prepare a checked native application without inspecting value arguments.
 -- See Note [Ground retained applications].
-tcRetainedGroundApp :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
+tcRetainedGroundApp :: Bool -> QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
                     -> HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn]
                     -> TcM ([HsExprArg 'TcpInst], QLFlag, TcSigmaType,
                             [HsExprArg 'TcpRn], RetainedInstPlan)
-tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
+tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
   | known_head fun
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; if not enabled then unchanged else
-    do { let (leading, rest) = span prefix_arg args
+  = do { let (leading, rest) = span prefix_arg args
        ; (prefix, residual, remaining) <-
            if any type_arg leading
            then do { (checked, ty) <- tcInstFunWithPrefix True [] Nothing Nothing
@@ -553,9 +592,8 @@ tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
                                  then return (prefix ++ [EWrap (EHsWrap (mkWpTyApps choices))],
                                               NoQL, body, remaining, Nothing)
                                  else keep_ql }
-                       _ -> declared_plan } } } } }
+                       _ -> declared_plan } } } }
   where
-    unchanged = return ([], DoQL, sigma, args, Nothing)
     known_head HsVar{} = True
     known_head (XExpr (ConLikeTc (RealDataCon _))) = True
     known_head _ = False
@@ -567,7 +605,7 @@ tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
     type_arg _ = False
     no_ql_vars = not . any is_ql . tyCoVarsOfTypeList
     is_ql v = isTcTyVar v && isQLInstTyVar v
-tcRetainedGroundApp ql _ _ _ sigma args = return ([], ql, sigma, args, Nothing)
+tcRetainedGroundApp _ ql _ _ _ sigma args = return ([], ql, sigma, args, Nothing)
 
 -- | Collect the types that can retain Quick Look choices in a checked prefix.
 -- Unrecognised evidence and wrappers keep the original Quick Look path.
@@ -882,12 +920,10 @@ for the pinned source links and the limits of this adaptation.
 
 -- | Use an existing monomorphic native variable without Quick Look.
 -- See Note [Known native variables with ImpredicativeTypes].
-tcRetainedKnownHeadQL :: QLFlag -> [HsExprArg 'TcpRn] -> ExpRhoType
+tcRetainedKnownHeadQL :: Bool -> QLFlag -> [HsExprArg 'TcpRn] -> ExpRhoType
                      -> HsExpr GhcTc -> TcSigmaType -> TcM QLFlag
-tcRetainedKnownHeadQL DoQL [] exp_res_ty HsVar{} actual
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; if not enabled then return DoQL else
-    do { actual <- liftZonkM (zonkTcType actual)
+tcRetainedKnownHeadQL True DoQL [] exp_res_ty HsVar{} actual
+  = do { actual <- liftZonkM (zonkTcType actual)
        ; expected <- readExpType_maybe exp_res_ty
        ; expected <- mapM (liftZonkM . zonkTcType) expected
        ; let tys = actual : maybeToList expected
@@ -895,8 +931,8 @@ tcRetainedKnownHeadQL DoQL [] exp_res_ty HsVar{} actual
        ; return $ if not (isSigmaTy actual || isForAllTy actual)
                      && any (hasNativeDependentExpr . Core.Type) tys
                      && not (any has_ql_var (tyCoVarsOfTypesList tys))
-                  then NoQL else DoQL } }
-tcRetainedKnownHeadQL do_ql _ _ _ _ = return do_ql
+                  then NoQL else DoQL }
+tcRetainedKnownHeadQL _ do_ql _ _ _ _ = return do_ql
 
 {- Note [Known native variables with ImpredicativeTypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -925,18 +961,18 @@ See docs/dependent-haskell/REFERENCES.md#qualified-retained-function-types.
 -}
 
 -- | Bind native dictionary evidence at the application that needs it.
-tcRetainedAppEvidence :: TcM (HsExpr GhcTc) -> TcM (HsExpr GhcTc)
-tcRetainedAppEvidence thing_inside
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; if not enabled then thing_inside else
-    do { (expr, wanted) <- captureConstraints thing_inside
+tcRetainedAppEvidence :: Bool -> TcM (HsExpr GhcTc) -> TcM (HsExpr GhcTc)
+tcRetainedAppEvidence enabled thing_inside
+  | not enabled = thing_inside
+  | otherwise
+  = do { (expr, wanted) <- captureConstraints thing_inside
        ; if any (hasNativeDependentExpr . Core.Type . ctPred) (wc_simple wanted)
          then do { tclvl <- getTcLevel
                  ; (implic, ev_binds) <- buildImplicationFor tclvl RetainedAppSkol [] [] wanted
                  ; emitImplications implic
                  ; return (mkHsWrap (mkWpLet ev_binds) expr) }
          else do { emitConstraints wanted
-                 ; return expr } } }
+                 ; return expr } }
 
 {- Note [Retained application evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1126,8 +1162,11 @@ tcValArg do_ql pos rn_fun_head
          -- can already have supplied a known native callback input.
          -- See Note [Named callbacks at known native inputs].
        ; enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; callback_enabled <- if enabled then return True else
+           do { callback_ty <- liftZonkM (zonkTcType exp_arg_ty)
+              ; return (hasNativeDependentExpr (Core.Type callback_ty)) }
        ; (_, callback_cache) <- case do_ql of
-           NoQL | enabled -> tcRetainedCallbackArgs [] [Scaled mult exp_arg_ty]
+           NoQL | callback_enabled -> tcRetainedCallbackArgs [] [Scaled mult exp_arg_ty]
                                [EValArg { ea_loc_span = lspan, ea_arg = larg
                                         , ea_arg_ty = noExtField }] Subst.emptySubst []
            _ -> return (Nothing, [])
@@ -2216,7 +2255,7 @@ tcRetainedOrdinaryResult n ty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A consumer can quantify over an erased index without returning that index.
 For example, observeVec :: forall n. Vec Int n -> IO String needs the index
-from its argument. Under ExperimentalDependentTypes and NoQL, infer arguments
+from its argument. With native application checking and NoQL, infer arguments
 whose formal types mention outer invisible index binders. Match their actual
 types against the formal types with an immutable substitution. A retained
 expected result can supply additional bindings. Native index binders must be
@@ -2394,12 +2433,13 @@ tcRetainedInferableArg (L _ expr)
 -- | Specialize the wired-in dollar operator from a checked result and one
 -- cached native-anchored RHS. Keep its original type and evidence application.
 -- See Note [Immutable native dollar applications].
-tcRetainedDollarInst :: ExpRhoType -> (HsExpr GhcRn, SrcSpan)
+tcRetainedDollarInst :: Bool -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
                     -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                     -> TcM (Maybe (HsExpr GhcTc, TcSigmaType), RetainedArgCache)
-tcRetainedDollarInst (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)), _)
+tcRetainedDollarInst enabled (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)), _)
                     args fun@(HsVar _ (L _ dollar)) sigma
-  | name `hasKey` dollarIdKey, dollar `hasKey` dollarIdKey
+  | enabled
+  , name `hasKey` dollarIdKey, dollar `hasKey` dollarIdKey
   , not (any is_type_arg args)
   , [lhs, rhs] <- [arg | EValArg { ea_arg = arg } <- args]
   , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
@@ -2407,8 +2447,7 @@ tcRetainedDollarInst (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)
   , not (null tvs)
   , (_, [_, domain], result) <- splitFunTys body
   , isTauTy body, not (hasNativeDependentExpr (Core.Type body))
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; result_ty <- if not enabled then return Nothing else
+  = do { result_ty <-
            do { expected <- liftZonkM (zonkTcType expected)
               ; if complete_result expected then return (Just expected)
                 else declared_result 1 lhs }
@@ -2515,7 +2554,7 @@ tcRetainedDollarInst (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)
            ; tcMatchTyX_BM (bind_outer tvs) subst template actual }
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
-tcRetainedDollarInst _ _ _ _ _ = return (Nothing, [])
+tcRetainedDollarInst _ _ _ _ _ _ = return (Nothing, [])
 
 {- Note [Immutable native dollar applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2537,7 +2576,8 @@ requirements on this fallback. Do not expand or typecheck the first operand.
 Keep the original expected type for final checkResultTy; it can fill the
 ordinary alpha with (). This fallback does not assign a native type to a meta.
 
-Require a named, native-anchored RHS under ExperimentalDependentTypes.
+Require a named, native-anchored RHS and an enabled application capability.
+See Note [Imported native application contracts].
 Before inference, inspect its head's declared argument domains. Reject a
 higher-rank or retained callback domain. For example, withBounded's callback
 needs an expected IO result before checking evaluate proof >> pure (). Keep
@@ -2588,15 +2628,14 @@ tcRetainedInstTelescope sigma
 type RetainedArgCache = [(Int, (LHsExpr GhcTc, TcRhoType, UsageEnv))]
 
 -- | Infer index-bearing arguments once and match only outer invisible binders.
-tcRetainedArgInst :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
+tcRetainedArgInst :: Bool -> QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
                   -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                   -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
-tcRetainedArgInst do_ql expected rn_head args fun sigma
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; if enabled
-         then do { expected <- readExpType_maybe expected
-                 ; tcRetainedArgInstEnabled Nothing do_ql expected rn_head args fun sigma }
-         else return (fun, sigma, [], Nothing) }
+tcRetainedArgInst enabled do_ql expected rn_head args fun sigma
+  = if enabled
+    then do { expected <- readExpType_maybe expected
+            ; tcRetainedArgInstEnabled Nothing do_ql expected rn_head args fun sigma }
+    else return (fun, sigma, [], Nothing)
 
 {- Note [Native worker argument inference]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2633,7 +2672,8 @@ Note [Cached retained argument inference] and
 docs/dependent-haskell/REFERENCES.md#native-worker-argument-inference.
 -}
 
--- | Match cached index arguments when the experimental extension is enabled.
+-- | Match cached index arguments after a caller selects native checking.
+-- See Note [Imported native application contracts].
 -- See Note [Available expected types in native applications].
 -- See Note [Generic retained argument inference] for overapplication.
 -- See Note [Native inference after visible type applications] for the mode argument.
@@ -2643,9 +2683,8 @@ tcRetainedArgInstEnabled :: Maybe Int -> QLFlag -> Maybe TcRhoType -> (HsExpr Gh
                          -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                          -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
 tcRetainedArgInstEnabled after_vta do_ql expected rn_head args fun sigma
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; declared <- case do_ql of
-           NoQL | enabled ->
+  = do { declared <- case do_ql of
+           NoQL ->
              do { sigma' <- liftZonkM (zonkTcType sigma)
                 ; expected' <- mapM (liftZonkM . zonkTcType) expected
                 ; tcRetainedKnownArgPlan expected' fun sigma' args }
@@ -2939,7 +2978,7 @@ tcRetainedCallbackArgs tvs domains args subst cache
                 -> do
                   { valid <- tcRetainedInstScope (sigma : actual : input : choices)
                   ; if not valid then go subst cache rest else
-                do { (usage, typed) <- tcCollectingUsage $ tcRetainedAppEvidence $
+                do { (usage, typed) <- tcCollectingUsage $ tcRetainedAppEvidence True $
                        do { let rn_head = (unLoc head_arg, locA (getLoc head_arg))
                           ; (fun, sigma') <- tcInferAppHead rn_head
                           ; (inst_args, rho) <- tcInstFunWithExpected Nothing (Just choices)
@@ -2989,7 +3028,7 @@ tcRetainedCallbackArgs tvs domains args subst cache
                Just subst'
                  | let expected = Subst.substTy subst' (scaledThing domain)
                  , not (mentions_templates expected)
-                 -> do { typed <- tcRetainedAppEvidence $
+                 -> do { typed <- tcRetainedAppEvidence True $
                             do { wrap <- tcSubTypeSigma (exprCtOrigin (unLoc arg))
                                            GenSigCtxt actual expected
                                ; return (mkHsWrap wrap (unLoc typed)) }
@@ -4575,13 +4614,12 @@ foldQLInstVars check_tv ty
 ********************************************************************* -}
 
 -- | Reject retained types before Quick Look inspects or assigns them.
+-- See Note [Retained types and Quick Look].
 rejectNativeQuickLook :: TcType -> TcM ()
 rejectNativeQuickLook ty
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; when enabled $
-         do { ty <- liftZonkM $ zonkTcType ty
-            ; when (hasNativeDependentExpr (Core.Type ty)) $
-                failWithTc (TcRnRetainedQuantificationError (RetainedQuickLook ty)) } }
+  = do { ty <- liftZonkM $ zonkTcType ty
+       ; when (hasNativeDependentExpr (Core.Type ty)) $
+           failWithTc (TcRnRetainedQuantificationError (RetainedQuickLook ty)) }
 
 -- | Check the type arguments that Quick Look will monomorphise.
 rejectNativeQLInstArgs :: [HsExprArg 'TcpInst] -> TcM ()
@@ -4601,7 +4639,13 @@ runtime-index escape check. Its instantiation-variable folders do not support
 retained types either. Reject those types before both operations. Zonk first
 so that the check also sees a type behind a filled metavariable. Check the
 WpTyApp inputs before qlMonoInstArgs enters its ZonkM folder.
-This source restriction does not add Quick Look support for retained types.
+
+This check depends on the actual type, not ExperimentalDependentTypes.
+Imported contracts can contain native types in a client without that flag.
+An incomplete immutable application plan can retain DoQL in such a client.
+The native-type rejection must still run before a Quick Look assignment or
+unsupported traversal. See Note [Imported native application contracts].
+This restriction does not add Quick Look support for retained types.
 See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
 -}
 
