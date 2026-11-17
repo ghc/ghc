@@ -2150,6 +2150,44 @@ call inversion, computed function equality or mutable native-meta assignment
 is added. Native coercion serialization, arbitrary unfoldings and ordinary
 optimization remain unsupported.
 
+### Ordinary-arrow matchability
+
+M63 stores a type-valued matchability annotation in `FunTy`. `Matchability` has
+constructors Matchable and Unmatchable. M and U name their promoted forms.
+Ordinary runtime arrows use U. Constructor
+kind arrows use M. Synonym and family declarations use U for their consumed
+argument prefix and preserve the independently specified result kind.
+Explicit metadata and outer dependencies survive substitution and traversal.
+
+`FunCo` stores a proof for this annotation. Its role is nominal under nominal
+or representational equality and phantom under phantom equality. Normalization
+weakens the nominal proof explicitly when needed. Structural `SelFun` can
+inspect the arrow type. Inverse application through `LRCo`, Given equality,
+eta expansion and injective-variable analysis requires M at the consumed kind.
+Forward `AppCo` works for M, U and unknown metadata. Binding a template variable
+to a whole opaque application remains valid. Rigid opaque applications retain
+uncertain apartness.
+
+`FUN` has arguments `[ma,mult,rep1,rep2,arg,res]` and roles N,N,N,N,R,R.
+Its specified invisible `ma` binder precedes the required multiplicity binder.
+Ordinary `FUN One` still selects linear multiplicity. The other three wired
+arrows retain their four arguments and fixed U/Many convention.
+
+Native `TermAppTy` remains opaque and nominal. Eligible runtime heads require
+U, Many and the existing scalar domains. A vacuous retained binder becomes a
+U arrow. This increment does not widen native domains or add function equality.
+
+Interfaces and HIE use the M63 version suffix. Public reflection `Fun` matches
+only U/Many; `Fun'` exposes arbitrary metadata at Many. The compatibility
+argument list remains `[arg,res]`. TH preserves explicit M/U synonyms and
+retains metadata through generated declarations. Primitive Typeable bindings
+remain in GHC.Internal.Types but identify GHC.Internal.Prim consistently.
+
+Both builds and the selected API, source, reflection and regression checks
+pass. The [M63 plan](PLAN.md#m63-ordinary-arrow-matchability) records their
+scope. ForAllTy and ForAllCo retain implicit M in this stage. Explicit forall
+metadata, source family unsaturation and general native domains remain open.
+
 ## Opaque whole-function cast lowering
 
 An opaque nominal equality between two complete retained function types can

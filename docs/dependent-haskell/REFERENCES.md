@@ -3862,6 +3862,23 @@ does not prove divergence. Record checked evidence and trusted assumptions
 separately. Agda's safe mode also controls positivity, universes and imports;
 a termination check alone does not supply that logical guarantee.
 
+The bounded GHC source review selects no checker implementation. A first
+candidate can inspect the final zonked `tcg_binds` through
+`typeCheckResultAction`. It can reuse coverage analysis at `pmcMatches` before
+simplification. That interface returns `Nablas`, not a totality certificate.
+Skipped checking, approximation and trusted COMPLETE assertions need explicit
+treatment. Recompute the full call graph: `Tc.Gen.Bind.mkEdges` excludes signed
+references for inference and can therefore omit a recursive cycle.
+
+Start with direct structural recursion in singleton recursive components.
+Unsupported syntax, mutual recursion, callbacks and unverified imports stay
+unknown. Report the finite-input, observation and callee assumptions. A lazy
+constructor can contain bottom; a cyclic Nat can have weak-head normal form
+without a finite normal form. No advisory result may strengthen conversion or
+relax native gates. The ignored `native-arrow-matchability-totality-followup-v1`
+records nine current source files and ten archived inputs. It is a source
+review and proposal, not an executed checker or termination proof.
+
 Casinghino, Sjoberg and Weirich's
 [Combining Proofs and Programs in a Dependently Typed Language (POPL 2014)](https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf)
 is direct mixed-fragment prior art. The author PDF is now archived and hashed.

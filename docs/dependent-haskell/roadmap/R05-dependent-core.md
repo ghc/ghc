@@ -29,6 +29,9 @@ The user selected a native Core extension based on Eisenberg's historical
 
 The [published M62 checkpoint](../ROADMAP.md#where-this-fork-stands) passes its
 selected checks with both compiler stages and its independent artifact audit.
+M63 adds validated ordinary-arrow matchability. Its selected source, Core,
+reflection and compatibility checks pass in both stages. The forall stage
+and publication remain open.
 Restricted pipelines and Lint checks do not establish general preservation.
 
 ## Next increments

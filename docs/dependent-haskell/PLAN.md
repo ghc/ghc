@@ -4408,26 +4408,28 @@ matchability foundation before generic index domains.
 ## M63: ordinary-arrow matchability
 
 Roadmap owner: R23 unsaturated type families. Related card: R05 dependent Core.
-Status: implementation in progress. Bootstrap attempt v8 passes after seven
-failed integration attempts. Self-hosting attempts v1 to v3 expose and correct
-the source kind annotation and extension requirements for `(->)`. Attempt v4
-reaches TypeRep and exposes an overbroad application-matching gate. Binding a
-variable to a whole opaque application must remain possible. Inverse
-application still requires M. Preserve uncertain apartness for rigid variables
-and repeated opaque targets. The correction and its quiet API controls need a
-fresh bootstrap build. Bootstrap v9 passes. Self-host v5 exposes generated
-selectors and reflection code that relied on inverse application. The next
-correction checks actual reflected heads and limits selector classification
-at opaque applications. Bootstrap v12 and selfhost v6 pass. The 13 pre-base
-selector controls pass. All 14 source formation and rejection controls pass.
-The corrected GHC API helper confirms declaration prefixes, residual kinds and
-FUN One. The first focused run exposes a primitive Typeable module mismatch
-that predates this increment. Correct the represented module before repeating
-the binary round trips. An interim kernel run also exposes hidden partial-FUN
-metadata in diagnostics. The unchanged fixture must pass after that fix.
-The candidate Showcase passes its original 88-line prefix and three new public
-reflection observations. The final selected cohort remains pending.
-M62 remains the last validated and published compiler checkpoint.
+Status: ordinary-arrow implementation and selected checks pass at source
+`95a19a409e`. Publication remains pending. M62 is the published checkpoint.
+Bootstrap v13 passes in 292.80 seconds. Selfhost v7 passes in 964.35 seconds.
+Both use 16 GiB with no swap. Their peaks are 3235 and 6677 MiB.
+The selected rebuild regenerates all eight primitive Typeable outputs.
+
+Focused v3 passes thirteen wrappers. Each stage checks source16, Given6,
+selector13, pattern-synonym9 and TH3, plus the old interface header.
+The selected old TypeRep consumer also passes. TH preserves explicit M/U
+aliases; the corrected fixtures compare those exact ASTs and reuse them.
+Checks v1 passes eight wrappers and nine measured cohort rows: API1/37,
+both-stage public19, parameterized14 with three rejections, and Showcase91/14.
+The five registered tests pass. Their selection skips 34 of 39 cases and has
+no unexpected result, framework failure or missing library. Focused and cohort
+peaks are 3267 and 2312 MiB under 4 GiB with no swap.
+
+The primitive Typeable correction aligns the stored module with its existing
+fingerprint. The partial-FUN printer exposes distinct metadata. The official
+kernel fixture passes without the diagnostic skip. Old .hi rejection is
+measured; no old HIE fixture is claimed. The binary dependency retains the
+documented one-line local decoder patch. Audit and publication are separate
+exit checks. Earlier unsuccessful attempts remain immutable evidence.
 
 The next foundation has two stages. M63 gives ordinary arrows explicit
 matchability through their complete pipeline. A later stage gives dependent
@@ -4445,7 +4447,7 @@ and substitution. It does not supply the FC projection rule or a Haskell eta law
 ### Representation and formation
 
 Store type-valued matchability in FunTy and its congruence in FunCo. Use the
-prototype's Matchability datatype and promoted M/U constants. Keep metadata
+prototype's Matchability datatype and M/U aliases. Keep metadata
 well-kinded, scoped and explicit. Bound metadata variables and explicit type
 computation must survive maps and substitution. This is not permission to
 infer a new matchability quantifier. The initial unannotated elaboration path
@@ -4524,19 +4526,19 @@ Migrate TypeRep/KindRepFun, raw FUN decomposition, binary reflection and
 fingerprints. Distinct well-formed metadata must not have identical reflected
 identity. Keep current native Typeable and unfolding/codec restrictions.
 
-- [ ] Implement type-valued arrow metadata, wired constants and actual makers.
-- [ ] Select and implement concrete source insertion/defaults. Check supplied
+- [x] Implement type-valued arrow metadata, wired constants and actual makers.
+- [x] Select and implement concrete source insertion/defaults. Check supplied
       kind signatures, ordinary FUN One, partial FUN, explicit metadata and
       data constructor worker/wrapper use. Add no inferred polymorphism.
-- [ ] Preserve metadata and proofs throughout traversals and transformations.
-- [ ] Gate all inverse application evidence and injective/apartness consumers.
+- [x] Preserve metadata and proofs throughout traversals and transformations.
+- [x] Gate all inverse application evidence and injective/apartness consumers.
       Preserve forward congruence and structural arrow decomposition.
-- [ ] Migrate interfaces with a changed wire version, reflection and native
+- [x] Migrate interfaces with a changed wire version, reflection and native
       lazy shape summaries. Preserve closed-domain gates and alias behavior.
-- [ ] Extend the existing API fixtures. Pair M/U inversion and forward cases;
+- [x] Extend the existing API fixtures. Pair M/U inversion and forward cases;
       test malformed roles, explicit substitutions, proof-only FVs, metadata
       fingerprints and wire incompatibility. Keep the previous runtime checks.
-- [ ] Build both stages under the established resource caps. Run the selected
+- [x] Build both stages under the established resource caps. Run the selected
       API/source/Showcase/registered checks and meaningful M/U source controls.
       Update Showcase only when a source feature is completed.
 - [ ] Audit and publish actual results. Keep R23 and the full goal open. Then

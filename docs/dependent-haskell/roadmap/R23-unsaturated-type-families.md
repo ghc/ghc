@@ -1,10 +1,9 @@
 # R23: Unsaturated type families
 
 Upstream: [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families).
-Upstream status: accepted, awaiting implementation. Local status: ordinary-arrow
-port in progress under the M63 specification. The first selfhost build passes.
-Final integration fixes and checks remain pending. No completed matchability implementation
-is claimed.
+Upstream status: accepted, awaiting implementation. Local status: the M63
+ordinary-arrow stage passes both builds and its selected checks. Publication
+remains pending. Forall metadata and source family unsaturation remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Goal and dependencies
@@ -96,8 +95,18 @@ compatibility correction:
 
 Read the addendum with the draft. It corrects the visible-argument analysis for
 the new invisible `FUN` binder. Each record states its source pin and reading
-scope. All proposed port controls remain unexecuted. Keep this feature page and
+scope. Those historical controls were unexecuted research. The selected M63
+controls now pass under the separate evidence prefix below. Keep this page and
 [REFERENCES.md](../REFERENCES.md) usable without the ignored cache.
+
+M63 selects source commit `95a19a409e`. Bootstrap v13 and selfhost v7 pass.
+Focused v3 passes all thirteen wrappers, including TH with both interpreter
+paths and selected old interface and TypeRep payloads. Checks v1 passes eight
+wrappers with nine measured cohort rows. Both stages pass public19,
+parameterized14 and Showcase91/14. The five registered tests pass; 34 other
+ways are skipped. Evidence uses `native-arrow-matchability-*`.
+The binary dependency still has one documented local decoder-line change.
+This is a validated ordinary-arrow stage, not completion of R23.
 
 The invisible-forall review identifies a concrete port obligation. The pinned
 prototype's `mkTyCoForAllTy` overwrites requested invisible matchability with
