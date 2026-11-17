@@ -31,7 +31,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.WiredIn.Types( unitTy )
+import GHC.Builtin.WiredIn.Types( unitTy, unmatchableDataConTy )
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Hs
@@ -102,7 +102,7 @@ synonymTyConsOfType ty
      go (TyVarTy _)       = emptyNameEnv
      go (AppTy a b)       = go a `plusNameEnv` go b
      go (FunTy _ ma w a b) = go ma `plusNameEnv` go w `plusNameEnv` go a `plusNameEnv` go b
-     go (ForAllTy _ ty)   = go ty
+     go (ForAllTy _ _ ty) = go ty
      go (CastTy ty co)    = go ty `plusNameEnv` go_co co
      go (CoercionTy co)   = go_co co
 
@@ -622,10 +622,12 @@ irType = go
     go lcls (AppTy t1 t2)      = go lcls t1 >> markNominal lcls t2
     go lcls (TyConApp tc tys)  = do { roles <- lookupRolesX tc
                                     ; zipWithM_ (go_app lcls) roles tys }
-    go lcls (ForAllTy tvb ty)  = do { let tv = binderVar tvb
-                                          lcls' = extendVarSet lcls tv
-                                    ; markNominal lcls (tyVarKind tv)
-                                    ; go lcls' ty }
+    go lcls (ForAllTy ma tvb ty)
+      = do { let tv = binderVar tvb
+                 lcls' = extendVarSet lcls tv
+           ; markNominal lcls ma
+           ; markNominal lcls (varType tv)
+           ; go lcls' ty }
     go lcls (FunTy _ ma w arg res) = markNominal lcls ma >> markNominal lcls w >> go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
@@ -678,8 +680,8 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
     get_ty_vars scope (FunTy _ ma w t1 t2)
       = mapUnionVarSet (get_ty_vars scope) [ma,w,t1,t2]
     get_ty_vars scope (TyConApp _ tys) = mapUnionVarSet (get_ty_vars scope) tys
-    get_ty_vars scope (ForAllTy (Bndr v _) ty)
-      = get_ty_vars scope (varType v) `unionVarSet`
+    get_ty_vars scope (ForAllTy ma (Bndr v _) ty)
+      = get_ty_vars scope ma `unionVarSet` get_ty_vars scope (varType v) `unionVarSet`
           (get_ty_vars (extendVarSet scope v) ty `delVarSet` v)
     get_ty_vars _ (LitTy {}) = emptyVarSet
     get_ty_vars scope (CastTy ty _) = get_ty_vars scope ty
@@ -840,7 +842,8 @@ mkDefaultMethodIds tycons
 mkDefaultMethodType :: Class -> Id -> DefMethSpec Type -> Type
 -- Returns the top-level type of the default method
 mkDefaultMethodType _ sel_id VanillaDM        = idType sel_id
-mkDefaultMethodType cls _   (GenericDM dm_ty) = mkSigmaTy tv_bndrs [pred] dm_ty
+mkDefaultMethodType cls _   (GenericDM dm_ty)
+  = mkSigmaTy [(unmatchableDataConTy, b) | b <- tv_bndrs] [pred] dm_ty
    where
      pred      = mkClassPred cls (mkTyVarTys (binderVars cls_bndrs))
      cls_bndrs = tyConBinders (classTyCon cls)
@@ -971,7 +974,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
       -- See Note [NoFieldSelectors and naughty record selectors]
 
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys sel_tvbs $
+           | otherwise  = mkForAllTys [(unmatchableDataConTy, b) | b <- sel_tvbs] $
                           -- Urgh! See Note [The stupid context] in GHC.Core.DataCon
                           mkPhiTy (conLikeStupidTheta con1) $
                           -- req_theta is empty for normal DataCon

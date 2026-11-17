@@ -183,14 +183,14 @@ mkLamTypes :: [Var] -> Type -> Type
 
 mkLamType v body_ty
    | isTyVar v
-   = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
+   = mkForAllTy unmatchableDataConTy (Bndr v coreTyLamForAllTyFlag) body_ty
      -- coreTyLamForAllTyFlag: see Note [Required foralls in Core]
      --                        in GHC.Core.TyCo.Rep
 
    | isCoVar v
    , v `elemVarSet` tyCoVarsOfType body_ty
      -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
-   = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
+   = mkForAllTy unmatchableDataConTy (Bndr v coreTyLamForAllTyFlag) body_ty
 
    | anyFreeVarsOfType (== v) body_ty
    , isNativeRetainedBinder v
@@ -289,9 +289,9 @@ mkCastMCo e (MCo co) = mkCast e co
   -- We are careful to use (MCo co) only when co is not reflexive
   -- Hence (Cast e co) rather than (mkCast e co)
 
-mkPiMCo :: Var -> MCoercionR -> MCoercionR
-mkPiMCo _  MRefl   = MRefl
-mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
+mkPiMCo :: Matchability -> Var -> MCoercionR -> MCoercionR
+mkPiMCo _ _ MRefl = MRefl
+mkPiMCo ma v (MCo co) = MCo (mkPiCo Representational ma v co)
 
 
 {- *********************************************************************

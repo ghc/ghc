@@ -29,9 +29,10 @@ module GHC.Tc.Gen.HsType (
 
         bindOuterFamEqnTKBndrs_Q_Tv, bindOuterFamEqnTKBndrs,
         tcOuterTKBndrs, scopedSortOuter, outerTyVars, outerTyVarBndrs,
-        tcGadtConTyVarBndrs, tcCheckRetainedConType,
+        tcGadtConTyVarBndrs, tcConDeclTelescope, tcCheckRetainedConType,
         bindOuterSigTKBndrs_Tv,
-        tcExplicitTKBndrs,
+        tcExplicitTKBndrs, tcRuntimeInvisForAllTelescopes,
+        tcCheckRuntimeForAllMatchability,
         bindNamedWildCardBinders,
 
         -- Type checking type and class decls, and instances thereof
@@ -93,7 +94,8 @@ import GHC.Tc.Zonk.Type
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBindersN,
                                   tcInstInvisibleTyBinder, tcSkolemiseInvisibleBndrs,
-                                  tcInstTypeBndrs )
+                                  tcInstTypeBndrs, tcInstSkolTyVarBndrsX,
+                                  tcRuntimeForAllBndrs )
 import GHC.Tc.Zonk.TcType
 
 import GHC.Core.TyCon
@@ -137,7 +139,7 @@ import GHC.Data.List.Infinite ( Infinite (..) )
 import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
-import GHC.Data.Bag( unitBag )
+import GHC.Data.Bag( unitBag, mapBagM_ )
 
 import Data.Function ( on )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
@@ -482,16 +484,17 @@ tc_lhs_sig_type :: Maybe Bool -> SkolemInfo -> LHsSigType GhcRn
 tc_lhs_sig_type retained_sig skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
                                                    , sig_body = hs_ty })) ctxt_kind
   = setSrcSpanA loc $
-    do { (tc_lvl, wanted, (exp_kind, (outer_bndrs, ty)))
+    do { (tc_lvl, wanted, (exp_kind, outer_ma, (outer_bndrs, ty)))
               <- pushLevelAndSolveEqualitiesX "tc_lhs_sig_type" $
                  -- See Note [Failure in local type signatures]
                  do { exp_kind <- newExpectedKind ctxt_kind
                           -- See Note [Escaping kind in type signatures]
+                    ; outer_ma <- tcForAllMatchability (hsOuterMatchability hs_outer_bndrs)
                     ; stuff <- tcOuterTKBndrs skol_info hs_outer_bndrs $
                                (case retained_sig of
                                   Just allow_function -> tcCheckRetainedSigType allow_function
                                   Nothing -> tcCheckLHsType) hs_ty exp_kind
-                    ; return (exp_kind, stuff) }
+                    ; return (exp_kind, outer_ma, stuff) }
 
        -- Default any unconstrained variables free in the kind
        -- See Note [Escaping kind in type signatures]
@@ -501,7 +504,7 @@ tc_lhs_sig_type retained_sig skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs
        ; traceTc "tc_lhs_sig_type" (ppr hs_outer_bndrs $$ ppr outer_bndrs)
        ; outer_bndrs <- scopedSortOuter outer_bndrs
 
-       ; let outer_tv_bndrs :: [InvisTVBinder] = outerTyVarBndrs outer_bndrs
+       ; let outer_tv_bndrs = map (fromMaybe unmatchableDataConTy outer_ma,) (outerTyVarBndrs outer_bndrs)
              ty1 = mkInvisForAllTys outer_tv_bndrs ty
        ; kvs <- kindGeneralizeSome skol_info wanted ty1
 
@@ -509,7 +512,7 @@ tc_lhs_sig_type retained_sig skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs
        -- See Note [Skolem escape in type signatures]
        ; implic <- buildTvImplication (getSkolemInfo skol_info) kvs tc_lvl wanted
 
-       ; return (implic, mkInfForAllTys kvs ty1) }
+       ; return (implic, mkInfForAllTys (map (unmatchableDataConTy,) kvs) ty1) }
   where
     err_ctx exp_kind tidy_env
       = do { (tidy_env2, exp_kind) <- zonkTidyTcType tidy_env exp_kind
@@ -931,26 +934,43 @@ tc_top_lhs_type_x decl tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bnd
   = setSrcSpanA loc $
     do { traceTc "tc_top_lhs_type {" (ppr sig_ty)
        ; skol_info <- mkSkolemInfo skol_info_anon
-       ; (tclvl, wanted, (outer_bndrs, ty))
+       ; (tclvl, wanted, (outer_bndrs, ma_bndrs, ty))
               <- pushLevelAndSolveEqualitiesX "tc_top_lhs_type"    $
                  do { kind <- newExpectedKind (expectedKindInCtxt ctxt)
+                    ; outer_ma <- tcForAllMatchability (hsOuterMatchability hs_outer_bndrs)
                     ; (outer_bndrs, ty) <- tcOuterTKBndrs skol_info hs_outer_bndrs $
                         tc_check_lhs_type mode body kind
-                    ; forM_ decl $ \ decl ->
-                        checkDeclKindMatchability decl $
-                          mkInvisForAllTys (outerTyVarBndrs outer_bndrs) ty
-                    ; return (outer_bndrs, ty) }
+                    ; ma_bndrs <- forAllMatchabilities mode outer_ma (outerTyVarBndrs outer_bndrs)
+                    ; return (outer_bndrs, ma_bndrs, ty) }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs
-       ; let outer_tv_bndrs = outerTyVarBndrs outer_bndrs
+       ; let ma_env = mkVarEnv [(binderVar bndr, ma) | (ma,bndr) <- ma_bndrs]
+             outer_tv_bndrs = [(lookupVarEnv_NF ma_env (binderVar bndr), bndr)
+                              | bndr <- outerTyVarBndrs outer_bndrs]
              ty1 = mkInvisForAllTys outer_tv_bndrs ty
 
+       ; wanted <- case decl of
+           Nothing -> return wanted
+           Just decl ->
+             do { (_, wanted', ()) <- pushLevelAndSolveEqualitiesX
+                                       "checkDeclKindMatchability" $
+                    do { emitConstraints wanted
+                       ; checkDeclKindMatchability decl ty1 }
+                ; return wanted' }
        ; when (isJust decl) $ defaultDeclKindMatchabilities ty1
        ; kvs <- kindGeneralizeAll skol_info ty1  -- "All" because it's a top-level type
        ; reportUnsolvedEqualities skol_info kvs tclvl wanted
 
+       ; let inferred_bndrs = map (mkForAllTyBinder Inferred) kvs
+       ; provisional <- liftZonkM $ zonkTcType $
+           mkForAllTys (map (defaultForAllMatchability tyki,) inferred_bndrs) ty1
+       ; let prefix_len = maybe 0 (\decl -> length (declKindPrefix decl provisional)) decl
+             inferred_mas = [ case decl of
+                                Just decl | i < prefix_len -> tyConFlavourMatchability (tyClDeclFlavour decl)
+                                _ -> defaultForAllMatchability tyki
+                            | i <- [0 .. length kvs - 1] ]
        ; final_ty <- initZonkEnv DefaultFlexi
-                   $ zonkTcTypeToTypeX (mkInfForAllTys kvs ty1)
+                   $ zonkTcTypeToTypeX (mkInfForAllTys (zip inferred_mas kvs) ty1)
        ; traceTc "tc_top_lhs_type }" (vcat [ppr sig_ty, ppr final_ty])
        ; return final_ty }
   where
@@ -959,21 +979,42 @@ tc_top_lhs_type_x decl tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bnd
 
 {- Note [Checked declaration-kind matchability]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A declaration's anonymous argument prefix is M for data, data families and
+A declaration's consumed Pi prefix is M for data, data families and
 classes. It is U for type families and synonyms. Its result kind is independent.
 Explicit metadata must satisfy this rule. Do not replace it in mkTyCon.
 
 During a standalone kind signature check, omitted metadata gets a local
-metavariable. checkDeclKindMatchability constrains only the consumed anonymous
-prefix. It uses the elaborated kind, so it also checks aliases and computed
-metadata. Data and class declarations also consume their eta-expanded prefix.
+metavariable for each semantic binder. A source group does not share an omitted
+annotation. checkDeclKindMatchability constrains only the consumed Pi prefix.
+Its header walk shares the zippable/skippable rules with matchUpSigWithDecl.
+Invisible signature binders belong to this prefix only while a header binder
+remains. Data and class declarations also consume their eta-expanded prefix.
+The check uses the elaborated kind, so it also checks aliases and computed
+metadata. A family with no header binders keeps its entire residual kind.
 The solver checks explicit metadata with ordinary equality constraints.
 defaultDeclKindMatchabilities then defaults remaining local metavariables to M
 before generalization. Explicit bound metadata variables remain bound.
 No new matchability quantifier is inferred.
 
+Solve the formation equalities before selecting the declaration prefix. A
+visible forall checks its body against an outer open kind. Inside its binder
+scope, this check can defer an equality and put a CastTy around the body.
+For example, the cast can hide the second argument of
+  type F :: forall k -> k -> Type
+  type family F k a
+The prefix splitter stops at that cast until the formation solver fills its
+coercion hole. Check the prefix after that solve. Solve its metadata constraints
+with the original residual constraints at the same pushed level. Only then
+default metadata. Do not discard a cast to select the prefix.
+
+Keep implicit outer annotations associated with their binder identities when
+scopedSortOuter changes their order. Kind generalization can introduce more
+inferred binders after this defaulting step. Assign those new binders concrete
+metadata from the same prefix partition. The residual binders get the normal
+kind default M. Ordinary source types instead default their foralls to U.
+
 Inline data-kind signatures use etaExpandAlgTyCon. It checks the metadata of
-each anonymous arrow that becomes a declared argument. This also rejects U
+each Pi node that becomes a declared argument. This also rejects U
 arrows in data signatures without a standalone kind signature.
 
 The earlier matchability prototype used a declaration-wide M/U default for
@@ -982,44 +1023,42 @@ This check instead constrains the declared prefix before it applies the M
 kind default. Existing aliases retain their metadata and their source shape.
 -}
 
--- | Check the anonymous arrows consumed by the declaration header.
+-- | Check all Pi nodes consumed by the declaration header.
 checkDeclKindMatchability :: TyClDecl GhcRn -> TcKind -> TcM ()
 checkDeclKindMatchability decl kind
   = do { kind <- liftZonkM $ zonkTcType kind
-       ; go hs_bndrs kind }
+       ; forM_ (declKindPrefix decl kind) $ \ (ma, _) ->
+           discardResult $ unifyType Nothing ma expected_ma }
+  where
+    expected_ma = tyConFlavourMatchability (tyClDeclFlavour decl)
+
+-- | Select exactly the prefix consumed by header matching and data eta expansion.
+-- See Note [Checked declaration-kind matchability].
+declKindPrefix :: TyClDecl GhcRn -> TcKind -> [(Matchability, PiTyBinder)]
+declKindPrefix decl = go hs_bndrs
   where
     flav = tyClDeclFlavour decl
-    expected_ma = tyConFlavourMatchability flav
     HsQTvs { hsq_explicit = hs_bndrs } = tyClDeclTyVars decl
 
     go [] kind
-      | needsEtaExpansion flav = check_eta kind
-      | otherwise = return ()
+      | needsEtaExpansion flav = eta_prefix kind
+      | otherwise = []
     go hs_bndrs@(hs_bndr : rest) kind
       | Just (ma, bndr, body) <- splitPiTy_maybe kind
-      = case bndr of
-          Named (Bndr _ Inferred) -> go hs_bndrs body
-          Named (Bndr _ Specified)
-            | isHsBndrInvisible (hsTyVarBndrFlag (unLoc hs_bndr))
-            -> go rest body
-            | otherwise -> go hs_bndrs body
-          Named (Bndr _ Required)
-            | not (isHsBndrInvisible (hsTyVarBndrFlag (unLoc hs_bndr)))
-            -> go rest body
-          Anon _ _
-            | not (isHsBndrInvisible (hsTyVarBndrFlag (unLoc hs_bndr)))
-            -> do { discardResult $ unifyType Nothing ma expected_ma
-                  ; go rest body }
-          _ -> return () -- The header matcher reports incompatible visibility.
-      | otherwise = return () -- The header matcher reports missing binders.
+      , let vis = case bndr of
+                    Named (Bndr _ vis) -> NamedTCB vis
+                    Anon{} -> AnonTCB
+      = if zippableTyConBinder vis (hsTyVarBndrFlag (unLoc hs_bndr))
+        then (ma,bndr) : go rest body
+        else if skippableTyConBinder vis
+             then (ma,bndr) : go hs_bndrs body
+             else [] -- The header matcher reports incompatible visibility.
+      | otherwise = [] -- The header matcher reports missing binders.
 
-    check_eta kind
+    eta_prefix kind
       | Just (ma, bndr, body) <- splitPiTy_maybe kind
-      = do { case bndr of
-               Anon _ _ -> discardResult $ unifyType Nothing ma matchableDataConTy
-               Named _ -> return ()
-           ; check_eta body }
-      | otherwise = return ()
+      = (ma,bndr) : eta_prefix body
+      | otherwise = []
 
 -- | Default unresolved local arrow metadata before kind generalization.
 defaultDeclKindMatchabilities :: TcKind -> TcM ()
@@ -1074,7 +1113,8 @@ tcHsDeriv :: LHsSigType GhcRn -> TcM (Maybe (Class, [TyCoVar], [Type], Kind))
 tcHsDeriv hs_ty
   = do { ty <- tcTopLHsType DerivClauseCtxt hs_ty
 
-       ; let (tvs, pred)    = splitForAllTyCoVars ty
+       ; let (ma_tvs, pred) = splitForAllTyCoVars ty
+             tvs = map snd ma_tvs
              (_, kind_args, _) = splitFunTys (typeKind pred)
       -- Checking that `pred` a is type class application
 
@@ -1140,6 +1180,16 @@ tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
 tcHsClsInstType user_ctxt hs_inst_ty
   = setSrcSpan (getLocA hs_inst_ty) $
     do { inst_ty <- tcTopLHsType user_ctxt hs_inst_ty
+       -- Check before instance consumers discard the forall annotations.
+       -- See Note [Runtime forall matchability] in GHC.Tc.Utils.Instantiate.
+       ; skol_info <- mkSkolemInfo (SigTypeSkol user_ctxt)
+       ; let (bndrs, body) = splitForAllForAllTyBinders inst_ty
+             subst0 = mkEmptySubst (mkInScopeSet (tyCoVarsOfType inst_ty))
+       ; (subst, skol_bndrs) <- tcInstSkolTyVarBndrsX skol_info subst0 bndrs
+       ; (_, prefix_implics) <- tcRuntimeForAllBndrs skol_info [] [] skol_bndrs
+                                  (substTy subst body)
+       ; mapBagM_ checkImplicationInvariants prefix_implics
+       ; emitImplications prefix_implics
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty
        ; return inst_ty }
 
@@ -1464,6 +1514,29 @@ matchabilityInstantiationMode mode
   | mode_declaration mode = Nothing
   | otherwise = Just (mode_tyki mode)
 
+-- | Associate metadata with each semantic binder.
+-- See Note [Source forall matchability] in GHC.Hs.Type.
+forAllMatchabilities :: TcTyMode -> Maybe Matchability -> [bndr] -> TcM [(Matchability, bndr)]
+forAllMatchabilities mode explicit_ma = mapM $ \ bndr ->
+  do { ma <- case explicit_ma of
+               Just ma -> return ma
+               Nothing | mode_declaration mode -> newFlexiTyVarTy matchabilityTy
+                       | otherwise -> return (defaultForAllMatchability (mode_tyki mode))
+     ; return (ma,bndr) }
+
+-- | Check a source annotation before its whole binder group enters scope.
+tcForAllMatchability :: Maybe (LHsType GhcRn) -> TcM (Maybe Matchability)
+tcForAllMatchability = traverse (\ma -> tc_check_lhs_type kindLevelMode ma matchabilityTy)
+
+-- | Require runtime declaration quantifiers to have unmatchable metadata.
+-- Use ordinary equality so type synonyms and reducing families are accepted.
+tcCheckRuntimeForAllMatchability :: Maybe (LHsType GhcRn) -> TcM ()
+tcCheckRuntimeForAllMatchability Nothing = return ()
+tcCheckRuntimeForAllMatchability (Just hs_ma) = setSrcSpanA (getLoc hs_ma) $
+  do { ma <- tc_check_lhs_type kindLevelMode hs_ma matchabilityTy
+     ; _ <- unifyType Nothing ma unmatchableDataConTy
+     ; return () }
+
 {-
 Note [Bidirectional type checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1674,7 +1747,7 @@ tcHsType mode rn_ty@(HsExplicitListTy _ _ tys) exp_kind
 
   | null tys
   = do let ty = mkTyConTy promotedNilDataCon
-       let kind = mkSpecForAllTys [alphaTyVar] $ mkListTy alphaTy
+       let kind = mkSpecForAllTys [(matchableDataConTy, alphaTyVar)] $ mkListTy alphaTy
        checkExpKind mode rn_ty ty kind exp_kind
 
   | otherwise
@@ -3455,7 +3528,7 @@ checkExpectedResKind sig_kind res_ki
              n_sig_invis_bndrs = invisibleBndrCount sig_kind
              n_to_inst         = n_sig_invis_bndrs - n_res_invis_bndrs
 
-             (_, sig_kind') = splitInvisPiTysN n_to_inst sig_kind
+             (_, _, sig_kind') = splitInvisPiTysN n_to_inst sig_kind
 
        ; discardResult $ unifyKind Nothing sig_kind' actual_res_ki }
 
@@ -3486,7 +3559,7 @@ matchUpSigWithDecl name sig_ma_tcbs sig_res_kind hs_bndrs thing_inside
       = failWithTc (TcRnTooManyBinders sig_res_kind hs_bndrs)
 
     go subst ((_ma, tcb) : ma_tcbs') hs_bndrs@(hs_bndr : hs_bndrs')
-      | zippable (binderFlag tcb) (hsTyVarBndrFlag (unLoc hs_bndr))
+      | zippableTyConBinder (binderFlag tcb) (hsTyVarBndrFlag (unLoc hs_bndr))
       = -- Visible TyConBinder, so match up with the hs_bndrs
         do { let Bndr tv vis = tcb
                  tv' = updateTyVarKind (substTy subst) $
@@ -3503,7 +3576,7 @@ matchUpSigWithDecl name sig_ma_tcbs sig_res_kind hs_bndrs thing_inside
              -- We do a tcExtendTyVarEnv [tv'], so we return tv' in
              -- the list of lexically-scoped skolem type variables
 
-      | skippable (binderFlag tcb)
+      | skippableTyConBinder (binderFlag tcb)
       = -- Invisible TyConBinder, so do not consume one of the hs_bndrs
         do { let (subst', tcb') = substTyConBinderX subst tcb
            ; traceTc "musd2" (ppr tcb $$ ppr hs_bndr $$ ppr tcb')
@@ -3527,20 +3600,14 @@ matchUpSigWithDecl name sig_ma_tcbs sig_res_kind hs_bndrs thing_inside
       = do { traceTc "musd3:unifying" (ppr kind $$ ppr expected_kind)
            ; tcHsTvbKind bvar kind expected_kind }
 
-    -- See GHC Proposal #425, section "Kind checking",
-    -- where zippable and skippable are defined.
-    -- In particular: we match up if
-    -- (a) HsBndr looks like @k, and TyCon binder is forall k. (NamedTCB Specified)
-    -- (b) HsBndr looks like a,  and TyCon binder is forall k -> (NamedTCB Required)
-    --                                            or k -> (AnonTCB)
-    zippable :: TyConBndrVis -> HsBndrVis GhcRn -> Bool
-    zippable vis (HsBndrInvisible _) = isInvisSpecTcbVis vis  -- (a)
-    zippable vis (HsBndrRequired _)  = isVisibleTcbVis vis    -- (b)
+-- | Match a declaration binder to a signature binder, as in proposal 425.
+zippableTyConBinder :: TyConBndrVis -> HsBndrVis GhcRn -> Bool
+zippableTyConBinder vis (HsBndrInvisible _) = isInvisSpecTcbVis vis
+zippableTyConBinder vis (HsBndrRequired _)  = isVisibleTcbVis vis
 
-    -- See GHC Proposal #425, section "Kind checking",
-    -- where zippable and skippable are defined.
-    skippable :: TyConBndrVis -> Bool
-    skippable vis = not (isVisibleTcbVis vis)
+-- | Skip an invisible signature binder while a declaration binder remains.
+skippableTyConBinder :: TyConBndrVis -> Bool
+skippableTyConBinder vis = not (isVisibleTcbVis vis)
 
 -- Check the kind of a type variable binder
 tcHsTvbKind :: HsBndrVar GhcRn -> LHsKind GhcRn -> TcKind -> TcM ()
@@ -3994,27 +4061,44 @@ that with a check in checkForDisconnectedScopedTyVars:
 tcTKTelescope :: TcTyMode
               -> HsForAllTelescope GhcRn
               -> TcM a
-              -> TcM ([TcTyVarBinder], a)
+              -> TcM ([(Matchability, TcTyVarBinder)], a)
 -- A HsForAllTelescope comes only from a HsForAllTy,
 -- an explicit, user-written forall type
-tcTKTelescope mode tele thing_inside = case tele of
-  HsForAllVis { hsf_vis_bndrs = bndrs }
-    -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
-          ; let skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode
-                                      , sm_tvtv = SMDSkolemTv skol_info }
-          ; (req_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
-            -- req_tv_bndrs :: [VarBndr TyVar ()],
-            -- but we want [VarBndr TyVar ForAllTyFlag]
-          ; return (tyVarReqToBinders req_tv_bndrs, thing) }
+tcTKTelescope mode tele thing_inside =
+ do { explicit_ma <- tcForAllMatchability (hsf_matchability tele)
+    ; case tele of
+      HsForAllVis { hsf_vis_bndrs = bndrs }
+        -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
+              ; let skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode
+                                          , sm_tvtv = SMDSkolemTv skol_info }
+              ; (req_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
+                -- req_tv_bndrs :: [VarBndr TyVar ()],
+                -- but we want [VarBndr TyVar ForAllTyFlag]
+              ; ma_bndrs <- forAllMatchabilities mode explicit_ma (tyVarReqToBinders req_tv_bndrs)
+              ; return (ma_bndrs, thing) }
 
-  HsForAllInvis { hsf_invis_bndrs = bndrs }
-    -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
-          ; let skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode
-                                      , sm_tvtv = SMDSkolemTv skol_info }
-          ; (inv_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
-            -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
-            -- but we want [VarBndr TyVar ForAllTyFlag]
-          ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
+      HsForAllInvis { hsf_invis_bndrs = bndrs }
+        -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
+              ; let skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode
+                                          , sm_tvtv = SMDSkolemTv skol_info }
+              ; (inv_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
+                -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
+                -- but we want [VarBndr TyVar ForAllTyFlag]
+              ; ma_bndrs <- forAllMatchabilities mode explicit_ma (tyVarSpecToBinders inv_tv_bndrs)
+              ; return (ma_bndrs, thing) }
+    }
+
+-- | Check runtime invisible forall groups without flattening their scopes.
+tcRuntimeInvisForAllTelescopes :: SkolemInfo -> [HsForAllTelescope GhcRn]
+                              -> TcM a -> TcM ([InvisTVBinder], a)
+tcRuntimeInvisForAllTelescopes _ [] inside = ([],) <$> inside
+tcRuntimeInvisForAllTelescopes skol_info (tele@HsForAllInvis{hsf_invis_bndrs = bndrs} : rest) inside =
+  do { tcCheckRuntimeForAllMatchability (hsf_matchability tele)
+     ; (tvs, (rest_tvs, a)) <- tcExplicitTKBndrs skol_info bndrs $
+         tcRuntimeInvisForAllTelescopes skol_info rest inside
+     ; return (tvs ++ rest_tvs, a) }
+tcRuntimeInvisForAllTelescopes _ (HsForAllVis{} : _) _ =
+  pprPanic "tcRuntimeInvisForAllTelescopes: visible group" empty
 
 --------------------------------------
 --    HsOuterTyVarBndrs
@@ -4031,9 +4115,11 @@ bindOuterTKBndrsX skol_mode outer_bndrs thing_inside
         do { (imp_tvs', thing) <- bindImplicitTKBndrsX skol_mode imp_tvs thing_inside
            ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
                     , thing) }
-      HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-        do { (exp_tvs', thing) <- bindExplicitTKBndrsX skol_mode exp_bndrs thing_inside
+      HsOuterExplicit{hso_matchability = ma, hso_bndrs = exp_bndrs} ->
+        do { tcCheckRuntimeForAllMatchability ma
+           ; (exp_tvs', thing) <- bindExplicitTKBndrsX skol_mode exp_bndrs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
+                                      , hso_matchability = ma
                                       , hso_bndrs     = exp_bndrs }
                     , thing) }
 
@@ -4119,9 +4205,10 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
         do { (imp_tvs', thing) <- tcImplicitTKBndrsX skol_mode skol_info imp_tvs thing_inside
            ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
                     , thing) }
-      HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      HsOuterExplicit{hso_matchability = ma, hso_bndrs = exp_bndrs} ->
         do { (exp_tvs', thing) <- tcExplicitTKBndrsX skol_mode exp_bndrs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
+                                      , hso_matchability = ma
                                       , hso_bndrs     = exp_bndrs }
                     , thing) }
 
@@ -4129,15 +4216,40 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
 tcGadtConTyVarBndrs :: SkolemInfo
                     -> HsOuterSigTyVarBndrs GhcRn
                     -> [LHsGadtTelescope GhcRn]
-                    -> TcM a -> TcM ([TcTyVarBinder], a)
+                    -> TcM a -> TcM ([TcTyVarBinder], TcThetaType, a)
 tcGadtConTyVarBndrs skol_info outer inner thing_inside
-  = do { (outer_bndrs, (inner_tvbs, a)) <-
+  = do { tcCheckRuntimeForAllMatchability (hsOuterMatchability outer)
+       ; (outer_bndrs, (inner_tvbs, theta, a)) <-
             tcOuterTKBndrs skol_info outer $
-            tcExplicitTKBndrs skol_info (gadtTelescopeBndrs inner) $
-            thing_inside
+            tcConDeclTelescope skol_info inner thing_inside
        ; outer_bndrs <- scopedSortOuter outer_bndrs
        ; let outer_tvbs = tyVarSpecToBinders (outerTyVarBndrs outer_bndrs)
-       ; return (outer_tvbs ++ inner_tvbs, a) }
+       ; return (outer_tvbs ++ inner_tvbs, theta, a) }
+
+-- | Check constructor contexts before later groups enter scope.
+-- See Note [Constructor telescope contexts] in GHC.Hs.Decls.
+tcConDeclTelescope :: SkolemInfo -> [LHsGadtTelescope GhcRn]
+                   -> TcM a -> TcM ([TcTyVarBinder], TcThetaType, a)
+tcConDeclTelescope _ [] inside = do
+  a <- inside
+  return ([], [], a)
+tcConDeclTelescope skol_info (L _ HsGadtPar{} : rest) inside =
+  tcConDeclTelescope skol_info rest inside
+tcConDeclTelescope skol_info (L _ (HsGadtContext ctxt) : rest) inside =
+  do { theta <- tcHsContext (Just ctxt)
+       -- Do not install constructor-local theta as Givens. See the owning Note.
+     ; (tvbs, rest_theta, a) <- tcConDeclTelescope skol_info rest inside
+     ; return (tvbs, theta ++ rest_theta, a) }
+tcConDeclTelescope skol_info (L _ (HsGadtForAll _ tele) : rest) inside =
+  do { tcCheckRuntimeForAllMatchability (hsf_matchability tele)
+     ; (tvbs, (rest_tvbs, theta, a)) <- case tele of
+         HsForAllInvis{hsf_invis_bndrs = bndrs} -> do
+           (tvs, a) <- tcExplicitTKBndrs skol_info bndrs (tcConDeclTelescope skol_info rest inside)
+           return (tyVarSpecToBinders tvs, a)
+         HsForAllVis{hsf_vis_bndrs = bndrs} -> do
+           (tvs, a) <- tcExplicitTKBndrs skol_info bndrs (tcConDeclTelescope skol_info rest inside)
+           return (tyVarReqToBinders tvs, a)
+     ; return (tvbs ++ rest_tvbs, theta, a) }
 
 --------------------------------------
 --    Explicit tyvar binders
@@ -4684,9 +4796,8 @@ etaExpandAlgTyCon :: SkolemInfo
 etaExpandAlgTyCon skol_info tcbs res_kind
   = do { (ma_tcbs, res_kind) <- splitTyConKind skol_info in_scope avoid_occs res_kind
        ; solveEqualities "etaExpandAlgTyCon matchability" $
-           forM_ ma_tcbs $ \ (ma, bndr) ->
-             unless (isNamedTyConBinder bndr) $
-               discardResult $ unifyType Nothing ma matchableDataConTy
+           forM_ ma_tcbs $ \ (ma, _) ->
+             discardResult $ unifyType Nothing ma matchableDataConTy
        ; return (map snd ma_tcbs, res_kind) }
   where
     tyvars     = binderVars tcbs
@@ -4744,8 +4855,8 @@ splitTyConKind skol_info in_scope avoid_occs kind
                             _           -> panic "impossible"
                         Inf occ occs' = occs
 
-                    Just (_, Named (Bndr tv vis), kind')
-                      -> go occs uniqs subst' ((matchableDataConTy, tcb) : acc) kind'
+                    Just (ma, Named (Bndr tv vis), kind')
+                      -> go occs uniqs subst' ((substTy subst ma, tcb) : acc) kind'
                       where
                         tcb           = Bndr tv' (NamedTCB vis)
                         tc_tyvar      = mkTcTyVar (tyVarName tv) (tyVarKind tv) details
@@ -4963,7 +5074,7 @@ tcHsPartialSigType
   -> LHsSigWcType GhcRn       -- The type signature
   -> TcM ( [(Name, TcTyVar)]  -- Wildcards
          , Maybe TcType       -- Extra-constraints wildcard
-         , [(Name,InvisTVBinder)] -- Original tyvar names, in correspondence with
+         , [(Name,(Matchability, InvisTVBinder))] -- Original tyvar names, in correspondence with
                               --   the implicitly and explicitly bound type variables
          , TcThetaType        -- Theta part
          , TcType )           -- Tau part
@@ -4974,11 +5085,12 @@ tcHsPartialSigType ctxt sig_ty
   , (hs_ctxt, hs_tau) <- splitLHsQualTy body_ty
   = addSigCtxt ctxt (UserLHsSigType sig_ty) $
     do { mode <- mkHoleMode TypeLevel HM_Sig
-       ; (outer_bndrs, (wcs, wcx, theta, tau))
+       ; (outer_ma, (outer_bndrs, (wcs, wcx, theta, tau)))
             <- solveEqualities "tcHsPartialSigType" $
                -- See Note [Failure in local type signatures]
-               bindNamedWildCardBinders sig_wcs             $ \ wcs ->
-               bindOuterSigTKBndrs_Tv_M mode hs_outer_bndrs $
+               do { outer_ma <- tcForAllMatchability (hsOuterMatchability hs_outer_bndrs)
+                  ; stuff <- bindNamedWildCardBinders sig_wcs $ \ wcs ->
+                             bindOuterSigTKBndrs_Tv_M mode hs_outer_bndrs $
                do {   -- Instantiate the type-class context; but if there
                       -- is an extra-constraints wildcard, just discard it here
                     (theta, wcx) <- tcPartialContext mode hs_ctxt
@@ -4990,10 +5102,11 @@ tcHsPartialSigType ctxt sig_ty
                            tc_check_lhs_type mode hs_tau ek
 
                   ; return (wcs, wcx, theta, tau) }
+                  ; return (outer_ma, stuff) }
 
        ; traceTc "tcHsPartialSigType 2" empty
        ; outer_bndrs <- scopedSortOuter outer_bndrs
-       ; let outer_tv_bndrs = outerTyVarBndrs outer_bndrs
+       ; let outer_tv_bndrs = map (fromMaybe unmatchableDataConTy outer_ma,) (outerTyVarBndrs outer_bndrs)
        ; traceTc "tcHsPartialSigType 3" empty
 
          -- No kind-generalization here:
@@ -5019,14 +5132,15 @@ tcHsPartialSigType ctxt sig_ty
          -- Test case: partial-sigs/should_compile/LocalDefinitionBug
        ; let outer_bndr_names :: [Name]
              outer_bndr_names = hsOuterTyVarNames hs_outer_bndrs
-             tv_prs :: [(Name,InvisTVBinder)]
+             tv_prs :: [(Name,(Matchability, InvisTVBinder))]
              tv_prs = outer_bndr_names `zip` outer_tv_bndrs
 
        -- Zonk, so that any nested foralls can "see" their occurrences
        -- See Note [Checking partial type signatures], and in particular
        -- Note [Levels for wildcards]
        ; (tv_prs, theta, tau) <- liftZonkM $
-         do { tv_prs <- mapSndM zonkInvisTVBinder (tv_prs ++ tv_prs')
+         do { tv_prs <- mapSndM (\ (ma,bndr) -> (,) <$> zonkTcType ma <*> zonkInvisTVBinder bndr)
+                               (tv_prs ++ tv_prs')
             ; theta  <- mapM    zonkTcType        (theta ++ theta')
             ; tau    <- zonkTcType                tau
             ; return (tv_prs, theta, tau) }

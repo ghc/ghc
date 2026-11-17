@@ -89,7 +89,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
     , mkKindCo, mkUnivCo, mkUnivCoAddTypeDeps
         -- These use eqType; see Note [mkKindCo and mkUnivCo] in GHC.Core.Coercion
     , decomposePiCos
-    , coercionKind -- Used in toPhantomCo
+    , coercionKind, coercionLKind -- Used in toPhantomCo and forall reflexivity
     -- Used in assertions only
     , assertGoodForAllCo, coercionRole
     )
@@ -258,10 +258,11 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_ty ty@(TyConApp tc tys)
       = do { tys' <- go_tys tys; tcapp_ty ty tc tys' }
 
-    go_ty (ForAllTy (Bndr tv vis) inner)
-      = do { tycobinder tv vis $ \tv' -> do
+    go_ty (ForAllTy ma (Bndr tv vis) inner)
+      = do { ma' <- go_ty ma
+           ; tycobinder tv vis $ \tv' -> do
            ; inner' <- go_ty inner
-           ; return $ ForAllTy (Bndr tv' vis) inner' }
+           ; return $ mkTyCoForAllTy ma' tv' vis inner' }
 
     -- See Note [Use explicit recursion in mapTyCo]
     go_cos []       = return []
@@ -299,11 +300,12 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_co co@(TyConAppCo r tc cos)   = do { cos' <- go_cos cos
                                           ; tcapp_co co r tc cos' }
     go_co (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
-                    , fco_kind = kind_co, fco_body = co })
-      = do { kind_co' <- go_mco kind_co
+                    , fco_ma = ma_co, fco_kind = kind_co, fco_body = co })
+      = do { ma_co' <- go_co ma_co
+           ; kind_co' <- go_mco kind_co
            ; tycobinder tv visL $ \tv' ->  do
            ; co' <- go_co co
-           ; return $ mkForAllCo tv' visL visR kind_co' co' }
+           ; return $ mkForAllCo tv' visL visR ma_co' kind_co' co' }
         -- See Note [Efficiency for ForAllCo case of mapTyCo]
 
 
@@ -682,57 +684,41 @@ mkCoercionTy = CoercionTy
 *                                                                      *
 ********************************************************************* -}
 
--- | Make a dependent forall over a TyCoVar
-mkTyCoForAllTy :: TyCoVar -> ForAllTyFlag -> Type -> Type
-mkTyCoForAllTy tv vis ty
-  | isCoVar tv
-  , not (tv `elemVarSet` tyCoVarsOfType ty)
-   -- Maintain ForAllTy's invariants
-    -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
-  = mkVisFunTyManyU (varType tv) ty
-  | otherwise
-  = ForAllTy (mkForAllTyBinder vis tv) ty
-
--- | Make a dependent forall over a TyCoVar
-mkTyCoForAllTys :: [ForAllTyBinder] -> Type -> Type
+-- | Make a forall telescope with one supplied annotation per binder.
+mkTyCoForAllTys :: [(Matchability, ForAllTyBinder)] -> Type -> Type
 mkTyCoForAllTys bndrs ty
-  = foldr (\(Bndr var vis) -> mkTyCoForAllTy var vis) ty bndrs
+  = foldr (\(ma, Bndr var vis) -> mkTyCoForAllTy ma var vis) ty bndrs
 
--- | Make a dependent forall over an 'Inferred' variable
-mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
-mkTyCoInvForAllTy tv ty = mkTyCoForAllTy tv Inferred ty
+-- | Make an inferred forall with explicit matchability.
+mkTyCoInvForAllTy :: Matchability -> TyCoVar -> Type -> Type
+mkTyCoInvForAllTy ma tv ty = mkTyCoForAllTy ma tv Inferred ty
 
--- | Like 'mkTyCoInvForAllTy', but tv should be a tyvar
-mkInfForAllTy :: TyVar -> Type -> Type
-mkInfForAllTy tv ty = assert (isTyVar tv )
-                      ForAllTy (Bndr tv Inferred) ty
+-- | Make an inferred type-variable forall with explicit matchability.
+mkInfForAllTy :: Matchability -> TyVar -> Type -> Type
+mkInfForAllTy ma tv ty = assert (isTyVar tv) $
+                       mkForAllTy ma (Bndr tv Inferred) ty
 
--- | Like 'mkForAllTys', but assumes all variables are dependent and
--- 'Inferred', a common case
-mkTyCoInvForAllTys :: [TyCoVar] -> Type -> Type
-mkTyCoInvForAllTys tvs ty = foldr mkTyCoInvForAllTy ty tvs
+-- | Make an inferred telescope and preserve each supplied annotation.
+mkTyCoInvForAllTys :: [(Matchability, TyCoVar)] -> Type -> Type
+mkTyCoInvForAllTys tvs ty = foldr (uncurry mkTyCoInvForAllTy) ty tvs
 
--- | Like 'mkTyCoInvForAllTys', but tvs should be a list of tyvar
-mkInfForAllTys :: [TyVar] -> Type -> Type
-mkInfForAllTys tvs ty = foldr mkInfForAllTy ty tvs
+-- | Like 'mkTyCoInvForAllTys', with only type-variable binders.
+mkInfForAllTys :: [(Matchability, TyVar)] -> Type -> Type
+mkInfForAllTys tvs ty = foldr (uncurry mkInfForAllTy) ty tvs
 
--- | Like 'mkForAllTy', but assumes the variable is dependent and 'Specified',
--- a common case
-mkSpecForAllTy :: TyVar -> Type -> Type
-mkSpecForAllTy tv ty = assert (isTyVar tv )
-                       -- covar is always Inferred, so input should be tyvar
-                       ForAllTy (Bndr tv Specified) ty
+-- | Make a specified type-variable forall with explicit matchability.
+mkSpecForAllTy :: Matchability -> TyVar -> Type -> Type
+mkSpecForAllTy ma tv ty = assert (isTyVar tv) $
+                        mkForAllTy ma (Bndr tv Specified) ty
 
--- | Like 'mkForAllTys', but assumes all variables are dependent and
--- 'Specified', a common case
-mkSpecForAllTys :: [TyVar] -> Type -> Type
-mkSpecForAllTys tvs ty = foldr mkSpecForAllTy ty tvs
+-- | Make specified foralls with one annotation per type variable.
+mkSpecForAllTys :: [(Matchability, TyVar)] -> Type -> Type
+mkSpecForAllTys tvs ty = foldr (uncurry mkSpecForAllTy) ty tvs
 
--- | Like mkForAllTys, but assumes all variables are dependent and visible
-mkVisForAllTys :: [TyVar] -> Type -> Type
-mkVisForAllTys tvs = assert (all isTyVar tvs )
-                     -- covar is always Inferred, so all inputs should be tyvar
-                     mkForAllTys [ Bndr tv Required | tv <- tvs ]
+-- | Make required foralls with one annotation per type variable.
+mkVisForAllTys :: [(Matchability, TyVar)] -> Type -> Type
+mkVisForAllTys tvs = assert (all (isTyVar . snd) tvs) $
+                   mkForAllTys [(ma, Bndr tv Required) | (ma, tv) <- tvs]
 
 -- | Given a list of type-level vars and the free vars of a result kind,
 -- makes PiTyBinders, preferring anonymous binders
@@ -891,86 +877,67 @@ checkFunCo _r afl afr _w arg_co res_co
 -- mkForAllVisCos [tv{vis}] constructs a cast
 --   forall tv. res  ~R#   forall tv{vis} res`.
 -- See Note [Required foralls in Core] in GHC.Core.TyCo.Rep
-mkForAllVisCos :: HasDebugCallStack => [ForAllTyBinder] -> Coercion -> Coercion
+mkForAllVisCos :: HasDebugCallStack => [(Matchability, ForAllTyBinder)] -> Coercion -> Coercion
 mkForAllVisCos bndrs orig_co = foldr go orig_co bndrs
   where
-    go (Bndr tv vis) = mkForAllCo tv coreTyLamForAllTyFlag vis MRefl
+    go (ma, Bndr tv vis) = mkForAllCo tv coreTyLamForAllTyFlag vis (mkNomReflCo ma) MRefl
 
--- | Make a Coercion quantified over a type/coercion variable;
--- the variable has the same kind and visibility in both sides of the coercion
-mkHomoForAllCos :: [ForAllTyBinder] -> Coercion -> Coercion
-mkHomoForAllCos vs orig_co
-  | Just (ty, r) <- isReflCo_maybe orig_co
-  = mkReflCo r (mkTyCoForAllTys vs ty)
-  | otherwise
-  = foldr go orig_co vs
+-- | Quantify a coercion with unchanged binder kinds and visibilities.
+-- Metadata evidence remains nominal and can be non-reflexive.
+mkHomoForAllCos :: [(CoercionN, ForAllTyBinder)] -> Coercion -> Coercion
+mkHomoForAllCos vs orig_co = foldr go orig_co vs
   where
-    go :: ForAllTyBinder -> Coercion -> Coercion
-    go (Bndr var vis) co = mk_forall_co var vis vis MRefl co
+    go (ma_co, Bndr var vis) co = mkForAllCo var vis vis ma_co MRefl co
 
-mkHomoForAllCo :: TyVar -> Coercion -> Coercion
--- Specialised for a single TyVar,
---    and visibility of coreTyLamForAllTyFlag
-mkHomoForAllCo tv orig_co
-  | Just (ty, r) <- isReflCo_maybe orig_co
-  = mkReflCo r (mkForAllTy (Bndr tv vis) ty)
-  | otherwise
-  = mk_forall_co tv vis vis MRefl orig_co
+-- | Quantify over one type variable with explicit nominal metadata evidence.
+mkHomoForAllCo :: CoercionN -> TyVar -> Coercion -> Coercion
+mkHomoForAllCo ma_co tv orig_co
+  = mkForAllCo tv vis vis ma_co MRefl orig_co
   where
-    vis  = coreTyLamForAllTyFlag
+    vis = coreTyLamForAllTyFlag
 
 isReflForAllCo :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-               -> KindMCoercion -> Coercion -> Maybe Coercion
-isReflForAllCo tcv visL visR kind_co co
+               -> CoercionN -> KindMCoercion -> Coercion -> Maybe Coercion
+isReflForAllCo tcv visL visR ma_co kind_co co
   | Just (ty, r) <- isReflCo_maybe co
+  , coercionRole ma_co == Nominal
+  , isReflCo ma_co
   , isReflMCo kind_co
-  , visL `eqForAllVis` visR   -- See Note [Comparing visibility]
-                              -- in GHC.Core.TyCo.Compare
-  = Just (mkReflCo r (mkTyCoForAllTy tcv visL ty))
-
+  , visL `eqForAllVis` visR
+  = Just (mkReflCo r (mkTyCoForAllTy (coercionLKind ma_co) tcv visL ty))
   | otherwise
   = Nothing
 
--- | Make a Coercion from a tycovar, a kind coercion, and a body coercion.
+-- | Build a forall coercion with nominal metadata evidence at every role.
 mkForAllCo :: HasDebugCallStack => TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-           -> KindMCoercion -> Coercion -> Coercion
-mkForAllCo v visL visR kind_co co
-  | Just refl_co <- isReflForAllCo v visL visR kind_co co
+           -> CoercionN -> KindMCoercion -> Coercion -> Coercion
+mkForAllCo v visL visR ma_co kind_co co
+  | Just refl_co <- isReflForAllCo v visL visR ma_co kind_co co
   = refl_co
   | otherwise
-  = mk_forall_co v visL visR kind_co co
+  = mk_forall_co v visL visR ma_co kind_co co
 
--- | `mk_forall_co` just builds a ForAllCo.
--- With debug on, it checks invariants (e.g. he kind of the tycovar should
---   be the left-hand kind of the kind coercion).
--- Callers should have done any isReflCo short-cutting.
+-- | Build a non-reflexive forall coercion and check its invariants.
 mk_forall_co :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-             -> KindMCoercion -> Coercion -> Coercion
-mk_forall_co tcv visL visR kind_co co
-  = assertGoodForAllCo tcv visL visR kind_co co $
-    assertPpr (not (isReflCo co && isReflMCo kind_co && visL `eqForAllVis` visR)) (ppr co) $
+             -> CoercionN -> KindMCoercion -> Coercion -> Coercion
+mk_forall_co tcv visL visR ma_co kind_co co
+  = assertGoodForAllCo tcv visL visR ma_co kind_co co $
+    assertPpr (not (isReflCo co && isReflCo ma_co && isReflMCo kind_co
+                    && visL `eqForAllVis` visR)) (ppr co) $
     ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-             , fco_kind = kind_co, fco_body = co }
+             , fco_ma = ma_co, fco_kind = kind_co, fco_body = co }
 
-mkNakedForAllCo :: TyVar    -- Never a CoVar
-                -> ForAllTyFlag -> ForAllTyFlag
-                -> CoercionN -> Coercion -> Coercion
--- This version deliberately lacks the assertion checks.
--- Used during type checking when the arguments may (legitimately) not be zonked
--- and so the assertions might (bogusly) fail
--- NB: since the coercions are un-zonked, we can't really deal with
---     (FC6) and (FC7) in Note [ForAllCo] in GHC.Core.TyCo.Rep.
---     Fortunately we don't have to: this function is needed only for /type/ variables.
--- In fact, there is only one call site, in `can_eq_nc_forall`
-mkNakedForAllCo tv visL visR kind_co co
-  | assertPpr (isTyVar tv) (ppr tv) True
-  , Just refl_co <- isReflForAllCo tv visL visR mco co
+-- | Build an unzonked forall coercion without invariant assertions.
+mkNakedForAllCo :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
+                -> CoercionN -> CoercionN -> Coercion -> Coercion
+mkNakedForAllCo tv visL visR ma_co kind_co co
+  | Just refl_co <- isReflForAllCo tv visL visR ma_co mco co
   = refl_co
   | otherwise
   = ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
-             , fco_kind = mco, fco_body = co }
+             , fco_ma = ma_co, fco_kind = mco, fco_body = co }
   where
-    mco = kindCoToMKindCo kind_co  -- kind_co is often Refl
+    mco = kindCoToMKindCo kind_co
 
 mkCoVarCo :: CoVar -> Coercion
 -- cv :: s ~# t
@@ -1040,8 +1007,10 @@ mkSymCo :: Coercion -> Coercion
 mkSymCo co | isReflCo co   = co
 mkSymCo (SymCo co)         = co
 mkSymCo (SubCo (SymCo co)) = SubCo co
-mkSymCo co@(ForAllCo { fco_kind = kco, fco_body = body_co })
-  | isReflMCo kco          = co { fco_body = mkSymCo body_co }
+mkSymCo co@(ForAllCo { fco_visL = visL, fco_visR = visR
+                       , fco_ma = ma_co, fco_kind = kco, fco_body = body_co })
+  | isReflMCo kco          = co { fco_visL = visR, fco_visR = visL
+                               , fco_ma = mkSymCo ma_co, fco_body = mkSymCo body_co }
 mkSymCo co                 = SymCo co
 
 -- | mkTransCo creates a new 'Coercion' by composing the two

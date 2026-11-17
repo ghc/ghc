@@ -248,30 +248,11 @@ tidyType env ty@(FunTy _ ma w arg res)
         ; !arg' = tidyType env arg
         ; !res' = tidyType env res }
     in ty { ft_ma = ma', ft_mult = w', ft_arg = arg', ft_res = res' }
-tidyType env (ty@(ForAllTy{}))      = tidyForAllType env ty
-
-
-tidyForAllType :: TidyEnv -> Type -> Type
-tidyForAllType env ty
-   = (mkForAllTys' $! (zip tcvs' vis)) $! tidyType body_env body_ty
-  where
-    (tcvs, vis, body_ty) = splitForAllTyCoVars' ty
-    (body_env, tcvs') = tidyVarBndrs env tcvs
-
--- The following two functions differ from mkForAllTys and splitForAllTyCoVars in that
--- they expect/preserve the ForAllTyFlag argument. These belong to "GHC.Core.Type", but
--- how should they be named?
-mkForAllTys' :: [(TyCoVar, ForAllTyFlag)] -> Type -> Type
-mkForAllTys' tvvs ty = foldr strictMkForAllTy ty tvvs
-  where
-    strictMkForAllTy (tv,vis) ty = (ForAllTy $! ((Bndr $! tv) $! vis)) $! ty
-
-splitForAllTyCoVars' :: Type -> ([TyCoVar], [ForAllTyFlag], Type)
-splitForAllTyCoVars' ty = go ty [] []
-  where
-    go (ForAllTy (Bndr tv vis) ty) tvs viss = go ty (tv:tvs) (vis:viss)
-    go ty                          tvs viss = (reverse tvs, reverse viss, ty)
-
+tidyType env (ForAllTy ma (Bndr tv vis) body)
+  = let !ma' = tidyType env ma
+        (body_env, tv') = tidyVarBndr env tv
+    in mkTyCoForAllTy ma' tv' vis (tidyType body_env body)
+    -- See Note [Forall matchability metadata] in GHC.Core.TyCo.Rep.
 
 ---------------
 tidyAvoiding :: [OccName]
@@ -346,8 +327,8 @@ tidyCo env co
     go (DepFunCo var domain co)
       = ((DepFunCo $! var') $! go_mco domain) $! tidyCo body_env co
       where (body_env, var') = tidyVarBndr env var
-    go (ForAllCo tv visL visR h co)
-      = ((((ForAllCo $! tvp) $! visL) $! visR) $! (go_mco h)) $! (tidyCo envp co)
+    go (ForAllCo tv visL visR ma h co)
+      = (((((ForAllCo $! tvp) $! visL) $! visR) $! go ma) $! go_mco h) $! tidyCo envp co
       where (envp, tvp) = tidyVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.

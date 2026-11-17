@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-
 
 Describes predicates as they are considered by the solver.
@@ -31,7 +33,7 @@ module GHC.Core.Predicate (
   DictId, isEvId, isDictId,
 
   -- * Well-scoped free variables
-  scopedSort, tyCoVarsOfTypeWellScoped,
+  scopedSort, scopedSortWith, tyCoVarsOfTypeWellScoped,
   tyCoVarsOfTypesWellScoped,
 
   -- Equality left-hand sides
@@ -135,7 +137,7 @@ data Pred
   -- | A quantified predicate.
   --
   -- See Note [Quantified constraints] in GHC.Tc.Solver.Solve
-  | ForAllPred [TyVar] [PredType] PredType
+  | ForAllPred [(Matchability, TyVar)] [PredType] PredType
 
   -- NB: There is no TuplePred case
   --     Tuple predicates like (Eq a, Ord b) are just treated
@@ -702,11 +704,16 @@ types/kinds are fully settled and zonked.
 -- See also Note [Ordering of implicit variables] in "GHC.Rename.HsType"
 
 scopedSort :: [Var] -> [Var]
-scopedSort xs
+scopedSort = scopedSortWith id (tyCoVarsOfType . varType)
+
+-- | Sort annotated binders using their complete dependencies.
+-- Include dependencies from both the binder kind and its outer annotations.
+scopedSortWith :: forall a. (a -> Var) -> (a -> TyCoVarSet) -> [a] -> [a]
+scopedSortWith get_var get_fvs xs
   | null xs   = []
   | otherwise = go [] [] xs
   where
-    go :: [Var] -- already sorted, in reverse order
+    go :: [a] -- already sorted, in reverse order
        -> [TyCoVarSet] -- each set contains all the variables which must be placed
                        -- before the tv corresponding to the set; they are accumulations
                        -- of the fvs in the sorted Var's types
@@ -716,25 +723,25 @@ scopedSort xs
                        --   all (\tl -> all (`subVarSet` head tl) (tail tl)) (tails fv_list)
                        -- That is, each set in the list is a superset of all later sets.
 
-       -> [Var] -- yet to be sorted
-       -> [Var]
+       -> [a] -- yet to be sorted
+       -> [a]
     go acc _fv_list [] = reverse acc
     go acc  fv_list (tv:tvs)
       = go acc' fv_list' tvs
       where
         (acc', fv_list') = insert tv acc fv_list
 
-    insert :: Var           -- var to insert
-           -> [Var]         -- sorted list, in reverse order
+    insert :: a             -- binder to insert
+           -> [a]           -- sorted list, in reverse order
            -> [TyCoVarSet]  -- list of fvs, as above
-           -> ([Var], [TyCoVarSet])   -- augmented lists
+           -> ([a], [TyCoVarSet])   -- augmented lists
     -- Generally we put the new Var at the front of the accumulating list
     -- (leading to a stable sort) unless there is are reason to put it later.
-    insert v []     []         = ([v], [tyCoVarsOfType (varType v)])
+    insert v []     []         = ([v], [get_fvs v])
     insert v (a:as) (fvs:fvss)
-      | (isTyVar v && isId a) ||          -- TyVars precede Ids
-        (isEvId v && isId a && not (isEvId a)) || -- DictIds precede non-DictIds
-        (v `elemVarSet` fvs)
+      | (isTyVar (get_var v) && isId (get_var a)) || -- TyVars precede Ids
+        (isEvId (get_var v) && isId (get_var a) && not (isEvId (get_var a))) || -- DictIds precede non-DictIds
+        (get_var v `elemVarSet` fvs)
           -- (a) put Ids after TyVars, and (b) respect dependencies
       , (as', fvss') <- insert v as fvss
       = (a:as', fvs `unionVarSet` fv_v : fvss')
@@ -742,7 +749,7 @@ scopedSort xs
       | otherwise  -- Put `v` at the front
       = (v:a:as, fvs `unionVarSet` fv_v : fvs : fvss)
       where
-        fv_v = tyCoVarsOfType (varType v)
+        fv_v = get_fvs v
 
        -- lists not in correspondence
     insert _ _ _ = panic "scopedSort"

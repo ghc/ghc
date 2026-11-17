@@ -877,7 +877,7 @@ idConcreteTvs id
   -- So, for the time being, we manually inspect the type of the original,
   -- unpatched Id to retrieve which of its outer forall-d tyvars should be concrete.
   | id `hasKnownKey`unsafeCoercePrimIdKey
-  , (a_rep:_b_rep:a:_b:_, _) <- tcSplitForAllTyVars $ idType id
+  , ((_,a_rep):_b_rep:(_,a):_b:_, _) <- tcSplitForAllTyVars $ idType id
   -- NB: only check the argument representation, not the result representation.
   -- This is because the following is OK:
   --

@@ -377,8 +377,9 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
                              -- "open" because a (literal) pattern can be unlifted;
                              -- e.g. pattern Zero <- 0#   (#12094)
                    -- See Note [Escaping kind in type signatures] in GHC.Tc.Gen.HsType
+                 ; tcCheckRuntimeForAllMatchability (hsOuterMatchability hs_outer_bndrs)
                  ; tcOuterTKBndrs skol_info hs_outer_bndrs   $
-                   tcExplicitTKBndrs skol_info ex_hs_tvbndrs $
+                   tcRuntimeInvisForAllTelescopes skol_info ex_hs_tvbndrs $
                    do { req     <- tcHsContext hs_req
                       ; prov    <- tcHsContext hs_prov
                       ; body_ty <- tcCheckLHsType hs_body_ty res_kind
@@ -454,10 +455,10 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
     ctxt = PatSynCtxt name
 
     build_patsyn_type implicit_bndrs univ_bndrs req ex_bndrs prov body
-      = mkInvisForAllTys implicit_bndrs $
-        mkInvisForAllTys univ_bndrs $
+      = mkInvisForAllTys [(unmatchableDataConTy,b) | b <- implicit_bndrs] $
+        mkInvisForAllTys [(unmatchableDataConTy,b) | b <- univ_bndrs] $
         mk_naked_phi_ty req $
-        mkInvisForAllTys ex_bndrs $
+        mkInvisForAllTys [(unmatchableDataConTy,b) | b <- ex_bndrs] $
         mk_naked_phi_ty prov $
         body
 

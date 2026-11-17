@@ -49,6 +49,16 @@ data BlankSrcSpan = BlankSrcSpan | BlankSrcSpanFile | NoBlankSrcSpan
 data BlankEpAnnotations = BlankEpAnnotations | NoBlankEpAnnotations
                   deriving (Eq,Show)
 
+{- Note [Blank forall token annotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Forall token annotations contain the forall token, separator, optional @ token,
+and comments. Blank both visibility variants when comparing syntax after normal
+pretty printing. Normal pretty printing does not retain these comments. The
+matchability type is a separate syntax field, so its structure remains visible
+in the comparison. Exact printing uses NoBlankEpAnnotations and retains all
+token and comment data.
+-}
+
 -- | Show the full AST as the compiler sees it.
 showAstDataFull :: Data a => a -> SDoc
 showAstDataFull = showAstData NoBlankSrcSpan NoBlankEpAnnotations
@@ -72,6 +82,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationAnnListEpAnn
               `extQ` annotationAnnList
               `extQ` annotationNoEpAnns
+              `extQ` annotationForallVis
+              `extQ` annotationForallInvis
               `extQ` annotationExprBracket
               `extQ` annotationTypedBracket
               `extQ` epTokenOC
@@ -372,6 +384,13 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             annotationNoEpAnns :: EpAnn NoEpAnns -> SDoc
             annotationNoEpAnns = annotation' (text "EpAnn NoEpAnns")
+
+            -- See Note [Blank forall token annotations].
+            annotationForallVis :: EpAnnForallVis -> SDoc
+            annotationForallVis = annotation' (text "EpAnnForallVis")
+
+            annotationForallInvis :: EpAnnForallInvis -> SDoc
+            annotationForallInvis = annotation' (text "EpAnnForallInvis")
 
             annotation' :: forall a .(Data a, Typeable a)
                        => SDoc -> EpAnn a -> SDoc

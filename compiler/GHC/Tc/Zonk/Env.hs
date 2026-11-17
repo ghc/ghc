@@ -238,10 +238,11 @@ we go.
 --
 -- Example:
 --
--- > zonk (ForAllTy (Bndr tv vis) body_ty)
--- >  = runZonkBndrT (zonkTyBndrX tv) $ \ tv' ->
+-- > zonk (ForAllTy ma (Bndr tv vis) body_ty)
+-- >  = do { ma' <- zonkTcTypeToTypeX ma
+-- >       ; runZonkBndrT (zonkTyBndrX tv) $ \ tv' ->
 -- >    do { body_ty' <- zonkTcTypeToTypeX body_ty
--- >       ; return (ForAllTy (Bndr tv' vis) body_ty') }
+-- >       ; return (ForAllTy ma' (Bndr tv' vis) body_ty') } }
 --
 -- See Note [Continuation-passing style for zonking].
 runZonkBndrT :: ZonkBndrT m a -> forall r. (a -> ZonkT m r) -> ZonkT m r

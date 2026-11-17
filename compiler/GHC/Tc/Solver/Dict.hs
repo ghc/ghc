@@ -29,6 +29,7 @@ import GHC.Tc.Utils.Unify( uType, mightEqualLater )
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Type
+import GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
 import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.InstEnv( DFunInstType )
@@ -1244,7 +1245,7 @@ matchLocalInst body_pred loc
       | let in_scope = mkInScopeSet (qtv_set `unionVarSet` body_pred_tv_set)
       , Just tv_subst <- ruleMatchTyKiX qtv_set (mkRnEnv2 in_scope)
                                         emptyTvSubstEnv qbody body_pred
-      , let match = (qev, map (lookupVarEnv tv_subst) qtvs)
+      , let match = (qev, map (lookupVarEnv tv_subst . snd) qtvs)
       = (match:matches, unifs)
 
       | otherwise
@@ -1255,11 +1256,11 @@ matchLocalInst body_pred loc
         (matches, this_unif `combine` unifs)
       where
         qloc = ctEvLoc qev
-        qtv_set = mkVarSet qtvs
+        qtv_set = mkVarSet (map snd qtvs)
         (matches, unifs) = match_local_inst inerts qcis
         this_unif
           | Just subst <- mightEqualLater inerts qbody qloc body_pred loc
-          = Just (qev, map  (lookupTyVar subst) qtvs)
+          = Just (qev, map (lookupTyVar subst . snd) qtvs)
           | otherwise
           = Nothing
 
@@ -1697,6 +1698,12 @@ the sc_theta_ids at all. So our final construction is
      g_sc = /\ tvs. sel_id tys (g0 tvs)
   and if tvs=[] we get the straight superclass selection
      g_sc = sel_id tys g0
+
+New runtime lambdas have U matchability. Use U for the new superclass
+evidence telescope, even when g0 has M or unknown annotations. Applying
+g0 does not require U. The original quantified constraint keeps its
+annotations. The direct selection case creates no lambdas and keeps
+the selected type unchanged.
 -}
 
 makeSuperClasses :: [Ct] -> TcS [Ct]
@@ -1727,7 +1734,7 @@ makeSuperClasses cts = concatMapM go cts
 
 mkStrictSuperClasses
     :: ExpansionFuel -> CtEvidence
-    -> [TyVar] -> ThetaType  -- These two args are non-empty only when taking
+    -> [(Matchability, TyVar)] -> ThetaType  -- These two args are non-empty only when taking
                              -- superclasses of a /quantified/ constraint
     -> Class -> [Type] -> TcS [Ct]
 -- Return constraints for the strict superclasses of
@@ -1739,7 +1746,7 @@ mkStrictSuperClasses fuel ev tvs theta cls tys
                            ev tvs theta cls tys
 
 mk_strict_superclasses :: ExpansionFuel -> NameSet -> CtEvidence
-                       -> [TyVar] -> ThetaType
+                       -> [(Matchability, TyVar)] -> ThetaType
                        -> Class -> [Type] -> TcS [Ct]
 -- Always return the immediate superclasses of (cls tys);
 -- and expand their superclasses, provided none of them are in rec_clss
@@ -1758,6 +1765,7 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
     loc  = ctEvLoc ev
     dict_ids  = mkTemplateLocals theta
     this_size = pSizeClassPred cls tys
+    runtime_tvs = [(unmatchableDataConTy,tv) | (_,tv) <- tvs]
 
     do_one_given sel_id
       | isUnliftedType sc_pred
@@ -1770,7 +1778,7 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
       = do { given_ev <- newGivenEv sc_loc $
                          mk_given_desc sel_id sc_pred
            ; assertFuelPrecondition fuel $
-             mk_superclasses fuel rec_clss (CtGiven given_ev) tvs theta sc_pred }
+             mk_superclasses fuel rec_clss (CtGiven given_ev) runtime_tvs theta sc_pred }
       where
         sc_pred = classMethodInstTy sel_id tys
 
@@ -1784,7 +1792,10 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
 
         all_tvs       = tvs `chkAppend` sc_tvs
         all_theta     = theta `chkAppend` (map scaledThing sc_theta)
-        swizzled_pred = mkInfSigmaTy all_tvs all_theta sc_inner_pred
+        swizzled_pred
+          | null tvs, null theta = sc_pred
+          | otherwise = mkInfSigmaTy [(unmatchableDataConTy,tv) | (_,tv) <- all_tvs]
+                                      all_theta sc_inner_pred
 
         -- evar   :: forall tvs. theta => cls tys
         -- sel_id :: forall cls_tvs. cls cls_tvs
@@ -1794,10 +1805,10 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
           | null tvs, null theta -- See wrinkle (NQCS1)
           = Var sel_id `mkTyApps` tys `App` evId evar
           | otherwise
-          = mkLams all_tvs $ mkLams dict_ids $
+          = mkLams (map snd all_tvs) $ mkLams dict_ids $
             Var sel_id `mkTyApps` tys
-                       `App` (evId evar `mkVarApps` (tvs ++ dict_ids))
-                       `mkVarApps` sc_tvs
+                       `App` (evId evar `mkVarApps` (map snd tvs ++ dict_ids))
+                       `mkVarApps` (map snd sc_tvs)
 
     sc_loc | isCTupleClass cls = loc
            | otherwise         = loc { ctl_origin = mk_sc_origin (ctLocOrigin loc) }
@@ -1860,7 +1871,7 @@ But no variables means no improvement; case closed.
 -}
 
 mk_superclasses :: ExpansionFuel -> NameSet -> CtEvidence
-                -> [TyVar] -> ThetaType -> PredType -> TcS [Ct]
+                -> [(Matchability, TyVar)] -> ThetaType -> PredType -> TcS [Ct]
 -- Return this constraint, plus its superclasses, if any
 -- Precondition: fuel >= 0
 mk_superclasses fuel rec_clss ev tvs theta pred
@@ -1872,7 +1883,7 @@ mk_superclasses fuel rec_clss ev tvs theta pred
   = return [mkNonCanonical ev]
 
 mk_superclasses_of :: ExpansionFuel -> NameSet -> CtEvidence
-                   -> [TyVar] -> ThetaType -> Class -> [Type]
+                   -> [(Matchability, TyVar)] -> ThetaType -> Class -> [Type]
                    -> TcS [Ct]
 -- Always return this class constraint,
 -- and expand its superclasses

@@ -5649,7 +5649,7 @@ runDomainConversionObjectCheck libdir = do
                     mkLams [a, b, q, h, f, n] $
                         mkApps (Cast (Var h) (SubCo (mkCoVarCo q))) [Var f, Var n]
                 kernelTy =
-                    mkInfForAllTys [a, b]
+                    mkInfForAllTys [(unmatchableDataConTy, a), (unmatchableDataConTy, b)]
                         $ mkFunctionType unmatchableDataConTy ManyTy (varType q)
                         $ mkFunctionType unmatchableDataConTy ManyTy (phi (mkTyVarTy a)) (phi (mkTyVarTy b))
                 kernelName =

@@ -779,20 +779,16 @@ recordPatSynErr loc pat =
     addFatalError $ mkPlainErrorMsgEnvelope loc $
       (PsErrRecordSyntaxInPatSynDecl pat)
 
-mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> [LHsModifier GhcPs]
-             -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
-                -> Maybe (LHsContext GhcPs) -> HsConDeclH98Details GhcPs
-                -> ConDecl GhcPs
-
-mkConDeclH98 (tdarrow, (tforall,tdot)) mods name mb_forall mb_cxt args
-  = ConDeclH98 { con_ext    = AnnConDeclH98 tforall tdot tdarrow
-               , con_name   = name
-               , con_forall = isJust mb_forall
-               , con_ex_tvs = mb_forall `orElse` []
-               , con_mb_cxt = mb_cxt
-               , con_args   = args
+mkConDeclH98 :: [LHsModifier GhcPs] -> LocatedN RdrName
+             -> [LHsGadtTelescope GhcPs] -> HsConDeclH98Details GhcPs
+             -> ConDecl GhcPs
+mkConDeclH98 mods name teles args
+  = ConDeclH98 { con_ext = noExtField
+               , con_name = name
+               , con_telescope = teles
+               , con_args = args
                , con_modifiers = mods
-               , con_doc    = Nothing }
+               , con_doc = Nothing }
 
 -- | Construct a GADT-style data constructor from the constructor names and
 -- their type. Some interesting aspects of this function:
@@ -830,17 +826,16 @@ mkGadtDecl loc mods names dcol ty = do
                      { con_g_ext  = AnnConDeclGADT ops cps dcol
                      , con_names  = names
                      , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
-                     , con_inner_bndrs = inner_bndrs
-                     , con_mb_cxt = mcxt
+                     , con_telescope = inner_bndrs
                      , con_g_args = args
                      , con_res_ty = res_ty
                      , con_modifiers = mods
                      , con_doc    = Nothing }
   where
-    (outer_bndrs, inner_bndrs, mcxt, body_ty) = splitLHsGadtTy ty
+    (outer_bndrs, inner_bndrs, body_ty) = splitLHsGadtTy ty
     outer_bndrs_loc = case outer_bndrs of
       HsOuterImplicit{} -> getLoc ty
-      HsOuterExplicit an _ -> EpAnn (entry an) noAnn emptyComments
+      HsOuterExplicit {hso_xexplicit = an} -> EpAnn (entry an) noAnn emptyComments
 
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
@@ -2358,8 +2353,8 @@ mkStarPV tok = do
 setTelescopeBndrsNameSpace :: NameSpace -> HsForAllTelescope GhcPs -> HsForAllTelescope GhcPs
 setTelescopeBndrsNameSpace ns forall_telescope =
   case forall_telescope of
-    HsForAllInvis x bndrs -> HsForAllInvis x (set_bndrs_ns bndrs)
-    HsForAllVis   x bndrs -> HsForAllVis   x (set_bndrs_ns bndrs)
+    HsForAllInvis x ma bndrs -> HsForAllInvis x ma (set_bndrs_ns bndrs)
+    HsForAllVis   x ma bndrs -> HsForAllVis   x ma (set_bndrs_ns bndrs)
   where
     set_bndrs_ns :: [LHsTyVarBndr flag GhcPs] -> [LHsTyVarBndr flag GhcPs]
     set_bndrs_ns = map (setLHsTyVarBndrNameSpace ns)

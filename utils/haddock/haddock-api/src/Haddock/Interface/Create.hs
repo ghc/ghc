@@ -974,10 +974,18 @@ extractPatternSyn nm t tvs cons =
           typ = longArrow args (data_ty con)
           typ' =
             case con of
-              ConDeclH98{con_mb_cxt = Just cxt} -> noLocA (HsQualTy noExtField cxt typ)
+              ConDeclH98{con_telescope = telescope} ->
+                foldr addPrefix typ telescope
               _ -> typ
           typ'' = noLocA (HsQualTy noExtField (noLocA emptyContext) typ')
        in PatSynSig noAnn [noLocA nm] (mkEmptySigType typ'')
+
+    addPrefix :: LHsGadtTelescope GhcRn -> LHsType GhcRn -> LHsType GhcRn
+    addPrefix (L _ (HsGadtForAll _ tele)) body =
+      noLocA $ HsForAllTy noExtField tele body
+    addPrefix (L _ (HsGadtContext ctxt)) body =
+      noLocA $ HsQualTy noExtField ctxt body
+    addPrefix (L _ HsGadtPar{}) body = noLocA $ HsParTy noAnn body
 
     longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
     longArrow inputs output = foldr (\x y -> noLocA (HsFunTy noExtField (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) x y)) output inputs

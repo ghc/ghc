@@ -43,7 +43,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text.Encoding
 import GHC hiding (HsTypeGhcPsExt (..))
-import GHC.Builtin.WiredIn.Types (liftedRepTy)
+import GHC.Builtin.WiredIn.Types (liftedRepTy, matchableDataConTy)
+import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.FVs (deepDetTypesFV)
 import GHC.Core.TyCo.Rep (Type (..))
 import GHC.Core.Type (isRuntimeRepVar)
@@ -167,7 +168,7 @@ mkEmptySigType :: LHsType GhcRn -> LHsSigType GhcRn
 -- though the type might have free variables
 mkEmptySigType lty@(L loc ty) = L loc $ case ty of
   HsForAllTy
-    { hst_tele = HsForAllInvis{hsf_invis_bndrs = bndrs}
+    { hst_tele = HsForAllInvis{hsf_matchability = ma, hsf_invis_bndrs = bndrs}
     , hst_body = body
     } ->
       HsSig
@@ -175,6 +176,7 @@ mkEmptySigType lty@(L loc ty) = L loc $ case ty of
         , sig_bndrs =
             HsOuterExplicit
               { hso_xexplicit = noExtField
+              , hso_matchability = ma
               , hso_bndrs = bndrs
               }
         , sig_body = body
@@ -189,7 +191,7 @@ mkEmptySigType lty@(L loc ty) = L loc $ case ty of
 mkHsForAllInvisTeleI
   :: [LHsTyVarBndr Specificity DocNameI] -> HsForAllTelescope DocNameI
 mkHsForAllInvisTeleI invis_bndrs =
-  HsForAllInvis{hsf_xinvis = noExtField, hsf_invis_bndrs = invis_bndrs}
+  HsForAllInvis{hsf_xinvis = noExtField, hsf_matchability = Nothing, hsf_invis_bndrs = invis_bndrs}
 
 mkHsImplicitSigTypeI :: LHsType DocNameI -> HsSigType DocNameI
 mkHsImplicitSigTypeI body =
@@ -219,8 +221,7 @@ getGADTConType :: ConDecl DocNameI -> LHsSigType DocNameI
 getGADTConType
   ( ConDeclGADT
       { con_outer_bndrs = outer_bndrs
-      , con_inner_bndrs = inner_bndrs
-      , con_mb_cxt = mcxt
+      , con_telescope = telescope
       , con_g_args = args
       , con_res_ty = res_ty
       }
@@ -229,15 +230,10 @@ getGADTConType
       ( HsSig
           { sig_ext = noExtField
           , sig_bndrs = unLoc outer_bndrs
-          , sig_body = mkGadtArgTys inner_bndrs phi_ty
+          , sig_body = mkGadtArgTys telescope tau_ty
           }
       )
     where
-      phi_ty :: LHsType DocNameI
-      phi_ty = case mcxt of
-        Nothing    -> tau_ty
-        Just theta -> mkQualTy theta tau_ty
-
       tau_ty :: LHsType DocNameI
       tau_ty = case args of
         RecConGADT _ flds -> mkFunTy (noLocA (XHsType (HsRecTy (unLoc flds)))) res_ty
@@ -256,6 +252,7 @@ getGADTConType
         L l (HsForAllTy { hst_xforall = noAnn
                            , hst_tele = tele, hst_body = body })
       mkGadtArgTy (L l HsGadtPar{}) body = L l (HsParTy noAnn body)
+      mkGadtArgTy (L _ (HsGadtContext ctxt)) body = mkQualTy ctxt body
 
       mkGadtArgTys :: [LHsGadtTelescope DocNameI] -> LHsType DocNameI -> LHsType DocNameI
       mkGadtArgTys = flip (foldr mkGadtArgTy)
@@ -529,8 +526,9 @@ reparenOuterTyVarBndrs
   => HsOuterTyVarBndrs flag a
   -> HsOuterTyVarBndrs flag a
 reparenOuterTyVarBndrs imp@HsOuterImplicit{} = imp
-reparenOuterTyVarBndrs (HsOuterExplicit x exp_bndrs) =
-  HsOuterExplicit x (map (mapXRec @(NoGhcTc a) reparenTyVar) exp_bndrs)
+reparenOuterTyVarBndrs (HsOuterExplicit x ma exp_bndrs) =
+  HsOuterExplicit x (fmap (mapXRec @(NoGhcTc a) reparenType) ma)
+    (map (mapXRec @(NoGhcTc a) reparenTyVar) exp_bndrs)
 reparenOuterTyVarBndrs v@XHsOuterTyVarBndrs{} = v
 
 -- | Add parentheses around the types in an 'HsForAllTelescope' (see 'reparenTypePrec')
@@ -539,10 +537,10 @@ reparenHsForAllTelescope
    . XRecCond a
   => HsForAllTelescope a
   -> HsForAllTelescope a
-reparenHsForAllTelescope (HsForAllVis x bndrs) =
-  HsForAllVis x (map (mapXRec @a reparenTyVar) bndrs)
-reparenHsForAllTelescope (HsForAllInvis x bndrs) =
-  HsForAllInvis x (map (mapXRec @a reparenTyVar) bndrs)
+reparenHsForAllTelescope (HsForAllVis x ma bndrs) =
+  HsForAllVis x (fmap (mapXRec @a reparenType) ma) (map (mapXRec @a reparenTyVar) bndrs)
+reparenHsForAllTelescope (HsForAllInvis x ma bndrs) =
+  HsForAllInvis x (fmap (mapXRec @a reparenType) ma) (map (mapXRec @a reparenTyVar) bndrs)
 reparenHsForAllTelescope v@XHsForAllTelescope{} = v
 
 -- | Add parenthesis around the types in a 'HsTyVarBndr' (see 'reparenTypePrec')
@@ -801,7 +799,7 @@ typeNames ty = go ty Set.empty
         -- See Note [Arrow matchability in Haddock] in Haddock.Convert.
         FunTy _ ma w t1 t2 -> go t2 $ go t1 $ go w $ go ma acc
         TyConApp tcon args -> List.foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
-        ForAllTy bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) acc
+        ForAllTy ma bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) $ go ma acc
         LitTy _ -> acc
         CastTy t' _ -> go t' acc
         CoercionTy{} -> acc
@@ -857,13 +855,15 @@ defaultRuntimeRepVars :: Type -> Type
 defaultRuntimeRepVars = go emptyVarEnv
   where
     go :: TyVarEnv () -> Type -> Type
-    go subs (ForAllTy (Bndr var flg) ty)
+    go subs (ForAllTy ma (Bndr var flg) ty)
       | isRuntimeRepVar var
-      , isInvisibleForAllTyFlag flg =
+      , isInvisibleForAllTyFlag flg
+      , ma `eqType` matchableDataConTy =
           let subs' = extendVarEnv subs var ()
            in go subs' ty
       | otherwise =
           ForAllTy
+            (go subs ma)
             (Bndr (updateTyVarKind (go subs) var) flg)
             (go subs ty)
     go subs (TyVarTy tv)

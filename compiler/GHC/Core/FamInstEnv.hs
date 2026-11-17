@@ -1606,10 +1606,11 @@ normalise_type ty
            ; w_redn <- withRole Nominal $ go w
            ; r <- getRole
            ; return $ mkFunRedn r vis ma_redn w_redn arg_redn res_redn }
-    go (ForAllTy (Bndr tcvar vis) ty)
-      = do { (lc', tv', k_redn) <- normalise_var_bndr tcvar
+    go (ForAllTy ma (Bndr tcvar vis) ty)
+      = do { ma_redn <- withRole Nominal $ go ma
+           ; (lc', tv', k_redn) <- normalise_var_bndr tcvar
            ; redn <- withLC lc' $ normalise_type ty
-           ; return $ mkForAllRedn vis tv' k_redn redn }
+           ; return $ mkForAllRedn vis tv' ma_redn k_redn redn }
     go (TyVarTy tv)    = normalise_tyvar tv
     go (CastTy ty co)
       = do { redn <- go ty

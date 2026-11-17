@@ -1300,11 +1300,11 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                                 ; return (wrap, rho, Nothing) }
                   Just choices -> do
                     { let (inst_tys, rest) = splitAt (length tvs) choices
-                          subst = Subst.zipTvSubst tvs inst_tys
+                          subst = Subst.zipTvSubst (map snd tvs) inst_tys
                     ; unless (tvs `equalLength` inst_tys
                               && and (zipWith (\tv ty ->
                                    eqType (Subst.substTy subst (tyVarKind tv))
-                                          (typeKind ty)) tvs inst_tys)) $
+                                          (typeKind ty)) (map snd tvs) inst_tys)) $
                         pprPanic "tcInstFun: invalid retained instantiations"
                                  (ppr tvs $$ ppr choices)
                     ; wrap <- instCall fun_orig inst_tys (substTheta subst theta)
@@ -1361,11 +1361,11 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
 
     -- Rule ITVDQ from the GHC Proposal #281
     go1 plan fun_orig pos acc fun_ty ((EValArg { ea_arg = arg }) : rest_args)
-      | Just (tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
+      | Just (ma, tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
       = assertPpr (isVisibleForAllTyFlag (binderFlag tvb)) (ppr fun_ty $$ ppr arg) $
         -- Any invisible binders have been instantiated by IALL above,
         -- so this forall must be visible (i.e. Required)
-        do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
+        do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (ma, tvb, body) arg
            ; let wrap = mkWpTyApps [ty_arg]
            ; go plan fun_orig (pos+1) (addArgWrap wrap acc) inst_body rest_args }
 
@@ -1725,7 +1725,8 @@ tcRetainedResultCandidate NoQL (Just expected) args fun sigma
   | hasNoConcreteTyVars fun
   , hasNativeDependentExpr (Core.Type expected)
   , not (any is_type_arg args)
-  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , let tvs = map snd ma_tvs
   , not (null tvs)
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) body
   , isRetainedValueType expected, isTauTy body
@@ -1800,7 +1801,8 @@ tcRetainedResultMatch :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
 tcRetainedResultMatch NoQL (Just expected) args fun sigma
   | hasNativeDependentExpr (Core.Type expected)
   , not (any is_type_arg args)
-  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , let tvs = map snd ma_tvs
   , not (null tvs)
   , let (theta, tau) = tcSplitPhiTy body
   , null theta || hasNoConcreteTyVars fun
@@ -1837,7 +1839,8 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
   | hasNoConcreteTyVars fun
   , hasNativeDependentExpr (Core.Type expected)
   , not (any is_type_arg args)
-  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , let tvs = map snd ma_tvs
   , not (null tvs)
   , let (_, tau) = tcSplitPhiTy body
   , hasNativeDependentExpr (Core.Type tau)
@@ -2210,7 +2213,8 @@ tcRetainedDollarInst (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)
   | name `hasKey` dollarIdKey, dollar `hasKey` dollarIdKey
   , not (any is_type_arg args)
   , [lhs, rhs] <- [arg | EValArg { ea_arg = arg } <- args]
-  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , let tvs = map snd ma_tvs
   , not (null tvs)
   , (_, [_, domain], result) <- splitFunTys body
   , isTauTy body, not (hasNativeDependentExpr (Core.Type body))
@@ -2276,7 +2280,7 @@ tcRetainedDollarInst (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)
 
     tau_domains ty
       | Just ty' <- coreView ty = tau_domains ty'
-    tau_domains (ForAllTy _ body) = tau_domains body
+    tau_domains (ForAllTy _ _ body) = tau_domains body
     tau_domains (CastTy ty _) = tau_domains ty
     tau_domains (DepFunTy binder body) = isTauTy (varType binder) && tau_domains body
     tau_domains (FunTy { ft_arg = domain, ft_res = result })
@@ -2298,7 +2302,8 @@ tcRetainedDollarInst (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)
                   ; case mb_id of
                       Just var | isEmptyNameEnv (idConcreteTvs var)
                         -> do { sigma <- liftZonkM (zonkTcType (varType var))
-                              ; let (tvs, body) = tcSplitForAllInvisTyVars sigma
+                              ; let (ma_tvs, body) = tcSplitForAllInvisTyVars sigma
+                                    tvs = map snd ma_tvs
                               ; return $ do
                                   guard (isTauTy body
                                          && not (hasNativeDependentExpr (Core.Type body)))
@@ -2381,7 +2386,8 @@ type RetainedInstPlan = Maybe [Type]
 -- Keep their original order in the application; this split is for matching only.
 tcRetainedInstTelescope :: Type -> ([TyVar], ThetaType, Type)
 tcRetainedInstTelescope sigma
-  | (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  | (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , let tvs = map snd ma_tvs
   , (theta, tau) <- tcSplitPhiTy body
   , not (null tvs && null theta)
   = let (rest_tvs, rest_theta, result) = tcRetainedInstTelescope tau
@@ -3080,7 +3086,7 @@ newArgTyVarTyQL do_ql frr_ctxt
 instantiateSigmaQL :: QLFlag
                    -> CtOrigin
                    -> ConcreteTyVars -- ^ concreteness information
-                   -> [TyVar]
+                   -> [(Matchability, TyVar)]
                    -> TcThetaType -> TcSigmaType
                    -> TcM (HsWrapper, TcSigmaType)
 -- (instantiateSigmaQL orig tvs theta ty)
@@ -3088,7 +3094,7 @@ instantiateSigmaQL :: QLFlag
 --     constraints theta, and returns the (instantiated) type ty
 -- See Note [Instantiating type variables in QuickLook]
 instantiateSigmaQL do_ql orig concs tvs theta body_ty
-  = do { rec (subst, inst_tvs) <- mapAccumLM (new_meta subst) empty_subst tvs
+  = do { rec (subst, inst_tvs) <- mapAccumLM (new_meta subst) empty_subst (map snd tvs)
        ; let inst_theta  = substTheta subst theta
              inst_body   = substTy subst body_ty
 
@@ -3151,9 +3157,9 @@ tcVTA :: ConcreteTyVars
 -- Deal with a visible type application
 -- The function type has already had its Inferred binders instantiated
 tcVTA conc_tvs fun_ty hs_ty
-  | Just (tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
+  | Just (ma, tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
   , isSpecifiedForAllTyFlag (binderFlag tvb)
-  = do { tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty }
+  = do { tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) hs_ty }
 
   | otherwise
   = do { (_, fun_ty) <- liftZonkM $ zonkTidyTcType emptyTidyEnv fun_ty
@@ -3161,12 +3167,12 @@ tcVTA conc_tvs fun_ty hs_ty
 
 -- See Note [Visible type application and abstraction]
 tcVDQ :: ConcreteTyVars              -- See Note [Representation-polymorphism checking built-ins]
-      -> (ForAllTyBinder, TcType)    -- Function type
+      -> (Matchability, ForAllTyBinder, TcType)    -- Function type
       -> LHsExpr GhcRn               -- Argument type
       -> TcM (TcType, TcType)
-tcVDQ conc_tvs (tvb, inner_ty) arg
+tcVDQ conc_tvs (ma, tvb, inner_ty) arg
   = do { hs_wc_ty <- expr_to_type arg
-       ; tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_wc_ty }
+       ; tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) hs_wc_ty }
 
 -- Convert a HsExpr into the equivalent HsType.
 -- See [RequiredTypeArguments and the T2T mapping]
@@ -3252,8 +3258,8 @@ expr_to_type earg =
         unwrap_sig (L _ (HsSig _ HsOuterImplicit{hso_ximplicit=bndrs} body))
           | null bndrs = return body
           | otherwise  = illegal_implicit_tvs bndrs
-        unwrap_sig (L l (HsSig _ HsOuterExplicit{hso_bndrs=bndrs} body)) =
-          return $ L l (HsForAllTy noExtField (HsForAllInvis noAnn bndrs) body)
+        unwrap_sig (L l (HsSig _ HsOuterExplicit{hso_matchability=ma,hso_bndrs=bndrs} body)) =
+          return $ L l (HsForAllTy noExtField (HsForAllInvis noAnn ma bndrs) body)
     go (L l (HsPar _ e)) =
       do { t <- go e
          ; return (L l (HsParTy noAnn t)) }
@@ -3338,7 +3344,7 @@ we get to type checking, where we know that f's type has a visible forall at the
 so we are expecting a type argument. More precisely, this happens in tcVDQ in GHC/Tc/Gen/App.hs:
 
   tcVDQ :: ConcreteTyVars              -- See Note [Representation-polymorphism checking built-ins]
-        -> (ForAllTyBinder, TcType)    -- Function type
+        -> (Matchability, ForAllTyBinder, TcType)    -- Function type
         -> LHsExpr GhcRn               -- Argument type
         -> TcM (TcType, TcType)
 
@@ -3407,10 +3413,10 @@ want that, use a `(type ty)` argument instead.
 -}
 
 tc_inst_forall_arg :: ConcreteTyVars            -- See Note [Representation-polymorphism checking built-ins]
-                   -> (ForAllTyBinder, TcType)  -- Function type
+                   -> (Matchability, ForAllTyBinder, TcType)  -- Function type
                    -> LHsWcType GhcRn           -- Argument type
                    -> TcM (TcType, TcType)
-tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
+tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) hs_ty
   = do { let tv   = binderVar tvb
              kind = tyVarKind tv
              tv_nm   = tyVarName tv
@@ -3436,7 +3442,7 @@ tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
              -- Emit [W] F Bool ~ kappa[conc] and pretend the user wrote (#,#) @kappa.
                coercionRKind <$> unifyConcrete (occNameFS $ getOccName $ tv_nm) conc ty_arg0
 
-       ; let fun_ty    = mkForAllTy tvb inner_ty
+       ; let fun_ty    = mkForAllTy ma tvb inner_ty
              in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
              insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
                -- This substitution is well-kinded even when inner_ty

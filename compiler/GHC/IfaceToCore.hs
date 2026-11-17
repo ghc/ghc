@@ -1885,11 +1885,21 @@ tcIfaceType = go
       = do { tc' <- tcIfaceTyCon tc
            ; tks' <- mapM go (appArgsIfaceTypes tks)
            ; return (mkTyConApp tc' tks') }
-    go (IfaceForAllTy bndr t)
-      = bindIfaceForAllBndr bndr $ \ tv' vis ->
-        ForAllTy (Bndr tv' (ifaceForAllTyFlag vis)) <$> go t
+    go (IfaceForAllTy ma bndr t)
+      = do { ma' <- go ma
+           ; checkIfaceForAllMatchability ma'
+           ; bindIfaceForAllBndr bndr $ \ tv' vis ->
+        ForAllTy ma' (Bndr tv' (ifaceForAllTyFlag vis)) <$> go t }
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
+
+-- | Check a forall annotation before its binder enters scope.
+-- See Note [Forall interface metadata] in GHC.Iface.Type.
+checkIfaceForAllMatchability :: Type -> IfL ()
+checkIfaceForAllMatchability ma
+  = unless (typeKind ma `eqType` matchabilityTy) $
+      failIfM (text "Invalid forall matchability in interface:" <+> ppr ma
+               $$ text "Expected kind Matchability.")
 
 -- | Evaluate native interface eligibility and report detected recursive knots.
 -- See Note [Detected recursive native interface domains].
@@ -2015,12 +2025,18 @@ tcIfaceCo = go
       = failIfM (text "Opaque runtime call congruence interfaces are not implemented.")
     go (IfaceTyConAppCo r tc cs) = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2
-    go (IfaceForAllCo tcv visL visR k co)
-      = do { k' <- go_mco k
+    go (IfaceForAllCo tcv visL visR ma k co)
+      = do { ma' <- go ma
+           ; unless (coercionRole ma' == Nominal) $
+               failIfM (text "Invalid forall matchability coercion in interface:"
+                        $$ text "Expected a nominal coercion." $$ ppr ma')
+           ; checkIfaceForAllMatchability (coercionLKind ma')
+           ; checkIfaceForAllMatchability (coercionRKind ma')
+           ; k' <- go_mco k
            ; bindIfaceBndr tcv $ \ tv' ->
         do { co' <- go co
            ; return (ForAllCo { fco_tcv = tv', fco_visL = ifaceForAllTyFlag visL, fco_visR = ifaceForAllTyFlag visR
-                              , fco_kind = k', fco_body = co' }) } }
+                              , fco_ma = ma', fco_kind = k', fco_body = co' }) } }
     go (IfaceCoVarCo n)           = CoVarCo <$> go_var n
     go (IfaceUnivCo p r t1 t2 ds) =
       do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2

@@ -100,7 +100,7 @@ import GHC.Iface.Decl    ( coAxiomToIfaceDecl )
 import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Load
 
-import GHC.Builtin.WiredIn.Types ( mkListTy, anyTypeOfKind )
+import GHC.Builtin.WiredIn.Types ( mkListTy, anyTypeOfKind, matchableDataConTy, unmatchableDataConTy )
 import GHC.Builtin.Modules( mAIN_NAME, gHC_PRIM, rOOT_MAIN, isWiredInOnlyModule )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
@@ -2714,7 +2714,7 @@ tcRnExpr hsc_env mode rdr_expr
     _ <- perhaps_disable_default_warnings $
          simplifyInteractive residual ;
 
-    let { all_expr_ty = mkInfForAllTys qtvs $
+    let { all_expr_ty = mkInfForAllTys [(unmatchableDataConTy,tv) | tv <- qtvs] $
                         mkPhiTy (map idType dicts) res_ty } ;
     ty <- liftZonkM $ zonkTcType all_expr_ty ;
 
@@ -2855,7 +2855,7 @@ tcRnType hsc_env flexi normalise rdr_type
                  | otherwise = ty
 
        ; traceTc "tcRnExpr" (debugPprType ty $$ debugPprType ty')
-       ; return (ty', mkInfForAllTys kvs (typeKind ty')) }
+       ; return (ty', mkInfForAllTys [(matchableDataConTy,kv) | kv <- kvs] (typeKind ty')) }
 
 
 {- Note [TcRnExprMode]

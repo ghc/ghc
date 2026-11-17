@@ -1763,54 +1763,69 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
       ConDeclGADT { con_names = names
                   , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
-                  , con_inner_bndrs = inner_bndrs
-                  , con_mb_cxt = ctx
+                  , con_telescope = teles
                   , con_g_args = args
                   , con_res_ty = typ
                   , con_doc = doc} ->
         [ toHie $ C (Decl ConDec $ getRealSpanA span) <$> names
+        , toHie $ case outer_bndrs of
+            HsOuterExplicit{hso_matchability = ma} -> ma
+            HsOuterImplicit{} -> Nothing
         , bindingsOnly $  -- implicit forall
             map (C $ TyVarBind (mkScope outer_bndrs_loc) (ResolvedScopes [sigmaScope]))
                 imp_vars
-        , toHie $ tvScopes (ResolvedScopes [phiScope]) NoScope exp_bndrs
-        , toHie ctx
+        , toHie $ tvScopes (ResolvedScopes [prefixScope]) NoScope exp_bndrs
+        , toHieConTelescope rhsScope teles
         , toHie args
         , toHie typ
         , toHie doc
         ]
         where
           rhsScope = combineScopes argsScope tyScope
-          ctxScope = maybe NoScope mkScope ctx
           argsScope = case args of
             PrefixConGADT _ xs -> scaled_args_scope xs
             RecConGADT _ x     -> mkScope x
           tyScope = mkScope typ
-          phiScope = combineScopes ctxScope rhsScope
-          sigmaScope = foldr combineScopes phiScope (map (mkScope . getLoc) exp_bndrs)
+          prefixScope = conTelescopeScope rhsScope teles
+          sigmaScope = foldr combineScopes prefixScope (map (mkScope . getLoc) exp_bndrs)
           imp_vars = case outer_bndrs of
             HsOuterImplicit{hso_ximplicit = imp_vars} -> imp_vars
             HsOuterExplicit{} -> []
           exp_bndrs =
             [ L l (updateHsTyVarBndrFlag Invisible b) | L l b <- hsOuterExplicitBndrs outer_bndrs ]
-            ++ concatMap hsForAllTelescopeBndrs (gadtArgTelescopes inner_bndrs)
-      ConDeclH98 { con_name = name, con_ex_tvs = qvars
-                 , con_mb_cxt = ctx, con_args = dets
+      ConDeclH98 { con_name = name, con_telescope = teles
+                 , con_args = dets
                  , con_doc = doc} ->
         [ toHie $ C (Decl ConDec $ getRealSpan (locA span)) name
-        , toHie $ tvScopes (ResolvedScopes []) rhsScope qvars
-        , toHie ctx
+        , toHieConTelescope (h98_args_scope dets) teles
         , toHie dets
         , toHie doc
         ]
-        where
-          rhsScope = combineScopes ctxScope argsScope
-          ctxScope = maybe NoScope mkScope ctx
-          argsScope = case dets of
-            PrefixCon _ xs -> scaled_args_scope xs
-            InfixCon _ a b -> scaled_args_scope [a, b]
-            RecCon _ x     -> mkScope x
     where scaled_args_scope :: [HsConDeclField GhcRn] -> Scope
           scaled_args_scope = foldr combineScopes NoScope . map (mkScope . cdf_type)
+          h98_args_scope (PrefixCon _ xs) = scaled_args_scope xs
+          h98_args_scope (InfixCon _ a b) = scaled_args_scope [a,b]
+          h98_args_scope (RecCon _ fields) = mkScope fields
+
+-- | Extend a constructor's body scope with its ordered prefix nodes.
+conTelescopeScope :: Scope -> [LHsGadtTelescope GhcRn] -> Scope
+conTelescopeScope = foldl' (\scope node -> combineScopes scope (mkScope node))
+
+-- | Visit each context and annotation before the binders that follow it.
+-- See Note [Constructor telescope contexts] in GHC.Hs.Decls.
+-- See Note [Forall metadata scopes in HIE].
+toHieConTelescope :: Scope -> [LHsGadtTelescope GhcRn] -> HieM [HieAST Type]
+toHieConTelescope _ [] = pure []
+toHieConTelescope body_scope (L span node : rest) = concatM $
+  makeNodeA node span : case node of
+    HsGadtForAll _ tele ->
+      [ toHie (hsf_matchability tele)
+      , toHie $ tvScopes (ResolvedScopes [conTelescopeScope body_scope rest])
+                  NoScope (hsForAllTelescopeBndrs tele)
+      , toHieConTelescope body_scope rest
+      ]
+    HsGadtContext ctxt -> [toHie ctxt, toHieConTelescope body_scope rest]
+    HsGadtPar _ -> [toHieConTelescope body_scope rest]
 
 instance ToHie (LocatedA [LocatedA (HsConDeclRecField GhcRn)]) where
   toHie (L span decls) = concatM $
@@ -1901,7 +1916,7 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
 
 instance ToHie (TScoped (LocatedA (HsSigType GhcRn))) where
   toHie (TS tsc (L span t@HsSig{sig_bndrs=bndrs,sig_body=body})) = concatM $ makeNodeA t span :
-      [ toHie (TVS tsc (mkScope span) bndrs)
+      [ toHie (TVS tsc (mkScope body) bndrs)
       , toHie body
       ]
 
@@ -1909,13 +1924,40 @@ instance ToHie (TScoped (LocatedA (HsSigType GhcRn))) where
 instance Data flag => ToHie (TVScoped (HsOuterTyVarBndrs flag GhcRn)) where
   toHie (TVS tsc sc bndrs) = case bndrs of
     HsOuterImplicit xs -> bindingsOnly $ map (C $ TyVarBind sc tsc) xs
-    HsOuterExplicit _ xs -> toHie $ tvScopes tsc sc xs
+    HsOuterExplicit _ ma xs -> concatM
+      -- See Note [Forall metadata scopes in HIE].
+      [ toHie ma
+      , toHie $ tvScopes tsc NoScope xs
+      , bindingsOnly [C (TyVarBind sc (ResolvedScopes [])) name
+                     | name <- hsLTyVarNames xs]
+      ]
 
 toHieForAllTele ::  HsForAllTelescope GhcRn -> SrcSpan -> HieM [HieAST Type]
-toHieForAllTele (HsForAllVis { hsf_vis_bndrs = bndrs }) loc =
-  toHie $ tvScopes (ResolvedScopes []) (mkScope loc) bndrs
-toHieForAllTele (HsForAllInvis { hsf_invis_bndrs = bndrs }) loc =
-  toHie $ tvScopes (ResolvedScopes []) (mkScope loc) bndrs
+-- See Note [Forall metadata scopes in HIE].
+toHieForAllTele (HsForAllVis { hsf_matchability = ma, hsf_vis_bndrs = bndrs }) loc =
+  concatM [toHie ma, toHie $ tvScopes (ResolvedScopes [mkScope loc]) NoScope bndrs]
+toHieForAllTele (HsForAllInvis { hsf_matchability = ma, hsf_invis_bndrs = bndrs }) loc =
+  concatM [toHie ma, toHie $ tvScopes (ResolvedScopes [mkScope loc]) NoScope bndrs]
+
+{- Note [Forall metadata scopes in HIE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The source annotation follows the forall separator, but it is outside the
+scope of every binder in that group. Keep two separate scope components:
+the later binder kinds in the same group, and the following prefix and body.
+Do not combine them into one source span across the annotation.
+
+Walk constructor prefix nodes in source order. An earlier context cannot
+refer to a later binder. A later annotation can refer to an earlier binder.
+Use only the remaining nodes and the constructor body for each group's
+following scope. Visit each annotation before recording the group's binders.
+
+Outer signature binders can also have an UnresolvedScope over their
+definitions. Keep that scope on the binder-kind context. Add a separate
+TyVarBind context for the signature body. HIE combines the scopes from both
+contexts. This retains the unresolved scope without joining the binder kinds
+to the body across the annotation. Use the body span, not the whole signature,
+for this additional local scope.
+-}
 
 -- | Record a retained binder as a value binding and visit its domain type.
 toHieRetainedBndr :: Scope -> LHsTyVarBndr () GhcRn -> HieM [HieAST Type]

@@ -160,8 +160,10 @@ sig_extra_cts is Nothing.
 data TcIdSigInst
   = TISI { sig_inst_sig :: TcIdSig
 
-         , sig_inst_skols :: [(Name, InvisTVBinder)]
-               -- Instantiated type and kind variables, TyVarTvs
+         , sig_inst_skols :: [(Name, (Matchability, InvisTVBinder))]
+               -- Instantiated type and kind variables, TyVarTvs.
+               -- Preserve each binder's Matchability annotation.
+               -- See Note [Forall matchability metadata] in GHC.Core.TyCo.Rep.
                -- The Name is the Name that the renamer chose;
                --   but the TcTyVar may come from instantiating
                --   the type and hence have a different unique.

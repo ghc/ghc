@@ -1448,7 +1448,7 @@ findTypeShape fam_envs ty
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
        = go_tc rec_tc tc tc_args
 
-       | Just (_, ty') <- splitForAllTyCoVar_maybe ty
+       | Just (_ma, _, ty') <- splitForAllTyCoVar_maybe ty
        = go rec_tc ty'
 
        | otherwise
@@ -1539,7 +1539,7 @@ isRecDataCon fam_envs fuel orig_dc
         TyConApp tc tc_args -> go_tc_app fuel visited_tcs tc tc_args
           -- See Note [Detecting recursive data constructors], points (B) and (C)
 
-        ForAllTy _ ty' -> go_arg_ty fuel visited_tcs ty'
+        ForAllTy _ _ ty' -> go_arg_ty fuel visited_tcs ty'
           -- See Note [Detecting recursive data constructors], point (A)
 
         CastTy ty' _ -> go_arg_ty fuel visited_tcs ty'

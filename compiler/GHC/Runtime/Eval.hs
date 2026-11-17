@@ -1225,11 +1225,12 @@ checkForExistence clsInst mb_inst_tys = do
       tau   = mkClassPred cls (substTheta subst args)
       -- Constrain the instance with any residual constraints
       phi   = mkPhiTy thetas tau
-      sigma = mkForAllTys (map (\v -> Bndr v Inferred) dfun_tvs) phi
+      sigma = mkForAllTys [(substTy subst ma, Bndr v Inferred) | (ma,v) <- ma_dfun_tvs] phi
 
     in inst { is_dfun = (is_dfun inst) { varType = sigma }}
     where
-    (dfun_tvs, _, cls, args) = instanceSig inst
+    (ma_dfun_tvs, _, cls, args) = instanceSig inst
+    dfun_tvs = map snd ma_dfun_tvs
 
 -----------------------------------------------------------------------------
 -- Compile an expression, run it, and deliver the result

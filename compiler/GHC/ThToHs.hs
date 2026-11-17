@@ -693,57 +693,27 @@ cvtConstr :: TH.Name -- ^ name of first constructor of parent type
 cvtConstr _ do_con_name (NormalC c strtys)
   = do  { c'   <- do_con_name c
         ; tys' <- mapM cvt_arg strtys
-        ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing (PrefixCon noExtField tys') }
+        ; returnLA $ mkConDeclH98 [] c' [] (PrefixCon noExtField tys') }
 
 cvtConstr parent_con do_con_name (RecC c varstrtys)
   = do  { c'    <- do_con_name c
         ; args' <- mapM (cvt_id_arg parent_con) varstrtys
-        ; con_decl <- wrapParLA (mkConDeclH98 noAnn [] c' Nothing Nothing . RecCon noAnn) args'
+        ; con_decl <- wrapParLA (mkConDeclH98 [] c' [] . RecCon noAnn) args'
         ; returnLA con_decl }
 
 cvtConstr _ do_con_name (InfixC st1 c st2)
   = do  { c'   <- do_con_name c
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
-        ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing
+        ; returnLA $ mkConDeclH98 [] c' []
                        (InfixCon noExtField st1' st2') }
 
 cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
-  = do  { tvs'      <- cvtTvs tvs
-        ; ctxt'     <- cvtContext funPrec ctxt
-        ; L _ con'  <- cvtConstr parent_con do_con_name con
-        ; returnLA $ add_forall tvs' ctxt' con' }
-  where
-    add_cxt :: LHsContext GhcPs -> Maybe (LHsContext GhcPs) -> Maybe (LHsContext GhcPs)
-    add_cxt lcxt         Nothing           = mkHsContextMaybe lcxt
-    add_cxt (L loc (HsContext _ cxt1)) (Just (L _ (HsContext _ cxt2)))
-      = Just (L loc (HsContext noAnn (cxt1 ++ cxt2)))
-
-    -- Nested foralls end up flattened (see tests/th/GadtConSigs_th_dump1.stderr)
-    -- but it doesn't seem to matter.
-    add_forall :: [LHsTyVarBndr Hs.Specificity GhcPs] -> LHsContext GhcPs
-               -> ConDecl GhcPs -> ConDecl GhcPs
-    add_forall tvs' cxt' con@(ConDeclGADT { con_outer_bndrs = L l outer_bndrs
-                                          , con_inner_bndrs = inner_bndrs
-                                          , con_mb_cxt = cxt })
-      = con { con_outer_bndrs = L l outer_bndrs'
-            , con_inner_bndrs = inner_bndrs
-            , con_mb_cxt = add_cxt cxt' cxt }
-      where
-        outer_bndrs'
-          | null all_tvs = mkHsOuterImplicit
-          | otherwise    = mkHsOuterExplicit noAnn all_tvs
-
-        all_tvs = tvs' ++ outer_exp_tvs
-
-        outer_exp_tvs = hsOuterExplicitBndrs outer_bndrs
-
-    add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
-      = con { con_forall = not (null all_tvs)
-            , con_ex_tvs = all_tvs
-            , con_mb_cxt = add_cxt cxt' cxt }
-      where
-        all_tvs = tvs' ++ ex_tvs
+  = cvtForallCon parent_con do_con_name Nothing tvs ctxt con
+cvtConstr parent_con do_con_name (ForallMatchC ma (ForallC tvs@(_ : _) ctxt con))
+  = do { ma' <- cvtKind ma
+       ; cvtForallCon parent_con do_con_name (Just ma') tvs ctxt con }
+cvtConstr _ _ ForallMatchC{} = failWith (InvalidForallMatchabilityWrapper "ForallMatchC")
 
 cvtConstr _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
     Nothing -> failWith GadtNoCons
@@ -770,8 +740,7 @@ mk_gadt_decl names args res_ty
                    { con_g_ext  = noAnn
                    , con_names  = names
                    , con_outer_bndrs = outer_bndrs
-                   , con_inner_bndrs = []
-                   , con_mb_cxt = Nothing
+                   , con_telescope = []
                    , con_g_args = args
                    , con_res_ty = res_ty
                    , con_modifiers = []
@@ -786,6 +755,38 @@ cvtSrcStrictness :: TH.SourceStrictness -> SrcStrictness
 cvtSrcStrictness NoSourceStrictness = NoSrcStrict
 cvtSrcStrictness SourceLazy         = SrcLazy
 cvtSrcStrictness SourceStrict       = SrcStrict
+
+-- | Retain each constructor forall group and its outer annotation scope.
+-- See Note [Source forall matchability] in GHC.Hs.Type.
+cvtForallCon :: TH.Name -> (TH.Name -> CvtM (LocatedN RdrName))
+             -> Maybe (LHsType GhcPs) -> [TH.TyVarBndr TH.Specificity]
+             -> TH.Cxt -> TH.Con -> CvtM (LConDecl GhcPs)
+cvtForallCon parent_con do_con_name ma tvs ctxt con =
+  do { tvs' <- cvtTvs tvs
+     ; ctxt' <- cvtContext funPrec ctxt
+     ; L _ con' <- cvtConstr parent_con do_con_name con
+     ; returnLA $ add_group tvs' ctxt' con' }
+  where
+    tele tvs = (mkHsForAllInvisTele noAnn tvs) { hsf_matchability = ma }
+    forall_node tvs = noLocA (HsGadtForAll noExtField (tele tvs))
+    context_nodes cxt = [mkHsGadtContext cxt | not (null (hsc_ctxt (unLoc cxt)))]
+    add_group tvs cxt con@ConDeclH98{con_telescope = teles} =
+      con { con_telescope = [forall_node tvs | not (null tvs)] ++ context_nodes cxt ++ teles }
+    add_group tvs cxt con@ConDeclGADT{con_outer_bndrs = L l outer, con_telescope = inner}
+      | null tvs, null (hsc_ctxt (unLoc cxt)) = con
+      | otherwise =
+        con { con_outer_bndrs = L l new_outer
+            , con_telescope = context_nodes cxt ++ old_outer ++ inner }
+      where
+        -- A context-only wrapper precedes the child's first explicit group.
+        -- See Note [Constructor telescope contexts] in GHC.Hs.Decls.
+        new_outer | null tvs = mkHsOuterImplicit
+                  | otherwise = (mkHsOuterExplicit noAnn tvs) { hso_matchability = ma }
+        old_outer = case outer of
+          HsOuterImplicit{} -> []
+          HsOuterExplicit{hso_matchability = old_ma, hso_bndrs = old_tvs} ->
+            [noLocA (HsGadtForAll noExtField
+              ((mkHsForAllInvisTele noAnn old_tvs) { hsf_matchability = old_ma }))]
 
 cvt_arg :: (TH.Bang, TH.Type) -> CvtM (HsConDeclField GhcPs)
 cvt_arg (Bang su ss, ty)
@@ -1216,6 +1217,10 @@ cvtl e = wrapLA (cvt e)
     cvt (ConstrainedE ctx body) = do { ctx' <- mapM cvtl ctx
                                      ; body' <- cvtl body
                                      ; return $ HsQual noExtField (noLocA (HsContext noAnn ctx')) body' }
+    cvt (ForallMatchE ma body)
+      | ForallE (_ : _) _ <- body = annotated_forall_expr ma body
+      | ForallVisE (_ : _) _ <- body = annotated_forall_expr ma body
+      | otherwise = failWith (InvalidForallMatchabilityWrapper "ForallMatchE")
     cvt (ForallE tvs body) =
       do { tvs' <- cvtTvs tvs
          ; body' <- cvtl body
@@ -1228,6 +1233,14 @@ cvtl e = wrapLA (cvt e)
          ; let tele = setTelescopeBndrsNameSpace varName $
                       mkHsForAllVisTele noAnn tvs'
          ; return $ HsForAll noExtField tele body' }
+
+    annotated_forall_expr ma body =
+      do { ma' <- cvtKind ma
+         ; e <- cvt body
+         ; case e of
+             HsForAll ext tele body' ->
+               return (HsForAll ext (tele { hsf_matchability = Just ma' }) body')
+             _ -> failWith (InvalidForallMatchabilityWrapper "ForallMatchE") }
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:
@@ -1753,6 +1766,16 @@ cvtTypeKind typeOrKind ty
                          ; lnm' <- returnLA nm'
                          ; mk_apps (HsTyVar noAnn prom lnm') tys'}
 
+           ForallMatchT ma body
+             | null tys'
+             , is_nonempty_forall body
+             -> do { ma' <- cvtKind ma
+                   ; L loc hs_ty <- cvtTypeKind typeOrKind body
+                   ; case hs_ty of
+                       HsForAllTy{hst_tele = tele} ->
+                         return (L loc (hs_ty { hst_tele = tele { hsf_matchability = Just ma' } }))
+                       _ -> failWith (InvalidForallMatchabilityWrapper "ForallMatchT") }
+             | otherwise -> failWith (InvalidForallMatchabilityWrapper "ForallMatchT")
            ForallT tvs cxt ty
              | null tys'
              -> do { tvs' <- cvtTvs tvs
@@ -1961,6 +1984,12 @@ See (among other closed issues) https://gitlab.haskell.org/ghc/ghc/issues/14289
 -}
 -- ---------------------------------------------------------------------
 
+-- | A metadata wrapper annotates one immediate, nonempty forall group.
+is_nonempty_forall :: TH.Type -> Bool
+is_nonempty_forall (ForallT (_ : _) _ _) = True
+is_nonempty_forall (ForallVisT (_ : _) _) = True
+is_nonempty_forall _ = False
+
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsTypeArg GhcPs])
 split_ty_app ty = go ty []
   where
@@ -2030,25 +2059,29 @@ cvtPatSynSigTy :: TH.Type -> CvtM (LHsSigType GhcPs)
 -- pattern synonym types are of peculiar shapes, which is why we treat
 -- them separately from regular types;
 -- see Note [Pattern synonym type signatures and Template Haskell]
-cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
-  | null exis, null provs = cvtSigType (ForallT univs reqs ty)
-  | null univs, null reqs = do { ty' <- cvtType (ForallT exis provs ty)
-                               ; ctxt' <- returnLA (HsContext noAnn [])
-                               ; cxtTy <- wrapParLA mkHsImplicitSigType $
-                                          HsQualTy { hst_ctxt = ctxt'
-                                                   , hst_xqual = noExtField
-                                                   , hst_body = ty' }
-                               ; returnLA cxtTy }
-  | null reqs             = do { univs' <- cvtTvs univs
-                               ; ty'    <- cvtType (ForallT exis provs ty)
-                               ; ctxt'  <- returnLA (HsContext noAnn [])
-                               ; let cxtTy = HsQualTy { hst_ctxt = ctxt'
-                                                      , hst_xqual = noExtField
-                                                      , hst_body = ty' }
-                               ; forTy <- wrapParLA (mkHsExplicitSigType noAnn univs') cxtTy
-                               ; returnLA forTy }
-  | otherwise             = cvtSigType (ForallT univs reqs (ForallT exis provs ty))
-cvtPatSynSigTy ty         = cvtSigType ty
+cvtPatSynSigTy ty
+  | Just (outer_ma, univs, reqs, inner) <- invisible_forall ty
+  , Just (_, exis, provs, body) <- invisible_forall inner
+  = if null exis && null provs
+    then cvtSigType (with_annotation outer_ma (ForallT univs reqs body))
+    else do { ma' <- traverse cvtKind outer_ma
+            ; univs' <- cvtTvs univs
+            ; inner' <- cvtType inner
+            ; reqs' <- cvtContext funPrec reqs
+            ; body' <- returnLA (HsQualTy noExtField reqs' inner')
+              -- Keep the required-context separator even when it is empty.
+              -- Otherwise the existential group becomes universal.
+            ; let outer | null univs = mkHsOuterImplicit
+                        | otherwise = (mkHsOuterExplicit noAnn univs') { hso_matchability = ma' }
+            ; returnLA (HsSig noExtField outer body') }
+  | otherwise = cvtSigType ty
+  where
+    invisible_forall (ForallT tvs ctxt body) = Just (Nothing, tvs, ctxt, body)
+    invisible_forall (ForallMatchT ma (ForallT tvs@(_ : _) ctxt body)) =
+      Just (Just ma, tvs, ctxt, body)
+    invisible_forall _ = Nothing
+    with_annotation Nothing body = body
+    with_annotation (Just ma) body = ForallMatchT ma body
 
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity

@@ -42,6 +42,11 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Instantiate (tcInstSkolTyVarBndrsX, tcRuntimeForAllBndrs)
+import GHC.Tc.Types.Constraint (checkImplicationInvariants)
+import GHC.Tc.Types.Origin (CtOrigin(OccurrenceOf), SkolemInfoAnon(SigTypeSkol), mkSkolemInfo)
+import GHC.Tc.Solver.Monad (runTcSEqualities)
+import GHC.Tc.Solver.Rewrite (rewriteFamilyAxioms)
 import GHC.Tc.Instance.Family
 
 import GHC.Core.FamInstEnv
@@ -58,6 +63,7 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
+import GHC.Types.Var.Env (mkInScopeSet)
 
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.WiredIn.Prim( isArrowTyCon )
@@ -123,6 +129,51 @@ normaliseFfiType :: Type -> TcM (Reduction, Bag GlobalRdrElt)
 normaliseFfiType ty
     = do fam_envs <- tcGetFamInstEnvs
          normaliseFfiType' fam_envs ty
+
+-- | Validate the runtime forall prefix and retain its metadata reductions.
+-- See Note [Foreign forall matchability].
+tcCheckForeignForAlls :: Name -> Reduction -> TcM Reduction
+tcCheckForeignForAlls name redn
+  | (bndrs, body) <- splitForAllForAllTyBinders (reductionReducedType redn)
+  , not (null bndrs)
+  = do { loc <- getCtLocM (OccurrenceOf name) Nothing
+       ; ma_redns <- mapM (\(ma, _) ->
+                            runTcSEqualities (rewriteFamilyAxioms loc ma)) bndrs
+       ; let norm_bndrs = zipWith (\ma_redn (_, bndr) ->
+                                    (reductionReducedType ma_redn, bndr)) ma_redns bndrs
+             norm_ty = mkTyCoForAllTys norm_bndrs body
+             norm_co = mkHomoForAllCos
+                         (zipWith (\ma_redn (_, bndr) ->
+                                    (reductionCoercion ma_redn, bndr)) ma_redns bndrs)
+                         (mkReflCo Representational body)
+             subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType norm_ty))
+       ; skol_info <- mkSkolemInfo (SigTypeSkol (ForSigCtxt name))
+       ; (subst', skol_bndrs) <- tcInstSkolTyVarBndrsX skol_info subst norm_bndrs
+       ; (_, prefix_implics) <- tcRuntimeForAllBndrs skol_info [] [] skol_bndrs
+                                  (substTy subst' body)
+       ; mapBagM_ checkImplicationInvariants prefix_implics
+       ; emitImplications prefix_implics
+       ; pure (reductionCoercion redn `mkTransRedn` mkReduction norm_co norm_ty) }
+  | otherwise = pure redn
+
+{- Note [Foreign forall matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Foreign desugaring introduces runtime type lambdas with U metadata. Check the
+actual normalized forall prefix, including prefixes hidden by synonyms and
+newtypes. A check of the written outer annotation does not cover these types.
+
+Reduce each annotation with the solver's bounded family-axiom rewriter. Keep
+its nominal proof in the FFI normalization coercion. A computed U annotation
+can then become U in the type of the generated lambdas without losing proof.
+This step does not use local Given evidence or default unknown annotations.
+
+Freshen the telescope and use the ordinary runtime-forall obligations. Each
+obligation sees only earlier binders. Do not introduce theta Givens or let a
+later binder justify an outer annotation. M and unresolved annotations fail
+through ordinary equality solving. The checked wrapper is not needed here:
+foreign desugaring uses the normalized U prefix and the retained coercion.
+See Note [Runtime forall matchability] in GHC.Tc.Utils.Instantiate.
+-}
 
 normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Reduction, Bag GlobalRdrElt)
 normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
@@ -253,7 +304,8 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl, fd_modifiers = mods }))
   = setSrcSpanA dloc $ addErrCtxt (ForeignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
-       ; (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
+       ; (ffi_redn, gres) <- normaliseFfiType sig_ty
+       ; Reduction norm_co norm_sig_ty <- tcCheckForeignForAlls nm ffi_redn
        ; let
              -- Drop the foralls before inspecting the
              -- structure of the foreign type.
@@ -429,7 +481,8 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
     rhs <- tcCheckPolyExpr (nlHsVar nm) sig_ty
 
-    (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
+    (ffi_redn, gres) <- normaliseFfiType sig_ty
+    Reduction norm_co norm_sig_ty <- tcCheckForeignForAlls nm ffi_redn
 
     spec' <- tcCheckFEType norm_sig_ty spec
 

@@ -59,7 +59,7 @@ import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
-                          pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAll)
+                          pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAllWithMatchability)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType, PatSyn )
 import GHC.Core.TyCo.Tidy
 import GHC.Core.Predicate
@@ -507,6 +507,8 @@ instance Diagnostic TcRnMessage where
                         | True          = hsep [int thing_arity, text "arguments"]
     TcRnIllegalInstance reason ->
       mkSimpleDecorated $ pprIllegalInstance reason
+    TcRnEmptyForallMatchability
+      -> mkSimpleDecorated $ text "A forall matchability annotation requires at least one binder."
     TcRnVDQInTermType mb_ty
       -> mkSimpleDecorated $
              case mb_ty of
@@ -1459,7 +1461,7 @@ instance Diagnostic TcRnMessage where
         EmptyCaseForall tvb ->
           vcat [ text "Empty list of alternatives in" <+> pp_ctxt
                , hang (text "checked against a forall-type:")
-                      2 (pprForAll [tvb] <+> ellipsis)
+                      2 (pprForAllWithMatchability [tvb] <+> ellipsis)
                ]
         where
           pp_ctxt = case ctxt of
@@ -2232,6 +2234,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalInstance rea
       -> illegalInstanceReason rea
+    TcRnEmptyForallMatchability
+      -> ErrorWithoutFlag
     TcRnVDQInTermType{}
       -> ErrorWithoutFlag
     TcRnBadQuantPredHead{}
@@ -2905,6 +2909,8 @@ instance Diagnostic TcRnMessage where
     TcRnVDQInTermType mb_ty
       | isJust mb_ty -> [suggestExtension LangExt.RequiredTypeArguments]
       | otherwise    -> []
+    TcRnEmptyForallMatchability
+      -> noHints
     TcRnBadQuantPredHead{}
       -> noHints
     TcRnIllegalTupleConstraint{}
@@ -3854,7 +3860,7 @@ deepInvisTvBinders = go
           = go res_ty
           | (tvs, body) <- splitForAllForAllTyBinders ty
           , not (null tvs)
-          = tvs ++ go body
+          = map snd tvs ++ go body
           | otherwise
           = []
 
@@ -6034,8 +6040,8 @@ tidySigSkol env cx ty tv_prs
     tv_prs' = mapSnd (tidyTyCoVarOcc env) tv_prs
     inst_env = mkNameEnv tv_prs'
 
-    tidy_ty env (ForAllTy (Bndr tv vis) ty)
-      = ForAllTy (Bndr tv' vis) (tidy_ty env' ty)
+    tidy_ty env (ForAllTy ma (Bndr tv vis) ty)
+      = ForAllTy (tidy_ty env ma) (Bndr tv' vis) (tidy_ty env' ty)
       where
         (env', tv') = tidy_tv_bndr env tv
 
@@ -6246,12 +6252,12 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
        in ( ty1 { ft_arg = t1_1', ft_res = t1_2' }
           , ty2 { ft_arg = t2_1', ft_res = t2_2' })
 
-    go (ForAllTy b1 t1) (ForAllTy b2 t2) =
+    go (ForAllTy ma1 b1 t1) (ForAllTy ma2 b2 t2) =
       -- NOTE: We may have a bug here, but we just can't reproduce it easily.
       -- See D1016 comments for details and our attempts at producing a test
       -- case. Short version: We probably need RnEnv2 to really get this right.
       let (t1', t2') = go t1 t2
-       in (ForAllTy b1 t1', ForAllTy b2 t2')
+       in (ForAllTy ma1 b1 t1', ForAllTy ma2 b2 t2')
 
     go (CastTy ty1 _) ty2 = go ty1 ty2
     go ty1 (CastTy ty2 _) = go ty1 ty2
@@ -6382,6 +6388,13 @@ pprConversionFailReason = \case
     where ty_str = case typeOrKind of
                      TypeLevel -> "type"
                      KindLevel -> "kind"
+  InvalidForallMatchabilityWrapper wrapper ->
+    vcat [ text wrapper <+> text "requires an immediate forall node with at least one binder:"
+         , nest 2 $ text $ case wrapper of
+             "ForallMatchT" -> "ForallT or ForallVisT"
+             "ForallMatchC" -> "ForallC"
+             "ForallMatchE" -> "ForallE or ForallVisE"
+             _ -> "a supported forall node" ]
   IllegalLastStatement do_or_lc stmt ->
     vcat [ text "Illegal last statement of" <+> pprAHsDoFlavour do_or_lc <> colon
          , nest 2 $ ppr stmt

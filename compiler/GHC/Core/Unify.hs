@@ -52,6 +52,7 @@ import Control.Monad
 import Data.Monoid (Any(..))
 import qualified Data.Semigroup as S
 import GHC.Builtin.WiredIn.Prim (fUNTyCon)
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (matchabilityTy)
 
 {- Note [The Core unifier]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1624,7 +1625,7 @@ hasUnmatchableApplication = go
     go (AppTy fun arg) = go fun || go arg
     go (TyConApp _ args) = any go args
     go (FunTy _ ma mult arg res) = any go [ma, mult, arg, res]
-    go (ForAllTy (Bndr tv _) body) = go (varType tv) || go body
+    go (ForAllTy ma (Bndr tv _) body) = go ma || go (varType tv) || go body
     go (CastTy ty _) = go ty
     go (DepFunTy binder body) = go (varType binder) || go body
     go _ = False
@@ -1792,9 +1793,10 @@ unify_ty env ty1 (AppTy ty2a ty2b) _kco
 
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
-unify_ty env (ForAllTy (Bndr tv1 _) ty1) (ForAllTy (Bndr tv2 _) ty2) kco
+unify_ty env (ForAllTy ma1 (Bndr tv1 _) ty1) (ForAllTy ma2 (Bndr tv2 _) ty2) kco
   -- ToDo: See Note [Unifying coercion-foralls]
-  = do { unify_ty env (varType tv1) (varType tv2) (mkNomReflCo liftedTypeKind)
+  = do { unify_ty env ma1 ma2 (mkNomReflCo matchabilityTy)
+       ; unify_ty env (varType tv1) (varType tv2) (mkNomReflCo liftedTypeKind)
        ; let env' = umRnBndr2 env tv1 tv2
        ; unify_ty env' ty1 ty2 kco }
 
@@ -2230,8 +2232,8 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go bvs (FunTy _ ma w arg res)    = go bvs ma || go bvs w || go bvs arg || go bvs res
     go bvs (TyConApp tc tys)         = go_tc bvs tc tys
 
-    go bvs (ForAllTy (Bndr tv _) ty)
-      = go bvs (tyVarKind tv) ||
+    go bvs (ForAllTy ma (Bndr tv _) ty)
+      = go bvs ma || go bvs (tyVarKind tv) ||
         (case lhs of
            TyVarLHS tv' | tv==tv'   -> False  -- Shadowing
                         | otherwise -> go (bvs `extendVarSet` tv) ty
@@ -2639,8 +2641,8 @@ ty_co_match menv subst (FunTy { ft_ma = ma, ft_mult = w, ft_arg = ty1, ft_res = 
     -- NB: we include the RuntimeRep arguments in the matching;
     --     not doing so caused #21205.
 
-ty_co_match menv subst (ForAllTy (Bndr tv1 vis1t) ty1)
-                       (ForAllCo tv2 vis1c vis2c kind_mco2 co2)
+ty_co_match menv subst (ForAllTy ma1 (Bndr tv1 vis1t) ty1)
+                       (ForAllCo tv2 vis1c vis2c ma_co2 kind_mco2 co2)
                        lkco rkco
   | isTyVar tv1 && isTyVar tv2
   , vis1t `eqForAllVis` vis1c && vis1c `eqForAllVis` vis2c -- Is this necessary?
@@ -2648,7 +2650,8 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 vis1t) ty1)
       -- Is this visibility check necessary?  @rae says: yes, I think the
       -- check is necessary, if we're caring about visibility (and we are).
       -- But ty_co_match is a dark and not important corner.
-  = do { subst1 <- ty_co_match menv subst (tyVarKind tv1)
+  = do { subst_ma <- ty_co_match menv subst ma1 ma_co2 ma_kind_co ma_kind_co
+       ; subst1 <- ty_co_match menv subst_ma (tyVarKind tv1)
                                (forAllCoKindCo tv2 kind_mco2)
                                ki_ki_co ki_ki_co
        ; let rn_env0 = me_env menv
@@ -2656,6 +2659,7 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 vis1t) ty1)
              menv'   = menv { me_env = rn_env1 }
        ; ty_co_match menv' subst1 ty1 co2 lkco rkco }
   where
+    ma_kind_co = mkNomReflCo matchabilityTy
     ki_ki_co = mkNomReflCo liftedTypeKind
 
 -- ty_co_match menv subst (ForAllTy (Bndr cv1 _) ty1)
@@ -2748,8 +2752,9 @@ pushRefl co =
       ->  Just (FunCo r af af (mkReflCo (funRole r SelMatch) ma) (mkReflCo (funRole r SelMult) w) (mkReflCo r ty1) (mkReflCo r ty2))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRoleListX r tc) tys))
-    Just (ForAllTy (Bndr tv vis) ty, r)
+    Just (ForAllTy ma (Bndr tv vis) ty, r)
       -> Just (ForAllCo { fco_tcv = tv, fco_visL = vis, fco_visR = vis
+                        , fco_ma = mkNomReflCo ma
                         , fco_kind = MRefl
                         , fco_body = mkReflCo r ty })
     _ -> Nothing

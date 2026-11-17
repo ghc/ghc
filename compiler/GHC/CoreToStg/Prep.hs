@@ -1165,7 +1165,7 @@ nameNativeConstructorArgs expr
       | otherwise = pprPanic "nameNativeConstructorArgs: application type" (ppr ty $$ ppr expr)
 
     check_erased_binder ty transport
-      | ForAllTy binder _ <- coreFullView ty
+      | ForAllTy _ma binder _ <- coreFullView ty
       , any (\(index, _) -> anyFreeVarsOfType (== index) (varType (binderVar binder))) transport
       = nativeIndexTransportError "a dependent erased binder kind"
       | otherwise = return ()

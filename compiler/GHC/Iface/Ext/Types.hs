@@ -48,7 +48,7 @@ type Span = RealSrcSpan
 -- | Current version of @.hie@ files.
 -- See Note [HIE arrow matchability].
 hieVersion :: Integer
-hieVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "63") :: Integer
+hieVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "64") :: Integer
 
 {- |
 GHC builds up a wealth of information about Haskell source as it compiles it.
@@ -152,7 +152,11 @@ HFunTy stores matchability before multiplicity, argument and result. Include
 matchability in equality, traversal and binary serialization. Otherwise HIE
 sharing can identify different arrow types or omit metadata dependencies.
 
-The new field changes the payload of the existing HFunTy tag. The suffix in
+HForAllTy stores matchability before the binder and body. Its metadata is
+outside the binder scope. Include this child in the same operations and in
+the type-table key. See Note [Forall interface metadata] in GHC.Iface.Type.
+
+The metadata fields change the existing HFunTy and HForAllTy payloads. The suffix in
 hieVersion rejects earlier files before their type tables are decoded. This
 version is separate from the ordinary interface version. Both HIE readers
 check it. The predicate passed to readHieFileWithVersion can further restrict
@@ -167,7 +171,7 @@ data HieType a
   = HTyVarTy Name
   | HAppTy a (HieArgs a)
   | HTyConApp IfaceTyCon (HieArgs a)
-  | HForAllTy ((Name, a),ForAllTyFlag) a
+  | HForAllTy a ((Name, a),ForAllTyFlag) a
   | HFunTy a a a a
     -- ^ Matchability, multiplicity, argument and result.
     -- See Note [HIE arrow matchability].
@@ -186,8 +190,8 @@ instance Eq a => Eq (HieType a) where
   HTyVarTy n1         == HTyVarTy n2         = n1 == n2
   HAppTy f1 as1       == HAppTy f2 as2       = f1 == f2 && as1 == as2
   HTyConApp tc1 as1   == HTyConApp tc2 as2   = tc1 == tc2 && as1 == as2
-  HForAllTy ((n1,k1),vis1) b1 == HForAllTy ((n2,k2),vis2) b2
-    = n1 == n2 && k1 == k2 && b1 == b2
+  HForAllTy ma1 ((n1,k1),vis1) b1 == HForAllTy ma2 ((n2,k2),vis2) b2
+    = ma1 == ma2 && n1 == n2 && k1 == k2 && b1 == b2
       && cmpForAllTyFlagExactly vis1 vis2 == EQ
   HFunTy m1 w1 a1 r1  == HFunTy m2 w2 a2 r2  = m1 == m2 && w1 == w2 && a1 == a2 && r1 == r2
   HQualTy c1 t1       == HQualTy c2 t2       = c1 == c2 && t1 == t2
@@ -200,8 +204,9 @@ instance Outputable a => Outputable (HieType a) where
   ppr (HTyVarTy name) = ppr name
   ppr (HAppTy fun arg) = parens $ ppr fun <+> ppr arg
   ppr (HTyConApp tc args) = parens $ ppr tc <+> ppr args
-  ppr (HForAllTy ((name, ty), flag) body) =
-    text "forall" <+> ppr flag <+> ppr name O.<> text ":" <+> ppr ty O.<> text "." <+> ppr body
+  ppr (HForAllTy ma ((name, ty), flag) body) =
+    text "forall" <+> ppr flag <+> ppr name O.<> text ":" <+> ppr ty O.<> text "."
+      <+> text "@" O.<> ppr ma <+> ppr body
   ppr (HFunTy ma mult arg res)
     = parens $ ppr arg <+> arrow <+> brackets (ppr ma) <+> ppr res <+> ppr mult
   ppr (HQualTy ctxt ty) = parens $ ppr ctxt <+> text "=>" <+> ppr ty
@@ -227,8 +232,9 @@ instance Binary (HieType TypeIndex) where
     putByte bh 2
     put_ bh n
     put_ bh xs
-  put_ bh (HForAllTy bndr a) = do
+  put_ bh (HForAllTy ma bndr a) = do
     putByte bh 3
+    put_ bh ma
     put_ bh bndr
     put_ bh a
   put_ bh (HFunTy ma w a b) = do
@@ -255,7 +261,7 @@ instance Binary (HieType TypeIndex) where
       0 -> HTyVarTy <$> get bh
       1 -> HAppTy <$> get bh <*> get bh
       2 -> HTyConApp <$> get bh <*> get bh
-      3 -> HForAllTy <$> get bh <*> get bh
+      3 -> HForAllTy <$> get bh <*> get bh <*> get bh
       4 -> HFunTy <$> get bh <*> get bh <*> get bh <*> get bh
       5 -> HQualTy <$> get bh <*> get bh
       6 -> HLitTy <$> get bh
@@ -897,7 +903,7 @@ idEntityInfo vid = S.fromList $ [EntityTypeVariable | isTyVar vid] <> [EntityFun
   <> [EntityRecordField | isRecordSelector vid] <> [EntityClassMethod | isClassOpId vid] <> [EntityVariable]
   where
     isFunType a = case coreFullView a of
-      ForAllTy _ t    -> isFunType t
+      ForAllTy _ _ t  -> isFunType t
       FunTy { ft_af = flg, ft_res = rhs } -> isFUNArg flg || isFunType rhs
       _x              -> isFunTy a
 

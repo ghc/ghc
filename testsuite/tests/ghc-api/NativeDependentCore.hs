@@ -11,7 +11,7 @@ import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags
 import GHC.Builtin.WiredIn.Prim (fUNTyCon, intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkForAllCo, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkForAllCo, mkFunCoNoFTF, mkKindCo, mkInstCo, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConRepArity, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
@@ -22,13 +22,13 @@ import GHC.Core.Lint (lintExpr)
 import GHC.Core.Make (mkIntExprInt)
 import GHC.Core.Map.Type (LooseTypeMap, TypeMap, emptyTypeMap)
 import GHC.Core.Opt.Arity (pushCoArg, pushCoTyArg)
-import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
+import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred, scopedSortWith)
 import GHC.Core.Reduction (Reduction (..))
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
 import GHC.Core.TyCo.FVs (isInjectiveInType, tyCoVarsOfCo, tyCoVarsOfType)
-import GHC.Core.TyCo.Rep (Coercion (..), CoSel (..), FunSel (..), Scaled (..), TyLit (..), Type (..))
+import GHC.Core.TyCo.Rep (Coercion (..), CoSel (..), ForAllSel (..), FunSel (..), Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, mkTyConKindWithMatchability, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
@@ -54,12 +54,19 @@ import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserD
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
 import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, IfaceSynonym, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
-import GHC.Iface.Type (IfaceAppArgs (IA_Nil, IA_Arg), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
+import GHC.Iface.Type (IfaceAppArgs (IA_Nil, IA_Arg), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo, IfaceForAllCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
+import qualified GHC.Tc.Solver.Monad as TcS
+import GHC.Tc.Solver.Solve (solveWanteds)
+import GHC.Tc.Types.Constraint (CtEvidence (CtWanted), emptyCoHoleSet, isSolvedWC, mkSimpleWC, wantedCtEvCoercion)
+import GHC.Tc.Types.Origin (CtOrigin (TypeEqOrigin), SkolemInfoAnon (UnifyForAllSkol), mkSkolemInfo)
 import GHC.Tc.Utils.Monad (initIfaceCheck, initIfaceLcl, initIfaceLoad)
+import qualified GHC.Tc.Utils.Monad as TcM
+import GHC.Tc.Utils.TcMType (isFilledMetaTyVar_maybe, newFlexiTyVar, newSkolemTyVar)
 import GHC.Tc.Utils.TcType (noConcreteTyVars)
+import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.Basic (LeftOrRight (..), OccInfo (..), PromotionFlag (IsPromoted, NotPromoted), TailCallInfo (..))
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
@@ -101,6 +108,8 @@ main = do
             runFunctionBinderChecks dflags
             runArrowMatchabilityChecks dflags
             runForAllSelectorChecks dflags
+            runForAllMatchabilityChecks dflags
+            runForAllSolverChecks libdir
             runMatchingChecks dflags
             runTypeMapChecks
             runCaseChecks dflags
@@ -1071,8 +1080,8 @@ runNatChecks dflags = do
             role
             "ordinary forall kind normalizes above retained body"
             []
-            (mkForAllTy (Bndr erased Specified) (mkDepFunTy n (indexedNat (add zeroTy index))))
-            (mkForAllTy (Bndr erasedNormalized Specified) (mkDepFunTy n (indexedNat (if role == Phantom then add zeroTy index else index))))
+            (mkForAllTy unmatchableDataConTy (Bndr erased Specified) (mkDepFunTy n (indexedNat (add zeroTy index))))
+            (mkForAllTy unmatchableDataConTy (Bndr erasedNormalized Specified) (mkDepFunTy n (indexedNat (if role == Phantom then add zeroTy index else index))))
     let originalShadow = mkFunctionType unmatchableDataConTy ManyTy (indexedNat index) (mkDepFunTy n (indexedNat (add zeroTy index)))
         expectedShadow = mkFunctionType unmatchableDataConTy ManyTy (indexedNat index) (mkDepFunTy n (indexedNat index))
     freshened <- checkNormalization Nominal "retained normalization avoids a free outer Id" [n] originalShadow expectedShadow
@@ -1885,6 +1894,101 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
         ordinary <- restorePackage env =<< roundtrip NormalCompression (tyThingToIfaceDecl (ATyCon boolTyCon))
         forcePackage ordinary
         check "ordinary constructor interface has no retained metadata" (all (null . dataConRepArgBinders) (tyConDataCons ordinary))
+        -- Check forall metadata through conversion, binary tables and import.
+        let wireMa = mkTyVar (mkSystemName (unique 9200) (mkTyVarOcc "wire_ma")) matchabilityTy
+            wireA = mkTyVar (mkSystemName (unique 9201) (mkTyVarOcc "wire_a")) liftedTypeKind
+            closedForall ma = mkForAllTy matchableDataConTy (Bndr wireMa Specified) $
+                mkForAllTy ma (Bndr wireA Specified) intTy
+            metadataCases = [matchableDataConTy, unmatchableDataConTy, mkTyVarTy wireMa]
+            shadowName = mkIfLclName (fsLit "wire_shadow")
+            shadowType = IfaceForAllTy (toIfaceType matchableDataConTy)
+                (mkIfaceForAllTvBndr Specified (shadowName, toIfaceType matchabilityTy)) $
+                IfaceForAllTy (IfaceTyVar shadowName)
+                    (mkIfaceForAllTvBndr Specified (shadowName, toIfaceType liftedTypeKind))
+                    (toIfaceType intTy)
+            ownType = IfaceForAllTy (IfaceTyVar shadowName)
+                (mkIfaceForAllTvBndr Specified (shadowName, toIfaceType matchabilityTy))
+                (toIfaceType intTy)
+            maProof = proof 9202 matchableDataConTy unmatchableDataConTy
+            structural role = mkForAllCo wireA Specified Specified
+                (mkCoVarCo maProof) MRefl (mkReflCo role intTy)
+            leftForall = mkForAllTy matchableDataConTy (Bndr wireA Specified) intTy
+            rightForall = mkForAllTy unmatchableDataConTy (Bndr wireA Specified) intTy
+            opaqueParent = mkCoVar (mkSystemName (unique 9203) (mkVarOcc "wire_forall_parent")) $
+                mkReprEqPred leftForall rightForall
+        forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
+            restoredForalls <- forM metadataCases $ \ma -> do
+                let originalForall = closedForall ma
+                wireForall <- roundtrip compression (toIfaceType (tidyTopType originalForall))
+                first <- restore [] wireForall
+                second <- restore [] wireForall
+                checkType dflags "forall codec preserves metadata and alpha equality" originalForall first
+                checkType dflags "separate forall imports remain alpha equal" first second
+                check "forall codec preserves closed scope" (isEmptyVarSet (tyCoVarsOfType first))
+                lintAccepts dflags "imported forall metadata has its declared kind and scope" [] (Coercion (mkNomReflCo first))
+                case (first, second) of
+                    (ForAllTy _ (Bndr outer _) (ForAllTy innerMa (Bndr inner _) _),
+                     ForAllTy _ (Bndr nextOuter _) (ForAllTy _ (Bndr nextInner _) _)) -> do
+                        check "separate forall imports freshen both binders" $
+                            outer /= wireMa && inner /= wireA && outer /= nextOuter && inner /= nextInner
+                        case ma of
+                            TyVarTy{} -> checkType dflags "variable metadata refers to the imported outer binder" (mkTyVarTy outer) innerMa
+                            _ -> pure ()
+                    _ -> fail "FAIL: forall codec lost its telescope"
+                pure first
+            forM_ [(left, right) | (i, left) <- zip [0 :: Int ..] restoredForalls,
+                                  (j, right) <- zip [0 :: Int ..] restoredForalls, i < j] $ \(left, right) ->
+                check "forall codec keeps M, U and variable metadata distinct" (not (eqType left right))
+            shadow <- restore [] =<< roundtrip compression shadowType
+            case shadow of
+                ForAllTy _ (Bndr outer _) (ForAllTy ma (Bndr inner _) _) -> do
+                    check "shadowed forall names retain distinct identities" (outer /= inner)
+                    checkType dflags "forall metadata is outside its own binder scope" (mkTyVarTy outer) ma
+                    lintAccepts dflags "shadowed metadata scope remains well kinded" [] (Coercion (mkNomReflCo shadow))
+                _ -> fail "FAIL: shadowed forall codec lost its telescope"
+            own <- roundtrip compression ownType
+            rejectsIface "forall metadata cannot capture its own binder" "Iface type variable out of scope" [] own
+            forM_ [Nominal, Representational, Phantom] $ \role -> do
+                decoded <- roundtrip compression (IfaceCo (toIfaceCoercion (structural role)))
+                restored <- restoreExpr [maProof] decoded
+                case restored of
+                    Coercion co -> do
+                        check "forall codec retains the parent coercion role" (coercionRole co == role)
+                        checkType dflags "forall coercion codec retains M on the left" leftForall (coercionLKind co)
+                        checkType dflags "forall coercion codec retains U on the right" rightForall (coercionRKind co)
+                        lintAccepts dflags "forall coercion codec retains nominal metadata evidence" [maProof] restored
+                        check "metadata-only evidence remains live after import" (maProof `elemVarSet` tyCoVarsOfCo co)
+                        let selected = mkSelCo (SelForAll SelFAMatch) co
+                        check "structural metadata selection retains the actual nominal proof" $
+                            coercionRole selected == Nominal && eqCoercion selected (mkCoVarCo maProof)
+                        lintAccepts dflags "imported structural metadata selection" [maProof] (Coercion selected)
+                    _ -> fail "FAIL: forall coercion codec returned a term"
+            opaqueWire <- roundtrip compression $ IfaceCo $
+                toIfaceCoercion (SelCo (SelForAll SelFAMatch) (mkCoVarCo opaqueParent))
+            opaque <- restoreExpr [opaqueParent] opaqueWire
+            case opaque of
+                Coercion co -> do
+                    check "opaque R forall metadata selection is nominal" (coercionRole co == Nominal)
+                    checkType dflags "opaque selector codec retains its M endpoint" matchableDataConTy (coercionLKind co)
+                    checkType dflags "opaque selector codec retains its U endpoint" unmatchableDataConTy (coercionRKind co)
+                    lintAccepts dflags "opaque forall metadata selector codec" [opaqueParent] opaque
+                _ -> fail "FAIL: forall selector codec returned a term"
+            case toIfaceCoercion (structural Nominal) of
+                IfaceForAllCo bndr visL visR _ kindCo bodyCo -> do
+                    let withMetadata ma = IfaceCo (IfaceForAllCo bndr visL visR ma kindCo bodyCo)
+                        ownName = mkIfLclName (fsLit "wire_own_proof")
+                        ownProof = IfaceCo $ IfaceForAllCo
+                            (IfaceIdBndr (toIfaceType ManyTy, ownName, toIfaceType (varType maProof)))
+                            visL visR (IfaceCoVarCo ownName) kindCo bodyCo
+                    forM_ [ ("non-nominal forall metadata", "Expected a nominal coercion.",
+                             withMetadata (toIfaceCoercion (mkReflCo Representational unmatchableDataConTy)))
+                          , ("wrong-kind forall metadata", "Invalid forall matchability in interface:",
+                             withMetadata (toIfaceCoercion (mkNomReflCo intTy)))
+                          , ("forall metadata proof cannot capture its own binder", "Iface id out of scope", ownProof)
+                          ] $ \(label, diagnostic, input) -> do
+                        decoded <- roundtrip compression input
+                        rejectsIfaceExpr label diagnostic [] decoded
+                _ -> fail "FAIL: forall coercion conversion lost its structural node"
         -- Check call types under the actual lexical Id environment.
         let callF = local 9100 "wire_call" (mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy)
             callN = local 9101 "wire_arg" boolTy
@@ -1955,7 +2059,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         nonclosedDomain = case domain of
                             IfaceFunTy flag ma arrowMult _ result -> IfaceFunTy flag ma arrowMult (IfaceTyVar boundDomainName) result
                             _ -> error "FAIL: function Pi domain is not an ordinary arrow"
-                        boundDomainPi = IfaceForAllTy
+                        boundDomainPi = IfaceForAllTy (toIfaceType unmatchableDataConTy)
                             (mkIfaceForAllTvBndr Specified (boundDomainName, toIfaceType liftedTypeKind))
                             (badDomain nonclosedDomain)
                     rejectsIface "function Pi rejects an in-scope nonclosed domain" "Invalid retained binder" [] boundDomainPi
@@ -2518,7 +2622,7 @@ runFunctionBinderChecks dflags = do
     let scopedCo = DepFunCo f MRefl bodyCo
     check "function coercion binder masks an outer head substitution" $
         eqCoercion scopedCo (Subst.substCo (indexSubst [g, n, m, cv] f (Var g)) scopedCo)
-    lintAccepts dflags "Pi abstraction scopes a function head" [n, m, cv] (Coercion (mkPiCo Nominal f bodyCo))
+    lintAccepts dflags "Pi abstraction scopes a function head" [n, m, cv] (Coercion (mkPiCo Nominal unmatchableDataConTy f bodyCo))
     let parameter = mkTyVar (mkSystemName (unique 6309) (mkTyVarOcc "head_payload")) liftedTypeKind
         given = proof 6310 intTy boolTy
         openPi = mkDepFunTy f (arrow (atN f) (mkTyVarTy parameter))
@@ -2585,29 +2689,29 @@ runForAllSelectorChecks :: DynFlags -> IO ()
 runForAllSelectorChecks dflags = do
     let a = mkTyVar (mkSystemName (unique 6500) (mkTyVarOcc "a")) liftedTypeKind
         b = mkTyVar (mkSystemName (unique 6501) (mkTyVarOcc "b")) boolTy
-        left = mkForAllTy (Bndr a Specified) intTy
-        right = mkForAllTy (Bndr b Specified) intTy
+        left = mkForAllTy unmatchableDataConTy (Bndr a Specified) intTy
+        right = mkForAllTy unmatchableDataConTy (Bndr b Specified) intTy
         phantom = mkPhantomCo (mkNomReflCo liftedTypeKind) left right
-        sameKind = mkPhantomCo (mkNomReflCo liftedTypeKind) left (mkForAllTy (Bndr a Specified) boolTy)
+        sameKind = mkPhantomCo (mkNomReflCo liftedTypeKind) left (mkForAllTy unmatchableDataConTy (Bndr a Specified) boolTy)
         kindProof = proof 6502 liftedTypeKind boolTy
         nominal = proof 6503 left right
         representational = mkCoVar (mkSystemName (unique 6504) (mkVarOcc "repr_cv")) (mkReprEqPred left right)
-        structural = mkForAllCo a Specified Specified (MCo (mkCoVarCo kindProof)) (mkReflCo Phantom intTy)
-        visibility = mkForAllCo a Specified Required MRefl (mkReflCo Representational intTy)
+        structural = mkForAllCo a Specified Specified (mkNomReflCo unmatchableDataConTy) (MCo (mkCoVarCo kindProof)) (mkReflCo Phantom intTy)
+        visibility = mkForAllCo a Specified Required (mkNomReflCo unmatchableDataConTy) MRefl (mkReflCo Representational intTy)
     lintAccepts dflags "phantom equality permits different forall binder kinds" [] (Coercion phantom)
     lintAccepts dflags "structural phantom forall retains a nominal kind child" [kindProof] (Coercion structural)
     forM_ [structural, mkSymCo structural] $ \co -> do
-        let selected = mkSelCo SelForAll co
+        let selected = mkSelCo (SelForAll SelKind) co
         check "structural phantom selection returns nominal evidence" (coercionRole selected == Nominal)
         lintAccepts dflags "structural phantom selector reduces to its nominal child" [kindProof] (Coercion selected)
-    check "structural phantom selector returns the stored child" (eqCoercion (mkSelCo SelForAll structural) (mkCoVarCo kindProof))
+    check "structural phantom selector returns the stored child" (eqCoercion (mkSelCo (SelForAll SelKind) structural) (mkCoVarCo kindProof))
     forM_ [mkNomReflCo left, sameKind] $ \co -> do
-        let selected = mkSelCo SelForAll co
+        let selected = mkSelCo (SelForAll SelKind) co
         check "equal forall binder kinds give nominal reflexivity" (coercionRole selected == Nominal && isReflCo selected)
         checkType dflags "reflexive forall selection has the binder kind" liftedTypeKind (coercionLKind selected)
         lintAccepts dflags "equal-kind phantom selection reduces before its role check" [] (Coercion selected)
     forM_ [nominal, representational] $ \cv -> do
-        let selected = mkSelCo SelForAll (mkCoVarCo cv)
+        let selected = mkSelCo (SelForAll SelKind) (mkCoVarCo cv)
         check "opaque nominal or representational selection remains nominal" (coercionRole selected == Nominal)
         checkType dflags "opaque forall selector left endpoint" liftedTypeKind (coercionLKind selected)
         checkType dflags "opaque forall selector right endpoint" boolTy (coercionRKind selected)
@@ -2622,8 +2726,8 @@ runForAllSelectorChecks dflags = do
                 MRefl -> pure ()
                 MCo co -> lintAccepts dflags "type-argument pushing retains representational result evidence" [representational] (Coercion co)
     lintAccepts dflags "required forall visibility bridge remains representational" [] (Coercion visibility)
-    lintRejects dflags "raw phantom forall selector cannot prove nominal binder-kind equality" [] (Coercion (SelCo SelForAll phantom))
-    lintRejects dflags "raw phantom forall selector requires reduction even at equal kinds" [] (Coercion (SelCo SelForAll sameKind))
+    lintRejects dflags "raw phantom forall selector cannot prove nominal binder-kind equality" [] (Coercion (SelCo (SelForAll SelKind) phantom))
+    lintRejects dflags "raw phantom forall selector requires reduction even at equal kinds" [] (Coercion (SelCo (SelForAll SelKind) sameKind))
 
 {- Note [Arrow matchability kernel controls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2639,7 +2743,164 @@ If that variable is rigid, a U or unknown application can still reduce to it.
 The lack of a permitted binding does not establish definite apartness.
 -}
 
--- | Check matchability at substitution, normalization and coercion boundaries.
+-- | Check explicit forall metadata, its scope, and conditional CoVar form.
+runForAllMatchabilityChecks :: DynFlags -> IO ()
+runForAllMatchabilityChecks dflags = do
+    let a = mkTyVar (mkSystemName (unique 6510) (mkTyVarOcc "forall_a")) liftedTypeKind
+        m = mkTyVar (mkSystemName (unique 6511) (mkTyVarOcc "forall_ma")) matchabilityTy
+        quantified ma = mkForAllTy ma (Bndr a Specified) intTy
+        forallM = quantified matchableDataConTy
+        forallU = quantified unmatchableDataConTy
+        forallV = quantified (mkTyVarTy m)
+        entries = [(forallM, 1), (forallU, 2), (forallV, 3)]
+        table :: TypeMap Int
+        table = foldl' (\acc (ty, value) -> Trie.insertTM ty value acc) emptyTypeMap entries
+    forM_ [(forallM, forallU), (forallM, forallV), (forallU, forallV)] $ \(left, right) -> do
+        check "forall metadata changes equality" (not (eqType left right))
+        check "forall metadata changes ordering" (nonDetCmpType left right /= EQ)
+    forM_ entries $ \(ty, value) -> do
+        check "type map preserves distinct forall metadata" (Trie.lookupTM ty table == Just value)
+        lintAccepts dflags "explicit forall metadata is well kinded" [m] (Coercion (mkNomReflCo ty))
+        checkType dflags "tidying preserves forall metadata" ty (tidyTopType ty)
+    check "forall annotation contributes free variables" (m `elemVarSet` tyCoVarsOfType forallV)
+    let annotated = [(mkTyVarTy m, a), (matchableDataConTy, m)]
+        ordered = scopedSortWith snd (\(ma, v) -> tyCoVarsOfType ma `unionVarSet` tyCoVarsOfType (varType v)) annotated
+    check "telescope sorting includes annotation dependencies" (map snd ordered == [m, a])
+    lintAccepts dflags "annotation-aware telescope sorting preserves scope" [] $
+        Coercion (mkNomReflCo (mkForAllTys [(ma, Bndr v Specified) | (ma, v) <- ordered] intTy))
+    checkType dflags "substitution preserves explicit invisible U" forallU $
+        Subst.substTyWith [m] [unmatchableDataConTy] forallV
+    checkType dflags "plural forall makers preserve per-binder U" forallU $
+        mkForAllTys [(unmatchableDataConTy, Bndr a Specified)] intTy
+    let nominal = proof 6514 forallV forallU
+        representational = mkCoVar (mkSystemName (unique 6515) (mkVarOcc "forall_repr"))
+                                  (mkReprEqPred forallV forallU)
+        phantom = mkPhantomCo (mkNomReflCo liftedTypeKind) forallV forallU
+    forM_ [nominal, representational] $ \parent -> do
+        let selected = mkSelCo (SelForAll SelFAMatch) (mkCoVarCo parent)
+        check "opaque forall metadata selector remains nominal" (coercionRole selected == Nominal)
+        checkType dflags "opaque metadata selector retains its left endpoint" (mkTyVarTy m) (coercionLKind selected)
+        checkType dflags "opaque metadata selector retains its right endpoint" unmatchableDataConTy (coercionRKind selected)
+        lintAccepts dflags "opaque N/R forall metadata selection" [m, parent] (Coercion selected)
+    lintRejects dflags "opaque P forall cannot project nominal metadata" [m] $
+        Coercion (SelCo (SelForAll SelFAMatch) phantom)
+    forM_ entries $ \(ty, _) -> do
+        let instantiated = mkInstCo (mkNomReflCo ty) (mkNomReflCo boolTy)
+        checkType dflags "forward forall instantiation does not require M" intTy (coercionLKind instantiated)
+        lintAccepts dflags "forall instantiation retains valid evidence" [m] (Coercion instantiated)
+    lintRejects dflags "forall annotation is outside its own binder" [] $
+        Coercion (mkNomReflCo (ForAllTy (mkTyVarTy m) (Bndr m Specified) intTy))
+    lintRejects dflags "forall annotation must have kind Matchability" [] $
+        Coercion (mkNomReflCo (ForAllTy intTy (Bndr a Specified) intTy))
+
+    let cv = proof 6512 liftedTypeKind liftedTypeKind
+        covarForall ma = mkTyCoForAllTy ma cv Specified intTy
+        cvM = covarForall matchableDataConTy
+        cvV = covarForall (mkTyVarTy m)
+        cvU = covarForall unmatchableDataConTy
+        arrowU = mkFunctionType unmatchableDataConTy ManyTy (varType cv) intTy
+        metadataProof = proof 6513 (mkTyVarTy m) unmatchableDataConTy
+        structural = mkForAllCo cv Specified Specified (mkCoVarCo metadataProof)
+                                MRefl (mkReflCo Phantom intTy)
+    checkType dflags "unused U CoVar uses actual arrow sorts" arrowU cvU
+    check "unused M CoVar retains a forall" (case cvM of ForAllTy{} -> True; _ -> False)
+    check "unused unknown CoVar retains a forall" (case cvV of ForAllTy{} -> True; _ -> False)
+    forM_ [cvM, cvV, cvU] $ \ty ->
+        lintAccepts dflags "CoVar canonicalization preserves well-kinded types" [m] (Coercion (mkNomReflCo ty))
+    checkType dflags "substitution rechecks CoVar vacuity after selecting U" arrowU $
+        Subst.substTyWith [m] [unmatchableDataConTy] cvV
+    lintAccepts dflags "structural forall evidence can have differently normalized endpoints" [m, metadataProof] (Coercion structural)
+    check "forall metadata proof remains a live coercion dependency" $
+        metadataProof `elemVarSet` tyCoVarsOfCo structural
+    checkType dflags "structural forall right endpoint uses U arrow form" arrowU (coercionRKind structural)
+    check "structural metadata projection returns its stored nominal proof" $
+        eqCoercion (mkSelCo (SelForAll SelFAMatch) structural) (mkCoVarCo metadataProof)
+    lintAccepts dflags "structural phantom metadata projection reduces before shape checks" [m, metadataProof] $
+        Coercion (mkSelCo (SelForAll SelFAMatch) structural)
+    lintRejects dflags "raw phantom metadata projection requires reduction" [m, metadataProof] $
+        Coercion (SelCo (SelForAll SelFAMatch) structural)
+    lintRejects dflags "forall metadata evidence must be nominal" [] $
+        Coercion (ForAllCo a Specified Specified (mkReflCo Representational unmatchableDataConTy)
+                          MRefl (mkNomReflCo intTy))
+
+-- | Check CoVar scope in the mutable solver, including safe outer unification.
+runForAllSolverChecks :: FilePath -> IO ()
+runForAllSolverChecks libdir = runGhc (Just libdir) $ do
+    initialFlags <- getSessionDynFlags
+    _ <- setSessionDynFlags initialFlags
+    env <- getSession
+    dflags <- getSessionDynFlags
+    liftIO $ do
+        (_, outcome) <- TcM.initTcInteractive TcM.NoTcMPlugins env $ do
+            let cv = mkCoVar (mkSystemName (unique 6520) (mkVarOcc "scope_cv")) (mkNomEqPred liftedTypeKind boolTy)
+                other = mkCoVar (mkSystemName (unique 6521) (mkVarOcc "scope_other")) (varType cv)
+                quantify binder = mkTyCoForAllTy matchableDataConTy binder Specified
+                headKind = quantify cv liftedTypeKind
+                solve left right = do
+                    loc <- TcM.getCtLocM (TypeEqOrigin left right Nothing Nothing) (Just TypeLevel)
+                    ((residual, proof), _) <- TcS.runTcS $ do
+                        (wanted, _) <- TcS.newWantedEq loc emptyCoHoleSet Nominal left right
+                        residual <- solveWanteds (mkSimpleWC [CtWanted wanted])
+                        proof <- if isSolvedWC residual
+                            then Just <$> TcS.zonkCo (wantedCtEvCoercion wanted)
+                            else pure Nothing
+                        pure (residual, proof)
+                    pure (isSolvedWC residual, proof)
+            skolInfo <- mkSkolemInfo (UnifyForAllSkol liftedTypeKind)
+            headVar <- newSkolemTyVar skolInfo (mkSystemName (unique 6522) (mkTyVarOcc "scope_head")) headKind
+            escaped <- newFlexiTyVar liftedTypeKind
+            let left = quantify cv (mkTyVarTy escaped)
+                applied = mkAppTy (mkTyVarTy headVar) (mkCoercionTy (mkCoVarCo other))
+                right = quantify other applied
+            (escapeSolved, _) <- solve left right
+            escapedValue <- isFilledMetaTyVar_maybe escaped
+            safe <- newFlexiTyVar liftedTypeKind
+            (safeSolved, safeProof) <- solve (quantify cv (mkTyVarTy safe)) (quantify other intTy)
+            safeValue <- isFilledMetaTyVar_maybe safe
+            let equalityCv = mkCoVar (mkSystemName (unique 6523) (mkVarOcc "fc6_cv")) (mkNomEqPred intTy boolTy)
+            (usedAsGiven, _) <- solve (quantify equalityCv intTy) (quantify equalityCv boolTy)
+            used <- newFlexiTyVar liftedTypeKind
+            -- A non-reflexive kind proof survives substitution and zonking.
+            -- Select accepts the resulting Bool index and returns a lifted type.
+            let usedCv = mkCoVar (mkSystemName (unique 6524) (mkVarOcc "used_cv")) (mkNomEqPred liftedTypeKind boolTy)
+                usedOther = mkCoVar (mkSystemName (unique 6525) (mkVarOcc "used_other")) (varType usedCv)
+                usedBody first binder = mkBoxedTupleTy
+                    [first, mkTyConApp (fst selectFamily) [CastTy intTy (mkCoVarCo binder)]]
+                usedLeft = quantify usedCv (usedBody (mkTyVarTy used) usedCv)
+                usedRight = quantify usedOther (usedBody intTy usedOther)
+            (usedSolved, usedProof) <- solve usedLeft usedRight
+            usedValue <- isFilledMetaTyVar_maybe used
+            pure (escapeSolved, escapedValue, safeSolved, safeValue, safeProof, usedAsGiven,
+                  (usedSolved, usedValue, usedProof))
+        case outcome of
+            Nothing -> fail "FAIL: CoVar solver controls could not initialize TcM"
+            Just (escapeSolved, escapedValue, safeSolved, safeValue, safeProof, usedAsGiven,
+                  (usedSolved, usedValue, usedProof)) -> do
+                check "CoVar-dependent Wanted remains unsolved without escaping its binder" (not escapeSolved)
+                check "outer metavariable cannot acquire a scoped CoVar" (case escapedValue of Nothing -> True; _ -> False)
+                check "CoVar-free equality still solves an outer metavariable" safeSolved
+                check "safe CoVar-free unification selects Int" (maybe False (`eqType` intTy) safeValue)
+                case safeProof of
+                    Just proof -> lintAccepts dflags "safe CoVar forall solver evidence" [] (Coercion proof)
+                    Nothing -> fail "FAIL: safe CoVar forall equality has no evidence"
+                check "CoVar forall does not expose forbidden Given evidence" (not usedAsGiven)
+                check "used CoVar forall equality still solves" usedSolved
+                check "used CoVar equality safely selects Int" (maybe False (`eqType` intTy) usedValue)
+                check "used CoVar cannot escape into the outer metavariable" $
+                    maybe False (not . anyVarSet isCoVar . tyCoVarsOfType) usedValue
+                case usedProof of
+                    Just proof -> do
+                        lintAccepts dflags "used CoVar forall solver evidence" [] (Coercion proof)
+                        check "used CoVar solver evidence has no free proof variable" $
+                            not (anyVarSet isCoVar (tyCoVarsOfCo proof))
+                        forM_ [coercionLKind proof, coercionRKind proof] $ \endpoint ->
+                            case splitForAllTyCoVar_maybe endpoint of
+                                Just (_, binder, body) -> check "solver evidence retains its used CoVar binder" $
+                                    isCoVar binder && binder `elemVarSet` tyCoVarsOfType body
+                                Nothing -> fail "FAIL: used CoVar solver endpoint lost its forall"
+                    Nothing -> fail "FAIL: used CoVar forall equality has no evidence"
+
+-- | Check arrow metadata at substitution and coercion boundaries.
 runArrowMatchabilityChecks :: DynFlags -> IO ()
 runArrowMatchabilityChecks dflags = do
     let ma = mkTyVar (mkSystemName (unique 6400) (mkTyVarOcc "arrow_ma")) matchabilityTy
@@ -2648,7 +2909,7 @@ runArrowMatchabilityChecks dflags = do
         arrowM = arrow matchableDataConTy
         arrowU = arrow unmatchableDataConTy
         arrowV = arrow (mkTyVarTy ma)
-        quantified v = mkForAllTy (Bndr v Specified) (arrow (mkTyVarTy v))
+        quantified v = mkForAllTy unmatchableDataConTy (Bndr v Specified) (arrow (mkTyVarTy v))
         entries = [(arrowM, 1), (arrowU, 2), (arrowV, 3), (quantified ma, 4)]
         table :: TypeMap Int
         table = foldl' (\m (ty, value) -> Trie.insertTM ty value m) emptyTypeMap entries
@@ -2822,9 +3083,9 @@ runMatchingChecks dflags = do
 
     let outer = mkTyVar (mkSystemName (unique 204) (mkTyVarOcc "outer")) liftedTypeKind
         inner = mkTyVar (mkSystemName (unique 205) (mkTyVarOcc "inner")) liftedTypeKind
-        captureTemplate = mkForAllTy (Bndr outer Specified) wholeTy
+        captureTemplate = mkForAllTy unmatchableDataConTy (Bndr outer Specified) wholeTy
         captureTarget =
-            mkForAllTy (Bndr inner Specified) $
+            mkForAllTy unmatchableDataConTy (Bndr inner Specified) $
                 mkDepFunTy b (mkFunctionType unmatchableDataConTy ManyTy (mkTyVarTy inner) (indexed index))
     check
         "a whole-type template cannot capture a forall variable through a retained function"
@@ -3010,7 +3271,7 @@ runDepFunCoChecks dflags = do
     check "proof-only retained coercion removes its bound index from free variables" (not (b `elemVarSet` tyCoVarsOfCo proofOnly))
     lintAccepts dflags "retained binder scopes an intermediate proof-only dependency" [] (Coercion proofOnly)
     lintAccepts dflags "Pi construction scopes an intermediate proof-only dependency" [] $
-        Coercion (mkPiCo Nominal b (TransCo (SymCo forgetting) forgetting))
+        Coercion (mkPiCo Nominal unmatchableDataConTy b (TransCo (SymCo forgetting) forgetting))
     check "scanner detects a coercion with ordinary endpoint types" (hasNativeDependentExpr (Coercion proofOnly))
     check "retained coercion diagnostics print its runtime binder" ("foreach" `isInfixOf` showSDoc dflags (ppr (toIfaceCoercion lifted)))
     writer <- Binary.openBinMem 16
@@ -3419,7 +3680,7 @@ runOccurrenceChecks dflags = do
         seed = local 6004 "index_seed" natTy
         producer = local 6005 "index_producer" (mkVisFunTyManyU natTy natTy)
         parameter = mkTyVar (mkSystemName (unique 6006) (mkTyVarOcc "index")) natTy
-        consume = local 6007 "consume_index_type" (mkForAllTy (Bndr parameter Specified) intTy)
+        consume = local 6007 "consume_index_type" (mkForAllTy unmatchableDataConTy (Bndr parameter Specified) intTy)
         expression =
             Let (NonRec dead (App (Var intProducer) (Var intSeed))) $
                 Let (NonRec index (App (Var producer) (Var seed))) $
@@ -3520,8 +3781,8 @@ runAliasChecks dflags = do
         alias = local 4201 "alias" natTy
         inner = local 4202 "inner_alias" natTy
         parameter = mkTyVar (mkSystemName (unique 4203) (mkTyVarOcc "index")) natTy
-        consume = local 4204 "consume_index" (mkForAllTy (Bndr parameter Specified) (mkVisFunTyManyU natTy (mkVisFunTyManyU natTy intTy)))
-        consumeType = local 4205 "consume_index_type" (mkForAllTy (Bndr parameter Specified) intTy)
+        consume = local 4204 "consume_index" (mkForAllTy unmatchableDataConTy (Bndr parameter Specified) (mkVisFunTyManyU natTy (mkVisFunTyManyU natTy intTy)))
+        consumeType = local 4205 "consume_index_type" (mkForAllTy unmatchableDataConTy (Bndr parameter Specified) intTy)
         seed = local 4206 "opaque_seed" natTy
         producer = local 4207 "opaque_producer" (mkVisFunTyManyU natTy natTy)
         zeroExpr = Var (dataConWorkId zero)
@@ -3575,7 +3836,7 @@ runAliasChecks dflags = do
 
     let at index = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy
         typeParameter = mkTyVar (mkSystemName (unique 4208) (mkTyVarOcc "result")) liftedTypeKind
-        consumePi = local 4209 "consume_pi" (mkForAllTy (Bndr typeParameter Specified) intTy)
+        consumePi = local 4209 "consume_pi" (mkForAllTy unmatchableDataConTy (Bndr typeParameter Specified) intTy)
         dependentCapture =
             Let (NonRec alias (Var actual))
                 $ App (Var consumePi)
@@ -3799,7 +4060,7 @@ runChecks dflags = do
         dflags
         "reflexive dependent coercion lifting retains the binder"
         (mkDepFunTy b (indexed (TermVarTy b)))
-        (coercionLKind (mkPiCo Nominal b (mkNomReflCo (indexed (TermVarTy b)))))
+        (coercionLKind (mkPiCo Nominal unmatchableDataConTy b (mkNomReflCo (indexed (TermVarTy b)))))
 
     check "scanner detects a closed retained function" (hasNativeDependentExpr worker)
     check "scanner detects an isolated native type" (hasNativeDependentExpr (Type workerTy))

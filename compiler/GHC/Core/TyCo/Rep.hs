@@ -68,7 +68,7 @@ module GHC.Core.TyCo.Rep (
         ForAllTyFlag(..), FunTyFlag(..),
 
         -- * Coercions
-        Coercion(..), CoSel(..), FunSel(..), Role(..),
+        Coercion(..), CoSel(..), ForAllSel(..), FunSel(..), Role(..),
         UnivCoProvenance(..),
 
         UnivCoDeps(..),
@@ -89,7 +89,7 @@ module GHC.Core.TyCo.Rep (
         mkVisFunTy, mkScaledFunTys,
         mkInvisFunTy, mkInvisFunTys,
         tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTy, tcMkScaledFunTys,
-        mkForAllTy, mkForAllTys, mkInvisForAllTys,
+        mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoForAllTy,
         mkPiTy, mkPiTys, mkDepFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
         mkVisFunTyManyM, mkVisFunTyManyU, mkVisFunTysManyM, mkVisFunTysManyU,
@@ -112,10 +112,11 @@ module GHC.Core.TyCo.Rep (
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Core.TyCo.Compare (eqType)
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
 import {-# SOURCE #-} GHC.Core.TyCo.FVs( tyCoVarsOfType, univCoDepsCoercions, univCoDepsSize )
-import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint )
+import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint, mkFunctionType )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -123,6 +124,7 @@ import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstr
 import GHC.Types.Var
 import GHC.Types.Var.Set
   ( elemVarSet, DCoVarSet, dVarSetElems )
+import GHC.Types.Unique ( Uniquable(..) )
 import GHC.Types.Unique.DSet
   ( UniqDSet, uniqDSetToList )
 import GHC.Types.Unique.Set
@@ -130,8 +132,6 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.KnownKeys
-
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -212,13 +212,13 @@ data Type
                         --    for example unsaturated type synonyms
                         --    can appear as the right hand side of a type synonym.
 
-  | ForAllTy  -- See Note [ForAllTy]
+  | ForAllTy  -- See Note [ForAllTy] and Note [Forall matchability metadata].
+        Matchability
         {-# UNPACK #-} !ForAllTyBinder
            -- ForAllTyBinder: see GHC.Types.Var
            --    Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility]
         Type
-           -- INVARIANT: If the binder is a coercion variable, it must
-           --            be mentioned in the Type.
+           -- INVARIANT: A known-U coercion binder must occur in the body.
            --            See Note [Unused coercion variable in ForAllTy]
            -- See Note [Why ForAllTy can quantify over a coercion variable]
 
@@ -298,7 +298,7 @@ The binder scopes over the proof as well as its endpoints. Keep DepFunCo even
 when both endpoints omit b: an intermediate proof can still use that index.
 The smart constructor simplifies a reflexive body only at a fixed domain.
 Substitution, lifting, free variables and tidying use runtime binder callbacks.
-ForAllCo continues to bind only erased type and coercion variables.
+ForAllCo binds type and coercion variables. DepFunCo binds runtime Ids.
 
 This follows D/DC's asymmetric An-PiCong rule. The right body needs the inverse
 domain conversion. Agda compares Pi domains before codomains under a shared
@@ -418,15 +418,18 @@ Note [Weird typing rule for ForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here are the typing rules for ForAllTy:
 
+ma : Matchability
 tyvar : Type
 inner : TYPE r
 tyvar does not occur in r
 ------------------------------------
-ForAllTy (Bndr tyvar vis) inner : TYPE r
+ForAllTy ma (Bndr tyvar vis) inner : TYPE r
 
+ma : Matchability
 inner : TYPE r
-------------------------------------
-ForAllTy (Bndr covar vis) inner : Type
+if ma is known U, covar is free in inner
+------------------------------------------
+ForAllTy ma (Bndr covar vis) inner : Type
 
 Note that the kind of the result depends on whether the binder is a
 tyvar or a covar. The kind of a forall-over-tyvar is the same as
@@ -604,7 +607,7 @@ This is (EQ3) below.
 One other troublesome case is ForAllTy. See Note [Weird typing rule for ForAllTy].
 The kind of the body is the same as the kind of the ForAllTy. Accordingly,
 
-  ForAllTy tv (ty |> co)     and     (ForAllTy tv ty) |> co
+  ForAllTy ma tv (ty |> co)     and     (ForAllTy ma tv ty) |> co
 
 are `eqType`. But only the first can be split by splitForAllTy. So we forbid
 the second form, instead pushing the coercion inside to get the first form.
@@ -617,7 +620,7 @@ In sum, in order to uphold (EQ), we need the following invariants:
         either a FunTy to a FunTy, or a ForAllTy to a ForAllTy.
   (EQ2) No reflexive casts in CastTy.
   (EQ3) No nested CastTys.
-  (EQ4) No CastTy over (ForAllTy (Bndr tyvar vis) body).
+  (EQ4) No CastTy over (ForAllTy ma (Bndr tyvar vis) body).
         See Note [Weird typing rule for ForAllTy]
 
 These invariants are all documented above, in the declaration for Type.
@@ -643,17 +646,30 @@ the kinds of the arg and the res.
 
 Note [ForAllTy]
 ~~~~~~~~~~~~~~~
-A (ForAllTy (Bndr tcv vis) ty) can quantify over a TyVar or, less commonly, a CoVar.
+A (ForAllTy ma (Bndr tcv vis) ty) can quantify over a TyVar or, less commonly, a CoVar.
 See Note [Why ForAllTy can quantify over a coercion variable] for why we need the latter.
 
 (FT1) Invariant: See Note [Weird typing rule for ForAllTy]
 
-(FT2) Invariant: in (ForAllTy (Bndr tcv vis) ty),
+(FT2) Invariant: in (ForAllTy ma (Bndr tcv vis) ty),
       if tcv is a CoVar, then vis = coreTyLamForAllTyFlag.
    Visibility is not important for coercion abstractions,
    because they are not user-visible.
 
 (FT3) Invariant: see Note [Unused coercion variable in ForAllTy]
+
+Note [Forall matchability metadata]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ForAllTy ma binder body stores a type of kind Matchability. The annotation
+is outside the binder scope. It can mention earlier telescope binders.
+Visibility does not determine matchability. Runtime type and coercion lambdas
+use U. Generic construction and reconstruction preserve their supplied ma.
+
+ForAllCo stores a nominal metadata proof at every body role, including P.
+That proof is outside the binder scope, like its binder-kind proof. Mapping,
+folding, substitution and tidying must process it before binding fco_tcv.
+Each telescope binder has its own annotation. Plural makers retain these
+annotations as pairs instead of assigning one annotation to the whole group.
 
 Note [Why ForAllTy can quantify over a coercion variable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -691,37 +707,26 @@ Core does *not* mean we have it in source Haskell.  See #15710 about that.
 
 Note [Unused coercion variable in ForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
-  \(co:t1 ~# t2). e
+An unused CoVar binder with known U matchability uses an anonymous arrow.
+mkTyCoForAllTy calls the sort-aware mkFunctionType for this case. Primitive
+proof domains have sort Constraint, so this can produce FTF_C_T or FTF_C_C.
+The arrow keeps U matchability and a Many multiplicity.
 
-What type should we give to the above expression?
-  (1) forall (co:t1 ~# t2) -> t
-  (2) (t1 ~# t2) -> t
-
-If co is used in t, (1) should be the right choice.
-if co is not used in t, we would like to have (1) and (2) equivalent.
-
-However, we want to keep eqType simple and don't want eqType (1) (2) to return
-True in any case.
-
-We decide to always construct (2) if co is not used in t.
-
-Thus in mkLamType, we check whether the variable is a coercion
-variable (of type (t1 ~# t2), and whether it is un-used in the
-body. If so, it returns a FunTy instead of a ForAllTy.
-
-There are cases we want to skip the check. For example, the check is
-unnecessary when it is known from the context that the input variable
-is a type variable.  In those cases, we use mkForAllTy.
+A vacuous CoVar forall with M or unresolved metadata remains a ForAllTy.
+The anonymous constraint arrows have fixed U metadata. Converting an M or
+unresolved annotation to such an arrow would discard that annotation.
+Substitution and normalization must repeat the known-U check after mapping.
+See Note [Forall matchability metadata].
 
 Note [Weird typing rule for ForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is the (truncated) typing rule for the dependent ForAllTy:
 
+  ma : Matchability
   inner : TYPE r
   tyvar is not free in r
   ----------------------------------------
-  ForAllTy (Bndr tyvar vis) inner : TYPE r
+  ForAllTy ma (Bndr tyvar vis) inner : TYPE r
 
 Note that the kind of `inner` is the kind of the overall ForAllTy. This is
 necessary because every ForAllTy over a type variable is erased at runtime.
@@ -741,13 +746,14 @@ problem.
 
 If the bound variable is a coercion variable:
 
+  ma : Matchability
   inner : TYPE r
-  covar is free in inner
-  ------------------------------------
-  ForAllTy (Bndr covar vis) inner : Type
+  if ma is known U, covar is free in inner
+  ------------------------------------------
+  ForAllTy ma (Bndr covar vis) inner : Type
 
 Here, the kind of the ForAllTy is just Type, because coercion abstractions
-are *not* erased. The "covar is free in inner" premise is solely to maintain
+are *not* erased. The conditional occurrence premise maintains
 the representation invariant documented in
 Note [Unused coercion variable in ForAllTy]. Though there is surface similarity
 between this free-var check and the one in the tyvar rule, these two restrictions
@@ -849,10 +855,8 @@ runtime arrows use U. Constructor kind arrows use M. Constraint arrows use
 fixed U/Many. DepFunTy is intrinsically U; removing vacuous dependence must
 produce the same arrow as an ordinary runtime lambda.
 
-This stage leaves ForAllTy unchanged. Its existing implicit M classification
-must not be used to form a new U forall. That needs a separate quantifier
-representation and coercion migration. Keep current native polymorphic-value
-and family-saturation gates until that stage is complete.
+ForAllTy also carries explicit metadata. See Note [Forall matchability metadata].
+Keep the native polymorphic-value and family-saturation gates unchanged.
 -}
 
 -- | Build a kind arrow without inspecting its endpoints' kinds.
@@ -926,49 +930,54 @@ mkScaledFunTysU :: HasDebugCallStack => [Scaled Type] -> Type -> Type
 mkScaledFunTysU tys = mkScaledFunTys [(unmatchableDataConTy,ty) | ty <- tys]
 
 ---------------
--- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
+-- | Preserve explicit metadata and assume a canonical coercion binder.
 -- See Note [Unused coercion variable in ForAllTy]
-mkForAllTy :: ForAllTyBinder -> Type -> Type
-mkForAllTy bndr body
-  = assertPpr (good_bndr bndr) (ppr bndr <+> ppr body) $
-    ForAllTy bndr body
+mkForAllTy :: Matchability -> ForAllTyBinder -> Type -> Type
+mkForAllTy ma bndr body
+  = assertPpr (good_bndr bndr) (ppr ma <+> ppr bndr <+> ppr body) $
+    ForAllTy ma bndr body
   where
-    -- Check ForAllTy invariants
+    -- See Note [Forall matchability metadata].
+    known_u = ma `eqType` unmatchableDataConTy
     good_bndr (Bndr cv vis)
       | isCoVar cv = isCoreTyLamForAllTyFlag vis
-                     -- See (FT2) in Note [ForAllTy]
-                  && (cv `elemVarSet` tyCoVarsOfType body)
-                     -- See (FT3) in Note [ForAllTy]
+                  && (not known_u || cv `elemVarSet` tyCoVarsOfType body)
       | otherwise = True
 
--- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
-mkForAllTys :: [ForAllTyBinder] -> Type -> Type
-mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
+-- | Make a dependent forall over a TyCoVar
+mkTyCoForAllTy :: Matchability -> TyCoVar -> ForAllTyFlag -> Type -> Type
+mkTyCoForAllTy ma tv vis ty
+  | isCoVar tv
+  , ma `eqType` unmatchableDataConTy
+  , not (tv `elemVarSet` tyCoVarsOfType ty)
+  = mkFunctionType ma manyDataConTy (varType tv) ty
+    -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep.
+  | otherwise
+  = mkForAllTy ma (mkForAllTyBinder vis tv) ty
 
--- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
-mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
-mkInvisForAllTys tyvars = mkForAllTys (tyVarSpecToBinders tyvars)
+-- | Wrap a telescope with one matchability for each binder.
+mkForAllTys :: [(Matchability, ForAllTyBinder)] -> Type -> Type
+mkForAllTys bndrs ty = foldr (uncurry mkForAllTy) ty bndrs
+
+-- | Wrap invisible binders and preserve each supplied matchability.
+mkInvisForAllTys :: [(Matchability, InvisTVBinder)] -> Type -> Type
+mkInvisForAllTys bndrs = mkForAllTys
+  [(ma, Bndr tv (Invisible spec)) | (ma, Bndr tv spec) <- bndrs]
 
 mkPiTy :: HasDebugCallStack => Matchability -> PiTyBinder -> Type -> Type
 mkPiTy ma (Anon ty1 af) ty2 = mkScaledFunTy af ma ty1 ty2
-mkPiTy ma (Named bndr) ty
-  | TyConApp tc [] <- ma, tc `hasKey` matchableDataConKey = mkForAllTy bndr ty
-  | otherwise = pprPanic "mkPiTy: unmatchable forall is not implemented" (ppr ma)
+mkPiTy ma (Named (Bndr tv vis)) ty = mkTyCoForAllTy ma tv vis ty
 
 mkPiTys :: HasDebugCallStack => [(Matchability, PiTyBinder)] -> Type -> Type
 mkPiTys tbs ty = foldr (uncurry mkPiTy) ty tbs
 
--- | Build a matchable telescope under the current forall invariant.
+-- | Build a telescope with M on every binder.
 mkPiTysM :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
 mkPiTysM tbs = mkPiTys [(matchableDataConTy,tb) | tb <- tbs]
 
--- | Build runtime anonymous arrows while retaining existing erased foralls.
--- See Note [Ordinary arrow matchability].
+-- | Build a runtime telescope with U on every binder.
 mkPiTysU :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
-mkPiTysU tbs = mkPiTys [(ma tb,tb) | tb <- tbs]
-  where
-    ma Named{} = matchableDataConTy
-    ma Anon{} = unmatchableDataConTy
+mkPiTysU tbs = mkPiTys [(unmatchableDataConTy,tb) | tb <- tbs]
 
 -- | Construct a retained dependent function. Remove vacuous dependence.
 mkDepFunTy :: Id -> Type -> Type
@@ -1098,9 +1107,10 @@ data Coercion
       , fco_visL :: !ForAllTyFlag -- Visibility of coercionLKind
       , fco_visR :: !ForAllTyFlag -- Visibility of coercionRKind
                                   -- See (FC7) of Note [ForAllCo]
+      , fco_ma   :: CoercionN    -- Outside the binder scope at every body role.
       , fco_kind :: KindMCoercion -- See (FC8) of Note [ForAllCo]
       , fco_body :: Coercion }
-         -- ForAllCo :: _ -> N -> e -> e
+         -- ForAllCo :: _ -> _ -> _ -> N -> N -> r -> r
 
   | FunCo  -- Congruence for matchability, multiplicity and both endpoints.
            -- See Note [FunCo] for fco_afl, fco_afr
@@ -1183,8 +1193,14 @@ data CoSel  -- See Note [SelCo]
 
   | SelFun FunSel      -- Decomposes (co1 -> co2)
 
-  | SelForAll          -- Decomposes (forall a. co)
+  | SelForAll ForAllSel -- Decomposes forall metadata or its binder kind.
 
+  deriving( Eq, Data.Data, Ord )
+
+-- | Select the matchability or binder-kind proof of a forall coercion.
+data ForAllSel
+  = SelFAMatch
+  | SelKind
   deriving( Eq, Data.Data, Ord )
 
 data FunSel  -- See Note [SelCo]
@@ -1202,13 +1218,21 @@ instance Outputable UnivCoDeps where
 
 instance Outputable CoSel where
   ppr (SelTyCon n r) = text "Tc" <> parens (int n <> comma <> pprOneCharRole r)
-  ppr SelForAll      = text "All"
+  ppr (SelForAll fs) = text "All" <> parens (ppr fs)
   ppr (SelFun fs)    = text "Fun" <> parens (ppr fs)
 
 pprOneCharRole :: Role -> SDoc
 pprOneCharRole Nominal          = char 'N'
 pprOneCharRole Representational = char 'R'
 pprOneCharRole Phantom          = char 'P'
+
+instance Outputable ForAllSel where
+  ppr SelFAMatch = text "match"
+  ppr SelKind = text "kind"
+
+instance NFData ForAllSel where
+  rnf SelFAMatch = ()
+  rnf SelKind = ()
 
 instance Outputable FunSel where
   ppr SelMatch = text "match"
@@ -1224,7 +1248,8 @@ instance NFData FunSel where
 
 instance Binary CoSel where
    put_ bh (SelTyCon n r)   = do { putByte bh 0; put_ bh n; put_ bh r }
-   put_ bh SelForAll        = putByte bh 1
+   put_ bh (SelForAll SelKind) = putByte bh 1
+   put_ bh (SelForAll SelFAMatch) = putByte bh 6
    put_ bh (SelFun SelMult) = putByte bh 2
    put_ bh (SelFun SelArg)  = putByte bh 3
    put_ bh (SelFun SelRes)  = putByte bh 4
@@ -1233,7 +1258,8 @@ instance Binary CoSel where
    get bh = do { h <- getByte bh
                ; case h of
                    0 -> do { n <- get bh; r <- get bh; return (SelTyCon n r) }
-                   1 -> return SelForAll
+                   1 -> return (SelForAll SelKind)
+                   6 -> return (SelForAll SelFAMatch)
                    2 -> return (SelFun SelMult)
                    3 -> return (SelFun SelArg)
                    5 -> return (SelFun SelMatch)
@@ -1241,7 +1267,7 @@ instance Binary CoSel where
 
 instance NFData CoSel where
   rnf (SelTyCon n r) = rnf n `seq` rnf r `seq` ()
-  rnf SelForAll      = ()
+  rnf (SelForAll fs) = rnf fs
   rnf (SelFun fs)    = rnf fs `seq` ()
 
 instance Outputable MCoercion where
@@ -1329,13 +1355,20 @@ checked by the SelCo case of GHC.Core.Lint.lintCoercion.
 
    See Note [SelCo Cached Roles]
 
-* SelForAll:
-      co : forall (a:k1).t1 ~r0 forall (a:k2).t2
+* SelForAll SelFAMatch:
+      co : forall @ma1 (a:k1).t1 ~r0 forall @ma2 (a:k2).t2
       r0 is Nominal or Representational
       ----------------------------------
-      SelCo SelForAll co : k1 ~N k2
+      SelCo (SelForAll SelFAMatch) co : ma1 ~N ma2
 
-  NB: SelForAll always gives a Nominal coercion.
+* SelForAll SelKind:
+      co : forall @ma1 (a:k1).t1 ~r0 forall @ma2 (a:k2).t2
+      r0 is Nominal or Representational
+      ----------------------------------
+      SelCo (SelForAll SelKind) co : k1 ~N k2
+
+  Both forall selectors give nominal coercions. SelFAMatch selects the
+  stored metadata proof. SelKind selects the binder-kind proof.
   See Note [Phantom forall selectors].
 
 * The SelFun form, for functions, has three sub-forms for the three
@@ -1359,7 +1392,7 @@ checked by the SelCo case of GHC.Core.Lint.lintCoercion.
 Note [Phantom forall selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A phantom coercion between forall types does not imply nominal equality
-between their binder kinds. For example, both (forall (a :: Type). Int)
+between their binder kinds or their matchability annotations. For example, both (forall (a :: Type). Int)
 and (forall (b :: Bool). Int) have kind Type. A phantom coercion can relate
 these types, but it cannot justify a nominal coercion between Type and Bool.
 The residual SelForAll rule therefore requires a nominal or representational
@@ -1369,7 +1402,8 @@ through casts; see pushCoTyArg in GHC.Core.Opt.Arity.
 This restriction does not prevent returning an existing nominal proof.
 A structural ForAllCo stores a nominal binder-kind proof even when its body
 has phantom role. mkSelCo_maybe can return this proof, including under SymCo.
-It can also return nominal Refl when the selected endpoint kinds are equal.
+The same structural reduction can return its nominal metadata proof.
+It can also return nominal Refl when the selected endpoints are equal.
 These reductions must precede the residual selector's role check. If they
 cannot simplify a phantom parent, mkSelCo_maybe returns Nothing.
 
@@ -1467,15 +1501,16 @@ because the kinds of the bound tyvars can be different.
 
 The typing rule is:
 
+  G |- ma_co : ma1 ~N ma2
   G |- kind_co : k1 ~N k2
   tv1 \not\in fv(typeKind(t1),typeKind(t2))  -- Skolem escape
   G, tv1:k1 |- co : t1 ~r t2
   if r=N, then vis1=vis2
   ------------------------------------
-  G |- ForAllCo (tv1:k1) vis1 vis2 kind_co co
-         : forall (tv1:k1) <vis1>. t1
+  G |- ForAllCo (tv1:k1) vis1 vis2 ma_co kind_co co
+         : forall (tv1:k1) <vis1>. @ma1 t1
               ~r
-           forall (tv1:k2) <vis2>. (t2[tv1 |-> (tv1:k2) |> sym kind_co])
+           forall (tv1:k2) <vis2>. @ma2 (t2[tv1 |-> (tv1:k2) |> sym kind_co])
 
 Several things to note here
 
@@ -1503,11 +1538,11 @@ Several things to note here
   there generally is just an impedance mismatch in a bunch of places. So we
   use tv1. When we need tv2, we can use setTyVarKind.
 
-(FC2) Note that the kind coercion must be Nominal; and that the role `r` of
+(FC2) Both the metadata and kind coercions must be nominal. The role `r` of
   the final coercion is the same as that of the body coercion.
 
 (FC3) A ForAllCo allows casting between visibilities.  For example:
-         ForAllCo a Required Specified (SubCo (Refl ty))
+         ForAllCo a Required Specified (Refl U) MRefl (SubCo (Refl ty))
            : (forall a -> ty) ~R (forall a. ty)
   But you can only cast between visiblities at Representational role;
   Hence the premise
@@ -1517,10 +1552,9 @@ Several things to note here
 
 (FC4) See Note [Required foralls in Core].
 
-(FC5) In a /type/, in (ForAllTy cv ty) where cv is a CoVar, we insist that
-  `cv` must appear free in `ty`; see Note [Unused coercion variable in ForAllTy]
-  in GHC.Core.TyCo.Rep for the motivation.  If it does not appear free,
-  use FunTy.
+(FC5) In a /type/, in (ForAllTy ma (Bndr cv vis) ty) where cv is a CoVar, we insist that
+  `cv` must appear free in `ty` when its metadata is known U. Otherwise
+  a vacuous forall is permitted. See Note [Unused coercion variable in ForAllTy].
 
   However we do /not/ impose the same restriction on ForAllCo in /coercions/.
   Instead, in coercionLKind and coercionRKind, we use mkTyCoForAllTy to perform
@@ -2366,8 +2400,8 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res })
       = lit af M.<> go_ty ma M.<> go_ty arg M.<> go_ty w M.<> go_ty res
         -- As per #23764, ordering is [arg, w, res]
-    go_ty (ForAllTy (Bndr tv _) inner)
-      = go_ty (varType tv) M.<> tycobinder tv (go_ty inner)
+    go_ty (ForAllTy ma (Bndr tv _) inner)
+      = go_ty ma M.<> go_ty (varType tv) M.<> tycobinder tv (go_ty inner)
 
     -- See Note [Use explicit recursion in foldTyCo]
     go_tys []     = mempty
@@ -2404,9 +2438,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
        = lit ro M.<> lit afl M.<> lit afr M.<> go_co cm M.<> go_co cw M.<> go_co c1 M.<> go_co c2
 
     go_co (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-                    , fco_kind = kind_co, fco_body = co })
+                    , fco_ma = ma_co, fco_kind = kind_co, fco_body = co })
       = lit visL M.<> lit visR
-        M.<> go_mco kind_co M.<> go_ty (varType tcv)
+        M.<> go_co ma_co M.<> go_mco kind_co M.<> go_ty (varType tcv)
         M.<> tycobinder tcv (go_co co)
 
     go_mco MRefl    = mempty
@@ -2453,7 +2487,7 @@ typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ ma _ t1 t2)       = typeSize ma + typeSize t1 + typeSize t2
-typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
+typeSize (ForAllTy ma (Bndr tv _) t) = typeSize ma + typeSize (varType tv) + typeSize t
 typeSize (TermAppTy f arg)         = 1 + typeSize (varType f) + typeSize arg
 typeSize (TermVarTy v)             = 1 + typeSize (varType v)
 typeSize (DepFunTy b t)            = 1 + typeSize (varType b) + typeSize t
@@ -2471,8 +2505,8 @@ coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
 coercionSize (TermAppCo f co)      = 1 + typeSize (varType f) + coercionSize co
 coercionSize (DepFunCo b domain co) = 1 + typeSize (varType b) + mCoercionSize domain + coercionSize co
-coercionSize (ForAllCo { fco_kind = h, fco_body = co })
-                                   = 1 + coercionSize co + mCoercionSize h
+coercionSize (ForAllCo { fco_ma = ma, fco_kind = h, fco_body = co })
+                                   = 1 + coercionSize ma + coercionSize co + mCoercionSize h
 coercionSize (FunCo _ _ _ ma w c1 c2) = 1 + coercionSize ma + coercionSize c1 + coercionSize c2
                                                          + coercionSize w
 coercionSize (CoVarCo _)         = 1

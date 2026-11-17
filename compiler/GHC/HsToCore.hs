@@ -801,8 +801,9 @@ mkUnsafeCoercePrimPair _old_id old_expr
                                 `setUnfoldingInfo` mkCompulsoryUnfolding rhs
                                 `setArityInfo`     arity
 
-             ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
-                                  , openAlphaTyVar, openBetaTyVar ] $
+             ty = mkSpecForAllTys [(unmatchableDataConTy, tv)
+                                  | tv <- [runtimeRep1TyVar, runtimeRep2TyVar
+                                          , openAlphaTyVar, openBetaTyVar]] $
                   mkVisFunTyManyU openAlphaTy openBetaTy
 
              arity = 1

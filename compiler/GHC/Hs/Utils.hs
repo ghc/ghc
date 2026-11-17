@@ -737,9 +737,10 @@ mkBigLHsPatTup = mkChunkified mkLHsPatTup
 hsTypeToHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
 hsTypeToHsSigType lty@(L loc ty) = case ty of
   HsForAllTy { hst_tele = HsForAllInvis { hsf_xinvis = an
+                                        , hsf_matchability = ma
                                         , hsf_invis_bndrs = bndrs }
              , hst_body = body }
-    -> L loc $ mkHsExplicitSigType an bndrs body
+    -> L loc $ HsSig noExtField (HsOuterExplicit an ma bndrs) body
   _ -> L (l2l loc) $ mkHsImplicitSigType lty -- The annotations are in lty, erase them from loc
 
 -- | Convert an 'LHsType' to an 'LHsSigWcType'.

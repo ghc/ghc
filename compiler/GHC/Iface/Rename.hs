@@ -914,9 +914,9 @@ rnIfaceCo (IfaceLRCo lr c)              = IfaceLRCo lr <$> rnIfaceCo c
 rnIfaceCo (IfaceSubCo c)                = IfaceSubCo <$> rnIfaceCo c
 rnIfaceCo (IfaceAxiomCo ax cos)         = IfaceAxiomCo ax <$> mapM rnIfaceCo cos
 rnIfaceCo (IfaceKindCo c)               = IfaceKindCo <$> rnIfaceCo c
-rnIfaceCo (IfaceForAllCo bndr visL visR co1 co2)
-    = (\bndr' co1' co2' -> IfaceForAllCo bndr' visL visR co1' co2')
-      <$> rnIfaceBndr bndr <*> rnIfaceMCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceForAllCo bndr visL visR ma co1 co2)
+    = (\ma' bndr' co1' co2' -> IfaceForAllCo bndr' visL visR ma' co1' co2')
+      <$> rnIfaceCo ma <*> rnIfaceBndr bndr <*> rnIfaceMCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceUnivCo s r t1 t2 deps)
     = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> pure deps
       -- The dependencies are either coercion variables or holes.
@@ -955,8 +955,8 @@ rnIfaceType (IfaceTupleTy s i tks)
     = IfaceTupleTy s i <$> rnIfaceAppArgs tks
 rnIfaceType (IfaceTyConApp tc tks)
     = IfaceTyConApp <$> rnIfaceTyCon tc <*> rnIfaceAppArgs tks
-rnIfaceType (IfaceForAllTy tv t)
-    = IfaceForAllTy <$> rnIfaceForAllBndr tv <*> rnIfaceType t
+rnIfaceType (IfaceForAllTy ma tv t)
+    = IfaceForAllTy <$> rnIfaceType ma <*> rnIfaceForAllBndr tv <*> rnIfaceType t
 rnIfaceType (IfaceCoercionTy co)
     = IfaceCoercionTy <$> rnIfaceCo co
 rnIfaceType (IfaceCastTy ty co)

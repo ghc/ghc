@@ -740,7 +740,7 @@ primOpType op
     Compare _occ ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
-        mkForAllTys tyvars (mkVisFunTysManyU arg_tys res_ty)
+        mkForAllTys [(unmatchableDataConTy, tv) | tv <- tyvars] (mkVisFunTysManyU arg_tys res_ty)
 
 primOpResultType :: PrimOp -> Type
 primOpResultType op

@@ -152,7 +152,8 @@ data TypeMapX a
        , tm_depfun :: TypeMapG (TypeMapG a)
        , tm_app    :: TypeMapG (TypeMapG a)  -- Note [Equality on AppTys] in GHC.Core.Type
        , tm_tycon  :: DNameEnv a
-       , tm_forall :: TypeMapG (BndrMap a) -- See Note [Binders] in GHC.Core.Map.Expr
+       , tm_forall :: TypeMapG (TypeMapG (BndrMap a)) -- Metadata, body, binder.
+             -- See Note [Binders] in GHC.Core.Map.Expr
        , tm_tylit  :: TyLitMap a
        , tm_coerce :: Maybe a
        }
@@ -214,7 +215,7 @@ instance Functor TypeMapX where
       , tm_termapp = fmap (fmap f) ttermapp
       , tm_depfun = fmap (fmap f) tdepfun
       , tm_app = fmap (fmap f) tapp, tm_tycon = fmap f ttycon
-      , tm_forall = fmap (fmap f) tforall
+      , tm_forall = fmap (fmap (fmap f)) tforall
       , tm_tylit  = fmap f tlit, tm_coerce = fmap f tcoerce }
 
 instance TrieMap TypeMapX where
@@ -310,10 +311,11 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
               -> liftEquality (tc == tc') `andEq` gos env env' tys tys'
           (LitTy l, LitTy l')
               -> liftEquality (l == l')
-          (ForAllTy (Bndr tv vis) ty, ForAllTy (Bndr tv' vis') ty')
+          (ForAllTy ma (Bndr tv vis) ty, ForAllTy ma' (Bndr tv' vis') ty')
               -> -- See Note [ForAllTy and type equality] in
                  -- GHC.Core.TyCo.Compare for why we use `eqForAllVis` here
                  liftEquality (vis `eqForAllVis` vis') `andEq`
+                 go (D env ma) (D env' ma') `andEq`
                  go (D env (varType tv)) (D env' (varType tv')) `andEq`
                  go (D (extendCME env tv) ty) (D (extendCME env' tv') ty')
           (CoercionTy {}, CoercionTy {})
@@ -367,7 +369,8 @@ lkT (D env ty) m = go ty m
                                                >=> lkG (D env t2)
     go (TyConApp tc [])            = tm_tycon  >.> lkDNamed tc
     go (LitTy l)                   = tm_tylit  >.> lkTyLit l
-    go (ForAllTy (Bndr tv _) ty)   = tm_forall >.> lkG (D (extendCME env tv) ty)
+    go (ForAllTy ma (Bndr tv _) ty) = tm_forall >.> lkG (D env ma)
+                                               >=> lkG (D (extendCME env tv) ty)
                                                >=> lkBndr env tv
     go (CastTy t _)                = go t
     go (CoercionTy {})             = tm_coerce
@@ -394,8 +397,9 @@ xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtDNamed tc f 
 xtT (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 xtT (D env (CastTy t _))      f m = xtT (D env t) f m
 xtT (D _   (CoercionTy {}))   f m = m { tm_coerce = tm_coerce m |> f }
-xtT (D env (ForAllTy (Bndr tv _) ty))  f m
-  = m { tm_forall = tm_forall m |> xtG (D (extendCME env tv) ty)
+xtT (D env (ForAllTy ma (Bndr tv _) ty)) f m
+  = m { tm_forall = tm_forall m |> xtG (D env ma)
+                                |>> xtG (D (extendCME env tv) ty)
                                 |>> xtBndr env tv f }
 
 -- trieMapView has eliminated non-nullary TyConApp
@@ -410,7 +414,7 @@ fdT k m = foldTM k (tm_var m)
         . foldTM (foldTM k) (tm_depfun m)
         . foldTM (foldTM k) (tm_app m)
         . foldTM k (tm_tycon m)
-        . foldTM (foldTM k) (tm_forall m)
+        . foldTM (foldTM (foldTM k)) (tm_forall m)
         . foldTyLit k (tm_tylit m)
         . foldMaybe k (tm_coerce m)
 
@@ -425,7 +429,7 @@ filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm
        , tm_depfun = fmap (filterTM f) tdepfun
        , tm_app    = fmap (filterTM f) tapp
        , tm_tycon  = filterTM f ttycon
-       , tm_forall = fmap (filterTM f) tforall
+       , tm_forall = fmap (fmap (filterTM f)) tforall
        , tm_tylit  = filterTM f tlit
        , tm_coerce = filterMaybe f tcoerce }
 
@@ -719,6 +723,6 @@ mpT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_dep
        , tm_depfun = fmap (mapMaybeTM f) tdepfun
        , tm_app    = fmap (mapMaybeTM f) tapp
        , tm_tycon  = mapMaybeTM f ttycon
-       , tm_forall = fmap (mapMaybeTM f) tforall
+       , tm_forall = fmap (fmap (mapMaybeTM f)) tforall
        , tm_tylit  = mapMaybeTM f tlit
        , tm_coerce = tcoerce >>= f }

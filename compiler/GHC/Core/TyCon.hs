@@ -545,13 +545,12 @@ isInferredTyConBinder (Bndr _ tcb_vis) = isInvisInferTcbVis tcb_vis
 mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind = mkTyConKindWithMatchability matchableDataConTy
 
--- | Build a constructor kind with the supplied anonymous-arrow matchability.
--- Named binders keep their ordinary matchable quantifier in this stage.
+-- | Build a constructor kind with the supplied prefix matchability.
 mkTyConKindWithMatchability :: Type -> [TyConBinder] -> Kind -> Kind
 mkTyConKindWithMatchability ma bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (Bndr tv (NamedTCB vis)) k = mkForAllTy (Bndr tv vis) k
+    mk (Bndr tv (NamedTCB vis)) k = mkForAllTy ma (Bndr tv vis) k
     mk (Bndr tv AnonTCB)        k = mkNakedFunTy ma FTF_T_T (varType tv) k
     -- mkNakedFunTy: see Note [Naked FunTy] in GHC.Builtin.WiredIn.Types
 

@@ -10,7 +10,7 @@ module GHC.Core.Coercion (
         -- * Main data type
         Coercion, CoercionN, CoercionR, CoercionP,
         MCoercion(..), MCoercionN, MCoercionR,
-        CoSel(..), FunSel(..),
+        CoSel(..), FunSel(..), ForAllSel(..),
         UnivCoProvenance, CoercionHole(..),
         coHoleCoVar, setCoHoleCoVar,
         LeftOrRight(..),
@@ -161,7 +161,7 @@ import GHC.Types.SrcLoc
 
 import GHC.Types.Unique.FM
 
-import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (matchabilityTy, unmatchableDataConTy)
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Data.FastString
@@ -328,13 +328,13 @@ checkReflexiveMCo MRefl                       = MRefl
 checkReflexiveMCo (MCo co) | isReflexiveCo co = MRefl
                            | otherwise        = MCo co
 
-mkPiMCos :: [Var] -> MCoercion -> MCoercion
+mkPiMCos :: [(Matchability, Var)] -> MCoercion -> MCoercion
 mkPiMCos _ MRefl = MRefl
 mkPiMCos vs (MCo co) = MCo (mkPiCos Representational vs co)
 
-mkFunResMCo :: Id -> MCoercionR -> MCoercionR
-mkFunResMCo _      MRefl    = MRefl
-mkFunResMCo arg_id (MCo co) = MCo (mkFunResCo Representational arg_id co)
+mkFunResMCo :: Matchability -> Id -> MCoercionR -> MCoercionR
+mkFunResMCo _ _ MRefl    = MRefl
+mkFunResMCo ma arg_id (MCo co) = MCo (mkFunResCo Representational ma arg_id co)
 
 
 {-
@@ -431,8 +431,8 @@ decomposePiCosK orig_co (Pair orig_k1 orig_k2) orig_args
     -- Invariant:  co :: subst1(k1) ~ subst2(k2)
 
     go acc_arg_cos (subst1,k1) co (subst2,k2) (ty:tys)
-      | Just (a, t1) <- splitForAllTyCoVar_maybe k1
-      , Just (b, t2) <- splitForAllTyCoVar_maybe k2
+      | Just (_ma1, a, t1) <- splitForAllTyCoVar_maybe k1
+      , Just (_ma2, b, t2) <- splitForAllTyCoVar_maybe k2
         -- know     co :: (forall a:s1.t1) ~ (forall b:s2.t2)
         --    function :: forall a:s1.t1   (the function is not passed to decomposePiCos)
         --           a :: s1
@@ -440,7 +440,7 @@ decomposePiCosK orig_co (Pair orig_k1 orig_k2) orig_args
         --          ty :: s2
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1[ty |> arg_co / a] ~ t2[ty / b]
-      = let arg_co  = mkSelCo SelForAll (mkSymCo co)
+      = let arg_co  = mkSelCo (SelForAll SelKind) (mkSymCo co)
             res_co  = mkInstCo co (mkGReflLeftCo Nominal ty arg_co)
             subst1' = extendTCvSubst subst1 a (ty `CastTy` arg_co)
             subst2' = extendTCvSubst subst2 b ty
@@ -511,32 +511,32 @@ splitFunCo_maybe (FunCo { fco_arg = arg, fco_res = res }) = Just (arg, res)
 splitFunCo_maybe _ = Nothing
 
 splitForAllCo_maybe :: Coercion
-                    -> Maybe (TyCoVar, ForAllTyFlag, ForAllTyFlag, KindCoercion, Coercion)
+                    -> Maybe (TyCoVar, ForAllTyFlag, ForAllTyFlag, CoercionN, KindCoercion, Coercion)
 -- You might think that this function should return KindMCoercion (rather
 -- than a KindCoercion), but in fact most of the clients want a KindCoercion.
 splitForAllCo_maybe (ForAllCo { fco_tcv = tv, fco_visL = vL, fco_visR = vR
-                              , fco_kind = k_mco, fco_body = co })
-  = Just (tv, vL, vR, forAllCoKindCo tv k_mco, co)
+                              , fco_ma = ma_co, fco_kind = k_mco, fco_body = co })
+  = Just (tv, vL, vR, ma_co, forAllCoKindCo tv k_mco, co)
 splitForAllCo_maybe co
   | Just (ty, r)        <- isReflCo_maybe co
-  , Just (Bndr tcv vis, body_ty) <- splitForAllForAllTyBinder_maybe ty
-  = Just (tcv, vis, vis, mkNomReflCo (varType tcv), mkReflCo r body_ty)
+  , Just (ma, Bndr tcv vis, body_ty) <- splitForAllForAllTyBinder_maybe ty
+  = Just (tcv, vis, vis, mkNomReflCo ma, mkNomReflCo (varType tcv), mkReflCo r body_ty)
 splitForAllCo_maybe _ = Nothing
 
 -- | Like 'splitForAllCo_maybe', but only returns Just for tyvar binder
 splitForAllCo_ty_maybe :: Coercion
-                       -> Maybe (TyVar, ForAllTyFlag, ForAllTyFlag, KindCoercion, Coercion)
+                       -> Maybe (TyVar, ForAllTyFlag, ForAllTyFlag, CoercionN, KindCoercion, Coercion)
 splitForAllCo_ty_maybe co
-  | Just stuff@(tv, _, _, _, _) <- splitForAllCo_maybe co
+  | Just stuff@(tv, _, _, _, _, _) <- splitForAllCo_maybe co
   , isTyVar tv
   = Just stuff
 splitForAllCo_ty_maybe _ = Nothing
 
 -- | Like 'splitForAllCo_maybe', but only returns Just for covar binder
 splitForAllCo_co_maybe :: Coercion
-                       -> Maybe (CoVar, ForAllTyFlag, ForAllTyFlag, KindCoercion, Coercion)
+                       -> Maybe (CoVar, ForAllTyFlag, ForAllTyFlag, CoercionN, KindCoercion, Coercion)
 splitForAllCo_co_maybe co
-  | Just stuff@(cv, _, _, _, _) <- splitForAllCo_maybe co
+  | Just stuff@(cv, _, _, _, _, _) <- splitForAllCo_maybe co
   , isCoVar cv
   = Just stuff
 splitForAllCo_co_maybe _ = Nothing
@@ -767,20 +767,26 @@ mkAppCos co1 cos = foldl' mkAppCo co1 cos
 
 assertGoodForAllCo :: HasDebugCallStack
                    => TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-                   -> KindMCoercion -> Coercion -> a -> a
+                   -> CoercionN -> KindMCoercion -> Coercion -> a -> a
 -- Check ForAllCo invariants; see Note [ForAllCo] in GHC.Core.TyCo.Rep
-assertGoodForAllCo tcv visL visR kind_co co
+assertGoodForAllCo tcv visL visR ma_co kind_co co
   | isTyVar tcv
-  = assertPpr tcv_kind_co_agree doc
+  = assertPpr ma_co_ok doc
+  . assertPpr tcv_kind_co_agree doc
 
   | otherwise
-  = assertPpr tcv_kind_co_agree doc
+  = assertPpr ma_co_ok doc
+  . assertPpr tcv_kind_co_agree doc
         -- The kind of the tycovar should be the left-hand kind of the kind coercion.
   . assertPpr (almostDevoidCoVarOfCo tcv co) doc
         -- See (FC6) in Note [ForAllCo] in GHC.Core.TyCo.Rep
   . assertPpr (isCoreTyLamForAllTyFlag visL && isCoreTyLamForAllTyFlag visR) doc
         -- See (FC7) in Note [ForAllCo] in GHC.Core.TyCo.Rep
   where
+    Pair ma1 ma2 = coercionKind ma_co
+    ma_co_ok = coercionRole ma_co == Nominal
+            && typeKind ma1 `eqType` matchabilityTy
+            && typeKind ma2 `eqType` matchabilityTy
     tcv_type      = varType tcv
     tcv_kind_co_agree = case kind_co of
                           MRefl  -> True
@@ -788,6 +794,7 @@ assertGoodForAllCo tcv visL visR kind_co co
 
     doc = vcat [ text "Var:" <+> ppr tcv <+> dcolon <+> ppr tcv_type
                , text "Vis:" <+> ppr visL <+> ppr visR
+               , text "ma_co:" <+> ppr ma_co
                , text "kind_co:" <+> pp_kind_co
                , text "body_co" <+> ppr co ]
     pp_kind_co = case kind_co of
@@ -839,10 +846,12 @@ mkUnbranchedAxInstLHS ax = mkAxInstLHS ax 0
 {- Note [mkSelCo precondition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To satisfy the Purely Kinded Type Invariant (PKTI), we require that
-  in any call (mkSelCo cs co)
+  whenever (mkSelCo cs co) leaves a residual SelCo
   * selectFromType cs (coercionLKind co) works
   * selectFromType cs (coercionRKind co) works
   * and hence coercionKind (SelCo cs co) works (PKTI)
+Structural ForAllCo children can simplify before these shape checks. Its
+endpoints can lose an unused U CoVar binder during reconstruction.
 -}
 
 mkSelCo :: HasDebugCallStack
@@ -853,7 +862,7 @@ mkSelCo :: HasDebugCallStack
 -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
 mkSelCo n co
   = mkSelCo_maybe n co `orElse`
-    assertPpr (n /= SelForAll || coercionRole co /= Phantom)
+    assertPpr (case n of { SelForAll _ -> coercionRole co /= Phantom; _ -> True })
       (text "mkSelCo: residual phantom forall selector" $$ ppr co)
       (SelCo n co)
 
@@ -863,11 +872,13 @@ mkSelCo_maybe :: HasDebugCallStack
         -> Maybe Coercion
 -- Note [mkSelCo precondition]
 mkSelCo_maybe cs co
-  = assertPpr (good_call cs) bad_call_msg $
-    go cs co
+  = go cs co
   where
 
-    go SelForAll (ForAllCo { fco_tcv = tcv, fco_kind = kind_co })
+    go (SelForAll SelFAMatch) (ForAllCo { fco_ma = ma_co })
+      = Just ma_co
+
+    go (SelForAll SelKind) (ForAllCo { fco_tcv = tcv, fco_kind = kind_co })
       = Just (forAllCoKindCo tcv kind_co)
       -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
       -- then (nth SelForAll co :: k1 ~N k2)
@@ -886,6 +897,9 @@ mkSelCo_maybe cs co
       = do { co' <- go cs co; return (mkSymCo co') }
 
     go cs co
+      = assertPpr (good_call cs) bad_call_msg $ go_other cs co
+
+    go_other cs co
       | Just (ty, co_role) <- isReflCo_maybe co
       = Just (mkReflCo (mkSelCoResRole cs co_role) (selectFromType cs ty))
         -- mkSelCoreResRole: The role of the result may not be
@@ -915,13 +929,13 @@ mkSelCo_maybe cs co
                         , text "cs =" <+> ppr cs
                         , text "coercion role =" <+> ppr (coercionRole co) ]
 
-    -- Check the endpoint shapes before simplification. mkSelCo checks the
-    -- residual forall selector's role after simplification.
+    -- Check endpoint shapes after extracting structural children. mkSelCo
+    -- checks the residual forall selector's role after simplification.
     -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
-    good_call SelForAll
-      | Just (_tv1, _) <- splitForAllTyCoVar_maybe ty1
-      , Just (_tv2, _) <- splitForAllTyCoVar_maybe ty2
-      =  True
+    good_call (SelForAll _)
+      | Just (_, tv1, _) <- splitForAllTyCoVar_maybe ty1
+      , Just (_, tv2, _) <- splitForAllTyCoVar_maybe ty2
+      = isTyVar tv1 == isTyVar tv2
 
     good_call (SelFun {})
        = isFunTy ty1 && isFunTy ty2
@@ -942,7 +956,7 @@ mkSelCoResRole :: CoSel -> Role -> Role
 -- What is the role of (SelCo cs co), if co has role 'r'?
 -- It is not just 'r'!
 -- c.f. the SelCo case of coercionRole
-mkSelCoResRole SelForAll       _ = Nominal
+mkSelCoResRole (SelForAll _)   _ = Nominal
 mkSelCoResRole (SelTyCon _ r') _ = r'
 mkSelCoResRole (SelFun fs)     r = funRole r fs
 
@@ -968,9 +982,13 @@ selectFromType (SelTyCon n _) ty
   = assertPpr (args `lengthExceeds` n) (ppr n $$ ppr ty) $
     args `getNth` n
 
-selectFromType SelForAll ty       -- Works for both tyvar and covar
-  | Just (tv,_) <- splitForAllTyCoVar_maybe ty
-  = tyVarKind tv
+selectFromType (SelForAll SelFAMatch) ty
+  | Just (ma, _, _) <- splitForAllTyCoVar_maybe ty
+  = ma
+
+selectFromType (SelForAll SelKind) ty  -- Works for both tyvar and covar
+  | Just (_, tv, _) <- splitForAllTyCoVar_maybe ty
+  = varType tv
 
 selectFromType cs ty
   = pprPanic "selectFromType" (ppr cs $$ ppr ty)
@@ -987,7 +1005,7 @@ mkLRCo lr co
 -- Works for both tyvar and covar
 mkInstCo :: Coercion -> CoercionN -> Coercion
 mkInstCo co_fun co_arg
-  | Just (tcv, _, _, kind_co, body_co) <- splitForAllCo_maybe co_fun
+  | Just (tcv, _, _, _ma_co, kind_co, body_co) <- splitForAllCo_maybe co_fun
   , Just (arg, _) <- isReflCo_maybe co_arg
   , let in_scope = mkInScopeSet $
                    tyCoVarsOfType arg `unionVarSet` tyCoVarsOfCo body_co
@@ -1113,7 +1131,7 @@ setNominalRole_maybe r co
           SelCo (SelTyCon n Nominal) <$> setNominalRole_maybe (coercionRole co) co
         SelFun fs ->
           SelCo (SelFun fs) <$> setNominalRole_maybe (coercionRole co) co
-        SelForAll ->
+        SelForAll _ ->
           pprPanic "setNominalRole_maybe: the coercion should already be nominal" (ppr co)
     setNominalRole_maybe_helper (InstCo co arg)
       = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
@@ -1415,34 +1433,32 @@ castCoercionKind g h1 h2
   where
     (Pair t1 t2, r) = coercionKindRole g
 
-mkPiCos :: Role -> [Var] -> Coercion -> Coercion
-mkPiCos r vs co = foldr (mkPiCo r) co vs
+mkPiCos :: Role -> [(Matchability, Var)] -> Coercion -> Coercion
+mkPiCos r vs co = foldr (uncurry (mkPiCo r)) co vs
 
--- | Make a forall 'Coercion', where both types related by the coercion
--- are quantified over the same variable.
-mkPiCo  :: Role -> Var -> Coercion -> Coercion
-mkPiCo r v co | isTyVar v = mkHomoForAllCo v co
-              | isCoVar v = assert (not (v `elemVarSet` tyCoVarsOfCo co)) $
-                  -- We didn't call mkForAllCo here because if v does not appear
-                  -- in co, the argument coercion will be nominal. But here we
-                  -- want it to be r. It is only called in 'mkPiCos', which is
-                  -- only used in GHC.Core.Opt.Simplify.Utils, where we are sure for
-                  -- now (Aug 2018) v won't occur in co.
-                            mkFunResCo r v co
-              | otherwise = mkFunResCo r v co
+-- | Quantify both endpoints over a binder with explicit matchability.
+mkPiCo :: Role -> Matchability -> Var -> Coercion -> Coercion
+mkPiCo r ma v co
+  | isTyVar v = mkHomoForAllCo (mkNomReflCo ma) v co
+  | isCoVar v
+  , not (v `elemVarSet` tyCoVarsOfCo co)
+  , ma `eqType` unmatchableDataConTy
+  = mkFunResCo r ma v co
+  | isCoVar v
+  = mkForAllCo v coreTyLamForAllTyFlag coreTyLamForAllTyFlag
+               (mkNomReflCo ma) MRefl co
+  | otherwise = mkFunResCo r ma v co
 
-mkFunResCo :: Role -> Id -> Coercion -> Coercion
--- Given res_co :: res1 ~ res2,
---   mkFunResCo r m arg res_co :: (arg -> res1) ~r (arg -> res2)
--- Reflexive in the multiplicity argument
-mkFunResCo role id res_co
+-- | Extend a result coercion with an argument and its matchability.
+mkFunResCo :: Role -> Matchability -> Id -> Coercion -> Coercion
+mkFunResCo role ma id res_co
   | isNonCoVarId id
   , id `elemVarSet` tyCoVarsOfCo res_co
-  = if isNativeRetainedBinder id
+  = if isNativeRetainedBinder id && ma `eqType` unmatchableDataConTy
     then mkDepFunCo id res_co
     else pprPanic "mkFunResCo: unsupported dependent runtime binder" (ppr id)
   | otherwise
-  = mkFunCoNoFTF role (mkReflCo (funRole role SelMatch) unmatchableDataConTy) mult arg_co res_co
+  = mkFunCoNoFTF role (mkReflCo (funRole role SelMatch) ma) mult arg_co res_co
   where
     arg_co = mkReflCo role (varType id)
     mult   = mkReflCo (funRole role SelMult) (idMult id)
@@ -1871,7 +1887,7 @@ ty_co_subst !lc role ty
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
     go r (FunTy af ma w t1 t2) = mkFunCo r af (go (funRole r SelMatch) ma) (go (funRole r SelMult) w) (go r t1) (go r t2)
-    go r t@(ForAllTy (Bndr v vis) ty)
+    go r t@(ForAllTy ma (Bndr v vis) ty)
        = let (lc', v', k_co) = liftCoSubstVarBndr lc v
              body_co = ty_co_subst lc' r ty
              k_mco = kindCoToMKindCo k_co
@@ -1882,7 +1898,7 @@ ty_co_subst !lc role ty
             -- We specifically check for this and panic because we know that
            -- there's a hole in the type system here (see (FC6), and we'd rather
            -- panic than fall into it.
-         then mkForAllCo v' vis vis k_mco body_co
+         then mkForAllCo v' vis vis (go Nominal ma) k_mco body_co
          else pprPanic "ty_co_subst: covar is not almost devoid" (ppr t)
     go r ty@(LitTy {})     = assert (r == Nominal) $
                              mkNomReflCo ty
@@ -2212,11 +2228,11 @@ coercion_lr_kind which orig_co
               , ft_arg = go arg, ft_res = go res }
 
     go co@(ForAllCo { fco_tcv = tv1, fco_visL = visL, fco_visR = visR
-                    , fco_kind = k_co, fco_body = co1 })
+                    , fco_ma = ma_co, fco_kind = k_co, fco_body = co1 })
       = case which of
-          CLeft  -> mkTyCoForAllTy tv1 visL (go co1)
+          CLeft  -> mkTyCoForAllTy (coercionLKind ma_co) tv1 visL (go co1)
           CRight | isReflKindMCo k_co
-                 -> mkTyCoForAllTy tv1 visR (go co1)
+                 -> mkTyCoForAllTy (coercionRKind ma_co) tv1 visR (go co1)
                  | otherwise
                  -> go_forall_right empty_subst co
       where
@@ -2270,14 +2286,14 @@ coercion_lr_kind which orig_co
 
     -------------
     go_forall_right subst (ForAllCo { fco_tcv = tv1, fco_visR = visR
-                                    , fco_kind = k_mco, fco_body = co })
+                                    , fco_ma = ma_co, fco_kind = k_mco, fco_body = co })
       -- See Note [Nested ForAllCos]
       | isTyVar tv1
       = case k_mco of
-          MRefl -> mkForAllTy (Bndr tv1 visR) (go_forall_right subst' co)
+          MRefl -> mkForAllTy (substTy subst (coercionRKind ma_co)) (Bndr tv1 visR) (go_forall_right subst' co)
                 where
                    subst' = extendSubstInScope subst tv1
-          MCo k_co -> mkForAllTy (Bndr tv2 visR) (go_forall_right subst' co)
+          MCo k_co -> mkForAllTy (substTy subst (coercionRKind ma_co)) (Bndr tv2 visR) (go_forall_right subst' co)
             where
               k2  = coercionRKind k_co
               tv2 = setTyVarKind tv1 (substTy subst k2)
@@ -2285,13 +2301,13 @@ coercion_lr_kind which orig_co
                        TyVarTy tv2 `mkCastTy` mkSymCo k_co
 
     go_forall_right subst (ForAllCo { fco_tcv = cv1, fco_visR = visR
-                                    , fco_kind = k_mco, fco_body = co })
+                                    , fco_ma = ma_co, fco_kind = k_mco, fco_body = co })
       | isCoVar cv1
       = case k_mco of
-           MRefl -> mkTyCoForAllTy cv1 visR (go_forall_right subst' co)
+           MRefl -> mkTyCoForAllTy (substTy subst (coercionRKind ma_co)) cv1 visR (go_forall_right subst' co)
              where
                subst' = extendSubstInScope subst cv1
-           MCo k_co -> mkTyCoForAllTy cv2 visR (go_forall_right subst' co)
+           MCo k_co -> mkTyCoForAllTy (substTy subst (coercionRKind ma_co)) cv2 visR (go_forall_right subst' co)
              where
                k2    = coercionRKind k_co
                r     = coVarRole cv1
@@ -2440,19 +2456,19 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
       | Just (ty1a, ty1b) <- splitAppTyNoView_maybe ty1
       = mkAppCo (go ty1a ty2a) (go ty1b ty2b)
 
-    go (ForAllTy (Bndr tv1 flag1) ty1) (ForAllTy (Bndr tv2 flag2) ty2)
+    go (ForAllTy ma1 (Bndr tv1 flag1) ty1) (ForAllTy ma2 (Bndr tv2 flag2) ty2)
       | isTyVar tv1
       = assert (isTyVar tv2) $
-        mkForAllCo tv1 flag1 flag2 (kindCoToMKindCo kind_co) (go ty1 ty2')
+        mkForAllCo tv1 flag1 flag2 (go ma1 ma2) (kindCoToMKindCo kind_co) (go ty1 ty2')
       where kind_co  = go (tyVarKind tv1) (tyVarKind tv2)
             in_scope = mkInScopeSet $ tyCoVarsOfType ty2 `unionVarSet` tyCoVarsOfCo kind_co
             ty2'     = substTyWithInScope in_scope [tv2]
                          [mkTyVarTy tv1 `mkCastTy` kind_co]
                          ty2
 
-    go (ForAllTy (Bndr cv1 flag1) ty1) (ForAllTy (Bndr cv2 flag2) ty2)
+    go (ForAllTy ma1 (Bndr cv1 flag1) ty1) (ForAllTy ma2 (Bndr cv2 flag2) ty2)
       = assert (isCoVar cv1 && isCoVar cv2) $
-        mkForAllCo cv1 flag1 flag2 (kindCoToMKindCo kind_co) (go ty1 ty2')
+        mkForAllCo cv1 flag1 flag2 (go ma1 ma2) (kindCoToMKindCo kind_co) (go ty1 ty2')
       where s1 = varType cv1
             s2 = varType cv2
             kind_co = go s1 s2

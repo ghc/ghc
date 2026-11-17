@@ -13,6 +13,8 @@ import GHC.Types.Var.Set( VarSet )
 toIfaceTypeX :: VarSet -> Type -> IfaceType
 toIfaceTyLit :: TyLit -> IfaceTyLit
 toIfaceForAllTyBndrs :: [ForAllTyBinder] -> [VarBndr IfaceBndr IfaceForAllTyFlag]
+toIfaceForAllTyBndrsWithMatchability :: [(Type, ForAllTyBinder)]
+                                    -> [(IfaceType, VarBndr IfaceBndr IfaceForAllTyFlag)]
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceCoercionX :: VarSet -> Coercion -> IfaceCoercion

@@ -107,7 +107,7 @@ varEOcc, conEOcc, litEOcc, appEOcc, appTypeEOcc, infixAppOcc, sectionLOcc,
   sectionROcc, lamEOcc, lamCaseEOcc, lamCasesEOcc, tupEOcc, unboxedTupEOcc,
   unboxedSumEOcc, condEOcc, multiIfEOcc, letEOcc, caseEOcc, doEOcc, mdoEOcc,
   compEOcc, staticEOcc, unboundVarEOcc, labelEOcc, implicitParamVarEOcc,
-  getFieldEOcc, projectionEOcc, typeEOcc, forallEOcc, forallVisEOcc,
+  getFieldEOcc, projectionEOcc, typeEOcc, forallEOcc, forallVisEOcc, forallMatchEOcc,
   constrainedEOcc :: KnownOcc
 varEOcc              = mkVarOcc "varE"
 conEOcc              = mkVarOcc "conE"
@@ -151,6 +151,7 @@ projectionEOcc       = mkVarOcc "projectionE"
 typeEOcc             = mkVarOcc "typeE"
 forallEOcc           = mkVarOcc "forallE"
 forallVisEOcc        = mkVarOcc "forallVisE"
+forallMatchEOcc      = mkVarOcc "forallMatchE"
 constrainedEOcc      = mkVarOcc "constrainedE"
 
 -- type FieldExp = ...
@@ -241,11 +242,12 @@ sourceLazyOcc         = mkVarOcc "sourceLazy"
 sourceStrictOcc       = mkVarOcc "sourceStrict"
 
 -- data Con = ...
-normalCOcc, recCOcc, infixCOcc, forallCOcc, gadtCOcc, recGadtCOcc :: KnownOcc
+normalCOcc, recCOcc, infixCOcc, forallCOcc, forallMatchCOcc, gadtCOcc, recGadtCOcc :: KnownOcc
 normalCOcc  = mkVarOcc "normalC"
 recCOcc     = mkVarOcc "recC"
 infixCOcc   = mkVarOcc "infixC"
 forallCOcc  = mkVarOcc "forallC"
+forallMatchCOcc = mkVarOcc "forallMatchC"
 gadtCOcc    = mkVarOcc "gadtC"
 recGadtCOcc = mkVarOcc "recGadtC"
 
@@ -274,13 +276,14 @@ infixPatSynName  = mkVarOcc "infixPatSyn"
 recordPatSynName = mkVarOcc "recordPatSyn"
 
 -- data Type = ...
-forallTName, forallVisTName, varTName, conTName, infixTName, tupleTName,
+forallTName, forallVisTName, forallMatchTName, varTName, conTName, infixTName, tupleTName,
     unboxedTupleTName, unboxedSumTName, arrowTName, mulArrowTName, listTName,
     appTName, appKindTName, sigTName, equalityTName, litTName, promotedTName,
     promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName, implicitParamTName :: KnownOcc
 forallTName         = mkVarOcc "forallT"
 forallVisTName      = mkVarOcc "forallVisT"
+forallMatchTName    = mkVarOcc "forallMatchT"
 varTName            = mkVarOcc "varT"
 conTName            = mkVarOcc "conT"
 tupleTName          = mkVarOcc "tupleT"

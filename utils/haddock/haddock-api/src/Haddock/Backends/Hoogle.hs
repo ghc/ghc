@@ -295,23 +295,31 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
   -- AZ:TODO get rid of the concatMap
   concatMap (lookupCon sDocContext subdocs) [con_name con] ++ f con_args'
   where
-    f (PrefixCon _ args) = [typeSig name $ (map cdf_type args) ++ [resType]]
+    f (PrefixCon _ args) =
+      [typeSig name $ foldr
+        addPrefix
+        (funs $ map cdf_type args ++ [resType])
+        (con_telescope con)]
     f (InfixCon x a1 a2) = f $ PrefixCon x [a1, a2]
     f (RecCon _ (L _ recs)) =
       f (PrefixCon noExtField $ map (cdrf_spec . unLoc) recs)
         ++ concat
           [ (concatMap (lookupCon sDocContext subdocs . noLocA . unLoc . foLabel . unLoc) (cdrf_names r))
-            ++ [out sDocContext (map (foExt . unLoc) $ cdrf_names r) `typeSig` [resType, cdf_type $ cdrf_spec r]]
+            ++ [out sDocContext (map (foExt . unLoc) $ cdrf_names r) `typeSig` funs [resType, cdf_type $ cdrf_spec r]]
           | r <- map unLoc recs
           ]
 
     funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) x y)
     apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
-    typeSig nm flds =
+    addPrefix (L _ (HsGadtForAll _ tele)) body = reL $ HsForAllTy noExtField tele body
+    addPrefix (L _ (HsGadtContext ctxt)) body = reL $ HsQualTy noExtField ctxt body
+    addPrefix (L _ HsGadtPar{}) body = reL $ HsParTy noAnn body
+
+    typeSig nm ty =
       operator nm
         ++ " :: "
-        ++ outHsSigType sDocContext (unL $ mkEmptySigType $ funs flds)
+        ++ outHsSigType sDocContext (unL $ mkEmptySigType ty)
 
     -- We print the constructors as comma-separated list. See GHC
     -- docs for con_names on why it is a list to begin with.
@@ -339,8 +347,7 @@ ppCtor
   ( ConDeclGADT
       { con_names = names
       , con_outer_bndrs = L _ outer_bndrs
-      , con_inner_bndrs = inner_bndrs
-      , con_mb_cxt = mcxt
+      , con_telescope = telescope
       , con_g_args = args
       , con_res_ty = res_ty
       }
@@ -350,11 +357,8 @@ ppCtor
       typeSig = operator name ++ " :: " ++ outHsSigType sDocContext con_sig_ty
       name = out sDocContext $ unL <$> names
       con_sig_ty = HsSig noExtField outer_bndrs $
-                   mkGadtArgTys inner_bndrs phi_ty
+                   mkGadtArgTys telescope tau_ty
         where
-          phi_ty = case mcxt of
-            Just theta -> mkQualTy theta tau_ty
-            Nothing -> tau_ty
           tau_ty = foldr mkFunTy res_ty $
             case args of
               PrefixConGADT _ pos_args -> map cdf_type pos_args
@@ -372,6 +376,7 @@ ppCtor
             L l (HsForAllTy { hst_xforall = noExtField
                                , hst_tele = tele, hst_body = body })
           mkGadtArgTy (L l HsGadtPar{}) body = L l (HsParTy noAnn body)
+          mkGadtArgTy (L _ (HsGadtContext ctxt)) body = mkQualTy ctxt body
 
           mkGadtArgTys :: [LHsGadtTelescope GhcRn] -> LHsType GhcRn -> LHsType GhcRn
           mkGadtArgTys = flip (foldr mkGadtArgTy)

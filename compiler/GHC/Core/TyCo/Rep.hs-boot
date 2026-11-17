@@ -10,6 +10,7 @@ data Type
 data Coercion
 data FunSel
 data CoSel
+data ForAllSel
 data UnivCoProvenance
 data UnivCoDeps
 data TyLit
@@ -29,7 +30,8 @@ type CoercionN = Coercion
 type MCoercionN = MCoercion
 type KindMCoercion = MCoercionN
 
-mkForAllTy       :: VarBndr Var ForAllTyFlag -> Type -> Type
+mkForAllTy       :: Matchability -> VarBndr Var ForAllTyFlag -> Type -> Type
+mkTyCoForAllTy   :: Matchability -> Var -> ForAllTyFlag -> Type -> Type
 mkNakedTyConTy   :: TyCon -> Type
 mkNakedFunTy     :: Matchability -> FunTyFlag -> Type -> Type -> Type
 

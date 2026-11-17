@@ -1595,7 +1595,7 @@ tcMatches ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
        ; let vis_pat_tys = filter isVisibleExpPatType pat_tys
        ; pat_ty <- case vis_pat_tys of
            [ExpFunPatTy t]      -> scaledExpTypeToType t
-           [ExpForAllPatTy tvb] -> failWithTc $ TcRnEmptyCase ctxt (EmptyCaseForall tvb)
+           [ExpForAllPatTy ma tvb] -> failWithTc $ TcRnEmptyCase ctxt (EmptyCaseForall (ma,tvb))
            []                   -> panic "tcMatches: no arguments in EmptyCase"
            _t1:(_t2:_ts)        -> panic "tcMatches: multiple arguments in EmptyCase"
        ; rhs_ty <- expTypeToType exp_ty
@@ -2042,7 +2042,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              tup_ty        = mkBigCoreVarTupTy bndr_ids
              poly_arg_ty   = m_app alphaTy
              poly_res_ty   = m_app (n_app alphaTy)
-             using_poly_ty = mkInfForAllTy alphaTyVar $
+             using_poly_ty = mkInfForAllTy unmatchableDataConTy alphaTyVar $
                              by_arrow $
                              poly_arg_ty `mkVisFunTyManyU` poly_res_ty
 
@@ -2193,7 +2193,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
              using_arg_ty = m1_ty `mkAppTy` tup_ty
              poly_res_ty  = m2_ty `mkAppTy` n_app alphaTy
              using_res_ty = m2_ty `mkAppTy` n_app tup_ty
-             using_poly_ty = mkInfForAllTy alphaTyVar $
+             using_poly_ty = mkInfForAllTy unmatchableDataConTy alphaTyVar $
                              by_arrow $
                              poly_arg_ty `mkVisFunTyManyU` poly_res_ty
 
@@ -2232,8 +2232,8 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        ; fmap_op' <- case form of
                        ThenForm -> return noExpr
                        _ -> fmap unLoc . tcCheckPolyExpr (noLocA fmap_op) $
-                            mkInfForAllTy alphaTyVar $
-                            mkInfForAllTy betaTyVar  $
+                            mkInfForAllTy unmatchableDataConTy alphaTyVar $
+                            mkInfForAllTy unmatchableDataConTy betaTyVar  $
                             (alphaTy `mkVisFunTyManyU` betaTy)
                             `mkVisFunTyManyU` (n_app alphaTy)
                             `mkVisFunTyManyU` (n_app betaTy)
@@ -2297,7 +2297,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
   = do { m_ty   <- newFlexiTyVarTy typeToTypeKind
 
-       ; let mzip_ty  = mkInfForAllTys [alphaTyVar, betaTyVar] $
+       ; let mzip_ty  = mkInfForAllTys [(unmatchableDataConTy,tv) | tv <- [alphaTyVar, betaTyVar]] $
                         (m_ty `mkAppTy` alphaTy)
                         `mkVisFunTyManyU`
                         (m_ty `mkAppTy` betaTy)

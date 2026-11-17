@@ -490,15 +490,19 @@ renameHsGadtTelescope :: LHsGadtTelescope GhcRn -> RnM (LHsGadtTelescope DocName
 renameHsGadtTelescope (L l HsGadtPar{}) = pure $ L l $ HsGadtPar noExtField
 renameHsGadtTelescope (L l (HsGadtForAll _ tele)) =
   L l . HsGadtForAll noExtField <$> renameHsForAllTelescope tele
+renameHsGadtTelescope (L l (HsGadtContext ctxt)) =
+  L l . HsGadtContext <$> renameLContext ctxt
 
 renameHsForAllTelescope :: HsForAllTelescope GhcRn -> RnM (HsForAllTelescope DocNameI)
 renameHsForAllTelescope tele = case tele of
-  HsForAllVis _ bndrs -> do
+  HsForAllVis _ ma bndrs -> do
+    ma' <- traverse renameLType ma
     bndrs' <- mapM (renameLTyVarBndr return) bndrs
-    pure $ HsForAllVis noExtField bndrs'
-  HsForAllInvis _ bndrs -> do
+    pure $ HsForAllVis noExtField ma' bndrs'
+  HsForAllInvis _ ma bndrs -> do
+    ma' <- traverse renameLType ma
     bndrs' <- mapM (renameLTyVarBndr return) bndrs
-    pure $ HsForAllInvis noExtField bndrs'
+    pure $ HsForAllInvis noExtField ma' bndrs'
 
 renameLTyVarBndr :: (flag -> RnM flag') -> LHsTyVarBndr flag GhcRn -> RnM (LHsTyVarBndr flag' DocNameI)
 renameLTyVarBndr rn_flag (L loc (HsTvb _ fl n kind)) =
@@ -737,17 +741,14 @@ renameCon :: ConDecl GhcRn -> RnM (ConDecl DocNameI)
 renameCon
   decl@( ConDeclH98
           { con_name = lname
-          , con_ex_tvs = ltyvars
-          , con_mb_cxt = lcontext
+          , con_telescope = telescope
           , con_args = details
           , con_doc = mbldoc
-          , con_forall = forall_
           , con_modifiers = mods
           }
         ) = do
     lname' <- renameNameL lname
-    ltyvars' <- mapM (renameLTyVarBndr return) ltyvars
-    lcontext' <- traverse renameLContext lcontext
+    telescope' <- mapM renameHsGadtTelescope telescope
     details' <- renameH98Details details
     mods' <- renameModifiers mods
     mbldoc' <- mapM (renameLDocHsSyn) mbldoc
@@ -755,9 +756,7 @@ renameCon
       ( decl
           { con_ext = noExtField
           , con_name = lname'
-          , con_ex_tvs = ltyvars'
-          , con_mb_cxt = lcontext'
-          , con_forall = forall_ -- Remove when #18311 is fixed
+          , con_telescope = telescope'
           , con_args = details'
           , con_modifiers = mods'
           , con_doc = mbldoc'
@@ -767,8 +766,7 @@ renameCon
   ConDeclGADT
     { con_names = lnames
     , con_outer_bndrs = outer_bndrs
-    , con_inner_bndrs = inner_bndrs
-    , con_mb_cxt = lcontext
+    , con_telescope = telescope
     , con_g_args = details
     , con_res_ty = res_ty
     , con_modifiers = mods
@@ -776,8 +774,7 @@ renameCon
     } = do
     lnames' <- mapM renameNameL lnames
     outer_bndrs' <- mapM renameOuterTyVarBndrs outer_bndrs
-    inner_bndrs' <- mapM renameHsGadtTelescope inner_bndrs
-    lcontext' <- traverse renameLContext lcontext
+    telescope' <- mapM renameHsGadtTelescope telescope
     details' <- renameGADTDetails details
     res_ty' <- renameLType res_ty
     mods' <- renameModifiers mods
@@ -787,8 +784,7 @@ renameCon
           { con_g_ext = noExtField
           , con_names = lnames'
           , con_outer_bndrs = outer_bndrs'
-          , con_inner_bndrs = inner_bndrs'
-          , con_mb_cxt = lcontext'
+          , con_telescope = telescope'
           , con_g_args = details'
           , con_res_ty = res_ty'
           , con_modifiers = mods'
@@ -1058,8 +1054,8 @@ renameOuterTyVarBndrs
   -> RnM (HsOuterTyVarBndrs flag DocNameI)
 renameOuterTyVarBndrs (HsOuterImplicit{}) =
   pure $ HsOuterImplicit{hso_ximplicit = noExtField}
-renameOuterTyVarBndrs (HsOuterExplicit{hso_bndrs = exp_bndrs}) =
-  HsOuterExplicit noExtField <$> mapM (renameLTyVarBndr return) exp_bndrs
+renameOuterTyVarBndrs (HsOuterExplicit{hso_matchability = ma, hso_bndrs = exp_bndrs}) =
+  HsOuterExplicit noExtField <$> traverse renameLType ma <*> mapM (renameLTyVarBndr return) exp_bndrs
 
 renameWc
   :: (in_thing -> RnM out_thing)

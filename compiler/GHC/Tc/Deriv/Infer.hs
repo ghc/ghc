@@ -45,7 +45,7 @@ import GHC.Core.Unify (tcUnifyTy)
 
 import GHC.Data.Pair
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.WiredIn.Types (mkConstraintTupleTy, typeToTypeKind)
+import GHC.Builtin.WiredIn.Types (eqTyCon, matchabilityTy, mkConstraintTupleTy, typeToTypeKind)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -61,7 +61,7 @@ import Control.Monad.Trans.Class  (lift)
 import Control.Monad.Trans.Reader (ask)
 import Data.Function              (on)
 import Data.Functor.Classes       (liftEq)
-import Data.List                  (sortBy)
+import Data.List                  (inits, sortBy)
 import Data.Maybe
 
 ----------------------
@@ -382,7 +382,8 @@ inferConstraintsAnyclass
                -- NB: the latter is /not/ quantified over the class variables
                -- See Note [Gathering and simplifying constraints for DeriveAnyClass]
              meth_pred (sel_id, gen_dm_ty)
-               = let (sel_tvs, _cls_pred, meth_ty) = tcSplitMethodTy (varType sel_id)
+               = let (sel_bndrs, _cls_pred, meth_ty) = tcSplitMethodTy (varType sel_id)
+                     sel_tvs   = map snd sel_bndrs
                      meth_ty'   = substTyWith sel_tvs inst_tys meth_ty
                      gen_dm_ty' = substTyWith sel_tvs inst_tys gen_dm_ty in
                  -- This is the only place where a SubTypePredSpec is
@@ -440,20 +441,9 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
 
       coercible_constraints
         = [ SimplePredSpec
-              { sps_pred =
-                  assertPpr (tvs1 == tvs2) (ppr t1 $$ ppr t2) $
-                  -- assert: mkCoerceClassMethEqn returns two
-                  -- foralls with the very same forall-binders
-                    tcMkDFunSigmaTy tvs2 theta2 $
-                      mkConstraintTupleTy $ mkReprEqPred tau1 tau2 : theta1
-                      -- The two method types (tau1, tau2) must be coercible.
-                      -- Also, if there are constraints, the constraints
-                      -- provided to the derived method (theta2) must be
-                      -- sufficient to solve the constraints required by the
-                      -- method being coerced (theta1).
-                      -- See Note [Inferred contexts from method constraints]
+              { sps_pred = pred
               , sps_origin = DerivOriginCoerce meth t1 t2 sa_wildcard
-              , sps_type_or_kind = TypeLevel
+              , sps_type_or_kind = type_or_kind
               }
           | meth <- meths
           , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
@@ -464,6 +454,17 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
               --      t2 = op_ty{t1,t2,t3/a,b,c]
           , let (tvs1, theta1, tau1) = tcSplitSigmaTy t1
           , let (tvs2, theta2, tau2) = tcSplitSigmaTy t2
+          , let method_pred =
+                  assertPpr (map snd tvs1 == map snd tvs2) (ppr t1 $$ ppr t2) $
+                  mkSpecForAllTys tvs2 $ tcMkDFunPhiTy theta2 $
+                    mkConstraintTupleTy (mkReprEqPred tau1 tau2 : theta1)
+          , (type_or_kind, pred) <-
+              (TypeLevel, method_pred) :
+              [ (KindLevel, mkSpecForAllTys prefix $
+                  mkTyConApp eqTyCon [matchabilityTy, ma1, ma2])
+              | (prefix, ((ma1, _), (ma2, _))) <- zip (inits tvs2) (zip tvs1 tvs2)
+              , not (ma1 `eqType` ma2) ]
+              -- See Note [Inferred contexts from method constraints].
           ]
 
   pure meth_preds
@@ -627,6 +628,13 @@ can write out what the type checker sees as follows:
   the derived instance decl.
 
 The target constraint for GND is created in `inferConstraintsCoerceBased`.
+
+Retain each quantified binder's matchability in that constraint. Substitution
+of the instance parameters can change this metadata between the two methods.
+Include a separate nominal equality for each differing pair of annotations.
+Quantify only the preceding binders around that equality. The current binder,
+later binders and the method context must not justify earlier metadata.
+Representational equality of the bodies alone does not justify these annotations.
 
 In general, the point here is that the inferred context for a derived instance
 must include, for each class method with constraints, a quantified constraint

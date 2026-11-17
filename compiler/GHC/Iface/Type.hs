@@ -51,6 +51,7 @@ module GHC.Iface.Type (
         pprIfaceIdBndr, pprIfaceLamBndr, pprIfaceTvBndr, pprIfaceTyConBinders,
         pprIfaceBndrs, pprIfaceAppArgs, pprParendIfaceAppArgs,
         pprIfaceForAllPart, pprIfaceForAllPartMust, pprIfaceForAll,
+        pprIfaceForAllWithMatchability, pprUserIfaceForAllWithMatchability,
         pprIfaceSigmaType, pprIfaceTyLit,
         pprIfaceCoercion, pprParendIfaceCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
@@ -172,7 +173,7 @@ instance Outputable IfaceOneShot where
 -------------------------------
 type IfaceKind     = IfaceType
 
--- | Type-valued matchability metadata for an ordinary arrow.
+-- | Type-valued matchability metadata for an arrow or a forall.
 type IfaceMatchability = IfaceType
 
 -- | A kind of universal type, used for types and kinds.
@@ -189,7 +190,8 @@ data IfaceType
                              -- IfaceType, analogous to AppTy.
   | IfaceFunTy     FunTyFlag IfaceMatchability IfaceMult IfaceType IfaceType
       -- See Note [Ordinary-arrow interface metadata].
-  | IfaceForAllTy  IfaceForAllBndr IfaceType
+  | IfaceForAllTy  IfaceMatchability IfaceForAllBndr IfaceType
+      -- See Note [Forall interface metadata].
   -- See Note [Retained Boolean interface types].
   | IfaceDepFunTy IfaceIdBndr IfaceType
   | IfaceTermVar IfLclName
@@ -213,6 +215,25 @@ data IfaceType
           -- See !3987.
   deriving (Eq, Ord)
   -- See Note [Ord instance of IfaceType]
+
+{- Note [Forall interface metadata]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+IfaceForAllTy stores matchability before its binder and body. The annotation
+is outside the binder scope. IfaceForAllCo stores its nominal metadata proof
+before its binder-kind proof. Both proofs are outside the binder scope.
+Read and validate these fields before installing the binder.
+
+Keep metadata in equality, serialization, dependencies and telescope views.
+Binder visibility does not determine matchability. The common interface
+version rejects the old payload before decoding these fields. HIE has its
+own version and stores the metadata as a type-table child.
+
+Print an annotation after its group's separator: forall a. @ma body, or
+forall a -> @ma body. The annotation remains outside the whole group.
+Combine adjacent binders only when their annotations and visibilities agree.
+Do not remove a non-M or symbolic annotation when defaulting display variables.
+Semantic declaration kinds come from ifKind, not from binder-only lists.
+-}
 
 {- Note [Ordinary-arrow interface metadata]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -340,14 +361,15 @@ instance NFData IfaceForAllTyFlag where
 mkIfaceForAllTvBndr :: ForAllTyFlag -> IfaceTvBndr -> IfaceForAllBndr
 mkIfaceForAllTvBndr vis var = Bndr (IfaceTvBndr var) (IfaceForAllTyFlag vis)
 
--- | Build the 'tyConKind' from the binders and the result kind.
+-- | Build a fresh 'tyConKind' with explicit prefix matchability.
+-- Use the stored full kind when reconstructing a declaration.
 -- Keep in sync with 'mkTyConKind' in "GHC.Core.TyCon".
 mkIfaceTyConKind :: IfaceMatchability -> [IfaceTyConBinder] -> IfaceKind -> IfaceKind
 mkIfaceTyConKind ma bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: IfaceTyConBinder -> IfaceKind -> IfaceKind
     mk (Bndr tv AnonTCB)        k = IfaceFunTy FTF_T_T ma many_ty (ifaceBndrType tv) k
-    mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv (IfaceForAllTyFlag vis)) k
+    mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy ma (Bndr tv (IfaceForAllTyFlag vis)) k
 
 ifaceForAllSpecToBndrs :: [IfaceForAllSpecBndr] -> [IfaceForAllBndr]
 ifaceForAllSpecToBndrs = map ifaceForAllSpecToBndr
@@ -574,7 +596,7 @@ data IfaceCoercion
   | IfaceTermAppCo    IfLclName IfaceCoercion -- Diagnostic form; no wire encoding
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
-  | IfaceForAllCo     IfaceBndr !IfaceForAllTyFlag !IfaceForAllTyFlag IfaceMCoercion IfaceCoercion
+  | IfaceForAllCo     IfaceBndr !IfaceForAllTyFlag !IfaceForAllTyFlag IfaceCoercion IfaceMCoercion IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomCo      IfaceAxiomRule [IfaceCoercion]
        -- ^ There are only a fixed number of CoAxiomRules, so it suffices
@@ -691,19 +713,19 @@ isIfaceLifted (IfaceTyConApp tc args)
   = True
 isIfaceLifted _ = False
 
-splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
+splitIfaceSigmaTy :: IfaceType -> ([(IfaceMatchability, IfaceForAllBndr)], [IfacePredType], IfaceType)
 -- Mainly for printing purposes
 --
 -- Here we split nested IfaceSigmaTy properly.
 --
 -- @
--- forall t. T t => forall m a b. M m => (a -> m b) -> t a -> m (t b)
+-- forall t. @M T t => forall m a b. @U M m => (a -> m b) -> t a -> m (t b)
 -- @
 --
 -- If you called @splitIfaceSigmaTy@ on this type:
 --
 -- @
--- ([t, m, a, b], [T t, M m], (a -> m b) -> t a -> m (t b))
+-- ([(M,t), (U,m), (U,a), (U,b)], [T t, M m], (a -> m b) -> t a -> m (t b))
 -- @
 splitIfaceSigmaTy ty
   = case (bndrs, theta) of
@@ -714,9 +736,9 @@ splitIfaceSigmaTy ty
     (bndrs, rho)   = split_foralls ty
     (theta, tau)   = split_rho rho
 
-    split_foralls (IfaceForAllTy bndr ty)
+    split_foralls (IfaceForAllTy ma bndr ty)
         | isInvisibleForAllTyFlag (ifaceForAllTyFlag (binderFlag bndr))
-        = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
+        = case split_foralls ty of { (bndrs, rho) -> ((ma,bndr):bndrs, rho) }
     split_foralls rho = ([], rho)
 
     split_rho (IfaceFunTy af _ _ ty1 ty2)
@@ -724,10 +746,10 @@ splitIfaceSigmaTy ty
         = case split_rho ty2 of { (ps, tau) -> (ty1:ps, tau) }
     split_rho tau = ([], tau)
 
-splitIfaceReqForallTy :: IfaceType -> ([IfaceForAllBndr], IfaceType)
-splitIfaceReqForallTy (IfaceForAllTy bndr ty)
+splitIfaceReqForallTy :: IfaceType -> ([(IfaceMatchability, IfaceForAllBndr)], IfaceType)
+splitIfaceReqForallTy (IfaceForAllTy ma bndr ty)
   | isVisibleForAllTyFlag (ifaceForAllTyFlag (binderFlag bndr))
-  = case splitIfaceReqForallTy ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
+  = case splitIfaceReqForallTy ty of { (bndrs, rho) -> ((ma,bndr):bndrs, rho) }
 splitIfaceReqForallTy rho = ([], rho)
 
 newtype PrintArityInvisibles = MkPrintArityInvisibles Bool
@@ -852,7 +874,7 @@ visibleTypeVarOccurencies = go
     go (IfaceDepFunTy (w, _, arg) res) = go w <> go arg <> go res
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ ma w arg res) = go ma <> go w <> go arg <> go res
-    go (IfaceForAllTy bndr ty)  = go (ifaceBndrType $ binderVar bndr) <> go ty
+    go (IfaceForAllTy ma bndr ty) = go ma <> go (ifaceBndrType $ binderVar bndr) <> go ty
     go (IfaceTyConApp _ args)   = go_args args
     go (IfaceTupleTy _ _ args)  = go_args args
     go (IfaceLitTy _)           = mempty
@@ -1108,7 +1130,7 @@ pprIfacePrefixApp ctxt_prec pp_fun pp_tys
                   hang pp_fun 2 (sep pp_tys)
 
 isIfaceRhoType :: IfaceType -> Bool
-isIfaceRhoType (IfaceForAllTy _ _)   = False
+isIfaceRhoType (IfaceForAllTy {})    = False
 isIfaceRhoType (IfaceFunTy af _ _ _ _) = isVisibleFunArg af
 isIfaceRhoType _ = True
 
@@ -1445,17 +1467,18 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
        -> Bool -- Are we in a toplevel forall, where defaulting is allowed?
        -> IfaceType
        -> IfaceType
-    go subs True (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
+    go subs True (IfaceForAllTy ma (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
      | isInvisibleForAllTyFlag (ifaceForAllTyFlag argf)  -- Don't default *visible* quantification
                                      -- or we get the mess in #13963
+     , ma == ifaceMatchable
      , Just substituted_ty <- check_substitution var_kind
       = let subs' = extendFsEnv subs (ifLclNameFS var) substituted_ty
             -- Record that we should replace it with LiftedRep/Lifted/Many,
             -- and recurse, discarding the forall
         in go subs' True ty
 
-    go subs rank1 (IfaceForAllTy bndr ty)
-      = IfaceForAllTy (go_ifacebndr subs bndr) (go subs rank1 ty)
+    go subs rank1 (IfaceForAllTy ma bndr ty)
+      = IfaceForAllTy (go subs False ma) (go_ifacebndr subs bndr) (go subs rank1 ty)
 
     go subs rank1 (IfaceDepFunTy (w, var, arg) res)
       = IfaceDepFunTy (go subs False w, var, go subs False arg) (go subs rank1 res)
@@ -1604,27 +1627,58 @@ ppr_app_arg ctx_prec (t, argf) =
        _         -> empty
 
 -------------------
-pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPart :: [(IfaceMatchability, IfaceForAllBndr)] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPart tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllWhen tvs ctxt sdoc
 
 -- | Like 'pprIfaceForAllPart', but always uses an explicit @forall@.
-pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPartMust :: [(IfaceMatchability, IfaceForAllBndr)] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPartMust tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
 
-pprIfaceForAllCoPart :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)]
+pprIfaceForAllCoPart :: [(IfaceBndr, ForAllTyFlag, ForAllTyFlag, IfaceCoercion, IfaceMCoercion)]
                      -> SDoc -> SDoc
 pprIfaceForAllCoPart tvs sdoc = sep [ pprIfaceForAllCo tvs, sdoc ]
 
 ppr_iface_forall_part :: ShowForAllFlag
-                      -> [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+                      -> [(IfaceMatchability, IfaceForAllBndr)] -> [IfacePredType] -> SDoc -> SDoc
 ppr_iface_forall_part show_forall tvs ctxt sdoc
   = sep [ case show_forall of
-            ShowForAllMust -> pprIfaceForAll tvs
-            ShowForAllWhen -> pprUserIfaceForAll tvs
+            ShowForAllMust -> pprIfaceForAllWithMatchability tvs
+            ShowForAllWhen -> pprUserIfaceForAllWithMatchability tvs
         , pprIfaceContextArr ctxt
         , sdoc]
+
+-- | Render a semantic forall telescope with its actual annotations.
+-- See Note [Forall interface metadata].
+pprIfaceForAllWithMatchability :: [(IfaceMatchability, IfaceForAllBndr)] -> SDoc
+pprIfaceForAllWithMatchability [] = empty
+pprIfaceForAllWithMatchability ((ma,bndr):bndrs)
+  = sep [ add_separator (forAllLit <+> fsep (map pprIfaceForAllBndr group))
+            <+> char '@' <> pprParendIfaceType ma
+        , pprIfaceForAllWithMatchability rest ]
+  where
+    vis = ifaceForAllTyFlag (binderFlag bndr)
+    (same, rest) = span same_group bndrs
+    group = bndr : map snd same
+    same_group (ma', bndr')
+      = ma == ma' && vis `eqForAllVis` ifaceForAllTyFlag (binderFlag bndr')
+    add_separator stuff = case vis of
+      Required -> stuff <+> arrow
+      _        -> stuff <> dot
+
+-- | Keep non-M and symbolic annotations visible in user-facing types.
+pprUserIfaceForAllWithMatchability :: [(IfaceMatchability, IfaceForAllBndr)] -> SDoc
+pprUserIfaceForAllWithMatchability bndrs
+  | any ((/= ifaceMatchable) . fst) bndrs
+  = pprIfaceForAllWithMatchability bndrs
+  | otherwise
+  = sdocOption sdocPrintExplicitForalls $ \print_foralls ->
+      ppWhen (print_foralls || any significant (map snd bndrs)) $
+        pprIfaceForAllWithMatchability bndrs
+  where
+    significant (Bndr bndr (IfaceForAllTyFlag vis))
+      = isVisibleForAllTyFlag vis || not (ifTypeIsVarFree (ifaceBndrType bndr))
 
 -- | Render the "forall ... ." or "forall ... ->" bit of a type.
 pprIfaceForAll :: [IfaceForAllBndr] -> SDoc
@@ -1652,12 +1706,12 @@ ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ (IfaceForAllTyFlag vis)) : bndrs) vis1
   | otherwise              = (all_bndrs, [])
 ppr_itv_bndrs [] _ = ([], [])
 
-pprIfaceForAllCo :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
+pprIfaceForAllCo :: [(IfaceBndr, ForAllTyFlag, ForAllTyFlag, IfaceCoercion, IfaceMCoercion)] -> SDoc
 pprIfaceForAllCo []  = empty
-pprIfaceForAllCo tvs = text "forall" <+> pprIfaceForAllCoBndrs tvs <> dot
-
-pprIfaceForAllCoBndrs :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
-pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
+pprIfaceForAllCo (bndr@(_,_,_,ma_co,_):bndrs)
+  = sep [ text "forall" <+> pprIfaceForAllCoBndr bndr <> dot
+            <+> char '@' <> pprParendIfaceCoercion ma_co
+        , pprIfaceForAllCo bndrs ]
 
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
 pprIfaceForAllBndr bndr =
@@ -1671,8 +1725,8 @@ pprIfaceForAllBndr bndr =
     -- See Note [Suppressing binder signatures]
     suppress_sig = SuppressBndrSig False
 
-pprIfaceForAllCoBndr :: (IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag) -> SDoc
-pprIfaceForAllCoBndr (tcv, kind_mco, visL, visR)
+pprIfaceForAllCoBndr :: (IfaceBndr, ForAllTyFlag, ForAllTyFlag, IfaceCoercion, IfaceMCoercion) -> SDoc
+pprIfaceForAllCoBndr (tcv, visL, visR, _ma_co, kind_mco)
   = parens (ppr (ifaceBndrName tcv) <> pp_vis
             <+> text "::~" <+> pprIfaceCoercion kind_co)
     -- We print (tcv ::~ kind_co), with the "::~" reminding us the type of tcv
@@ -1741,7 +1795,7 @@ ppr_sigma show_forall ctxt_prec iface_ty
           -- Then it could handle both invisible and required binders, and
           -- splitIfaceReqForallTy wouldn't be necessary here.
     in ppr_iface_forall_part show_forall invis_tvs theta $
-       sep [pprIfaceForAll req_tvs, ppr_ty_nested tau']
+       sep [pprIfaceForAllWithMatchability req_tvs, ppr_ty_nested tau']
 
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
@@ -2290,8 +2344,8 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
   where
     (tvs, inner_co) = split_co co
 
-    split_co (IfaceForAllCo bndr visL visR kind_co co')
-      = let (tvs, co'') = split_co co' in ((bndr,kind_co,ifaceForAllTyFlag visL,ifaceForAllTyFlag visR):tvs,co'')
+    split_co (IfaceForAllCo bndr visL visR ma_co kind_co co')
+      = let (tvs, co'') = split_co co' in ((bndr,ifaceForAllTyFlag visL,ifaceForAllTyFlag visR,ma_co,kind_co):tvs,co'')
     split_co co' = ([], co')
 
 -- Why these three? See Note [Free TyVars and CoVars in IfaceType]
@@ -2576,8 +2630,9 @@ putIfaceType bh (IfaceDepFunTy bndr body)
 putIfaceType bh (IfaceTermVar var)
   = do { putByte bh 11; put_ bh var }
 
-putIfaceType bh (IfaceForAllTy aa ab) = do
+putIfaceType bh (IfaceForAllTy ma aa ab) = do
         putByte bh 0
+        put_ bh ma
         put_ bh aa
         put_ bh ab
 putIfaceType bh (IfaceTyVar ad) = do
@@ -2613,9 +2668,10 @@ getIfaceType :: HasCallStack => ReadBinHandle -> IO IfaceType
 getIfaceType bh = do
             h <- getByte bh
             case h of
-              0 -> do aa <- get bh
+              0 -> do ma <- get bh
+                      aa <- get bh
                       ab <- get bh
-                      return (IfaceForAllTy aa ab)
+                      return (IfaceForAllTy ma aa ab)
               1 -> do ad <- get bh
                       return (IfaceTyVar ad)
               2 -> do ae <- get bh
@@ -2695,11 +2751,12 @@ instance Binary IfaceCoercion where
           putByte bh 5
           put_ bh a
           put_ bh b
-  put_ bh (IfaceForAllCo a visL visR b c) = do
+  put_ bh (IfaceForAllCo a visL visR ma b c) = do
           putByte bh 6
           put_ bh a
           put_ bh visL
           put_ bh visR
+          put_ bh ma
           put_ bh b
           put_ bh c
   put_ bh (IfaceCoVarCo a) = do
@@ -2774,9 +2831,10 @@ instance Binary IfaceCoercion where
            6 -> do a <- get bh
                    visL <- get bh
                    visR <- get bh
+                   ma <- get bh
                    b <- get bh
                    c <- get bh
-                   return $ IfaceForAllCo a visL visR b c
+                   return $ IfaceForAllCo a visL visR ma b c
            7 -> do a <- get bh
                    return $ IfaceCoVarCo a
            9 -> do a <- get bh
@@ -2857,7 +2915,7 @@ instance NFData IfaceType where
     IfaceLitTy f1 -> rnf f1
     IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceFunTy f1 f2 f3 f4 f5 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
-    IfaceForAllTy f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceForAllTy f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceTyConApp f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCastTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCoercionTy f1 -> rnf f1
@@ -2878,7 +2936,7 @@ instance NFData IfaceCoercion where
     IfaceFunCo f1 f2 f3 f4 f5 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
     IfaceTyConAppCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceAppCo f1 f2 -> rnf f1 `seq` rnf f2
-    IfaceForAllCo f1 f2 f3 f4 f5 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
+    IfaceForAllCo f1 f2 f3 f4 f5 f6 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
     IfaceCoVarCo f1 -> rnf f1
     IfaceAxiomCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceUnivCo f1 f2 f3 f4 deps -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf deps

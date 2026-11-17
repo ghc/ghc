@@ -31,7 +31,7 @@ import GHC.Tc.Solver.Monad  as TcS
 import qualified GHC.Tc.Utils.Monad   as TcM
 import qualified GHC.Tc.Zonk.TcType   as TcM
 
-import GHC.Core.TyCo.FVs( tyCoVarsOfQuant )
+import GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
 import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
@@ -1506,6 +1506,15 @@ Wrinkles:
     lacks a type signature #26376.  Again, if the forall-constraint is not
     turned into an implication `approximateWC` gives a less-good answer.
 
+(WFA6) Runtime forall lambdas have U matchability. For each target annotation,
+  generate nominal U-to-annotation evidence before introducing its binder.
+  Use nested implications to keep each obligation outside its own binder
+  and all later body Givens. Store each prefix evidence binding with its
+  proof in EvFun. The body implication keeps the body evidence bindings.
+  A telescope tail with known U annotations needs no metadata obligations.
+  Skolemize that tail together, as in the ordinary quantified-constraint path.
+  See Note [Runtime forall matchability] in GHC.Tc.Utils.Instantiate.
+
 Note [Solving Wanted QCs from Given QCs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we are about to solve a Wanted quantified constraint, and there is a
@@ -1545,7 +1554,7 @@ SPECIALISE pragmas).
 -- that superclasses have not yet been expanded).
 --
 -- Precondition: the constraint has already been rewritten by the inert set.
-solveForAllNC :: CtEvidence -> [TcTyVar] -> TcThetaType -> TcPredType
+solveForAllNC :: CtEvidence -> [(Matchability, TcTyVar)] -> TcThetaType -> TcPredType
               -> SolverStage Void
 solveForAllNC ev tvs theta body_pred
   = do { fuel <- simpleStage mk_super_classes
@@ -1638,9 +1647,7 @@ solveWantedQCI mode ct@(CQuantCan (QCI { qci_ev =  ev, qci_tvs = tvs
   | CtWanted (WantedCt { ctev_pred = forall_pred, ctev_dest = dest
                        , ctev_rewriters = rewriters, ctev_loc = loc }) <- ev
   , let is_qc = IsQC forall_pred (ctLocOrigin loc)
-        empty_subst = mkEmptySubst $ mkInScopeSet $
-                      tyCoVarsOfQuant tvs $
-                      tyCoVarsOfTypes (body_pred:theta)
+        empty_subst = mkEmptySubst $ mkInScopeSet $ tyCoVarsOfType forall_pred
   = TcS.setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
     -- This setSrcSpan is important: the TcM.newImplication uses that
     -- TcLclEnv for the implication, and that in turn sets the location
@@ -1648,31 +1655,63 @@ solveWantedQCI mode ct@(CQuantCan (QCI { qci_ev =  ev, qci_tvs = tvs
     do { -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
          --           in GHC.Tc.Utils.TcType
          -- Very like the code in tcSkolDFunType
+       ; let build_prefix skol_info subst new_skols remaining
+               | not (null remaining)
+               , all ((`tcEqType` unmatchableDataConTy) . fst) remaining
+               = do { (subst', fresh_tvs) <- tcInstSkolTyVarsX skol_info subst (map snd remaining)
+                    ; (imp, (proof_tvs, givens, binds, wanted, inst_pred)) <-
+                        build_prefix skol_info subst' (new_skols ++ fresh_tvs) []
+                    ; let refl_tvs = [(emptyTcEvBinds, mkNomReflCo unmatchableDataConTy, tv)
+                                     | tv <- fresh_tvs]
+                    ; return (imp, (refl_tvs ++ proof_tvs, givens, binds, wanted, inst_pred)) }
+               | otherwise
+               = do { ev_binds_var <- TcS.newTcEvBinds
+                    ; (lvl, (givens, wanted, result)) <-
+                        pushLevelNoWorkList (ppr forall_pred) $
+                        case remaining of
+                          [] ->
+                            do { let inst_pred = substTy subst body_pred
+                                     inst_theta = substTheta subst theta
+                                     loc' = setCtLocOrigin loc (ScOrigin is_qc NakedSc)
+                               ; given_ev_vars <- mapM TcS.newEvVar inst_theta
+                               ; wanted_ev <- newWantedNC loc' rewriters inst_pred
+                               ; return (given_ev_vars, mkSimpleWC [CtWanted wanted_ev],
+                                   ([], given_ev_vars, ev_binds_var, wanted_ev, inst_pred)) }
+                          (ma,tv):rest ->
+                            do { let ma' = substTy subst ma
+                               ; (ma_co, ma_wanted) <-
+                                   if ma' `tcEqType` unmatchableDataConTy
+                                   then return (mkNomReflCo ma', emptyWC)
+                                   else do
+                                     { wanted_ma <- newWantedNC loc rewriters $
+                                         mkNomEqPred unmatchableDataConTy ma'
+                                     ; return (ctEvCoercion (CtWanted wanted_ma),
+                                               mkSimpleWC [CtWanted wanted_ma]) }
+                               ; (subst', fresh_tvs) <- tcInstSkolTyVarsX skol_info subst [tv]
+                               ; case fresh_tvs of
+                                   [fresh_tv] ->
+                                     do { (child, (proof_tvs, body_givens, body_binds,
+                                                   body_wanted, inst_pred)) <-
+                                            build_prefix skol_info subst' [fresh_tv] rest
+                                        ; return ([], ma_wanted `andWC` mkImplicWC (unitBag child),
+                                            ((TcEvBinds ev_binds_var, ma_co, fresh_tv):proof_tvs,
+                                             body_givens, body_binds, body_wanted, inst_pred)) }
+                                   _ -> panic "solveWantedQCI: freshen binder" }
+                    ; let (_, _, _, _, inst_pred) = result
+                          imp = (implicationPrototype (ctLocEnv loc))
+                            { ic_tclvl = lvl
+                            , ic_skols = new_skols
+                            , ic_given = givens
+                            , ic_wanted = wanted
+                            , ic_binds = ev_binds_var
+                            , ic_warn_inaccessible = False
+                            , ic_info = InstSkol is_qc (pSizeHead inst_pred) }
+                    ; return (imp, result) }
+
        ; rec { skol_info <- mkSkolemInfo skol_info_anon
-             ; (subst, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst tvs
-             ; let inst_pred  = substTy    subst body_pred
-                   inst_theta = substTheta subst theta
-                   skol_info_anon = InstSkol is_qc (pSizeHead inst_pred) }
-
-       ; given_ev_vars <- mapM TcS.newEvVar inst_theta
-       ; (lvl, wanted_ev)
-             <- pushLevelNoWorkList (ppr skol_info) $
-                do { let loc' = setCtLocOrigin loc (ScOrigin is_qc NakedSc)
-                         -- Set the thing to prove to have a ScOrigin, so we are
-                         -- careful about its termination checks.
-                         -- See (QC-INV) in Note [Solving a Wanted forall-constraint]
-                   ; newWantedNC loc' rewriters inst_pred }
-
-       ; ev_binds_var <- TcS.newTcEvBinds
-       ; let imp :: Implication
-             imp = (implicationPrototype (ctLocEnv loc))
-                     { ic_tclvl  = lvl
-                     , ic_skols  = skol_tvs
-                     , ic_given  = given_ev_vars
-                     , ic_wanted = mkSimpleWC [CtWanted wanted_ev]
-                     , ic_binds  = ev_binds_var
-                     , ic_warn_inaccessible = False
-                     , ic_info   = skol_info_anon }
+             ; (imp, (proof_tvs, given_ev_vars, ev_binds_var, wanted_ev, inst_pred)) <-
+                 build_prefix skol_info empty_subst [] tvs
+             ; let skol_info_anon = InstSkol is_qc (pSizeHead inst_pred) }
 
       ; imp' <- solveImplication imp
 
@@ -1692,7 +1731,7 @@ solveWantedQCI mode ct@(CQuantCan (QCI { qci_ev =  ev, qci_tvs = tvs
               --     carrying a record of which evidence variables are used
               --     See Note [Free vars of EvFun] in GHC.Tc.Types.Evidence
              do { setWantedDict dest EvCanonical $
-                  EvFun { et_tvs   = skol_tvs
+                  EvFun { et_tvs   = proof_tvs
                         , et_given = given_ev_vars
                         , et_binds = TcEvBinds ev_binds_var
                         , et_body  = wantedCtEvEvId wanted_ev }

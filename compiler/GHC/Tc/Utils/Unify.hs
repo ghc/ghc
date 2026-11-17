@@ -109,6 +109,7 @@ import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic
+import GHC.Types.SrcLoc (GenLocated(L))
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
 import GHC.Utils.Misc
@@ -381,7 +382,8 @@ Both ultimately handled by matchExpectedFunTys.
 
 * `tcFunBindMatches` and `tcLambdaMatches` both use `matchExpectedFunTys`, which
   ensures that any trailing invisible binders are skolemised; and does so deeply
-  if DeepSubsumption is on.
+  if DeepSubsumption is on. Non-U forall results can instead pass to RHS
+  checking. See Note [Non-U forall results after value patterns].
 
   This corresponds to the plan: "skolemise at the '=' of a function binding or
   at the '->' of a lambda binding".  (See #17594 and "Plan B2".)
@@ -447,7 +449,7 @@ tcSkolemiseGeneral
         -- -     expected_ty is the type we are actually skolemising
         -- matchExpectedFunTys walks down the type, skolemising as it goes,
         -- keeping the same top_ty, but successively smaller expected_tys
-  -> ([(Name, TcInvisTVBinder)] -> TcType -> TcM result)
+  -> ([(Name, (Matchability,TcInvisTVBinder))] -> TcType -> TcM result)
   -> TcM (HsWrapper, result)
 tcSkolemiseGeneral ds_flag ctxt top_ty expected_ty thing_inside
   | isRhoTyDS ds_flag expected_ty
@@ -461,13 +463,15 @@ tcSkolemiseGeneral ds_flag ctxt top_ty expected_ty thing_inside
   | otherwise
   = do { -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
          --           in GHC.Tc.Utils.TcType
-       ; rec { (wrap, tv_prs, given, rho_ty) <- case ds_flag of
+       ; rec { (wrap, tv_prs, given, rho_ty, prefix_implics) <- case ds_flag of
                     Deep {} -> deeplySkolemise skol_info expected_ty
                     Shallow -> topSkolemise skol_info expected_ty
-             ; let sig_skol = SigSkol ctxt top_ty (map (fmap binderVar) tv_prs)
+             ; let sig_skol = SigSkol ctxt top_ty (map (fmap (binderVar . snd)) tv_prs)
              ; skol_info <- mkSkolemInfo sig_skol }
 
-       ; let skol_tvs = map (binderVar . snd) tv_prs
+       ; mapBagM_ checkImplicationInvariants prefix_implics
+       ; emitImplications prefix_implics
+       ; let skol_tvs = map (binderVar . snd . snd) tv_prs
        ; traceTc "tcSkolemiseGeneral {" (pprUserTypeCtxt ctxt <+> ppr skol_tvs <+> ppr given)
        ; (ev_binds, result) <- checkConstraints sig_skol skol_tvs given $
                                thing_inside tv_prs rho_ty
@@ -491,7 +495,7 @@ tcSkolemiseCompleteSig (CSig { sig_bndr = poly_id, sig_ctxt = ctxt, sig_loc = lo
        ; setSrcSpan loc $   -- Sets the location for the implication constraint
          tcSkolemiseGeneral Shallow ctxt poly_ty poly_ty $ \tv_prs rho_ty ->
          setSrcSpan cur_loc $ -- Revert to the original location
-         tcExtendNameTyVarEnv (map (fmap binderVar) tv_prs) $
+         tcExtendNameTyVarEnv (map (fmap (binderVar . snd)) tv_prs) $
          thing_inside (map (mkInvisExpPatType . snd) tv_prs) rho_ty }
 
 tcSkolemiseExpectedType :: HasDebugCallStack => TcSigmaType
@@ -810,7 +814,8 @@ Example:
 -- | Use this function to split off arguments types when you have an
 -- \"expected\" type.
 --
--- This function skolemises at each polytype.
+-- This function skolemises at each polytype, except for the result case in
+-- Note [Non-U forall results after value patterns].
 --
 -- Invariant: this function only applies the provided function
 -- to a list of argument types which all have a syntactically fixed RuntimeRep
@@ -827,8 +832,8 @@ matchExpectedFunTys :: forall a.
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
 --
--- Unconditionally concludes by skolemising any trailing invisible
--- binders and, if DeepSubsumption is on, it does so deeply.
+-- Concludes by skolemising trailing invisible binders, deeply if
+-- DeepSubsumption is on, except for the result case described above.
 --
 -- Postcondition:
 --   If exp_ty is Check {}, then [ExpPatType] and ExpRhoType results are all Check{}
@@ -857,21 +862,31 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
     -- n_req is the number of /visible/ arguments still needed
 
     ----------------------------
+    -- See Note [Non-U forall results after value patterns].
+    check 0 rev_pat_tys ty
+      | non_u_invisible_forall ty
+      , no_trailing_invis_pats
+      = do { result <- thing_inside (reverse rev_pat_tys) (mkCheckExpType ty)
+           ; return (idHsWrapper, result) }
+
+    ----------------------------
     -- Skolemise quantifiers, both visible (up to n_req) and invisible
     -- See Note [Visible type application and abstraction] in GHC.Tc.Gen.App
     check n_req rev_pat_tys ty
       | isSigmaTy ty                     -- An invisible quantifier at the top
         || (n_req > 0 && isForAllTy ty)  -- A visible quantifier at top, and we need it
-      = do { rec { (n_req', wrap_gen, tv_nms, bndrs, given, inner_ty) <- skolemiseRequired skol_info n_req ty
+      = do { rec { (n_req', wrap_gen, tv_nms, bndrs, given, inner_ty, prefix_implics) <- skolemiseRequired skol_info n_req ty
                  ; let sig_skol = SigSkol ctx top_ty (tv_nms `zip` skol_tvs)
-                       skol_tvs = binderVars bndrs
+                       skol_tvs = map (binderVar . snd) bndrs
                  ; skol_info <- mkSkolemInfo sig_skol }
              -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
              --           in GHC.Tc.Utils.TcType
+           ; mapBagM_ checkImplicationInvariants prefix_implics
+           ; emitImplications prefix_implics
            ; (ev_binds, (wrap_res, result))
                   <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
                      check n_req'
-                           (reverse (map ExpForAllPatTy bndrs) ++ rev_pat_tys)
+                           (reverse (map (uncurry ExpForAllPatTy) bndrs) ++ rev_pat_tys)
                            inner_ty
            ; assertPpr (not (null bndrs && null given)) (ppr ty) $
                        -- The guard ensures that we made some progress
@@ -971,6 +986,49 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
 
            ; co <- unifyType Nothing (mkScaledFunTysU more_arg_tys res_ty) fun_ty
            ; return (mkWpCastN co, result) }
+
+    non_u_invisible_forall :: TcSigmaType -> Bool
+    non_u_invisible_forall ty
+      | Just (ma, bndr, body) <- splitForAllForAllTyBinder_maybe ty
+      , isInvisibleForAllTyBinder bndr
+      = not (ma `tcEqType` unmatchableDataConTy)
+        || non_u_invisible_forall body
+      | otherwise = False
+
+    no_trailing_invis_pats :: Bool
+    no_trailing_invis_pats = case herald of
+      ExpectedFunTyMatches _ matches -> no_trailing matches
+      ExpectedFunTyLam _ (HsLam _ _ matches) -> no_trailing matches
+      _ -> False
+
+    no_trailing :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
+    no_trailing (MG { mg_alts = L _ matches }) = all match_done matches
+      where
+        match_done (L _ (Match { m_pats = L _ pats })) = case reverse pats of
+          [] -> True
+          pat : _ -> isVisArgLPat pat
+
+{- Note [Non-U forall results after value patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+
+  pass :: (forall a. @M a -> a) -> (forall a. @M a -> a)
+  pass f = f
+
+After the value pattern, the result type still has an invisible M forall.
+Skolemising this result would introduce a runtime type lambda and require
+U ~ M before we check the RHS. The RHS can instead use the existing value f
+at its full type. See Note [Checking existing values at non-U foralls] in
+GHC.Tc.Gen.Expr. A fresh lambda RHS still requires runtime U abstraction.
+
+At zero remaining visible arguments, pass the result to RHS checking if
+its invisible forall prefix has metadata that is not known to be U.
+Do this only for source matches with no trailing invisible pattern in any
+alternative. For example, a
+written @a after the last value pattern still needs an ExpForAllPatTy and
+must use the skolemisation path. Required binders and ordinary U results
+also keep the existing path, including deep skolemisation and Plan B2.
+-}
 
 new_infer_arg_ty :: ExpectedFunTyCtxt -> Int -> TcM (Scaled ExpRhoTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
@@ -1637,11 +1695,17 @@ tcSubTypeAmbiguity :: UserTypeCtxt   -- Where did this type arise
                    -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- See Note [Ambiguity check and deep subsumption]
 tcSubTypeAmbiguity ctxt ty_actual ty_expected
-  = tc_sub_type_ds (Nothing, Top)
-      Shallow
-      (unifyType Nothing)
-      (AmbiguityCheckOrigin ctxt)
-      ctxt ty_actual ty_expected
+  -- See Note [Ambiguity skolemisation is not runtime abstraction]
+  -- in GHC.Tc.Utils.Instantiate. No result wrapper is applied to a value.
+  = do { rec { (_, tv_prs, given, rho_ty, _) <-
+                 topSkolemiseWith AmbiguitySkolemisation skol_info ty_expected
+             ; let sig_skol = SigSkol ctxt ty_expected (map (fmap (binderVar . snd)) tv_prs)
+             ; skol_info <- mkSkolemInfo sig_skol }
+       ; let skol_tvs = map (binderVar . snd . snd) tv_prs
+       ; _ <- checkConstraints sig_skol skol_tvs given $
+                tc_sub_type_shallow (unifyType Nothing)
+                  (AmbiguityCheckOrigin ctxt) ty_actual rho_ty
+       ; pure idHsWrapper }
 
 ---------------
 addSubTypeCtxt :: TcType -> ExpType -> TcM a -> TcM a
@@ -1685,6 +1749,12 @@ tc_sub_type_ds :: (Maybe (HsExpr GhcTc), Position p)
 -- tc_sub_type_ds is the main subsumption worker function
 -- It takes an explicit DeepSubsumptionFlag
 tc_sub_type_ds pos ds_flag unify inst_orig ctxt ty_actual ty_expected
+  -- See Note [Identity subsumption and runtime foralls].
+  | case inst_orig of
+      AmbiguityCheckOrigin {} -> False
+      _                      -> ty_actual `tcEqType` ty_expected
+  = pure idHsWrapper
+
   | definitely_poly ty_expected   -- See Note [Don't skolemise unnecessarily]
   , isRhoTyDS ds_flag ty_actual
   = do { traceTc "tc_sub_type (drop to equality)" $
@@ -1708,6 +1778,21 @@ tc_sub_type_ds pos ds_flag unify inst_orig ctxt ty_actual ty_expected
 
        ; return (sk_wrap <.> inner_wrap) }
 
+{- Note [Identity subsumption and runtime foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An existing value can have a forall type with M or unresolved matchability.
+Passing that value at the same type introduces no runtime type lambda.
+Return the identity wrapper when the complete types are equal, including
+their metadata. Eta expansion would introduce U lambdas and could demand an
+unnecessary U-to-M proof. A new lambda still has its inferred U metadata;
+this equality check does not change that annotation.
+
+An ambiguity check must still skolemize and instantiate its types. Its purpose
+is to detect constraints that cannot be solved after instantiation. Returning
+an identity wrapper there could suppress that check. Exclude
+AmbiguityCheckOrigin from this fast path.
+-}
+
 ----------------------
 tc_sub_type_shallow :: (TcType -> TcType -> TcM TcCoercionN)
                     -> CtOrigin
@@ -1725,7 +1810,7 @@ definitely_poly :: TcType -> Bool
 -- see Note [Don't skolemise unnecessarily]
 definitely_poly ty
   | (tvs, theta, tau) <- tcSplitSigmaTy ty
-  , (tv:_) <- tvs   -- At least one tyvar
+  , ((_,tv):_) <- tvs   -- At least one tyvar
   , null theta      -- No constraints; see (DP1)
   , tv `isInjectiveInType` tau
        -- The tyvar actually occurs (DP2),
@@ -2441,16 +2526,17 @@ getWpCo_maybe _             _  = Nothing
 -----------------------
 deeplySkolemise :: SkolemInfo -> TcSigmaType
                 -> TcM ( HsWrapper
-                       , [(Name,TcInvisTVBinder)]     -- All skolemised variables
+                       , [(Name,(Matchability,TcInvisTVBinder))] -- All skolemised variables
                        , [EvVar]                      -- All "given"s
-                       , TcRhoType )
+                       , TcRhoType
+                       , Bag Implication )
 -- See Note [Deep skolemisation]
 deeplySkolemise skol_info ty
-  = go init_subst ty
+  = go [] [] init_subst ty
   where
     init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
 
-    go subst ty
+    go prefix_tvs prefix_given subst ty
       | Just (mas, arg_tys, bndrs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
       = do { let arg_tys' = substScaledTys subst arg_tys
                  mas' = substTys subst mas
@@ -2458,23 +2544,28 @@ deeplySkolemise skol_info ty
            ; ids1 <- newSysLocalIds (fsLit "dk") arg_tys'
            ; (subst', bndrs1) <- tcInstSkolTyVarBndrsX skol_info subst bndrs
            ; ev_vars1         <- newEvVars (substTheta subst' theta)
-           ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
-           ; let tvs     = binderVars bndrs
-                 tvs1    = binderVars bndrs1
+           ; (forall_wrap, prefix_implics) <- tcRuntimeForAllBndrs skol_info prefix_tvs prefix_given
+               [(ma, Bndr tv (Invisible spec)) | (ma, Bndr tv spec) <- bndrs1]
+               (mkPhiTy (substTheta subst' theta) (substTy subst' ty'))
+           ; (wrap, tvs_prs2, ev_vars2, rho, pending_inner) <- go
+               (prefix_tvs ++ map (binderVar . snd) bndrs1)
+               (prefix_given ++ ev_vars1) subst' ty'
+           ; let tvs     = map (binderVar . snd) bndrs
                  tv_prs1 = map tyVarName tvs `zip` bndrs1
                  input_body = foldl' (\fun_ty _ -> funResultTy fun_ty) (substTy subst ty) arg_tys'
                  input_co = mkArrowMatchabilityCo ma_cos arg_tys' input_body
                  output_co = mkArrowMatchabilityCo (map mkSymCo ma_cos) arg_tys' rho
            ; return ( mkWpCastN output_co
                         <.> mkWpEta (coercionRKind input_co) ids1
-                              (mkWpTyLams tvs1 <.> mkWpEvLams ev_vars1 <.> wrap)
+                              (forall_wrap <.> mkWpEvLams ev_vars1 <.> wrap)
                         <.> mkWpCastN input_co
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
-                    , mkScaledFunTys (zip mas' arg_tys') rho ) }
+                    , mkScaledFunTys (zip mas' arg_tys') rho
+                    , prefix_implics `unionBags` pending_inner ) }
 
       | otherwise
-      = return (idHsWrapper, [], [], substTy subst ty)
+      = return (idHsWrapper, [], [], substTy subst ty, emptyBag)
         -- substTy is a quick no-op on an empty substitution
 
 deeplyInstantiate :: CtOrigin -> TcType -> TcM (HsWrapper, Type)
@@ -2487,7 +2578,7 @@ deeplyInstantiate orig ty
 
     go subst ty
       | Just (mas, arg_tys, bndrs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
-      = do { let tvs = binderVars bndrs
+      = do { let tvs = map (binderVar . snd) bndrs
                  input_args = substScaledTys subst arg_tys
               -- As per Note [Multiplicity in deep subsumption],
               -- we treat (a %1 -> b) as if it were forall m. a %m -> b.
@@ -2528,7 +2619,7 @@ mkArrowMatchabilityCo mas args body
       = mkFunCoNoFTF Nominal ma_co (mkNomReflCo mult) (mkNomReflCo arg) res_co
 
 tcDeepSplitSigmaTy_maybe
-  :: TcSigmaType -> Maybe ([Type], [Scaled TcType], [TcInvisTVBinder], ThetaType, TcSigmaType)
+  :: TcSigmaType -> Maybe ([Type], [Scaled TcType], [(Matchability,TcInvisTVBinder)], ThetaType, TcSigmaType)
 -- Looks for a *non-trivial* quantified type, under zero or more function arrows
 -- By "non-trivial" we mean either tyvars or constraints are non-empty
 tcDeepSplitSigmaTy_maybe ty
@@ -3733,7 +3824,7 @@ retainedCallOccurs call_ty = go
     go (FunTy _ ma mult arg res) = any go [ma, mult, arg, res]
     go (DepFunTy binder body)
       = go (varType binder) || (binder `notElem` dependencies && go body)
-    go (ForAllTy (Bndr binder _) body) = go (varType binder) || go body
+    go (ForAllTy ma (Bndr binder _) body) = go ma || go (varType binder) || go body
     go (TermAppTy _ arg) = go arg
     go (CastTy ty co) = go ty || proof_depends co
     go (CoercionTy co) = proof_depends co
@@ -3932,7 +4023,8 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
       | not fam_ok,    not (isFamFreeTyCon tc)       = True
       | otherwise                                    = any rhs_is_bad tys
 
-    rhs_is_bad (ForAllTy (Bndr tv _) ty)
+    rhs_is_bad (ForAllTy ma (Bndr tv _) ty)
+      | rhs_is_bad ma               = True
       | not forall_ok               = True
       | rhs_is_bad (tyVarKind tv)   = True
       | tv /= lhs_tv, rhs_is_bad ty = True

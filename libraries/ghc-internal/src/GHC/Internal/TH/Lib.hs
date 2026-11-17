@@ -435,6 +435,14 @@ forallE tvars body = ForallE <$> sequenceA tvars <*> body
 forallVisE :: Quote m => [m (TyVarBndr ())] -> m Exp -> m Exp
 forallVisE tvars body = ForallVisE <$> sequenceA tvars <*> body
 
+-- | Set the matchability of an immediate, nonempty expression forall group.
+-- See Note [Forall matchability wrappers] in GHC.Internal.TH.Syntax.
+forallMatchE :: Quote m => m Type -> m Exp -> m Exp
+forallMatchE ma body = do
+  ma' <- ma
+  body' <- body
+  pure (ForallMatchE ma' body')
+
 constrainedE :: Quote m => [m Exp] -> m Exp -> m Exp
 constrainedE ctx body = ConstrainedE <$> sequenceA ctx <*> body
 
@@ -751,6 +759,14 @@ forallC ns ctxt con = do
   con'  <- con
   pure $ ForallC ns' ctxt' con'
 
+-- | Set the matchability of an immediate, nonempty constructor forall group.
+-- See Note [Forall matchability wrappers] in GHC.Internal.TH.Syntax.
+forallMatchC :: Quote m => m Type -> m Con -> m Con
+forallMatchC ma con = do
+  ma' <- ma
+  con' <- con
+  pure (ForallMatchC ma' con')
+
 gadtC :: Quote m => [Name] -> [m StrictType] -> m Type -> m Con
 gadtC cons strtys ty = liftA2 (GadtC cons) (sequenceA strtys) ty
 
@@ -769,6 +785,14 @@ forallT tvars ctxt ty = do
 
 forallVisT :: Quote m => [m (TyVarBndr ())] -> m Type -> m Type
 forallVisT tvars ty = ForallVisT <$> sequenceA tvars <*> ty
+
+-- | Set the matchability of an immediate, nonempty type forall group.
+-- See Note [Forall matchability wrappers] in GHC.Internal.TH.Syntax.
+forallMatchT :: Quote m => m Type -> m Type -> m Type
+forallMatchT ma ty = do
+  ma' <- ma
+  ty' <- ty
+  pure (ForallMatchT ma' ty')
 
 varT :: Quote m => Name -> m Type
 varT = pure . VarT

@@ -1108,7 +1108,7 @@ substConcreteTvOrigin subst body_ty (ConcreteFRR frr_orig)
   -- for the justification of this extra complication.
   = let subst' = case splitForAllTyCoVars body_ty of
                    ([], _) -> subst
-                   (bndrs, _) -> fst $ substTyVarBndrs subst bndrs
+                   (bndrs, _) -> fst $ substTyVarBndrs subst (map snd bndrs)
     in ConcreteFRR $ substFRROrigin subst' frr_orig
 
 substFRROrigin :: Subst -> FixedRuntimeRepOrigin -> FixedRuntimeRepOrigin
@@ -1445,9 +1445,10 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
                              Just ind_ty -> go dv ind_ty
                              Nothing     -> go_tv dv tv }
 
-    go dv (ForAllTy (Bndr tv _) ty)
-      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (tyVarKind tv)
-           ; collect_cand_qtvs orig_ty is_dep cur_lvl (bound `extendVarSet` tv) dv1 ty }
+    go dv (ForAllTy ma (Bndr tv _) ty)
+      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv ma
+           ; dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 (tyVarKind tv)
+           ; collect_cand_qtvs orig_ty is_dep cur_lvl (bound `extendVarSet` tv) dv2 ty }
 
       -- This makes sure that we default e.g. the alpha in Proxy alpha (Any alpha).
       -- Tested in polykinds/NestedProxies.
@@ -1552,9 +1553,10 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (HoleCo hole)           = go_hole dv hole
     go_co dv (CoVarCo cv)            = go_cv dv cv
 
-    go_co dv (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
-      = do { dv1 <- go_mco dv kind_co
-           ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` tcv) dv1 co }
+    go_co dv (ForAllCo { fco_tcv = tcv, fco_ma = ma_co, fco_kind = kind_co, fco_body = co })
+      = do { dv1 <- go_co dv ma_co
+           ; dv2 <- go_mco dv1 kind_co
+           ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` tcv) dv2 co }
 
     go_mco dv MRefl    = return dv
     go_mco dv (MCo co) = go_co dv co

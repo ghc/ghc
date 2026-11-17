@@ -35,7 +35,7 @@ import GHC.Data.Pair       ( Pair(Pair) )
 import GHC.Data.List.Infinite ( Infinite (..) )
 import qualified GHC.Data.List.Infinite as Inf
 
-import GHC.Types.Var       ( Id, VarBndr(..), setTyVarKind )
+import GHC.Types.Var       ( Id, VarBndr(..), setVarType )
 import GHC.Types.Var.Env   ( mkInScopeSet )
 import GHC.Types.Var.Set   ( TyCoVarSet, unionVarSet )
 
@@ -385,29 +385,30 @@ mkDepFunRedn b (Reduction co ty)
 -- | Create a 'Reduction' associated to a Π type,
 -- from a kind 'Reduction' and a body 'Reduction'.
 --
--- Combines 'mkForAllCo' and 'mkForAllTy'.
+-- Combines 'mkForAllCo' and 'mkTyCoForAllTy'.
 mkForAllRedn :: ForAllTyFlag
-             -> TyVar
+             -> TyCoVar
+             -> ReductionN -- ^ nominal matchability reduction
              -> ReductionN -- ^ kind reduction
              -> Reduction  -- ^ body reduction
              -> Reduction
-mkForAllRedn vis tv1 (Reduction h ki') (Reduction co ty)
+mkForAllRedn vis tv1 (Reduction ma_co ma') (Reduction h ki') (Reduction co ty)
   = mkReduction
-      (mkForAllCo tv1 vis vis (kindCoToMKindCo h) co)
-      (mkForAllTy (Bndr tv2 vis) ty)
+      (mkForAllCo tv1 vis vis ma_co (kindCoToMKindCo h) co)
+      (mkTyCoForAllTy ma' tv2 vis ty)
   where
-    tv2 = setTyVarKind tv1 ki'
+    tv2 = setVarType tv1 ki'
 {-# INLINE mkForAllRedn #-}
 
 -- | Create a 'Reduction' of a quantified type from a
 -- 'Reduction' of the body.
 --
--- Combines 'mkHomoForAllCos' and 'mkForAllTys'.
-mkHomoForAllRedn :: [TyVarBinder] -> Reduction -> Reduction
+-- Combines 'mkHomoForAllCos' and 'mkTyCoForAllTys'.
+mkHomoForAllRedn :: [(Matchability, ForAllTyBinder)] -> Reduction -> Reduction
 mkHomoForAllRedn bndrs (Reduction co ty)
   = mkReduction
-      (mkHomoForAllCos bndrs co)
-      (mkForAllTys bndrs ty)
+      (mkHomoForAllCos [(mkNomReflCo ma,bndr) | (ma,bndr) <- bndrs] co)
+      (mkTyCoForAllTys bndrs ty)
 {-# INLINE mkHomoForAllRedn #-}
 
 -- | Create a 'Reduction' from a coercion between coercions.

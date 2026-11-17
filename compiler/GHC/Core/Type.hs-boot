@@ -27,3 +27,6 @@ nativeIndexFunctionTys_maybe :: Id -> Maybe (Type, Type)
 
 -- | Check the consumed arrow kind for proven nominal matchability.
 isMatchableFunTy :: Type -> Bool
+
+-- | Build an arrow from the actual argument and result sorts.
+mkFunctionType :: HasDebugCallStack => Type -> Type -> Type -> Type -> Type

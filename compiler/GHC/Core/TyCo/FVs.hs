@@ -66,7 +66,7 @@ module GHC.Core.TyCo.FVs
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type
-  ( partitionInvisibleTypes, coreView, coreFullView, rewriterView
+  ( partitionInvisibleTypes, coreView, rewriterView
   , typeKind, isMatchableFunTy )
 
 import GHC.Builtin.WiredIn.Prim( funTyFlagTyCon )
@@ -906,8 +906,9 @@ almost_devoid_co_var_of_co (DepFunCo v domain co) cv
   = almost_devoid_co_var_of_type (varType v) cv
   && almost_devoid_co_var_of_mco domain cv
   && almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_co (ForAllCo { fco_tcv = v, fco_kind = kind_co, fco_body = co }) cv
-  = almost_devoid_co_var_of_mco kind_co cv
+almost_devoid_co_var_of_co (ForAllCo { fco_tcv = v, fco_ma = ma, fco_kind = kind_co, fco_body = co }) cv
+  = almost_devoid_co_var_of_co ma cv
+  && almost_devoid_co_var_of_mco kind_co cv
   && (v == cv || almost_devoid_co_var_of_co co cv)
 almost_devoid_co_var_of_co (FunCo { fco_ma = ma, fco_mult = w, fco_arg = co1, fco_res = co2 }) cv
   =  almost_devoid_co_var_of_co ma  cv
@@ -966,8 +967,9 @@ almost_devoid_co_var_of_type (FunTy _ ma w arg res) cv
   && almost_devoid_co_var_of_type w cv
   && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
-almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
-  = almost_devoid_co_var_of_type (varType v) cv
+almost_devoid_co_var_of_type (ForAllTy ma (Bndr v _) ty) cv
+  = almost_devoid_co_var_of_type ma cv
+  && almost_devoid_co_var_of_type (varType v) cv
   && (v == cv || almost_devoid_co_var_of_type ty cv)
 almost_devoid_co_var_of_type (CastTy ty co) cv
   = almost_devoid_co_var_of_type ty cv
@@ -1010,8 +1012,9 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     go (TyConApp tc tys) = go_tc tc tys
     go (FunTy _ ma w t1 t2) = invisible (tyCoVarsOfType ma) `mappend`
                                go w `mappend` go t1 `mappend` go t2
-    go (ForAllTy (Bndr tv _) ty)
-      = ((`delVarSet` tv) <$> go ty) `mappend`
+    go (ForAllTy ma (Bndr tv _) ty)
+      = invisible (tyCoVarsOfType ma) `mappend`
+        ((`delVarSet` tv) <$> go ty) `mappend`
         (invisible (tyCoVarsOfType $ varType tv))
     go (LitTy {}) = mempty
     go (CastTy ty co) = go ty `mappend` invisible (tyCoVarsOfCo co)
@@ -1051,10 +1054,7 @@ result.
 -- | Test whether an application permits inverse function and argument evidence.
 -- See Note [Matchability and injective variables].
 injectiveAppTy :: Type -> Bool
-injectiveAppTy fun
-  = case coreFullView (typeKind fun) of
-      ForAllTy {} -> True
-      kind        -> isMatchableFunTy kind
+injectiveAppTy fun = isMatchableFunTy (typeKind fun)
 
 isInjectiveInType :: TyVar -> Type -> Bool
 -- True <=> tv /definitely/ appears injectively in ty
@@ -1073,7 +1073,7 @@ isInjectiveInType tv ty
     go (AppTy f a)                      = injectiveAppTy f && (go f || go a)
     go (FunTy _ ma w ty1 ty2)           = go ma || go w || go ty1 || go ty2
     go (TyConApp tc tys)                = go_tc tc tys
-    go (ForAllTy (Bndr tv' _) ty)       = go (tyVarKind tv')
+    go (ForAllTy ma (Bndr tv' _) ty)    = go ma || go (tyVarKind tv')
                                           || (tv /= tv' && go ty)
     go LitTy{}                          = False
     go (CastTy ty _)                    = go ty
@@ -1148,7 +1148,7 @@ inj_vars_of_type look_under_tfs = go
       | otherwise                     = mempty
     go (FunTy _ ma w ty1 ty2)           = go ma `mappend` go w `mappend` go ty1 `mappend` go ty2
     go (TyConApp tc tys)                = go_tc tc tys
-    go (ForAllTy (Bndr tv _) ty)        = go (tyVarKind tv) `mappend`
+    go (ForAllTy ma (Bndr tv _) ty)     = go ma `mappend` go (tyVarKind tv) `mappend`
                                           addBndrFV tv (go ty)
     go LitTy{}                          = mempty
     go (CastTy ty _)                    = go ty
@@ -1203,8 +1203,9 @@ invisibleVarsOfType = go
     go (TyConApp tc tys)   = tyCoVarsOfTypes invisibles `unionVarSet`
                              invisibleVarsOfTypes visibles
       where (invisibles, visibles) = partitionInvisibleTypes tc tys
-    go (ForAllTy (Bndr var _) ty)
-      = tyCoVarsOfType (varType var) `unionVarSet` (go ty `delVarSet` var)
+    go (ForAllTy ma (Bndr var _) ty)
+      = tyCoVarsOfType ma `unionVarSet` tyCoVarsOfType (varType var)
+        `unionVarSet` (go ty `delVarSet` var)
     go LitTy{}             = emptyVarSet
     go (CastTy ty co)      = tyCoVarsOfCo co `unionVarSet` go ty
     go (CoercionTy co)     = tyCoVarsOfCo co
@@ -1354,7 +1355,7 @@ tyConsOfType ty
      go (FunTy af ma w a b)         = go ma `unionUniqSets` go w `unionUniqSets`
                                       go a `unionUniqSets` go b
                                       `unionUniqSets` go_tc (funTyFlagTyCon af)
-     go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varType tv)
+     go (ForAllTy ma (Bndr tv _) ty) = go ma `unionUniqSets` go ty `unionUniqSets` go (varType tv)
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co
 
@@ -1364,8 +1365,8 @@ tyConsOfType ty
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
      go_co (TermAppCo f co)        = go (varType f) `unionUniqSets` go_co co
      go_co (DepFunCo v domain co)  = go (varType v) `unionUniqSets` go_mco domain `unionUniqSets` go_co co
-     go_co (ForAllCo { fco_kind = kind_co, fco_body = co })
-                                   = go_mco kind_co `unionUniqSets` go_co co
+     go_co (ForAllCo { fco_ma = ma, fco_kind = kind_co, fco_body = co })
+                                   = go_co ma `unionUniqSets` go_mco kind_co `unionUniqSets` go_co co
      go_co (FunCo { fco_ma = ma, fco_mult = m, fco_arg = a, fco_res = r })
                                    = go_co ma `unionUniqSets` go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
      go_co (AxiomCo ax args)       = go_ax ax `unionUniqSets` go_cos args
@@ -1517,13 +1518,14 @@ occCheckExpand vs_to_avoid ty
             ; ty1' <- go cxt ty1
             ; ty2' <- go cxt ty2
             ; return (ty { ft_ma = ma', ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
-    go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
-       = do { ki' <- go cxt (varType tv)
+    go cxt@(as, env) (ForAllTy ma (Bndr tv vis) body_ty)
+       = do { ma' <- go cxt ma
+            ; ki' <- go cxt (varType tv)
             ; let tv'  = setVarType tv ki'
                   env' = extendVarEnv env tv tv'
                   as'  = as `delVarSet` tv
             ; body' <- go (as', env') body_ty
-            ; return (ForAllTy (Bndr tv' vis) body') }
+            ; return (mkTyCoForAllTy ma' tv' vis body') }
 
     -- For a type constructor application, first try expanding away the
     -- offending variable from the arguments.  If that doesn't work, next
@@ -1596,14 +1598,15 @@ occCheckExpand vs_to_avoid ty
            ; body' <- go_co (as', env') body_co
            ; return (DepFunCo v' domain' body') }
 
-    go_co cxt@(as, env) co@(ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = body_co })
-      = do { ki' <- go cxt (varType tcv)
+    go_co cxt@(as, env) co@(ForAllCo { fco_tcv = tcv, fco_ma = ma_co, fco_kind = kind_co, fco_body = body_co })
+      = do { ma_co' <- go_co cxt ma_co
+           ; ki' <- go cxt (varType tcv)
            ; let tcv' = setVarType tcv ki'
                  env' = extendVarEnv env tcv tcv'
                  as'  = as `delVarSet` tcv
            ; kind_co' <- go_mco cxt kind_co
            ; body' <- go_co (as', env') body_co
-           ; return (co { fco_tcv = tcv', fco_kind = kind_co', fco_body = body' }) }
+           ; return (co { fco_tcv = tcv', fco_ma = ma_co', fco_kind = kind_co', fco_body = body' }) }
 
     go_co cxt co@(FunCo { fco_ma = ma, fco_mult = w, fco_arg = co1 ,fco_res = co2 })
       = do { ma' <- go_co cxt ma

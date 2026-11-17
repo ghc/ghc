@@ -2628,8 +2628,9 @@ typeableInfo_maybe item
 
          -- TyCons whose kind is non-typeable, are not typeable
          | Just (tc, _tys) <- splitTyConApp_maybe ty
-         , not (kindIsTypeable (tyConKind tc))
-         -> return $ Just $ NoTypeableForTyConWithNonTypeableKind ty (tyConKind tc)
+         -> do { typeable <- kindIsTypeable (tyConKind tc)
+               ; return $ if typeable then Nothing else
+                   Just $ NoTypeableForTyConWithNonTypeableKind ty (tyConKind tc) }
 
          | otherwise -> return Nothing
   | otherwise = return Nothing

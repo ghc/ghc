@@ -1555,12 +1555,12 @@ ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
         | {- empty -}                 { noLoc [] }
 
 ty_fam_inst_eqn :: { LTyFamInstEqn GhcPs }
-        : 'forall' tv_bndrs '.' type '=' ktype
+        : 'forall' tv_bndrs '.' forall_matchability type '=' ktype
               {% do { hintExplicitForall $1
                     ; tvbs <- fromSpecTyVarBndrs $2
                     ; let loc = comb2 $1 $>
                     ; !cs <- getCommentsFor loc
-                    ; mkTyFamInstEqn loc (mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3) cs) tvbs) $4 $6 (epTok $5) }}
+                    ; mkTyFamInstEqn loc ((mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3, fst (unLoc $4)) cs) tvbs) { hso_matchability = snd (unLoc $4) }) $5 $7 (epTok $6) }}
         | type '=' ktype
               {% mkTyFamInstEqn (comb2 $1 $>) mkHsOuterImplicit $1 $3 (epTok $2) }
               -- Note the use of type for the head; this allows
@@ -1694,18 +1694,18 @@ tycl_hdr :: { Located (Maybe (LHsContext GhcPs), LHsType GhcPs) }
         | type                      { sL1 $1 (Nothing, $1) }
 
 datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs, LHsType GhcPs) }
-        : 'forall' tv_bndrs '.' context '=>' type   {% hintExplicitForall $1
+        : 'forall' tv_bndrs '.' forall_matchability context '=>' type   {% hintExplicitForall $1
                                                        >> fromSpecTyVarBndrs $2
                                                          >>= \tvbs ->
                                                              (acs (comb2 $1 $>) (\loc cs -> (L loc
-                                                                                  (Just ( addTrailingDarrowA $4 (epUniTok $5) cs)
-                                                                                        , mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3) emptyComments) tvbs, $6))))
+                                                                                  (Just ( addTrailingDarrowA $5 (epUniTok $6) cs)
+                                                                                        , (mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3, fst (unLoc $4)) emptyComments) tvbs) { hso_matchability = snd (unLoc $4) }, $7))))
                                                     }
-        | 'forall' tv_bndrs '.' type   {% do { hintExplicitForall $1
+        | 'forall' tv_bndrs '.' forall_matchability type   {% do { hintExplicitForall $1
                                              ; tvbs <- fromSpecTyVarBndrs $2
                                              ; let loc = comb2 $1 $>
                                              ; !cs <- getCommentsFor loc
-                                             ; return (sL loc (Nothing, mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3) cs) tvbs, $4))
+                                             ; return (sL loc (Nothing, (mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3, fst (unLoc $4)) cs) tvbs) { hso_matchability = snd (unLoc $4) }, $5))
                                        } }
         | context '=>' type         {% acs (comb2 $1 $>) (\loc cs -> (L loc (Just (addTrailingDarrowA $1 (epUniTok $2) cs), mkHsOuterImplicit, $3))) }
         | type                      { sL1 $1 (Nothing, mkHsOuterImplicit, $1) }
@@ -2264,14 +2264,25 @@ unpackedness :: { Located UnpackednessPragma }
         : '{-# UNPACK' '#-}'   { sLL $1 $> (UnpackednessPragma (glR $1, epTok $2) (getUNPACK_PRAGs $1) SrcUnpack) }
         | '{-# NOUNPACK' '#-}' { sLL $1 $> (UnpackednessPragma (glR $1, epTok $2) (getNOUNPACK_PRAGs $1) SrcNoUnpack) }
 
+-- The annotation is atomic, as in visible type application.
+forall_matchability :: { Located (Maybe (EpToken "@"), Maybe (LHsType GhcPs)) }
+        : PREFIX_AT atype { sLL $1 $> (Just (epTok $1), Just $2) }
+        | {- empty -}     { noLoc (Nothing, Nothing) }
+
 forall_telescope :: { Located (HsForAllTelescope GhcPs) }
-        : 'forall' tv_bndrs '.'  {% do { hintExplicitForall $1
-                                       ; acs (comb2 $1 $>) (\loc cs -> (L loc $
-                                           mkHsForAllInvisTele (EpAnn (glEE $1 $>) (epUniTok $1,epTok $3) cs) $2 )) }}
-        | 'forall' tv_bndrs '->' {% do { hintExplicitForall $1
-                                       ; req_tvbs <- fromSpecTyVarBndrs $2
-                                       ; acs (comb2 $1 $>) (\loc cs -> (L loc $
-                                           mkHsForAllVisTele (EpAnn (glEE $1 $>) (epUniTok $1,epUniTok $3) cs) req_tvbs )) }}
+        : 'forall' tv_bndrs '.' forall_matchability
+             {% do { hintExplicitForall $1
+                   ; acs (comb3 $1 $3 $4) (\loc cs -> L loc $
+                       (mkHsForAllInvisTele
+                         (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3, fst (unLoc $4)) cs) $2)
+                         { hsf_matchability = snd (unLoc $4) }) }}
+        | 'forall' tv_bndrs '->' forall_matchability
+             {% do { hintExplicitForall $1
+                   ; req_tvbs <- fromSpecTyVarBndrs $2
+                   ; acs (comb3 $1 $3 $4) (\loc cs -> L loc $
+                       (mkHsForAllVisTele
+                         (EpAnn (glEE $1 $3) (epUniTok $1, epUniTok $3, fst (unLoc $4)) cs) req_tvbs)
+                         { hsf_matchability = snd (unLoc $4) }) }}
 
 -- A ktype is a ctype, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
@@ -2622,27 +2633,27 @@ constrs1 :: { Located [LConDecl GhcPs] }
 constr :: { LConDecl GhcPs }
         : modifiers forall context '=>' constr_stuff
                 {% unless (null $ unLoc $1) (hintModifiers (getLoc $1))
-                >> amsA' (let (con,details) = unLoc $5 in
-                  (L (comb5 $1 $2 $3 $4 $5) (mkConDeclH98
-                                                       (epUniTok $4,(fst $ unLoc $2))
-                                                       (reverse $ unLoc $1)
-                                                       con
-                                                       (snd $ unLoc $2)
-                                                       (Just $3)
-                                                       details))) }
+                >> amsA' (let { (con,details) = unLoc $5
+                             ; ctxt = addTrailingDarrowA $3 (epUniTok $4) emptyComments }
+                          in L (comb5 $1 $2 $3 $4 $5)
+                               (mkConDeclH98 (reverse $ unLoc $1) con
+                                 (unLoc $2 ++ [mkHsGadtContext ctxt]) details)) }
         | modifiers forall constr_stuff
                 {% unless (null $ unLoc $1) (hintModifiers (getLoc $1))
-                >> amsA' (let (con,details) = unLoc $3 in
-                  (L (comb3 $1 $2 $3) (mkConDeclH98 (noAnn, fst $ unLoc $2)
-                                                      (reverse $ unLoc $1)
-                                                      con
-                                                      (snd $ unLoc $2)
-                                                      Nothing   -- No context
-                                                      details))) }
+                >> amsA' (let (con,details) = unLoc $3
+                          in L (comb3 $1 $2 $3)
+                               (mkConDeclH98 (reverse $ unLoc $1) con (unLoc $2) details)) }
 
-forall :: { Located ((TokForall, EpToken "."), Maybe [LHsTyVarBndr Specificity GhcPs]) }
-        : 'forall' tv_bndrs '.'       { sLL $1 $> ((epUniTok $1,epTok $3), Just $2) }
-        | {- empty -}                 { noLoc (noAnn, Nothing) }
+forall :: { Located [LHsGadtTelescope GhcPs] }
+        : 'forall' tv_bndrs '.' forall_matchability forall
+            {% do { hintExplicitForall $1
+                  ; acs (comb4 $1 $3 $4 $5) (\loc cs -> L loc $
+                      L (noAnnSrcSpan (comb3 $1 $3 $4))
+                        (HsGadtForAll noExtField
+                          ((mkHsForAllInvisTele
+                            (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3, fst (unLoc $4)) cs) $2)
+                            { hsf_matchability = snd (unLoc $4) })) : unLoc $5) }}
+        | {- empty -} { noLoc [] }
 
 constr_stuff :: { Located (LocatedN RdrName, HsConDeclH98Details GhcPs) }
         : infixtype       {% do { b <- runPV $1

@@ -222,7 +222,8 @@ dsCFExportDynamic id co0 cconv = do
 
  where
   ty                           = coercionLKind co0
-  (tvs,sans_foralls)           = tcSplitForAllInvisTyVars ty
+  (ma_tvs,sans_foralls)        = tcSplitForAllInvisTyVars ty
+  tvs                         = map snd ma_tvs
   (_, [scaled_arg_ty], fn_res_ty) = tcSplitFunTys sans_foralls
   arg_ty                       = scaledThing scaled_arg_ty
   Just (io_tc, res_ty)         = tcSplitIOType_maybe fn_res_ty
@@ -309,7 +310,7 @@ dsFCall fn_id co fcall mDeclHeader = do
     let
         -- Build the worker
         worker_ty     = mkForAllTys tv_bndrs (mkVisFunTysManyU (map idType work_arg_ids) ccall_result_ty)
-        tvs           = map binderVar tv_bndrs
+        tvs           = map (binderVar . snd) tv_bndrs
         the_ccall_app = mkFCall ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
         work_id       = mkSysLocal (fsLit "$wccall") work_uniq ManyTy worker_ty

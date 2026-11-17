@@ -694,8 +694,8 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
   addHaddock (L l_con_decl con_decl) =
     extendHdkA (locA l_con_decl) $
     case con_decl of
-      ConDeclGADT { con_g_ext, con_names, con_outer_bndrs, con_inner_bndrs
-                  , con_mb_cxt, con_g_args, con_res_ty, con_modifiers } -> do
+      ConDeclGADT { con_g_ext, con_names, con_outer_bndrs, con_telescope
+                  , con_g_args, con_res_ty, con_modifiers } -> do
         con_doc' <- getConDoc (getLocA (NE.head con_names))
         con_g_args' <-
           case con_g_args of
@@ -706,18 +706,18 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
           ConDeclGADT { con_g_ext, con_names,
-                        con_outer_bndrs, con_inner_bndrs, con_mb_cxt, con_modifiers,
+                        con_outer_bndrs, con_telescope, con_modifiers,
                         con_doc = lexLHsDocString <$> con_doc',
                         con_g_args = con_g_args',
                         con_res_ty = con_res_ty' }
-      ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args, con_modifiers } ->
+      ConDeclH98 { con_ext, con_name, con_telescope, con_args, con_modifiers } ->
         let
           -- See Note [Leading and trailing comments on H98 constructors]
           getTrailingLeading :: HdkM (LocatedA (ConDecl GhcPs))
           getTrailingLeading = do
             con_doc' <- getPrevNextDoc (locA l_con_decl)
             return $ L l_con_decl $
-              ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args, con_modifiers
+              ConDeclH98 { con_ext, con_name, con_telescope, con_args, con_modifiers
                          , con_doc = lexLHsDocString <$> con_doc' }
 
           -- See Note [Leading and trailing comments on H98 constructors]
@@ -728,7 +728,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
                 con_doc' <- getConDoc (getLocA con_name)
                 ts' <- traverse addHaddock ts
                 pure $ L l_con_decl $
-                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
+                  ConDeclH98 { con_ext, con_name, con_telescope, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
                                con_args = PrefixCon x ts' }
               InfixCon x t1 t2 -> do
@@ -736,14 +736,14 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
                 con_doc' <- getConDoc (getLocA con_name)
                 t2' <- addHaddock t2
                 pure $ L l_con_decl $
-                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
+                  ConDeclH98 { con_ext, con_name, con_telescope, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
                                con_args = InfixCon x t1' t2' }
               RecCon x (L l_rec flds) -> do
                 con_doc' <- getConDoc (getLocA con_name)
                 flds' <- traverse addHaddock flds
                 pure $ L l_con_decl $
-                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
+                  ConDeclH98 { con_ext, con_name, con_telescope, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
                                con_args = RecCon x (L l_rec flds') }
         in

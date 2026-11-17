@@ -381,7 +381,7 @@ mkDictSelId name clas
 
     pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
     res_ty  = scaledThing (getNth arg_tys val_index)
-    sel_ty  = mkForAllTys tyvars $
+    sel_ty  = mkForAllTys [(unmatchableDataConTy, tv) | tv <- tyvars] $
               mkFunctionType unmatchableDataConTy ManyTy pred_ty res_ty
              -- See Note [Type classes and linear types]
 

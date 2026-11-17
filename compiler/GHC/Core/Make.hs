@@ -124,7 +124,8 @@ mkCoreTyLams :: [TyVarBinder] -> CoreExpr -> CoreExpr
 mkCoreTyLams binders body = mkCast lam co
   where
     lam = mkCoreLams (binderVars binders) body
-    co  = mkForAllVisCos binders (mkRepReflCo (exprType body))
+    co  = mkForAllVisCos [(unmatchableDataConTy, bndr) | bndr <- binders]
+                        (mkRepReflCo (exprType body))
 
 -- | Bind a list of binding groups over an expression. The leftmost binding
 -- group becomes the outermost group in the resulting expression
@@ -723,7 +724,7 @@ aBSENT_SUM_FIELD_ERROR_ID = mkExceptionId absentSumFieldErrorName
 mkExceptionId :: Name -> Id
 mkExceptionId name
   = mkVanillaGlobalWithInfo name
-      (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
+      (mkSpecForAllTys [(unmatchableDataConTy, alphaTyVar)] (mkTyVarTy alphaTyVar)) -- forall a . a
       (divergingIdInfo [] `setCafInfo` NoCafRefs)
          -- See Note [Wired-in exceptions are not CAFfy]
 
@@ -921,7 +922,7 @@ aBSENT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
  = mk_runtime_error_id absentErrorName absent_ty
  where
    -- absentError :: forall (a :: Type). Addr# -> a
-   absent_ty = mkSpecForAllTys [alphaTyVar] $
+   absent_ty = mkSpecForAllTys [(unmatchableDataConTy, alphaTyVar)] $
                mkVisFunTyManyU addrPrimTy (mkTyVarTy alphaTyVar)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils
@@ -931,7 +932,7 @@ aBSENT_CONSTRAINT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
    -- See Note [Type vs Constraint for error ids]
  where
    -- absentConstraintError :: forall (a :: Constraint). Addr# -> a
-   absent_ty = mkSpecForAllTys [alphaConstraintTyVar] $
+   absent_ty = mkSpecForAllTys [(unmatchableDataConTy, alphaConstraintTyVar)] $
                mkFunTy visArgConstraintLike unmatchableDataConTy ManyTy
                        addrPrimTy (mkTyVarTy alphaConstraintTyVar)
 
@@ -969,7 +970,7 @@ mk_runtime_error_id name ty
 mkRuntimeErrorTy :: TypeOrConstraint -> Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
 --   See Note [Error and friends have an "open-tyvar" forall]
-mkRuntimeErrorTy torc = mkSpecForAllTys [runtimeRep1TyVar, tyvar] $
+mkRuntimeErrorTy torc = mkSpecForAllTys [(unmatchableDataConTy, tv) | tv <- [runtimeRep1TyVar, tyvar]] $
                         mkFunctionType unmatchableDataConTy ManyTy addrPrimTy (mkTyVarTy tyvar)
   where
     tyvar:|_ = expectNonEmpty $ mkTemplateTyVars [kind]

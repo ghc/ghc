@@ -28,6 +28,7 @@ coVarTypesRole :: HasDebugCallStack => CoVar -> (Type, Type, Role)
 mkCoercionType :: Role -> Type -> Type -> Type
 
 coercionKind  :: HasDebugCallStack => Coercion -> Pair Type
+coercionLKind :: HasDebugCallStack => Coercion -> Type
 coercionRKind :: HasDebugCallStack => Coercion -> Type
 coercionRole  :: Coercion -> Role
 coercionType  :: Coercion -> Type
@@ -38,4 +39,4 @@ topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 
 assertGoodForAllCo :: HasDebugCallStack
                    => TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-                   -> KindMCoercion -> Coercion -> a -> a
+                   -> Coercion -> KindMCoercion -> Coercion -> a -> a

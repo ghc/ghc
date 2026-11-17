@@ -224,7 +224,7 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
     go (WpCast co)        = liftPRType $ \_ -> coercionRKind co
     go (WpEvLam v)        = liftPRType $ mkInvisFunTy (idType v)
     go (WpEvApp _)        = liftPRType $ funResultTy
-    go (WpTyLam tv)       = liftPRType $ mkForAllTy (Bndr tv Inferred)
+    go (WpTyLam tv)       = liftPRType $ mkTyCoForAllTy unmatchableDataConTy tv Inferred
     go (WpTyApp ta)       = \(ty,tas) -> (ty, ta:tas)
     go (WpLet _)          = id
 

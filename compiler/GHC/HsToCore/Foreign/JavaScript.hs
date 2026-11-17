@@ -266,7 +266,8 @@ dsJsFExportDynamic :: Id
 dsJsFExportDynamic id co0 cconv = do
     let
       ty                            = coercionLKind co0
-      (tvs,sans_foralls)            = tcSplitForAllTyVars ty
+      (ma_tvs,sans_foralls)         = tcSplitForAllTyVars ty
+      tvs                          = map snd ma_tvs
       (_, [scaled_arg_ty], fn_res_ty)  = tcSplitFunTys sans_foralls
       arg_ty                        = scaledThing scaled_arg_ty
       (io_tc, res_ty)               = expectJust
@@ -348,7 +349,7 @@ dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
         -- Build the worker
         fcall         = CCall (CCallSpec target cconv safety)
         worker_ty     = mkForAllTys tv_bndrs (mkVisFunTysManyU (map idType work_arg_ids) ccall_result_ty)
-        tvs           = map binderVar tv_bndrs
+        tvs           = map (binderVar . snd) tv_bndrs
         the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
         work_id       = mkSysLocal (fsLit "$wccall") work_uniq ManyTy worker_ty
@@ -627,7 +628,7 @@ jsResultWrapper result_ty
 
   -- The type might contain foralls (eg. for dummy type arguments,
   -- referring to 'Ptr a' is legal).
-  | Just (tyvar, rest) <- splitForAllTyCoVar_maybe result_ty
+  | Just (_ma, tyvar, rest) <- splitForAllTyCoVar_maybe result_ty
   = do (maybe_ty, wrapper) <- jsResultWrapper rest
        return (maybe_ty, \e -> Lam tyvar (wrapper e))
 

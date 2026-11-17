@@ -1474,7 +1474,7 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
       rnImplicitTvOccs mb_cls implicit_vars $ \implicit_vars' ->
         thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
 
-    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+    HsOuterExplicit{hso_matchability = ma, hso_bndrs = exp_bndrs} ->
       -- The type already has an explicit, user-written, invisible forall,
       --     so do not add an implicit forall
       -- See Note [forall-or-nothing rule] in Language.Haskell.Syntax.Type
@@ -1483,10 +1483,14 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
       -- will use class variables for any names the user meant to bring in
       -- scope here. This is an explicit forall, so we want fresh names, not
       -- class variables. Thus: always pass Nothing.
-      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' -> do
-        checkForAllTelescopeWildcardBndrs doc exp_bndrs'
-        thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
-                                       , hso_bndrs     = exp_bndrs' }
+      do { checkEmptyForAllMatchability ma (null exp_bndrs)
+         ; (ma', ma_fvs) <- rnForAllMatchability doc ma
+         ; (result, fvs) <- bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' -> do
+             checkForAllTelescopeWildcardBndrs doc exp_bndrs'
+             thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
+                                            , hso_matchability = ma'
+                                            , hso_bndrs = exp_bndrs' }
+         ; return (result, ma_fvs `plusFN` fvs) }
 
 -- See Note [Term variable capture and implicit quantification]
 warn_term_var_capture :: LocatedN RdrName -> RnM ()
@@ -1508,15 +1512,33 @@ bindHsForAllTelescope :: HsDocContext
                       -> (HsForAllTelescope GhcRn -> RnM (a, FreeNames))
                       -> RnM (a, FreeNames)
 bindHsForAllTelescope doc tele thing_inside =
-  case tele of
-    HsForAllVis { hsf_vis_bndrs = bndrs } ->
-      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' -> do
-        checkForAllTelescopeWildcardBndrs doc bndrs'
-        thing_inside $ mkHsForAllVisTele noAnn bndrs'
-    HsForAllInvis { hsf_invis_bndrs = bndrs } ->
-      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' -> do
-        checkForAllTelescopeWildcardBndrs doc bndrs'
-        thing_inside $ mkHsForAllInvisTele noAnn bndrs'
+  do { checkEmptyForAllMatchability (hsf_matchability tele) (null (hsForAllTelescopeBndrs tele))
+     ; (ma', ma_fvs) <- rnForAllMatchability doc (hsf_matchability tele)
+     ; (result, fvs) <- case tele of
+         HsForAllVis { hsf_vis_bndrs = bndrs } ->
+           bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' -> do
+             checkForAllTelescopeWildcardBndrs doc bndrs'
+             thing_inside $ (mkHsForAllVisTele noAnn bndrs') { hsf_matchability = ma' }
+         HsForAllInvis { hsf_invis_bndrs = bndrs } ->
+           bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' -> do
+             checkForAllTelescopeWildcardBndrs doc bndrs'
+             thing_inside $ (mkHsForAllInvisTele noAnn bndrs') { hsf_matchability = ma' }
+     ; return (result, ma_fvs `plusFN` fvs) }
+
+-- | An annotation needs a semantic forall binder.
+checkEmptyForAllMatchability :: Maybe (LHsType GhcPs) -> Bool -> RnM ()
+checkEmptyForAllMatchability (Just ma) True =
+  setSrcSpanA (getLoc ma) $ failWithTc TcRnEmptyForallMatchability
+checkEmptyForAllMatchability _ _ = return ()
+
+-- | Rename a group annotation before its binders enter scope.
+-- See Note [Source forall matchability] in GHC.Hs.Type.
+rnForAllMatchability :: HsDocContext -> Maybe (LHsType GhcPs)
+                    -> RnM (Maybe (LHsType GhcRn), FreeNames)
+rnForAllMatchability _ Nothing = return (Nothing, emptyFNs)
+rnForAllMatchability doc (Just ma) = do
+  (ma', fvs) <- rnLHsKind doc ma
+  return (Just ma', fvs)
 
 bindHsGadtTelescopes :: HsDocContext
                      -> [LHsGadtTelescope GhcPs]
@@ -1531,6 +1553,12 @@ bindHsGadtTelescopes doc (L l (HsGadtForAll _ tele) : args) thing_inside =
   bindHsForAllTelescope doc tele $ \tele' ->
   bindHsGadtTelescopes        doc args $ \args' ->
     thing_inside (L l (HsGadtForAll noExtField tele') : args')
+
+bindHsGadtTelescopes doc (L l (HsGadtContext ctxt) : args) thing_inside =
+  do { (ctxt', ctxt_fvs) <- rnContext doc ctxt
+     ; (a, fvs) <- bindHsGadtTelescopes doc args $ \args' ->
+         thing_inside (L l (HsGadtContext ctxt') : args')
+     ; return (a, ctxt_fvs `plusFN` fvs) }
 
 -- See Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type
 checkForAllTelescopeWildcardBndrs :: HsDocContext
@@ -2546,6 +2574,7 @@ extract_hs_for_all_telescope :: HsForAllTelescope GhcPs
                              -> FreeKiTyVars -- Accumulator
                              -> FreeKiTyVars -- Free in body
                              -> FreeKiTyVars
+-- Annotation names must already be in scope. See Note [Source forall matchability].
 extract_hs_for_all_telescope tele acc_vars body_fvs =
   case tele of
     HsForAllVis { hsf_vis_bndrs = bndrs } ->
@@ -2570,6 +2599,9 @@ extractHsGadtTelescopes (L _ HsGadtPar{} : args)         body_fvs =
 extractHsGadtTelescopes (L _ (HsGadtForAll _ tele) : args) body_fvs =
   extract_hs_for_all_telescope tele [] $
   extractHsGadtTelescopes args body_fvs
+
+extractHsGadtTelescopes (L _ (HsGadtContext ctxt) : args) body_fvs =
+  extract_lctxt ctxt $ extractHsGadtTelescopes args body_fvs
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr flag GhcPs]
                     -> FreeKiTyVars  -- Accumulator

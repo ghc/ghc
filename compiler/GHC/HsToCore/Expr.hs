@@ -514,7 +514,8 @@ dsExpr (HsStatic (static_ptr_ty, from_static_fun) expr@(L loc _))
              static_rhs = mkLams static_fvs $
                           mkCoreApps (Var make_static_id) [ Type ty, srcLoc, expr_ds ]
 
-       ; static_id <- newStaticId (mkSpecForAllTys static_fvs static_ptr_ty)
+       ; static_id <- newStaticId
+           (mkSpecForAllTys [(unmatchableDataConTy, tv) | tv <- static_fvs] static_ptr_ty)
 
        -- Emit the static bindings to top level, but NOT when we are in
        -- the auxiliary desugaring for the pattern-match checking

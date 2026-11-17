@@ -347,7 +347,7 @@ findFixity iface ifaceMap instIfaceMap = \name ->
 -- Collecting and sorting instances
 --------------------------------------------------------------------------------
 
-instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], SName, [SimpleType])
+instHead :: ([(Type, TyVar)], [PredType], Class, [Type]) -> ([Int], SName, [SimpleType])
 instHead (_, _, cls, args) =
   (map argCount args, SName (className cls), map simplify args)
 
@@ -355,7 +355,7 @@ argCount :: Type -> Int
 argCount (AppTy t _) = argCount t + 1
 argCount (TyConApp _ ts) = length ts
 argCount (FunTy _ _ _ _ _) = 2
-argCount (ForAllTy _ t) = argCount t
+argCount (ForAllTy _ _ t) = argCount t
 argCount (CastTy t _) = argCount t
 argCount _ = 0
 
@@ -363,7 +363,7 @@ simplify :: Type -> SimpleType
 simplify (FunTy _ ma _ t1 t2)
   -- See Note [Arrow matchability in Haddock] in Haddock.Convert.
   = SimpleType (SName unrestrictedFunTyConName) [simplify t1, simplify t2, simplify ma]
-simplify (ForAllTy _ t) = simplify t
+simplify (ForAllTy _ _ t) = simplify t
 simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
   where
     (SimpleType s ts) = simplify t1

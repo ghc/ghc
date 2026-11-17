@@ -276,7 +276,7 @@ module GHC (
         pprParendType, pprTypeApp,
         Kind,
         PredType,
-        ThetaType, pprForAll, pprThetaArrowTy,
+        ThetaType, pprForAll, pprForAllWithMatchability, pprThetaArrowTy,
         parseInstanceHead,
         getInstancesForType,
 
@@ -411,7 +411,7 @@ import GHC.Utils.Fingerprint
 import GHC.Core.Predicate
 import GHC.Core.Type  hiding( typeKind )
 import GHC.Core.TyCon
-import GHC.Core.TyCo.Ppr   ( pprForAll )
+import GHC.Core.TyCo.Ppr   ( pprForAll, pprForAllWithMatchability )
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts, orphNamesOfFamInst )

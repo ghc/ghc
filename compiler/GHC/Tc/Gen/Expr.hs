@@ -171,36 +171,73 @@ tcPolyExprCheck :: HsExpr GhcRn
 -- See Note [Skolemisation overview] in GHC.Tc.Utils.Unify
 
 tcPolyExprCheck expr res_ty
-  = outer_skolemise res_ty $ \pat_tys rho_ty ->
-    let
-      -- tc_body is a little loop that looks past parentheses
-      tc_body (HsPar x (L loc e))
-        = setSrcSpanA loc $
-          do { e' <- tc_body e
-             ; return (HsPar x (L loc e')) }
-
-      -- Look through any untyped splices (#24559)
-      -- See Note [Type Checking Template Haskell Splices]
-      tc_body (HsUntypedSplice splice_res _)
-        = do { body <- getUntypedSpliceBody splice_res
-             ; tc_body body }
-
-      -- The special case for lambda: go to tcLambdaMatches, passing pat_tys
-      tc_body e@(HsLam x lam_variant matches)
-        = do { (wrap, matches') <-  tcLambdaMatches e lam_variant matches pat_tys
-                                                   (mkCheckExpType rho_ty)
-               -- NB: tcLambdaMatches concludes with deep skolemisation,
-               --     if DeepSubsumption is on;  hence no need to do that here
-             ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
-
-      -- The general case: just do deep skolemisation if necessary,
-      -- before handing off to tcExpr
-      tc_body e = do { ds_flag <- getDeepSubsumptionFlag
-                     ; inner_skolemise ds_flag rho_ty $ \rho_ty' ->
-                       tcExpr e (mkCheckExpType rho_ty') }
-    in tc_body expr
+  | any (\(ma, _) -> not (ma `tcEqType` unmatchableDataConTy)) expected_bndrs
+  , case res_ty of
+      Left{}  -> True
+      Right{} -> bare_variable expr
+  = tc_existing_value expr
+  | otherwise
+  = tc_skolemise expr
   where
-    -- `outer_skolemise` is used always
+    expected_ty = case res_ty of
+      Left ty   -> ty
+      Right sig -> idType (sig_bndr sig)
+    (expected_bndrs, _) = splitForAllForAllTyBinders expected_ty
+
+    -- See Note [Checking existing values at non-U foralls].
+    bare_variable (HsPar _ (L _ e)) = bare_variable e
+    bare_variable HsVar{} = True
+    bare_variable _ = False
+
+    tc_existing_value (HsPar x (L loc e))
+      = setSrcSpanA loc $
+        do { e' <- tc_existing_value e
+           ; return (HsPar x (L loc e')) }
+    tc_existing_value (HsUntypedSplice splice_res _)
+      = do { body <- getUntypedSpliceBody splice_res
+           ; tc_existing_value body }
+    tc_existing_value e
+      = do { inferred <- tcInferAppHead_maybe e
+           ; case inferred of
+               Just (e', actual_ty) ->
+                 do { wrap <- case res_ty of
+                        Left{} -> tcSubTypeSigma (exprCtOrigin e) ctxt actual_ty expected_ty
+                        Right sig -> setSrcSpan (sig_loc sig) $
+                          tcSubTypeSigma (exprCtOrigin e) ctxt actual_ty expected_ty
+                    ; return (mkHsWrap wrap e') }
+               Nothing -> tc_skolemise e }
+
+    tc_skolemise expr
+      = outer_skolemise res_ty $ \pat_tys rho_ty ->
+        let
+          -- tc_body is a little loop that looks past parentheses
+          tc_body (HsPar x (L loc e))
+            = setSrcSpanA loc $
+              do { e' <- tc_body e
+                 ; return (HsPar x (L loc e')) }
+
+          -- Look through any untyped splices (#24559)
+          -- See Note [Type Checking Template Haskell Splices]
+          tc_body (HsUntypedSplice splice_res _)
+            = do { body <- getUntypedSpliceBody splice_res
+                 ; tc_body body }
+
+          -- The special case for lambda: go to tcLambdaMatches, passing pat_tys
+          tc_body e@(HsLam x lam_variant matches)
+            = do { (wrap, matches') <-  tcLambdaMatches e lam_variant matches pat_tys
+                                                       (mkCheckExpType rho_ty)
+                   -- NB: tcLambdaMatches concludes with deep skolemisation,
+                   --     if DeepSubsumption is on;  hence no need to do that here
+                 ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
+
+          -- The general case: just do deep skolemisation if necessary,
+          -- before handing off to tcExpr
+          tc_body e = do { ds_flag <- getDeepSubsumptionFlag
+                         ; inner_skolemise ds_flag rho_ty $ \rho_ty' ->
+                           tcExpr e (mkCheckExpType rho_ty') }
+        in tc_body expr
+
+    -- `outer_skolemise` checks expressions that need runtime abstraction.
     -- It only does shallow skolemisation
     -- It always makes an implication constraint if deferred-errors is on
     outer_skolemise :: Either TcSigmaType TcCompleteSig
@@ -232,6 +269,26 @@ tcPolyExprCheck expr res_ty
     ctxt = case res_ty of
              Left {}   -> GenSigCtxt
              Right sig -> sig_ctxt sig
+
+
+{- Note [Checking existing values at non-U foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An existing value can have an M or variable-annotated forall type. Checking
+that value does not require a new type lambda. Try inferable application
+heads before skolemising a leading forall prefix with a non-U annotation.
+Use normal sigma subsumption for any adaptation. Identity subsumption can
+then retain an existing value without emitting U-to-annotation obligations.
+Lambdas and other expressions keep the runtime abstraction checks.
+
+Look through parentheses and untyped splices. Preserve parenthesis annotations
+and source spans. Consume splice finalizers once, including on the fallback
+path. Known-U prefixes keep the ordinary checking and Quick Look path.
+
+A complete signature also brings scoped type variables into scope during
+skolemisation. Before that step, infer only a bare variable under parentheses.
+Other signed expressions keep the existing scoped checking path. In particular,
+an inner expression signature can refer to those scoped variables.
+-}
 
 
 {- *********************************************************************

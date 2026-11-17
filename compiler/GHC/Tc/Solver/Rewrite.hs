@@ -51,7 +51,7 @@ import GHC.Data.Maybe
 import GHC.Exts (oneShot)
 import Control.Monad
 import Control.Applicative (liftA3)
-import GHC.Builtin.WiredIn.Types (tYPETyCon, matchableDataConTy)
+import GHC.Builtin.WiredIn.Types (tYPETyCon)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
 import GHC.Data.Bag( listToBag, bagToList, isEmptyBag )
@@ -818,16 +818,17 @@ rewrite_one (FunTy { ft_af = vis, ft_ma = ma, ft_mult = mult, ft_arg = ty1, ft_r
           -- Forgetting this caused #19677.
        ; return $! mkFunRedn role vis ma_redn w_redn casted_arg_redn casted_res_redn }
 
-rewrite_one ty@(ForAllTy {})
+rewrite_one (ForAllTy ma (Bndr tv vis) rho)
 -- TODO (RAE): This is inadequate, as it doesn't rewrite the kind of
 -- the bound tyvar. Doing so will require carrying around a substitution
 -- and the usual substTyVarBndr-like silliness. Argh.
 
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
-  = do { let (bndrs, rho) = tcSplitForAllTyVarBinders ty
+  = do { ma_redn <- setEqRel NomEq $ rewrite_one ma
        ; redn <- rewrite_one rho
-       ; return $! mkHomoForAllRedn bndrs redn }
+       ; return $! mkForAllRedn vis tv ma_redn
+                     (mkReflRedn Nominal (varType tv)) redn }
 
 rewrite_one (CastTy ty g)
   = do { redn <- rewrite_one ty
@@ -2072,10 +2073,10 @@ split_pi_tys' :: Type -> ([(Type, PiTyBinder)], Type, Bool)
 split_pi_tys' ty = split ty ty
   where
      -- put common cases first
-  split _       (ForAllTy b res) = let -- This bang is necessary lest we see rather
+  split _       (ForAllTy ma b res) = let -- This bang is necessary lest we see rather
                                        -- terrible reboxing, as noted in #19102.
                                        !(bs, ty, _) = split res res
-                                   in  ((matchableDataConTy, Named b) : bs, ty, True)
+                                   in  ((ma, Named b) : bs, ty, True)
   split _       (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res })
                                  = let -- See #19102
                                        !(bs, ty, named) = split res res

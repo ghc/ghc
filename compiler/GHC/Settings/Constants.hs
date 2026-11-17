@@ -7,8 +7,8 @@ import GHC.Settings.Config
 
 hiVersion :: Integer
 -- The suffix changes when the fork changes a common interface payload.
--- Reject older ordinary-arrow payloads before decoding their fields.
-hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "63") :: Integer
+-- Reject older forall payloads before decoding their fields.
+hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "64") :: Integer
 
 -- All pretty arbitrary:
 

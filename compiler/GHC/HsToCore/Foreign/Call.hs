@@ -132,7 +132,7 @@ mkFCall uniq the_fcall val_args res_ty
     arg_tys = map exprType val_args
     body_ty = (mkVisFunTysManyU arg_tys res_ty)
     tyvars  = tyCoVarsOfTypeWellScoped body_ty
-    ty      = mkInfForAllTys tyvars body_ty
+    ty      = mkInfForAllTys (map (unmatchableDataConTy,) tyvars) body_ty
     the_fcall_id = mkFCallId uniq the_fcall ty
 
 unboxArg :: CoreExpr                    -- The supplied argument, not representation-polymorphic
@@ -338,7 +338,7 @@ resultWrapper result_ty
 
   -- The type might contain foralls (eg. for dummy type arguments,
   -- referring to 'Ptr a' is legal).
-  | Just (tyvar, rest) <- splitForAllTyCoVar_maybe result_ty
+  | Just (_ma, tyvar, rest) <- splitForAllTyCoVar_maybe result_ty
   = do { (maybe_ty, wrapper) <- resultWrapper rest
        ; return (maybe_ty, \e -> Lam tyvar (wrapper e)) }
 

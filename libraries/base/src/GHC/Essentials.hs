@@ -227,7 +227,7 @@ module GHC.Essentials
          , lamE, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE, multiIfE
          , letE, caseE, doE, mdoE, compE, fromE, fromThenE, fromToE, fromThenToE
          , listE, sigE, recConE, recUpdE, staticE, unboundVarE, labelE, implicitParamVarE
-         , getFieldE, projectionE, typeE, forallE, forallVisE, constrainedE
+         , getFieldE, projectionE, typeE, forallE, forallVisE, forallMatchE, constrainedE
     , TH.cxt
     , TH.noSourceUnpackedness, TH.sourceNoUnpack, TH.sourceUnpack
     , TH.noSourceStrictness, TH.sourceLazy, TH.sourceStrict
@@ -238,11 +238,11 @@ module GHC.Essentials
     , Stmt, bindS, letS, noBindS, parS, recS
     , Body, normalB, guardedB
     , Guard, normalGE, patGE
-    , normalC, recC, infixC, forallC, gadtC, recGadtC
+    , normalC, recC, infixC, forallC, forallMatchC, gadtC, recGadtC
     , TH.bang, TH.bangType, TH.varBangType
     , TH.unidir, TH.implBidir, TH.explBidir
     , TH.prefixPatSyn, TH.recordPatSyn, TH.infixPatSyn
-    , forallT, forallVisT, varT, conT, infixT, tupleT
+    , forallT, forallVisT, forallMatchT, varT, conT, infixT, tupleT
     , unboxedTupleT, unboxedSumT, arrowT, mulArrowT, listT
     , appT, appKindT, sigT, equalityT, litT, promotedT
     , promotedTupleT, promotedNilT, promotedConsT

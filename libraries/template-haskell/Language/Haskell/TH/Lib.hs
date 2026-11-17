@@ -46,7 +46,7 @@ module Language.Haskell.TH.Lib (
         lamE, lam1E, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE,
         multiIfE, letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE,
         fieldExp, getFieldE, projectionE, typedSpliceE, typedBracketE, typeE,
-        forallE, forallVisE, constrainedE,
+        forallE, forallVisE, forallMatchE, constrainedE,
 
     -- **** Ranges
     fromE, fromThenE, fromToE, fromThenToE,
@@ -59,7 +59,7 @@ module Language.Haskell.TH.Lib (
     bindS, letS, noBindS, parS, recS,
 
     -- *** Types
-        forallT, forallVisT, varT, conT, appT, appKindT, arrowT, mulArrowT,
+        forallT, forallVisT, forallMatchT, varT, conT, appT, appKindT, arrowT, mulArrowT,
         infixT, uInfixT, promotedInfixT, promotedUInfixT,
         parensT, equalityT, listT, tupleT, unboxedTupleT, unboxedSumT,
         sigT, litT, wildCardT, promotedT, promotedTupleT, promotedNilT,
@@ -74,7 +74,7 @@ module Language.Haskell.TH.Lib (
     -- **** Class Contexts
     cxt, classP, equalP,
     -- **** Constructors
-    normalC, recC, infixC, forallC, gadtC, recGadtC,
+    normalC, recC, infixC, forallC, forallMatchC, gadtC, recGadtC,
 
     -- *** Kinds
     varK, conK, tupleK, arrowK, listK, appK, starK, constraintK,

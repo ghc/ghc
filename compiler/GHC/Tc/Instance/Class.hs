@@ -16,7 +16,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate(instDFunType, tcInstType)
-import GHC.Tc.Instance.Typeable
+import {-# SOURCE #-} GHC.Tc.Instance.Typeable ( tyConIsTypeable )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc
@@ -991,13 +991,13 @@ doFunTy clas ty ma mult arg_ty ret_ty
 -- of monomorphic kind (e.g. all kind variables have been instantiated).
 doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcM ClsInstResult
 doTyConApp clas ty tc kind_args
-  | tyConIsTypeable tc
-  = return $ OneInst { cir_new_theta   = map (mk_typeable_pred clas) kind_args
-                     , cir_mk_ev       = mk_ev
-                     , cir_canonical   = EvCanonical
-                     , cir_what        = BuiltinTypeableInstance tc }
-  | otherwise
-  = return NoInstance
+  = do { typeable <- tyConIsTypeable tc
+       ; return $ if typeable
+         then OneInst { cir_new_theta   = map (mk_typeable_pred clas) kind_args
+                      , cir_mk_ev       = mk_ev
+                      , cir_canonical   = EvCanonical
+                      , cir_what        = BuiltinTypeableInstance tc }
+         else NoInstance }
   where
     mk_ev kinds = evTypeable ty $ EvTypeableTyCon tc (map EvExpr kinds)
 

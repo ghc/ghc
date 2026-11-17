@@ -67,6 +67,7 @@ import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
 import GHC.Core.Opt.ConstantFold
+import GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
 
 import GHC.Types.Name
 import GHC.Types.Id
@@ -768,7 +769,7 @@ mkArgInfo env fun rules_for_fun cont
     add_type_strictness fun_ty dmds
       | null dmds = []
 
-      | Just (_, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
+      | Just (_ma, _, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
       = add_type_strictness fun_ty' dmds     -- Look through foralls
 
       | Just (_, _, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
@@ -2061,7 +2062,7 @@ rebuildLam env bndrs@(bndr:_) body cont
       | -- Note [Casts and lambdas]
         seCastSwizzle env
       , not (any bad bndrs)
-      = mkCast (mk_lams bndrs body) (mkPiCos Representational bndrs co)
+      = mkCast (mk_lams bndrs body) (mkPiCos Representational [(unmatchableDataConTy,b) | b <- bndrs] co)
       where
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
@@ -2490,7 +2491,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
     mk_poly1 tvs_here var
       = do { uniq <- getUniqueM
            ; let  poly_name = setNameUnique (idName var) uniq      -- Keep same name
-                  poly_ty   = mkInfForAllTys tvs_here (idType var) -- But new type of course
+                  poly_ty   = mkInfForAllTys [(unmatchableDataConTy,tv) | tv <- tvs_here] (idType var) -- But new type of course
                   poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in GHC.Types.Id
                               mkLocalId poly_name (idMult var) poly_ty
            ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }

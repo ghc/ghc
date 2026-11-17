@@ -479,11 +479,15 @@ mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 --   forall tv. res  ~R#   forall tv{vis} res`.
 -- See Note [Required foralls in Core] in GHC.Core.TyCo.Rep
 --
--- It's a no-op if all binders are invisible;
--- but in that case we refrain from calling it.
-mkWpForAllCast :: [ForAllTyBinder] -> Type -> HsWrapper
+-- The metadata proof goes from runtime U to the target annotation.
+-- Invisible binders can also require a metadata cast.
+mkWpForAllCast :: [(CoercionN, ForAllTyBinder)] -> Type -> HsWrapper
 mkWpForAllCast bndrs res_ty
-  = mkWpCastR (mkForAllVisCos bndrs (mkRepReflCo res_ty))
+  = mkWpCastR (foldr step (mkRepReflCo res_ty) bndrs)
+  where
+    -- See Note [Runtime forall matchability] in GHC.Tc.Utils.Instantiate.
+    step (ma_co, Bndr tv vis) co
+      = mkForAllCo tv coreTyLamForAllTyFlag vis ma_co MRefl co
 
 mkWpEvLams :: [Var] -> HsWrapper
 mkWpEvLams ids = mk_co_lam_fn WpEvLam ids
@@ -598,7 +602,7 @@ optSubTypeHsWrapper wrap
     -- (WpTyLam a <.> WpCastCo co <.> w)
     --    = WpCast (ForAllCo a co) (WpTyLam <.> w)
     opt_ty_lam tv (WpCast co : ws)
-      = opt_co (mkHomoForAllCo tv co) (opt_ty_lam tv ws)
+      = opt_co (mkHomoForAllCo (mkNomReflCo unmatchableDataConTy) tv co) (opt_ty_lam tv ws)
 
     opt_ty_lam tv ws
       = WpTyLam tv : ws
@@ -914,7 +918,7 @@ data EvTerm
   | EvTypeable Type EvTypeable   -- Dictionary for (Typeable ty)
 
   | EvFun     -- /\as \ds. let binds in v
-      { et_tvs   :: [TyVar]
+      { et_tvs   :: [(TcEvBinds, CoercionN, TyCoVar)] -- Prefix binds and nominal U-to-target proofs.
       , et_given :: [EvVar]
       , et_binds :: TcEvBinds  -- This field is why we need an EvFun
                                -- constructor, and can't just use EvExpr
@@ -1355,12 +1359,22 @@ evTermFVs (EvExpr e)         = exprFVs e
 evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
 evTermFVs (EvFun { et_tvs = tvs, et_given = given
                  , et_binds = tc_ev_binds, et_body = v })
-  = case tc_ev_binds of
-      TcEvBinds {}  -> mempty  -- See Note [Free vars of EvFun]
+  = foldr forall_fvs body_fvs tvs
+  where
+    -- The proof is outside the current binder and all later Given evidence.
+    -- See Note [Runtime forall matchability] in GHC.Tc.Utils.Instantiate.
+    forall_fvs (prefix_binds, ma_co, tv) fvs
+      = let inner = exprFVs (Coercion ma_co) `mappend` addCoreBndrFV tv fvs
+        in case prefix_binds of
+          TcEvBinds {} -> inner
+          EvBinds binds -> addBndrsSelectiveFV (map eb_lhs (bagToList binds)) $
+            foldr (mappend . evTermFVs . eb_rhs) inner binds
+    body_fvs = case tc_ev_binds of
+      TcEvBinds {} -> mempty -- See Note [Free vars of EvFun].
       EvBinds binds -> addBndrsSelectiveFV bndrs fvs
         where
           fvs = foldr (mappend . evTermFVs . eb_rhs) (unitFV v) binds
-          bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
+          bndrs = foldr ((:) . eb_lhs) given binds
 
 evTermFVss :: [EvTerm] -> SelectiveDFV
 evTermFVss = mapUnionFV evTermFVs
@@ -1384,7 +1398,8 @@ can just squeeze by.  Here's how.
     ic_binds field of an Implication
   * So we can track usage via the processing for that implication,
     (see Note [Tracking needed EvIds] in GHC.Tc.Solver).
-    We can ignore usage from the EvFun altogether.
+    We can ignore body usage from the EvFun. Metadata proofs are outside
+    et_binds, so evTermFVs must still visit them in prefix scope.
 
 * /After/ typechecking `evTermFVs` is used by `GHC.Iface.Ext.Ast`, but by
   then it has been zonked so we can get at the bindings.
@@ -1461,8 +1476,10 @@ instance Outputable EvTerm where
   ppr (EvExpr e)         = ppr e
   ppr (EvTypeable ty ev) = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
   ppr (EvFun { et_tvs = tvs, et_given = gs, et_binds = bs, et_body = w })
-      = hang (text "\\" <+> sep (map pprLamBndr (tvs ++ gs)) <+> arrow)
+      = hang (text "\\" <+> sep (map ppr_tv tvs ++ map pprLamBndr gs) <+> arrow)
            2 (ppr bs $$ ppr w)   -- Not very pretty
+    where ppr_tv (prefix_binds, ma_co, tv)
+            = brackets (ppr prefix_binds) <+> pprLamBndr tv <> braces (ppr ma_co)
 
 instance Outputable EvCallStack where
   ppr EvCsEmpty

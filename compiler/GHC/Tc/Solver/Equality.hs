@@ -24,6 +24,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types( TcM )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Instantiate ( freshenCoVarBndrsX )
 import GHC.Tc.Instance.Family ( tcUnwrapNewtype_maybe )
 import qualified GHC.Tc.Utils.Monad    as TcM
 
@@ -34,7 +35,7 @@ import GHC.Core.DataCon ( dataConName )
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
-import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo )
+import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo, almostDevoidCoVarOfCo )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
 import GHC.Core.Reduction
@@ -842,10 +843,16 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 -- See Note [Solving forall equalities]
 
 can_eq_nc_forall ev eq_rel s1 s2
+ | CtWanted {} <- ev
+ , Just (_, tv1, _) <- splitForAllTyCoVar_maybe s1
+ , Just (_, tv2, _) <- splitForAllTyCoVar_maybe s2
+ , isTyVar tv1 /= isTyVar tv2
+ = canEqHardFailure ev s1 s2
+
  | CtWanted (WantedCt { ctev_dest = orig_dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
  = do { let (bndrs1, phi1, bndrs2, phi2) = split_foralls s1 s2
-            flags1 = binderFlags bndrs1
-            flags2 = binderFlags bndrs2
+            flags1 = binderFlags (map snd bndrs1)
+            flags2 = binderFlags (map snd bndrs2)
 
       ; if eq_rel == NomEq && not (all2 eqForAllVis flags1 flags2) -- Note [ForAllTy and type equality]
         then do { traceTcS "Forall failure: visibility-mismatch" $
@@ -858,41 +865,73 @@ can_eq_nc_forall ev eq_rel s1 s2
             empty_subst1   = mkEmptySubst $ mkInScopeSet free_tvs
             skol_info_anon = UnifyForAllSkol phi1
       ; skol_info <- mkSkolemInfo skol_info_anon
-      ; (subst1, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst1 $
-                              binderVars bndrs1
+      ; (subst1, skol_tvs) <- mapAccumLM
+          (\subst tv ->
+            do { (subst', tvs') <- if isTyVar tv
+                   then tcInstSkolTyVarsX skol_info subst [tv]
+                   else wrapTcS $ freshenCoVarBndrsX subst [tv]
+               ; case tvs' of
+                   [tv'] -> return (subst', tv')
+                   _ -> panic "can_eq_nc_forall: freshen binder" })
+          empty_subst1 (binderVars (map snd bndrs1))
 
       ; let phi1' = substTy subst1 phi1
 
             -- Unify the kinds, extend the substitution
-            go :: UnifyEnv -> [TcTyVar] -> Subst
-               -> [TyVarBinder] -> [TyVarBinder] -> TcM.TcM TcCoercion
-            go uenv (skol_tv:skol_tvs) subst2 (bndr1:bndrs1) (bndr2:bndrs2)
+            go :: UnifyEnv -> [TcTyCoVar] -> Subst -> Subst
+               -> [(Matchability, ForAllTyBinder)] -> [(Matchability, ForAllTyBinder)]
+               -> TcM.TcM TcCoercion
+            go uenv (skol_tv:skol_tvs) lsubst1 subst2 ((ma1,bndr1):bndrs1) ((ma2,bndr2):bndrs2)
               = do { let tv2  = binderVar bndr2
                          vis1 = binderFlag bndr1
                          vis2 = binderFlag bndr2
 
+                   -- Metadata is outside this binder's scope. Apply only
+                   -- substitutions for earlier binders on either side.
+                   ; ma_co <- uType (uenv `setUEnvRole` Nominal)
+                                    (substTy lsubst1 ma1) (substTy subst2 ma2)
+
                    -- Unify the kinds, at Nominal role
                    -- See (SF1) in Note [Solving forall equalities]
                    ; kind_co <- uType (uenv `setUEnvRole` Nominal)
-                                      (tyVarKind skol_tv)
-                                      (substTy subst2 (tyVarKind tv2))
+                                      (varType skol_tv)
+                                      (substTy subst2 (varType tv2))
 
-                   ; let subst2' = extendTvSubstAndInScope subst2 tv2
-                                       (mkCastTy (mkTyVarTy skol_tv) kind_co)
+                   ; let left_arg
+                           | isTyVar skol_tv = mkTyVarTy skol_tv
+                           | otherwise = mkCoercionTy (mkCoVarCo skol_tv)
+                         right_arg
+                           | isTyVar skol_tv = mkCastTy left_arg kind_co
+                           | otherwise
+                           = let r = coVarRole skol_tv
+                                 h = downgradeRole r Nominal kind_co
+                             in mkCoercionTy
+                                  (mkSymCo (mkSelCo (SelTyCon 2 r) h)
+                                   `mkTransCo` mkCoVarCo skol_tv
+                                   `mkTransCo` mkSelCo (SelTyCon 3 r) h)
+                         extend subst tv arg = extendTCvSubst
+                           (extendSubstInScopeSet subst (tyCoVarsOfType arg)) tv arg
+                         lsubst1' = extend lsubst1 (binderVar bndr1) left_arg
+                         subst2' = extend subst2 tv2 right_arg
                          -- skol_tv is already in the in-scope set, but the
                          -- free vars of kind_co are not; hence "...AndInScope"
-                   ; co <- go uenv skol_tvs subst2' bndrs1 bndrs2
+                   ; body_uenv <- if isCoVar skol_tv
+                       then do { level <- TcM.getTcLevel
+                               ; return (uenv { u_given_eq_lvl =
+                                   maxTcLevel level (u_given_eq_lvl uenv) }) }
+                       else return uenv
+                   ; co <- go body_uenv skol_tvs lsubst1' subst2' bndrs1 bndrs2
 
-                   ; return (mkNakedForAllCo skol_tv vis1 vis2 kind_co co)}
+                   ; return (mkNakedForAllCo skol_tv vis1 vis2 ma_co kind_co co)}
                      -- mkNaked.. because these types are not zonked, and the
                      -- assertions in mkForAllCo may fail without that zonking
 
             -- Done: unify phi1 ~ phi2
-            go uenv [] subst2 bndrs1 bndrs2
+            go uenv [] _lsubst1 subst2 bndrs1 bndrs2
               = assert (null bndrs1 && null bndrs2) $
                 uType uenv phi1' (substTyUnchecked subst2 phi2)
 
-            go _ _ _ _ _ = panic "can_eq_nc_forall"  -- case (s:ss) []
+            go _ _ _ _ _ _ = panic "can_eq_nc_forall"  -- case (s:ss) []
 
             init_subst2 = mkEmptySubst (substInScopeSet subst1)
 
@@ -907,21 +946,32 @@ can_eq_nc_forall ev eq_rel s1 s2
                      (tclvl, (all_co, wanteds))
                           <- pushLevelNoWorkList (ppr skol_info) $
                              wrapUnifier rws loc (eqRelRole eq_rel)   $ \uenv ->
-                             go uenv skol_tvs init_subst2 bndrs1 bndrs2
+                             go uenv skol_tvs (mkEmptySubst (substInScopeSet subst1)) init_subst2 bndrs1 bndrs2
 
                    ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
 
                    -- Solve the `wanteds` in a nested context.
                    ; residual_wanted <- nestImplicTcS skol_info_anon nested_ev_binds_var tclvl $
-                                        solveSimpleWanteds wanteds
+                                        solve_forall_wanteds (mkVarSet (filter isCoVar skol_tvs)) wanteds
 
                    ; return (all_co, isSolvedWC residual_wanted) }
 
       -- Kick out any inerts constraints that mention unified type variables
       ; kickOutAfterUnification unifs
 
-      ; if solved
-        then do {  -- Record any used used Given coercions (in `evb_tcvs`) so that
+      ; mb_all_co <- if solved
+          then do { mb_co <- zonk_forall_co all_co
+                  ; left <- zonkTcType s1
+                  ; right <- zonkTcType s2
+                  ; return $ do
+                      co <- mb_co
+                      guard (coercionLKind co `tcEqType` left
+                             && coercionRKind co `tcEqType` right)
+                      return co }
+          else return Nothing
+      ; case mb_all_co of
+        Just all_co -> do
+                {  -- Record any used used Given coercions (in `evb_tcvs`) so that
                    -- they are kept alive by `neededEvVars`. Admittedly they are free in `all_co`,
                    -- but only if we zonk it, which `neededEvVars` does not do (see test T7196).
                   ev_binds_var <- getTcEvBindsVar
@@ -931,7 +981,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                      -- emptyCoHoleSet: fully solved, so all_co has no holes
                 ; stopWith ev "Polytype equality: solved" }
 
-        else canEqSoftFailure IrredShapeReason ev s1 s2 } }
+        Nothing -> canEqSoftFailure IrredShapeReason ev s1 s2 } }
 
  | otherwise
  = do { traceTcS "Omitting decomposition of given polytype equality" $
@@ -939,17 +989,53 @@ can_eq_nc_forall ev eq_rel s1 s2
       ; stopWith ev "Discard given polytype equality" }
 
  where
+    -- See Note [CoVar forall touchability] in GHC.Tc.Solver.Monad.
+    solve_forall_wanteds :: CoVarSet -> Cts -> TcS WantedConstraints
+    solve_forall_wanteds cvs wanteds
+      | isEmptyVarSet cvs = solveSimpleWanteds wanteds
+      | otherwise
+      = do { wanteds <- zonkSimples wanteds
+           ; let cv_free ct = disjointVarSet cvs (tyCoVarsOfCt ct)
+                 (outside, inside) = partitionBag cv_free wanteds
+           ; outside_res <- solveSimpleWanteds outside
+           ; inside_res <- withCoVarTouchabilityBoundary $ solveSimpleWanteds inside
+           ; inside_simples <- zonkSimples (wc_simple inside_res)
+           ; let (new_outside, _) = partitionBag cv_free inside_simples
+           ; residual <- if isEmptyBag new_outside
+               then return (inside_res { wc_simple = inside_simples })
+               else do { simple_res <- solve_forall_wanteds cvs inside_simples
+                       ; return (inside_res { wc_simple = emptyBag } `andWC` simple_res) }
+           ; return (outside_res `andWC` residual) }
+
+    -- Check FC6 after resolving holes, before constructing a checked ForAllCo.
+    -- A local CoVar is not a Given equality for the nested solver.
+    zonk_forall_co :: Coercion -> TcS (Maybe Coercion)
+    zonk_forall_co (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
+                            , fco_ma = ma_co, fco_kind = kind_mco, fco_body = body_co })
+      = do { ma_co' <- zonkCo ma_co
+           ; tv' <- zonkTyCoVarKind tv
+           ; kind_mco' <- case kind_mco of
+               MRefl -> return MRefl
+               MCo co -> MCo <$> zonkCo co
+           ; mb_body_co' <- zonk_forall_co body_co
+           ; return $ do
+               body_co' <- mb_body_co'
+               guard (isTyVar tv' || almostDevoidCoVarOfCo tv' body_co')
+               return (mkForAllCo tv' visL visR ma_co' kind_mco' body_co') }
+    zonk_forall_co co = Just <$> zonkCo co
+
     split_foralls :: TcType -> TcType
-                  -> ( [ForAllTyBinder], TcType
-                     , [ForAllTyBinder], TcType)
+                  -> ( [(Matchability, ForAllTyBinder)], TcType
+                     , [(Matchability, ForAllTyBinder)], TcType)
     -- Split matching foralls; stop when the foralls don't match
     -- See #22537.  See (SF3) in Note [Solving forall equalities]
     -- Postcondition: the two lists of binders returned have the same length
     split_foralls s1 s2
-      | Just (bndr1, s1') <- splitForAllForAllTyBinder_maybe s1
-      , Just (bndr2, s2') <- splitForAllForAllTyBinder_maybe s2
+      | Just (ma1, bndr1, s1') <- splitForAllForAllTyBinder_maybe s1
+      , Just (ma2, bndr2, s2') <- splitForAllForAllTyBinder_maybe s2
+      , isTyVar (binderVar bndr1) == isTyVar (binderVar bndr2)
       = let !(bndrs1, phi1, bndrs2, phi2) = split_foralls s1' s2'
-        in (bndr1:bndrs1, phi1, bndr2:bndrs2, phi2)
+        in ((ma1,bndr1):bndrs1, phi1, (ma2,bndr2):bndrs2, phi2)
     split_foralls s1 s2 = ([], s1, [], s2)
 
 
@@ -972,6 +1058,16 @@ There are lots of wrinkles of course:
       [W] forall (a:ka). { ka ~N kb,  t1 ~ t2[a/b] }
    These kind equalities are generated by the `go` loop in `can_eq_nc_forall`.
    Why Nominal role? See the typing rule for ForAllCo.
+
+  Matchability equality is also nominal at every outer role. Check the
+  annotation before extending the substitution with its own binder.
+
+  A CoVar binder uses a fresh CoVar, not a skolem TyVar. Given a nominal
+  proof h between the equality predicates, transport the right binder to
+  sym(nth 2 h); cv; nth 3 h. This is the same transport as the ForAllCo
+  endpoint rule. Do not add cv as a Given equality to the nested solver.
+  Such evidence could violate (FC6). After solving the Wanted constraints,
+  zonk the body proofs and check almostDevoid before rebuilding ForAllCo.
 
 (SF2) At Nominal role we must check that the visiblities match.
   For example

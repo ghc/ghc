@@ -60,7 +60,8 @@ import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 
-import GHC.Builtin.WiredIn.Types ( oneDataConTy,  unitTy, makeRecoveryTyCon, manyDataConTy )
+import GHC.Builtin.WiredIn.Types ( oneDataConTy, unitTy, makeRecoveryTyCon
+                               , manyDataConTy, unmatchableDataConTy )
 
 import GHC.Rename.Env( lookupConstructorFields )
 
@@ -1498,6 +1499,7 @@ generaliseTcTyCon (tc, tc_kind, skol_info, scoped_prs, tc_res_kind)
 
              user_kind =
                generaliseTcTyConKind
+                 (tyConFlavourMatchability flav)
                  inferred sorted_spec_tvs required_tcbs
                  tc_kind
 
@@ -1533,16 +1535,17 @@ generaliseTcTyCon (tc, tc_kind, skol_info, scoped_prs, tc_res_kind)
 -- | Generalise the kind of a 'TyCon', by inserting the appropriate
 -- inferred/specified/required foralls.
 generaliseTcTyConKind
-  :: [TcTyCoVar]   -- ^ inferred binders
+  :: Matchability -- ^ generated declaration-prefix quantifiers
+  -> [TcTyCoVar]   -- ^ inferred binders
   -> [TcTyCoVar]   -- ^ specified binders
   -> [TyConBinder] -- ^ required binders
   -> TcKind        -- ^ pre-generalisation monomorphic 'TyCon' kind
   -> TcKind
-generaliseTcTyConKind inferred_tvs sorted_spec_tvs req_bndrs0 ki0 =
+generaliseTcTyConKind ma inferred_tvs sorted_spec_tvs req_bndrs0 ki0 =
   mkForAllTys
-    ( mkForAllTyBinders Inferred inferred_tvs
+    ( map (ma,) (mkForAllTyBinders Inferred inferred_tvs)
         ++
-      mkForAllTyBinders Specified sorted_spec_tvs
+      map (ma,) (mkForAllTyBinders Specified sorted_spec_tvs)
     ) $ mk_req_foralls req_bndrs0 ki0
   where
 
@@ -1561,11 +1564,10 @@ generaliseTcTyConKind inferred_tvs sorted_spec_tvs req_bndrs0 ki0 =
         FunTy af ma w arg res ->
           case vis of
             NamedTCB ftf ->
-              -- Named quantifiers keep implicit M. Family saturation still applies.
-              mkForAllTy (Bndr tv ftf) $ mk_req_foralls bndrs res
+              mkForAllTy ma (Bndr tv ftf) $ mk_req_foralls bndrs res
             _ -> mkFunTy af ma w arg $ mk_req_foralls bndrs res
-        ForAllTy bndr' ty' ->
-          mkForAllTy bndr' $ mk_req_foralls bndrs ty'
+        ForAllTy ma' bndr' ty' ->
+          mkForAllTy ma' bndr' $ mk_req_foralls bndrs ty'
         _ ->
           pprPanic "generaliseTcTyConKind" $
             vcat [ text "ki:" <+> ppr ki0
@@ -2258,13 +2260,11 @@ kcConDecls tc_res_kind cons
 -- we need the first two arguments.
 kcConDecl :: NewOrData -> TcKind -> ConDecl GhcRn -> TcM ()
 kcConDecl new_or_data tc_res_kind
-          (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
-                      , con_mb_cxt = ex_ctxt, con_args = args })
+          (ConDeclH98 { con_name = name, con_telescope = teles
+                      , con_args = args })
   = addErrCtxt (DataConDefCtxt (NE.singleton name)) $
-    discardResult                   $
-    bindExplicitTKBndrs_Tv ex_tvs $
-    do { _ <- tcHsContext ex_ctxt
-       ; let arg_exp_kind = getArgExpKind new_or_data tc_res_kind
+    kcRuntimeConTelescope teles $
+    do { let arg_exp_kind = getArgExpKind new_or_data tc_res_kind
              -- getArgExpKind: for newtypes, check that the argument kind
              -- is the same as the tc_res_kind.  See (KCD1)
              -- in Note [kcConDecls: kind-checking data type decls]
@@ -2276,14 +2276,13 @@ kcConDecl new_or_data tc_res_kind
 kcConDecl new_or_data _
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt = cxt, con_g_args = args
+                       , con_telescope = inner_bndrs
+                       , con_g_args = args
                        , con_res_ty = res_ty })
   | hsHasForEachTy (unLoc res_ty)
   = addErrCtxt (DataConDefCtxt names) $
-    discardResult $ bindOuterSigTKBndrs_Tv outer_bndrs $
-    bindExplicitTKBndrs_Tv (gadtTelescopeBndrs inner_bndrs) $
-    do { checkRetainedConShape new_or_data cxt args res_ty
+    kcRuntimeGadtConBndrs outer_bndrs inner_bndrs $
+    do { checkRetainedConShape new_or_data inner_bndrs args res_ty
        ; case args of
            PrefixConGADT _ _ -> do
              { _ <- kcConGADTArgs (TheKind liftedTypeKind) args
@@ -2296,16 +2295,14 @@ kcConDecl new_or_data _tc_res_kind
                       -- Note [kcConDecls: kind-checking data type decls]
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt = cxt
+                       , con_telescope = inner_bndrs
                        , con_g_args = args
                        , con_res_ty = res_ty })
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (DataConDefCtxt names) $
     -- Not sure this is right, should just extend rather than skolemise but no test
-    bind_con_tvbs outer_bndrs inner_bndrs $
-    do { _ <- tcHsContext cxt
-       ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
+    kcRuntimeGadtConBndrs outer_bndrs inner_bndrs $
+    do { traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
 
@@ -2317,12 +2314,31 @@ kcConDecl new_or_data _tc_res_kind
 
        ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr arg_exp_kind)
        ; return () }
-  where
-    bind_con_tvbs outer_bndrs inner_bndrs thing_inside
-      -- Why "_Tv"? See Note [Using TyVarTvs for kind-checking GADTs]
-      = discardResult $ bindOuterSigTKBndrs_Tv outer_bndrs $
-                        bindExplicitTKBndrs_Tv (gadtTelescopeBndrs inner_bndrs) $
-                        thing_inside
+
+-- | Keep constructor contexts and annotations in their lexical scopes.
+kcRuntimeGadtConBndrs :: HsOuterSigTyVarBndrs GhcRn
+                     -> [LHsGadtTelescope GhcRn] -> TcM () -> TcM ()
+kcRuntimeGadtConBndrs outer inner inside =
+  do { tcCheckRuntimeForAllMatchability (hsOuterMatchability outer)
+     ; discardResult $ bindOuterSigTKBndrs_Tv outer $
+         kcRuntimeConTelescope inner inside }
+
+-- | Infer a constructor prefix in source order.
+-- See Note [Constructor telescope contexts] in GHC.Hs.Decls.
+kcRuntimeConTelescope :: [LHsGadtTelescope GhcRn] -> TcM () -> TcM ()
+kcRuntimeConTelescope [] action = action
+kcRuntimeConTelescope (L _ HsGadtPar{} : rest) action =
+  kcRuntimeConTelescope rest action
+kcRuntimeConTelescope (L _ (HsGadtContext ctxt) : rest) action =
+  do { _ <- tcHsContext (Just ctxt)
+     ; kcRuntimeConTelescope rest action }
+kcRuntimeConTelescope (L _ (HsGadtForAll _ tele) : rest) action =
+  do { tcCheckRuntimeForAllMatchability (hsf_matchability tele)
+     ; case tele of
+         HsForAllInvis{hsf_invis_bndrs = bndrs} ->
+           discardResult $ bindExplicitTKBndrs_Tv bndrs (kcRuntimeConTelescope rest action)
+         HsForAllVis{hsf_vis_bndrs = bndrs} ->
+           discardResult $ bindExplicitTKBndrs_Tv bndrs (kcRuntimeConTelescope rest action) }
 
 {- Note [kcConDecls: kind-checking data type decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4109,8 +4125,7 @@ tcConDecl :: NewOrData
 
 tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
           (ConDeclH98 { con_name = lname@(L _ name)
-                      , con_ex_tvs = explicit_tkv_nms
-                      , con_mb_cxt = hs_ctxt
+                      , con_telescope = explicit_teles
                       , con_args = hs_args })
   = addErrCtxt (DataConDefCtxt (NE.singleton lname)) $
     do { -- NB: the tyvars from the declaration header are in scope
@@ -4121,26 +4136,27 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
          --      hs_qvars = HsQTvs { hsq_implicit = {k}
          --                        , hsq_explicit = {f,b} }
 
+       ; let explicit_tkv_nms = concatMap invis_bndrs (gadtArgTelescopes explicit_teles)
        ; traceTc "tcConDecl 1" (vcat [ ppr name
                                      , text "explicit_tkv_nms" <+> ppr explicit_tkv_nms
                                      , text "tc_bndrs" <+> ppr tc_bndrs ])
        ; skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> explicit_tkv_nms)))
 
-       ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
+       ; (tclvl, wanted, (exp_tvbs, ctxt, (arg_tys, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
-              tcExplicitTKBndrs skol_info explicit_tkv_nms  $
-              do { ctxt <- tcHsContext hs_ctxt
-                 ; let exp_kind = getArgExpKind new_or_data res_kind
+              tcConDeclTelescope skol_info explicit_teles $
+              do { let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConH98Args exp_kind hs_args
                  ; field_lbls <- lookupConstructorFields $ noUserRdr name
                  ; let (arg_tys, stricts) = unzip btys
-                 ; return (ctxt, arg_tys, field_lbls, stricts)
+                 ; return (arg_tys, field_lbls, stricts)
                  }
 
 
-       ; let tc_tvs   = binderVars tc_bndrs
-             fake_ty  = mkSpecForAllTys  tc_tvs      $
-                        mkInvisForAllTys exp_tvbndrs $
+       ; let exp_tvbndrs = map invis_bndr exp_tvbs
+             tc_tvs   = binderVars tc_bndrs
+             fake_ty  = mkSpecForAllTys (map (unmatchableDataConTy,) tc_tvs) $
+                        mkInvisForAllTys (map (unmatchableDataConTy,) exp_tvbndrs) $
                         tcMkPhiTy ctxt               $
                         tcMkScaledFunTysU arg_tys     $
                         unitTy
@@ -4202,22 +4218,27 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
                   --      that way checkValidDataCon can complain if it's wrong.
 
        ; return (NE.singleton dc) }
+  where
+    invis_bndrs HsForAllInvis{hsf_invis_bndrs = bndrs} = bndrs
+    invis_bndrs HsForAllVis{} = pprPanic "tcConDecl: visible H98 group" empty
+    invis_bndr (Bndr tv (Invisible spec)) = Bndr tv spec
+    invis_bndr bndr = pprPanic "tcConDecl: visible H98 binder" (ppr bndr)
 
 tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt = cxt, con_g_args = args
+                       , con_telescope = inner_bndrs
+                       , con_g_args = args
                        , con_res_ty = hs_res_ty })
   | hsHasForEachTy (unLoc hs_res_ty)
   = addErrCtxt (DataConDefCtxt names) $
     do { let L _ name :| _ = names
-       ; checkRetainedConShape new_or_data cxt args hs_res_ty
+       ; checkRetainedConShape new_or_data inner_bndrs args hs_res_ty
        ; case dd_info of
            DDataType -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration
        ; skol_info <- mkSkolemInfo (DataConSkol name)
-       ; (tclvl, wanted, (tvbs, (retained, full_ty))) <-
+       ; (tclvl, wanted, (tvbs, _ctxt, (retained, full_ty))) <-
            pushLevelAndSolveEqualitiesX "tcConDecl:retained" $
            tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
            do { prefix <- tcConGADTArgs (TheKind liftedTypeKind) args
@@ -4225,7 +4246,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
                   tcCheckRetainedConType True (tcDataConMult IsPrefixConGADT) hs_res_ty
               ; return (replicate (length prefix) Nothing ++ retained,
                         tcMkScaledFunTysU (map fst prefix) suffix_ty) }
-       ; inf_tkvs <- kindGeneralizeAll skol_info (mkForAllTys tvbs full_ty)
+       ; inf_tkvs <- kindGeneralizeAll skol_info (mkForAllTys (map (unmatchableDataConTy,) tvbs) full_ty)
        ; reportUnsolvedEqualities skol_info inf_tkvs tclvl wanted
        ; let inf_bndrs = mkTyVarBinders Inferred inf_tkvs
        ; (inf_bndrs, tvbs, retained, full_ty) <- initZonkEnv NoFlexi $
@@ -4256,18 +4277,17 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   -- we get the res_kind by typechecking the result type.
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt = cxt, con_g_args = hs_args
+                       , con_telescope = inner_bndrs
+                       , con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
        ; skol_info <- mkSkolemInfo (DataConSkol name)
-       ; (tclvl, wanted, (tvbs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
+       ; (tclvl, wanted, (tvbs, ctxt, (arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
-              do { ctxt <- tcHsContext cxt
-                 ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
+              do { (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
 
                  -- For data instances (only), ensure that the return type,
@@ -4289,11 +4309,11 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
                  ; let (arg_tys, stricts) = unzip btys
                  ; field_lbls <- lookupConstructorFields $ noUserRdr name
-                 ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
+                 ; return (arg_tys, res_ty, field_lbls, stricts)
                  }
 
        ; inf_tkvs <- kindGeneralizeAll skol_info
-                    (mkForAllTys tvbs         $
+                    (mkForAllTys (map (unmatchableDataConTy,) tvbs) $
                      tcMkPhiTy ctxt           $
                      tcMkScaledFunTysU arg_tys $
                      res_ty)
@@ -4341,13 +4361,14 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; mapM buildOneDataCon names }
 
 -- | Check the syntax admitted for a retained constructor field telescope.
-checkRetainedConShape :: NewOrData -> Maybe (LHsContext GhcRn)
+checkRetainedConShape :: NewOrData -> [LHsGadtTelescope GhcRn]
                       -> HsConDeclGADTDetails GhcRn -> LHsType GhcRn -> TcM ()
-checkRetainedConShape new_or_data ctxt args res_ty
+checkRetainedConShape new_or_data telescope args res_ty
   = setSrcSpanA (getLoc res_ty) $
     do { strict_data <- xoptM LangExt.StrictData
        ; unless (not strict_data && new_or_data /= NewType
-                 && maybe True (null . hsc_ctxt . unLoc) ctxt && plain_prefix args) $
+                 && all (null . hsc_ctxt . unLoc) (gadtTelescopeContexts telescope)
+                 && plain_prefix args) $
            failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
   where
     plain_prefix (PrefixConGADT _ fields) = all plain_field fields
@@ -6091,8 +6112,9 @@ checkValidRoles tc
       >> check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 
-    check_ty_roles env role (ForAllTy (Bndr tv _) ty)
-      =  check_ty_roles env Nominal (tyVarKind tv)
+    check_ty_roles env role (ForAllTy ma (Bndr tv _) ty)
+      =  check_ty_roles env Nominal ma
+      >> check_ty_roles env Nominal (tyVarKind tv)
       >> check_ty_roles (extendVarEnv env tv Nominal) role ty
 
     check_ty_roles _   _    (LitTy {}) = return ()

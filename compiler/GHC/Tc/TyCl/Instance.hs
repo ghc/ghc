@@ -65,6 +65,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.Class
+import GHC.Builtin.WiredIn.Types ( matchableDataConTy, unmatchableDataConTy )
 
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
@@ -509,17 +510,28 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty
   = setSrcSpanA loc                   $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
-        ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
+        ; let (ma_tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
+              tyvars = map snd ma_tyvars
              -- NB: tcHsClsInstType does checkValidInstance
         ; skol_info <- mkSkolemInfo (InstSkol IsClsInst pSizeZero)
                        -- pSizeZero: here the size part of InstSkol is irrelevant
         ; (subst, skol_tvs) <- tcInstSkolTyVars skol_info tyvars
+        ; let (ma_bndrs, rho) = splitForAllForAllTyBinders dfun_ty
+              skol_bndrs = zipWith (\(ma, Bndr _ vis) tv ->
+                               (substTy subst ma, Bndr tv vis)) ma_bndrs skol_tvs
+        -- A new dictionary function has runtime U quantifiers. Check each
+        -- source annotation before introducing its binder or instance Givens.
+        -- See Note [Runtime forall matchability] in GHC.Tc.Utils.Instantiate.
+        ; (_, prefix_implics) <- tcRuntimeForAllBndrs skol_info [] [] skol_bndrs
+                                  (substTy subst rho)
+        ; mapBagM_ checkImplicationInvariants prefix_implics
+        ; emitImplications prefix_implics
         ; let tv_skol_prs = [ (tyVarName tv, skol_tv)
                             | (tv, skol_tv) <- tyvars `zip` skol_tvs ]
               -- Map from the skolemized Names to the original Names.
               -- See Note [Associated data family instances and di_scoped_tvs].
               tv_skol_env = mkVarEnv $ map swap tv_skol_prs
-              n_inferred = countWhile (isInferredForAllTyFlag . binderFlag) $
+              n_inferred = countWhile (isInferredForAllTyFlag . binderFlag . snd) $
                            fst $ splitForAllForAllTyBinders dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
 
@@ -741,7 +753,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
              post_eta_qtvs = filterOut (`elem` eta_tvs) qtvs
 
              full_tcbs = mkTyConBindersPreferAnon post_eta_qtvs
-                            (tyCoVarsOfType (mkSpecForAllTys eta_tvs tc_res_kind))
+                            (tyCoVarsOfType (mkSpecForAllTys [(matchableDataConTy,tv) | tv <- eta_tvs] tc_res_kind))
                          ++ eta_tcbs
                  -- Put the eta-removed tyvars at the end
                  -- Remember, qtvs is in arbitrary order, except kind vars are
@@ -1445,7 +1457,7 @@ addDFunPrags dfun_id sc_meth_ids
 
    (dfun_tvs, dfun_theta, clas, inst_tys) = tcSplitDFunTy (idType dfun_id)
    ev_ids      = mkTemplateLocalsNum 1                    dfun_theta
-   dfun_bndrs  = dfun_tvs ++ ev_ids
+   dfun_bndrs  = map snd dfun_tvs ++ ev_ids
    clas_tc     = classTyCon clas
    dict_con    = tyConSingleDataCon clas_tc
 
@@ -2185,7 +2197,7 @@ mkMethIds dfun_id clas tyvars dfun_ev_vars inst_tys sel_id
     -- Force so that a thunk doesn't end up in a Name (#19619)
     !sel_occ      = nameOccName sel_name
     local_meth_ty = instantiateMethod clas sel_id inst_tys
-    poly_meth_ty  = mkSpecSigmaTy tyvars theta local_meth_ty
+    poly_meth_ty  = mkSpecSigmaTy [(unmatchableDataConTy,tv) | tv <- tyvars] theta local_meth_ty
     theta         = map idType dfun_ev_vars
 
 
@@ -2310,14 +2322,14 @@ mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
         -- visible type application (visible_sel_tys). See Note [Default methods
         -- in instances] (Wrinkle: Ambiguous types from vanilla method type
         -- signatures).
-        VanillaDM -> filter (\tvb -> binderFlag tvb /= InferredSpec) sel_tvbs
+        VanillaDM -> filter (\(_,tvb) -> binderFlag tvb /= InferredSpec) sel_tvbs
         -- If we are dealing with a generic default method, on the other hand,
         -- don't bother doing any of this. See Note [Default methods
         -- in instances] (Wrinkle: Ambiguous types from generic default method
         -- type signatures).
         GenericDM {} -> []
-    visible_sel_pats = map mk_ty_pat visible_sel_tvbs
-    visible_sel_tys = map (mkTyVarTy . binderVar) visible_sel_tvbs
+    visible_sel_pats = map (mk_ty_pat . snd) visible_sel_tvbs
+    visible_sel_tys = map (mkTyVarTy . binderVar . snd) visible_sel_tvbs
 
     fn   = noLocA (idName sel_id)
     rhs  = foldl' mk_vta (nlHsVar dm_name) $

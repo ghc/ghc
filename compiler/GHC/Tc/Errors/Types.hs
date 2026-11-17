@@ -1201,6 +1201,8 @@ data TcRnMessage where
   -}
   TcRnVDQInTermType :: !(Maybe Type) -> TcRnMessage
 
+  TcRnEmptyForallMatchability :: TcRnMessage
+
   {-| TcRnBadQuantPredHead is an error that occurs whenever a quantified predicate
       lacks a class or type variable head.
 
@@ -6601,7 +6603,7 @@ data BadInvisPatReason
 data BadEmptyCaseReason
   = EmptyCaseWithoutFlag
   | EmptyCaseDisallowedCtxt
-  | EmptyCaseForall ForAllTyBinder
+  | EmptyCaseForall (Type, ForAllTyBinder)
 
 -- | Either `HsType p` or `HsSigType p`.
 --
@@ -7233,6 +7235,7 @@ data ConversionFailReason
   | IllegalSumAlt !TH.SumAlt
   | IllegalSumArity !TH.SumArity
   | MalformedType !TypeOrKind !TH.Type
+  | InvalidForallMatchabilityWrapper !String
   | IllegalLastStatement !HsDoFlavour !(LStmt GhcPs (LHsExpr GhcPs))
   | KindSigsOnlyAllowedOnGADTs
   | IllegalDeclaration !THDeclDescriptor !IllegalDecls

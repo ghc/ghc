@@ -289,7 +289,7 @@ buildPatSyn src_name declared_infix matcher@(_, matcher_ty,_) builder
     (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy (scaledThing cont_sigma)
     (_, arg_tys1, _) = tcSplitFunTys cont_tau
     twiddle = char '~'
-    subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)
+    subst = zipTvSubst (map snd (univ_tvs1 ++ ex_tvs1))
                        (mkTyVarTys (binderVars (univ_tvs ++ ex_tvs)))
 
     -- For a nullary pattern synonym we add a single (# #) argument to the

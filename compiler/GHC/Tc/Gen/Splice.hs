@@ -1744,6 +1744,7 @@ lookupThInstName th_type = do
 
     inst_cls_name (TH.ForallT _ _ _)         = inst_cls_name_err
     inst_cls_name (TH.ForallVisT _ _)        = inst_cls_name_err
+    inst_cls_name (TH.ForallMatchT _ _)      = inst_cls_name_err
     inst_cls_name (TH.AppKindT _ _)          = inst_cls_name_err
     inst_cls_name (TH.TupleT _)              = inst_cls_name_err
     inst_cls_name (TH.UnboxedTupleT _)       = inst_cls_name_err
@@ -2406,7 +2407,10 @@ reifyDataCon isGadtDataCon tys dc
                          ; ex_tvs'' <- case to_invis_bndrs ex_tvs' of
                              Nothing  -> noTH DataConVisibleForall (dataConWrapperType dc)
                              Just tvs -> reifyTyVarBndrs tvs
-                         ; return (TH.ForallC ex_tvs'' cxt main_con) }
+                         ; ma <- reifyType unmatchableDataConTy
+                         ; let con = TH.ForallC ex_tvs'' cxt main_con
+                         ; return $ if null ex_tvs'' then con
+                                    else TH.ForallMatchC ma con }
        ; assert (r_arg_tys `equalLength` dcdBangs)
          ret_con }
   where
@@ -2725,8 +2729,17 @@ reifyType ty                | tcIsLiftedTypeKind ty = return TH.StarT
 reifyType ty@(TermAppTy {}) = pprPanic "reifyType: unsupported runtime call index" (ppr ty)
 reifyType ty@(TermVarTy {}) = pprPanic "reifyType: unsupported runtime index" (ppr ty)
 reifyType ty@(DepFunTy {}) = pprPanic "reifyType: unsupported retained function" (ppr ty)
-reifyType ty@(ForAllTy (Bndr _ argf) _)
-                            = reify_for_all argf ty
+reifyType (ForAllTy ma (Bndr tv argf) body)
+  -- See Note [Reifying forall matchability].
+  = do { ma' <- reifyType ma
+       ; body' <- reifyType body
+       ; group <- case argf of
+           Required -> do { tvs <- reifyTyVarBndrs [Bndr tv ()]
+                          ; pure (TH.ForallVisT tvs body') }
+           Invisible spec -> do
+             { tvs <- reifyTyVarBndrs [Bndr tv spec]
+             ; pure (TH.ForallT tvs [] body') }
+       ; pure (TH.ForallMatchT ma' group) }
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
 reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))
 reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synonyms here
@@ -2753,7 +2766,7 @@ reifyType (FunTy { ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft
        ; let fun = TH.AppKindT (TH.ConT (reifyName (funTyFlagTyCon FTF_T_T))) ma'
        ; return (mkThAppTs fun [mult',arg',res']) }
 reifyType ty@(FunTy { ft_af = af, ft_mult = ManyTy, ft_arg = t1, ft_res = t2 })
-  | isInvisibleFunArg af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
+  | isInvisibleFunArg af = reify_context ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise            = do { [r1,r2] <- reifyTypes [t1,t2]
                               ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
@@ -2763,21 +2776,27 @@ reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH CoercionsInTypes ty
 
-reify_for_all :: TyCoRep.ForAllTyFlag -> TyCoRep.Type -> TcM TH.Type
--- Arg of reify_for_all is always ForAllTy or a predicate FunTy
-reify_for_all argf ty
-  | isVisibleForAllTyFlag argf
-  = do let (req_bndrs, phi) = tcSplitForAllReqTVBinders ty
-       tvbndrs' <- reifyTyVarBndrs req_bndrs
-       phi' <- reifyType phi
-       pure $ TH.ForallVisT tvbndrs' phi'
-  | otherwise
-  = do let (inv_bndrs, phi) = tcSplitForAllInvisTVBinders ty
-       tvbndrs' <- reifyTyVarBndrs inv_bndrs
-       let (cxt, tau) = tcSplitPhiTy phi
+-- | Reify predicate arrows without introducing a quantified group.
+reify_context :: TyCoRep.Type -> TcM TH.Type
+-- The argument is a predicate FunTy. Context-only nodes have no metadata.
+reify_context ty
+  = do let (cxt, tau) = tcSplitPhiTy ty
        cxt' <- reifyCxt cxt
        tau' <- reifyType tau
-       pure $ TH.ForallT tvbndrs' cxt' tau'
+       pure $ TH.ForallT [] cxt' tau'
+
+{- Note [Reifying forall matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reify each Core forall as a separate annotated group. Metadata can refer to
+an earlier binder. A larger group would put that binder outside its scope.
+Reify the actual metadata type. Do not replace an alias or a variable with a
+default. See Note [Forall matchability wrappers] in GHC.Internal.TH.Syntax.
+
+Data constructor and pattern synonym binders describe runtime abstractions.
+These binders have U metadata. Their reified nonempty groups retain U too.
+Empty context-only groups have no binder to annotate. Preserve those groups
+in pattern synonym signatures to separate required and provided contexts.
+-}
 
 reifyTyLit :: TyCoRep.TyLit -> TcM TH.TyLit
 reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
@@ -2798,8 +2817,11 @@ reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
        ; exTyVars'   <- reifyTyVarBndrs exTyVars
        ; prov'       <- reifyCxt prov
        ; tau'        <- reifyType (mkScaledFunTysU argTys resTy)
-       ; return $ TH.ForallT univTyVars' req'
-                $ TH.ForallT exTyVars' prov' tau' }
+       ; ma <- reifyType unmatchableDataConTy
+       ; let slot tvs ctxt body =
+               let ty = TH.ForallT tvs ctxt body
+               in if null tvs then ty else TH.ForallMatchT ma ty
+       ; return $ slot univTyVars' req' $ slot exTyVars' prov' tau' }
 
 reifyKind :: Kind -> TcM TH.Kind
 reifyKind = reifyType

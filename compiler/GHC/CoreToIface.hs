@@ -12,6 +12,7 @@ module GHC.CoreToIface
     , toIfaceForAllBndrs
     , toIfaceForAllTyBndr
     , toIfaceForAllTyBndrs
+    , toIfaceForAllTyBndrsWithMatchability
     , toIfaceTyVar
       -- * Types
     , toIfaceType, toIfaceTypeX
@@ -167,6 +168,12 @@ toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 toIfaceForAllTyBndrs :: [ForAllTyBinder] -> [IfaceForAllBndr]
 toIfaceForAllTyBndrs = map toIfaceForAllTyBndr
 
+-- | Convert a forall telescope without discarding its matchability.
+toIfaceForAllTyBndrsWithMatchability
+  :: [(Matchability, ForAllTyBinder)] -> [(IfaceMatchability, IfaceForAllBndr)]
+toIfaceForAllTyBndrsWithMatchability
+  = map (\(ma,bndr) -> (toIfaceType ma, toIfaceForAllTyBndr bndr))
+
 toIfaceForAllTyBndr :: ForAllTyBinder -> IfaceForAllBndr
 toIfaceForAllTyBndr = toIfaceForAllTyBndrX emptyVarSet
 
@@ -215,7 +222,8 @@ toIfaceTypeX fr ty@(AppTy {})  =
   let (head, args) = splitAppTys ty
   in IfaceAppTy (toIfaceTypeX fr head) (toIfaceAppTyArgsX fr head args)
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
-toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllTyBndrX fr b)
+toIfaceTypeX fr (ForAllTy ma b t) = IfaceForAllTy (toIfaceTypeX fr ma)
+                                               (toIfaceForAllTyBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy { ft_arg = t1, ft_ma = ma, ft_mult = w, ft_res = t2, ft_af = af })
   = IfaceFunTy af (toIfaceTypeX fr ma) (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
@@ -350,10 +358,11 @@ toIfaceCoercionX fr co
                            , mkIfLclName (occNameFS (getOccName var))
                            , toIfaceTypeX fr (varType var) )
 
-    go (ForAllCo tv visL visR k co)
+    go (ForAllCo tv visL visR ma k co)
       = IfaceForAllCo (toIfaceBndr tv)
                       (IfaceForAllTyFlag visL)
                       (IfaceForAllTyFlag visR)
+                      (toIfaceCoercionX fr ma)
                       (go_mco k)
                       (toIfaceCoercionX fr' co)
                           where
@@ -408,7 +417,7 @@ toIfaceAppArgsX fr kind ty_args
       = go env ty' ts
     go _ ty@(DepFunTy {}) (_:_)
       = pprPanic "toIfaceAppArgsX: native dependent kind application not implemented" (ppr ty)
-    go env (ForAllTy (Bndr tv vis) res) (t:ts)
+    go env (ForAllTy _ma (Bndr tv vis) res) (t:ts)
       = IA_Arg t' (IfaceForAllTyFlag vis) ts'
       where
         t'  = toIfaceTypeX fr t

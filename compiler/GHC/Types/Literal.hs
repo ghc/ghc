@@ -65,6 +65,7 @@ import GHC.Prelude
 
 import GHC.Types.Literal.Floating
 import GHC.Builtin.WiredIn.Prim
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 import GHC.Core.Type( Type, RuntimeRepType, mkForAllTy, mkTyVarTy, typeOrConstraintKind )
 import GHC.Core.TyCo.Compare( nonDetCmpType )
 import GHC.Types.Var
@@ -860,7 +861,7 @@ literalType (LitNumber lt _)  = case lt of
 
 -- LitRubbish: see Note [Rubbish literals]
 literalType (LitRubbish torc rep)
-  = mkForAllTy (Bndr a Inferred) (mkTyVarTy a)
+  = mkForAllTy unmatchableDataConTy (Bndr a Inferred) (mkTyVarTy a)
   where
     a = mkTemplateKindVar (typeOrConstraintKind torc rep)
 

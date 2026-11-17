@@ -84,7 +84,6 @@ import GHC.Unit.Module.Warnings
 
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
-import GHC.Builtin.WiredIn.Types ( constraintKindTyConName )
 import GHC.Stg.EnforceEpt.TagSig
 import GHC.Parser.Annotation (noLocA, noAnn)
 import GHC.Hs.Extension ( GhcPass, GhcRn, GhcTc )
@@ -255,6 +254,7 @@ data IfaceDecl
                   ifPatBuilder    :: Maybe (IfExtName, Bool),
                   -- Everything below is redundant,
                   -- but needed to implement pprIfaceDecl
+                  -- See Note [Runtime declaration forall binders].
                   ifPatUnivBndrs  :: [IfaceForAllSpecBndr],
                   ifPatExBndrs    :: [IfaceForAllSpecBndr],
                   ifPatProvCtxt   :: IfaceContext,
@@ -370,6 +370,7 @@ data IfaceConDecl
         -- but it's not so easy for the original TyCon/DataCon
         -- So this guarantee holds for IfaceConDecl, but *not* for DataCon
 
+        -- See Note [Runtime declaration forall binders].
         ifConUnivTvs  :: [IfaceBndr],
         ifConExTCvs   :: [IfaceBndr],  -- Existential ty/covars
         ifConUserTvBinders :: [IfaceForAllBndr],
@@ -389,6 +390,20 @@ data IfaceConDecl
         ifConSrcStricts :: [IfaceSrcBang] } -- empty meaning no src stricts
 
 type IfaceEqSpec = [(IfLclName,IfaceType)]
+
+{- Note [Runtime declaration forall binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The outer erased quantifiers of constructors, pattern synonyms, matchers and
+builders are runtime abstractions. Their declaration classification is U.
+This rule does not depend on binder visibility. These binder-only fields
+therefore describe fixed-U telescopes. Rebuild and print them with explicit U.
+The source checker must constrain explicit outer annotations to U, including
+aliases and computed annotations. It must reject a conflicting annotation.
+
+Nested quantified types use IfaceForAllTy and retain their actual metadata.
+A promoted constructor has a separate generative kind. Its full kind retains
+its own annotations. Do not recover that kind from a runtime binder list.
+-}
 
 {- Note [Retained constructor fields in interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1011,10 +1026,6 @@ pprClassStandaloneKindSig :: ShowSub -> IfaceTopBndr -> IfaceKind -> SDoc
 pprClassStandaloneKindSig ss clas =
   pprStandaloneKindSig (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
 
-constraintIfaceKind :: IfaceKind
-constraintIfaceKind =
-  IfaceTyConApp (IfaceTyCon constraintKindTyConName (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
-
 {- Note [Print invisible binders in interface declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Starting from GHC 9.8 it is possible to write invisible @-binders
@@ -1312,12 +1323,13 @@ pprIfaceDecl ss decl@(IfaceData { ifName = tycon, ifCType = ctype,
     pp_extra = vcat [pprCType ctype]
 
 pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
+                                 , ifKind = kind
                                  , ifRoles = roles
                                  , ifFDs    = fds
                                  , ifBinders = binders
                                  , ifBody = IfAbstractClass })
   = vcat [ pprClassRoles ss clas binders roles
-         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind ifaceMatchable binders constraintIfaceKind)
+         , pprClassStandaloneKindSig ss clas kind
          , text "class" <+> decl_head <+> pprFundeps fds ]
   where
     decl_head = pprIfaceDeclHead decl suppress_bndr_sig [] ss clas binders
@@ -1326,6 +1338,7 @@ pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
     suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
+                                 , ifKind = kind
                                  , ifRoles = roles
                                  , ifFDs    = fds
                                  , ifBinders = binders
@@ -1336,7 +1349,7 @@ pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
                                      ifMinDef = minDef
                                    }})
   = vcat [ pprClassRoles ss clas binders roles
-         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind ifaceMatchable binders constraintIfaceKind)
+         , pprClassStandaloneKindSig ss clas kind
          , text "class" <+> decl_head <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
                         , ppShowAllSubs ss (pprMinDef $ fromIfaceBooleanFormula minDef)])]
@@ -1377,12 +1390,13 @@ pprIfaceDecl ss decl@(IfaceClass { ifName  = clas
       suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss decl@(IfaceSynonym { ifName    = tc
+                                   , ifKind = kind
                                    , ifBinders = binders
                                    , ifSynRhs  = poly_ty
-                                   , ifResKind = res_kind})
-  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind ifaceUnmatchable binders res_kind)
+                                   })
+  = vcat [ pprStandaloneKindSig name_doc kind
          , hang (text "type" <+> decl_head <+> equals)
-           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr_tau ])
+           2 (sep [ pprIfaceForAllWithMatchability tvs, pprIfaceContextArr theta, ppr_tau ])
          ]
   where
     (tvs, theta, tau) = splitIfaceSigmaTy poly_ty
@@ -1401,16 +1415,16 @@ pprIfaceDecl ss decl@(IfaceSynonym { ifName    = tc
     suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
+                                  , ifKind = kind
                                   , ifFamFlav = rhs, ifBinders = binders
-                                  , ifResKind = res_kind
                                   , ifResVar = res_var, ifFamInj = inj })
   | IfaceDataFamilyTyCon <- rhs
-  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind ifaceUnmatchable binders res_kind)
+  = vcat [ pprStandaloneKindSig name_doc kind
          , text "data family" <+> decl_head
          ]
 
   | otherwise
-  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind ifaceUnmatchable binders res_kind)
+  = vcat [ pprStandaloneKindSig name_doc kind
          , hang (text "type family" <+> decl_head <+> pp_inj res_var inj
                    <+> ppShowRhs ss (pp_where rhs))
               2 (ppShowRhs ss (pp_rhs rhs))
@@ -1486,8 +1500,10 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               , pprIfaceType $ foldr (IfaceFunTy visArgTypeLike ifaceUnmatchable many_ty)
                                                      pat_ty arg_tys ])
         pat_body = braces $ sep $ punctuate comma $ map ppr pat_fldlbls
-        univ_msg = pprUserIfaceForAll $ ifaceForAllSpecToBndrs univ_bndrs
-        ex_msg   = pprUserIfaceForAll $ ifaceForAllSpecToBndrs ex_bndrs
+        univ_msg = pprUserIfaceForAllWithMatchability $
+                     map (ifaceUnmatchable,) (ifaceForAllSpecToBndrs univ_bndrs)
+        ex_msg   = pprUserIfaceForAllWithMatchability $
+                     map (ifaceUnmatchable,) (ifaceForAllSpecToBndrs ex_bndrs)
 
         insert_empty_ctxt = null req_ctxt
             && not (null prov_ctxt && isEmpty sdocCtx ex_msg)
@@ -1630,9 +1646,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- the visibilities of the existential tyvar binders, we can simply drop
     -- the universal tyvar binders from user_tvbs.
     ex_tvbs = dropList tc_binders user_tvbs
-    ppr_ex_quant = pprIfaceForAllPartMust ex_tvbs ctxt
+    ppr_ex_quant = pprIfaceForAllPartMust (map (ifaceUnmatchable,) ex_tvbs) ctxt
     pp_gadt_res_ty = mk_user_con_res_ty eq_spec
-    ppr_gadt_ty = pprIfaceForAllPart user_tvbs ctxt pp_tau
+    ppr_gadt_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) user_tvbs) ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName
@@ -2142,7 +2158,8 @@ freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
 freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
-freeNamesIfType (IfaceForAllTy tv t)  = freeNamesIfVarBndr tv &&& freeNamesIfType t
+freeNamesIfType (IfaceForAllTy ma tv t)
+  = freeNamesIfType ma &&& freeNamesIfVarBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy _ ma w s t) = freeNamesIfType ma &&& freeNamesIfType w &&& freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfaceCastTy t c)     = freeNamesIfType t &&& freeNamesIfCoercion c
 freeNamesIfType (IfaceCoercionTy c)   = freeNamesIfCoercion c
@@ -2164,8 +2181,9 @@ freeNamesIfCoercion (IfaceTyConAppCo _ tc cos)
   = freeNamesIfTc tc &&& fnList freeNamesIfCoercion cos
 freeNamesIfCoercion (IfaceAppCo c1 c2)
   = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
-freeNamesIfCoercion (IfaceForAllCo _tcv _visL _visR kind_co co)
-  = freeNamesIfMCoercion kind_co &&& freeNamesIfCoercion co
+freeNamesIfCoercion (IfaceForAllCo tcv _visL _visR ma_co kind_co co)
+  = freeNamesIfBndr tcv &&& freeNamesIfCoercion ma_co
+    &&& freeNamesIfMCoercion kind_co &&& freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
 freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
 freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet

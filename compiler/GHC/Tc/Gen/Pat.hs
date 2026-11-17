@@ -131,7 +131,7 @@ tcMatchPats :: forall a.
 --    number of visible pats::[LPat GhcRn]   (p is visible, @p is invisible)
 --      ==
 --    number of visible pat_tys::[ExpPatType]   (ExpFunPatTy is visible,
---                                               ExpForAllPatTy b is visible iff b is Required)
+--                                               ExpForAllPatTy ma b is visible iff b is Required)
 --
 -- POSTCONDITION:
 --   Returns only the /value/ patterns; see Note [tcMatchPats]
@@ -157,7 +157,7 @@ tcMatchPats match_ctxt pats pat_tys thing_inside
                     ; return ([], res) }
 
              -- ExpForAllPat: expecting a type pattern
-             loop all_pats@(pat : pats) (ExpForAllPatTy (Bndr tv vis) : pat_tys)
+             loop all_pats@(pat : pats) (ExpForAllPatTy _ma (Bndr tv vis) : pat_tys)
                | isVisibleForAllTyFlag vis
                = do { (_p, (ps, res)) <- tc_forall_lpat tv penv pat $
                                          loop pats pat_tys
@@ -189,9 +189,9 @@ tcMatchPats match_ctxt pats pat_tys thing_inside
              --      2.  f :: Int -> Int
              --          f @a x = ... -- loop (InvisPat{} : _) (ExpFunPatTy{} : _)
              --      3.  f :: forall a -> Int
-             --          f @a t = ... -- loop (InvisPat{} : _) (ExpForAllPatTy (Bndr _ Required) : _)
+             --          f @a t = ... -- loop (InvisPat{} : _) (ExpForAllPatTy _ (Bndr _ Required) : _)
              --      4.  f :: forall {a}. Int
-             --          f @a t = ... -- loop (InvisPat{} : _) (ExpForAllPatTy (Bndr _ Inferred) : _)
+             --          f @a t = ... -- loop (InvisPat{} : _) (ExpForAllPatTy _ (Bndr _ Inferred) : _)
              loop (L loc (InvisPat _ tp) : _) _
               = setSrcSpanA loc $
                 failWithTc (TcRnIllegalInvisibleTypePattern tp InvisPatNoForall)

@@ -384,16 +384,20 @@ data HsForAllTelescope pass
                 --   These do not have any notion of specificity, so we use
                 --   '()' as a placeholder value.
     { hsf_xvis      :: XHsForAllVis pass
+    , hsf_matchability :: Maybe (LHsType pass)
+      -- ^ Annotation after the separator. Its scope precedes this group.
     , hsf_vis_bndrs :: [LHsTyVarBndr () pass]
     }
   | HsForAllInvis -- ^ An invisible @forall@ (e.g., @forall a {b} c. {...}@),
                   --   where each binder has a 'Specificity'.
     { hsf_xinvis       :: XHsForAllInvis pass
+    , hsf_matchability :: Maybe (LHsType pass)
+      -- ^ Annotation after the separator. Its scope precedes this group.
     , hsf_invis_bndrs  :: [LHsTyVarBndr Specificity pass]
     }
   | XHsForAllTelescope !(XXHsForAllTelescope pass)
 
--- | A type for interleaved GADT foralls and parentheses, inspired by HsArg.
+-- | A constructor prefix with forall groups, contexts, and parentheses.
 --
 -- Here's an example:
 --
@@ -414,6 +418,7 @@ data HsForAllTelescope pass
 --       , ...]
 data HsGadtTelescope pass
   = HsGadtForAll !(XGadtForAll pass) (HsForAllTelescope pass)
+  | HsGadtContext (LHsContext pass)
   | HsGadtPar !(XGadtPar pass)
     -- ^ `HsGadtPar` is only usefull for pretty-printing/exact-printing for recovering
     -- parenthisis interleaved with foralls.
@@ -475,6 +480,8 @@ data HsOuterTyVarBndrs flag pass
   | HsOuterExplicit -- ^ Explicit forall, e.g.,
                     --    @f :: forall a b. a -> b -> b@
     { hso_xexplicit :: XHsOuterExplicit pass flag
+    , hso_matchability :: Maybe (LHsType (NoGhcTc pass))
+      -- ^ Annotation on the outer group, before its binders enter scope.
     , hso_bndrs     :: [LHsTyVarBndr flag (NoGhcTc pass)]
     }
   | XHsOuterTyVarBndrs !(XXHsOuterTyVarBndrs pass)

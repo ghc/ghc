@@ -1292,7 +1292,7 @@ concreteTyVarPositions fun_id conc_tvs
       let positions =
             IntMap.fromList
               [ (pos, conc_orig)
-              | (tv, pos) <- zip tvs [1..]
+              | ((_ma, tv), pos) <- zip tvs [1..]
               , conc_orig <- maybeToList $ lookupNameEnv conc_tvs (tyVarName tv)
               ]
          -- Assert that we have as many positions as concrete type variables,
@@ -1534,7 +1534,7 @@ checkCaseLinearity ue case_bndr var_w bndr = do
 -----------------
 lintTyApp :: Type -> Type -> LintM Type
 lintTyApp fun_ty arg_ty
-  | Just (tv,body_ty) <- splitForAllTyVar_maybe fun_ty
+  | Just (_ma,tv,body_ty) <- splitForAllTyVar_maybe fun_ty
   = do  { lintTyKind tv arg_ty
         ; in_scope <- getInScope
         -- substTy needs the set of tyvars in scope to avoid generating
@@ -1837,7 +1837,7 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
           -- See Note [Validating multiplicities in a case]
           ; multiplicities = constructorMults con_payload_ty
           ; constructorMults ty = case coreFullView ty of
-              ForAllTy _ body -> ManyTy : constructorMults body
+              ForAllTy _ _ body -> ManyTy : constructorMults body
               DepFunTy _ body -> ManyTy : constructorMults body
               FunTy { ft_mult = mult, ft_res = body }
                               -> mult : constructorMults body
@@ -2200,19 +2200,25 @@ lintType ty@(ForAllTy {})
   where
     go :: [OutTyCoVar] -> Type -> LintM ()
     -- Loop, collecting the forall-binders
-    go tcvs ty@(ForAllTy (Bndr tcv _) body_ty)
+    go tcvs ty@(ForAllTy ma (Bndr tcv vis) body_ty)
       | not (isTyCoVar tcv)
       = failWithL (text "Non-TyVar or Non-CoVar bound in type:" <+> ppr ty)
 
       | otherwise
-      = lintTyCoBndr tcv $
+      = do { lintType ma
+           ; ensureEqTys (typeKind ma) matchabilityTy $
+               text "Invalid forall matchability:" <+> ppr ma
+           ; lintTyCoBndr tcv $
         do { -- See GHC.Core.TyCo.Rep Note [Unused coercion variable in ForAllTy]
              -- Suspicious because it works on InTyCoVar; c.f. ForAllCo
              when (isCoVar tcv) $
-             lintL (anyFreeVarsOfType (== tcv) body_ty) $
-             text "Covar does not occur in the body:" <+> (ppr tcv $$ ppr body_ty)
+             do { lintL (isCoreTyLamForAllTyFlag vis) $
+                    text "Invalid visibility in CoVar forall:" <+> ppr ty
+                ; lintL (not (ma `eqType` unmatchableDataConTy)
+                         || anyFreeVarsOfType (== tcv) body_ty) $
+                    text "Vacuous unmatchable CoVar forall:" <+> ppr ty }
 
-           ; go (tcv : tcvs) body_ty }
+           ; go (tcv : tcvs) body_ty } }
 
     go tcvs body_ty
       = do { lintType body_ty
@@ -2370,7 +2376,7 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                go subst fun_ty acc []
                  = return (substTy subst fun_ty, acc)
 
-               go subst (ForAllTy (Bndr tv _vis) body_ty) acc (arg:args)
+               go subst (ForAllTy _ma (Bndr tv _vis) body_ty) acc (arg:args)
                  = do { arg' <- lint_forall_arg arg
                       ; let tv_kind = substTy subst (varType tv)
                             karg'   = typeKind arg'
@@ -2661,12 +2667,19 @@ lintCoercion co@(ForAllCo {})
     go :: [OutTyCoVar]   -- Binders in reverse order
        -> Coercion -> LintM Role
     go tcvs co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-                         , fco_kind = kind_mco, fco_body = body_co })
+                         , fco_ma = ma_co, fco_kind = kind_mco, fco_body = body_co })
       | not (isTyCoVar tcv)
       = failWithL (text "Non tyco binder in ForAllCo:" <+> ppr co)
 
       | otherwise
-      = do { mb_lk <- case kind_mco of
+      = do { lintCoercion ma_co
+           ; lintRole ma_co Nominal (coercionRole ma_co)
+           ; let Pair ma1 ma2 = coercionKind ma_co
+           ; ensureEqTys (typeKind ma1) matchabilityTy $
+               text "Invalid left forall matchability:" <+> ppr ma_co
+           ; ensureEqTys (typeKind ma2) matchabilityTy $
+               text "Invalid right forall matchability:" <+> ppr ma_co
+           ; mb_lk <- case kind_mco of
                      MRefl -> return Nothing
                      MCo kind_co -> Just <$> lintStarCoercion kind_co
            ; lintTyCoBndr tcv $
@@ -2826,7 +2839,7 @@ lintCoercion the_co@(SelCo cs co)
        ; if -- forall (both TyVar and CoVar)
             | Just _ <- splitForAllTyCoVar_maybe s
             , Just _ <- splitForAllTyCoVar_maybe t
-            , SelForAll <- cs
+            , SelForAll _ <- cs
             , coercionRole co /= Phantom
               -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
             ,   (isForAllTy_ty s && isForAllTy_ty t)
@@ -2895,7 +2908,7 @@ lintCoercion orig_co@(InstCo co arg)
 
            ; case (splitForAllTyCoVar_maybe lty, splitForAllTyCoVar_maybe rty) of
               -- forall over tvar
-                (Just (ltv,lty1), Just (rtv,rty1))
+                (Just (_lma,ltv,lty1), Just (_rma,rtv,rty1))
                   | typeKind arg_lty `eqType` substTy lsubst (tyVarKind ltv)
                   , typeKind arg_rty `eqType` substTy rsubst (tyVarKind rtv)
                   -> return ( (extendTCvSubst lsubst ltv arg_lty, lty1)

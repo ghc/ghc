@@ -962,10 +962,9 @@ data ConDecl pass
         --   cf. HsSigType that also stores the outermost sig_bndrs separately
         --   from the forall telescopes in sig_body.
         --   See Note [Representing type signatures] in Language.Haskell.Syntax.Type
-      , con_inner_bndrs :: [LHsGadtTelescope pass]
-        -- ^ The forall telescopes other than the outermost invisible forall,
-        --   interleaved with the parentheses that enclose them.
-      , con_mb_cxt  :: Maybe (LHsContext pass)   -- ^ User-written context (if any)
+      , con_telescope :: [LHsGadtTelescope pass]
+        -- ^ Prefix groups after the outer binders, in source order.
+        --   Each context keeps its position before later binders.
       , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
       , con_res_ty  :: LHsType pass              -- ^ Result type
 
@@ -978,13 +977,8 @@ data ConDecl pass
       , con_modifiers :: [LHsModifier pass]
       , con_name    :: LIdP pass
 
-      , con_forall  :: Bool
-                              -- ^ True <=> explicit user-written forall
-                              --     e.g. data T a = forall b. MkT b (b->a)
-                              --     con_ex_tvs = {b}
-                              -- False => con_ex_tvs is empty
-      , con_ex_tvs :: [LHsTyVarBndr Specificity pass] -- ^ Existentials only
-      , con_mb_cxt :: Maybe (LHsContext pass)         -- ^ User-written context (if any)
+      , con_telescope :: [LHsGadtTelescope pass]
+        -- ^ Existential forall groups and contexts, in source order.
       , con_args   :: HsConDeclH98Details pass        -- ^ Arguments; can be infix
 
       , con_doc    :: Maybe (LHsDoc pass) -- ^ A possible Haddock comment.
@@ -993,13 +987,16 @@ data ConDecl pass
 
 {- Note [GADT abstract syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The types of both forms of GADT constructors are very structured, as they
+The source types of both forms of GADT constructors are very structured, as they
 must consist of the quantified type variables (if provided), followed by the
 context (if provided), followed by the argument types (if provided), followed
 by the result type. (See "Wrinkle: No nested foralls or contexts" below for
 more discussion on the restrictions imposed here.) As a result, instead of
 storing the type of a GADT constructor as a single LHsType, we split it up
 into its constituent components for easier access.
+TH ForallC can supply a context before a later forall group. The ordered
+con_telescope field retains that context scope. See
+Note [Constructor telescope contexts] in GHC.Hs.Decls.
 
 There are two broad ways to classify GADT constructors:
 
@@ -1076,7 +1073,7 @@ the GADT type, in precisely that order. For instance:
     MkT5 :: forall a. Int -> Eq a => a -> T
       -- Rejected, `Eq a` is nested
     MkT6 :: (forall a. a -> T)
-      -- OK, the parentheses are recorded in con_inner_bndrs.
+      -- OK, the parentheses are recorded in con_telescope.
     MkT7 :: (Eq a => a -> T)
       -- OK, ditto
 
@@ -1088,7 +1085,7 @@ or contexts in a single place:
    extracts out the leading `forall`s and context (if they are provided). To
    accomplish this splitting, the parser uses the GHC.Hs.Type.splitLHsGadtTy
    function, which records the parentheses that surround the leading `forall`s
-   in con_inner_bndrs (as these parentheses are syntactically significant).
+   in con_telescope (as these parentheses are syntactically significant).
    If the body returned by splitLHsGadtTy still contains any `forall`s or
    contexts, then they must be nested, so they will be rejected.
 

@@ -816,11 +816,11 @@ tcStandaloneDerivInstType ctxt
                         , sig_bndrs = outer_bndrs
                         , sig_body  = rho }
        let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
-       pure (tvs, InferContext (Just (locA wc_span)), cls, inst_tys)
+       pure (map snd tvs, InferContext (Just (locA wc_span)), cls, inst_tys)
   | otherwise
   = do dfun_ty <- tcHsClsInstType ctxt deriv_ty
        let (tvs, theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
-       pure (tvs, SupplyContext theta, cls, inst_tys)
+       pure (map snd tvs, SupplyContext theta, cls, inst_tys)
 
 warnUselessTypeable :: TcM ()
 warnUselessTypeable = addDiagnosticTc TcRnUselessTypeable

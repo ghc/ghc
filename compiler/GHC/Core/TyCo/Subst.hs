@@ -798,6 +798,8 @@ runSubstM :: forall a. (a -> SubstM a) -> Subst -> a -> a
 {-# INLINE runSubstM #-}
 runSubstM tx subst x = runStrictIdentity (runStrictReaderT (tx x) subst)
 
+-- Metadata uses the outer substitution before the binder callback.
+-- See Note [Forall matchability metadata] in GHC.Core.TyCo.Rep.
 subst_ty :: Subst -> Type -> Type
 subst_co :: Subst -> Coercion -> Coercion
 (subst_ty, subst_co)

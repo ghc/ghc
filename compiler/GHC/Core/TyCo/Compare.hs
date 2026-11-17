@@ -450,13 +450,14 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
         | Just (s1, t1') <- tcSplitAppTyNoView_maybe t1
         -> go s1 s2 && go t1' t2'
 
-      (ForAllTy (Bndr tv1 vis1) body1, ForAllTy (Bndr tv2 vis2) body2)
+      (ForAllTy ma1 (Bndr tv1 vis1) body1, ForAllTy ma2 (Bndr tv2 vis2) body2)
         -> case mb_env of
               Nothing -> generic_eq_type_x syn_flag mult_flag
                             (Just (initRnEnv t1 t2)) t1 t2
               Just env
                 | vis1 `eqForAllVis` vis2         -- See Note [ForAllTy and type equality]
-                -> go (varType tv1) (varType tv2)  -- Always do kind-check
+                -> go ma1 ma2
+                   && go (varType tv1) (varType tv2)  -- Always do kind-check
                    && generic_eq_type_x syn_flag mult_flag
                              (Just (rnBndr2 env tv1 tv2)) body1 body2
                 | otherwise
@@ -482,7 +483,7 @@ hasCasts (CastTy {})     = True
 hasCasts (CoercionTy {}) = True
 hasCasts (AppTy t1 t2)   = hasCasts t1 || hasCasts t2
 hasCasts (TermAppTy _ arg) = hasCasts arg
-hasCasts (ForAllTy _ ty) = hasCasts ty
+hasCasts (ForAllTy ma _ ty) = hasCasts ma || hasCasts ty
 hasCasts (DepFunTy v ty) = hasCasts (varType v) || hasCasts ty
 hasCasts _               = False   -- TyVarTy, TermVarTy, TyConApp, FunTy, LitTy
 
@@ -733,8 +734,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     go env (DepFunTy v1 t1) (DepFunTy v2 t2)
       = go env (varType v1) (varType v2)
         `thenCmpTy` go (rnBndr2 env v1 v2) t1 t2
-    go env (ForAllTy (Bndr tv1 vis1) t1) (ForAllTy (Bndr tv2 vis2) t2)
+    go env (ForAllTy ma1 (Bndr tv1 vis1) t1) (ForAllTy ma2 (Bndr tv2 vis2) t2)
       = liftOrdering (vis1 `cmpForAllVis` vis2)   -- See Note [ForAllTy and type equality]
+        `thenCmpTy` go env ma1 ma2
         `thenCmpTy` go env (varType tv1) (varType tv2)
         `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
 
@@ -940,16 +942,18 @@ mayLookIdentical orig_ty1 orig_ty2
     go top vis t1              (CastTy t2 _)   = go top vis t1 t2
     go _   _   (CoercionTy {}) (CoercionTy {}) = return True
 
-    go env _top (ForAllTy (Bndr tv1 vis1) ty1)
-                (ForAllTy (Bndr tv2 vis2) ty2)
+    go env _top (ForAllTy ma1 (Bndr tv1 vis1) ty1)
+                (ForAllTy ma2 (Bndr tv2 vis2) ty2)
       = if vis1 `eqForAllVis` vis2  -- See Note [ForAllTy and type equality]
-        then do { _kind_ok <- tell_on_mismatch InvisibleKind $ go env False (tyVarKind tv1) (tyVarKind tv2)
-                ; go (rnBndr2 env tv1 tv2) False ty1 ty2 }
+        then do { ma_ok <- go env False ma1 ma2
+                ; _kind_ok <- tell_on_mismatch InvisibleKind $ go env False (tyVarKind tv1) (tyVarKind tv2)
+                ; body_ok <- go (rnBndr2 env tv1 tv2) False ty1 ty2
+                ; return (ma_ok && body_ok) }
         else return False
 
     -- See Note [Defaultable tyvars in mayLookIdentical]
-    go _ _ (ForAllTy b@(Bndr tv _) _) _ | isDefaultableBndr b = discard_defaultable_tyvar tv
-    go _ _ _ (ForAllTy b@(Bndr tv _) _) | isDefaultableBndr b = discard_defaultable_tyvar tv
+    go _ _ (ForAllTy _ b@(Bndr tv _) _) _ | isDefaultableBndr b = discard_defaultable_tyvar tv
+    go _ _ _ (ForAllTy _ b@(Bndr tv _) _) | isDefaultableBndr b = discard_defaultable_tyvar tv
 
     go env _top (FunTy _ ma1 w1 arg1 res1) (FunTy _ ma2 w2 arg2 res2)
       = do { _mult_ok <- tell_on_mismatch InvisibleMultiplicity $ go env False w1 w2

@@ -83,6 +83,7 @@ import GHC.Types.SourceText
 import GHC.Core.Class
 import GHC.Types.Name
 import GHC.Builtin.KnownKeys
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 import GHC.Core.Predicate
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -1250,7 +1251,8 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
         NoDataConRep -> dataConWrapperTypeUnchecked con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
-        DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
+        DCR{} -> mkInfForAllTys [(unmatchableDataConTy, tv) | tv <- univ_tvs] $
+                 mkTyCoInvForAllTys [(unmatchableDataConTy, tv) | tv <- ex_tvs] $
                  mkScaledFunctionTysU rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
                  -- res_arg_tys is a mixture of TypeLike and ConstraintLike,
@@ -1613,7 +1615,7 @@ dataConWrapperTypeUnchecked (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOrigArgBinders = arg_binders,
                              dcOrigResTy = res_ty,
                              dcStupidTheta = stupid_theta })
-  = mkForAllTys user_tvbs $
+  = mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- user_tvbs] $
     mkInvisFunTys (stupid_theta ++ theta) $
     mkRetainedArgTys arg_binders arg_tys res_ty
 

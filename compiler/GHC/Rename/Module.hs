@@ -2611,9 +2611,9 @@ rnConDecls :: DataDefnCons (LConDecl GhcPs) -> RnM (DataDefnCons (LConDecl GhcRn
 rnConDecls = mapFvRn (wrapLocFstMA rnConDecl)
 
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeNames)
-rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
-                           , con_mb_cxt = mcxt, con_args = args
-                           , con_doc = mb_doc, con_forall = forall_
+rnConDecl decl@(ConDeclH98 { con_name = name, con_telescope = teles
+                           , con_args = args
+                           , con_doc = mb_doc
                            , con_modifiers = mods })
   = do  { _        <- addLocM checkConName name
         ; new_name <- lookupLocatedTopBndrRnN WL_ConLike name
@@ -2628,29 +2628,25 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
         -- scoping we get.  So no implicit binders at the existential forall
 
         ; let ctxt = ConDeclCtx [new_name]
-        ; bindLHsTyVarBndrs ctxt WarnUnusedForalls
-                            Nothing ex_tvs $ \ new_ex_tvs ->
-    do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
-        ; (new_args,    fvs2) <- rnConDeclH98Details (unLoc new_name) ctxt args
+        ; bindHsGadtTelescopes ctxt teles $ \ new_teles ->
+    do  { (new_args,    fvs2) <- rnConDeclH98Details (unLoc new_name) ctxt args
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
-        ; let all_fvs  = fvs1 `plusFN` fvs2 `plusFN` mods_fvs
+        ; let all_fvs  = fvs2 `plusFN` mods_fvs
         ; traceRn "rnConDecl (ConDeclH98)" (ppr name <+> vcat
-             [ text "ex_tvs:" <+> ppr ex_tvs
-             , text "new_ex_dqtvs':" <+> ppr new_ex_tvs ])
+             [ text "telescopes:" <+> ppr teles
+             , text "renamed telescopes:" <+> ppr new_teles ])
 
         ; mb_doc' <- traverse rnLHsDoc mb_doc
         ; return (decl { con_ext = noExtField
-                       , con_name = new_name, con_ex_tvs = new_ex_tvs
-                       , con_mb_cxt = new_context, con_args = new_args
+                       , con_name = new_name, con_telescope = new_teles
+                       , con_args = new_args
                        , con_doc = mb_doc'
-                       , con_forall = forall_ -- Remove when #18311 is fixed
                        , con_modifiers = mods' },
                   all_fvs) }}
 
 rnConDecl (ConDeclGADT { con_names   = names
                        , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt  = mcxt
+                       , con_telescope = inner_bndrs
                        , con_g_args  = args
                        , con_res_ty  = res_ty
                        , con_modifiers = mods
@@ -2666,7 +2662,6 @@ rnConDecl (ConDeclGADT { con_names   = names
               implicit_bndrs =
                 extractHsOuterTvBndrs outer_bndrs           $
                 extractHsGadtTelescopes inner_bndrs         $
-                extractHsTysRdrTyVars (hsConDeclTheta mcxt) $
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
 
@@ -2674,8 +2669,7 @@ rnConDecl (ConDeclGADT { con_names   = names
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
           bindHsGadtTelescopes ctxt inner_bndrs $ \inner_bndrs' ->
-    do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
-        ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
+    do  { (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <-
             if hsHasForEachTy (unLoc res_ty)
             then do { enabled <- xoptM LangExt.ExperimentalDependentTypes
@@ -2690,24 +2684,17 @@ rnConDecl (ConDeclGADT { con_names   = names
        ; addNoNestedForallsContextsErr ctxt
            NFC_GadtConSig new_res_ty
 
-        ; let all_fvs = fvs1 `plusFN` fvs2 `plusFN` fvs3 `plusFN` mods_fvs
+        ; let all_fvs = fvs2 `plusFN` fvs3 `plusFN` mods_fvs
 
         ; traceRn "rnConDecl (ConDeclGADT)"
             (ppr names $$ ppr outer_bndrs' $$ ppr inner_bndrs')
         ; new_mb_doc <- traverse rnLHsDoc mb_doc
         ; return (ConDeclGADT { con_g_ext = noExtField, con_names = new_names
                               , con_outer_bndrs = L outer_bndrs_loc outer_bndrs'
-                              , con_inner_bndrs = inner_bndrs'
-                              , con_mb_cxt = new_cxt
+                              , con_telescope = inner_bndrs'
                               , con_g_args = new_args, con_res_ty = new_res_ty
                               , con_doc = new_mb_doc, con_modifiers = mods' },
                   all_fvs) } }
-
-rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
-            -> RnM (Maybe (LHsContext GhcRn), FreeNames)
-rnMbContext _    Nothing    = return (Nothing, emptyFNs)
-rnMbContext doc cxt = do { (ctx',fvs) <- rnMaybeContext doc cxt
-                         ; return (ctx',fvs) }
 
 rnConDeclH98Details ::
       Name

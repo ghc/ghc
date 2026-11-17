@@ -285,9 +285,9 @@ recordSelectorResultVars = snd . go
       | otherwise = unions (map go args)
     go (TyVarTy tv) = unions [(False, unitVarSet tv), go (varType tv)]
     go (FunTy _ ma mult arg res) = unions (map go [ma, mult, arg, res])
-    go (ForAllTy (Bndr tv _) body)
+    go (ForAllTy ma (Bndr tv _) body)
       = let (opaque, vars) = go body
-        in unions [go (varType tv), (opaque, vars `delVarSet` tv)]
+        in unions [go ma, go (varType tv), (opaque, vars `delVarSet` tv)]
     go (CastTy ty co) = unions [go ty, (False, tyCoVarsOfCo co)]
     go (DepFunTy binder body)
       = let (opaque, vars) = go body
@@ -319,7 +319,7 @@ synonymMayHideOpaqueApplication tc
       | otherwise = scan_many seen args
     scan seen (TyVarTy tv) = scan seen (varType tv)
     scan seen (FunTy _ ma mult arg res) = scan_many seen [ma, mult, arg, res]
-    scan seen (ForAllTy (Bndr tv _) body) = scan_many seen [varType tv, body]
+    scan seen (ForAllTy ma (Bndr tv _) body) = scan_many seen [ma, varType tv, body]
     scan seen (CastTy ty _) = scan seen ty
     scan seen (DepFunTy binder body) = scan_many seen [varType binder, body]
     scan seen (TermAppTy fun arg) = scan_many seen [varType fun, arg]

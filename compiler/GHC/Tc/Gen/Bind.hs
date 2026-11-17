@@ -61,7 +61,7 @@ import GHC.Core.Type (mkStrLitTy, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
-import GHC.Builtin.WiredIn.Types ( mkConstraintTupleTy )
+import GHC.Builtin.WiredIn.Types ( mkConstraintTupleTy, unmatchableDataConTy )
 import GHC.Builtin.WiredIn.Prim
 import GHC.Unit.Module
 
@@ -526,7 +526,7 @@ forall_a_a :: TcType
 -- kappa is a unification variable. But I don't think we need that
 -- complication here. I'm going to just use (forall (a::*). a).
 -- See #15276
-forall_a_a = mkSpecForAllTys [alphaTyVar] alphaTy
+forall_a_a = mkSpecForAllTys [(unmatchableDataConTy,alphaTyVar)] alphaTy
 
 {- *********************************************************************
 *                                                                      *
@@ -927,7 +927,7 @@ mkExport prag_fn residual insoluble qtvs theta
         -- NB: we have already done checkValidType, including an ambiguity check,
         --     on the type; either when we checked the sig or in mkInferredPolyId
         ; let poly_ty     = idType poly_id
-              sel_poly_ty = mkInfSigmaTy qtvs theta mono_ty
+              sel_poly_ty = mkInfSigmaTy [(unmatchableDataConTy,tv) | tv <- qtvs] theta mono_ty
                 -- This type is just going into tcSubType,
                 -- so Inferred vs. Specified doesn't matter
 
@@ -1008,14 +1008,14 @@ chooseInferredQuantifiers :: WantedConstraints  -- residual constraints
                           -> TcTyVarSet    -- tvs free in tau type
                           -> [TcTyVar]     -- inferred quantified tvs
                           -> Maybe TcIdSigInst
-                          -> TcM ([InvisTVBinder], TcThetaType)
+                          -> TcM ([(Matchability, InvisTVBinder)], TcThetaType)
 chooseInferredQuantifiers _residual inferred_theta tau_tvs qtvs Nothing
   = -- No type signature (partial or complete) for this binder,
     do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- See Note [growThetaTyVars vs closeWrtFunDeps] in GHC.Tc.Solver
                         -- Include kind variables!  #7916
              my_theta = pickCapturedPreds free_tvs inferred_theta
-             binders  = [ mkTyVarBinder InferredSpec tv
+             binders  = [ (unmatchableDataConTy, mkTyVarBinder InferredSpec tv)
                         | tv <- qtvs
                         , tv `elemVarSet` free_tvs ]
        ; return (binders, my_theta) }
@@ -1026,12 +1026,15 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
   | TcPartialSig (PSig { psig_name = fn_name, psig_hs_ty = hs_ty }) <- sig
   = -- Choose quantifiers for a partial type signature
     do { let (psig_qtv_nms, psig_qtv_bndrs) = unzip annotated_tvs
-       ; psig_qtv_bndrs <- liftZonkM $ mapM zonkInvisTVBinder psig_qtv_bndrs
-       ; let psig_qtvs    = map binderVar psig_qtv_bndrs
+       ; psig_qtv_bndrs <- liftZonkM $ forM psig_qtv_bndrs $ \(ma,bndr) ->
+           do { ma' <- zonkTcType ma
+              ; bndr' <- zonkInvisTVBinder bndr
+              ; return (ma', bndr') }
+       ; let psig_qtvs    = map (binderVar . snd) psig_qtv_bndrs
              psig_qtv_set = mkVarSet psig_qtvs
              psig_qtv_prs = psig_qtv_nms `zip` psig_qtvs
-             psig_bndr_map :: TyVarEnv InvisTVBinder
-             psig_bndr_map = mkVarEnv [ (binderVar tvb, tvb) | tvb <- psig_qtv_bndrs ]
+             psig_bndr_map :: TyVarEnv (Matchability, InvisTVBinder)
+             psig_bndr_map = mkVarEnv [ (binderVar tvb, (ma,tvb)) | (ma,tvb) <- psig_qtv_bndrs ]
 
             -- Check whether the quantified variables of the
             -- partial signature have been unified together
@@ -1050,9 +1053,13 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
        ; (free_tvs, my_theta) <- choose_psig_context psig_qtv_set annotated_theta wcx
                                  -- NB: free_tvs includes tau_tvs
 
-       ; let (_,final_qtvs) = foldr (choose_qtv psig_bndr_map) (free_tvs, []) qtvs
-                              -- Pulling from qtvs maintains original order
-                              -- NB: qtvs is already in dependency order
+       ; let quant_fvs = free_tvs `unionVarSet` tyCoVarsOfTypes (map fst psig_qtv_bndrs)
+             (_, chosen_qtvs) = foldr (choose_qtv psig_bndr_map) (quant_fvs, []) qtvs
+             final_qtvs = scopedSortWith (binderVar . snd)
+                            (\(ma,bndr) -> tyCoVarsOfTypes [ma, varType (binderVar bndr)])
+                            chosen_qtvs
+               -- Keep metadata dependencies even when qtvs only records
+               -- dependency order from variable kinds.
 
        ; traceTc "chooseInferredQuantifiers" $
          vcat [ text "qtvs" <+> pprTyVars qtvs
@@ -1062,21 +1069,25 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
 
        ; return (final_qtvs, my_theta) }
   where
-    choose_qtv :: TyVarEnv InvisTVBinder -> TcTyVar
-             -> (TcTyVarSet, [InvisTVBinder]) -> (TcTyVarSet, [InvisTVBinder])
+    choose_qtv :: TyVarEnv (Matchability, InvisTVBinder) -> TcTyVar
+             -> (TcTyVarSet, [(Matchability, InvisTVBinder)])
+             -> (TcTyVarSet, [(Matchability, InvisTVBinder)])
     -- Pick which of the original qtvs should be retained
     -- Keep it if (a) it is mentioned in the body of the type (free_tvs)
     --            (b) it is a forall'd variable of the partial signature (psig_qtv_bndrs)
     --            (c) it is mentioned in the kind of a retained qtv (#22065)
+    --            (d) it is mentioned in a retained binder's matchability
     choose_qtv psig_bndr_map tv (free_tvs, qtvs)
        | Just psig_bndr <- lookupVarEnv psig_bndr_map tv
        = (free_tvs', psig_bndr : qtvs)
        | tv `elemVarSet` free_tvs
-       = (free_tvs', mkTyVarBinder InferredSpec tv : qtvs)
+       = (free_tvs', (unmatchableDataConTy, mkTyVarBinder InferredSpec tv) : qtvs)
        | otherwise  -- Do not pick it
        = (free_tvs, qtvs)
        where
          free_tvs' = free_tvs `unionVarSet` tyCoVarsOfType (tyVarKind tv)
+                              `unionVarSet` maybe emptyVarSet (tyCoVarsOfType . fst)
+                                              (lookupVarEnv psig_bndr_map tv)
 
     choose_psig_context :: VarSet -> TcThetaType -> Maybe TcType
                         -> TcM (VarSet, TcThetaType)
@@ -1704,7 +1715,7 @@ tcExtendTyVarEnvFromSig :: TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvFromSig sig_inst thing_inside
   | TISI { sig_inst_skols = skol_prs, sig_inst_wcs = wcs } <- sig_inst
   = tcExtendNameTyVarEnv wcs $
-    tcExtendNameTyVarEnv (mapSnd binderVar skol_prs) $
+    tcExtendNameTyVarEnv (mapSnd (binderVar . snd) skol_prs) $
     thing_inside
 
 tcExtendIdBinderStackForRhs :: [MonoBindInfo] -> TcM a -> TcM a

@@ -66,7 +66,7 @@ module GHC.Tc.Solver.Monad (
     updInertSet, updInertCans,
     getHasGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertGivens,
-    getInertInsols, getInnermostGivenEqLevel,
+    getInertInsols, getInnermostGivenEqLevel, withCoVarTouchabilityBoundary,
     getInertSet, setInertSet,
     getUnsolvedInerts,
     removeInertCts, getPendingGivenScs,
@@ -719,7 +719,51 @@ getInertEqs = do { inert <- getInertCans; return (inert_eqs inert) }
 
 getInnermostGivenEqLevel :: TcS TcLevel
 getInnermostGivenEqLevel = do { inert <- getInertCans
-                              ; return (inert_given_eq_lvl inert) }
+                              ; touchabilityLevel (inert_given_eq_lvl inert) }
+
+-- | Include the lexical CoVar boundary in the unification level.
+touchabilityLevel :: TcLevel -> TcS TcLevel
+touchabilityLevel given_level = mkTcS $ \env ->
+  return (maybe given_level (maxTcLevel given_level) (tcs_covar_level env))
+
+-- | Keep outer metavariables untouchable while comparing a CoVar body.
+-- See Note [CoVar forall touchability].
+withCoVarTouchabilityBoundary :: TcS a -> TcS a
+withCoVarTouchabilityBoundary (TcS thing_inside)
+  = TcS $ \env@(TcSEnv { tcs_inerts = old_inert_var }) ->
+    do { level <- TcM.getTcLevel
+       ; old_inerts <- TcM.readTcRef old_inert_var
+       ; new_inert_var <- TcM.newTcRef $
+           pushCycleBreakerVarStack (resetInertCans old_inerts)
+       ; new_wl_var <- TcM.newTcRef emptyWorkList
+       ; let boundary = maybe level (maxTcLevel level) (tcs_covar_level env)
+       ; result <- thing_inside (env { tcs_covar_level = Just boundary
+                                     , tcs_inerts = new_inert_var
+                                     , tcs_worklist = new_wl_var })
+       ; final_inerts <- TcM.readTcRef new_inert_var
+       ; restoreTyVarCycles final_inerts
+       ; return result }
+
+{- Note [CoVar forall touchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A ForAllCo body can use its CoVar only in Refl and GRefl (FC6). Do not add
+that CoVar as a usable Given equality when comparing the bodies. However,
+unification normally relies on a Given-equality boundary to prevent a
+CoVar from escaping into an outer metavariable. CoVars have no TcLevel.
+See checkPromoteFreeVars in GHC.Tc.Utils.Unify.
+
+Keep a lexical touchability level for this body instead. Nested solver
+scopes inherit it. The level restricts unification and floating, but it
+does not add Given evidence or enable rewriting. The eager unifier uses
+the same level after crossing the CoVar binder. Before scoped solving,
+can_eq_nc_forall solves constraints with no free local CoVar outside this
+boundary. This permits safe updates such as alpha := Int.
+
+Keep body inerts and caches local as well. A solved dictionary can refer
+to the bound proof even when proof irrelevance makes its predicate equal
+to a predicate outside this scope. Restore local cycle breakers before
+discarding the local inert set. Keep the shared evidence bindings.
+-}
 
 -- | Retrieves all insoluble constraints from the inert set,
 -- specifically including Given constraints.
@@ -860,8 +904,9 @@ getHasGivenEqs :: TcLevel             -- TcLevel of this implication
 getHasGivenEqs tclvl
   = do { inerts@(IC { inert_irreds       = irreds
                     , inert_given_eqs    = given_eqs
-                    , inert_given_eq_lvl = ge_lvl })
+                    , inert_given_eq_lvl = given_level })
               <- getInertCans
+       ; ge_lvl <- touchabilityLevel given_level
        ; let given_insols = filterBag insoluble_given_equality irreds
                       -- Specifically includes ones that originated in some
                       -- outer context but were refined to an insoluble by
@@ -1035,6 +1080,9 @@ data TcSEnv
 
       -- See Note [Native runtime binder scopes].
       tcs_native_binders :: VarSet,
+
+      -- See Note [CoVar forall touchability].
+      tcs_covar_level :: Maybe TcLevel,
 
       tcs_worklist :: TcRef WorkList
     }
@@ -1248,6 +1296,7 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
                           , tcs_inerts   = inert_var
                           , tcs_mode     = mode
                           , tcs_native_binders = emptyVarSet
+                          , tcs_covar_level = Nothing
                           , tcs_worklist = wl_var }
 
              -- Run the computation

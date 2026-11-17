@@ -157,10 +157,10 @@ renameContext (HsContext ac tys) = do
 renameForAllTelescope
   :: HsForAllTelescope GhcRn
   -> Rename (IdP GhcRn) (HsForAllTelescope GhcRn)
-renameForAllTelescope (HsForAllVis x bndrs) =
-  HsForAllVis x <$> mapM renameLBinder bndrs
-renameForAllTelescope (HsForAllInvis x bndrs) =
-  HsForAllInvis x <$> mapM renameLBinder bndrs
+renameForAllTelescope (HsForAllVis x ma bndrs) =
+  HsForAllVis x <$> traverse renameLType ma <*> mapM renameLBinder bndrs
+renameForAllTelescope (HsForAllInvis x ma bndrs) =
+  HsForAllInvis x <$> traverse renameLType ma <*> mapM renameLBinder bndrs
 
 renameBinder :: HsTyVarBndr flag GhcRn -> Rename (IdP GhcRn) (HsTyVarBndr flag GhcRn)
 renameBinder (HsTvb x fl bvar lkind) =

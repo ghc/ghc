@@ -400,11 +400,13 @@ opt_co4' opts env@(LC subst lift_env) sym rep r (DepFunCo b domain co)
       MCo delta -> MCo (opt_co4 opts env NotSwapped False Nominal delta)
 
 opt_co4' opts env sym rep r (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
-                                 , fco_kind = k_co, fco_body = co })
-  = mkForAllCo tv' visL' visR' k_co' $
+                                 , fco_ma = ma_co, fco_kind = k_co, fco_body = co })
+  = mkForAllCo tv' visL' visR' ma_co' k_co' $
     opt_co4 opts env' sym rep r co
      -- Use the "mk" functions to check for nested Refls
   where
+    -- The metadata proof is outside the binder and remains nominal.
+    ma_co' = opt_co4 opts env sym False Nominal ma_co
     !(env', tv', k_co') = optForAllCoBndr opts env sym tv k_co
     !(visL', visR') = swapSym sym (visL, visR)
 
@@ -540,7 +542,7 @@ So we extend the environment binding cv to arg's left-hand type.
 -- See Note [Optimising InstCo]
 opt_co4' opts env sym rep r (InstCo fun_co arg_co)
     -- forall over type...
-  | Just (tv, _visL, _visR, k_co, body_co) <- splitForAllCo_ty_maybe fun_co
+  | Just (tv, _visL, _visR, _ma_co, k_co, body_co) <- splitForAllCo_ty_maybe fun_co
     -- tv      :: k1
     -- k_co    :: k1 ~ k2
     -- body_co :: t1 ~ t2
@@ -556,7 +558,7 @@ opt_co4' opts env sym rep r (InstCo fun_co arg_co)
   = opt_co4 opts (extendLiftingContext env tv tv_co) sym rep r body_co
 
     -- See Note [Forall over coercion]
-  | Just (cv, _visL, _visR, _kind_co, body_co) <- splitForAllCo_co_maybe fun_co
+  | Just (cv, _visL, _visR, _ma_co, _kind_co, body_co) <- splitForAllCo_co_maybe fun_co
   , CoercionTy h1 <- coercionLKind arg_co
   , let h1' = opt_co4 opts env NotSwapped False Nominal h1
   = opt_co4 opts (extendLiftingContextCvSubst env cv h1') sym rep r body_co
@@ -565,14 +567,14 @@ opt_co4' opts env sym rep r (InstCo fun_co arg_co)
   -- If so, do an inefficient one-variable substitution, then re-optimize
 
     -- forall over type...
-  | Just (tv', _visL, _visR, k_co', body_co') <- splitForAllCo_ty_maybe fun_co'
+  | Just (tv', _visL, _visR, _ma_co', k_co', body_co') <- splitForAllCo_ty_maybe fun_co'
   , let s2'   = coercionRKind arg_co'
         tv_co = mk_coherence_right_co Nominal s2' (mkSymCo k_co') arg_co'
         env'  = extendLiftingContext (zapLiftingContext env) tv' tv_co
   = opt_co4 opts env' sym False r' body_co'
 
     -- See Note [Forall over coercion]
-  | Just (cv', _visL, _visR, _kind_co', body_co') <- splitForAllCo_co_maybe fun_co'
+  | Just (cv', _visL, _visR, _ma_co', _kind_co', body_co') <- splitForAllCo_co_maybe fun_co'
   , CoercionTy h1' <- coercionLKind arg_co'
   , let env' = extendLiftingContextCvSubst (zapLiftingContext env) cv' h1'
   = opt_co4 opts env' sym False r' body_co'
@@ -679,9 +681,9 @@ mkDeepSymCo = go
       -- Same as in opt_co4': do *not* push sym inside top-level axioms.
 
     go co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-                    , fco_kind = k_mco, fco_body = body_co })
+                    , fco_ma = ma_co, fco_kind = k_mco, fco_body = body_co })
       = case k_mco of
-          MRefl -> ForAllCo tcv visR visL k_mco (go body_co)
+          MRefl -> ForAllCo tcv visR visL (go ma_co) k_mco (go body_co)
           MCo {} ->
             -- Pushing 'sym' into the kind coercion would require threading a
             -- substitution through, as per Note [Optimising ForAllCo].
@@ -995,16 +997,16 @@ opt_trans_rule opts is co1 co2@(AppCo co2a co2b)
 -- Push transitivity inside forall
 -- forall over types.
 opt_trans_rule opts is co1 co2
-  | Just (tv1, visL1, _visR1, kco1, r1) <- splitForAllCo_ty_maybe co1
-  , Just (tv2, _visL2, visR2, kco2, r2) <- etaForAllCo_ty_maybe co2
-  = push_trans tv1 kco1 r1 tv2 kco2 r2 visL1 visR2
+  | Just (tv1, visL1, _visR1, mco1, kco1, r1) <- splitForAllCo_ty_maybe co1
+  , Just (tv2, _visL2, visR2, mco2, kco2, r2) <- etaForAllCo_ty_maybe co2
+  = push_trans tv1 mco1 kco1 r1 tv2 mco2 kco2 r2 visL1 visR2
 
-  | Just (tv2, _visL2, visR2, kco2, r2) <- splitForAllCo_ty_maybe co2
-  , Just (tv1, visL1, _visR1, kco1, r1) <- etaForAllCo_ty_maybe co1
-  = push_trans tv1 kco1 r1 tv2 kco2 r2 visL1 visR2
+  | Just (tv2, _visL2, visR2, mco2, kco2, r2) <- splitForAllCo_ty_maybe co2
+  , Just (tv1, visL1, _visR1, mco1, kco1, r1) <- etaForAllCo_ty_maybe co1
+  = push_trans tv1 mco1 kco1 r1 tv2 mco2 kco2 r2 visL1 visR2
 
   where
-  push_trans tv1 kco1 r1 tv2 kco2 r2 visL visR
+  push_trans tv1 mco1 kco1 r1 tv2 mco2 kco2 r2 visL visR
     -- Given:
     --   co1 = /\ tv1 : kco1 <visL, visM>. r1
     --   co2 = /\ tv2 : kco2 <visM, visR>. r2
@@ -1012,6 +1014,7 @@ opt_trans_rule opts is co1 co2
     --   /\tv1 : (kco1;kco2) <visL, visR>.  (r1; r2[tv2 |-> tv1 |> kco1])
     = fireTransRule "EtaAllTy_ty" co1 co2 $
       mkForAllCo tv1 visL visR
+                 (opt_trans opts is mco1 mco2)
                  (kindCoToMKindCo (opt_trans opts is kco1 kco2))
                  (opt_trans opts is' r1 r2')
     where
@@ -1021,16 +1024,16 @@ opt_trans_rule opts is co1 co2
 -- Push transitivity inside forall
 -- forall over coercions.
 opt_trans_rule opts is co1 co2
-  | Just (cv1, visL1, _visR1, kco1, r1) <- splitForAllCo_co_maybe co1
-  , Just (cv2, _visL2, visR2, kco2, r2) <- etaForAllCo_co_maybe co2
-  = push_trans cv1 kco1 r1 cv2 kco2 r2 visL1 visR2
+  | Just (cv1, visL1, _visR1, mco1, kco1, r1) <- splitForAllCo_co_maybe co1
+  , Just (cv2, _visL2, visR2, mco2, kco2, r2) <- etaForAllCo_co_maybe co2
+  = push_trans cv1 mco1 kco1 r1 cv2 mco2 kco2 r2 visL1 visR2
 
-  | Just (cv2, _visL2, visR2, kco2, r2) <- splitForAllCo_co_maybe co2
-  , Just (cv1, visL1, _visR1, kco1, r1) <- etaForAllCo_co_maybe co1
-  = push_trans cv1 kco1 r1 cv2 kco2 r2 visL1 visR2
+  | Just (cv2, _visL2, visR2, mco2, kco2, r2) <- splitForAllCo_co_maybe co2
+  , Just (cv1, visL1, _visR1, mco1, kco1, r1) <- etaForAllCo_co_maybe co1
+  = push_trans cv1 mco1 kco1 r1 cv2 mco2 kco2 r2 visL1 visR2
 
   where
-  push_trans cv1 kco1 r1 cv2 kco2 r2 visL visR
+  push_trans cv1 mco1 kco1 r1 cv2 mco2 kco2 r2 visL visR
     -- Given:
     --   co1 = /\ (cv1 : kco1) <visL, visM>. r1
     --   co2 = /\ (cv2 : kco2) <visM, visR>. r2
@@ -1039,7 +1042,7 @@ opt_trans_rule opts is co1 co2
     --   n2 = nth 3 kco1
     --   nco = /\ cv1 : (kco1;kco2). (r1; r2[cv2 |-> (sym n1);cv1;n2])
     = fireTransRule "EtaAllTy_co" co1 co2 $
-      mkForAllCo cv1 visL visR (coToMCo (opt_trans opts is kco1 kco2))
+      mkForAllCo cv1 visL visR (opt_trans opts is mco1 mco2) (coToMCo (opt_trans opts is kco1 kco2))
                                (opt_trans opts is' r1 r2')
     where
       is'  = is `extendInScopeSet` cv1
@@ -1535,7 +1538,9 @@ Suppose we have
 
   g : all a1:k1.t1  ~  all a2:k2.t2
 
-but g is *not* a ForAllCo. We want to eta-expand it. So, we do this:
+but g is *not* a ForAllCo. Its role must be N or R. We recover nominal
+matchability and binder-kind proofs with SelFAMatch and SelKind, then
+eta-expand it. The metadata proof remains outside the binder. We do this:
 
   g' = all a1:(ForAllKindCo g).(InstCo g (a1 ~ a1 |> ForAllKindCo g))
 
@@ -1572,51 +1577,51 @@ Here,
   h2   = mkInstCo g (cv1 ~ (sym eta1;c1;eta2))
 -}
 etaForAllCo_ty_maybe :: Coercion
-                     -> Maybe (TyVar, ForAllTyFlag, ForAllTyFlag, KindCoercion, Coercion)
+                     -> Maybe (TyVar, ForAllTyFlag, ForAllTyFlag, CoercionN, KindCoercion, Coercion)
 -- Try to make the coercion be of form (forall tv:kind_co. co)
 etaForAllCo_ty_maybe co
-  | Just (tv, visL, visR, kind_co, r) <- splitForAllCo_ty_maybe co
-  = Just (tv, visL, visR, kind_co, r)
+  | Just (tv, visL, visR, ma_co, kind_co, r) <- splitForAllCo_ty_maybe co
+  = Just (tv, visL, visR, ma_co, kind_co, r)
 
   | (Pair ty1 ty2, role)  <- coercionKindRole co
-  , Just (Bndr tv1 vis1, _) <- splitForAllForAllTyBinder_maybe ty1
+  , Just (_, Bndr tv1 vis1, _) <- splitForAllForAllTyBinder_maybe ty1
   , isTyVar tv1
-  , Just (Bndr tv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
+  , Just (_, Bndr tv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
   , isTyVar tv2
   , role /= Phantom
     -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
   -- can't eta-expand at nominal role unless visibilities match
   , (role /= Nominal) || (vis1 `eqForAllVis` vis2)
-  , let kind_co = mkSelCo SelForAll co
-  = Just ( tv1, vis1, vis2, kind_co
+  , let kind_co = mkSelCo (SelForAll SelKind) co
+  = Just ( tv1, vis1, vis2, mkSelCo (SelForAll SelFAMatch) co, kind_co
          , mkInstCo co (mk_grefl_right_co Nominal (TyVarTy tv1) kind_co))
 
   | otherwise
   = Nothing
 
 etaForAllCo_co_maybe :: Coercion
-                     -> Maybe (CoVar, ForAllTyFlag, ForAllTyFlag, KindCoercion, Coercion)
+                     -> Maybe (CoVar, ForAllTyFlag, ForAllTyFlag, CoercionN, KindCoercion, Coercion)
 -- Try to make the coercion be of form (forall cv:kind_co. co)
 etaForAllCo_co_maybe co
-  | Just (cv, visL, visR, kind_co, r) <- splitForAllCo_co_maybe co
-  = Just (cv, visL, visR, kind_co, r)
+  | Just (cv, visL, visR, ma_co, kind_co, r) <- splitForAllCo_co_maybe co
+  = Just (cv, visL, visR, ma_co, kind_co, r)
 
   | (Pair ty1 ty2, role)  <- coercionKindRole co
-  , Just (Bndr cv1 vis1, _) <- splitForAllForAllTyBinder_maybe ty1
+  , Just (_, Bndr cv1 vis1, _) <- splitForAllForAllTyBinder_maybe ty1
   , isCoVar cv1
-  , Just (Bndr cv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
+  , Just (_, Bndr cv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
   , isCoVar cv2
   -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
   -- The opaque CoVar path requires a representational parent.
   , role == Representational
-  = let kind_co  = mkSelCo SelForAll co
+  = let kind_co  = mkSelCo (SelForAll SelKind) co
         r        = coVarRole cv1
         l_co     = mkCoVarCo cv1
         kind_co' = downgradeRole r Nominal kind_co
         r_co     = mkSymCo (mkSelCo (SelTyCon 2 r) kind_co')
                    `mk_trans_co` l_co
                    `mk_trans_co` mkSelCo (SelTyCon 3 r) kind_co'
-    in Just ( cv1, vis1, vis2, kind_co
+    in Just ( cv1, vis1, vis2, mkSelCo (SelForAll SelFAMatch) co, kind_co
             , mkInstCo co (mkProofIrrelCo Nominal kind_co l_co r_co))
 
   | otherwise
@@ -1697,18 +1702,20 @@ and these two imply
 {- Note [Optimising ForAllCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If sym=NotSwapped, optimising ForAllCo is relatively easy:
-   opt env (ForAllCo tcv kco bodyco)
-     = ForAllCo tcv' (opt env kco) (opt env' bodyco)
+   opt env (ForAllCo tcv visL visR maco kco bodyco)
+     = ForAllCo tcv' visL visR (opt env maco)
+                  (opt env kco) (opt env' bodyco)
      where
        (env', tcv') = substBndr env tcv
 
-Just apply the substitution to the kind of the binder, deal with
-shadowing etc, and recurse.  Remember in (ForAllCo tcv kco bodyco)
+The metadata proof is nominal. It is outside the binder's scope, so use
+env rather than env' for that proof. Apply the substitution to the kind
+of the binder, handle shadowing, and recurse. Remember that
     varKind tcv = coercionLKind kco
 
 But if sym=Swapped, things are trickier.  Here is an identity that helps:
-   Sym (ForAllCo (tv:k1) (kco:k1~k2) bodyco)
-   = ForAllCo (tv:k2) (Sym kco : k2~k1)
+   Sym (ForAllCo (tv:k1) visL visR maco (kco:k1~k2) bodyco)
+   = ForAllCo (tv:k2) visR visL (Sym maco) (Sym kco : k2~k1)
               (Sym (bodyco[tv:->tv:k2 |> Sym kco]))
 
 * We re-type tv:k1 to become tv:k2.

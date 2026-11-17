@@ -432,7 +432,8 @@ orphNamesOfType (TermAppTy f arg)    = orphNamesOfType (varType f)
 orphNamesOfType (DepFunTy v res)     = orphNamesOfType (varType v)
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (LitTy {})           = emptyNameSet
-orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
+orphNamesOfType (ForAllTy ma bndr res) = orphNamesOfType ma `unionNameSet`
+                                     orphNamesOfType (binderType bndr)
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
 

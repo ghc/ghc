@@ -193,6 +193,10 @@ An ordinary runtime lambda has U matchability. Eta expansion can introduce
 that lambda only when the consumed arrow has U. typeOneShots and mkEtaWW use
 the same condition so that typeArity does not promise unsupported expansion.
 Join-point eta expansion and eta reduction use this condition as well.
+Runtime type and coercion lambdas also have U matchability. Their forall
+arrows use the same condition. A cast can pass through a forall lambda
+only when its metadata proof is reflexive. Application still consumes
+an M or unknown forall without this eta premise.
 
 Pushing a cast through a lambda must retain its U result classification.
 Both lambda-pushing paths require reflexive matchability evidence before
@@ -217,7 +221,8 @@ typeOneShots ty
   = go initRecTc ty
   where
     go rec_nts ty
-      | Just (tcv, ty')  <- splitForAllTyCoVar_maybe ty
+      | Just (ma, tcv, ty') <- splitForAllTyCoVar_maybe ty
+      , ma `eqType` unmatchableDataConTy
       = if isCoVar tcv
         then idOneShotInfo tcv : go rec_nts ty'
         else go rec_nts ty'
@@ -2092,7 +2097,7 @@ eta_expand in_scope one_shots orig_expr
           (in_scope', eis@(EI eta_bndrs mco))
                     = mkEtaWW oss (ppr orig_expr) in_scope (exprType expr)
           top_bndrs = reverse rev_vs
-          top_eis   = EI (top_bndrs ++ eta_bndrs) (mkPiMCos top_bndrs mco)
+          top_eis   = EI (top_bndrs ++ eta_bndrs) (mkPiMCos [(unmatchableDataConTy,b) | b <- top_bndrs] mco)
 
           -- Find ticks behind type apps.
           -- See Note [Eta expansion and source notes]
@@ -2334,14 +2339,15 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
     go n oss@(one_shot:oss1) subst ty
        ----------- Forall types  (forall a. ty)
-       | Just (Bndr tcv vis, ty') <- splitForAllForAllTyBinder_maybe ty
+       | Just (ma, Bndr tcv vis, ty') <- splitForAllForAllTyBinder_maybe ty
+       , Type.substTyUnchecked subst ma `eqType` unmatchableDataConTy
        , (subst', tcv') <- Type.substVarBndr subst tcv
        , let oss' | isTyVar tcv = oss
                   | otherwise   = oss1
          -- A forall can bind a CoVar, in which case
          -- we consume one of the [OneShotInfo]
        , (in_scope, EI bs mco) <- go n oss' subst' ty'
-       = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Bndr tcv' vis) ty' mco))
+       = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Type.substTyUnchecked subst ma) (Bndr tcv' vis) (Type.substTyUnchecked subst' ty') mco))
 
        ----------- Retained dependent functions
        | DepFunTy b res_ty <- coreFullView ty
@@ -2368,7 +2374,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
        , let eta_id' = eta_id `setIdOneShotInfo` one_shot
        , (in_scope, EI bs mco) <- go (n+1) oss1 subst' res_ty
-       = (in_scope, EI (eta_id' : bs) (mkFunResMCo eta_id' mco))
+       = (in_scope, EI (eta_id' : bs) (mkFunResMCo unmatchableDataConTy eta_id' mco))
 
        ----------- Newtypes
        -- Given this:
@@ -2398,14 +2404,14 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
         -- So we simply decline to eta-expand.  Otherwise we'd end up
         -- with an explicit lambda having a non-function type
 
-mkEtaForAllMCo :: ForAllTyBinder -> Type -> MCoercion -> MCoercion
-mkEtaForAllMCo (Bndr tcv vis) ty mco
+mkEtaForAllMCo :: Matchability -> ForAllTyBinder -> Type -> MCoercion -> MCoercion
+mkEtaForAllMCo ma (Bndr tcv vis) ty mco
   = case mco of
       MRefl | isCoreTyLamForAllTyFlag vis -> MRefl
             | otherwise                   -> mk_fco (mkRepReflCo ty)
       MCo co                              -> mk_fco co
   where
-    mk_fco co = MCo (mkForAllCo tcv coreTyLamForAllTyFlag vis MRefl co)
+    mk_fco co = MCo (mkForAllCo tcv coreTyLamForAllTyFlag vis (mkNomReflCo ma) MRefl co)
     -- coreTyLamForAllTyFlag: See Note [The EtaInfo mechanism], particularly
     -- the (EtaInfo Invariant).  (sym co) wraps a lambda that always has
     -- a ForAllTyFlag of coreTyLamForAllTyFlag; see Note [Required foralls in Core]
@@ -2847,11 +2853,13 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_arg bndr (Type arg_ty) co fun_ty
        | Just tv <- getTyVar_maybe arg_ty
        , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
-           Just (Bndr _ vis, _) -> Just (fco, [])
-             where !fco = mkForAllCo tv vis coreTyLamForAllTyFlag MRefl co
+           Just (ma, Bndr _ vis, _)
+             | ma `eqType` unmatchableDataConTy -> Just (fco, [])
+             where !fco = mkForAllCo tv vis coreTyLamForAllTyFlag (mkNomReflCo ma) MRefl co
                    -- The lambda we are eta-reducing always has visibility
                    -- 'coreTyLamForAllTyFlag' which may or may not match
                    -- the visibility on the inner function (#24014)
+           Just {} -> Nothing
            Nothing -> pprPanic "tryEtaReduce: type arg to non-forall type"
                                (text "fun:" <+> ppr bndr
                                 $$ text "arg:" <+> ppr arg_ty
@@ -2862,7 +2870,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
        , Just (_af, ma, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , ma `eqType` unmatchableDataConTy
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
-       = Just (mkFunResCo Representational bndr co, [])
+       = Just (mkFunResCo Representational ma bndr co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , Just (_, ma, fun_mult, _, _) <- splitFunTy_maybe fun_ty
@@ -3023,7 +3031,7 @@ pushCoTyArg co arg_ty
     tyL = coercionLKind co
     tyR = coercionRKind co -- Used only in asssertions and debug messages
 
-    co1 = mkSymCo (mkSelCo SelForAll co)
+    co1 = mkSymCo (mkSelCo (SelForAll SelKind) co)
        -- co1 :: k2 ~N k1
        -- Note that SelCo extracts a Nominal equality between the
        -- kinds of the types related by a coercion between forall-types.
@@ -3257,14 +3265,15 @@ collectBindersPushingCo e
       , let Pair tyL tyR = coercionKind co
       , assert (isForAllTy_ty tyL) $
         isForAllTy_ty tyR
-      , isReflCo (mkSelCo SelForAll co)  -- See Note [collectBindersPushingCo]
+      , isReflCo (mkSelCo (SelForAll SelFAMatch) co)
+      , isReflCo (mkSelCo (SelForAll SelKind) co)  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
 
       | isCoVar b
       , let Pair tyL tyR = coercionKind co
-      , assert (isForAllTy_co tyL) $
-        isForAllTy_co tyR
-      , isReflCo (mkSelCo SelForAll co)  -- See Note [collectBindersPushingCo]
+      , isForAllTy_co tyL, isForAllTy_co tyR
+      , isReflCo (mkSelCo (SelForAll SelFAMatch) co)
+      , isReflCo (mkSelCo (SelForAll SelKind) co)  -- See Note [collectBindersPushingCo]
       , let cov = mkCoVarCo b
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkCoercionTy cov)))
 
@@ -3341,7 +3350,8 @@ etaBodyForJoinPoint need_args body
     go 0 _  _     rev_bs e
       = (reverse rev_bs, e)
     go n ty subst rev_bs e
-      | Just (tv, res_ty) <- splitForAllTyCoVar_maybe ty
+      | Just (ma, tv, res_ty) <- splitForAllTyCoVar_maybe ty
+      , Type.substTyUnchecked subst ma `eqType` unmatchableDataConTy
       , let (subst', tv') = substVarBndr subst tv
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
         -- The varToCoreExpr is important: `tv` might be a coercion variable

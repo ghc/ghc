@@ -308,7 +308,7 @@ classToIfaceDecl env clas
         (env2, if_decl) = tyConToIfaceDecl env1 tc
 
     toIfaceClassOp (sel_id, def_meth)
-        = assert (sel_tyvars == binderVars tc_binders) $
+        = assert (map snd sel_tyvars == binderVars tc_binders) $
           IfaceClassOp (getName sel_id)
                        (tidyToIfaceType env1 op_ty)
                        (fmap toDmSpec def_meth)

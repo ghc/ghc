@@ -1836,12 +1836,23 @@ zonkEvTerm (EvTypeable ty ev)
   = EvTypeable <$> zonkTcTypeToTypeX ty <*> zonkEvTypeable ev
 zonkEvTerm (EvFun { et_tvs = tvs, et_given = evs
                   , et_binds = ev_binds, et_body = body_id })
-  = runZonkBndrT (zonkTyBndrsX tvs)       $ \ new_tvs      ->
+  = runZonkBndrT (zonk_foralls tvs)       $ \ new_tvs      ->
     runZonkBndrT (zonkEvBndrsX evs)       $ \ new_evs      ->
     runZonkBndrT (zonkTcEvBinds ev_binds) $ \ new_ev_binds ->
   do { new_body_id  <- zonkIdOcc body_id
      ; return (EvFun { et_tvs = new_tvs, et_given = new_evs
                      , et_binds = new_ev_binds, et_body = new_body_id }) }
+  where
+    -- See Note [Runtime forall matchability] in GHC.Tc.Utils.Instantiate.
+    zonk_foralls :: [(TcEvBinds, CoercionN, TyCoVar)]
+                 -> ZonkBndrTcM [(TcEvBinds, CoercionN, TyCoVar)]
+    zonk_foralls [] = pure []
+    zonk_foralls ((binds, ma_co, tv) : rest)
+      = do { binds' <- zonkTcEvBinds binds
+           ; ma_co' <- noBinders (zonkCoToCo ma_co)
+           ; tv' <- if isCoVar tv then zonkEvBndrX tv else zonkTyBndrX tv
+           ; rest' <- zonk_foralls rest
+           ; pure ((binds', ma_co', tv') : rest') }
 
 zonkCoreExpr :: CoreExpr -> ZonkTcM CoreExpr
 zonkCoreExpr (Var v)

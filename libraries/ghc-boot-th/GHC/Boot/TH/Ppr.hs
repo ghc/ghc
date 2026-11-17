@@ -103,13 +103,22 @@ pprPatSynSig nm ty
 -- unambiguously. See the note on 'PatSynType' and the section on
 -- pattern synonyms in the GHC user's guide for more information.
 pprPatSynType :: PatSynType -> Doc
-pprPatSynType ty@(ForallT uniTys reqs ty'@(ForallT exTys provs ty''))
-  | null exTys,  null provs = ppr (ForallT uniTys reqs ty'')
-  | null uniTys, null reqs  = noreqs <+> ppr ty'
-  | null reqs               = pprForallBndrs uniTys <+> noreqs <+> ppr ty'
-  | otherwise               = ppr ty
+pprPatSynType ty
+  | Just (ma, uniTys, reqs, ty') <- forallSlot ty
+  , Just (_, exTys, provs, ty'') <- forallSlot ty'
+  = renderSlots ma uniTys reqs ty' exTys provs ty''
   where noreqs = text "() =>"
-        pprForallBndrs tvs = text "forall" <+> hsep (map ppr tvs) <+> text "."
+        renderSlots ma uniTys reqs ty' exTys provs ty''
+          | null exTys, null provs = ppr (wrap ma (ForallT uniTys reqs ty''))
+          | null uniTys, null reqs = noreqs <+> ppr ty'
+          | null reqs = pprForallMatch ForallInvis ma uniTys [] <+> noreqs <+> ppr ty'
+          | otherwise = ppr ty
+        forallSlot (ForallT tvs ctxt body) = Just (Nothing, tvs, ctxt, body)
+        forallSlot (ForallMatchT ma (ForallT tvs ctxt body))
+          | not (null tvs) = Just (Just ma, tvs, ctxt, body)
+        forallSlot _ = Nothing
+        wrap Nothing body = body
+        wrap (Just ma) body = ForallMatchT ma body
 pprPatSynType ty            = ppr ty
 
 ------------------------------
@@ -248,6 +257,14 @@ pprExp i (ForallVisE tvars body) =
   parensIf (i >= funPrec) $ sep [pprForallVis tvars [], pprExp qualPrec body]
 pprExp i (ForallE tvars body) =
   parensIf (i >= funPrec) $ sep [pprForall tvars [], pprExp qualPrec body]
+pprExp i (ForallMatchE ma (ForallVisE tvars body)) | not (null tvars) =
+  parensIf (i >= funPrec) $
+    sep [pprForallMatch ForallVis (Just ma) tvars [], pprExp qualPrec body]
+pprExp i (ForallMatchE ma (ForallE tvars body)) | not (null tvars) =
+  parensIf (i >= funPrec) $
+    sep [pprForallMatch ForallInvis (Just ma) tvars [], pprExp qualPrec body]
+pprExp i malformed@ForallMatchE{} =
+  parensIf (i >= appPrec) $ text (show malformed)
 pprExp i (ConstrainedE ctx body) =
   parensIf (i >= funPrec) $ sep [pprCtxWith pprExp ctx, pprExp qualPrec body]
 
@@ -564,6 +581,7 @@ ppr_typedef data_or_newtype isTop maybeInst ctxt t argsDoc ksig cs decs
         where isGadtCon (GadtC _ _ _   ) = True
               isGadtCon (RecGadtC _ _ _) = True
               isGadtCon (ForallC _ _ x ) = isGadtCon x
+              isGadtCon (ForallMatchC _ x) = isGadtCon x
               isGadtCon  _               = False
 
     ksigDoc = case ksig of
@@ -730,6 +748,12 @@ instance Ppr Con where
           <+> pprBangType st2
       ppr_con ppr_foralls (ForallC ns ctxt con)
         = ppr_con (\d -> ppr_foralls $ sep [pprForall ns ctxt, d]) con
+      ppr_con ppr_foralls (ForallMatchC ma (ForallC ns ctxt con))
+        | not (null ns)
+        = ppr_con (\d -> ppr_foralls $
+                    sep [pprForallMatch ForallInvis (Just ma) ns ctxt, d]) con
+      ppr_con ppr_foralls malformed@ForallMatchC{}
+        = ppr_foralls $ text (show malformed)
       ppr_con ppr_foralls (GadtC cs sts ty)
         = commaSepApplied cs <+> dcolon <+> ppr_foralls (pprGadtRHS sts ty)
       ppr_con ppr_foralls (RecGadtC cs vsts ty)
@@ -757,14 +781,20 @@ pprForallVis :: [TyVarBndr ()] -> Cxt -> Doc
 pprForallVis = pprForall' ForallVis
 
 pprForall' :: PprFlag flag => ForallVisFlag -> [TyVarBndr flag] -> Cxt -> Doc
-pprForall' fvf tvs cxt
+pprForall' fvf = pprForallMatch fvf Nothing
+
+-- | Print metadata after the forall separator. Keep malformed wrappers visible
+-- in their callers so that splice errors can display the complete input.
+pprForallMatch :: PprFlag flag => ForallVisFlag -> Maybe Type -> [TyVarBndr flag] -> Cxt -> Doc
+pprForallMatch fvf ma tvs cxt
   -- even in the case without any tvs, there could be a non-empty
   -- context cxt (e.g., in the case of pattern synonyms, where there
   -- are multiple forall binders and contexts).
   | [] <- tvs = pprCxt cxt
   | otherwise = text "forall" <+> hsep (map ppr tvs)
-                              <+> separator <+> pprCxt cxt
+                              <+> separator <+> annotation <+> pprCxt cxt
   where
+    annotation = maybe empty (\ty -> char '@' <> parens (ppr ty)) ma
     separator = case fvf of
                   ForallVis   -> text "->"
                   ForallInvis -> char '.'
@@ -871,6 +901,14 @@ pprType p (ForallT tvars ctxt ty) =
   parensIf (p >= funPrec) $ sep [pprForall tvars ctxt, pprType qualPrec ty]
 pprType p (ForallVisT tvars ty) =
   parensIf (p >= funPrec) $ sep [pprForallVis tvars [], pprType qualPrec ty]
+pprType p (ForallMatchT ma (ForallT tvars ctxt ty)) | not (null tvars) =
+  parensIf (p >= funPrec) $
+    sep [pprForallMatch ForallInvis (Just ma) tvars ctxt, pprType qualPrec ty]
+pprType p (ForallMatchT ma (ForallVisT tvars ty)) | not (null tvars) =
+  parensIf (p >= funPrec) $
+    sep [pprForallMatch ForallVis (Just ma) tvars [], pprType qualPrec ty]
+pprType p malformed@ForallMatchT{} =
+  parensIf (p >= appPrec) $ text (show malformed)
 pprType p t@AppT{}               = pprTyApp p (split t)
 pprType p t@AppKindT{}           = pprTyApp p (split t)
 

@@ -267,9 +267,11 @@ withRetainedAmbiguityType ty thing_inside
       = do { fresh <- newSysLocalId (getOccFS index) ManyTy (varType index)
            ; (indices, body) <- go (applyTypeToArgs ty [Var fresh])
            ; return (fresh : indices, mkVisFunTyManyU (varType index) body) }
-    go (ForAllTy binder body)
-      = do { (indices, body) <- go body
-           ; return (indices, mkForAllTy binder body) }
+    go (ForAllTy ma binder body)
+      = do { (ma_indices, ma) <- go ma
+           ; (indices, body) <- go body
+           ; return (ma_indices ++ indices,
+                     mkTyCoForAllTy ma (binderVar binder) (binderFlag binder) body) }
     go (FunTy flag ma mult arg res)
       = do { (ma_indices, ma) <- go ma
            ; (arg_indices, arg) <- go arg
@@ -557,7 +559,7 @@ checkEscapingKind :: Type -> TcM ()
 checkEscapingKind poly_ty
   | (tvs, tau) <- splitForAllTyVars poly_ty
   , let tau_kind = typeKind tau
-  , Nothing <- occCheckExpand tvs tau_kind
+  , Nothing <- occCheckExpand (map snd tvs) tau_kind
     -- Ensure that none of the tvs occur in the kind of the forall
     -- /after/ expanding type synonyms.
     -- See Note [Phantom type variables in kinds] in GHC.Core.Type
@@ -884,7 +886,8 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
                 -- Reject forall (a :: Eq b => b). blah
                 -- In a kind signature we don't allow constraints
 
-        ; checkVdqOK ve tvbs ty
+        ; mapM_ (check_type (ve{ve_rank = MustBeMonoType}) . fst) tvbs
+        ; checkVdqOK ve (map snd tvbs) ty
                 -- Reject visible, dependent quantification in the type of a
                 -- term (e.g., `f :: forall a -> a -> Maybe a`)
 
@@ -902,7 +905,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
   where
     (tvbs, phi)   = tcSplitForAllTyVarBinders ty
     (theta, tau)  = tcSplitPhiTy phi
-    (env', _)     = tidyForAllTyBinders env tvbs
+    (env', _)     = tidyForAllTyBinders env (map snd tvbs)
 
 check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank })
@@ -1853,7 +1856,7 @@ dropCasts ty@(FunTy _ ma w t1 t2)
   = ty { ft_ma = dropCasts ma, ft_mult = dropCasts w
        , ft_arg = dropCasts t1, ft_res = dropCasts t2 }
 dropCasts (TyConApp tc tys)   = mkTyConApp tc (map dropCasts tys)
-dropCasts (ForAllTy b ty)     = ForAllTy (dropCastsB b) (dropCasts ty)
+dropCasts (ForAllTy ma b ty)  = ForAllTy (dropCasts ma) (dropCastsB b) (dropCasts ty)
 dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy
 
 dropCastsB :: TyVarBinder -> TyVarBinder
@@ -2265,7 +2268,7 @@ splitInstTyForValidity = split_context [] . drop_foralls
     -- This is like 'dropForAlls', except that it does not look through type
     -- synonyms.
     drop_foralls :: Type -> Type
-    drop_foralls (ForAllTy (Bndr _tv argf) ty)
+    drop_foralls (ForAllTy _ (Bndr _tv argf) ty)
       | isInvisibleForAllTyFlag argf = drop_foralls ty
     drop_foralls ty = ty
 
@@ -2306,7 +2309,7 @@ checkInstTermination theta head_pred
            -> check2 (pSizeClassPredX foralld_tvs cls tys)
 
          ForAllPred tvs _ head_pred'
-           -> check (foralld_tvs `extendVarSetList` tvs) head_pred'
+           -> check (foralld_tvs `extendVarSetList` map snd tvs) head_pred'
               -- Termination of the quantified predicate itself is checked
               -- when the predicates are individually checked for validity
 

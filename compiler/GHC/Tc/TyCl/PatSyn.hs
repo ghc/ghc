@@ -146,7 +146,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
 
              named_taus = (name, pat_ty) : map mk_named_tau args
              mk_named_tau arg
-               = (getName arg, mkSpecForAllTys ex_tvs (varType arg))
+               = (getName arg, mkSpecForAllTys [(unmatchableDataConTy,tv) | tv <- ex_tvs] (varType arg))
                -- The mkSpecForAllTys is important (#14552), albeit
                -- slightly artificial (there is no variable with this funny type).
                -- We do not want to quantify over variable (alpha::k)
@@ -839,7 +839,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              (cont_args, cont_arg_tys)
                | is_unlifted = ([nlHsDataCon unboxedUnitDataCon], [unboxedUnitTy])
                | otherwise   = (args,                             arg_tys)
-             cont_ty = mkInfSigmaTy ex_tvs prov_theta $
+             cont_ty = mkInfSigmaTy [(unmatchableDataConTy,tv) | tv <- ex_tvs] prov_theta $
                        mkVisFunTysManyU cont_arg_tys res_ty
 
              fail_ty  = mkVisFunTyManyU unboxedUnitTy res_ty
@@ -852,7 +852,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
        ; is_strict    <- xoptM LangExt.Strict
        ; comps        <- getCompleteMatchesTcM
        ; let matcher_tau   = mkVisFunTysManyU [pat_ty, cont_ty, fail_ty] res_ty
-             matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
+             matcher_sigma = mkInfSigmaTy [(unmatchableDataConTy,tv) | tv <- rr_tv:res_tv:univ_tvs] req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
              patsyn_id     = mkExportedVanillaId ps_name matcher_sigma
                              -- See Note [Exported LocalIds] in GHC.Types.Id
@@ -950,8 +950,8 @@ mkPatSynBuilder dir (L _ name)
                -- Ideally, we'd defer making the builder until the representation is settled,
                -- but that would be a lot more work.
              builder_sigma  = add_void need_dummy_arg $
-                              mkInvisForAllTys univ_bndrs $
-                              mkInvisForAllTys ex_bndrs $
+                              mkInvisForAllTys [(unmatchableDataConTy,b) | b <- univ_bndrs] $
+                              mkInvisForAllTys [(unmatchableDataConTy,b) | b <- ex_bndrs] $
                               mkPhiTy theta $
                               mkVisFunTysManyU arg_tys $
                               pat_ty

@@ -306,7 +306,7 @@ tc_cmd env cmd@(HsCmdArrForm fixity expr f cmd_args) (cmd_stk, res_ty)
   = addErrCtxt (CmdCtxt cmd)
     do  { (cmd_args', cmd_tys) <- mapAndUnzipM tc_cmd_arg cmd_args
                               -- We use alphaTyVar for 'w'
-        ; let e_ty = mkInfForAllTy alphaTyVar $
+        ; let e_ty = mkInfForAllTy unmatchableDataConTy alphaTyVar $
                      mkVisFunTysManyU cmd_tys $
                      mkCmdArrTy env (mkPairTy alphaTy cmd_stk) res_ty
         ; expr' <- tcCheckPolyExpr expr e_ty
@@ -452,7 +452,7 @@ tcCmdSyntaxTable loc orig ty (CST tbl)
             ; hasFixedRuntimeRepRes std_occ user_nm_expr sigma1
             ; return (std_occ, unLoc expr) }
        where
-         ([tv], _, tau) = tcSplitSigmaTy (idType std_id)
+         ([(_ma,tv)], _, tau) = tcSplitSigmaTy (idType std_id)
          sigma1         = substTyWith [tv] [ty] tau
          -- Actually, the "tau-type" might be a sigma-type in the
          -- case of locally-polymorphic methods.

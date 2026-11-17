@@ -273,7 +273,7 @@ orphNamesOfClsInst :: ClsInst -> NameSet
 orphNamesOfClsInst (ClsInst { is_cls_nm = cls_nm, is_tys = tys })
   = orphNamesOfTypes tys `unionNameSet` unitNameSet cls_nm
 
-instanceSig :: ClsInst -> ([TyVar], [Type], Class, [Type])
+instanceSig :: ClsInst -> ([(Matchability, TyVar)], [Type], Class, [Type])
 -- Decomposes the DFunId
 instanceSig ispec = tcSplitDFunTy (idType (is_dfun ispec))
 
@@ -342,7 +342,8 @@ mkImportedClsInst cls_nm mb_tcs dfun_name dfun oflag orphan warn
             , is_orphan = orphan
             , is_warn = warn }
   where
-    (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
+    (ma_tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
+    tvs = map snd ma_tvs
 
 {-
 Note [When exactly is an instance decl an orphan?]

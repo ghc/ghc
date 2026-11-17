@@ -8,6 +8,7 @@ module GHC.Builtin.PrimOps.Ids
 where
 
 import GHC.Prelude
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 
 -- primop rules are attached to primop ids
 import {-# SOURCE #-} GHC.Core.Opt.ConstantFold (primOpRules)
@@ -46,7 +47,7 @@ mkPrimOpId prim_op
   = id
   where
     (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
-    ty   = mkForAllTys tyvars (mkVisFunTysManyU arg_tys res_ty)
+    ty   = mkForAllTys [(unmatchableDataConTy, tv) | tv <- tyvars] (mkVisFunTysManyU arg_tys res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
                          (AnId id) UserSyntax

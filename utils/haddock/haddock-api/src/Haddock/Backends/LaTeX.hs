@@ -576,10 +576,10 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_sig_args 0 leader typ
     do_sig_args :: Int -> LaTeX -> HsSigType DocNameI -> [(LaTeX, LaTeX)]
     do_sig_args n leader (HsSig{sig_bndrs = outer_bndrs, sig_body = ltype}) =
       case outer_bndrs of
-        HsOuterExplicit{hso_bndrs = bndrs} ->
+        HsOuterExplicit{} ->
           [
             ( decltt leader
-            , decltt (ppHsForAllTelescope (mkHsForAllInvisTeleI bndrs) unicode)
+            , decltt (ppHsOuterTyVarBndrs outer_bndrs unicode)
                 <+> ppLType unicode ltype
             )
           ]
@@ -638,15 +638,23 @@ ppTypeSig nms ty unicode =
 
 ppHsOuterTyVarBndrs :: RenderableBndrFlag flag => HsOuterTyVarBndrs flag DocNameI -> Bool -> LaTeX
 ppHsOuterTyVarBndrs (HsOuterImplicit{}) _ = empty
-ppHsOuterTyVarBndrs (HsOuterExplicit{hso_bndrs = bndrs}) unicode =
+ppHsOuterTyVarBndrs (HsOuterExplicit{hso_matchability = ma, hso_bndrs = bndrs}) unicode =
   hsep (forallSymbol unicode : ppTyVars unicode bndrs) <> dot
+    <> ppForAllMatchability unicode ma
 
 ppHsForAllTelescope :: HsForAllTelescope DocNameI -> Bool -> LaTeX
 ppHsForAllTelescope tele unicode = case tele of
-  HsForAllVis{hsf_vis_bndrs = bndrs} ->
+  HsForAllVis{hsf_matchability = ma, hsf_vis_bndrs = bndrs} ->
     hsep (forallSymbol unicode : ppTyVars unicode bndrs) <> text "\\" <> arrow unicode
-  HsForAllInvis{hsf_invis_bndrs = bndrs} ->
+      <> ppForAllMatchability unicode ma
+  HsForAllInvis{hsf_matchability = ma, hsf_invis_bndrs = bndrs} ->
     hsep (forallSymbol unicode : ppTyVars unicode bndrs) <> dot
+      <> ppForAllMatchability unicode ma
+
+-- | Print the annotation after the forall separator.
+ppForAllMatchability :: Bool -> Maybe (LHsType DocNameI) -> LaTeX
+ppForAllMatchability unicode =
+  maybe empty (\ma -> space <> atSign <> ppr_mono_ty (reparenTypePrec PREC_CON (unLoc ma)) unicode)
 
 -- | Print retained value binders without the result arrow.
 ppHsForEachBinders :: [LHsTyVarBndr () DocNameI] -> Bool -> LaTeX
@@ -916,24 +924,18 @@ ppDataDecl _ _ _ _ _ _ = error "ppDataDecl"
 
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
 ppConstrHdr
-  :: Bool
-  -- ^ print explicit foralls
-  -> [LHsTyVarBndr Specificity DocNameI]
-  -- ^ type variables
-  -> HsContext DocNameI
-  -- ^ context
+  :: [LHsGadtTelescope DocNameI]
+  -- ^ Quantifiers and contexts in source order.
   -> Bool
   -- ^ unicode
   -> LaTeX
-ppConstrHdr forall_ tvs ctxt unicode = ppForall <> ppCtxt
+ppConstrHdr telescope unicode = hsep (map ppPrefix telescope)
   where
-    ppForall
-      | null tvs || not forall_ = empty
-      | otherwise = ppHsForAllTelescope (mkHsForAllInvisTeleI tvs) unicode
-
-    ppCtxt
-      | null (hsc_ctxt ctxt) = empty
-      | otherwise = ppContextNoArrow ctxt unicode <+> darrow unicode <> space
+    ppPrefix (L _ (HsGadtForAll _ tele)) = ppHsForAllTelescope tele unicode
+    ppPrefix (L _ (HsGadtContext ctxt))
+      | null (hsc_ctxt (unLoc ctxt)) = empty
+      | otherwise = ppContextNoArrow (unLoc ctxt) unicode <+> darrow unicode <> space
+    ppPrefix (L _ HsGadtPar{}) = empty
 
 -- | Pretty-print a constructor
 ppSideBySideConstr
@@ -967,12 +969,9 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     decl = case con of
       ConDeclH98
         { con_args = det
-        , con_ex_tvs = tyVars
-        , con_forall = forall_
-        , con_mb_cxt = cxt
+        , con_telescope = telescope
         } ->
-          let context = fromMaybeContext cxt
-              header_ = ppConstrHdr forall_ tyVars context unicode
+          let header_ = ppConstrHdr telescope unicode
            in case det of
                 -- Prefix constructor, e.g. 'Just a'
                 PrefixCon _ args

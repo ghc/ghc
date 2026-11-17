@@ -27,6 +27,8 @@ module GHC.Core.PatSyn (
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
+
 import GHC.Core.Type
 import GHC.Core.TyCo.Ppr
 import GHC.Types.Name
@@ -515,7 +517,7 @@ pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
         , ppWhen insert_empty_ctxt $ parens empty <+> darrow
         , pprType sigma_ty ]
   where
-    sigma_ty = mkInvisForAllTys ex_tvs $
+    sigma_ty = mkInvisForAllTys [(unmatchableDataConTy, tv) | tv <- ex_tvs] $
                mkInvisFunTys prov_theta $
                mkVisFunTysManyU orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

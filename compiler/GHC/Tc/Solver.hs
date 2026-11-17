@@ -945,8 +945,9 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
    = do { -- When quantifying, we want to preserve any order of variables as they
           -- appear in partial signatures. cf. decideQuantifiedTyVars
-          let psig_tv_tys = [ mkTyVarTy tv | sig <- partial_sigs
-                                           , (_,Bndr tv _) <- sig_inst_skols sig ]
+          let psig_tv_tys = [ ty | sig <- partial_sigs
+                                , (_, (ma, Bndr tv _)) <- sig_inst_skols sig
+                                , ty <- [ma, mkTyVarTy tv] ]
               psig_theta  = [ pred | sig <- partial_sigs
                                    , pred <- sig_inst_theta sig ]
 
@@ -1927,17 +1928,19 @@ getSeedTys :: [(Name,TcType)]    -- The type of each RHS in the group
            -> [TcIdSigInst]      -- Any partial type signatures
            -> TcM ( [TcTyVar]    -- Zonked partial-sig quantified tyvars
                   , ThetaType    -- Zonked partial signature thetas
-                  , [TcType] )   -- Zonked tau-tys from the bindings
+                  , [TcType] )   -- Zonked tau-types and forall metadata
 getSeedTys name_taus psigs
   = TcM.liftZonkM $
     do { psig_tv_tys <- mapM TcM.zonkTcTyVar [ tv | TISI{ sig_inst_skols = skols } <- psigs
-                                                  , (_, Bndr tv _) <- skols ]
+                                                  , (_, (_, Bndr tv _)) <- skols ]
+       ; psig_mas <- mapM TcM.zonkTcType [ ma | TISI{ sig_inst_skols = skols } <- psigs
+                                            , (_, (ma, _)) <- skols ]
        ; psig_theta  <- mapM TcM.zonkTcType [ pred | TISI{ sig_inst_theta = theta } <- psigs
                                                    , pred <- theta ]
        ; tau_tys     <- mapM (TcM.zonkTcType . snd) name_taus
        ; return ( map getTyVar psig_tv_tys
                 , psig_theta
-                , tau_tys ) }
+                , psig_mas ++ tau_tys ) }
 
 ------------------
 predMentions :: TcTyVarSet -> TcPredType -> Bool

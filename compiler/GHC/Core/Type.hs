@@ -147,7 +147,7 @@ module GHC.Core.Type (
         -- * Multiplicity
 
         isMultiplicityTy, isMultiplicityVar,
-        Matchability, isMatchableFunTy,
+        Matchability, isMatchableFunTy, defaultForAllMatchability,
         unrestricted, linear, tymult,
         mkScaled, irrelevantMult, scaledSet,
         pattern OneTy, pattern ManyTy,
@@ -1097,7 +1097,7 @@ splitFunTys ty = split [] [] ty ty
 isMatchableFunTy :: Type -> Bool
 isMatchableFunTy ki = case coreFullView ki of
     FunTy { ft_ma = ma } -> eqType ma matchableDataConTy
-    ForAllTy{} -> True -- Existing implicit-M invariant; no U forall formation.
+    ForAllTy ma _ _ -> eqType ma matchableDataConTy
     _ -> False
 
 funResultTy :: HasDebugCallStack => Type -> Type
@@ -1124,7 +1124,7 @@ piResultTy_maybe :: Type -> Type -> Maybe Type
 piResultTy_maybe ty arg = case coreFullView ty of
   FunTy { ft_res = res } -> Just res
 
-  ForAllTy (Bndr tv _) res
+  ForAllTy _ (Bndr tv _) res
     -> let empty_subst = mkEmptySubst $ mkInScopeSet $
                          tyCoVarsOfTypes [arg,res]
        in Just (substTy (extendTCvSubst empty_subst tv arg) res)
@@ -1158,7 +1158,7 @@ piResultTys ty orig_args@(arg:args)
   | FunTy { ft_res = res } <- ty
   = piResultTys res args
 
-  | ForAllTy (Bndr tcv _) res <- ty
+  | ForAllTy _ (Bndr tcv _) res <- ty
   = -- Both type and coercion variables
     go (extendTCvSubst init_subst tcv arg) res args
 
@@ -1177,7 +1177,7 @@ piResultTys ty orig_args@(arg:args)
       | FunTy { ft_res = res } <- ty
       = go subst res args
 
-      | ForAllTy (Bndr tv _) res <- ty
+      | ForAllTy _ (Bndr tv _) res <- ty
       = go (extendTCvSubst subst tv arg) res args
 
       | Just ty' <- coreView ty
@@ -1377,7 +1377,7 @@ mk_cast_ty orig_ty co = go orig_ty
       = mkCastTy ty (co1 `mkTransCo` co)
           -- call mkCastTy again for the reflexivity check
 
-    go (ForAllTy (Bndr tv vis) inner_ty)
+    go (ForAllTy ma (Bndr tv vis) inner_ty)
       -- (EQ4) from the Note
       -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep.
       | isTyVar tv
@@ -1386,8 +1386,8 @@ mk_cast_ty orig_ty co = go orig_ty
         if tv `elemVarSet` fvs
         then let empty_subst = mkEmptySubst (mkInScopeSet fvs)
                  (subst, tv') = substVarBndr empty_subst tv
-             in ForAllTy (Bndr tv' vis) (substTy subst inner_ty `mk_cast_ty` co)
-        else ForAllTy (Bndr tv vis) (inner_ty `mk_cast_ty` co)
+             in ForAllTy ma (Bndr tv' vis) (substTy subst inner_ty `mk_cast_ty` co)
+        else ForAllTy ma (Bndr tv vis) (inner_ty `mk_cast_ty` co)
 
     go _ = CastTy orig_ty co -- NB: orig_ty: preserve synonyms if possible
 
@@ -1444,11 +1444,16 @@ tyConBindersPiTyBinders = map to_tyb
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
     to_tyb (Bndr tv AnonTCB)        = Anon (tymult (varType tv)) FTF_T_T
 
--- | Take a ForAllTy apart, returning the binders and result type
-splitForAllForAllTyBinders :: Type -> ([ForAllTyBinder], Type)
+-- | Select the concrete default of a newly introduced source forall.
+defaultForAllMatchability :: TypeOrKind -> Matchability
+defaultForAllMatchability TypeLevel = unmatchableDataConTy
+defaultForAllMatchability KindLevel = matchableDataConTy
+
+-- | Take a ForAllTy apart, returning annotated binders and the result type.
+splitForAllForAllTyBinders :: Type -> ([(Matchability, ForAllTyBinder)], Type)
 splitForAllForAllTyBinders ty = split ty ty []
   where
-    split _ (ForAllTy b res) bs                   = split res res (b:bs)
+    split _ (ForAllTy ma b res) bs                = split res res ((ma,b):bs)
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split orig_ty _                bs             = (reverse bs, orig_ty)
 {-# INLINE splitForAllForAllTyBinders #-}
@@ -1456,39 +1461,39 @@ splitForAllForAllTyBinders ty = split ty ty []
 -- | Take a ForAllTy apart, returning the list of tycovars and the result type.
 -- This always succeeds, even if it returns only an empty list. Note that the
 -- result type returned may have free variables that were bound by a forall.
-splitForAllTyCoVars :: Type -> ([TyCoVar], Type)
+splitForAllTyCoVars :: Type -> ([(Matchability, TyCoVar)], Type)
 splitForAllTyCoVars ty = split ty ty []
   where
-    split _       (ForAllTy (Bndr tv _) ty)    tvs = split ty ty (tv:tvs)
+    split _       (ForAllTy ma (Bndr tv _) ty) tvs = split ty ty ((ma,tv):tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
 -- | Like 'splitForAllTyCoVars', but split only for tyvars.
 -- This always succeeds, even if it returns only an empty list. Note that the
 -- result type returned may have free variables that were bound by a forall.
-splitForAllTyVars :: Type -> ([TyVar], Type)
+splitForAllTyVars :: Type -> ([(Matchability, TyVar)], Type)
 splitForAllTyVars ty = split ty ty []
   where
-    split _ (ForAllTy (Bndr tv _) ty) tvs | isTyVar tv = split ty ty (tv:tvs)
+    split _ (ForAllTy ma (Bndr tv _) ty) tvs | isTyVar tv = split ty ty ((ma,tv):tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty     = split orig_ty ty' tvs
     split orig_ty _                   tvs              = (reverse tvs, orig_ty)
 
 -- | Like 'splitForAllTyCoVars', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. Furthermore, each returned tyvar is annotated with '()'.
-splitForAllReqTyBinders :: Type -> ([ReqTyBinder], Type)
+splitForAllReqTyBinders :: Type -> ([(Matchability, ReqTyBinder)], Type)
 splitForAllReqTyBinders ty = split ty ty []
   where
-    split _ (ForAllTy (Bndr tv Required) ty) tvs   = split ty ty (Bndr tv ():tvs)
+    split _ (ForAllTy ma (Bndr tv Required) ty) tvs = split ty ty ((ma,Bndr tv ()):tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                   tvs          = (reverse tvs, orig_ty)
 
 -- | Like 'splitForAllTyCoVars', but only splits 'ForAllTy's with 'Invisible' type
 -- variable binders. Furthermore, each returned tyvar is annotated with its
 -- 'Specificity'.
-splitForAllInvisTyBinders :: Type -> ([InvisTyBinder], Type)
+splitForAllInvisTyBinders :: Type -> ([(Matchability, InvisTyBinder)], Type)
 splitForAllInvisTyBinders ty = split ty ty []
   where
-    split _ (ForAllTy (Bndr tv (Invisible spec)) ty) tvs = split ty ty (Bndr tv spec:tvs)
+    split _ (ForAllTy ma (Bndr tv (Invisible spec)) ty) tvs = split ty ty ((ma,Bndr tv spec):tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty       = split orig_ty ty' tvs
     split orig_ty _                   tvs                = (reverse tvs, orig_ty)
 
@@ -1501,7 +1506,7 @@ isForAllTy ty
 -- | Like `isForAllTy`, but returns True only if it is a tyvar binder
 isForAllTy_ty :: Type -> Bool
 isForAllTy_ty ty
-  | ForAllTy (Bndr tv _) _ <- coreFullView ty
+  | ForAllTy _ (Bndr tv _) _ <- coreFullView ty
   , isTyVar tv
   = True
 
@@ -1510,7 +1515,7 @@ isForAllTy_ty ty
 -- | Like `isForAllTy`, but returns True only if it is an inferred tyvar binder
 isForAllTy_invis_ty :: Type -> Bool
 isForAllTy_invis_ty  ty
-  | ForAllTy (Bndr tv (Invisible InferredSpec)) _ <- coreFullView ty
+  | ForAllTy _ (Bndr tv (Invisible InferredSpec)) _ <- coreFullView ty
   , isTyVar tv
   = True
 
@@ -1519,7 +1524,7 @@ isForAllTy_invis_ty  ty
 -- | Like `isForAllTy`, but returns True only if it is a covar binder
 isForAllTy_co :: Type -> Bool
 isForAllTy_co ty
-  | ForAllTy (Bndr tv _) _ <- coreFullView ty
+  | ForAllTy _ (Bndr tv _) _ <- coreFullView ty
   , isCoVar tv
   = True
 
@@ -1556,7 +1561,7 @@ isFunTy ty
   | otherwise                   = False
 
 -- | Take a forall type apart, or panics if that is not possible.
-splitForAllTyCoVar :: Type -> (TyCoVar, Type)
+splitForAllTyCoVar :: Type -> (Matchability, TyCoVar, Type)
 splitForAllTyCoVar ty
   | Just answer <- splitForAllTyCoVar_maybe ty = answer
   | otherwise                                  = pprPanic "splitForAllTyCoVar" (ppr ty)
@@ -1565,38 +1570,38 @@ splitForAllTyCoVar ty
 dropForAlls :: Type -> Type
 dropForAlls ty = go ty
   where
-    go (ForAllTy _ res)            = go res
+    go (ForAllTy _ _ res)            = go res
     go ty | Just ty' <- coreView ty = go ty'
     go res                         = res
 
 -- | Attempts to take a ForAllTy apart, returning the full ForAllTyBinder
-splitForAllForAllTyBinder_maybe :: Type -> Maybe (ForAllTyBinder, Type)
+splitForAllForAllTyBinder_maybe :: Type -> Maybe (Matchability, ForAllTyBinder, Type)
 splitForAllForAllTyBinder_maybe ty
-  | ForAllTy bndr inner_ty <- coreFullView ty = Just (bndr, inner_ty)
+  | ForAllTy ma bndr inner_ty <- coreFullView ty = Just (ma, bndr, inner_ty)
   | otherwise                                 = Nothing
 
 
 -- | Attempts to take a ForAllTy apart, returning the Var
-splitForAllTyCoVar_maybe :: Type -> Maybe (TyCoVar, Type)
+splitForAllTyCoVar_maybe :: Type -> Maybe (Matchability, TyCoVar, Type)
 splitForAllTyCoVar_maybe ty
-  | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty = Just (tv, inner_ty)
+  | ForAllTy ma (Bndr tv _) inner_ty <- coreFullView ty = Just (ma, tv, inner_ty)
   | otherwise                                        = Nothing
 
 -- | Attempts to take a ForAllTy apart, but only if the binder is a TyVar
-splitForAllTyVar_maybe :: Type -> Maybe (TyVar, Type)
+splitForAllTyVar_maybe :: Type -> Maybe (Matchability, TyVar, Type)
 splitForAllTyVar_maybe ty
-  | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty
+  | ForAllTy ma (Bndr tv _) inner_ty <- coreFullView ty
   , isTyVar tv
-  = Just (tv, inner_ty)
+  = Just (ma, tv, inner_ty)
 
   | otherwise = Nothing
 
 -- | Like 'splitForAllTyCoVar_maybe', but only returns Just if it is a covar binder.
-splitForAllCoVar_maybe :: Type -> Maybe (CoVar, Type)
+splitForAllCoVar_maybe :: Type -> Maybe (Matchability, CoVar, Type)
 splitForAllCoVar_maybe ty
-  | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty
+  | ForAllTy ma (Bndr tv _) inner_ty <- coreFullView ty
   , isCoVar tv
-  = Just (tv, inner_ty)
+  = Just (ma, tv, inner_ty)
 
   | otherwise = Nothing
 
@@ -1605,7 +1610,7 @@ splitForAllCoVar_maybe ty
 {-# INLINE splitPiTy_maybe #-}  -- callers will immediately deconstruct
 splitPiTy_maybe :: Type -> Maybe (Matchability, PiTyBinder, Type)
 splitPiTy_maybe ty = case coreFullView ty of
-  ForAllTy bndr ty -> Just (matchableDataConTy, Named bndr, ty)
+  ForAllTy ma bndr ty -> Just (ma, Named bndr, ty)
   FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res }
     -> Just (ma,Anon (mkScaled w arg) af,res)
   _ -> Nothing
@@ -1620,7 +1625,7 @@ splitPiTy ty
 splitPiTys :: Type -> ([Matchability], [PiTyBinder], Type)
 splitPiTys ty = split ty ty [] []
   where
-    split _ (ForAllTy b res) mas bs = split res res (matchableDataConTy:mas) (Named b:bs)
+    split _ (ForAllTy ma b res) mas bs = split res res (ma:mas) (Named b:bs)
     split _ (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = arg, ft_res = res }) mas bs
       = split res res (ma:mas) (Anon (Scaled w arg) af:bs)
     split orig_ty ty mas bs | Just ty' <- coreView ty = split orig_ty ty' mas bs
@@ -1635,7 +1640,7 @@ splitUninstantiatedValArgTys :: Type -> [Type]
 -- It's a pretty specialised function, hence its long name
 splitUninstantiatedValArgTys ty = go ty
   where
-    go (ForAllTy (Bndr b _) res) | isCoVar b  = varType b : go res
+    go (ForAllTy _ (Bndr b _) res) | isCoVar b  = varType b : go res
                                  | otherwise  = go res
     go (FunTy { ft_arg = arg, ft_res = res }) = arg : go res
     go ty | Just ty' <- coreView ty = go ty'
@@ -1670,7 +1675,7 @@ getRuntimeArgTys :: Type -> [(Scaled Type, FunTyFlag)]
 getRuntimeArgTys = go
   where
     go :: Type -> [(Scaled Type, FunTyFlag)]
-    go (ForAllTy _ res)
+    go (ForAllTy _ _ res)
       = go res
     go (FunTy { ft_mult = w, ft_arg = arg, ft_res = res, ft_af = af })
       = (Scaled w arg, af) : go res
@@ -1687,37 +1692,37 @@ invisibleBndrCount :: Type -> Int
 -- Includes invisible predicate arguments; e.g. for
 --    e.g.  forall {k}. (k ~ *) => k -> k
 -- returns 2 not 1
-invisibleBndrCount ty = length (fst (splitInvisPiTys ty))
+invisibleBndrCount ty = case splitInvisPiTys ty of (_, bs, _) -> length bs
 
 -- | Like 'splitPiTys', but returns only *invisible* binders, including constraints.
 -- Stops at the first visible binder.
-splitInvisPiTys :: Type -> ([PiTyBinder], Type)
-splitInvisPiTys ty = split ty ty []
+splitInvisPiTys :: Type -> ([Matchability], [PiTyBinder], Type)
+splitInvisPiTys ty = split ty ty [] []
    where
-    split _ (ForAllTy b res) bs
+    split _ (ForAllTy ma b res) mas bs
       | Bndr _ vis <- b
-      , isInvisibleForAllTyFlag vis   = split res res (Named b  : bs)
-    split _ (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })  bs
-      | isInvisibleFunArg af     = split res res (Anon (mkScaled mult arg) af : bs)
-    split orig_ty ty bs
-      | Just ty' <- coreView ty  = split orig_ty ty' bs
-    split orig_ty _          bs  = (reverse bs, orig_ty)
+      , isInvisibleForAllTyFlag vis = split res res (ma:mas) (Named b:bs)
+    split _ (FunTy { ft_af = af, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res }) mas bs
+      | isInvisibleFunArg af = split res res (ma:mas) (Anon (mkScaled mult arg) af:bs)
+    split orig_ty ty mas bs
+      | Just ty' <- coreView ty = split orig_ty ty' mas bs
+    split orig_ty _ mas bs = (reverse mas, reverse bs, orig_ty)
 
-splitInvisPiTysN :: Int -> Type -> ([PiTyBinder], Type)
+splitInvisPiTysN :: Int -> Type -> ([Matchability], [PiTyBinder], Type)
 -- ^ Same as 'splitInvisPiTys', but stop when
 --   - you have found @n@ 'PiTyBinder's,
 --   - or you run out of invisible binders
-splitInvisPiTysN n ty = split n ty ty []
+splitInvisPiTysN n ty = split n ty ty [] []
    where
-    split n orig_ty ty bs
-      | n == 0                  = (reverse bs, orig_ty)
-      | Just ty' <- coreView ty = split n orig_ty ty' bs
-      | ForAllTy b res <- ty
+    split n orig_ty ty mas bs
+      | n == 0 = (reverse mas, reverse bs, orig_ty)
+      | Just ty' <- coreView ty = split n orig_ty ty' mas bs
+      | ForAllTy ma b res <- ty
       , Bndr _ vis <- b
-      , isInvisibleForAllTyFlag vis  = split (n-1) res res (Named b  : bs)
-      | FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res } <- ty
-      , isInvisibleFunArg af   = split (n-1) res res (Anon (Scaled mult arg) af : bs)
-      | otherwise              = (reverse bs, orig_ty)
+      , isInvisibleForAllTyFlag vis = split (n-1) res res (ma:mas) (Named b:bs)
+      | FunTy { ft_af = af, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res } <- ty
+      , isInvisibleFunArg af = split (n-1) res res (ma:mas) (Anon (Scaled mult arg) af:bs)
+      | otherwise = (reverse mas, reverse bs, orig_ty)
 
 -- | Given a 'TyCon' and a list of argument types, filter out any invisible
 -- (i.e., 'Inferred' or 'Specified') arguments.
@@ -1789,7 +1794,7 @@ fun_kind_arg_flags = go emptySubst
     go subst ki arg_tys
       | Just ki' <- coreView ki = go subst ki' arg_tys
     go _ _ [] = []
-    go subst (ForAllTy (Bndr tv argf) res_ki) (arg_ty:arg_tys)
+    go subst (ForAllTy _ (Bndr tv argf) res_ki) (arg_ty:arg_tys)
       = argf : go subst' res_ki arg_tys
       where
         subst' = extendTvSubst subst tv arg_ty
@@ -1889,7 +1894,7 @@ isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
 isFamFreeTy (AppTy a b)       = isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (FunTy _ ma w a b) = isFamFreeTy ma && isFamFreeTy w && isFamFreeTy a && isFamFreeTy b
-isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
+isFamFreeTy (ForAllTy ma _ ty)  = isFamFreeTy ma && isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
 isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 
@@ -2132,7 +2137,7 @@ isValidJoinPointType arity ty
     valid_under tvs arity ty
       | arity == 0
       = tvs `disjointVarSet` tyCoVarsOfType ty
-      | Just (t, ty') <- splitForAllTyCoVar_maybe ty
+      | Just (_, t, ty') <- splitForAllTyCoVar_maybe ty
       = valid_under (tvs `extendVarSet` t) (arity-1) ty'
       | Just (_, ma, _, _, res_ty) <- splitFunTy_maybe ty
       , eqType ma unmatchableDataConTy
@@ -2511,7 +2516,8 @@ typeKind ty@(ForAllTy {})
       Just k' | all isTyVar tcvs -> k'                     -- Rule (FORALL1)
               | otherwise        -> lifted_kind_from_body  -- Rule (FORALL2)
   where
-    (tcvs, body) = splitForAllTyCoVars ty  -- Important: splits both TyVar and CoVar binders
+    (annotated_tcvs, body) = splitForAllTyCoVars ty
+    tcvs = map snd annotated_tcvs  -- Important: splits both TyVar and CoVar binders
     body_kind    = typeKind body
 
     lifted_kind_from_body  -- Implements (FORALL2)
@@ -2617,7 +2623,7 @@ returnsConstraintKind :: Kind -> Bool
 --         forall k. k -> Constraint
 returnsConstraintKind kind
   | Just kind' <- coreView kind = returnsConstraintKind kind'
-returnsConstraintKind (ForAllTy _ ty)         = returnsConstraintKind ty
+returnsConstraintKind (ForAllTy _ _ ty)         = returnsConstraintKind ty
 returnsConstraintKind (FunTy { ft_res = ty }) = returnsConstraintKind ty
 returnsConstraintKind kind                    = isConstraintLikeKind kind
 
@@ -2641,7 +2647,7 @@ typeHasFixedRuntimeRep = go
       | tcHasFixedRuntimeRep tc = True
     go (FunTy {})               = True
     go (LitTy {})               = True
-    go (ForAllTy _ ty)          = go ty
+    go (ForAllTy _ _ ty)          = go ty
     go ty                       = isFixedRuntimeRepKind (typeKind ty)
 
 -- | Checks that a kind of the form 'Type', 'Constraint'
@@ -3040,5 +3046,5 @@ isLinearType :: Type -> Bool
 isLinearType ty = case ty of
                       FunTy _ _ ManyTy _ res -> isLinearType res
                       FunTy _ _ _ _ _      -> True
-                      ForAllTy _ res       -> isLinearType res
+                      ForAllTy _ _ res       -> isLinearType res
                       _ -> False

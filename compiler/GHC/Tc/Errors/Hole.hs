@@ -1188,6 +1188,6 @@ definitelyNotSubType = go
       = Just $ funTyFlagTyCon af
     tc_head (TyConApp tc _)
       = Just tc
-    tc_head (ForAllTy _ body)
+    tc_head (ForAllTy _ _ body)
       = tc_head body
     tc_head _ = Nothing

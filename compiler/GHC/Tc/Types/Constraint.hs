@@ -127,6 +127,7 @@ import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.CtLoc
 
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 
 import GHC.Types.Var.Set
 import GHC.Types.Name.Reader
@@ -350,7 +351,7 @@ instance Outputable IrredCt where
 data QCInst
   -- | A quantified constraint, of type @forall tvs. context => ty@
   = QCI { qci_ev    :: CtEvidence -- See Note [Ct/evidence invariant]
-        , qci_tvs   :: [TcTyVar]  -- ^ @tvs@
+        , qci_tvs   :: [(Matchability, TcTyVar)] -- ^ Per-binder annotations and @tvs@
         , qci_theta :: TcThetaType
         , qci_body  :: TcPredType -- ^ the body of the @forall@, i.e. @ty@
         , qci_pend_sc :: ExpansionFuel
@@ -1421,7 +1422,7 @@ userTypeError_maybe look_everywhere = go
       = foldr (firstJust . go) Nothing (drop (tyConArity tc) tys)
       | otherwise
       = foldr (firstJust . go) Nothing tys
-    go (ForAllTy (Bndr tv _) ty) = go (tyVarKind tv) `firstJust` go ty
+    go (ForAllTy ma (Bndr tv _) ty) = go ma `firstJust` go (tyVarKind tv) `firstJust` go ty
     go (TermVarTy v) = go (varType v)
     go (TermAppTy _ arg)
       | not look_everywhere = Nothing
@@ -2209,7 +2210,7 @@ pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
 
 
 wrapType :: Type -> [TyVar] -> [PredType] -> Type
-wrapType ty skols givens = mkSpecForAllTys skols $ mkPhiTy givens ty
+wrapType ty skols givens = mkSpecForAllTys [(unmatchableDataConTy, tv) | tv <- skols] $ mkPhiTy givens ty
 
 
 {-

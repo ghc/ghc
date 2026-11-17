@@ -23,6 +23,9 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence ( mkWpTyApps )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Origin ( CtOrigin(OccurrenceOf) )
+import GHC.Tc.Solver.Monad ( runTcSEqualities )
+import GHC.Tc.Solver.Rewrite ( rewriteFamilyAxioms )
 
 import GHC.Iface.Env( newGlobalBinder )
 
@@ -42,8 +45,12 @@ import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Var ( VarBndr(..) )
+import GHC.Types.Var.Set ( isEmptyVarSet )
 
 import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
+import GHC.Core.Coercion ( coVarsOfCo )
+import GHC.Core.TyCo.FVs ( coVarsOfType )
+import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -57,8 +64,10 @@ import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFing
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Monad ( allM )
 import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 
+import Control.Monad ( filterM )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe ( isJust )
@@ -458,8 +467,8 @@ todoForTyCons mod mod_id tycons = do
                              `setInlinePragma` neverInlinePragma
                           -- See Note [NOINLINE on generated Typeable bindings]
 
-    let typeable_tycons :: [TypeableTyCon]
-        typeable_tycons =
+    let candidate_tycons :: [TypeableTyCon]
+        candidate_tycons =
             [ TypeableTyCon { tycon = tc''
                             , tycon_rep_id = mk_rep_id rep_name
                             }
@@ -476,8 +485,8 @@ todoForTyCons mod mod_id tycons = do
               -- Do, however, make them for their promoted datacon (see #13915).
             , not $ isDataFamInstTyCon tc''
             , Just rep_name <- pure $ tyConRepName_maybe tc''
-            , tyConIsTypeable tc''
             ]
+    typeable_tycons <- filterM (tyConIsTypeable . tycon) candidate_tycons
     return $ TyConTodo $
              TCTD { mod_rep_expr    = nlHsVar mod_id
                   , pkg_fingerprint = pkg_fpr
@@ -616,7 +625,9 @@ mkTyConRepBinds stuff todo (TypeableTyCon {..})
        let (bndrs, kind) = splitForAllForAllTyBinders (tyConKind tycon)
        liftTc $ traceTc "mkTyConKindRepBinds"
                         (ppr tycon $$ ppr (tyConKind tycon) $$ ppr kind)
-       let ctx = mkDeBruijnContext (map binderVar bndrs)
+       -- todoForTyCons certified these annotations before constructing the todo.
+       -- See Note [Forall matchability in Typeable kind prefixes].
+       let ctx = mkDeBruijnContext (map (binderVar . snd) bndrs)
        kind_rep <- getKindRep stuff ctx kind
 
        -- Make the TyCon binding
@@ -626,14 +637,52 @@ mkTyConRepBinds stuff todo (TypeableTyCon {..})
 
 -- | Is a particular 'TyCon' representable by @Typeable@?. These exclude type
 -- families and polytypes.
-tyConIsTypeable :: TyCon -> Bool
-tyConIsTypeable tc = isJust (tyConRepName_maybe tc)
-                  && kindIsTypeable (dropForAlls $ tyConKind tc)
+tyConIsTypeable :: TyCon -> TcM Bool
+tyConIsTypeable tc
+  | not (isJust (tyConRepName_maybe tc)) = return False
+  | otherwise
+  = do { prefix_ok <- allM matchable_bndr bndrs
+       ; if prefix_ok then kindIsTypeable body else return False }
+  where
+    (bndrs, body) = splitForAllForAllTyBinders (tyConKind tc)
+
+    matchable_bndr (ma, _)
+      | not (isEmptyVarSet (coVarsOfType ma)) = return False
+      | ma `eqType` matchableDataConTy = return True
+      | otherwise
+      = do { loc <- getCtLocM (OccurrenceOf (tyConName tc)) Nothing
+           ; Reduction co normal_ma <-
+               runTcSEqualities (rewriteFamilyAxioms loc ma)
+           ; return (normal_ma `eqType` matchableDataConTy
+                     && isEmptyVarSet (coVarsOfCo co)) }
+
+{- Note [Forall matchability in Typeable kind prefixes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+KindRep omits the leading forall binders of a generative TyCon kind.
+Check that each annotation equals M before omitting it. Use eqType for
+concrete annotations and synonyms. For computed annotations, use the solver's
+bounded family-axiom rewriter. This rewriter uses no local Given evidence or
+plugin evidence. Reject a reduction with free coercion variables or holes.
+The prefix must not depend on proof evidence that KindRep does not store.
+
+Keep the original TyCon kind. Only its certified leading forall annotations
+are omitted by mkTyConRepBinds. Its body still passes kindIsTypeable without
+normalization. General polytype reflection needs its own representation.
+Removing a forall does not implement it.
+
+TypeableTyCon is private. todoForTyCons retains it in the todo only after
+this check. mkTyConRepBinds relies on that invariant. A pure eqType assertion
+there would reject a computed annotation that this check has already certified.
+
+The bounded rewriter introduces a module cycle through Solver.Monad and
+Instance.Class. Class imports this predicate through Typeable.hs-boot to
+break that cycle. Keep the boot signature and the implementation consistent.
+-}
 
 -- | Is a particular 'Kind' representable by @Typeable@? Here we look for
 -- polytypes and types containing casts (which may be, for instance, a type
 -- family).
-kindIsTypeable :: Kind -> Bool
+kindIsTypeable :: Kind -> TcM Bool
 -- We handle types of the form (TYPE LiftedRep) specifically to avoid
 -- looping on (tyConIsTypeable RuntimeRep). We used to consider (TYPE rr)
 -- to be typeable without inspecting rr, but this exhibits bad behavior
@@ -641,23 +690,21 @@ kindIsTypeable :: Kind -> Bool
 kindIsTypeable ty
   | Just ty' <- coreView ty         = kindIsTypeable ty'
 kindIsTypeable ty
-  | isLiftedTypeKind ty             = True
-kindIsTypeable (TyVarTy _)          = True
-kindIsTypeable (TermVarTy {})       = False
-kindIsTypeable (TermAppTy {})       = False
-kindIsTypeable (DepFunTy {})        = False
-kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
-kindIsTypeable (FunTy _ ma w a b)   = kindIsTypeable ma &&
-                                      kindIsTypeable w &&
-                                      kindIsTypeable a &&
-                                      kindIsTypeable b
-kindIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
-                                   && all kindIsTypeable args
-kindIsTypeable (ForAllTy{})         = False
-kindIsTypeable (LitTy _)            = True
-kindIsTypeable (CastTy{})           = False
+  | isLiftedTypeKind ty             = return True
+kindIsTypeable (TyVarTy _)          = return True
+kindIsTypeable (TermVarTy {})       = return False
+kindIsTypeable (TermAppTy {})       = return False
+kindIsTypeable (DepFunTy {})        = return False
+kindIsTypeable (AppTy a b)          = allM kindIsTypeable [a,b]
+kindIsTypeable (FunTy _ ma w a b)   = allM kindIsTypeable [ma,w,a,b]
+kindIsTypeable (TyConApp tc args)
+  = do { tc_ok <- tyConIsTypeable tc
+       ; if tc_ok then allM kindIsTypeable args else return False }
+kindIsTypeable (ForAllTy{})         = return False
+kindIsTypeable (LitTy _)            = return True
+kindIsTypeable (CastTy{})           = return False
   -- See Note [Typeable instances for casted types]
-kindIsTypeable (CoercionTy{})       = False
+kindIsTypeable (CoercionTy{})       = return False
 
 -- | Maps kinds to 'KindRep' bindings. This binding may either be defined in
 -- some other module (in which case the @Maybe (LHsExpr Id@ will be 'Nothing')
@@ -807,7 +854,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
       | otherwise
       = pprPanic "mkTyConKindRepBinds(TyConApp)" (ppr tc $$ ppr k)
 
-    new_kind_rep (ForAllTy (Bndr var _) ty)
+    new_kind_rep (ForAllTy _ (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
     new_kind_rep ty@(FunTy af ma mult t1 t2)

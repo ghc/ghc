@@ -73,7 +73,7 @@ import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Var( EvVar, mkLocalVar, isRuntimePiTyBinder )
+import GHC.Types.Var( EvVar, mkLocalVar, isRuntimePiTyBinder, coreTyLamForAllTyFlag )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
@@ -1777,10 +1777,18 @@ dsEvTerm (EvExpr e)          = return e
 dsEvTerm (EvTypeable ty ev)  = dsEvTypeable ty ev
 dsEvTerm (EvFun { et_tvs = tvs, et_given = given
                 , et_binds = ev_binds, et_body = wanted_id })
-  = do { dsTcEvBinds ev_binds $ \ds_ev_binds ->
-         return $ (mkLams (tvs ++ given) $
-                   mkCoreLets ds_ev_binds $
-                   Var wanted_id) }
+  = do { body <- dsTcEvBinds ev_binds $ \ds_ev_binds ->
+                   return $ mkLams given $ mkCoreLets ds_ev_binds $ Var wanted_id
+       ; forall_lams tvs body }
+  where
+    -- Keep each metadata proof outside its own binder and inside its prefix.
+    forall_lams [] body = return body
+    forall_lams ((prefix_binds, ma_co, tv) : rest) body
+      = dsTcEvBinds prefix_binds $ \binds ->
+        do { inner <- forall_lams rest body
+           ; let co = mkForAllCo tv coreTyLamForAllTyFlag coreTyLamForAllTyFlag
+                                ma_co MRefl (mkRepReflCo (exprType inner))
+           ; return $ mkCoreLets binds $ mkCast (Lam tv inner) co }
 
 
 {-**********************************************************************
