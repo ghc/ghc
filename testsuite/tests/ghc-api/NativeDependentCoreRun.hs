@@ -5580,10 +5580,34 @@ runDomainConversionObjectCheck libdir = do
                     , "{-# NOINLINE opaqueEntry #-}"
                     , "opaqueEntry :: IO String"
                     , "opaqueEntry = pure \"opaque-placeholder\""
+                    , "{-# NOINLINE visibilityWorker #-}"
+                    , "visibilityWorker :: Bool -> Bool -> Int"
+                    , "visibilityWorker strict b = if strict then b `seq` 42 else 42"
+                    , "{-# NOINLINE hiddenEntry #-}"
+                    , "hiddenEntry :: Bool -> IO String"
+                    , "hiddenEntry _ = pure \"hidden-placeholder\""
+                    , "{-# NOINLINE hiddenWhnf #-}"
+                    , "hiddenWhnf :: IO String"
+                    , "hiddenWhnf = pure \"whnf-placeholder\""
+                    , "reportBottom :: String -> IO String -> IO ()"
+                    , "reportBottom marker action = do"
+                    , "    result <- E.try (action >>= putStrLn) :: IO (Either E.SomeException ())"
+                    , "    case result of"
+                    , "        Left exception | marker `isInfixOf` E.displayException exception -> putStrLn marker"
+                    , "        _ -> fail (\"expected \" ++ marker)"
                     , "main :: IO ()"
-                    , "main = do entry >>= putStrLn; opaqueEntry >>= putStrLn"
+                    , "main = do"
+                    , "    entry >>= putStrLn"
+                    , "    opaqueEntry >>= putStrLn"
+                    , "    observeInt (visibilityWorker False bottomBool) >>= putStrLn"
+                    , "    hiddenEntry False >>= putStrLn"
+                    , "    reportBottom \"native-bottom-bool\" (observeInt (visibilityWorker True bottomBool))"
+                    , "    reportBottom \"native-bottom-bool\" (hiddenEntry True)"
+                    , "    reportBottom \"native-bottom-function\" (force (bottomFunction :: Bool -> Int))"
+                    , "    reportBottom \"native-bottom-function\" hiddenWhnf"
                     ]
-        mainHeader "module NativeRuntimeHelpers where" = "module Main where"
+        mainHeader "module NativeRuntimeHelpers where" =
+            unlines ["module Main where", "import qualified Control.Exception as E", "import Data.List (isInfixOf)"]
         mainHeader line = line
     writeFile sourcePath source
     previousDump <- doesFileExist prepDumpPath
@@ -5632,9 +5656,9 @@ runDomainConversionObjectCheck libdir = do
             bindings = map fst (flattenBinds (mg_binds guts))
             named label binder = occNameString (nameOccName (idName binder)) == label
             isEntry = named "entry"
-            isOpaqueEntry = named "opaqueEntry"
-        unless (length (filter isEntry bindings) == 1 && length (filter isOpaqueEntry bindings) == 1) $
-            fail "FAIL: domain conversion object entries are not unique"
+        forM_ ["entry", "opaqueEntry", "hiddenEntry", "hiddenWhnf"] $ \label ->
+            unless (length (filter (named label) bindings) == 1) $
+                fail ("FAIL: object entry is not unique: " ++ label)
         liftIO $ do
             (values, _) <- domainConversionCases configured bindings (mg_tcs guts)
             expression <- case find (\(label, _, _) -> label == "converted retained function ignores bottom token") values of
@@ -5708,6 +5732,23 @@ runDomainConversionObjectCheck libdir = do
                     Let (NonRec actualF bottomF)
                         $ Let (NonRec actualN (Var (helper bindings "bottomNat")))
                         $ App (Var (helper bindings "observeInt")) closedCall
+                visibilityBinder = local 17220 "object_visibility_binder" boolTy
+                visibilityCo = mkDepFunCoWithVis DepFunVisible DepFunInvisible visibilityBinder MRefl (mkReflCo Representational intTy)
+                hiddenTy = coercionRKind visibilityCo
+                visibleTy = coercionLKind visibilityCo
+                strict = local 17221 "object_visibility_strict" boolTy
+                actual = local 17222 "object_visibility_argument" boolTy
+                hiddenExpression =
+                    Lam strict $
+                        Let (NonRec actual (Var (helper bindings "bottomBool"))) $
+                            App (Var (helper bindings "observeInt")) $
+                                App (Cast (App (Var (helper bindings "visibilityWorker")) (Var strict)) visibilityCo) (Var actual)
+                hiddenWhnf =
+                    mkApps
+                        (Var (helper bindings "force"))
+                        [ Type hiddenTy
+                        , Cast (App (Var (helper bindings "bottomFunction")) (Type visibleTy)) visibilityCo
+                        ]
                 checkKernel stage program = case filter (named "opaqueWholePiKernel" . fst) (flattenBinds program) of
                     [(binder, rhs)] ->
                         unless
@@ -5720,21 +5761,26 @@ runDomainConversionObjectCheck libdir = do
                     _ -> fail ("FAIL: opaque object kernel is not unique after " ++ stage)
             unless (templateF /= f && templateN /= n && a /= b) $
                 fail "FAIL: opaque object endpoint and actual binders are not distinct"
-            forM_ [("scalar entry", expression), ("opaque kernel", kernelRhs), ("opaque entry", opaqueExpression)] $ \(label, rhs) -> do
+            let entries =
+                    [ ("entry", expression)
+                    , ("opaqueEntry", opaqueExpression)
+                    , ("hiddenEntry", hiddenExpression)
+                    , ("hiddenWhnf", hiddenWhnf)
+                    ]
+            forM_ (("opaque kernel", kernelRhs) : entries) $ \(label, rhs) -> do
                 unless (hasNativeDependentExpr rhs) $
                     fail ("FAIL: " ++ label ++ " lost native forms")
                 case lintExpr (initLintConfig configured (kernel : bindings)) rhs of
                     Nothing -> pure ()
                     Just errors -> fail ("FAIL: " ++ label ++ " Lint: " ++ showSDoc configured (vcat (bagToList errors)))
-            unless
-                ( exprType expression `eqType` idType (helper bindings "entry")
-                    && exprType opaqueExpression `eqType` idType (helper bindings "opaqueEntry")
-                    && exprType kernelRhs `eqType` kernelTy
-                )
-                $ fail "FAIL: domain conversion object entry or abstract kernel type mismatch"
+            unless (exprType kernelRhs `eqType` kernelTy) $
+                fail "FAIL: abstract object kernel type mismatch"
+            forM_ entries $ \(label, rhs) ->
+                unless (exprType rhs `eqType` idType (helper bindings label)) $
+                    fail ("FAIL: object entry type mismatch: " ++ label)
             let replacePair (binder, rhs)
-                    | isEntry binder = (setIdUnfolding binder NoUnfolding, expression)
-                    | isOpaqueEntry binder = (setIdUnfolding binder NoUnfolding, opaqueExpression)
+                    | Just replacement <- lookup (occNameString (nameOccName (idName binder))) entries
+                    = (setIdUnfolding binder NoUnfolding, replacement)
                     | otherwise = (binder, rhs)
                 replace (NonRec binder rhs) = uncurry NonRec (replacePair (binder, rhs))
                 replace (Rec pairs) = Rec (map replacePair pairs)
@@ -5769,7 +5815,18 @@ runDomainConversionObjectCheck libdir = do
                     oneShot environment NoStop [(path, Just StopLn)]
                 Nothing -> fail "FAIL: domain conversion assembly produced no object path"
     (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
-    unless (status == ExitSuccess && actual == "42\n42\n" && null errors) $
+    let expected =
+            unlines
+                [ "42"
+                , "42"
+                , "42"
+                , "42"
+                , "native-bottom-bool"
+                , "native-bottom-bool"
+                , "native-bottom-function"
+                , "native-bottom-function"
+                ]
+    unless (status == ExitSuccess && actual == expected && null errors) $
         fail ("FAIL: domain conversion object result: " ++ show (status, actual, errors))
 
 -- | Lint a closed native expression before it reaches the backend API.
@@ -5786,6 +5843,29 @@ execute environment flags label expression = do
     lintNative flags label expression
     (value, _, _) <- hscCompileCoreExpr environment noSrcSpan expression
     evalString (hscInterp environment) value
+
+-- | Check that a change in retained visibility preserves argument demand.
+runDepFunVisibilityChecks :: HscEnv -> DynFlags -> [Id] -> IO ()
+runDepFunVisibilityChecks environment flags bindings = do
+    let index = local 17210 "hidden_bool" boolTy
+        actual = local 17211 "hidden_actual" boolTy
+        scrutinee = local 17212 "hidden_scrutinee" boolTy
+        payload = mkIntExpr (targetPlatform flags) 42
+        bridge = mkDepFunCoWithVis DepFunVisible DepFunInvisible index MRefl (mkReflCo Representational intTy)
+        observe body =
+            Let (NonRec actual (Var (helper bindings "bottomBool"))) $
+                App (Var (helper bindings "observeInt"))
+                    (App (Cast (Lam index body) bridge) (Var actual))
+    ignored <- execute environment flags "hidden retained keep" (observe payload)
+    unless (ignored == "42") $ fail "FAIL: hidden retained keep returned a different value"
+    demanded <-
+        try (execute environment flags "hidden retained demand" (observe (Case (Var index) scrutinee intTy [Alt DEFAULT [] payload])))
+            :: IO (Either SomeException String)
+    case demanded of
+        Left exception
+            | "native-bottom-bool" `isInfixOf` displayException exception -> pure ()
+            | otherwise -> fail ("FAIL: hidden retained demand raised another exception: " ++ displayException exception)
+        Right actualResult -> fail ("FAIL: hidden retained demand returned " ++ show actualResult)
 
 -- | Check runtime results and distinguish both keep laziness observations.
 runChecks :: GHC.Ghc ()
@@ -5834,6 +5914,7 @@ runChecks = do
                 | otherwise -> fail ("FAIL: choose bottom raised another exception: " ++ displayException exception)
             Right actual -> fail ("FAIL: choose bottom returned " ++ show actual)
     liftIO $ runNatChecks environment flags bindings tycons
+    liftIO $ runDepFunVisibilityChecks environment flags bindings
     liftIO $ runDomainConversionChecks environment flags bindings tycons
     liftIO $ runOpaquePiWholeCastChecks environment flags bindings tycons
     runSourceChecks
@@ -7580,7 +7661,7 @@ opaquePiCastIsScoped = go emptyVarSet emptyVarSet
 
     -- \| Require the two retained binder layers used by this fixture.
     retainedEndpoint :: Type -> Bool
-    retainedEndpoint (DepFunTy function (DepFunTy index _)) =
+    retainedEndpoint (DepFunTy DepFunVisible function (DepFunTy DepFunVisible index _)) =
         isNativeIndexFunctionId function && isNativeIndexId index
     retainedEndpoint _ = False
 

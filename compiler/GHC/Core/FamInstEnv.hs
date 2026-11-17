@@ -1572,7 +1572,7 @@ normalise_type ty
            ; return $ coercionRedn (liftCoSubstNative lc r v) }
       | otherwise
       = pprPanic "normalise_type: invalid runtime index" (ppr v)
-    go (DepFunTy v body)
+    go (DepFunTy vis v body)
       | isNativeOpaqueValueId v
       , typeKind body `eqType` liftedTypeKind
       = do { lc <- getLC
@@ -1583,7 +1583,7 @@ normalise_type ty
                    | otherwise = runNormM (normalise_type domain) env ctx Nominal
                  (lc', v', domain) = liftCoSubstNativeBndrUsing reductionCoercion callback lc v
            ; Reduction body_co _ <- withLC lc' $ normalise_type body
-           ; let co = mkDepFunCoWithDomain v' (coToMCo (reductionCoercion domain)) body_co
+           ; let co = mkDepFunCoWithVis vis vis v' (coToMCo (reductionCoercion domain)) body_co
            ; return $ mkReduction co (coercionRKind co) }
       | otherwise
       = pprPanic "normalise_type: invalid retained function"

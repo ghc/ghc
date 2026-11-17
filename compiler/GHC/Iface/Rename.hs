@@ -899,8 +899,8 @@ rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty
 rnIfaceCo (IfaceGReflCo role ty mco)    = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
 rnIfaceCo (IfaceFunCo role ma w co1 co2) = IfaceFunCo role <$> rnIfaceCo ma <*> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTermAppCo fun co) = IfaceTermAppCo fun <$> rnIfaceCo co
-rnIfaceCo (IfaceDepFunCo bndr domain co)
-    = IfaceDepFunCo <$> rnIfaceIdBndr bndr <*> rnIfaceMCo domain <*> rnIfaceCo co
+rnIfaceCo (IfaceDepFunCo visL visR bndr domain co)
+    = IfaceDepFunCo visL visR <$> rnIfaceIdBndr bndr <*> rnIfaceMCo domain <*> rnIfaceCo co
 rnIfaceCo (IfaceTyConAppCo role tc cos) = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)          = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceFreeCoVar c)            = pure (IfaceFreeCoVar c)
@@ -944,8 +944,8 @@ rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
 rnIfaceType (IfaceTermVar n)   = pure (IfaceTermVar n)
 rnIfaceType (IfaceTermAppTy fun arg) = IfaceTermAppTy fun <$> rnIfaceType arg
 rnIfaceType (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun <$> rnIfaceType arg
-rnIfaceType (IfaceDepFunTy bndr body)
-    = IfaceDepFunTy <$> rnIfaceIdBndr bndr <*> rnIfaceType body
+rnIfaceType (IfaceDepFunTy vis bndr body)
+    = IfaceDepFunTy vis <$> rnIfaceIdBndr bndr <*> rnIfaceType body
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceAppArgs t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)

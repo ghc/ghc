@@ -387,11 +387,12 @@ opt_co4' opts env@(LC subst _ _) sym _rep r (TermAppCo f co)
         mkTermAppCo f' (opt_co4 opts env sym False Nominal co)
       ty -> pprPanic "opt_co4: native function substitution" (ppr ty)
 
-opt_co4' opts env sym rep r (DepFunCo b domain co)
+opt_co4' opts env sym rep r (DepFunCo visL visR b domain co)
   -- The common body relates the two lifted versions of A. The complete
   -- domain proof instead relates lifted A to lifted B. Keep them separate.
-  -- See Note [Optimising retained domain transport].
-  = wrapSym sym $ mkDepFunCoWithDomain b' domain'
+  -- See Note [Optimising retained domain transport] and
+  -- Note [Retained function visibility coercions] in GHC.Core.TyCo.Make.
+  = wrapSym sym $ mkDepFunCoWithVis visL visR b' domain'
       (opt_co4 opts body_env NotSwapped rep r co)
   where
     !(body_env, b', binder_domain) = liftCoSubstNativeBndrUsing id
@@ -402,13 +403,15 @@ opt_co4' opts env sym rep r (DepFunCo b domain co)
 
 {- Note [Optimising retained domain transport]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For DepFunCo b (delta : A ~ B) body, the source body binds b : A on both
-ends. The ambient lifting context first relates A_left to A_right. Use that
+For DepFunCo visL visR b (delta : A ~ B) body, the source body binds b : A
+on both ends. The ambient lifting context first relates A_left to A_right. Use that
 proof for b's common body relation. The optimized delta instead relates
 A_left to B_right and belongs outside the binder. Replacing the common body
 relation with the complete delta would give body occurrences the wrong type.
 An original MRefl domain can become nonreflexive under ambient lifting.
-Keep ambient symmetry outside the complete retained coercion.
+Keep ambient symmetry outside the complete retained coercion. Keep the original
+visibility endpoints inside that symmetry. The smart maker must retain a bridge
+when only its visibility differs.
 -}
 
 opt_co4' opts env sym rep r (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR

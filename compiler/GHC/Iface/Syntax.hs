@@ -2151,7 +2151,7 @@ freeNamesIfType (IfaceFreeTermVar _)  = emptyNameSet
 freeNamesIfType (IfaceTermVar _)      = emptyNameSet
 freeNamesIfType (IfaceTermAppTy _ arg) = freeNamesIfType arg
 freeNamesIfType (IfaceFreeTermAppTy _ arg) = freeNamesIfType arg
-freeNamesIfType (IfaceDepFunTy (w, _, arg) res)
+freeNamesIfType (IfaceDepFunTy _vis (w, _, arg) res)
   = freeNamesIfType w &&& freeNamesIfType arg &&& freeNamesIfType res
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
@@ -2175,7 +2175,7 @@ freeNamesIfCoercion (IfaceGReflCo _ t mco)
 freeNamesIfCoercion (IfaceFunCo _ c_ma c_mult c1 c2)
   = freeNamesIfCoercion c_ma &&& freeNamesIfCoercion c_mult &&& freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
 freeNamesIfCoercion (IfaceTermAppCo _ co) = freeNamesIfCoercion co
-freeNamesIfCoercion (IfaceDepFunCo (w, _, arg) domain co)
+freeNamesIfCoercion (IfaceDepFunCo _visL _visR (w, _, arg) domain co)
   = freeNamesIfType w &&& freeNamesIfType arg &&& freeNamesIfMCoercion domain &&& freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceTyConAppCo _ tc cos)
   = freeNamesIfTc tc &&& fnList freeNamesIfCoercion cos

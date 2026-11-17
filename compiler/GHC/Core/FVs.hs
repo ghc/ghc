@@ -429,7 +429,7 @@ orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (TermVarTy v)        = orphNamesOfType (varType v)
 orphNamesOfType (TermAppTy f arg)    = orphNamesOfType (varType f)
                                        `unionNameSet` orphNamesOfType arg
-orphNamesOfType (DepFunTy v res)     = orphNamesOfType (varType v)
+orphNamesOfType (DepFunTy _ v res)     = orphNamesOfType (varType v)
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (LitTy {})           = emptyNameSet
 orphNamesOfType (ForAllTy ma bndr res) = orphNamesOfType ma `unionNameSet`

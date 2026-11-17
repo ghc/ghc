@@ -234,7 +234,7 @@ tidyType _   t@(LitTy {})           = t -- Preserve sharing
 tidyType env (TyVarTy tv)           = TyVarTy $! tidyTyCoVarOcc env tv
 tidyType env (TermVarTy var)        = TermVarTy $! tidyTyCoVarOcc env var
 tidyType env (TermAppTy fun arg)    = (TermAppTy $! tidyTyCoVarOcc env fun) $! tidyType env arg
-tidyType env (DepFunTy var res)     = (DepFunTy $! var') $! tidyType body_env res
+tidyType env (DepFunTy vis var res) = (DepFunTy vis $! var') $! tidyType body_env res
   where
     (body_env, var') = tidyVarBndr env var
 tidyType _   t@(TyConApp _ [])      = t -- Preserve sharing if possible
@@ -324,8 +324,8 @@ tidyCo env co
     go (TyConAppCo r tc cos) = TyConAppCo r tc $! strictMap go cos
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
     go (TermAppCo fun co)    = (TermAppCo $! tidyTyCoVarOcc env fun) $! go co
-    go (DepFunCo var domain co)
-      = ((DepFunCo $! var') $! go_mco domain) $! tidyCo body_env co
+    go (DepFunCo visL visR var domain co)
+      = ((DepFunCo visL visR $! var') $! go_mco domain) $! tidyCo body_env co
       where (body_env, var') = tidyVarBndr env var
     go (ForAllCo tv visL visR ma h co)
       = (((((ForAllCo $! tvp) $! visL) $! visR) $! go ma) $! go_mco h) $! tidyCo envp co

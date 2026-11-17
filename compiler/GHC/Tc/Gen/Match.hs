@@ -95,7 +95,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
-import GHC.Types.Var ( EvVar, varType, isId, isCoVar, isVisibleFunArg )
+import GHC.Types.Var ( EvVar, DepFunTyFlag(..), varType, isId, isCoVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
@@ -185,7 +185,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
               (case boundary of
                  Nothing -> matches
                  Just prefix -> splitRetainedContext prefix matches)
-      _ | DepFunTy binder _ <- coreFullView ty ->
+      _ | DepFunTy DepFunVisible binder _ <- coreFullView ty ->
           do { index <- newSysLocalId (fsLit "retained") ManyTy (varType binder)
              ; let body_ty = applyTypeToArgs ty [Var index]
              ; (pat_tys, argument_plan, rhs_ty) <-
@@ -199,7 +199,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     -- See Note [Function-valued retained binders] in GHC.Core.Type.
     has_function_binder :: Type -> Bool
     has_function_binder ty = case coreFullView ty of
-      DepFunTy binder body -> isNativeIndexFunctionId binder || has_function_binder body
+      DepFunTy _ binder body -> isNativeIndexFunctionId binder || has_function_binder body
       FunTy _ _ _ _ body -> has_function_binder body
       _ -> False
 
@@ -211,7 +211,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     variable_retained_patterns :: Type -> [LPat GhcRn] -> Bool
     variable_retained_patterns _ [] = True
     variable_retained_patterns ty (pat : pats) = case coreFullView ty of
-      DepFunTy _ body -> case unLoc pat of
+      DepFunTy DepFunVisible _ body -> case unLoc pat of
         VarPat{} -> variable_retained_patterns body pats
         _ -> False
       FunTy af _ _ _ body
@@ -220,7 +220,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
       _ -> False
 
     first_retained_constructor pats
-      | DepFunTy{} <- coreFullView ty
+      | DepFunTy DepFunVisible _ _ <- coreFullView ty
       = case filter isVisArgLPat pats of
           pat : _ -> constructor_pat pat
           _ -> False
@@ -266,7 +266,7 @@ with ordinary leading constructor patterns remain separate work.
 -- | Find a retained binder after any canonical ordinary arrows.
 hasRetainedFunTy :: Type -> Bool
 hasRetainedFunTy ty = case coreFullView ty of
-  DepFunTy{} -> True
+  DepFunTy DepFunVisible _ _ -> True
   FunTy _ _ _ _ result -> hasRetainedFunTy result
   _ -> False
 
@@ -592,8 +592,11 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
         spine _ _ = Nothing
 
         -- | Substitute eligible actual arguments without allocating type choices.
+        consume _ ty _
+          | DepFunTy DepFunInvisible _ _ <- coreFullView ty
+          = return False
         consume consumed ty args
-          | DepFunTy binder _ <- coreFullView ty
+          | DepFunTy DepFunVisible binder _ <- coreFullView ty
           = case args of
               arg : rest -> do
                 { actual <- if isNativeIndexFunctionId binder
@@ -882,7 +885,7 @@ tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty init
            ; thing_inside (reverse acc) (mkCheckExpType ty) (Just prefix) }
     go acc ty [] thing_inside = thing_inside (reverse acc) (mkCheckExpType ty) Nothing
     go acc ty (pat : pats) thing_inside
-      | DepFunTy binder _ <- coreFullView ty
+      | DepFunTy DepFunVisible binder _ <- coreFullView ty
       = setSrcSpanA (getLoc pat) $
         do { name <- case unLoc pat of
                VarPat _ (L _ name) -> return name
@@ -955,7 +958,7 @@ tcRetainedConArgs herald ctxt = go [] []
                 (reverse (map RetainedConDict givens) ++ argument_plan) n tau }
       | n == 0
       = return (reverse acc, reverse argument_plan, mkCheckExpType ty)
-      | DepFunTy binder _ <- coreFullView ty
+      | DepFunTy DepFunVisible binder _ <- coreFullView ty
       = do { name <- newSysName (nameOccName (idName binder))
            ; let index = mkLocalId name ManyTy (varType binder)
                  pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
@@ -979,9 +982,12 @@ tcRetainedConArgs herald ctxt = go [] []
 {- Note [Retained argument telescopes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Introduce every retained argument with the Name of its actual variable pattern.
-Instantiate its codomain before reading later argument types. Check the complete
-pattern list only after these identities have been chosen. tcPatBndr and
-selectMatchVar preserve their Unique values. Outer erased forall binders keep
+Instantiate its codomain before reading later argument types. Only visible
+retained binders consume source value patterns. An invisible retained binder
+uses the ordinary expected-function fallback. No implicit runtime argument is
+introduced. See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
+Check the complete pattern list only after these identities have been chosen.
+tcPatBndr and selectMatchVar preserve their Unique values. Outer erased forall binders keep
 their ordinary skolemisation and wrapper; do not lift a nonidentity wrapper
 through a retained binder.
 

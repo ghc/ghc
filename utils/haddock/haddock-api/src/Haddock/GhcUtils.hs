@@ -794,7 +794,7 @@ typeNames ty = go ty Set.empty
       case t of
         TyVarTy{} -> acc
         TermVarTy v -> go (varType v) acc
-        DepFunTy b body -> go body $ go (varType b) acc
+        DepFunTy _ b body -> go body $ go (varType b) acc
         AppTy t1 t2 -> go t2 $ go t1 acc
         -- See Note [Arrow matchability in Haddock] in Haddock.Convert.
         FunTy _ ma w t1 t2 -> go t2 $ go t1 $ go w $ go ma acc

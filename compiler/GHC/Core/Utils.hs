@@ -197,7 +197,7 @@ mkLamType v body_ty
      -- See Note [Opaque runtime index values] in GHC.Core.Type.
    = assertPpr (isNativeOpaqueValueId v && typeKind body_ty `eqType` liftedTypeKind)
        (text "Unsupported retained dependent lambda:" <+> ppr v <+> dcolon <+> ppr body_ty) $
-     DepFunTy v body_ty
+     DepFunTy DepFunVisible v body_ty
 
    | anyFreeVarsOfType (== v) body_ty
    = pprPanic "mkLamType: unsupported runtime dependency"
@@ -255,7 +255,7 @@ applyTypeToArgs op_ty args
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
     go op_ty (arg : args)
-      | DepFunTy b res_ty <- coreFullView op_ty
+      | DepFunTy _ b res_ty <- coreFullView op_ty
       , isNativeOpaqueValueId b
       , retained_arg b arg
       = let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)

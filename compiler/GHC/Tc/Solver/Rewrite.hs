@@ -766,7 +766,7 @@ rewrite_one ty@(TermVarTy v)
        ; return $! coercionRedn (liftCoSubstNative lc role v) }
   | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
-rewrite_one ty@(DepFunTy b body)
+rewrite_one ty@(DepFunTy vis b body)
   -- See Note [Rewriting retained dependent functions].
   | isNativeOpaqueValueId b
   , isLiftedTypeKind (typeKind body)
@@ -778,7 +778,7 @@ rewrite_one ty@(DepFunTy b body)
        ; let (lc', b', _) = liftCoSubstNativeBndrUsing reductionCoercion
                               (\_ _ -> domain) lc b
        ; Reduction body_co _ <- withNativeLifting lc' b' $ rewrite_one body
-       ; let co = mkDepFunCoWithDomain b' (coToMCo (reductionCoercion domain)) body_co
+       ; let co = mkDepFunCoWithVis vis vis b' (coToMCo (reductionCoercion domain)) body_co
        ; return $! mkReduction co (coercionRKind co) }
   | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)

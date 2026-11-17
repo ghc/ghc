@@ -72,6 +72,9 @@ module GHC.Types.Var (
         coreTyLamForAllTyFlag, isCoreTyLamForAllTyFlag,
         eqForAllVis, cmpForAllVis, cmpForAllTyFlagExactly,
 
+        -- * Retained function visibility
+        DepFunTyFlag(..),
+
         -- * FunTyFlag
         FunTyFlag(..), isVisibleFunArg, isInvisibleFunArg, isFUNArg,
         mkFunTyFlag, visArg, invisArg,
@@ -572,6 +575,22 @@ cmpForAllTyFlagExactly Specified Specified = EQ
 cmpForAllTyFlagExactly Specified Required  = LT
 cmpForAllTyFlagExactly Required  Required  = EQ
 cmpForAllTyFlagExactly Required  _         = GT
+
+-- | The source visibility of a retained runtime binder. Both flags
+-- represent value arguments in Core.
+data DepFunTyFlag = DepFunVisible | DepFunInvisible
+  deriving (Eq, Ord, Show, Data)
+
+instance Binary DepFunTyFlag where
+  put_ bh DepFunVisible   = putByte bh 0
+  put_ bh DepFunInvisible = putByte bh 1
+
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> return DepFunVisible
+      1 -> return DepFunInvisible
+      _ -> fail ("DepFunTyFlag: invalid tag " ++ show tag)
 
 {- *********************************************************************
 *                                                                      *

@@ -1008,7 +1008,7 @@ tcTyFamInstsAndVisX = go
     go is_invis_arg (TermVarTy v)      = go is_invis_arg (varType v)
     go is_invis_arg (TermAppTy f arg)  = go is_invis_arg (varType f)
                                          ++ go is_invis_arg arg
-    go is_invis_arg (DepFunTy v ty)    = go is_invis_arg (varType v)
+    go is_invis_arg (DepFunTy _ v ty)    = go is_invis_arg (varType v)
                                          ++ go is_invis_arg ty
     go is_invis_arg (TyConApp tc tys)
       | isTypeFamilyTyCon tc
@@ -1102,7 +1102,7 @@ any_rewritable role tv_pred tc_pred ty
     go _ _ _ (TermVarTy {}) = False
     -- Opaque call arguments have nominal role and are not injective positions.
     go _ bvs _ (TermAppTy _ arg) = go True bvs NomEq arg
-    go uf bvs rl (DepFunTy v ty)
+    go uf bvs rl (DepFunTy _ v ty)
       = go uf bvs NomEq (varType v) || go uf (bvs `extendVarSet` v) rl ty
     go uf bvs rl (TyVarTy tv)        = go_tv uf bvs rl tv
     go _  _    _ (LitTy {})          = False

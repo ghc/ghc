@@ -96,7 +96,7 @@ synonymTyConsOfType ty
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go (TermVarTy v)     = go (varType v)
      go (TermAppTy f arg) = go (varType f) `plusNameEnv` go arg
-     go (DepFunTy v ty)   = go (varType v) `plusNameEnv` go ty
+     go (DepFunTy _ v ty)   = go (varType v) `plusNameEnv` go ty
      go (TyConApp tc tys) = go_tc tc `plusNameEnv` go_s tys
      go (LitTy _)         = emptyNameEnv
      go (TyVarTy _)       = emptyNameEnv
@@ -131,7 +131,7 @@ synonymTyConsOfType ty
      go_mco (MCo co) = go_co co
 
      go_co (TermAppCo f co)     = go (varType f) `plusNameEnv` go_co co
-     go_co (DepFunCo v domain co) = go (varType v) `plusNameEnv` go_mco domain `plusNameEnv` go_co co
+     go_co (DepFunCo _ _ v domain co) = go (varType v) `plusNameEnv` go_mco domain `plusNameEnv` go_co co
      go_co (Refl ty)            = go ty
      go_co (GRefl _ ty mco)     = go ty `plusNameEnv` go_mco mco
      go_co (TyConAppCo _ tc cs) = go_tc tc `plusNameEnv` go_co_s cs
@@ -613,7 +613,7 @@ irType = go
     go lcls ty@(TermVarTy v)
       | v `elemVarSet` lcls, isNativeRetainedBinder v = markNominal lcls (varType v)
       | otherwise = pprPanic "irType: invalid runtime index scope" (ppr ty)
-    go lcls ty@(DepFunTy v body)
+    go lcls ty@(DepFunTy _ v body)
       | isNativeRetainedBinder v
       = markNominal lcls (varType v) >> go (extendVarSet lcls v) body
       | otherwise = pprPanic "irType: invalid retained binder" (ppr ty)
@@ -670,7 +670,7 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
     get_ty_vars scope ty@(TermVarTy v)
       | v `elemVarSet` scope, isNativeRetainedBinder v = get_ty_vars scope (varType v)
       | otherwise = pprPanic "markNominal: invalid runtime index scope" (ppr ty)
-    get_ty_vars scope ty@(DepFunTy v body)
+    get_ty_vars scope ty@(DepFunTy _ v body)
       | isNativeRetainedBinder v
       = get_ty_vars scope (varType v) `unionVarSet`
           get_ty_vars (extendVarSet scope v) body

@@ -231,7 +231,7 @@ typeOneShots ty
       , ma `eqType` unmatchableDataConTy
       = typeOneShot arg : go rec_nts res
 
-      | DepFunTy _ res <- coreFullView ty
+      | DepFunTy _ _ res <- coreFullView ty
       = NoOneShotInfo : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
@@ -2350,7 +2350,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Type.substTyUnchecked subst ma) (Bndr tcv' vis) (Type.substTyUnchecked subst' ty') mco))
 
        ----------- Retained dependent functions
-       | DepFunTy b res_ty <- coreFullView ty
+       | DepFunTy _ b res_ty <- coreFullView ty
        , (subst', eta_id) <- freshEtaId n subst (Scaled ManyTy (varType b))
        , let eta_id' = eta_id `setIdOneShotInfo` one_shot
              subst'' = Core.extendIdSubst subst' b (Var eta_id')
@@ -2946,8 +2946,8 @@ pushCoArg co arg
 pushCoRetainedArg :: Coercion -> CoreArg -> Maybe (CoreArg, MCoercion)
 pushCoRetainedArg = go
   where
-    go (DepFunCo b domain body) arg = instantiate False b domain body arg
-    go (SymCo (DepFunCo b domain body)) arg = instantiate True b domain body arg
+    go (DepFunCo _ _ b domain body) arg = instantiate False b domain body arg
+    go (SymCo (DepFunCo _ _ b domain body)) arg = instantiate True b domain body arg
     go (SymCo (SymCo co)) arg = go co arg
     go (SymCo (TransCo first second)) arg
       = go (TransCo (mkSymCo second) (mkSymCo first)) arg

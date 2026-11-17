@@ -212,8 +212,8 @@ toIfaceTypeX fr (TermAppTy fun arg)
   | otherwise = IfaceTermAppTy (mkIfLclName (occNameFS (getOccName fun))) arg'
   where
     arg' = toIfaceTypeX fr arg
-toIfaceTypeX fr (DepFunTy var res)
-  = IfaceDepFunTy (toIfaceIdBndrX fr var)
+toIfaceTypeX fr (DepFunTy vis var res)
+  = IfaceDepFunTy vis (toIfaceIdBndrX fr var)
                   (toIfaceTypeX (fr `delVarSet` var) res)
 toIfaceTypeX fr ty@(AppTy {})  =
   -- Flatten as many argument AppTys as possible, then turn them into an
@@ -363,8 +363,8 @@ toIfaceCoercionX fr co
       -- See Note [Function-value call congruence in interfaces].
       = IfaceAppCo (IfaceReflCo (toIfaceTypeX fr (TermVarTy fun))) (go co)
 
-    go (DepFunCo var domain co)
-      = IfaceDepFunCo bndr (go_mco domain)
+    go (DepFunCo visL visR var domain co)
+      = IfaceDepFunCo visL visR bndr (go_mco domain)
                       (toIfaceCoercionX (fr `delVarSet` var) co)
       where
         bndr | isId var = toIfaceIdBndrX fr var

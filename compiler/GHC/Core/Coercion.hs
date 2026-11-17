@@ -37,7 +37,7 @@ module GHC.Core.Coercion (
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
-        mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo, mkDepFunCoWithDomain, mkTermAppCo,
+        mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo, mkDepFunCoWithDomain, mkDepFunCoWithVis, mkTermAppCo,
         nativeIndexCastCo_maybe, mapNativeIndexCastCo, mapNativeIndexCastCoM,
         mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkUnivCoFromDeps, mkUnivCoAddTypeDeps,
@@ -1117,8 +1117,10 @@ setNominalRole_maybe r co
     setNominalRole_maybe_helper (AppCo co1 co2)
       = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
     setNominalRole_maybe_helper co@(TermAppCo {}) = Just co
-    setNominalRole_maybe_helper (DepFunCo b domain co)
-      = mkDepFunCoWithDomain b domain <$> setNominalRole_maybe_helper co
+    setNominalRole_maybe_helper (DepFunCo visL visR b domain co)
+      -- See Note [Retained function visibility coercions] in GHC.Core.TyCo.Make.
+      | visL == visR
+      = mkDepFunCoWithVis visL visR b domain <$> setNominalRole_maybe_helper co
     setNominalRole_maybe_helper co@(ForAllCo { fco_visL = visL, fco_visR = visR, fco_body = body_co })
       | visL `eqForAllVis` visR -- See (FC3) in Note [ForAllCo] in GHC.Core.TyCo.Rep
       = do { body_co' <- setNominalRole_maybe_helper body_co
@@ -1888,11 +1890,11 @@ ty_co_subst !lc role ty
             -> downgradeRole r Nominal (mkTermAppCo f (go Nominal arg))
           _ -> pprPanic "ty_co_subst: native function head changed" (ppr ty)
     go r (TermVarTy v) = liftCoSubstNative lc r v
-    go r (DepFunTy b body)
+    go r (DepFunTy vis b body)
       | isNativeOpaqueValueId b
       = let (lc', b', delta) = liftCoSubstNativeBndrUsing id
                                  (\ctx -> ty_co_subst ctx Nominal) lc b
-        in mkDepFunCoWithDomain b' (coToMCo delta) (ty_co_subst lc' r body)
+        in mkDepFunCoWithVis vis vis b' (coToMCo delta) (ty_co_subst lc' r body)
       | otherwise
       = pprPanic "ty_co_subst: invalid retained binder" (ppr b)
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
@@ -2061,13 +2063,13 @@ abstractNativeIndices pairs ty = go emptyVarEnv initial_scope pairs ty
             if fty `eqType` varType f then pure () else Nothing
             let f' = maybe f snd (lookupVarEnv renamed f)
             TermAppTy f' <$> go renamed scope replacements arg
-          DepFunTy binder body -> do
+          DepFunTy vis binder body -> do
             domain <- go renamed scope replacements (varType binder)
             mult <- go renamed scope replacements (idMult binder)
             let target = uniqAway scope (setIdMult (setVarType binder domain) mult)
             body' <- go (extendVarEnv renamed binder (binder, target))
                         (extendInScopeSet scope target) (mask binder replacements) body
-            return (mkDepFunTy target body')
+            return (mkDepFunTyWithVis vis target body')
           ForAllTy ma (Bndr binder vis) body -> do
             ma' <- go renamed scope replacements ma
             kind <- go renamed scope replacements (varType binder)
@@ -2408,9 +2410,10 @@ coercion_lr_kind which orig_co
     go (AppCo co1 co2)        = mkAppTy (go co1) (go co2)
       -- See Note [Native function-value application] in GHC.Core.TyCo.Make.
     go (TermAppCo f co)       = TermAppTy f (go co)
-    go (DepFunCo b MRefl co)  = mkDepFunTy b (go co)
-    go (DepFunCo b (MCo delta) co)
-      | CLeft <- which = mkDepFunTy b (go co)
+    go (DepFunCo visL visR b MRefl co)
+      = mkDepFunTyWithVis (pickLR which (visL, visR)) b (go co)
+    go (DepFunCo visL visR b (MCo delta) co)
+      | CLeft <- which = mkDepFunTyWithVis visL b (go co)
       | otherwise
       = let body = go co
             free = tyCoVarsOfCo delta `unionVarSet` (tyCoVarsOfType body `delVarSet` b)
@@ -2420,7 +2423,7 @@ coercion_lr_kind which orig_co
             scope = mkInScopeSet (extendVarSet
                       (tyCoVarsOfType body `unionVarSet` tyCoVarsOfCo delta) target)
             subst = mkIdSubst scope (unitVarEnv b argument)
-        in mkDepFunTy target (substTy subst body)
+        in mkDepFunTyWithVis visR target (substTy subst body)
     go (CoVarCo cv)           = go_covar cv
     go (HoleCo h)             = go_covar (coHoleCoVar h)
     go (SymCo co)             = pickLR which (coercionRKind co, coercionLKind co)
@@ -2581,7 +2584,7 @@ coercionRole = go
     go (TyConAppCo r _ _)           = r
     go (AppCo co1 _)                = go co1
     go (TermAppCo {})               = Nominal
-    go (DepFunCo _ _ co)            = go co
+    go (DepFunCo _ _ _ _ co)        = go co
     go (ForAllCo { fco_body = co }) = go co
     go (FunCo { fco_role = r })     = r
     go (CoVarCo cv)                 = coVarRole cv

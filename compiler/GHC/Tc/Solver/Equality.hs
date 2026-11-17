@@ -481,16 +481,18 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1@DepFunTy{} _ ty2@DepFunTy{} _
   = canEqReflexive ev eq_rel ty1
 
 -- See Note [Solving retained function equalities].
-can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy vis1 b1 _) _ ty2@(DepFunTy vis2 b2 _) _
   | bothRewritten ces
+  , vis1 == vis2
   , isWanted ev
   , isNativeIndexFunctionId b1, isNativeIndexFunctionId b2
   , varType b1 `tcEqType` varType b2
   = can_eq_nc_depfun ev eq_rel ty1 ty2 MRefl
 
 -- See Note [Solving retained function equalities].
-can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy b1 _) _ ty2@(DepFunTy b2 _) _
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy vis1 b1 _) _ ty2@(DepFunTy vis2 b2 _) _
   | bothRewritten ces
+  , vis1 == vis2
   , isWanted ev
   , isNativeIndexId b1, isNativeIndexId b2
   = if domain1 `tcEqType` domain2
@@ -770,8 +772,9 @@ Missing this point is what caused #15431
 -- See Note [Solving retained function equalities].
 can_eq_nc_depfun :: CtEvidence -> EqRel -> Type -> Type -> MCoercionN
                  -> TcS (StopOrContinue (Either IrredCt EqCt))
-can_eq_nc_depfun ev eq_rel ty1@(DepFunTy b1 body1) ty2@(DepFunTy b2 body2) domain
-  | CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
+can_eq_nc_depfun ev eq_rel ty1@(DepFunTy vis1 b1 body1) ty2@(DepFunTy vis2 b2 body2) domain
+  | vis1 == vis2
+  , CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
   = do { binder <- wrapTcS $ TcM.newSysLocalId (fsLit "retained") ManyTy (varType b1)
        ; let in_scope = mkInScopeSet $
                           extendVarSet (tyCoVarsOfTypes [ty1,ty2]
@@ -794,7 +797,7 @@ can_eq_nc_depfun ev eq_rel ty1@(DepFunTy b1 body1) ty2@(DepFunTy b2 body2) domai
               ; return (body_co, isSolvedWC residual) }
        ; kickOutAfterUnification unifs
        ; if solved
-         then do { all_co <- zonkCo (mkDepFunCoWithDomain binder domain body_co)
+         then do { all_co <- zonkCo (mkDepFunCoWithVis vis1 vis2 binder domain body_co)
                  ; left <- zonkTcType ty1
                  ; right <- zonkTcType ty2
                  ; if coercionLKind all_co `tcEqType` left
@@ -812,9 +815,12 @@ can_eq_nc_depfun _ _ ty1 ty2 _
 
 {- Note [Solving retained function equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Compare two retained functions using nominal DepFunCo. Use MRefl when their
-complete eligible scalar or function domains agree. Substitute the same fresh
-bare variable into both bodies. A function head must remain a Var; a reflexive
+Compare two retained functions with the same visibility using nominal DepFunCo.
+Preserve both endpoint flags in the completed proof. Visibility mismatch cannot
+be solved by this source equality rule.
+See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
+Use MRefl when their complete eligible scalar or function domains agree.
+Substitute the same fresh bare variable into both bodies. A function head must remain a Var; a reflexive
 cast around that variable is not a supported native call head.
 
 For unequal closed scalar domains, normalize them outside the runtime binder.

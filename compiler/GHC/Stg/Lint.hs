@@ -424,7 +424,7 @@ lintStgAppReps fun args = do
     fun_arg_reps ty = case coreFullView ty of
       FunTy { ft_arg = arg, ft_res = res }
         -> typePrimRep_maybe arg : fun_arg_reps res
-      DepFunTy b res
+      DepFunTy _ b res
         -> typePrimRep_maybe (varType b) : fun_arg_reps res
       _ -> []
 

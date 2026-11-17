@@ -54,7 +54,7 @@ module GHC.Core.TyCo.Make (
     , mkGReflCo, mkGReflRightCo, mkGReflLeftCo
     , mkGReflMCo, mkGReflRightMCo, mkGReflLeftMCo
     , mkSubCo, mkSymCo, mkSymMCo
-    , mkFunCo2, mkForAllCo, mkDepFunCo, mkDepFunCoWithDomain, mkTermAppCo
+    , mkFunCo2, mkForAllCo, mkDepFunCo, mkDepFunCoWithDomain, mkDepFunCoWithVis, mkTermAppCo
     , mkAxiomCo, mkUnbranchedAxInstCo
     , mkFunCo, mkNakedFunCo
     , mkNakedForAllCo, mkForAllVisCos, mkHomoForAllCo, mkHomoForAllCos
@@ -241,8 +241,8 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_ty (TyVarTy tv)    = tyvar tv
     go_ty (TermVarTy v)   = termvar v
     go_ty (TermAppTy f arg) = TermAppTy <$> termfun f <*> go_ty arg
-    go_ty (DepFunTy b body)
-      = termbinder b $ \b' -> mkDepFunTy b' <$> go_ty body
+    go_ty (DepFunTy vis b body)
+      = termbinder b $ \b' -> mkDepFunTyWithVis vis b' <$> go_ty body
     go_ty (AppTy t1 t2)   = mkAppTy <$> go_ty t1 <*> go_ty t2
     go_ty ty@(LitTy {})   = return ty
     go_ty (CastTy ty co)  = mkCastTy <$> go_ty ty <*> go_co co
@@ -276,9 +276,10 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_co (GRefl r ty mco)           = mkGReflCo r <$> go_ty ty <*> go_mco mco
     go_co (AppCo c1 c2)              = mkAppCo <$> go_co c1 <*> go_co c2
     go_co (TermAppCo f co)           = mkTermAppCo <$> termfun f <*> go_co co
-    go_co (DepFunCo b domain co)     = do { domain' <- go_mco domain
-                                         ; termbinder b $ \b' ->
-                                           mkDepFunCoWithDomain b' domain' <$> go_co co }
+    go_co (DepFunCo visL visR b domain co)
+      = do { domain' <- go_mco domain
+           ; termbinder b $ \b' ->
+               mkDepFunCoWithVis visL visR b' domain' <$> go_co co }
     go_co (FunCo r afl afr cm cw c1 c2) = mkFunCo2 r afl afr <$> go_co cm <*> go_co cw
                                           <*> go_co c1 <*> go_co c2
     go_co (CoVarCo cv)               = covar cv
@@ -795,20 +796,49 @@ mkTermAppCo f co
       GRefl Nominal ty MRefl -> mkNomReflCo (TermAppTy f ty)
       _ -> TermAppCo f co
 
--- | Bind one runtime index in a coercion with an unchanged closed domain.
+-- | Bind one visible runtime index with an unchanged domain.
 -- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 mkDepFunCo :: Id -> Coercion -> Coercion
 mkDepFunCo b = mkDepFunCoWithDomain b MRefl
 
--- | Bind a runtime index with optional nominal evidence for its new domain.
+-- | Bind a visible runtime index with nominal evidence for its new domain.
 -- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 mkDepFunCoWithDomain :: Id -> MCoercionN -> Coercion -> Coercion
-mkDepFunCoWithDomain b domain co
+mkDepFunCoWithDomain = mkDepFunCoWithVis DepFunVisible DepFunVisible
+
+-- | Bind a runtime index with explicit endpoint visibility and domain evidence.
+-- See Note [Retained function visibility coercions].
+mkDepFunCoWithVis :: DepFunTyFlag -> DepFunTyFlag -> Id
+                  -> MCoercionN -> Coercion -> Coercion
+mkDepFunCoWithVis visL visR b domain co
   | MCo delta <- domain, isReflCo delta
-  = mkDepFunCoWithDomain b MRefl co
-  | MRefl <- domain, Just (ty, role) <- isReflCo_maybe co
-  = mkReflCo role (mkDepFunTy b ty)
-  | otherwise = DepFunCo b domain co
+  = mkDepFunCoWithVis visL visR b MRefl co
+  | visL == visR
+  , MRefl <- domain, Just (ty, role) <- isReflCo_maybe co
+  = mkReflCo role (mkDepFunTyWithVis visL b ty)
+  | otherwise
+  = assertPpr (coercionRole co /= Nominal || visL == visR)
+      (text "Nominal retained coercion has different visibilities:" <+> ppr b) $
+    DepFunCo visL visR b domain co
+
+{- Note [Retained function visibility coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Both retained visibilities consume the same unrestricted runtime argument.
+Nominal equality distinguishes them. A representational coercion can change
+visibility while preserving the existing nominal domain proof and body proof.
+Its endpoints use mkDepFunTyWithVis independently. A visible unused binder can
+become an ordinary arrow. An invisible unused binder must remain a retained Pi.
+
+Do not collapse a visibility bridge when its domain and body proofs are Refl.
+Reflexivity also requires equal endpoint visibility. Symmetry swaps the flags;
+transitivity keeps the outer flags. Nominal role recovery must require equal
+flags before recovering a nominal body proof. Phantom evidence is not a value
+cast and does not justify nominal evidence.
+
+The smart maker uses a debug assertion for the nominal visibility precondition.
+Core Lint checks that precondition independently. Neither check changes the
+existing nominal domain transport or the runtime binder's lexical scope.
+-}
 
 -- | Make a reflexive coercion
 mkReflCo :: Role -> Type -> Coercion

@@ -4381,7 +4381,7 @@ splitRetainedConFields :: [Maybe Id] -> Type -> ([Scaled Type], Type)
 splitRetainedConFields [] ty = ([], ty)
 splitRetainedConFields (mb : rest) ty
   = case (mb, coreFullView ty) of
-      (Just b, DepFunTy b' body)
+      (Just b, DepFunTy DepFunVisible b' body)
         | b == b' -> add (Scaled ManyTy (varType b)) body
       (_, FunTy { ft_mult = mult, ft_arg = arg, ft_res = body })
         -> add (Scaled mult arg) body
@@ -6080,7 +6080,7 @@ checkValidRoles tc
       | Just Nominal <- lookupVarEnv env v, isNativeRetainedBinder v
       = check_ty_roles env Nominal (varType v)
       | otherwise = pprPanic "check_ty_roles: invalid runtime index scope" (ppr ty)
-    check_ty_roles env role ty@(DepFunTy v body)
+    check_ty_roles env role ty@(DepFunTy _ v body)
       | isNativeRetainedBinder v
       = check_ty_roles env Nominal (varType v) >>
           check_ty_roles (extendVarEnv env v Nominal) role body

@@ -1687,7 +1687,7 @@ tcIfaceDomainShape (IfaceFunTy FTF_T_T ma mult arg res)
   = NativeFunctionDomain <$> tcIfaceDomainShape ma
                          <*> tcIfaceDomainShape mult
                          <*> tcIfaceDomainShape arg <*> tcIfaceDomainShape res
-tcIfaceDomainShape (IfaceDepFunTy (mult, _, arg) res)
+tcIfaceDomainShape (IfaceDepFunTy _vis (mult, _, arg) res)
   = NativePiDomain <$> tcIfaceDomainShape mult
                    <*> tcIfaceDomainShape arg
                    <*> tcIfaceDomainShape res
@@ -1710,7 +1710,7 @@ nativeTypeDomainShape (FunTy FTF_T_T ma mult arg res)
                          (nativeTypeDomainShape mult)
                          (nativeTypeDomainShape arg) (nativeTypeDomainShape res)
 nativeTypeDomainShape FunTy{} = NativeInvalidDomain
-nativeTypeDomainShape (DepFunTy binder body)
+nativeTypeDomainShape (DepFunTy _vis binder body)
   = NativePiDomain (nativeTypeDomainShape (idMult binder))
                    (nativeTypeDomainShape (varType binder))
                    (nativeTypeDomainShape body)
@@ -1814,8 +1814,9 @@ An algebraic domain can contain an eligible function leaf. Check its fields
 with the retained union, but check each function endpoint with the old
 function-free algebraic policy. Start a separate data visited set for each
 endpoint. An enclosing data back-edge must not certify that endpoint.
-A raw Pi is not scalar. mkDepFunTy can convert a vacuous Pi to an ordinary
-arrow. Retain its multiplicity, argument and result shapes. Check its possible
+A raw Pi is not scalar. mkDepFunTyWithVis can convert a vacuous visible Pi
+to an ordinary arrow. A hidden Pi remains retained. Keep the domain projection
+conservative for both flags. Retain the multiplicity, argument and result shapes. Check its possible
 function endpoints with the function-free policy before decoding its binder.
 This rejects recursive domains through a Pi without forcing their Type knots.
 Applied synonyms and casts remain
@@ -1896,7 +1897,7 @@ tcIfaceType = go
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
-    go (IfaceDepFunTy bndr@(mult, name, domain) body)
+    go (IfaceDepFunTy vis bndr@(mult, name, domain) body)
       -- See Note [Retained binders in interfaces].
       -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
       = do { mult_shape <- tcIfaceDomainShape mult
@@ -1921,7 +1922,7 @@ tcIfaceType = go
                failIfM (text "Invalid retained function result in interface for:" <+> ppr v
                         $$ text "Expected kind Type."
                         $$ text "Actual kind:" <+> ppr (typeKind body'))
-           ; return (mkDepFunTy v body') } }
+           ; return (mkDepFunTyWithVis vis v body') } }
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag ma w t1 t2) = FunTy flag <$> go ma <*> go w <*> go t1 <*> go t2
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks

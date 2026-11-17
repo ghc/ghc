@@ -263,7 +263,7 @@ withRetainedAmbiguityType ty thing_inside
   = do { (indices, check_ty) <- go ty
        ; tcExtendIdEnv indices (thing_inside check_ty) }
   where
-    go ty@(DepFunTy index _)
+    go ty@(DepFunTy DepFunVisible index _)
       = do { fresh <- newSysLocalId (getOccFS index) ManyTy (varType index)
            ; (indices, body) <- go (applyTypeToArgs ty [Var fresh])
            ; return (fresh : indices, mkVisFunTyManyU (varType index) body) }
@@ -286,8 +286,11 @@ For forall a. foreach n -> a -> Vec a n, the payload metavariable must unify
 with the payload skolem. Structural unification under a retained binder remains
 gated, so ordinary equality cannot perform this payload unification.
 
-Open each retained binder with one fresh runtime Id. Use that same opaque Id
-on both sides of the check. Replace the opened binder with an ordinary arrow.
+Open each visible retained binder with one fresh runtime Id. Use that same
+opaque Id on both sides of the check. Replace the opened binder with an
+ordinary arrow. Keep invisible retained binders intact for ordinary checking.
+This projection does not supply an implicit source argument.
+See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
 Keep outer erased quantifiers, so ordinary ambiguity checks still apply to
 their type variables and constraints. Do not replace runtime indices with
 fresh type metavariables: Select b need not determine b.
@@ -824,7 +827,7 @@ check_type ve (TermVarTy v)
   = do { unless (isNativeOpaqueValueId v) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; check_retained_index ve v }
-check_type ve (DepFunTy v body)
+check_type ve (DepFunTy _ v body)
   = do { unless (isNativeOpaqueValueId v && not (v `elemVarSet` ve_indices ve)) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; unless (typeKind body `eqType` liftedTypeKind) $

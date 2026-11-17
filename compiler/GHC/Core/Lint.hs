@@ -1553,7 +1553,7 @@ lintTyApp fun_ty arg_ty
 lintValApp :: CoreExpr -> Type -> Type -> UsageEnv -> UsageEnv
            -> LintM (Type, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
-  | DepFunTy b res_ty <- coreFullView fun_ty
+  | DepFunTy _ b res_ty <- coreFullView fun_ty
   = do { ensureEqTys (varType b) arg_ty (mkAppMsg (varType b) arg_ty arg)
        ; lintRetainedArgument b arg
        ; in_scope <- getInScope
@@ -1838,7 +1838,7 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
           ; multiplicities = constructorMults con_payload_ty
           ; constructorMults ty = case coreFullView ty of
               ForAllTy _ _ body -> ManyTy : constructorMults body
-              DepFunTy _ body -> ManyTy : constructorMults body
+              DepFunTy _ _ body -> ManyTy : constructorMults body
               FunTy { ft_mult = mult, ft_res = body }
                               -> mult : constructorMults body
               _               -> [] }
@@ -2149,11 +2149,11 @@ lintType (TermAppTy f arg)
            (text "Opaque runtime call argument has the wrong kind:" <+> ppr arg
             $$ text "Expected:" <+> ppr domain) }
 
-lintType (DepFunTy b body)
+lintType (DepFunTy vis b body)
   = do { lintL (isNativeOpaqueValueId b)
            (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
-       ; lintL (b `elemVarSet` tyCoVarsOfType body)
-           (text "Vacuous retained dependent binder:" <+> ppr b)
+       ; lintL (vis == DepFunInvisible || b `elemVarSet` tyCoVarsOfType body)
+           (text "Vacuous visible retained dependent binder:" <+> ppr b)
        ; lintBinder LambdaBind b $
          do { lintType body
             ; lintL (typeKind body `eqType` liftedTypeKind)
@@ -2393,7 +2393,7 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                                 2 (ppr arg' <+> dcolon <+> ppr karg'))
                       ; go subst' body_ty acc args }
 
-               go subst (DepFunTy b body_ty) acc (arg:args)
+               go subst (DepFunTy _ b body_ty) acc (arg:args)
                  = case runtime_arg of
                      Nothing -> failWithL (text "Retained runtime binder in a type application")
                      Just to_core -> do
@@ -2663,7 +2663,7 @@ lintCoercion (TermAppCo f arg_co)
            (text "Opaque runtime call congruence has the wrong argument kinds."
             $$ ppr arg_co) }
 
-lintCoercion co@(DepFunCo b domain body_co)
+lintCoercion co@(DepFunCo visL visR b domain body_co)
   = do { lintL (isNativeOpaqueValueId b)
            (text "Invalid retained coercion binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
        ; case domain of
@@ -2679,6 +2679,9 @@ lintCoercion co@(DepFunCo b domain body_co)
                     (text "Unsupported retained domain conversion:" <+> ppr delta) }
        ; lintBinder LambdaBind b $
          do { lintCoercion body_co
+            ; lintL (coercionRole body_co /= Nominal || visL == visR)
+                (text "Nominal retained coercion has different visibilities:" <+> ppr co)
+                -- See Note [Retained function visibility coercions] in GHC.Core.TyCo.Make.
             ; let Pair left right = coercionKind body_co
             ; lintL (typeKind left `eqType` liftedTypeKind
                       && typeKind right `eqType` liftedTypeKind)

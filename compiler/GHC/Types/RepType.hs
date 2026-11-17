@@ -141,7 +141,7 @@ countFunRepArgs n ty
     + countFunRepArgs (n - 1) res
     -- If typePrimRep returns [] that means a void arg,
     -- and we count 1 for that
-  | DepFunTy index res <- unwrapType ty
+  | DepFunTy _ index res <- unwrapType ty
   -- See Note [Retained representation arity].
   = (length (typePrimRep (varType index)) `max` 1)
     + countFunRepArgs (n - 1) res
@@ -158,7 +158,7 @@ countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
     go n ty
       | FunTy _ _ _ arg res <- unwrapType ty
       = length (typePrimRep arg) + go (n - 1) res
-      | DepFunTy index res <- unwrapType ty
+      | DepFunTy _ index res <- unwrapType ty
       -- See Note [Retained representation arity].
       = length (typePrimRep (varType index)) + go (n - 1) res
       | otherwise

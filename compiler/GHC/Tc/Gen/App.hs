@@ -807,7 +807,8 @@ retainedDeclaredDomains supplied = go supplied emptyVarSet
     go 0 bound result = result_view bound result
     go remaining bound ty
       | Just ty' <- coreView ty = go remaining bound ty'
-    go remaining bound (DepFunTy binder body)
+    go _ _ (DepFunTy DepFunInvisible _ _) = ([], Nothing)
+    go remaining bound (DepFunTy DepFunVisible binder body)
       = let domain = independent bound (Scaled (idMult binder) (varType binder))
             (rest, result) = go (remaining - 1) (extendVarSet bound binder) body
         in (domain : rest, result)
@@ -1570,7 +1571,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     -- See Note [Retained argument application].
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
-      | DepFunTy binder _ <- coreFullView fun_ty
+      | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
       = do { core_arg <- if isNativeIndexFunctionId binder
                           then tcRetainedFunctionArg (varType binder) arg
                           else tcRetainedArg (varType binder) arg
@@ -1807,6 +1808,11 @@ tcRetainedArgVar expected arg_id
 
 {- Note [Retained argument application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Only DepFunVisible consumes a written source value argument. Declaration
+advice stops at DepFunInvisible. The ordinary application checker then uses
+its existing non-function fallback. No implicit runtime argument is supplied.
+See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
+
 A retained argument is a value. Resolve a local unrestricted Id or a saturated
 constructor tree before instantiating the codomain. Also resolve an immediate
 single-variable lambda application in the checked native beta grammar.
@@ -2136,7 +2142,7 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
       | otherwise = Nothing
 
     constructor_result [] ty = Just ty
-    constructor_result (Just _ : fields) (DepFunTy _ body)
+    constructor_result (Just _ : fields) (DepFunTy DepFunVisible _ body)
       = constructor_result fields body
     constructor_result (Just index : fields) ty
       | FunTy flag _ma mult domain body <- coreFullView ty
@@ -2158,7 +2164,7 @@ isRetainedValueType = go False
   where
     go _ ty | isTauTy ty = True
     go under_pi ty = case coreFullView ty of
-      DepFunTy index body -> isNativeOpaqueValueId index
+      DepFunTy _ index body -> isNativeOpaqueValueId index
                          && typeKind body `eqType` liftedTypeKind
                          && go True body
       FunTy flag ma mult arg res -> isTauTy ma && isTauTy mult
@@ -2574,7 +2580,8 @@ tcRetainedDollarInst enabled (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr
       | Just ty' <- coreView ty = tau_domains ty'
     tau_domains (ForAllTy _ _ body) = tau_domains body
     tau_domains (CastTy ty _) = tau_domains ty
-    tau_domains (DepFunTy binder body) = isTauTy (varType binder) && tau_domains body
+    tau_domains (DepFunTy DepFunVisible binder body) = isTauTy (varType binder) && tau_domains body
+    tau_domains (DepFunTy DepFunInvisible _ _) = False
     tau_domains (FunTy { ft_arg = domain, ft_res = result })
       = isTauTy domain && tau_domains result
     tau_domains _ = True

@@ -902,7 +902,7 @@ almost_devoid_co_var_of_co (AppCo co arg) cv
 almost_devoid_co_var_of_co (TermAppCo f co) cv
   = almost_devoid_co_var_of_type (varType f) cv
   && almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_co (DepFunCo v domain co) cv
+almost_devoid_co_var_of_co (DepFunCo _ _ v domain co) cv
   = almost_devoid_co_var_of_type (varType v) cv
   && almost_devoid_co_var_of_mco domain cv
   && almost_devoid_co_var_of_co co cv
@@ -953,7 +953,7 @@ almost_devoid_co_var_of_type (TermAppTy f arg) cv
   && almost_devoid_co_var_of_type arg cv
 almost_devoid_co_var_of_type (TermVarTy v) cv
   = almost_devoid_co_var_of_type (varType v) cv
-almost_devoid_co_var_of_type (DepFunTy v ty) cv
+almost_devoid_co_var_of_type (DepFunTy _ v ty) cv
   = almost_devoid_co_var_of_type (varType v) cv
   && almost_devoid_co_var_of_type ty cv
 almost_devoid_co_var_of_type (TyConApp _ tys) cv
@@ -1005,7 +1005,7 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
     go (TermAppTy f arg) = go (TermVarTy f) `mappend` go arg
     go (TermVarTy v)     = Pair (tyCoVarsOfType $ varType v) (unitVarSet v)
-    go (DepFunTy v ty)
+    go (DepFunTy _ v ty)
       = ((`delVarSet` v) <$> go ty) `mappend`
         invisible (tyCoVarsOfType $ varType v)
     go (AppTy t1 t2)     = go t1 `mappend` go t2
@@ -1068,7 +1068,7 @@ isInjectiveInType tv ty
     go (TyVarTy tv')                    = tv' == tv
     go (TermAppTy {})                   = False
     go (TermVarTy v)                    = v == tv
-    go (DepFunTy v ty)                  = go (varType v) || (tv /= v && go ty)
+    go (DepFunTy _ v ty)                  = go (varType v) || (tv /= v && go ty)
     -- See Note [Matchability and injective variables].
     go (AppTy f a)                      = injectiveAppTy f && (go f || go a)
     go (FunTy _ ma w ty1 ty2)           = go ma || go w || go ty1 || go ty2
@@ -1140,7 +1140,7 @@ inj_vars_of_type look_under_tfs = go
     go (TyVarTy v)                      = deepUnitFV (go . varType) v
     go (TermAppTy {})                   = mempty
     go (TermVarTy v)                    = deepUnitFV (go . varType) v
-    go (DepFunTy v ty)                  = go (varType v) `mappend`
+    go (DepFunTy _ v ty)                  = go (varType v) `mappend`
                                           addBndrFV v (go ty)
     -- See Note [Matchability and injective variables].
     go (AppTy f a)
@@ -1194,7 +1194,7 @@ invisibleVarsOfType = go
     go (TyVarTy v)         = go (tyVarKind v)
     go (TermAppTy f arg)   = go (varType f) `unionVarSet` go arg
     go (TermVarTy v)       = go (varType v)
-    go (DepFunTy v ty)
+    go (DepFunTy _ v ty)
       = tyCoVarsOfType (varType v) `unionVarSet` (go ty `delVarSet` v)
     go (AppTy f a)         = go f `unionVarSet` go a
     go (FunTy _ ma w ty1 ty2)
@@ -1348,7 +1348,7 @@ tyConsOfType ty
      go (TyVarTy {})                = emptyUniqSet
      go (TermAppTy f arg)           = go (varType f) `unionUniqSets` go arg
      go (TermVarTy v)               = go (varType v)
-     go (DepFunTy v ty)             = go (varType v) `unionUniqSets` go ty
+     go (DepFunTy _ v ty)             = go (varType v) `unionUniqSets` go ty
      go (LitTy {})                  = emptyUniqSet
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` tyConsOfTypes tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
@@ -1364,7 +1364,7 @@ tyConsOfType ty
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
      go_co (TermAppCo f co)        = go (varType f) `unionUniqSets` go_co co
-     go_co (DepFunCo v domain co)  = go (varType v) `unionUniqSets` go_mco domain `unionUniqSets` go_co co
+     go_co (DepFunCo _ _ v domain co)  = go (varType v) `unionUniqSets` go_mco domain `unionUniqSets` go_co co
      go_co (ForAllCo { fco_ma = ma, fco_kind = kind_co, fco_body = co })
                                    = go_co ma `unionUniqSets` go_mco kind_co `unionUniqSets` go_co co
      go_co (FunCo { fco_ma = ma, fco_mult = m, fco_arg = a, fco_res = r })
@@ -1500,13 +1500,13 @@ occCheckExpand vs_to_avoid ty
       | bad_var_occ as v              = Nothing
       | otherwise                    = return ty
 
-    go cxt@(as, env) (DepFunTy v body_ty)
+    go cxt@(as, env) (DepFunTy vis v body_ty)
        = do { arg_ty <- go cxt (varType v)
             ; let v'   = setVarType v arg_ty
                   env' = extendVarEnv env v v'
                   as'  = as `delVarSet` v
             ; body' <- go (as', env') body_ty
-            ; return (mkDepFunTy v' body') }
+            ; return (mkDepFunTyWithVis vis v' body') }
 
     go _   ty@(LitTy {}) = return ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
@@ -1589,14 +1589,14 @@ occCheckExpand vs_to_avoid ty
       | bad_var_occ as f = Nothing
       | otherwise = TermAppCo (lookupVarEnv env f `orElse` f) <$> go_co cxt arg_co
 
-    go_co cxt@(as, env) (DepFunCo v domain body_co)
+    go_co cxt@(as, env) (DepFunCo visL visR v domain body_co)
       = do { arg_ty <- go cxt (varType v)
            ; domain' <- go_mco cxt domain
            ; let v' = setVarType v arg_ty
                  env' = extendVarEnv env v v'
                  as' = as `delVarSet` v
            ; body' <- go_co (as', env') body_co
-           ; return (DepFunCo v' domain' body') }
+           ; return (DepFunCo visL visR v' domain' body') }
 
     go_co cxt@(as, env) co@(ForAllCo { fco_tcv = tcv, fco_ma = ma_co, fco_kind = kind_co, fco_body = body_co })
       = do { ma_co' <- go_co cxt ma_co

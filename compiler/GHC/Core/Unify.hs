@@ -1627,7 +1627,7 @@ hasUnmatchableApplication = go
     go (FunTy _ ma mult arg res) = any go [ma, mult, arg, res]
     go (ForAllTy ma (Bndr tv _) body) = go ma || go (varType tv) || go body
     go (CastTy ty _) = go ty
-    go (DepFunTy binder body) = go (varType binder) || go body
+    go (DepFunTy _ binder body) = go (varType binder) || go body
     go _ = False
 
 -- | Detect retained binders, including those with no free runtime indices.
@@ -1660,7 +1660,9 @@ forall, do not consult family substitutions under that binder.
 The default policy does not descend into a retained function. Keep that policy
 for all existing matching, unification, injectivity and PMC callers. The separate
 tcMatchRetainedTyX_BM entry point opts in to immutable matching through supported
-runtime binders. Both binders must satisfy isNativeRetainedBinder with
+runtime binders with the same visibility. A visibility bridge is representational
+evidence, not a nominal template match. Both binders must satisfy
+isNativeRetainedBinder with
 the same closed domain. See Note [Function-valued retained binders] in
 GHC.Core.Type. Both bodies must have kind Type, and the accumulated
 kind coercion must be reflexive. Compare the domains; do not infer them.
@@ -1823,8 +1825,9 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
            _ -> return () }
 
 -- See Note [Matching retained function types].
-unify_ty env (DepFunTy b1 body1) (DepFunTy b2 body2) kco
-  | Matching <- um_unif env
+unify_ty env (DepFunTy vis1 b1 body1) (DepFunTy vis2 b2 body2) kco
+  | vis1 == vis2
+  , Matching <- um_unif env
   , um_match_retained env
   , isNativeRetainedBinder b1, isNativeRetainedBinder b2
   , tcEqType (varType b1) (varType b2)
@@ -2216,7 +2219,7 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
       -- A supported index Id has a closed algebraic domain and Many
       -- multiplicity. Its type has no type variables or family applications.
       -- See Note [Apartness of retained runtime indices].
-    go bvs (DepFunTy v body)
+    go bvs (DepFunTy _ v body)
       = go bvs (varType v) ||
         (case lhs of
            TyVarLHS {} -> go (bvs `extendVarSet` v) body

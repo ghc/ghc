@@ -204,7 +204,7 @@ scanType :: Type -> NativeScan
 scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy _) = NativeScan (pure True)
 scanType (TermAppTy _ _) = NativeScan (pure True)
-scanType (DepFunTy _ _) = NativeScan (pure True)
+scanType DepFunTy{} = NativeScan (pure True)
 scanType (LitTy _) = mempty
 scanType (TyConApp tc args) = foldMap scanType args <> scanSynonym tc
 scanType (AppTy fun arg) = scanType fun <> scanType arg

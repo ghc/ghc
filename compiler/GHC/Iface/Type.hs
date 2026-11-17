@@ -193,7 +193,8 @@ data IfaceType
   | IfaceForAllTy  IfaceMatchability IfaceForAllBndr IfaceType
       -- See Note [Forall interface metadata].
   -- See Note [Retained Boolean interface types].
-  | IfaceDepFunTy IfaceIdBndr IfaceType
+  | IfaceDepFunTy !DepFunTyFlag IfaceIdBndr IfaceType
+      -- See Note [Retained interface visibility].
   | IfaceTermVar IfLclName
   | IfaceFreeTermVar Id                 -- Diagnostics only, like IfaceFreeTyVar
   | IfaceTermAppTy IfLclName IfaceType  -- See Note [Opaque call indices in interfaces]
@@ -263,6 +264,24 @@ Old readers must reject the file in the whole-file version check before
 type decoding.
 See docs/dependent-haskell/REFERENCES.md#agda-provenance for the comparison
 with Agda's explicit binder and variable serialization.
+-}
+
+{- Note [Retained interface visibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+IfaceDepFunTy stores its visibility before the local Id binder. Visibility
+selects source argument syntax. Both flags retain a runtime value. Preserve
+this flag in sharing, renaming, type traversals and the binary payload.
+The common interface version must reject previous payloads before decoding.
+The DepFunTyFlag decoder rejects unknown flag tags.
+
+The reader must use mkDepFunTyWithVis. A vacuous visible binder can become an
+ordinary arrow. A vacuous hidden binder must remain retained. Keep the same
+Many, lifted-domain, scope and result-kind checks for both forms.
+
+Print a visible binder with an arrow and a hidden binder with a dot. This is
+a diagnostic spelling; it adds no source grammar. IfaceDepFunCo preserves
+both endpoint flags for diagnostics, including a change of visibility.
+Native coercion serialization and import remain blocked.
 -}
 
 {- Note [Opaque call indices in interfaces]
@@ -590,7 +609,7 @@ data IfaceCoercion
   = IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion IfaceCoercion
-  | IfaceDepFunCo     IfaceIdBndr IfaceMCoercion IfaceCoercion
+  | IfaceDepFunCo     !DepFunTyFlag !DepFunTyFlag IfaceIdBndr IfaceMCoercion IfaceCoercion
       -- Diagnostic form only. The runtime binder scopes over the body.
       -- The interface writer and importer reject this form.
   | IfaceTermAppCo    IfLclName IfaceCoercion -- Diagnostic form; no wire encoding
@@ -871,7 +890,7 @@ visibleTypeVarOccurencies = go
     go (IfaceFreeTermVar {})    = mempty
     go (IfaceTermAppTy _ arg)   = go arg
     go (IfaceFreeTermAppTy _ arg) = go arg
-    go (IfaceDepFunTy (w, _, arg) res) = go w <> go arg <> go res
+    go (IfaceDepFunTy _vis (w, _, arg) res) = go w <> go arg <> go res
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ ma w arg res) = go ma <> go w <> go arg <> go res
     go (IfaceForAllTy ma bndr ty) = go ma <> go (ifaceBndrType $ binderVar bndr) <> go ty
@@ -1275,6 +1294,12 @@ pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
 pprPrecIfaceType prec ty =
   hideNonStandardTypes (ppr_ty prec) ty
 
+-- | Render the stored visibility of a retained runtime binder.
+-- See Note [Retained interface visibility].
+pprIfaceDepFunArrow :: DepFunTyFlag -> SDoc
+pprIfaceDepFunArrow DepFunVisible = arrow
+pprIfaceDepFunArrow DepFunInvisible = dot
+
 pprTypeArrow :: FunTyFlag -> IfaceMatchability -> IfaceMult -> SDoc
 pprTypeArrow af ma mult = pprArrowWithModifiers mods af arr <+> ppr_matchability
   where
@@ -1301,10 +1326,14 @@ ppr_ty ctxt_prec (IfaceTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
 ppr_ty ctxt_prec (IfaceFreeTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
-ppr_ty ctxt_prec (IfaceDepFunTy (_, var, arg) res)
+ppr_ty ctxt_prec (IfaceDepFunTy vis (_, var, arg) res)
   = maybeParen ctxt_prec funPrec $
-    sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
-        , arrow <+> ppr_ty_nested res ]
+    case vis of
+      DepFunVisible   -> sep [binder, arrow <+> body]
+      DepFunInvisible -> sep [binder <> dot, body]
+  where
+    binder = text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
+    body = ppr_ty_nested res
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = ppr_tuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
@@ -1480,8 +1509,8 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
     go subs rank1 (IfaceForAllTy ma bndr ty)
       = IfaceForAllTy (go subs False ma) (go_ifacebndr subs bndr) (go subs rank1 ty)
 
-    go subs rank1 (IfaceDepFunTy (w, var, arg) res)
-      = IfaceDepFunTy (go subs False w, var, go subs False arg) (go subs rank1 res)
+    go subs rank1 (IfaceDepFunTy vis (w, var, arg) res)
+      = IfaceDepFunTy vis (go subs False w, var, go subs False arg) (go subs rank1 res)
 
     go _ _ ty@(IfaceTermVar {}) = ty
     go _ _ ty@(IfaceFreeTermVar {}) = ty
@@ -2302,11 +2331,14 @@ ppr_co ctxt_prec (IfaceGReflCo r ty (IfaceMCo co))
 ppr_co ctxt_prec (IfaceTermAppCo fun co)
   = maybeParen ctxt_prec appPrec (text "TermAppCo" <+> ppr fun <+> ppr_co appPrec co)
 
-ppr_co ctxt_prec (IfaceDepFunCo (_, var, arg) domain co)
+ppr_co ctxt_prec (IfaceDepFunCo visL visR (_, var, arg) domain co)
   = maybeParen ctxt_prec funPrec $
     sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg <+> ppr_domain domain)
-        , arrow <+> pprIfaceCoercion co ]
+        , visibility <+> pprIfaceCoercion co ]
   where
+    visibility
+      | visL == visR = pprIfaceDepFunArrow visL
+      | otherwise = braces (pprIfaceDepFunArrow visL <> char '~' <> pprIfaceDepFunArrow visR)
     ppr_domain IfaceMRefl = empty
     ppr_domain (IfaceMCo proof) = text "|>" <+> pprIfaceCoercion proof
 
@@ -2625,8 +2657,8 @@ putIfaceType _ (IfaceFreeTermAppTy fun _)
   = pprPanic "Can't serialise IfaceFreeTermAppTy" (ppr fun)
 putIfaceType bh (IfaceTermAppTy fun arg)
   = do { putByte bh 12; put_ bh fun; put_ bh arg }
-putIfaceType bh (IfaceDepFunTy bndr body)
-  = do { putByte bh 10; put_ bh bndr; put_ bh body }
+putIfaceType bh (IfaceDepFunTy vis bndr body)
+  = do { putByte bh 10; put_ bh vis; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceTermVar var)
   = do { putByte bh 11; put_ bh var }
 
@@ -2694,8 +2726,8 @@ getIfaceType bh = do
                       ; return (IfaceTupleTy s i tys) }
               9  -> do n <- get bh
                        return (IfaceLitTy n)
-              10 -> do { bndr <- get bh; body <- get bh
-                       ; return (IfaceDepFunTy bndr body) }
+              10 -> do { vis <- get bh; bndr <- get bh; body <- get bh
+                       ; return (IfaceDepFunTy vis bndr body) }
               11 -> IfaceTermVar <$> get bh
               12 -> IfaceTermAppTy <$> get bh <*> get bh
               _  -> ioError (userError ("getIfaceType: invalid type tag " ++ show h))
@@ -2906,7 +2938,7 @@ instance NFData (DefMethSpec IfaceType) where
 instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()
-    IfaceDepFunTy bndr res -> rnf bndr `seq` rnf res
+    IfaceDepFunTy vis bndr res -> vis `seq` rnf bndr `seq` rnf res
     IfaceTermVar var -> rnf var
     IfaceFreeTermVar var -> var `seq` ()
     IfaceTermAppTy fun arg -> rnf fun `seq` rnf arg
@@ -2929,7 +2961,7 @@ instance NFData IfaceTyLit where
 
 instance NFData IfaceCoercion where
   rnf = \case
-    IfaceDepFunCo bndr domain co -> rnf bndr `seq` rnf domain `seq` rnf co
+    IfaceDepFunCo visL visR bndr domain co -> visL `seq` visR `seq` rnf bndr `seq` rnf domain `seq` rnf co
     IfaceTermAppCo fun co -> rnf fun `seq` rnf co
     IfaceReflCo f1 -> rnf f1
     IfaceGReflCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3

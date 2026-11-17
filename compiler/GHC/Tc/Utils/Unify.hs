@@ -3823,7 +3823,7 @@ retainedCallOccurs call_ty = go
     go (TyConApp _ args) = any go args
     go (AppTy fun arg) = go fun || go arg
     go (FunTy _ ma mult arg res) = any go [ma, mult, arg, res]
-    go (DepFunTy binder body)
+    go (DepFunTy _ binder body)
       = go (varType binder) || (binder `notElem` dependencies && go body)
     go (ForAllTy ma (Bndr binder _) body) = go ma || go (varType binder) || go body
     go (TermAppTy _ arg) = go arg
@@ -4671,12 +4671,12 @@ check_ty_eq_rhs flags ty
         -> return $ okCheckRefl ty
         | otherwise
         -> return $ PuFail (cteProblem cteSkolemEscape)
-      DepFunTy index body
+      DepFunTy vis index body
         | native_given
         , isNativeRetainedBinder index
         , typeKind body `eqType` liftedTypeKind
         -> do { body_res <- check_ty_eq_rhs flags body
-              ; return (mkDepFunRedn index <$> body_res) }
+              ; return (mkDepFunRedn vis index <$> body_res) }
         | otherwise
         -> return $ PuFail impredicativeProblem
       LitTy {}        -> return $ okCheckRefl ty

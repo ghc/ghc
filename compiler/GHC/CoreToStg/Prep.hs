@@ -1137,7 +1137,7 @@ nameNativeConstructorArgs expr
       = do { co <- liftNativeIndexTransport "the application result" transport ty
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
-      | DepFunTy index _ <- coreFullView ty
+      | DepFunTy _ index _ <- coreFullView ty
       , isNativeIndexFunctionId index
       = case nativeIndexFunctionVar_maybe arg of
           Just actual
@@ -1146,7 +1146,7 @@ nameNativeConstructorArgs expr
                      transport wrap rest
           _ -> throwGhcException (Sorry
                  "Native dependent Core requires a retained function argument to be an eligible local variable of its fixed function type in CorePrep.")
-      | DepFunTy index _ <- coreFullView ty
+      | DepFunTy _ index _ <- coreFullView ty
       -- See Note [Naming later retained domains].
       = do { domain_co <- liftNativeIndexTransport "a later retained domain" transport (varType index)
            ; let prepared_arg

@@ -259,10 +259,14 @@ debug_ppr_ty _ (TermVarTy var)
 debug_ppr_ty prec (TermAppTy fun arg)
   = maybeParen prec appPrec $ ppr fun <+> debug_ppr_ty appPrec arg
 
-debug_ppr_ty prec (DepFunTy var res)
+debug_ppr_ty prec (DepFunTy vis var res)
   = maybeParen prec funPrec $
-    sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> debug_ppr_ty topPrec (varType var))
-        , arrow <+> debug_ppr_ty topPrec res ]
+    case vis of
+      DepFunVisible   -> sep [binder, arrow <+> body]
+      DepFunInvisible -> sep [binder <> dot, body]
+  where
+    binder = text "foreach" <+> parens (ppr var <+> dcolon <+> debug_ppr_ty topPrec (varType var))
+    body = debug_ppr_ty topPrec res
 
 debug_ppr_ty prec (FunTy { ft_af = af, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res })
   = maybeParen prec funPrec $

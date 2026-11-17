@@ -65,7 +65,7 @@ module GHC.Core.TyCo.Rep (
         RuntimeRepType, LevityType, Matchability,
         KnotTied,
         PredType, ThetaType, FRRType,     -- Synonyms
-        ForAllTyFlag(..), FunTyFlag(..),
+        ForAllTyFlag(..), FunTyFlag(..), DepFunTyFlag(..),
 
         -- * Coercions
         Coercion(..), CoSel(..), ForAllSel(..), FunSel(..), Role(..),
@@ -90,7 +90,7 @@ module GHC.Core.TyCo.Rep (
         mkInvisFunTy, mkInvisFunTys,
         tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTy, tcMkScaledFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoForAllTy,
-        mkPiTy, mkPiTys, mkDepFunTy,
+        mkPiTy, mkPiTys, mkDepFunTy, mkDepFunTyWithVis,
         mkVisFunTyMany, mkVisFunTysMany,
         mkVisFunTyManyM, mkVisFunTyManyU, mkVisFunTysManyM, mkVisFunTysManyU,
         mkScaledFunTysM, mkScaledFunTysU, tcMkScaledFunTysM, tcMkScaledFunTysU,
@@ -181,8 +181,10 @@ data Type
   | TermVarTy Id -- ^ The value index of a local runtime identifier.
                  -- See Note [Restricted retained dependent types].
 
-  | DepFunTy Id Type -- ^ A retained runtime binder and its dependent result.
-                     -- See Note [Restricted retained dependent types].
+  | DepFunTy !DepFunTyFlag Id Type
+      -- ^ A retained runtime binder and its dependent result.
+      -- See Note [Restricted retained dependent types]
+      -- and Note [Retained function visibility].
 
   | AppTy
         Type
@@ -274,9 +276,9 @@ closed function-free structural endpoints. Their application uses
 TermAppTy/TermAppCo. See Note [Native function-value application] in
 GHC.Core.TyCo.Make.
 
-The binder scopes over the result. A vacuous binder is represented by FunTy;
-use mkDepFunTy to maintain this invariant. Index occurrences are scope
-dependencies, not additional runtime uses. Type-variable and coercion-variable
+The binder scopes over the result. Use mkDepFunTyWithVis to preserve the
+canonical forms in Note [Retained function visibility]. Index occurrences are
+scope dependencies. They add no runtime uses. Type-variable and coercion-variable
 callbacks must not process runtime index variables.
 
 Index expressions and substitution keep their checked variable, constructor,
@@ -292,7 +294,7 @@ docs/dependent-haskell/REFERENCES.md.
 
 {- Note [Retained dependent function coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-DepFunCo b domain co binds one unrestricted runtime binder throughout co.
+DepFunCo visL visR b domain co binds one unrestricted runtime binder throughout co.
 The optional domain proof is outside that binder. MRefl keeps its complete
 lifted domain A unchanged. MCo delta requires nominal evidence A ~ B between
 lifted value types. The type of b is A. Both body endpoints have kind Type.
@@ -301,7 +303,7 @@ complete types. Other opaque function-value domains can be transported with
 nominal evidence; that transport grants no native call permission. See
 Note [Opaque runtime index values] in GHC.Core.Type.
 
-If co relates S and T at role r, the left endpoint is foreach (b :: A) -> S.
+If co relates S and T at role r, the left endpoint binds b at A in S.
 The right endpoint binds a fresh Id at type B and substitutes its backward
 conversion for the old b in T. Freshen against the domain proof's deep free
 variables and the body's free variables other than b. The domain proof is
@@ -309,12 +311,13 @@ outside b's scope and can refer to an outer Id with the same Unique. CastTy
 carries this nominal kind conversion. The runtime bridge uses
 Cast value (SubCo (sym delta)). Preserve the nominal proof structure.
 See Note [Nominal native index casts] in GHC.Core. An eligible call head keeps
-its complete fixed type and its dedicated bare-Id head slot. Each endpoint can
-independently become an ordinary arrow when b is unused.
+its complete fixed type and its dedicated bare-Id head slot. Each visible
+endpoint can become an ordinary arrow when b is unused.
 
 The binder scopes over the proof as well as its endpoints. Keep DepFunCo even
 when both endpoints omit b: an intermediate proof can still use that index.
-The smart constructor simplifies a reflexive body only at a fixed domain.
+The smart constructor simplifies a reflexive body at a fixed domain and
+visibility.
 Substitution, lifting, free variables and tidying use runtime binder callbacks.
 ForAllCo binds type and coercion variables. DepFunCo binds runtime Ids.
 
@@ -1004,11 +1007,38 @@ mkPiTysM tbs = mkPiTys [(matchableDataConTy,tb) | tb <- tbs]
 mkPiTysU :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
 mkPiTysU tbs = mkPiTys [(unmatchableDataConTy,tb) | tb <- tbs]
 
--- | Construct a retained dependent function. Remove vacuous dependence.
+-- | Construct a visible retained dependent function.
 mkDepFunTy :: Id -> Type -> Type
-mkDepFunTy b body
-  | b `elemVarSet` tyCoVarsOfType body = DepFunTy b body
+mkDepFunTy = mkDepFunTyWithVis DepFunVisible
+
+-- | Construct a retained function without losing its source visibility.
+-- See Note [Retained function visibility].
+mkDepFunTyWithVis :: DepFunTyFlag -> Id -> Type -> Type
+mkDepFunTyWithVis vis b body
+  | vis == DepFunInvisible || b `elemVarSet` tyCoVarsOfType body
+  = DepFunTy vis b body
   | otherwise = mkVisFunTyManyU (varType b) body
+
+{- Note [Retained function visibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder takes a value argument in Core. Its visibility describes
+how the argument is supplied in source. Keep an invisible binder even when
+its Id is absent from the result type. A visible binder with no dependency
+still collapses to an ordinary visible U/Many arrow. An invisible FunTy
+represents a predicate argument and cannot represent this value binder.
+
+Core Lam has a canonical visible type. A DepFunCo can relate it to an
+invisible type at Representational role, with no extra lambda or argument.
+The nominal domain proof and dependent body proof still determine the
+endpoints. Each endpoint uses mkDepFunTyWithVis independently. For example,
+the visible endpoint of a vacuous function can be a FunTy and the invisible
+endpoint a DepFunTy. Different flags are never nominally equal.
+
+This follows the shape of Note [Required foralls in Core]. Retained
+visibility does not erase the value argument. Both endpoints have the same
+runtime calling convention. Preserve both flags until the cast is erased.
+See Note [Retained dependent function coercions].
+-}
 
 -- | 'mkNakedTyConTy' creates a nullary 'TyConApp'. In general you
 -- should rather use 'GHC.Core.Type.mkTyConTy', which picks the shared
@@ -1122,7 +1152,8 @@ data Coercion
   | TermAppCo Id CoercionN
       -- ^ Nominal argument congruence for the same runtime function.
 
-  | DepFunCo Id MCoercionN Coercion
+  | DepFunCo !DepFunTyFlag !DepFunTyFlag Id MCoercionN Coercion
+      -- Left and right endpoint visibility.
       -- The optional nominal domain proof is outside the runtime binder scope.
       -- See Note [Retained dependent function coercions].
 
@@ -2416,7 +2447,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty (TyVarTy tv)        = tyvar tv
     go_ty (TermVarTy v)       = termvar v
     go_ty (TermAppTy f arg)   = termvar f M.<> go_ty arg
-    go_ty (DepFunTy b body)   = go_ty (varType b) M.<> termbinder b (go_ty body)
+    go_ty (DepFunTy _ b body) = go_ty (varType b) M.<> termbinder b (go_ty body)
     go_ty (LitTy l)           = lit l
     go_ty (AppTy t1 t2)       = go_ty t1 M.<> go_ty t2
     go_ty (CastTy ty co)      = go_ty ty M.<> go_co co
@@ -2442,7 +2473,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co (TyConAppCo ro tc args)  = lit ro M.<> lit tc M.<> go_cos args
     go_co (AppCo c1 c2)            = go_co c1 M.<> go_co c2
     go_co (TermAppCo f co)         = termvar f M.<> go_co co
-    go_co (DepFunCo b domain co)   = go_ty (varType b) M.<> go_mco domain M.<> termbinder b (go_co co)
+    go_co (DepFunCo _ _ b domain co) = go_ty (varType b) M.<> go_mco domain M.<> termbinder b (go_co co)
     go_co (CoVarCo cv)             = covar cv
     go_co (AxiomCo ax cos)         = lit ax M.<> go_cos cos
     go_co (HoleCo hole)            = cohole hole
@@ -2515,7 +2546,7 @@ typeSize (FunTy _ ma _ t1 t2)       = typeSize ma + typeSize t1 + typeSize t2
 typeSize (ForAllTy ma (Bndr tv _) t) = typeSize ma + typeSize (varType tv) + typeSize t
 typeSize (TermAppTy f arg)         = 1 + typeSize (varType f) + typeSize arg
 typeSize (TermVarTy v)             = 1 + typeSize (varType v)
-typeSize (DepFunTy b t)            = 1 + typeSize (varType b) + typeSize t
+typeSize (DepFunTy _ b t)          = 1 + typeSize (varType b) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
 typeSize (CoercionTy co)            = coercionSize co
@@ -2529,7 +2560,7 @@ coercionSize (GRefl _ ty mco)      = typeSize ty + mCoercionSize mco
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
 coercionSize (TermAppCo f co)      = 1 + typeSize (varType f) + coercionSize co
-coercionSize (DepFunCo b domain co) = 1 + typeSize (varType b) + mCoercionSize domain + coercionSize co
+coercionSize (DepFunCo _ _ b domain co) = 1 + typeSize (varType b) + mCoercionSize domain + coercionSize co
 coercionSize (ForAllCo { fco_ma = ma, fco_kind = h, fco_body = co })
                                    = 1 + coercionSize ma + coercionSize co + mCoercionSize h
 coercionSize (FunCo _ _ _ ma w c1 c2) = 1 + coercionSize ma + coercionSize c1 + coercionSize c2

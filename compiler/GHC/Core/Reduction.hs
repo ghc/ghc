@@ -374,12 +374,12 @@ Do not use that collapse to hide an invalid metadata role in a Phantom FunCo.
 -}
 
 -- | Lift a body reduction under an unchanged retained runtime binder.
--- The binder scopes over the complete proof. Each endpoint can independently
--- become an ordinary arrow. See Note [Retained dependent function coercions]
--- in GHC.Core.TyCo.Rep.
-mkDepFunRedn :: Id -> Reduction -> Reduction
-mkDepFunRedn b (Reduction co ty)
-  = mkReduction (mkDepFunCo b co) (mkDepFunTy b ty)
+-- The binder scopes over the complete proof. A visible endpoint can
+-- become an ordinary arrow if its result does not depend on the binder.
+-- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+mkDepFunRedn :: DepFunTyFlag -> Id -> Reduction -> Reduction
+mkDepFunRedn vis b (Reduction co ty)
+  = mkReduction (mkDepFunCoWithVis vis vis b MRefl co) (mkDepFunTyWithVis vis b ty)
 {-# INLINE mkDepFunRedn #-}
 
 -- | Create a 'Reduction' associated to a Π type,
