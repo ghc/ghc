@@ -5759,3 +5759,37 @@ receipts. format-v1 records the read-only formatter observations; those
 non-passing observations are not counted as executable passes. No broad
 formatting change was made. Final main-checkout validation and publication
 remain separate from these isolated results.
+
+## M70: higher-order calls with native list arguments
+
+Roadmap owner: R03. Prerequisite: M69 declared list element advice.
+
+At published M69, both compiler stages accept
+`fmap toList (lookupGeneric vectors 0)` with a named native list in an EDT
+client. Both reject the literal form `fmap toList (lookupGeneric [vector] 0)`
+with GHC-83865, in EDT and NoEDT. The NoEDT standalone list inference control
+also rejects. The paired source and execution records use the
+`native-higher-order-result-baseline-` prefix under `_build/verification`.
+
+Let an ordinary list literal supply a native anchor to the existing
+application classifier. Read a bare or parenthesized variable's lifted
+monomorphic declaration. Share the field selection predicate with M69.
+Keep the literal itself in checking mode. The enclosing application can
+still be an inference candidate. The test case uses M69's list advice in
+`lookupGeneric`, then the existing cached argument and named callback path
+in `fmap`. Check the source occurrences, original multiplicities, evidence
+scope, and final result normally. Keep overloaded lists and native Quick Look
+outside this experiment.
+
+Agda's [argument checking](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks arguments against their domains and retains the checked argument with
+its type. The pinned source blob is 82ba94ac864d19b947d4c92b9af252b0fe81347a.
+GHC reuses its existing cache and selection order here. The [Quick Look
+paper](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf) supplies
+GHC prior art for inspecting arguments before final checking. The new
+classifier supplies a Boolean flag and leaves instantiation to existing rules.
+
+Check both source modes with the literal and the EDT named control. Exercise
+lazy unused elements, mismatched runtime indices, and the NoEDT standalone
+rejection. Run the maintained source and Showcase gates with both rebuilt
+stages before publication.
