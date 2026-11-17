@@ -1,9 +1,10 @@
 # R23: Unsaturated type families
 
 Upstream: [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families).
-Upstream status: accepted, awaiting implementation. Local status: the M63
-ordinary-arrow stage passes both builds and its selected checks. Publication
-remains pending. Forall metadata and source family unsaturation remain open.
+Upstream status: accepted, awaiting implementation. Local status: M63 has
+selected ordinary-arrow build/check evidence. M64 implements explicit forall
+metadata. Its selected builds and checks pass; publication remains pending.
+The generic native client and family source unsaturation remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Goal and dependencies
@@ -43,28 +44,39 @@ counterexample against the current closed subset is claimed.
 
 The [M63 contract](../PLAN.md#m63-ordinary-arrow-matchability) selects an
 ordinary-arrow stage with complete transport, interface and reflection work.
-The next stage adds forall metadata and preserves explicit invisible U.
+The [M64 contract](../CORE.md#forall-matchability) adds per-binder metadata,
+nominal evidence at every body role, source annotations, ordered constructor
+telescopes, three additive TH wrappers and supported Typeable/FFI normalization.
+It preserves explicit invisible U. Both compiler stages and the selected
+controls pass. The maintained cohort passes Showcase95/14 in both stages.
+The standard selection passes seven tests, with 54 other ways skipped.
+
+Runtime abstraction uses U. Analysis does not impose a runtime abstraction.
+Existing M values can use identity subsumption, but arbitrary application RHSs
+and complete signed expressions retain conservative checking limits.
+Constructor-local Givens do not justify later metadata while typed DataCon
+forms hoist fixed-U quantifiers. General polytype TypeRep remains unsupported.
 Keep generic-domain widening gated until both stages and field/telescope
 transport are complete. Do not describe a syntax-only classification refactor
 as a matchability implementation.
 
-- [ ] Write the kernel specification before porting. Classify constructor,
+- [x] Write the kernel specification before porting. Classify constructor,
       family and runtime-function applications. State which equality rules
       permit decomposition. Preserve generativity of ordinary constructors.
-- [ ] Port matchability through kinds, quantifiers, `FunTy`, coercions,
+- [x] Port matchability through kinds, quantifiers, `FunTy`, coercions,
       substitution, Lint and native `DepFunTy`/`DepFunCo` handling.
       Preserve requested invisible `U` binders through smart constructors.
       Review inferred/specified helpers and runtime type-lambda recovery.
-- [ ] Preserve role checks on every added coercion field. The prototype uses
+- [x] Preserve role checks on every added coercion field. The prototype uses
       nominal matchability evidence in `ForAllCo`, including at phantom role.
       Do not infer that evidence from an arbitrary phantom parent coercion.
       Preserve the current representational visibility cast between invisible
       Core type lambdas and required source foralls.
-- [ ] Update raw `FUN` layout, kind recovery, interfaces, reflection and
+- [x] Update raw `FUN` layout, kind recovery, interfaces, reflection and
       fingerprints. Its specified invisible binder does not consume the
       required visible multiplicity argument. Keep the other three arrow
       constructors' fixed-unmatchable convention under explicit review.
-- [ ] Add useful diagnostics for hidden matchability differences. Preserve
+- [x] Add useful diagnostics for hidden matchability differences. Preserve
       multiplicity and quantifier information. An inverse-call explanation
       must not discard independent equality evidence that solves the goal.
 - [ ] Check the generic-domain client with saturated families before source
@@ -111,8 +123,9 @@ This is a validated ordinary-arrow stage, not completion of R23.
 The invisible-forall review identifies a concrete port obligation. The pinned
 prototype's `mkTyCoForAllTy` overwrites requested invisible matchability with
 `M`. Copying that shortcut would discard an explicit `U`. Visibility alone
-does not establish matchability. A future polymorphic runtime value can ignore
-its erased argument; current native formation gates reject that value.
+does not establish matchability. M64 runtime erased abstraction uses U. Reusing
+an existing M value does not introduce that abstraction or make an arbitrary
+runtime function matchable.
 
 Modern GHC also preserves higher-rank invisible binders and uses representational
 `ForAllCo` casts for required type arguments. Keep the matchability evidence

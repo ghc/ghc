@@ -95,8 +95,16 @@ can advance a card while the card remains open.
 | 2 | R03: safe indexing over a retained `[Bool]` | Complete bounded increment: M60 | Both stages and the evidence audit pass. The next compiler task is the R05 opaque-cast probe. |
 | 3 | R05: application through opaque whole-function evidence | Complete bounded increment: M61 | Both builds, selected cohort and independent audit pass. Typed opaque proof projection remains separate. |
 | 4 | R03: explicit complete retained-function type arguments | Complete bounded increment: M62 | Both builds, nested source arguments, worker demand, the selected cohort and independent audit pass. Next: the R23 foundation. |
-| 5 | R23: matchability foundation; also advances R05 | M63 ordinary-arrow builds and selected checks pass; publication pending | Ordinary arrows carry metadata through equality, interfaces and reflection. Next specify and implement forall metadata before unrestricted function-valued fields. |
-| 6 | R05: generic domain metadata and dependent telescopes; enables R03 source work | Research obligations identified | After the matchability foundation, target generic `[a]`. Transport binder types, occurrences and later fields together. State the policy for runtime-dependent domains separately. |
+| 5 | R23: matchability foundation; also advances R05 | M63/M64 foundation passes selected builds and checks; publication pending | Explicit arrow and forall metadata pass Core, source, interface, TH and reflection checks. The generic native client and source family unsaturation remain open. |
+| 6 | R05: generic domain metadata and dependent telescopes; enables R03 source work | Research obligations identified | Start with a closed container that holds one scalar function. Check family exposure and existing proof substitution before generic `[a]`. Transport binder types, occurrences and later fields together. State the policy for runtime-dependent domains separately. |
+
+M64 now carries explicit forall metadata in the development source. The
+[Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
+runtime U and the conservative expression and constructor-evidence limits.
+The selected builds and checks pass, including Showcase95 with 14 home
+modules in both stages. The standard selection passes seven tests with
+54 skipped ways. R23 remains open for the generic native client and family source
+unsaturation.
 
 The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks
 serially under the configured memory cap. This execution policy does not add

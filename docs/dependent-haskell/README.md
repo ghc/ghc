@@ -97,7 +97,7 @@ optimization support or full roadmap completion.
 | Parameterized index domains | M56 retains closed `[Bool]`, `Maybe Nat` and `Tree Bool` values through source, Core, interfaces and native lowering |
 | Safe list indexing | M60 combines `Fin (Count xs)` with a retained `[Bool]`; both stages pass runtime bounds, lazy access and equal-count reuse |
 | Source domain conversion | M58 checks nominal scalar-domain conversion and ordinary payload inference in a private body solve; recursive domain reduction uses the solver depth limit |
-| Configured fork version | `10.1.20261115.1`, with M63 interface and HIE version `100120261115163`; matching compiler and libraries rebuilt |
+| Configured fork version | `10.1.20261115.1`, with M64 interface and HIE version `100120261115164`; matching compiler and libraries rebuilt in the isolated checkout |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
@@ -107,9 +107,9 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M63 passes both builds, API1/37, both-stage public19, parameterized14 and Showcase91/14, plus five registered tests; M62 remains the published checkpoint |
-| Ordinary-arrow matchability | M63 retains type-valued metadata through Core, coercions, interfaces and reflection; thirteen focused wrappers pass; forall metadata and source family unsaturation remain open |
-| Forall selector prerequisite | M64 phase 0 rejects residual phantom-parent binder-kind selectors; both isolated builds, API1/37, both-stage source/Showcase controls and five registered tests pass; the full forall metadata port remains open |
+| Compiler validation | M64 passes both builds, API1/37, both-stage public19, parameterized14 and Showcase95/14, plus seven registered tests; M62 remains the published checkpoint |
+| Ordinary-arrow matchability | M63 retains type-valued metadata through Core, coercions, interfaces and reflection; M64 extends this foundation to foralls; source family unsaturation remains open |
+| Forall matchability | M64 carries per-binder annotations and nominal evidence through Core, source, interfaces, HIE, TH and supported reflection; runtime abstractions require U; selected source, scope, role and printer checks pass |
 | Example validation | Audited M60 passes both-stage hidden-interface source19, five rejection controls, compile-only equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
@@ -151,13 +151,19 @@ optimization support or full roadmap completion.
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | `Showcase.hs` passes both compilers with 91 finite output lines; R22/C1/C2 remain open |
+| Maintained showcase | `Showcase.hs` passes both compilers with 95 finite output lines; R22/C1/C2 remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
 Nat elimination with ordinary runtime bindings. General dependent computation
 remains open. Singleton reification remains specific to the comparison
 implementation.
+
+The [M64 contract](CORE.md#forall-matchability) describes forall annotations,
+declaration defaults and remaining expression and constructor-evidence limits.
+The [validation record](PLAN.md#final-m64-validation) separates builds, runtime
+checks and rejection controls. General source family unsaturation, arbitrary
+dependent evaluation and totality remain open.
 
 ## Native Core implementation
 

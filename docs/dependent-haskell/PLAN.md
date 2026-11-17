@@ -4564,8 +4564,8 @@ but represent GHC.Internal.Prim. Do not weaken binary kind equality checks.
 
 ## M64: forall matchability
 
-Roadmap owner: R23. Related card: R05. Status: specification and prerequisite
-role correction in progress. M63 remains the validated publication candidate.
+Roadmap owner: R23. Related card: R05. Status: complete within the selected
+foundation contract. Publication remains pending. The full R23 card stays open.
 This increment must carry matchability through erased dependent quantifiers.
 The selector correction below is a prerequisite, not completion of that port.
 
@@ -4617,7 +4617,8 @@ unexpected, framework or missing-library result. Inputs remain unchanged.
 Builds use 16 GiB with no swap. Verification uses 4 GiB with no swap and runs serially.
 The scoped compiler review found no actionable defect. These checks do not
 establish source reachability of the original malformed selector or a
-preservation theorem. Phase 0 is complete. The full forall port remains open.
+preservation theorem. Phase 0 is complete. At that checkpoint, the full forall
+port remained open.
 
 ### Phase 1: explicit Core forall metadata
 
@@ -4647,45 +4648,181 @@ no source reachability claim is made. The contract follows the proposal and
 the pinned FC/role reviews in the research record. It is not a preservation
 theorem.
 
-- [ ] Migrate Core representation, makers, complete views, FV analysis,
+- [x] Migrate Core representation, makers, complete views, FV analysis,
       substitution, tidying, comparison, normalization and transformations.
-- [ ] Migrate coercion formation, selectors, role checks, lifting, reduction,
+- [x] Migrate coercion formation, selectors, role checks, lifting, reduction,
       transitivity and nominal metadata equality before binder introduction.
-- [ ] Preserve metadata in interfaces and HIE. Read it outside binder scope.
+- [x] Preserve metadata in interfaces and HIE. Read it outside binder scope.
       Bump both compatibility versions before emitting the new payload.
-- [ ] Check metadata variables, aliases, substitution, vacuous CoVars and
+- [x] Check metadata variables, aliases, substitution, vacuous CoVars and
       structural versus opaque projection in the existing API fixture.
-- [ ] Build the migrated compiler and check ordinary polymorphic programs.
+- [x] Build the migrated compiler and check ordinary polymorphic programs.
 
 These tasks do not complete the source annotation, TH or reflection work below.
 Keep the complete M64 goal open until those paths and the source showcase pass.
 
-### Remaining forall port
+Development status, 2026-11-17: the six selected Core objects compile in
+`native-forall-matchability-core-preflight-v4`. The snapshot has 98 changed
+files at specification head `9a8d3bd1730913c795a387dbf2019339ce6ba49d`.
+Its patch SHA256 is
+`6f3d013fbb8a0638852fa4e10874f15f95016c4463202d44765a7f7a5f594229`.
+The inputs remain unchanged during that compile. Main M63 remains clean.
+This result does not validate the later source and TH integration changes.
 
-- [ ] Select the CoVar-forall metadata contract. A CoVar passes a zero-width
+The development tree now carries source annotations and additive TH wrappers.
+The bootstrap compiler builds in
+`native-forall-matchability-bootstrap-build-v10`. That snapshot has 140 changed
+files, including the new Typeable boot file, at the same specification head.
+Its patch SHA256 is
+`5df9e86ebd5c13c4c787f87c50c1f7273db258c96b8aa9de84816b62319fe1da`.
+Its inputs remain unchanged. This is compiler build evidence only.
+
+The API development fixture compiles against that compiler. Its first run
+rejects the old target libraries: interface version 63 differs from the new
+version 64. The first target rebuild then finds a separate integration error.
+Ambiguity analysis of an inline kind annotation introduces runtime U obligations
+for a stored M forall. Analysis must retain skolemisation and constraint solving,
+but it must not require a runtime abstraction. Keep both failed attempts in
+their versioned records. Later development results appear below. Do not count
+these features in Showcase.hs until the complete selected checks pass.
+
+Untyped declaration-kind quotations must defer omitted forall metadata along
+their main Pi path. Their consumed prefix has not been selected yet. The normal
+declaration checker selects it after checking the complete kind and header.
+Freeze explicit annotations, ordinary type-quotation defaults and actual typed
+reification. Independent nested kind positions use the normal M default.
+The `native-forall-matchability-th-contract-v2` research record corrects the
+earlier design-only requirement to freeze every untyped declaration default.
+
+Constructor contexts were an integration gap. A single `con_mb_cxt` could not
+retain the lexical scope of contexts interleaved with forall groups. The new
+ordered telescope contains forall, context and parenthesis nodes. Conversion,
+renaming, checking and quotation process these nodes in order. Exact printing
+returns the nodes in the same order. The final checks below validate these paths.
+
+The typed DataCon and interface contracts still hoist fixed-U quantifiers before
+the constructor constraints. A constructor-local equality cannot justify a later
+metadata annotation under that representation. Do not install such Givens and
+then discard the evidence dependency. Closed and computed-U annotations use
+ordinary equality. Evidence-dependent annotations need explicit DataCon
+transport or an interleaved typed telescope before they can be accepted.
+
+Development validation, 2026-11-17: self-host build v3 passes in 1381.291 seconds.
+It rebuilds the bootstrap compiler, target libraries and self-hosted compiler.
+Its 141 changed files have patch SHA256
+`b709eaeca40cf98827c1cdbeabb99b570ddfa89ab35c1e796094e2e0d19eefb4`.
+Its inputs remain unchanged and main M63 is preserved. API development v2 passes
+the quiet Core fixture, including safe used-CoVar and escape controls.
+
+The source and TH supplements record independent outcomes after the first
+failure. Both stages pass runtime identity, earlier-Given checking, computed-U
+FFI execution, constructor shadowing, computed-M TypeRep/Binary reflection and
+the selected malformed-wrapper rejection. They reject fresh M runtime
+abstractions, own-group annotation capture and a later Given. The later-Given
+oracle expected GHC-83865 but receives the appropriate rigid-variable error
+GHC-25897. The first FFI fixture also needed an explicit kind for its unused
+type variable. Keep these fixture corrections separate from compiler defects.
+
+Three compiler defects remained after those measurements. Declaration-prefix
+selection runs before formation casts are solved and misses F2's second
+consumed argument. Binding checking skolemises an M-polymorphic result before
+the RHS can reuse its existing value. The TH builders lack exports from
+GHC.Essentials for known-occurrence lookup. The final snapshot corrects these
+defects and executes the interface and HIE controls. The development supplements
+alone did not establish M64 completion.
+
+The additional quiet interface assertions pass against the preserved v3
+artifacts in `native-forall-matchability-interface-preview-v1`. They check
+metadata identity, lexical scope, coercion roles and malformed payloads through
+all three compression modes. They do not establish HIE coverage.
+
+The actual HIE-file regression reaches the intended outer-signature scope
+failure against the same artifacts in `native-forall-matchability-hie-red-v2`.
+Its preceding metadata, alpha-sharing and inner-scope assertions pass. The first
+attempt compiled but did not place the generated file at the fixture's expected
+name. Keep that harness failure separate. The final positive HIE run below
+checks the correction against both rebuilt stages.
+
+### Forall port acceptance
+
+- [x] Select the CoVar-forall metadata contract. A CoVar passes a zero-width
       argument and is not identical to an erased TyVar. Record the role rule.
-- [ ] Add type-valued ForAllTy metadata and nominal ForAllCo metadata evidence.
+- [x] Add type-valued ForAllTy metadata and nominal ForAllCo metadata evidence.
       Preserve it in every maker, view, map, FV analysis, substitution,
       comparison, normalization, role analysis and transformation.
-- [ ] State and implement the role-indexed metadata projection rule. An
+- [x] State and implement the role-indexed metadata projection rule. An
       arbitrary phantom parent cannot supply nominal metadata. The ordinary
       M-only application inversion rule does not establish this projection.
-- [ ] Implement source group annotations, outer scope, concrete context
+- [x] Implement source group annotations, outer scope, concrete context
       defaults, declared-prefix constraints and useful located diagnostics.
       Preserve explicit variables/computation and higher-rank kinds. Add no
       inferred matchability quantifier in this stage.
-- [ ] Migrate complete declaration kinds, constructor/pattern-synonym
+- [x] Migrate complete declaration kinds, constructor/pattern-synonym
       telescopes, interfaces, HIE, printers and compatibility versions.
-- [ ] Select and implement an explicit TH annotation representation with
+- [x] Select and implement an explicit TH annotation representation with
       quotation, splice and reification round trips. An unsupported-case gate
       alone does not establish ordinary polymorphic quotation compatibility.
-- [ ] Preserve supported Typeable TyCon-kind prefixes. Keep general polytype
+- [x] Preserve supported Typeable TyCon-kind prefixes. Keep general polytype
       reflection separate. Check both M63 interpreter paths and FUN controls.
-- [ ] Add a completed source observation to Showcase. Build both stages and
+- [x] Add a completed source observation to Showcase. Build both stages and
       run scope, role, inference, interface and source/runtime controls.
-- [ ] Audit the complete selected contract before publishing the increment.
+- [x] Review the selected compiler paths and validation evidence. Record
+      conservative limits and keep publication separate from local validation.
 
 Research and the executed comparator use native-forall-matchability-*.
 The full R23 and project goals remain open. Generic native-domain widening,
 family source unsaturation and the proposal's full inference policy need
 their separate contracts and checks.
+
+### Final M64 validation
+
+The frozen source is specification head
+`9a8d3bd1730913c795a387dbf2019339ce6ba49d` plus patch SHA256
+`459cd7c30827784a52a49b7423f3071f9ca9fdfdbea1ae242eb1e62c4bd005be`.
+Build v11 passes the bootstrap compiler, target libraries, self-hosted compiler,
+Haddock, check-ppr and check-exact targets. Test-dependency build v1 also passes.
+Both builds preserve their source inputs and main M63 checkout.
+
+The final focused checks pass:
+
+- Source development v3: 32 commands. Both stages check declaration-prefix
+  defaults, existing M values, runtime42, computed-U FFI and the selected
+  located rejections. Fresh M abstractions still reject.
+- TH development v3: 18 commands. Both interpreter paths check declaration
+  defaults, constructor context scope, all three quotation helpers,
+  computed-M reflection/Binary and malformed type-wrapper rejection.
+- HIE development v2: both stages write and read actual HIE files. Metadata,
+  alpha sharing, Name identity and whole-group scope assertions pass.
+- Printer development v3: six checks. Exact printing preserves source bytes
+  and ASTs. Normal printing preserves ASTs. The controls cover annotations,
+  comments, constructor contexts and adjacent forall groups.
+- Maintained cohort v1: API goldens 1/37; both-stage public19, parameterized14
+  plus three located rejections, Showcase95/14, two higher-rank controls and
+  required-visibility runtime42. All 20 measured cases pass.
+- Registered v1: seven passes, 61 cases and 54 skipped ways. There are no
+  unexpected, framework or missing-library results. The selection includes
+  HieVdq, EssentialsCoverage and the extended RetainedPrint fixtures.
+
+The two existing printer fixtures were extended after the maintained cohort.
+Their explicit source-equivalence receipt lists both changed inputs. Compiler
+and library sources and artifacts are unchanged. The registered selection
+checks the updated ASCII and Unicode fixtures. All check inputs stay unchanged
+during their recorded runs. Historical failures remain separate records.
+
+The bounded compiler review finds no acceptance defect in the selected paths.
+It identifies an expression-checking limit: `pass f = f` can reuse an existing
+M forall, but an application RHS such as `pass f = keep f True` can still take
+runtime skolemisation even when its result has that exact type. Complete signed
+non-variable expressions retain their scoped checking path. Generalize this
+inference route separately. Do not weaken runtime-U checks to accept it.
+
+Constructor-local evidence transport, general polytype reflection, the generic
+native client, source family unsaturation and the full inference policy remain
+open. These checks do not establish a preservation theorem or totality.
+Publication still needs the separate binary dependency fork and branch.
+
+Read-only formatter observation v2 covers 146 files. Fourmolu reports 96 format
+differences and 48 parser failures; one file passes. Cabal-gild reports that
+the unchanged compiler Cabal template is not formatted. The tools change no
+source bytes. No formatter pass is claimed. Keep GHC formatting and the fork's
+syntax instead of applying whole-file rewrites.

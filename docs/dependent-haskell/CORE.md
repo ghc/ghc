@@ -2185,8 +2185,103 @@ remain in GHC.Internal.Types but identify GHC.Internal.Prim consistently.
 
 Both builds and the selected API, source, reflection and regression checks
 pass. The [M63 plan](PLAN.md#m63-ordinary-arrow-matchability) records their
-scope. ForAllTy and ForAllCo retain implicit M in this stage. Explicit forall
-metadata, source family unsaturation and general native domains remain open.
+scope. M63 leaves ForAllTy and ForAllCo at implicit M. The M64 port below
+adds explicit forall metadata. Its selected builds and checks pass. Source
+family unsaturation and general native domains remain open.
+
+### Forall matchability
+
+M64 stores `ForAllTy ma binder body`. Each annotation has kind `Matchability`.
+It is outside the binder scope and can refer to earlier telescope binders.
+Plural makers and split views retain `(ma, binder)` pairs. Reconstruction
+preserves these pairs. Visibility does not select metadata. See Note
+[Forall matchability metadata] in
+[GHC.Core.TyCo.Rep](../../compiler/GHC/Core/TyCo/Rep.hs).
+
+`ForAllCo tv visL visR ma_co kind_mco body` stores nominal metadata evidence
+at every body role, including phantom. The metadata and binder-kind proofs
+are outside the binder scope. Structural selection can return these stored
+nominal children at any body role. Symmetry and reflexivity also preserve
+those reductions. A residual opaque selector needs a nominal or
+representational parent and actual forall endpoints. A phantom parent alone
+cannot supply either nominal proof. Core Lint enforces this restriction.
+The residual smart-maker precondition uses a debug assertion.
+
+A vacuous known-U CoVar binder becomes an anonymous Many arrow. The maker
+uses the domain and result sorts, including Constraint domains. A vacuous M
+or unresolved CoVar forall remains quantified. Substitution and normalization
+repeat this check. Structural coercion endpoints can therefore normalize to
+different type constructors. Select stored evidence before checking the shape
+of a residual opaque projection.
+
+Source annotations follow the separator: `forall a b. @ma body` or
+`forall a b -> @ma body`. Rename and check `ma` before the whole group enters
+scope. Annotation-only names do not introduce implicit binders. An omitted
+annotation defaults to U in a type and M in an independent kind. Checked
+declaration kinds defer omissions. Their actual consumed prefix uses M for
+data, data families and classes, and U for synonyms and type families.
+Preserve the independent result kind. For the ordinary kind
+`forall k -> k -> Type`, families with zero, one and two header arguments
+have metadata M/M, U/M and U/U. Solve formation casts before selecting that
+prefix. Constrain explicit annotations by equality before defaulting local
+omissions. See Note [Checked declaration-kind matchability] in
+[GHC.Tc.Gen.HsType](../../compiler/GHC/Tc/Gen/HsType.hs).
+
+Runtime type and coercion lambdas use U. Constructor, pattern-synonym and
+foreign prefixes also require U. Analysis can skolemise an M forall without
+constructing a runtime lambda. Identity subsumption can reuse an existing
+value at its complete M or variable-annotated type. For example, `pass f = f`
+can retain an M-polymorphic argument. This does not cover arbitrary
+application RHSs. Under a complete signature, only a bare variable under
+parentheses takes the early reuse path. Other signed expressions keep the
+scoped skolemisation path and can still fail its U obligation. Fresh lambdas
+still require U. See Note [Checking existing values at non-U foralls] in
+[GHC.Tc.Gen.Expr](../../compiler/GHC/Tc/Gen/Expr.hs).
+
+H98 and GADT constructors share an ordered source telescope. It stores forall,
+context and parenthesis nodes. Rename, check and quote each context before
+later binders enter scope. Preserve context-only TH groups without adding an
+empty forall. Source record and prenex restrictions remain. The typed DataCon
+and interface forms still move fixed-U quantifiers before their contexts.
+Constructor-local Givens cannot justify later metadata under this form.
+Evidence-dependent annotations need typed telescope or evidence transport
+work. See Note [Constructor telescope contexts] in
+[GHC.Hs.Decls](../../compiler/GHC/Hs/Decls.hs).
+
+TH adds `ForallMatchT Type Type`, `ForallMatchC Type Con` and
+`ForallMatchE Type Exp`. Each wrapper annotates one immediate nonempty forall
+group from outside its complete scope. Existing constructors keep their
+arities. Quotation and reification retain selected annotations. An untyped
+declaration-kind quotation leaves omitted main-prefix annotations contextual
+until header checking. Independent kind defaults remain M. Malformed wrappers
+and annotated empty groups receive located diagnostics. See Note
+[Forall matchability wrappers] in
+[GHC.Internal.TH.Syntax](../../libraries/ghc-internal/src/GHC/Internal/TH/Syntax.hs).
+
+Typeable omits only certified M leading foralls of supported generative TyCon
+kinds. It uses bounded family-axiom reduction for computed M, without local
+Given or plugin evidence. It preserves the original kind. General polytype
+TypeRep remains unsupported. FFI normalization uses the same bounded reduction
+for computed U and retains its nominal proof in the normalization coercion.
+It does not default unknown metadata or use later Givens. See the owning Notes
+in [GHC.Tc.Instance.Typeable](../../compiler/GHC/Tc/Instance/Typeable.hs) and
+[GHC.Tc.Gen.Foreign](../../compiler/GHC/Tc/Gen/Foreign.hs).
+
+Interfaces and HIE persist metadata outside binder scope. Sharing keys, free
+names, fingerprints and type tables include it. Declaration printers use the
+authoritative full kind. The selected version configuration gives suffix
+`164`: both versions append `64` after the configured patch level. Older
+headers must fail before the changed forall payload is decoded. This does
+not promise general cross-version compatibility.
+
+The final selected builds and checks pass. Source controls run 32 commands;
+TH controls run 18. Both stages pass HIE roundtrips. The six printer checks
+retain source bytes where required and preserve ASTs. The maintained cohort
+passes API goldens 1/37, both-stage public19, parameterized14 plus three
+rejections, and Showcase95/14. Seven registered tests pass: 61 cases and
+54 skipped ways. The bounded compiler review finds no acceptance defect.
+These checks do not establish a preservation theorem or complete R23. Generic
+native-domain transport and family source unsaturation remain separate work.
 
 ## Opaque whole-function cast lowering
 
