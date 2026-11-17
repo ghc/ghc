@@ -4994,3 +4994,55 @@ does not establish a bound for every native family-normalization path.
 The ignored `native-bounded-family-research-v1` note pins twenty source files,
 proposed trigger programs and the required nominal proof directions. Those
 programs are not executed results. No totality checker is implemented.
+
+## M66: bounded family views in native frontend inference
+
+Roadmap owner: R05. Related card: R03. Prerequisite: validated M65.
+Status: contract selected; baseline execution and implementation remain open.
+
+The native shape matcher and immutable argument cache use a deep pure family
+normalizer. It has no solver reduction-depth state. First execute the prepared
+looping and finite controls on M65. Record actual outcomes before selecting a
+source change. A predicted timeout is not an executed result.
+
+Use the existing nominal family-only solver rewrite. Add one narrow TcM wrapper
+in GHC.Tc.Solver and a corresponding hs-boot signature for the Unify import
+cycle. Keep TcS internals behind that wrapper. Ordinary views retain their
+current gates. Do not introduce a new equality, coercion or reduction rule.
+
+For Unify, reduce the original native family view. Return the inverse nominal
+proof only when the required algebraic TyCon is exposed. Keep the existing
+fallback otherwise. Do not allocate a fresh meta for a native parameter.
+Capture the current use-site context and the actual family name.
+
+For App, keep each cache position and restore its original renamed argument
+context before constructing CtLoc. Apply the same bounded view at initial,
+extra and final matching. Retain the original typed expression, inferred type
+and saved usage. Existing final subsumption constructs the actual family proof.
+Do not infer the expression or emit its usage again.
+
+Each view uses the configured reduction-depth limit. The existing runRewrite
+starts the view at depth zero. Recursive family RHS reduction increments that
+same location. This is not a global rewrite-work budget. The explicit flag
+-freduction-depth=0 retains its existing meaning.
+
+Acceptance:
+
+- [ ] Observe both original native loop candidates on the fixed M65 compiler.
+- [ ] Preserve ordinary GHC-40404 behavior for a nonnative recursive family.
+- [ ] Produce located GHC-40404 for both native views under a finite limit.
+- [ ] Check source argument context for the second cached argument and a leading
+  explicit type application. Assert the code, useful type and location/context.
+  Do not depend on one exact depth counter value.
+- [ ] Preserve a terminating list shape whose element contains an actual runtime
+  vector length. Check cached selection, returned payload scope and lazy fields.
+- [ ] Build both stages. Run the existing API/source and registered controls, plus
+  the maintained Showcase. Add focused controls to an existing fixture.
+- [ ] Record source, diagnostic, runtime and artifact provenance separately.
+
+Primary code evidence is in the ignored `native-bounded-family-research-v1`
+and corrected `native-bounded-family-diagnostics-research-v1` records.
+The proposed source programs are in `native-bounded-family-probes-preparation-v2`.
+The probe runner v3 adds dependency and inventory checks. All controls remain
+unexecuted. See [the reference ledger](REFERENCES.md#bounded-native-frontend-family-views).
+This draft changes no generic-domain, optimizer, totality or erasure policy.

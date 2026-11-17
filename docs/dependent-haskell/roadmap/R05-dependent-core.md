@@ -67,6 +67,7 @@ Restricted pipelines and Lint checks do not establish general preservation.
 - [ ] Bound the inherited family views in native shape and argument inference.
       Use the solver's reduction-depth policy. Preserve the inverse nominal
       proof for shape matching and the original cached argument usage.
+      The bounded contract is [M66](../PLAN.md#m66-bounded-family-views-in-native-frontend-inference).
 - [ ] Specify transport through later runtime-dependent telescope entries.
       Freshen binders and transport remaining fields, targets and evidence
       together. Preserve the distinction between lexical scope and active

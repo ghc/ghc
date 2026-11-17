@@ -97,7 +97,7 @@ can advance a card while the card remains open.
 | 4 | R03: explicit complete retained-function type arguments | Complete bounded increment: M62 | Both builds, nested source arguments, worker demand, the selected cohort and independent audit pass. Next: the R23 foundation. |
 | 5 | R23: matchability foundation; also advances R05 | M63/M64 foundation passes selected builds and checks; publication pending | Explicit arrow and forall metadata pass Core, source, interface, TH and reflection checks. The generic native client and source family unsaturation remain open. |
 | 6 | R05: function values in closed algebraic indices; enables R03 source work | Complete bounded increment: M65 | Both rebuilt stages pass source/interface controls and Showcase100/16. Seven registered tests pass. Generic `[a]`, higher-order endpoints and changed dependent domains remain open. |
-| 7 | R05: bounded family views in native frontend inference | Research prepared; specification and implementation open | Replace the inherited pure native shape and argument views with the solver's depth-limited family API. Preserve proof direction and cached argument usage. |
+| 7 | R05: bounded family views in native frontend inference | M66 contract selected; baseline and implementation open | Replace the inherited pure native shape and argument views with the solver's depth-limited family API. Preserve proof direction and cached argument usage. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

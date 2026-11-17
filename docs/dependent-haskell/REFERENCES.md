@@ -4015,3 +4015,30 @@ records the source review and a pinned four-file implementation archive.
 `native-arrow-matchability-observational-papers-v1` contains four original PDFs
 and per-page pypdf extractions. All eight PDF/text hashes verify. Automated
 extraction does not expand the recorded reading scope.
+
+
+## Bounded native frontend family views
+
+M66 reuses the current nominal family-only rewrite in GHC.Tc.Solver.Rewrite.
+The source contract is `rewriteFamilyAxioms`; `rewriteType` and `tcNormalise`
+do not reduce family applications. The existing retained-function equality,
+Typeable, pattern-synonym and strict-call paths provide local precedents.
+No new dependent typing or equality rule is selected.
+
+The ignored `native-bounded-family-research-v1` pins twenty source files.
+It records the native Unify/App sites, proof directions and the import cycle.
+The separate `native-bounded-family-diagnostics-research-v1` pins twelve files
+at clean M65 commit `374d95b5e2994693c2898abd87b35d6bf3f91c97`.
+Its corrected note matches that recorded HEAD. The prior prose and registry
+remain archived. The selected source hashes still agree.
+
+`getCtLocM` captures source and error context. Restore an original argument's
+`addArgCtxt` before creating its location. `solverDepthError` later restores
+that location. Preserve the cache position and its existing VTA offset.
+`runRewrite` resets depth at the start of each view. Recursive family RHS
+steps then increment the same location. This is a per-view finite limit,
+not a global work bound. The explicit zero-depth flag retains its old policy.
+
+The source candidates and runtime oracle are prepared but unexecuted.
+Do not report a predicted timeout as a compiler result. These source reviews
+add no totality claim or change to the cross-language calculus provenance.
