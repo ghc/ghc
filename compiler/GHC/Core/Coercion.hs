@@ -850,7 +850,12 @@ mkSelCo :: HasDebugCallStack
         -> Coercion
         -> Coercion
 -- See Note [mkSelCo precondition]
-mkSelCo n co = mkSelCo_maybe n co `orElse` SelCo n co
+-- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
+mkSelCo n co
+  = mkSelCo_maybe n co `orElse`
+    assertPpr (n /= SelForAll || coercionRole co /= Phantom)
+      (text "mkSelCo: residual phantom forall selector" $$ ppr co)
+      (SelCo n co)
 
 mkSelCo_maybe :: HasDebugCallStack
         => CoSel
@@ -910,7 +915,9 @@ mkSelCo_maybe cs co
                         , text "cs =" <+> ppr cs
                         , text "coercion role =" <+> ppr (coercionRole co) ]
 
-    -- good_call checks the typing rules given in Note [SelCo]
+    -- Check the endpoint shapes before simplification. mkSelCo checks the
+    -- residual forall selector's role after simplification.
+    -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
     good_call SelForAll
       | Just (_tv1, _) <- splitForAllTyCoVar_maybe ty1
       , Just (_tv2, _) <- splitForAllTyCoVar_maybe ty2

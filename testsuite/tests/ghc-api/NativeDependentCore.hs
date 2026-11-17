@@ -11,7 +11,7 @@ import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags
 import GHC.Builtin.WiredIn.Prim (fUNTyCon, intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkForAllCo, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConRepArity, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
@@ -21,7 +21,7 @@ import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, n
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Make (mkIntExprInt)
 import GHC.Core.Map.Type (LooseTypeMap, TypeMap, emptyTypeMap)
-import GHC.Core.Opt.Arity (pushCoArg)
+import GHC.Core.Opt.Arity (pushCoArg, pushCoTyArg)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Reduction (Reduction (..))
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
@@ -100,6 +100,7 @@ main = do
             runOpaqueCallChecks dflags
             runFunctionBinderChecks dflags
             runArrowMatchabilityChecks dflags
+            runForAllSelectorChecks dflags
             runMatchingChecks dflags
             runTypeMapChecks
             runCaseChecks dflags
@@ -2578,6 +2579,51 @@ runFunctionBinderChecks dflags = do
         case tcMatchRetainedTyX_BM (\var _ -> if var == indexParameter then BindMe else DontBindMe) (initial opaqueTemplate opaqueTarget) opaqueTemplate opaqueTarget of
             Nothing -> True
             Just _ -> False
+
+-- | Check forall selector roles and the reductions that preserve nominal evidence.
+runForAllSelectorChecks :: DynFlags -> IO ()
+runForAllSelectorChecks dflags = do
+    let a = mkTyVar (mkSystemName (unique 6500) (mkTyVarOcc "a")) liftedTypeKind
+        b = mkTyVar (mkSystemName (unique 6501) (mkTyVarOcc "b")) boolTy
+        left = mkForAllTy (Bndr a Specified) intTy
+        right = mkForAllTy (Bndr b Specified) intTy
+        phantom = mkPhantomCo (mkNomReflCo liftedTypeKind) left right
+        sameKind = mkPhantomCo (mkNomReflCo liftedTypeKind) left (mkForAllTy (Bndr a Specified) boolTy)
+        kindProof = proof 6502 liftedTypeKind boolTy
+        nominal = proof 6503 left right
+        representational = mkCoVar (mkSystemName (unique 6504) (mkVarOcc "repr_cv")) (mkReprEqPred left right)
+        structural = mkForAllCo a Specified Specified (MCo (mkCoVarCo kindProof)) (mkReflCo Phantom intTy)
+        visibility = mkForAllCo a Specified Required MRefl (mkReflCo Representational intTy)
+    lintAccepts dflags "phantom equality permits different forall binder kinds" [] (Coercion phantom)
+    lintAccepts dflags "structural phantom forall retains a nominal kind child" [kindProof] (Coercion structural)
+    forM_ [structural, mkSymCo structural] $ \co -> do
+        let selected = mkSelCo SelForAll co
+        check "structural phantom selection returns nominal evidence" (coercionRole selected == Nominal)
+        lintAccepts dflags "structural phantom selector reduces to its nominal child" [kindProof] (Coercion selected)
+    check "structural phantom selector returns the stored child" (eqCoercion (mkSelCo SelForAll structural) (mkCoVarCo kindProof))
+    forM_ [mkNomReflCo left, sameKind] $ \co -> do
+        let selected = mkSelCo SelForAll co
+        check "equal forall binder kinds give nominal reflexivity" (coercionRole selected == Nominal && isReflCo selected)
+        checkType dflags "reflexive forall selection has the binder kind" liftedTypeKind (coercionLKind selected)
+        lintAccepts dflags "equal-kind phantom selection reduces before its role check" [] (Coercion selected)
+    forM_ [nominal, representational] $ \cv -> do
+        let selected = mkSelCo SelForAll (mkCoVarCo cv)
+        check "opaque nominal or representational selection remains nominal" (coercionRole selected == Nominal)
+        checkType dflags "opaque forall selector left endpoint" liftedTypeKind (coercionLKind selected)
+        checkType dflags "opaque forall selector right endpoint" boolTy (coercionRKind selected)
+        lintAccepts dflags "nominal and representational forall selectors remain valid" [cv] (Coercion selected)
+    case pushCoTyArg (mkCoVarCo representational) (mkTyConTy (promoteDataCon trueDataCon)) of
+        Nothing -> fail "FAIL: representational forall type-argument pushing was declined"
+        Just (functionType, argument, resultCo) -> do
+            checkType dflags "type-argument pushing retains its source forall" left functionType
+            checkType dflags "type-argument pushing transports the argument kind" liftedTypeKind (typeKind argument)
+            lintAccepts dflags "transported type argument retains its nominal kind proof" [representational] (Coercion (mkNomReflCo argument))
+            case resultCo of
+                MRefl -> pure ()
+                MCo co -> lintAccepts dflags "type-argument pushing retains representational result evidence" [representational] (Coercion co)
+    lintAccepts dflags "required forall visibility bridge remains representational" [] (Coercion visibility)
+    lintRejects dflags "raw phantom forall selector cannot prove nominal binder-kind equality" [] (Coercion (SelCo SelForAll phantom))
+    lintRejects dflags "raw phantom forall selector requires reduction even at equal kinds" [] (Coercion (SelCo SelForAll sameKind))
 
 {- Note [Arrow matchability kernel controls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

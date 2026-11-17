@@ -4597,11 +4597,13 @@ opaque TyVar forall eta. Opaque CoVar forall eta requires representational
 role. Preserve the existing nominal visibility check. The owning contract is
 Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
 
-- [ ] Extend the existing quiet kernel fixture: reject the raw phantom
+- [x] Extend the existing quiet kernel fixture: reject the raw phantom
       counterexample and an equal-kind raw phantom selector; preserve the
       parent coercion, structural nominal-child extraction, symmetry,
       reflexive reduction and nominal/representational selector behavior.
-- [ ] Verify the new rejection against the unchanged M63 API before rebuilding.
+- [x] Verify the new rejection against the unchanged M63 API before rebuilding.
+      Red attempt v4 reaches the intended raw-selector assertion after the
+      positive controls pass. Earlier fixture failures remain separate records.
 - [ ] Build the correction in an isolated checkout. Run the kernel fixture,
       required-type-argument controls and the maintained source/runtime cohort.
 

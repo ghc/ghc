@@ -1331,10 +1331,12 @@ checked by the SelCo case of GHC.Core.Lint.lintCoercion.
 
 * SelForAll:
       co : forall (a:k1).t1 ~r0 forall (a:k2).t2
+      r0 is Nominal or Representational
       ----------------------------------
       SelCo SelForAll co : k1 ~N k2
 
   NB: SelForAll always gives a Nominal coercion.
+  See Note [Phantom forall selectors].
 
 * The SelFun form, for functions, has three sub-forms for the three
   components of the function type (multiplicity, argument, result).
@@ -1353,6 +1355,29 @@ checked by the SelCo case of GHC.Core.Lint.lintCoercion.
       r = funRole r0 SelRes
       ----------------------------------
       SelCo (SelFun SelRes) co : t1 ~r t2
+
+Note [Phantom forall selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A phantom coercion between forall types does not imply nominal equality
+between their binder kinds. For example, both (forall (a :: Type). Int)
+and (forall (b :: Bool). Int) have kind Type. A phantom coercion can relate
+these types, but it cannot justify a nominal coercion between Type and Bool.
+The residual SelForAll rule therefore requires a nominal or representational
+parent. Representational parents are needed when pushing type arguments
+through casts; see pushCoTyArg in GHC.Core.Opt.Arity.
+
+This restriction does not prevent returning an existing nominal proof.
+A structural ForAllCo stores a nominal binder-kind proof even when its body
+has phantom role. mkSelCo_maybe can return this proof, including under SymCo.
+It can also return nominal Refl when the selected endpoint kinds are equal.
+These reductions must precede the residual selector's role check. If they
+cannot simplify a phantom parent, mkSelCo_maybe returns Nothing.
+
+mkSelCo checks the residual role with a debug assertion, in the same way as
+its other smart-maker preconditions. This is not an all-build rejection.
+Core Lint rejects a residual phantom-parent SelForAll. Forall eta expansion
+also checks this premise in its opaque-parent path. Its structural and
+reflexive fast paths can still return existing evidence at phantom role.
 
 Note [FunCo]
 ~~~~~~~~~~~~

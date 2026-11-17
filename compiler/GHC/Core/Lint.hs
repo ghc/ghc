@@ -2827,6 +2827,8 @@ lintCoercion the_co@(SelCo cs co)
             | Just _ <- splitForAllTyCoVar_maybe s
             , Just _ <- splitForAllTyCoVar_maybe t
             , SelForAll <- cs
+            , coercionRole co /= Phantom
+              -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
             ,   (isForAllTy_ty s && isForAllTy_ty t)
              || (isForAllTy_co s && isForAllTy_co t)
             -> return ()

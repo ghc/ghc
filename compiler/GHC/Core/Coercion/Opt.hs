@@ -1583,6 +1583,8 @@ etaForAllCo_ty_maybe co
   , isTyVar tv1
   , Just (Bndr tv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
   , isTyVar tv2
+  , role /= Phantom
+    -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
   -- can't eta-expand at nominal role unless visibilities match
   , (role /= Nominal) || (vis1 `eqForAllVis` vis2)
   , let kind_co = mkSelCo SelForAll co
@@ -1604,8 +1606,9 @@ etaForAllCo_co_maybe co
   , isCoVar cv1
   , Just (Bndr cv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
   , isCoVar cv2
-  -- can't eta-expand at nominal role unless visibilities match
-  , (role /= Nominal)
+  -- See Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
+  -- The opaque CoVar path requires a representational parent.
+  , role == Representational
   = let kind_co  = mkSelCo SelForAll co
         r        = coVarRole cv1
         l_co     = mkCoVarCo cv1
