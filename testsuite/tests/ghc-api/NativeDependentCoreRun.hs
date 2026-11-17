@@ -48,7 +48,10 @@ import GHC.Types.InlinePragma (neverInlinePragma)
 import GHC.Types.Name (mkExternalName, mkSystemName, nameOccName)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameString)
 import GHC.Types.SourceError (SourceError, srcErrorMessages)
-import GHC.Types.SrcLoc (isGoodSrcSpan, noLoc, noSrcSpan)
+import GHC.Types.SrcLoc
+    ( SrcSpan (RealSrcSpan), isGoodSrcSpan, noLoc, noSrcSpan
+    , srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol, srcSpanFile
+    )
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env (mkInScopeSet)
@@ -1113,6 +1116,7 @@ runModuleChecks libdir = do
     runMultiPackageSourceChecks libdir
     runFunctionPackageModuleChecks libdir
     runFunctionFieldModuleChecks libdir
+    runBoundedFamilyModuleChecks libdir
     runExportedFunctionSignatureModuleChecks libdir
     forM_
         [
@@ -6225,6 +6229,248 @@ runFunctionFieldModuleChecks libdir = do
                     liftIO $ void $ compileFile environment NoStop (path, Nothing)
                     pure (Right ())
                 checkSourceRejection moduleName code fragment result
+
+{- Note [Bounded family diagnostic argument positions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Native argument caches count value arguments. Diagnostics count user-written
+type arguments as well. In the VTA control, xs is the third value argument
+and the fourth written argument, after @Bool. Check its own source span and
+argument context in the same depth diagnostic. Do not check the reported
+depth size. That size can change when the rewrite implementation changes.
+-}
+
+-- | Check finite native family views and located reduction-depth failures.
+runBoundedFamilyModuleChecks :: FilePath -> IO ()
+runBoundedFamilyModuleChecks libdir = do
+    let finite = unlines
+            [ "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE ExplicitForAll #-}"
+            , "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE UndecidableInstances #-}"
+            , "module FiniteNative where"
+            , ""
+            , "import Data.Kind (Type)"
+            , ""
+            , "-- | A runtime length."
+            , "data Nat = Z | S Nat"
+            , ""
+            , "-- | A vector with an erased length parameter."
+            , "data Vec a (n :: Nat) where"
+            , "    VNil :: Vec a 'Z"
+            , "    VCons :: a -> Vec a n -> Vec a ('S n)"
+            , ""
+            , "type family Shape (n :: Nat) :: Type where"
+            , "    Shape n = [Vec Int n]"
+            , ""
+            , "-- | Inspect only the outer list constructor."
+            , "shape :: foreach (n :: Nat) -> Shape n -> Int"
+            , "shape n xs = case xs of"
+            , "    [] -> 0"
+            , "    _ : _ -> 1"
+            , ""
+            , "-- | Preserve the actual runtime length in the selected payload."
+            , "payload :: foreach (n :: Nat) -> Shape n -> Maybe (Vec Int n)"
+            , "payload n xs = case xs of"
+            , "    [] -> Nothing"
+            , "    value : _ -> Just value"
+            , ""
+            , "-- | Ignore an argument with an ordinary polymorphic function."
+            , "ignore :: forall a. a -> ()"
+            , "ignore _ = ()"
+            , ""
+            , "-- | Select the cached argument type without evaluating either argument."
+            , "cached :: foreach (n :: Nat) -> Shape n -> ()"
+            , "cached n xs = ignore xs"
+            ]
+        consumer = unlines
+            [ "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE ExplicitForAll #-}"
+            , "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE UndecidableInstances #-}"
+            , "module Main where"
+            , ""
+            , "import FiniteNative"
+            , ""
+            , "main :: IO ()"
+            , "main = do"
+            , "    print (shape Z [])"
+            , "    print (shape (S Z) [VCons 7 VNil])"
+            , "    print (case payload Z [VNil] of"
+            , "        Nothing -> False"
+            , "        Just VNil -> True)"
+            , "    let n :: Nat"
+            , "        n = error \"index-demand\""
+            , "    let xs :: Shape n"
+            , "        xs = error \"argument-demand\""
+            , "    print (case cached n xs of () -> (42 :: Int))"
+            , "    print (case payload (S Z) [error \"vector-demand\"] of"
+            , "        Nothing -> (0 :: Int)"
+            , "        Just _ -> 1)"
+            ]
+        depthFlags = ["-freduction-depth=12"]
+    runModuleCases libdir "bounded-family-source" [("FiniteNative", finite)]
+        depthFlags consumer ["0", "1", "True", "42", "1"]
+    directory <- makeAbsolute ("NativeDependentCoreRun.modules" </> "bounded-family-source" </> "diagnostics")
+    createDirectoryIfMissing True directory
+    forM_
+        [ ("LoopShape", Nothing, unlines
+            [ "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE ExplicitForAll #-}"
+            , "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE UndecidableInstances #-}"
+            , "module LoopShape where"
+            , ""
+            , "import Data.Kind (Type)"
+            , ""
+            , "type family Spin (b :: Bool) :: Type where"
+            , "    Spin b = Spin b"
+            , ""
+            , "type family Shape (b :: Bool) :: Type where"
+            , "    Shape b = [Spin b]"
+            , ""
+            , "shapeOnly :: foreach (b :: Bool) -> Shape b -> ()"
+            , "shapeOnly b xs = case xs of"
+            , "    [] -> ()"
+            , "    _ : _ -> ()"
+            ]
+          )
+        , ("LoopCached", Nothing, unlines
+            [ "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE ExplicitForAll #-}"
+            , "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE UndecidableInstances #-}"
+            , "module LoopCached where"
+            , ""
+            , "import Data.Kind (Type)"
+            , ""
+            , "type family Spin (b :: Bool) :: Type where"
+            , "    Spin b = Spin b"
+            , ""
+            , "type family Shape (b :: Bool) :: Type where"
+            , "    Shape b = [Spin b]"
+            , ""
+            , "ignore :: forall a. a -> ()"
+            , "ignore _ = ()"
+            , ""
+            , "cached :: foreach (b :: Bool) -> Shape b -> ()"
+            , "cached b xs = ignore xs"
+            ]
+          )
+        , ("LoopCachedSecond", Just (22, 28, "second argument"), unlines
+            [ "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE ExplicitForAll #-}"
+            , "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE UndecidableInstances #-}"
+            , "module LoopCachedSecond where"
+            , ""
+            , "import Data.Kind (Type)"
+            , ""
+            , "type family Spin (b :: Bool) :: Type where"
+            , "    Spin b = Spin b"
+            , ""
+            , "type family Shape (b :: Bool) :: Type where"
+            , "    Shape b = [Spin b]"
+            , ""
+            , "ignore :: forall a c. a -> c -> ()"
+            , "ignore _ _ = ()"
+            , ""
+            , "cached :: foreach (b :: Bool) -> Shape b -> ()"
+            , "cached b xs = ignore False xs"
+            ]
+          )
+        , ("LoopCachedVta", Just (23, 37, "fourth argument"), unlines
+            [ "{-# LANGUAGE TypeApplications #-}"
+            , "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE ExplicitForAll #-}"
+            , "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE UndecidableInstances #-}"
+            , "module LoopCachedVta where"
+            , ""
+            , "import Data.Kind (Type)"
+            , ""
+            , "type family Spin (b :: Bool) :: Type where"
+            , "    Spin b = Spin b"
+            , ""
+            , "type family Shape (b :: Bool) :: Type where"
+            , "    Shape b = [Spin b]"
+            , ""
+            , "ignore :: forall tag a c. tag -> a -> c -> ()"
+            , "ignore _ _ _ = ()"
+            , ""
+            , "cached :: foreach (b :: Bool) -> Shape b -> ()"
+            , "cached b xs = ignore @Bool False () xs"
+            ]
+          )
+        , ("LoopOrdinary", Nothing, unlines
+            [ "{-# LANGUAGE DataKinds #-}"
+            , "{-# LANGUAGE ExplicitForAll #-}"
+            , "{-# LANGUAGE GADTs #-}"
+            , "{-# LANGUAGE KindSignatures #-}"
+            , "{-# LANGUAGE TypeFamilies #-}"
+            , "{-# LANGUAGE UndecidableInstances #-}"
+            , "module LoopOrdinary where"
+            , ""
+            , "import Data.Kind (Type)"
+            , ""
+            , "type family Spin (b :: Bool) :: Type where"
+            , "    Spin b = Spin b"
+            , ""
+            , "type family Shape (b :: Bool) :: Type where"
+            , "    Shape b = [Spin b]"
+            , ""
+            , "plain :: Spin 'False -> ()"
+            , "plain value = value"
+            ]
+          )
+        ]
+        $ \(moduleName, expectedArgument, source) -> do
+            let path = directory </> (moduleName ++ ".hs")
+            writeFile path source
+            GHC.runGhc (Just libdir) $ do
+                environment <- nativeModuleEnvironment directory depthFlags NoLink Nothing
+                result <- GHC.handleSourceError (pure . Left) $ do
+                    liftIO $ void $ compileFile environment NoStop (path, Nothing)
+                    pure (Right ())
+                checkSourceRejection moduleName 40404 "Reduction stack overflow" result
+                case (expectedArgument, result) of
+                    (Just (line, column, context), Left exception) -> do
+                        flags <- GHC.getSessionDynFlags
+                        let messages = bagToList (getMessages (srcErrorMessages exception))
+                            matches envelope =
+                                let rendered = showSDoc flags (pprDiagnostic (errMsgDiagnostic envelope))
+                                in diagnosticCode (errMsgDiagnostic envelope) == Just (DiagnosticCode "GHC" 40404)
+                                    && all (`isInfixOf` rendered) [context, "ignore", "namely", "xs"]
+                                    && case errMsgSpan envelope of
+                                        RealSrcSpan span _ ->
+                                            srcSpanFile span == fsLit path
+                                                && srcSpanStartLine span == line
+                                                && srcSpanEndLine span == line
+                                                && srcSpanStartCol span == column
+                                                && srcSpanEndCol span == column + 2
+                                        _ -> False
+                        unless (any matches messages) $
+                            fail ("FAIL: family reduction lost its argument location or context: " ++ moduleName
+                                ++ ":\n" ++ showSDoc flags (vcat (concatMap (\envelope ->
+                                    [ppr (errMsgSpan envelope), pprDiagnostic (errMsgDiagnostic envelope)]) messages)))
+                    _ -> pure ()
 
 -- | Check an exported function telescope and package fields through an object interface.
 runExportedFunctionSignatureModuleChecks :: FilePath -> IO ()
