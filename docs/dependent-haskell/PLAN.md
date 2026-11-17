@@ -5583,7 +5583,9 @@ R03, R05 and the full project goal remain open.
 
 Roadmap owner: R03. Related card: R05. Prerequisites: M60 Fin and M67 generic
 list transport. M68 is the validated and published application baseline.
-Status: specified; source implementation and acceptance remain unexecuted.
+Status: source producer accepted in both published compiler stages. The first
+runtime matrix exposes one list-literal argument-planning gap. The focused
+frontend correction and complete runtime acceptance remain pending.
 Keep R03, R05 and the full project goal open.
 
 ### Contract and scope
@@ -5673,3 +5675,36 @@ of M69. Bottom and cyclic inputs retain ordinary Haskell behavior. R03, R05 and
 the full project goal remain open. The static report and source pins are under
 _build/verification/native-generic-safe-index-next-candidate-v1. The unapplied
 implementation preparation is separate from execution evidence.
+
+### Measured application gap and selected correction
+
+The published M68 compilers accept both producers with Core and STG Lint.
+The stage0 matrix passes ten clients and 46 observations. These cover ordinary
+values, higher-order functions, IO actions, demand, cyclic lists and equal-bound
+reuse. The unchanged runtime-vector client rejects only observePacked at 25:85:
+toList (indexGeneric [vector] (FZ @'Z)) compares a fresh n0 with vector's actual n.
+Keep this source as an acceptance target. Explicit element arguments or a named
+list are diagnostic comparisons, not permanent source restrictions.
+
+The ordinary cached route counts arrows with splitFunTys. It stops at DepFunTy
+and cannot select the erased element parameter for this worker. The existing
+declaration planner walks retained domains, but reads only named arguments.
+Extend that planner with advice for a finite built-in list. Read a bare or
+parenthesized field's existing monomorphic native declaration. Require a lifted
+tau type and reuse the current scope and constructor-Given views. Select an
+element type without checking occurrences, collecting usage, expanding syntax,
+inferring an expression or assigning a meta-variable.
+
+Use the selected list type only to propose complete immutable erased choices.
+Keep the existing no-Quick-Look, kind, exact-domain, runtime-scope, IALL and final
+subsumption checks. Check every original list element at the selected exact type.
+This actual check retains each occurrence and its usage. Empty lists and lists
+without an eligible declaration retain their existing paths. Preserve the Expr
+list-inference source flag. Known expected list checking needs no new mode.
+
+The correction is local to GHC.Tc.Gen.App. It adds no Core judgment, solver
+equality rule, admitted domain, interface encoding or native mutable-meta fill.
+Check mixed native fields, scoped equality, linear fields and escaping callback
+results. Keep actual located diagnostics after their corresponding positives.
+Receipts begin with native-generic-safe-index-producer-v1 and source-both-v1.
+The latter is a preserved failed experiment, not a feature pass.

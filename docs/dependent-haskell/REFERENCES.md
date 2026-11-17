@@ -4270,3 +4270,11 @@ native-generic-safe-index-next-candidate-v1/readpins.json. The proposed source
 copy and patch are in native-generic-safe-index-implementation-preparation-v1.
 These records describe unexecuted preparation. See the
 [bounded plan](PLAN.md#m69-generic-safe-list-indexing) for acceptance gates.
+
+The first source run is native-generic-safe-index-source-both-v1. It stops at
+the original callback's list literal. The App declaration planner already
+selects complete immutable arguments from named values. The selected correction
+extends that advice to a known native list field. It reuses the monomorphic
+field policy in Note [Inference of native list elements] in GHC.Tc.Gen.Expr.
+The existing Quick Look argument-advice and Agda current-context references
+remain the precedent. They do not permit filling GHC metas with runtime Ids.
