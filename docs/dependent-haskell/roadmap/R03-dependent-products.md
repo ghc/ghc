@@ -72,8 +72,13 @@ M58 and M59 expose those rules through source checking.
       elements, signed bounds, lazy fields and finite cyclic access. Keep the
       family saturated. Guarded declaration advice supports the original
       callback list literal. No new Core judgment or native meta fill is added.
-- [ ] Specify invisible retained binders and explicit runtime overrides.
-      Keep retention independent of visibility. Do not infer a new `foreach`.
+- [x] Form an invisible retained source signature and check a named definition.
+      Infer one retained operand from later declared domains. Check IORef input,
+      lazy ignored operands and import through an object interface.
+      See [M72](../PLAN.md#m72-invisible-retained-binders-in-source).
+- [ ] Add explicit invisible runtime operands and extend omission beyond the
+      measured domains and application forms. Keep the signature's retention
+      independent of both visibility and the availability of inference.
 - [ ] Specify runtime `Type` operands and their universe representation.
       Existing `TypeRep` and required erased `forall` leave a bridge to define.
 - [x] Finish [M68 ordinary callers](../PLAN.md#m68-ordinary-callers-of-retained-apis).
@@ -88,9 +93,10 @@ Generic `[a]` needs the matchability invariant described in
 surface feature or ordinary function promotion. Runtime-dependent later domains,
 such as `[Vec Int n]`, use M67's scoped metadata substitution and nominal
 telescope transport. M69 measures that contract with the finite-position client.
-Invisible retained binders and their explicit runtime overrides remain
-unimplemented. The [new research summary](../REFERENCES.md#invisible-retained-binders-next-candidate)
-records a candidate; it does not select syntax, representation or inference rules.
+M72 implements leading invisible source definitions and one exact
+declaration-based omitted operand. The
+[research references](../REFERENCES.md#invisible-retained-binders-next-candidate)
+record the choice of delimiter, representation and telescope-order checks.
 
 ## Completion boundary
 

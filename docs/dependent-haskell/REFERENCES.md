@@ -4334,11 +4334,22 @@ justify assigning GHC native runtime Ids to mutable type metas.
 
 The ignored native-invisible-retained-next-candidate-v1 report/readpins proposes
 a checked hidden Nat operand selected from a later vector's actual declaration,
-paired with an explicit runtime override. The source choice remains open.
+paired with an explicit runtime override. The override syntax remains open.
 M71 adds persistent visibility to the Core type and interface node. It checks
-that the visibility cast preserves demand in the object pipeline. The next
-source work covers definition checking, override syntax, immutable omission
-and dictionary scope. See [M71](PLAN.md#m71-visibility-of-retained-binders-in-core).
+that the visibility cast preserves demand in the object pipeline. M72 uses
+that cast in source definitions and inserts one runtime operand from a later
+declared argument type. Explicit operands and general inference remain next.
+See [M71](PLAN.md#m71-visibility-of-retained-binders-in-core) and
+[M72](PLAN.md#m72-invisible-retained-binders-in-source).
+
+Agda v2.8.0 inserts implicit patterns in the expected telescope context before
+it compares visibility and chooses binder names. See
+[ProblemRest.hs:108–129](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Rules/LHS/ProblemRest.hs#L108-L129),
+blob 24cb7b08975d4efafb8f8473def6eef5fb9045b3, and
+[Implicit.hs:63–94](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Rules/LHS/Implicit.hs#L63-L94),
+blob f47fcb713d3b37af67fa11c3e8293afc73be8d84. This supplies the expected-type
+and telescope-order precedent. The GHC renamer uses the signature's actual
+term Name. GHC's existing rules determine argument demand and usage.
 
 ## Native list anchors in higher-order calls: M70
 

@@ -27,7 +27,7 @@ The supported static subset and native pipeline remain restricted.
 | Area | Demonstrated in this fork | Work before the roadmap task is complete |
 | --- | --- | --- |
 | Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
-| Dependent products (`R03`) | Visible `foreach (n :: Nat) -> ...`, dependent equations and checked lambdas, runtime indices from IO, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, invisible retained quantification, and predictable inference beyond the measured subset. |
+| Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with an operand inferred from a vector, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, explicit invisible runtime operands, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
 | Type computation (`R06`, `R13`) | Existing promoted constructors and saturated type families, with explicit equality proofs | Ordinary function promotion, closed and open evaluation, and lambda/let/case expressions in types. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
@@ -50,11 +50,11 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-The latest validated bounded increment is M71. Core distinguishes invisible
-retained binders, and visibility round-trips in a versioned interface. Source
-formation and inference for these binders are the next R03 work.
-Both rebuilt stages pass the Showcase with 125 output lines through seventeen
-source modules. The count
+The latest validated bounded increment is M72. A source definition can bind a
+leading invisible runtime argument. An imported call can recover that
+argument from a later declaration such as `Vec Int n`. Explicit operands and
+general inference remain R03 work. Both rebuilt stages pass the Showcase
+with 128 output lines through seventeen source modules. The count
 includes the banner. R03, R05 and R23 remain open.
 M62 supplied the earlier 88-line source group through fourteen modules.
 M56 provides
@@ -107,7 +107,8 @@ can advance a card while the card remains open.
 | 9 | R03: ordinary callers of imported retained APIs; preserves R05 evidence | Complete bounded increment: M68 | Both rebuilt stages pass source/interface checks, scope and multiplicity controls, Showcase118/17 and seven registered tests. Published M67 readers accept the interfaces. Explicit syntax, Expr inference modes and native pipeline policies retain their scope. |
 | 10 | R03: safe indexing over a generic retained list | Complete bounded increment: M69 | Reuses Fin and GenericCount with scoped list refinement. Both rebuilt stages pass the reviewed primary/focused source collections, API1/37, Showcase124/17 and seven registered tests. Guarded list-declaration advice preserves the original runtime-vector callback. Case-based ordinary clients pass. Measured literal-list/fmap and NoEDT native let-list inference retain their limits; named-list fmap is unmeasured. No new Core judgment or wire field. R03, R05 and R23 remain open. |
 | 11 | R03: higher-order calls with native list arguments | Complete bounded increment: M70 | List fields supply an anchor to the existing argument cache. The literal fmap call passes with and without the dependent source extension. Both stages pass the 125-line Showcase, and seven selected registered tests pass. |
-| 12 | R05: invisible retained function types and coercions; enables R03 | Complete bounded increment: M71 | Both stages compile. The API, versioned interface and object tests cover visibility and demand. Source definitions and calls remain open. |
+| 12 | R05: invisible retained function types and coercions; enables R03 | Complete bounded increment: M71 | Both stages compile. The API, versioned interface and object tests cover visibility and demand. |
+| 13 | R03: source definitions and omitted invisible runtime operands | Complete bounded increment: M72 | The imported call passes the IO-sourced Nat from a later vector declaration. Native object tests cover ignored bottom, name shadowing and located missing and conflicting operands. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

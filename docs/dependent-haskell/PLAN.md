@@ -5847,9 +5847,9 @@ separates visibility from retention.
 - [x] Round-trip the invisible type in a versioned object interface.
 - [x] Compare visible and invisible workers through object execution. Check
       bottom at function WHNF and ignored and inspected runtime operands.
-- [ ] Add source formation, definition checking and an explicit override,
-      then test omission from a later declared vector. Check ambiguous
-      selection and a wrong explicit runtime index.
+- [x] Add source formation and definition checking. Check omitted operands
+      from later vector declarations and report conflicting candidates in M72.
+- [ ] Check explicit operands, including one with an inconsistent index.
 
 ### M71 validation
 
@@ -5872,3 +5872,67 @@ The seven selected registered normal-way tests pass. The driver skipped
 54 other ways.
 
 See the `native-retained-visibility-` receipts under `_build/verification`.
+
+## M72: invisible retained binders in source
+
+Roadmap owner: R03. Depends on the M71 Core visibility cast and interface.
+Use the foreach-dot delimiter proposed in #378. Keep its token in the source
+tree for exact printing. Check binder domains, scope, and result kinds through
+the retained signature checker. Constructor fields still require visible
+retained binders and report a located error for this delimiter.
+
+A named definition with a complete signature binds the leading invisible
+runtime names from that signature. Written patterns can shadow those names.
+Typechecking inserts runtime patterns after the erased patterns. The checked
+closure has a canonical visible type and a representational cast to the
+declared visibility. An equation with no written arguments still introduces
+the signature's runtime binders. The inserted patterns use Haskell's ordinary
+argument demand, including Strict.
+[Proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-definition)
+shows the signature-bound name. [Agda 2.8.0 implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+describes insertion into signed definitions.
+
+Recover one omitted runtime operand from monomorphic declarations of later
+written arguments. Abstract its index as an immutable template. Require a
+consistent exact match and an unrestricted local Id from the actual lexical
+environment. Before ordinary instantiation, the same declarations can choose
+all erased parameters. Insert the value application at the invisible binder
+and check the written arguments normally. Its usage is Many. Keep later
+dictionary constraints under the scope of the chosen index. Put the diagnostic
+on the written argument when the available types do not determine an operand.
+
+CorePrep eta expansion carries a scoped visibility proof. Cast the function
+from the declared invisible type to the canonical visible type for the
+applications. Cast the generated lambda back to the declared type. This
+follows the existing EtaInfo invariant in GHC.Core.Opt.Arity.
+
+The Agda application checker inserts hidden arguments in telescope order.
+This fork uses its existing immutable matching and lexical metadata checks to
+select a runtime value. See the pinned Agda source under "Invisible retained
+binders" in REFERENCES.md.
+
+- [x] Parse and print both delimiters, including comments before the dot.
+- [x] Compile producer and interface-only consumer. Infer the retained Nat
+      from a later Vec declaration. Test with and without written @Int.
+- [x] Observe the actual nonzero IORef value. Check an ignored bottom index
+      and report conflicting and missing operands at the call.
+- [ ] Add an explicit runtime override alongside erased type application.
+- [x] Add the verified source examples to Showcase.
+
+### M72 validation
+
+The bootstrap source-object check found a CorePrep eta-expansion mismatch
+for the polymorphic functions. Preserving the scoped visibility proof fixes
+it. The Core API checks eta expansion of dependent and vacuous invisible
+functions.
+
+The interface-only source consumer observes 2 with an inferred element type
+and 2 with written @Int. Name shadowing selects the ordinary Nat argument
+and returns 0. Ignoring a bottom index and its vector returns 42. The missing
+and inconsistent operand examples report GHC-83605 at a source span.
+
+Both stages pass Showcase with 128 lines through seventeen modules. Seven
+registered tests pass in the normal way, with 54 other cases skipped. They
+check both API fixtures, the extension-off control, source quantification,
+exact printing, HIE compatibility and essentials. See the
+`native-invisible-retained-source-` receipts under `_build/verification`.

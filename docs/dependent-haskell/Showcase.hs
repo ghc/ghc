@@ -718,6 +718,27 @@ genericSafeIndexing = do
     observe "generic vector lookup through fmap"
         (fmap toList (Parameterized.lookupGeneric [vector] 0))
 
+-- | Return the runtime length inferred from the vector's declared index.
+readInvisibleLength :: forall a. foreach (n :: Nat). Vec a n -> Int
+readInvisibleLength _ = natToInt n
+
+-- | Ignore both the vector and its invisible runtime argument.
+ignoreInvisibleLength :: forall a. foreach (n :: Nat). Vec a n -> Int
+ignoreInvisibleLength _ = 42
+
+-- | Pass an IO-sourced index without writing it in the application.
+invisibleRetainedArguments :: IO ()
+invisibleRetainedArguments = do
+    n <- newIORef (S (S Z)) >>= readIORef
+    let vector :: Vec Int n
+        vector = replicateNative @Int n 7
+    observe "invisible retained length" (readInvisibleLength vector)
+    observe "invisible retained length with @Int" (readInvisibleLength @Int vector)
+    bottom <- newIORef (bottomValue @Nat "ignored invisible length") >>= readIORef
+    let unused :: Vec Int bottom
+        unused = replicateNative @Int bottom 7
+    observe "invisible retained ignores bottom" (ignoreInvisibleLength unused)
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -740,3 +761,4 @@ main = do
     genericListIndexing
     ordinaryModuleCalls
     genericSafeIndexing
+    invisibleRetainedArguments

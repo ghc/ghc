@@ -511,7 +511,7 @@ its source-flag boundary.
 Container and dependent-case inference in GHC.Tc.Gen.Expr keep their existing
 source-flag policy. Native Core detection still controls the restricted
 pipeline, including for ordinary callers. General optimization, unfolding
-serialization, source use of invisible retained binders and totality checking remain open.
+serialization, general invisible-argument inference and totality checking remain open.
 
 ## Generic retained argument inference
 
