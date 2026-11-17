@@ -4561,3 +4561,76 @@ before expansion, so ordinary repeated aliases retain their compact syntax.
 Primitive Typeable bindings need the same module identity in the stored Module
 and the fingerprint calculation. Keep their binding in GHC.Internal.Types,
 but represent GHC.Internal.Prim. Do not weaken binary kind equality checks.
+
+## M64: forall matchability
+
+Roadmap owner: R23. Related card: R05. Status: specification and prerequisite
+role correction in progress. M63 remains the validated publication candidate.
+This increment must carry matchability through erased dependent quantifiers.
+The selector correction below is a prerequisite, not completion of that port.
+
+Use proposal #242 and the pinned prototype identified in REFERENCES.md.
+Preserve explicit invisible U. The prototype overwrites invisible metadata
+in several basic and list makers; those shortcuts are not the contract.
+Check source annotations outside the complete binder group. Preserve the
+runtime type-lambda classification through the existing required/invisible
+representational visibility bridge. Visibility does not select matchability.
+
+### Phase 0: forall selector role boundary
+
+The existing binder-kind selector returns nominal evidence. A phantom parent
+can relate forall types with different binder kinds. It cannot justify that
+nominal result. An executed API probe reproduces acceptance by both stock
+GHC 9.14.1 and M63. This does not demonstrate source-program reachability.
+Normal optimization currently avoids the opaque phantom eta route indirectly.
+
+Require nominal or representational role for a residual raw SelForAll. Keep
+representational selection for existing type-argument pushing. Core Lint must
+reject raw phantom-parent selectors, including equal-kind endpoints. Smart
+makers can instead return the actual nominal child of a structural ForAllCo,
+its symmetry, or nominal reflexivity when the selected kinds are equal.
+Apply the residual role precondition after those reductions. Keep the existing
+debug-assertion convention; do not claim an all-build checked smart API.
+
+Keep structural and reflexive eta fast paths. Explicitly exclude phantom from
+opaque TyVar forall eta. Opaque CoVar forall eta requires representational
+role. Preserve the existing nominal visibility check. The owning contract is
+Note [Phantom forall selectors] in GHC.Core.TyCo.Rep.
+
+- [ ] Extend the existing quiet kernel fixture: reject the raw phantom
+      counterexample and an equal-kind raw phantom selector; preserve the
+      parent coercion, structural nominal-child extraction, symmetry,
+      reflexive reduction and nominal/representational selector behavior.
+- [ ] Verify the new rejection against the unchanged M63 API before rebuilding.
+- [ ] Build the correction in an isolated checkout. Run the kernel fixture,
+      required-type-argument controls and the maintained source/runtime cohort.
+
+### Remaining forall port
+
+- [ ] Select the CoVar-forall metadata contract. A CoVar passes a zero-width
+      argument and is not identical to an erased TyVar. Record the role rule.
+- [ ] Add type-valued ForAllTy metadata and nominal ForAllCo metadata evidence.
+      Preserve it in every maker, view, map, FV analysis, substitution,
+      comparison, normalization, role analysis and transformation.
+- [ ] State and implement the role-indexed metadata projection rule. An
+      arbitrary phantom parent cannot supply nominal metadata. The ordinary
+      M-only application inversion rule does not establish this projection.
+- [ ] Implement source group annotations, outer scope, concrete context
+      defaults, declared-prefix constraints and useful located diagnostics.
+      Preserve explicit variables/computation and higher-rank kinds. Add no
+      inferred matchability quantifier in this stage.
+- [ ] Migrate complete declaration kinds, constructor/pattern-synonym
+      telescopes, interfaces, HIE, printers and compatibility versions.
+- [ ] Select and implement an explicit TH annotation representation with
+      quotation, splice and reification round trips. An unsupported-case gate
+      alone does not establish ordinary polymorphic quotation compatibility.
+- [ ] Preserve supported Typeable TyCon-kind prefixes. Keep general polytype
+      reflection separate. Check both M63 interpreter paths and FUN controls.
+- [ ] Add a completed source observation to Showcase. Build both stages and
+      run scope, role, inference, interface and source/runtime controls.
+- [ ] Audit the complete selected contract before publishing the increment.
+
+Research and the executed comparator use native-forall-matchability-*.
+The full R23 and project goals remain open. Generic native-domain widening,
+family source unsaturation and the proposal's full inference policy need
+their separate contracts and checks.
