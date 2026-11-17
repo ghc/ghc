@@ -12,7 +12,7 @@ The internal `Type` datatype has three new constructors:
 
 ```text
 TermVarTy b       -- The opaque value index of a runtime identifier.
-DepFunTy b result -- A retained dependent function.
+DepFunTy vis b result -- A retained function with source visibility.
 TermAppTy f arg   -- A scoped opaque runtime call index.
 ```
 
@@ -31,10 +31,12 @@ these types through GHC's DataKinds machinery. Nat has no wired compiler identit
 The result of a retained function has kind `Type`.
 Dependent runtime representations are outside this subset.
 
-Canonicalize a dependent function whose binder does not occur in its result to
-an ordinary unrestricted arrow over its domain. This preserves one representation for a
-vacuous retained binder. Lambda typing detects dependence from the result type.
-No retainedness flag is added to every ordinary identifier.
+Canonicalize a visible retained function whose binder is absent from its
+result to an ordinary unrestricted arrow. Keep an invisible retained binder
+even when the result omits it. Both variants take one runtime value argument.
+A Core lambda has the canonical visible type. A representational visibility
+coercion gives the same closure an invisible type without adding a lambda.
+See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
 
 `isNativeIndexType` validates a lifted structural datatype schema. Ordinary
 parameters have kind `Type`. After instantiation, a field whose original type
@@ -207,35 +209,36 @@ RHSs keep their existing path. The existing CorePrep alias guard preserves
 these local names. Top binder types and the native unfolding/interface gates
 remain unchanged. See Note [Local indices across Core Tidy] in `GHC.Iface.Tidy`.
 
-Check `DepFunTy b result` under a context extended by the runtime binder `b`.
+Check the result of `DepFunTy vis b result` under the runtime binder `b`.
 Check every `TermVarTy` occurrence against its binding-site identifier and type.
 Free-variable collection includes the runtime index and its type dependencies.
 It removes `b` under the dependent function binder. Index occurrences are erased
 dependencies. They are not additional runtime uses for linearity analysis.
 
-Compare runtime index variables by scoped identity. Compare dependent functions
-modulo alpha-renaming of their binders. Do not inspect identifier unfoldings to
-equate separately bound runtime producers.
+Compare runtime index variables by scoped identity. Compare retained function
+visibility and domains, then compare bodies modulo binder alpha-renaming.
+Keep separately bound producers distinct.
 
 Existing type variables, coercion variables, and their substitutions keep their
 current meanings. The new forms must use separate mapper and folder callbacks.
 
 ## Retained congruence and nominal domain conversion
 
-`DepFunCo b domain co` binds one unrestricted runtime index in its body proof.
-`MRefl` keeps the binder's complete lifted value domain unchanged.
+`DepFunCo visL visR b domain co` binds one unrestricted runtime index in its
+body proof. `MRefl` uses the same lifted domain at both endpoints.
 If `co :: s ~r t`, this specialization gives:
 
 ```text
-DepFunCo b MRefl co :: mkDepFunTy b s ~r mkDepFunTy b t
+DepFunCo visL visR b MRefl co
+    :: mkDepFunTyWithVis visL b s ~r mkDepFunTyWithVis visR b t
 ```
 
 Both body endpoints must have kind `Type`. The coercion inherits the body's
-FC role. Each endpoint independently becomes an ordinary arrow when its result
-omits `b`. The binder also scopes over intermediate proof types. Keep it even
-when both final endpoints omit the index. `mkDepFunCo` simplifies a syntactically
-reflexive body; endpoint independence alone does not remove the proof binder.
-Substitution, free variables, lifting, zonking, and tidying preserve that scope.
+FC role. Nominal coercions require the same visibility at both endpoints.
+A visible endpoint becomes an ordinary arrow when its result omits `b`.
+The binder also scopes over intermediate proof types. A reflexive domain
+and body reduce to reflexivity when both endpoint flags match.
+Substitution, lifting, zonking, and tidying preserve scope and visibility.
 
 `MCo delta` adds nominal evidence `delta : A ~N B` outside the binder's scope.
 The binder has domain `A`. Both domains must be lifted value types. If either
@@ -313,9 +316,9 @@ Explicit comparison of unequal domains still uses bounded family reduction.
 See Note [Closed retained domains] in `GHC.Core.FamInstEnv`.
 
 Normalize the body with the existing family reducer and construct
-`mkDepFunCoWithDomain`. This preserves the proof binder even when an
-intermediate type alone needs it. Each endpoint separately
-canonicalizes a vacuous binder to an ordinary arrow. For example, `Add Z n`
+`mkDepFunCoWithVis` with the original visibility at each endpoint. Preserve
+the proof binder when an intermediate type needs it. Each visible endpoint
+separately canonicalizes a vacuous binder to an ordinary arrow. For example, `Add Z n`
 reduces to `n`; `Add (S n) Z` reduces to `S (Add n Z)` while its inner family
 application stays stuck. A constant family can remove the retained dependency.
 Family axioms reduce at nominal and representational roles. At phantom role,
@@ -508,7 +511,7 @@ its source-flag boundary.
 Container and dependent-case inference in GHC.Tc.Gen.Expr keep their existing
 source-flag policy. Native Core detection still controls the restricted
 pipeline, including for ordinary callers. General optimization, unfolding
-serialization, invisible retained binders and totality checking remain open.
+serialization, source use of invisible retained binders and totality checking remain open.
 
 ## Generic retained argument inference
 
@@ -616,8 +619,8 @@ See [the primary instance-context sources](REFERENCES.md#retained-class-consumer
 
 Native dictionary predicates also require native type-map keys. Keep `TermVarTy`
 separate from `TyVarTy`. Bound runtime Ids compare by de Bruijn position; free
-Ids compare by Unique. For `DepFunTy`, compare the domain in the outer context
-and the body under the extended context. Keep retained functions separate from
+Ids compare by Unique. For `DepFunTy`, compare visibility and the domain in the
+outer context, then the body under the extended context. Keep retained functions separate from
 ordinary arrows and erased foralls. Singleton equality and trie operations must
 use the same rules. Preserve synonym, cast, and kind handling. This support does
 not enable native family-cache reuse under a Pi binder or ordinary optimization.
@@ -787,14 +790,14 @@ lifting builds `DepFunCo` with nominal domain evidence. Cast the closure without
 eta expansion. Preserve forall metadata outside its own binder. Input cast or
 coercion evidence that depends on the abstracted index remains unsupported.
 
-For signature ambiguity checking only, open retained binders in ordinary arrow
+For signature ambiguity checking only, open visible retained binders in ordinary arrow
 arguments as well as results. Use one fresh opaque runtime Id on both sides of
 the self-check. Scope all fresh Ids over constraint capture and simplification.
 Keep the actual signature retained. This projection supplies no coercion between
 different retained functions. Preserve the structural-unification gate.
 See [Agda's expected-argument and shared-context rules](REFERENCES.md#explicit-higher-order-arguments).
 
-For application of `DepFunTy b result`, first check the runtime argument against
+For Core application of `DepFunTy vis b result`, check the runtime argument against
 the binder's domain. Then substitute its index for `b` in the result. The Core
 grammar accepts a local index Id or a saturated tree of constructor workers.
 Convert the fields recursively and check each field domain. Map workers to their
@@ -1060,8 +1063,8 @@ does not establish cross-module native types or ordinary optimizer safety.
 
 ## Native interface signatures
 
-`IfaceDepFunTy` stores an `IfaceIdBndr` and a body. `IfaceTermVar` stores an
-`IfLclName` in the local Id namespace. The binder's domain and multiplicity are
+`IfaceDepFunTy` stores visibility, an `IfaceIdBndr` and a body.
+`IfaceTermVar` stores an `IfLclName` in the local Id namespace. The binder's domain and multiplicity are
 outside its scope. `bindIfaceId` allocates a fresh Id and extends the environment
 for the body. The decoder checks each binder and occurrence against its supported
 algebraic domain and `Many` multiplicity,
@@ -1076,16 +1079,15 @@ for diagnostics and cannot be serialized or imported. The ordinary printer-only
 interface substitution still excludes binders. It does not become a general
 capture-avoiding substitution in this increment.
 
-Tags 10 and 11 encode the retained function and runtime index. Tag 9 remains
-the ordinary type literal. Unknown tags fail with an IO error. The configured
-fork version is `10.1.20261113.1`, with interface header `1001202611131`.
-The existing whole-file version check runs before type decoding, including for
-`IgnoreHiWay`. Rebuild matching libraries when moving from the old format.
-Nat signatures now import and execute through the bootstrap API and rebuilt
-CLI. The preserved Boolean-only reader accepts its old control and rejects the
-new file with both way checks. The new reader rejects the old format. Normal module unfolding
-generation remains gated. The expression-table path
-below reconstructs virtual alternative proofs separately.
+Tag 10 encodes a retained function with a visibility byte before the binder
+and body. Tag 11 encodes a runtime index. Unknown tags fail with an IO error.
+M71 uses interface header `100120261115165`. The M70 header ends in 64.
+The whole-file version check runs before type decoding, including for
+`IgnoreHiWay`. Rebuild matching libraries when moving between versions.
+Both directions of the version mismatch pass their diagnostic checks.
+Normal module unfolding generation and native coercion persistence remain
+gated. The expression-table path below reconstructs virtual alternative
+proofs separately.
 
 The regression uses the real binary tables at all three compression levels.
 The executable fixture compiles a producer, then imports only its `.hi` in a

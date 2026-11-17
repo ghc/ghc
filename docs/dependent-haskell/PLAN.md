@@ -5842,11 +5842,33 @@ provides source prior art for an argument that can be supplied by the checker
 or written explicitly. [Proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#quantifiers)
 separates visibility from retention.
 
-- [ ] Check dependent and vacuous invisible types, exact cast endpoints,
+- [x] Check dependent and vacuous invisible types, exact cast endpoints,
       reflexivity, optimization and scope in the existing Core API fixture.
-- [ ] Round-trip the invisible type in a versioned object interface.
-- [ ] Compare visible and invisible workers through object execution. Check
+- [x] Round-trip the invisible type in a versioned object interface.
+- [x] Compare visible and invisible workers through object execution. Check
       bottom at function WHNF and ignored and inspected runtime operands.
 - [ ] Add source formation, definition checking and an explicit override,
       then test omission from a later declared vector. Check ambiguous
       selection and a wrong explicit runtime index.
+
+### M71 validation
+
+Both compilers and the selected support tools compile. The first self-host
+build found an old constructor pattern in Haddock. The corrected build passes.
+The existing Core API fixture checks both endpoint flags, scope, type-map
+keys, coercion optimization and rejection of nominal visibility changes.
+It writes, reads and reconstructs the two invisible signatures from a
+versioned interface file. Both compiler stages accept the current version
+and reject the previous version. The previous reader rejects the current
+version.
+
+The native object fixture checks the same visible and invisible workers.
+Each ignoring call returns 42 with a bottom argument. Each consuming call
+raises the original Bool exception. A bottom function raises its original
+exception at WHNF with either visibility. Both stages pass the 125-line
+Showcase through seventeen modules.
+
+The seven selected registered normal-way tests pass. The driver skipped
+54 other ways.
+
+See the `native-retained-visibility-` receipts under `_build/verification`.

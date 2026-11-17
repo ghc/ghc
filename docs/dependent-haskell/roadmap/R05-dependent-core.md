@@ -89,6 +89,9 @@ linear actuals. The owner is R03. This increment adds no Core equality rule.
       retained-body comparison scope. M67 supplies nominal transport for its
       generic retained-domain contract. General expression and proof
       abstraction remain separate obligations.
+- [x] Preserve retained-binder visibility in Core, proof operations and
+      interfaces. Check a representational visibility cast through native
+      object execution. See [M71](../PLAN.md#m71-visibility-of-retained-binders-in-core).
 - [ ] Extend one ordinary Core transformation with a measured benefit.
       Preserve deep type dependencies, index identity, demand and sharing.
       Keep other unsupported transformations gated.

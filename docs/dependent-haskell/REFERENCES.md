@@ -4334,12 +4334,11 @@ justify assigning GHC native runtime Ids to mutable type metas.
 
 The ignored native-invisible-retained-next-candidate-v1 report/readpins proposes
 a checked hidden Nat operand selected from a later vector's actual declaration,
-paired with an explicit runtime override. It remains unimplemented. Current
-DepFunTy and its interface node have no visibility field. mkDepFunTy turns a
-vacuous binder into a visible arrow. Persistent visibility, override syntax,
-complete immutable choices, dictionary scope and lazy runtime application need
-review before any source change. No representation or new rule is selected.
-R03, R05 and R23 remain open.
+paired with an explicit runtime override. The source choice remains open.
+M71 adds persistent visibility to the Core type and interface node. It checks
+that the visibility cast preserves demand in the object pipeline. The next
+source work covers definition checking, override syntax, immutable omission
+and dictionary scope. See [M71](PLAN.md#m71-visibility-of-retained-binders-in-core).
 
 ## Native list anchors in higher-order calls: M70
 
