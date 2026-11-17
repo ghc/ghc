@@ -3862,6 +3862,21 @@ does not prove divergence. Record checked evidence and trusted assumptions
 separately. Agda's safe mode also controls positivity, universes and imports;
 a termination check alone does not supply that logical guarantee.
 
+Vazou, Seidel, Jhala, Vytiniotis and Peyton-Jones's
+[Refinement Types For Haskell (ICFP 2014)](https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf)
+provides Haskell-specific prior art. Its stratification separates potentially
+divergent terms, weak-head values and finite values. Do not use a lazy binding's
+postcondition as an unconditional logical assumption. A structural-recursion
+argument must state its finite-input contract. Constructor matching alone does
+not establish that contract.
+
+The 14-page author PDF is archived in the ignored
+`native-forall-totality-laziness-research-v1` directory. Read selected passages
+in sections 2.2, 2.4, 2.5, 4.2, 5.1 and 5.2, plus Corollary 1. The paper ledger
+records hashes and reading scope. No current LiquidHaskell implementation,
+measurement or proof was replayed. This comparison adds no solver dependency
+and grants no new conversion or totality rule to this fork.
+
 The bounded GHC source review selects no checker implementation. A first
 candidate can inspect the final zonked `tcg_binds` through
 `typeCheckResultAction`. It can reuse coverage analysis at `pmcMatches` before

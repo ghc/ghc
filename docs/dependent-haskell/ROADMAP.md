@@ -168,6 +168,11 @@ coverage checker. Recompute the complete call graph; the inference graph omits
 some signed-call edges. Unsupported recursion, callbacks and imports stay
 unknown. No checker or new totality guarantee is implemented.
 
+Use LiquidHaskell's [Refinement Types For Haskell](https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf)
+as Haskell-specific prior art. Its analysis distinguishes potentially divergent
+terms, weak-head values and finite values. Keep the first report advisory.
+It must not change conversion, proof erasure or imported type contracts.
+
 ## Main relationships
 
 Arrows have the same direction as the upstream graph: a task points to a

@@ -3,16 +3,16 @@
   "cache_directory": "_build/verification/dependent-haskell-papers-2026-11-14",
   "storage_note": "PDFs and extraction artifacts remain in the ignored cache. This manifest records references and reading coverage only.",
   "verification": {
-    "verified_utc": "2026-11-16T21:40:51.784454+00:00",
+    "verified_utc": "2026-11-17T02:00:46.548608+00:00",
     "pdf_reader": "pypdf 7.1.0",
-    "checks": "All 27 PDF hashes and byte counts verify. The previous 20 work records and 26 version records are unchanged. The new paper has 13 extracted pages. Technical sections were read selectively; no formal proof or implementation was replayed.",
-    "work_count": 21,
-    "pdf_count": 27,
-    "previous_manifest_sha256": "c070a48d521a690854816320f55cda6a4f12b1516fa7f348f370640286d1b1cb",
-    "reviewed_additions": "_build/verification/native-arrow-matchability-trellys-research-v1/proposed-manifest-additions.json",
-    "reviewed_additions_sha256": "b0f98c67c425e1b89654c977e1ba6c427d390d71854dc21679ae57175f96609b",
-    "archive_verification": "_build/verification/native-arrow-matchability-trellys-research-v1/archive-verification.json",
-    "archive_verification_sha256": "e09e311d61e70fd63c926b19cf0f77d07b92195bacdb5c88dcf7f4b3cde5aee1",
+    "checks": "All 28 PDF hashes and byte counts verify. The previous 21 work records and 27 version records are unchanged. The new paper has 14 extracted pages. Selected sections were read; no proof or implementation was replayed.",
+    "work_count": 22,
+    "pdf_count": 28,
+    "previous_manifest_sha256": "a07d844c579965c2bf0733b4710b33cf561577022329350fb8b5535f62b6b807",
+    "reviewed_additions": "_build/verification/native-forall-totality-laziness-research-v1/proposed-manifest-additions.json",
+    "reviewed_additions_sha256": "41c59593b699eed816c3070b0214ddb5ecfa768e172feaf4d1ac0e4d8029fd58",
+    "archive_verification": "_build/verification/native-forall-totality-laziness-research-v1/extraction.json",
+    "archive_verification_sha256": "c9535ecda6a27988a166b2416bbbae1022842e03b96f81730e8bdeb601eb5a13",
     "previous_verification": {
       "verified_utc": "2026-11-16T20:43:00.045082+00:00",
       "pdf_reader": "pypdf 7.1.0",
@@ -1533,6 +1533,51 @@
         "R05"
       ],
       "application_boundary": "The proved λθ core has closed logical CBV termination, not arbitrary open-term normalization. Zombie adds features outside the completed core proof. The logical/terminating fragment requires a separate lazy-Haskell input/import account; no theorem is transferred."
+    },
+    {
+      "id": "icfp2014-refinement-types-for-haskell",
+      "title": "Refinement Types For Haskell",
+      "authors": [
+        "Niki Vazou",
+        "Eric L. Seidel",
+        "Ranjit Jhala",
+        "Dimitrios Vytiniotis",
+        "Simon Peyton-Jones"
+      ],
+      "year": 2014,
+      "venue": "ICFP 2014",
+      "doi": "10.1145/2628136.2628161",
+      "versions": [
+        {
+          "id": "author-paper",
+          "description": "Author-hosted 14-page ICFP 2014 paper.",
+          "pdf_filename": "../native-forall-totality-laziness-research-v1/refinement-types-for-haskell-icfp2014.pdf",
+          "source_url": "https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf",
+          "sha256": "edc4bfad3e2733b9db16c05e5e9668b4cb441fe98c42286c926f375040105484",
+          "bytes": 788777,
+          "pdf_pages": 14,
+          "accessed_utc": "2026-11-17T01:47:38.447251+00:00",
+          "reading_scope": {
+            "summary": "Selected-section review through local pypdf extraction. No figure inspection, proof replay or execution.",
+            "sections": [
+              "Sections 2.2, 2.4 and 2.5: lazy verification, divergence and stratification; PDF pages 2–5",
+              "Section 4.2 and Corollary 1: stratified types and fixpoints; PDF pages 9–10",
+              "Selected implementation passages in sections 5.1 and 5.2: metrics, finite inputs and potentially divergent results; PDF pages 10–12"
+            ],
+            "excluded": [
+              "Complete declarative and algorithmic derivation audit",
+              "Current LiquidHaskell source audit",
+              "Implementation or measurement reproduction",
+              "Transfer theorem for this GHC fork"
+            ]
+          }
+        }
+      ],
+      "reading_metadata": "../native-forall-totality-laziness-research-v1/extraction.json",
+      "roadmap_cards": [
+        "R05"
+      ],
+      "application_boundary": "The paper studies a lazy refinement calculus and its LiquidHaskell implementation. Its Div/Wnf/Fin distinction informs the optional advisory analysis. It does not establish totality, conversion or consistency for this compiler."
     }
   ]
 }
