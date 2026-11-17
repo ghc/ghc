@@ -4185,12 +4185,16 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                        , con_cxts = cxts, con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (DataConDefCtxt names) $
-    do { traceTc "tcConDecl 1 gadt" (ppr names)
+    do { traceTc "tcConDecl 1 gadt" $
+         vcat [ text "data con names:" <+> ppr names
+              , text "outer_bndrs:" <+> ppr outer_bndrs
+              , text "inner_bndrs:" <+> ppr inner_bndrs ]
        ; let L _ name :| _ = names
        ; skol_info <- mkSkolemInfo (DataConSkol name)
-       ; (tclvl, wanted, (tvbs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
-           <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
-              tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
+       ; (tclvl, wanted, (tc_outer, (inner_tvbs, (ctxt, arg_tys, res_ty, field_lbls, stricts))))
+           <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT"                $
+              tcOuterTKBndrs skol_info outer_bndrs                         $
+              tcExplicitTKBndrs skol_info (gadtTelescopeBndrs inner_bndrs) $
               do { ctxt <- tcHsContext cxts
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
@@ -4217,11 +4221,16 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
 
+       -- Must do this scopedSortOut /after/ solving the equalities (#28135)
+       ; tc_outer <- scopedSortOuter tc_outer
+       ; let outer_tvbs = tyVarSpecToBinders (outerTyVarBndrs tc_outer)
+             tvbs       = outer_tvbs ++ inner_tvbs
+
        ; inf_tkvs <- kindGeneralizeAll skol_info
-                    (mkForAllTys tvbs         $
-                     tcMkPhiTy ctxt           $
-                     tcMkScaledFunTys arg_tys $
-                     res_ty)
+                     (mkForAllTys tvbs         $
+                      tcMkPhiTy ctxt           $
+                      tcMkScaledFunTys arg_tys $
+                      res_ty)
        ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr inf_tkvs)
        ; reportUnsolvedEqualities skol_info inf_tkvs tclvl wanted
 
