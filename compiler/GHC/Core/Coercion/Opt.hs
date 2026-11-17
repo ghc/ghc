@@ -379,7 +379,7 @@ opt_co4' opts env sym rep r (AppCo co1 co2)
   = mkAppCo (opt_co4 opts env sym rep r co1)
             (opt_co4 opts env sym False Nominal co2)
 
-opt_co4' opts env@(LC subst _) sym _rep r (TermAppCo f co)
+opt_co4' opts env@(LC subst _ _) sym _rep r (TermAppCo f co)
   -- The child proof is nominal even when the result is used representationally.
   -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
   = case substTy subst (TermAppTy f (coercionLKind co)) of
@@ -387,17 +387,29 @@ opt_co4' opts env@(LC subst _) sym _rep r (TermAppCo f co)
         mkTermAppCo f' (opt_co4 opts env sym False Nominal co)
       ty -> pprPanic "opt_co4: native function substitution" (ppr ty)
 
-opt_co4' opts env@(LC subst lift_env) sym rep r (DepFunCo b domain co)
-  -- Domain evidence is outside the binder. Keep symmetry outside the whole
-  -- proof: its body is checked at the original domain.
-  -- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+opt_co4' opts env sym rep r (DepFunCo b domain co)
+  -- The common body relates the two lifted versions of A. The complete
+  -- domain proof instead relates lifted A to lifted B. Keep them separate.
+  -- See Note [Optimising retained domain transport].
   = wrapSym sym $ mkDepFunCoWithDomain b' domain'
-      (opt_co4 opts (LC subst' lift_env) NotSwapped rep r co)
+      (opt_co4 opts body_env NotSwapped rep r co)
   where
-    !(subst', b') = substNativeIndexBndr subst b
+    !(body_env, b', binder_domain) = liftCoSubstNativeBndrUsing id
+      (\lc -> liftCoSubst Nominal lc) env b
     domain' = case domain of
-      MRefl -> MRefl
-      MCo delta -> MCo (opt_co4 opts env NotSwapped False Nominal delta)
+      MRefl -> coToMCo binder_domain
+      MCo delta -> coToMCo (opt_co4 opts env NotSwapped False Nominal delta)
+
+{- Note [Optimising retained domain transport]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For DepFunCo b (delta : A ~ B) body, the source body binds b : A on both
+ends. The ambient lifting context first relates A_left to A_right. Use that
+proof for b's common body relation. The optimized delta instead relates
+A_left to B_right and belongs outside the binder. Replacing the common body
+relation with the complete delta would give body occurrences the wrong type.
+An original MRefl domain can become nonreflexive under ambient lifting.
+Keep ambient symmetry outside the complete retained coercion.
+-}
 
 opt_co4' opts env sym rep r (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
                                  , fco_ma = ma_co, fco_kind = k_co, fco_body = co })

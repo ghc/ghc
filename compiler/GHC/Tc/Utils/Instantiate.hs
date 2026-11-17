@@ -56,6 +56,7 @@ import GHC.Core.Predicate ( getClassPredTys_maybe )
 import GHC.Core.TyCo.Rep ( Type(TermVarTy), CoercionN )
 import GHC.Core.Coercion ( mkNomReflCo )
 import GHC.Core.TyCo.Ppr ( debugPprType )
+import GHC.Core.TyCo.Subst ( extendSubstInScopeSetFromSource )
 import GHC.Core.Class( Class )
 import GHC.Core.Coercion.Axiom
 
@@ -595,8 +596,9 @@ tcInstType inst_tyvars id
   = return ([], theta, tau)
   | otherwise
   = do { (subst, tyvars') <- inst_tyvars tyvars
+       -- See Note [Source and target substitution scopes] in GHC.Core.TyCo.Subst.
        ; let tv_prs  = map tyVarName tyvars `zip` tyvars'
-             subst'  = extendSubstInScopeSet subst (tyCoVarsOfType rho)
+             subst'  = extendSubstInScopeSetFromSource subst (tyCoVarsOfType (idType id))
        ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
   where
     (ma_tyvars, rho) = tcSplitForAllInvisTyVars (idType id)
@@ -612,8 +614,9 @@ tcInstTypeBndrs poly_ty
   = return ([], theta, tau)
   | otherwise
   = do { (subst, tyvars') <- mapAccumLM inst_invis_bndr emptySubst tyvars
+       -- See Note [Source and target substitution scopes] in GHC.Core.TyCo.Subst.
        ; let tv_prs  = map (tyVarName . binderVar . snd) tyvars `zip` tyvars'
-             subst'  = extendSubstInScopeSet subst (tyCoVarsOfType rho)
+             subst'  = extendSubstInScopeSetFromSource subst (tyCoVarsOfType poly_ty)
        ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
   where
     (tyvars, rho) = tcSplitForAllInvisTVBinders poly_ty

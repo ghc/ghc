@@ -117,6 +117,7 @@ runRewrite loc flav eq_rel thing_inside
                         , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref
                         , re_used_cos  = used_cos_ref
+                        , re_native_lifting = emptyLiftingContext emptyInScopeSet
                         , re_native_binders = native_binders
                         , re_fam_axioms_only = False
                         , re_zap_coercions = isEmptyVarSet native_binders
@@ -170,6 +171,11 @@ withNativeBinder b thing_inside
       (env { re_native_binders = extendVarSet (re_native_binders env) b
            , re_zap_coercions = False })
 {-# INLINE withNativeBinder #-}
+
+-- | Extend the runtime relation together with its side-effect scope.
+withNativeLifting :: LiftingContext -> Id -> RewriteM a -> RewriteM a
+withNativeLifting lc b thing_inside = mkRewriteM $ \env ->
+  runRewriteM (withNativeBinder b thing_inside) (env { re_native_lifting = lc })
 
 -- | Skip external evidence during axiom-only reduction or under a runtime binder.
 -- See Note [Solving retained function equalities] in GHC.Tc.Solver.Equality.
@@ -676,14 +682,15 @@ rewrite_args_slow binders inner_ki fvs roles tys
 ------------------
 {- Note [Rewriting retained dependent functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained function has a fixed closed domain and a Many runtime binder.
-The domain can also be an eligible ordinary function type. Keep its Id only
-in dedicated call-head slots. See Note [Function-valued retained binders] in
-GHC.Core.Type. Normalize its body without changing that binder or its domain.
-mkDepFunRedn uses DepFunCo to bind the runtime Id in the reduction proof. Each endpoint uses
-mkDepFunTy independently: normalization can remove a dependency and produce an
-ordinary Many arrow on one side. A bound runtime index remains rigid. Do not
-inspect its definition or add a singleton witness.
+A retained function has a local Many runtime binder of lifted type. Normalize
+an open domain nominally before installing its relation in the common body
+prefix. Keep a closed domain unchanged; see Note [Closed retained domains] in
+GHC.Core.FamInstEnv. Still install the binder relation and rewrite its body.
+DepFunCo binds that runtime Id and its nominal domain evidence in the proof.
+Each endpoint can independently become an ordinary Many arrow. A bound runtime
+index remains rigid. Do not inspect its definition or add a singleton witness.
+Eligible ordinary function heads keep their separate fixed-domain policy.
+See Note [Function-valued retained binders] in GHC.Core.Type.
 
 The ordinary ForAllTy case recurses into its body, but it does not establish a
 solver scope for runtime Ids. In particular, a plugin can emit a Wanted, and a
@@ -752,16 +759,27 @@ rewrite_one ty@(TermAppTy f arg)
   | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 
-rewrite_one ty@(TermVarTy {})
+rewrite_one ty@(TermVarTy v)
+  | isNativeOpaqueValueId v
   = do { role <- getRole
-       ; return $! mkReflRedn role ty }
+       ; lc <- getRewriteEnvField re_native_lifting
+       ; return $! coercionRedn (liftCoSubstNative lc role v) }
+  | otherwise
+  = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 rewrite_one ty@(DepFunTy b body)
   -- See Note [Rewriting retained dependent functions].
-  | isId b, isNativeRetainedBinder b
+  | isNativeOpaqueValueId b
   , isLiftedTypeKind (typeKind body)
-  = withNativeBinder b $
-    do { redn <- rewrite_one body
-       ; return $! mkDepFunRedn b redn }
+  = do { lc <- getRewriteEnvField re_native_lifting
+       ; domain <- if noFreeVarsOfType (varType b)
+                   -- See Note [Closed retained domains] in GHC.Core.FamInstEnv.
+                   then return (mkReflRedn Nominal (varType b))
+                   else setEqRel NomEq $ rewrite_one (varType b)
+       ; let (lc', b', _) = liftCoSubstNativeBndrUsing reductionCoercion
+                              (\_ _ -> domain) lc b
+       ; Reduction body_co _ <- withNativeLifting lc' b' $ rewrite_one body
+       ; let co = mkDepFunCoWithDomain b' (coToMCo (reductionCoercion domain)) body_co
+       ; return $! mkReduction co (coercionRKind co) }
   | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 

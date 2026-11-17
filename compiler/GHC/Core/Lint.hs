@@ -1092,7 +1092,7 @@ lintLambda var lintBody =
     do { (body_ty, ue) <- lintBody
        ; lintL (not (isNonCoVarId var)
                   || not (anyFreeVarsOfType (== var) body_ty)
-                  || isNativeRetainedBinder var)
+                  || isNativeOpaqueValueId var)
            (text "Unsupported runtime dependency in lambda result:" <+> ppr var
             $$ ppr body_ty)
        ; ue' <- checkLinearity ue var
@@ -1573,11 +1573,11 @@ lintValApp arg fun_ty arg_ty fun_ue arg_ue
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
 lintRetainedArgument :: Id -> CoreExpr -> LintM ()
 lintRetainedArgument b arg
-  | isNativeIndexId b
-  = lintL (isJust (exprToNativeIndex arg)) unsupported
   | isNativeIndexFunctionId b, Var f <- arg
   = do { _ <- lintNativeIndexFunction f
        ; ensureEqTys (varType b) (varType f) unsupported }
+  | not (isNativeIndexFunctionId b), isNativeOpaqueValueId b
+  = lintL (isJust (exprToNativeIndex arg)) unsupported
   | otherwise = failWithL unsupported
   where
     unsupported = text "Unsupported retained runtime argument:" <+> ppr arg
@@ -1797,7 +1797,7 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
         _ -> failWithL (text "Native index alternative must bind its fields followed by one CoVar")
     ; in_scope <- getInScope
     ; let field_set = mkVarSet fields
-    ; lintL (all isNativeRetainedBinder fields
+    ; lintL (all isNativeOpaqueValueId fields
              && all (\v -> not (v `elemInScopeSet` in_scope)) fields
              && sizeVarSet field_set == length fields)
         (text "Native index fields must be fresh unrestricted local identifiers:" <+> ppr fields)
@@ -2136,8 +2136,8 @@ lintType (TyVarTy tv)
 
 lintType (TermVarTy v)
   = do { in_scope <- getInScope
-       ; lintL (isNativeRetainedBinder v
-                 && maybe False (\b -> isNativeRetainedBinder b && varType b `eqType` varType v)
+       ; lintL (isNativeOpaqueValueId v
+                 && maybe False (\b -> isNativeOpaqueValueId b && varType b `eqType` varType v)
                                 (lookupInScope in_scope v))
            (text "Invalid runtime index:" <+> ppr v <+> dcolon <+> ppr (varType v))
        ; lintVarOcc v }
@@ -2150,7 +2150,7 @@ lintType (TermAppTy f arg)
             $$ text "Expected:" <+> ppr domain) }
 
 lintType (DepFunTy b body)
-  = do { lintL (isNativeRetainedBinder b)
+  = do { lintL (isNativeOpaqueValueId b)
            (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
        ; lintL (b `elemVarSet` tyCoVarsOfType body)
            (text "Vacuous retained dependent binder:" <+> ppr b)
@@ -2398,10 +2398,12 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                      Nothing -> failWithL (text "Retained runtime binder in a type application")
                      Just to_core -> do
                        { (arg_ty, acc') <- lint_arrow_arg arg ManyTy acc
-                       ; ensureEqTys (varType b) arg_ty
+                       ; let b' = updateIdTypeAndMult (substTy subst) b
+                             -- See Note [Pending substitutions in retained applications].
+                       ; ensureEqTys (varType b') arg_ty
                            (text "Retained runtime argument has the wrong type:" <+> ppr arg)
                        ; let arg_expr = to_core arg
-                       ; lintRetainedArgument b arg_expr
+                       ; lintRetainedArgument b' arg_expr
                        ; let Subst in_scope ids tvs cvs = subst
                              subst' = Subst in_scope (extendVarEnv ids b arg_expr) tvs cvs
                        ; go subst' body_ty acc' args }
@@ -2427,6 +2429,22 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                                   (text "Not a fun:" <+> (ppr fun_ty $$ ppr args)))
 
          ; go init_subst orig_fun_ty acc all_args }
+
+{- Note [Pending substitutions in retained applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lintApp accumulates type and runtime arguments in a substitution. A retained
+binder's domain still belongs to that source context. For example, checking
+f @Int xs for f :: forall a. foreach (ys :: [a]) -> T ys must compare xs with
+[Int], not [a]. Instantiate the binder's type and multiplicity for both the
+domain check and the retained-argument classification.
+
+Keep the original source binder as the substitution key for the actual
+argument. The argument is a completed target expression. Keep the pending
+substitution for the source body, and do not apply it to that argument again.
+The temporary instantiated binder is only a checking view. It does not bind
+the body or enter the in-scope set. See Note [Substituting runtime Id metadata]
+in GHC.Core.TyCo.Subst.
+-}
 
 -- This is a top level definition to ensure we pass all variables of the error message
 -- explicitly and don't capture them as free variables. Otherwise this binder might
@@ -2646,7 +2664,7 @@ lintCoercion (TermAppCo f arg_co)
             $$ ppr arg_co) }
 
 lintCoercion co@(DepFunCo b domain body_co)
-  = do { lintL (isNativeRetainedBinder b)
+  = do { lintL (isNativeOpaqueValueId b)
            (text "Invalid retained coercion binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
        ; case domain of
            MRefl -> return ()
@@ -2657,8 +2675,8 @@ lintCoercion co@(DepFunCo b domain body_co)
                 ; let Pair source target = coercionKind delta
                 ; lintL (source `eqType` varType b)
                     (text "Retained domain conversion has the wrong source domain:" <+> ppr delta)
-                ; lintL (isNativeIndexId b && isNativeIndexType target)
-                    (text "Retained domain conversion requires scalar index domains:" <+> ppr delta) }
+                ; lintL (isNativeIndexDomainConversion source target)
+                    (text "Unsupported retained domain conversion:" <+> ppr delta) }
        ; lintBinder LambdaBind b $
          do { lintCoercion body_co
             ; let Pair left right = coercionKind body_co

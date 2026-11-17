@@ -193,8 +193,9 @@ mkLamType v body_ty
    = mkForAllTy unmatchableDataConTy (Bndr v coreTyLamForAllTyFlag) body_ty
 
    | anyFreeVarsOfType (== v) body_ty
-   , isNativeRetainedBinder v
-   = assertPpr (isNativeRetainedBinder v && typeKind body_ty `eqType` liftedTypeKind)
+   , isNativeOpaqueValueId v
+     -- See Note [Opaque runtime index values] in GHC.Core.Type.
+   = assertPpr (isNativeOpaqueValueId v && typeKind body_ty `eqType` liftedTypeKind)
        (text "Unsupported retained dependent lambda:" <+> ppr v <+> dcolon <+> ppr body_ty) $
      DepFunTy v body_ty
 
@@ -255,7 +256,7 @@ applyTypeToArgs op_ty args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
     go op_ty (arg : args)
       | DepFunTy b res_ty <- coreFullView op_ty
-      , isNativeRetainedBinder b
+      , isNativeOpaqueValueId b
       , retained_arg b arg
       = let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)
         in go (substTy (Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv) res_ty) args
@@ -263,11 +264,16 @@ applyTypeToArgs op_ty args
                                   = go res_ty args
     go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
 
-    -- See Note [Function-valued retained binders] in GHC.Core.Type.
+    -- See Notes [Function-valued retained binders] and
+    -- [Opaque runtime index values] in GHC.Core.Type.
     retained_arg b arg
-      | isNativeIndexId b = isJust (exprToNativeIndex arg)
-      | Var f <- arg
-      = isNativeIndexFunctionId f && varType f `eqType` varType b
+      | isNativeIndexFunctionId b
+      = case arg of
+          Var f -> isNativeIndexFunctionId f && varType f `eqType` varType b
+          _ -> False
+      | isNativeOpaqueValueId b
+      , Just index <- exprToNativeIndex arg
+      = typeKind index `eqType` varType b
       | otherwise = False
 
     -- go_ty_args: accumulate type arguments so we can

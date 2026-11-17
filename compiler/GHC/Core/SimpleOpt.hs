@@ -354,6 +354,17 @@ definitions. Their compulsory unfoldings produce casts. Expand these templates
 with the same substitution and beta rules. Do not force the wrapped value.
 See Note [Newtype workers] in GHC.Types.Id.Make.
 
+The wired-in coerceId is another exception. It has no runtime definition.
+Its representation-polymorphic type must not reach code generation.
+Expand its existing compulsory template with the same substitution and beta
+rules. The template selects the representational proof from its Coercible
+dictionary and casts the argument. Keep any remaining lets, lambdas and cases.
+Do not add eta expansion or enable ordinary constructor-case reduction.
+For example, a derived Eq method for a newtype can call coerce in a module
+that also has retained functions. The module uses this restricted pass for
+all bindings, so it must lower that call as well. See coerceId in
+GHC.Builtin.WiredIn.Ids.
+
 A virtual Boolean proof is not a constructor field. Reduce its case only when
 the scrutinee is an exact constructor and the substituted primitive nominal
 equality has that constructor at both endpoints. Replace the proof with nominal
@@ -582,6 +593,7 @@ simple_app env (Var v) as
   | not (soe_native env)
     || v `hasKey` leftSectionKey
     || v `hasKey` rightSectionKey
+    || v `hasKey` coerceKey
     || maybe False isNewDataCon (isDataConWrapId_maybe v)
   , let unf = idUnfolding v
   , isCompulsoryUnfolding unf

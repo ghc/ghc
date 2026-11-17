@@ -1696,7 +1696,7 @@ tcIfaceDomainShape IfaceLitTy{} = return NativeInvalidDomain
 tcIfaceDomainShape _ = return NativeUnknownDomain
 
 -- | Select the existing eligibility policy for a shape precheck.
-data NativeDomainUse = NativeScalarUse | NativeFunctionUse | NativeRetainedUse
+data NativeDomainUse = NativeScalarUse | NativeFunctionUse | NativeRetainedUse | NativeOpaqueUse
                      | NativeFunctionEndpointUse
                      | NativeFieldMultUse | NativeManyMultUse | NativeUnmatchableUse
   deriving Eq
@@ -1721,6 +1721,13 @@ nativeTypeDomainShape _ = NativeUnknownDomain
 nativeDomainShapePossible :: NativeDomainUse -> NativeDomainShape -> Bool
 nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
   where
+    -- See Note [Opaque native interface values].
+    go seen aliases NativeOpaqueUse (NativeTyConDomain tc)
+      | Just (NativeSynonymDomain rhs) <- tyConNativeDomainShape tc
+      = not (tc `elemTyConSet` aliases)
+        && go seen (extendTyConSet aliases tc) NativeOpaqueUse rhs
+      | otherwise = True
+    go _ _ NativeOpaqueUse _ = True
     go seen aliases NativeRetainedUse shape
       = go seen aliases NativeScalarUse shape
         || go seen aliases NativeFunctionUse shape
@@ -1827,6 +1834,25 @@ This is not a termination guarantee for those headers or unclassified forms.
 See Note [Native interface domain shapes] in GHC.Core.TyCon.
 -}
 
+{- Note [Opaque native interface values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A runtime index can name an opaque value at any lifted value type. Do not
+traverse its constructors. An Int value does not require the unlifted field
+of I# to be an index. A generic cons head keeps its instantiated field type.
+Core formation also permits generated dependent lambdas over these values.
+Source foreach domains have a separate structural check in GHC.Tc.Gen.HsType.
+
+The raw opaque precheck rejects nullary alias cycles before bindIfaceId can
+expand them. Other raw shapes require the typed lifted-value check. Keep the
+stricter structural and function-endpoint prechecks at their existing callers.
+Opaque identity does not grant native call permission.
+
+Check promoted constructor applications that contain runtime indices against
+their complete structural parent and instantiated fields. Checking each local
+Id alone would permit an Int cons to contain a Bool head. Ordinary promoted
+applications without runtime dependencies keep their existing import path.
+-}
+
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
@@ -1861,12 +1887,12 @@ tcIfaceType = go
       = do { v <- tcIfaceLclId n
            ; precheckIfaceNativeDomain
                (text "Invalid retained index in interface:" <+> ppr n)
-               (nativeIdDomainShapePossible NativeRetainedUse v)
-           ; valid <- evaluateIfaceNativeDomain (ppr n) (isNativeRetainedBinder v)
+               (nativeIdDomainShapePossible NativeOpaqueUse v)
+           ; valid <- evaluateIfaceNativeDomain (ppr n) (isNativeOpaqueValueId v)
            ; unless valid $
                failIfM (text "Invalid retained index in interface:" <+> ppr n
                         $$ text "Expected a local identifier with multiplicity Many"
-                        $$ text "and a supported algebraic or fixed U function domain."
+                        $$ text "at a lifted value type."
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
@@ -1878,16 +1904,16 @@ tcIfaceType = go
            ; precheckIfaceNativeDomain
                (text "Invalid retained binder in interface:" <+> ppr name)
                (nativeDomainShapePossible NativeManyMultUse mult_shape
-                && nativeDomainShapePossible NativeRetainedUse domain_shape)
+                && nativeDomainShapePossible NativeOpaqueUse domain_shape)
            ; bindIfaceId bndr $ \ v ->
         do { precheckIfaceNativeDomain
                (text "Invalid retained binder in interface:" <+> ppr name)
-               (nativeIdDomainShapePossible NativeRetainedUse v)
-           ; valid <- evaluateIfaceNativeDomain (ppr name) (isNativeRetainedBinder v)
+               (nativeIdDomainShapePossible NativeOpaqueUse v)
+           ; valid <- evaluateIfaceNativeDomain (ppr name) (isNativeOpaqueValueId v)
            ; unless valid $
                failIfM (text "Invalid retained binder in interface:" <+> ppr v
                         $$ text "Expected a local identifier with multiplicity Many"
-                        $$ text "and a supported scalar or closed function domain."
+                        $$ text "at a lifted value type."
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; body' <- go body
@@ -1906,6 +1932,17 @@ tcIfaceType = go
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc
            ; tks' <- mapM go (appArgsIfaceTypes tks)
+           ; case isPromotedDataCon_maybe tc' of
+               Just con
+                 | let (tys, fields) = splitAt (length (dataConUnivTyVars con)) tks'
+                 , any (anyFreeVarsOfType isId) fields ->
+                 do { valid <- evaluateIfaceNativeDomain (ppr tc) $
+                          isJust (nativeIndexDataConTyArgs (mkTyConApp (dataConTyCon con) tys) con)
+                          && nativeIndexArgKinds con tys fields
+                      ; unless valid $
+                          failIfM (text "Invalid retained constructor fields in interface:"
+                                   <+> ppr tc) }
+               _ -> return ()
            ; return (mkTyConApp tc' tks') }
     go (IfaceForAllTy ma bndr t)
       = do { ma' <- go ma

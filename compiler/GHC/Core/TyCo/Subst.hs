@@ -21,6 +21,7 @@ module GHC.Core.TyCo.Subst
         getCvSubstEnv, substInScopeSet, setInScope, getSubstRangeTyCoFVs,
         isInScope, elemSubst, notElemSubst, zapSubst,
         extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
+        extendSubstInScopeSetFromSource,
         extendTCvSubst, extendTCvSubstWithClone,
         extendCvSubst, extendCvSubstWithClone,
         extendTvSubst, extendTvSubstWithClone,
@@ -249,7 +250,9 @@ composeTCvSubst :: Subst -> Subst -> Subst
 composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
   = Subst is3 ids3 tenv3 cenv3
   where
-    is3 = is1 `unionInScope` is2
+    -- Keep final target representatives from subst1.
+    -- See Note [Source and target substitution scopes].
+    is3 = is2 `unionInScope` is1
     ids3 = ids1 `plusVarEnv` mapVarEnv compose_index ids2
     tenv3 = tenv1 `plusVarEnv` mapVarEnv (substTy extended_subst1) tenv2
     cenv3 = cenv1 `plusVarEnv` mapVarEnv (substCo extended_subst1) cenv2
@@ -373,6 +376,31 @@ extendSubstInScopeSet :: Subst -> VarSet -> Subst
 extendSubstInScopeSet (Subst in_scope ids tvs cvs) vs
   = Subst (in_scope `extendInScopeSetSet` vs)
           ids tvs cvs
+
+-- | Add source-context free variables without replacing target representatives.
+-- See Note [Source and target substitution scopes].
+extendSubstInScopeSetFromSource :: Subst -> VarSet -> Subst
+extendSubstInScopeSetFromSource (Subst in_scope ids tvs cvs) source_vars
+  = Subst (mkInScopeSet source_vars `unionInScope` in_scope) ids tvs cvs
+
+{- Note [Source and target substitution scopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The in-scope set stores target representatives. A source free-variable set
+also supplies names for capture avoidance. Add those source variables without
+replacing an existing target representative. The right side of unionInScope
+wins. Collect source variables separately from target argument variables.
+
+For a well-scoped forall, ambient runtime Id metadata cannot depend on its
+later quantified binder. Such ambient Ids stay unchanged during instantiation.
+A split runtime telescope instead needs the preceding actual binder or range
+installed before processing its tail. Do not refresh a target Id's metadata
+or substitute a stored range again. See Note [Substituting runtime Id metadata].
+
+Composition gives the final targets of the first substitution precedence over
+intermediate representatives from the second. This scope operation does not
+prepare arbitrary free Ids whose domains change. Ordered telescope callers
+must supply their actual prefix ranges. Domain transport still needs evidence.
+-}
 
 extendTCvSubst :: Subst -> TyCoVar -> Type -> Subst
 extendTCvSubst subst v ty
@@ -674,7 +702,7 @@ substTysWithCoVars cvs cos = assert (cvs `equalLength` cos )
 -- See also Note [The substitution invariant].
 substTyAddInScope :: HasDebugCallStack => Subst -> Type -> Type
 substTyAddInScope subst ty =
-  substTy (extendSubstInScopeSet subst $ tyCoVarsOfType ty) ty
+  substTy (extendSubstInScopeSetFromSource subst $ tyCoVarsOfType ty) ty
 
 -- | When calling `substTy` it should be the case that the in-scope set in
 -- the substitution is a superset of the (deep) free vars of the range of

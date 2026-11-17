@@ -1336,13 +1336,13 @@ tcRetainedCon domain source_pat = case unLoc (retainedConPat source_pat) of
 
 {- Note [Parameterized retained constructor patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check the complete closed domain before instantiating a constructor's ordinary
+Check the complete structural domain before instantiating a constructor's ordinary
 universals. Runtime field Ids use those instantiated types. A promoted index
 contains the ordinary type arguments before the actual runtime field indices.
 Use the same domain check for patterns and constructor argument metadata.
 
-A closed algebraic domain can contain eligible function leaves. Keep each
-leaf's actual field Id in the promoted constructor index. The nominal whole
+A structural domain can contain opaque parameter fields. Keep each field's
+actual Id and instantiated type in the promoted constructor index. The nominal whole
 constructor proof transports later fields through a family that exposes that
 Id. It does not project equality through an unmatchable function application.
 
@@ -1406,13 +1406,13 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     check_fields subst refinements position ((mb_binder, arg_ty) : args) (pat : pats)
       = setSrcSpanA (getLoc pat) $
         do { let original_ty = scaleScaled ManyTy (substScaledTy subst arg_ty)
-           ; co <- refine_type refinements (scaledThing original_ty)
-           ; let scaled_ty = Scaled (scaledMult original_ty) (pSnd (coercionKind co))
-                 wrap_pat (L loc checked) = L loc $
-                   mkHsWrapPat (mkWpCastN co) checked (scaledThing original_ty)
            ; case mb_binder of
                Nothing ->
-                 do { (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
+                 do { co <- refine_type refinements (scaledThing original_ty)
+                    ; let scaled_ty = Scaled (scaledMult original_ty) (pSnd (coercionKind co))
+                          wrap_pat (L loc checked) = L loc $
+                            mkHsWrapPat (mkWpCastN co) checked (scaledThing original_ty)
+                    ; (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
                            (position, pat, scaled_ty) $
                            check_fields subst refinements (position + 1) args pats
                     ; return (wrap_pat pat' : pats', res) }
@@ -1420,15 +1420,16 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                  do { name <- case unLoc pat of
                         VarPat _ (L _ name) -> return name
                         _ -> newSysName (mkVarOcc "retained_field")
-                    ; let index = mkLocalId name ManyTy (scaledThing scaled_ty)
+                    -- Keep the incoming field identity and domain.
+                    -- See Note [Refining later retained domains] in GHC.Tc.Gen.Match.
+                    ; let index = mkLocalId name ManyTy (scaledThing original_ty)
                           subst' = CoreSubst.extendIdSubst
                             (extendSubstInScope subst index) template (Var index)
-                    ; unless (isManyTy (scaledMult scaled_ty) && isNativeRetainedBinder index
-                              && scaledThing original_ty `eqType` scaledThing scaled_ty) bad_pattern
+                    ; unless (isManyTy (scaledMult original_ty) && isNativeRetainedBinder index) bad_pattern
                     ; case unLoc pat of
                         VarPat{} ->
                           do { (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
-                                  (position, pat, scaled_ty) $
+                                  (position, pat, original_ty) $
                                   check_fields subst' refinements (position + 1) args pats
                              ; return (pat' : pats', res) }
                         _ ->
@@ -1438,13 +1439,18 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                              ; (index_con, fields) <- maybe bad_pattern return info
                              ; let constructor_index = retainedConIndex (varType index) index_con fields
                              ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
-                             ; (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
-                                     (position, retainedConPat pat, scaled_ty) $
+                             ; let match_ctxt = case pe_ctxt penv of
+                                     LamPat mc -> mc
+                                     LetPat{} -> PatBindRhs
+                             ; (ev_binds, (pat', (pats', res))) <-
+                                 checkConstraints (PatSkol (RealDataCon index_con) match_ctxt) [] [cv] $
+                                   tcConArg (RealDataCon con) penv
+                                     (position, retainedConPat pat, original_ty) $
                                      check_fields subst' (refinements ++ [(index, mkCoVarCo cv)])
                                        (position + 1) args pats
                              ; let L loc checked = pat'
                                    field_pat = AsPat noExtField (noLocA index)
-                                                 (L loc (add_proof cv checked))
+                                                 (L loc (add_proof cv ev_binds checked))
                              ; return (L loc field_pat : pats', res) } } }
     check_fields _ _ _ _ _ = bad_pattern
 
@@ -1454,11 +1460,14 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            ; later <- refine_type rest (pSnd (coercionKind co))
            ; return (mkTransCo co later) }
 
-    add_proof cv (ParPat x (L loc pat)) = ParPat x (L loc (add_proof cv pat))
-    add_proof cv pat@(ConPat { pat_con_ext = ext })
-      = assertPpr (null (cpt_dicts ext) && null (cpt_tvs ext)) (ppr pat) $
-          pat { pat_con_ext = ext { cpt_dicts = [cv] } }
-    add_proof _ pat = pprPanic "tcRetainedDataConPat: not an index constructor" (ppr pat)
+    add_proof cv binds (ParPat x (L loc pat)) = ParPat x (L loc (add_proof cv binds pat))
+    add_proof cv binds pat@(ConPat { pat_con_ext = ext })
+      = assertPpr (null (cpt_dicts ext) && null (cpt_tvs ext) && empty_binds (cpt_binds ext)) (ppr pat) $
+          pat { pat_con_ext = ext { cpt_dicts = [cv], cpt_binds = binds } }
+      where
+        empty_binds ev@EvBinds{} = isEmptyTcEvBinds ev
+        empty_binds TcEvBinds{} = False
+    add_proof _ _ pat = pprPanic "tcRetainedDataConPat: not an index constructor" (ppr pat)
 
 {- Note [Checking retained package patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1474,7 +1483,10 @@ Id in an outer generated as-pattern. Its inner ConPat carries the nominal
 whole-index equality. Keep the actual source subfield Ids. Transport each
 later field type under that equality with tcRetainedCoercion, then retain
 the original outer field type in a coercion pattern. The proof stays under
-the inner constructor alternative. The whole-field as-pattern must remain
+the inner constructor alternative. Check the remaining fields and RHS under
+this proof as a Given. Store the resulting evidence bindings in that inner
+ConPat. See Note [Refining later retained domains] in GHC.Tc.Gen.Match.
+The whole-field as-pattern must remain
 outermost so match selection uses its exact Id. Ordinary row failure keeps
 the existing equation order; no complete source-case group is required.
 See docs/dependent-haskell/REFERENCES.md#source-package-patterns.

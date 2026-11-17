@@ -821,11 +821,11 @@ check_type ve (TermAppTy head_id arg)
            Just (domain, _) | typeKind arg `eqType` domain -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex }
 check_type ve (TermVarTy v)
-  = do { unless (isNativeRetainedBinder v) $
+  = do { unless (isNativeOpaqueValueId v) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; check_retained_index ve v }
 check_type ve (DepFunTy v body)
-  = do { unless (isNativeRetainedBinder v && not (v `elemVarSet` ve_indices ve)) $
+  = do { unless (isNativeOpaqueValueId v && not (v `elemVarSet` ve_indices ve)) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; unless (typeKind body `eqType` liftedTypeKind) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedResultKind body)
@@ -931,7 +931,7 @@ check_retained_index ve v
        ; case level of
            Comp -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
-       ; unless (isNativeRetainedBinder v && v `elemVarSet` ve_indices ve) $
+       ; unless (maybe False valid_bound (lookupVarSet (ve_indices ve) v)) $
          do { mb_thing <- tcLookupLcl_maybe (getName v)
             ; case mb_thing of
                 Just (ATcId { tct_id = v' }) ->
@@ -940,8 +940,10 @@ check_retained_index ve v
                                && eqType (varType v) (varType binding)) out_of_scope }
                 _ -> out_of_scope } }
   where
+    valid_bound binding = isNativeOpaqueValueId binding
+                       && eqType (varType v) (varType binding)
     eligible index = isNativeIndexId index
-                  || (not (isExternalName (getName index)) && isNativeIndexFunctionId index)
+                  || (not (isExternalName (getName index)) && isNativeOpaqueValueId index)
     out_of_scope = failWithTc $ TcRnRetainedQuantificationError (RetainedIndexOutOfScope v)
 
 {- Note [Validity of retained binders]
@@ -954,10 +956,10 @@ Zonk the lexical binding's type and multiplicity before testing it. IO-bound
 indices can retain filled meta-variables in that metadata. Keep the same Unique
 and require the occurrence and binding domains to agree. This follows
 GHC.Tc.Gen.App, Note [Native index bindings during typechecking].
-Its domain must satisfy the retained-binder policy. An eligible function Id
-can occur as a dedicated call head or a function-value TermVarTy. Bound-set
-membership covers both binder domains; free function heads still need the
-actual lexical binding and internal Name.
+Its domain must be a lifted value type. Compare the occurrence metadata with
+the bound or lexical Id. Source foreach domains have a separate structural
+check in GHC.Tc.Gen.HsType. An eligible function Id can also occur as a
+dedicated call head. Opaque value identity does not grant call permission.
 See Note [Function-valued retained binders] in GHC.Core.Type.
 Ordinary outer forall binders
 keep their existing type-variable scope and rank checks.

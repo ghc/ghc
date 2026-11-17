@@ -108,6 +108,8 @@ import GHC.Core.Predicate ( getClassPredTys_maybe, isCTupleClass )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
+import qualified GHC.Core.TyCo.Subst as Subst
+import GHC.Core.Unify ( BindFlag(..), tcMatchTyX_BM )
 
 import GHC.Builtin( allNameStrings )
 import GHC.Builtin.KnownKeys
@@ -535,7 +537,7 @@ tcRetainedAmbientIndices invalid_reason hs_ty
              Just (ATcId { tct_id = index }) ->
                do { index <- liftZonkM (zonkId index)
                   ; unless (not (isExternalName name)
-                            && isNativeRetainedBinder index) invalid_index
+                            && isNativeOpaqueValueId index) invalid_index
                   ; level <- getThLevel
                   ; case level of
                       Comp -> return ()
@@ -745,7 +747,7 @@ See Note [Function-valued retained binders] in GHC.Core.Type. A bare function
 is a value index at its fixed type. Application keeps the opaque call policy.
 
 The interface already encodes this telescope with IfaceDepFunTy and
-IfaceTermAppTy. tcIfaceType uses isNativeRetainedBinder for both a binder
+IfaceTermAppTy. tcIfaceType uses isNativeOpaqueValueId for both a binder
 and a bare IfaceTermVar value. Decode each binder
 before its body and check that the body has kind Type. No wire tag or layout
 changes. With the same header version, an old reader can display the raw
@@ -2351,15 +2353,15 @@ tcInferTyApps mode hs_ty fun hs_args
 
 tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
   = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
-       ; (f_args, res_k) <- go_init 1 fun orig_hs_args
+       ; (f_args, res_k) <- go_init 1 fun orig_hs_args Nothing
        ; traceTc "tcInferTyApps }" (ppr f_args <+> dcolon <+> ppr res_k)
        ; return (f_args, res_k) }
   where
 
     -- go_init just initialises the auxiliary
     -- arguments of the 'go' loop
-    go_init n fun all_args
-      = go n fun empty_subst fun_ki all_args
+    go_init n fun all_args checked_arg
+      = go n fun empty_subst fun_ki all_args checked_arg
       where
         fun_ki = typeKind fun
            -- We do (typeKind fun) here, even though the caller
@@ -2376,8 +2378,9 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
        -> Subst        -- Applies to function kind
        -> TcKind          -- Function kind
        -> [LHsTypeArg GhcRn]    -- Un-type-checked args
+       -> Maybe (TcType, TcKind) -- Checked current visible argument
        -> TcM (TcType, TcKind)  -- Result type and its kind
-    -- INVARIANT: in any call (go n fun subst fun_ki args)
+    -- INVARIANT: in any call (go n fun subst fun_ki args checked_arg)
     --               typeKind fun  =  subst(fun_ki)
     -- So the 'subst' and 'fun_ki' arguments are simply
     -- there to avoid repeatedly calling typeKind.
@@ -2388,13 +2391,13 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
     -- is apply 'fun' to an argument type.
 
     -- Dispatch on all_args first, for performance reasons
-    go n fun subst fun_ki all_args = case (all_args, tcSplitPiTy_maybe fun_ki) of
+    go n fun subst fun_ki all_args checked_arg = case (all_args, tcSplitPiTy_maybe fun_ki) of
 
       ---------------- No user-written args left. We're done!
       ([], _) -> return (fun, substTy subst fun_ki)
 
       ---------------- HsArgPar: We don't care about parens here
-      (HsArgPar _ : args, _) -> go n fun subst fun_ki args
+      (HsArgPar _ : args, _) -> go n fun subst fun_ki args checked_arg
 
       ---------------- HsTypeArg: a kind application (fun @ki)
       (HsTypeArg _ hs_ki_arg : hs_args, Just (_ma, ki_binder, inner_ki)) ->
@@ -2418,7 +2421,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
 
              ; traceTc "tcInferTyApps (vis kind app)" (ppr exp_kind)
              ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
-             ; go (n+1) fun' subst' inner_ki hs_args }
+             ; go (n+1) fun' subst' inner_ki hs_args Nothing }
 
         -- Attempted visible kind application (fun @ki), but fun_ki is
         --   forall k -> blah   or   k1 -> k2
@@ -2434,7 +2437,28 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
         -- next binder is invisible; need to instantiate it
         | Named (Bndr kv flag) <- ki_binder
         , isInvisibleForAllTyFlag flag   -- ForAllTy with Inferred or Specified
-         -> instantiate kv inner_ki
+         -> if mentions_index arg
+            then do { (arg_ty, arg_kind) <- case checked_arg of
+                        Just checked -> return checked
+                        Nothing ->
+                          do { (arg_ty, arg_kind) <-
+                                 addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
+                                   tc_infer_lhs_type mode arg
+                             ; [arg_ty, arg_kind] <- liftZonkM $ zonkTcTypes [arg_ty, arg_kind]
+                             ; return (arg_ty, arg_kind) }
+                    ; let checked = Just (arg_ty, arg_kind)
+                    ; case native_choices subst fun_ki arg_kind of
+                        Just (binders, choices, result_kind) ->
+                          do { (subst', fun') <- foldM
+                                 (\(s, f) (binder, choice) -> mkAppTyM s f binder choice)
+                                 (subst, fun) (zipEqual binders choices)
+                             ; valid <- native_scope
+                                 (arg_ty : arg_kind : fun' : substTy subst' result_kind : choices)
+                             ; if valid
+                               then go n fun' subst' result_kind all_args checked
+                               else instantiate_checked kv inner_ki checked }
+                        Nothing -> instantiate_checked kv inner_ki checked }
+            else instantiate kv inner_ki
 
         -- "normal" case
         | otherwise
@@ -2445,10 +2469,13 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                                 , ppr subst ])
                 ; let exp_kind = substTy subst $ piTyBinderType ki_binder
                 ; arg' <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
-                          tc_check_lhs_type mode arg exp_kind
+                          case checked_arg of
+                            Nothing -> tc_check_lhs_type mode arg exp_kind
+                            Just (arg_ty, arg_kind) ->
+                              checkExpectedKind mode (unLoc arg) arg_ty arg_kind exp_kind
                 ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
                 ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
-                ; go (n+1) fun' subst' inner_ki args }
+                ; go (n+1) fun' subst' inner_ki args Nothing }
 
           -- no binder; try applying the substitution, or infer another arrow in fun kind
       (HsValArg _ _ : _, Nothing)
@@ -2465,28 +2492,99 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                         , ppr arrows_needed
                         , ppr co
                         , ppr fun' <+> dcolon <+> ppr (typeKind fun')]
-              ; go_init n fun' all_args }
+              ; go_init n fun' all_args checked_arg }
                 -- Use go_init to establish go's INVARIANT
       where
         instantiate ki_binder inner_ki
+          = instantiate_checked ki_binder inner_ki checked_arg
+
+        instantiate_checked ki_binder inner_ki checked
           = do { traceTc "tcInferTyApps (need to instantiate)"
                          (vcat [ ppr ki_binder, ppr subst])
                ; (subst', arg') <-
                    tcInstInvisibleTyBinder (matchabilityInstantiationMode mode) subst ki_binder
-               ; go n (mkAppTy fun arg') subst' inner_ki all_args }
+               ; go n (mkAppTy fun arg') subst' inner_ki all_args checked }
                  -- Because tcInvisibleTyBinder instantiate ki_binder,
                  -- the kind of arg' will have the same shape as the kind
                  -- of ki_binder.  So we don't need mkAppTyM here.
 
         try_again_after_substing_or fallthrough
           | not (isEmptyTCvSubst subst)
-          = go n fun zapped_subst substed_fun_ki all_args
+          = go n fun zapped_subst substed_fun_ki all_args checked_arg
           | otherwise
           = fallthrough
 
         zapped_subst   = zapSubst subst
         substed_fun_ki = substTy subst fun_ki
         hs_ty          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
+
+    -- Detect a registered runtime Name in a source argument.
+    -- See Note [Immutable native kind arguments].
+    mentions_index :: Data a => a -> Bool
+    mentions_index thing
+      | Just (L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))))
+          <- (cast thing :: Maybe (LHsType GhcRn))
+      = isJust (lookupNameEnv (mode_indices mode) name)
+      | Just _ <- (cast thing :: Maybe Name) = False
+      | Just _ <- (cast thing :: Maybe Type) = False
+      | otherwise = or (gmapQ mentions_index thing)
+
+    -- Match complete invisible choices from an actual native kind.
+    native_choices :: Subst -> TcKind -> TcKind
+                   -> Maybe ([PiTyBinder], [TcType], TcKind)
+    native_choices subst kind actual
+      | hasNativeDependentExpr (Core.Type actual)
+      , let (binders, result) = invisible_prefix kind
+            tvs = [tv | Named (Bndr tv _) <- binders]
+      , not (null tvs), all isTyVar tvs
+      , Just (_ma, visible, _) <- tcSplitPiTy_maybe result
+      , let formal = substTy subst (piTyBinderType visible)
+            bind_outer tv _ | tv `elem` tvs = BindMe
+                            | otherwise = DontBindMe
+            target_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType actual))
+            match_subst = Subst.extendSubstInScopeSetFromSource target_subst
+                            (tyCoVarsOfTypes [formal, substTy subst kind])
+      , Just matched <- tcMatchTyX_BM bind_outer match_subst formal actual
+      , Just (complete, choices) <- choose matched tvs tvs
+      , substTy complete formal `tcEqType` actual
+      = Just (binders, choices, result)
+      | otherwise = Nothing
+      where
+        choose matched _ [] = Just (matched, [])
+        choose matched all_tvs (tv : tvs) = do
+          let expected_kind = substTy matched (substTy subst (tyVarKind tv))
+          choice <- if expected_kind `tcEqType` matchabilityTy
+                    then do { tyki <- matchabilityInstantiationMode mode
+                            ; let ma = defaultForAllMatchability tyki
+                            ; guard (maybe True (`tcEqType` ma) (Subst.lookupTyVar matched tv))
+                            ; return ma }
+                    else Subst.lookupTyVar matched tv
+          guard (typeKind choice `tcEqType` expected_kind)
+          guard (not (any (`elemVarSet` tyCoVarsOfType choice) all_tvs))
+          (complete, choices) <- choose (extendTvSubstAndInScope matched tv choice) all_tvs tvs
+          return (complete, choice : choices)
+
+    -- Check runtime metadata against the source-owned lexical context.
+    native_scope :: [TcType] -> TcM Bool
+    native_scope tys = do
+      bindings <- mapM (liftZonkM . zonkId) (nonDetNameEnvElts (mode_indices mode))
+      let metadata = tyCoVarsOfTypes (concatMap (\v -> [varType v, idMult v]) bindings)
+          in_scope = extendInScopeSetList (mkInScopeSet metadata) bindings
+          valid v = isNativeOpaqueValueId v
+                 && maybe False (\binding -> isNativeOpaqueValueId binding
+                                 && varType binding `tcEqType` varType v)
+                                (lookupInScope in_scope v)
+      indices <- mapM (liftZonkM . zonkId)
+                   (filter isNonCoVarId (tyCoVarsOfTypesList tys))
+      return (all valid indices)
+
+    -- Observe the invisible prefix without rebuilding its annotations.
+    invisible_prefix kind
+      | Just (_ma, binder@(Named (Bndr _ flag)), inner) <- tcSplitPiTy_maybe kind
+      , isInvisibleForAllTyFlag flag
+      = let (binders, result) = invisible_prefix inner
+        in (binder : binders, result)
+      | otherwise = ([], kind)
 
     n_initial_val_args :: [HsArg p tm ty] -> Arity
     -- Count how many leading HsValArgs we have
@@ -2496,6 +2594,50 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
 
     ty_app_err arg ty
       = failWith $ TcRnInvalidVisibleKindArgument arg ty
+
+{- Note [Immutable native kind arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider Count :: forall a. List a -> Nat and xs :: List (Vec Int n), where
+n is an earlier runtime index. Instantiating a with a mutable meta before
+checking xs requires that meta to contain n. The native escape check correctly
+rejects that assignment. Choose a from the checked kind of xs instead.
+
+Before instantiating an invisible prefix, inspect whether the source argument
+mentions an actual Name in mode_indices. Infer that argument once and cache
+its Type and kind. This also handles a constructor or saturated family around
+the index: inference checks its smaller source arguments first. Applications
+without registered runtime Names keep the ordinary checking path.
+
+When the checked kind contains native metadata, match the visible domain with
+tcMatchTyX_BM. Only the pending invisible variables can bind. Require complete
+choices, check their substituted kinds, and reject free pending variables in
+those choices. Seed matching with the actual target's free variables, then add
+source kind variables with extendSubstInScopeSetFromSource. Target entries
+retain their prepared metadata. Check the entire instantiated domain too.
+Preserve the existing
+mode default for Matchability binders; do not infer an omitted M/U choice from
+the argument. A checked declaration's deferred default keeps its old path.
+
+Apply a successful choice through mkAppTyM. It preserves the Purely Kinded
+Type Invariant and the original forall annotations. Then run checkExpectedKind
+on the cached argument. If matching fails, instantiate normally and retain
+the same cache. A smaller pending prefix can try matching again. Never repeat
+argument inference, splice finalizers or constraints after a failed candidate.
+The cache survives a kind-substitution or arrow-exposure restart and is cleared
+when its visible argument is consumed.
+
+Check runtime occurrences against mode_indices and its deep earlier metadata
+dependencies. Direct mode entries take priority. This covers signature binders
+which are not ATcIds yet. It also covers an ambient xs whose kind mentions an
+earlier n not written separately in this argument. The ambient resolver already
+checked xs. Zonk the original prototypes and compare their complete types and
+Many multiplicities. Do not consult a global type environment or IdInfo.
+
+This changes immutable instantiation, not meta assignment or native admission.
+The source argument supplies its lexical scope. Ordinary kind checking and
+complete-signature validity still check the resulting type. No new quantifier,
+runtime use, family evaluator or escape exception is introduced.
+-}
 
 mkAppTyM :: Subst
          -> TcType -> PiTyBinder    -- fun, plus its top-level binder
@@ -2805,7 +2947,7 @@ tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- This does not instantiate. See Note [Do not always instantiate eagerly in types]
 tcTyVar mode name
   | Just index <- lookupNameEnv (mode_indices mode) name
-  = if isNativeRetainedBinder index
+  = if isNativeOpaqueValueId index
     then pure (TermVarTy index, varType index)
     else failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
 tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon

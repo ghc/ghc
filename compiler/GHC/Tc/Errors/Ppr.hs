@@ -3552,7 +3552,7 @@ pprRetainedQuantificationError reason = case reason of
   RetainedUnsupportedDomain ty ->
     vcat [ if isPiTy ty
            then text "This retained argument has an unsupported function domain."
-           else text "A retained argument requires a supported closed algebraic domain."
+           else text "A retained argument requires a supported structural algebraic domain."
          , text "Its declared domain is:" <+> ppr ty ]
   RetainedResultKind ty ->
     vcat [ text "The result of retained quantification must have kind" <+> quotes (text "Type")
@@ -3625,6 +3625,9 @@ pprRetainedQuantificationError reason = case reason of
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedIndexExpression ->
     text "A retained argument must be a local index variable, a supported constructor tree, or a supported immediate lambda application."
+  RetainedIndexMultiplicity mult ->
+    vcat [ text "A retained argument must have unrestricted multiplicity Many."
+         , text "This argument has multiplicity:" <+> ppr mult ]
   RetainedFunctionArgument ->
     text "A function-valued retained argument must be an already-bound unrestricted local function variable of its declared domain."
   RetainedCallIndex ->

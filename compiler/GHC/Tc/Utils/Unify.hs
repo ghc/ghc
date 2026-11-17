@@ -3800,8 +3800,7 @@ tcRetainedCoercion index branch_co original_ty
                  && is_constructor (coercionRKind branch_co)) $
            pprPanic "tcRetainedCoercion: invalid branch proof"
              (ppr index $$ ppr branch_co $$ ppr original_ty)
-       ; tcRetainedIndexCoercion (TermVarTy index)
-           (anyFreeVarsOfType (== index)) branch_co original_ty }
+       ; tcRetainedIndexCoercion (TermVarTy index) branch_co original_ty }
   where
     is_constructor ty
       | TyConApp tc _ <- coreFullView ty
@@ -3844,8 +3843,7 @@ tcRetainedCallCoercion call_ty branch_co original_ty
                  && typeKind (coercionRKind branch_co) `eqType` typeKind call_ty) $
            pprPanic "tcRetainedCallCoercion: invalid alias proof"
              (ppr call_ty $$ ppr branch_co $$ ppr original_ty)
-       ; tcRetainedIndexCoercion call_ty (retainedCallOccurs call_ty)
-           branch_co original_ty }
+       ; tcRetainedIndexCoercion call_ty branch_co original_ty }
   where
     valid_call (TermAppTy fun arg)
       | Just (domain, _) <- nativeIndexFunctionTys_maybe fun
@@ -3853,65 +3851,44 @@ tcRetainedCallCoercion call_ty branch_co original_ty
     valid_call _ = False
 
 -- | Abstract one checked index, then use ordinary nominal FC lifting.
-tcRetainedIndexCoercion :: Type -> (TcType -> Bool) -> CoercionN
-                       -> TcType -> TcM CoercionN
-tcRetainedIndexCoercion index_ty occurs branch_co original_ty
+tcRetainedIndexCoercion :: Type -> CoercionN -> TcType -> TcM CoercionN
+tcRetainedIndexCoercion index_ty branch_co original_ty
   = do { ty <- liftZonkM $ zonkTcType original_ty
        ; name <- newSysName (mkTyVarOcc "retained")
        ; let template = mkTyVar name (typeKind index_ty)
-       ; template_ty <- abstract_index (mkTyVarTy template) ty
-       ; let co = liftCoSubstWith Nominal [template] [branch_co] template_ty
-             rhs = substTyWith [template] [coercionRKind branch_co] template_ty
+       ; template_ty <- case abstractNativeIndices [(index_ty, template)] ty of
+           Just result -> return result
+           Nothing -> failWithTc $ TcRnRetainedQuantificationError (RetainedPatternType original_ty)
+       ; let lc = prepareNativeLiftingContext (mkLiftingContext [(template, branch_co)]) template_ty
+             co = liftCoSubst Nominal lc template_ty
+             lhs = substTy (lcSubstLeft lc) template_ty
+             rhs = substTy (lcSubstRight lc) template_ty
        ; unless (coercionRole co == Nominal
-                 && coercionLKind co `eqType` ty
+                 && lhs `eqType` ty
+                 && coercionLKind co `eqType` lhs
                  && coercionRKind co `eqType` rhs) $
            pprPanic "tcRetainedIndexCoercion: invalid lifted proof"
              (ppr co $$ ppr ty $$ ppr rhs)
        ; return co }
-  where
-    abstract_index template_ty ty
-      | not (occurs ty) = return ty
-      | index_ty `eqType` ty = return template_ty
-      | Just ty' <- coreView ty = abstract_index template_ty ty'
-    abstract_index template_ty (TermAppTy f arg)
-      | isNativeIndexFunctionId f
-      = TermAppTy f <$> abstract_index template_ty arg
-    abstract_index template_ty (TyConApp tc tys)
-      = mkTyConApp tc <$> mapM (abstract_index template_ty) tys
-    abstract_index template_ty (AppTy fun arg)
-      = mkAppTy <$> abstract_index template_ty fun
-                <*> abstract_index template_ty arg
-    abstract_index template_ty (FunTy af ma mult arg res)
-      = FunTy af <$> abstract_index template_ty ma
-                 <*> abstract_index template_ty mult
-                 <*> abstract_index template_ty arg
-                 <*> abstract_index template_ty res
-    abstract_index template_ty (DepFunTy binder body)
-      | isNativeRetainedBinder binder
-      , not (occurs (varType binder))
-      , typeKind body `eqType` liftedTypeKind
-      = mkDepFunTy binder <$> abstract_index template_ty body
-    abstract_index _ _
-      = failWithTc $ TcRnRetainedQuantificationError (RetainedPatternType original_ty)
-
 {- Note [Transport through a retained index]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A checked constructor pattern provides n ~# 'S k, for example. Its actual
 field identities are in scope when the branch body is checked. Check the
-constructor against the full ground parent, including its ordinary type arguments.
+constructor against the full structural parent, including its ordinary type arguments.
 See Note [Algebraic runtime index domains] in GHC.Core.Type. Abstract the
 free occurrences of n in a supported value type to one fresh, immutable TyVar
-of the index domain. Use liftCoSubstWith to transport that template along
+of the index domain. Prepare a lifting context and transport that template along
 the branch proof. Existing FC lifting supplies the required congruence.
 The runtime Id remains an Id. The template never enters the checked type.
 
-Keep subtrees that do not depend on n unchanged. A retained closure type can
-capture n in its body. Preserve its inner runtime binder and unchanged domain.
-FC lifting then uses the existing fixed-domain DepFunCo rule. It freshens the
-inner binder and preserves its scope over the body proof. Cast the closure;
+Abstract domains before freshening their binders. Preserve outer forall
+metadata and update source Id prototypes in the body. The owned template
+boundary prepares free runtime metadata explicitly. Nominal lifting builds
+DepFunCo with domain evidence and one common body prefix. Cast the closure;
 eta expansion would change bottom-function behavior in Haskell.
 
-Reject changed domains, dependent erased foralls, casts, and coercion types.
+Input casts and coercion types whose evidence depends on the selected index
+remain unsupported. See Note [Scoped native index abstraction] in GHC.Core.Coercion.
 This adds no axiom, singleton, general Pi unification, or term evaluation.
 It follows dependent pattern specialization; see
 docs/dependent-haskell/REFERENCES.md#agda-provenance.

@@ -140,6 +140,7 @@ import {-# SOURCE #-} GHC.Tc.Errors.Hole.Plugin ( HoleFitPlugin )
 import GHC.Tc.Errors.Types
 
 import GHC.Core.Reduction ( Reduction(..) )
+import GHC.Core.Coercion (LiftingContext)
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep ( UnivCoDeps )
 import GHC.Core.TyCon  ( TyCon )
@@ -369,6 +370,10 @@ data RewriteEnv
           -- in the family application cache.
           --
           -- See Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite.
+
+       , re_native_lifting :: !LiftingContext
+          -- ^ Source runtime binder relations in the common rewriting prefix.
+          -- See Note [Lifting runtime binder domains] in GHC.Core.Coercion.
 
        , re_native_binders :: !VarSet
           -- ^ Retained runtime binders in scope during normalization.

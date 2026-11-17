@@ -39,7 +39,6 @@ import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.Compare( eqType, eqTypes )
-import GHC.Core.TyCo.Subst( substNativeIndexBndr )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
@@ -1565,30 +1564,27 @@ normalise_type ty
                       (ppr ty $$ ppr left $$ ppr right) }
       | otherwise
       = pprPanic "normalise_type: invalid native call" (ppr ty)
-    go ty@(TermVarTy v)
+    go (TermVarTy v)
       -- See Note [Normalising retained runtime indices].
-      | isNativeRetainedBinder v
+      | isNativeOpaqueValueId v
       = do { lc <- getLC
            ; r <- getRole
-           ; let lty = substTy (lcSubstLeft lc) ty
-                 rty = substTy (lcSubstRight lc) ty
-           ; case lty of
-               TermVarTy v' | isNativeRetainedBinder v'
-                            , varType v' `eqType` varType v
-                            , lty `eqType` rty
-                 -> return $ mkReflRedn r lty
-               _ -> pprPanic "normalise_type: runtime index changed by lifting context"
-                      (ppr ty $$ ppr lty $$ ppr rty) }
+           ; return $ coercionRedn (liftCoSubstNative lc r v) }
       | otherwise
-      = pprPanic "normalise_type: invalid runtime index" (ppr ty)
+      = pprPanic "normalise_type: invalid runtime index" (ppr v)
     go (DepFunTy v body)
-      | isNativeRetainedBinder v
+      | isNativeOpaqueValueId v
       , typeKind body `eqType` liftedTypeKind
-      = do { LC subst env <- getLC
-           ; let (subst', v') = substNativeIndexBndr subst v
-                 lc' = LC subst' (delVarEnv env v)
-           ; redn <- withLC lc' $ normalise_type body
-           ; return $ mkDepFunRedn v' redn }
+      = do { lc <- getLC
+           ; env <- getEnv
+           ; let callback ctx domain
+                   -- See Note [Closed retained domains].
+                   | noFreeVarsOfType domain = mkReflRedn Nominal domain
+                   | otherwise = runNormM (normalise_type domain) env ctx Nominal
+                 (lc', v', domain) = liftCoSubstNativeBndrUsing reductionCoercion callback lc v
+           ; Reduction body_co _ <- withLC lc' $ normalise_type body
+           ; let co = mkDepFunCoWithDomain v' (coToMCo (reductionCoercion domain)) body_co
+           ; return $ mkReduction co (coercionRKind co) }
       | otherwise
       = pprPanic "normalise_type: invalid retained function"
           (ppr v $$ ppr (varType v) $$ ppr body)
@@ -1674,29 +1670,48 @@ normalise_args fun_ki roles args
 
 {- Note [Normalising retained runtime indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained runtime index is a rigid local Id with a fixed closed domain and
-unrestricted multiplicity. See Note [Algebraic runtime index domains] in GHC.Core.Type.
-The Id can also denote an eligible function stored in a constructor field.
-See Note [Native function-value application] in GHC.Core.TyCo.Make.
-Preserve that Id and return reflexivity at the current role. Do not inspect
-its unfolding or evaluate its value. Family matching keeps an opaque index
-MaybeApart from constructor indices; see Note [Apartness of retained runtime indices]
-in GHC.Core.Unify. A family application can therefore remain stuck at this index.
+A retained runtime index is an actual local Many Id of lifted type. See
+Note [Opaque runtime index values] in GHC.Core.Type. Use its scoped lifting
+relation for the target Id and nominal domain evidence. Do not inspect its
+unfolding or evaluate its value. Family matching keeps an opaque index
+MaybeApart from constructor indices; see Note [Apartness of retained runtime
+indices] in GHC.Core.Unify. A family can remain stuck at this index.
 
-NormM starts with an empty lifting context. A retained binder extends its ordinary
-substitution with a scoped runtime-Id renaming. Remove the bound Id from the
-lifting environment. That environment contains erased-variable coercions, not
-runtime-Id mappings. Normalise the body in this scope, then abstract its reduction
-with mkDepFunRedn. Both context substitutions must map a runtime occurrence to the
-same valid Id with the same domain. Do not transport it to another runtime value.
+NormM starts with an empty lifting context. Normalise an open binder domain
+nominally before installing its runtime relation in the common body prefix.
+Keep a closed domain unchanged; see Note [Closed retained domains]. Then
+normalise the body in that scope and bind its proof with DepFunCo. The body
+relation uses the target Id and its forward nominal domain cast. It does not
+assert equality between distinct runtime values. Eligible native function
+heads keep their fixed domain policy.
 
-The binder keeps its closed domain and unrestricted multiplicity. It can bind a
-scalar index or an eligible opaque function head. See Note [Function-valued
-retained binders] in GHC.Core.Type. Keep function heads identical on both sides;
-do not infer equality between different functions. Ordinary forall
-binders still normalise their kinds through normalise_var_bndr. Agda compares Pi
-codomains in one shared extended context. The D/DC PiCong rule supplies explicit
-evidence for this abstraction. See docs/dependent-haskell/REFERENCES.md#agda-provenance.
+Ordinary forall binders still normalise their kinds through normalise_var_bndr.
+Agda compares Pi codomains in one shared extended context. The D/DC PiCong rule
+supplies explicit evidence for this abstraction. See
+docs/dependent-haskell/REFERENCES.md#agda-provenance.
+
+Note [Closed retained domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A closed retained domain has no free erased variable, runtime Id or coercion
+variable. No inherited lifting relation can change it. Keep nominal reflexivity
+for that domain while normalising a whole retained function. Still freshen the
+binder, install its runtime relation and normalise the body.
+
+For example, let A = Token (Loop Bool), where Loop Bool reduces to itself.
+Two retained binders can have the identical domain A. Reducing Loop here would
+reject that identity before the solver can compare the domains. This shortcut
+states that substitution cannot affect A. It makes no termination claim about
+closed families. For unequal domains, the retained equality solver still uses
+bounded rewriteFamilyAxioms on the standalone domains. Keep that reduction
+and its depth error. See Note [Solving retained function equalities] in
+GHC.Tc.Solver.Equality.
+
+An open domain can depend on an outer type variable or an earlier runtime Id.
+Keep its nominal normalisation and transport. Body arguments still use the
+ordinary argument normaliser. If Element reduces to Int while a binder keeps
+domain [Element], simplifyArgsWorker retains the corresponding kind cast on
+that binder's occurrence in GenericCount @Int. It must not retype the Id as
+[Int]. See Note [simplifyArgsWorker] in GHC.Core.Reduction.
 -}
 
 normalise_tyvar :: TyVar -> NormM Reduction

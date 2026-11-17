@@ -36,6 +36,7 @@ module GHC.Core (
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
         exprToNativeCaseIndex, nativeIndexFunctionVar_maybe,
+        nativeIndexArgKinds,
         isNativeIndexAlt, isNativeIndexAliasAlt,
 
         mkBinds,
@@ -2636,7 +2637,7 @@ normaliseNativeIndexExpr = go emptyVarEnv
   where
     go :: IdEnv (CoreExpr, Type) -> CoreExpr -> Maybe (CoreExpr, Type)
     go env expr
-      | Var v <- expr, isNativeRetainedBinder v
+      | Var v <- expr, isNativeOpaqueValueId v
       = case lookupVarEnv env v of
           Just result@(_, index)
             | sameNativeIndexDomain (varType v) (typeKind index) -> Just result
@@ -2693,15 +2694,16 @@ normaliseNativeIndexExpr = go emptyVarEnv
 
 {- Note [Checked native index beta exposure]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A native index normal form is a local runtime variable or a saturated ordinary
-constructor tree. Keep erased universal arguments before runtime fields in
+A native index normal form is an opaque local runtime variable or a saturated
+ordinary constructor tree. See Note [Opaque runtime index values] in
+GHC.Core.Type. Keep erased universal arguments before runtime fields in
 both the expression and promoted index. Instantiate field domains at those
 arguments. See Note [Algebraic runtime index domains] in GHC.Core.Type.
 Also accept an immediate (\b -> body) arg when b is an
 eligible local Many index binder. The argument must normalize to an atom:
 an eligible variable or a nullary constructor worker with erased applications.
-Require the argument and binder to have the same supported closed algebraic
-domain A. The body can have an independently supported closed scalar domain B.
+Require the argument and binder to have the same supported structural
+domain A. The body can have an independently supported structural domain B.
 In particular, a checked nominal cast can change the result domain. This is
 typed beta exposure, not equality between the argument and result domains.
 Every constructor field must have its declared domain.
@@ -2731,11 +2733,14 @@ No general evaluator, nominal proof from Coercible, or new coercion is added.
 
 {- Note [Nominal native index casts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-CastTy index delta changes the scalar index domain from A to B, where delta
+CastTy index delta changes the value index domain from A to B, where delta
 is nominal evidence A ~ B. Its runtime expression uses Cast expr (SubCo delta).
 Keep the raw SubCo: mkSubCo can simplify away the nominal proof structure.
 Recover nominal evidence only through setNominalRole_maybe, and check its role,
-both closed scalar domains and its source against the original index kind.
+both lifted endpoint types and its source against the original index kind.
+Opaque fields can change domain with nominal evidence. A fixed eligible native
+function type must remain the same complete type. See
+Note [Opaque runtime index values] in GHC.Core.Type.
 An arbitrary representational coercion does not justify a converted index.
 
 Core expression substitution, SimpleOpt and CorePrep preserve this evidence
@@ -2755,28 +2760,25 @@ Function-head domains keep their separate fixed-domain policy. See
 Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 -}
 
--- | Check the nominal evidence for conversion between closed scalar domains.
+-- | Check nominal evidence for a structural or opaque value-domain conversion.
 nativeIndexCastDomains :: CoercionN -> Maybe (Type, Type)
 nativeIndexCastDomains delta
   | coercionRole delta == Nominal
   , let source = coercionLKind delta
         target = coercionRKind delta
-  , isNativeIndexType source, isNativeIndexType target
+  , isNativeIndexDomainConversion source target
   = Just (source, target)
   | otherwise = Nothing
 
--- | Compare supported closed domains after expanding type synonyms.
+-- | Compare complete lifted value types after expanding type synonyms.
 sameNativeIndexDomain :: Type -> Type -> Bool
 sameNativeIndexDomain left right
-  | TyConApp {} <- coreFullView left
-  , TyConApp {} <- coreFullView right
-  = left `eqType` right
-  | Just _ <- nativeIndexFunctionTypeTys_maybe left
-  , Just _ <- nativeIndexFunctionTypeTys_maybe right
+  | isNativeOpaqueValueType left, isNativeOpaqueValueType right
   = left `eqType` right
   | otherwise = False
 
 -- | Check the domains of a saturated promoted constructor's field indices.
+-- Validate its parent with 'nativeIndexDataConTyArgs' before calling this.
 nativeIndexArgKinds :: DataCon -> [Type] -> [Type] -> Bool
 nativeIndexArgKinds con tys indices
   = indices `equalLength` fields && and (zipWith same_domain indices fields)
@@ -2797,7 +2799,7 @@ mapNativeIndex subst expr
   | otherwise = expr
   where
     from_index (TermVarTy v)
-      | isNativeRetainedBinder v = Just (Var v)
+      | isNativeOpaqueValueId v = Just (Var v)
     from_index (CastTy index delta)
       | Just (source, _) <- nativeIndexCastDomains delta
       , sameNativeIndexDomain source (typeKind index)

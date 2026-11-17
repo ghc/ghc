@@ -2530,7 +2530,7 @@ liftCoMatch tmpls ty co
   = do { cenv1 <- ty_co_match menv emptyVarEnv ki ki_co ki_ki_co ki_ki_co
        ; cenv2 <- ty_co_match menv cenv1       ty co
                               (mkNomReflCo co_lkind) (mkNomReflCo co_rkind)
-       ; return (LC (mkEmptySubst in_scope) cenv2) }
+       ; return (LC (mkEmptySubst in_scope) cenv2 emptyVarEnv) }
   where
     menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
     in_scope = mkInScopeSet (tmpls `unionVarSet` tyCoVarsOfCo co)

@@ -68,8 +68,8 @@ import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeRetainedBinder, nativeIndexDataConTyArgs )
-import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
+                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId, nativeIndexDataConTyArgs )
+import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, mkTransCo, mkNomReflCo )
 import GHC.Core.DataCon ( DataCon, dataConName, dataConInstOrigArgTys, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
@@ -633,7 +633,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
           | HsVar{} <- expr
           = do { actual <- local_variable expr
                ; return $ case actual of
-                   Just var | isNativeRetainedBinder var
+                   Just var | isNativeOpaqueValueId var
                             , varType var `eqType` expected -> Just (Var var)
                    _ -> Nothing }
           | otherwise = return Nothing
@@ -1148,9 +1148,8 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                      return (mkTransCo one two)
            ; arg_cos <- mapM (transport . scaledThing) arg_tys
            ; result_co <- transport result_ty
-           ; sequence_ [unless (isReflCo co) $
-                          failWithTc (TcRnRetainedQuantificationError (RetainedPatternType ty))
-                       | (RetainedConIndex _, co, Scaled _ ty) <- zip3 plan arg_cos arg_tys]
+           -- Keep later retained arguments at their incoming types.
+           -- See Note [Refining later retained domains].
            ; let refined_args = zipWith3 (\argument (Scaled mult ty) co ->
                                    mkCheckExpFunPatTy (Scaled mult (case argument of
                                      RetainedConValue -> pSnd (coercionKind co)
@@ -1162,20 +1161,27 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                    (retainedConPats [0, second_column+1] $ case row of
                       Just _ -> renamed_pats
                       Nothing -> bind_wildcards 0 renamed_pats) }
-           ; L checked_loc checked <- tcMatchWithSource tcBody
-                 (invis_pat_tys ++ first_arg : refined_args)
-                 (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc prepared)
+                 check = tcMatchWithSource tcBody
+                   (invis_pat_tys ++ first_arg : refined_args)
+                   (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc prepared)
+           ; (ev_binds, L checked_loc checked) <- case (row, cvs) of
+               (Nothing, Nothing) ->
+                 do { checked <- check; return (emptyTcEvBinds, checked) }
+               (Just ((first_con, _), _), Just (first_cv, second_cv)) ->
+                 checkConstraints (PatSkol (RealDataCon first_con) (m_ctxt match)) []
+                   [first_cv, second_cv] check
+               _ -> panic "tcRetainedMatrixMatches: inconsistent constructor proofs"
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
-                 wrap_index _ Nothing pat = pat
-                 wrap_index index (Just cv) (L pat_loc pat)
+                 wrap_index _ Nothing _ pat = pat
+                 wrap_index index (Just cv) binds (L pat_loc pat)
                    = L pat_loc (AsPat noExtField (noLocA index)
-                       (L pat_loc (addRetainedConProof cv emptyTcEvBinds pat)))
+                       (L pat_loc (addRetainedConProof cv binds pat)))
                  wrap_later column argument co (Scaled _ ty) pat@(L pat_loc inner)
-                   | column == second_column = wrap_index second_index (snd <$> cvs) pat
+                   | column == second_column = wrap_index second_index (snd <$> cvs) ev_binds pat
                    | RetainedConValue <- argument = L pat_loc (XPat (CoPat (mkWpCastN co) inner ty))
                    | otherwise = pat
                  checked_pats' = case checked_pats of
-                   first : rest -> wrap_index first_index (fst <$> cvs) first :
+                   first : rest -> wrap_index first_index (fst <$> cvs) emptyTcEvBinds first :
                      zipWith4 (\(column, argument) co ty pat -> wrap_later column argument co ty pat)
                        (zip [0..] plan) arg_cos arg_tys rest
                    [] -> panic "tcRetainedMatrixMatches: missing first pattern"
@@ -1358,9 +1364,8 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
            ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
            ; arg_cos <- mapM (tcRetainedCoercion index (mkCoVarCo cv) . scaledThing) arg_tys
            ; result_co <- tcRetainedCoercion index (mkCoVarCo cv) result_ty
-           ; sequence_ [unless (isReflCo co) $
-                          failWithTc (TcRnRetainedQuantificationError (RetainedPatternType ty))
-                       | (RetainedConIndex _, co, Scaled _ ty) <- zip3 argument_plan arg_cos arg_tys]
+           -- Keep later retained arguments at their incoming types.
+           -- See Note [Refining later retained domains].
            ; let dictionary_cos = [(dict, co) | (RetainedConDict dict, co) <- zip argument_plan arg_cos]
            ; refined_givens <- newEvVars (map (pSnd . coercionKind . snd) dictionary_cos)
            ; let refined_args = zipWith3 (\dictionary (Scaled mult ty) co ->
@@ -1373,9 +1378,9 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  match' = renamed { m_pats = fmap (insert_dictionaries argument_plan . retainedConPats [0]) (m_pats renamed) }
                  check = tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
                            (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc match')
-           ; (ev_binds, L checked_loc checked) <- if null refined_givens
-               then do { checked <- check; return (emptyTcEvBinds, checked) }
-               else checkConstraints (PatSkol (RealDataCon con) (m_ctxt match)) [] refined_givens check
+           ; (ev_binds, L checked_loc checked) <-
+               checkConstraints (PatSkol (RealDataCon con) (m_ctxt match)) []
+                 (cv : refined_givens) check
            ; let given_binds = zipWith (\given (dict, co) ->
                                    mkGivenEvBind given
                                      (if isCoVar dict
@@ -1507,8 +1512,9 @@ Reject quotations at their expression spans before the rewrite.
 
 Keep each shared index VarPat outermost, as for dictionaries. Even a reflexive
 CoPat would make selectMatchVar choose a fresh Id and break runtime identity.
-Its closed domain must have reflexive constructor transport. Only dictionary
-positions get specialised Givens; ordinary payloads keep their existing CoPats.
+Keep its incoming domain even when constructor transport changes that domain.
+See Note [Refining later retained domains]. Only dictionary positions get
+specialised Givens; ordinary payloads keep their existing CoPats.
 All source value and dictionary lambdas still precede constructor discrimination.
 Agda lifts its constructor substitution over the later telescope and RHS target.
 See docs/dependent-haskell/REFERENCES.md#later-retained-arguments-in-constructor-equations.
@@ -1525,6 +1531,34 @@ Keep the CoPat even when transport is reflexive. A synonym such as
 Ignore b = Int can remove the index during specialisation. selectMatchVar must
 still allocate the outer argument from its original Ignore b annotation.
 Otherwise the recovered lambda type can lose its retained binder.
+-}
+
+{- Note [Refining later retained domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An earlier constructor proof can change a later retained argument's domain.
+For example, n ~ Z changes [Vec Int n] to [Vec Int Z]. Keep the shared xs Id
+and its incoming type [Vec Int n] in every equation. Do not change that Id's
+type to the refined domain or add a CoPat around its binding.
+
+The branch checks each use against its expected domain. tcRetainedArgVar in
+GHC.Tc.Gen.App retains the nominal conversion as Cast (Var xs) (SubCo delta).
+The result coercion from tcRetainedCoercion relates the original xs index to
+that forward cast. Thus the branch result and its runtime operand use the
+same conversion. See Note [Lifting runtime binder domains] in GHC.Core.Coercion.
+No new runtime binding, case or evaluation of xs is required.
+
+Check the branch under the constructor proof as a Given. Ordinary domain
+unification can then use that exact equality for an on-use conversion.
+checkConstraints captures the Wanted evidence in a local implication.
+Store its evidence bindings in the ConPat that binds the constructor proof.
+For a two-constructor matrix, store the bindings in the second ConPat.
+Both proofs are in scope there. A fallback row has no constructor Given.
+Retained package patterns use the same rule for each inner constructor.
+This does not add general rewriting or inversion of runtime indices.
+
+This follows the ordered constructor refinement used for the later telescope
+in Agda. The explicit nominal conversions preserve this fork's lazy runtime
+identity rule. They do not establish totality or equality of distinct values.
 -}
 
 

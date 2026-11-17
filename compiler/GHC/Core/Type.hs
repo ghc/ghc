@@ -66,6 +66,8 @@ module GHC.Core.Type (
         isNativeIndexId, isNativeIndexType, nativeIndexDataConTyArgs,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
         nativeIndexFunctionTypeTys_maybe,
+        isNativeOpaqueValueId, isNativeOpaqueValueType,
+        isNativeIndexDomainConversion,
         isNativeRetainedBinder, isNativeRetainedBinderType,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
@@ -1126,8 +1128,10 @@ piResultTy_maybe ty arg = case coreFullView ty of
   FunTy { ft_res = res } -> Just res
 
   ForAllTy _ (Bndr tv _) res
-    -> let empty_subst = mkEmptySubst $ mkInScopeSet $
-                         tyCoVarsOfTypes [arg,res]
+    -- See Note [Source and target substitution scopes] in GHC.Core.TyCo.Subst.
+    -> let target_subst = mkEmptySubst $ mkInScopeSet $ tyCoVarsOfType arg
+           empty_subst = extendSubstInScopeSetFromSource target_subst
+                           (tyCoVarsOfType ty)
        in Just (substTy (extendTCvSubst empty_subst tv arg) res)
 
   _ -> Nothing
@@ -1169,7 +1173,9 @@ piResultTys ty orig_args@(arg:args)
   | otherwise
   = pprPanic "piResultTys1" (ppr ty $$ ppr orig_args)
   where
-    init_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
+    -- See Note [Source and target substitution scopes] in GHC.Core.TyCo.Subst.
+    init_subst = extendSubstInScopeSetFromSource target_subst (tyCoVarsOfType ty)
+    target_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfTypes orig_args)
 
     go :: Subst -> Type -> [Type] -> Type
     go subst ty [] = substTyUnchecked subst ty
@@ -2307,15 +2313,15 @@ See #14939.
 -}
 
 -----------------------------
--- | Test whether a closed, lifted algebraic type is a supported index domain.
+-- | Test whether a lifted algebraic type has a supported index schema.
 -- See Note [Algebraic runtime index domains].
 isNativeIndexType :: Type -> Bool
 isNativeIndexType = nativeIndexType True
 
--- | Check an algebraic domain with optional opaque function fields.
+-- | Check a structural schema or a closed function-free endpoint.
 -- See Note [Function fields in native index domains].
 nativeIndexType :: Bool -> Type -> Bool
-nativeIndexType function_fields = go []
+nativeIndexType structural_fields = go []
   where
     go path ty
       | TyConApp tc args <- coreFullView ty
@@ -2326,21 +2332,26 @@ nativeIndexType function_fields = go []
       , not (isTypeDataTyCon tc), tyConArity tc == length args
       , all (tcIsLiftedTypeKind . tyVarKind) (tyConTyVars tc)
       , tcIsLiftedTypeKind (typeKind ty)
-      , all closed_argument args
+      , all argument args
       , null (tyConStupidTheta tc)
       , Just fields <- concat <$> traverse (con_fields ty args) (tyConDataCons tc)
       = all (field ((tc, args) : path)) fields
       | otherwise = False
 
-    field path ty
-      | function_fields
+    field path (parameter, ty)
+      | structural_fields
+      , parameter
+      = isNativeOpaqueValueType ty
+      | structural_fields
       , isJust (nativeIndexFunctionTypeTys_maybe ty)
       = True
       | otherwise
       = go path ty
 
-    closed_argument arg = noFreeVarsOfType arg && isTauTy arg
-                          && tcIsLiftedTypeKind (typeKind arg)
+    argument arg
+      | structural_fields = isNativeOpaqueValueType arg
+      | otherwise = noFreeVarsOfType arg && isTauTy arg
+                    && isNativeOpaqueValueType arg
 
     con_fields domain args con
       | null (dataConRepArgBinders con)
@@ -2352,12 +2363,17 @@ nativeIndexType function_fields = go []
       , substTyWith univs args res `eqType` domain
       , orig_args `equalLength` rep_args
       , and (zipWith same_field (instantiate orig_args) (instantiate rep_args))
-      = Just (map scaledThing (instantiate rep_args))
+      = Just (zipWith field_origin orig_args (instantiate rep_args))
       | otherwise = Nothing
       where
         rep_args = dataConRepArgTys con
         (univs, _, _, _, _, _) = dataConFullSig con
         instantiate = map (mapScaledType (substTyWith univs args))
+        field_origin (Scaled _ orig) (Scaled _ ty)
+          = (is_parameter orig, ty)
+        is_parameter orig = case coreFullView orig of
+          TyVarTy tv -> tv `elem` univs
+          _         -> False
 
     same_field (Scaled orig_mult orig) (Scaled rep_mult rep)
       | closed_mult orig_mult, closed_mult rep_mult
@@ -2406,18 +2422,67 @@ nativeIndexFunctionTypeTys_maybe ty
 isNativeIndexFunctionId :: Id -> Bool
 isNativeIndexFunctionId = isJust . nativeIndexFunctionTys_maybe
 
+-- | Test whether a type can classify an opaque runtime value index.
+-- See Note [Opaque runtime index values].
+isNativeOpaqueValueType :: Type -> Bool
+isNativeOpaqueValueType = tcIsLiftedTypeKind . typeKind
+
+-- | Test the metadata of an opaque local unrestricted runtime value.
+-- The caller must check its actual lexical binding.
+-- See Note [Opaque runtime index values].
+isNativeOpaqueValueId :: Id -> Bool
+isNativeOpaqueValueId v
+  = isLocalId v && not (isCoVar v)
+    && not (isJoinIdDetails (idDetails v))
+    && isManyTy (idMult v) && isNativeOpaqueValueType (varType v)
+
+-- | Check nominal index-conversion endpoints without checking the evidence.
+-- Eligible native function heads retain their complete fixed type.
+-- See Note [Opaque runtime index values].
+isNativeIndexDomainConversion :: Type -> Type -> Bool
+isNativeIndexDomainConversion source target
+  = isNativeOpaqueValueType source && isNativeOpaqueValueType target
+    && (not (fixed_function source || fixed_function target) || source `eqType` target)
+  where
+    fixed_function = isJust . nativeIndexFunctionTypeTys_maybe
+
+{- Note [Opaque runtime index values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An opaque index records the identity of an actual local Many value Id. Its
+type must have kind Type, not Constraint or an unlifted kind. Keep its complete
+type, Name and Unique. The type can contain outer erased variables and earlier
+runtime indices. The caller must check that scope and the binding's actual
+metadata. Do not inspect the value's RHS or its constructors.
+
+Opaque identity does not require a structural domain. A parameter field of
+List a stays opaque when a becomes Int, IO Int or Vec Int n. The list tail
+still has the structural domain List a. Derive that distinction from the
+original constructor telescope. See Note [Algebraic runtime index domains].
+
+Opaque identity does not grant native call permission. Keep the independently
+closed function policy in nativeIndexFunctionTypeTys_maybe. A nominal value
+conversion can change an opaque domain. If either endpoint has an eligible
+native function type, require the same complete type at both endpoints.
+Other function values can remain opaque fields. The conversion predicate
+checks endpoints only; its caller must retain nominal evidence and direction.
+
+Core retained value binders and occurrences use the opaque Id judgment.
+Source foreach roots use isNativeRetainedBinder instead. That predicate keeps
+the structural-domain or fixed-call-head policy. Neither judgment establishes
+scope, nominal domain equality or runtime evaluation of an opaque value.
+-}
+
 -- | Test whether a local unrestricted identifier has a supported index domain.
 isNativeIndexId :: Id -> Bool
 isNativeIndexId v
-  = isLocalId v && not (isCoVar v)
-    && isManyTy (idMult v) && isNativeIndexType (varType v)
+  = isNativeOpaqueValueId v && isNativeIndexType (varType v)
 
--- | Test whether an Id can bind a scalar index or an opaque call head.
+-- | Test whether an Id can bind a structural source root or a fixed call head.
 -- See Note [Function-valued retained binders].
 isNativeRetainedBinder :: Id -> Bool
 isNativeRetainedBinder v = isNativeIndexId v || isNativeIndexFunctionId v
 
--- | Test a retained binder domain without constructing a temporary Id.
+-- | Test a source retained-root domain without constructing a temporary Id.
 -- See Note [Function-valued retained binders].
 isNativeRetainedBinderType :: Type -> Bool
 isNativeRetainedBinderType ty
@@ -2425,14 +2490,17 @@ isNativeRetainedBinderType ty
 
 {- Note [Function fields in native index domains]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A closed algebraic index can contain an eligible opaque function field.
+An algebraic index can contain an eligible opaque function field.
 For example, Maybe (Bool -> Bool) has a Nothing alternative and a Just field
 with a closed ordinary U/Many arrow. Keep all other algebraic-domain checks.
 The function remains a runtime Id. Its TermVarTy records identity without
 evaluating the function or comparing its behavior.
 
-Function arguments and results keep the old function-free algebraic policy.
-nativeIndexType False checks that policy. Do not call the broader public
+Function arguments and results keep the old closed function-free algebraic
+policy. nativeIndexType False checks every instantiated field structurally.
+It requires closed monotype parameters and disables opaque parameter fields.
+Thus List Int can be a structural root without becoming a native function
+endpoint. Do not call the broader public
 predicate from nativeIndexFunctionTypeTys_maybe: a domain such as
 
   data Loop = Loop (Loop -> Bool)
@@ -2441,27 +2509,29 @@ would then restart eligibility checking through its function argument.
 The function-free endpoint check rejects Loop without this recursive restart.
 This restriction is separate from regular algebraic recursion.
 
-Use isNativeRetainedBinder for function-valued TermVarTy occurrences.
-isNativeIndexId still checks algebraic-root identifiers. The existing retained
-predicate also checks local U/Many function heads, their complete fixed types,
-and the non-join restriction. See Note [Native function-value application] in
-GHC.Core.TyCo.Make for application and forward evidence.
+Use isNativeOpaqueValueId for TermVarTy occurrences. isNativeIndexId still
+checks algebraic-root identifiers. The source retained-binder predicate also
+checks local U/Many function heads and their complete fixed types. See
+Note [Native function-value application] in GHC.Core.TyCo.Make for application
+and forward evidence.
 -}
 
 {- Note [Function-valued retained binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained binder can bind a scalar index or an eligible opaque call head.
+A source foreach root can bind a structural index or an eligible opaque call
+head. Core retained value binders use the separate opaque Id judgment. See
+Note [Opaque runtime index values].
 The function head has a closed ordinary visible Many arrow A -> B. Both A and
 B are independently supported scalar domains. The Id is local, unrestricted,
-and not a join point. Reuse the head policy; do not widen the scalar policy.
+and not a join point. Keep the head policy separate from structural schemas.
 
 A bound function can occur in the head slot of TermAppTy or TermAppCo, or as
 a TermVarTy stored in an algebraic index. Application of that TermVarTy uses
 the same opaque TermAppTy form. It is not a matchable function. Applying its
 retained binder requires an eligible local Var with exactly the same type.
 Use the existing head-only Id substitution. Do not unfold that Var or transport
-the function domain through a coercion. DepFunCo keeps function-valued domains
-unchanged. Scalar domain conversion uses nominal evidence; see
+the function domain through a coercion. DepFunCo keeps eligible call-head domains
+unchanged. Value-domain conversion uses nominal evidence; see
 Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 
 The binder scopes over calls in the result and its proofs. Existing runtime
@@ -2477,13 +2547,24 @@ head-only-function-valued-retained-binders-prior-art.
 
 {- Note [Algebraic runtime index domains]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A runtime index has a closed, lifted algebraic data type. Inspect ordinary
-TyCons and DataCons; Nat has no wired identity. Instantiate ordinary universal
-parameters with closed monotypes of kind Type. Check the instantiated original
-and representation fields. Static parameters need not themselves be scalar
-domains: Proxy (Bool -> Bool) has no function field, but Maybe (Bool -> Bool) does.
-The latter uses the separate function-leaf policy. See
-Note [Function fields in native index domains].
+A structural runtime index has a lifted algebraic data type. Inspect ordinary
+TyCons and DataCons; Nat has no wired identity. Its ordinary universal arguments
+must have kind Type. They can contain outer erased variables and earlier
+runtime indices. The caller checks their full types and scope.
+
+Check the original constructor telescope before instantiating its universals.
+A field that expands to one of those universal variables is an opaque parameter
+field. Require only a lifted value type after instantiation. Thus the cons head
+stays opaque at Int or Vec Int n. Do not inspect Int's unlifted field or Vec's
+constructors. The cons tail List a is a structural field. A nested Maybe a
+uses Maybe's own constructor telescope. Keep structural traversal for fixed
+concrete fields. A datatype with a fixed Int field need not be a structural
+root for its values to occur opaquely in a list. No stored flag is needed.
+
+Other fields retain the existing structural or eligible function-leaf policy.
+Check the instantiated original and representation fields for exact agreement.
+The strict function endpoint mode disables parameter opacity and still requires
+closed monotypes. See Note [Function fields in native index domains].
 
 Track full datatype applications along the active path. A return to the same
 TyCon must have nominally equal arguments. Use ordinary eqType, which requires
@@ -2498,14 +2579,14 @@ separate promotion rule, even when a named field is unused by the later types.
 Inspect their metadata before the full signature. A recursive interface field
 can otherwise force the same domain thunk which is already being checked.
 
-Original and representation fields must have the same closed domain. Thus a
+Original and representation fields must have the same complete domain. Thus a
 promoted constructor's arguments match
 its worker's runtime fields. In particular, do not promote an unpacked payload as
 if it were the original boxed field. Constructor field multiplicities may be One
 or Many; the retained identifier itself must be unrestricted.
 
 Agda's constructor indices and refined field context are the precedent. The
-closed-domain and worker restrictions bound this implementation; they are not
+schema and worker restrictions bound this implementation; they are not
 Agda language restrictions. Haskell fields can be partial or cyclic. Do not use
 termination or finite-tree apartness to compare opaque runtime indices.
 See the Agda Nat/Vec provenance in docs/dependent-haskell/REFERENCES.md.

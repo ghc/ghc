@@ -52,7 +52,6 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
-import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..) )
 import GHC.Core.Type
@@ -68,7 +67,7 @@ import GHC.Types.Basic ( TypeOrKind(TypeLevel) )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
 import GHC.Types.Id ( mkLocalId )
-import GHC.Types.Var.Set ( elemVarSet )
+import GHC.Types.Var.Set ( elemVarSet, emptyVarSet, extendVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -608,15 +607,16 @@ tcRetainedKnownArgPlan expected fun sigma args
   , not (any is_type_arg args)
   , (tvs, _, tau) <- tcRetainedInstTelescope sigma
   , not (null tvs), isRetainedValueType tau
-  , let (_mas, domains, result) = splitFunTys tau
-        values = [arg | EValArg { ea_arg = arg } <- args]
+  , let values = [arg | EValArg { ea_arg = arg } <- args]
+        (domains, result) = retainedDeclaredDomains (length values) tau
   , not (null domains), not (null values)
   = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
        ; let actuals = map snd pairs
              seed | length domains == length values
+                  , Just result_ty <- result
                   , Just rho <- expected
                   = fromMaybe Subst.emptySubst $
-                      matchRetainedAppType tvs Subst.emptySubst result rho
+                      matchRetainedAppType tvs Subst.emptySubst result_ty rho
                   | otherwise = Subst.emptySubst
              match subst = foldM (\s (formal, actual) ->
                                     matchRetainedAppType tvs s formal actual)
@@ -635,8 +635,8 @@ tcRetainedKnownArgPlan expected fun sigma args
                       eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
                     tvs choices)
              , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
-             , all no_ql_vars (actuals ++ choices)
-             -> do { valid <- tcRetainedInstScope (actuals ++ choices)
+             , all no_ql_vars (sigma : actuals ++ choices ++ maybeToList expected)
+             -> do { valid <- tcRetainedInstScope (sigma : actuals ++ choices ++ maybeToList expected)
                    ; return (if valid then Just choices else Nothing) }
            _ -> return Nothing }
   where
@@ -644,12 +644,13 @@ tcRetainedKnownArgPlan expected fun sigma args
     is_type_arg _ = False
     no_ql_vars = not . any (\v -> isTcTyVar v && isQLInstTyVar v) . tyCoVarsOfTypeList
 
-    declared_arg tvs (domain, arg)
+    declared_arg tvs (Just domain, arg)
       | let formal = scaledThing domain
       , any (`elemVarSet` tyCoVarsOfType formal) tvs
       = do { actual <- declared_type arg
            ; return ((formal,) <$> actual) }
       | otherwise = return Nothing
+    declared_arg _ _ = return Nothing
 
     declared_type (L _ (HsPar _ arg)) = declared_type arg
     declared_type (L loc (HsVar _ lname))
@@ -659,13 +660,142 @@ tcRetainedKnownArgPlan expected fun sigma args
            ; case mb_id of
                Just var -> do
                  { ty <- liftZonkM (zonkTcType (varType var))
+                 ; valid <- tcRetainedInstScope [ty]
                  ; let (tvs, theta, _) = tcRetainedInstTelescope ty
-                 ; return (if null tvs && null theta && isRetainedValueType ty
-                              && no_ql_vars ty
-                           then Just ty else Nothing) }
+                 ; if valid && null tvs && null theta && isRetainedValueType ty
+                            && no_ql_vars ty
+                   then do { view <- tcRetainedDeclaredTypeView ty
+                           ; return (if isRetainedValueType view && no_ql_vars view
+                                     then Just view else Nothing) }
+                   else return Nothing }
                Nothing -> return Nothing }
     declared_type _ = return Nothing
 tcRetainedKnownArgPlan _ _ _ _ = return Nothing
+
+-- | Refine a declared argument type with actual lexical constructor Givens.
+-- Keep the argument Id and its stored type unchanged.
+-- See Note [Declared retained argument refinement].
+tcRetainedDeclaredTypeView :: Type -> TcM Type
+tcRetainedDeclaredTypeView ty
+  = do { givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; givens <- mapM (liftZonkM . zonkId) givens
+       ; foldM refine ty (reverse givens) }
+  where
+    refine ty given
+      | isCoVar given
+      , let co = mkCoVarCo given
+      , coercionRole co == Nominal
+      , TermVarTy index <- coercionLKind co
+      , isNativeIndexId index
+      , TyConApp tc _ <- coreFullView (coercionRKind co)
+      , Just con <- isPromotedDataCon_maybe tc
+      , Just _ <- nativeIndexDataConTyArgs (varType index) con
+      , typeKind (coercionRKind co) `eqType` varType index
+      , anyFreeVarsOfType (== index) ty
+      = do { name <- newSysName (mkTyVarOcc "retained_view")
+           ; let template = mkTyVar name (varType index)
+           ; case abstractNativeIndices [(TermVarTy index, template)] ty of
+               Nothing -> return ty
+               Just _ -> coercionRKind <$> tcRetainedCoercion index co ty }
+      | otherwise = return ty
+
+{- Note [Declared retained argument refinement]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A constructor branch can have retained ~# S k while a declared argument keeps
+its original type [Vec Int retained]. Select the erased element parameter of
+genericVector from the proof-backed view [Vec Int (S k)]. Otherwise Count at
+the original and refined element types can block result checking before the
+ordinary solver checks the argument.
+
+Use only the actual lexical evidence parameters in tcl_native_givens. This
+list is newest first. Apply checked nominal constructor proofs from outer to
+inner scope. The existing tcRetainedCoercion supplies the type view. Check the
+original declaration's runtime scope first. Keep its Id and stored type.
+First probe the existing abstractNativeIndices grammar with a fresh immutable
+template. Unsupported input casts or coercion types keep the current type.
+This optional selection must not turn an unavailable view into a diagnostic.
+After a successful probe, tcRetainedCoercion still reports any real error.
+The ordinary argument checker must still prove the domain conversion and cast
+the actual occurrence. The view is a type-argument choice, not a replacement
+argument or equality evidence. Final result subsumption still runs.
+
+A generated retained binder can be absent from the source name environment
+until desugaring installs its AsPat. Its exact prototype occurs free in the
+predicate of an actual lexical Given. tcRetainedInstScope can use that
+prototype only when no normal binding exists. It must not obtain scope from
+the candidate type itself. A present normal binding remains authoritative,
+even when its metadata or multiplicity fails the check. CoVars are evidence,
+not runtime values; ordinary coercion scope checking remains responsible for
+them. See Note [Native index bindings during typechecking].
+
+Keep free-variable prototypes separately for each Given predicate. Require a
+nonempty set of matching prototypes and check all their metadata. The standard
+FV list deduplicates within one predicate. Therefore also use the existing
+deep anyFreeVarsOfType traversal to reject every incompatible occurrence,
+including occurrences in variable types. That traversal does not deduplicate
+occurrences. This check assumes canonical finite typechecked predicates and
+Core's NoTypeShadowing invariant. It does not validate arbitrary cyclic or
+malformed type graphs. See Note [Computing deep free variables] in
+GHC.Core.TyCo.FVs.
+-}
+
+-- | Collect declared domains for the written value-argument prefix.
+-- Nothing keeps a dependent argument's position without matching its domain.
+-- See Note [Declared retained-domain choices].
+retainedDeclaredDomains :: Int -> Type -> ([Maybe (Scaled Type)], Maybe Type)
+retainedDeclaredDomains supplied = go supplied emptyVarSet
+  where
+    go 0 bound result = result_view bound result
+    go remaining bound ty
+      | Just ty' <- coreView ty = go remaining bound ty'
+    go remaining bound (DepFunTy binder body)
+      = let domain = independent bound (Scaled (idMult binder) (varType binder))
+            (rest, result) = go (remaining - 1) (extendVarSet bound binder) body
+        in (domain : rest, result)
+    go remaining bound (FunTy af _ mult arg res)
+      | isVisibleFunArg af
+      = let (rest, result) = go (remaining - 1) bound res
+        in (independent bound (Scaled mult arg) : rest, result)
+      | otherwise = go remaining bound res
+    go _ bound result = result_view bound result
+
+    result_view bound result
+      = ([], if mentions bound result then Nothing else Just result)
+
+    independent bound domain
+      | mentions bound (scaledThing domain) = Nothing
+      | otherwise = Just domain
+    mentions bound = anyFreeVarsOfType (`elemVarSet` bound)
+
+{- Note [Declared retained-domain choices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For genericVector :: forall a. foreach (xs :: [a]) -> Vec a (Count xs),
+a declared argument xs0 :: [Vec Int n] determines a := Vec Int n. Select it
+before ordinary instantiation creates a meta that cannot be filled with n
+inside the retained application implication. Read the declaration without
+checking the occurrence or consuming its usage. The complete immutable IALL
+plan and its existing kind, exact-domain, Quick Look and lexical-scope checks
+remain authoritative.
+
+Include a retained binder's own domain, which is outside that binder's scope.
+Do not match a later domain or result that mentions a crossed runtime binder.
+Such a match would need the actual runtime argument, which this declaration
+scan does not select. Keep a skipped domain's position for the source argument
+alignment. Original argument checking still resolves every actual index and
+checks the substituted domain. No runtime Id or metadata-only index is invented.
+
+Stop after the written value-argument prefix. A remaining retained telescope
+can be the result value. For example, withScoped Refl f can return ScopedQ m
+while f has type ScopedQ n. The expected result selects index := m, and the
+declared f selects value := ScopedQ n. Keep that complete candidate. The
+ordinary Refl and result checks must diagnose the different scoped indices.
+Do not count the returned ScopedQ telescope as more supplied arguments.
+
+Run the declaration selector at the NoQL prepass and after VTA too. Reading
+types and zonking filled assignments allocates no native meta. Failed or
+incomplete selection uses the existing cached inference path. The original
+signature, evidence order, and final result subsumption remain unchanged.
+-}
 
 -- | Match kinds and types with the same outer erased binder substitution.
 -- See Note [Declared native argument choices] and
@@ -686,11 +816,14 @@ Do not call tcInferId: it emits usage. Global lookup may load an interface.
 Keep applications, constructors, signatures and polymorphic values on their
 existing paths. Look through parentheses without expanding source syntax.
 
-Match known types against the declared ordinary argument prefix. Match kinds
-before types and bind only the outer erased variables. Require every choice,
+Match known types against declared independent visible argument domains.
+Include retained domains without choosing their runtime arguments. See
+Note [Declared retained-domain choices]. Match kinds before types and bind
+only the outer erased variables. Require every choice,
 correct substituted kinds, exact matched domains and valid runtime scope.
 Reject free Quick Look variables, including those in kinds and coercions.
-Use an expected seed only at ordinary saturation. Retry a failed seeded match
+Use an expected seed only after collecting all written values, with an
+independent remaining result. Retry a failed seeded match
 independently from the empty substitution. Conflicts retain the guarded path.
 
 Return the choices as an IALL plan. Keep the original signature and checked
@@ -989,9 +1122,22 @@ tcValArg do_ql pos rn_fun_head
               ]
 
 
-         -- Now check the argument
+         -- Now check the argument. Fully explicit outer type applications
+         -- can already have supplied a known native callback input.
+         -- See Note [Named callbacks at known native inputs].
+       ; enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; (_, callback_cache) <- case do_ql of
+           NoQL | enabled -> tcRetainedCallbackArgs [] [Scaled mult exp_arg_ty]
+                               [EValArg { ea_loc_span = lspan, ea_arg = larg
+                                        , ea_arg_ty = noExtField }] Subst.emptySubst []
+           _ -> return (Nothing, [])
        ; arg' <- tcScalingUsage mult $
-                 tcPolyExpr arg (mkCheckExpType exp_arg_ty)
+           case callback_cache of
+             [(1, (typed, actual, usage))] ->
+               do { tcEmitBindingUsage usage
+                  ; wrap <- tcSubTypeSigma (exprCtOrigin arg) GenSigCtxt actual exp_arg_ty
+                  ; return (mkHsWrap wrap (unLoc typed)) }
+             _ -> tcPolyExpr arg (mkCheckExpType exp_arg_ty)
        ; traceTc "tcValArg" $ vcat [ ppr arg'
                                    , text "}" ]
        ; return (EValArg { ea_loc_span = lspan
@@ -1518,8 +1664,20 @@ tcRetainedArg domain arg
                   ; case mb_id of
                       Just arg_id
                         -> do { arg_id <- liftZonkM (zonkId arg_id)
-                              ; if isNativeRetainedBinder arg_id
-                                then tcRetainedArgVar expected arg_id
+                              ; if isNativeOpaqueValueId (setIdMult arg_id ManyTy)
+                                then do
+                                  { let mult = idMult arg_id
+                                        flexible = case coreFullView mult of
+                                          TyVarTy tv -> isMetaTyVar tv
+                                          _ -> False
+                                  ; unless (isManyTy mult || flexible) $ failWithTc $
+                                      TcRnRetainedQuantificationError (RetainedIndexMultiplicity mult)
+                                  ; tcSubMult (OccurrenceOf (getName arg_id)) ManyTy mult
+                                  ; arg_id <- liftZonkM (zonkId arg_id)
+                                  ; if isNativeOpaqueValueId arg_id
+                                    then tcRetainedArgVar expected arg_id
+                                    else failWithTc $ TcRnRetainedQuantificationError
+                                           (RetainedIndexMultiplicity (idMult arg_id)) }
                                 else unsupported }
                       _ -> unsupported }
           _ -> unsupported
@@ -1583,7 +1741,7 @@ single-variable lambda application in the checked native beta grammar.
 applyTypeToArgs uses the same index substitution as Core type recovery.
 Do not use tcVDQ: it translates an expression into an erased type argument.
 
-The retained binder supplies the closed domain. A lambda's provisional Many
+The retained binder supplies the checked domain. A lambda's provisional Many
 Id uses its actual renamed Name. Keep these Ids in a separate NameEnv; do not
 install them in the Tc environment or collect usage. Resolve the argument in
 the outer environment and the body in the extended environment. Constructor
@@ -1606,6 +1764,23 @@ Many usage requires Many. Remaining multiplicity metas default to Many during
 final zonking. No admitted signature, linear function head, or expected linear
 arrow can impose One. Check actual zonked lambda metadata when this grammar
 changes. The source pattern checker preserves the renamed Name/Unique.
+
+A local NoGen let can keep a fresh multiplicity metavariable. For example,
+let bools = [flag, False] can capture a do-bound flag before genericVector bools
+uses bools as a retained index. First check its local, non-CoVar, non-join,
+lifted shape with a temporary Many view. Do not store or return that view.
+Require Many on the actual Id with tcSubMult at retained resolution, then
+re-zonk the Id before its exact Core metadata check. This
+constrains an ordinary multiplicity. It does not default an unknown value or
+accept One or a rigid multiplicity. tcSubMult requires reflexive evidence.
+Use the same rule as Note [Checking retained package patterns] in
+GHC.Tc.Gen.Pat. Keep optional declaration lookup read-only. Resolution emits
+no usage; the later ordinary argument check records the occurrence once.
+The separate fixed-domain function argument resolver keeps its existing rule.
+Reject an already known One or rigid multiplicity before requesting that
+constraint. Report the retained argument's Many requirement and its actual
+multiplicity. This is an unsupported retained argument, not a request to use
+GADT evidence to equate multiplicities.
 
 A scalar variable can have a nominally equal domain with a different family
 application. Keep its nominal domain cast in the resolved Core argument.
@@ -1911,7 +2086,7 @@ isRetainedValueType = go False
   where
     go _ ty | isTauTy ty = True
     go under_pi ty = case coreFullView ty of
-      DepFunTy index body -> isNativeRetainedBinder index
+      DepFunTy index body -> isNativeOpaqueValueId index
                          && typeKind body `eqType` liftedTypeKind
                          && go True body
       FunTy flag ma mult arg res -> isTauTy ma && isTauTy mult
@@ -1997,8 +2172,9 @@ type-argument, complete-substitution, kind, runtime-scope and exact-result check
 still apply. Preserve the original body and its constraints in the substitution.
 The ordinary argument and result subsumption checks still run afterward.
 
-Use isNativeRetainedBinder for each known Pi binder. This includes an eligible
-opaque function head with a closed unrestricted arrow between scalar domains.
+Use isNativeOpaqueValueId for each known Core Pi binder. Source foreach domain
+formation keeps its separate structural check. An eligible opaque function
+head still has a closed unrestricted arrow between scalar domains.
 The retained matcher pairs function binders only when their full domains agree.
 It does not construct a function cast or infer an index by decomposing a call.
 Actual function arguments still pass through tcRetainedFunctionArg. The value
@@ -2466,7 +2642,24 @@ docs/dependent-haskell/REFERENCES.md#native-worker-argument-inference.
 tcRetainedArgInstEnabled :: Maybe Int -> QLFlag -> Maybe TcRhoType -> (HsExpr GhcRn, SrcSpan)
                          -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                          -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
-tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
+tcRetainedArgInstEnabled after_vta do_ql expected rn_head args fun sigma
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; declared <- case do_ql of
+           NoQL | enabled ->
+             do { sigma' <- liftZonkM (zonkTcType sigma)
+                ; expected' <- mapM (liftZonkM . zonkTcType) expected
+                ; tcRetainedKnownArgPlan expected' fun sigma' args }
+           _ -> return Nothing
+       ; case declared of
+           Just choices -> return (fun, sigma, [], Just choices)
+           Nothing -> tcRetainedArgInstCached after_vta do_ql expected rn_head args fun sigma }
+
+-- | Run the existing usage-cached inference after declaration selection fails.
+-- See Note [Declared retained-domain choices].
+tcRetainedArgInstCached :: Maybe Int -> QLFlag -> Maybe TcRhoType -> (HsExpr GhcRn, SrcSpan)
+                       -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
+                       -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
+tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
   | not (any is_type_arg args)
   , (outer_tvs, body) <- tcSplitForAllInvisTyVars sigma
   , let (tvs, theta, tau) = tcRetainedInstTelescope sigma
@@ -2515,8 +2708,10 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
                              && isJust (tcRetainedOrdinaryResult arity tau)
                           then do { shapes <- mapM tcRetainedInferableArg
                                                 (take arity value_args)
+                                  ; deferred <- zipWithM defer_named domains (take arity value_args)
                                   ; return (if result_anchor || any snd shapes
-                                            then Just (map fst shapes)
+                                            then Just (zipWith (\shape defer -> fst shape && not defer)
+                                                               shapes deferred)
                                             else Nothing) }
                           else return Nothing
        ; case eligible of
@@ -2612,6 +2807,13 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
 
     actual_type (_, ty, _) = ty
 
+    -- See Note [Named callbacks at known native inputs].
+    defer_named domain arg
+      | FunTy { ft_af = af, ft_mult = mult } <- coreFullView (scaledThing domain)
+      , isVisibleFunArg af, isManyTy mult
+      = isJust <$> tcRetainedNamedCallbackType arg
+      | otherwise = return False
+
     infer_args :: [TyVar] -> [Bool] -> [Scaled Type] -> Int -> [HsExprArg 'TcpRn]
                -> TcM RetainedArgCache
     infer_args _ _ _ _ [] = return []
@@ -2626,7 +2828,7 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
            ; return (entry ++ entries) }
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
-tcRetainedArgInstEnabled _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+tcRetainedArgInstCached _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
 
 {- Note [Family views in native argument inference]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2712,6 +2914,47 @@ tcRetainedCallbackArgs tvs domains args subst cache
            ; return (Just subst, cache) }
     go subst cache ((pos, domain, arg) : rest)
       | isNothing (lookup pos cache)
+      , FunTy { ft_af = af, ft_mult = mult, ft_arg = input }
+          <- coreFullView (Subst.substTy subst (scaledThing domain))
+      , isVisibleFunArg af, isManyTy mult
+      , not (mentions_templates input)
+      , isTauTy input, typeKind input `eqType` liftedTypeKind
+      , hasNativeDependentExpr (Core.Type input)
+      , Just (build, head_arg) <- retainedNamedCallback arg
+      = setSrcSpanA (getLoc arg) $ do
+          { candidate <- tcRetainedNamedCallbackType arg
+          ; case candidate of
+              Just sigma
+                | (callback_tvs, _, tau) <- tcRetainedInstTelescope sigma
+                , FunTy { ft_arg = formal_input } <- coreFullView tau
+                , Just selected <- matchRetainedAppType callback_tvs Subst.emptySubst formal_input input
+                , Just choices <- traverse (Subst.lookupTyVar selected) callback_tvs
+                , not (any (`elemVarSet` tyCoVarsOfTypes choices) callback_tvs)
+                , and (zipWith (\tv ty ->
+                         eqType (Subst.substTy selected (tyVarKind tv)) (typeKind ty))
+                       callback_tvs choices)
+                , let actual = Subst.substTy selected tau
+                , Subst.substTy selected formal_input `eqType` input
+                , all no_ql_vars (sigma : actual : input : choices)
+                -> do
+                  { valid <- tcRetainedInstScope (sigma : actual : input : choices)
+                  ; if not valid then go subst cache rest else
+                do { (usage, typed) <- tcCollectingUsage $ tcRetainedAppEvidence $
+                       do { let rn_head = (unLoc head_arg, locA (getLoc head_arg))
+                          ; (fun, sigma') <- tcInferAppHead rn_head
+                          ; (inst_args, rho) <- tcInstFunWithExpected Nothing (Just choices)
+                                                NoQL True rn_head fun sigma' []
+                          ; ensure_expected <- tcSubTypeSigma (lexprCtOrigin arg)
+                                                 GenSigCtxt rho actual
+                          ; checked_args <- tcValArgsWithCache [] NoQL rn_head inst_args
+                          ; return (mkHsWrap ensure_expected (unLoc (build (rebuildHsApps fun checked_args)))) }
+                   ; let entry = (pos, (fmap (const typed) arg, actual, usage))
+                         matched = match_type subst (scaledThing domain) actual
+                   ; case matched of
+                       Just subst' -> go subst' (cache ++ [entry]) rest
+                       Nothing -> return (Nothing, cache ++ [entry]) } }
+              _ -> go subst cache rest }
+      | isNothing (lookup pos cache)
       , FunTy { ft_af = af, ft_mult = mult, ft_arg = input, ft_res = output }
           <- coreFullView (Subst.substTy subst (scaledThing domain))
       , isVisibleFunArg af, isManyTy mult
@@ -2756,6 +2999,7 @@ tcRetainedCallbackArgs tvs domains args subst cache
       | otherwise = go subst cache rest
 
     mentions_templates ty = any (`elemVarSet` tyCoVarsOfType ty) tvs
+    no_ql_vars = not . any (\v -> isTcTyVar v && isQLInstTyVar v) . tyCoVarsOfTypeList
 
     expose_choice subst tv
       | Just ty <- Subst.lookupTyVar subst tv
@@ -2784,6 +3028,61 @@ tcRetainedCallbackArgs tvs domains args subst cache
       , [L _ (GRHS _ [] body)] <- NE.toList grhss
       = Just (L loc, annotation, matches, getLoc body)
     callback _ = Nothing
+
+-- | Recognize a named callback without checking it or collecting usage.
+-- See Note [Named callbacks at known native inputs].
+retainedNamedCallback :: LHsExpr GhcRn
+                      -> Maybe (HsExpr GhcTc -> LHsExpr GhcTc, LHsExpr GhcRn)
+retainedNamedCallback (L loc (HsPar annotation arg))
+  = do { (build, head_arg) <- retainedNamedCallback arg
+       ; return (L loc . HsPar annotation . build, head_arg) }
+retainedNamedCallback arg@(L loc (HsVar _ lname))
+  | not (isDataOcc (nameOccName (unLocWithUserRdr lname))) = Just (L loc, arg)
+retainedNamedCallback _ = Nothing
+
+-- | Read a polymorphic callback declaration without instantiation or usage.
+-- See Note [Named callbacks at known native inputs].
+tcRetainedNamedCallbackType :: LHsExpr GhcRn -> TcM (Maybe TcSigmaType)
+tcRetainedNamedCallbackType arg
+  | Just (_, L _ (HsVar _ lname)) <- retainedNamedCallback arg
+  = do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+       ; case mb_id of
+           Just var | isEmptyNameEnv (idConcreteTvs var) ->
+             do { sigma <- liftZonkM (zonkTcType (varType var))
+                ; let (tvs, _, tau) = tcRetainedInstTelescope sigma
+                ; return $ case coreFullView tau of
+                    FunTy { ft_af = af, ft_mult = mult }
+                      | not (null tvs), isTauTy tau, isVisibleFunArg af, isManyTy mult
+                      -> Just sigma
+                    _ -> Nothing }
+           _ -> return Nothing }
+  | otherwise = return Nothing
+
+{- Note [Named callbacks at known native inputs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In map toList values, values :: [Vec Int n] fixes map's input to Vec Int n.
+Inferring toList first would allocate an index meta n0. The later argument
+cannot assign that meta to the actual runtime n. Defer a named polymorphic
+callback in the ordinary generic native-anchored argument route. Infer the
+other arguments first. Do not change the index-binder or native-worker routes.
+
+Once the input is known, match the callback declaration's input immutably.
+Require every callback binder, substituted kinds, an exact input match and
+valid runtime scope. Instantiate the original declaration with existing IALL.
+This preserves forall/context evidence order and concreteness checks. Cache
+the typed callback and its usage once. Preserve all earlier argument and result
+choices when matching this callback. Final argument subsumption and result
+checking still run. The callback value is not eta-expanded or evaluated.
+
+Keep this route to bare or parenthesized named callbacks with a tau Many
+function body and no concrete-variable requirements. Other expressions keep
+their existing inference path. Partial explicit type applications on the
+callback keep that path too. Outer higher-order function VTA still uses its
+existing ordered immutable plan. When that plan has consumed all binders,
+tcValArg uses the same callback check at its known native input. It emits the
+saved usage under the original argument scaling. A failed callback match keeps
+the checked cache and its usage. Candidate types do not provide equality evidence.
+-}
 
 {- Note [Scoped native callback results]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2907,26 +3206,49 @@ tcRetainedInstScope :: [Type] -> TcM Bool
 tcRetainedInstScope tys
   = do { local_env <- getLclTypeEnv
        ; global_env <- tcg_type_env <$> getGblEnv
-       ; let current_binding v
+       ; givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; givens <- mapM (liftZonkM . zonkId) givens
+       ; let -- The outer Maybe distinguishes an absent binding from a
+             -- present binding of the wrong sort. Only absence permits
+             -- the lexical Given fallback.
+             current_binding v
                = case lookupNameEnv local_env (getName v) of
-                   Just (ATcId { tct_id = local_id }) -> Just (True, local_id)
-                   Just _ -> Nothing
+                   Just (ATcId { tct_id = local_id }) -> Just (Just (True, local_id))
+                   Just _ -> Just Nothing
                    Nothing -> case lookupTypeEnv global_env (getName v) of
-                     Just (AnId module_id) -> Just (False, module_id)
-                     _ -> Nothing
+                     Just (AnId module_id) -> Just (Just (False, module_id))
+                     Just _ -> Just Nothing
+                     Nothing -> Nothing
+             given_predicates = map varType givens
+             given_prototypes = filter isNonCoVarId $
+                                  concatMap tyCoVarsOfTypeList given_predicates
+             valid_binding lexical occurrence binding
+               = occurrence == binding
+                 && ((isNativeIndexId occurrence && isNativeIndexId binding)
+                     || (lexical && not (isExternalName (getName occurrence))
+                         && isNativeOpaqueValueId occurrence
+                         && isNativeOpaqueValueId binding))
+                 && eqType (varType occurrence) (varType binding)
+                 && isManyTy (idMult occurrence) && isManyTy (idMult binding)
              valid_runtime_id v
-               | not (isId v) = return True
-               | Just (lexical, binding) <- current_binding v
+               | not (isNonCoVarId v) = return True
+               | otherwise
                = do { occurrence <- liftZonkM (zonkId v)
-                    ; binding <- liftZonkM (zonkId binding)
-                    ; return (occurrence == binding
-                              && ((isNativeIndexId occurrence && isNativeIndexId binding)
-                                  || (lexical && not (isExternalName (getName occurrence))
-                                      && isNativeIndexFunctionId occurrence
-                                      && isNativeIndexFunctionId binding))
-                              && eqType (varType occurrence) (varType binding)
-                              && isManyTy (idMult occurrence) && isManyTy (idMult binding)) }
-               | otherwise = return False
+                    ; case current_binding v of
+                        Just (Just (lexical, binding)) ->
+                          do { binding <- liftZonkM (zonkId binding)
+                             ; return (valid_binding lexical occurrence binding) }
+                        Just Nothing -> return False
+                        Nothing -> do
+                          { prototypes <- mapM (liftZonkM . zonkId)
+                                            (filter (== v) given_prototypes)
+                          ; return (not (null prototypes)
+                                    && all (valid_binding True occurrence) prototypes
+                                    && not (any (anyFreeVarsOfType (bad_prototype occurrence))
+                                                given_predicates)) } }
+             bad_prototype occurrence prototype
+               = isNonCoVarId prototype && prototype == occurrence
+                 && not (valid_binding True occurrence prototype)
        ; and <$> mapM valid_runtime_id (tyCoVarsOfTypesList tys) }
 
 {- Note [Native index bindings during typechecking]
@@ -2946,18 +3268,21 @@ need immutable instantiation at the actual bottomLength index. Checking only
 the local environment would reject that binding and fall back to a forbidden
 native meta-variable fill.
 
-An opaque call can also depend on an eligible ordinary function head. Admit
-that head only from the lexical environment. Keep the existing module lookup
-for scalar indices. Zonk both head occurrences without changing their Names,
-then check their closed ordinary Many arrows. This does not admit a bare
-function as a scalar index or extend retained runtime argument syntax. See
-Note [Source opaque call indices] in GHC.Tc.Gen.HsType.
+A hidden retained binder can instead have its exact prototype certified by
+an actual lexical Given predicate. Use that fallback only when no ordinary
+binding exists. See Note [Declared retained argument refinement]. CoVars do
+not enter this runtime-value judgment.
+
+Structural indices can also contain opaque local values. Check their exact
+lifted types and lexical identities. An eligible ordinary function head keeps
+its separate closed U/Many call policy. Keep the existing module lookup for
+structural indices. See Note [Source opaque call indices] in GHC.Tc.Gen.HsType.
 
 Look in the local environment first, then the existing module type environment.
 Do not load interfaces for a missing or stale name. Normalize both the index
 occurrence and its authoritative binding before checking their identity,
-closed native domain and Many multiplicity. Imported GlobalIds, unresolved or
-rigid domains, linear indices and missing bindings still fail. The existing
+exact domain and Many multiplicity. Imported GlobalIds, linear indices and
+missing bindings still fail. The existing
 Core Tidy alias step keeps accepted module indices local when Tidy globalises
 their top-level bindings. Keep the Core index grammar unchanged.
 
@@ -3462,8 +3787,7 @@ tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) hs_ty
                coercionRKind <$> unifyConcrete (occNameFS $ getOccName $ tv_nm) conc ty_arg0
 
        ; let fun_ty    = mkForAllTy ma tvb inner_ty
-             in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
-             insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
+             insted_ty = piResultTy fun_ty ty_arg
                -- This substitution is well-kinded even when inner_ty
                -- is not fully zonked, because ty_arg is fully zonked.
                -- See Note [Type application substitution].

@@ -100,10 +100,13 @@ module GHC.Core.Coercion (
         liftCoSubstVarBndrUsing, isMappedByLC, extendLiftingContextCvSubst,
         updateLCSubst,
 
-        mkSubstLiftingContext, liftingContextSubst, zapLiftingContext,
+        mkLiftingContext, mkSubstLiftingContext, liftingContextSubst, zapLiftingContext,
         lcLookupCoVar, lcInScopeSet,
 
-        LiftCoEnv, LiftingContext(..), liftEnvSubstLeft, liftEnvSubstRight,
+        LiftCoEnv, NativeLiftEnv, LiftingContext(..), liftEnvSubstLeft, liftEnvSubstRight,
+        extendLiftingContextNative, liftCoSubstNative, liftCoSubstNativeBndrUsing,
+        prepareNativeLiftingContext,
+        abstractNativeIndices,
         substRightCo, substLeftCo, swapLiftCoEnv, lcSubstLeft, lcSubstRight,
 
         -- ** Comparison
@@ -1033,8 +1036,7 @@ nativeIndexCastCo_maybe co
   | coercionRole co == Representational
   , Just delta <- setNominalRole_maybe Representational co
   , coercionRole delta == Nominal
-  , isNativeIndexType (coercionLKind delta)
-  , isNativeIndexType (coercionRKind delta)
+  , isNativeIndexDomainConversion (coercionLKind delta) (coercionRKind delta)
   = Just delta
   | otherwise = Nothing
 
@@ -1047,7 +1049,7 @@ mapNativeIndexCastCo rewrite co
   | otherwise = rewrite co
 
 -- | Rewrite a value cast before checking its scalar domains. The callback
--- preserves roles and resolves the types needed by 'isNativeIndexType'.
+-- preserves roles and resolves the types needed by 'isNativeIndexDomainConversion'.
 -- See Note [Zonking nominal native index casts].
 mapNativeIndexCastCoM :: Applicative m
                      => (Coercion -> m Coercion)
@@ -1061,8 +1063,7 @@ mapNativeIndexCastCoM rewrite co
   = rewrite co
   where
     preserve delta
-      | isNativeIndexType (coercionLKind delta)
-      , isNativeIndexType (coercionRKind delta)
+      | isNativeIndexDomainConversion (coercionLKind delta) (coercionRKind delta)
       = SubCo delta
       | otherwise
       = mkSubCo delta
@@ -1456,7 +1457,7 @@ mkFunResCo :: Role -> Matchability -> Id -> Coercion -> Coercion
 mkFunResCo role ma id res_co
   | isNonCoVarId id
   , id `elemVarSet` tyCoVarsOfCo res_co
-  = if isNativeRetainedBinder id && ma `eqType` unmatchableDataConTy
+  = if isNativeOpaqueValueId id && ma `eqType` unmatchableDataConTy
     then mkDepFunCo id res_co
     else pprPanic "mkFunResCo: unsupported dependent runtime binder" (ppr id)
   | otherwise
@@ -1720,13 +1721,21 @@ This follows the lifting context extension definition in the
 -- See Note [Lifting coercions over types: liftCoSubst]
 -- ----------------------------------------------------
 
-data LiftingContext = LC Subst LiftCoEnv
+-- | A source runtime binder and its target representative in the common prefix.
+-- See Note [Lifting runtime binder domains].
+data NativeBndrLift = NativeBndrLift Id Id MCoercionN
+
+-- | Runtime source provenance is separate from the TyVar/CoVar lifting map.
+type NativeLiftEnv = IdEnv NativeBndrLift
+
+data LiftingContext = LC Subst LiftCoEnv NativeLiftEnv
   -- in optCoercion, we need to lift when optimizing InstCo.
   -- See Note [Optimising InstCo] in GHC.Core.Coercion.Opt
   -- We thus propagate the substitution from GHC.Core.Coercion.Opt here.
 
 instance Outputable LiftingContext where
-  ppr (LC _ env) = hang (text "LiftingContext:") 2 (ppr env)
+  ppr (LC _ env native) = hang (text "LiftingContext:") 2
+    (ppr env $$ text "Runtime binders:" <+> ppr (nonDetKeysUFM native))
 
 type LiftCoEnv = VarEnv Coercion
      -- Maps *type variables* to *coercions*.
@@ -1747,7 +1756,8 @@ liftCoSubstWithEx univs omegas exs rhos
 
 liftCoSubstWith :: Role -> [TyCoVar] -> [Coercion] -> Type -> Coercion
 liftCoSubstWith r tvs cos ty
-  = liftCoSubst r (mkLiftingContext $ zipEqual tvs cos) ty
+  = let lc = prepareNativeLiftingContext (mkLiftingContext $ zipEqual tvs cos) ty
+    in liftCoSubst r lc ty
 
 -- | @liftCoSubst role lc ty@ produces a coercion (at role @role@)
 -- that coerces between @lc_left(ty)@ and @lc_right(ty)@, where
@@ -1756,23 +1766,23 @@ liftCoSubstWith r tvs cos ty
 liftCoSubst :: HasDebugCallStack => Role -> LiftingContext -> Type -> Coercion
 {-# INLINE liftCoSubst #-}
 -- Inlining this function is worth 2% of allocation in T9872d,
-liftCoSubst r lc@(LC subst env) ty
-  | isEmptyVarEnv env = mkReflCo r (substTy subst ty)
+liftCoSubst r lc@(LC subst env native) ty
+  | isEmptyVarEnv env && isEmptyVarEnv native = mkReflCo r (substTy subst ty)
   | otherwise         = ty_co_subst lc r ty
 
 emptyLiftingContext :: InScopeSet -> LiftingContext
-emptyLiftingContext in_scope = LC (mkEmptySubst in_scope) emptyVarEnv
+emptyLiftingContext in_scope = LC (mkEmptySubst in_scope) emptyVarEnv emptyVarEnv
 
 mkLiftingContext :: [(TyCoVar,Coercion)] -> LiftingContext
 mkLiftingContext pairs
   = LC (mkEmptySubst $ mkInScopeSet $ tyCoVarsOfCos (map snd pairs))
-       (mkVarEnv pairs)
+       (mkVarEnv pairs) emptyVarEnv
 
 mkSubstLiftingContext :: Subst -> LiftingContext
-mkSubstLiftingContext subst = LC subst emptyVarEnv
+mkSubstLiftingContext subst = LC subst emptyVarEnv emptyVarEnv
 
 liftingContextSubst :: LiftingContext -> Subst
-liftingContextSubst (LC subst _) = subst
+liftingContextSubst (LC subst _ _) = subst
 
 -- | Extend a lifting context with a new mapping.
 extendLiftingContext :: LiftingContext  -- ^ original LC
@@ -1780,11 +1790,11 @@ extendLiftingContext :: LiftingContext  -- ^ original LC
                      -> Coercion        -- ^ ...to this lifted version
                      -> LiftingContext
     -- mappings to reflexive coercions are just substitutions
-extendLiftingContext (LC subst env) tv arg
+extendLiftingContext (LC subst env native) tv arg
   | Just (ty, _) <- isReflCo_maybe arg
-  = LC (extendTCvSubst subst tv ty) env
+  = LC (extendTCvSubst subst tv ty) env native
   | otherwise
-  = LC subst (extendVarEnv env tv arg)
+  = LC subst (extendVarEnv env tv arg) native
 
 -- | Extend the substitution component of a lifting context with
 -- a new binding for a coercion variable. Used during coercion optimisation.
@@ -1792,16 +1802,16 @@ extendLiftingContextCvSubst :: LiftingContext
                             -> CoVar
                             -> Coercion
                             -> LiftingContext
-extendLiftingContextCvSubst (LC subst env) cv co
-  = LC (extendCvSubst subst cv co) env
+extendLiftingContextCvSubst (LC subst env native) cv co
+  = LC (extendCvSubst subst cv co) env native
 
 -- | Extend a lifting context with a new mapping, and extend the in-scope set
 extendLiftingContextAndInScope :: LiftingContext  -- ^ Original LC
                                -> TyCoVar         -- ^ new variable to map...
                                -> Coercion        -- ^ to this coercion
                                -> LiftingContext
-extendLiftingContextAndInScope (LC subst env) tv co
-  = extendLiftingContext (LC (extendSubstInScopeSet subst (tyCoVarsOfCo co)) env) tv co
+extendLiftingContextAndInScope (LC subst env native) tv co
+  = extendLiftingContext (LC (extendSubstInScopeSet subst (tyCoVarsOfCo co)) env native) tv co
 
 -- | Extend a lifting context with existential-variable bindings.
 -- See Note [extendLiftingContextEx]
@@ -1812,7 +1822,7 @@ extendLiftingContextEx :: LiftingContext    -- ^ original lifting context
 -- takes a coercion to extend with, so it's assumed that the caller has taken
 -- into account any of the kind-changing stuff worried about here.
 extendLiftingContextEx lc [] = lc
-extendLiftingContextEx lc@(LC subst env) ((v,ty):rest)
+extendLiftingContextEx lc@(LC subst env native) ((v,ty):rest)
 -- This function adds bindings for *Nominal* coercions. Why? Because it
 -- works with existentially bound variables, which are considered to have
 -- nominal roles.
@@ -1821,7 +1831,7 @@ extendLiftingContextEx lc@(LC subst env) ((v,ty):rest)
                  (extendVarEnv env v $
                   mkGReflRightCo Nominal
                                  ty
-                                 (ty_co_subst lc Nominal (tyVarKind v)))
+                                 (ty_co_subst lc Nominal (tyVarKind v))) native
     in extendLiftingContextEx lc' rest
   | CoercionTy co <- ty
   = -- co      :: s1 ~r s2
@@ -1838,7 +1848,7 @@ extendLiftingContextEx lc@(LC subst env) ((v,ty):rest)
         lc'     = LC (subst `extendSubstInScopeSet` tyCoVarsOfCo co)
                      (extendVarEnv env v
                         (mkProofIrrelCo Nominal kco co $
-                          (mkSymCo lift_s1) `mkTransCo` co `mkTransCo` lift_s2))
+                          (mkSymCo lift_s1) `mkTransCo` co `mkTransCo` lift_s2)) native
     in extendLiftingContextEx lc' rest
   | otherwise
   = pprPanic "extendLiftingContextEx" (ppr v <+> text "|->" <+> ppr ty)
@@ -1846,11 +1856,11 @@ extendLiftingContextEx lc@(LC subst env) ((v,ty):rest)
 
 -- | Erase the environments in a lifting context
 zapLiftingContext :: LiftingContext -> LiftingContext
-zapLiftingContext (LC subst _) = LC (zapSubst subst) emptyVarEnv
+zapLiftingContext (LC subst _ _) = LC (zapSubst subst) emptyVarEnv emptyVarEnv
 
 updateLCSubst :: LiftingContext -> (Subst -> (Subst, a)) -> (LiftingContext, a)
 -- Lift a Subst-update function over LiftingContext
-updateLCSubst (LC subst lc_env) upd = (LC subst' lc_env, res)
+updateLCSubst (LC subst lc_env native) upd = (LC subst' lc_env native, res)
   where
     (subst', res) = upd subst
 
@@ -1877,13 +1887,12 @@ ty_co_subst !lc role ty
           (TermAppTy f _, TermAppTy g _) | f == g
             -> downgradeRole r Nominal (mkTermAppCo f (go Nominal arg))
           _ -> pprPanic "ty_co_subst: native function head changed" (ppr ty)
-    go r ty@(TermVarTy {})  = lift_native r ty
+    go r (TermVarTy v) = liftCoSubstNative lc r v
     go r (DepFunTy b body)
-      | isNativeRetainedBinder b
-      = let LC subst env = lc
-            (subst', b') = substNativeIndexBndr subst b
-            lc' = LC subst' (delVarEnv env b)
-        in mkDepFunCo b' (ty_co_subst lc' r body)
+      | isNativeOpaqueValueId b
+      = let (lc', b', delta) = liftCoSubstNativeBndrUsing id
+                                 (\ctx -> ty_co_subst ctx Nominal) lc b
+        in mkDepFunCoWithDomain b' (coToMCo delta) (ty_co_subst lc' r body)
       | otherwise
       = pprPanic "ty_co_subst: invalid retained binder" (ppr b)
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
@@ -1910,13 +1919,6 @@ ty_co_subst !lc role ty
                                                   (substRightCo lc co)
       where kco = go Nominal (coercionType co)
 
-    lift_native r ty
-      | lty `eqType` rty = mkReflCo r lty
-      | otherwise = pprPanic "ty_co_subst: native dependent congruence not implemented" (ppr ty)
-      where
-        lty = substTy (lcSubstLeft lc) ty
-        rty = substTy (lcSubstRight lc) ty
-
     lift_phantom ty = mkPhantomCo (go Nominal (typeKind ty))
                                   (substTy (lcSubstLeft  lc) ty)
                                   (substTy (lcSubstRight lc) ty)
@@ -1934,9 +1936,217 @@ failing is fine. matchAxiom is trying to find a set of coercions
 that match, but it may fail, and this is healthy behavior.
 -}
 
+{- Note [Lifting runtime binder domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Keep runtime source Ids in a separate map. LiftCoEnv has Unique keys and
+classifies its ranges as type or coercion substitutions. A TermVarTy range
+can belong to an ordinary TyVar, so its shape does not identify a runtime key.
+
+For source binder b, lift its domain in the earlier prefix to delta : A ~N B.
+Bind bL : A and record b |-> GRefl N bL delta in the common body context.
+The endpoint Id ranges are bL and bL |> delta. They are completed targets;
+return them once. DepFunCo later binds bR : B on its right and substitutes
+bL := bR |> sym delta. No runtime case or eta expansion is needed.
+
+The domain proof is outside its own binder. Preserve deep proof/range free
+variables when freshening, including an ambient Id with the source Unique.
+The original Id is stored explicitly to retain source metadata provenance.
+At an owned template boundary, prepareNativeLiftingContext seeds free source
+prototypes without changing their runtime Unique. Existing completed entries
+must match source type and multiplicity metadata exactly. Body binder extension
+masks the source's ordinary Id range; native endpoint ranges are authoritative
+over that range. Earlier completed targets are not substituted a second time.
+No runtime key enters extendTCvSubst, including the reflexive case.
+-}
+
+-- | Extend a source runtime binder's relation in the common body prefix.
+extendLiftingContextNative :: LiftingContext -> Id -> Id -> MCoercionN
+                          -> LiftingContext
+extendLiftingContextNative (LC subst env native) source target delta
+  = assertPpr valid (ppr source $$ ppr target) $
+    LC (extendSubstInScopeSet subst free) env
+       (extendVarEnv native source (NativeBndrLift source target delta))
+  where
+    proof = mkGReflRightMCo Nominal (TermVarTy target) delta
+    free = extendVarSet (tyCoVarsOfCo proof) target
+    valid = isNativeOpaqueValueId source && isNativeOpaqueValueId target
+         && case delta of
+              MRefl -> True
+              MCo co -> coercionRole co == Nominal
+                     && varType target `eqType` coercionLKind co
+                     && isNativeIndexDomainConversion (coercionLKind co) (coercionRKind co)
+
+-- | Prepare free runtime source prototypes in an owned lifting template.
+-- Input metadata belongs to the source context. Existing entries are completed
+-- target relations and are returned once. Do not use this to refresh arbitrary
+-- free Ids inserted in an in-scope set for capture avoidance.
+prepareNativeLiftingContext :: LiftingContext -> Type -> LiftingContext
+prepareNativeLiftingContext initial template = foldl' prepare initial (runtime_vars template)
+  where
+    runtime_vars = filter (\v -> isId v && not (isCoVar v))
+                 . nonDetVarSetElems . tyCoVarsOfType
+    prepare lc@(LC subst _ native) source
+      | Just (NativeBndrLift original _ _) <- lookupVarEnv native source
+      = assertPpr (varType original `eqType` varType source
+                     && idMult original `eqType` idMult source)
+                  (ppr original $$ ppr source) lc
+      | Just {} <- lookupVarEnv (getIdSubstEnv subst) source
+      = pprPanic "prepareNativeLiftingContext: completed Id range" (ppr source)
+      | otherwise =
+          let prefix = foldl' prepare lc (runtime_vars (varType source) ++ runtime_vars (idMult source))
+              delta = liftCoSubst Nominal prefix (varType source)
+              target = setVarType source (coercionLKind delta)
+          in extendLiftingContextNative prefix source target (coToMCo delta)
+
+-- | Lift one runtime source occurrence without inferring its variable sort.
+liftCoSubstNative :: LiftingContext -> Role -> Id -> Coercion
+liftCoSubstNative lc@(LC _ _ native) role source
+  | not (isNativeOpaqueValueId source)
+  = pprPanic "liftCoSubstNative: invalid source Id" (ppr source)
+  | Just (NativeBndrLift original target delta) <- lookupVarEnv native source
+  = assertPpr (varType original `eqType` varType source && idMult original `eqType` idMult source)
+      (ppr original $$ ppr source) $
+    downgradeRole role Nominal (mkGReflRightMCo Nominal (TermVarTy target) delta)
+  | left `eqType` right, typeKind left `eqType` typeKind right
+  = mkReflCo role left
+  | otherwise
+  = pprPanic "liftCoSubstNative: missing source relation" (ppr source $$ ppr left $$ ppr right)
+  where
+    left = substTy (lcSubstLeft lc) (TermVarTy source)
+    right = substTy (lcSubstRight lc) (TermVarTy source)
+
+-- | Lift a runtime domain before introducing its binder.
+liftCoSubstNativeBndrUsing :: (a -> CoercionN)
+                          -> (LiftingContext -> Type -> a)
+                          -> LiftingContext -> Id -> (LiftingContext, Id, a)
+liftCoSubstNativeBndrUsing view fun lc@(LC subst env native) source
+  = (extendLiftingContextNative (LC subst' env (delVarEnv native source))
+         source target (coToMCo delta), target, stuff)
+  where
+    stuff = fun lc (varType source)
+    delta = view stuff
+    left = coercionLKind delta
+    right = coercionRKind delta
+    free = tyCoVarsOfCo delta `unionVarSet` tyCoVarsOfType (idMult source)
+    scope = substInScopeSet subst `extendInScopeSetSet` free
+    target = assertPpr (coercionRole delta == Nominal
+                         && isNativeIndexDomainConversion left right)
+                       (ppr source $$ ppr delta) $
+             uniqAway scope (setVarType source left)
+    subst' = case extendSubstInScope subst target of
+      Subst scope ids tvs cvs -> Subst scope (delVarEnv ids source) tvs cvs
+
+-- | Abstract checked native indices in a source type and its Id metadata.
+-- Replacements are completed target TyVars. Return them once.
+-- See Note [Scoped native index abstraction].
+abstractNativeIndices :: [(Type, TyVar)] -> Type -> Maybe Type
+abstractNativeIndices pairs ty = go emptyVarEnv initial_scope pairs ty
+  where
+    initial_scope = mkInScopeSet $
+      tyCoVarsOfType ty `unionVarSet`
+      tyCoVarsOfTypes (map (mkTyVarTy . snd) pairs)
+
+    go renamed scope replacements original
+      | Just target <- lookup_index replacements original = Just (mkTyVarTy target)
+      | otherwise = case original of
+          TermVarTy v
+            | Just (_, target) <- lookupVarEnv renamed v -> Just (TermVarTy target)
+            | otherwise -> do
+                domain <- go renamed scope replacements (varType v)
+                mult <- go renamed scope replacements (idMult v)
+                return (TermVarTy (setIdMult (setVarType v domain) mult))
+          TermAppTy f arg -> do
+            fty <- go renamed scope replacements (varType f)
+            -- A callable head retains its fixed M65 domain.
+            if fty `eqType` varType f then pure () else Nothing
+            let f' = maybe f snd (lookupVarEnv renamed f)
+            TermAppTy f' <$> go renamed scope replacements arg
+          DepFunTy binder body -> do
+            domain <- go renamed scope replacements (varType binder)
+            mult <- go renamed scope replacements (idMult binder)
+            let target = uniqAway scope (setIdMult (setVarType binder domain) mult)
+            body' <- go (extendVarEnv renamed binder (binder, target))
+                        (extendInScopeSet scope target) (mask binder replacements) body
+            return (mkDepFunTy target body')
+          ForAllTy ma (Bndr binder vis) body -> do
+            ma' <- go renamed scope replacements ma
+            kind <- go renamed scope replacements (varType binder)
+            let target = uniqAway scope (setVarType binder kind)
+            body' <- go (extendVarEnv renamed binder (binder, target))
+                        (extendInScopeSet scope target) (mask binder replacements) body
+            return (mkTyCoForAllTy ma' target vis body')
+          TyVarTy v
+            | Just (_, target) <- lookupVarEnv renamed v -> Just (mkTyVarTy target)
+            | otherwise -> mkTyVarTy . setVarType v <$> go renamed scope replacements (varType v)
+          TyConApp tc args -> mkTyConApp tc <$> traverse (go renamed scope replacements) args
+          AppTy fun arg -> mkAppTy <$> go renamed scope replacements fun
+                                    <*> go renamed scope replacements arg
+          FunTy af ma mult arg res ->
+            FunTy af <$> go renamed scope replacements ma
+                     <*> go renamed scope replacements mult
+                     <*> go renamed scope replacements arg
+                     <*> go renamed scope replacements res
+          LitTy {} -> Just original
+          CastTy body co
+            | independent replacements (tyCoVarsOfCo co) ->
+                mkCastTy <$> go renamed scope replacements body <*> pure (rename_co renamed scope co)
+          CoercionTy co
+            | independent replacements (tyCoVarsOfCo co) ->
+                Just (CoercionTy (rename_co renamed scope co))
+          _ -> Nothing
+
+    lookup_index [] _ = Nothing
+    lookup_index ((source, target):rest) index
+      | source `eqType` index = Just target
+      | otherwise = lookup_index rest index
+
+    mask binder = filter (not . elemVarSet binder . tyCoVarsOfType . fst)
+    independent replacements vars =
+      all (disjointVarSet vars . tyCoVarsOfType . fst) replacements
+
+    rename_co renamed scope co = substCo (Subst scope ids tvs cvs) co
+      where
+        entries = map snd (nonDetUFMToList renamed)
+        ids = mkVarEnv [(source, varToCoreExpr target) | (source,target) <- entries
+                      , isId source, not (isCoVar source)]
+        tvs = mkVarEnv [(source, mkTyVarTy target)
+                      | (source,target) <- entries, isTyVar source]
+        cvs = mkVarEnv [(source, mkCoVarCo target)
+                      | (source,target) <- entries, isCoVar source]
+
+{- Note [Scoped native index abstraction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The input is a source type. Free runtime Ids have source metadata. A bound
+source Id maps explicitly to its target prototype; no in-scope lookup decides
+whether metadata needs another substitution. Map a binder's domain before its
+body, and return stored targets and replacement TyVars once. Preserve forall
+metadata outside its own group. Do not inspect recursive IdInfo.
+
+The temporary TyVars are local lifting templates. They do not become checked
+runtime indices. Input casts and coercion types retain independent evidence;
+abstracting selected runtime indices inside such evidence remains unsupported.
+The later lifting step constructs new domain evidence explicitly.
+-}
+
+-- | Add completed runtime ranges to an endpoint substitution.
+nativeLiftSubst :: LeftOrRight -> NativeLiftEnv -> Subst -> Subst
+nativeLiftSubst side native subst@(Subst scope ids tvs cvs)
+  | isEmptyVarEnv native = subst
+  | otherwise = Subst scope' (ids `plusVarEnv` ranges) tvs cvs
+  where
+    entries = map snd (nonDetUFMToList native)
+    ranges = mkVarEnv [ (source, mapNativeIndex (const index) (varToCoreExpr source))
+                      | NativeBndrLift source target delta <- entries
+                      , let index = case side of
+                              CLeft -> TermVarTy target
+                              CRight -> mkCastTyMCo (TermVarTy target) delta ]
+    scope' = scope `extendInScopeSetSet`
+      tyCoVarsOfCos [mkGReflRightMCo Nominal (TermVarTy target) delta
+                   | NativeBndrLift _ target delta <- entries]
+
 -- See Note [liftCoSubstTyVar]
 liftCoSubstTyVar :: LiftingContext -> Role -> TyVar -> Maybe Coercion
-liftCoSubstTyVar (LC subst env) r v
+liftCoSubstTyVar (LC subst env _) r v
   | Just co_arg <- lookupVarEnv env v
   = downgradeRole_maybe r (coercionRole co_arg) co_arg
 
@@ -2016,9 +2226,9 @@ liftCoSubstTyVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
                           -> (LiftingContext -> Type -> r) -- ^ callback
                           -> LiftingContext -> TyVar
                           -> (LiftingContext, TyVar, r)
-liftCoSubstTyVarBndrUsing view_co fun lc@(LC subst cenv) old_var
+liftCoSubstTyVarBndrUsing view_co fun lc@(LC subst cenv native) old_var
   = assert (isTyVar old_var) $
-    ( LC (subst `extendSubstInScope` new_var) new_cenv
+    ( LC (subst `extendSubstInScope` new_var) new_cenv native
     , new_var, stuff )
   where
     old_kind = tyVarKind old_var
@@ -2036,9 +2246,9 @@ liftCoSubstCoVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
                           -> (LiftingContext -> Type -> r) -- ^ callback
                           -> LiftingContext -> CoVar
                           -> (LiftingContext, CoVar, r)
-liftCoSubstCoVarBndrUsing view_co fun lc@(LC subst cenv) old_var
+liftCoSubstCoVarBndrUsing view_co fun lc@(LC subst cenv native) old_var
   = assert (isCoVar old_var) $
-    ( LC (subst `extendSubstInScope` new_var) new_cenv
+    ( LC (subst `extendSubstInScope` new_var) new_cenv native
     , new_var, stuff )
   where
     old_kind = coVarKind old_var
@@ -2068,7 +2278,7 @@ liftCoSubstCoVarBndrUsing view_co fun lc@(LC subst cenv) old_var
 
 -- | Is a var in the domain of a lifting context?
 isMappedByLC :: TyCoVar -> LiftingContext -> Bool
-isMappedByLC tv (LC _ env) = tv `elemVarEnv` env
+isMappedByLC tv (LC _ env _) = tv `elemVarEnv` env
 
 -- If [a |-> g] is in the substitution and g :: t1 ~ t2, substitute a for t1
 -- If [a |-> (g1, g2)] is in the substitution, substitute a for g1
@@ -2086,10 +2296,10 @@ swapLiftCoEnv :: LiftCoEnv -> LiftCoEnv
 swapLiftCoEnv = mapVarEnv mkSymCo
 
 lcSubstLeft :: LiftingContext -> Subst
-lcSubstLeft (LC subst lc_env) = liftEnvSubstLeft subst lc_env
+lcSubstLeft (LC subst lc_env native) = nativeLiftSubst CLeft native (liftEnvSubstLeft subst lc_env)
 
 lcSubstRight :: LiftingContext -> Subst
-lcSubstRight (LC subst lc_env) = liftEnvSubstRight subst lc_env
+lcSubstRight (LC subst lc_env native) = nativeLiftSubst CRight native (liftEnvSubstRight subst lc_env)
 
 liftEnvSubstLeft :: Subst -> LiftCoEnv -> Subst
 liftEnvSubstLeft = liftEnvSubst pFst
@@ -2125,11 +2335,11 @@ liftEnvSubst selector subst lc_env
 
 -- | Lookup a 'CoVar' in the substitution in a 'LiftingContext'
 lcLookupCoVar :: LiftingContext -> CoVar -> Maybe Coercion
-lcLookupCoVar (LC subst _) cv = lookupCoVar subst cv
+lcLookupCoVar (LC subst _ _) cv = lookupCoVar subst cv
 
 -- | Get the 'InScopeSet' from a 'LiftingContext'
 lcInScopeSet :: LiftingContext -> InScopeSet
-lcInScopeSet (LC subst _) = substInScopeSet subst
+lcInScopeSet (LC subst _ _) = substInScopeSet subst
 
 
 {-

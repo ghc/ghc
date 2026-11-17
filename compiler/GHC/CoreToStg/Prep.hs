@@ -1147,10 +1147,17 @@ nameNativeConstructorArgs expr
           _ -> throwGhcException (Sorry
                  "Native dependent Core requires a retained function argument to be an eligible local variable of its fixed function type in CorePrep.")
       | DepFunTy index _ <- coreFullView ty
-      = do { (atom, co, wrap_arg) <- nameNativeIndexArg arg
+      -- See Note [Naming later retained domains].
+      = do { domain_co <- liftNativeIndexTransport "a later retained domain" transport (varType index)
+           ; let prepared_arg
+                   | isReflCo domain_co = arg
+                   | otherwise = Cast arg (SubCo (mkSymCo domain_co))
+           ; (atom, naming_co, wrap_arg) <- nameNativeIndexArg prepared_arg
            ; marker <- mkSysLocalM (fsLit "retained_template") ManyTy (varType index)
-           ; let ty' = applyTypeToArgs ty [Var marker]
-           ; build ty' (App app atom) ((marker, co) : transport)
+           ; let marker_co = mkTransCo naming_co
+                    (mkGReflRightCo Nominal (coercionRKind naming_co) domain_co)
+                 ty' = applyTypeToArgs ty [Var marker]
+           ; build ty' (App app atom) ((marker, marker_co) : transport)
                    (wrap . wrap_arg) rest }
       | Type {} <- arg
       = do { check_erased_binder ty transport
@@ -1278,28 +1285,50 @@ head nor decomposes an equality between call results. See
 docs/dependent-haskell/REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison.
 -}
 
--- | Lift index equalities through value types and fixed-domain retained binders.
+{- Note [Naming later retained domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Naming an earlier retained argument changes its index from the original term
+to a prepared atom. A later domain can depend on that index. First lift the
+domain to delta : A_prepared ~N A_original, then cast the incoming argument
+back to A_prepared with raw SubCo (sym delta). This cast does not evaluate an
+opaque variable. Keep the marker at its source domain in the temporary type.
+
+Naming gives p : atom ~ (original |> sym delta), at kind A_prepared. Compose
+p with GRefl N (coercionRKind p) delta to obtain the marker relation
+atom :: A_prepared ~ original :: A_original. The nested kind casts cancel
+through mkCastTy. The nominal child stays present in the runtime value cast.
+
+The builder prepends marker relations. Reverse that list before constructing
+template TyVars: each later template kind needs the completed earlier prefix.
+-}
+
+-- | Lift index equalities through value types and retained binder domains.
 -- Fresh symbolic Ids occur only in this temporary template, never in output Core.
 liftNativeIndexTransport :: String -> [(Id, CoercionN)] -> Type -> UniqSM CoercionN
 liftNativeIndexTransport context transport ty
   | all (isReflCo . snd) relevant
   = return (mkReflCo Nominal left_ty)
   | otherwise
-  = do { templates <- forM relevant $ \(index, _) ->
-           do { unique <- getUniqueM
-              ; return (mkTyVar (mkSystemName unique (mkTyVarOccFS (fsLit "retained")))
-                                (varType index)) }
-       ; template_ty <- case abstract (mkVarEnv (zip (map fst relevant) templates)) ty of
+  = do { bindings <- foldM template [] relevant
+       ; let templates = map snd bindings
+       ; template_ty <- case abstractNativeIndices bindings ty of
            Just template_ty -> return template_ty
            Nothing -> nativeIndexTransportError context
-       ; let co = liftCoSubstWith Nominal templates (map snd relevant) template_ty
-       ; if coercionLKind co `eqType` left_ty && coercionRKind co `eqType` right_ty
+       ; let lc = prepareNativeLiftingContext
+                    (mkLiftingContext (zip templates (map snd relevant))) template_ty
+             co = liftCoSubst Nominal lc template_ty
+             expected_left = substTy (lcSubstLeft lc) template_ty
+             expected_right = substTy (lcSubstRight lc) template_ty
+       ; if expected_left `eqType` left_ty
+            && coercionLKind co `eqType` expected_left
+            && coercionRKind co `eqType` expected_right
          then return co
          else pprPanic "liftNativeIndexTransport: endpoints" (ppr co $$ ppr ty) }
   where
-    relevant = filter (\(index, _) -> anyFreeVarsOfType (== index) ty) transport
+    -- Restore the earlier prefix before constructing dependent template kinds.
+    -- See Note [Naming later retained domains].
+    relevant = reverse (filter (\(index, _) -> anyFreeVarsOfType (== index) ty) transport)
     left_ty = instantiate coercionLKind
-    right_ty = instantiate coercionRKind
     instantiate endpoint
       = substTy (Subst in_scope bindings emptyVarEnv emptyVarEnv) ty
       where
@@ -1308,21 +1337,14 @@ liftNativeIndexTransport context transport ty
         bindings = mkVarEnv [(index, mapNativeIndex (const (endpoint co)) (Var index))
                            | (index, co) <- relevant]
 
-    abstract env ty
-      | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) ty) = Just ty
-      | Just ty' <- coreView ty = abstract env ty'
-    abstract env (TermVarTy index) = mkTyVarTy <$> lookupVarEnv env index
-    abstract env (TermAppTy fun arg)
-      | not (isJust (lookupVarEnv env fun)) = TermAppTy fun <$> abstract env arg
-    abstract env (DepFunTy index body)
-      | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) (varType index))
-      = mkDepFunTy index <$> abstract (delVarEnv env index) body
-    abstract env (TyConApp con args) = mkTyConApp con <$> mapM (abstract env) args
-    abstract env (AppTy fun arg) = mkAppTy <$> abstract env fun <*> abstract env arg
-    abstract env (FunTy flag ma mult arg res)
-      = FunTy flag <$> abstract env ma <*> abstract env mult
-                   <*> abstract env arg <*> abstract env res
-    abstract _ _ = Nothing
+    -- Each later template kind uses the completed earlier prefix.
+    template earlier (index, _) =
+      do { kind <- case abstractNativeIndices earlier (varType index) of
+             Just kind -> return kind
+             Nothing -> nativeIndexTransportError context
+         ; unique <- getUniqueM
+         ; let binder = mkTyVar (mkSystemName unique (mkTyVarOccFS (fsLit "retained"))) kind
+         ; return (earlier ++ [(TermVarTy index, binder)]) }
 
 -- | Report the remaining coercion boundary without fabricating index evidence.
 nativeIndexTransportError :: String -> UniqSM a

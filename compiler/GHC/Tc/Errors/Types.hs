@@ -5352,6 +5352,7 @@ data RetainedQuantificationError
   | RetainedContextPattern
   | RetainedResultWrapper
   | RetainedIndexExpression
+  | RetainedIndexMultiplicity Type
   | RetainedFunctionArgument
   | RetainedCallIndex
   | RetainedCallInstrumentation

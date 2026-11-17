@@ -2970,8 +2970,8 @@ pushCoRetainedArg = go
                MCo proof
                  | coercionRole proof == Nominal
                  , coercionLKind proof `eqType` varType b
-                 , isNativeIndexId b
-                 , isNativeIndexType (coercionRKind proof)
+                 , isNativeOpaqueValueId b
+                 , isNativeIndexDomainConversion (varType b) (coercionRKind proof)
                  -> Just proof
                _ -> Nothing
            ; let source_domain = if symmetric then coercionLKind delta
@@ -2988,13 +2988,13 @@ pushCoRetainedArg = go
            ; return (converted, MCo (if symmetric then mkSymCo proof else proof)) }
 
     valid_argument b arg
-      | isNativeIndexId b
-      = case exprToNativeIndex arg of
-          Just index -> typeKind index `eqType` varType b
-          Nothing -> False
       | isNativeIndexFunctionId b
       = case nativeIndexFunctionVar_maybe arg of
           Just actual -> varType actual `eqType` varType b
+          Nothing -> False
+      | isNativeOpaqueValueId b
+      = case exprToNativeIndex arg of
+          Just index -> typeKind index `eqType` varType b
           Nothing -> False
       | otherwise = False
 

@@ -502,12 +502,75 @@ tcExpr e@HsQualLit{} _ = pprPanic "tcExpr: HsQualLit" (ppr e)
 -- The expansion includes an ExplicitList, but it is always the built-in
 -- list type, so that's all we need concern ourselves with here.  See
 -- GHC.Rename.Expr. Note [Handling overloaded and rebindable constructs]
-tcExpr (ExplicitList _ exprs) res_ty
-  = do  { res_ty <- expTypeToType res_ty
-        ; (coi, elt_ty) <- matchExpectedListTy res_ty
-        ; let tc_elt expr = tcCheckPolyExpr expr elt_ty
-        ; exprs' <- mapM tc_elt exprs
-        ; return $ mkHsWrapCo coi $ ExplicitList elt_ty exprs' }
+tcExpr expr@(ExplicitList _ exprs) res_ty
+  = do { anchor <- case res_ty of
+             Infer _ -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+                           ; if enabled then find_native [] exprs
+                                        else return Nothing }
+             _ -> return Nothing
+       ; case anchor of
+           Just (before, element, after)
+             -> do { (element', elt_ty) <- tcInferRho element
+                   ; _ <- setSrcSpanA (getLoc element) $ addExprCtxt (unLoc element) $
+                            unifyType Nothing (typeKind elt_ty) liftedTypeKind
+                   ; before' <- mapM (`tcCheckPolyExpr` elt_ty) before
+                   ; after' <- mapM (`tcCheckPolyExpr` elt_ty) after
+                   ; tcWrapResultMono expr
+                       (ExplicitList elt_ty (before' ++ (element' : after')))
+                       (mkListTy elt_ty) res_ty }
+           Nothing
+             -> do { res_ty <- expTypeToType res_ty
+                   ; (coi, elt_ty) <- matchExpectedListTy res_ty
+                   ; exprs' <- mapM (`tcCheckPolyExpr` elt_ty) exprs
+                   ; return $ mkHsWrapCo coi $ ExplicitList elt_ty exprs' } }
+  where
+    -- Select a declared type without checking an occurrence or collecting usage.
+    find_native :: [LHsExpr GhcRn] -> [LHsExpr GhcRn]
+                -> TcM (Maybe ([LHsExpr GhcRn], LHsExpr GhcRn, [LHsExpr GhcRn]))
+    find_native before (element : after)
+      = do { native <- native_element element
+           ; if native then return (Just (reverse before, element, after))
+                       else find_native (element : before) after }
+    find_native _ [] = return Nothing
+
+    native_element :: LHsExpr GhcRn -> TcM Bool
+    native_element (L _ (HsPar _ element)) = native_element element
+    native_element (L _ (HsVar _ lname))
+      | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
+      = do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+           ; case mb_id of
+               Just var -> do
+                 { ty <- liftZonkM (zonkTcType (varType var))
+                 ; return (isTauTy ty && hasNativeDependentExpr (Core.Type ty)
+                           && typeKind ty `eqType` liftedTypeKind) }
+               Nothing -> return False }
+    native_element _ = return False
+
+{- Note [Inference of native list elements]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If vector :: Vec Int n, inferring [vector] must retain that exact element
+type. The ordinary list path allocates an element meta-variable first.
+It cannot contain the runtime Id n.
+
+Under ExperimentalDependentTypes, an inferred list can use a declared
+monomorphic native variable as its element type. Look through parentheses.
+Read and zonk its declared type without checking its occurrence or emitting
+usage. Do not expand splices or infer an application to select this type.
+The type must be a lifted tau type that already contains native syntax.
+
+Infer the selected occurrence once with tcInferRho. This retains its usual
+usage and application checks. Check its lifted kind and check all other
+elements against its exact inferred type. An earlier bottom element can then
+use the same expected type. Keep every typed element in its original position.
+This changes no runtime evaluation order and adds no sharing binding.
+
+Use tcWrapResultMono with the original InferResult. Keep its level and
+promotion checks. Surrounding application and callback scope checks remain
+active. A list does not bind or hide a free runtime index. Do not write a
+native type to an element meta-variable. Known expected types, empty lists
+and lists without a declared native element keep ordinary list checking.
+Polymorphic variables and checking-only expressions do not select this route.
+-}
 
 tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   | all tupArgPresent tup_args

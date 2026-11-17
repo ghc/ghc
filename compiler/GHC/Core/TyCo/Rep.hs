@@ -254,28 +254,38 @@ data Type
 
 {- Note [Restricted retained dependent types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TermVarTy and DepFunTy implement an internal experiment. A scalar runtime index
-remains a local, non-coercion, unrestricted Id with a supported closed algebraic
-type. See Note [Algebraic runtime index domains] in GHC.Core.Type.
-DepFunTy can also bind an eligible opaque call head. See Note [Function-valued
-retained binders] in GHC.Core.Type. Such a head can occur as TermVarTy when it
-is stored in an algebraic index. Its application uses TermAppTy/TermAppCo.
-See Note [Native function-value application] in GHC.Core.TyCo.Make.
-TermVarTy has the identifier's type as its kind. A DepFunTy result has kind Type. Constraint
-also has a lifted representation, but is not a supported result kind here.
+TermVarTy and DepFunTy implement an internal experiment. An opaque runtime
+index remains an actual local, non-CoVar, non-join Many Id of lifted value type.
+Its complete type can contain outer erased variables and earlier runtime
+indices. Check the actual lexical binding and its type and multiplicity
+metadata. See Note [Opaque runtime index values] in GHC.Core.Type.
+TermVarTy has the identifier's type as its kind. A DepFunTy result has kind
+Type. Constraint has a lifted representation but is not a supported result
+kind here.
+
+Source foreach roots keep a separate rule. They require a structural algebraic
+domain or an eligible native call head. Derive opaque parameter fields from
+the original constructor telescope before instantiation. Fixed concrete fields
+keep their structural or eligible function-field checks. See Notes
+[Algebraic runtime index domains] and [Function-valued retained binders] in
+GHC.Core.Type. Opaque function-value identity does not grant call permission.
+Native calls retain their closed visible U/Many function type and independently
+closed function-free structural endpoints. Their application uses
+TermAppTy/TermAppCo. See Note [Native function-value application] in
+GHC.Core.TyCo.Make.
 
 The binder scopes over the result. A vacuous binder is represented by FunTy;
 use mkDepFunTy to maintain this invariant. Index occurrences are scope
 dependencies, not additional runtime uses. Type-variable and coercion-variable
 callbacks must not process runtime index variables.
 
-Only variable and constructor index substitution is implemented. The restricted
-bytecode and module entries check these forms with Core Lint before and after
-preparation. Interface signatures use scoped local Ids. General expression
-substitution and the ordinary optimizer remain unsupported. Native interface
-templates have separate checks and a module writer gate. The restricted source
-checker accepts closed algebraic domains, including Bool, user-defined Nat,
-and constructors with eligible opaque function fields.
+Index expressions and substitution keep their checked variable, constructor,
+nominal-cast and selected beta grammar. Stored ranges are used once. This is
+not arbitrary Core expression substitution. The restricted bytecode and module
+entries check these forms with Core Lint before and after preparation.
+Interface signatures use scoped local Ids. The ordinary optimizer remains
+unsupported. Native interface templates retain their separate checks and
+module writer gate. These rules add no evaluator or totality assumption.
 See docs/dependent-haskell/CORE.md and the Agda provenance in
 docs/dependent-haskell/REFERENCES.md.
 -}
@@ -283,19 +293,24 @@ docs/dependent-haskell/REFERENCES.md.
 {- Note [Retained dependent function coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 DepFunCo b domain co binds one unrestricted runtime binder throughout co.
-The optional domain proof is outside that binder. MRefl keeps its closed
-domain A. MCo delta requires nominal evidence A ~ B between supported scalar
-domains. The type of b is A. Both body endpoints have kind Type.
+The optional domain proof is outside that binder. MRefl keeps its complete
+lifted domain A unchanged. MCo delta requires nominal evidence A ~ B between
+lifted value types. The type of b is A. Both body endpoints have kind Type.
+If either domain is an eligible native-call function type, require identical
+complete types. Other opaque function-value domains can be transported with
+nominal evidence; that transport grants no native call permission. See
+Note [Opaque runtime index values] in GHC.Core.Type.
 
 If co relates S and T at role r, the left endpoint is foreach (b :: A) -> S.
 The right endpoint binds a fresh Id at type B and substitutes its backward
 conversion for the old b in T. Freshen against the domain proof's deep free
 variables and the body's free variables other than b. The domain proof is
-outside b's scope and can refer to an outer Id with the same Unique. CastTy carries this nominal kind
-conversion. The runtime bridge uses Cast value (SubCo (sym delta)). Preserve
-the nominal proof structure. See Note [Nominal native index casts] in GHC.Core.
-Function-valued binders retain MRefl: their occurrences are fixed-type Id heads.
-Each endpoint can independently become an ordinary arrow when b is unused.
+outside b's scope and can refer to an outer Id with the same Unique. CastTy
+carries this nominal kind conversion. The runtime bridge uses
+Cast value (SubCo (sym delta)). Preserve the nominal proof structure.
+See Note [Nominal native index casts] in GHC.Core. An eligible call head keeps
+its complete fixed type and its dedicated bare-Id head slot. Each endpoint can
+independently become an ordinary arrow when b is unused.
 
 The binder scopes over the proof as well as its endpoints. Keep DepFunCo even
 when both endpoints omit b: an intermediate proof can still use that index.
