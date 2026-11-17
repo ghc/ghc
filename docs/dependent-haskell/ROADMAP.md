@@ -50,12 +50,11 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-The latest validated bounded increment is M73. A call can supply a leading
-invisible runtime operand with `@{n}`, or recover it from a later declaration
-such as `Vec Int n`. The written operand determines the index for later
-arguments and the result. Both rebuilt stages pass the Showcase with 131
-output lines through seventeen source modules, including the banner.
-General inference remains R03 work. R05 and R23 also remain open.
+M74 checks consecutive invisible retained arguments. The two vectors in
+`appendHidden xs ys` supply separate runtime lengths, and the result has
+index `Add n m`. A caller can also write either the leading operand or both
+operands. Both stages match 133 Showcase output lines through seventeen
+source modules, including the banner. R03, R05 and R23 remain open.
 M62 supplied the earlier 88-line source group through fourteen modules.
 M56 provides
 the closed parameterized domains. M57 provides nominal scalar-domain conversion
@@ -110,6 +109,7 @@ can advance a card while the card remains open.
 | 12 | R05: invisible retained function types and coercions; enables R03 | Complete bounded increment: M71 | Both stages compile. The API, versioned interface and object tests cover visibility and demand. |
 | 13 | R03: source definitions and omitted invisible runtime operands | Complete bounded increment: M72 | The imported call passes the IO-sourced Nat from a later vector declaration. Native object tests cover ignored bottom, name shadowing and located missing and conflicting operands. |
 | 14 | R03: explicit invisible runtime operands | Complete bounded increment: M73 | Written `@{n}` works with or without erased `@Int`. The interface-only client preserves demand. A wrong written index reports the later argument where the two indices disagree. |
+| 15 | R03: consecutive invisible runtime operands | Complete bounded increment: M74 | The interface-only vector append infers two lengths and checks their sum in the result type. Constructor inference respects term scope and records import usage. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -147,7 +147,7 @@ increment has a bounded scope.
 
 | Roadmap area | Remaining local work | Main obligations before completion |
 | --- | --- | --- |
-| R03: dependent products | General domains, invisible retained binders, runtime `Type` operands | Separate retention from visibility. Define a runtime universe bridge. Required erased `forall` and existing `TypeRep` do not supply that bridge. |
+| R03: dependent products | General domains, broader invisible argument inference, runtime `Type` operands | Separate retention from visibility. Define a runtime universe bridge. Required erased `forall` and existing `TypeRep` do not supply that bridge. |
 | R04 and R22: sums and existentials | First-class erased `exists` and retained `some` | Specify formation, introduction, elimination, scope and representation. Existing retained ADT fields provide a storage baseline. |
 | R05: dependent Core | Typed conversion, proof operations, transformations, unfoldings and normal optimization | Reconcile the native forms with the calculi. Preserve roles, scope, demand, sharing and ordinary GHC behavior. |
 | R15 and R16: closed and open evaluation | Computation in types over closed inputs and rigid variables | Specify staging, divergence, stuck terms and diagnostics. Reuse ordinary term definitions without parallel handwritten families. |
@@ -434,8 +434,8 @@ L1 to R20; and I1 to R01. The current queue above owns the next work.
   M50 changes source package pattern checking and row desugaring, with no new
   Core, solver, codec or backend rule. C1 and C2 remain open.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
-  release. Broaden the documented static subset and supported domains. Implement
-  invisible retained binders and their explicit `@` overrides. Reuse inherited
+  release. Broaden the documented static subset and supported domains. Extend application and definition checking beyond the leading invisible
+  binders supported by M72–M74. Reuse inherited
   visibility and scoping machinery. State when annotations are required. Never
   infer a new retained quantifier merely because a definition could have one.
   Advances `R03` and `R02`.

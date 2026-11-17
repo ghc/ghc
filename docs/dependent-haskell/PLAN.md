@@ -6007,15 +6007,28 @@ term uses at Many and record constructor imports when inserting the
 operand. See Note [Inferring an invisible retained argument] in
 GHC.Tc.Gen.App and [the prior art](REFERENCES.md#successive-invisible-arguments).
 
-- [ ] Compile the library and a client that sees only its object interfaces.
+- [x] Compile the library and a client that sees only its object interfaces.
       Check both lengths omitted, erased `@Int` supplied, only the first
       length supplied, and both lengths supplied.
-- [ ] Check source order with runtime lengths 2 and 1. Reverse them and
+- [x] Check source order with runtime lengths 2 and 1. Reverse them and
       use the same length twice. Check the sum-indexed append result.
-- [ ] Check both constructor branches and an ignored successor with a bottom
+- [x] Check both constructor branches and an ignored successor with a bottom
       field. Check a constructor import used only by inference and reject
       the same call when the constructor is outside the client's scope.
-- [ ] Reject omission when the only occurrence is under the non-injective
+- [x] Reject omission when the only occurrence is under the non-injective
       `Forget` family. Check both the explicit operand and the independent
       vector argument that determines the length.
-- [ ] Run both compiler stages on Showcase and the selected registered tests.
+- [x] Run both compiler stages on Showcase and the selected registered tests.
+
+M73 compiled the definition and rejected the omitted application at `xs`
+with GHC-83605. M74 produces `[7,7,9]` in all four application forms.
+The runtime length observations are 21, 12 and 22. The ordinary consumer
+passes with `-Werror=unused-imports`. Both stages match all 133 Showcase
+lines through seventeen source modules. Seven normal-way registered tests
+pass with 54 other cases skipped. Before the injectivity check, the isolated
+family probe compiled the ambiguous call. With the check it reports
+GHC-83605 at the written vector. A declared injective family supplies its
+index. An erased variable alone gives GHC-83605. The explicit and
+independently determined calls both return 1.
+The local verification files have the
+`native-hidden-append-` prefix.

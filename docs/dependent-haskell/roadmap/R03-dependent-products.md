@@ -31,6 +31,9 @@ all Core transformations. Normal optimization remains a broader release gate.
   rejection. Required type arguments also check holes combined after renaming.
   Its independent audit passes. The M62 Showcase has 88 output lines.
 - Generic structural lists and runtime-index-bearing element domains at M67.
+- Consecutive hidden indices in an imported append function at M74. Both
+  vectors determine the result index. Non-injective family arguments require
+  another determining argument or an explicit operand.
 - Imported retained application contracts in ordinary modules at M68. Both
   rebuilt stages pass paired clients, scoped callback dictionaries and located
   rejections. The Showcase has 118 output lines through seventeen modules.
@@ -79,6 +82,10 @@ M58 and M59 expose those rules through source checking.
 - [x] Add explicit invisible runtime operands. Check `f @Int @{n} xs`, a
       constructor operand, and a located error for a mismatched later vector.
       See [M73](../PLAN.md#m73-explicit-invisible-runtime-arguments).
+- [x] Infer consecutive invisible operands in telescope order. Run vector
+      append with both lengths omitted or with an explicit leading length.
+      Recover in-scope constructor trees from declared indices.
+      See [M74](../PLAN.md#m74-successive-invisible-retained-arguments).
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.

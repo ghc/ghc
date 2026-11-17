@@ -746,6 +746,20 @@ invisibleRetainedArguments = do
     observe "invisible retained ignores bottom" (ignoreInvisibleLength unused)
     observe "explicit invisible retained ignores bottom" (ignoreInvisibleLength @Int @{bottom} unused)
 
+-- | Recover both runtime lengths from the vector declarations.
+inferredAppend :: IO ()
+inferredAppend = do
+    n <- newIORef (S (S Z)) >>= readIORef
+    m <- newIORef (S Z) >>= readIORef
+    let xs :: Vec Int n
+        xs = replicateNative @Int n 7
+        ys :: Vec Int m
+        ys = replicateNative @Int m 9
+        joined :: Vec Int (Add n m)
+        joined = appendHidden xs ys
+    observe "append with inferred lengths" (toList joined)
+    observe "append with first length written" (toList (appendHidden @{n} xs ys))
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -769,3 +783,4 @@ main = do
     ordinaryModuleCalls
     genericSafeIndexing
     invisibleRetainedArguments
+    inferredAppend
