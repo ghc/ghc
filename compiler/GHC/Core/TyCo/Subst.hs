@@ -824,19 +824,8 @@ substTyCoMapper
    subst_cv cv = StrictReaderT $ \subst -> return (substCoVar  subst cv)
    subst_ch ch = StrictReaderT $ \subst -> return (substCoHole subst ch)
 
-   -- Return a stored converted range once, including its nominal evidence.
-   -- See Note [Nominal native index casts] in GHC.Core.
-   subst_index v = StrictReaderT $ \subst@(Subst in_scope ids _ _) ->
-     return $ if isNativeIndexFunctionId v
-       then TermVarTy (substNativeIndexFunction subst v)
-         -- Keep the same Var-only ranges as a native call head.
-         -- See Note [Native function-value application] in GHC.Core.TyCo.Make.
-       else case lookupVarEnv ids v of
-         Nothing -> TermVarTy (lookupInScope in_scope v `orElse` v)
-         Just rhs -> case exprToNativeIndex rhs of
-           Just index | typeKind index `eqType` varType v -> index
-           _ -> pprPanic "substTy: unsupported runtime index or changed domain"
-                        (ppr v <+> text ":=" <+> ppr rhs)
+   subst_index v = StrictReaderT $ \subst ->
+     return (substNativeIndexUsing substTy subst v)
 
    subst_fun f = StrictReaderT $ \subst -> return (substNativeIndexFunction subst f)
 
@@ -869,15 +858,64 @@ substNativeIndexFunction (Subst in_scope ids _ _) f
                      (ppr f <+> text ":=" <+> ppr rhs)
     same_domain = eqType
 
--- | Rename a closed-domain runtime binder and mask its outer substitution.
+-- | Substitute a source index occurrence and return its target only once.
+-- See Note [Substituting runtime Id metadata].
+substNativeIndexUsing :: (Subst -> Type -> Type) -> Subst -> Id -> Type
+substNativeIndexUsing subst_ty subst@(Subst in_scope ids _ _) v
+  | isNativeIndexFunctionId v
+  = TermVarTy (substNativeIndexFunction subst v)
+    -- Keep the same Var-only ranges as a native call head.
+    -- See Note [Native function-value application] in GHC.Core.TyCo.Make.
+  | otherwise
+  = case lookupVarEnv ids v of
+      Nothing -> TermVarTy (lookupInScope in_scope v `orElse` v)
+      Just rhs -> case exprToNativeIndex rhs of
+        Just index | typeKind index `eqType` subst_ty subst (varType v) -> index
+        _ -> pprPanic "substTy: unsupported runtime index or changed domain"
+                     (ppr v <+> text ":=" <+> ppr rhs)
+
+-- | Substitute a runtime binder's metadata and mask its outer substitution.
 -- Use the resulting substitution only inside the binder's scope.
 substNativeIndexBndr :: Subst -> Id -> (Subst, Id)
-substNativeIndexBndr (Subst in_scope ids tvs cvs) old
+substNativeIndexBndr = substNativeIndexBndrUsing substTy
+
+-- | Use the selected ordinary or deep operation on source binder metadata.
+-- See Note [Substituting runtime Id metadata].
+substNativeIndexBndrUsing
+  :: (Subst -> Type -> Type) -> Subst -> Id -> (Subst, Id)
+substNativeIndexBndrUsing subst_ty subst@(Subst in_scope ids tvs cvs) old
   = (Subst (extendInScopeSet in_scope new) ids' tvs cvs, new)
   where
-    new = uniqAway in_scope old
+    old' | noFreeVarsOfType (varType old), noFreeVarsOfType (idMult old) = old
+         | otherwise = updateIdTypeAndMult (subst_ty subst) old
+    new = uniqAway in_scope old'
     ids' | new == old = delVarEnv ids old
          | otherwise = extendVarEnv ids old (varToCoreExpr new)
+
+{- Note [Substituting runtime Id metadata]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder's type and multiplicity belong to the source context.
+Substitute them before freshening and before masking the outer Id mapping.
+The binder does not scope over its domain. Install the resulting target Id
+in the in-scope set even when its Unique stays the same. Body occurrences
+then recover its updated metadata. Use the deep operation for deep mapping.
+
+For example, substituting a := Bool in a raw binder xs :: [a] must update
+both the binder and its body occurrences to [Bool]. If capture avoidance
+clones xs, the Id range has that new type too. Compare this range's kind with
+the substituted source type, not the old [a]. Return the range unchanged.
+Its metadata is already in the target context. The same rule applies to an
+Id returned by lookupInScope. Substituting either target again would break
+a := Maybe a and other apply-once substitutions.
+
+This operation updates metadata only. It does not traverse IdInfo or create
+a proof for a changed dependent domain. It does not prepare free source Ids
+inserted into the in-scope set solely for capture avoidance. Such callers
+must distinguish those source prototypes from completed target Ids. Nor does
+it widen native range admission: a stored range still passes the existing
+exprToNativeIndex check. Generic admission and composition remain separate.
+See Note [Substitutions apply only once].
+-}
 
 -- Avoid allocation in this very common case (e.g. Int, LiftedRep).
 nopTcAppTy :: Type -> TyCon -> [Type] -> SubstM Type
@@ -1134,9 +1172,9 @@ Wrinkles:
 deepSubstTyCoMapper :: TyCoMapper SubstM
 deepSubstTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
-               , tcm_termvar    = tcm_termvar substTyCoMapper
+               , tcm_termvar    = subst_index
                , tcm_termfun    = tcm_termfun substTyCoMapper
-               , tcm_termbinder = tcm_termbinder substTyCoMapper
+               , tcm_termbinder = index_bndr
                , tcm_covar      = subst_cv
                , tcm_hole       = subst_ch
                , tcm_tycobinder = tcv_bndr
@@ -1147,6 +1185,14 @@ deepSubstTyCoMapper
    subst_tv tv = StrictReaderT $ \subst -> return (deepSubstTyVar  subst tv)
    subst_cv cv = StrictReaderT $ \subst -> return (deepSubstCoVar  subst cv)
    subst_ch ch = StrictReaderT $ \subst -> return (deepSubstCoHole subst ch)
+
+   subst_index v = StrictReaderT $ \subst ->
+     return (substNativeIndexUsing deepSubstTy subst v)
+
+   index_bndr :: Id -> (Id -> SubstM r) -> SubstM r
+   index_bndr old k = StrictReaderT $ \subst ->
+     let (subst', new) = substNativeIndexBndrUsing deepSubstTy subst old
+     in runStrictReaderT (k new) subst'
 
    tcv_bndr :: TyCoVar -> ForAllTyFlag -> (TyCoVar -> SubstM r) -> SubstM r
    tcv_bndr tcv _vis k

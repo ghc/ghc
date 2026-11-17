@@ -229,10 +229,10 @@ zonkCo      :: Coercion -> ZonkM Coercion
     zonkTcTypeMapper :: TyCoMapper ZonkM
     zonkTcTypeMapper = TyCoMapper
       { tcm_tyvar = zonkTcTyVar
-      , tcm_termvar = pure . TermVarTy
-      , tcm_termfun = pure
-      , tcm_termbinder = \v k -> k v
-          -- See Note [Zonking retained Boolean indices]
+      , tcm_termvar = fmap TermVarTy . zonkId
+      , tcm_termfun = zonkId
+      , tcm_termbinder = \v k -> zonkId v >>= k
+          -- See Note [Zonking runtime index metadata]
       , tcm_covar = \cv -> mkCoVarCo <$> zonkTyCoVarKind cv
       , tcm_hole       = zonk_hole
       , tcm_tycobinder = \ tcv _vis k -> zonkTyCoVarKind tcv >>= k
@@ -320,10 +320,10 @@ zonkTcTypeAndFV ty
   = tyCoVarsOfTypeDSet <$> zonkTcType ty
 
 zonkTyCoVar :: TyCoVar -> ZonkM TcType
--- Works on TyVars and TcTyVars
+-- Works on TyVars, TcTyVars, CoVars, and runtime Ids.
 zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
                | isTyVar   tv = mkTyVarTy <$> zonkTyCoVarKind tv
-               | not (isCoVar tv) = return (TermVarTy tv)
+               | not (isCoVar tv) = TermVarTy <$> zonkId tv
                | otherwise    = assertPpr (isCoVar tv) (ppr tv) $
                                 mkCoercionTy . mkCoVarCo <$> zonkTyCoVarKind tv
    -- Hackily, when typechecking type and class decls
@@ -361,35 +361,43 @@ zonkTyCoVarBndrKind (Bndr tv flag) =
   do { tv' <- zonkTyCoVarKind tv
      ; return (Bndr tv' flag) }
 
--- | zonkId is used *during* typechecking just to zonk the 'Id''s type
+-- | Zonk an 'Id''s type and multiplicity during typechecking.
 zonkId :: TcId -> ZonkM TcId
 zonkId id = updateIdTypeAndMultM zonkTcType id
 
-{- Note [Zonking retained Boolean indices]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained Boolean index is a rigid Id with type Bool and multiplicity Many.
-Its metadata has no metavariables. During typechecking, preserve this Id at
-both its binder and its occurrences. Do not default it or turn it into a
-TyVar. The final zonker also preserves the occurrence's prototype Id. Its
-Name and Unique identify the actual runtime binder. Its closed domain and
-Many multiplicity need no zonking. Closed algebraic indices and eligible function
-heads use the same prototype policy. A function head has independently closed
-scalar argument/result domains and Many multiplicity. Its actual Name/Unique
-is preserved without consulting the recursive Id environment. The generic
-runtime binder callback already scopes it.
-See Note [Function-valued retained binders] in GHC.Core.Type.
+{- Note [Zonking runtime index metadata]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TermVarTy stores a runtime Id, whose type is the index's kind. Its type and
+multiplicity can contain filled metavariables. Zonk that metadata at each
+binder and occurrence. Use the same rule for TermAppTy and TermAppCo heads.
+zonkTyCoVar must also update runtime Ids before the FV entry points inspect
+their types. Keep the Id's Name and Unique. Do not turn it into a TyVar.
+
+Use zonkId during typechecking and zonkIdBndr in the final type mapper.
+These helpers reconstruct metadata from the original input Id. They do not
+inspect its IdInfo. Binder and occurrence metadata must be zonk-equivalent
+on input. Runtime dependencies in an Id's type must refer to an earlier,
+acyclic prefix. Thus metadata such as [Vec Int n] follows the earlier n
+without reading its term binding. Ordinary substitution must already update
+the input prototypes; zonking does not supply a missing type substitution.
 
 Do not look up an index occurrence in the knot-tied Id environment. Zonking
 can inspect the resulting type before the recursive bindings are available.
 Such a lookup can cause cyclic evaluation in fixIO. See Note [The ZonkEnv]
 in GHC.Tc.Zonk.Env. Runtime expression occurrences still use zonkIdOcc.
-The final zonker still extends the binder scope for DepFunTy; see
-zonk_tycomapper in GHC.Tc.Zonk.Type.
+An ambient index uses its stored input metadata. Ordinary recursive RHSs
+do not enter this traversal. The final binder callback still extends scope
+with zonkIdBndrX; type occurrences do not consult that expression Id map.
 
-This is the restricted dependent binder described in
-docs/dependent-haskell/REFERENCES.md#agda-provenance. The index does not add
-a runtime use. Haskell laziness still governs the retained argument; see
-docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+Final zonking can produce a Type with unfinished knot-tied TyCons. Do not
+zonk the newly produced Id again. Repeated occurrences reconstruct their
+original input prototypes, not the output of this pass. Keep the existing
+final meta cache and type-binder environment.
+See Note [Sharing when zonking to Type] in GHC.Tc.Zonk.Type.
+
+Metadata mapping does not admit a new index domain or provide domain
+transport. Those checks remain separate. The index adds no runtime use
+and this traversal does not evaluate its value.
 -}
 
 zonkCoVar :: CoVar -> ZonkM CoVar
