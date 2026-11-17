@@ -52,6 +52,7 @@ _build/showcase/showcase
 | Qualified native functions, erased choices and equality transport | `vectors`, with the imported Ground/Known providers |
 | Opaque calls, index beta reduction and retained function arguments | `vectors`, `functions` |
 | Function fields, exported retained workers, generic payloads and lazy storage | `functionFields` |
+| Function values inside algebraic indices and family-exposed calls | `algebraicFunctionFields` |
 | Later retained arguments, dictionaries, equality contexts and shadowing | `laterArguments` |
 | Multiple package constructors, nested fields and guard fallback | `alternatives` |
 | Runtime list indices, optional indices and heterogeneous tree payloads | `parameterizedDomains` |
@@ -69,6 +70,10 @@ M61 also passes the unchanged 84-line program with both rebuilt stages.
 M62 extends the program to 88 lines through the same fourteen modules.
 M63 passes 91 lines through those fourteen modules in both compiler stages.
 It appends three public matchability observations. Publication remains pending.
+M65 adds five observations and two provider modules for function values in
+algebraic indices. Both rebuilt stages pass all 100 lines from sixteen modules.
+Each stage also passes twelve runtime observations through a separate producer
+and interface-only client. The seven selected registered tests pass.
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
@@ -107,9 +112,10 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M64 passes both builds, API1/37, both-stage public19, parameterized14 and Showcase95/14, plus seven registered tests; M62 remains the published checkpoint |
+| Compiler validation | M65 passes the full self-hosted build, both-stage source/interface checks and Showcase100/16, plus seven registered tests including API1/37; M62 remains the published checkpoint |
 | Ordinary-arrow matchability | M63 retains type-valued metadata through Core, coercions, interfaces and reflection; M64 extends this foundation to foralls; source family unsaturation remains open |
 | Forall matchability | M64 carries per-binder annotations and nominal evidence through Core, source, interfaces, HIE, TH and supported reflection; runtime abstractions require U; selected source, scope, role and printer checks pass |
+| Function values in algebraic indices | M65 stores eligible fixed U/Many functions in closed domains, preserves family application proofs and later fields, and checks runtime demand across interfaces |
 | Example validation | Audited M60 passes both-stage hidden-interface source19, five rejection controls, compile-only equal-count reuse and Showcase84/14; no compiler change |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
@@ -151,7 +157,7 @@ optimization support or full roadmap completion.
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | `Showcase.hs` passes both compilers with 95 finite output lines; R22/C1/C2 remain open |
+| Maintained showcase | `Showcase.hs` passes both compilers with 100 finite output lines through sixteen modules; R22/C1/C2 remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -164,11 +170,15 @@ declaration defaults and remaining expression and constructor-evidence limits.
 The [validation record](PLAN.md#final-m64-validation) separates builds, runtime
 checks and rejection controls. General source family unsaturation, arbitrary
 dependent evaluation and totality remain open.
+The [M65 contract](CORE.md#function-values-in-algebraic-indices) adds function
+values in closed algebraic indices. Its [validation record](PLAN.md#m65-validation)
+separates the two compiler stages, interface controls and registered tests.
 
 ## Native Core implementation
 
 `TermVarTy` refers to the index of an existing runtime identifier in a supported
-closed algebraic domain, including Bool and user-defined Nat.
+closed algebraic domain, including Bool and user-defined Nat. It can also refer
+to an eligible local function at its complete fixed U/Many type.
 `DepFunTy` binds that identifier in a dependent result type. Type recovery and
 Core Lint agree on retained application. The implementation includes scope,
 capture avoidance, supported index substitution, alpha equality, and diagnostic

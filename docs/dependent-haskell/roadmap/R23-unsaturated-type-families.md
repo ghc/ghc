@@ -63,7 +63,9 @@ as a matchability implementation.
 The [M65 contract](../PLAN.md#m65-function-valued-fields-in-closed-native-index-domains)
 selects the first native function-field client. It connects saturated-family
 application to the existing opaque call index and preserves the complete
-forward proof. Its implementation and checks remain open.
+forward proof. Both rebuilt stages pass its selected source, interface and
+demand controls. Seven registered tests and Showcase100/16 pass.
+This does not implement source family unsaturation or close R23.
 
 - [x] Write the kernel specification before porting. Classify constructor,
       family and runtime-function applications. State which equality rules

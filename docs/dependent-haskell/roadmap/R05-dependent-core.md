@@ -59,6 +59,14 @@ Restricted pipelines and Lint checks do not establish general preservation.
       occurrence types, multiplicities, substitution and zonking together.
       Constructor fields at arbitrary `a` need an opaque-field rule. Include
       `a = Nat -> Nat`; then use a separate R03 source increment to check it.
+- [x] Admit fixed function leaves in closed algebraic indices. Preserve
+      canonical call endpoints, forward family proofs and later package fields.
+      M65 passes both builds, separate-module demand controls, Showcase100/16
+      and seven registered tests. Generic `[a]` and higher-order endpoints
+      remain open. See [the contract](../CORE.md#function-values-in-algebraic-indices).
+- [ ] Bound the inherited family views in native shape and argument inference.
+      Use the solver's reduction-depth policy. Preserve the inverse nominal
+      proof for shape matching and the original cached argument usage.
 - [ ] Specify transport through later runtime-dependent telescope entries.
       Freshen binders and transport remaining fields, targets and evidence
       together. Preserve the distinction between lexical scope and active

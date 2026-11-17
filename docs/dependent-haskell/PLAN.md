@@ -4829,8 +4829,9 @@ syntax instead of applying whole-file rewrites.
 
 ## M65: function-valued fields in closed native index domains
 
-Roadmap owner: R05. Related cards: R03 and R23. Status: contract selected;
-implementation and validation remain open. M64 is the prerequisite.
+Roadmap owner: R05. Related cards: R03 and R23. Status: the bounded increment
+passes the selected build, source, interface and registered checks.
+M64 is the prerequisite. The full roadmap cards remain open.
 
 An algebraic index can store an eligible opaque function. Use closed regular
 boxed domains, with the existing constructor and representation restrictions.
@@ -4897,21 +4898,21 @@ or tags change.
 
 Acceptance checks:
 
-- [ ] Extend domain, field-kind, source and runtime reification admission
+- [x] Extend domain, field-kind, source and runtime reification admission
       together. Keep strict function endpoint checking separate.
-- [ ] Canonicalize single and batched application. Check family exposure,
+- [x] Canonicalize single and batched application. Check family exposure,
       cast leftovers and substitution of pre-existing forward proofs.
-- [ ] Preserve later field types and proof scope through the constructor case.
+- [x] Preserve later field types and proof scope through the constructor case.
       Keep same-spelling function names in separate packages distinct.
-- [ ] Check forward N/R/P application evidence under the existing role rules.
+- [x] Check forward N/R/P application evidence under the existing role rules.
       Retain an M-positive inverse control and reject U/unknown inversion.
-- [ ] Compile separate producer and client modules using only interfaces.
+- [x] Compile separate producer and client modules using only interfaces.
       Check direct calls against family-exposed calls and imported proofs.
-- [ ] Check bottom container, function, argument and proof demand separately.
+- [x] Check bottom container, function, argument and proof demand separately.
       Ignoring fields must stay lazy. Matching Just must not force its field.
-- [ ] Check located rejections for M/linear or polymorphic function leaves,
+- [x] Check located rejections for M/linear or polymorphic function leaves,
       open domains, invalid scope and unsupported function-domain casts.
-- [ ] Build both stages. Run the maintained cohort and affected regressions.
+- [x] Build both stages. Run the maintained API cohort and affected regressions.
       Add the completed source observations to Showcase.
 
 Prior art: proposal #242 and the 2019 higher-order type-level programming paper,
@@ -4923,3 +4924,73 @@ See REFERENCES.md and the selected source-reading records.
 Generic open domains, arbitrary function indices, dependent function domains,
 general native HIE/TypeRep, native unfoldings and normal optimization remain
 separate work. Keep R23 and the full project goal open.
+
+### M65 validation
+
+The isolated full self-hosted build v12 passes in 946.92 seconds. It builds the
+target libraries, both compilers and the selected compiler utilities. Its
+27,298 source inputs remain unchanged. The source HEAD is
+`1e5fd2ccfd7b6b5cb5aec41e4004430a9cf8e71f`; its compiled patch has SHA256
+`dd0437dc73c93d10411712ba48c09acf52fb5d3d4b98953c6fceae9f1d4ac26e`.
+The publication checkout remains at M64 during these checks.
+
+Core/interface fixture v6 and the updated bootstrap source fixture pass their
+unchanged 1/37-line goldens. The final registered selection checks both
+maintained fixtures with the rebuilt self-hosted compiler.
+
+Source v6 passes seventeen commands. Its separate producer and interface-only
+client pass twelve runtime observations. The observations distinguish demand
+for the container, function, argument and proof. Inaccessible and overlapping
+pattern warnings are errors. Five unsupported domains reject with GHC-83605.
+A cross-package proof mismatch rejects at its third argument with GHC-83865.
+A looping family reports GHC-40404 at reduction depth thirteen with a limit of
+twelve. The M64 reader rejects the new typed signature between two ordinary
+positive imports. Focused matchable v1 retains GHC-40564 for a known-M shape
+contradiction. All selected inputs remain unchanged during these checks.
+
+The source case checker uses a bounded family view for activation and capture
+discovery. It composes the full family reduction with the strict-call alias
+proof. The solver retains U and unknown application equalities as unresolved;
+it cannot infer a constructor contradiction from their shape. The imported
+shape precheck retains raw Pi endpoints to reject recursive function domains
+before forcing Type knots. Its positive controls include a regular recursive
+container with a vacuous function alias.
+
+The final source-both v1 run passes 36 commands across both rebuilt stages.
+Each stage passes the twelve runtime observations and eight negative clients.
+The negatives include the earlier five unsupported domains, cross-package proof
+scope, known-M shape contradiction and bounded family reduction. Each stage
+also passes the old-reader positive/rejection/positive sequence. Inputs and
+artifact inventories remain unchanged.
+
+Showcase includes the exercised providers and five additional observations.
+The final showcase-both v1 run passes 100 lines from sixteen modules in each
+stage. Its overlapping pattern warnings retain the existing nonfatal policy.
+The function-field source controls still treat inaccessible and overlapping
+warnings as errors.
+
+Test prerequisites v1 pass. Registered v1 reports seven expected normal-way
+passes, 54 skipped ways and zero unexpected failures or framework warnings.
+The selected tests are NativeDependentCore, NativeDependentCoreRun,
+RetainedKeywordOff, RetainedQuantification, RetainedPrint, HieVdq and
+EssentialsCoverage. The maintained source fixture compiles both function-field
+providers in fresh one-shot contexts against interfaces. It checks the twelve
+runtime observations and located GHC-40404, GHC-83865 and GHC-40564 controls.
+No new test file or golden is added.
+
+Read-only formatter v2 observes 28 files without changes: nine Fourmolu format
+differences, sixteen parser failures, two timeouts and one Cabal-gild failure
+on the unchanged compiler template. Formatter v1's earlier timeout remains
+recorded. No formatter pass is claimed. Keep the GHC source style and the
+experimental source syntax.
+
+Evidence is under `_build/verification/native-function-field-*`. Compiler and
+library inputs are fixed during each run. Subsequent status edits change only
+Markdown documents; the final receipt records their relation to this snapshot.
+
+The inherited pure family normalizers in matchExpectedTyConApp and native
+argument inference remain a separate follow-up. The bounded strict-call view
+does not establish a bound for every native family-normalization path.
+The ignored `native-bounded-family-research-v1` note pins twenty source files,
+proposed trigger programs and the required nominal proof directions. Those
+programs are not executed results. No totality checker is implemented.

@@ -96,7 +96,8 @@ can advance a card while the card remains open.
 | 3 | R05: application through opaque whole-function evidence | Complete bounded increment: M61 | Both builds, selected cohort and independent audit pass. Typed opaque proof projection remains separate. |
 | 4 | R03: explicit complete retained-function type arguments | Complete bounded increment: M62 | Both builds, nested source arguments, worker demand, the selected cohort and independent audit pass. Next: the R23 foundation. |
 | 5 | R23: matchability foundation; also advances R05 | M63/M64 foundation passes selected builds and checks; publication pending | Explicit arrow and forall metadata pass Core, source, interface, TH and reflection checks. The generic native client and source family unsaturation remain open. |
-| 6 | R05: generic domain metadata and dependent telescopes; enables R03 source work | M65 contract selected; implementation open | Start with closed algebraic indices that store eligible functions. Check saturated-family exposure, existing proof substitution and later package fields before generic `[a]`. Keep call endpoints and dependent domains separate. |
+| 6 | R05: function values in closed algebraic indices; enables R03 source work | Complete bounded increment: M65 | Both rebuilt stages pass source/interface controls and Showcase100/16. Seven registered tests pass. Generic `[a]`, higher-order endpoints and changed dependent domains remain open. |
+| 7 | R05: bounded family views in native frontend inference | Research prepared; specification and implementation open | Replace the inherited pure native shape and argument views with the solver's depth-limited family API. Preserve proof direction and cached argument usage. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -105,6 +106,13 @@ The selected builds and checks pass, including Showcase95 with 14 home
 modules in both stages. The standard selection passes seven tests with
 54 skipped ways. R23 remains open for the generic native client and family source
 unsaturation.
+
+M65 connects stored function values to canonical opaque call indices. A
+saturated family can expose the stored function without losing its forward
+application proof. Later package fields retain the actual function identity.
+See [the Core contract](CORE.md#function-values-in-algebraic-indices) and
+[the validation record](PLAN.md#m65-validation). This increment does not
+complete R05, R03 or R23.
 
 The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks
 serially under the configured memory cap. This execution policy does not add

@@ -1841,8 +1841,8 @@ registered tests. Freeze and independent audit must pass before publication.
 
 See Note [Signed source call beta] in GHC.Tc.Gen.Expr and
 [the pinned readings](REFERENCES.md#signed-source-call-beta-prior-art).
-M45 left function-domain retained binders for the M46 rule below. TermVarTy
-remains scalar-only. Call-bearing interfaces stay gated.
+M45 left function-domain retained binders for the M46 rule below. M65 later
+admits function-value indices under the fixed-domain policy below.
 
 ### Function-valued retained binders
 
@@ -1850,11 +1850,13 @@ isNativeRetainedBinder accepts a scalar index Id or an existing eligible opaque
 head Id. isNativeRetainedBinderType checks the domain without a fabricated Id.
 A function head has a closed ordinary visible Many arrow A -> B. Both A and B
 are independently supported scalar domains. The Id is local, unrestricted and
-not a join point. Scalar predicates and TermVarTy remain scalar-only. M51
-adds function-valued constructor fields under the separate policy below.
+not a join point. M51 adds function-valued constructor fields under the
+separate policy below. M65 also admits these function Ids as value indices.
 
-DepFunTy f body scopes f over calls in body. The body has kind Type. Within types and coercions, f occurs only in TermAppTy/TermAppCo head slots.
-It is not a scalar index or a matchable type function. A vacuous retained binder still becomes an ordinary
+DepFunTy f body scopes f over calls and function-value indices in body.
+The body has kind Type. A function-value index uses TermVarTy f at its complete
+fixed type. It is not a scalar index or a matchable type function.
+A vacuous retained binder still becomes an ordinary
 arrow. Lambda type recovery uses this extended binder policy.
 
 At a function-valued retained binder, application accepts only an eligible
@@ -2122,17 +2124,17 @@ that permission disabled. Partial signatures retain the complete-signature
 check before function domains are admitted.
 
 Each function domain must be a closed ordinary visible Many `A -> B`. The
-existing scalar checks validate `A` and `B` independently. Within a type or
-coercion, the bound function remains a dedicated call head. It is never a bare
-scalar `TermVarTy`. Application accepts an already-bound eligible local Var
+existing function-free algebraic checks validate `A` and `B` independently.
+M65 permits the bound function as a value index as well as a call head.
+Application accepts an already-bound eligible local Var
 of the exact function type, then substitutes its actual identity. A global
 callee does not permit a global function operand. Ordinary argument checking
 and usage checking still run once.
 
 The interface writer and reader reuse `IfaceDepFunTy` and `IfaceTermAppTy`.
 The reader checks `isNativeRetainedBinder` for the former, binds that actual
-Id, then reads and kind-checks its body. It keeps `isNativeIndexId` for a bare
-`IfaceTermVar`. Bound-head scope, alpha freshening and deep free variables
+Id, then reads and kind-checks its body. M65 uses the same retained union for
+a bare `IfaceTermVar`. Bound-head scope, alpha freshening and deep free variables
 retain their existing rules. No tag, byte layout or version changes. The
 fork remains10.1.20261115.1 with header1001202611151.
 
@@ -2425,8 +2427,10 @@ Unsupported retained domain shape.
 An unknown shape uses the typed path with M54's detected-loop boundary.
 Applied synonyms, casts, constraint arrows and raw variable/call-index forms
 remain unclassified. Their decoders retain scope checks. A raw retained Pi is
-not scalar. Its function classification is unknown because a vacuous Pi can
-become an ordinary eligible arrow. No positive shape result validates a Type.
+not scalar. M65 retains its multiplicity, argument and result shapes because
+a vacuous Pi can become an ordinary eligible arrow. Function endpoints use
+the separate function-free policy before typed decoding.
+No positive shape result validates a Type.
 
 The existing API fixture checks 28 early generic rejection cases, 12 separate
 named-field rejection cases and 32 valid graph scenarios across both compression
@@ -2467,7 +2471,7 @@ change. Nested list patterns remain outside the existing bare-field subset.
 
 Static parameters and stored fields have different obligations. A monokinded
 `Proxy (Bool -> Bool)` has no function field. `Maybe (Bool -> Bool)` stores
-one and fails scalar eligibility. No existential, equality specification,
+one and uses M65's separate function-leaf policy. No existential, equality specification,
 constructor context, wrapper, newtype or retained constructor telescope is
 admitted as an index domain. Haskell values may still be partial or cyclic.
 
@@ -2515,3 +2519,56 @@ Showcase has 79 observations through fourteen source modules. This increment
 adds no Core constructor, interface form, function equality or eta expansion.
 Changed function domains, opaque Pi projection, general native metas and normal
 optimization remain unsupported.
+
+## Function values in algebraic indices
+
+M65 permits an eligible local function as a leaf in a closed algebraic index.
+For example, `Maybe (FUN @U 'Many Bool Bool)` can contain the actual function
+Id. The function has a fixed ordinary visible U/Many arrow. Check its argument
+and result with the previous function-free algebraic policy. This separate
+policy rejects `data Loop = Loop (Loop -> Bool)` without restarting the same
+eligibility query. Regular algebraic recursion retains its existing checks.
+
+`TermVarTy f` records the function's lexical identity at its complete type.
+`isNativeRetainedBinder` admits it. `isNativeIndexId` still requires an
+algebraic root. Lint checks the actual scoped binding as well as its occurrence.
+Reification and reconstruction preserve the same Id and its fixed domain.
+
+The smart makers use one application representation:
+
+```
+mkAppTy (TermVarTy f) a = TermAppTy f a
+```
+
+Batched application, cast leftovers, substitution, family reduction and
+interface import use the same rule. Lint rejects a raw ordinary `AppTy` with
+this function head. An existing forward `AppCo` can contain a nonreflexive
+head proof through a saturated family. Preserve that proof and its role.
+`TermAppCo f arg_co` alone cannot replace it. M remains necessary for inverse
+projection; U and unknown applications supply no inverse rule.
+
+A strict source case can expose the same call through a saturated family.
+The case checker uses the solver's bounded family rewrite for capture discovery
+and transport. Compose the nominal family proof with the strict-call alias
+proof. U and unknown application equalities remain unresolved when rewriting
+cannot expose their heads. Their shape does not establish an inaccessible
+GADT branch. Known-M shape contradictions retain their existing diagnostic.
+
+The interface writer encodes direct `TermAppCo` with existing `IfaceAppCo`,
+`IfaceReflCo` and `IfaceTermVar` forms. It preserves the argument proof.
+The reader checks the actual function Id and canonicalizes application.
+Raw Pi shape metadata retains multiplicity, argument and result views.
+Check each function endpoint with a fresh function-free data traversal.
+No wire tag, header version, coercion axiom or DepFunCo persistence is added.
+
+Both rebuilt stages pass the selected separate-module source and demand
+checks. The maintained API tests and seven registered regressions pass.
+Showcase passes 100 observations through sixteen modules in both stages.
+See [the M65 validation record](PLAN.md#m65-validation).
+Open domains, higher-order endpoints, nonreflexive function-domain transport,
+normal optimization and totality remain separate work. The inherited pure
+family views in native argument and shape inference still need a bounded API.
+
+See Note [Function fields in native index domains] in GHC.Core.Type,
+Note [Native function-value application] in GHC.Core.TyCo.Make, and
+Note [Function-value call congruence in interfaces] in GHC.CoreToIface.
