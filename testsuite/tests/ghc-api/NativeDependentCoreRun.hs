@@ -1849,7 +1849,7 @@ runModuleCases libdir label producers extraFlags consumer expected = do
 runInvisibleRetainedModuleChecks :: FilePath -> IO ()
 runInvisibleRetainedModuleChecks libdir = do
     vectors <- readFile "PackedVecLibrary.hs"
-    let extensions = "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeApplications #-}"
+    let extensions = "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables, TypeApplications, TypeFamilies #-}"
         library = unlines
             [ extensions
             , "module NativeInvisibleRetained where"
@@ -1866,11 +1866,37 @@ runInvisibleRetainedModuleChecks libdir = do
             , "noWrittenArguments = natToInt n"
             , "shadowIndex :: foreach (n :: Nat). Nat -> Vec Int n -> Int"
             , "shadowIndex n _ = natToInt n"
+            , "lengthCode :: foreach (n :: Nat). foreach (m :: Nat). Vec Int n -> Vec Int m -> Int"
+            , "lengthCode _ _ = 10 * natToInt n + natToInt m"
+            , "emptyVector :: Vec Int Z"
+            , "emptyVector = VNil"
+            , "type family Forget (n :: Nat) :: Nat where"
+            , "    Forget Z = Z"
+            , "    Forget (S k) = Z"
+            , "observeForgotten :: foreach (n :: Nat). Vec Int (Forget n) -> Int"
+            , "observeForgotten _ = natToInt n"
+            , "withAnchor :: foreach (n :: Nat). Vec Int (Forget n) -> Vec Int n -> Int"
+            , "withAnchor _ _ = natToInt n"
+            , "controls :: foreach (m :: Nat) -> Vec Int (Forget m) -> Vec Int m -> (Int, Int)"
+            , "controls m xs ys = (observeForgotten @{m} xs, withAnchor xs ys)"
+            , "missingSecond :: foreach (n :: Nat). foreach (m :: Nat). Vec Int n -> Int"
+            , "missingSecond _ = natToInt m"
+            , "refined :: foreach (n :: Nat) -> Vec Int n -> Int"
+            , "refined n xs = case n of { Z -> observeIndex False xs; S _pred -> observeIndex False xs }"
+            ]
+        ordinary = unlines
+            [ "{-# OPTIONS_GHC -Werror=unused-imports #-}"
+            , "module VisibleIndexConstructor where"
+            , "import NativeInvisibleRetained (observeIndex, emptyVector)"
+            , "import PackedVecLibrary (Nat(Z))"
+            , "observedEmpty :: Int"
+            , "observedEmpty = observeIndex False emptyVector"
             ]
         consumer = unlines
             [ extensions
             , "module Main where"
             , "import Data.IORef"
+            , "import VisibleIndexConstructor (observedEmpty)"
             , "import NativeInvisibleRetained"
             , "import PackedVecLibrary"
             , "main :: IO ()"
@@ -1889,13 +1915,39 @@ runInvisibleRetainedModuleChecks libdir = do
             , "        ys = replicateNative @Int bottom 9"
             , "    print (ignoreIndex ys)"
             , "    print (ignoreIndex @Int @{bottom} ys)"
+            , "    m <- newIORef (S Z) >>= readIORef"
+            , "    let zs :: Vec Int m"
+            , "        zs = replicateNative @Int m 9"
+            , "        joined :: Vec Int (Add n m)"
+            , "        joined = appendHidden xs zs"
+            , "    print (toList joined)"
+            , "    print (toList (appendHidden @Int xs zs))"
+            , "    print (toList (appendHidden @{n} xs zs))"
+            , "    print (toList (appendHidden @Int @{n} @{m} xs zs))"
+            , "    print (lengthCode xs zs, lengthCode zs xs, lengthCode xs xs)"
+            , "    print (refined n xs, refined Z emptyVector)"
+            , "    let lazySucc :: Vec Int (S bottom)"
+            , "        lazySucc = error \"lazy constructor vector\""
+            , "    print (ignoreIndex lazySucc, observedEmpty)"
+            , "    print (controls (S Z) emptyVector (VCons 7 VNil))"
             ]
         label = "invisible-retained"
     runModuleCases libdir label
-        [("PackedVecLibrary", vectors), ("NativeInvisibleRetained", library)] []
-        consumer ["2", "2", "2", "2", "2", "0", "42", "42"]
+        [("PackedVecLibrary", vectors), ("NativeInvisibleRetained", library), ("VisibleIndexConstructor", ordinary)] []
+        consumer (["2", "2", "2", "2", "2", "0", "42", "42"] ++ replicate 4 "[7,7,9]" ++ ["(21,12,22)", "(2,0)", "(42,0)", "(1,1)"])
     directory <- makeAbsolute ("NativeDependentCoreRun.modules" </> label)
     let artifacts = directory </> "artifacts"
+        reject moduleName flags code fragment declarations = do
+            let path = directory </> (moduleName ++ ".hs")
+            writeFile path $ unlines $
+                [flags, "module " ++ moduleName ++ " where", "import NativeInvisibleRetained"]
+                    ++ declarations
+            GHC.runGhc (Just libdir) $ do
+                environment <- nativeModuleEnvironment artifacts [] NoLink Nothing
+                result <- GHC.handleSourceError (pure . Left) $ do
+                    liftIO $ void $ compileFile environment NoStop (path, Nothing)
+                    pure (Right ())
+                checkSourceRejection moduleName code fragment result
     forM_
         [ ("MissingInvisibleIndex", extensions, 83605, "Cannot infer the invisible retained argument",
             ["bad :: Int", "bad = missingIndex False"])
@@ -1907,21 +1959,22 @@ runInvisibleRetainedModuleChecks libdir = do
             [ "bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Int"
             , "bad n m xs = observeIndex @Int @{m} False xs"
             ])
+        , ("MissingSecondIndex", extensions, 83605, "invisible retained argument ‘m’",
+            [ "bad :: foreach (n :: Nat) -> Vec Int n -> Int"
+            , "bad n xs = missingSecond xs"
+            ])
+        , ("NonInjectiveInvisibleIndex", extensions, 83605, "Cannot infer the invisible retained argument",
+            [ "bad :: foreach (m :: Nat) -> Vec Int (Forget m) -> Int"
+            , "bad m xs = observeForgotten xs"
+            ])
         , ("NoInvisibleBinder", extensions, 83605, "requires an invisible retained binder",
             ["bad :: Nat -> Nat", "bad = id @{Z}"])
         , ("ExplicitIndexExtensionOff", "", 83605, "Illegal explicit retained argument",
             ["bad :: Int", "bad = noWrittenArguments @{Z}"])
-        ] $ \(moduleName, flags, code, fragment, declarations) -> do
-            let path = directory </> (moduleName ++ ".hs")
-            writeFile path $ unlines $
-                [flags, "module " ++ moduleName ++ " where", "import NativeInvisibleRetained", "import PackedVecLibrary"]
-                    ++ declarations
-            GHC.runGhc (Just libdir) $ do
-                environment <- nativeModuleEnvironment artifacts [] NoLink Nothing
-                result <- GHC.handleSourceError (pure . Left) $ do
-                    liftIO $ void $ compileFile environment NoStop (path, Nothing)
-                    pure (Right ())
-                checkSourceRejection moduleName code fragment result
+        ] $ \(moduleName, flags, code, fragment, declarations) ->
+            reject moduleName flags code fragment ("import PackedVecLibrary" : declarations)
+    reject "HiddenIndexConstructor" extensions 83605 "Cannot infer the invisible retained argument"
+        ["bad :: Int", "bad = observeIndex False emptyVector"]
 
 -- | Configure the shared one-shot compiler for object and diagnostic checks.
 nativeModuleEnvironment :: FilePath -> [String] -> GhcLink -> Maybe FilePath -> GHC.Ghc HscEnv

@@ -18,6 +18,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferRho )
 
 import GHC.Hs
 
+import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Match ( tcMatches, tcBody )
 import GHC.Tc.Gen.Sig ( isCompleteHsSig )
@@ -42,7 +43,7 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
 
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
+import GHC.Core.DataCon ( dataConConcreteTyVars, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Reduction ( reductionReducedType )
@@ -691,7 +692,7 @@ tcRetainedKnownArgPlan expected fun sigma args
     declared_arg tvs (Just domain, arg)
       | let formal = scaledThing domain
       , any (`elemVarSet` tyCoVarsOfType formal) tvs
-      = do { actual <- tcRetainedDeclaredArgType arg
+      = do { actual <- tcRetainedDeclaredArgType tcRetainedDeclaredTypeView arg
            ; return ((formal,) <$> actual) }
       | otherwise = return Nothing
     declared_arg _ _ = return Nothing
@@ -700,11 +701,11 @@ tcRetainedKnownArgPlan _ _ _ _ = return Nothing
 
 -- | Read a monomorphic declaration for immutable retained argument matching.
 -- See Note [Declared retained-domain choices].
-tcRetainedDeclaredArgType :: LHsExpr GhcRn -> TcM (Maybe Type)
-tcRetainedDeclaredArgType (L _ (HsPar _ arg)) = tcRetainedDeclaredArgType arg
-tcRetainedDeclaredArgType (L _ (ExplicitList _ fields))
-  = fmap (fmap mkListTy) (tcRetainedListElementType tcRetainedDeclaredArgType fields)
-tcRetainedDeclaredArgType (L loc (HsVar _ lname))
+tcRetainedDeclaredArgType :: (Type -> TcM Type) -> LHsExpr GhcRn -> TcM (Maybe Type)
+tcRetainedDeclaredArgType view (L _ (HsPar _ arg)) = tcRetainedDeclaredArgType view arg
+tcRetainedDeclaredArgType view (L _ (ExplicitList _ fields))
+  = fmap (fmap mkListTy) (tcRetainedListElementType (tcRetainedDeclaredArgType view) fields)
+tcRetainedDeclaredArgType view_type (L loc (HsVar _ lname))
   | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
   = setSrcSpan (locA loc) $
     do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
@@ -715,12 +716,12 @@ tcRetainedDeclaredArgType (L loc (HsVar _ lname))
              ; let (tvs, theta, _) = tcRetainedInstTelescope ty
              ; if valid && null tvs && null theta && isRetainedValueType ty
                         && noQuickLookVars ty
-               then do { view <- tcRetainedDeclaredTypeView ty
+               then do { view <- view_type ty
                        ; return (if isRetainedValueType view && noQuickLookVars view
                                  then Just view else Nothing) }
                else return Nothing }
            Nothing -> return Nothing }
-tcRetainedDeclaredArgType _ = return Nothing
+tcRetainedDeclaredArgType _ _ = return Nothing
 
 -- | Test whether a type is independent of Quick Look instantiation variables.
 noQuickLookVars :: Type -> Bool
@@ -729,43 +730,92 @@ noQuickLookVars = not . any (\v -> isTcTyVar v && isQLInstTyVar v) . tyCoVarsOfT
 -- | Select one invisible value operand and any outer erased parameters.
 -- See Note [Inferring an invisible retained argument].
 tcInferInvisibleRetained :: [TyVar] -> Id -> Type -> [LHsExpr GhcRn]
-                         -> TcM (Maybe (Id, [Type]))
+                         -> TcM (Maybe (InvisibleOperand, [Type]))
 tcInferInvisibleRetained tvs binder body args
   = do { name <- newSysName (mkTyVarOcc "retained_argument")
        ; let template = mkTyVar name (varType binder)
-             (domains, _) = retainedDeclaredDomains (length args) body
-       ; pairs <- fmap catMaybes $ mapM (declared_pair template) (zip domains args)
-       ; let match subst (formal, actual) = matchRetainedAppType (template : tvs) subst formal actual
-       ; case foldM match Subst.emptySubst pairs of
-           Just subst
-             | Just (TermVarTy occurrence) <- Subst.lookupTyVar subst template
-             , Just choices <- traverse (Subst.lookupTyVar subst) tvs
-             , all noQuickLookVars choices
-             , not (any (`elemVarSet` tyCoVarsOfTypes choices) (template : tvs))
-             , and (zipWith (\tv ty ->
-                      eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
-                    tvs choices)
-             , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
-             -> do { thing <- tcLookupLcl_maybe (getName occurrence)
-                   ; case thing of
-                       Just (ATcId { tct_id = actual }) ->
-                         do { actual <- liftZonkM (zonkId actual)
-                            ; valid <- tcRetainedInstScope (TermVarTy actual : choices)
-                            ; return (if valid && occurrence == actual
-                                           && isNativeOpaqueValueId actual
-                                           && varType occurrence `eqType` varType actual
-                                           && varType actual `eqType` Subst.substTy subst (varType binder)
-                                      then Just (actual, choices) else Nothing) }
-                       _ -> return Nothing }
-           _ -> return Nothing }
+       ; (indices, suffix) <- collect [(TermVarTy binder, template)] body
+       ; let (domains, _) = retainedDeclaredDomains (length args) suffix
+             choose view = do
+               { pairs <- catMaybes <$> mapM (declared_pair view indices) (zip domains args)
+               ; let determines (formal, _) = template `elemVarSet` injectiveVarsOfType True formal
+                     anchors | null tvs  = filter determines pairs
+                             | otherwise = pairs  -- Erased argument prepass
+               ; select template (map snd indices ++ tvs) anchors }
+       ; givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; selected <- choose return
+       ; case selected of
+           Nothing | not (null givens) -> choose tcRetainedDeclaredTypeView
+           _ -> return selected }
   where
-    declared_pair template (Just domain, arg)
+    collect indices ty
+      | DepFunTy DepFunInvisible next rest <- coreFullView ty
+      , Just kind <- abstractNativeIndices indices (varType next)
+      = do { name <- newSysName (mkTyVarOcc "retained_argument")
+           ; collect ((TermVarTy next, mkTyVar name kind) : indices) rest }
+      | otherwise = return (indices, ty)
+
+    select template variables pairs
+      = case foldM match Subst.emptySubst pairs of
+          Just subst
+            | Just index <- Subst.lookupTyVar subst template
+            , Just choices <- traverse (Subst.lookupTyVar subst) tvs
+            , all noQuickLookVars (index : choices)
+            , not (any (`elemVarSet` tyCoVarsOfTypes (index : choices)) variables)
+            , typeKind index `eqType` Subst.substTy subst (varType binder)
+            , and (zipWith (\tv ty ->
+                     eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                   tvs choices)
+            , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
+            -> do { valid <- tcRetainedInstScope (index : choices)
+                  ; if valid then fmap (fmap (, choices)) (tcInvisibleOperand index)
+                             else return Nothing }
+          _ -> return Nothing
+      where
+        match subst (formal, actual) = matchRetainedAppType variables subst formal actual
+
+    declared_pair view indices (Just domain, arg)
       | let formal = scaledThing domain
       , any (`elemVarSet` tyCoVarsOfType formal) (binder : tvs)
-      , Just abstract <- abstractNativeIndices [(TermVarTy binder, template)] formal
-      = do { actual <- tcRetainedDeclaredArgType arg
+      , Just abstract <- abstractNativeIndices indices formal
+      = do { actual <- tcRetainedDeclaredArgType view arg
            ; return ((abstract,) <$> actual) }
-    declared_pair _ _ = return Nothing
+    declared_pair _ _ _ = return Nothing
+
+-- | The inferred value and the usage to record when it is inserted.
+data InvisibleOperand = InvisibleOperand Core.CoreExpr (TcM ())
+
+-- | Recover a runtime operand and its term and constructor uses.
+-- See Note [Inferring an invisible retained argument].
+tcInvisibleOperand :: Type -> TcM (Maybe InvisibleOperand)
+tcInvisibleOperand index
+  = do { rdr_env <- getGlobalRdrEnv
+       ; candidate <- recover rdr_env index
+       ; return $ do { (operand, uses) <- candidate
+                     ; recovered <- Core.exprToNativeIndex operand
+                     ; guard (eqType recovered index)
+                     ; return (InvisibleOperand operand uses) } }
+  where
+    recover _ (TermVarTy occurrence)
+      = do { thing <- tcLookupLcl_maybe (getName occurrence)
+           ; case thing of
+               Just (ATcId { tct_id = actual }) ->
+                 do { actual <- liftZonkM (zonkId actual)
+                    ; return $ do { guard (occurrence == actual && isNativeOpaqueValueId actual
+                                          && varType occurrence `eqType` varType actual)
+                                  ; return (Core.Var actual, tcEmitBindingUsage (singleUsageUE actual)) } }
+               _ -> return Nothing }
+    recover env ty@(TyConApp tc args)
+      | Just con <- isPromotedDataCon_maybe tc
+      , not (isTypeDataTyCon (dataConTyCon con))
+      , Just gre <- lookupGRE_Name env (dataConName con)
+      , Just tys <- nativeIndexDataConTyArgs (typeKind ty) con
+      = do { fields <- mapM (recover env) (drop (length tys) args)
+           ; return $ do { (values, uses) <- unzip <$> sequence fields
+                         ; let worker = Core.mkTyApps (Core.Var (dataConWorkId con)) tys
+                         ; return (Core.mkApps worker values,
+                                   addUsedGRE NoDeprecationWarnings gre >> sequence_ uses) } }
+    recover _ _ = return Nothing
 
 {- Note [Inferring an invisible retained argument]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -786,6 +836,34 @@ insert the same runtime operand. Keep the written argument and its position
 for the usual cache and diagnostics. Emit usage once at Many and let the
 remaining application instantiate constraints with the chosen local Id.
 See Note [Retained application evidence].
+
+For appendHidden, the two consecutive invisible Nat binders precede
+Vec a n and Vec a m. Abstract each binder with a fresh template. Abstract
+earlier indices in the kind of each later template. Read the domains after
+the group. Select only the current operand and outer erased parameters.
+The next application step sees the substituted type and checks the next
+operand in its own scope. A written operand also enters through that step.
+
+When inserting a runtime operand, match only domains with an injective
+occurrence of its template. For example, Vec Int (Forget n) cannot select n
+when Forget maps every Nat to Z. A later Vec Int n can supply it. Check the
+Forget domain at its written argument after substitution. The erased
+argument prepass may use all domain matches to select its type arguments.
+It discards the speculative runtime operand. This distinction also lets
+an explicit operand select the runtime value.
+
+Prefer the original declaration for runtime identity. A constructor Given
+can refine the index n in Vec a n to Z. The caller can still pass its local
+n. Retry with the existing refined declaration view when raw matching fails
+in a context with Givens. A generated branch capture can already have the
+refined declaration Vec a (S pred). Rebuild the constructor application
+from its promoted form. Require term visibility for each constructor and
+resolve each field variable in its lexical environment. The Core index
+judgment must recover the selected index from the complete operand.
+Only term fields contribute occurrences to runtime usage. Record the
+constructor imports when inserting the selected operand, after the erased
+argument prepass. See wrinkle (DTW2) of Note [DataToTag overview] in
+GHC.Tc.Instance.Class.
 
 Agda inserts hidden argument terms from the expected telescope. Here the
 immutable match supplies a checked runtime occurrence. It leaves stuck
@@ -1654,16 +1732,15 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     -- See Note [Inferring an invisible retained argument].
     go1 plan fun_orig pos acc fun_ty args@(EValArg { ea_arg = first } : _)
       | DepFunTy DepFunInvisible binder body <- coreFullView fun_ty
-      = do { actual <- addArgCtxt (pos + count written_prefix_arg acc) rn_head first $
+      = do { InvisibleOperand operand record_usage <- addArgCtxt (pos + count written_prefix_arg acc) rn_head first $
                  do { selected <- tcInferInvisibleRetained [] binder body
                                     [arg | EValArg { ea_arg = arg } <- args]
                     ; case selected of
                         Just (actual, _) -> return actual
                         Nothing -> failWithTc (TcRnRetainedQuantificationError
                                                 (RetainedInvisibleArgument binder)) }
-           ; tcScalingUsage ManyTy (tcEmitBindingUsage (singleUsageUE actual))
-           ; let operand = Core.Var actual
-                 wrap = mkWpEvApps [EvExpr operand]
+           ; tcScalingUsage ManyTy record_usage
+           ; let wrap = mkWpEvApps [EvExpr operand]
            ; go plan fun_orig pos (addArgWrap wrap acc) (applyTypeToArgs fun_ty [operand]) args }
 
     -- Rule IRESULT from Fig 4 of the QL paper; no more arguments

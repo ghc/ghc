@@ -40,6 +40,7 @@ module PackedVecLibrary (
     zipPacked,
     sumNat,
     appendNative,
+    appendHidden,
     appendPacked,
     addSucc,
     rightZero,
@@ -112,6 +113,10 @@ appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
 -- | Append vectors indexed by two retained runtime lengths.
 appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)
 appendNative n m xs ys = appendVec xs ys
+
+-- | Append vectors whose declarations supply both retained lengths.
+appendHidden :: forall a. foreach (n :: Nat). foreach (m :: Nat). Vec a n -> Vec a m -> Vec a (Add n m)
+appendHidden xs ys = appendNative @a n m xs ys
 
 -- | Compute the sum length before packaging the appended vector.
 appendPacked :: PackedVec a -> PackedVec a -> PackedVec a

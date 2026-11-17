@@ -3556,7 +3556,7 @@ pprRetainedQuantificationError reason = case reason of
   RetainedInvisibleArgument binder ->
     vcat [ text "Cannot infer the invisible retained argument" <+> quotes (ppr binder)
          , text "Supply an argument with" <+> quotes (text "@{...}")
-           <+> text "or use a later value argument that determines an unrestricted local value of type"
+           <+> text "or use a later value argument whose type determines a runtime value of type"
            <+> ppr (varType binder) <> dot ]
   RetainedArgumentExtension ->
     text "Illegal explicit retained argument."
