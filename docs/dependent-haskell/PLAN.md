@@ -17,11 +17,11 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The current increment is [M67](#m67-structural-generic-domains-and-dependent-domain-transport),
-owned by [R05 dependent Core](roadmap/R05-dependent-core.md). Its generic
-structural source domains, opaque fields and nominal later-domain transport
-pass both builds and the selected checks. The user resumed GHC execution on
-2026-11-16 at 17:53 CET.
+The current increment is [M68](#m68-ordinary-callers-of-retained-apis), owned by
+[R03 dependent products](roadmap/R03-dependent-products.md), with R05 scope and
+evidence obligations. M67 is published at d430f27102. Both main compilers build
+and pass Showcase116/16. The user resumed GHC execution on 2026-11-16 at
+17:53 CET.
 
 The [R23 matchability foundation](roadmap/R23-unsaturated-type-families.md)
 precedes this R05 increment. The roadmap separates this chosen order from
@@ -5400,3 +5400,109 @@ The next source candidate is direct use of retained APIs from a module without
 ExperimentalDependentTypes. Existing ordinary wrapper clients already pass.
 Direct calls and generic inference need separate measurements before changing
 the extension boundary or adding a requested-length list adapter.
+
+
+## M68: ordinary callers of retained APIs
+
+Roadmap owner: R03. Related card: R05. Prerequisite: validated M67.
+Status: source baseline measured; type-aware application checking selected.
+Implementation and self-hosted validation remain pending.
+
+Keep explicit dependent source syntax opt-in. An imported retained signature
+already states an indexed contract. Ordinary callers can use its runtime
+arguments. They must preserve that contract when a polymorphic consumer needs
+an erased index from the argument type. Do not default away the index or allow
+an ordinary meta-variable to capture its runtime Id.
+
+### Measured baseline
+
+The source matrix at published d430f27102 uses six paired clients. Each pair
+differs only in ExperimentalDependentTypes versus NoExperimentalDependentTypes.
+The producer is compiled separately. Each consumer reads its copied interface
+from the actual -hidir. Both modes use the same restricted object options.
+Runtime Nat and list inputs come from IORef. Finite stdout oracles are authored
+from the input values and provider definitions before execution.
+
+Stage0 baseline v1 observes thirteen values across all six EDT clients.
+NoEDT passes direct replicateNative calls with explicit or inferred element
+types, and an actual appendNative consumer: seven observations in three
+clients. Three ordinary toList consumers reject with GHC-83865. They compare
+a fresh n0 with the actual n or GenericCount xs. Writing @Int fixes only the
+element type; it does not supply that erased length.
+
+Both modes reject a Vec Int m where appendNative requires Vec Int n1.
+The diagnostic points to line 10:75, the fifth displayed argument, which includes
+the written type argument. These controls run only after same-mode direct-call
+positives meet their runtime oracles. The failure is an actual payload-index
+mismatch. It is not an unsupported-feature rejection.
+
+The receipt is native-module-interoperability-baseline-stage0-v1. Source inputs,
+compiler binaries and target libraries remain unchanged. This is a bootstrap
+baseline, not a self-hosted or general interoperability result.
+
+### Intended implementation
+
+Compute one private application capability from the existing extension flag
+or already available native types. Read the head signature, an available
+expected type and the existing declared-argument anchors. Zonk existing
+assignments. Keep these reads separate from occurrence checking and usage.
+Reuse tcRetainedInferableArg. Do not add another source traversal or infer an
+argument just to select this capability. Ordinary calls with no native type
+keep their existing application paths.
+
+Use the capability consistently through the existing application helpers:
+known-head Quick Look handling, ground preparation, argument-driven immutable
+selection, dollar handling, post-VTA caching and native evidence capture.
+The callback check can also use its already known native expected type.
+Preserve all current Quick Look, kind, concreteness, scope and exact-domain
+checks. Keep typed argument caches and emit their usage once. Instantiate the
+original signature through IALL. Run final argument and result subsumption.
+Quick Look must reject actual native types in either language mode. Its former
+source-flag guard is insufficient once imported contracts enable these helpers.
+Measure an incomplete native candidate with ImpredicativeTypes as a control.
+
+Native class Wanteds need the same expression-local evidence scope with either
+language mode. A dictionary that depends on runtime n must remain below the
+lambda that binds n. Keep the original constraints and solver. A generated
+application capability does not change the module's language flags.
+
+The existing Expr container and dependent-case inference modes retain their
+source extension policy in this increment. Explicit foreach syntax remains
+gated by the renamer and type checker. Native module detection and compiler
+option checks remain based on actual Core. Ordinary clients that contain
+native Core still need the restricted pipeline. General optimization and
+native unfolding serialization remain R05 work.
+
+### Acceptance checks
+
+- [x] Measure direct calls and ordinary consumers separately in paired source
+      clients. Keep the exact compiler, source, interface and stdout evidence.
+- [ ] Pass all six pairs through separate producer and interface-only consumer
+      modules in both rebuilt compiler stages: thirteen observations per mode.
+- [ ] Preserve the located n/m mismatch in both modes after their positives.
+      Keep original imported signatures and nominal equality requirements.
+- [ ] Check a native class dictionary and a retained callback with an actual
+      runtime length. Reject callback index escape and linear retained actuals.
+      Establish their corresponding positives before interpreting failures.
+- [ ] Add a small NoEDT source provider to the example library. Export ordinary
+      replicate and generic round-trip functions using retained imports. Extend
+      Showcase by two observations through this seventeenth source module.
+- [ ] Build both compilers and utilities. Preserve the selected API/source
+      cohort, registered tests, typed reader controls and current diagnostics.
+      Record formatter results separately from executable checks.
+- [ ] Update the owning roadmap pages, source contract and references. Keep R03,
+      R05, the remaining expression modes and the full project goal open.
+
+### Prior art and boundary
+
+GHC's linear-types guide separates syntax, type display and imported contracts.
+linear-base uses explicit typed adapters when an ordinary API needs a different
+interface. This increment reuses GHC's existing imported contract and IALL.
+It does not add such an adapter. Agda's previously pinned application checker
+uses the known declaration and current context in telescope order. Its
+contextual metas do not justify filling GHC metas with runtime Ids.
+
+See the M68 entry in REFERENCES.md. This work adds no equality rule, source
+universe, term evaluator, totality checker or wire encoding. It does not erase
+a dependency at a module boundary. A passing client establishes only its stated
+application, inference, scope and runtime behavior.

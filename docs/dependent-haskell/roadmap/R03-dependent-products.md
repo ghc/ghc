@@ -62,6 +62,10 @@ M58 and M59 expose those rules through source checking.
       Keep retention independent of visibility. Do not infer a new `foreach`.
 - [ ] Specify runtime `Type` operands and their universe representation.
       Existing `TypeRep` and required erased `forall` leave a bridge to define.
+- [ ] Finish [M68 ordinary callers](../PLAN.md#m68-ordinary-callers-of-retained-apis).
+      Imported retained contracts must preserve inference and evidence scope
+      without requiring dependent source syntax. Keep the application change
+      separate from container and dependent-case inference.
 
 Running safe indexing after M59 is a scheduling choice. Closed `[Bool]` does
 not require generic domains, new evaluation or bounds-check elimination.

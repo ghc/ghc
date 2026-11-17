@@ -99,6 +99,7 @@ can advance a card while the card remains open.
 | 6 | R05: function values in closed algebraic indices; enables R03 source work | Complete bounded increment: M65 | Both rebuilt stages pass source/interface controls and Showcase100/16. Seven registered tests pass. Generic `[a]`, higher-order endpoints and changed dependent domains remain open. |
 | 7 | R05: bounded family views in native frontend inference | Complete bounded increment: M66 | Both builds, exact source diagnostics, finite controls, Showcase100/16 and seven registered tests pass. Other pure normalization paths remain separate. |
 | 8 | R05: structural generic domains and dependent-domain transport; enables R03 | Complete bounded increment: M67 | Both builds, selected API/source controls, Showcase116/16 and seven registered tests pass. Generic elements include arbitrary lifted and runtime-index-bearing values. Old readers reject the new typed signature cleanly. R05 and general source domains remain open. See M67 in PLAN.md. |
+| 9 | R03: ordinary callers of imported retained APIs; preserves R05 evidence | M68 baseline measured; implementation pending | Direct calls already pass without the extension. Three ordinary consumers need contextual index inference. Preserve dictionary scope, callback scope, multiplicities and native Quick Look exclusion. See M68 in PLAN.md. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -116,9 +117,11 @@ See [the Core contract](CORE.md#function-values-in-algebraic-indices) and
 complete R05, R03 or R23.
 
 M67 adds generic `[a]` constructor refinement and nominal transport through
-later dependent domains. The next source candidate is direct retained API use
-without the dependent extension. Ordinary wrapper clients are already checked.
-Measure explicit and inferred direct calls before changing that boundary.
+later dependent domains. M68 measures direct retained API use without the
+dependent extension. Direct calls pass; three ordinary consumers reject when
+their erased index cannot be inferred. The selected increment uses imported
+type contracts to enable the existing application checker. Explicit dependent
+syntax and the restricted native pipeline keep their current policies.
 The local subset and dependent-base tasks below retain their own scope.
 
 The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks

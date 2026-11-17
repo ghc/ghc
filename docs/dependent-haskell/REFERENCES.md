@@ -4186,3 +4186,43 @@ source clients and the previously pinned linear-base sources. Ordinary clients
 already use wrapper APIs. Direct retained calls without the dependent extension
 remain unmeasured. Its proposed call matrix and requested-length list adapter
 are unexecuted candidates. Imported type contracts must not be silently erased.
+
+
+## Ordinary callers of retained APIs: M68
+
+The [GHC 10.0 alpha2 linear-types guide](https://downloads.haskell.org/ghc/10.0.1-alpha2/docs/users_guide/exts/linear_types.html)
+separates declarations, contextual usage checking and display defaults. Disabling
+LinearTypes can hide multiplicity polymorphism in printed types. A linear
+callback requirement still belongs to the interface. This supplies a comparison
+for syntax opt-in without a general rule that discards imported contracts.
+The current local docs/users_guide/exts/linear_types.rst records this distinction.
+
+The [linear-base user guide](https://github.com/tweag/linear-base/blob/master/docs/USER_GUIDE.md)
+uses Ur, conversion helpers and scoped continuation APIs to compose linear and
+ordinary code. Reuse the explicit API design when a caller needs an ordinary
+result. Its temporary let/where limitation is stale relative to current GHC,
+which documents inferred local multiplicities and annotations. Do not adopt
+that old limitation as a compiler requirement. Both guides were read on
+2026-11-17. The source-pinned reading is
+native-generic-module-boundary-primary-reading-v1 under _build/verification.
+
+Agda's existing application provenance remains the primary telescope comparison:
+Rules/Application.hs lines 619-641 retains a checked prefix, and lines 774-808 substitute in
+order at the previously pinned v2.8.0 source. This work changes application
+availability for already typed native values. It introduces no Agda meta or
+unification rule. See [the existing application record](#applications-with-fixed-native-type-choices).
+
+The read-only pipeline review native-generic-module-boundary-pipeline-reading-v1
+pins Driver/Main/Hsc.hs, Driver/Main/Passes.hs, Core/Dependent.hs and the ordinary
+Core pipeline at d430f27102. Detection scans actual native types and bindings,
+not the source flag. Restricted object options still apply to ordinary callers.
+The existing withPacked takes a retained callback; it is not an erased rank-2
+adapter. An erased adapter remains an unexecuted library proposal.
+
+The source matrix preparation and inference audit are respectively
+native-module-interoperability-source-matrix-preparation-v1 and
+native-module-interoperability-inference-audit-v1. The executed stage0 baseline
+is native-module-interoperability-baseline-stage0-v1. It distinguishes direct
+retained calls from an ordinary consumer's erased-index inference. Source and
+artifact hashes, conditional rejection controls and authored stdout oracles
+remain in those records. See [the bounded plan](PLAN.md#m68-ordinary-callers-of-retained-apis).
