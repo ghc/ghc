@@ -1555,11 +1555,14 @@ lookupMBI :: Name -> TcM MonoBindInfo
 -- names that lack a signature, which the pattern has brought
 -- into scope.
 lookupMBI name
-  = do { mono_id <- tcLookupId name
-       ; return (MBI { mbi_poly_name = name
-                     , mbi_sig       = Nothing
-                     , mbi_mono_id   = mono_id
-                     , mbi_mono_mult = idMult mono_id }) }
+  = do { mono_id_e <- tcLookupTermBndr name
+       ; case mono_id_e of
+         Left _ -> failIllegalTyVar (noUserRdr name)
+         Right mono_id ->
+           return (MBI { mbi_poly_name = name
+                       , mbi_sig       = Nothing
+                       , mbi_mono_id   = mono_id
+                       , mbi_mono_mult = idMult mono_id }) }
 
 -------------------
 tcLhsSigId :: LetBndrSpec -> (Name, TcIdSig) -> TcM MonoBindInfo

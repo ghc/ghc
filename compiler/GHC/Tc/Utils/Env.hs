@@ -43,6 +43,7 @@ module GHC.Tc.Utils.Env(
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
+        tcLookupTermBndr, NotATermBndr (..),
         tcLookupTcTyCon,
         tcLookupLcl_maybe,
         getInLocalScope,
@@ -765,6 +766,20 @@ tcLookupIdMaybe name
            ATcId { tct_id = id} -> return $ Just id
            AGlobal (AnId id)    -> return $ Just id
            _                    -> return Nothing }
+
+-- | Encountered a thing that is not a term binder when
+--  calling 'tcLookupTermBndr'.
+newtype NotATermBndr
+  = ButATyVar TcTyVar
+
+tcLookupTermBndr :: Name -> TcM (Either NotATermBndr Id)
+tcLookupTermBndr name = do
+  thing <- tcLookup name
+  case thing of
+    ATcId { tct_id } -> pure $ Right $! tct_id
+    AGlobal (AnId id) -> pure $ Right $! id
+    ATyVar _ var -> pure $ Left $! ButATyVar var
+    _ -> pprPanic "tcLookupTermBndr: unexpected thing" (ppr thing)
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at

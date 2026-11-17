@@ -651,12 +651,9 @@ collectPatSynArgInfo details =
 -- type argument; then we report an illegal term-level use of @x@ (#27586).
 tcLookupPatSynArg :: Name -> TcM Id
 tcLookupPatSynArg arg_name
-  = do { thing <- tcLookup arg_name
-       ; case thing of
-           ATcId { tct_id = id } -> return id
-           AGlobal (AnId id)     -> return id
-           ATyVar {}             -> failIllegalTyVar (noUserRdr arg_name)
-           _                     -> pprPanic "tcLookupPatSynArg" (ppr arg_name) }
+  = do { tcLookupTermBndr arg_name >>= \ case
+         Left (ButATyVar _var) -> failIllegalTyVar (noUserRdr arg_name)
+         Right id -> return id }
 
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> TcM a
 wrongNumberOfParmsErr name decl_arity missing

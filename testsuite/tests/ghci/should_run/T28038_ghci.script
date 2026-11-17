@@ -1,0 +1,3 @@
+:set -XRequiredTypeArguments
+data A where MkA :: forall a -> A
+MkA b <- pure (MkA Int)

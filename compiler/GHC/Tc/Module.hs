@@ -2570,11 +2570,14 @@ tcGhciStmts stmts
 
         -- OK, we're ready to typecheck the stmts
       ; traceTc "GHC.Tc.Module.tcGhciStmts: tc stmts" empty
-      ; ((tc_stmts, ids), lie) <- captureTopConstraints $
+      ; ((tc_stmts, ids_e), lie) <- captureTopConstraints $
                                   tc_io_stmts $ \ _ ->
-                                  mapM tcLookupId names
+                                  mapM tcLookupTermBndr names
                         -- Look up the names right in the middle,
                         -- where they will all be in scope
+
+        -- discard invalid term binders
+      ; let ids = foldMap (\case Left {} -> []; Right id -> [id]) ids_e
 
         -- Simplify the context
       ; traceTc "GHC.Tc.Module.tcGhciStmts: simplify ctxt" empty
