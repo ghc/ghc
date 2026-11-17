@@ -362,15 +362,13 @@ let selectedVector = case mkFinGeneric [vector] 0 of
         Just checked -> Just (toList (indexGeneric [vector] checked))
 ```
 
-The Showcase instead cases on lookupGeneric before calling toList. Both paths
-convert the vector before constructing an ordinary result container. They do
-not require a standalone inferred native let-list in NoEDT. The measured literal-list composition
-`fmap toList (lookupGeneric [vector] 0)` rejects its fresh-index mismatch. The
-named-list fmap variant was not executed before the Showcase case edit and is
-unmeasured. These observations do not require case syntax for every consumer.
-They do not change the library's generic type or require an explicit element
-type in the original callback. The broader source matrix
-retains runtime n/m, scope, multiplicity and invalid-bound rejections.
+The Showcase also calls lookupGeneric through fmap. With M70,
+`fmap toList (lookupGeneric [vector] 0)` uses the declared vector type to
+infer the lookup result before specializing toList. Both source modes pass.
+They also pass with an unused bottom element before a parenthesized vector
+field. The standalone native let-list inference control in NoEDT still
+rejects. The source checks also reject incompatible element types, mismatched
+runtime indices and a linear field used in an unrestricted list.
 
 The maintained Showcase appends six observations, reaching 124 output lines
 through seventeen source modules in both stages. The API fixture's stdout stays

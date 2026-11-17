@@ -50,10 +50,9 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 `Add` is still a type family. The implementation does not yet let an arbitrary
 ordinary Haskell `length` or `append` compute inside a type.
 
-The latest validated bounded increment is M69. Both isolated stages pass the
-Showcase with 124 output lines through seventeen source modules. The count
-includes the banner. API goldens stay 1/37. Exact-HEAD main validation and
-publication remain separate gates. R03, R05 and R23 remain open.
+The latest validated bounded increment is M70. Both rebuilt stages pass the
+Showcase with 125 output lines through seventeen source modules. The count
+includes the banner. R03, R05 and R23 remain open.
 M62 supplied the earlier 88-line source group through fourteen modules.
 M56 provides
 the closed parameterized domains. M57 provides nominal scalar-domain conversion
@@ -104,6 +103,7 @@ can advance a card while the card remains open.
 | 8 | R05: structural generic domains and dependent-domain transport; enables R03 | Complete bounded increment: M67 | Both builds, selected API/source controls, Showcase116/16 and seven registered tests pass. Generic elements include arbitrary lifted and runtime-index-bearing values. Old readers reject the new typed signature cleanly. R05 and general source domains remain open. See M67 in PLAN.md. |
 | 9 | R03: ordinary callers of imported retained APIs; preserves R05 evidence | Complete bounded increment: M68 | Both rebuilt stages pass source/interface checks, scope and multiplicity controls, Showcase118/17 and seven registered tests. Published M67 readers accept the interfaces. Explicit syntax, Expr inference modes and native pipeline policies retain their scope. |
 | 10 | R03: safe indexing over a generic retained list | Complete bounded increment: M69 | Reuses Fin and GenericCount with scoped list refinement. Both rebuilt stages pass the reviewed primary/focused source collections, API1/37, Showcase124/17 and seven registered tests. Guarded list-declaration advice preserves the original runtime-vector callback. Case-based ordinary clients pass. Measured literal-list/fmap and NoEDT native let-list inference retain their limits; named-list fmap is unmeasured. No new Core judgment or wire field. R03, R05 and R23 remain open. |
+| 11 | R03: higher-order calls with native list arguments | Complete bounded increment: M70 | List fields supply an anchor to the existing argument cache. The literal fmap call passes with and without the dependent source extension. Both stages pass the 125-line Showcase, and seven selected registered tests pass. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

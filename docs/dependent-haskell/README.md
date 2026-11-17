@@ -10,14 +10,11 @@ functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
 Last updated: 2026-11-17.
 
-M69 passes both isolated compiler builds and the selected checks. Generic safe
-indexing returns ordinary, function-valued and runtime-index-bearing elements.
-Ordinary modules use the supported imported application paths without removing
-indexed type or dictionary-scope checks. Both stages pass 124 Showcase output
-lines through seventeen modules, including the banner. API stdout goldens stay
-1/37. Seven selected registered tests pass, with 54 skipped ways; the full GHC
-suite was not run. The exact committed HEAD still needs its main-checkout
-rebuild and publication receipt. See [the implementation record](PLAN.md#m69-generic-safe-list-indexing).
+M70 supports `fmap toList (lookupGeneric [vector] 0)` for a vector with an
+actual runtime index, with or without the dependent source extension.
+Both rebuilt stages pass 125 Showcase lines through seventeen modules,
+including the banner. Seven selected registered tests pass, with 54 other
+ways skipped. See [the implementation record](PLAN.md#m70-higher-order-calls-with-native-list-arguments).
 
 ## Project documents
 
@@ -109,6 +106,9 @@ named-list fmap variant is unmeasured; these results do not require case syntax
 for every ordinary consumer.
 The maintained fixture checks both source modes quietly; its golden stays 37
 lines. See [the M69 record](PLAN.md#m69-generic-safe-list-indexing).
+M70 adds one observation for the literal `fmap` call. The existing callback
+checker uses the actual vector index from the cached lookup result. The
+standalone NoEDT list inference control still rejects.
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
@@ -147,9 +147,9 @@ optimization support or full roadmap completion.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M69 passes both isolated builds, reviewed source controls, Showcase124/17 and seven selected registered tests with 54 skipped ways. API stdout goldens remain 1/37. Exact-HEAD main rebuild and publication remain separate gates. |
+| Compiler validation | M70 passes both builds, reviewed source controls, a 125-line Showcase through seventeen modules and seven selected registered tests. |
 | Ordinary callers of retained APIs | M68 selects application checking from imported native contracts. Erased-index inference, scoped callback dictionaries, linear argument rejection and native Quick Look exclusion pass in both language modes. |
-| Generic safe indexing | M69 uses Fin (GenericCount xs), checked signed positions and scoped list refinement. Functions and Vec Int n remain ordinary payloads. Case-based ordinary clients pass. Measured literal-list/fmap and NoEDT native let-list inference retain their limits; named-list fmap is unmeasured. |
+| Generic safe indexing | Fin (GenericCount xs) checks signed positions and uses scoped list refinement. Functions and Vec Int n remain ordinary payloads. Both case-based and literal-list fmap clients pass. |
 | Ordinary-arrow matchability | M63 retains type-valued metadata through Core, coercions, interfaces and reflection; M64 extends this foundation to foralls; source family unsaturation remains open |
 | Forall matchability | M64 carries per-binder annotations and nominal evidence through Core, source, interfaces, HIE, TH and supported reflection; runtime abstractions require U; selected source, scope, role and printer checks pass |
 | Function values in algebraic indices | M65 stores eligible fixed U/Many functions in closed domains, preserves family application proofs and later fields, and checks runtime demand across interfaces |
@@ -195,7 +195,7 @@ optimization support or full roadmap completion.
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | `Showcase.hs` passes both compilers with 124 output lines, including the banner, through seventeen modules. R03, R05 and R23 remain open. |
+| Maintained showcase | `Showcase.hs` passes both compilers with 125 output lines, including the banner, through seventeen modules. R03, R05 and R23 remain open. |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and

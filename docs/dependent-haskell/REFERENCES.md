@@ -4340,3 +4340,25 @@ vacuous binder into a visible arrow. Persistent visibility, override syntax,
 complete immutable choices, dictionary scope and lazy runtime application need
 review before any source change. No representation or new rule is selected.
 R03, R05 and R23 remain open.
+
+## Native list anchors in higher-order calls: M70
+
+The M69 baseline rejects the literal lookup under fmap and accepts the
+named list in EDT. M70 uses the list field to select the existing argument
+cache. The original call and its argument checks supply the cached type and
+usage. The classifier only reads a lifted monomorphic declaration. It
+does not use the type as evidence for a lookup result.
+
+[Agda v2.8.0 argument checking](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+records a checked argument with its modality and substitutes its term in
+the remaining Pi. The pinned blob is 82ba94ac864d19b947d4c92b9af252b0fe81347a.
+The implemented Agda rule checks the current argument. GHC's existing
+cache and callback path determine its own checking order.
+
+The authors' January 2026 [Quick Look paper](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf)
+describes inspecting ordinary application arguments before final checking.
+The cached PDF has SHA256
+cd2702e52a609806597890bea8f89a7bfd2fe28e8f3d158a40bf3ba894336f25.
+M70 selects the existing non-Quick-Look path for these native inputs.
+See [the M70 record](PLAN.md#m70-higher-order-calls-with-native-list-arguments)
+and Note [Native list anchors] in GHC.Tc.Gen.App.

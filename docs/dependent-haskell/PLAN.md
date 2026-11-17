@@ -17,12 +17,10 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The latest bounded increment is [M69](#m69-generic-safe-list-indexing), owned by
-[R03 dependent products](roadmap/R03-dependent-products.md), with R05 telescope
-and scope obligations. Both isolated compiler stages pass generic safe indexing,
-the selected checks and Showcase124/17. API stdout goldens remain 1/37.
-Validate the exact committed HEAD with a matching main-checkout build and a
-separate publication receipt. R03, R05 and R23 remain open.
+The latest bounded increment is [M70](#m70-higher-order-calls-with-native-list-arguments),
+owned by [R03 dependent products](roadmap/R03-dependent-products.md).
+Both rebuilt stages pass higher-order calls with literal vector lists and the
+125-line Showcase through seventeen modules. R03, R05 and R23 remain open.
 The user resumed GHC execution on 2026-11-16 at
 17:53 CET.
 
@@ -5774,8 +5772,8 @@ also rejects. The paired source and execution records use the
 Let an ordinary list literal supply a native anchor to the existing
 application classifier. Read a bare or parenthesized variable's lifted
 monomorphic declaration. Share the field selection predicate with M69.
-Keep the literal itself in checking mode. The enclosing application can
-still be an inference candidate. The test case uses M69's list advice in
+The classifier marks the enclosing application as a candidate for inference
+while leaving the literal for checking. The test case uses M69's list advice in
 `lookupGeneric`, then the existing cached argument and named callback path
 in `fmap`. Check the source occurrences, original multiplicities, evidence
 scope, and final result normally. Keep overloaded lists and native Quick Look
@@ -5793,3 +5791,23 @@ Check both source modes with the literal and the EDT named control. Exercise
 lazy unused elements, mismatched runtime indices, and the NoEDT standalone
 rejection. Run the maintained source and Showcase gates with both rebuilt
 stages before publication.
+
+### M70 validation
+
+Both rebuilt stages pass seven interface-only clients each. These include
+the original literal calls, inference of an unannotated result binding,
+the named-list control, and a later native field after a bottom element.
+The ten reviewed rejections match between stages. GHC-83865 points at the
+wrong Bool element, vector with a different index, or standalone NoEDT list
+element. GHC-18872 points at the linear binder used in an unrestricted list.
+
+The existing runtime API fixture passes its 37-line golden with the new
+observation in both language modes. Both Showcases match 125 lines through
+seventeen modules, including the banner. Seven registered tests pass and
+54 other ways are skipped. Formatter checks report style differences and
+an unrecognized source extension in Showcase.
+
+The isolated receipts use the `native-higher-order-result-` prefix under
+`_build/verification`. See `baseline-v1`, `selfhost-build-v1`, `source-v1`
+and `source-review-v1.json`, `regression-v1`, `showcase-v1`,
+`registered-v1`, and `format-v1`.
