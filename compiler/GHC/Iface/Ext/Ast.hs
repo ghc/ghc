@@ -755,6 +755,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
       computeType e = case e of
         HsApp{} -> Nothing
         HsAppType{} -> Nothing
+        HsAppRetained{} -> Nothing
         NegApp{} -> Nothing
         HsPar _ e -> computeLType e
         ExplicitTuple{} -> Nothing
@@ -1229,6 +1230,10 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsAppType _ expr sig ->
         [ toHie expr
         , toHie $ TS (ResolvedScopes []) sig
+        ]
+      HsAppRetained _ fun arg ->
+        [ toHie fun
+        , toHie arg
         ]
       OpApp _ a b c ->
         [ toHie a

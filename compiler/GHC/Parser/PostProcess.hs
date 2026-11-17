@@ -1782,6 +1782,9 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsAppPV :: SrcSpanAnnA -> LocatedA b -> LocatedA (FunArg b) -> PV (LocatedA b)
   -- | Disambiguate "f @t" (visible type application)
   mkHsAppTypePV :: SrcSpanAnnA -> LocatedA b -> EpToken "@" -> LHsType GhcPs -> PV (LocatedA b)
+  -- | Disambiguate "f @{e}" (explicit invisible retained application).
+  mkHsAppRetainedPV :: SrcSpanAnnA -> LocatedA b -> XAppRetained GhcPs
+                    -> LHsExpr GhcPs -> PV (LocatedA b)
   -- | Disambiguate "if ... then ... else ..."
   mkHsIfPV :: SrcSpan
          -> LHsExpr GhcPs
@@ -1939,6 +1942,7 @@ instance DisambECP (HsCmd GhcPs) where
     checkExpBlockArguments e
     return $ L l (HsCmdApp noExtField c e)
   mkHsAppTypePV l c _ t = cmdFail (locA l) (ppr c <+> text "@" <> ppr t)
+  mkHsAppRetainedPV l c _ e = cmdFail (locA l) (ppr c <+> text "@" <> braces (ppr e))
   mkHsIfPV l c semi1 a semi2 b anns = do
     checkDoAndIfThenElse PsErrSemiColonsInCondCmd c semi1 a semi2 b
     !cs <- getCommentsFor l
@@ -2038,6 +2042,9 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsAppTypePV l e at t = do
     checkExpBlockArguments e
     return $ L l (HsAppType at e (mkHsWildCardBndrs t))
+  mkHsAppRetainedPV l fun anns arg = do
+    checkExpBlockArguments fun
+    return $ L l (HsAppRetained anns fun arg)
   mkHsIfPV l c semi1 a semi2 b anns = do
     checkDoAndIfThenElse PsErrSemiColonsInCondExpr c semi1 a semi2 b
     !cs <- getCommentsFor l
@@ -2139,6 +2146,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsAppTypePV l p at t = do
     !cs <- getCommentsFor (locA l)
     return $ L (addCommentsToEpAnn l cs) (PatBuilderAppType p at (mkHsTyPat t))
+  mkHsAppRetainedPV l p _ e = patFail (locA l) (PsErrInPat (unLoc p) (PEIP_RetainedArg e))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
   mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)

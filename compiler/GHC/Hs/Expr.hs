@@ -243,6 +243,10 @@ type instance XAppTypeE      GhcPs = EpToken "@"
 type instance XAppTypeE      GhcRn = NoExtField
 type instance XAppTypeE      GhcTc = Type
 
+type instance XAppRetained   GhcPs = (EpToken "@", EpToken "{", EpToken "}")
+type instance XAppRetained   GhcRn = NoExtField
+type instance XAppRetained   GhcTc = Type
+
 -- OpApp not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
 type instance XOpApp         GhcPs = NoExtField
@@ -764,11 +768,12 @@ pprExpr :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
 -- and not     f ... x
 pprExpr (HsPar _ e) = parens (pprLExpr e)
 
--- HsApp/HsAppType: always try to print the head of the application,
+-- In an application, always try to print its head,
 -- so we get      f (g ...) (h ...)
 -- rather than    f (...) (...)
 pprExpr e@(HsApp {})     = pprApp e
 pprExpr e@(HsAppType {}) = pprApp e
+pprExpr e@(HsAppRetained {}) = pprApp e
 
 -- Now trim with pprDeeper, unless the expression is atomic
 -- in which case replacing "x" with "..." is silly
@@ -793,9 +798,10 @@ pprApp app
   where
     go fun args
       = case fun of
-          HsApp _     (L _ fun') arg -> go fun' (Left arg  : args)
-          HsAppType _ (L _ fun') arg -> go fun' (Right arg : args)
-          _                          -> ppr_app fun args
+          HsApp _         (L _ fun') arg -> go fun' (Left arg : args)
+          HsAppType _     (L _ fun') arg -> go fun' (Right (char '@' <> ppr arg) : args)
+          HsAppRetained _ (L _ fun') arg -> go fun' (Right (char '@' <> braces (pprLExpr arg)) : args)
+          _                              -> ppr_app fun args
 
     ppr_app fun args
       -- Special case: (f x) should print as (f x)
@@ -821,7 +827,7 @@ pprApp app
         --     with that if it bites us; but arity-1000 functions are rather rare
 
     pp (Left arg)  = ppr_lexpr arg  -- We already gone deeper in ppr_app
-    pp (Right arg) = text "@" <> ppr arg
+    pp (Right arg) = arg
 
 -----------------------
 ppr_lexpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
@@ -832,6 +838,7 @@ ppr_expr :: forall p. (OutputableBndrId p)
 ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
 ppr_expr e@(HsApp {})        = pprApp e
 ppr_expr e@(HsAppType {})    = pprApp e
+ppr_expr e@(HsAppRetained {}) = pprApp e
 
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
 ppr_expr (HsIPVar _ v)       = ppr v
@@ -1171,6 +1178,7 @@ hsExprNeedsParens prec = go
     go (HsPar{})                      = False
     go (HsApp{})                      = prec >= appPrec
     go (HsAppType {})                 = prec >= appPrec
+    go (HsAppRetained {})             = prec >= appPrec
     go (OpApp{})                      = prec >= opPrec
     go (NegApp{})                     = prec > topPrec
     go (SectionL{})                   = True

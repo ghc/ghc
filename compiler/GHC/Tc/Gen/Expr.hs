@@ -377,6 +377,7 @@ tcExpr :: HsExpr GhcRn
 --   - HsOverLit       overloaded literals
 --   - HsApp           value applications
 --   - HsAppType       type applications
+--   - HsAppRetained   explicit invisible retained applications
 
 -- These constructors are the union of
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
@@ -390,6 +391,7 @@ tcExpr e@(HsVar {})              res_ty = tcApp e e [] res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e e [] res_ty
 tcExpr e@(XExpr (HsRecSelRn{}))  res_ty = tcApp e e [] res_ty
 tcExpr e@(HsAppType {})          res_ty = tcCollectApp e res_ty
+tcExpr e@(HsAppRetained {})      res_ty = tcCollectApp e res_ty
 tcExpr e@(HsApp {})              res_ty = tcCollectApp e res_ty
 
 -- Typecheck an occurrence of an unbound Id

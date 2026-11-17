@@ -546,6 +546,7 @@ isGoodBreakExpr e = isCallSite e
 isCallSite :: HsExpr GhcTc -> Bool
 isCallSite HsApp{}     = True
 isCallSite HsAppType{} = True
+isCallSite HsAppRetained{} = True
 isCallSite HsCase{}    = True
 isCallSite (XExpr NativeCaseAlias{}) = True
 isCallSite (XExpr (ExpandedThingTc (HSE _ e)))
@@ -596,6 +597,8 @@ addTickHsExpr (HsApp x e1 e2)          = liftM2 (HsApp x) (addTickLHsExprNever e
 addTickHsExpr (HsAppType x e ty) = do
         e' <- addTickLHsExprNever e
         return (HsAppType x e' ty)
+addTickHsExpr (HsAppRetained ty fun arg)
+  = liftM2 (HsAppRetained ty) (addTickLHsExprNever fun) (addTickLHsExpr arg)
 addTickHsExpr (OpApp fix e1 e2 e3) =
         liftM4 OpApp
                 (return fix)

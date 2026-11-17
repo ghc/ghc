@@ -390,6 +390,14 @@ rnExpr (HsAppType _ fun arg)
        ; (arg',fvArg) <- rnHsTypeApp arg
        ; return (HsAppType noExtField fun' arg', fvFun `plusFN` fvArg) }
 
+rnExpr (HsAppRetained _ fun arg)
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; unless enabled $
+           addErr (TcRnRetainedQuantificationError RetainedArgumentExtension)
+       ; (fun', fv_fun) <- rnLExpr fun
+       ; (arg', fv_arg) <- rnLExpr arg
+       ; return (HsAppRetained noExtField fun' arg', fv_fun `plusFN` fv_arg) }
+
 rnExpr (OpApp _ e1 op e2)
   = do  { (e1', fv_e1) <- rnLExpr e1
         ; (e2', fv_e2) <- rnLExpr e2

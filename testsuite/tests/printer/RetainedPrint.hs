@@ -18,6 +18,9 @@ invisible :: foreach (b :: Bool) -- Preserve this comment before the dot.
     . Select b -> Select b
 invisible x = x
 
+explicit = invisible @{ {- Preserve this comment inside the braces. -}
+    True} 42
+
 identity :: forall a. {- Before metadata. -} @U a -> a
 identity x = x
 

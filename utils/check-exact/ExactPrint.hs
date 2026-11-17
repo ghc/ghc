@@ -3014,6 +3014,13 @@ instance ExactPrint (HsExpr GhcPs) where
     at' <- markEpToken at
     arg' <- markAnnotated arg
     return (HsAppType at' fun' arg')
+  exact (HsAppRetained (at, open, close) fun arg) = do
+    fun' <- markAnnotated fun
+    at' <- markEpToken at
+    open' <- markEpToken open
+    arg' <- markAnnotated arg
+    close' <- markEpToken close
+    return (HsAppRetained (at', open', close') fun' arg')
   exact (OpApp x e1 e2 e3) = do
     e1' <- markAnnotated e1
     e2' <- markAnnotated e2

@@ -3451,6 +3451,8 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.TypeApplications]
     TcRnRetainedQuantificationNotImplemented{}
       -> noHints
+    TcRnRetainedQuantificationError RetainedArgumentExtension
+      -> [suggestExtension LangExt.ExperimentalDependentTypes]
     TcRnRetainedQuantificationError{}
       -> noHints
     TcRnInvalidRecordField{}
@@ -3553,8 +3555,14 @@ pprRetainedQuantificationError reason = case reason of
     text "Invisible retained arguments are not supported in constructor signatures."
   RetainedInvisibleArgument binder ->
     vcat [ text "Cannot infer the invisible retained argument" <+> quotes (ppr binder)
-         , text "A later value argument must determine an unrestricted local value of type"
+         , text "Supply an argument with" <+> quotes (text "@{...}")
+           <+> text "or use a later value argument that determines an unrestricted local value of type"
            <+> ppr (varType binder) <> dot ]
+  RetainedArgumentExtension ->
+    text "Illegal explicit retained argument."
+  RetainedExplicitArgument ty ->
+    vcat [ text "An explicit retained argument requires an invisible retained binder."
+         , text "The function has type:" <+> ppr ty ]
   RetainedUnsupportedDomain ty ->
     vcat [ if isPiTy ty
            then text "This retained argument has an unsupported function domain."

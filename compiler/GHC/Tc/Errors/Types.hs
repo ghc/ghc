@@ -5322,6 +5322,8 @@ data RetainedQuantificationError
   | RetainedBinderNeedsType
   | RetainedInvisibleField
   | RetainedInvisibleArgument Id
+  | RetainedArgumentExtension
+  | RetainedExplicitArgument Type
   | RetainedUnsupportedDomain Type
   | RetainedResultKind Type
   | RetainedSolverType Type

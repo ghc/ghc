@@ -178,15 +178,22 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
 
   ETypeArg :: { ea_loc_span :: HsExprLoc
               , ea_hs_ty    :: LHsWcType GhcRn  -- The type arg
-              , ea_ty_arg   :: !(XETAType p) }  -- Kind-checked type arg
+              , ea_ty_arg   :: !(XCheckedType p) }  -- Kind-checked type arg
            -> HsExprArg p
+
+  -- Kept separate from the ordinary argument cache and its positions.
+  ERetainedArg :: { ea_loc_span     :: HsExprLoc
+                  , ea_arg_ty       :: !(XEVAType p)
+                  , ea_arg          :: LHsExpr (GhcPass (XPass p))
+                  , ea_retained_res :: !(XCheckedType p) }
+               -> HsExprArg p
 
   EPrag :: HsExprLoc -> (HsPragE (GhcPass (XPass p))) -> HsExprArg p
   EWrap :: EWrap                                      -> HsExprArg p
 
-type family XETAType (p :: TcPass) where  -- Type arguments
-  XETAType 'TcpRn = NoExtField
-  XETAType _      = Type
+type family XCheckedType (p :: TcPass) where
+  XCheckedType 'TcpRn = NoExtField
+  XCheckedType _      = Type
 
 type family XEVAType (p :: TcPass) where   -- Value arguments
   XEVAType 'TcpInst = Scaled TcSigmaTypeFRR
@@ -229,6 +236,7 @@ getFunSrcSpan :: [HsExprArg 'TcpRn] -> TcM SrcSpan
 getFunSrcSpan [] = getSrcSpanM
 getFunSrcSpan (ETypeArg { ea_loc_span = l }    : _)    = return (locA l)
 getFunSrcSpan (EValArg  { ea_loc_span = l }    : _)    = return (locA l)
+getFunSrcSpan (ERetainedArg { ea_loc_span = l } : _)   = return (locA l)
 getFunSrcSpan (EPrag l _                       : _)    = return (locA l)
 getFunSrcSpan (EWrap (EPar l)                  : _)    = return (locA l)
 getFunSrcSpan (EWrap (EExpand l _)             : _)    = return (locA l)
@@ -245,19 +253,23 @@ leadingValArgs (EValArg { ea_arg = arg } : args) = arg : leadingValArgs args
 leadingValArgs (EWrap {}    : args)              = leadingValArgs args
 leadingValArgs (EPrag {}    : args)              = leadingValArgs args
 leadingValArgs (ETypeArg {} : _)                 = []
+leadingValArgs (ERetainedArg {} : _)             = []
 
 isValArg :: HsExprArg id -> Bool
 isValArg (EValArg {}) = True
+isValArg (ERetainedArg {}) = True
 isValArg _            = False
 
 isVisibleArg :: HsExprArg id -> Bool
 isVisibleArg (EValArg {})  = True
 isVisibleArg (ETypeArg {}) = True
+isVisibleArg (ERetainedArg {}) = True
 isVisibleArg _             = False
 
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
   ppr (EPrag _ p)                     = text "EPrag" <+> ppr p
   ppr (ETypeArg { ea_hs_ty = hs_ty }) = char '@' <> ppr hs_ty
+  ppr (ERetainedArg { ea_arg = arg }) = char '@' <> braces (ppr arg)
   ppr (EWrap wrap)                    = ppr wrap
   ppr (EValArg { ea_arg = arg, ea_loc_span = sloc })
     = text "EValArg" <> braces (ppr sloc) <+> ppr arg
@@ -269,6 +281,7 @@ pprArgInst :: HsExprArg 'TcpInst -> SDoc
 -- Ugh!  A special version for 'TcpInst, se we can print the arg_ty of EValArg
 pprArgInst (EPrag _ p)                     = text "EPrag" <+> ppr p
 pprArgInst (ETypeArg { ea_hs_ty = hs_ty }) = char '@' <> ppr hs_ty
+pprArgInst arg@ERetainedArg{}             = ppr arg
 pprArgInst (EWrap wrap)                    = ppr wrap
 pprArgInst (EValArg { ea_arg = arg, ea_arg_ty = ty })
   = hang (text "EValArg" <+> ppr arg)
@@ -299,6 +312,8 @@ splitHsApps e = go e []
     go (HsPar _ (L l fun))        args = go fun (EWrap (EPar l)   : args)
     go (HsPragE _ p (L l fun))    args = go fun (EPrag      l p   : args)
     go (HsAppType _ (L l fun) ty) args = go fun (mkETypeArg l ty  : args)
+    go (HsAppRetained _ (L l fun) arg) args
+      = go fun (ERetainedArg l noExtField arg noExtField : args)
     go (HsApp _ (L l fun) arg)    args = go fun (mkEValArg  l arg : args)
     go fun args = do { mb_hse <- tcExpand fun
                      ; case mb_hse of
@@ -322,6 +337,8 @@ rebuildHsApps fun (arg : args)
         -> rebuildHsApps (HsApp noExtField (L l fun) arg) args
       ETypeArg { ea_hs_ty = hs_ty, ea_ty_arg = ty, ea_loc_span = l }
         -> rebuildHsApps (HsAppType ty (L l fun) hs_ty) args
+      ERetainedArg { ea_arg = arg, ea_retained_res = ty, ea_loc_span = l }
+        -> rebuildHsApps (HsAppRetained ty (L l fun) arg) args
       EPrag l p
         -> rebuildHsApps (HsPragE noExtField p (L l fun)) args
       EWrap (EPar l)

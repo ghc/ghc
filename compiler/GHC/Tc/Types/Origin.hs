@@ -609,6 +609,7 @@ exprCtOrigin (HsQualLit _ lit)    = QualLiteralOrigin lit
 exprCtOrigin (HsLam _ _ ms)       = matchesCtOrigin ms
 exprCtOrigin (HsApp _ e1 _)       = lexprCtOrigin e1
 exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
+exprCtOrigin (HsAppRetained _ e1 _) = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
 exprCtOrigin (NegApp _ e _)       = lexprCtOrigin e
 exprCtOrigin (HsPar _ e)          = lexprCtOrigin e

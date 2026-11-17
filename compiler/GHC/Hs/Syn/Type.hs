@@ -115,6 +115,7 @@ hsExprType (HsQualLit _ lit) = case lit of
 hsExprType (HsLam _ _ (MG { mg_ext = match_group })) = matchGroupTcType match_group
 hsExprType (HsApp _ f _) = funResultTy $ lhsExprType f
 hsExprType (HsAppType x f _) = piResultTy (lhsExprType f) x
+hsExprType (HsAppRetained ty _ _) = ty
 hsExprType (OpApp v _ _ _) = dataConCantHappen v
 hsExprType (NegApp _ _ se) = syntaxExpr_wrappedFunResTy se
 hsExprType (HsPar _ e) = lhsExprType e

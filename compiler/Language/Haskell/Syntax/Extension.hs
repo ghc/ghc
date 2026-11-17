@@ -501,6 +501,7 @@ type family XLam            x
 type family XLamCase        x
 type family XApp            x
 type family XAppTypeE       x
+type family XAppRetained    x
 type family XOpApp          x
 type family XNegApp         x
 type family XPar            x

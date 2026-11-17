@@ -697,6 +697,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  PREFIX_PROJ    { L _ (ITproj True) }               -- RecordDotSyntax
  TIGHT_INFIX_PROJ { L _ (ITproj False) }            -- RecordDotSyntax
  PREFIX_AT      { L _ ITtypeApp }
+ RETAINED_AT    { L _ ITretainedApp }
  PREFIX_PERCENT { L _ ITpercent }                   -- for linear types
 
  '{'            { L _ ITocurly }                        -- special symbols
@@ -3099,6 +3100,13 @@ fexp    :: { ECP }
         | fexp PREFIX_AT atype       { ECP $
                                         unECP $1 >>= \ $1 ->
                                         mkHsAppTypePV (noAnnSrcSpan $ comb2 $1 $>) $1 (epTok $2) $3 }
+
+        | fexp RETAINED_AT '{' exp '}' { ECP $
+                                        unECP $1 >>= \ $1 ->
+                                        unECP $4 >>= \ $4 ->
+                                        spanWithComments (comb2 $1 $>) >>= \l ->
+                                        mkHsAppRetainedPV l $1
+                                          (epTok $2, epTok $3, epTok $5) $4 }
 
         | 'static' aexp              {% runPV (unECP $2) >>= \ $2 ->
                                         fmap ecpFromExp $

@@ -971,6 +971,12 @@ zonkExpr (HsAppType ty e t)
        return (HsAppType new_ty new_e t)
        -- NB: the type is an HsType; can't zonk that!
 
+zonkExpr (HsAppRetained ty fun arg)
+  = do new_ty <- zonkTcTypeToTypeX ty
+       new_fun <- zonkLExpr fun
+       new_arg <- zonkLExpr arg
+       return (HsAppRetained new_ty new_fun new_arg)
+
 zonkExpr (HsTypedBracket hsb_tc body)
   = (\x -> HsTypedBracket x body) <$> zonkBracket hsb_tc
 

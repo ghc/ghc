@@ -287,6 +287,7 @@ classify tok =
     ITproj{} -> TkOperator
     ITstar{} -> TkOperator
     ITtypeApp -> TkGlyph
+    ITretainedApp -> TkGlyph
     ITpercent -> TkGlyph
     ITbiglam -> TkGlyph
     ITocurly -> TkSpecial

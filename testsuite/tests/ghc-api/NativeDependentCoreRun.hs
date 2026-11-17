@@ -1845,7 +1845,7 @@ runModuleCases libdir label producers extraFlags consumer expected = do
     unless (status == ExitSuccess && lines actual == expected) $
         fail ("FAIL: native cross-module observations (" ++ label ++ "): " ++ show (status, actual, errors))
 
--- | Infer an imported invisible runtime argument from a later vector.
+-- | Check omitted and explicit invisible runtime arguments through an interface.
 runInvisibleRetainedModuleChecks :: FilePath -> IO ()
 runInvisibleRetainedModuleChecks libdir = do
     vectors <- readFile "PackedVecLibrary.hs"
@@ -1880,35 +1880,48 @@ runInvisibleRetainedModuleChecks libdir = do
             , "        xs = replicateNative @Int n 7"
             , "    print (observeIndex False xs)"
             , "    print (observeIndex @Int False xs)"
+            , "    print (observeIndex @Int @{n} False xs)"
+            , "    print (observeIndex @{n} False xs)"
+            , "    print (noWrittenArguments @{S (S Z)})"
             , "    print (shadowIndex Z xs)"
             , "    bottom <- newIORef (error \"invisible-index-bottom\" :: Nat) >>= readIORef"
             , "    let ys :: Vec Int bottom"
             , "        ys = replicateNative @Int bottom 9"
             , "    print (ignoreIndex ys)"
+            , "    print (ignoreIndex @Int @{bottom} ys)"
             ]
         label = "invisible-retained"
     runModuleCases libdir label
         [("PackedVecLibrary", vectors), ("NativeInvisibleRetained", library)] []
-        consumer ["2", "2", "0", "42"]
+        consumer ["2", "2", "2", "2", "2", "0", "42", "42"]
     directory <- makeAbsolute ("NativeDependentCoreRun.modules" </> label)
     let artifacts = directory </> "artifacts"
     forM_
-        [ ("MissingInvisibleIndex", ["bad :: Int", "bad = missingIndex False"])
-        , ("ConflictingInvisibleIndices",
+        [ ("MissingInvisibleIndex", extensions, 83605, "Cannot infer the invisible retained argument",
+            ["bad :: Int", "bad = missingIndex False"])
+        , ("ConflictingInvisibleIndices", extensions, 83605, "Cannot infer the invisible retained argument",
             [ "bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Int"
             , "bad n m xs ys = compareIndices xs ys"
             ])
-        ] $ \(moduleName, declarations) -> do
+        , ("WrongExplicitIndex", extensions, 83865, "Couldn't match type",
+            [ "bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Int"
+            , "bad n m xs = observeIndex @Int @{m} False xs"
+            ])
+        , ("NoInvisibleBinder", extensions, 83605, "requires an invisible retained binder",
+            ["bad :: Nat -> Nat", "bad = id @{Z}"])
+        , ("ExplicitIndexExtensionOff", "", 83605, "Illegal explicit retained argument",
+            ["bad :: Int", "bad = noWrittenArguments @{Z}"])
+        ] $ \(moduleName, flags, code, fragment, declarations) -> do
             let path = directory </> (moduleName ++ ".hs")
             writeFile path $ unlines $
-                [extensions, "module " ++ moduleName ++ " where", "import NativeInvisibleRetained", "import PackedVecLibrary"]
+                [flags, "module " ++ moduleName ++ " where", "import NativeInvisibleRetained", "import PackedVecLibrary"]
                     ++ declarations
             GHC.runGhc (Just libdir) $ do
                 environment <- nativeModuleEnvironment artifacts [] NoLink Nothing
                 result <- GHC.handleSourceError (pure . Left) $ do
                     liftIO $ void $ compileFile environment NoStop (path, Nothing)
                     pure (Right ())
-                checkSourceRejection moduleName 83605 "Cannot infer the invisible retained argument" result
+                checkSourceRejection moduleName code fragment result
 
 -- | Configure the shared one-shot compiler for object and diagnostic checks.
 nativeModuleEnvironment :: FilePath -> [String] -> GhcLink -> Maybe FilePath -> GHC.Ghc HscEnv

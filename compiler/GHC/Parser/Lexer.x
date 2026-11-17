@@ -726,6 +726,8 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 --  ----------+---------------+------------------------------------------
 --    @       |  prefix       | ITtypeApp
 --            |               |   type application, e.g.  fmap @Maybe
+--            |  prefix,      | ITretainedApp
+--            |  before '{'   |   retained application, e.g.  f @{n}
 --            |  tight infix  | ITat
 --            |               |   as-pattern, e.g.  f p@(a,b) = rhs
 --            |  suffix       | parse error
@@ -886,6 +888,7 @@ data Token
   | ITtilde    -- Prefix (~) only, e.g. f ~x = rhs
   | ITat       -- Tight infix (@) only, e.g. f x@pat = rhs
   | ITtypeApp  -- Prefix (@) only, e.g. f @t
+  | ITretainedApp -- Prefix (@) immediately before an explicit operand brace
   | ITpercent  -- Prefix (%) only, e.g. a %1 -> b
   | ITstar              IsUnicodeSyntax
   | ITdot
@@ -1802,7 +1805,10 @@ varsym opws@OpWsPrefix = sym $ \span exts s ->
            ; return (ITvarsym s) }
   in
   if | s == fsLit "@" ->
-         return ITtypeApp  -- regardless of TypeApplications for better error messages
+         -- OpWsPrefix excludes the start of a comment. Keep the brace as
+         -- its own token so that it opens the usual explicit layout context.
+         do { AI _ next <- getInput
+            ; return $ if nextCharIs next (== '{') then ITretainedApp else ITtypeApp }
      | s == fsLit "%" ->
          if xtest ModifiersBit exts || xtest LinearTypesBit exts
          then return ITpercent

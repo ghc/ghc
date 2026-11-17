@@ -286,6 +286,7 @@ dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr e@(HsVar {})                 = dsApp e
 dsExpr e@(HsApp {})                 = dsApp e
 dsExpr e@(HsAppType {})             = dsApp e
+dsExpr e@(HsAppRetained {})         = dsApp e
 
 dsExpr (HsHole (_, (HER ref _ _))) = dsEvTerm =<< readMutVar ref
       -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint.
@@ -728,6 +729,8 @@ ds_app (HsApp _ fun arg) hs_args core_args
 
 ds_app (HsAppType arg_ty fun _) hs_args core_args
   = ds_lapp fun hs_args (Type arg_ty : core_args)
+ds_app (HsAppRetained _ fun arg) hs_args core_args
+  = ds_app (HsApp noExtField fun arg) hs_args core_args
 
 ds_app (XExpr (WrapExpr hs_wrap fun)) hs_args core_args
   = do { (fun_wrap, all_args) <- splitHsWrapperArgs hs_wrap core_args

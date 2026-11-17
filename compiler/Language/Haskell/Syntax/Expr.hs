@@ -358,6 +358,9 @@ data HsExpr p
        -- Explicit type argument; e.g  f @Int x y
        -- NB: Has wildcards, but no implicit quantification
 
+  | HsAppRetained (XAppRetained p) (LHsExpr p) (LHsExpr p)
+      -- ^ Explicit invisible retained argument, e.g. `f @{n}`.
+
   -- | Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
 

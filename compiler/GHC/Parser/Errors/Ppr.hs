@@ -479,6 +479,7 @@ instance Diagnostic PsMessage where
       -> let msg  = parse_error_in_pat
              body = case details of
                  PEIP_NegApp -> text "-" <> ppr s
+                 PEIP_RetainedArg e -> ppr s <+> char '@' <> braces (ppr e)
                  PEIP_OtherPatDetails (ParseContext (Just fun) _)
                   -> ppr s <+> text "In a function binding for the"
                                      <+> quotes (ppr fun)

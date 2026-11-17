@@ -55,7 +55,7 @@ import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..) )
 import GHC.Core.Type
-import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE )
+import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
 
 import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy )
@@ -440,7 +440,9 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        -- See Note [Imported native application contracts].
        ; native_app <- tcRetainedAppCapability fun_sigma0 exp_res_ty rn_args
        -- See Note [Known native variables with ImpredicativeTypes].
-       ; head_ql <- tcRetainedKnownHeadQL native_app wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
+       ; head_ql <- if any isExplicitRetainedArg rn_args
+                    then return NoQL
+                    else tcRetainedKnownHeadQL native_app wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
        ; tcRetainedAppEvidence native_app $
          do { (prefix, prepared_ql, prepared_sigma, remaining_args, prepared_plan) <-
                 tcRetainedGroundApp native_app head_ql exp_res_ty rn_head tc_fun0 fun_sigma0 rn_args
@@ -1231,6 +1233,7 @@ tcValArgsWithCache cache do_ql rn_head args = go do_ql 0 0 args
 
     user_visible (EValArg{})                   = True
     user_visible (EValArgQL{})                 = True
+    user_visible (ERetainedArg{})              = True
     user_visible (ETypeArg{ ea_loc_span = l }) = not (isGeneratedSrcSpan (locA l))
     user_visible _                             = False
 
@@ -1243,6 +1246,12 @@ tcValArg _ _ _ (EPrag l p)         = return (EPrag l (tcExprPrag p))
 tcValArg _ _ _ (ETypeArg l hty ty) = return (ETypeArg l hty ty)
 tcValArg _ _ _ (EWrap (EHsWrap w)) = return (EWrap (EHsWrap w))
 tcValArg _ _ _ (EWrap ew)          = return (EWrap ew)
+
+tcValArg _ pos rn_head (ERetainedArg loc (Scaled mult ty) arg res_ty)
+  = addArgCtxt pos rn_head arg $
+    do { checked <- tcScalingUsage mult $
+                     traverse (\e -> tcPolyExpr e (mkCheckExpType ty)) arg
+       ; return (ERetainedArg loc noExtField checked res_ty) }
 
 tcValArg do_ql pos rn_fun_head
          (EValArg { ea_loc_span  = lspan
@@ -1511,6 +1520,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     inst_fun [] | inst_final  = isInvisibleForAllTyFlag
                 | otherwise   = const False
     inst_fun (EValArg {} : _) = isInvisibleForAllTyFlag
+    inst_fun (ERetainedArg {} : _) = isInvisibleForAllTyFlag
     inst_fun _                = isInferredForAllTyFlag
 
     -----------
@@ -1566,12 +1576,16 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
       = not (isGeneratedSrcSpan (locA loc))
     written_type_arg _ = False
 
+    written_prefix_arg arg = written_type_arg arg || isExplicitRetainedArg arg
+
     -- go1: fun_ty is not filled-in instantiation variable
     --      ('go' dealt with that case)
 
     -- Handle out-of-scope functions gracefully
     go1 plan fun_orig pos acc fun_ty (arg : rest_args)
-      | fun_is_out_of_scope, looks_like_type_arg arg   -- See Note [VTA for out-of-scope functions]
+      | fun_is_out_of_scope
+      , looks_like_type_arg arg || isExplicitRetainedArg arg
+      -- See Note [VTA for out-of-scope functions]
       = go plan fun_orig pos acc fun_ty rest_args
 
     -- Rule IALL from Fig 4 of the QL paper; applies even if args = []
@@ -1624,10 +1638,23 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                 -- Going around again means we deal easily with
                 -- nested  forall a. Eq a => forall b. Show b => blah
 
+    -- See Note [Explicit invisible retained arguments].
+    go1 plan fun_orig pos acc fun_ty (ERetainedArg loc _ arg _ : rest_args)
+      = do { (binder, operand) <-
+               addArgCtxt (pos + count written_prefix_arg acc) rn_head arg $
+               case coreFullView fun_ty of
+                 DepFunTy DepFunInvisible binder _ ->
+                   (binder,) <$> tcRetainedOperand binder arg
+                 _ -> failWithTc
+                        (TcRnRetainedQuantificationError (RetainedExplicitArgument fun_ty))
+           ; let res_ty = applyTypeToArgs fun_ty [operand]
+                 checked = ERetainedArg loc (Scaled ManyTy (varType binder)) arg res_ty
+           ; go plan fun_orig pos (checked : acc) res_ty rest_args }
+
     -- See Note [Inferring an invisible retained argument].
     go1 plan fun_orig pos acc fun_ty args@(EValArg { ea_arg = first } : _)
       | DepFunTy DepFunInvisible binder body <- coreFullView fun_ty
-      = do { actual <- addArgCtxt pos rn_head first $
+      = do { actual <- addArgCtxt (pos + count written_prefix_arg acc) rn_head first $
                  do { selected <- tcInferInvisibleRetained [] binder body
                                     [arg | EValArg { ea_arg = arg } <- args]
                     ; case selected of
@@ -1665,9 +1692,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
-      = do { core_arg <- if isNativeIndexFunctionId binder
-                          then tcRetainedFunctionArg (varType binder) arg
-                          else tcRetainedArg (varType binder) arg
+      = do { core_arg <- tcRetainedOperand binder arg
            ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy (varType binder))
            ; let body_ty = applyTypeToArgs fun_ty [core_arg]
            ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
@@ -1745,7 +1770,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                 matchActualFunTy herald
                   (Just $ HsExprTcThing tc_fun)
                   (n_val_args, fun_sigma) fun_ty
-           ; arg' <- quickLookArg do_ql (pos + count written_type_arg acc)
+           ; arg' <- quickLookArg do_ql (pos + count written_prefix_arg acc)
                                   ctxt rn_head arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go plan fun_orig (pos+1) acc' res_ty rest_args }
@@ -1770,6 +1795,12 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
            DoStmtOrigin -> ExpectedFunTySyntaxOp DoStmtOrigin tc_fun
            _ -> ExpectedFunTyArg (HsExprTcThing tc_fun) arg
 
+
+-- | Resolve the index at the binder's checked scalar or function domain.
+tcRetainedOperand :: Id -> LHsExpr GhcRn -> TcM Core.CoreExpr
+tcRetainedOperand binder
+  | isNativeIndexFunctionId binder = tcRetainedFunctionArg (varType binder)
+  | otherwise                     = tcRetainedArg (varType binder)
 
 -- | Resolve one already-bound local function at its exact retained domain.
 -- Read existing assignments without instantiating or checking the value again.
@@ -1901,10 +1932,9 @@ tcRetainedArgVar expected arg_id
 
 {- Note [Retained argument application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Only DepFunVisible consumes a written source value argument. Declaration
-advice stops at DepFunInvisible. The ordinary application checker then uses
-its existing non-function fallback. No implicit runtime argument is supplied.
-See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
+A plain source value argument consumes DepFunVisible. At DepFunInvisible it
+can determine an omitted operand. See Note [Inferring an invisible retained
+argument] and Note [Explicit invisible retained arguments].
 
 A retained argument is a value. Resolve a local unrestricted Id or a saturated
 constructor tree before instantiating the codomain. Also resolve an immediate
@@ -1968,6 +1998,32 @@ The provisional Core expression does not replace this original source check.
 See docs/dependent-haskell/REFERENCES.md#agda-provenance and
 docs/dependent-haskell/CORE.md#laziness-and-eta.
 -}
+
+{- Note [Explicit invisible retained arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In f @Int @{n} xs, @Int is an erased type application and @{n} is an
+expression in the ordinary term namespace. Agda uses braces to supply an
+implicit term. The prefix @ distinguishes the argument from GHC's record
+syntax. See docs/dependent-haskell/REFERENCES.md#invisible-retained-binders-next-candidate.
+
+Instantiate preceding erased foralls and dictionaries before consuming the
+invisible retained binder. Declaration advice can choose erased arguments.
+Substitute the written operand, resolved by the same rules as a visible
+retained argument. An inferred operand cannot replace it. Check the original
+expression at the binder's domain and multiplicity Many exactly once. Store
+the substituted result type in HsAppRetained. Desugar its expression to a
+runtime value application.
+
+Keep ERetainedArg separate from EValArg through application checking. It
+counts in source diagnostic positions. It does not consume a position in
+the ordinary argument cache. Skip Quick Look for this application so that
+the retained result is checked without Quick Look instantiation variables.
+-}
+
+-- | Is this a written runtime argument for an invisible retained binder?
+isExplicitRetainedArg :: HsExprArg p -> Bool
+isExplicitRetainedArg ERetainedArg{} = True
+isExplicitRetainedArg _ = False
 
 {- Note [Immutable retained result instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4538,7 +4594,9 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
        ; fun_lspan_arg <- getFunSrcSpan rn_args
 
        -- Step 1: get the type of the head of the argument
-       ; (fun_ue, mb_fun_ty) <- tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg
+       ; (fun_ue, mb_fun_ty) <- if any isExplicitRetainedArg rn_args
+                               then return (zeroUE, Nothing)
+                               else tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg
          -- tcCollectingUsage: the use of an Id at the head generates usage-info
          -- See the call to `tcEmitBindingUsage` in `check_local_id`.  So we must
          -- capture and save it in the `EValArgQL`.  See (QLA6) in
