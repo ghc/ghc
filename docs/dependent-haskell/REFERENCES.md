@@ -4406,3 +4406,28 @@ import usage. M74 records each constructor it uses when it inserts the
 operand. See Note [DataToTag overview], especially DTW2, in
 [GHC.Tc.Instance.Class](../../compiler/GHC/Tc/Instance/Class.hs) and
 [the M74 tests](PLAN.md#m74-successive-invisible-retained-arguments).
+
+## Closed evaluation of a source function
+
+Agda accepts mechanically checked recursion and distinguishes runtime
+evaluation from reduction during typechecking. M75 starts with finite
+constructor tables. Its totality obligation concerns reduction on a closed
+constructor input. Haskell runtime arguments can still be bottom.
+[Agda 2.8.0 termination checking](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html)
+
+Eisenberg and Stolarek translate a term declaration to a type family in
+`singletons`. The implementation promotes each clause and emits a closed
+family with the resulting equations. This provides an implementation to
+compare against when choosing how the GHC checker represents a verified
+source equation. The pinned Promote.hs blob is
+`232bea5b719f5eb6eda9926f197e63f9d0c9f30a`.
+[Haskell 2014 paper](https://richarde.dev/papers/2014/promotion/promotion.pdf)
+and [Promote.hs, lines 1010–1121](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L1010-L1121).
+
+Proposal #378 gives the primary namespace precedence and describes a
+fallback to the other namespace. The M74 interface-only client reaches
+GHC-76037 for the value name in a type synonym. In the same experiment,
+the ordinary runtime function and a separately declared family both work.
+Local sources and observations are in
+`_build/verification/native-closed-evaluation-baseline-v4`.
+[Proposal #378, lexical scoping](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#changes-to-support-dependent-types)

@@ -6032,3 +6032,42 @@ index. An erased variable alone gives GHC-83605. The explicit and
 independently determined calls both return 1.
 The local verification files have the
 `native-hidden-append-` prefix.
+
+## M75: closed evaluation of a source function
+
+R15 owns the evaluation check. R13 owns reuse of the source definition and
+R21 tracks declaration ordering. Use M74 as the baseline. The independent
+producer exports an ordinary Boolean function. Its client has only the
+object interface. The runtime control returns `(True,False)`. A companion
+closed type family proves its first equation by `Refl`. The direct source
+type `type Computed = flipBit 'False` fails at `flipBit` with GHC-76037.
+
+The first implementation target is a unary table over a finite datatype
+with nullary constructors. Read the domain, result, constructors and
+promoted names from the checked declaration. Test an independently
+declared datatype as well as Bool. Match every domain constructor once.
+Each result is a constructor of the declared result type. This grammar
+gives a finite reduction rule and preserves ordinary Haskell demand.
+A call on an unknown scrutinee can stay stuck. A runtime call on bottom
+retains its normal demand. Recursion needs a separate termination check.
+
+Compare the checked table with the closed-family translation in
+`singletons-th`. Reuse GHC's nominal reduction evidence if that representation
+fits the checked table. Preserve the term-level name, its source spans and
+the checked equations across an interface, including builds that omit
+unfoldings. In a dependent module, give a bound type name its existing
+precedence when resolving a function in type syntax. Verify declaration
+ordering for both local and imported definitions. See
+[the research and baseline](REFERENCES.md#closed-evaluation-of-a-source-function).
+
+- [x] Measure the ordinary runtime call, the closed-family control and the
+      direct source proof on the M74 compiler.
+- [ ] Generate and validate the reduction equations from one source binding.
+      Require an ordinary datatype with an exhaustive constructor table.
+      Report unsupported clauses at their source.
+- [ ] Prove a closed application by `Refl` in the defining module and in an
+      interface-only client. Reject the opposite equation. Preserve type
+      variable shadowing and the ordinary runtime result.
+- [ ] Change only the producer's table and verify dependent client
+      recompilation. Check an opaque imported definition and an open,
+      undetermined input. Add the verified example to Showcase.

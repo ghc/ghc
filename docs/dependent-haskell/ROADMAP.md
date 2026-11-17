@@ -55,6 +55,10 @@ M74 checks consecutive invisible retained arguments. The two vectors in
 index `Add n m`. A caller can also write either the leading operand or both
 operands. Both stages match 133 Showcase output lines through seventeen
 source modules, including the banner. R03, R05 and R23 remain open.
+The next evaluation experiment tests an ordinary source function in a closed
+type expression. Its runtime and handwritten-family controls pass. The direct
+source proof currently fails at name resolution. See [M75](PLAN.md#m75-closed-evaluation-of-a-source-function).
+
 M62 supplied the earlier 88-line source group through fourteen modules.
 M56 provides
 the closed parameterized domains. M57 provides nominal scalar-domain conversion
