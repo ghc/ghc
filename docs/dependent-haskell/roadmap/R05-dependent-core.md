@@ -56,7 +56,7 @@ Restricted pipelines and Lint checks do not establish general preservation.
 - [ ] Integrate the [R23 matchability foundation](R23-unsaturated-type-families.md)
       with native types and coercions. Preserve forward congruence and restrict
       inverse projection to the permitted function kinds.
-- [ ] Specify generic domain metadata for `[a]`. Update binder types,
+- [ ] Implement M67 generic domain metadata for `[a]`. Update binder types,
       occurrence types, multiplicities, substitution and zonking together.
       Constructor fields at arbitrary `a` need an opaque-field rule. Include
       Int, functions, arbitrary lifted types and `a = Vec Int n`. The last

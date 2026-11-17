@@ -4075,3 +4075,22 @@ The selected Agda telescope-prefix substitution and proposal #378 neutral-value
 passages provide comparisons. Their assumptions do not prove this design.
 The full target, implementation order and remaining obligations belong to
 [R05](roadmap/R05-dependent-core.md).
+
+M67 records the full implementation contract in
+[PLAN.md](PLAN.md#m67-structural-generic-domains-and-dependent-domain-transport).
+The ignored `native-generic-domain-substitution-algorithm-v1` pins twelve
+current source files at M66. It distinguishes source binder metadata from
+stored target ranges and target in-scope representatives. Only source metadata
+receives the substitution. Same-Unique binder updates use the in-scope entry.
+Free-source preparation and composition need an explicit provenance contract;
+membership alone does not establish fresh metadata. Proposed raw controls
+remain unexecuted at specification time.
+
+The ignored `native-generic-domain-zonker-research-v1` pins ten source files.
+It refines the earlier prefix-map proposal: the existing metadata-only helpers
+can reconstruct original Id prototypes without new environment state. This
+requires acyclic earlier-index metadata, unchanged binding identities and
+zonk-equivalent input prototypes. Final zonking is not idempotent. It must not
+feed its own unfinished output back as input or consult the recursive IdInfo
+map from a type occurrence. These are implementation obligations, not a new
+domain-admission or termination result.

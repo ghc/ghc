@@ -5113,3 +5113,86 @@ status edits change only Markdown. The final provenance receipt relates them
 to this compiled snapshot. R05, generic domains, dependent-domain transport,
 normal optimization and totality remain open. Other inherited pure family
 normalization paths are outside this increment.
+
+## M67: structural generic domains and dependent-domain transport
+
+Roadmap owner: R05. Related cards: R03 and R23. Prerequisite: validated M66.
+Status: specified. Implementation and acceptance checks remain open.
+
+The full source target is `forall (a :: Type). foreach (xs :: [a]) -> ...`.
+Constructor matching must bind the actual cons head at `a` and tail at `[a]`.
+Its nominal proof must retain those values and the complete type argument.
+Instances include Bool, Int, eligible functions, other lifted types and
+`a := Vec Int n`, where `n` is an earlier runtime index. Check inferred type
+arguments as well as explicit applications. Forwarding alone does not complete
+this increment. A runtime-independent restriction cannot replace this target.
+
+Use three separate judgments. A structural domain exposes an admitted boxed
+constructor schema. An opaque value index names an actual scoped local Many
+Id at its exact lifted type. A native call head retains the existing fixed
+U/Many function policy. A datatype parameter field stays opaque after ordinary
+instantiation. For example, the Int field of `[Int]` does not require the
+unlifted field of `I#` to become a structural index. Opaque identity does not
+grant native call permission or inverse application.
+
+Implement and validate the following dependencies in order:
+
+1. Preserve runtime Id metadata through ordinary and deep type substitution
+   and both zonkers. Substitute source binder domains before freshening. Keep
+   stored ranges and target representatives apply-once. Update same-Unique
+   binder prototypes without reading recursive IdInfo. State the preparation
+   contract for free source Ids and substitution composition explicitly.
+2. Admit structural generic schemas and opaque parameter fields consistently
+   in Core, source checking, application inference, constructor matching, Lint
+   and typed interface loading. Derive field origin from the constructor
+   telescope. Do not classify a field solely from its instantiated type shape.
+3. Add nominal transport when an earlier runtime refinement changes a later
+   domain. Transport the value, its index occurrences and subsequent proof
+   types in the correct direction. Cover DepFunCo, lifting, family rewriting,
+   source evidence, backend lowering and Lint together. Preserve function WHNF
+   and field demand. Ordinary metadata substitution supplies no domain proof.
+4. Extend the maintained fixtures and Showcase with complete source clients.
+   Compile separate producer and interface-only consumer modules in both
+   stages. Record diagnostics, source inputs and consumed artifacts.
+
+The first implementation commit can prepare metadata while admission remains
+closed. Raw generic mapper controls are representation checks. They do not
+establish accepted generic source, admissible Core or later-domain transport.
+Do not mark this increment complete from those controls.
+
+Acceptance checks:
+
+- [ ] Update actual binder and occurrence types, multiplicities and deep free
+  variables for erased substitution. Check same-Unique updates, alpha cloning,
+  capture, masking, apply-once ranges, composition and deep kind substitution.
+- [ ] Zonk filled ordinary metas in native binder and occurrence metadata.
+  Check original TcId inputs, ambient earlier indices and ordinary recursive
+  expression groups without consulting their knot-tied IdInfo environment.
+- [ ] Preserve an explicit source/target preparation contract for free Ids.
+  Do not infer metadata freshness from Unique membership or type shape.
+- [ ] Compile generic nil/cons refinement with an explicit saturated Count
+  family. Instantiate at Bool, Int, functions, IO and another opaque lifted
+  type. Preserve existing closed constructor actuals and call-head rules.
+- [ ] Compile `a := Vec Int n`. Refine list shape and the earlier runtime `n`
+  in separate controls. Check exact nominal endpoints and later binder domains.
+- [ ] Check inferred instantiation, later payload scope and proof-only
+  dependencies. Reject own/later-binder capture and sibling-branch escape with
+  located diagnostics. Keep ordinary payload metas distinct from index choices.
+- [ ] Keep bottom heads and tails lazy when only cons shape is required.
+  Check explicit head demand, partial applications and finite cyclic prefixes.
+- [ ] Round-trip generic signatures and actual field identities through
+  interfaces. Check old-reader rejection when the representation permits it.
+  Bump versions if the final encoding changes fields or tags.
+- [ ] Build both stages. Run the selected existing API/source cohort and
+  Showcase. Record the remaining boundary after each preparatory commit.
+
+Agda's ordered substitution and constructor telescope refinement are the
+primary comparison. The existing GHC apply-once substitution contract governs
+Name/Unique prototypes and stored ranges. Proposal #242 supplies the separate
+forward-application and matchable-inversion distinction. See the generic-domain
+and metadata entries in REFERENCES.md. These readings do not prove preservation
+for this fork or transfer Agda's totality guarantees to lazy Haskell.
+
+Ordinary function promotion, source family unsaturation, general TypeRep,
+native unfoldings, normal optimization and totality remain separate work.
+Keep R05 and the full project goal open throughout these preparatory stages.
