@@ -9,6 +9,11 @@ and closed parameterized indices such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
 
 Last updated: 2026-11-17.
 
+The M67 metadata foundation passes both builds and the selected checks.
+It prepares generic structural domains by preserving runtime Id metadata.
+Generic `[a]` source and changed-domain transport remain open. See
+[the implementation record](PLAN.md#m67-metadata-foundation).
+
 ## Project documents
 
 - [Program roadmap](ROADMAP.md): the main work queue, all fifty upstream cards, dependencies and local completion boundaries.

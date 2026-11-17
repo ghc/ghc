@@ -4094,3 +4094,31 @@ zonk-equivalent input prototypes. Final zonking is not idempotent. It must not
 feed its own unfinished output back as input or consult the recursive IdInfo
 map from a type occurrence. These are implementation obligations, not a new
 domain-admission or termination result.
+
+The M67 metadata implementation and executed controls are recorded in
+[PLAN.md](PLAN.md#m67-metadata-foundation). The older proposed probe lists
+retain their original unexecuted status. Actual receipts distinguish the raw
+metadata failure on M66, corrected bootstrap controls, complete build and
+self-hosted registered checks.
+
+Three later source reviews refine the remaining implementation:
+
+- `native-generic-free-id-callers-research-v1` pins eighteen source files.
+  Actual forall-instantiation callers own a complete source sigma and target
+  arguments. Preserve target entries when adding source free variables.
+  Ordered retained constructor instantiation already installs earlier actual
+  field ranges. A universal metadata refresh is unnecessary at these callers.
+- `native-generic-structural-schema-research-v1` pins twenty-eight source files
+  and eight historical inputs. Derive parameter origin before substitution.
+  Keep opaque value identity, structural roots and strict M65 call endpoints
+  distinct. Include generated dependent lambdas and exact interface field kinds.
+- `native-generic-domain-transport-research-v1` pins sixteen source/context
+  inputs. Existing GRefl and the asymmetric DepFunCo rule supply the proposed
+  evidence orientation. A separate native lifting component retains runtime
+  source provenance. Coordinate domain reduction, body prefix, source
+  abstraction, casts and backend guards. No new equality primitive is proposed.
+
+These reviews ran no compiler or executable control. Their proposed source
+clients and transport oracles remain unexecuted. The comparisons use the
+previously pinned Agda telescope rules and current FC kind-binder lifting.
+They do not establish preservation or transfer a totality guarantee.

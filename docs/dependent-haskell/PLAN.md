@@ -5117,7 +5117,8 @@ normalization paths are outside this increment.
 ## M67: structural generic domains and dependent-domain transport
 
 Roadmap owner: R05. Related cards: R03 and R23. Prerequisite: validated M66.
-Status: specified. Implementation and acceptance checks remain open.
+Status: metadata foundation validated. Generic admission and nominal
+later-domain transport remain open.
 
 The full source target is `forall (a :: Type). foreach (xs :: [a]) -> ...`.
 Constructor matching must bind the actual cons head at `a` and tail at `[a]`.
@@ -5196,3 +5197,90 @@ for this fork or transfer Agda's totality guarantees to lazy Haskell.
 Ordinary function promotion, source family unsaturation, general TypeRep,
 native unfoldings, normal optimization and totality remain separate work.
 Keep R05 and the full project goal open throughout these preparatory stages.
+
+### M67 metadata foundation
+
+Commits `4aaec9a545` and `ae5238487c` implement metadata preservation and its
+maintained controls. Admission remains closed. No new equality, wire field,
+runtime use or totality guarantee is added.
+
+Substitute source binder types and multiplicities before freshening. Install
+the target Id even when its Unique stays the same. A cloned range must have
+the substituted source domain. Return stored ranges and in-scope target Ids
+without applying the substitution again. The deep mapper uses deep metadata
+substitution. Closed binder metadata keeps the existing no-change path.
+
+Both zonkers reconstruct original native Id metadata with their existing
+helpers. They preserve binding identity and do not inspect recursive IdInfo.
+The final pass must not zonk its own unfinished output again. Metadata must
+have acyclic earlier-runtime dependencies and zonk-equivalent input prototypes.
+See the owning Notes in Core.TyCo.Subst and Tc.Zonk.TcType.
+
+Baseline v2 compiles the maintained fixture against the unchanged M66 main
+compiler. Its first new assertion fails: the retained binder still has `[a]`
+after `a := Bool`. This expected negative stops before the zonker controls.
+It is not evidence of a miscompilation in the currently admitted source subset.
+
+Bootstrap build v1 passes in 100.81 seconds. API v4 passes after resolving the
+real IO type through the GHC session API. Earlier fixture compile failures
+remain recorded: a missing final-zonker wrapper, an unavailable IO constant,
+and a list pattern for the NonEmpty parseName result. Final bootstrap refresh
+v4 passes in 5.12 seconds.
+
+Full self-hosted build v1 passes in 388.32 seconds. Its 27,299 source inputs
+remain unchanged at spec commit `170c808c9ca2d496bdc3dd5933c7bc8160fe1a5b`
+plus patch SHA256
+`e2d6fc676903e38d403a5c67bf6558ba20c2b4dea6ac5e7bbbd0a1ab97a93ba6`.
+It rebuilds target libraries, both compilers and the selected utilities.
+The validated main M66 checkout remains unchanged.
+
+Maintained kernel and source/runtime fixtures pass their unchanged 1/37-line
+goldens against the complete build. The new quiet controls inspect actual
+Id types, multiplicities and deep free variables. They cover same-Unique
+updates, cloning, masking, apply-once substitution, Int/function/IO metadata,
+an earlier-runtime-index element, deep kind substitution and both zonkers.
+They also check ambient final zonking with an unusable recursive Id environment
+and both type and coercion call-head metadata.
+
+Raw generic controls establish metadata mapping only. The closed List Bool
+specialization is checked with Core Lint. The indexed-element control is not
+a vector algorithm or a changed-domain transport check.
+
+Showcase passes 100 observations through sixteen modules in each stage.
+Test prerequisites v1 pass in 79.94 seconds. Registered v1 reports seven
+expected normal-way passes, 54 skipped ways and no unexpected failures or
+framework warnings. Both API fixtures run under the self-hosted compiler.
+The full GHC suite was not run.
+
+Read-only formatting observes five files without changes. Fourmolu reports
+two style differences and two parser failures. Cabal-gild rejects the unchanged
+compiler template. No formatter pass is claimed. Evidence is under
+`_build/verification/native-generic-metadata-*`. Later status edits change
+Markdown only; the final provenance receipt relates them to this build.
+
+### Next M67 implementation group
+
+Preserve target representatives when adding source free variables at actual
+instantiation boundaries. A complete source sigma supplies the lexical
+invariant: an ambient Id cannot depend on a later bound forall variable.
+Constructor field instantiation already installs actual earlier Id ranges
+before later field types. Do not add a universal free-Id refresh.
+
+Derive parameter-field origin from the original constructor telescope.
+Keep fixed concrete field traversal and strict M65 function endpoints.
+Opaque value identity needs separate Core and typed-interface judgments.
+Generated dependent lambdas over those values need the same Core formation
+rule. Source foreach root admission remains a separate decision.
+
+Use existing GRefl and DepFunCo for changed-domain transport. Add a separate
+runtime component to the lifting context. Its entries retain runtime-source
+provenance and the left binder with nominal domain evidence. The common body
+relates the left index to its forward cast. DepFunCo then substitutes the
+right binder through the inverse cast. Preserve cast composition, exact kinds
+and the fixed native-call policy. Update normalization, solver prefix scope,
+source abstraction, Lint and backend application together.
+
+These next changes remain unimplemented at this checkpoint. Their pinned
+source reviews are recorded in REFERENCES.md. The prepared generic producer,
+thirteen-observation client and wrong-list negative are unexecuted candidates.
+They do not close any source or interface acceptance check above.

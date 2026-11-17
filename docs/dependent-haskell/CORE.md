@@ -2602,3 +2602,26 @@ The exact argument-context checks, maintained API fixtures, seven registered
 tests and unchanged Showcase100/16 pass. See
 [the validation record](PLAN.md#final-m66-validation) and
 Note [Bounded frontend family views] in GHC.Tc.Solver.
+
+## Runtime Id metadata preparation
+
+The M67 foundation substitutes a retained binder's source type and multiplicity
+before freshening. Its domain is outside its own scope. Install the resulting
+target Id before mapping the body, including when its Unique stays the same.
+Check a cloned range against the substituted source domain. Return a stored
+range or target in-scope Id once. A second substitution would change a range
+such as `a := Maybe a` incorrectly. The deep mapper uses deep substitution
+inside binder metadata.
+
+Both zonkers reconstruct original Id metadata with their existing helpers.
+Keep the Name and Unique. Do not inspect the recursive IdInfo environment.
+Input prototypes must have equivalent zonked metadata and acyclic earlier-index
+dependencies. Final zonking must not use its own unfinished output as new input.
+
+These operations supply no domain coercion or new admission rule. Generic
+structural lists still need opaque fields and nominal later-domain transport.
+Free-source scope construction and lifting need their own prefix contracts.
+See Note [Substituting runtime Id metadata] in GHC.Core.TyCo.Subst and
+Note [Zonking runtime index metadata] in GHC.Tc.Zonk.TcType. The
+[validation record](PLAN.md#m67-metadata-foundation) separates raw metadata
+controls from the closed specialization checked with Lint.

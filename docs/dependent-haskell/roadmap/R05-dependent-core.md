@@ -33,6 +33,9 @@ M63/M64 add ordinary-arrow and forall matchability. Their selected source,
 Core, reflection and compatibility checks pass in both stages. Publication
 and the full R23 scope remain open. M65 adds closed function-value indices.
 M66 bounds the selected native family views and preserves diagnostic context.
+The M67 metadata foundation passes both builds, API fixtures, Showcase100/16
+and seven registered tests. Generic admission and later-domain transport remain
+open. See [the checkpoint](../PLAN.md#m67-metadata-foundation).
 Restricted pipelines and Lint checks do not establish general preservation.
 
 ## Next increments
