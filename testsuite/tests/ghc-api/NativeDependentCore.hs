@@ -11,7 +11,7 @@ import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags
 import GHC.Builtin.WiredIn.Prim (fUNTyCon, intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkForAllCo, mkFunCoNoFTF, mkKindCo, mkInstCo, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (MCoercion (..), coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAppCo, mkAxInstCo, mkCoercionType, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkForAllCo, mkFunCoNoFTF, mkKindCo, mkInstCo, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo, splitAppCo_maybe)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConRepArity, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
@@ -54,7 +54,7 @@ import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserD
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
 import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, IfaceSynonym, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
-import GHC.Iface.Type (IfaceAppArgs (IA_Nil, IA_Arg), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo, IfaceForAllCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
+import GHC.Iface.Type (IfaceAppArgs (IA_Nil, IA_Arg), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo, IfaceForAllCo, IfaceTermAppCo), IfaceForAllTyFlag (IfaceForAllTyFlag), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
@@ -106,6 +106,7 @@ main = do
             runAliasChecks dflags
             runOpaqueCallChecks dflags
             runFunctionBinderChecks dflags
+            runFunctionFieldChecks dflags
             runArrowMatchabilityChecks dflags
             runForAllSelectorChecks dflags
             runForAllMatchabilityChecks dflags
@@ -793,7 +794,7 @@ runParameterizedDomainChecks dflags = do
         fnTy = mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy
         domains =
             [ ("phantom closed function parameter", mkTyConApp phantom [fnTy], True)
-            , ("actual function field", mkTyConApp actualFunction [boolTy], False)
+            , ("actual closed function field", mkTyConApp actualFunction [boolTy], True)
             , ("uniform recursive Tree Bool", mkTyConApp tree [boolTy], True)
             , ("growing recursive arguments", mkTyConApp growing [boolTy], False)
             , ("permuting recursive arguments", mkTyConApp permuting [boolTy, natTy], False)
@@ -1244,7 +1245,8 @@ fields in order. The lifted payload is an equality-dictionary function. It is
 not an executed vector; the separate source module checks a generic Nat/Vec
 package through its compiled object and interface.
 
-Call-coercion imports remain rejected. The constructor-field checks use the
+Call congruence uses the ordinary AppCo encoding. Raw diagnostic call-coercion
+imports remain rejected. The constructor-field checks use the
 prefix decoder and its scoped call-type codec. The generic Pi checks demand
 ordinary field types after all imported parent knots exist. Unsupported raw
 domains must fail before typed field reconstruction recurses. Normalization
@@ -1810,6 +1812,13 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             mixedHolder = genericScalarDomain mixedFields (recursiveDeclaration 10260 "IfaceMixedMultiplicityHolder")
             functionAlias = synonym 10270 "IfaceVacuousFunctionAlias" (IfaceDepFunTy (many, firstName, bool) bool)
             functionAliasHolder = genericScalarDomain functionAlias (recursiveDeclaration 10280 "IfaceVacuousFunctionHolder")
+            storedFunction = ordinaryRecursive 10430 "IfaceStoredFunction" [reference storedFunction, reference functionAlias]
+            storedFunctionHolder = genericScalarDomain storedFunction (recursiveDeclaration 10440 "IfaceStoredFunctionHolder")
+            functionLoop = ordinaryRecursive 10450 "IfaceFunctionLoop"
+                [case toIfaceType (mkVisFunTyManyU boolTy boolTy) of
+                    IfaceFunTy flag ma mult _ result -> IfaceFunTy flag ma mult (reference functionLoop) result
+                    _ -> error "FAIL: ordinary function wire changed shape"]
+            functionLoopHolder = genericScalarDomain functionLoop (recursiveDeclaration 10460 "IfaceFunctionLoopHolder")
             ignoredParameter = mkTyVar (mkSystemName (unique 10290) (mkTyVarOcc "ignored")) liftedTypeKind
             ignoredBinders = [mkAnonTyConBinder ignoredParameter]
             forgetful = mkSynonymTyCon
@@ -1841,6 +1850,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             , ("alias data back edge holder first", [(aliasDataHolder, False), (aliasData, True), (dataAlias, True)])
             , ("One and Many nullary aliases", [(mixedHolder, False), (mixedFields, True), (boolAlias, True), (oneAlias, False), (manyAlias, False)])
             , ("vacuous Pi alias admits function mode", [(functionAliasHolder, False), (functionAlias, False)])
+            , ("stored vacuous function alias domain first", [(storedFunction, True), (functionAlias, False), (storedFunctionHolder, False)])
+            , ("stored vacuous function alias holder first", [(storedFunctionHolder, False), (functionAlias, False), (storedFunction, True)])
             , ("applied forgetful alias uses typed fallback", [(forgetfulHolder, False), (forgetfulDeclaration, False)])
             , ("same Names valid session before", [(sessionHolder, False), (sessionDomain, True)])
             ]
@@ -1852,6 +1863,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             , ("raw Pi in field multiplicity rejects early", [badMultHolder, badMultDomain])
             , ("deferred constructor context rejects early", [contextHolder, contextDomain])
             , ("visited data edge does not hide invalid sibling", [invalidSiblingHolder, invalidSibling])
+            , ("function endpoint cannot reuse an enclosing data back edge", [functionLoopHolder, functionLoop])
             , ("same Names malformed session", [sessionHolder, malformedSession])
             ]
             $ \(label, declarations) -> rejectsImportedKnots label shapeDiagnostic declarations
@@ -2000,8 +2012,10 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             closedCalls = mkDepFunTy callF (mkDepFunTy callN (indexed (callAt callN)))
             freeCall = toIfaceTypeX (unitVarSet callF) (callAt callN)
             nestedFreeCall = toIfaceTypeX (unitVarSet callF) (indexed (callAt callN))
-            reservedCo = toIfaceCoercion (mkTermAppCo callF (mkCoVarCo callCv))
-        forM_ [NormalCompression, MaximumCompression] $ \compression -> do
+            callCo = mkTermAppCo callF (mkCoVarCo callCv)
+            callCoWire = toIfaceCoercion callCo
+            reservedCo = IfaceTermAppCo callName (toIfaceCoercion (mkCoVarCo callCv))
+        forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
             wire <- roundtrip compression openCalls
             restored <- restore [callF, callN] wire
             checkType dflags "open call codec preserves its type" (indexed (callAt callN)) restored
@@ -2019,6 +2033,28 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             rejectsIface "wire call rejects stale scalar head metadata" "Invalid retained call head" [scalarHead, callN] decoded
             wrongDomain <- roundtrip compression (IfaceTermAppTy callName (toIfaceType intTy))
             rejectsIface "wire call rejects wrong argument domain" "Invalid retained call argument" [callF] wrongDomain
+            let argument ty rest = IA_Arg ty (IfaceForAllTyFlag Required) rest
+                rawCall ty = IfaceAppTy (IfaceTermVar callName) (argument ty IA_Nil)
+                argumentWire = toIfaceType (TermVarTy callN)
+            rawRestored <- restore [callF, callN] =<< roundtrip compression (rawCall argumentWire)
+            checkType dflags "ordinary wire application has a canonical native endpoint" (callAt callN) rawRestored
+            check "ordinary wire application uses the actual lexical head" $ case rawRestored of
+                TermAppTy head (TermVarTy arg) -> head == callF && arg == callN
+                _ -> False
+            lintAccepts dflags "canonical ordinary wire application" [callF, callN] (Coercion (mkNomReflCo rawRestored))
+            rejectsIface "ordinary wire application checks its argument domain" "Invalid retained function-value application" [callF] $
+                rawCall (toIfaceType intTy)
+            rejectsIface "ordinary wire application rejects an extra argument" "A retained call result cannot be applied" [callF, callN] $
+                IfaceAppTy (IfaceTermVar callName) (argument argumentWire (argument argumentWire IA_Nil))
+            rejectsIface "ordinary wire application cannot invent its head" "Iface id out of scope" [callN] (rawCall argumentWire)
+            let changedDomain = proof 9112 (varType callF) (mkVisFunTyManyU boolTy (mkTyConApp maybeTyCon [boolTy]))
+                functionCast co = IfaceCastTy (IfaceTermVar callName) (toIfaceCoercion co)
+            castRestored <- restore [callF] =<< roundtrip compression (functionCast (mkNomReflCo (varType callF)))
+            checkType dflags "reflexive function-value cast preserves identity" (TermVarTy callF) castRestored
+            rejectsIface "function-value cast cannot change its fixed domain" "A retained function-value cast changes its fixed domain" [callF, changedDomain] $
+                functionCast (mkCoVarCo changedDomain)
+            rejectsIface "function-value cast requires nominal evidence" "A retained function-value cast changes its fixed domain" [callF] $
+                functionCast (mkReflCo Representational (varType callF))
             functionPiWire <- roundtrip compression (toIfaceType (tidyTopType closedCalls))
             firstFunctionPi <- restore [] functionPiWire
             secondFunctionPi <- restore [] =<< roundtrip compression (toIfaceType (tidyTopType closedCalls))
@@ -2063,14 +2099,28 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                             (mkIfaceForAllTvBndr Specified (boundDomainName, toIfaceType liftedTypeKind))
                             (badDomain nonclosedDomain)
                     rejectsIface "function Pi rejects an in-scope nonclosed domain" "Invalid retained binder" [] boundDomainPi
-                    rejectsIface "function binder is not a scalar TermVarTy" "Invalid retained index" [] $
+                    rejectsIface "function-value index cannot be a retained function result" "Invalid retained function result" [] $
                         IfaceDepFunTy (mult, name, domain) (IfaceTermVar name)
                     rejectsIface "call argument cannot refer to a later scalar binder" "Iface id out of scope" [] $
                         IfaceDepFunTy (mult, name, domain) (IfaceTermAppTy name (toIfaceType (TermVarTy callN)))
                     rejectsIface "a sibling function binder is not in scope" "Iface id out of scope" [] $
                         IfaceDepFunTy (mult, name, domain) (IfaceTermAppTy (mkIfLclName (fsLit "sibling_head")) (toIfaceType boolTy))
                 _ -> fail "FAIL: function Pi wire fixture changed shape"
-            rejectsWith "call coercion serialization stays reserved" "Opaque runtime call congruence interfaces are not implemented" (roundtrip compression reservedCo)
+            encodedCo <- roundtrip compression callCoWire
+            restoredCoExpr <- restoreExpr [callF, callN, callM, callCv] (IfaceCo encodedCo)
+            case restoredCoExpr of
+                Coercion co -> do
+                    check "call congruence roundtrip keeps nominal role and argument evidence" $
+                        coercionRole co == Nominal && callCv `elemVarSet` tyCoVarsOfCo co
+                    checkType dflags "call congruence roundtrip source" (callAt callN) (coercionLKind co)
+                    checkType dflags "call congruence roundtrip target" (callAt callM) (coercionRKind co)
+                    check "call congruence roundtrip has canonical endpoints" $ case (coercionLKind co, coercionRKind co) of
+                        (TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)) ->
+                            left == callF && right == callF && ln == callN && rn == callM
+                        _ -> False
+                    lintAccepts dflags "call congruence roundtrip" [callF, callN, callM, callCv] (Coercion co)
+                _ -> fail "FAIL: call congruence import did not return a coercion"
+            rejectsWith "raw diagnostic call coercion serialization stays reserved" "Opaque runtime call congruence interfaces are not implemented" (roundtrip compression reservedCo)
             forM_ [("direct", freeCall), ("nested", nestedFreeCall)] $ \(label, diagnostic) ->
                 rejectsWith (label ++ " diagnostic call head cannot enter binary") "Can't serialise IfaceFreeTermAppTy" (roundtrip compression diagnostic)
         rejectsIfaceExpr "raw call coercion import stays reserved" "Opaque runtime call congruence interfaces are not implemented" [callF, callN, callM, callCv] (IfaceCo reservedCo)
@@ -2568,10 +2618,10 @@ runFunctionBinderChecks dflags = do
     forM_ [f, cross] $ \head -> do
         check "supported function head is an eligible retained binder" (isNativeRetainedBinder head && isNativeRetainedBinderType (idType head))
         check "retained function stays outside scalar index eligibility" (not (isNativeIndexId head) && not (isNativeIndexType (idType head)))
-        check "scalar reification cannot turn a function into an index" $ case exprToNativeIndex (Var head) of
-            Nothing -> True
-            Just _ -> False
-        lintRejects dflags "a retained function cannot occur as TermVarTy" [head] (Coercion (mkNomReflCo (TermVarTy head)))
+        check "function-value reification preserves the actual eligible head" $ case exprToNativeIndex (Var head) of
+            Just (TermVarTy actual) -> actual == head && eqType (varType actual) (varType head)
+            _ -> False
+        lintAccepts dflags "a retained function can occur as a scoped TermVarTy" [head] (Coercion (mkNomReflCo (TermVarTy head)))
     check "function-domain binder alpha equality" (eqType retained alpha)
     let nested = mkDepFunTy f (mkDepFunTy n body)
         nestedAlpha = mkDepFunTy g (mkDepFunTy m (arrow (at g (TermVarTy m)) (at g (TermVarTy m))))
@@ -2683,6 +2733,164 @@ runFunctionBinderChecks dflags = do
         case tcMatchRetainedTyX_BM (\var _ -> if var == indexParameter then BindMe else DontBindMe) (initial opaqueTemplate opaqueTarget) opaqueTemplate opaqueTarget of
             Nothing -> True
             Just _ -> False
+
+{- Note [Closed native function-field checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check the function value at a complete fixed type. It is an opaque leaf in a
+closed algebraic container. The original function-free endpoint policy must
+still reject a recursive function over its own container.
+
+Build forward application proofs before replacing their erased head variables
+with runtime function indices. Preserve each nonreflexive head proof and its
+canonical endpoints. Extracting an existing AppCo child uses stored evidence;
+it does not justify projecting an opaque U or unknown application equality.
+The separate source client checks actual saturated-family constructor transport.
+-}
+
+-- | Check closed function fields and preservation of their forward proofs.
+runFunctionFieldChecks :: DynFlags -> IO ()
+runFunctionFieldChecks dflags = do
+    let fnTy = mkVisFunTyManyU boolTy boolTy
+        maybeFn = mkTyConApp maybeTyCon [fnTy]
+        f = local 97000 "field_function" fnTy
+        other = local 97001 "field_function" fnTy
+        a = local 97002 "field_argument" boolTy
+        b = local 97003 "field_argument" boolTy
+        argTy = TermVarTy a
+        otherArgTy = TermVarTy b
+        call = TermAppTy f argTy
+        otherCall = TermAppTy other otherArgTy
+        variable n label kind = mkTyVar (mkSystemName (unique n) (mkTyVarOcc label)) kind
+        open = variable 97004 "field_open" liftedTypeKind
+        poly = mkTyCoForAllTy unmatchableDataConTy open Specified $
+            mkVisFunTyManyU (mkTyVarTy open) (mkTyVarTy open)
+        maybeOf ty = mkTyConApp maybeTyCon [ty]
+    check "closed Maybe function field is an index domain" (isNativeIndexType maybeFn)
+    check "regular nested function-field containers are index domains" (isNativeIndexType (mkListTy maybeFn))
+    check "function values remain separate from algebraic index eligibility" $
+        isNativeRetainedBinder f && not (isNativeIndexId f || isNativeIndexType fnTy)
+    forM_
+        [ ("M", mkVisFunTyManyM boolTy boolTy)
+        , ("linear", mkVisFunTy unmatchableDataConTy OneTy boolTy boolTy)
+        , ("polymorphic", poly)
+        , ("open", mkVisFunTyManyU boolTy (mkTyVarTy open))
+        ]
+        $ \(label, ty) -> check ("function field rejects " ++ label ++ " leaves") (not (isNativeIndexType (maybeOf ty)))
+    bounded <- timeout 1000000 (evaluate (isNativeIndexType (mkTyConTy loop)))
+    check "a recursive function over its container is rejected without looping" (bounded == Just False)
+    lintAccepts dflags "function-value index has its actual lexical binding" [f] (Coercion (mkNomReflCo (TermVarTy f)))
+    lintRejects dflags "function-value index cannot escape" [] (Coercion (mkNomReflCo (TermVarTy f)))
+    lintRejects dflags "function-value index cannot use a linear binding" [setIdMult f OneTy] (Coercion (mkNomReflCo (TermVarTy f)))
+    forM_ [Nominal, Representational, Phantom] $ \role -> do
+        let Reduction evidence normalized = normaliseType emptyFamInstEnvs role (TermVarTy f)
+        checkType dflags "function-value normalization keeps the exact value" (TermVarTy f) normalized
+        check "function-value normalization preserves role" (coercionRole evidence == role)
+        lintAccepts dflags "function-value normalization proof" [f] (Coercion evidence)
+    let justExpr = mkApps (Var (dataConWorkId justDataCon)) [Type fnTy, Var f]
+        justIndex = mkTyConApp (promoteDataCon justDataCon) [fnTy, TermVarTy f]
+    lintAccepts dflags "Just stores a scoped opaque function value" [f] justExpr
+    check "Just function-field reification preserves its index" (maybe False (eqType justIndex) (exprToNativeIndex justExpr))
+    check "Just function-field reconstruction preserves its actual field" (cheapEqExpr justExpr (mapNativeIndex id justExpr))
+    checkType dflags "Just function-field index has the full container kind" maybeFn (typeKind justIndex)
+    forM_
+        [ ("single", mkAppTy (TermVarTy f) argTy)
+        , ("batched", mkAppTys (TermVarTy f) [argTy])
+        , ("cast batch", mkAppTys (CastTy (TermVarTy f) (mkNomReflCo fnTy)) [argTy])
+        ]
+        $ \(label, actual) -> do
+            checkType dflags (label ++ " function-value application matches a direct call") call actual
+            check (label ++ " function-value application has one canonical form") $ case actual of
+                TermAppTy head argument -> head == f && eqType argument argTy
+                _ -> False
+    lintRejects dflags "raw duplicate native application form is rejected" [f, a] $
+        Coercion (mkNomReflCo (AppTy (TermVarTy f) argTy))
+
+    let g = variable 97010 "generic_field_head" fnTy
+        h = variable 97011 "generic_other_head" fnTy
+        argumentProof = proof 97012 argTy otherArgTy
+        argumentCo = mkCoVarCo argumentProof
+        genericCall = AppTy (mkTyVarTy g) argTy
+        genericOtherCall = AppTy (mkTyVarTy h) otherArgTy
+    checkType dflags "substitution into a pre-existing application is canonical" call $
+        Subst.substTyWith [g] [TermVarTy f] genericCall
+    forM_ (zip [97020, 97030] [Nominal, Representational]) $ \(base, role) -> do
+        let genericHead = mkCoVar (mkSystemName (unique base) (mkVarOcc "generic_head_proof")) $
+                mkCoercionType role (mkTyVarTy g) (mkTyVarTy h)
+            actualHead = mkCoVar (mkSystemName (unique (base + 1)) (mkVarOcc "actual_head_proof")) $
+                mkCoercionType role (TermVarTy f) (TermVarTy other)
+            genericCo = mkAppCo (mkCoVarCo genericHead) argumentCo
+            scope = [f, other, a, b, argumentProof, actualHead]
+            subst = Subst.Subst (mkInScopeSet (mkVarSet scope)) emptyVarEnv
+                (mkVarEnv [(g, TermVarTy f), (h, TermVarTy other)])
+                (unitVarEnv genericHead (mkCoVarCo actualHead))
+            actualCo = Subst.substCo subst genericCo
+        lintAccepts dflags "generic forward proof is valid before substitution" [g, h, a, b, argumentProof, genericHead] (Coercion genericCo)
+        checkType dflags "generic forward proof starts at the original application" genericCall (coercionLKind genericCo)
+        checkType dflags "generic forward proof ends at the original application" genericOtherCall (coercionRKind genericCo)
+        checkType dflags "substituted forward proof has a canonical native source" call (coercionLKind actualCo)
+        checkType dflags "substituted forward proof has a canonical native target" otherCall (coercionRKind actualCo)
+        check "forward proof retains its role and nonreflexive head evidence" $
+            coercionRole actualCo == role && actualHead `elemVarSet` tyCoVarsOfCo actualCo
+        lintAccepts dflags "substituted N/R/P application proof" scope (Coercion actualCo)
+        case splitAppCo_maybe actualCo of
+            Just (storedHead, storedArg) -> do
+                check "structural application splitting returns the stored proof" $
+                    actualHead `elemVarSet` tyCoVarsOfCo storedHead && eqCoercion storedArg argumentCo
+                lintAccepts dflags "stored application head evidence" scope (Coercion storedHead)
+                lintAccepts dflags "stored application argument evidence" scope (Coercion storedArg)
+            Nothing -> fail "FAIL: forward proof lost its stored application children"
+    let phantomHead = mkPhantomCo (mkNomReflCo fnTy) (mkTyVarTy g) (mkTyVarTy h)
+        phantomGeneric = mkAppCo phantomHead argumentCo
+        phantomSubst = Subst.Subst (mkInScopeSet (mkVarSet [f, other, a, b, argumentProof])) emptyVarEnv
+            (mkVarEnv [(g, TermVarTy f), (h, TermVarTy other)]) emptyVarEnv
+        phantomActual = Subst.substCo phantomSubst phantomGeneric
+    lintAccepts dflags "generic phantom application has ordinary kind evidence" [g, h, a, b, argumentProof] (Coercion phantomGeneric)
+    checkType dflags "phantom forward proof has a canonical native source" call (coercionLKind phantomActual)
+    checkType dflags "phantom forward proof has a canonical native target" otherCall (coercionRKind phantomActual)
+    check "phantom application retains its role and nominal argument evidence" $
+        coercionRole phantomActual == Phantom && argumentProof `elemVarSet` tyCoVarsOfCo phantomActual
+    lintAccepts dflags "substituted phantom application proof" [f, other, a, b, argumentProof] (Coercion phantomActual)
+    let fixedHeadCo = mkAppCo (mkNomReflCo (mkTyVarTy g)) argumentCo
+        predicateCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo boolTy, fixedHeadCo, fixedHeadCo]
+        bodyCo = mkFunCoNoFTF Nominal (mkNomReflCo unmatchableDataConTy) (mkNomReflCo ManyTy) predicateCo (mkNomReflCo intTy)
+        quantifiedCo = mkForAllCo g Specified Specified (mkNomReflCo matchableDataConTy) MRefl bodyCo
+        instantiated = mkInstCo quantifiedCo (mkNomReflCo (TermVarTy f))
+    checkType dflags "InstCo preserves the substituted native source" (indexed call) (coercionLKind instantiated)
+    checkType dflags "InstCo preserves the substituted native target" (indexed (TermAppTy f otherArgTy)) (coercionRKind instantiated)
+    lintAccepts dflags "InstCo keeps a pre-existing forward application proof" [f, a, b, argumentProof] (Coercion instantiated)
+    checkType dflags "function-value substitution keeps an eligible variable range" (TermVarTy other) $
+        Subst.substTy (indexSubst [other] f (Var other)) (TermVarTy f)
+    forM_ [("lambda", identity 97050 boolTy), ("cast", Cast (Var other) (mkReflCo Representational fnTy))] $ \(label, rhs) ->
+        rejectsWith ("bare function substitution rejects a " ++ label ++ " range") "unsupported native function range" $
+            evaluate (typeKind (Subst.substTy (indexSubst [other] f rhs) (TermVarTy f)))
+
+    let callProof = proof 97051 call (TermAppTy f otherArgTy)
+    forM_ [CLeft, CRight] $ \side ->
+        lintRejects dflags "opaque native U equality cannot reveal stored children" [f, a, b, callProof] (Coercion (LRCo side (mkCoVarCo callProof)))
+    let ma = variable 97052 "field_unknown_matchability" matchabilityTy
+    forM_ [(97060, matchableDataConTy, True), (97070, mkTyVarTy ma, False)] $ \(base, metadata, matchable) -> do
+        let head = variable base "field_inverse_head" (mkVisFunTyMany metadata boolTy boolTy)
+            lhs = AppTy (mkTyVarTy head) argTy
+            rhs = AppTy (mkTyVarTy head) otherArgTy
+            opaque = proof (base + 1) lhs rhs
+            scope = [ma, head, a, b, opaque]
+        forM_ [CLeft, CRight] $ \side ->
+            if matchable
+                then lintAccepts dflags "ordinary M inverse application remains valid" scope (Coercion (LRCo side (mkCoVarCo opaque)))
+                else lintRejects dflags "unknown inverse application remains invalid" scope (Coercion (LRCo side (mkCoVarCo opaque)))
+  where
+    modu = mkModule mainUnit (mkModuleName "NativeFunctionFieldAPI")
+    name n occurrence = mkExternalName (unique n) modu occurrence noSrcSpan
+    loop = mkAlgTyCon (name 97080 (mkTcOcc "Loop")) liftedTypeKind [] 0 liftedTypeKind [] Nothing []
+        (mkDataTyConRhs [loopCon]) (VanillaAlgTyCon (name 97081 (mkVarOcc "loop_rep"))) False
+    loopCon = con
+      where
+        occurrence = mkDataOcc "Loop"
+        con = mkDataCon (name 97082 occurrence) False (name 97083 (mkVarOcc "loop_con_rep"))
+            [HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict] [HsLazy] [NotMarkedStrict]
+            [] [] [] noConcreteTyVars [] [] []
+            [Scaled OneTy (mkVisFunTyManyU (mkTyConTy loop) boolTy)] (mkTyConTy loop)
+            NoPromInfo loop 1 [] (mkDataConWorkId (name 97084 (mkDataConWorkerOcc occurrence)) con) NoDataConRep
 
 -- | Check forall selector roles and the reductions that preserve nominal evidence.
 runForAllSelectorChecks :: DynFlags -> IO ()

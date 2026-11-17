@@ -1112,6 +1112,7 @@ runModuleChecks :: FilePath -> IO ()
 runModuleChecks libdir = do
     runMultiPackageSourceChecks libdir
     runFunctionPackageModuleChecks libdir
+    runFunctionFieldModuleChecks libdir
     runExportedFunctionSignatureModuleChecks libdir
     forM_
         [
@@ -1798,66 +1799,63 @@ runModuleChecks libdir = do
 
 -- | Read a producer interface in a fresh one-shot context and link its object.
 runModuleCase :: FilePath -> String -> String -> String -> String -> [String] -> IO ()
-runModuleCase libdir label moduleName producer consumer expected = do
+runModuleCase libdir label moduleName producer =
+    runModuleCases libdir label [(moduleName, producer)] []
+
+-- | Compile ordered producers, then link a consumer against their interfaces.
+runModuleCases :: FilePath -> String -> [(String, String)] -> [String] -> String -> [String] -> IO ()
+runModuleCases libdir label producers extraFlags consumer expected = do
     directory <- makeAbsolute ("NativeDependentCoreRun.modules" </> label)
     let producerDirectory = directory </> "producer"
         consumerDirectory = directory </> "consumer"
         artifacts = directory </> "artifacts"
-        producerSource = producerDirectory </> (moduleName ++ ".hs")
+        producerSources = [(name, producerDirectory </> (name ++ ".hs"), source) | (name, source) <- producers]
         consumerSource = consumerDirectory </> "Main.hs"
         executablePath = directory </> ("native-modules" ++ if os == "mingw32" then ".exe" else "")
-        configure linkMode output = do
-            flags <- GHC.getSessionDynFlags
-            logger <- GHC.getLogger
-            (configured, leftovers, _) <-
-                GHC.parseDynamicFlags logger flags $
-                    map
-                        noLoc
-                        [ "-O0"
-                        , "-fasm"
-                        , "-fomit-interface-pragmas"
-                        , "-fno-write-if-simplified-core"
-                        , "-dcore-lint"
-                        , "-dstg-lint"
-                        , "-fforce-recomp"
-                        , "-v0"
-                        , "-odir"
-                        , artifacts
-                        , "-hidir"
-                        , artifacts
-                        ]
-            unless (null leftovers) (fail "FAIL: native module flags were not parsed")
-            void $
-                GHC.setSessionDynFlags
-                    configured
-                        { ghcMode = OneShot
-                        , ghcLink = linkMode
-                        , outputFile_ = output
-                        , importPaths = [artifacts]
-                        }
-            GHC.getSession
+        configure linkMode output = nativeModuleEnvironment artifacts extraFlags linkMode output
         compile environment path = do
             result <- compileFile environment NoStop (path, Nothing)
             case result of
                 Just object -> pure object
                 Nothing -> fail ("FAIL: native module produced no object: " ++ path)
     forM_ [producerDirectory, consumerDirectory, artifacts] $ createDirectoryIfMissing True
-    writeFile producerSource producer
+    forM_ producerSources $ \(_, path, source) -> writeFile path source
     writeFile consumerSource consumer
-    producerObject <- GHC.runGhc (Just libdir) $ do
+    producerObjects <- mapM (\(_, path, _) -> GHC.runGhc (Just libdir) $ do
         environment <- configure NoLink Nothing
-        liftIO $ compile environment producerSource
-    interfaceExists <- doesFileExist (artifacts </> (moduleName ++ ".hi"))
-    unless interfaceExists (fail "FAIL: native producer wrote no interface")
+        liftIO $ compile environment path) producerSources
+    forM_ producers $ \(name, _) -> do
+        interfaceExists <- doesFileExist (artifacts </> (name ++ ".hi"))
+        unless interfaceExists (fail "FAIL: native producer wrote no interface")
     GHC.runGhc (Just libdir) $ do
         -- OneShot searches only interfaces. The producer source is outside its import path.
         environment <- configure (LinkExecutable Dynamic) (Just executablePath)
         liftIO $ do
             consumerObject <- compile environment consumerSource
-            oneShot environment NoStop [(consumerObject, Just StopLn), (producerObject, Just StopLn)]
+            oneShot environment NoStop [(object, Just StopLn) | object <- consumerObject : producerObjects]
     (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
     unless (status == ExitSuccess && lines actual == expected) $
         fail ("FAIL: native cross-module observations (" ++ label ++ "): " ++ show (status, actual, errors))
+
+-- | Configure the shared one-shot compiler for object and diagnostic checks.
+nativeModuleEnvironment :: FilePath -> [String] -> GhcLink -> Maybe FilePath -> GHC.Ghc HscEnv
+nativeModuleEnvironment artifacts extraFlags linkMode output = do
+    flags <- GHC.getSessionDynFlags
+    logger <- GHC.getLogger
+    (configured, leftovers, _) <-
+        GHC.parseDynamicFlags logger flags $ map noLoc $
+            [ "-O0", "-fasm", "-fomit-interface-pragmas", "-fno-write-if-simplified-core"
+            , "-dcore-lint", "-dstg-lint", "-fforce-recomp", "-v0"
+            , "-odir", artifacts, "-hidir", artifacts
+            ] ++ extraFlags
+    unless (null leftovers) (fail "FAIL: native module flags were not parsed")
+    void $ GHC.setSessionDynFlags configured
+        { ghcMode = OneShot
+        , ghcLink = linkMode
+        , outputFile_ = output
+        , importPaths = [artifacts]
+        }
+    GHC.getSession
 
 {- Note [Retained signature recompilation checks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3943,7 +3941,7 @@ runPackageSourceRejectChecks = do
         , ("PiOperandDistinctOuterRuntimeIndices", 5617, "Could not deduce", ["TypeFamilies", "FlexibleContexts"], [], ["wrongOuterPi :: forall value. foreach (k :: Nat) -> foreach (m :: Nat) -> value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> (foreach (n :: Nat) -> (Vec Int m, Vec Bool n))", "wrongOuterPi k m f = f"])
         , ("PiOperandRepresentationalEvidenceCannotSupplyNominalProof", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts", "AllowAmbiguousTypes"], ["import Data.Coerce (Coercible)"], ["wrongRolePi :: forall left right. (Coercible left right, left ~ (foreach (n :: Nat) -> Vec Int n)) => right -> (foreach (n :: Nat) -> Vec Int n)", "wrongRolePi f = f"])
         , ("PiOperandLinearOuterIndexCaptureRejected", 83605, "already-bound unrestricted local value", ["TypeFamilies", "FlexibleContexts", "LinearTypes"], [], ["consumeNat :: Nat %1 -> Int", "consumeNat Z = 42", "consumeNat (S rest) = consumeNat rest", "bad :: Nat %1 -> Int", "bad k = let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in consumeNat k"])
-        , ("PiOperandUnsupportedPiDomainRejected", 83605, "supported closed first-order algebraic domain", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Int) -> Int) => value -> Int -> Int", "bad f = f"])
+        , ("PiOperandUnsupportedPiDomainRejected", 83605, "supported closed algebraic domain", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Int) -> Int) => value -> Int -> Int", "bad f = f"])
         , ("PiOperandPartialPiOperandRejected", 83605, "complete type signature", ["TypeFamilies", "FlexibleContexts", "PartialTypeSignatures"], [], ["bad :: forall value. value ~ (foreach (n :: Nat) -> Vec _ n) => value -> (foreach (n :: Nat) -> Vec Int n)", "bad f = f"])
         , ("PiOperandQuotedPiOperandCaptureRejected", 83605, "Template Haskell", ["TypeFamilies", "FlexibleContexts", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in (42 :: Int) |]"])
         , ("PiOperandEqualityOperandKindMismatch", 83865, "Expected kind", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall (value :: Nat). value ~ (foreach (n :: Nat) -> Vec Int n) => Int", "bad = 42"])
@@ -4488,7 +4486,7 @@ runSourceRejectChecks = do
                 ++ local [] consumer ["keep b x = 42"] "keep True 42"
     mapM_
         check
-        [ ("unsupported algebraic domain", 83605, "supported closed first-order algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
+        [ ("unsupported algebraic domain", 83605, "supported closed algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
         , ("missing domain annotation", 83605, "explicit domain type", [], local [] "foreach b -> Int -> Int" identity "42")
         , ("anonymous retained binder", 83605, "requires a variable name", [], local [] "foreach (_ :: Bool) -> Int -> Int" identity "42")
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
@@ -6117,6 +6115,116 @@ runFunctionPackageModuleChecks libdir = do
     unless (not (null declaration) && ") where" `elem` declaration) $
         fail "FAIL: PackedVecLibrary module header changed"
     runModuleCase libdir "function-package-source" "NativeFunctionPackageAPI" producer consumer expected
+
+-- | Check function fields, family transport and separate lazy demand boundaries.
+runFunctionFieldModuleChecks :: FilePath -> IO ()
+runFunctionFieldModuleChecks libdir = do
+    library <- readFile "FunctionFieldLibrary.hs"
+    client <- readFile "FunctionFieldClient.hs"
+    let warnings = ["-Werror=inaccessible-code", "-Werror=overlapping-patterns"]
+        consumer = unlines
+            [ "{-# LANGUAGE ScopedTypeVariables #-}"
+            , ""
+            , "module Main (main) where"
+            , ""
+            , "import Control.Exception (ErrorCall, displayException, evaluate, try)"
+            , "import Control.Monad (unless)"
+            , "import Data.IORef (newIORef, readIORef)"
+            , "import Data.List (isInfixOf)"
+            , "import FunctionFieldClient"
+            , "import FunctionFieldLibrary"
+            , ""
+            , "-- | Check the independent expected value before printing it."
+            , "check :: (Eq a, Show a) => a -> a -> IO ()"
+            , "check expected actual = do"
+            , "    unless (expected == actual) (error (\"function field mismatch: \" ++ show actual))"
+            , "    print actual"
+            , ""
+            , "-- | Require the selected demand failure instead of an arbitrary exception."
+            , "expectMarker :: String -> Int -> IO ()"
+            , "expectMarker marker value = do"
+            , "    result <- try (evaluate value)"
+            , "    case result of"
+            , "        Left (exception :: ErrorCall)"
+            , "            | marker `isInfixOf` displayException exception -> putStrLn marker"
+            , "        Left exception -> error (displayException exception)"
+            , "        Right _ -> error (\"expected \" ++ marker)"
+            , ""
+            , "-- | Check finite results and the separate lazy demand boundaries."
+            , "main :: IO ()"
+            , "main = do"
+            , "    bFalse <- newIORef False >>= readIORef"
+            , "    bTrue <- newIORef True >>= readIORef"
+            , "    check 2 (inspect (build not bFalse))"
+            , "    check 1 (inspect (build not bTrue))"
+            , "    check 2 (inspectViaCall (repack (build id bTrue)))"
+            , "    check True (proofOnly (build not bFalse))"
+            , "    _ <- evaluate (loose (error \"function-field-container\") (error \"function-field-argument\"))"
+            , "    _ <- evaluate (repack (loose (error \"function-field-container\") (error \"function-field-argument\")))"
+            , "    putStrLn \"package and repack: whnf\""
+            , "    check 42 (outer (loose (error \"function-field-container\") (error \"function-field-argument\")))"
+            , "    check 1 (which (loose (Just (error \"function-field-function\")) (error \"function-field-argument\")))"
+            , "    check 0 (which (loose Nothing (error \"function-field-argument\")))"
+            , "    expectMarker \"function-field-container\" (which (loose (error \"function-field-container\") True))"
+            , "    expectMarker \"function-field-function\" (inspect (loose (Just (error \"function-field-function\")) True))"
+            , "    expectMarker \"function-field-argument\" (inspect (loose (Just id) (error \"function-field-argument\")))"
+            , "    expectMarker \"function-field-proof\" (inspect (loose (Just (const False)) True))"
+            ]
+        expected =
+            [ "2", "1", "2", "True", "package and repack: whnf", "42", "1", "0"
+            , "function-field-container", "function-field-function"
+            , "function-field-argument", "function-field-proof"
+            ]
+    runModuleCases libdir "function-field-source"
+        [("FunctionFieldLibrary", library), ("FunctionFieldClient", client)]
+        warnings consumer expected
+    artifacts <- makeAbsolute ("NativeDependentCoreRun.modules" </> "function-field-source" </> "artifacts")
+    forM_
+            [ ("RejectReductionDepth", 40404, "Reduction stack overflow", unlines
+                [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}"
+                , "{-# LANGUAGE TypeApplications, TypeFamilies, UndecidableInstances #-}"
+                , "{-# OPTIONS_GHC -freduction-depth=12 #-}"
+                , "module RejectReductionDepth where"
+                , "import Data.Kind (Type)"
+                , "import GHC.Exts (FUN, U, Multiplicity (Many))"
+                , "type BoolEndo = FUN @U 'Many Bool Bool"
+                , "type family Spin (b :: Bool) :: Type where"
+                , "    Spin b = Spin b"
+                , "bad :: foreach (f :: BoolEndo) -> foreach (b :: Bool) -> Spin (f b)"
+                , "bad f b = case f b of"
+                , "    False -> error \"unreachable\""
+                , "    True -> error \"unreachable\""
+                ]
+            )
+            , ("RejectCrossPayload", 83865, "consumeFlag", unlines
+                [ "{-# LANGUAGE ExperimentalDependentTypes, GADTs #-}"
+                , "module RejectCrossPayload where"
+                , "import FunctionFieldLibrary"
+                , "wrong :: Box -> Box -> Int"
+                , "wrong (Box (Just f) b proof) (Box (Just g) c other) = consumeFlag f b other"
+                ]
+            )
+            , ("RejectMatchableShape", 40564, "Inaccessible code", unlines
+                [ "{-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeApplications #-}"
+                , "{-# LANGUAGE ExperimentalDependentTypes, ExplicitForAll #-}"
+                , "module RejectMatchableShape where"
+                , "import GHC.Exts (FUN, M, Multiplicity (Many))"
+                , "data Flag (b :: Bool) where"
+                , "    IsFalse :: Flag 'False"
+                , "knownM :: forall (f :: FUN @M 'Many Bool Bool) (b :: Bool). Flag (f b) -> Int"
+                , "knownM IsFalse = 42"
+                ]
+            )
+            ]
+        $ \(moduleName, code, fragment, source) -> do
+            let path = artifacts </> (moduleName ++ ".hs")
+            writeFile path source
+            GHC.runGhc (Just libdir) $ do
+                environment <- nativeModuleEnvironment artifacts warnings NoLink Nothing
+                result <- GHC.handleSourceError (pure . Left) $ do
+                    liftIO $ void $ compileFile environment NoStop (path, Nothing)
+                    pure (Right ())
+                checkSourceRejection moduleName code fragment result
 
 -- | Check an exported function telescope and package fields through an object interface.
 runExportedFunctionSignatureModuleChecks :: FilePath -> IO ()

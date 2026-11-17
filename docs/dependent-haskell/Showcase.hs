@@ -29,6 +29,8 @@ import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Kind (Type)
 import Data.List (isInfixOf)
 import Data.Type.Equality ((:~:) (Refl))
+import qualified FunctionFieldClient
+import qualified FunctionFieldLibrary as FunctionFields
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
@@ -68,8 +70,9 @@ Run from the repository root with this fork's matching compiler and libraries:
     -o _build/showcase/showcase
   _build/showcase/showcase
 
-General optimization, arbitrary dependent evaluation and bare function values
-as indices remain outside the completed source subset. See README.md and CORE.md.
+General optimization and arbitrary dependent evaluation remain outside the
+completed source subset. Function-value indices use the fixed closed-domain
+policy in CORE.md.
 -}
 
 -- | Select different ordinary result types with a runtime Boolean.
@@ -303,6 +306,22 @@ functionFields = do
     ignoreImported :: FunctionPackages.FunctionPack Int -> Int
     ignoreImported (FunctionPackages.FunctionPack f n xs) =
         const 42 (FunctionSignatures.idCall @Int f n xs)
+
+-- | Expose a stored function through a saturated family and preserve laziness.
+algebraicFunctionFields :: IO ()
+algebraicFunctionFields = do
+    cell <- newIORef False
+    b <- readIORef cell
+    observe "function value in an algebraic index" $
+        FunctionFieldClient.inspect (FunctionFields.build not b)
+    observe "family-exposed call uses imported proof" $
+        FunctionFieldClient.inspectViaCall (FunctionFields.repack (FunctionFields.build id b))
+    observe "proof retains the stored function identity" $
+        FunctionFieldClient.proofOnly (FunctionFields.build not b)
+    observe "algebraic function container stays lazy" $
+        FunctionFieldClient.outer (FunctionFields.loose (error "showcase-function-container") (error "showcase-function-input"))
+    observe "algebraic function leaf stays lazy" $
+        FunctionFieldClient.which (FunctionFields.loose (Just (error "showcase-function-leaf")) (error "showcase-function-input"))
 
 -- | Open either constructor without sharing their retained field binders.
 alternatives :: IO ()
@@ -622,3 +641,4 @@ main = do
     completeFunctionArguments
     arrowMatchability
     forallMatchability
+    algebraicFunctionFields
