@@ -3894,6 +3894,29 @@ relax native gates. The ignored `native-arrow-matchability-totality-followup-v1`
 records nine current source files and ten archived inputs. It is a source
 review and proposal, not an executed checker or termination proof.
 
+Import maintenance needs more than a successful status flag. In pinned Agda,
+[trust overrides](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/Termination/TermCheck.hs#L176)
+can set the same successful termination status as a check. Its
+[interface loader](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/Interaction/Imports.hs#L863)
+checks relevant options and imported full hashes. Its
+[full hash](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Monad/Base.hs#L1377)
+combines the module source hash and imported full hashes.
+
+Pinned Idris2 stores
+[termination and coverage separately](https://github.com/idris-lang/Idris2/blob/15a3e4e70843f7a34100f6470c04b791330788df/src/Core/TTC.idr#L565).
+Its [reuse check](https://github.com/idris-lang/Idris2/blob/15a3e4e70843f7a34100f6470c04b791330788df/src/Idris/ProcessIdr.idr#L325)
+compares source freshness and imported interface hashes. Its
+[body hashing policy](https://github.com/idris-lang/Idris2/blob/15a3e4e70843f7a34100f6470c04b791330788df/src/TTImp/ProcessDef.idr#L979)
+depends on visibility and inline flags. This bounded reading does not establish
+complete invalidation for every change that affects termination.
+
+A future report must retain checked, trusted and unknown provenance. Record
+checker policy, options, input assumptions and callee evidence. Recompute
+affected call graphs and recursive components when those inputs change.
+The ignored `native-forall-totality-interface-research-v1` archives six source
+files and records the selected reading scope. This is source research. It
+implements no checker and proves no invalidation theorem.
+
 Casinghino, Sjoberg and Weirich's
 [Combining Proofs and Programs in a Dependently Typed Language (POPL 2014)](https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf)
 is direct mixed-fragment prior art. The author PDF is now archived and hashed.
