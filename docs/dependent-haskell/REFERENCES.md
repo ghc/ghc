@@ -3819,6 +3819,33 @@ Agda supplies the separately recorded telescope/substitution comparison; its
 eta and totality policies do not establish the FC projection rule. No new
 paper version, whole-paper reading or preservation proof is claimed here.
 
+## Function-valued fields in closed native indices
+
+M65 uses the same proposal and 2019 paper as M63/M64. Re-read Figure 5 and
+the surrounding discussion on PDF pages 13–14. Forward application preserves
+both the head and argument proofs. Inverse projection needs M. The source
+proposal still assigns U to ordinary runtime arrows. The paper's older term
+arrow convention does not override that source contract.
+
+The native bridge is an implementation choice. Canonical application of
+`TermVarTy f` produces the existing `TermAppTy f a`. A family-head proof can
+remain an ordinary AppCo. Preserve that proof when the family exposes f.
+A direct TermAppCo alone would discard a nonreflexive head proof. Single and
+batched makers, substitution, family reapplication and interface loading must
+compute the same endpoints. These requirements follow from the current code
+and its representations; the cited theorem does not cover the native Id forms.
+
+The prior Agda neutral-application and substitution references remain relevant.
+An opaque function field can occur in an index without evaluating its body.
+Do not transfer Agda's normalization or eta policies to lazy Haskell. The source
+client performs an explicit strict call when it needs to refine the result.
+Function identity, call equality and function behavior remain distinct.
+
+The ignored `native-forall-matchability-next-client-research-v1` records the
+initial source review at M64 development head. The selected M65 contract is in
+[PLAN.md](PLAN.md#m65-function-valued-fields-in-closed-native-index-domains).
+No M65 runtime, compatibility or preservation result is claimed by this reading.
+
 ## Dependent modules, library boundaries and optional totality
 
 The user selected a dependent subset in opt-in modules and suggested a small

@@ -4826,3 +4826,100 @@ differences and 48 parser failures; one file passes. Cabal-gild reports that
 the unchanged compiler Cabal template is not formatted. The tools change no
 source bytes. No formatter pass is claimed. Keep GHC formatting and the fork's
 syntax instead of applying whole-file rewrites.
+
+## M65: function-valued fields in closed native index domains
+
+Roadmap owner: R05. Related cards: R03 and R23. Status: contract selected;
+implementation and validation remain open. M64 is the prerequisite.
+
+An algebraic index can store an eligible opaque function. Use closed regular
+boxed domains, with the existing constructor and representation restrictions.
+Do not special-case Maybe. Function fields are leaves with an ordinary known-U
+Many arrow between independently closed algebraic domains. Keep the old
+function-free policy for those endpoints. In particular, a recursive data type
+that stores a function over itself must not make eligibility checking loop.
+Open parameters, polymorphic leaves and changed dependent domains remain open.
+
+Use the existing local, unrestricted, non-join function Id policy. Admit that
+Id as a `TermVarTy` inside a constructor index. Do not unfold the function or
+compare its behavior. Function-field kinds must agree at their complete fixed
+type. This does not introduce nonreflexive function-domain transport.
+
+Canonical application is the bridge to existing native calls:
+
+```
+mkAppTy (TermVarTy f) a = TermAppTy f a
+```
+
+Apply the same rule in batched application, cast leftovers, substitution,
+family reduction and interface reconstruction. A saturated family can remain
+stuck until its container is refined. When it exposes f, application must agree
+with direct native-call syntax. Do not keep two forms with different equality,
+ordering or sharing keys.
+
+Preserve forward evidence. With `q :: c ~N 'Just f`, lift q through the saturated
+family and compose its equation to obtain `head_q :: Stored c ~N f`.
+Use ordinary `AppCo head_q arg_q` to retain that head proof. Replacing it with
+`TermAppCo f arg_q` would discard the family transport. Existing proofs must
+retain their endpoints after a type variable is substituted by `TermVarTy f`.
+Keep the current application role and argument-proof rules. M is still needed
+for opaque inverse application. Equality of two U calls does not prove either
+head or argument equality.
+
+The first source client uses existing syntax:
+
+```haskell
+type BoolEndo = FUN @U 'Many Bool Bool
+type family Stored (x :: Maybe BoolEndo) :: BoolEndo where
+    Stored ('Just f) = f
+
+data Box where
+    Box :: foreach (x :: Maybe BoolEndo) -> foreach (b :: Bool)
+        -> Flag (Stored x b) -> Box
+```
+
+`Flag` has ordinary False and True constructors. A producer explicitly cases
+on `f b` to build its flag and packages `Just f`. A consumer matches
+`Box (Just f) b proof`. Its later proof field must retain the evidence that
+refines the whole container. A subsequent strict `case f b` exposes the same
+call index. The type family is saturated before ordinary U application.
+This client does not need source family unsaturation.
+
+Use existing interface tags. Reconstruct ordinary applications through the
+canonical makers. An applied Maybe remains unknown in the non-forcing shape
+precheck; complete typed validation decides eligibility. Preserve scope, Many
+and local Id checks. If direct nominal call congruence must be persisted,
+encode it through the existing AppCo and reflexive function-value index.
+Do not add a coercion axiom or imply support for DepFunCo persistence.
+An older M64 reader must retain its positive controls and reject the new native
+signatures during typed import. Bump the compatibility versions if wire fields
+or tags change.
+
+Acceptance checks:
+
+- [ ] Extend domain, field-kind, source and runtime reification admission
+      together. Keep strict function endpoint checking separate.
+- [ ] Canonicalize single and batched application. Check family exposure,
+      cast leftovers and substitution of pre-existing forward proofs.
+- [ ] Preserve later field types and proof scope through the constructor case.
+      Keep same-spelling function names in separate packages distinct.
+- [ ] Check forward N/R/P application evidence under the existing role rules.
+      Retain an M-positive inverse control and reject U/unknown inversion.
+- [ ] Compile separate producer and client modules using only interfaces.
+      Check direct calls against family-exposed calls and imported proofs.
+- [ ] Check bottom container, function, argument and proof demand separately.
+      Ignoring fields must stay lazy. Matching Just must not force its field.
+- [ ] Check located rejections for M/linear or polymorphic function leaves,
+      open domains, invalid scope and unsupported function-domain casts.
+- [ ] Build both stages. Run the maintained cohort and affected regressions.
+      Add the completed source observations to Showcase.
+
+Prior art: proposal #242 and the 2019 higher-order type-level programming paper,
+Figure 5. They distinguish forward congruence from matchable inversion.
+Agda's neutral application and scoped substitution supply the operational
+comparison. These sources do not prove preservation for the native forms.
+See REFERENCES.md and the selected source-reading records.
+
+Generic open domains, arbitrary function indices, dependent function domains,
+general native HIE/TypeRep, native unfoldings and normal optimization remain
+separate work. Keep R23 and the full project goal open.

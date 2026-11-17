@@ -60,6 +60,11 @@ Keep generic-domain widening gated until both stages and field/telescope
 transport are complete. Do not describe a syntax-only classification refactor
 as a matchability implementation.
 
+The [M65 contract](../PLAN.md#m65-function-valued-fields-in-closed-native-index-domains)
+selects the first native function-field client. It connects saturated-family
+application to the existing opaque call index and preserves the complete
+forward proof. Its implementation and checks remain open.
+
 - [x] Write the kernel specification before porting. Classify constructor,
       family and runtime-function applications. State which equality rules
       permit decomposition. Preserve generativity of ordinary constructors.
