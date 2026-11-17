@@ -715,6 +715,8 @@ genericSafeIndexing = do
         cyclic = 31 : cyclic
     observe "generic checked position in cyclic list"
         (Parameterized.lookupGeneric cyclic 5)
+    observe "generic vector lookup through fmap"
+        (fmap toList (Parameterized.lookupGeneric [vector] 0))
 
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
