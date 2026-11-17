@@ -101,7 +101,7 @@ can advance a card while the card remains open.
 | 7 | R05: bounded family views in native frontend inference | Complete bounded increment: M66 | Both builds, exact source diagnostics, finite controls, Showcase100/16 and seven registered tests pass. Other pure normalization paths remain separate. |
 | 8 | R05: structural generic domains and dependent-domain transport; enables R03 | Complete bounded increment: M67 | Both builds, selected API/source controls, Showcase116/16 and seven registered tests pass. Generic elements include arbitrary lifted and runtime-index-bearing values. Old readers reject the new typed signature cleanly. R05 and general source domains remain open. See M67 in PLAN.md. |
 | 9 | R03: ordinary callers of imported retained APIs; preserves R05 evidence | Complete bounded increment: M68 | Both rebuilt stages pass source/interface checks, scope and multiplicity controls, Showcase118/17 and seven registered tests. Published M67 readers accept the interfaces. Explicit syntax, Expr inference modes and native pipeline policies retain their scope. |
-| 10 | R03: safe indexing over a generic retained list | Prepared source candidate; unexecuted | Reuse M60 Fin and M67 GenericCount/transport. Check function-valued and runtime-index-bearing elements. No new compiler rule is selected. See the R03 feature page. |
+| 10 | R03: safe indexing over a generic retained list | Active bounded increment: M69; specified and unexecuted | Reuse M60 Fin and M67 GenericCount/transport. Check function-valued and runtime-index-bearing elements. No new compiler rule is selected. See the R03 feature page. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

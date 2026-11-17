@@ -17,10 +17,11 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The current increment is [M68](#m68-ordinary-callers-of-retained-apis), owned by
-[R03 dependent products](roadmap/R03-dependent-products.md), with R05 scope and
-evidence obligations. Both rebuilt compilers pass the selected checks and
-Showcase118/17. Its published predecessor is M67 at d430f27102.
+The current increment is [M69](#m69-generic-safe-list-indexing), owned by
+[R03 dependent products](roadmap/R03-dependent-products.md), with R05 telescope
+and scope obligations. It composes generic safe indexing from source. Its
+published predecessor is M68 at 2572748770. Both predecessor compilers pass
+Showcase118/17 and the selected checks. M69 source acceptance is unmeasured.
 The user resumed GHC execution on 2026-11-16 at
 17:53 CET.
 
@@ -5576,3 +5577,99 @@ The final source review must permit only Markdown changes after this validation.
 Rebuild the exact committed HEAD in the main checkout before publication. Run
 the matching both-stage Showcase and retain a separate publication receipt.
 R03, R05 and the full project goal remain open.
+
+
+## M69: generic safe list indexing
+
+Roadmap owner: R03. Related card: R05. Prerequisites: M60 Fin and M67 generic
+list transport. M68 is the validated and published application baseline.
+Status: specified; source implementation and acceptance remain unexecuted.
+Keep R03, R05 and the full project goal open.
+
+### Contract and scope
+
+Add three functions to the existing ParameterizedIndexLibrary:
+
+```haskell
+indexGeneric :: forall (a :: Type). foreach (xs :: [a])
+             -> Fin (GenericCount xs) -> a
+mkFinGeneric :: forall (a :: Type). foreach (xs :: [a])
+             -> Int -> Maybe (Fin (GenericCount xs))
+lookupGeneric :: forall (a :: Type). [a] -> Int -> Maybe a
+```
+
+Reuse the existing ordinary Fin GADT and imported saturated GenericCount family.
+Preserve Count, indexClosed, mkFinClosed and lookupRuntime. Keep their M60
+observations and rejections. Do not add a family, compiler rule, public Vec-only
+helper, wire format or evaluator. The new functions compose M60's finite-position
+algorithm with M67's structural list schema and opaque parameter fields.
+
+The list case supplies a nominal constructor refinement. It transports the
+later Fin bound before the ordinary FZ/FS case. The recursive call uses the
+actual tail. Its element type can be a function type or Vec Int n for an earlier
+runtime n. Return the exact selected value with its complete type. No element
+inspection, native function call or inverse GenericCount rule is needed.
+
+Write FZ @(GenericCount rest) and FS @(GenericCount rest) explicitly. Keep the
+signed-negative test before the list case. lookupGeneric constructs and consumes
+the witness with the same actual list. Fin records a bound, not list identity.
+Equal bounds can permit witness reuse across distinct lists. Count and
+GenericCount are separate families; do not assume their applications equal at
+an unknown list.
+
+### Acceptance gates
+
+- [ ] Compile the producer and a separate interface-only client with both
+      rebuilt stages. Pin the exact sources, interfaces and compiler artifacts.
+      Extend existing fixtures and authored runtime oracles; add no tracked
+      standalone test module solely for this increment.
+- [ ] Check direct indexing and the signed adapter at empty, first, later,
+      negative and out-of-range positions. Keep explicit bound constructors in
+      the primary source. Do not count a distinct inference experiment as a
+      prerequisite for the explicit worker.
+- [ ] Select ordinary Int values, function values and an opaque lifted action.
+      Apply the selected function as an ordinary runtime function. Run only the
+      selected action. Check the independent value or effect. Require no Eq a
+      or Show a constraint and no eligible-native-call restriction on a.
+- [ ] Select Vec Int n elements at an actual earlier runtime n. Include a client
+      that refines n with Z/S before the generic call. Observe the vector with
+      existing library operations. Preserve complete Id types and scoped nominal
+      transport; reject a real n/m element-domain mismatch without equality.
+- [ ] Check demand: negative ignores bottom list; zero ignores bottom tail;
+      later selection ignores an unused bottom head; forcing a selected bottom
+      exposes its marker. Preserve bottom at selected-function WHNF. EmptyCase
+      forces its witness. Finite access to a cyclic list needs only its prefix.
+- [ ] Reject an empty bound and an explicitly oversized finite witness. Reject
+      unrelated unknown bounds without equality. Accept deliberate equal-bound
+      reuse across distinct lists. Keep list-identity and family-inversion
+      rejections separate from bound compatibility.
+- [ ] Preserve M60's controls, source structural-root restrictions, actual local
+      Many value checks, lexical scope and M65 native-call endpoints. Preserve
+      opaque U/unknown inverse rejection. Pin actual diagnostics after execution;
+      do not assign diagnostic codes from this design.
+- [ ] Run the existing selected API, source, Showcase and registered-test gates.
+      Review any new source failure as an obligation at its actual instantiation
+      or evidence scope before proposing a compiler change. Record build and
+      runtime evidence separately from formatter limitations.
+
+### Prior art and limits
+
+The existing M60 reference pins Agda v2.8.0's finite-position example in
+[instance-arguments.lagda.rst, lines 353-377](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/instance-arguments.lagda.rst#L353-L377),
+blob 69c52629a737a8670fe11286a705111b7ba99e9d. Its Fin constructors provide the
+datatype precedent. The Haskell signed adapter checks its bound at runtime;
+it does not use Agda instance search.
+
+Agda's pinned [splitCon](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1503-L1531),
+blob 3779ffa6e418bca99e30c071e189106f82ecbe1b, substitutes the constructor into
+the later telescope and target. Its [domain substitution](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L1072-L1077),
+blob 1ef41f6d2a0223c8328984903b60dabc2a05a783, preserves domain metadata. These
+sources supply telescope and scope prior art. GHC uses its existing nominal
+constructor proofs and coercion lifting. No Agda termination, totality,
+definitional equality or erasure theorem transfers to these functions.
+
+No general normalization, optimizer or bounds-check-elimination result is part
+of M69. Bottom and cyclic inputs retain ordinary Haskell behavior. R03, R05 and
+the full project goal remain open. The static report and source pins are under
+_build/verification/native-generic-safe-index-next-candidate-v1. The unapplied
+implementation preparation is separate from execution evidence.

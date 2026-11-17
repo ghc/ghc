@@ -4248,3 +4248,25 @@ and the previously read Agda telescope and pattern code. It proposes generic
 safe indexing, including function-valued and runtime-index-bearing elements.
 It is a static source-composition review. No implementation, execution or new
 compiler rule is claimed by that report.
+
+
+## Generic safe list indexing: M69
+
+The [Agda finite-position example](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/instance-arguments.lagda.rst#L353-L377)
+provides the existing Fin datatype precedent. M60 already records its source
+blob 69c52629a737a8670fe11286a705111b7ba99e9d. M69 reuses the same Haskell Fin
+and the existing signed adapter's control flow. It adds no instance-search or
+termination rule. A Fin bound does not record list identity.
+
+The previously pinned Agda splitCon code in Rules/LHS.hs lines 1503-1531
+substitutes the constructor into the later telescope and target. Domain
+substitution in Substitute.hs lines 1072-1077 preserves domain metadata. The
+M69 review rereads those cached ranges. GHC uses its existing nominal
+constructor proofs and lifting. No Agda preservation or totality theorem
+transfers to the Haskell implementation.
+
+The source and prior-art pins are in
+native-generic-safe-index-next-candidate-v1/readpins.json. The proposed source
+copy and patch are in native-generic-safe-index-implementation-preparation-v1.
+These records describe unexecuted preparation. See the
+[bounded plan](PLAN.md#m69-generic-safe-list-indexing) for acceptance gates.
