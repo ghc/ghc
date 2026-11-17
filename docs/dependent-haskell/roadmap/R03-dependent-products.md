@@ -76,9 +76,11 @@ M58 and M59 expose those rules through source checking.
       Infer one retained operand from later declared domains. Check IORef input,
       lazy ignored operands and import through an object interface.
       See [M72](../PLAN.md#m72-invisible-retained-binders-in-source).
-- [ ] Add explicit invisible runtime operands and extend omission beyond the
-      measured domains and application forms. Keep the signature's retention
-      independent of both visibility and the availability of inference.
+- [x] Add explicit invisible runtime operands. Check `f @Int @{n} xs`, a
+      constructor operand, and a located error for a mismatched later vector.
+      See [M73](../PLAN.md#m73-explicit-invisible-runtime-arguments).
+- [ ] Extend omission beyond the measured domains and application forms.
+      Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.
       Existing `TypeRep` and required erased `forall` leave a bridge to define.
 - [x] Finish [M68 ordinary callers](../PLAN.md#m68-ordinary-callers-of-retained-apis).

@@ -4334,13 +4334,14 @@ justify assigning GHC native runtime Ids to mutable type metas.
 
 The ignored native-invisible-retained-next-candidate-v1 report/readpins proposes
 a checked hidden Nat operand selected from a later vector's actual declaration,
-paired with an explicit runtime override. The override syntax remains open.
+paired with an explicit runtime operand.
 M71 adds persistent visibility to the Core type and interface node. It checks
 that the visibility cast preserves demand in the object pipeline. M72 uses
 that cast in source definitions and inserts one runtime operand from a later
-declared argument type. Explicit operands and general inference remain next.
-See [M71](PLAN.md#m71-visibility-of-retained-binders-in-core) and
-[M72](PLAN.md#m72-invisible-retained-binders-in-source).
+declared argument type. M73 adds a written runtime operand.
+See [M71](PLAN.md#m71-visibility-of-retained-binders-in-core),
+[M72](PLAN.md#m72-invisible-retained-binders-in-source) and
+[M73](PLAN.md#m73-explicit-invisible-runtime-arguments).
 
 Agda v2.8.0 inserts implicit patterns in the expected telescope context before
 it compares visibility and chooses binder names. See
@@ -4350,6 +4351,19 @@ blob 24cb7b08975d4efafb8f8473def6eef5fb9045b3, and
 blob f47fcb713d3b37af67fa11c3e8293afc73be8d84. This supplies the expected-type
 and telescope-order precedent. The GHC renamer uses the signature's actual
 term Name. GHC's existing rules determine argument demand and usage.
+
+### Explicit invisible runtime arguments
+
+[Agda 2.8.0](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+uses braces for written implicit terms. Its pinned
+[application checker](https://github.com/agda/agda/blob/3d04bacca842729f9c0869b9287256321b5f450f/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks the term at the binder domain and substitutes it in the remaining
+type. The blob is 82ba94ac864d19b947d4c92b9af252b0fe81347a.
+[Proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#switching-syntaxes)
+discusses switches between term and type syntax. M73 uses `@{term}` for an
+explicit invisible runtime argument. The prefix `@` is a syntax choice
+in this fork. The braces take their contents through the ordinary term
+namespace. The existing `@Type` form still selects an erased argument.
 
 ## Native list anchors in higher-order calls: M70
 

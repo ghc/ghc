@@ -726,18 +726,25 @@ readInvisibleLength _ = natToInt n
 ignoreInvisibleLength :: forall a. foreach (n :: Nat). Vec a n -> Int
 ignoreInvisibleLength _ = 42
 
--- | Pass an IO-sourced index without writing it in the application.
+-- | Construct a vector indexed by the explicit runtime length.
+makeInvisibleVector :: foreach (n :: Nat). Vec Int n
+makeInvisibleVector = replicateNative @Int n 7
+
+-- | Compare omitted and explicit calls with an IO-sourced runtime index.
 invisibleRetainedArguments :: IO ()
 invisibleRetainedArguments = do
     n <- newIORef (S (S Z)) >>= readIORef
     let vector :: Vec Int n
-        vector = replicateNative @Int n 7
+        vector = makeInvisibleVector @{n}
     observe "invisible retained length" (readInvisibleLength vector)
     observe "invisible retained length with @Int" (readInvisibleLength @Int vector)
+    observe "explicit invisible retained length" (readInvisibleLength @{n} vector)
+    observe "explicit invisible retained length with @Int" (readInvisibleLength @Int @{n} vector)
     bottom <- newIORef (bottomValue @Nat "ignored invisible length") >>= readIORef
     let unused :: Vec Int bottom
         unused = replicateNative @Int bottom 7
     observe "invisible retained ignores bottom" (ignoreInvisibleLength unused)
+    observe "explicit invisible retained ignores bottom" (ignoreInvisibleLength @Int @{bottom} unused)
 
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()

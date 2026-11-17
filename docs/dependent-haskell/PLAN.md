@@ -5849,7 +5849,7 @@ separates visibility from retention.
       bottom at function WHNF and ignored and inspected runtime operands.
 - [x] Add source formation and definition checking. Check omitted operands
       from later vector declarations and report conflicting candidates in M72.
-- [ ] Check explicit operands, including one with an inconsistent index.
+- [x] Check explicit operands and an inconsistent index in [M73](#m73-explicit-invisible-runtime-arguments).
 
 ### M71 validation
 
@@ -5916,7 +5916,7 @@ binders" in REFERENCES.md.
       from a later Vec declaration. Test with and without written @Int.
 - [x] Observe the actual nonzero IORef value. Check an ignored bottom index
       and report conflicting and missing operands at the call.
-- [ ] Add an explicit runtime override alongside erased type application.
+- [x] Add an explicit runtime operand alongside erased type application in [M73](#m73-explicit-invisible-runtime-arguments).
 - [x] Add the verified source examples to Showcase.
 
 ### M72 validation
@@ -5936,3 +5936,48 @@ registered tests pass in the normal way, with 54 other cases skipped. They
 check both API fixtures, the extension-off control, source quantification,
 exact printing, HIE compatibility and essentials. See the
 `native-invisible-retained-source-` receipts under `_build/verification`.
+
+## M73: explicit invisible runtime arguments
+
+Roadmap owner: R03. Depends on M72 source checking and the M71 Core visibility
+cast. Use `f @Int @{n} xs` to supply the runtime term `n` next to the erased
+argument `Int`. Agda uses braces for explicit implicit terms. The prefix `@`
+fits GHC's application grammar and distinguishes this form from record syntax.
+See [the syntax and checking references](REFERENCES.md#explicit-invisible-runtime-arguments).
+
+The operand uses the ordinary term namespace and the existing retained
+application resolver. In telescope order, instantiate erased quantifiers
+and dictionaries and then substitute the written operand. Check its value
+once at the declared domain. A later declaration may supply an erased type
+choice. The written operand determines the index in the rest of the type.
+Use the same runtime application in Core as for a visible retained argument.
+
+- [x] Exercise the parser, exact printer and extension-off diagnostic.
+- [x] Compile a producer and interface-only consumer. Compare explicit and
+      omitted calls with the IO-sourced Nat, with and without a written type.
+- [x] Test a constructor operand with no determining argument. Check that
+      an explicit ignored bottom stays lazy.
+- [x] Report the mismatched vector when a call supplies a different index.
+      Report an explicit operand at an ordinary function type.
+- [x] Run both compiler builds, Showcase and the selected registered suite.
+
+### M73 validation
+
+The first grammar used the existing prefix-at token and conflicted with the
+record type production. Classify prefix `@` followed by an opening brace
+as a separate token. Preserve the brace tokens and ordinary layout handling.
+The exact-print check preserves the comment inside the braces.
+
+The bootstrapped compiler's interface-only client observes `2` for both
+explicit calls. An explicit `S (S Z)` works without a later vector, and
+an explicit ignored bottom returns `42`. With `n` in `xs :: Vec Int n`
+and `@{m}` in the application, GHC-83865 points to `xs` and describes the
+fourth argument and the two indices. The extension-off check suggests
+`ExperimentalDependentTypes`. A focused compile check with
+`ImpredicativeTypes` covers an explicit operand in a nested call and a
+result type indexed by the written operand.
+
+Both compiler stages match 131 Showcase output lines through seventeen
+source modules. The seven selected normal-way tests pass, with 54 other
+cases skipped. The receipts use the `native-explicit-retained-` prefix under
+`_build/verification`.

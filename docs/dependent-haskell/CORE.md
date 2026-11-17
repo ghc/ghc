@@ -513,6 +513,12 @@ source-flag policy. Native Core detection still controls the restricted
 pipeline, including for ordinary callers. General optimization, unfolding
 serialization, general invisible-argument inference and totality checking remain open.
 
+A checked `@{n}` expression records the result type after retained substitution.
+Desugaring passes the checked expression in an ordinary Core value application.
+The written operand remains a runtime value even when the function ignores it.
+See Note [Explicit invisible retained arguments] in GHC.Tc.Gen.App and
+[M73](PLAN.md#m73-explicit-invisible-runtime-arguments).
+
 ## Generic retained argument inference
 
 An ordinary erased argument can denote a whole type that contains a runtime
