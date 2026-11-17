@@ -691,7 +691,8 @@ tcRetainedKnownArgPlan expected fun sigma args
     declared_arg _ _ = return Nothing
 
     declared_type (L _ (HsPar _ arg)) = declared_type arg
-    declared_type (L _ (ExplicitList _ fields)) = declared_list fields
+    declared_type (L _ (ExplicitList _ fields))
+      = fmap (fmap mkListTy) (tcRetainedListElementType declared_type fields)
     declared_type (L loc (HsVar _ lname))
       | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
       = setSrcSpan (locA loc) $
@@ -710,19 +711,25 @@ tcRetainedKnownArgPlan expected fun sigma args
                Nothing -> return Nothing }
     declared_type _ = return Nothing
 
-    -- | Read one declared native element type without checking the literal.
-    declared_list [] = return Nothing
-    declared_list (L _ (HsPar _ field) : fields) = declared_list (field : fields)
-    declared_list (field@(L _ HsVar{}) : fields)
-      = do { actual <- declared_type field
-           ; case actual of
-               Just ty | hasNativeDependentExpr (Core.Type ty)
-                       , isTauTy ty
-                       , typeKind ty `eqType` liftedTypeKind
-                 -> return (Just (mkListTy ty))
-               _ -> declared_list fields }
-    declared_list (_ : fields) = declared_list fields
 tcRetainedKnownArgPlan _ _ _ _ = return Nothing
+
+-- | Find a declared native element type without checking the literal.
+-- See Note [Declared retained-domain choices] and Note [Native list anchors].
+tcRetainedListElementType :: (LHsExpr GhcRn -> TcM (Maybe Type))
+                          -> [LHsExpr GhcRn] -> TcM (Maybe Type)
+tcRetainedListElementType _ [] = return Nothing
+tcRetainedListElementType declared (L _ (HsPar _ field) : fields)
+  = tcRetainedListElementType declared (field : fields)
+tcRetainedListElementType declared (field@(L _ HsVar{}) : fields)
+  = do { actual <- declared field
+       ; case actual of
+           Just ty | hasNativeDependentExpr (Core.Type ty)
+                   , isTauTy ty
+                   , typeKind ty `eqType` liftedTypeKind
+             -> return (Just ty)
+           _ -> tcRetainedListElementType declared fields }
+tcRetainedListElementType declared (_ : fields)
+  = tcRetainedListElementType declared fields
 
 -- | Refine a declared argument type with actual lexical constructor Givens.
 -- Keep the argument Id and its stored type unchanged.
@@ -2405,8 +2412,9 @@ retains the completed immutable mode and cannot allocate another type meta.
 The existing flat routes still apply their type arguments directly.
 -}
 
--- | Classify named, completely signed or boxed tuple arguments without elaboration.
+-- | Classify arguments without elaboration.
 -- See Note [Inference of native tuple fields] in GHC.Tc.Gen.Expr for tuples.
+-- See Note [Native list anchors] for lists.
 tcRetainedInferableArg :: LHsExpr GhcRn -> TcM (Bool, Bool)
 tcRetainedInferableArg (L _ expr)
   = case expr of
@@ -2426,6 +2434,11 @@ tcRetainedInferableArg (L _ expr)
                 else do { (_, arg_anchor) <- tcRetainedInferableArg arg
                         ; return (True, fun_anchor || arg_anchor) } }
       HsAppType _ fun _ -> tcRetainedInferableArg fun
+      ExplicitList _ fields
+        -> do { overloaded <- xoptM LangExt.OverloadedLists
+              ; anchor <- if overloaded then return Nothing
+                          else tcRetainedListElementType declared_field fields
+              ; return (False, isJust anchor) }
       ExplicitTuple _ args Boxed
         -> do { shapes <- mapM tcRetainedInferableArg [arg | Present _ arg <- args]
               ; return (True, any snd shapes) }
@@ -2439,6 +2452,13 @@ tcRetainedInferableArg (L _ expr)
       XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> tcRetainedInferableArg arg
       _ -> return (False, False)
   where
+    declared_field (L _ (HsVar _ lname))
+      | not (isDataOcc (nameOccName name))
+      = do { mb_id <- tcLookupIdMaybe name
+           ; traverse (liftZonkM . zonkTcType . varType) mb_id }
+      where name = unLocWithUserRdr lname
+    declared_field _ = return Nothing
+
     -- | Exclude checking-only syntax without traversing compiler type graphs.
     simple_type :: Data a => a -> Bool
     simple_type thing
@@ -2455,6 +2475,24 @@ tcRetainedInferableArg (L _ expr)
     simple_shape HsQualTy{} = False
     simple_shape HsSpliceTy{} = False
     simple_shape _ = True
+
+{- Note [Native list anchors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In fmap toList (lookupGeneric [vector] 0), the declared type of vector can
+contain a runtime index. Discover it through the built-in list literal so
+the enclosing lookupGeneric call can supply an argument type to fmap's
+cache. Otherwise checking toList can choose a fresh index meta before the
+lookup argument supplies the actual runtime index. The existing callback
+path can choose the erased index from the exact cached argument type.
+
+Report an anchor without marking the literal itself inferable. Checking it
+at a known list type works even without ExperimentalDependentTypes. The
+standalone list-inference rule has its own extension check. The anchor probe
+reads declarations only and excludes overloaded lists. The inner call still
+selects its type arguments and checks each element, including its usage.
+Keep the original type, evidence and usage of the inferred call in the
+existing cache. See Note [Named callbacks at known native inputs].
+-}
 
 -- | Specialize the wired-in dollar operator from a checked result and one
 -- cached native-anchored RHS. Keep its original type and evidence application.
