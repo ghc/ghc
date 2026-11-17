@@ -1117,6 +1117,7 @@ runModuleChecks libdir = do
     runFunctionPackageModuleChecks libdir
     runFunctionFieldModuleChecks libdir
     runGenericListModuleChecks libdir
+    runOrdinaryRetainedModuleChecks libdir
     runBoundedFamilyModuleChecks libdir
     runExportedFunctionSignatureModuleChecks libdir
     forM_
@@ -6407,6 +6408,430 @@ runGenericListModuleChecks libdir = do
         ]
         $ \(moduleName, code, fragments, source) -> do
             let path = artifacts </> (moduleName ++ ".hs")
+            writeFile path source
+            GHC.runGhc (Just libdir) $ do
+                environment <- nativeModuleEnvironment artifacts warnings NoLink Nothing
+                result <- GHC.handleSourceError (pure . Left) $ do
+                    liftIO $ void $ compileFile environment NoStop (path, Nothing)
+                    pure (Right ())
+                forM_ fragments $ \fragment ->
+                    checkSourceRejection moduleName code fragment result
+
+{- Note [Ordinary clients of retained contracts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Each paired client imports the same retained signatures. Only its EDT pragma
+changes. Compile both providers once, then check each client in a fresh
+interface-only session. The driver labels each client's independent oracle.
+Dictionary and callback results must keep the actual runtime index scope.
+Run rejection pairs only after all positive oracles pass. Check the located
+semantic diagnostic and its argument context. These checks add no output to
+the fixture's existing golden.
+-}
+
+-- | Check retained imports and native inference in ordinary source modules.
+runOrdinaryRetainedModuleChecks :: FilePath -> IO ()
+runOrdinaryRetainedModuleChecks libdir = do
+    library <- readFile "PackedVecLibrary.hs"
+    ordinary <- readFile "OrdinaryVecClient.hs"
+    let warnings = ["-Werror=inaccessible-code", "-Werror=overlapping-patterns"]
+        modes = [("NoEDT", "NoExperimentalDependentTypes"), ("EDT", "ExperimentalDependentTypes")]
+        cases :: [(String, [String], String, [String])]
+        cases =
+            [
+                ( "ExplicitCase"
+                , ["GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Observe imported retained applications without dependent source syntax."
+                    , ""
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "probe :: Nat -> Int"
+                    , "probe n = case replicateNative @Int n (7 :: Int) of"
+                    , "    VNil -> 0"
+                    , "    VCons x _ -> x"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (probe zero)"
+                    , "    print (probe two)"
+                    ]
+                , ["0", "7"]
+                )
+            ,
+                ( "InferredCase"
+                , ["GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Observe imported retained applications without dependent source syntax."
+                    , ""
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "probe :: Nat -> Int"
+                    , "probe n = case replicateNative n (7 :: Int) of"
+                    , "    VNil -> 0"
+                    , "    VCons x _ -> x"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (probe zero)"
+                    , "    print (probe two)"
+                    ]
+                , ["0", "7"]
+                )
+            ,
+                ( "ExplicitList"
+                , ["GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Observe imported retained applications without dependent source syntax."
+                    , ""
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "probe :: Nat -> [Int]"
+                    , "probe n = toList @Int (replicateNative @Int n (7 :: Int))"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (probe zero)"
+                    , "    print (probe two)"
+                    ]
+                , ["[]", "[7,7]"]
+                )
+            ,
+                ( "InferredList"
+                , ["GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Observe imported retained applications without dependent source syntax."
+                    , ""
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "probe :: Nat -> [Int]"
+                    , "probe n = toList (replicateNative n (7 :: Int))"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (probe zero)"
+                    , "    print (probe two)"
+                    ]
+                , ["[]", "[7,7]"]
+                )
+            ,
+                ( "NativeConsumer"
+                , ["GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Observe imported retained applications without dependent source syntax."
+                    , ""
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "probe :: Nat -> Nat -> Int"
+                    , "probe n m = case appendNative @Int n m (replicateNative @Int n (7 :: Int)) (replicateNative @Int m (9 :: Int)) of"
+                    , "    VNil -> 0"
+                    , "    VCons x _ -> x"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    oneRef <- newIORef (S Z)"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    one <- readIORef oneRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (probe zero zero)"
+                    , "    print (probe zero one)"
+                    , "    print (probe two one)"
+                    ]
+                , ["0", "9", "7"]
+                )
+            ,
+                ( "GenericList"
+                , ["GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Observe imported retained applications without dependent source syntax."
+                    , ""
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "probe :: [Int] -> [Int]"
+                    , "probe xs = toList @Int (genericVector @Int xs)"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    emptyRef <- newIORef ([] :: [Int])"
+                    , "    valuesRef <- newIORef ([11, 22] :: [Int])"
+                    , "    empty <- readIORef emptyRef"
+                    , "    values <- readIORef valuesRef"
+                    , "    print (probe empty)"
+                    , "    print (probe values)"
+                    ]
+                , ["[]", "[11,22]"]
+                )
+            ,
+                ( "DictionaryScope"
+                , ["DataKinds", "GADTs", "TypeApplications", "FlexibleInstances"]
+                , unlines
+                    [ "-- | Resolve a dictionary for the exact native argument type."
+                    , ""
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "class Measure a where"
+                    , "    measure :: a -> Int"
+                    , ""
+                    , "instance Measure (Vec Int n) where"
+                    , "    measure VNil = 0"
+                    , "    measure (VCons _ rest) = 1 + measure rest"
+                    , ""
+                    , "probe :: Nat -> Int"
+                    , "probe n = measure (replicateNative @Int n (7 :: Int))"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (probe zero)"
+                    , "    print (probe two)"
+                    ]
+                , ["0", "2"]
+                )
+            ,
+                ( "PackedCallback"
+                , ["DataKinds", "GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Consume a real package with a retained callback and an ordinary list result."
+                    , ""
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "probe :: Nat -> [Int]"
+                    , "probe n ="
+                    , "    let package :: PackedVec Int"
+                    , "        package = PackVec @Int n (replicateNative @Int n (7 :: Int))"
+                    , "     in withPacked @Int package (\\n xs -> toList xs)"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (probe zero)"
+                    , "    print (probe two)"
+                    ]
+                , ["[]", "[7,7]"]
+                )
+            ,
+                ( "CallbackDictionaries"
+                , ["DataKinds", "GADTs", "TypeApplications", "FlexibleInstances", "ExplicitForAll"]
+                , unlines
+                    [ "-- | Keep dictionary evidence inside each retained callback scope."
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "class Measure a where"
+                    , "    measure :: a -> Int"
+                    , ""
+                    , "instance Measure (Vec Int n) where"
+                    , "    measure VNil = 0"
+                    , "    measure (VCons _ rest) = 1 + measure rest"
+                    , ""
+                    , "measureVia :: forall b a. Measure a => b -> a -> Int"
+                    , "measureVia _ = measure"
+                    , ""
+                    , "probe :: Nat -> (Int, Int)"
+                    , "probe n ="
+                    , "    let package :: PackedVec Int"
+                    , "        package = PackVec @Int n (replicateNative @Int n (7 :: Int))"
+                    , "     in ( withPacked @Int package (\\n xs -> measure xs)"
+                    , "        , withPacked @Int package (\\n xs -> measureVia @Int (0 :: Int) xs)"
+                    , "        )"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (probe zero)"
+                    , "    print (probe two)"
+                    ]
+                , ["(0,0)", "(2,2)"]
+                )
+            ,
+                ( "OrdinaryExample"
+                , []
+                , unlines
+                    [ "-- | Call the ordinary exports of the separately compiled example client."
+                    , "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary (Nat (..))"
+                    , "import OrdinaryVecClient (ordinaryReplicate, ordinaryRoundTrip)"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    zeroRef <- newIORef Z"
+                    , "    twoRef <- newIORef (S (S Z))"
+                    , "    zero <- readIORef zeroRef"
+                    , "    two <- readIORef twoRef"
+                    , "    print (ordinaryReplicate zero True)"
+                    , "    print (ordinaryReplicate two True)"
+                    , "    print (ordinaryRoundTrip ([] :: [Int]))"
+                    , "    print (ordinaryRoundTrip ([11, 22] :: [Int]))"
+                    ]
+                , ["[]", "[True,True]", "[]", "[11,22]"]
+                )
+            ,
+                ( "QuickLookCompleteNative"
+                , ["GADTs", "ImpredicativeTypes"]
+                , unlines
+                    [ "-- | Complete the ordinary const application from declared argument types."
+                    , ""
+                    , "import PackedVecLibrary (rightZero)"
+                    , ""
+                    , "probe :: Bool -> Int"
+                    , "probe flag = case const rightZero flag of"
+                    , "    _ -> 42"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    print (probe False)"
+                    , "    print (probe True)"
+                    ]
+                , ["42", "42"]
+                )
+            ,
+                ( "QuickLookOrdinaryPartial"
+                , ["GADTs", "ImpredicativeTypes"]
+                , unlines
+                    [ "-- | Keep ordinary partial application inference unchanged."
+                    , ""
+                    , "import PackedVecLibrary (natToInt)"
+                    , ""
+                    , "probe :: Int"
+                    , "probe = case const natToInt of"
+                    , "    _ -> 42"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = print probe"
+                    ]
+                , ["42"]
+                )
+            ]
+        rejections :: [(String, [String], String, Int, [String])]
+        rejections =
+            [
+                ( "IndexMismatch"
+                , ["GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Require each vector to use the actual retained length passed to appendNative."
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "bad :: Nat -> Nat -> Int"
+                    , "bad n m = case appendNative @Int n n (replicateNative @Int n (7 :: Int)) (replicateNative @Int m (9 :: Int)) of"
+                    , "    VNil -> 0"
+                    , "    VCons x _ -> x"
+                    ]
+                , 83865
+                , ["Expected: Vec Int", "Actual: Vec Int m", "In the fifth argument of", "appendNative"]
+                )
+            ,
+                ( "EscapingCallback"
+                , ["DataKinds", "GADTs", "TypeApplications"]
+                , unlines
+                    [ "-- | Reject an inferred result that would expose the callback's runtime index."
+                    , ""
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "escape package = withPacked @Int package (\\n xs -> xs)"
+                    ]
+                , 25897
+                , ["Vec Int", "rigid type variable", "In the expression: xs", "In the third argument of", "withPacked"]
+                )
+            ,
+                ( "LinearRetainedArg"
+                , ["DataKinds", "GADTs", "TypeApplications", "LinearTypes"]
+                , unlines
+                    [ "-- | Reject a local linear Nat argument at an imported unrestricted retained call."
+                    , ""
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "bad :: Nat %1 -> Int"
+                    , "bad n = case replicateNative @Int n (7 :: Int) of"
+                    , "    VNil -> 0"
+                    , "    VCons x _ -> x"
+                    ]
+                , 83605
+                , ["unrestricted multiplicity Many", "This argument has multiplicity:", "One", "replicateNative"]
+                )
+            ,
+                ( "QuickLookPartialNative"
+                , ["GADTs", "ImpredicativeTypes"]
+                , unlines
+                    [ "-- | Keep an incomplete ordinary application with a native value anchor."
+                    , ""
+                    , "import PackedVecLibrary (rightZero)"
+                    , ""
+                    , "probe :: Int"
+                    , "probe = case const rightZero of"
+                    , "    _ -> 42"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = print probe"
+                    ]
+                , 83605
+                , ["Quick Look inference does not support this retained type yet", "In the first argument of", "const", "rightZero"]
+                )
+            ]
+        clients =
+            [ (moduleName, unlines $
+                map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") (mode : extensions)
+                ++ ["", "module " ++ moduleName ++ " (main) where", ""] ++ lines body)
+            | (name, extensions, body, _) <- cases
+            , (suffix, mode) <- modes
+            , let moduleName = "M68" ++ name ++ suffix
+            ]
+        driver = unlines $
+            ["{-# LANGUAGE NoExperimentalDependentTypes #-}", "module Main (main) where"]
+            ++ ["import qualified " ++ name | (name, _) <- clients]
+            ++ ["main :: IO ()", "main = do"]
+            ++ concat [["    putStrLn " ++ show name, "    " ++ name ++ ".main"] | (name, _) <- clients]
+        expected = concat
+            [ ("M68" ++ name ++ suffix) : oracle
+            | (name, _, _, oracle) <- cases
+            , (suffix, _) <- modes
+            ]
+    runModuleCases libdir "ordinary-retained-source"
+        ([("PackedVecLibrary", library), ("OrdinaryVecClient", ordinary)] ++ clients)
+        warnings driver expected
+    artifacts <- makeAbsolute ("NativeDependentCoreRun.modules" </> "ordinary-retained-source" </> "artifacts")
+    rejectionDirectory <- makeAbsolute ("NativeDependentCoreRun.modules" </> "ordinary-retained-source" </> "rejections")
+    createDirectoryIfMissing True rejectionDirectory
+    forM_ rejections $ \(name, extensions, body, code, fragments) ->
+        forM_ modes $ \(suffix, mode) -> do
+            let moduleName = "M68Reject" ++ name ++ suffix
+                source = unlines $
+                    map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") (mode : extensions)
+                    ++ ["", "module " ++ moduleName ++ " where", ""] ++ lines body
+                path = rejectionDirectory </> (moduleName ++ ".hs")
             writeFile path source
             GHC.runGhc (Just libdir) $ do
                 environment <- nativeModuleEnvironment artifacts warnings NoLink Nothing

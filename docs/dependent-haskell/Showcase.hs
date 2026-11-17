@@ -40,6 +40,7 @@ import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified NativeMultiPackage as Packages
 import qualified OpaqueCallClient as Opaque
+import qualified OrdinaryVecClient as Ordinary
 import qualified ParameterizedIndexLibrary as Parameterized
 import PackedVecLibrary
 import qualified QualifiedPiLibrary as Qualified
@@ -672,6 +673,16 @@ genericListIndexing = do
     _ <- evaluate @(foreach (ys :: [Vec Int lazySize]) -> Vec (Vec Int lazySize) (GenericCount ys)) suspended
     observe "generic partial worker WHNF" True
 
+-- | Use imported retained APIs from a module without dependent source syntax.
+ordinaryModuleCalls :: IO ()
+ordinaryModuleCalls = do
+    sizeRef <- newIORef (S (S Z))
+    n <- readIORef sizeRef
+    observe "ordinary module runtime replicate" (Ordinary.ordinaryReplicate n (7 :: Int))
+    valuesRef <- newIORef ([11, 22] :: [Int])
+    values <- readIORef valuesRef
+    observe "ordinary module generic round-trip" (Ordinary.ordinaryRoundTrip values)
+
 -- | Run each completed source feature group with finite runtime observations.
 main :: IO ()
 main = do
@@ -692,3 +703,4 @@ main = do
     forallMatchability
     algebraicFunctionFields
     genericListIndexing
+    ordinaryModuleCalls
