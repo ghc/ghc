@@ -1,0 +1,8 @@
+section: compiler
+issues: #28135
+mrs: !17006
+synopsis:
+  Fix a bug in kind inference in data constructors
+description:
+  This bug affected only data constructors using kind polymorphism,
+  and declared in GADT style.

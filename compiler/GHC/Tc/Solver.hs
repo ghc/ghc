@@ -187,7 +187,7 @@ pushLevelAndSolveEqualitiesX callsite thing_inside
                do { (res, wanted) <- captureConstraints thing_inside
                   ; wanted <- runTcSEqualities (simplifyTopWanteds wanted)
                   ; return (wanted,res) }
-       ; traceTc "pushLevelAndSolveEqualities }" (vcat [ text "Residual:" <+> ppr wanted
+       ; traceTc "pushLevelAndSolveEqualitiesX }" (vcat [ text "Residual:" <+> ppr wanted
                                                        , text "Level:" <+> ppr tclvl ])
        ; return (tclvl, wanted, res) }
 
