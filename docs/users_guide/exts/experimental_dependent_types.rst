@@ -319,9 +319,7 @@ checks a list against a requested length::
     fromListExact Z [] = Just VNil
     fromListExact Z (_ : _) = Nothing
     fromListExact (S _) [] = Nothing
-    fromListExact (S n) (x : xs) = do
-        rest <- fromListExact n xs
-        pure (VCons x rest)
+    fromListExact (S n) (x : xs) = VCons x <$> fromListExact n xs
 
 In each equation, matching the leading constructor refines dependent
 argument and result types for that equation alone. Retained constructor
