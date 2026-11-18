@@ -19,9 +19,10 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferRho )
 import GHC.Hs
 
 import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
+import GHC.Rename.Utils ( mkExpandedLExpr )
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Match ( tcMatches, tcBody )
-import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId )
+import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId, recordSourceMethodUse )
 import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
@@ -37,7 +38,8 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types ( TcGblEnv(tcg_type_env) )
 import GHC.Tc.Types.TcRef ( TcRef )
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred)
+import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred, ctEvLoc, ctEvEvId,
+                                mkNonCanonical, DelayedError(DE_SourceMethod))
 import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
@@ -50,6 +52,8 @@ import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Reduction ( reductionReducedType )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
 import GHC.Core.FVs ( exprFreeVarsList )
+import GHC.Core.InstEnv ( lookupUniqueInstEnv, instanceDFunId )
+import GHC.Core.Predicate ( classMethodInstTy )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -68,7 +72,7 @@ import GHC.Types.TyThing ( TyThing(AnId) )
 import GHC.Types.Basic ( TypeOrKind(TypeLevel) )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
-import GHC.Types.Id ( mkLocalId )
+import GHC.Types.Id ( mkLocalId, isClassOpId_maybe, sourceMethodTarget_maybe )
 import GHC.Types.Var.Set ( elemVarSet, emptyVarSet, extendVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
@@ -78,6 +82,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
 
 import GHC.Data.Maybe
+import GHC.Data.Bag ( unitBag )
 import GHC.Data.FastString
 
 import GHC.Utils.Misc
@@ -1719,7 +1724,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
 
     -- See Note [Explicit invisible retained arguments].
     go1 plan fun_orig pos acc fun_ty (ERetainedArg loc _ arg _ : rest_args)
-      = do { (binder, operand) <-
+      = do { (binder, (operand, runtime_arg)) <-
                addArgCtxt (pos + count written_prefix_arg acc) rn_head arg $
                case coreFullView fun_ty of
                  DepFunTy DepFunInvisible binder _ ->
@@ -1727,7 +1732,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                  _ -> failWithTc
                         (TcRnRetainedQuantificationError (RetainedExplicitArgument fun_ty))
            ; let res_ty = applyTypeToArgs fun_ty [operand]
-                 checked = ERetainedArg loc (Scaled ManyTy (varType binder)) arg res_ty
+                 checked = ERetainedArg loc (Scaled ManyTy (varType binder)) runtime_arg res_ty
            ; go plan fun_orig pos (checked : acc) res_ty rest_args }
 
     -- See Note [Inferring an invisible retained argument].
@@ -1770,8 +1775,8 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
-      = do { core_arg <- tcRetainedOperand binder arg
-           ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy (varType binder))
+      = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
+           ; arg' <- skipQuickLook ctxt runtime_arg (Scaled ManyTy (varType binder))
            ; let body_ty = applyTypeToArgs fun_ty [core_arg]
            ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
 
@@ -1875,10 +1880,83 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
 
 
 -- | Resolve the index at the binder's checked scalar or function domain.
-tcRetainedOperand :: Id -> LHsExpr GhcRn -> TcM Core.CoreExpr
-tcRetainedOperand binder
-  | isNativeIndexFunctionId binder = tcRetainedFunctionArg (varType binder)
-  | otherwise                     = tcRetainedArg (varType binder)
+tcRetainedOperand :: Id -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+tcRetainedOperand binder arg
+  | isNativeIndexFunctionId binder = (,arg) <$> tcRetainedFunctionArg domain arg
+  | otherwise = do { runtime_arg <- tcRetainedMethod domain arg
+                   ; index_arg <- tcRetainedArg domain runtime_arg
+                   ; return (index_arg, runtime_arg) }
+  where
+    domain = varType binder
+
+-- | Specialise a class selector in a retained operand to its checked method.
+-- See Note [Dictionary selection in retained arguments].
+tcRetainedMethod :: Type -> LHsExpr GhcRn -> TcM (LHsExpr GhcRn)
+tcRetainedMethod domain arg@(L loc original)
+  | (op, args@(_:_)) <- split_call arg []
+  , let (L head_loc head_expr, type_arg) = case op of
+          L _ (HsAppType _ f ty) -> (stripParensLHsExpr f, Just ty)
+          _ -> (op, Nothing)
+  , HsVar _ lname <- head_expr
+  , let name = unLocWithUserRdr lname
+  , isExternalName name, isVarOcc (nameOccName name)
+  = setSrcSpanA head_loc $ do
+      mb_sel <- tcLookupIdMaybe name
+      case mb_sel of
+        Just sel | Just cls <- isClassOpId_maybe sel -> do
+          let unchecked :: TcM a
+              unchecked = failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall name))
+          case tcSplitSigmaTy (varType sel) of
+            ([(_, tv)], [theta], rho)
+              | let (_, _, result) = splitFunTys rho
+              , result `tcEqType` mkTyVarTy tv
+              , theta `tcEqType` mkClassPred cls [mkTyVarTy tv]
+              , noFreeVarsOfType domain, typeKind domain `tcEqType` tyVarKind tv -> return ()
+            _ -> unchecked
+          forM_ type_arg $ \ty -> do
+            (supplied, _) <- tcVTA (idConcreteTvs sel) (varType sel) ty
+            unless (supplied `tcEqType` domain) unchecked
+          insts <- tcGetInstEnvs
+          dfun <- case lookupUniqueInstEnv insts cls [domain] of
+            Right (inst, []) -> tcLookupIdMaybe (getName (instanceDFunId inst)) >>= maybe unchecked return
+            _ -> unchecked
+          target_name <- maybe unchecked return (sourceMethodTarget_maybe dfun sel)
+          target <- tcLookupIdMaybe target_name >>= maybe unchecked return
+          unless (varType target `tcEqType` classMethodInstTy sel [domain]) unchecked
+
+          ev <- newWanted (OccurrenceOf name) Nothing (mkClassPred cls [domain])
+          emitSimple (mkNonCanonical ev)
+          emitDelayedErrors (unitBag (DE_SourceMethod (ctEvEvId ev) dfun name (ctEvLoc ev)))
+          recordSourceMethodUse dfun sel target
+          let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
+          return (L loc (mkExpandedLExpr original (mkHsApps target_head args)))
+        _ -> return arg
+  | otherwise = return arg
+  where
+    split_call :: LHsExpr GhcRn -> [LHsExpr GhcRn] -> (LHsExpr GhcRn, [LHsExpr GhcRn])
+    split_call (L _ (HsPar _ e)) args = split_call e args
+    split_call (L _ (HsApp _ f a)) args = split_call f (a:args)
+    split_call (L _ (OpApp _ a op b)) args = split_call op (a:b:args)
+    split_call e args = (e, args)
+
+{- Note [Dictionary selection in retained arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For replicateNative (n + m), the result type depends on which addition
+method the caller uses. Look up a candidate concrete dictionary from the
+known index domain. Require the method's result to be its class parameter:
+the result of an ambiguous method such as C a => Bool -> Bool cannot
+determine the dictionary type. The interface identifies an exact alias to a checked
+source function. The ordinary constraint solver must select this same
+dictionary for the method occurrence in its lexical scope. Emit an
+ordinary Wanted and attach the check to that Wanted's evidence variable.
+A Given for Num Nat can select a different dictionary.
+
+Once this obligation is recorded, use the target for both the index
+and the runtime application. The expanded expression keeps the user's
+operator and its source span. The later argument check must not resolve
+a second dictionary. M81's source-call check verifies saturation and
+operand kinds and preserves the lazy call through erasure.
+-}
 
 -- | Resolve one already-bound local function at its exact retained domain.
 -- Read existing assignments without instantiating or checking the value again.
