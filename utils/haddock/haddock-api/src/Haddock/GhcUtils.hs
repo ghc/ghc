@@ -794,7 +794,8 @@ typeNames ty = go ty Set.empty
       case t of
         TyVarTy{} -> acc
         TermVarTy v -> go (varType v) acc
-        DepFunTy _ b body -> go body $ go (varType b) acc
+        TermAppTy fun arg -> go arg $ go (varType fun) acc
+        DepFunTy _ b body -> go body $ go (varType b) $ go (idMult b) acc
         AppTy t1 t2 -> go t2 $ go t1 acc
         -- See Note [Arrow matchability in Haddock] in Haddock.Convert.
         FunTy _ ma w t1 t2 -> go t2 $ go t1 $ go w $ go ma acc
@@ -871,8 +872,11 @@ defaultRuntimeRepVars = go emptyVarEnv
           liftedRepTy
       | otherwise =
           TyVarTy (updateTyVarKind (go subs) tv)
-    go _ (TermVarTy{}) = panic "defaultRuntimeRepVars: native runtime index is not supported"
-    go _ (DepFunTy{}) = panic "defaultRuntimeRepVars: native dependent function is not supported"
+    go subs (TermVarTy var) = TermVarTy (go_id subs var)
+    go subs (TermAppTy fun arg) = TermAppTy (go_id subs fun) (go subs arg)
+    go subs (DepFunTy vis binder body) =
+      -- See Note [Retained types in Haddock] in Haddock.Convert.
+      DepFunTy vis (go_id subs binder) (go subs body)
     go subs (TyConApp tc tc_args) =
       TyConApp tc (map (go subs) tc_args)
     go subs (FunTy af ma w arg res) =
@@ -884,6 +888,9 @@ defaultRuntimeRepVars = go emptyVarEnv
       CastTy (go subs x) co
     go _ ty@(LitTy{}) = ty
     go _ ty@(CoercionTy{}) = ty
+
+    go_id subs var =
+      setIdMult (setVarType var (go subs $ varType var)) (go subs $ idMult var)
 
 fromMaybeContext :: Maybe (LHsContext DocNameI) -> HsContext DocNameI
 fromMaybeContext Nothing = HsContext noExtField []

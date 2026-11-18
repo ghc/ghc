@@ -591,6 +591,8 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_sig_args 0 leader typ
     arg_doc n = rDoc . fmap _doc $ Map.lookup n argDocs
 
     do_args :: Int -> LaTeX -> HsType DocNameI -> [(LaTeX, LaTeX)]
+    do_args n leader (HsForEachTy (_, Right _) bndrs ltype) =
+      do_largs n (leader <+> (ppHsForEachBinders bndrs unicode <> dot)) ltype
     do_args n leader (HsForEachTy _ bndrs ltype)
       | not (null bndrs) =
           [ (decltt ldr, decltt (ppHsForEachBinders [bndr] unicode) <-> arg_doc i <+> nl)
@@ -1317,11 +1319,16 @@ ppr_mono_lty :: LHsType DocNameI -> Bool -> LaTeX
 ppr_mono_lty ty unicode = ppr_mono_ty (unLoc ty) unicode
 
 ppr_mono_ty :: HsType DocNameI -> Bool -> LaTeX
-ppr_mono_ty (HsForEachTy _ bndrs ty) unicode =
+ppr_mono_ty (HsForEachTy (_, visibility) bndrs ty) unicode =
   sep
-    [ ppHsForEachBinders bndrs unicode <+> arrow unicode
+    [ prefix
     , ppr_mono_lty ty unicode
     ]
+  where
+    binders = ppHsForEachBinders bndrs unicode
+    prefix = case visibility of
+      Left _ -> binders <+> arrow unicode
+      Right _ -> binders <> dot
 ppr_mono_ty (HsForAllTy _ tele ty) unicode =
   sep
     [ ppHsForAllTelescope tele unicode

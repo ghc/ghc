@@ -325,6 +325,8 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_sig_args 0 sep
     do_largs n leader (L _ t) = do_args n leader t
 
     do_args :: Int -> Html -> HsType DocNameI -> [SubDecl]
+    do_args n leader (HsForEachTy (_, Right _) bndrs ltype) =
+      do_largs n (leader <+> (ppForEachBinders unicode qual bndrs +++ dot)) ltype
     do_args n leader (HsForEachTy _ bndrs ltype)
       | not (null bndrs) =
           [ (ldr <+> ppForEachBinders unicode qual [bndr], argDoc i, [])
@@ -1819,9 +1821,13 @@ ppr_mono_lty :: LHsType DocNameI -> Unicode -> Qualification -> HideEmptyContext
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty :: HsType DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
-ppr_mono_ty (HsForEachTy _ bndrs ty) unicode qual emptyCtxts =
-  ppForEachBinders unicode qual bndrs <+> arrow unicode
-    <+> ppr_mono_lty ty unicode qual emptyCtxts
+ppr_mono_ty (HsForEachTy (_, visibility) bndrs ty) unicode qual emptyCtxts =
+  prefix <+> ppr_mono_lty ty unicode qual emptyCtxts
+  where
+    binders = ppForEachBinders unicode qual bndrs
+    prefix = case visibility of
+      Left _ -> binders <+> arrow unicode
+      Right _ -> binders +++ dot
 ppr_mono_ty (HsForAllTy _ tele ty) unicode qual emptyCtxts =
   ppForAllPart unicode qual tele <+> ppr_mono_lty ty unicode qual emptyCtxts
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode qual emptyCtxts =

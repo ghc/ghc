@@ -825,6 +825,22 @@ Instance sorting keeps its existing argument and result keys before metadata.
 This distinguishes arrows with the same endpoints and different metadata.
 -}
 
+{- Note [Retained types in Haddock]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Use HsForEachTy for a retained binder. Its arrow or dot preserves visibility.
+Keep the explicit domain annotation, including a function domain. Convert
+the domain before extending the binder scope. The binder scopes over the
+result only. Runtime variable and opaque application nodes use the original
+Id Names. Do not convert a retained binder to erased forall syntax.
+
+Runtime-representation defaulting updates the domain and multiplicity of
+each runtime Id without changing its Name. It applies the same transformation
+to runtime occurrences. Valid retained binders have Many multiplicity; the
+source foreach syntax does not need a separate multiplicity annotation.
+The DocNameI annotation keeps the arrow or dot through renaming. HTML and
+LaTeX use that annotation when they render both signatures and argument docs.
+-}
+
 -- | Convert a core type into an 'HsType'.
 synifyType
   :: SynifyTypeState
@@ -835,8 +851,23 @@ synifyType
   -- ^ the type to convert
   -> LHsType GhcRn
 synifyType _ _ (TyVarTy tv) = noLocA $ HsTyVar noAnn NotPromoted $ noLocA (noUserRdr $ getName tv)
-synifyType _ _ (TermVarTy{}) = error "synifyType: native runtime index is not supported"
-synifyType _ _ (DepFunTy{}) = error "synifyType: native dependent function is not supported"
+synifyType _ _ (TermVarTy var) =
+  noLocA $ HsTyVar noAnn NotPromoted $ noLocA (noUserRdr $ getName var)
+synifyType _ boundTvs (TermAppTy fun arg) =
+  noLocA $ HsAppTy noExtField
+    (noLocA $ HsTyVar noAnn NotPromoted $ noLocA (noUserRdr $ getName fun))
+    (synifyType WithinType boundTvs arg)
+synifyType _ boundTvs (DepFunTy vis binder body) =
+  -- See Note [Retained types in Haddock].
+  noLocA $ HsForEachTy
+    { hst_xforeach = (noAnn, case vis of
+        DepFunVisible -> Left noAnn
+        DepFunInvisible -> Right noAnn)
+    , hst_bndrs = [noLocA $ HsTvb noAnn ()
+        (HsBndrVar noExtField (noLocA $ getName binder))
+        (HsBndrKind noExtField $ synifyType WithinType boundTvs (varType binder))]
+    , hst_body = synifyType WithinType (extendVarSet boundTvs binder) body
+    }
 synifyType _ boundTvs (TyConApp tc tys) =
   maybe_sig res_ty
   where
