@@ -92,7 +92,7 @@ M58 and M59 expose those rules through source checking.
       Recover in-scope constructor trees from declared indices.
       See [M74](../PLAN.md#m74-successive-invisible-retained-arguments).
 - [x] Infer the erased tail index when `safeHead` consumes the result of
-      `replicateNative (1 + n) x` or `sourceVector (x : xs)`. The first
+      `replicateNative (1 + n) x` or `sourceVector @a (x : xs)`. The first
       element is available without evaluating the tail.
       See [M84](../PLAN.md#m84-infer-a-nonempty-vectors-tail-at-a-nested-application).
 - [ ] Extend omission beyond the measured domains and application forms.

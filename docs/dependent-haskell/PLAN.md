@@ -6730,8 +6730,10 @@ Every cached domain must still match the candidate after substitution.
 Ordinary subsumption checks the original argument and supplies its coercion.
 
 Both compiler stages ran the generic `firstCopy` example with an undefined
-tail length. They also ran `safeHead (sourceVector (x : xs))` with an
-undefined list tail. An extension-off
+tail length. They also ran `safeHead (sourceVector @a (x : xs))` with an
+undefined list tail. This generic list example requires `@a` on the inner
+call. Without it, GHC-83605 points at `x : xs`: the retained constructor
+operand does not yet determine the erased element type. An extension-off
 module could call the imported functions directly. The empty vector, an
 unknown list, a stuck `n + 1`, conflicting tails and a representational
 newtype mismatch still failed. A family that drops a parameter supplied no
