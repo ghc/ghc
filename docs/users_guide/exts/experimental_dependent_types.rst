@@ -234,6 +234,29 @@ With :extension:`TypeApplications`, the expression
 ``charVal (Proxy @(Data.Char.toUpper 'x'))`` reflects the result as a
 character. A visible type argument containing such a call must be complete.
 
+A pattern can determine the input after GHC reads a partial signature.
+For example, with :extension:`NamedWildCards`, :extension:`PartialTypeSignatures`,
+:extension:`ScopedTypeVariables` and :extension:`TypeApplications`::
+
+    import Data.Proxy (Proxy(..))
+    import qualified Data.Char
+
+    upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+    upper (_ :: Proxy 'a') = Proxy @'A'
+
+GHC learns that ``_c`` is ``'a'`` from the pattern. Before it generalizes
+the binding, it evaluates the call and checks that the body returns
+``Proxy 'A'``. A body that returns ``Proxy 'Z'`` fails at the call in
+the signature. A body that leaves ``_c`` unknown also fails there.
+An importing module sees ``upper :: Proxy 'a' -> Proxy 'A'``.
+
+This form requires a named wildcard in the value type of a partial
+signature with no leading constraints. Each input must become a
+character literal or a list of natural number literals within the binding
+group. An equality available only in one GADT branch cannot determine
+the input for the whole group. A local pattern binding with an explicit
+multiplicity cannot postpone a call.
+
 An imported polymorphic function can also occur in a type when its argument
 is a rigid type variable. For example, this definition checks because
 reducing the ordinary Prelude function ``id`` returns the type variable

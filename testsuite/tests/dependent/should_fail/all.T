@@ -102,6 +102,14 @@ test('NativeLetMethodRule',
      ['NativeLetMethodRule', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
 test('NativeSourceLengthFamily', req_th, compile_fail, [''])
 test('NativeOpenTermLimit', normal, compile_fail, [''])
+test('NativeOpenRetryWrong', [req_interp, req_rts_linker, only_ways(['normal'])],
+     compile_fail, ['-fdefer-type-errors -Wno-partial-type-signatures ' + config.ghc_th_way_flags])
+test('NativeOpenRetryUnknown', normal, compile_fail,
+     ['-fdefer-type-errors -Wno-partial-type-signatures'])
+test('NativeOpenRetryGiven', normal, compile_fail, ['-Wno-partial-type-signatures'])
+test('NativeOpenRetryNoGen', normal, compile_fail, ['-Wno-partial-type-signatures'])
+test('NativeOpenRetrySafe', normal, compile_fail, ['-Wno-partial-type-signatures'])
+test('NativeOpenRetryQuote', req_th, compile_fail, ['-Wno-partial-type-signatures'])
 test('NativeClosedEvalSafe',
      extra_files(['../../../../docs/dependent-haskell/examples/closed-evaluation/ClosedLengthProducer.hs']),
      multimod_compile_fail, ['NativeClosedEvalSafe', '-v0'])

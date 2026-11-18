@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice, tcRunClosedCall
+     finishTH, runTopSplice, tcRunClosedCall, tcCheckClosedCallContext, tcDecodeClosedCallOperand
       ) where
 
 import GHC.Prelude
@@ -67,7 +67,7 @@ import GHC.Tc.Utils.Instantiate
 
 import qualified GHC.Core as Core
 import GHC.Core.FVs (exprSomeFreeVarsList)
-import GHC.Core.Make (mkCoreApp, mkCoreApps)
+import GHC.Core.Make (mkCoreApp, mkCoreApps, mkCharExpr, mkListExpr, mkNaturalExpr)
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion( etaExpandCoAxBranch )
 import GHC.Core.Type as Type
@@ -1301,6 +1301,20 @@ of compilation.
 Previously, we failed to abort in cases (b) and (c), leading to #19709.
 -}
 
+-- | Reconstruct a runtime operand from a checked ground literal type.
+tcDecodeClosedCallOperand :: Type -> TcM (Maybe Core.CoreExpr)
+tcDecodeClosedCallOperand operand
+  | kind `tcEqType` charTy = pure (mkCharExpr <$> isCharLitTy operand)
+  | kind `tcEqType` mkListTy naturalTy
+  , Just elements <- extractPromotedList_maybe operand
+  , Just numbers <- traverse isNumLitTy elements
+  , all (>= 0) numbers = do
+      platform <- targetPlatform <$> getDynFlags
+      pure (Just (mkListExpr naturalTy (map (mkNaturalExpr platform) numbers)))
+  | otherwise = pure Nothing
+  where
+    kind = typeKind operand
+
 -- | Execute a checked closed call through the target interpreter.
 -- See Note [Closed literal type evaluation].
 tcRunClosedCall :: Id -> Core.CoreExpr -> Type -> TcM Type
@@ -1436,6 +1450,22 @@ See Note [Object File Dependencies] in GHC.HsToCore.Usage.
 -- | Check the execution context before loading code for a type.
 checkClosedTypeEvalStage :: HscEnv -> Name -> TcM Interp
 checkClosedTypeEvalStage hsc_env name = do
+  tcCheckClosedCallContext name
+  let reject :: String -> TcM a
+      reject = failWithTc . TcRnClosedTypeEval name
+  dflags <- getDynFlags
+  iface <- loadInterfaceForName (text "closed call in a type") name
+  when (isHsBootOrSig (mi_hsc_src iface)) $
+    reject "The defining interface is a boot file or a module signature and provides no executable definition."
+  when (safeInferOn dflags) $
+    recordUnsafeInfer emptyMessages
+  case hsc_interp hsc_env of
+    Just interp -> return interp
+    Nothing -> reject "Compile-time evaluation requires a GHC interpreter for the target."
+
+-- | Check policy at the location where the call occurs.
+tcCheckClosedCallContext :: Name -> TcM ()
+tcCheckClosedCallContext name = do
   failIfErrsM
   dflags <- getDynFlags
   let reject = failWithTc . TcRnClosedTypeEval name
@@ -1452,15 +1482,6 @@ checkClosedTypeEvalStage hsc_env name = do
   boot <- tcIsHsBootOrSig
   when boot $
     reject "Closed calls in types are not supported in boot files or module signatures."
-  iface <- loadInterfaceForName (text "closed call in a type") name
-  when (isHsBootOrSig (mi_hsc_src iface)) $
-    reject "The defining interface is a boot file or a module signature and provides no executable definition."
-  when (safeInferOn dflags) $
-    recordUnsafeInfer emptyMessages
-  case hsc_interp hsc_env of
-    Just interp -> return interp
-    Nothing -> failWithTc (TcRnClosedTypeEval name
-                 "Compile-time evaluation requires a GHC interpreter for the target.")
 
 {- Note [Running imported code in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

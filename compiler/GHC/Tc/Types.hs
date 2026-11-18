@@ -70,7 +70,7 @@ module GHC.Tc.Types(
         TcSigFun,
         TcSigInfo(..), TcIdSig(..),
         TcCompleteSig(..), TcPartialSig(..), TcPatSynSig(..),
-        TcIdSigInst(..),
+        TcIdSigInst(..), TcPendingTypeCall(..),
         isPartialSig, hasCompleteSig, tcSigInfoName, tcIdSigLoc,
         completeSigPolyId_maybe,
 

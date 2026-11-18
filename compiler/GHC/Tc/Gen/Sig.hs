@@ -482,9 +482,9 @@ ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 ********************************************************************* -}
 
 
-tcInstSig :: TcIdSig -> TcM TcIdSigInst
--- Instantiate a type signature; only used with plan InferGen
-tcInstSig hs_sig@(TcCompleteSig (CSig { sig_bndr = poly_id, sig_loc = loc }))
+-- | Instantiate a signature for the caller's inference plan.
+tcInstSig :: PendingSigCalls -> TcIdSig -> TcM TcIdSigInst
+tcInstSig _ hs_sig@(TcCompleteSig (CSig { sig_bndr = poly_id, sig_loc = loc }))
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { (tv_prs, theta, tau) <- tcInstTypeBndrs (idType poly_id)
               -- See Note [Pattern bindings and complete signatures]
@@ -492,21 +492,23 @@ tcInstSig hs_sig@(TcCompleteSig (CSig { sig_bndr = poly_id, sig_loc = loc }))
        ; return (TISI { sig_inst_sig   = hs_sig
                       , sig_inst_skols = tv_prs
                       , sig_inst_wcs   = []
+                      , sig_inst_calls = []
                       , sig_inst_wcx   = Nothing
                       , sig_inst_theta = theta
                       , sig_inst_tau   = tau }) }
 
-tcInstSig hs_sig@(TcPartialSig (PSig { psig_hs_ty = hs_ty
+tcInstSig call_owner hs_sig@(TcPartialSig (PSig { psig_hs_ty = hs_ty
                                      , psig_ctxt = ctxt
                                      , psig_loc = loc }))
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { traceTc "Staring partial sig {" (ppr hs_sig)
-       ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+       ; (wcs, wcx, tv_prs, theta, tau, calls) <- tcHsPartialSigType call_owner ctxt hs_ty
          -- See Note [Checking partial type signatures] in GHC.Tc.Gen.HsType
 
        ; let inst_sig = TISI { sig_inst_sig   = hs_sig
                              , sig_inst_skols = tv_prs
                              , sig_inst_wcs   = wcs
+                             , sig_inst_calls = calls
                              , sig_inst_wcx   = wcx
                              , sig_inst_theta = theta
                              , sig_inst_tau   = tau }

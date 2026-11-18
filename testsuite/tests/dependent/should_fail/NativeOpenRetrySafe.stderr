@@ -1,0 +1,6 @@
+NativeOpenRetrySafe.hs:7:29: error: [GHC-70565]
+    • Cannot evaluate ‘Data.Char.toUpper’ in a type.
+        Safe Haskell disallows executing imported functions in types.
+    • In the first argument of ‘Proxy’, namely ‘(Data.Char.toUpper _c)’
+      In the type signature:
+        upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)

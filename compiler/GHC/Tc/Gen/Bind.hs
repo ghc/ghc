@@ -1179,9 +1179,11 @@ warnMissingSignatures id
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If /any/ of the signatures in the group is a partial type signature
    f :: _ -> Int
-then we *always* use the InferGen plan, and hence tcPolyInfer.
-We do this even for a local binding with -XMonoLocalBinds, when
-we normally use NoGen.
+then we normally use the InferGen plan, and hence tcPolyInfer.
+This includes local bindings with -XMonoLocalBinds. There is an earlier
+exception in decideGeneralisationPlan for a local pattern binding with
+an explicit multiplicity. Its group uses NoGen and cannot postpone calls.
+See Note [Pending calls in partial signatures] in GHC.Tc.Solver.
 
 Reasons:
   * The TcSigInfo for 'f' has a unification variable for the '_',
@@ -1653,12 +1655,19 @@ lookupMBI name
 -------------------
 tcLhsSigId :: LetBndrSpec -> (Name, TcIdSig) -> TcM MonoBindInfo
 tcLhsSigId no_gen (name, sig)
-  = do { inst_sig <- tcInstSig sig
+  = do { inst_sig <- tcInstSig call_owner sig
        ; mono_id <- newSigLetBndr no_gen name inst_sig
        ; return (MBI { mbi_poly_name = name
                      , mbi_sig       = Just inst_sig
                      , mbi_mono_id   = mono_id
                      , mbi_mono_mult = idMult mono_id }) }
+
+  where
+    -- InferGen discharges pending calls in simplifyInfer. NoGen has
+    -- no corresponding checkpoint, so reject before making a result meta.
+    call_owner = case no_gen of
+      LetLclBndr -> RetrySigCalls
+      LetGblBndr {} -> RejectSigCalls
 
 ------------
 newSigLetBndr :: LetBndrSpec -> Name -> TcIdSigInst -> TcM TcId

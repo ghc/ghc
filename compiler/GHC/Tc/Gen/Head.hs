@@ -547,7 +547,7 @@ tcExprSig expr sig@(TcPartialSig (PSig { psig_name = name, psig_loc = loc }))
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
-                do { sig_inst <- tcInstSig sig
+                do { sig_inst <- tcInstSig RetrySigCalls sig
                    ; expr' <- tcExtendNameTyVarEnv (mapSnd (binderVar . snd) $ sig_inst_skols sig_inst) $
                               tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
                               tcCheckPolyExprNC expr (sig_inst_tau sig_inst)

@@ -8,6 +8,14 @@ test('NativeOpenIdentity',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs',
                  'OpenSource.hs', 'RunOpenSource.hs', 'RunOpenSource.stdout', 'check-source.sh']]),
      run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
+test('NativeOpenRetry',
+     [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeOpenRetryLib.hs'])],
+     multimod_compile_and_run,
+     ['NativeOpenRetry', '-Wno-partial-type-signatures ' + config.ghc_th_way_flags])
+test('NativeOpenRetryInterface',
+     [req_interp, req_rts_linker, only_ways(['normal'])],
+     run_command, ['bash NativeOpenRetryInterface.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeClosedLength',
      [req_interp, req_rts_linker, extra_files([closed_eval_dir + f for f in
                                   ['check-source.sh', 'Client.hs', 'ClosedLengthProducer.hs']])],

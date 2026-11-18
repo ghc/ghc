@@ -14,7 +14,7 @@ module GHC.Tc.Gen.HsType (
         -- Type signatures
         kcClassSigType, tcClassSigType,
         tcHsSigType, tcHsSigWcType,
-        tcHsPartialSigType,
+        tcHsPartialSigType, PendingSigCalls(..),
         tcStandaloneKindSig,
         funsSigCtxt, addSigCtxt, pprSigCtxt,
 
@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedCall)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedCall, tcCheckClosedCallContext, tcDecodeClosedCallOperand)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -110,7 +110,6 @@ import GHC.Core.Class
 import GHC.Core.FamInstEnv (familyNameInstances, famInstTyCon, lookupFamInstEnv, fim_instance)
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
-import GHC.Core.Make (mkCharExpr, mkListExpr, mkNaturalExpr)
 import GHC.Core.Predicate ( getClassPredTys_maybe, isCTupleClass )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
@@ -1474,6 +1473,8 @@ data TcTyMode
              , mode_declaration :: Bool
              , mode_holes :: HoleInfo
              , mode_indices :: NameEnv Id
+             , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
+               -- See Note [Pending calls in partial signatures] in GHC.Tc.Solver.
              , mode_complete_type_arg :: Maybe Bool }
                -- Nothing outside a visible type argument. Just records
                -- completeness of the whole argument, not the current child.
@@ -1498,6 +1499,7 @@ mkMode :: TypeOrKind -> TcTyMode
 mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
                       , mode_declaration = False
                       , mode_indices = emptyNameEnv
+                      , mode_pending_calls = Nothing
                       , mode_complete_type_arg = Nothing }
 
 typeLevelMode, kindLevelMode :: TcTyMode
@@ -1512,6 +1514,7 @@ mkHoleMode tyki hm
                           , mode_declaration = False
                           , mode_holes = Just (lvl,hm)
                           , mode_indices = emptyNameEnv
+                          , mode_pending_calls = Nothing
                           , mode_complete_type_arg = Nothing }) }
 
 instance Outputable HoleMode where
@@ -1827,7 +1830,8 @@ tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
 tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
   = do { let mode' = mode { mode_tyki = KindLevel
-                         , mode_complete_type_arg = Nothing }
+                            , mode_pending_calls = Nothing
+                            , mode_complete_type_arg = Nothing }
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
@@ -2356,17 +2360,36 @@ tc_app_ty mode rn_ty exp_kind
        ; case traverse value_arg (filterOut is_par hs_args) of
            Just args
              | isTypeLevel (mode_tyki mode)
-             , isNothing (mode_holes mode) || isJust (mode_complete_type_arg mode)
+             , ordinary_call || isJust (mode_pending_calls mode)
              , not (nameIsLocalOrFrom (tcg_semantic_mod env) name)
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
-                         | Just (instantiated, arity) <- instantiateOpenTypeFunction fun
+                         | [arg] <- args, isQual rdr
+                         , Just (wildcards, call_owner, pending) <- mode_pending_calls mode
+                         , Just (owner_level, HM_Sig) <- mode_holes mode
+                         , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ operand))) <- ignoreParens arg
+                         , Just _ <- lookupNameEnv wildcards operand
+                         -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg
+                               ; tcCheckClosedCallContext name
+                               ; case call_owner of
+                                   RetrySigCalls -> return ()
+                                   RejectSigCalls -> failWithTc (TcRnClosedTypeEval name
+                                     ("This binding group has a pattern binding with an explicit multiplicity. " ++
+                                      "Give the binding that uses this call a complete type signature."))
+                               ; checked <- tc_check_lhs_type mode arg domain
+                               ; result <- setTcLevel owner_level (newFlexiTyVarTy result_kind)
+                               ; call_span <- getSrcSpanM
+                               ; updTcRef pending (TcPendingTypeCall call_span fun checked result :)
+                               ; checkExpKind mode rn_ty result result_kind exp_kind }
+                         | ordinary_call
+                         , Just (instantiated, arity) <- instantiateOpenTypeFunction fun
                          , arity == length args
                          , all isTypeVariableArg args
                          -> do { result <- tcOpenTypeCall mode name instantiated args
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
                          | [arg] <- args, isQual rdr
+                         , ordinary_call || ready_partial_call arg
                          -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg
                                ; argument <- tcClosedTypeCallArgument mode name domain arg
                                ; result <- tcRunClosedCall fun argument result_kind
@@ -2379,6 +2402,10 @@ tc_app_ty mode rn_ty exp_kind
     is_par _ = False
     value_arg (HsValArg _ arg) = Just arg
     value_arg _ = Nothing
+    ordinary_call = isNothing (mode_holes mode) || isJust (mode_complete_type_arg mode)
+    ready_partial_call arg
+      | Just (_, RetrySigCalls, _) <- mode_pending_calls mode = isJust (closedCallLiteralKind arg)
+      | otherwise = False
     unsupported = failWithTc . TcRnNoSourceTable
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
@@ -2454,8 +2481,7 @@ tcClosedCallKinds name fun_ty arg
     inputs = [charTy, list_kind]
     argumentDomain domain
       | any (tcEqType domain) inputs = return domain
-      | L _ (HsTyLit _ (HsChar _ _)) <- ignoreParens arg = return charTy
-      | isJust (closedNaturalList arg) = return list_kind
+      | Just kind <- closedCallLiteralKind arg = return kind
       | not (null predicates), any (isJust . tcMatchTy domain) inputs =
           bad "The argument must be a closed Char literal or a closed list of Natural literals."
       | otherwise = unsupported
@@ -2474,28 +2500,34 @@ tcClosedTypeCallArgument mode name domain arg
       case ignoreParens arg of
         L _ (HsTyLit _ (HsChar _ _)) -> do
           checked <- checked_argument
-          case isCharLitTy checked of
-            Just c -> return (mkCharExpr c)
-            Nothing -> bad "The checked argument does not represent a Char literal."
+          decode "The checked argument does not represent a Char literal." checked
         _ -> bad "The argument must be a closed Char literal, such as 'x'."
   | otherwise = case closedNaturalList arg of
       Just numbers -> do
-        check_literal (mkPromotedListTy naturalTy (map mkNumLitTy numbers))
-        platform <- targetPlatform <$> getDynFlags
-        return (mkListExpr naturalTy (map (mkNaturalExpr platform) numbers))
+        checked <- checked_argument
+        let expected = mkPromotedListTy naturalTy (map mkNumLitTy numbers)
+            message = "The checked argument does not have the expected literal representation."
+        unless (tcEqType checked expected) (bad message)
+        decode message checked
       Nothing -> bad "The argument must be a closed list of Natural literals, such as '[1, 2, 3]."
   where
     checked_argument = do
       arg_ty <- tc_check_lhs_type mode arg domain
       liftZonkM (zonkTcType arg_ty)
 
-    check_literal expected = do
-      checked <- checked_argument
-      unless (tcEqType checked expected) $
-        bad "The checked argument does not have the expected literal representation."
+    decode message checked = do
+      value <- tcDecodeClosedCallOperand checked
+      maybe (bad message) pure value
 
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name
+
+-- | Identify the input kind from the source literal alone.
+closedCallLiteralKind :: LHsType GhcRn -> Maybe Type
+closedCallLiteralKind arg
+  | L _ (HsTyLit _ (HsChar _ _)) <- ignoreParens arg = Just charTy
+  | isJust (closedNaturalList arg) = Just (mkListTy naturalTy)
+  | otherwise = Nothing
 
 -- | Read a promoted literal list before admitting the call to execution.
 closedNaturalList :: LHsType GhcRn -> Maybe [Integer]
@@ -4770,6 +4802,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
     tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info
                          , mode_declaration = False
                          , mode_indices = emptyNameEnv
+                         , mode_pending_calls = Nothing
                          , mode_complete_type_arg = Nothing }
                  -- Inherit the HoleInfo from the context
 
@@ -5482,22 +5515,31 @@ It isn't essential for correctness.
 
 -}
 
+-- | Whether the caller checks pending computations in its inference group.
+data PendingSigCalls = RetrySigCalls | RejectSigCalls
+
 tcHsPartialSigType
-  :: UserTypeCtxt
+  :: PendingSigCalls
+  -> UserTypeCtxt
   -> LHsSigWcType GhcRn       -- The type signature
   -> TcM ( [(Name, TcTyVar)]  -- Wildcards
          , Maybe TcType       -- Extra-constraints wildcard
          , [(Name,(Matchability, InvisTVBinder))] -- Original tyvar names, in correspondence with
                               --   the implicitly and explicitly bound type variables
          , TcThetaType        -- Theta part
-         , TcType )           -- Tau part
+         , TcType             -- Tau part
+         , [TcPendingTypeCall] )
 -- See Note [Checking partial type signatures]
-tcHsPartialSigType ctxt sig_ty
+tcHsPartialSigType call_owner ctxt sig_ty
   | HsWC { hswc_ext  = sig_wcs, hswc_body = sig_ty } <- sig_ty
   , L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = body_ty}) <- sig_ty
   , (hs_ctxt, hs_tau) <- splitLHsQualTy body_ty
   = addSigCtxt ctxt (UserLHsSigType sig_ty) $
     do { mode <- mkHoleMode TypeLevel HM_Sig
+       ; experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; pending <- if experimental && not (null sig_wcs)
+                    then Just <$> newTcRef []
+                    else pure Nothing
        ; (outer_ma, (outer_bndrs, (wcs, wcx, theta, tau)))
             <- solveEqualities "tcHsPartialSigType" $
                -- See Note [Failure in local type signatures]
@@ -5509,10 +5551,14 @@ tcHsPartialSigType ctxt sig_ty
                     (theta, wcx) <- tcPartialContext mode hs_ctxt
 
                   ; ek <- newOpenTypeKind
+                  ; let tau_mode
+                          | null theta, isNothing wcx, Just calls <- pending
+                          = mode { mode_pending_calls = Just (mkNameEnv wcs, call_owner, calls) }
+                          | otherwise = mode
                   ; tau <- -- Don't do (addTypeCtxt hs_tau) here else we get
                            --   In the type <blah>
                            --   In the type signature: foo :: <blah>
-                           tc_check_lhs_type mode hs_tau ek
+                           tc_check_lhs_type tau_mode hs_tau ek
 
                   ; return (wcs, wcx, theta, tau) }
                   ; return (outer_ma, stuff) }
@@ -5563,7 +5609,8 @@ tcHsPartialSigType ctxt sig_ty
       --     here because we don't have a complete type to check
 
        ; traceTc "tcHsPartialSigType" (ppr tv_prs)
-       ; return (wcs, wcx, tv_prs, theta, tau) }
+       ; calls <- maybe (pure []) (fmap reverse . readTcRef) pending
+       ; return (wcs, wcx, tv_prs, theta, tau, calls) }
 
 tcPartialContext :: TcTyMode -> Maybe (LHsContext GhcRn) -> TcM (TcThetaType, Maybe TcType)
 tcPartialContext _ Nothing = return ([], Nothing)

@@ -27,6 +27,7 @@ module GHC.Tc.Solver(
 import GHC.Prelude
 
 import GHC.Tc.Errors
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedCall, tcDecodeClosedCallOperand)
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Solve   ( solveSimpleGivens, solveSimpleWanteds
@@ -51,6 +52,7 @@ import GHC.Core.Predicate
 import GHC.Core.Reduction ( Reduction )
 import GHC.Core.Type
 import GHC.Core.Ppr
+import GHC.Driver.Ppr (showPpr)
 import GHC.Core.TyCon    ( TyConBinder )
 
 import GHC.Types.Name
@@ -983,7 +985,7 @@ simplifyInfer :: TopLevelFlag          -- Syntactically top-level
                       Bool)         -- True <=> the residual constraints are insoluble
 
 simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
-  | isEmptyWC wanteds
+  | null pending, isEmptyWC wanteds
    = do { -- When quantifying, we want to preserve any order of variables as they
           -- appear in partial signatures. cf. decideQuantifiedTyVars
           let psig_tv_tys = [ ty | sig <- partial_sigs
@@ -1034,6 +1036,7 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
        --      the psig_theta; it's just the extra bit
        -- NB2: We do not do any defaulting when inferring a type, this can lead
        --      to less polymorphic types, see Note [Default while Inferring]
+       ; wanted_transformed <- retryTypeCalls rhs_tclvl ev_binds_var pending wanted_transformed
        ; wanted_transformed <- TcM.liftZonkM $ TcM.zonkWC wanted_transformed
        ; let definite_error = insolubleWC wanted_transformed
                               -- See Note [Quantification with errors]
@@ -1080,6 +1083,72 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
          -- NB: bound_theta_vars must be fully zonked
   where
     partial_sigs = filter isPartialSig sigs
+    pending = concatMap sig_inst_calls partial_sigs
+
+{- Note [Pending calls in partial signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A pattern or expression can fix a signature wildcard after the signature
+is checked. When a checked imported call consumes that wildcard, put an
+ordinary result metavariable at the owner level in the signature. Keep
+the computation obligation on that signature instance. Only named
+wildcards owned by the signature and calls in its unqualified body are
+eligible. Existing staging checks apply before recording the obligation.
+
+Solve the owner's ordinary constraints first. Evaluate a call only when
+its operand is a checked literal. Its result can constrain a later input
+through ordinary equality. Each successful step removes one obligation.
+If none of the remaining operands is ready, report the first blocked
+call. Never infer an operand by reversing its own call.
+
+Use an ordinary nominal equality between the result metavariable and
+the decoded literal. Verify that its solve completed and that the
+metavariable zonks to the literal. Resume the remaining ordinary
+constraints with the same evidence bindings. No application endpoint
+or unfinished computation enters an inferred type, even when the
+caller requested deferred type errors.
+-}
+
+-- | Finish the admitted calls before generalizing the owners. No
+-- application type survives this checkpoint. The same evidence environment
+-- handles the original constraints and the new literal equalities.
+retryTypeCalls :: TcLevel -> EvBindsVar -> [TcPendingTypeCall]
+               -> WantedConstraints -> TcM WantedConstraints
+retryTypeCalls _ _ [] wanteds = pure wanteds
+retryTypeCalls lvl binds calls wanteds = TcM.setTcLevel lvl (go calls wanteds)
+  where
+    go [] residual = pure residual
+    go remaining@(TcPendingTypeCall call_span fun _ _ : _) residual = do
+      ready <- findReady [] remaining
+      case ready of
+        Nothing -> TcM.setSrcSpan call_span $ failWithTc (TcRnClosedTypeEval (idName fun)
+          "The type call is blocked because inference did not determine a literal argument.")
+        Just (TcPendingTypeCall location function _ result, argument, rest) -> do
+          TcM.setSrcSpan location $ checkResult function argument result
+          residual' <- solve residual
+          go rest residual'
+
+    findReady _ [] = pure Nothing
+    findReady skipped (call@(TcPendingTypeCall _ _ input _) : rest) = do
+      checked <- TcM.liftZonkM (TcM.zonkTcType input)
+      argument <- tcDecodeClosedCallOperand checked
+      case argument of
+        Just value -> pure (Just (call, value, reverse skipped ++ rest))
+        Nothing -> findReady (call : skipped) rest
+
+    checkResult fun argument result = do
+      value <- tcRunClosedCall fun argument (typeKind result)
+      (_, equality) <- captureConstraints $
+        TcM.emitWantedEq AnnOrigin TypeLevel Nominal result value
+      residual <- solve equality
+      inferred <- TcM.liftZonkM (TcM.zonkTcType result)
+      unless (isEmptyWC residual && inferred `tcEqType` value) $ do
+        dflags <- getDynFlags
+        failWithTc (TcRnClosedTypeEval (idName fun)
+          ("The call returned " ++ showPpr dflags value ++
+           ". The binding requires " ++ showPpr dflags inferred ++ "."))
+
+    solve wanted = runTcSWithEvBinds binds $
+      setTcLevelTcS lvl $ solveWanteds wanted
 
 --------------------
 emitResidualConstraints :: TcLevel -> SkolemInfoAnon -> EvBindsVar

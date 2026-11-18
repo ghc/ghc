@@ -7,7 +7,7 @@ module GHC.Tc.Types.BasicTypes (
   -- * Signatures
   , TcSigFun, TcSigInfo(..), TcIdSig(..)
   , TcCompleteSig(..), TcPartialSig(..), TcPatSynSig(..)
-  , TcIdSigInst(..)
+  , TcIdSigInst(..), TcPendingTypeCall(..)
   , isPartialSig, hasCompleteSig
   , tcSigInfoName, tcIdSigLoc, completeSigPolyId_maybe
 
@@ -157,6 +157,10 @@ wildcards in the type signature, i.e. iff sig_wcs is empty and
 sig_extra_cts is Nothing.
 -}
 
+-- | An imported call awaiting inference of its checked operand. This
+-- obligation is owned by its partial signature and never enters Core.
+data TcPendingTypeCall = TcPendingTypeCall SrcSpan Id TcType TcType
+
 data TcIdSigInst
   = TISI { sig_inst_sig :: TcIdSig
 
@@ -188,6 +192,10 @@ data TcIdSigInst
                -- Like sig_inst_skols, but for /named/ wildcards (_a etc).
                -- The named wildcards scope over the binding, and hence
                -- their Names may appear in type signatures in the binding
+
+         , sig_inst_calls :: [TcPendingTypeCall]
+               -- Owned by the signature instance. Discharged before
+               -- inference can quantify or export the type.
 
          , sig_inst_wcx   :: Maybe TcType
                -- Extra-constraints wildcard to fill in, if any
