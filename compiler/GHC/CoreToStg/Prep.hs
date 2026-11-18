@@ -1138,6 +1138,12 @@ nameNativeConstructorArgs expr
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
       | DepFunTy _ index _ <- coreFullView ty
+      , Just call_index <- nativeSourceCallIndex arg
+      -- See Note [Naming computed retained arguments at erasure].
+      = if typeKind call_index `eqType` varType index
+        then build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest
+        else nativeIndexTransportError "the domain of a computed retained argument"
+      | DepFunTy _ index _ <- coreFullView ty
       , isNativeIndexFunctionId index
       = case nativeIndexFunctionVar_maybe arg of
           Just actual
@@ -1577,6 +1583,24 @@ cpeApp top_env expr
         where
            co' = cpSubstCo env co
 
+      AIApp arg@App{}
+        | cp_allowNativeDependent (cpe_config env)
+        , DepFunTy {} <- coreFullView (exprType fun')
+        , Just index <- nativeSourceCallIndex arg
+        -> do -- See Note [Naming computed retained arguments at erasure].
+              unless (all exprIsTrivial (snd (collectArgs arg))) unsupported
+              (call_floats, call) <- cpeBodyF env arg
+              case nativeSourceCallIndex call of
+                Just index'
+                  | isEmptyFloats call_floats
+                  , all exprIsTrivial (snd (collectArgs call))
+                  , index' `eqType` cpSubstTy env index
+                  -> rebuild_app' env as (App fun' call) floats (drop 1 ss) rt_ticks (req_depth-1)
+                _ -> unsupported
+        where
+          unsupported = throwGhcException (Sorry
+            "CorePrep requires a computed retained argument to remain a certified call on atomic operands.")
+
       AIApp arg -> do
         -- See Note [Retained constructor arguments in CorePrep].
         when (cp_allowNativeDependent (cpe_config env)) $
@@ -1608,6 +1632,21 @@ cpeApp top_env expr
         | otherwise
         -- See [Floating Ticks in CorePrep]
         -> rebuild_app' env as fun' (snocFloat floats (FloatTick tickish)) ss rt_ticks req_depth
+
+{- Note [Naming computed retained arguments at erasure]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `f (plus n m) xs`, the type of xs and the result type can both contain
+the certified family application for `plus n m`. A fresh Core variable for
+the call has a different index. A case that names the call forces it even
+when f ignores it.
+
+Preserve the certified call as a retained argument through the final Core
+Lint check. Prepare its operands and check that the call still has the
+substituted index. This exception to ANF requires atomic operands and an
+unchanged domain. No binding floats out of the call. At erasure,
+GHC.CoreToStg.coreToStgArgs allocates a lazy thunk for the call and passes
+its name to f. The fresh name occurs only in STG.
+-}
 
 {- Note [Retained constructor arguments in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

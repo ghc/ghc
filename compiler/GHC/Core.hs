@@ -35,6 +35,7 @@ module GHC.Core (
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
+        nativeSourceCallIndex, retainedArgIndex,
         exprToNativeCaseIndex, nativeIndexFunctionVar_maybe,
         nativeIndexArgKinds,
         isNativeIndexAlt, isNativeIndexAliasAlt,
@@ -112,7 +113,8 @@ import GHC.Builtin.KnownKeys ( boolTyConKey )
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.DataCon
-import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon, isBoxedDataTyCon )
+import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon, isBoxedDataTyCon,
+                        tyConTyVars, tyConResKind )
 import GHC.Unit.Module
 
 import GHC.Types.InlinePragma
@@ -121,7 +123,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Var.Env( InScopeSet, IdEnv, emptyVarEnv, lookupVarEnv, extendVarEnv, mapVarEnv, mkInScopeSet )
 import GHC.Types.Var.Set ( unionVarSet )
 import GHC.Types.Var
-import {-# SOURCE #-} GHC.Types.Id ( isDataConWorkId_maybe )
+import {-# SOURCE #-} GHC.Types.Id ( isDataConWorkId_maybe, sourceTableId_maybe )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Basic
@@ -2606,6 +2608,50 @@ mkCoBind cv co      = NonRec cv (Coercion co)
 -- See Note [Checked native index beta exposure].
 exprToNativeIndex :: CoreExpr -> Maybe Type
 exprToNativeIndex expr = snd <$> normaliseNativeIndexExpr expr
+
+-- | Compute the index of a monomorphic source call with atomic operands.
+-- See Note [Source calls in retained arguments].
+nativeSourceCallIndex :: CoreExpr -> Maybe Type
+nativeSourceCallIndex expr
+  | (Var fun, args@(_:_)) <- collectArgs expr
+  , Just family <- sourceTableId_maybe fun
+  , let (_, domains, result) = splitFunTys (varType fun)
+        binders = tyConTyVars family
+  , args `equalLength` domains, args `equalLength` binders
+  , result `sameNativeIndexDomain` tyConResKind family
+  , Just indices <- traverse atom_index args
+  , and (zipWith3 has_domain domains binders indices)
+  = Just (mkTyConApp family indices)
+  | otherwise = Nothing
+  where
+    atom_index arg
+      | (Var _, tys) <- collectArgs arg, all isTypeArg tys = exprToNativeIndex arg
+      | otherwise = Nothing
+    has_domain (Scaled mult domain) binder index =
+      isManyTy mult && sameNativeIndexDomain domain (tyVarKind binder)
+                    && sameNativeIndexDomain domain (typeKind index)
+
+-- | Interpret a checked argument at a retained application.
+retainedArgIndex :: CoreExpr -> Maybe Type
+retainedArgIndex expr = case exprToNativeIndex expr of
+  Just index -> Just index
+  Nothing -> nativeSourceCallIndex expr
+
+{- Note [Source calls in retained arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In build (plus n m), the index of the argument is T:plus n m. Use the
+closed family recorded by the checked term Id. Check its arity and kinds
+against the actual call before substituting it into the result. Two
+functions of the same type can select different families. The compiler
+does not need to reduce either equation or read the function's unfolding.
+
+The original Core application supplies the runtime head. A family
+application on its own is insufficient to reconstruct that Id. Keep
+the expression when composing substitutions. Keep the structural
+normalizer separate: beta substitution of a nontrivial call could
+duplicate a shared thunk, and a strict alias case could evaluate it.
+Core-to-STG can name this lifted argument after erasing its index.
+-}
 
 -- | Recognize a checked local function head without inspecting its unfolding.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.

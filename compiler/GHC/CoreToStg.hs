@@ -565,13 +565,13 @@ coreToStgApp :: Id            -- Function
              -> CtsM StgExpr
 coreToStgApp f core_args app_ticks res_ty
   = do { how_bound             <- lookupVarCts f
-       ; (stg_args, arg_ticks) <- coreToStgArgs core_args
+       ; (stg_args, arg_ticks, arg_binds) <- coreToStgArgs core_args
        ; let app = mkStgApp f how_bound core_args stg_args res_ty
              all_ticks =  app_ticks ++ arg_ticks
 
        -- Forcing these fixes a leak in the code generator,
        -- noticed while profiling for #4367
-       ; app `seq` return (foldr add_tick app all_ticks)}
+       ; app `seq` return (foldr (StgLet noExtFieldSilent) (foldr add_tick app all_ticks) arg_binds)}
   where
     add_tick !t !e = StgTick t e
 
@@ -639,20 +639,29 @@ getStgArgFromTrivialArg e = trivial_expr_fold StgVarArg StgLitArg panic panic e
   where
     panic = pprPanic "getStgArgFromTrivialArg" (ppr e)
 
-coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish])
+coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish], [StgBinding])
 coreToStgArgs []
-  = return ([], [])
+  = return ([], [], [])
 
-coreToStgArgs (Type _ : args) = do     -- Type argument
-    (args', ts) <- coreToStgArgs args
-    return (args', ts)
+coreToStgArgs (Type _ : args) = coreToStgArgs args
 
 coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion tokens]
-  = do { (args', ts) <- coreToStgArgs args
-       ; return (StgVarArg coercionTokenId : args', ts) }
+  = do { (args', ts, binds) <- coreToStgArgs args
+       ; return (StgVarArg coercionTokenId : args', ts, binds) }
+
+-- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
+coreToStgArgs (call@(App _ last_arg) : args)
+  | not (isTyCoArg last_arg)
+  , Just {} <- nativeSourceCallIndex call
+  , all exprIsTrivial (snd (collectArgs call))
+  = do { uniq <- getCtsUnique
+       ; let thunk = mkSysLocal (fsLit "retained_arg") uniq ManyTy (exprType call)
+       ; rhs <- coreToStgRhs (thunk, call)
+       ; (args', ts, binds) <- coreToStgArgs args
+       ; return (StgVarArg thunk : args', ts, StgNonRec thunk rhs : binds) }
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
-    (stg_args, ticks) <- coreToStgArgs args
+    (stg_args, ticks, binds) <- coreToStgArgs args
     -- We know that `arg` must be trivial, but it may contain Ticks.
     -- Example from test case `decodeMyStack`:
     --   $ @... ((src<decodeMyStack.hs:18:26-28> Data.Tuple.snd) @Int @[..])
@@ -678,7 +687,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     () <- warnPprTraceM bad_args
             "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" (ppr arg)
 
-    return (arg' : stg_args, ticks' ++ ticks)
+    return (arg' : stg_args, ticks' ++ ticks, binds)
 
 coreToStgTick :: Type -- type of the ticked expression
               -> CoreTickish

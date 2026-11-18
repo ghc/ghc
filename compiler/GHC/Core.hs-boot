@@ -12,5 +12,8 @@ type CoreExpr = Expr CoreBndr
 
 varToCoreExpr :: CoreBndr -> Expr b
 exprToNativeIndex :: CoreExpr -> Maybe Type
+retainedArgIndex :: CoreExpr -> Maybe Type
+normaliseNativeIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
+nativeSourceCallIndex :: CoreExpr -> Maybe Type
 nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
 mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr

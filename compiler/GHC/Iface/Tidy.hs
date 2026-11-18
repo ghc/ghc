@@ -44,6 +44,7 @@ import GHC.Tc.Types
 import GHC.Tc.Utils.Env
 
 import GHC.Core
+import GHC.Core.Utils ( exprType )
 import GHC.Core.Unfold
 import GHC.Core.FVs
 import GHC.Core.Dependent ( hasNativeDependentExprRhs )
@@ -53,6 +54,7 @@ import GHC.Core.Seq         ( seqBinds )
 import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Tidy
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
@@ -1177,6 +1179,8 @@ localiseNativeTopIndices :: NameCache -> CoreProgram -> IO CoreProgram
 localiseNativeTopIndices name_cache binds = mapM localise_bind binds
   where
     top_binders = mkVarSet (bindersOfBinds binds)
+    top_tables = filterVarSet (\v -> isNonCoVarId v && isJust (sourceTableId_maybe v)
+                                 && isNativeIndexFunctionId v) top_binders
 
     localise_bind (NonRec bndr rhs)
       = do { (bndr', rhs') <- localise_pair (bndr, rhs)
@@ -1190,17 +1194,40 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
       = assertPpr (not (anyFreeVarsOfType (`elemVarSet` index_set) (idType bndr)))
                   (text "localiseNativeTopIndices: escaping top-level index" $$ ppr bndr) $
         do { aliases <- mapM new_alias indices
-           ; let in_scope = mkInScopeSet (extendVarSetList (exprFreeVars rhs) aliases)
+           ; let in_scope = mkInScopeSet (extendVarSetList (exprFreeVars protected_rhs) aliases)
                  subst = CoreSubst.extendIdSubstList (CoreSubst.mkEmptySubst in_scope)
                            (zip indices (map Var aliases))
                  alias_binds = zipWith (\index alias -> NonRec alias (Var index))
                                        indices aliases
-           ; return (bndr, mkLets alias_binds (CoreSubst.substExpr subst rhs)) }
+           ; return (bndr, mkLets alias_binds (CoreSubst.substExpr subst protected_rhs)) }
       where
+        protected_rhs | isEmptyVarSet top_tables = rhs
+                      | otherwise = protect_calls rhs
         indices = filter (\v -> v `elemVarSet` top_binders
                             && (isNativeIndexId v || isNativeIndexFunctionId v))
-                         (exprFreeVarsList rhs)
+                         (exprFreeVarsList protected_rhs)
         index_set = mkVarSet indices
+
+    -- Core.Subst leaves the global reference intact. tidyVarOcc finds the
+    -- final top-level binder by Unique. See Note [Local indices across Core Tidy].
+    protect_calls (App fun arg)
+      | App{} <- arg
+      , (Var f, args) <- collectArgs arg
+      , Just owner <- lookupVarSet top_tables f
+      , Just{} <- nativeSourceCallIndex arg
+      , DepFunTy{} <- coreFullView (exprType fun)
+      = App (protect_calls fun) (mkApps (Var (globaliseId owner)) args)
+      | otherwise = App (protect_calls fun) (protect_calls arg)
+    protect_calls (Lam b body) = Lam b (protect_calls body)
+    protect_calls (Let bind body) = Let (protect_bind bind) (protect_calls body)
+    protect_calls (Case scrut b ty alts) =
+      Case (protect_calls scrut) b ty [Alt con bs (protect_calls r) | Alt con bs r <- alts]
+    protect_calls (Cast e co) = Cast (protect_calls e) co
+    protect_calls (Tick t e) = Tick t (protect_calls e)
+    protect_calls e = e
+
+    protect_bind (NonRec b r) = NonRec b (protect_calls r)
+    protect_bind (Rec pairs) = Rec [(b, protect_calls r) | (b, r) <- pairs]
 
     new_alias index
       = do { uniq <- takeUniqFromNameCache name_cache
@@ -1221,6 +1248,14 @@ the whole RHS, including type and coercion occurrences, with Core.Subst.
 Wrap the aliases outside this substituted body. Their RHSs still refer to the
 original top-level Ids. Tidy then globalises those references and keeps each
 alias local. Local binder and type tidying already share the same environment.
+
+In a retained argument such as `atBit (flipBit b)`, the certified top-level
+function determines the result index. Exclude that occurrence from alias
+substitution by globalising its exact top-level binder first. Its operands
+still receive the substitution. The same RHS can pass flipBit as a first-class
+function or use it in a strict case with TermAppTy evidence. Those occurrences
+and their types still receive the local alias. See Note [Source calls in
+retained arguments] in GHC.Core.
 
 The top binder and its type do not change. A selected index must not escape
 through that type. Source signature and inference checks already exclude

@@ -61,7 +61,9 @@ import GHC.Data.Maybe ( orElse )
 import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyConAppCo )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
-import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToNativeIndex, mapNativeIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
+import {-# SOURCE #-} GHC.Core ( CoreExpr, retainedArgIndex, normaliseNativeIndexExpr,
+                                nativeSourceCallIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
+import {-# SOURCE #-} GHC.Core.Subst ( substExpr )
 import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, isNativeIndexFunctionId
                                  , nativeIndexFunctionTys_maybe, typeKind )
 
@@ -243,9 +245,8 @@ emptyCvSubstEnv :: CvSubstEnv
 emptyCvSubstEnv = emptyVarEnv
 
 -- | Composes two substitutions, applying the second one provided first,
--- like in function composition. Compose supported scalar and function-head
--- variable ranges in the expression environment too. Other ranges stay unchanged;
--- this function does not compose general Core expression substitutions.
+-- like in function composition. Compose structural index expressions,
+-- checked source calls and function-head variables in the Id environment.
 composeTCvSubst :: Subst -> Subst -> Subst
 composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
   = Subst is3 ids3 tenv3 cenv3
@@ -265,7 +266,11 @@ composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
     compose_index rhs
       | Just f <- nativeIndexFunctionVar_maybe rhs
       = varToCoreExpr (substNativeIndexFunction extended_subst1 f)
-      | otherwise = mapNativeIndex (substTy extended_subst1) rhs
+      -- Keep the called Id when composing its arguments. See
+      -- Note [Source calls in retained arguments] in GHC.Core.
+      | Just (normal, _) <- normaliseNativeIndexExpr rhs = substExpr extended_subst1 normal
+      | Just _ <- nativeSourceCallIndex rhs = substExpr extended_subst1 rhs
+      | otherwise = rhs
 
 emptySubst :: Subst
 emptySubst = Subst emptyInScopeSet emptyVarEnv emptyVarEnv emptyVarEnv
@@ -332,7 +337,7 @@ getSubstRangeTyCoFVs (Subst _ ids tenv cenv)
     tenvFVs = tyCoVarsOfTyVarEnv tenv
     cenvFVs = tyCoVarsOfCoVarEnv cenv
     indexFVs = tyCoVarsOfTypes
-      [ index | rhs <- nonDetEltsUFM ids, Just index <- [exprToNativeIndex rhs] ]
+      [ index | rhs <- nonDetEltsUFM ids, Just index <- [retainedArgIndex rhs] ]
     functionFVs = unionVarSets
       [ unitVarSet f `unionVarSet` tyCoVarsOfType (varType f)
                      `unionVarSet` tyCoVarsOfType (idMult f)
@@ -897,7 +902,7 @@ substNativeIndexUsing subst_ty subst@(Subst in_scope ids _ _) v
   | otherwise
   = case lookupVarEnv ids v of
       Nothing -> TermVarTy (lookupInScope in_scope v `orElse` v)
-      Just rhs -> case exprToNativeIndex rhs of
+      Just rhs -> case retainedArgIndex rhs of
         Just index | typeKind index `eqType` subst_ty subst (varType v) -> index
         _ -> pprPanic "substTy: unsupported runtime index or changed domain"
                      (ppr v <+> text ":=" <+> ppr rhs)

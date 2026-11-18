@@ -1577,7 +1577,15 @@ lintRetainedArgument b arg
   = do { _ <- lintNativeIndexFunction f
        ; ensureEqTys (varType b) (varType f) unsupported }
   | not (isNativeIndexFunctionId b), isNativeOpaqueValueId b
-  = lintL (isJust (exprToNativeIndex arg)) unsupported
+  = do { lintL (isJust (retainedArgIndex arg)) unsupported
+       ; case collectArgs arg of
+           (Var fun, _ : _) | Just fam <- sourceTableId_maybe fun -> do
+             env <- getInVarEnv
+             case lookupVarEnv env fun of
+               Just (bound, _) -> lintL (sourceTableId_maybe bound == Just fam)
+                 (text "Retained source call has different equations at its binding:" <+> ppr fun)
+               Nothing -> return ()
+           _ -> return () }
   | otherwise = failWithL unsupported
   where
     unsupported = text "Unsupported retained runtime argument:" <+> ppr arg

@@ -272,7 +272,7 @@ applyTypeToArgs op_ty args
           Var f -> isNativeIndexFunctionId f && varType f `eqType` varType b
           _ -> False
       | isNativeOpaqueValueId b
-      , Just index <- exprToNativeIndex arg
+      , Just index <- retainedArgIndex arg
       = typeKind index `eqType` varType b
       | otherwise = False
 
