@@ -6980,6 +6980,25 @@ runOrdinaryRetainedModuleChecks libdir = do
         cases :: [(String, [String], String, [String])]
         cases =
             [
+                ( "ConstructorPrefixList"
+                , ["GADTs"]
+                , unlines
+                    [ "import Data.IORef (newIORef, readIORef)"
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "probe :: Nat -> Int -> [Int] -> Maybe [Int]"
+                    , "probe n x xs = fmap toList (VCons x <$> fromListExact n xs)"
+                    , ""
+                    , "main :: IO ()"
+                    , "main = do"
+                    , "    sizeRef <- newIORef (1 :: Nat)"
+                    , "    size <- readIORef sizeRef"
+                    , "    print (probe size 1 [2])"
+                    , "    print (probe size 1 [])"
+                    ]
+                , ["Just [1,2]", "Nothing"]
+                )
+            ,
                 ( "ExplicitCase"
                 , ["GADTs", "TypeApplications"]
                 , unlines
@@ -7281,6 +7300,35 @@ runOrdinaryRetainedModuleChecks libdir = do
         rejections :: [(String, [String], String, Int, [String])]
         rejections =
             [
+                ( "ConstructorPrefixIndependentIndex"
+                , ["DataKinds", "GADTs"]
+                , unlines
+                    [ "import PackedVecLibrary"
+                    , ""
+                    , "bad :: Nat -> Nat -> [Int] -> [Int] -> Maybe [(Int, Int)]"
+                    , "bad n m xs ys = do"
+                    , "    left <- fmap (VCons 1) (fromListExact n xs)"
+                    , "    right <- fromListExact m ys"
+                    , "    pure (toList (zipVec left right))"
+                    ]
+                , 83865
+                , ["Couldn't match type", "zipVec", "Vec Int (S n)", "Vec Int m"]
+                )
+            ,
+                ( "ConstructorPrefixLinearCaptureTwice"
+                , ["DataKinds", "GADTs", "LinearTypes"]
+                , unlines
+                    [ "import PackedVecLibrary"
+                    , ""
+                    , "applyOnce :: (a %1 -> b) %1 -> a %1 -> b"
+                    , "applyOnce f x = f x"
+                    , "bad :: Int %1 -> Vec Int n -> (Vec Int (S n), Vec Int (S n))"
+                    , "bad x xs = (applyOnce (VCons x) xs, applyOnce (VCons x) xs)"
+                    ]
+                , 18872
+                , ["multiplicity", "x"]
+                )
+            ,
                 ( "WrongSourceLengthElement"
                 , ["TypeApplications"]
                 , unlines

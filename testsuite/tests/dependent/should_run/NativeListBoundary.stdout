@@ -6,6 +6,20 @@ Just [(1,'a'),(2,'b')]
 Nothing
 Nothing
 Just []
+Just [1,2]
+Just [1,2]
+Just [1,2]
+Just [1,2]
+[1,2]
+True
+Just 2
+Nothing
+Nothing
+[[1,7,7],[1,7,7],[1,7,7]]
+3
+0
+[True,True]
+True
 True
 Just 1
 True
