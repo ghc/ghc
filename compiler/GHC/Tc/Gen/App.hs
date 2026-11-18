@@ -21,6 +21,7 @@ import GHC.Hs
 import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Match ( tcMatches, tcBody )
+import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId )
 import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
@@ -1908,9 +1909,9 @@ tcRetainedArg :: Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
 tcRetainedArg domain arg
   = setSrcSpanA (getLoc arg) $
     do { core_arg <- resolve emptyNameEnv domain arg
-       ; case Core.exprToNativeIndex core_arg of
-           Just _ -> return core_arg
-           Nothing -> unsupported }
+       ; case Core.retainedArgIndex core_arg of
+           Just index | typeKind index `tcEqType` domain -> return core_arg
+           _ -> unsupported }
   where
     resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
     resolve env expected (L loc expr)
@@ -1983,7 +1984,17 @@ tcRetainedArg domain arg
            ; body' <- resolve (extendNameEnv env name binder) expected body
            ; return (Core.App (Core.Lam binder body') arg') }
     resolve_app env expected fun arg
-      = do { fun' <- resolve env expected fun
+      = do { fun' <- case unLoc fun of
+               HsVar _ name | let n = unLocWithUserRdr name
+                            , not (isDataOcc (nameOccName n)) -> do
+                     certified <- if isExternalName n
+                       then tcLookupIdMaybe n >>= maybe (pure Nothing) tcLookupSourceTableId
+                       else pure Nothing
+                     case certified of
+                       Just v -> pure (Core.Var v)
+                       _ -> setSrcSpanA (getLoc fun) $
+                              failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall n))
+               _ -> resolve env expected fun
            ; case splitFunTy_maybe (exprType fun') of
                Just (_, _, _, arg_ty, _)
                  -> Core.App fun' <$> resolve env arg_ty arg

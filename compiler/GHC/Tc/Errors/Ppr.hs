@@ -3652,7 +3652,12 @@ pprRetainedQuantificationError reason = case reason of
     text "A rewrite rule can change the result of" <+> quotes (ppr fun)
       <> text ", which a retained argument uses as an index."
   RetainedIndexExpression ->
-    text "A retained argument must be a local index variable, a supported constructor tree, or a supported immediate lambda application."
+    vcat [ text "GHC cannot use this expression as a retained index."
+         , text "Use a local index variable, a supported constructor tree, an immediate lambda application,"
+         , text "or a fully applied checked source function with atomic arguments." ]
+  RetainedUncheckedSourceCall fun ->
+    text "No checked source equations are available for" <+> quotes (ppr fun)
+      <+> text "in this retained argument."
   RetainedIndexMultiplicity mult ->
     vcat [ text "A retained argument must have unrestricted multiplicity Many."
          , text "This argument has multiplicity:" <+> ppr mult ]
