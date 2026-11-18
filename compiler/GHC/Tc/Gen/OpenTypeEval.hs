@@ -2,17 +2,19 @@ module GHC.Tc.Gen.OpenTypeEval
   ( OpenTypeFailure(..)
   , openTypeFailureReason
   , observeOpenType
-  , supportsOpenTypeFunction
+  , instantiateOpenTypeFunction
   ) where
 
 import GHC.Prelude
 
 import qualified Data.Set as Set
+import Control.Monad (foldM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT, throwE)
-import GHC.Builtin.WiredIn.Types (liftedTypeKind, manyDataConTy)
+import GHC.Builtin.WiredIn.Types (liftedTypeKind, manyDataConTy, unmatchableDataConTy)
 import GHC.Core (CoreExpr, Expr(..))
-import GHC.Core.Type (Type, mkTyVarTy, mkVisFunTyManyU, splitForAllForAllTyBinder_maybe)
+import GHC.Core.Type (Type, FunTyFlag(FTF_T_T), isManyTy, mkTyVarTy, mkVisFunTyManyU,
+                      splitForAllForAllTyBinders, splitFunTy_maybe)
 import GHC.Core.Utils (exprType)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Maybe (MaybeErr(..))
@@ -26,11 +28,11 @@ import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcR
                            tcg_semantic_mod, updTcRef)
 import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), tcEqType)
 import GHC.Types.Id (Id, idName, idType, mkSysLocal)
-import GHC.Types.Name (Name, nameModule_maybe)
+import GHC.Types.Name (Name, getOccString, nameModule_maybe)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, extendNameSet)
 import GHC.Types.SourceFile (isHsBootOrSig)
 import GHC.Types.Var (ForAllTyFlag(Invisible), TyVar, VarBndr(..), isGlobalId, isTcTyVar, isTyVar,
-                      tcTyVarDetails, tyVarKind)
+                      tcTyVarDetails, tyVarKind, varName)
 import GHC.Types.Var.Env (emptyVarEnv, extendVarEnv, lookupVarEnv)
 import GHC.Types.Var.Set (emptyVarSet)
 import GHC.Core.OpenWhnf
@@ -48,26 +50,19 @@ data OpenTypeFailure
   = InvalidInput
   | UnavailableDefinition Name DefinitionFailure
   | CannotReduce EvalFailure
+  | RigidCase Name
   | UnexpectedNeutral
 
--- | Observe an admitted call and report every external definition used.
--- The caller checks source staging and checks the result's expected kind.
-observeOpenType :: Id -> TyVar -> TcM (Either OpenTypeFailure (Type, NameSet))
-observeOpenType function skolem
-  | isTcTyVar skolem
-  , SkolemTv{} <- tcTyVarDetails skolem
-  , tyVarKind skolem `tcEqType` liftedTypeKind
-  , supportsOpenTypeFunction function = runExceptT $ do
-      unique <- lift newUnique
+-- | Apply the instantiated function to symbolic operands of the checked kind.
+observeOpenType :: CoreExpr -> [TyVar] -> TcM (Either OpenTypeFailure (Type, NameSet))
+observeOpenType instantiated skolems
+  | all isRigidType skolems = runExceptT $ do
       limit <- reductionDepth <$> lift getDynFlags
-      let argumentKind = tyVarKind skolem
-          symbol = mkSysLocal (fsLit "open-type-operand") unique manyDataConTy argumentKind
-          instantiated = App (Var function) (Type argumentKind)
-          operand = Var symbol
-          application = App instantiated operand
-      if exprType instantiated `tcEqType` mkVisFunTyManyU argumentKind argumentKind
-         && exprType operand `tcEqType` argumentKind
-         && exprType application `tcEqType` argumentKind
+      let expected = foldr (const (mkVisFunTyManyU liftedTypeKind)) liftedTypeKind skolems
+      (_, origins, application) <-
+        lift $ foldM applyOperand (emptyVarEnv, emptyVarEnv, instantiated) skolems
+      if exprType instantiated `tcEqType` expected
+         && exprType application `tcEqType` liftedTypeKind
         then do
           readDefinitions <- lift (newTcRef (emptyVarEnv, emptyNameSet))
           let obtain v
@@ -88,12 +83,30 @@ observeOpenType function skolem
           case outcome of
             Left failure -> throwE (CannotReduce failure)
             Right (Neutral (Rigid actual))
-              | actual == symbol
-              , idType actual `tcEqType` argumentKind -> do
+              | Just skolem <- lookupVarEnv origins actual
+              , idType actual `tcEqType` liftedTypeKind -> do
                   (_, dependencies) <- lift (readTcRef readDefinitions)
                   pure (mkTyVarTy skolem, dependencies)
+            Right (Neutral (CaseBlocked (Rigid actual) _))
+              | Just skolem <- lookupVarEnv origins actual ->
+                  throwE (RigidCase (varName skolem))
             _ -> throwE UnexpectedNeutral
         else throwE InvalidInput
+  where
+    isRigidType skolem
+      | isTcTyVar skolem
+      , SkolemTv{} <- tcTyVarDetails skolem
+      = tyVarKind skolem `tcEqType` liftedTypeKind
+      | otherwise = False
+
+    applyOperand (symbols, origins, application) skolem =
+      case lookupVarEnv symbols skolem of
+        Just symbol -> pure (symbols, origins, App application (Var symbol))
+        Nothing -> do
+          unique <- newUnique
+          let symbol = mkSysLocal (fsLit "open-type-operand") unique manyDataConTy liftedTypeKind
+          pure (extendVarEnv symbols skolem symbol, extendVarEnv origins symbol skolem,
+                App application (Var symbol))
 observeOpenType _ _ = pure (Left InvalidInput)
 
 -- | A demanded external definition was unavailable to the observer.
@@ -104,15 +117,26 @@ data DefinitionFailure
   | WrongTemplateType
   deriving (Eq, Show)
 
--- | Check for one ordinary invisible type argument and one lifted operand.
-supportsOpenTypeFunction :: Id -> Bool
-supportsOpenTypeFunction function
-  | Just (_, Bndr universal (Invisible _), arrow) <- splitForAllForAllTyBinder_maybe (idType function)
-  , isTyVar universal
-  , tyVarKind universal `tcEqType` liftedTypeKind
-  , let argTy = mkTyVarTy universal
-  , arrow `tcEqType` mkVisFunTyManyU argTy argTy = True
-  | otherwise = False
+-- | Instantiate the checked type binders and count the remaining term arrows.
+instantiateOpenTypeFunction :: Id -> Maybe (CoreExpr, Int)
+instantiateOpenTypeFunction function
+  | not (null binders), all liftedUniversal binders
+  = do arity <- termArity 0 body
+       pure (foldl (\expr _ -> App expr (Type liftedTypeKind)) (Var function) binders, arity)
+  | otherwise = Nothing
+  where
+    (binders, body) = splitForAllForAllTyBinders (idType function)
+    liftedUniversal (_, Bndr v (Invisible _)) =
+      isTyVar v && tyVarKind v `tcEqType` liftedTypeKind
+    liftedUniversal _ = False
+    bound ty = any (\(_, Bndr v _) -> ty `tcEqType` mkTyVarTy v) binders
+    termArity arity ty
+      | Just (FTF_T_T, matchability, multiplicity, domain, result) <- splitFunTy_maybe ty
+      , matchability `tcEqType` unmatchableDataConTy
+      , isManyTy multiplicity
+      , bound domain = termArity (arity + 1) result
+      | arity > 0, bound ty = Just arity
+      | otherwise = Nothing
 
 -- | Read the checked expression for one demanded ordinary import.
 -- Use a full interface because EPS may discard the optimizer's IdInfo.
@@ -175,7 +199,7 @@ openDefinitionIface hscEnv mod installed = do
 -- | Describe why a candidate cannot elaborate to a type.
 openTypeFailureReason :: OpenTypeFailure -> (Maybe Name, String)
 openTypeFailureReason InvalidInput =
-  (Nothing, "This call requires an imported function of type forall u. u -> u and a rigid argument of kind Type.")
+  (Nothing, "This call requires an imported function with lifted type parameters and rigid arguments of kind Type.")
 openTypeFailureReason (UnavailableDefinition name failure) =
   (Just name, case failure of
     UnavailableModule -> "A referenced definition does not come from an ordinary imported module."
@@ -187,17 +211,21 @@ openTypeFailureReason (CannotReduce failure) =
     Exhausted -> "Reduction exceeded the open evaluation step limit (-freduction-depth)."
     UnsupportedCore -> "Reduction reached an unsupported Core expression."
     MissingAlternative -> "Reduction reached a case without a matching alternative.")
+openTypeFailureReason (RigidCase scrutinee) =
+  (Nothing, "Reduction stopped at a case on the rigid argument " ++ getOccString scrutinee ++ ".")
 openTypeFailureReason UnexpectedNeutral =
-  (Nothing, "Reduction did not return the original rigid argument.")
+  (Nothing, "Reduction did not return any of the supplied rigid arguments.")
 
 {- Note [Open source calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Serokell's open evaluator example applies a source function to a rigid
 type variable. GHC #27413 describes observation with unknowns. Start by
-observing an ordinary Core definition at the skolem's kind. Use a fresh
-symbolic Id in the observer only. Check its kind and reify its exact
-identity to the original skolem. The observer emits no residual Core
-expression or conversion proof.
+observing an ordinary Core definition at the operands' common kind.
+Admit a lifted invisible forall telescope and ordinary saturated arrows.
+Every operand and the result must use one of those quantified variables.
+Use a fresh symbolic Id per distinct skolem in the observer only.
+Check the application's result kind and reify the returned Id by identity.
+The observer emits no residual Core expression or conversion proof.
 
 At -O0, interface loading normally ignores optimizer pragmas. Read the
 needed template from the complete interface when the observer demands its

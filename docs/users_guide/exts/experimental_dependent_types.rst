@@ -233,8 +233,17 @@ reducing the ordinary Prelude function ``id`` returns the type variable
     x :: forall a. Num a => id a
     x = 42
 
-The current implementation accepts an imported function of type
-``forall u. u -> u`` when it reduces to its argument of kind ``Type``.
+The compiler also accepts projections with several operands. For example::
+
+    left :: forall a b. a -> b -> const a b
+    left x _ = x
+
+The imported function must have one or more invisible, lifted type
+parameters. Each operand type and the result type must be one of those
+parameters. Supply all the operands as rigid type variables of kind
+``Type``. The function must return one of them during evaluation. If
+evaluation reaches a case directly on a rigid operand, the error names
+that operand at the source call.
 A user-defined function can participate if its interface provides the
 Core unfoldings that reduction needs. Compile the producer with
 :ghc-flag:`-fno-omit-interface-pragmas` to retain available unfoldings.

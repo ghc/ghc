@@ -1,6 +1,7 @@
 direct open calls and type binders checked, including alias usages
 unchanged one-shot recompilation reused the producer and consumer artifacts
-one-shot source calls return 42 at Int
-home modules under --make return 42 at Int
+one-shot source calls select the expected type arguments
+home modules under --make select the expected type arguments
+both compilation modes report the demanded rigid argument at the strict call
 the unchanged consumer rejected the changed worker
 missing interface definition rejected at the source application

@@ -87,7 +87,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
-import GHC.Tc.Gen.OpenTypeEval (observeOpenType, openTypeFailureReason, supportsOpenTypeFunction)
+import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedCall)
 import GHC.Tc.Utils.Unify
@@ -2353,22 +2353,24 @@ tc_app_ty mode rn_ty exp_kind
   , isExternalName name
   = setSrcSpanA loc $
     do { env <- getGblEnv
-       ; case filterOut is_par hs_args of
-           [HsValArg _ arg]
+       ; case traverse value_arg (filterOut is_par hs_args) of
+           Just args
              | isTypeLevel (mode_tyki mode)
              , isNothing (mode_holes mode) || isJust (mode_complete_type_arg mode)
              , not (nameIsLocalOrFrom (tcg_semantic_mod env) name)
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
-                         | isQual rdr
+                         | [arg] <- args
+                         , isQual rdr
                          , Just (domain, result_kind) <- closedTypeCallKinds (varType fun)
                          -> do { argument <- tcClosedTypeCallArgument mode name domain arg
                                ; result <- tcRunClosedCall fun argument result_kind
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
-                         | isTypeVariableArg arg
-                         , supportsOpenTypeFunction fun
-                         -> do { result <- tcOpenTypeCall mode name fun arg
+                         | Just (instantiated, arity) <- instantiateOpenTypeFunction fun
+                         , arity == length args
+                         , all isTypeVariableArg args
+                         -> do { result <- tcOpenTypeCall mode name instantiated args
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name }
@@ -2376,6 +2378,8 @@ tc_app_ty mode rn_ty exp_kind
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
     is_par HsArgPar{} = True
     is_par _ = False
+    value_arg (HsValArg _ arg) = Just arg
+    value_arg _ = Nothing
     unsupported = failWithTc . TcRnNoSourceTable
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
@@ -2384,10 +2388,10 @@ tc_app_ty mode rn_ty exp_kind
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
 
--- | Check a named rigid operand and record definitions used to reduce the call.
+-- | Check named rigid operands and record definitions used to reduce the call.
 -- See Note [Open source calls] in GHC.Tc.Gen.OpenTypeEval.
-tcOpenTypeCall :: TcTyMode -> Name -> Id -> LHsType GhcRn -> TcM Type
-tcOpenTypeCall mode name fun arg = do
+tcOpenTypeCall :: TcTyMode -> Name -> Core.CoreExpr -> [LHsType GhcRn] -> TcM Type
+tcOpenTypeCall mode name instantiated args = do
   when (mode_complete_type_arg mode == Just False) $
     reject "A visible type argument containing an open call must be complete. Replace its wildcards with types."
   level <- getThLevel
@@ -2396,20 +2400,23 @@ tcOpenTypeCall mode name fun arg = do
   case level of
     Comp | not bootOrSig && not explicitLevels -> pure ()
     _ -> reject "This call requires an ordinary module outside quotes and splices, without ExplicitLevelImports."
-  checked <- tc_check_lhs_type mode arg liftedTypeKind
-  operand <- liftZonkM (zonkTcType checked)
-  case getTyVar_maybe operand of
-    Just skolem -> do
-      outcome <- observeOpenType fun skolem
-      case outcome of
-        Left reason -> let (definition, message) = openTypeFailureReason reason
-                       in failWithTc (TcRnOpenTypeEval name definition message)
-        Right (result, used) -> do
-          env <- getGblEnv
-          updTcRef (tcg_open_term_uses env) (`unionNameSet` used)
-          pure result
-    Nothing -> reject "The argument must be a rigid type variable of kind Type."
+  skolems <- mapM checkOperand args
+  outcome <- observeOpenType instantiated skolems
+  case outcome of
+    Left reason -> let (definition, message) = openTypeFailureReason reason
+                   in failWithTc (TcRnOpenTypeEval name definition message)
+    Right (result, used) -> do
+      env <- getGblEnv
+      updTcRef (tcg_open_term_uses env) (`unionNameSet` used)
+      pure result
   where
+    checkOperand arg = do
+      checked <- tc_check_lhs_type mode arg liftedTypeKind
+      operand <- liftZonkM (zonkTcType checked)
+      case getTyVar_maybe operand of
+        Just skolem -> pure skolem
+        Nothing -> reject "Each argument must be a rigid type variable of kind Type."
+
     reject :: String -> TcM a
     reject = failWithTc . TcRnOpenTypeEval name Nothing
 

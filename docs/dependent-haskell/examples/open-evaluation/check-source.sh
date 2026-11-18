@@ -6,7 +6,7 @@ if [[ $# -ne 2 ]]; then
     exit 2
 fi
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ghc=("$1" "-B$2" -v0 -O0 -package-env - -i -Werror=unused-imports -dcore-lint -dstg-lint)
+ghc=("$1" "-B$2" -v0 -O0 -package-env - -i -Werror=unused-imports -fdiagnostics-color=never -dcore-lint -dstg-lint)
 run=$(mktemp -d)
 trap 'rm -rf -- "$run"' EXIT
 cd -- "$run"
@@ -50,7 +50,7 @@ printf 'unchanged one-shot recompilation reused the producer and consumer artifa
     ./open-source > result.txt
     diff -u "$src/RunOpenSource.stdout" result.txt
 )
-printf 'one-shot source calls return 42 at Int\n'
+printf 'one-shot source calls select the expected type arguments\n'
 
 # Generate fresh home modules under --make. Keep the unfolding flag on
 # the producer files. The consumer keeps the ordinary -O0 flags.
@@ -67,7 +67,33 @@ cp "$src"/{OpenSource,RunOpenSource}.hs manager/
     ./open-source > result.txt
     diff -u "$src/RunOpenSource.stdout" result.txt
 )
-printf 'home modules under --make return 42 at Int\n'
+printf 'home modules under --make select the expected type arguments\n'
+
+cat > negative/OpenStrict.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
+module OpenStrict where
+
+import qualified OpenProducer
+
+strict :: forall a b. a -> b -> OpenProducer.strictSecond a b
+strict _ y = y
+HS
+cp negative/OpenStrict.hs manager/
+# Inspecting the first operand of strictSecond must stop at its skolem.
+expect_rigid_case() {
+    if "${ghc[@]}" "$@" > strict.log 2>&1; then
+        printf 'expected a strict call to stay stuck on its first argument\n' >&2
+        exit 1
+    fi
+    if ! grep -Fxq 'OpenStrict.hs:6:33: error: [GHC-70566]' strict.log ||
+       ! grep -Fq 'Reduction stopped at a case on the rigid argument a.' strict.log; then
+        cat strict.log >&2
+        exit 1
+    fi
+}
+(cd negative && expect_rigid_case -i../artifacts -c OpenStrict.hs)
+(cd manager && expect_rigid_case --make -i. -no-link OpenStrict.hs)
+printf 'both compilation modes report the demanded rigid argument at the strict call\n'
 
 # Only the worker implementation changes. The consumer and direct alias
 # retain their original source and interface artifacts.
