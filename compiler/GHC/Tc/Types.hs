@@ -619,9 +619,9 @@ data TcGblEnv
         tcg_keep      :: TcRef NameSet,
 
         tcg_source_table_uses :: TcRef NameSet,
-          -- ^ Imported tables absent during renaming, and tables used by retained calls.
-          -- A Name from this module records a retained call. The renamer only
-          -- records unsuccessful lookups for Names from other modules.
+          -- ^ Type Names record missing imported tables and tables used by retained
+          -- calls. A local table Name records an actual use. Term Names record the
+          -- DFun, selector and source target of a retained method application.
           -- See Note [Source table usage fingerprints] in GHC.Unit.Module.ModIface.
 
         tcg_th_used :: TcRef Bool,

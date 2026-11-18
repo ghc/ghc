@@ -1,9 +1,13 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, tcLookupSourceTableId) where
+module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, tcLookupSourceTableId,
+                              visibleSourceMethodRules, hasSourceMethodRule,
+                              recordSourceMethodUse, checkSourceMethodUses) where
 
 import GHC.Prelude
 
 import GHC.Builtin.WiredIn.Types (listTyCon, mkListTy, unmatchableDataConTy)
+import GHC.Core (isAutoRule, isBuiltinRule, ruleActivation)
+import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
 import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch)
 import GHC.Core.ConLike (ConLike(..))
 import GHC.Core.DataCon
@@ -13,29 +17,46 @@ import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.Bag (isEmptyBag)
+import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRulesBelow)
 import GHC.Hs
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Tc.Errors.Types (RetainedQuantificationError(..), TcRnMessage(..))
 import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), isEmptyEvBindsMap)
-import GHC.Tc.Types (TcGblEnv(..))
-import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTcEvBindsMap, liftZonkM, newSysName, updTcRef, xoptM)
+import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
+import GHC.Tc.Utils.Env (tcLookupId)
+import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBindsMap,
+                           getTopEnv, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Basic (Origin(..))
-import GHC.Types.Id (setIdType, sourceTableId_maybe)
+import GHC.Types.Id (globaliseId, idName, setIdType, sourceTableId_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkInstTyCoOcc,
-                       mkTyVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, tvName)
-import GHC.Types.Name.Set (NameSet, extendNameSet, unionNameSets, unitNameSet)
+                       isVarOcc, mkTyVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, tvName)
+import GHC.Types.Name.Set (NameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
+                           intersectNameSet, isEmptyNameSet, minusNameSet, nameSetElemsStable,
+                           unionNameSets, unitNameSet)
 import GHC.Types.SrcLoc
+import GHC.Types.SourceFile (hscSourceToIsBoot)
+import GHC.Unit.External (eps_rule_base)
+import GHC.Unit.Home (homeUnitId)
+import GHC.Unit.Home.Graph (lookupHugByModule)
+import GHC.Unit.Home.ModInfo (hm_details)
+import GHC.Unit.Module.Env (moduleSetElts)
+import GHC.Unit.Module.ModDetails (md_rules)
+import GHC.Unit.Types (GenWithIsBoot(..), IsBootInterface(..), isInteractiveModule, moduleName, moduleUnitId)
 import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
+import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet)
 import GHC.Types.Var (Id, VarBndr(..), mkTyVar, varName)
 import GHC.Utils.Monad (allM)
 
-import Control.Monad (guard, zipWithM)
+import Control.Monad (foldM, forM_, guard, unless, when, zipWithM)
+import Control.Monad.IO.Class (liftIO)
+import Data.List (find)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (catMaybes, isNothing, mapMaybe)
 
@@ -55,6 +76,65 @@ tcLookupSourceTableId actual = do
         updTcRef (tcg_source_table_uses env) (`extendNameSet` tyConName table)
         return (Just fun)
       _ -> return Nothing
+
+-- | Load the rules visible to the module, including rules from home boot cycles.
+visibleSourceMethodRules :: TcGblEnv -> TcM RuleEnv
+visibleSourceMethodRules env = do
+    hsc <- getTopEnv
+    eps <- getEps
+    let mod = tcg_mod env
+        visible = tcVisibleOrphanMods env
+        -- GHCi's synthetic module has no node in the module graph. Start at
+        -- its actual imports, as runTcInteractive does for instance visibility.
+        from_import rules m = do
+          info <- lookupHugByModule m (hsc_HUG hsc)
+          case info of
+            Nothing -> pure rules
+            Just hmi -> do
+              below <- hugRulesBelow hsc (moduleUnitId m) (GWIB (moduleName m) NotBoot)
+              pure (extendRuleBaseList (plusUFM_C (++) rules below) (md_rules (hm_details hmi)))
+    home_rules <- liftIO $ if isInteractiveModule mod
+      then foldM from_import emptyRuleBase (moduleSetElts visible)
+      else hugRulesBelow hsc (homeUnitId (hsc_home_unit hsc))
+                         (GWIB (moduleName mod) (hscSourceToIsBoot (tcg_src env)))
+    pure emptyRuleEnv { re_home_rules = home_rules, re_eps_rules = eps_rule_base eps
+                      , re_visible_orphs = visible }
+
+-- | Test for a visible user rewrite on the exact Id. Every class selector
+-- has a built-in dictionary selection rule. That rule selects this field.
+hasSourceMethodRule :: RuleEnv -> Id -> Bool
+hasSourceMethodRule rules fun = any user_rule (getRules rules (globaliseId fun))
+  where
+    user_rule rule = not (isBuiltinRule rule || isAutoRule rule || isNeverActive (ruleActivation rule))
+
+-- | Check the selected method at the occurrence, and record its semantic dependencies.
+recordSourceMethodUse :: Id -> Id -> Id -> TcM ()
+recordSourceMethodUse dfun selector target = do
+    env <- getGblEnv
+    visible <- visibleSourceMethodRules env
+    let local = sourceRuleOwners (tcg_rules env)
+        changed v = idName v `elemNameSet` local || hasSourceMethodRule visible v
+        ids = [selector, dfun, target]
+    case find changed ids of
+      Just v -> failWithTc (TcRnRetainedQuantificationError (RetainedSourceRule (idName v)))
+      Nothing -> updTcRef (tcg_source_table_uses env) (`extendNameSetList` map idName ids)
+
+-- | Check rules declared or imported after an earlier retained method application.
+-- Report a local rule at its declaration, including one added by a splice.
+checkSourceMethodUses :: TcGblEnv -> TcM ()
+checkSourceMethodUses env = do
+    uses <- filterNameSet (isVarOcc . nameOccName) <$> readTcRef (tcg_source_table_uses env)
+    unless (isEmptyNameSet uses) $ do
+      let local = [(rule, uses `intersectNameSet` sourceRuleOwners [rule]) | rule <- tcg_rules env]
+          imported = uses `minusNameSet` unionNameSets (map snd local)
+          report name = addErr (TcRnRetainedQuantificationError (RetainedSourceRule name))
+      forM_ local $ \(rule, names) ->
+        setSrcSpanA (getLoc rule) (mapM_ report (nameSetElemsStable names))
+      unless (isEmptyNameSet imported) $ do
+        visible <- visibleSourceMethodRules env
+        forM_ (nameSetElemsStable imported) $ \name -> do
+          v <- tcLookupId name
+          when (hasSourceMethodRule visible v) (report name)
 
 -- | Find source functions that a user rule can rewrite. A checked wrapper
 -- can hide the head of the source application on the rule's left side.

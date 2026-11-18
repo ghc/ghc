@@ -14,6 +14,7 @@ module GHC.Tc.TyCl.Instance
    ( tcInstDecls1
    , tcInstDeclsDeriv
    , tcInstDecls2
+   , checkedSourceMethods
    )
 where
 
@@ -59,7 +60,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
-import GHC.Core.Predicate( classMethodInstTy, isCoVarType )
+import GHC.Core.Predicate( classMethodInstTy, getClassPredTys_maybe, isCoVarType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
@@ -79,6 +80,7 @@ import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Set
+import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.SrcLoc
 
 import GHC.Driver.DynFlags
@@ -99,6 +101,7 @@ import Control.Monad
 import Data.Tuple
 import GHC.Data.Maybe
 import Data.List( mapAccumL )
+import Data.List.NonEmpty (NonEmpty(..))
 
 
 {-
@@ -1333,6 +1336,104 @@ particular operation (see Note [INLINE and default methods] below).
 
 So right here in tcInstDecls2 we must re-extend the type envt with
 the default method Ids replete with their INLINE pragmas.  Urk.
+-}
+
+-- | Find ground dictionaries whose checked method fields alias source functions.
+-- Each result records the class selector, the instance method and its target.
+-- See Note [Certifying a source method alias].
+checkedSourceMethods :: TcGblEnv -> [(DFunId, [(Id, Id, Id)])]
+checkedSourceMethods env = mapMaybe dictionary binds
+  where
+    binds = map unLoc (tcg_binds env)
+    instances = mkVarSet (map instanceDFunId (tcg_insts env))
+    aliases = mkVarEnv (mapMaybe method_alias binds)
+
+    dictionary binding = do
+      (dfun, local, VarBind{var_id = bound, var_rhs = L _ rhs}) <- abstraction isDFunId binding
+      guard (dfun `elemVarSet` instances && local == bound)
+      (cls, [inst_ty]) <- getClassPredTys_maybe (idType dfun)
+      guard (noFreeVarsOfType inst_ty && isTyFamFree inst_ty)
+      (con, con_ty, fields) <- dictionary_args [] rhs
+      let selectors = classAllSelIds cls
+      guard (con == tyConSingleDataCon (classTyCon cls) && con_ty `eqType` inst_ty
+             && selectors `equalLength` fields && all lazy_id fields)
+      let methods = [(sel, meth, target) | (sel, meth) <- zip selectors fields
+                    , sel `elem` classMethods cls
+                    , InstMethId owner <- [idDetails meth], owner == idName dfun
+                    , Just value <- [lookupVarEnv aliases meth]
+                    , Just target <- [checked_target value]
+                    , idType target `eqType` classMethodInstTy sel [inst_ty]]
+      guard (not (null methods))
+      pure (dfun, methods)
+
+    dictionary_args :: [Id] -> HsExpr GhcTc -> Maybe (DataCon, Type, [Id])
+    dictionary_args fields (HsApp _ f (L _ (HsVar _ (L _ v)))) =
+      dictionary_args (v : fields) (unLoc f)
+    dictionary_args fields (XExpr (WrapExpr (WpTyApp ty) (XExpr (ConLikeTc (RealDataCon con))))) =
+      Just (con, ty, fields)
+    dictionary_args _ _ = Nothing
+
+    checked_target value = do
+      guard (isExternalName (idName value))
+      target <- if nameIsLocalOrFrom (tcg_semantic_mod env) (idName value)
+                then case lookupTypeEnv (tcg_type_env env) (idName value) of
+                       Just (AnId actual) | actual == value -> Just actual
+                       _ -> Nothing
+                else Just value
+      guard (isJust (sourceTableId_maybe target) && isTauTy (idType target))
+      pure target
+
+    method_alias binding = do
+      (meth, local, inner) <- abstraction is_method binding
+      (_, mono, FunBind{fun_id = L _ bound, fun_ext = (WpHole, []),
+                           fun_matches = MG{mg_ext = MatchGroupTc{mg_origin = FromSource},
+                                            mg_alts = L _ [L _ match]}}) <- abstraction (== local) inner
+      guard (mono == bound)
+      Match{m_pats = L _ [], m_grhss = GRHSs _ (L _ (GRHS _ [] rhs) :| [])
+                                                 (L _ EmptyLocalBinds{})} <- pure match
+      HsVar _ (L _ target) <- pure (unLoc (stripParensLHsExpr rhs))
+      guard (idType meth `eqType` idType target)
+      pure (meth, target)
+
+    is_method v = case idDetails v of { InstMethId{} -> True; _ -> False }
+
+    abstraction :: (Id -> Bool) -> HsBind GhcTc -> Maybe (Id, Id, HsBind GhcTc)
+    abstraction wanted (XHsBindsLR AbsBinds{abs_tvs = [], abs_ev_vars = [], abs_sig = True,
+                  abs_exports = [ABE{abe_poly = poly, abe_mono = mono, abe_wrap = WpHole,
+                                     abe_prags = SpecPrags []}],
+                  abs_ev_binds = evs, abs_binds = [L _ inner]})
+      | wanted poly, idType poly `eqType` idType mono, all lazy_evidence evs = Just (poly, mono, inner)
+    abstraction _ _ = Nothing
+
+    lazy_id v = isCoVar v || typeLevity_maybe (idType v) == Just Lifted
+    lazy_evidence (EvBinds bs) = allBag (lazy_id . eb_lhs) bs
+    lazy_evidence (TcEvBinds {}) = False
+
+{- Note [Certifying a source method alias]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For an instance such as Num Nat, tcInstDecl2 applies the dictionary constructor
+to its superclass fields and methods in classAllSelIds order. Match that checked
+application and use its actual field Id to find the instance method binding.
+Check the parent DFun in InstMethId. Generated method names can share a spelling.
+buildClass gives dictionary fields HsLazy. Check that each runtime field is
+lifted so that selecting one method cannot force another field.
+
+For (+) = plus, tcMethodBody and tcPolyCheck each add an AbsBinds. Follow the
+exported and local Ids through both bindings. Require a source equation with
+no patterns, guards or local bindings and an RHS that refers directly to the
+certified function. The shared instance evidence may contain lazy dictionary
+bindings for other methods. The matched RHS refers only to an external Id.
+Erased evidence and unused lifted evidence therefore add no runtime demand.
+
+Check the final zonked bindings after all local source tables and rewrite
+rules are known. This also supplies the certificate for a no-code interface.
+An importer can then check the actual selected DFun and selector. A local
+value can precede instance method checking and cannot use that certificate.
+
+A client can add an orphan rewrite rule for an imported selector, DFun or
+source function. Check the visible rules at each retained use. Save these
+three Names as recompilation dependencies. Check them again after the last
+declaration group because a splice can introduce a later rule.
 -}
 
 tcInstDecl2 :: InstInfo GhcRn -> TcM (LHsBinds GhcTc)

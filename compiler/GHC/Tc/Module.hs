@@ -75,7 +75,8 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Sig( tcRules )
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners)
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, visibleSourceMethodRules,
+                               hasSourceMethodRule, checkSourceMethodUses)
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
@@ -113,7 +114,7 @@ import GHC.Hs.Dump
 
 import GHC.Core.PatSyn
 import GHC.Core (ruleActivation)
-import GHC.Core.Rules (RuleEnv(..), emptyRuleEnv, getRules)
+import GHC.Core.Rules (getRules)
 import GHC.Core.Predicate ( classMethodTy )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
@@ -686,11 +687,33 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
 
         -- The interface also carries the equations of eligible source functions.
         -- See Note [Closed source tables] in GHC.Tc.Gen.SourceTable.
+      ; setGblEnv tcg_env' (checkSourceMethodUses tcg_env')
+      ; failIfErrsM
       ; tables_enabled <- xoptM LangExt.ExperimentalDependentTypes
       ; if tables_enabled
         then setGblEnv tcg_env' $
-             sourceTableTyCons (tcg_binds tcg_env') >>= installSourceTables
+             sourceTableTyCons (tcg_binds tcg_env') >>= installSourceTables >>= installSourceMethods
         else return tcg_env' }
+
+-- | Publish only checked method aliases that user rules cannot replace.
+-- See Note [Certifying a source method alias] in GHC.Tc.TyCl.Instance.
+installSourceMethods :: TcGblEnv -> TcM TcGblEnv
+installSourceMethods env
+  | null (tcg_insts env) = pure env
+  | otherwise = case checkedSourceMethods env of
+      [] -> pure env
+      methods -> setGblEnv env $ do
+        rules <- visibleSourceMethodRules env
+        let local_rules = sourceRuleOwners (tcg_rules env)
+            plain v = not (idName v `elemNameSet` local_rules || hasSourceMethodRule rules v)
+            checked = [(dfun, pairs) | (dfun, fields) <- methods, plain dfun
+                      , let pairs = [(sel, target) | (sel, meth, target) <- fields
+                                    , all plain [sel, meth, target]]
+                      , not (null pairs)]
+        for_ checked $ \(_, pairs) -> for_ pairs $ \(_, target) ->
+          when (nameIsLocalOrFrom (tcg_semantic_mod env) (idName target)) $
+            keepAlive (idName target)
+        tcExtendGlobalValEnv [setSourceMethodIds dfun pairs | (dfun, pairs) <- checked] getGblEnv
 
 -- | Add the families and their axioms to the module interface. A local use
 -- may already have required the family before we finished checking the module.
@@ -705,13 +728,7 @@ installSourceTables tables = do
     rewriting <- goptM Opt_EnableRewriteRules
     boot_rules <- if rewriting && not (null boot_functions)
       then do
-        hsc <- getTopEnv
-        eps <- getEps
-        let mod = tcg_mod env
-        home_rules <- liftIO (hugRulesBelow hsc (homeUnitId (hsc_home_unit hsc))
-                              (GWIB (moduleName mod) (hscSourceToIsBoot (tcg_src env))))
-        let rule_env = emptyRuleEnv { re_home_rules = home_rules, re_eps_rules = eps_rule_base eps
-                                    , re_visible_orphs = tcVisibleOrphanMods env }
+        rule_env <- visibleSourceMethodRules env
         pure (mkNameSet [idName fun | fun <- boot_functions
                             , any (not . isNeverActive . ruleActivation) (getRules rule_env (globaliseId fun))])
       else pure emptyNameSet

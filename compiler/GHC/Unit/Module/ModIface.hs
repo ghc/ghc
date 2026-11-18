@@ -853,6 +853,12 @@ Use the same lookup when checking the client's entity usages. A change to
 the equations, addition of a table or removal of a table then invalidates
 the client. Unrelated edits to the producer preserve the recorded hash.
 Use the module where the term was defined, including for a re-export.
+
+A retained class method can use a concrete dictionary field that aliases
+a checked source function. Record the dictionary, selector and target.
+Changing just the field can invalidate the proof even when the target
+function and all public types stay the same.
+See Note [Dictionary selection in retained arguments] in GHC.Tc.Gen.App.
 -}
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
