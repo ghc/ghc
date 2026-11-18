@@ -57,6 +57,7 @@ import GHC.Driver.Session
 
 import Control.Monad
 
+import Data.Foldable ( asum )
 import Data.List( deleteFirstsBy )
 import qualified Data.Semigroup as S
 import Data.Void( Void )
@@ -733,8 +734,7 @@ simplifyDelayedErrors = mapMaybeBagM simpl_err
              else
                return $ Just (DE_Multiplicity mult_co' loc) }
     simpl_err err@(DE_SourceMethod ev dfun _ _)
-      = do { ev_binds_var <- getTcEvBindsVar
-           ; bindings <- TcS.getTcEvBindsMap ev_binds_var
+      = do { bindings <- getInScopeEvBindsVars >>= traverse TcS.getTcEvBindsMap
            ; checked <- sourceMethodEvidenceMatches bindings ev dfun
            ; return (if checked then Nothing else Just err) }
 
@@ -765,7 +765,11 @@ or a cycle does not prove the obligation. Keep an unproved check for a later
 solver pass or error reporting. Never replace its evidence with another DFun.
 
 cloneWC preserves these checks and dictionary EvVars, while it clones evidence
-maps. This check only reads the active map. It does not publish a certificate or
+maps. A nested implication can reuse a solved dictionary from its parent.
+For example, a closed literal can solve Num Nat in the outer scope and
+both methods in n + 1 can refer to that binding. Read only maps in lexical
+scope, following actual variable occurrences. A sibling implication cannot
+supply evidence. This check does not publish a certificate or
 change evidence when a speculative solve succeeds. Constraint recovery retains
 unproved checks. Do not float them across a lexical evidence scope during kind
 checking. Do not suppress them in Template Haskell brackets. Error reporting
@@ -775,7 +779,7 @@ equations have already been used in the result type.
 
 -- | Check the actual solved dictionary without performing instance search.
 -- See Note [Checked source method evidence].
-sourceMethodEvidenceMatches :: EvBindsMap -> EvVar -> DFunId -> TcS Bool
+sourceMethodEvidenceMatches :: [EvBindsMap] -> EvVar -> DFunId -> TcS Bool
 sourceMethodEvidenceMatches bindings dictionary expected
   = do { dictionary <- zonk_id dictionary
        ; expected <- zonk_id expected
@@ -789,7 +793,7 @@ sourceMethodEvidenceMatches bindings dictionary expected
     go seen predicate expected current
       | current `elemVarSet` seen = return False
       | Just EvBind { eb_info = EvBindWanted {}, eb_rhs = EvExpr (Var next) }
-          <- lookupEvBind bindings current
+          <- asum [lookupEvBind scope current | scope <- bindings]
       = do { next <- zonk_id next
            ; if not (idType next `tcEqType` predicate) then return False
              else if isDFunId next then return (next == expected)

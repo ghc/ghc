@@ -58,7 +58,7 @@ module GHC.Tc.Solver.Monad (
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
-    getTcEvBindsVar, getTcLevel,
+    getTcEvBindsVar, getInScopeEvBindsVars, getTcLevel,
     getTcEvBindsMap, setTcEvBindsMap, getTcEvBindsState, combineTcEvBinds,
     tcLookupKnownKeyId,
 
@@ -1065,6 +1065,8 @@ The constraint solver can operate in different modes:
 data TcSEnv
   = TcSEnv {
       tcs_ev_binds  :: EvBindsVar,
+      -- See Note [Checked source method evidence] in GHC.Tc.Solver.Solve.
+      tcs_outer_ev_binds :: [EvBindsVar],
 
       tcs_what  :: WhatUnifications,
          -- Level of the outermost meta-tyvar that we have unified
@@ -1291,6 +1293,7 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
        ; wl_var      <- TcM.newTcRef emptyWorkList
        ; unif_lvl_var <- TcM.newTcRef infiniteTcLevel
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
+                          , tcs_outer_ev_binds = []
                           , tcs_what     = WU_Coarse unif_lvl_var
                           , tcs_count    = step_count
                           , tcs_inerts   = inert_var
@@ -1382,6 +1385,8 @@ nestImplicTcS skol_info ev_binds_var inner_tclvl (TcS thing_inside)
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
+                            , tcs_outer_ev_binds = if isStaticSkolInfo skol_info then []
+                                                  else tcs_ev_binds env : tcs_outer_ev_binds env
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
        ; res <- TcM.setTcLevel inner_tclvl $
@@ -1578,6 +1583,10 @@ updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
 
 getTcEvBindsVar :: TcS EvBindsVar
 getTcEvBindsVar = TcS (return . tcs_ev_binds)
+
+-- | The current evidence bindings followed by lexically enclosing implications.
+getInScopeEvBindsVars :: TcS [EvBindsVar]
+getInScopeEvBindsVars = TcS (\env -> return (tcs_ev_binds env : tcs_outer_ev_binds env))
 
 getTcLevel :: TcS TcLevel
 getTcLevel = wrapTcS TcM.getTcLevel
