@@ -9,6 +9,7 @@
     - add test cases to exercise any newly uncovered diagnostic codes,
     - accept the expected output of the 'codes' test by passing the '-a' flag to Hadrian.
 
+[GHC-94726] is untested (constructor = DsRetainedPackagePatterns)
 [GHC-58181] is untested (constructor = DsOrphanRule)
 [GHC-19551] is untested (constructor = DsAggregatedViewExpressions)
 [GHC-93315] is untested (constructor = UselessSpecialiseForClassMethodSelector)

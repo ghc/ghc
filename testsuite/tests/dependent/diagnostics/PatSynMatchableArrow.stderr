@@ -1,0 +1,4 @@
+PatSynMatchableArrow.hs:5:9: error: [GHC-83606]
+    • Pattern synonym ‘P’ has unsupported arrow matchability: M
+      Declaration arrows must reduce to Unmatchable (U).
+    • In the declaration for pattern synonym ‘P’

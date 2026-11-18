@@ -1,0 +1,8 @@
+ForallMatchabilityTHWrapper.hs:5:13: error: [GHC-50906]
+    • ForallMatchT requires an immediate forall node with at least one binder:
+        ForallT or ForallVisT
+      When splicing a TH type:
+        ForallMatchT (ConT GHC.Internal.Types.U) (ForallT [] [] (ConT GHC.Internal.Types.Int))
+    • In the untyped splice:
+        $(pure
+            (TH.ForallMatchT (TH.ConT ''U) (TH.ForallT [] [] (TH.ConT ''Int))))

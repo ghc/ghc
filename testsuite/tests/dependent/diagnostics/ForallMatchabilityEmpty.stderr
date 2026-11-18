@@ -1,0 +1,2 @@
+ForallMatchabilityEmpty.hs:4:18: error: [GHC-50907]
+    A forall matchability annotation requires at least one binder.

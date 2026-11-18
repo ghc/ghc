@@ -1,0 +1,2 @@
+RetainedQuantificationInKind.hs:5:21: error: [GHC-43582]
+    Retained quantification is not supported in this type position yet.
