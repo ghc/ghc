@@ -4759,3 +4759,20 @@ using any index equality. An optional refinement must preserve that case.
 [Dictionary selection](../../compiler/GHC/Tc/Solver/Solve.hs),
 [source method certificates](../../compiler/GHC/Tc/Gen/SourceTable.hs),
 and [the OutsideIn(X) reading record](papers/README.md#outsideinx-jfp-2011).
+
+### Instance evidence in a local definition
+
+Agda resolves an instance argument from the declarations and the current
+context. Its example of list membership passes the caller's equality
+instance to the element comparison. This motivates inspecting the evidence
+selected for the written operation. Haskell's `Num Nat` constraint can
+likewise supply multiplication at the call site.
+[Agda 2.8.0, instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html).
+
+OutsideIn(X) solves outer simple constraints before solving a nested
+implication. GHC can therefore inspect the ordinary RHS dictionary when
+it checks the constraints arising from a let body. The optional Given,
+its use in committed evidence, the rewrite-rule checks and lazy dependent
+application are design choices in this fork.
+[OutsideIn(X) reading record](papers/README.md#outsideinx-jfp-2011)
+and [the GHC implication solver](../../compiler/GHC/Tc/Solver/Solve.hs).

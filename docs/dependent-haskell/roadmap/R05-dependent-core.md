@@ -66,6 +66,8 @@ linear actuals. The owner is R03. This increment adds no Core equality rule.
 - [x] Discharge a local index equality through retained application and
       reflexivity. The value argument remains lazy.
       See [M90](../PLAN.md#m90-equality-for-lazy-local-definitions).
+- [x] Check proof use against committed solver evidence before lowering
+      an overloaded local definition. See [M91](../PLAN.md#m91-dictionary-evidence-for-a-local-index-definition).
 - [ ] Specify an opaque Pi instantiation rule if a typed transformation needs
       one. M61's measured whole-cast lowering needs no new primitive. Add a proof
       operation only when a measured or calculus obligation requires it.

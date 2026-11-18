@@ -7062,15 +7062,15 @@ Haskell must preserve a lazy, shared binding.
 - [x] Check a nonrecursive binding that names a variable, constructor or
       function with checked equations. Make its nominal equality available in
       the body and keep the original source locations.
-- [ ] Select an optional equality for an overloaded let RHS using the
-      caller's actual dictionary and the applicable rewrite rules.
+- [x] Select an optional equality for an overloaded let RHS using the
+      caller's actual dictionary and the applicable rewrite rules (M91).
 - [x] Use dependent application to discharge the equality by reflexivity.
       Keep one runtime argument and preserve its demand and sharing.
 - [x] Exercise checked functions, wrong results, shadowing, recursion, and
       ordinary arithmetic that needs no equality. Verify native and interpreted
       source and update the Showcase.
-- [ ] Test optional solver activation with local dictionaries, rewrite rules,
-      nested implications and speculative solving.
+- [x] Test optional solver activation with local dictionaries, rewrite rules,
+      nested implications and speculative solving (M91).
 
 A source control already checks on the self-hosted M89 compiler. Its local
 helper takes `foreach (cells :: Nat) -> (cells ~ rows * cols) => result`
@@ -7129,7 +7129,7 @@ body and names the local equality. At an undefined length, `1 + cells`
 exposes a successor and evaluating the outer constructor of `cells + 1`
 raises the exception.
 
-### Remaining work for overloaded RHSs
+### Overloaded RHSs at the end of M90
 
 An ordinary `cells = rows * cols` checks under a local `Num Nat` Given. A
 result can mention `times rows cols` independently while the program uses
@@ -7137,20 +7137,12 @@ result can mention `times rows cols` independently while the program uses
 call makes such a program fail at `*`. Checking only the selector's name
 or the result of global instance lookup cannot preserve this behavior.
 
-The next experiment is to inspect the evidence for the actual ordinary RHS
-before solving the body's implication. Compare it to the certified instance
-with `sourceMethodEvidenceMatches`. A matching instance can make an optional
-local equality available. A different dictionary leaves the ordinary let in
-force. Both stages accept the ordinary use under a caller-supplied
-`Num Nat` or a local rule on `(*)` when the vector is built independently
-at `times rows cols`. Both accept `replicateNative (n * 3) True`. A local
-`cells = times n 3` still cannot supply that result equality.
-Check the selected target and applicable rewrite rules before relying
-on the equality. A body that uses the proof must discharge it by retained
-application. A body that needs no proof can keep the original let and RHS.
-Verify this distinction after solving, including with speculative solves.
-The solver ordering has prior art in [OutsideIn(X)](papers/README.md#outsideinx-jfp-2011).
-Conditional evidence and its elaboration are proposed work in this fork.
+At M90 both stages accepted ordinary arithmetic under a caller-supplied
+`Num Nat` or a local rule on `(*)` when the vector was built independently
+at `times rows cols`. Both accepted `replicateNative (n * 3) True`.
+Neither could use `let cells = times n 3` to supply that result equality.
+M91 checks the evidence for the actual RHS before solving the body.
+Its solver ordering follows [OutsideIn(X)](papers/README.md#outsideinx-jfp-2011).
 
 ## M91: dictionary evidence for a local index definition
 
@@ -7159,16 +7151,16 @@ runtime operand and validates its equality evidence. M90 accepts
 `let cells = times rows cols`. The same let written with `(*)` still
 fails at the body with GHC-83865 on the M90 compiler.
 
-- [ ] Check the ordinary binding once, including generalisation and usage.
+- [x] Check the ordinary binding once, including generalisation and usage.
       Read the exact dictionary Wanted from each typed selector or literal.
       Recover the canonical operand only for a fully checked expression.
-- [ ] Offer the local nominal equality inside the body only when the
+- [x] Offer the local nominal equality inside the body only when the
       surrounding evidence supplies every certified dictionary. Preserve an
       independent ordinary result under a local Given or rewrite rule.
-- [ ] If the body needs the equality, retain its equation and method
+- [x] If the body needs the equality, retain its equation and method
       dependencies, check later RULES and discharge the proof by dependent
       application. Preserve the original lazy RHS when the proof is unused.
-- [ ] Check a local product from runtime dimensions, numerals inside an
+- [x] Check a local product from runtime dimensions, numerals inside an
       operand, nested operators, shadowing, sharing, strictness, and rejection
       under an unknown dictionary. Verify source, GHCi, and an interface-only
       client, then update the Showcase.
@@ -7178,3 +7170,68 @@ Haskell, the relevant parameter is the evidence that the solver chose for
 the actual RHS. OutsideIn's ordering makes that evidence available when it
 enters the implication for the body.
 [Local definitions and solver provenance](REFERENCES.md#equality-for-lazy-local-definitions).
+
+### From a runtime product to a vector length
+
+```haskell
+namedPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Char (1 + rows * cols)
+namedPrefix rows cols =
+    let cells = rows * cols
+    in replicateNative (1 + cells) 'x'
+```
+
+GHC checks the ordinary RHS once. For each method or numeral in the RHS,
+it keeps the dictionary constraint from that occurrence. The solver can
+use the equality between `cells` and the checked product only when every
+dictionary comes from its certified instance. A given `Num Nat` may
+supply different arithmetic. Code that uses `cells` only as an ordinary
+value still runs with that dictionary.
+
+If the body uses the equality, desugaring passes the product once to a
+retained lambda. Reflexivity discharges the equality at that application.
+Core Lint checks the application. If the body does not use the equality,
+desugaring emits the original lazy binding. A rewrite rule that can change
+the meaning of an equation used in a type produces GHC-83605 at the rule.
+An unrelated rule for `(*) @Int` permits the `Nat` example above.
+
+The library defines addition by recursion on its first argument.
+Consequently `1 + rows * cols` exposes a successor even with unknown
+dimensions. The type checker can accept `safeHead (namedPrefix rows cols)`
+without evaluating either input. At runtime the head is `'x'`. Computing
+the length of the tail can still demand the dimensions.
+
+### Evidence checks and current scope
+
+A source RULE can bind a dictionary on its left-hand side. GHC first
+checks a copy of the constraints, then solves the original RHS under
+that dictionary. In the regression for `supplied`, the first solve
+selects the certified instance. The committed solve sees the rule's
+dictionary and rejects the use of `cells` at the canonical product
+length. The corresponding rule for `concrete` passes. A separate
+deferred-error control consumes a vector built with a valid product
+proof, then forces an independent erroneous field and catches its
+type error.
+
+The checked form accepts a type annotation on the RHS, such as
+`let cells = (rows * cols :: Nat)`. The same program with a separate
+`cells :: Nat` binding signature still fails to establish the equality.
+So does a let group that binds both `cells` and a second value. A closed
+result such as `Vec Bool 3` accepts a direct numeral argument. The
+control `let n = (3 :: Nat) in replicateNative n True` at that same
+closed result still fails. These cases bound the next extension of R03.
+
+### Verification at `-O0`
+
+The bootstrap and self-hosted compilers both built. Both accepted fresh
+arithmetic clients of the unchanged M89 producer interface with Core Lint
+and STG Lint. Stable names agreed for two references to the same product
+before either was forced. Both stages accepted the first cell with an
+undefined dimension. They rejected a proof under an unknown dictionary
+at the use of the vector and reported a conflicting later rule at its
+declaration. The same results held when the proof occurred inside a
+GADT alternative.
+
+The two native Showcase runs and self-hosted GHCi each reproduced all
+165 output lines. All 44 selected normal tests and four selected GHCi
+tests passed. One normal test required a rerun after its expected
+diagnostic was updated to match GHC's disambiguation of the local name.

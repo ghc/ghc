@@ -857,7 +857,7 @@ safeHead (VCons x _) = x
 -- | Name a shared product inside a vector whose result type uses that product.
 namedPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Char (1 + rows * cols)
 namedPrefix rows cols =
-    let cells = times rows cols
+    let cells = rows * cols
     in replicateNative (1 + cells) 'x'
 
 -- | Use ordinary addition on two unknown lengths in a vector result type.
@@ -931,4 +931,5 @@ arithmeticNotation = do
     observe "one cell plus a runtime rectangle" (toList withPrefix)
     observe "safeHead before an unknown product"
         (safeHead (replicateNative (1 + rows * unknownCols) 'x'))
+    observe "one plus a let-bound product" (length (toList (namedPrefix rows cols)))
     observe "safeHead with a let-bound product" (safeHead (namedPrefix rows unknownCols))

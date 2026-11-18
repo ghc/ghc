@@ -107,15 +107,20 @@ is undefined.
 ```haskell
 namedPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Char (1 + rows * cols)
 namedPrefix rows cols =
-    let cells = times rows cols
+    let cells = rows * cols
     in replicateNative (1 + cells) 'x'
 ```
 
-Here `times` names the checked multiplication function. Writing `rows * cols`
-directly as a retained argument works too. In an ordinary let RHS, however,
-`(*)` takes its meaning from the caller's `Num Nat` dictionary. Inferring
-the equality for that spelling is still open.
-[Local definitions](PLAN.md#m90-equality-for-lazy-local-definitions).
+GHC checks which `Num Nat` dictionary supplies `(*)` in the written RHS.
+When its multiplication method is the checked `times` function, the body
+can use `cells` at the length `rows * cols`. Two uses of `cells` share the
+product. A caller can also write `let cells = times rows 3` and use it
+at the length `rows * 3`. GHC checks the literal conversion as well.
+
+An explicit `Num Nat =>` constraint can supply another multiplication.
+The local arithmetic still works with that dictionary. Returning a vector
+at the canonical product length then requires independent evidence.
+[Dictionary selection in a let](PLAN.md#m91-dictionary-evidence-for-a-local-index-definition).
 
 The order of addition also affects evaluation. With an undefined `cells`,
 `1 + cells` already has a successor constructor. Asking for the first
