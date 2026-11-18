@@ -95,3 +95,7 @@ test('T22257b', normal, compile, [''])
 test('T25238', normal, compile, [''])
 test('T25834', normal, compile, [''])
 test('GADTSingletons', normal, compile, [''])
+
+test('NativeSourceCallIface',
+     extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs']),
+     makefile_test, ['NativeSourceCallIface'])

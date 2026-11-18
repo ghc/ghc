@@ -4,3 +4,15 @@ NativeSourceTableWrong.hs:11:9: error: [GHC-83865]
         Actual: False :~: False
     • In the expression: Refl
       In an equation for ‘wrong’: wrong = Refl
+
+NativeSourceTableWrong.hs:19:13: error: [GHC-83865]
+    • Couldn't match type ‘True’ with ‘False’
+      Expected: Flag False
+        Actual: Flag (flipBit False)
+    • In the expression: atBit (flipBit False)
+      In an equation for ‘wrongCall’: wrongCall = atBit (flipBit False)
+
+NativeSourceTableWrong.hs:22:24: error: [GHC-83605]
+    • No checked source equations are available for ‘f’ in this retained argument.
+    • In the expression: atBit (f False)
+      In an equation for ‘unknownCall’: unknownCall f = atBit (f False)

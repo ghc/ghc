@@ -9,3 +9,14 @@ type Computed = flipBit 'False
 
 wrong :: Computed :~: 'False
 wrong = Refl
+
+data Flag (b :: Bool) = Flag
+
+atBit :: foreach (b :: Bool) -> Flag b
+atBit _b = Flag
+
+wrongCall :: Flag False
+wrongCall = atBit (flipBit False)
+
+unknownCall :: (Bool -> Bool) -> Flag True
+unknownCall f = atBit (f False)

@@ -45,6 +45,7 @@ import GHC.Iface.Syntax (IfaceDecl(IfaceAxiom, ifAxSourceSpans))
 import GHC.Runtime.Interpreter (evalString)
 import GHC.Types.Error (Diagnostic (diagnosticCode), DiagnosticCode (..), MsgEnvelope (..), getMessages, pprDiagnostic)
 import GHC.Types.Id
+import GHC.Types.Id.Info (IdDetails (VanillaId))
 import GHC.Types.InlinePragma (neverInlinePragma)
 import GHC.Types.Name (mkExternalName, mkSystemName, nameOccName)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameString)
@@ -4703,7 +4704,7 @@ runSourceRejectChecks = do
         , ("inner erased forall", 83605, "within the scope of a retained binder", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
         , ("non-variable retained pattern", 83605, "bare variable pattern", [], local [] selection ["keep _ x = x"] "42")
         , ("multiple variable equations", 83605, "one unguarded clause for each constructor", [], local [] selection (identity ++ identity) "42")
-        , ("producer expression argument", 83605, "local index variable, a supported constructor tree, or a supported immediate lambda application", [], local [] consumer identity "keep (not False) 42")
+        , ("producer expression argument", 83605, "No checked source equations are available for", [], local [] consumer identity "keep (not False) 42")
         , ("nonreflexive indexed constraint", 18872, "True", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
         , ("general indexed constraint", 39999, "Show", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
         , ("Quick Look through ($)", 83605, "Quick Look inference", [], local [] consumer ["keep b x = 42"] "(keep $ True) 42")
@@ -6099,8 +6100,101 @@ runChecks = do
     liftIO $ runDepFunVisibilityChecks environment flags bindings
     liftIO $ runDomainConversionChecks environment flags bindings tycons
     liftIO $ runOpaquePiWholeCastChecks environment flags bindings tycons
+    runSourceCallIndexChecks
     runSourceChecks
     runSourceRejectChecks
+
+-- | Check source-call certificates against their actual Core bindings.
+runSourceCallIndexChecks :: GHC.Ghc ()
+runSourceCallIndexChecks = do
+    parsed <- parseSourceTarget "NativeSourceCallIndices" $ unlines
+        [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}"
+        , "module NativeSourceCallIndices where"
+        , "flipNative :: Bool -> Bool"
+        , "flipNative False = True"
+        , "flipNative True = False"
+        , "type CheckedFlip = flipNative 'False"
+        ]
+    checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
+    desugared <- GHC.desugarModule checked
+    flags <- GHC.getSessionDynFlags
+    let pairs = flattenBinds (mg_binds (GHC.coreModule desugared))
+    (certified, rhs) <- case find ((== "flipNative") . occNameString . nameOccName . varName . fst) pairs of
+        Just pair -> pure pair
+        Nothing -> fail "FAIL: source-call index fixture has no checked function"
+    family <- case sourceTableId_maybe certified of
+        Just table -> pure table
+        Nothing -> fail "FAIL: checked source function lost its equation certificate"
+    liftIO $ do
+        let operand = local 17900 "source_call_operand" boolTy
+            retained = local 17901 "source_call_retained" boolTy
+            index = TermVarTy retained
+            dictionary = local 17902 "source_call_dictionary" (mkTyConApp eqTyCon [boolTy, index, index])
+            keep = Lam retained (Lam dictionary (mkIntExpr (targetPlatform flags) 42))
+            call fun argument = App (Var fun) (Var argument)
+            expected = mkTyConApp family [TermVarTy operand]
+            bound = GHC.Types.Id.setIdNotExported (localiseId certified)
+            expression binder value occurrence argument =
+                Let (NonRec binder value) (Lam argument (App keep (call occurrence argument)))
+            baseline = expression bound rhs bound operand
+            renamed = setIdUnique bound (unique 17903)
+            plain = setIdDetails bound VanillaId
+            listOperand = local 17904 "source_call_list_operand" (mkListTy boolTy)
+            wrongRhs = Lam listOperand (Var (dataConWorkId falseDataCon))
+            wrongDomain = GHC.Types.Id.setIdType bound (exprType wrongRhs)
+            reject label fragment value = case lintExpr (initLintConfig flags []) value of
+                Just errors | fragment `isInfixOf` showSDoc flags (vcat (bagToList errors)) -> pure ()
+                Just errors -> fail ("FAIL: " ++ label ++ "; wrong Lint errors:\n" ++ showSDoc flags (vcat (bagToList errors)))
+                Nothing -> fail ("FAIL: Lint accepted " ++ label)
+            checkIndex label value = case value of
+                Just actual | actual `eqType` expected -> pure ()
+                _ -> fail ("FAIL: " ++ label ++ "; source call selected another index")
+        checkIndex "source call" (nativeSourceCallIndex (call bound operand))
+        checkIndex "retained source call" (retainedArgIndex (call bound operand))
+        let sourceCall = call bound operand
+            trueWorker = dataConWorkId trueDataCon
+            -- Include the LocalId call head in the expression range's scope.
+            first = CoreSubst.extendIdSubst
+                (CoreSubst.mkEmptySubst (mkInScopeSet (exprFreeVars sourceCall))) retained sourceCall
+            second = CoreSubst.extendIdSubst
+                (CoreSubst.mkEmptySubst (mkInScopeSet emptyVarSet)) operand (Var trueWorker)
+            composed = composeTCvSubst second first
+            sequentialIndex = CoreSubst.substTy second (CoreSubst.substTy first index)
+            composedIndex = CoreSubst.substTy composed index
+            expectedTrue = mkTyConApp family [boolIndex True]
+            sequentialCall = CoreSubst.substExpr (CoreSubst.extendSubstInScope second bound)
+                (CoreSubst.substExpr first (Var retained))
+            composedCall = CoreSubst.substExpr composed (Var retained)
+        unless (composedIndex `eqType` sequentialIndex && composedIndex `eqType` expectedTrue) $
+            fail "FAIL: composed source-call substitution selected another family index"
+        case (composedCall, sequentialCall) of
+            (App (Var actual) (Var value), App (Var sequential) (Var sequentialValue))
+                | actual == bound, sequential == bound
+                , sourceTableId_maybe actual == Just family
+                , sourceTableId_maybe sequential == Just family
+                , value == trueWorker, sequentialValue == trueWorker -> pure ()
+            _ -> fail "FAIL: composed source-call substitution lost its actual runtime owner"
+        unless (isNothing (sourceTableId_maybe renamed)
+                && isNothing (nativeSourceCallIndex (call renamed operand))) $
+            fail "FAIL: copied equation certificate accepted a different Name"
+        unless (isNothing (nativeSourceCallIndex (call wrongDomain listOperand))
+                && isNothing (retainedArgIndex (call wrongDomain listOperand))) $
+            fail "FAIL: source call accepted a different family domain"
+        lintNative flags "certified source-call baseline" baseline
+        reject "uncertified source binding" "different equations at its binding"
+            (expression plain rhs bound operand)
+        reject "copied source certificate" "Unsupported retained runtime argument"
+            (expression renamed rhs renamed operand)
+        reject "source-call family domain mismatch" "Unsupported retained runtime argument"
+            (expression wrongDomain wrongRhs wrongDomain listOperand)
+        let simplified = simpleOptNativeExpr baseline
+        lintNative flags "computed source-call beta after SimpleOpt" simplified
+        unless (exprType baseline `eqType` exprType simplified) $
+            fail "FAIL: computed source-call beta changed its dependent result"
+        case simplified of
+            Let (NonRec _ _) (Lam _ (App (Lam _ _) argument)) ->
+                checkIndex "shared source-call beta argument" (nativeSourceCallIndex argument)
+            _ -> fail "FAIL: SimpleOpt did not retain the computed source-call beta argument"
 
 {- Note [Constructed call activation source checks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

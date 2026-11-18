@@ -4,10 +4,11 @@ module Main where
 
 import ClosedTableLibrary
 import Control.Exception (ArithException(DivideByZero), evaluate, throw, try)
-import Data.Proxy (Proxy)
+import Data.IORef (newIORef, readIORef)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import PackedVecLibrary (type (+), Vec(..), Nat(..), appendVec, boolVector, isSuccessor, listCount, natToInt, plus, previous,
-                         replicateAt, sourceLength, sourceVector, toList)
+                         replicateAt, replicateNative, sourceLength, sourceVector, toList)
 
 type Flipped = '[flipBit 'False, flipBit 'True]
 
@@ -108,6 +109,21 @@ stepSum :: Proxy (n :: Nat) -> Proxy (m :: Nat)
         -> plus ('S n) m :~: 'S (plus n m)
 stepSum _ _ = Refl
 
+replicateSum :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> a -> Vec a (n + m)
+replicateSum n m x = replicateNative @a (plus n m) x
+
+-- The call is the only use of this source function. Its definition follows it.
+localOne :: Vec Bool 1
+localOne = replicateNative @Bool (countFlag True) True
+
+countFlag :: Bool -> Nat
+countFlag False = Z
+countFlag True  = S Z
+
+{-# NOINLINE tagLength #-}
+tagLength :: foreach (n :: Nat) -> Proxy n
+tagLength _n = Proxy
+
 main :: IO ()
 main = case (flipProof, signalProof, phaseProof) of
   (Refl, Refl, Refl) -> do
@@ -127,3 +143,17 @@ main = case (flipProof, signalProof, phaseProof) of
     print (natToInt (plus (S Z) (S Z)), isSuccessor (plus (S Z) (throw DivideByZero)))
     print (toList literalThree, headOfNonempty literalThree, natToInt (2 + 3))
     print (toList (replicateAt 3 True), length (toList (replicateAt 3 (undefined :: Int))))
+    (n,m) <- newIORef ((1, 2) :: (Nat, Nat)) >>= readIORef
+    print (toList (replicateSum n m False))
+    bottom <- newIORef (throw DivideByZero :: Nat) >>= readIORef
+    let tag :: Proxy (bottom + m)
+        tag = tagLength (plus bottom m)
+        cells = toList (replicateSum n bottom True)
+    case tag of Proxy -> print True
+    case cells of
+        x : rest -> do
+            print x
+            forcedTail <- try (evaluate (null rest))
+            print (forcedTail == Left DivideByZero)
+        [] -> fail "Expected one cell before the undefined tail"
+    print (toList localOne)
