@@ -6604,3 +6604,34 @@ GADT branch. A separate test put ordinary lambda-bound lengths in that
 branch. Both direct and overloaded addition stopped at multiplicity
 checking and printed `Many` for the reported mismatch. Diagnosing this
 lambda case remains open.
+
+## M83: ordinary numerals in retained arguments
+
+The source targets under R07, R12 and R03 are `replicateNative 3 x`
+and `replicateNative (n + 1) x`. On M82 both calls give GHC-83605
+at the literal. The first result has type `Vec a 3`. The second has
+type `Vec a (n + 1)` even when `n` comes from IO.
+
+- [ ] Identify the actual `Num.fromInteger` implementation that returns
+      zero at zero and one successor for each positive integer step.
+      Check the constructor identities, integer guards, decrement,
+      recursive dictionary and effects of rewrite rules.
+- [ ] Publish that conversion as part of the concrete dictionary's ABI.
+      The client must check the dictionary selected for the literal
+      by the ordinary solver. Rebinding, an unknown dictionary, or
+      different equations must not give the client the Peano proof.
+- [ ] Construct the runtime operand and its index using the same zero
+      and successor. Check expansion against the reduction-depth setting.
+      The independent type-level `FromNatural` registration must still
+      agree for a signature such as `Vec a 3` to check.
+- [ ] Preserve a checked source call with constructed operands through
+      Core Lint and lowering. Its constructor fields and the shared sum
+      must retain Haskell's ordinary demand behaviour.
+- [ ] Run the two examples and update the Showcase. Check diagnostics
+      at the offending literal, changed instances across an interface,
+      and the existing GHC numerical and dependent-Core controls.
+
+Agda's overloaded numerals use the selected `fromNat` operation. Its
+natural-number builtin checks the constructors of its representation.
+The Haskell rule applies these precedents to the checked instance body.
+See [runtime literal research](REFERENCES.md#a-runtime-literal-in-a-retained-argument).
