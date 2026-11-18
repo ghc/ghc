@@ -3658,6 +3658,9 @@ pprRetainedQuantificationError reason = case reason of
   RetainedUncheckedSourceCall fun ->
     text "No checked source equations are available for" <+> quotes (ppr fun)
       <+> text "in this retained argument."
+  RetainedSourceMethodEvidence method predicate ->
+    vcat [ text "GHC cannot use method" <+> quotes (ppr method) <+> text "as a retained index."
+         , text "This call needs a known" <+> quotes (ppr predicate) <+> text "dictionary." ]
   RetainedIndexMultiplicity mult ->
     vcat [ text "A retained argument must have unrestricted multiplicity Many."
          , text "This argument has multiplicity:" <+> ppr mult ]

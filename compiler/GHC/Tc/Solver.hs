@@ -283,6 +283,9 @@ floatKindEqualities wc = float_wc emptyVarSet wc
     float_wc trapping_tvs (WC { wc_simple = simples
                               , wc_impl = implics
                               , wc_errors = errs })
+      -- Keep the dictionary choice in its original evidence scope.
+      -- See Note [Checked source method evidence] in GHC.Tc.Solver.Solve.
+      | anyBag is_source_method errs = Nothing
       | all is_floatable simples
       = do { (inner_simples, inner_errs)
                 <- flatMapBagPairM (float_implic trapping_tvs) implics
@@ -291,6 +294,8 @@ floatKindEqualities wc = float_wc emptyVarSet wc
       | otherwise
       = Nothing
       where
+        is_source_method DE_SourceMethod {} = True
+        is_source_method _ = False
         is_floatable ct
            | insolubleCt ct = False
            | otherwise      = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs

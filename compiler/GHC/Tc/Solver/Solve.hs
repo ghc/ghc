@@ -32,13 +32,14 @@ import qualified GHC.Tc.Utils.Monad   as TcM
 import qualified GHC.Tc.Zonk.TcType   as TcM
 
 import GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
+import GHC.Core ( Expr(Var) )
 import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
 import GHC.Core.Class( classHasSCs )
 
-import GHC.Types.Id(  idType )
-import GHC.Types.Var( EvVar, tyVarKind )
+import GHC.Types.Id( idType, isDFunId )
+import GHC.Types.Var( DFunId, EvVar, tyVarKind )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( IntWithInf, intGtLimit )
@@ -731,6 +732,11 @@ simplifyDelayedErrors = mapMaybeBagM simpl_err
                return Nothing
              else
                return $ Just (DE_Multiplicity mult_co' loc) }
+    simpl_err err@(DE_SourceMethod ev dfun _ _)
+      = do { ev_binds_var <- getTcEvBindsVar
+           ; bindings <- TcS.getTcEvBindsMap ev_binds_var
+           ; checked <- sourceMethodEvidenceMatches bindings ev dfun
+           ; return (if checked then Nothing else Just err) }
 
     simpl_hole :: Hole -> TcS Hole
 
@@ -744,6 +750,51 @@ simplifyDelayedErrors = mapMaybeBagM simpl_err
       = do { ty' <- rewriteType loc ty
            ; traceTcS "simpl_hole" (ppr ty $$ ppr ty')
            ; return (h { hole_ty = ty' }) }
+
+{- Note [Checked source method evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained method application can provisionally use a concrete instance's
+checked source equations. Its dictionary Wanted must still be solved in its
+original implication. Check that same Wanted's actual evidence after solving.
+A separate instance lookup cannot account for lexical Givens or local instances.
+
+Accept only a context-free, ground DFun of the exact dictionary predicate.
+Follow exact variable aliases in Wanted evidence bindings. Do not follow Given
+bindings, casts, evidence applications, or arbitrary unfoldings. A missing alias
+or a cycle does not prove the obligation. Keep an unproved check for a later
+solver pass or error reporting. Never replace its evidence with another DFun.
+
+cloneWC preserves these checks and dictionary EvVars, while it clones evidence
+maps. This check only reads the active map. It does not publish a certificate or
+change evidence when a speculative solve succeeds. Constraint recovery retains
+unproved checks. Do not float them across a lexical evidence scope during kind
+checking. Do not suppress them in Template Haskell brackets. Error reporting
+must reject them even with deferred type errors: the provisional source
+equations have already been used in the result type.
+-}
+
+-- | Check the actual solved dictionary without performing instance search.
+-- See Note [Checked source method evidence].
+sourceMethodEvidenceMatches :: EvBindsMap -> EvVar -> DFunId -> TcS Bool
+sourceMethodEvidenceMatches bindings dictionary expected
+  = do { dictionary <- zonk_id dictionary
+       ; expected <- zonk_id expected
+       ; if isDFunId expected && isClassPred (idType dictionary)
+            && noFreeVarsOfType (idType dictionary)
+            && idType dictionary `tcEqType` idType expected
+         then go emptyVarSet (idType dictionary) expected dictionary
+         else return False }
+  where
+    zonk_id var = wrapTcS (TcM.liftZonkM (TcM.zonkId var))
+    go seen predicate expected current
+      | current `elemVarSet` seen = return False
+      | Just EvBind { eb_info = EvBindWanted {}, eb_rhs = EvExpr (Var next) }
+          <- lookupEvBind bindings current
+      = do { next <- zonk_id next
+           ; if not (idType next `tcEqType` predicate) then return False
+             else if isDFunId next then return (next == expected)
+             else go (extendVarSet seen current) predicate expected next }
+      | otherwise = return False
 
 {- Note [Delete dead Given evidence bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

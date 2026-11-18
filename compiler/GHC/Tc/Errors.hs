@@ -457,6 +457,7 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
                                  , ic_tclvl  = tc_lvl })
   | BracketSkol <- info
   , not insoluble
+  , not (has_source_method_check wanted)
   = return ()        -- For Template Haskell brackets report only
                      -- definite errors. The whole thing will be re-checked
                      -- later when we plug it in, and meanwhile there may
@@ -476,6 +477,13 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
        -- Report redundant (unused) constraints
        ; warnRedundantConstraints ctxt' ct_loc_env info' dead_givens }
   where
+    -- See Note [Checked source method evidence] in GHC.Tc.Solver.Solve.
+    has_source_method_check WC { wc_errors = errors, wc_impl = implics }
+      = anyBag is_source_method errors
+        || anyBag (has_source_method_check . ic_wanted) implics
+    is_source_method DE_SourceMethod {} = True
+    is_source_method _ = False
+
     insoluble    = isInsolubleStatus status
     (env1, tvs') = tidyVarBndrs (cec_tidy ctxt) $
                    scopedSort tvs
@@ -679,7 +687,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                                          , text "tidy_items =" <+> ppr tidy_items
                                          , text "tidy_errs  =" <+> ppr tidy_errs ])
 
-       ; let (out_of_scope, other_holes, not_conc_errs, mult_co_errs)
+       ; let (out_of_scope, other_holes, not_conc_errs, mult_co_errs, source_method_errs)
                 = partition_errors tidy_errs
 
          -- First, deal with any out-of-scope errors:
@@ -689,6 +697,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        -- Don't suppress holes or concreteness errors, ever
        ; reportHoles ctxt tidy_items other_holes
        ; reportNotConcreteErrs ctxt not_conc_errs
+       ; mapM_ reportSourceMethodError source_method_errs
 
        -- We only want to report multiplicity coercion errors for multiplicity
        -- constraints which are /solved/ with a non-reflexivity coercion. We
@@ -745,21 +754,31 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
  where
     env = cec_tidy ctxt
 
-    partition_errors :: [DelayedError] -> ([Hole], [Hole], [NotConcreteError], [(TcCoercion, CtLoc)])
+    partition_errors :: [DelayedError]
+                     -> ([Hole], [Hole], [NotConcreteError], [(TcCoercion, CtLoc)], [(EvVar, Name, CtLoc)])
     partition_errors []
-      = ([], [], [], [])
+      = ([], [], [], [], [])
     partition_errors (err:errs)
-      | (es1, es2, es3, es4) <- partition_errors errs
+      | (es1, es2, es3, es4, es5) <- partition_errors errs
       = case err of
           DE_Hole hole
             | isOutOfScopeHole hole
-            -> (hole : es1, es2, es3, es4)
+            -> (hole : es1, es2, es3, es4, es5)
             | otherwise
-            -> (es1, hole : es2, es3, es4)
+            -> (es1, hole : es2, es3, es4, es5)
           DE_NotConcrete err
-            -> (es1, es2, err : es3, es4)
+            -> (es1, es2, err : es3, es4, es5)
           DE_Multiplicity mult_co loc
-            -> (es1, es2, es3, (mult_co, loc):es4)
+            -> (es1, es2, es3, (mult_co, loc):es4, es5)
+          DE_SourceMethod ev _ method loc
+            -> (es1, es2, es3, es4, (ev, method, loc):es5)
+
+    -- This obligation must remain an error with -fdefer-type-errors.
+    -- See Note [Checked source method evidence] in GHC.Tc.Solver.Solve.
+    reportSourceMethodError :: (EvVar, Name, CtLoc) -> TcM ()
+    reportSourceMethodError (ev, method, loc)
+      = setCtLocM loc $ addErrTc $ TcRnRetainedQuantificationError $
+          RetainedSourceMethodEvidence method (varType ev)
 
     --serious_reporters: ones that should *not* be suppressed by cec_error_reported,
     --     (i.e. by an insoluble somewhere else in the tree)
