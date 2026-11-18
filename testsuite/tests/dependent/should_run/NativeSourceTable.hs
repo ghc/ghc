@@ -8,6 +8,7 @@ import Control.Exception (ArithException(DivideByZero), evaluate, throw, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
+import System.Mem.StableName (makeStableName)
 import PackedVecLibrary (type (+), type (*), Vec(..), Nat(..), appendVec, boolVector, flattenRows, isSuccessor, listCount, natToInt, plus, previous, times,
                          replicateAt, replicateNative, sourceLength, sourceVector, toList)
 
@@ -134,6 +135,10 @@ S n <.> m = S (S (n <.> m))
 localInfix :: foreach (n :: Nat) -> Vec Bool (n <.> Z)
 localInfix n = let cells = n <.> Z in replicateNative cells True
 
+-- | Use the local operator's equations together with a selected Num method.
+localFormula :: foreach (n :: Nat) -> Vec Bool (n <.> (n + 1))
+localFormula n = let cells = (n <.> ((+) @Nat n 1) :: Nat) in replicateNative cells True
+
 fixityProof :: (0 <.> 0 <.> 0) :~: (2 :: Nat)
 fixityProof = Refl
 
@@ -151,8 +156,24 @@ replicateSum n m x = replicateNative @a (n + m) x
 replicateProductPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat)
                        -> Vec Bool (1 + rows * cols)
 replicateProductPrefix rows cols =
-  let cells = times rows cols
+  let cells = rows * cols
   in replicateNative (1 + cells) True
+
+-- | Keep both references to the local product.
+{-# NOINLINE sharedProduct #-}
+sharedProduct :: foreach (rows :: Nat) -> foreach (cols :: Nat)
+              -> (Nat, Nat, Vec Bool (1 + rows * cols))
+sharedProduct rows cols =
+  let cells = rows * cols
+  in (cells, cells, replicateNative (1 + cells) True)
+
+-- | Keep both references below separate constructors.
+{-# NOINLINE sharedInnerProduct #-}
+sharedInnerProduct :: foreach (rows :: Nat) -> foreach (cols :: Nat)
+                   -> (Nat, Nat, Vec Bool (1 + rows * cols))
+sharedInnerProduct rows cols =
+  let cells = rows * cols
+  in (S cells, S cells, replicateNative (1 + cells) True)
 
 -- | Use the caller's multiplication independently of the vector length.
 ordinaryProduct :: Num Nat => foreach (rows :: Nat) -> foreach (cols :: Nat)
@@ -235,6 +256,16 @@ main = case (flipProof, signalProof, phaseProof) of
                    headOfNonempty (replicateProductPrefix bottom m),
                    natToInt ordinaryCells, length (toList checkedVector),
                    rightSuccessor == Left DivideByZero)
+    case sharedProduct n m of
+        (left, right, _) -> do
+            leftName <- makeStableName left
+            rightName <- makeStableName right
+            print (leftName == rightName)
+    case sharedInnerProduct n m of
+        (S left, S right, _) -> do
+            leftName <- makeStableName left
+            rightName <- makeStableName right
+            print (leftName == rightName)
     lamp <- newIORef Green >>= readIORef
     print (snd (afterLamp lamp))
     let partial = toList (replicateNative (S (times bottom m)) 'x')
@@ -244,4 +275,7 @@ main = case (flipProof, signalProof, phaseProof) of
             tailResult <- try (evaluate (null rest))
             print (x, tailResult == Left DivideByZero, null emptyCells)
         [] -> fail "Expected a cell before the nested product"
-    print (length (toList (localInfix n)))
+    print (length (toList (localInfix n)), length (toList (localFormula n)))
+
+-- The selector rule applies to Int. Local vector lengths select Num Nat.
+{-# RULES "Int multiply by one" forall (n :: Int). n * 1 = n #-}

@@ -30,5 +30,6 @@ do { n <- readIORef ref; m <- readIORef ref; print (toList (appendNative n m (re
 :continue
 let reserve :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); reserve r c = replicateNative (1 + r * c) True
 print (length (toList (reserve 2 3)))
-let named :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); named r c = let cells = times r c in replicateNative (1 + cells) True
+let named :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); named r c = let cells = r * c in replicateNative (1 + cells) True
 print (toList (named 0 8))
+do { r <- newIORef (error "forced product" :: Nat); n <- readIORef r; print (take 1 (toList (named n 2))) }
