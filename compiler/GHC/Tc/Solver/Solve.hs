@@ -409,12 +409,14 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                do { selected_givens <- select_source_let
                   ; let loc    = mkGivenLoc tclvl info ct_loc_env
                         givens = mkGivens loc selected_givens
-                  ; solveSimpleGivens givens
 
                   ; residual_wanted <- case ic_source_let imp of
                       Just (_, proof) | proof `elem` selected_givens ->
-                        withSourceLetProof proof (solveWanteds wanteds)
-                      _ -> solveWanteds wanteds
+                        withSourceLetProof proof $
+                          do { solveSimpleGivens (mkGivens loc (filter (/= proof) selected_givens))
+                             ; solveWanteds wanteds }
+                      _ -> do { solveSimpleGivens givens
+                              ; solveWanteds wanteds }
 
                   ; (has_eqs, given_insols) <- getHasGivenEqs tclvl
                         -- Call getHasGivenEqs /after/ solveWanteds, because
@@ -449,6 +451,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
 
        ; return res_implic }
   where
+    -- See Note [Demand-driven source-let Givens].
     select_source_let = case ic_source_let imp of
       Nothing -> return given_ids
       Just (_, proof) | proof `elem` given_ids -> return given_ids
@@ -545,6 +548,27 @@ pruneImplications wc@(WC { wc_impl = implics })
       = False
       | otherwise
       = True        -- Otherwise, keep it
+
+{- Note [Demand-driven source-let Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Keep a selected source-let proof in ic_given and the lexical definition
+map. Do not pass that synthetic proof to solveSimpleGivens. Normalizing
+its own RHS can reduce source families and record RULE or ABI dependencies
+even when no body constraint uses the definition.
+
+withSourceLetProof installs the ordinary Given-equality touchability
+barrier with updGivenEqLevel. It also snapshots the given-only inerts.
+This snapshot is necessary when the remaining Given list is empty:
+solveSimpleGivens then returns without updating inert_givens. Nested
+implications must inherit the barrier as well as the lexical definition.
+
+Check all ordinary Givens and Wanteds inside this scope. Their predicates
+can still normalize through selected definitions, including inside GADT
+matches. Only a real evidence use commits the synthetic proof. The proof
+does not need an inert entry: local-definition rewriting and direct
+equality preference read its lexical map. Needed-evidence tracking still
+uses ic_given and the actual coercions.
+-}
 
 {- Note [Conditional source let evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

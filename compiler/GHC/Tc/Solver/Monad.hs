@@ -333,8 +333,7 @@ addInertQCI new_qci
                   -- A qci_body like (f a) might be an equality
 
              ics2 | not_equality = ics1
-                  | otherwise    = ics1 { inert_given_eq_lvl = tclvl
-                                        , inert_given_eqs    = True }
+                  | otherwise    = updGivenEqLevel tclvl ics1
 
        ; setInertCans ics2 }
   where
@@ -1111,10 +1110,17 @@ getSourceLetScope :: TcS (VarEnv CoVar)
 getSourceLetScope = mkTcS $ \env -> return (tcs_source_lets env)
 
 -- | Scope the equality of a checked source definition over its suffix.
+-- The inert set must contain Givens only.
+-- See Note [Demand-driven source-let Givens] in GHC.Tc.Solver.Solve.
 withSourceLetProof :: CoVar -> TcS a -> TcS a
 withSourceLetProof proof inside
   | coVarRole proof == Nominal, TermVarTy value <- coVarLType proof
-  = mkTcS $ \env -> unTcS inside
+  = mkTcS $ \env -> unTcS
+      (do { level <- getTcLevel
+          ; updInertSet $ \inerts ->
+              let givens = updGivenEqLevel level (inert_cans inerts)
+              in inerts { inert_cans = givens, inert_givens = givens }
+          ; inside })
         (env { tcs_source_lets = extendVarEnv (tcs_source_lets env) value proof })
   | otherwise = pprPanic "withSourceLetProof" (ppr proof)
 

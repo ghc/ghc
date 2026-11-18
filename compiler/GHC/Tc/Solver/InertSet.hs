@@ -15,7 +15,7 @@ module GHC.Tc.Solver.InertSet (
     InertCans(..),
     emptyInertSet, emptyInertCans, resetInertCans,
 
-    noGivenNewtypeReprEqs, updGivenEqs,
+    noGivenNewtypeReprEqs, updGivenEqs, updGivenEqLevel,
     prohibitedSuperClassSolve,
 
     -- * Inert equalities
@@ -1603,8 +1603,12 @@ updGivenEqs tclvl ct inerts
 
   -- At this point we are left with a constraint that either
   -- is an equality (F a ~ ty), or /might/ be, like (c a)
-  | otherwise = inerts { inert_given_eq_lvl = tclvl
-                       , inert_given_eqs    = True }
+  | otherwise = updGivenEqLevel tclvl inerts
+
+-- | Record a Given equality that makes outer metavariables untouchable.
+updGivenEqLevel :: TcLevel -> InertCans -> InertCans
+updGivenEqLevel tclvl inerts
+  = inerts { inert_given_eq_lvl = tclvl, inert_given_eqs = True }
 
 isLetBoundSkolemCt :: TcLevel -> Ct -> Bool
 -- See Note [Let-bound skolems]
