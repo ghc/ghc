@@ -27,3 +27,26 @@ NativeSourceLengthEmpty.hs:19:29: error: [GHC-83865]
       In the expression: safeHead (replicateNative (n + 1) True)
       In an equation for ‘rightSuccessor’:
           rightSuccessor n = safeHead (replicateNative (n + 1) True)
+
+NativeSourceLengthEmpty.hs:22:44: error: [GHC-25897]
+    • Couldn't match type ‘b’ with ‘a’
+      Expected: [a]
+        Actual: [b]
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          badCell :: forall a b. @GHC.Internal.Types.Unmatchable
+                     a -> [b] -> a
+        at NativeSourceLengthEmpty.hs:21:1-24
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          badCell :: forall a b. @GHC.Internal.Types.Unmatchable
+                     a -> [b] -> a
+        at NativeSourceLengthEmpty.hs:21:1-24
+    • In the expression: sourceVector (x : ys)
+      In the first argument of ‘safeHead’, namely
+        ‘(sourceVector (x : ys))’
+      In the expression: safeHead (sourceVector (x : ys))
+    • Relevant bindings include
+        ys :: [b] (bound at NativeSourceLengthEmpty.hs:22:11)
+        x :: a (bound at NativeSourceLengthEmpty.hs:22:9)
+        badCell :: a -> [b] -> a (bound at NativeSourceLengthEmpty.hs:22:1)

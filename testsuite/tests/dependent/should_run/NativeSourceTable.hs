@@ -93,6 +93,16 @@ oneMore n = replicateNative (n + 1) False
 headOfNonempty :: Vec a (1 + n) -> a
 headOfNonempty (VCons x _) = x
 
+-- The list cell determines both the element type and nonemptiness.
+firstCell :: a -> [a] -> a
+firstCell x xs = headOfNonempty (sourceVector (x : xs))
+
+-- The inner constructor supplies both parameters of the outer constructor.
+data Parcel a b = Leaf a b | Layer (Parcel a b)
+
+parcelTag :: forall a b. foreach (p :: Parcel a b) -> Proxy p
+parcelTag _p = Proxy
+
 -- The later tag fixes the first addend before the vector determines the tail.
 withPrefix :: Vec a (p + k) -> Proxy p -> [a]
 withPrefix xs _ = toList xs
@@ -150,6 +160,10 @@ main = case (flipProof, signalProof, phaseProof) of
     print (spine == Left DivideByZero)
     let ints = [11, 22] :: [Int]
     print (toList (sourceVector @Int ints))
+    tailRef <- newIORef (throw DivideByZero :: [Int])
+    tailCells <- readIORef tailRef
+    print (firstCell 37 tailCells)
+    case parcelTag (Layer (Leaf True tailCells)) of Proxy -> print True
     print (natToInt (plus (S Z) (S Z)), isSuccessor (plus (S Z) (throw DivideByZero)))
     print (toList literalThree, headOfNonempty literalThree, natToInt (2 + 3))
     print (toList (replicateAt 3 True), length (toList (replicateAt 3 (undefined :: Int))))

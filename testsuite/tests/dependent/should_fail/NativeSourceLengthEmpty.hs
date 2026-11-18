@@ -17,3 +17,6 @@ fromRef ref = do
 
 rightSuccessor :: foreach (n :: Nat) -> Bool
 rightSuccessor n = safeHead (replicateNative (n + 1) True)
+
+badCell :: a -> [b] -> a
+badCell x ys = safeHead (sourceVector (x : ys))

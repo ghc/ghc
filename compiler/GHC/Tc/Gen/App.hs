@@ -30,7 +30,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Utils.Env ( tcLookupIdMaybe, tcLookupConLike, tcLookupLcl_maybe )
+import GHC.Tc.Utils.Env ( tcLookupIdMaybe, tcLookupConLike, tcLookupGlobal, tcLookupLcl_maybe )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -47,7 +47,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Class ( Class )
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( dataConConcreteTyVars, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
+import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Reduction ( reductionReducedType )
@@ -70,7 +70,7 @@ import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
 import GHC.Driver.DynFlags ( DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
-import GHC.Types.TyThing ( TyThing(AnId) )
+import GHC.Types.TyThing ( TyThing(AnId, AConLike) )
 import GHC.Types.Basic ( TypeOrKind(TypeLevel), intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
@@ -698,10 +698,10 @@ tcRetainedKnownArgPlan expected fun sigma args
                      ; return (if valid then Just choices else Nothing) }
              _ -> return Nothing }
 
-    declared_arg tvs (Just domain, arg)
-      | let formal = scaledThing domain
-      , any (`elemVarSet` tyCoVarsOfType formal) tvs
-      = do { actual <- tcRetainedDeclaredArgType tcRetainedDeclaredTypeView arg
+    declared_arg tvs (Just (retained, formal), arg)
+      | any (`elemVarSet` tyCoVarsOfType formal) tvs
+      = do { actual <- if retained then tcRetainedConstructorArgType arg
+                         else tcRetainedDeclaredArgType tcRetainedDeclaredTypeView arg
            ; return ((formal,) <$> actual) }
       | otherwise = return Nothing
     declared_arg _ _ = return Nothing
@@ -731,6 +731,63 @@ tcRetainedDeclaredArgType view_type (L loc (HsVar _ lname))
                else return Nothing }
            Nothing -> return Nothing }
 tcRetainedDeclaredArgType _ _ = return Nothing
+
+-- | Read a visible retained argument's type from its constructor fields.
+-- See Note [Erased parameters of a retained constructor argument].
+tcRetainedConstructorArgType :: LHsExpr GhcRn -> TcM (Maybe Type)
+tcRetainedConstructorArgType = collect []
+  where
+    collect args (L _ (HsPar _ fun)) = collect args fun
+    collect args (L _ (HsApp _ fun arg)) = collect (arg : args) fun
+    collect [] (L _ (OpApp _ lhs op rhs)) = collect [lhs, rhs] op
+    collect [] (L _ (ExplicitList _ fields))
+      = fmap (fmap mkListTy) (firstJustsM (map tcRetainedConstructorArgType fields))
+    collect args (L loc (HsVar _ lname))
+      | let name = unLocWithUserRdr lname
+      , isDataOcc (nameOccName name)
+      = setSrcSpanA loc $ do
+          { thing <- tcLookupGlobal name
+          ; case thing of
+              AConLike (RealDataCon dc)
+                | (tvs, [], [], [], fields, result) <- dataConFullSig dc
+                , fields `equalLength` args
+                , isJust (nativeIndexDataConTyArgs result dc)
+                -> do { subst <- foldM (match_field tvs) Subst.emptySubst (zip fields args)
+                      ; return $ do
+                          { choices <- traverse (Subst.lookupTyVar subst) tvs
+                          ; let ty = substTyWith tvs choices result
+                          ; guard (isNativeIndexType ty)
+                          ; return ty } }
+              _ -> return Nothing }
+    collect [] arg = tcRetainedDeclaredArgType tcRetainedDeclaredTypeView arg
+    collect _ _ = return Nothing
+
+    match_field tvs subst (Scaled _ formal, arg)
+      | any (\tv -> isNothing (Subst.lookupTyVar subst tv)
+                  && tv `elemVarSet` tyCoVarsOfType formal) tvs
+      = do { actual <- tcRetainedConstructorArgType arg
+           ; return (fromMaybe subst (actual >>= matchRetainedAppType tvs subst formal)) }
+      | otherwise = return subst
+
+{- Note [Erased parameters of a retained constructor argument]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In sourceVector (x : xs), the type of x supplies the list element type.
+This can be Vec Bool n for a runtime binder n. Select the erased argument
+before IALL creates a metavariable that cannot mention n.
+
+Read the declared types of fields of saturated, eligible index constructors.
+Resolve the constructor by its renamed Name. Match its original field types
+in source order. A field contributes only while it can determine a missing
+parameter. For Twin x y z with fields a, a, b, the declaration of x can fix
+a. The ordinary argument checker then reports a mismatch at y. A nullary
+constructor such as False determines Bool. A polymorphic nullary constructor
+cannot supply its missing parameter. Numeric literals require a known domain.
+
+This pass reads declarations without checking occurrences. The enclosing
+selector validates the scope and kinds of the complete choice. tcRetainedArg
+checks the actual constructor tree at that domain. Value checking accounts
+for field usage. See Note [Declared retained-domain choices].
+-}
 
 -- | Test whether a type is independent of Quick Look instantiation variables.
 noQuickLookVars :: Type -> Bool
@@ -783,9 +840,8 @@ tcInferInvisibleRetained tvs binder body args
       where
         match subst (formal, actual) = matchRetainedAppType variables subst formal actual
 
-    declared_pair view indices (Just domain, arg)
-      | let formal = scaledThing domain
-      , any (`elemVarSet` tyCoVarsOfType formal) (binder : tvs)
+    declared_pair view indices (Just (_, formal), arg)
+      | any (`elemVarSet` tyCoVarsOfType formal) (binder : tvs)
       , Just abstract <- abstractNativeIndices indices formal
       = do { actual <- tcRetainedDeclaredArgType view arg
            ; return ((abstract,) <$> actual) }
@@ -966,9 +1022,9 @@ GHC.Core.TyCo.FVs.
 -}
 
 -- | Collect declared domains for the written value-argument prefix.
--- Nothing keeps a dependent argument's position without matching its domain.
+-- Mark visible retained domains with True. Keep dependent positions with Nothing.
 -- See Note [Declared retained-domain choices].
-retainedDeclaredDomains :: Int -> Type -> ([Maybe (Scaled Type)], Maybe Type)
+retainedDeclaredDomains :: Int -> Type -> ([Maybe (Bool, Type)], Maybe Type)
 retainedDeclaredDomains supplied = go supplied emptyVarSet
   where
     go 0 bound result = result_view bound result
@@ -976,22 +1032,22 @@ retainedDeclaredDomains supplied = go supplied emptyVarSet
       | Just ty' <- coreView ty = go remaining bound ty'
     go _ _ (DepFunTy DepFunInvisible _ _) = ([], Nothing)
     go remaining bound (DepFunTy DepFunVisible binder body)
-      = let domain = independent bound (Scaled (idMult binder) (varType binder))
+      = let domain = independent bound True (varType binder)
             (rest, result) = go (remaining - 1) (extendVarSet bound binder) body
         in (domain : rest, result)
-    go remaining bound (FunTy af _ mult arg res)
+    go remaining bound (FunTy af _ _ arg res)
       | isVisibleFunArg af
       = let (rest, result) = go (remaining - 1) bound res
-        in (independent bound (Scaled mult arg) : rest, result)
+        in (independent bound False arg : rest, result)
       | otherwise = go remaining bound res
     go _ bound result = result_view bound result
 
     result_view bound result
       = ([], if mentions bound result then Nothing else Just result)
 
-    independent bound domain
-      | mentions bound (scaledThing domain) = Nothing
-      | otherwise = Just domain
+    independent bound retained domain
+      | mentions bound domain = Nothing
+      | otherwise = Just (retained, domain)
     mentions bound = anyFreeVarsOfType (`elemVarSet` bound)
 
 {- Note [Declared retained-domain choices]
@@ -1050,10 +1106,10 @@ matchRetainedAppType tvs subst formal actual
 In withQ Refl f, the declared monomorphic type of f can determine value := QPi.
 Reading this declaration does not check the occurrence or consume its usage.
 Do not call tcInferId: it emits usage. Global lookup may load an interface.
-Keep applications, constructors, signatures and polymorphic values on their
-existing paths. Look through parentheses without expanding source syntax.
-A built-in list literal can use a declared native variable field as element
-advice. See Note [Declared retained-domain choices].
+Visible retained domains can also use constructor fields. See
+Note [Erased parameters of a retained constructor argument]. Look through
+parentheses without expanding source syntax. A built-in list literal can
+use a declared native variable field as element advice. See Note [Declared retained-domain choices].
 
 Match known types against declared independent visible argument domains.
 Include retained domains without choosing their runtime arguments. See
