@@ -55,9 +55,12 @@ M74 checks consecutive invisible retained arguments. The two vectors in
 index `Add n m`. A caller can also write either the leading operand or both
 operands. Both stages match 133 Showcase output lines through seventeen
 source modules, including the banner. R03, R05 and R23 remain open.
-The next evaluation experiment tests an ordinary source function in a closed
-type expression. Its runtime and handwritten-family controls pass. The direct
-source proof currently fails at name resolution. See [M75](PLAN.md#m75-closed-evaluation-of-a-source-function).
+M75 lets a type use an ordinary source function on a finite enumeration.
+The imported `flipBit` determines a payload type. The three equations of a
+traffic-light function reduce in a client with only the object interface.
+Both use checked clauses from the producer. R15 remains open for constructor
+fields and recursion, including the roadmap's list-length example.
+See [M75](PLAN.md#m75-closed-evaluation-of-a-source-function).
 
 M62 supplied the earlier 88-line source group through fourteen modules.
 M56 provides
@@ -114,6 +117,8 @@ can advance a card while the card remains open.
 | 13 | R03: source definitions and omitted invisible runtime operands | Complete bounded increment: M72 | The imported call passes the IO-sourced Nat from a later vector declaration. Native object tests cover ignored bottom, name shadowing and located missing and conflicting operands. |
 | 14 | R03: explicit invisible runtime operands | Complete bounded increment: M73 | Written `@{n}` works with or without erased `@Int`. The interface-only client preserves demand. A wrong written index reports the later argument where the two indices disagree. |
 | 15 | R03: consecutive invisible runtime operands | Complete bounded increment: M74 | The interface-only vector append infers two lengths and checks their sum in the result type. Constructor inference respects term scope and records import usage. |
+| 16 | R15: closed evaluation of source functions; advances R13 and R21 | M75 finite constructor tables | Check the complete table once and export its equations. A body change invalidates an unchanged client proof. |
+| 17 | R15: constructor fields in a source equation | [M76](PLAN.md#m76-constructor-fields-in-a-source-equation) | Return the field of `S n` from a checked `previous` clause. This supplies field binding for a later structural list-length example. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -274,7 +279,7 @@ still require substantial research.
 - [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24.
 - [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23.
 - [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge.
-- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. Locally, M75 reduces closed applications of unary constructor tables.
 - [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge.
 - [ ] **R17 [Type-level lambdas](https://ghc.serokell.io/dh#type-level-lambdas)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R18 [Type-level let-bindings](https://ghc.serokell.io/dh#type-level-let-bindings)** — Unmarked. Needs/includes: R05, R16.

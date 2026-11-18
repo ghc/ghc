@@ -4431,3 +4431,36 @@ the ordinary runtime function and a separately declared family both work.
 Local sources and observations are in
 `_build/verification/native-closed-evaluation-baseline-v4`.
 [Proposal #378, lexical scoping](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#changes-to-support-dependent-types)
+
+Agda's manual starts with Boolean negation. The checker validates clause
+coverage and termination separately. GHC can use a simpler test for the
+M75 grammar. Each constructor occurs exactly once on the left, and every
+right-hand side names a constructor. There are no recursive calls to check.
+The type checker can therefore reduce a closed input without running the
+producer's object code. [Agda 2.8.0 function definitions](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#introduction)
+
+Serokell's closed-evaluator card uses `length [1,2,3]` as its example and
+discusses bytecode or native execution. M75 uses GHC's closed-family
+reducer for verified constructor equations. Reaching the list example
+requires constructor fields and recursion. The dependency-analysis card
+also calls for checking types that depend on values in the same module.
+[Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)
+and [dependency analysis](https://ghc.serokell.io/dh#dependency-analysis).
+
+### Constructor fields and the next evaluation rule
+
+Agda's one-argument coverage example permits one clause for each constructor.
+Its case-tree rules explain why a nested or overlapping pattern can change
+which source equations hold by reduction. M76 limits each field pattern to a
+fresh variable or a wildcard. One row per outer constructor then covers all
+constructor values. [Agda coverage checking](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#single-match-on-a-non-indexed-datatype)
+and [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
+
+`singletons-th` scopes variables from a clause's pattern over its right-hand
+side and promotes constructor arguments in order. It warns when promotion
+drops a lazy or strict pattern. For instance, the Haskell binding
+`always ~(S _) = True` also accepts `Z`. M76 excludes explicit lazy and
+strict patterns. A lifted field matched by a wildcard must remain unevaluated
+at runtime. [Clause translation](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L1344-L1381),
+[pattern translation](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L1395-L1433)
+and [Haskell pattern semantics](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-590003.17).

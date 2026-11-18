@@ -71,6 +71,7 @@ _build/showcase/showcase
 | Generic lists, opaque elements, dependent element domains and lazy prefixes | `genericListIndexing` |
 | Retained imports used by a module without dependent source syntax | `ordinaryModuleCalls` |
 | Generic finite positions, function elements, runtime-indexed payloads and lazy prefixes | `genericSafeIndexing` |
+| A source function used in a result type and a proof about an imported traffic-light function | `closedSourceFunctions` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -121,6 +122,20 @@ Keep the program finite. Compiler-only invariants stay in the focused tests and
 optimization support or full roadmap completion.
 
 ## Current status
+
+A dependent module can use checked equations from an ordinary function in
+a type. For example, the producer defines `flipBit False = True` and
+`flipBit True = False`. A client with `ExperimentalDependentTypes` can write
+`proof :: flipBit 'False :~: 'True` and `proof = Refl`. The function accepts
+an ordinary `Bool` at runtime. A closed family in the producer's interface
+supplies the compile-time equations. The producer and client also work with
+user-defined enumerations. [Source example](examples/qualified-pi/ClosedTableLibrary.hs)
+and [runnable client](Showcase.hs).
+
+Exporting an eligible function from a dependent module makes its equations
+part of the module's type-level API. Editing a right-hand side can invalidate
+a client proof even when the function's signature stays the same. A module
+that imports only the term can call it as ordinary Haskell.
 
 | Item | State |
 | --- | --- |
@@ -195,7 +210,7 @@ optimization support or full roadmap completion.
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | `Showcase.hs` passes both compilers with 125 output lines, including the banner, through seventeen modules. R03, R05 and R23 remain open. |
+| Maintained showcase | `Showcase.hs` passes both compilers with 136 output lines, including the banner, through eighteen modules. The closed-evaluation example uses a source function in its result type. |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and

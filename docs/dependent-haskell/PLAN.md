@@ -6062,12 +6062,85 @@ ordering for both local and imported definitions. See
 
 - [x] Measure the ordinary runtime call, the closed-family control and the
       direct source proof on the M74 compiler.
-- [ ] Generate and validate the reduction equations from one source binding.
+- [x] Generate and validate the reduction equations from one source binding.
       Require an ordinary datatype with an exhaustive constructor table.
-      Report unsupported clauses at their source.
-- [ ] Prove a closed application by `Refl` in the defining module and in an
+      Report an incomplete local table at its binding. Report an unavailable
+      imported table at the use in the client.
+- [x] Prove a closed application by `Refl` in the defining module and in an
       interface-only client. Reject the opposite equation. Preserve type
       variable shadowing and the ordinary runtime result.
-- [ ] Change only the producer's table and verify dependent client
+- [x] Change only the producer's table and verify dependent client
       recompilation. Check an opaque imported definition and an open,
       undetermined input. Add the verified example to Showcase.
+
+The producer checks the solved function type and the typechecked matches.
+It accepts a monomorphic, unrestricted function between lifted enumerations.
+Each row must match a distinct nullary constructor and return a nullary
+constructor. GHC creates one nominal axiom for the closed family. The
+ordinary function still matches its input at runtime. Imported functions
+can have inferred signatures, as in the traffic-light example.
+
+An explicitly bound type variable takes precedence. Qualified names,
+re-exports and import hiding follow the term's scope. In the defining
+declaration group the current scheduler requires a single explicit signature
+of the form `f :: A -> B`. It can move an independent local enumeration with
+the binding. Deriving clauses and `SPECIALISE` pragmas are outside this
+scheduler. A syntactically eligible local binding can reserve the name before
+coverage checking. An imported function without checked equations leaves
+that spelling available for implicit quantification. Write `forall f.`
+to bind the type variable in both contexts. General mixed declaration
+ordering remains on R21.
+
+The interface records the equations even with unfoldings omitted. The
+public spelling in a diagnostic is the term name. The dependent client
+records whether the producer had a table at the time of lookup. Changing
+one result invalidates a proof. Adding a table can invalidate a previous
+implicit binder. Moving an equation updates its stored source span and
+preserves the equation ABI. The preceding v65 compiler reads the interface,
+skips the optional locations and runs an ordinary client.
+
+Both compiler stages pass the object-interface and `-fno-code` proofs.
+The latter produced only a `.hi` file for the client to read. A producer
+with deferred errors exported equations for its well-typed table alone.
+The declaration-splice control kept the order and number of splice
+executions. Both stages match all 136 Showcase output lines across eighteen
+source modules. Fifteen registered normal-way tests pass, with 74 other
+cases skipped. The local verification files use the `native-source-table-`
+prefix. Implementation commits are `8ffae4114c` and `4b2cdc63c1`.
+
+## M76: constructor fields in a source equation
+
+R15 owns this step towards the roadmap's list-length example. Start with
+an ordinary recursive datatype and functions that do not call themselves.
+
+```haskell
+data Nat = Z | S Nat
+
+previous :: Nat -> Nat
+previous Z     = Z
+previous (S n) = n
+
+isSuccessor :: Nat -> Bool
+isSuccessor Z     = False
+isSuccessor (S _) = True
+```
+
+- [x] Measure the M75 compiler on `previous ('S ('S 'Z))` and compare
+      it with the handwritten family and ordinary runtime call. The direct
+      proof gives GHC-68947 at `previous`. The control proves the family
+      equation and prints `(S Z,True)` with a bottom predecessor field in
+      the successor test.
+- [ ] Extend checked rows to shallow patterns on ordinary lifted data
+      constructors. Bind fresh variables for their lazy fields. Permit a
+      returned field of the appropriate type. Keep the one-row-per-constructor
+      check. In particular, a row for `S Z` leaves `S (S Z)` uncovered.
+- [ ] Prove `previous ('S n) :~: n` in an interface-only client, including
+      an abstract `n`. Keep `previous n` stuck for an unknown outer
+      constructor. Check that `isSuccessor (S undefined)` returns `True`
+      and that forcing `previous (S undefined)` raises the field's error.
+      Reject explicit lazy and strict patterns until their reduction rules
+      account for Haskell demand.
+
+Recursive calls need a later termination check. List length also needs to
+construct the successor of a recursive result. See the [Agda and singletons
+sources](REFERENCES.md#constructor-fields-and-the-next-evaluation-rule).

@@ -22,6 +22,7 @@
 module Main (main) where
 
 import qualified BetaCallClient as Beta
+import qualified ClosedTableLibrary as Table
 import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
@@ -784,3 +785,19 @@ main = do
     genericSafeIndexing
     invisibleRetainedArguments
     inferredAppend
+    closedSourceFunctions
+
+-- | Use the same imported function at runtime and in a result type.
+closedSourceFunctions :: IO ()
+closedSourceFunctions = do
+    observe "flipBit at runtime" (map Table.flipBit [False, True])
+    observe "payload selected by flipBit" (chooseFlipped False, chooseFlipped True)
+    case signalProof of
+        Refl -> observe "signal at Green" (Table.signal Table.Green)
+  where
+    chooseFlipped :: foreach (b :: Bool) -> Select (Table.flipBit b)
+    chooseFlipped False = 42
+    chooseFlipped True = False
+
+    signalProof :: Table.signal 'Table.Green :~: 'Table.Go
+    signalProof = Refl
