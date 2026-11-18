@@ -22,7 +22,7 @@ import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
 import GHC.Rename.Utils ( mkExpandedLExpr )
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Match ( tcMatches, tcBody )
-import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId, recordSourceMethodUse )
+import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId, recordSourceMethodUse, recordSourceLiteralUse )
 import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
@@ -44,6 +44,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
 
+import GHC.Core.Class ( Class )
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
@@ -67,11 +68,12 @@ import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, con
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
+import GHC.Driver.DynFlags ( DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
 import GHC.Types.TyThing ( TyThing(AnId) )
-import GHC.Types.Basic ( TypeOrKind(TypeLevel) )
+import GHC.Types.Basic ( TypeOrKind(TypeLevel), intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
-import GHC.Types.Id ( mkLocalId, isClassOpId_maybe, sourceMethodTarget_maybe )
+import GHC.Types.Id ( mkLocalId, isClassOpId_maybe, sourceMethodTarget_maybe, sourceLiteralCons_maybe )
 import GHC.Types.Var.Set ( elemVarSet, emptyVarSet, extendVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
@@ -1913,37 +1915,85 @@ tcRetainedValueOperand domain arg@(L loc original)
           forM_ type_arg $ \ty -> do
             (supplied, _) <- tcVTA (idConcreteTvs sel) (varType sel) ty
             unless (supplied `tcEqType` domain) unchecked
-          insts <- tcGetInstEnvs
-          dfun <- case lookupUniqueInstEnv insts cls [domain] of
-            Right (inst, []) -> do
-              env <- getGblEnv
-              let dfun_name = getName (instanceDFunId inst)
-              -- A local method has no completed instance interface yet.
-              when (nameIsLocalOrFrom (tcg_semantic_mod env) dfun_name) $
-                failWithTc (TcRnRetainedQuantificationError (RetainedLocalSourceMethod name))
-              tcLookupIdMaybe dfun_name >>= maybe unchecked return
-            _ -> unchecked
+          dfun <- tcRetainedDFun name cls domain >>= maybe unchecked return
           target_name <- maybe unchecked return (sourceMethodTarget_maybe dfun sel)
           target <- tcLookupIdMaybe target_name >>= maybe unchecked return
           unless (varType target `tcEqType` classMethodInstTy sel [domain]) unchecked
 
           let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
               runtime_arg = L loc (mkExpandedLExpr original (mkHsApps target_head args))
-          index_arg <- tcRetainedArg domain runtime_arg
+          checked <- tcRetainedArg domain runtime_arg
           recordSourceMethodUse dfun sel target
-          ev <- newWanted (OccurrenceOf name) Nothing (mkClassPred cls [domain])
-          emitSimple (mkNonCanonical ev)
-          emitDelayedErrors (unitBag (DE_SourceMethod (ctEvEvId ev) dfun name (ctEvLoc ev)))
-          return (index_arg, runtime_arg)
+          wantRetainedMethod sel dfun
+          return checked
         _ -> ordinary
   | otherwise = ordinary
   where
-    ordinary = (,arg) <$> tcRetainedArg domain arg
+    ordinary = tcRetainedArg domain arg
     split_call :: LHsExpr GhcRn -> [LHsExpr GhcRn] -> (LHsExpr GhcRn, [LHsExpr GhcRn])
     split_call (L _ (HsPar _ e)) args = split_call e args
     split_call (L _ (HsApp _ f a)) args = split_call f (a:args)
     split_call (L _ (OpApp _ a op b)) args = split_call op (a:b:args)
     split_call e args = (e, args)
+
+-- | Look up a completed, ground instance with no context.
+tcRetainedDFun :: Name -> Class -> Type -> TcM (Maybe Id)
+tcRetainedDFun method cls domain = do
+  insts <- tcGetInstEnvs
+  case lookupUniqueInstEnv insts cls [domain] of
+    Right (inst, []) -> do
+      env <- getGblEnv
+      let dfun_name = getName (instanceDFunId inst)
+      when (nameIsLocalOrFrom (tcg_semantic_mod env) dfun_name) $
+        failWithTc (TcRnRetainedQuantificationError (RetainedLocalSourceMethod method))
+      tcLookupIdMaybe dfun_name
+    _ -> return Nothing
+
+-- | Require the ordinary solver to select this dictionary at the use site.
+wantRetainedMethod :: Id -> Id -> TcM ()
+wantRetainedMethod sel dfun = do
+  let name = getName sel
+  ev <- newWanted (OccurrenceOf name) Nothing (varType dfun)
+  emitSimple (mkNonCanonical ev)
+  emitDelayedErrors (unitBag (DE_SourceMethod (ctEvEvId ev) dfun name (ctEvLoc ev)))
+
+-- | Elaborate a nonnegative literal at a known retained domain.
+-- See Note [Retained integral literals].
+tcRetainedNumeral :: Type -> Name -> Integer -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+tcRetainedNumeral domain from n = do
+  let unverified :: TcM a
+      unverified = failWithTc (TcRnRetainedQuantificationError (RetainedLiteralConversion from domain))
+  sel <- tcLookupIdMaybe from >>= maybe unverified return
+  cls <- case isClassOpId_maybe sel of
+    Just cls | cls `hasKey` numClassKey, noFreeVarsOfType domain -> return cls
+    _ -> unverified
+  dfun <- tcRetainedDFun from cls domain >>= maybe unverified return
+  (zero, succ_con) <- maybe unverified return (sourceLiteralCons_maybe dfun sel)
+  dflags <- getDynFlags
+  when (n > toInteger (maxBound :: Int) || intGtLimit (fromInteger n) (reductionDepth dflags)) $
+    failWithTc (TcRnRetainedQuantificationError (RetainedLiteralDepth n))
+  recordSourceLiteralUse dfun sel
+  wantRetainedMethod sel dfun
+  let build :: Int -> (Core.CoreExpr, LHsExpr GhcRn)
+      build 0 = (Core.Var (dataConWorkId zero), nlHsVar (dataConName zero))
+      build k = let (val, src) = build (k - 1)
+                in (Core.App (Core.Var (dataConWorkId succ_con)) val,
+                    nlHsApp (nlHsVar (dataConName succ_con)) src)
+  return (build (fromInteger n))
+
+{- Note [Retained integral literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In replicateNative 3 x, the renamer supplies the literal conversion Name.
+The completed Num dictionary must certify its zero and successor equations.
+Require the ordinary solver to select this dictionary, just as for (+).
+Build both the runtime argument and its index from those exact constructors.
+The constructors may be private to the module that defines the instance.
+
+A result signature such as Vec a 3 resolves its numeral independently through
+FromNatural. Ordinary type equality checks that the two meanings agree.
+Each successor adds one constructor. Check the reduction-depth budget before
+allocating the tree, including for a literal too large to fit in an Int.
+-}
 
 {- Note [Dictionary selection in retained arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1990,34 +2040,48 @@ tcRetainedFunctionArg domain arg
 
 -- | Resolve a retained argument at its known domain without checking its value.
 -- See Note [Retained argument application].
-tcRetainedArg :: Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
+tcRetainedArg :: Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
 tcRetainedArg domain arg
   = setSrcSpanA (getLoc arg) $
-    do { core_arg <- resolve emptyNameEnv domain arg
+    do { result@(core_arg, _) <- resolve emptyNameEnv domain arg
        ; case Core.retainedArgIndex core_arg of
-           Just index | typeKind index `tcEqType` domain -> return core_arg
+           Just index | typeKind index `tcEqType` domain -> return result
            _ -> unsupported }
   where
-    resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
-    resolve env expected (L loc expr)
+    resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+    resolve env expected original@(L loc expr)
       = setSrcSpanA loc $ case expr of
-          HsPar _ arg -> resolve env expected arg
-          XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> resolve env expected arg
-          HsApp _ fun arg -> resolve_app env expected fun arg
-          OpApp _ left op right -> resolve_app env expected (nlHsApp op left) right
-          ExplicitList _ elements
+          HsPar x arg -> do
+            (core, arg') <- resolve env expected arg
+            return (core, L loc (HsPar x arg'))
+          XExpr (ExpandedThingRn (HSE ctxt arg)) -> do
+            (core, arg') <- resolve env expected arg
+            return (core, L loc (XExpr (ExpandedThingRn (HSE ctxt arg'))))
+          HsOverLit _ (OverLit OverLitRn{ol_from_fun = L _ from} (HsIntegral lit))
+            | let n = il_value lit, n >= 0
+            -> do { (core, generated) <- tcRetainedNumeral expected from n
+                  ; return (core, L loc (mkExpandedLExpr expr generated)) }
+          HsApp x fun arg -> do
+            (core, fun', arg') <- resolve_app env expected fun arg
+            return (core, L loc (HsApp x fun' arg'))
+          OpApp x left op right -> do
+            (partial, op', left') <- resolve_app env expected op left
+            (core, right') <- apply env partial right
+            return (core, L loc (OpApp x left' op' right'))
+          ExplicitList x elements
             | Just [element_ty] <- nativeIndexDataConTyArgs expected nilDataCon
             -> do { nil <- constructor expected nilDataCon
                   ; cons <- constructor expected consDataCon
-                  ; values <- mapM (resolve env element_ty) elements
-                  ; return (foldr (\value rest -> Core.mkApps cons [value, rest]) nil values) }
+                  ; (values, elements') <- unzip <$> mapM (resolve env element_ty) elements
+                  ; return (foldr (\value rest -> Core.mkApps cons [value, rest]) nil values,
+                            L loc (ExplicitList x elements')) }
           HsVar _ lname
             | Just arg_id <- lookupNameEnv env (unLocWithUserRdr lname)
-            -> tcRetainedArgVar expected arg_id
+            -> (,original) <$> tcRetainedArgVar expected arg_id
             | isDataOcc (nameOccName (unLocWithUserRdr lname))
             -> do { con <- tcLookupConLike (unLoc lname)
                   ; case con of
-                      RealDataCon dc -> constructor expected dc
+                      RealDataCon dc -> (,original) <$> constructor expected dc
                       _ -> unsupported }
             | otherwise
             -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
@@ -2035,7 +2099,7 @@ tcRetainedArg domain arg
                                   ; tcSubMult (OccurrenceOf (getName arg_id)) ManyTy mult
                                   ; arg_id <- liftZonkM (zonkId arg_id)
                                   ; if isNativeOpaqueValueId arg_id
-                                    then tcRetainedArgVar expected arg_id
+                                    then (,original) <$> tcRetainedArgVar expected arg_id
                                     else failWithTc $ TcRnRetainedQuantificationError
                                            (RetainedIndexMultiplicity (idMult arg_id)) }
                                 else unsupported }
@@ -2048,42 +2112,53 @@ tcRetainedArg domain arg
       Nothing -> unsupported
 
     resolve_app :: NameEnv Id -> Type -> LHsExpr GhcRn -> LHsExpr GhcRn
-                -> TcM Core.CoreExpr
-    resolve_app env expected (L _ (HsPar _ fun)) arg
-      = resolve_app env expected fun arg
-    resolve_app env expected (L _ (XExpr (ExpandedThingRn (HSE { hse_exp = fun })))) arg
-      = resolve_app env expected fun arg
-    resolve_app env expected (L loc (HsLam _ LamSingle matches)) arg
-      | [L _ Match { m_pats = L _ [L _ (VarPat _ lname)]
-                   , m_grhss = GRHSs { grhssGRHSs = grhss
-                                     , grhssLocalBinds = L _ (EmptyLocalBinds _) } }]
-          <- unLoc (mg_alts matches)
-      , [L _ (GRHS _ [] body)] <- NE.toList grhss
+                -> TcM (Core.CoreExpr, LHsExpr GhcRn, LHsExpr GhcRn)
+    resolve_app env expected (L loc (HsPar x fun)) arg = do
+        (core, fun', arg') <- resolve_app env expected fun arg
+        return (core, L loc (HsPar x fun'), arg')
+    resolve_app env expected (L loc (XExpr (ExpandedThingRn (HSE ctxt fun)))) arg = do
+        (core, fun', arg') <- resolve_app env expected fun arg
+        return (core, L loc (XExpr (ExpandedThingRn (HSE ctxt fun'))), arg')
+    resolve_app env expected (L loc (HsLam x LamSingle matches)) arg
+      | L alts_loc [L match_loc match@Match
+          { m_pats = L _ [L _ (VarPat _ lname)]
+          , m_grhss = rhss@GRHSs { grhssGRHSs = grhss
+                                , grhssLocalBinds = L _ (EmptyLocalBinds _) } }]
+          <- mg_alts matches
+      , [L grhs_loc (GRHS grhs_ext [] body)] <- NE.toList grhss
       = setSrcSpanA loc $
         do { strict <- xoptM LangExt.Strict
            ; when strict $ failWithTc
                (TcRnRetainedQuantificationError RetainedIndexLambdaStrict)
            ; let name = unLoc lname
                  binder = mkLocalId name ManyTy expected
-           ; arg' <- resolve env expected arg
-           ; body' <- resolve (extendNameEnv env name binder) expected body
-           ; return (Core.App (Core.Lam binder body') arg') }
+           ; (core_arg, arg') <- resolve env expected arg
+           ; (core_body, body') <- resolve (extendNameEnv env name binder) expected body
+           ; let rhss' = rhss { grhssGRHSs = NE.singleton (L grhs_loc (GRHS grhs_ext [] body')) }
+                 match' = match { m_grhss = rhss' }
+                 matches' = matches { mg_alts = L alts_loc [L match_loc match'] }
+           ; return (Core.App (Core.Lam binder core_body) core_arg,
+                     L loc (HsLam x LamSingle matches'), arg') }
     resolve_app env expected fun arg
-      = do { fun' <- case unLoc fun of
+      = do { (core_fun, fun') <- case unLoc fun of
                HsVar _ name | let n = unLocWithUserRdr name
                             , not (isDataOcc (nameOccName n)) -> do
                      certified <- if isExternalName n
                        then tcLookupIdMaybe n >>= maybe (pure Nothing) tcLookupSourceTableId
                        else pure Nothing
                      case certified of
-                       Just v -> pure (Core.Var v)
+                       Just v -> pure (Core.Var v, fun)
                        _ -> setSrcSpanA (getLoc fun) $
                               failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall n))
                _ -> resolve env expected fun
-           ; case splitFunTy_maybe (exprType fun') of
-               Just (_, _, _, arg_ty, _)
-                 -> Core.App fun' <$> resolve env arg_ty arg
-               _ -> unsupported }
+           ; (app, arg') <- apply env core_fun arg
+           ; return (app, fun', arg') }
+
+    apply env fun arg = case splitFunTy_maybe (exprType fun) of
+      Just (_, _, _, arg_ty, _) -> do
+        (core_arg, arg') <- resolve env arg_ty arg
+        return (Core.App fun core_arg, arg')
+      _ -> unsupported
 
     unsupported :: TcM a
     unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)

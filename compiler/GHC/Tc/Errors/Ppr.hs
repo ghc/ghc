@@ -3654,13 +3654,18 @@ pprRetainedQuantificationError reason = case reason of
   RetainedIndexExpression ->
     vcat [ text "GHC cannot use this expression as a retained index."
          , text "Use a local index variable, a supported constructor tree, an immediate lambda application,"
-         , text "or a fully applied checked source function with atomic arguments." ]
+         , text "or a fully applied checked source function on variables and constructor trees." ]
   RetainedUncheckedSourceCall fun ->
     text "No checked source equations are available for" <+> quotes (ppr fun)
       <+> text "in this retained argument."
   RetainedLocalSourceMethod method ->
     vcat [ text "Method" <+> quotes (ppr method) <+> text "belongs to an instance in this module."
          , text "Retained method calls currently need a compiled instance interface." ]
+  RetainedLiteralConversion from domain ->
+    vcat [ text "Cannot use this numeral as a retained index of type" <+> quotes (ppr domain) <> dot
+         , text "Conversion" <+> quotes (ppr from) <+> text "has no checked zero and successor equations." ]
+  RetainedLiteralDepth n ->
+    text "The numeral" <+> integer n <+> text "exceeds the constructor expansion limit for a retained argument."
   RetainedSourceMethodEvidence method predicate ->
     vcat [ text "GHC cannot use method" <+> quotes (ppr method) <+> text "as a retained index."
          , text "This call needs a known" <+> quotes (ppr predicate) <+> text "dictionary." ]

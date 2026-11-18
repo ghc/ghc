@@ -5361,6 +5361,8 @@ data RetainedQuantificationError
   | RetainedIndexExpression
   | RetainedUncheckedSourceCall Name
   | RetainedLocalSourceMethod Name
+  | RetainedLiteralConversion Name Type
+  | RetainedLiteralDepth Integer
   | RetainedSourceMethodEvidence Name Type
   | RetainedSourceRule Name
   | RetainedIndexMultiplicity Type
