@@ -29,7 +29,7 @@ module GHC.Core.Opt.OccurAnal (
     OccurAnalOpts(..),
     occurAnalysePgm,
     occurAnalyseExpr, occurAnalyseBndrsAndExpr,
-    occurAnalyseNativeExpr,
+    occurAnalyseNativeExpr, canDropNativeLocalBinding,
     occurAnalyseExpr_Prep,
     zapLambdaBndrs
   ) where
@@ -93,16 +93,7 @@ occurAnalyseExpr expr = expr'
 occurAnalyseNativeExpr :: CoreExpr -> CoreExpr
 occurAnalyseNativeExpr = go . freeVars
   where
-    opts = (occ_opts initOccEnv) { oa_can_drop = can_drop }
-
-    -- | Keep strict bindings and bindings with protected metadata.
-    can_drop b = isId b && not (isCoVar b) && isLocalId b
-              && definitelyLiftedType (idType b) && isManyTy (idMult b)
-              && not (isExportedId b) && not (isJoinId b)
-              && not (isStableUnfolding (idUnfolding b))
-              && not (idHasRules b)
-              && isAlwaysActive (idInlineActivation b)
-              && not (isWeakLoopBreaker (idOccInfo b))
+    opts = (occ_opts initOccEnv) { oa_can_drop = canDropNativeLocalBinding }
 
     -- | Rebuild the tree and remove eligible dead local bindings.
     go :: CoreExprWithFVs -> CoreExpr
@@ -126,6 +117,17 @@ occurAnalyseNativeExpr = go . freeVars
     go_bind :: CoreBindWithFVs -> CoreBind
     go_bind (AnnNonRec b rhs) = NonRec b (go rhs)
     go_bind (AnnRec pairs) = Rec [(b, go rhs) | (b, rhs) <- pairs]
+
+-- | Check whether removing a lazy local binding preserves protected metadata.
+canDropNativeLocalBinding :: Var -> Bool
+canDropNativeLocalBinding b
+  = isId b && not (isCoVar b) && isLocalId b
+    && definitelyLiftedType (idType b) && isManyTy (idMult b)
+    && not (isExportedId b) && not (isJoinId b)
+    && not (isStableUnfolding (idUnfolding b))
+    && not (idHasRules b)
+    && isAlwaysActive (idInlineActivation b)
+    && not (isWeakLoopBreaker (idOccInfo b))
 
 {- Note [Native dead local bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

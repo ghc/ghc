@@ -31,8 +31,10 @@ import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Make
 import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalyseNativeExpr,
+                             canDropNativeLocalBinding,
                              occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -539,6 +541,12 @@ simple_opt_expr env expr = go expr
     go (Coercion co)    = Coercion (go_co co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
+    go (Let (NonRec alias con_app) (Case (Var scrut) b ty alts))
+      | soe_native env
+      , alias == scrut
+      , Just body <- simple_native_con_case env alias con_app b ty alts
+      = body
+
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
                              (env', Nothing)   -> simple_opt_expr env' body
                              (env', Just bind) -> Let bind (simple_opt_expr env' body)
@@ -601,6 +609,75 @@ simple_opt_expr env expr = go expr
       = Alt con bndrs' (simple_opt_expr env' rhs)
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
+
+----------------------
+{- Note [Native adjacent constructor cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Desugaring can name a constructor before matching it:
+
+  let ds = Just @(Vec a n) xs in case ds of { Nothing -> def; Just ys -> rhs }
+
+Remove the constructor and case when the worker is ordinary, saturated and
+lazy. Its instantiated fields can have native types. Do not reject the full
+application for containing Vec a n. Inspect the uninstantiated worker type
+instead. Require lifted Many fields and no existential or retained binders.
+Strict and unlifted fields require evaluation that this rule does not insert.
+
+The selected RHS can use the fields in terms, types and metadata. Check deep
+free variables before removing ds and the case binder. Include the result type
+and field metadata. Keep the existing protected-binding exclusions.
+
+Simplify every actual field in the outer environment before introducing any
+alternative binder. Then use simple_out_bind to freshen each field and update
+its type and multiplicity. Native mode retains these lazy lets. Clear pattern
+binder evaluatedness before making a let binder. Do not substitute an arbitrary
+field expression into a native index. The lets preserve its scope and sharing.
+
+Only bind fields mentioned by the surviving expression or its annotations.
+Use the same deep free variables as the scope check. No second occurrence
+analysis or constructor unfolding is needed.
+-}
+
+-- | Remove an adjacent ordinary constructor binding and its case.
+simple_native_con_case :: SimpleOptEnv -> Id -> CoreExpr -> Id -> Type
+                       -> [CoreAlt] -> Maybe CoreExpr
+simple_native_con_case env alias con_app case_bndr result_ty alts
+  | canDropNativeLocalBinding alias
+  , canDropNativeLocalBinding case_bndr
+  , (Var worker, args) <- collectArgs con_app
+  , Just con <- isDataConWorkId_maybe worker
+  , null (dataConRepArgBinders con)
+  , isVanillaDataCon con, not (isNewDataCon con)
+  , isLazyDataConRep con
+  , not (hasNativeDependentExpr (Type (dataConRepType con)))
+  , let (type_args, actuals) = span isTypeArg args
+  , type_args `equalLength` dataConUnivTyVars con
+  , length actuals == dataConRepArity con
+  , all (not . isTyCoArg) actuals
+  , all (definitelyLiftedType . exprType) actuals
+  , Just (Alt alt fields rhs) <- findAlt (DataAlt con) alts
+  , not (any (\a -> isNativeIndexAlt a || isNativeIndexAliasAlt a) alts)
+  , all canDropNativeLocalBinding fields
+  , let dependencies = exprFreeVars rhs `unionVarSet` tyCoVarsOfType result_ty
+                       `unionVarSet` unionVarSets (map bndrFreeVars fields)
+  , not (alias `elemVarSet` dependencies)
+  , not (case_bndr `elemVarSet` dependencies)
+  = case alt of
+      DEFAULT | null fields -> Just (simple_opt_expr env rhs)
+      DataAlt selected
+        | selected == con
+        , fields `equalLength` actuals
+        , let actuals' = map (simple_opt_expr env) actuals
+        , and (zipWith same_type fields actuals')
+        -> let used = [(zapIdUnfolding field, arg) | (field, arg) <- zip fields actuals'
+                                                   , field `elemVarSet` dependencies]
+               (env', bindings) = mapAccumL (simple_out_bind NotTopLevel) env used
+           in Just (foldr wrapLet (simple_opt_expr env' rhs) bindings)
+      _ -> Nothing
+  | otherwise = Nothing
+  where
+    same_type field actual
+      = substTyUnchecked (soe_subst env) (idType field) `eqType` exprType actual
 
 ----------------------
 -- simple_app collects arguments for beta reduction
