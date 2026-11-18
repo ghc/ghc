@@ -21,4 +21,4 @@ tagBoth _n _m = (Proxy, Proxy)
 
 -- Only the second retained operand lacks a checked index.
 badSecond :: foreach (n :: Nat) -> foreach (m :: Nat) -> (Proxy (n + m), Proxy (1 :: Nat))
-badSecond n m = tagBoth (n + m) 1
+badSecond n m = tagBoth (n + m) (-1)

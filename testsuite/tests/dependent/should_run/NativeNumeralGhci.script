@@ -1,0 +1,10 @@
+:set -fobject-code -O0 -fomit-interface-pragmas -fno-write-if-simplified-core
+:load PackedVecLibrary
+:seti -XDataKinds -XExperimentalDependentTypes -XTypeOperators -XTypeFamilies
+let { fill :: foreach (n :: Nat) -> Vec Bool (n + 1); fill n = replicateNative (n + 1) True } in print (toList (fill 2))
+import Data.Proxy
+import GHC.TypeNats.Experimental (FromNatural)
+data Tone = Blue
+type instance FromNatural Tone n = 'Blue
+let witness :: Proxy (3 :: Tone); witness = Proxy
+case witness of Proxy -> putStrLn "prompt numeral"

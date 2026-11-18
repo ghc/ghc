@@ -84,6 +84,12 @@ bitsProof = Refl
 literalThree :: Vec Bool 3
 literalThree = VCons True (VCons False (VCons True VNil))
 
+filledThree :: Vec Bool 3
+filledThree = replicateNative 3 True
+
+oneMore :: foreach (n :: Nat) -> Vec Bool (n + 1)
+oneMore n = replicateNative (n + 1) False
+
 headOfNonempty :: Vec a (1 + n) -> a
 headOfNonempty (VCons x _) = x
 
@@ -145,6 +151,7 @@ main = case (flipProof, signalProof, phaseProof) of
     print (toList (replicateAt 3 True), length (toList (replicateAt 3 (undefined :: Int))))
     (n,m) <- newIORef ((1, 2) :: (Nat, Nat)) >>= readIORef
     print (toList (replicateSum n m False))
+    print (toList filledThree, toList (oneMore n))
     bottom <- newIORef (throw DivideByZero :: Nat) >>= readIORef
     let tag :: Proxy (bottom + m)
         tag = tagLength (plus bottom m)

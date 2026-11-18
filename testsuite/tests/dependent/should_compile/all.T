@@ -98,5 +98,6 @@ test('GADTSingletons', normal, compile, [''])
 
 test('NativeSourceCallIface',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',
-                  'NativeMethodAliases.hs', 'NativeMethodAliasClient.hs']),
+                  '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
+                  'NativeMethodAliases.hs', 'NativeMethodAliasClient.hs', 'NativeLiteralClient.hs']),
      makefile_test, ['NativeSourceCallIface'])

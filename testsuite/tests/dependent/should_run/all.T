@@ -7,3 +7,6 @@ test('NativeSourceTable',
                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_and_run,
      ['NativeSourceTable', '-fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeNumeralGhci',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     ghci_script, ['NativeNumeralGhci.script'])
