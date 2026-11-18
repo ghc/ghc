@@ -48,6 +48,10 @@ The input can also come from a pattern. In
 A module that imports `upper` can use that concrete type with the
 extension switched off. [Inference example](roadmap/R16-open-term-evaluator.md#inferring-a-character-from-a-pattern).
 
+One closed call can supply another's argument directly.
+`Prelude.sum (Prelude.reverse '[2, 3, 5])` computes the index `10`.
+[Nested calls](roadmap/R15-closed-term-evaluator.md#nested-closed-calls).
+
 An ordinary recursive length function now gives the return type of a
 vector constructor. For a list of `Int` read from an `IORef`, the caller can
 write `vector :: Vec Int (sourceLength xs)` and construct it with

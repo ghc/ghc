@@ -8018,16 +8018,22 @@ total :: Prelude.sum (Prelude.reverse '[2, 3, 5]) :~: 10
 total = Refl
 ```
 
-- [ ] Infer the inner application's kind and check the inner call once.
+- [x] Infer the inner application's kind and check the inner call once.
       Use its checked value to specialize the outer function. Also test
       an order-sensitive consumer of the reversed list.
-- [ ] Reject an outer call with invalid staging before running either
+- [x] Reject an outer call with invalid staging before running either
       function. Report a failing inner call at its own source span.
       Reject a wrong input kind and a result parameter that the operand
       leaves ambiguous.
-- [ ] Check dependencies from both calls with separate compilation.
+- [x] Check dependencies from both calls with separate compilation.
       Change only the inner producer, then only the outer producer.
       In both cases require the unchanged client to check its proof again.
 
 At the M105 baseline, GHC reports GHC-70565 at the outer `Prelude.sum`.
 It accepts the inner `reverse` when that call is checked on its own.
+
+Both compiler stages ran the nested source cases. The order-sensitive
+decimal fold produced `532`. Replacing only the inner or only the outer
+producer's object changed the result from `10` to `8` or `11` while the
+producer ABIs remained fixed. The selected suite covered 20 tests. The
+compiled Showcase and GHCi agreed on 182 lines.

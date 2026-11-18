@@ -814,6 +814,8 @@ main = do
         (charVal (upperFromPattern (Proxy @'a')))
     observe "Prelude.reverse '[2, 3, 5] equals '[5, 3, 2]"
         (Refl :: Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2])
+    observe "sum of a list reversed during type checking"
+        (TypeNats.natVal (Proxy @(Prelude.sum (Prelude.reverse '[2, 3, 5]))))
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])

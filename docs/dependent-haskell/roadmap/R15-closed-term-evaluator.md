@@ -154,6 +154,26 @@ ordinary printing. The compiler reads the actual reversed order.
 [Source checks](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs)
 and [representation references](../REFERENCES.md#reifying-closed-list-results).
 
+## Nested closed calls
+
+```haskell
+total :: Prelude.sum (Prelude.reverse '[2, 3, 5]) :~: 10
+total = Refl
+```
+
+The inner result supplies the input kind for `sum`. In another check, the
+outer function reads the first element and its result must be `5`.
+This distinguishes a genuinely reversed argument from the original list.
+The compiler checks staging before entering a nested argument. A failure
+while forcing an inner result reports the inner function's source span.
+Draft proposal #509 specifies this argument-first order for closed calls.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+and [source tests](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs).
+
+The client records the objects for both functions. With their interfaces
+held fixed, changing either implementation can invalidate the client's
+type. [Recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedNestedDependencies.sh).
+
 Same-module definitions require further work on R21. A nested list result, a `Maybe` result and a list of a newtype over
 `Natural` are outside the supported result shapes. General closed expressions
 and user-defined representations remain open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).

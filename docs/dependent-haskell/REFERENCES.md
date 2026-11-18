@@ -5074,3 +5074,15 @@ continuation as a local function. Observing its result must preserve
 the evaluation of its unlifted argument.
 [Desugarer and design note](../../compiler/GHC/HsToCore/Utils.hs)
 and [R16 case experiment](roadmap/R16-open-term-evaluator.md#an-equality-that-crosses-a-module-boundary).
+
+### Evaluation order for nested closed calls
+
+Draft proposal #509 specifies argument normalization before execution of
+the function. For R15 this makes an exception in the inner list visible
+at the inner call, even when the outer Haskell function ignores its
+input. The inner call has its own inferred kind. The fork uses that kind
+to specialize the outer function. Agda's case trees address a distinct
+question on R16, where a scrutinee can remain unknown.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509),
+[GHC's bidirectional type checker](../../compiler/GHC/Tc/Gen/HsType.hs)
+and [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
