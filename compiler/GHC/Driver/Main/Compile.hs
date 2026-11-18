@@ -37,7 +37,7 @@ module GHC.Driver.Main.Compile
 import GHC.Prelude
 
 import GHC.Driver.Main.Hsc
-    ( add_iface_to_hpt, iface_core_bindings, ioMsgMaybe, checkNativeDependentModule )
+    ( add_iface_to_hpt, iface_core_bindings, ioMsgMaybe, checkNativeDependentModule, nativeCodeGenFlags )
 
 
 import GHC.Driver.Plugins
@@ -81,7 +81,7 @@ import GHC.Core.TyCon
 import GHC.Core.LateCC
 import GHC.Core.LateCC.Types
 
-import GHC.CoreToStg.Prep( CorePrepConfig(..), CorePrepPgmConfig, corePrepPgm )
+import GHC.CoreToStg.Prep( CorePrepPgmConfig, corePrepPgm )
 import GHC.CoreToStg.AddImplicitBinds( addImplicitBinds )
 import GHC.CoreToStg    ( coreToStg )
 
@@ -552,9 +552,9 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
 
         -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
         native <- checkNativeDependentModule hsc_env core_binds [] (cg_tycons cgguts)
-        let dflags | native = gopt_set (gopt_set (hsc_dflags hsc_env) Opt_DoCoreLinting)
-                                       Opt_DoStgLinting
-                   | otherwise = hsc_dflags hsc_env
+        let dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
+        when (native && not (backendWritesFiles (backend dflags))) $
+          throwGhcExceptionIO (Sorry "Native dependent Core requires an object backend at hscGenHardCode.")
 
         -------------------
         -- ADD IMPLICIT BINDINGS
@@ -641,12 +641,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
         -- Do saturation and convert to A-normal form
         unless native $
           rejectNativeDependentProgram "unchecked late-plugin or implicit-binding output" binds_to_prep []
-        cp_cfg0 <- initCorePrepConfig hsc_env
-        let cp_cfg | native = cp_cfg0 { cp_allowNativeDependent = True
-                                      , cp_arityOpts = Nothing
-                                      , cp_specEval = False
-                                      , cp_specEvalDFun = False }
-                   | otherwise = cp_cfg0
+        cp_cfg <- initCorePrepConfigFor native hsc_env
         (prepd_binds) <- {-# SCC "CorePrep" #-}
                          corePrepPgm
                            (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
@@ -775,9 +770,7 @@ hscInteractive hsc_env cgguts location = do
 -- | Generate 'CompiledByteCode' (only) for a given module.
 hscGenerateByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO CompiledByteCode
 hscGenerateByteCode hsc_env cgguts location = do
-    let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
-    let platform = targetPlatform dflags
     let CgInteractiveGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
                cgi_module   = this_mod,
@@ -787,18 +780,24 @@ hscGenerateByteCode hsc_env cgguts location = do
                cgi_spt_entries = spt_entries,
                cgi_hpc_info = hpc_info } = cgguts
 
+    -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
+    native <- checkNativeDependentModule hsc_env core_binds [] tycons
+    let dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
+        platform = targetPlatform dflags
 
     -------------------
     -- ADD IMPLICIT BINDINGS
     let cp_pgm_cfg :: CorePrepPgmConfig
-        cp_pgm_cfg = initCorePrepPgmConfig (hsc_dflags hsc_env)
+        cp_pgm_cfg = initCorePrepPgmConfig dflags
                                            (interactiveInScope $ hsc_IC hsc_env)
     binds_to_prep <- addImplicitBinds cp_pgm_cfg location tycons core_binds
 
     -------------------
     -- PREPARE FOR CODE GENERATION
     -- Do saturation and convert to A-normal form
-    cp_cfg <- initCorePrepConfig hsc_env
+    unless native $
+      rejectNativeDependentProgram "unchecked implicit-binding output" binds_to_prep []
+    cp_cfg <- initCorePrepConfigFor native hsc_env
     prepd_binds <- {-# SCC "CorePrep" #-}
                    corePrepPgm (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
                                this_mod binds_to_prep

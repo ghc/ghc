@@ -44,6 +44,7 @@ import GHC.Driver.Main.Hsc
       handleWarningsThrowErrors,
       ioMsgMaybe,
       checkNativeDependentModule,
+      nativeCodeGenFlags,
       hscSimpleIface )
 
 import GHC.Driver.Plugins
@@ -112,7 +113,7 @@ import GHC.Core.Stats
 import GHC.Core.SimpleOpt ( simpleOptNativeExpr, simpleOptNativeProgram )
 
 
-import GHC.CoreToStg.Prep( CorePrepConfig(..), corePrepExpr )
+import GHC.CoreToStg.Prep( corePrepExpr )
 import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Errors.Types
@@ -1481,8 +1482,12 @@ and disabled speculation as the expression entry. Force STG Lint after erasure.
 
 Require -O0 and omit interface pragmas and serialized Core. Native interface
 signatures use scoped local Ids. Native unfoldings remain gated. Reject plugins,
-profiling, and non-object module backends before unsupported transformations.
-Repeat the option check at the machine-code entry for direct API callers.
+profiling and JavaScript code generation before unsupported transformations.
+Repeat the option check at the object and bytecode entries for direct API callers.
+GHCi declaration groups, loaded source modules, and -fbyte-code -no-link use
+the same checked program CorePrep and STG pipeline. The optional .gbc writer
+serializes the resulting bytecode. Serializing Core to an interface is a
+separate path and remains gated.
 Include retained constructor worker types from the module's type constructors
 in each option check. A declaration-only module can have no native explicit
 binding. addImplicitBinds generates its constructor worker later. Classify
@@ -1603,10 +1608,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   {- Simplify it -}
   -- See Note [Compiling native dependent Core].
   let native = hasNativeDependentExpr ds_expr
-      dflags = if native
-               then gopt_set (gopt_set (hsc_dflags hsc_env) Opt_DoCoreLinting)
-                             Opt_DoStgLinting
-               else hsc_dflags hsc_env
+      dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
       lint_env = hsc_env { hsc_dflags = dflags }
   let logger = hsc_logger hsc_env
   let ic = hsc_IC hsc_env
@@ -1639,12 +1641,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   let tidy_expr    = tidyExpr tidy_env simpl_expr
 
   {- Prepare for codegen -}
-  cp_cfg0 <- initCorePrepConfig hsc_env
-  let cp_cfg | native = cp_cfg0 { cp_allowNativeDependent = True
-                               , cp_arityOpts = Nothing
-                               , cp_specEval = False
-                               , cp_specEvalDFun = False }
-             | otherwise = cp_cfg0
+  cp_cfg <- initCorePrepConfigFor native hsc_env
   prepd_expr <- corePrepExpr
    logger cp_cfg
    tidy_expr

@@ -1,5 +1,6 @@
 module GHC.Driver.Config.CoreToStg.Prep
   ( initCorePrepConfig
+  , initCorePrepConfigFor
   , initCorePrepPgmConfig
   ) where
 
@@ -16,17 +17,22 @@ import GHC.Utils.Outputable ( alwaysQualify )
 import GHC.CoreToStg.Prep
 
 initCorePrepConfig :: HscEnv -> IO CorePrepConfig
-initCorePrepConfig hsc_env = do
+initCorePrepConfig = initCorePrepConfigFor False
+
+-- | Configure CorePrep after the driver has classified the input program or expression.
+-- See Note [CorePrep for retained dependent programs] in GHC.CoreToStg.Prep.
+initCorePrepConfigFor :: Bool -> HscEnv -> IO CorePrepConfig
+initCorePrepConfigFor native hsc_env = do
    let dflags = hsc_dflags hsc_env
    return $ CorePrepConfig
       { cp_catchNonexhaustiveCases = gopt Opt_CatchNonexhaustiveCases dflags
-      , cp_allowNativeDependent = False
+      , cp_allowNativeDependent = native
       , cp_platform  = targetPlatform dflags
-      , cp_arityOpts = if gopt Opt_DoCleverArgEtaExpansion dflags
+      , cp_arityOpts = if not native && gopt Opt_DoCleverArgEtaExpansion dflags
                        then Just (initArityOpts dflags)
                        else Nothing
-      , cp_specEval  = gopt Opt_SpecEval dflags
-      , cp_specEvalDFun = gopt Opt_SpecEvalDictFun dflags
+      , cp_specEval  = not native && gopt Opt_SpecEval dflags
+      , cp_specEvalDFun = not native && gopt Opt_SpecEvalDictFun dflags
       }
 
 initCorePrepPgmConfig :: DynFlags -> [Var] -> CorePrepPgmConfig

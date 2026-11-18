@@ -2253,7 +2253,7 @@ runProgramChecks libdir = do
             , ("late cost centres", ["-fprof-late"], retainedProgramSource, "profiling or late cost-centre insertion")
             , ("INLINE entry", [], sourceWith ["{-# INLINE entry #-}"], "unfolding construction while desugaring binding")
             , ("INLINABLE entry", [], sourceWith ["{-# INLINABLE entry #-}"], "unfolding construction while desugaring binding")
-            , ("non-object module", ["-fbyte-code", "-no-link"], retainedProgramSource, "non-object module compilation")
+            , ("no-code backend", ["-fno-code", "-no-link"], retainedProgramSource, "module compilation without an object or bytecode backend")
             , ("native class default method", [], classSource, "default-method unfolding construction while desugaring binding")
             ]
     forM_ rejections $ \(label, extraFlags, source, phase) -> do

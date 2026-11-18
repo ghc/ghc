@@ -38,6 +38,7 @@ module GHC.Driver.Main.Hsc
     , writeInterfaceOnlyMode
     , genModDetails
     , checkNativeDependentModule
+    , nativeCodeGenFlags
 
     ) where
 
@@ -74,6 +75,7 @@ import GHC.Core.TyCon ( TyCon, tyConDataCons_maybe )
 import GHC.Types.Id ( idType )
 
 import GHC.Parser.Errors.Types
+import GHC.Platform ( platformArch, Arch(ArchJavaScript) )
 
 import GHC.Tc.Utils.Monad
 
@@ -178,8 +180,10 @@ checkNativeDependentModule hsc_env binds rules tycons = do
         mapM_ (rejectNativeDependentExpr phase) implicit_cons
   when native $ do
     -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
-    unless (backendWritesFiles (backend dflags) && not (backendUseJSLinker (backend dflags))) $
-      reject "non-object module compilation"
+    unless (backendGeneratesCode (backend dflags)) $
+      reject "module compilation without an object or bytecode backend"
+    when (backendUseJSLinker (backend dflags) || platformArch (targetPlatform dflags) == ArchJavaScript) $
+      reject "JavaScript code generation"
     when (sccProfilingEnabled dflags || profAuto dflags /= NoProfAuto
           || not (null (callerCcFilters dflags))
           || any (`gopt` dflags) [ Opt_ProfLateInlineCcs, Opt_ProfLateCcs
@@ -194,6 +198,11 @@ checkNativeDependentModule hsc_env binds rules tycons = do
     unless (null (pluginsWithArgs (hsc_plugins hsc_env)) && null (pluginModNames dflags)) $
       reject "module plugins"
   return native
+
+-- | Enable the mandatory Core and STG checks for native code generation.
+nativeCodeGenFlags :: Bool -> DynFlags -> DynFlags
+nativeCodeGenFlags True dflags = gopt_set (gopt_set dflags Opt_DoCoreLinting) Opt_DoStgLinting
+nativeCodeGenFlags False dflags = dflags
 
 getDiagnostics :: Hsc (Messages GhcMessage)
 getDiagnostics = Hsc $ \_ w -> return (w, w)
