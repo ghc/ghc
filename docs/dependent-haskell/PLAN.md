@@ -7451,3 +7451,22 @@ test now accepts `let m = n` when the result requires the index `n`.
 It still rejects an alias of a different input at the vector argument.
 Execution used `-O0`. The separate `-O1` probe reached the existing
 diagnostic for optimized native dependent Core.
+
+## M95: check ordinary list inputs at an indexed boundary
+
+The small dependent-base task on the local R03/R04 work queue calls for
+a length-checking adapter. Use the existing example library and its
+ordinary client. Keep the representation of Nat, Vec and PackedVec.
+
+- [ ] Add `fromListExact :: foreach (n :: Nat) -> [a] -> Maybe (Vec a n)`.
+      Check length and list constructors together. Return Nothing for
+      short or long input. On excess input leave the extra cell's fields
+      unevaluated. On success leave every element unevaluated.
+- [ ] Offer `packList :: [a] -> PackedVec a` for callers that accept any
+      length. Use the established source length, vector and package.
+      Keep the fields lazy so that an observer can consume a finite prefix.
+- [ ] Zip ordinary inputs after checking both against a common runtime
+      length. Check a client without the extension through separate
+      interfaces. Reject attempts to combine independently indexed vectors.
+- [ ] Check the examples in native code and GHCi. Record the traversal
+      and proof boundaries in the Showcase, roadmap and references.
