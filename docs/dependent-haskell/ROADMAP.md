@@ -49,7 +49,7 @@ and [allocation measurements](PLAN.md#m97-simplify-a-case-of-an-ordinary-constru
 | Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with a written or inferred runtime operand, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
 | Function promotion (`R13`, under `R06`) | A list-length function works at any lifted element type. Multiplication calls checked addition on a recursive result. Both functions supply closed-family equations to interface clients. | General function promotion, polymorphic helper calls, and lambda/let/case expressions in types. |
-| Evaluation (`R15`, `R16`) | An imported length computes a vector index. Installed `Data.Char` functions compute character and Boolean indices. `Prelude.sum` uses ordinary instance resolution. Open projections select one of several rigid type variables. | Compound results, retry after unification, and checked evidence for residual applications. |
+| Evaluation (`R15`, `R16`) | An imported length computes a vector index. Installed `Data.Char` functions compute character and Boolean indices. `Prelude.sum` uses ordinary instance resolution. Open projections select a rigid type variable. A pattern can fix a wildcard and unblock a call before generalization. | Compound results and checked evidence for applications that remain in exported constraints. |
 | Numeric literals (`R07`) | The vector library registers an interpretation for nonnegative literals. Clients can write `Vec Bool 3`, `replicateNative 3 x` and `replicateNative (n + 1) x`. The retained calls check the actual `Num Nat` dictionary. | More general literal conversions and literal constraints such as finite bounds. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
 
@@ -157,7 +157,7 @@ argument is still unknown.
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Reify `Prelude.reverse '[2, 3, 5]` as a promoted list of known element kind. | M103 specializes polymorphic functions and solves their instance requirements. The result representation currently supports scalar values. |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check a source call that must wait for an inference variable. Identify the constraint that owns the blocked call and show when unification wakes it. | M100 and M102 reduce imported functions on rigid operands. If a residual must survive in FC, specify its nominal evidence. R17–R19 also depend on R05 and R16. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check proposal #509’s exported equality `Data.Char.toUpper c ~ uc` when the client instantiates `c`. Specify the nominal evidence for that reduction. | M104 handles a named wildcard that becomes a literal inside the producer’s inference group. A rigid parameter can remain unknown until a client supplies it. R17–R19 also depend on R05 and R16. |
 | R21, dependency analysis | Allow the producer to be defined in the consumer module, respecting declaration order and cycles. | A separately compiled producer lets R15 proceed while R21 remains open. |
 
 [R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
@@ -220,6 +220,7 @@ evaluator work has priority.
 | 42 | R15: closed character calls | [M101](PLAN.md#m101-evaluate-closed-character-calls-from-installed-libraries) | The ordinary `Data.Char.toUpper` and `Data.Char.isDigit` check equality witnesses. Both interpreters track the producer code they loaded. |
 | 43 | R16: open projections | [M102](PLAN.md#m102-reduce-open-projections) | Prelude's `const` and an independent second projection return the selected rigid type variable. A strict second projection identifies the operand blocking evaluation. |
 | 44 | R15: overloaded closed calls | [M103](PLAN.md#m103-infer-a-closed-overloaded-call-from-its-argument) | `Prelude.sum '[2, 3, 5]` computes the index 10 using ordinary dictionaries. The client records the selected instance even if the interpreter calls its method implementation directly. |
+| 45 | R16: retry after local inference | [M104](PLAN.md#m104-retry-a-type-call-after-inference-determines-its-input) | A pattern fixes the input. GHC checks the computed result before generalization. An ordinary client reads the concrete signature from the interface. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

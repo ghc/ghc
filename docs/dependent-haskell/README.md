@@ -38,6 +38,12 @@ GHC selects the ordinary list and natural-number instances. The Showcase
 reflects the resulting type as the number `10`.
 [Source proof](../../testsuite/tests/dependent/should_run/NativeClosedSum.hs).
 
+The input can also come from a pattern. In
+`upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)`, matching
+`(_ :: Proxy 'a')` fixes the wildcard. The body must return `Proxy 'A'`.
+A module that imports `upper` can use that concrete type with the
+extension switched off. [Inference example](roadmap/R16-open-term-evaluator.md#inferring-a-character-from-a-pattern).
+
 An ordinary recursive length function now gives the return type of a
 vector constructor. For a list of `Int` read from an `IORef`, the caller can
 write `vector :: Vec Int (sourceLength xs)` and construct it with

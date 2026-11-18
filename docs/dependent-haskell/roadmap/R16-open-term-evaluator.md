@@ -41,7 +41,30 @@ and [consumer](../examples/open-evaluation/OpenSource.hs). The
 [strictness references](../REFERENCES.md#strict-and-lazy-open-projections)
 give the Haskell and Agda precedents for this check.
 
-## Current experiment
+## Inferring a character from a pattern
+
+```haskell
+upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+upper (_ :: Proxy 'a') = Proxy @'A'
+```
+
+The pattern determines `_c`. GHC runs the imported function on `'a'`
+and checks the body against the resulting `Proxy 'A'`. If the body
+claims `'Z'`, the error at `Data.Char.toUpper` reports both characters.
+If the pattern leaves `_c` unknown, GHC reports the blocked input there.
+An ordinary client sees `upper :: Proxy 'a' -> Proxy 'A'` in the
+interface. [Source tests](../../../testsuite/tests/dependent/should_run/NativeOpenRetry.hs)
+and [interface test](../../../testsuite/tests/dependent/should_run/NativeOpenRetryInterface.sh).
+
+A partial signature with no leading constraints owns the pending calls
+on its named wildcards. After solving the binding group's ordinary
+constraints, GHC retries the calls whose operands are literals. A result
+can make a second call ready. The group must finish every call before
+generalization. A binding plan that skips this inference step rejects a
+pending call at its source. [Solver and design note](../../../compiler/GHC/Tc/Solver.hs)
+and [Agda's constraint ownership](../REFERENCES.md#retrying-a-check-during-inference).
+
+## Reducing a rigid variable
 
 Use the actual typed unfolding for Prelude's `id`. A source skolem
 `a :: Type` stands for a type chosen by the caller. Give the evaluator
@@ -79,9 +102,12 @@ still needs a representation and evidence before it could enter Core.
 - [x] At the evaluator API, suspend a case on a rigid scrutinee with its
       binder and alternatives. Observe the same case after supplying a
       previously unknown definition.
-- [ ] During source type checking, track which inference variable blocked
-      a necessary observation. Retry that observation when unification
-      assigns the variable. A rigid skolem has no such assignment.
+- [x] Retry a source call on a partial signature's named wildcard after
+      inference determines its literal value. Reject an unresolved input
+      at the call before generalization.
+- [ ] Keep a call on a rigid parameter in an exported equality constraint.
+      Check the equality when an importing client supplies a literal. The
+      caller chooses this input after the producer has been compiled.
 - [ ] Specify the typed input, lexical environments and which reductions
       produce weak-head normal form. Preserve Haskell's demand behavior.
       A strict pattern cannot discard the need to inspect its argument.
@@ -106,12 +132,50 @@ second variable. A rigid `f` stays unknown throughout this check.
 
 A separate API experiment exercised these cases with seven assertions and
 actual GHC metavariable cells. The fixture supplied the assignments and
-their interpretation as symbolic Core values. The next source milestone
-needs a typing judgment that can wait for such a result, a solver wakeup
-for the demanded variable, and a source error when the check stays stuck.
+their interpretation as symbolic Core values. M104 checks for ready literals at the existing
+generalization step. A general evaluator still needs to identify the
+variable that blocks an observation and wake the affected constraints.
 GHC already records unification and revisits affected constraints in
 `kickOutAfterUnification`. A reduction that survives into FC also needs
 checked nominal evidence for its endpoints.
 [GHC solver](../../../compiler/GHC/Tc/Solver/Monad.hs),
 [Eisenberg's Core Lint](https://github.com/goldfirere/ghc/blob/b64ef80f8002727422c05092f429c38d0527ed0b/compiler/coreSyn/CoreLint.lhs#L498-L548)
 and [Agda blockers](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/Syntax/Internal/Blockers.hs#L26).
+
+## An equality that crosses a module boundary
+
+Draft proposal #509 gives this producer. The consumer calls it with
+`Proxy @'x'` and expects `'X'`.
+
+```haskell
+p3 :: forall c uc. (Data.Char.toUpper c ~ uc, KnownChar uc) => Proxy c -> Char
+p3 _ = charVal (Proxy @uc)
+```
+
+The producer checks the body with the equality and dictionary supplied
+by its caller. The caller must establish the equality after it chooses
+`c`. The application must therefore survive in the producer's interface.
+M104 rejects this signature at `Data.Char.toUpper`.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).
+
+Start with an ordinary imported `Char -> Char` that changes one literal
+and returns its input in the default branch. This is the shape of the
+[Unicode worker](../../../libraries/ghc-internal/src/GHC/Internal/Unicode/Char/UnicodeData/SimpleUpperCaseMapping.hs)
+behind the installed library function. This example has three checks.
+
+- A rigid operand must stay unevaluated. In particular, choosing the
+  default branch at this point could yield the wrong result.
+- For a ground operand, Core Lint must be able to check the claimed
+  reduction against the producer's typed definition. Check both the
+  literal branch and the default, including a deliberately false result.
+- A client must read the application from the interface. Changing the
+  producer's selected branch without changing its signature must cause
+  the unchanged client to check its equality again.
+
+The design question is how to represent and check this reduction in
+Core. The current `TermAppCo` proves congruence under one local head.
+GHC's built-in literal rules give an example of checking proof endpoints.
+A checked step for a case must also identify the imported definition and
+preserve its demand on the scrutinee. [Core Lint](../../../compiler/GHC/Core/Lint.hs),
+[GHC's literal rules](../../../compiler/GHC/Builtin/WiredIn/TypeLits.hs)
+and [research references](../REFERENCES.md#checking-a-reduction-across-an-interface).

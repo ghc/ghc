@@ -7,7 +7,9 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE NamedWildCards #-}
 {-# LANGUAGE NoStarIsType #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RequiredTypeArguments #-}
@@ -808,6 +810,8 @@ main = do
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
     observe "Prelude.sum in a type" (TypeNats.natVal (Proxy @(Prelude.sum '[2, 3, 5])))
+    observe "uppercase after the pattern determines the character"
+        (charVal (upperFromPattern (Proxy @'a')))
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])
@@ -824,6 +828,10 @@ checkedCharacters = (charVal (Proxy @(Data.Char.toUpper 'x')), Refl)
 -- | The result type selects the first operand even when the argument types differ.
 openLeft :: forall a b. a -> b -> const a b
 openLeft x _ = x
+
+-- | The argument pattern fixes the wildcard before GHC checks the result.
+upperFromPattern :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+upperFromPattern (_ :: Proxy 'a') = Proxy @'A'
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()

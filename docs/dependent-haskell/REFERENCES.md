@@ -5050,3 +5050,18 @@ user `Show` instance may choose any text for that list, so its output
 cannot establish the type index.
 [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [the singletons 3.0.4 API](https://hackage-content.haskell.org/package/singletons-3.0.4/docs/Data-Singletons.html#t:SingKind).
+
+### Checking a reduction across an interface
+
+Weirich, Voizard, de Amorim and Eisenberg distinguish computational
+reduction from congruence in the explicit calculus DC. Eisenberg's
+historical Core Lint checks the kind of a promoted argument before
+substituting it into a dependent result. The fork needs a check for both
+endpoints when it adds a nominal proof for a selected case branch.
+For GHC's built-in family rules, Core Lint consults the rule's proof
+checker. Agda's case trees explain
+why an unknown scrutinee can block reduction even with a default branch.
+[DC specification](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf),
+[historical Core Lint](https://github.com/goldfirere/ghc/blob/b64ef80f8002727422c05092f429c38d0527ed0b/compiler/coreSyn/CoreLint.lhs#L527-L544),
+[GHC literal axioms](../../compiler/GHC/Builtin/WiredIn/TypeLits.hs)
+and [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).

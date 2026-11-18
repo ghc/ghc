@@ -7936,24 +7936,38 @@ upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
 upper (_ :: Proxy 'a') = Proxy @'A'
 ```
 
-- [ ] Attach the pending call to the partial signature that owns the input
+- [x] Attach the pending call to the partial signature that owns the input
       variable. Preserve its source span and staging restrictions.
-- [ ] Solve the binding's ordinary constraints. Once the input is known,
+- [x] Solve the binding's ordinary constraints. Once the input is known,
       evaluate the call and check its result through ordinary nominal
       equality. A result may make a second call ready. Check that an
       unresolved input stays an error even when type errors are deferred.
-- [ ] Reject a body that claims the wrong result. Keep nested scopes,
+- [x] Reject a body that claims the wrong result. Keep nested scopes,
       incomplete inference, and compile-time execution in Safe modules
       or quotations under test. Check that no pending operation or
       result placeholder can escape into a generalized signature.
 
 The baseline accepts the analogous ordinary closed type family. The
-character primitive succeeds with a literal input. Before M104, the signature above failed at the source call with GHC-68947. Proposal #509 also describes an exported
+character primitive succeeds with a literal input. Before M104, the
+signature above failed at the source call with GHC-68947. The group now
+checks the result before generalization. A local pattern with an explicit
+multiplicity takes a different inference path. GHC rejects a pending call
+on that path before allocating its result variable.
+
+Proposal #509 also describes an exported
 constraint with a rigid input. That signature requires a representation
 that can survive until a client chooses the character. An operation owned
 by one inference group addresses the local example only.
 [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [R16](roadmap/R16-open-term-evaluator.md).
+
+Both compiler stages checked the positive and negative source cases.
+Compiled and interpreted Showcase runs produced the same 180 lines.
+The 21 selected normal-way tests passed. One compiles a client with
+the extension disabled against only the producer interface. In a separate
+recompilation check, changing the ordinary function from uppercasing to
+lowercasing preserved its ABI. Both interpreters detected the changed
+object and rejected the unchanged body that still claimed `'A'`.
 
 ## M105: return a promoted list from a closed call
 
