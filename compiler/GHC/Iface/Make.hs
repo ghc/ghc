@@ -271,8 +271,8 @@ mkRecompUsageInfo hsc_env tc_result = do
     then return Nothing
     else do
      tables <- readIORef (tcg_source_table_uses tc_result)
-     open_terms <- readIORef (tcg_open_term_uses tc_result)
-     let used_names = mkUsedNames tc_result `unionNameSet` tables `unionNameSet` open_terms
+     evaluated_terms <- readIORef (tcg_evaluated_term_uses tc_result)
+     let used_names = mkUsedNames tc_result `unionNameSet` tables `unionNameSet` evaluated_terms
      dep_files <- (readIORef (tcg_dependent_files tc_result))
      dep_dirs  <- (readIORef (tcg_dependent_dirs tc_result))
      (needed_links, needed_pkgs) <- readIORef (tcg_th_needed_deps tc_result)

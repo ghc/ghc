@@ -1,0 +1,9 @@
+NativeClosedSumLocal.hs:14:10: error: [GHC-28914]
+    • Level error:
+      instance for ‘Local Natural’ is used at level -1
+      but it is bound at level 0
+    • In the expression: NativeClosedSumLib.local
+      In the first argument of ‘(:~:)’, namely
+        ‘NativeClosedSumLib.local '[2, 3, 5]’
+      In the type signature:
+        local :: NativeClosedSumLib.local '[2, 3, 5] :~: 0

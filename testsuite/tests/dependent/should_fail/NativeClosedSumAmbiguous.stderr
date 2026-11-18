@@ -1,0 +1,7 @@
+NativeClosedSumAmbiguous.hs:7:14: error: [GHC-70565]
+    • Cannot evaluate ‘NativeClosedSumLib.ambiguous’ in a type.
+        The literal argument does not determine the following type parameters: unused.
+    • In the first argument of ‘(:~:)’, namely
+        ‘NativeClosedSumLib.ambiguous '[2, 3, 5]’
+      In the type signature:
+        ambiguous :: NativeClosedSumLib.ambiguous '[2, 3, 5] :~: 0

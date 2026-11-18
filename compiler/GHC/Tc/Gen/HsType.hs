@@ -116,7 +116,7 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.TyCo.Subst as Subst
-import GHC.Core.Unify ( BindFlag(..), tcMatchTyX_BM )
+import GHC.Core.Unify ( BindFlag(..), tcMatchTy, tcMatchTyX_BM )
 
 import GHC.Builtin( allNameStrings )
 import GHC.Builtin.Modules (gHC_INTERNAL_TYPENATS)
@@ -2361,17 +2361,16 @@ tc_app_ty mode rn_ty exp_kind
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
-                         | [arg] <- args
-                         , isQual rdr
-                         , Just (domain, result_kind) <- closedTypeCallKinds (varType fun)
-                         -> do { argument <- tcClosedTypeCallArgument mode name domain arg
-                               ; result <- tcRunClosedCall fun argument result_kind
-                               ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | Just (instantiated, arity) <- instantiateOpenTypeFunction fun
                          , arity == length args
                          , all isTypeVariableArg args
                          -> do { result <- tcOpenTypeCall mode name instantiated args
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
+                         | [arg] <- args, isQual rdr
+                         -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg
+                               ; argument <- tcClosedTypeCallArgument mode name domain arg
+                               ; result <- tcRunClosedCall fun argument result_kind
+                               ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name }
   where
@@ -2407,7 +2406,7 @@ tcOpenTypeCall mode name instantiated args = do
                    in failWithTc (TcRnOpenTypeEval name definition message)
     Right (result, used) -> do
       env <- getGblEnv
-      updTcRef (tcg_open_term_uses env) (`unionNameSet` used)
+      updTcRef (tcg_evaluated_term_uses env) (`unionNameSet` used)
       pure result
   where
     checkOperand arg = do
@@ -2427,15 +2426,44 @@ isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
   isTyVarName name
 isTypeVariableArg _ = False
 
--- | Find the domain and range of an ordinary arrow with a supported input.
-closedTypeCallKinds :: Type -> Maybe (Type, Type)
-closedTypeCallKinds ty
-  | Just (FTF_T_T, matchability, multiplicity, domain, result_kind) <- splitFunTy_maybe ty
-  , matchability `tcEqType` unmatchableDataConTy
-  , isManyTy multiplicity
-  , any (tcEqType domain) [charTy, mkListTy naturalTy]
-  = Just (domain, result_kind)
-  | otherwise = Nothing
+-- | Specialize the declared arrow using only its argument. Keep the
+-- result independent of defaulting and of the surrounding expected kind.
+tcClosedCallKinds :: Name -> Type -> LHsType GhcRn -> TcM (Type, Type)
+tcClosedCallKinds name fun_ty arg
+  | Just (FTF_T_T, _, _, domain, codomain) <- splitFunTy_maybe rho
+  , all isTyVar tvs
+  = do input <- argumentDomain domain
+       subst <- maybe unsupported return (tcMatchTy domain input)
+       let undetermined tv = maybe True (not . noFreeVarsOfType) (Subst.lookupTyVar subst tv)
+           unresolved = filter undetermined tvs
+           result = Subst.substTy subst codomain
+           ground_class p = let pred_ty = Subst.substTy subst p
+                            in noFreeVarsOfType pred_ty && isJust (getClassPredTys_maybe pred_ty)
+       unless (null unresolved) $
+         bad ("The literal argument does not determine the following type parameters: "
+              ++ unwords (map getOccString unresolved) ++ ".")
+       unless (all ground_class predicates && noFreeVarsOfType result &&
+               Subst.substTy subst rho `tcEqType` mkVisFunTyManyU input result) unsupported
+       return (input, result)
+  | otherwise = unsupported
+  where
+    (_, binders, rho) = splitInvisPiTys fun_ty
+    tvs = mapMaybe namedPiTyBinder_maybe binders
+    predicates = mapMaybe anonPiTyBinderType_maybe binders
+    list_kind = mkListTy naturalTy
+    inputs = [charTy, list_kind]
+    argumentDomain domain
+      | any (tcEqType domain) inputs = return domain
+      | L _ (HsTyLit _ (HsChar _ _)) <- ignoreParens arg = return charTy
+      | isJust (closedNaturalList arg) = return list_kind
+      | not (null predicates), any (isJust . tcMatchTy domain) inputs =
+          bad "The argument must be a closed Char literal or a closed list of Natural literals."
+      | otherwise = unsupported
+
+    bad :: String -> TcM a
+    bad = failWithTc . TcRnClosedTypeEval name
+    unsupported :: TcM a
+    unsupported = failWithTc (TcRnNoSourceTable name)
 
 -- | Check the literal at the expected kind and build its runtime value.
 tcClosedTypeCallArgument :: TcTyMode -> Name -> Type -> LHsType GhcRn -> TcM Core.CoreExpr
@@ -2488,8 +2516,11 @@ literals or a Char literal. The renamer keeps the qualifier and resolved
 term Name after trying the ordinary type and checked source-table paths.
 The term Name is not a retained local index.
 
-Require a complete monomorphic function type and a literal argument before
-execution. Elaborate the result to a Natural or Char literal, or to a
+Require a literal argument before execution. Its kind can instantiate a
+polymorphic function when the declared domain determines all its
+type variables and every class constraint becomes ground. The ordinary
+expression checker solves those constraints before evaluation.
+Elaborate the result to a Natural or Char literal, or to a
 promoted Bool constructor. See Note [Closed literal type evaluation] in
 GHC.Tc.Gen.Splice for execution and result decoding.
 

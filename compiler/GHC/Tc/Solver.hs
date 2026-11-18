@@ -4,7 +4,7 @@ module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,
        growThetaTyVars,
        simplifyAmbiguityCheck,
-       simplifyTop, simplifyTopImplic,
+       simplifyTop, simplifyTopNoDefaulting, simplifyTopImplic,
        simplifyInteractive,
        solveEqualities,
        pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX,
@@ -157,10 +157,19 @@ simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- Usually these will be implications,
 -- but when there is nothing to quantify we don't wrap
 -- in a degenerate implication, so we do that here instead
-simplifyTop wanteds
+simplifyTop = simplifyTopWith simplifyTopWanteds
+
+-- | Solve compile-time dictionary requirements without choosing default types.
+simplifyTopNoDefaulting :: WantedConstraints -> TcM (Bag EvBind)
+simplifyTopNoDefaulting = simplifyTopWith (nestTcS . solveWanteds)
+
+-- | Solve top-level constraints and report unsolved or unsafe instance uses.
+simplifyTopWith :: (WantedConstraints -> TcS WantedConstraints)
+                -> WantedConstraints -> TcM (Bag EvBind)
+simplifyTopWith solve wanteds
   = do { traceTc "simplifyTop {" $ text "wanted = " <+> ppr wanteds
        ; ((final_wc, unsafe_ol), binds1) <- runTcS $
-            do { final_wc <- simplifyTopWanteds wanteds
+            do { final_wc <- solve wanteds
                ; unsafe_ol <- getSafeOverlapFailures
                ; return (final_wc, unsafe_ol) }
        ; traceTc "End simplifyTop }" empty

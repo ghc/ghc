@@ -55,6 +55,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Tc.Gen.SourceTable (checkOptionalSourceUses)
 import GHC.Tc.Types.LclEnv
+import GHC.Tc.Types.Constraint (WantedConstraints)
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Zonk.TcType
@@ -65,6 +66,7 @@ import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Instantiate
 
 import qualified GHC.Core as Core
+import GHC.Core.FVs (exprSomeFreeVarsList)
 import GHC.Core.Make (mkCoreApp, mkCoreApps)
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion( etaExpandCoAxBranch )
@@ -137,6 +139,7 @@ import GHC.Utils.Exception (throwIO, ErrorCall(..), SomeAsyncException)
 
 import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
+import GHC.Data.Bag (Bag)
 import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import GHC.Data.EnumSet (EnumSet)
@@ -1018,7 +1021,12 @@ tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 -- The recursive call to tcCheckPolyExpr will simply expand the
 -- inner escape before dealing with the outer one
 
-tcTopSpliceExpr isTypedSplice tc_action
+tcTopSpliceExpr = tcTopSpliceExprWith simplifyTop
+
+-- | Check a staged expression and attach the evidence from the supplied solver.
+tcTopSpliceExprWith :: (WantedConstraints -> TcM (Bag EvBind))
+                    -> SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
+tcTopSpliceExprWith solve isTypedSplice tc_action
   = checkNoErrs $  -- checkNoErrs: must not try to run the thing
                    -- if the type checker fails!
 
@@ -1029,10 +1037,10 @@ tcTopSpliceExpr isTypedSplice tc_action
              -- we want to capture and report those constraints, else we may
              -- just get a silent failure (#20179). Hence the 'try' part.
 
-       ; const_binds <- simplifyTop wanted
+       ; const_binds <- solve wanted
 
        ; case mb_expr' of
-            Nothing    -> failM   -- In this case simplifyTop should have
+            Nothing    -> failM   -- The solver should have
                                   -- reported some errors
             Just expr' -> return $ mkHsDictLet (EvBinds const_binds) expr' }
 
@@ -1298,14 +1306,18 @@ Previously, we failed to abort in cases (b) and (c), leading to #19709.
 tcRunClosedCall :: Id -> Core.CoreExpr -> Type -> TcM Type
 tcRunClosedCall fun argument result_kind = do
   hsc_env <- getTopEnv
-  unless (idType fun `tcEqType` mkVisFunTyManyU (exprType argument) result_kind) $
-    bad "The closed call does not have the expected ordinary function type."
   decode <- case closedTypeResultDecoder result_kind of
     Just decoder -> return decoder
     Nothing -> bad ("The function returns " ++ showPpr (hsc_dflags hsc_env) result_kind ++
                     ". Closed calls in types currently support results of type Natural, Char, or Bool.")
   interp <- checkClosedTypeEvalStage hsc_env name
-  let call = mkCoreApp (Core.Var fun) argument
+  let expected = mkVisFunTyManyU (exprType argument) result_kind
+  function <- if idType fun `tcEqType` expected
+                then pure (Core.Var fun)
+                else specializeClosedFunction name expected
+  unless (exprType function `tcEqType` expected) $
+    bad "The closed call does not have the expected ordinary function type."
+  let call = mkCoreApp function argument
 
   show_class <- tcLookupKnownKeyClass showClassKey
   inst_env <- tcGetInstEnvs
@@ -1344,6 +1356,39 @@ tcRunClosedCall fun argument result_kind = do
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name
 
+-- | Use ordinary term checking to supply type and dictionary arguments.
+specializeClosedFunction :: Name -> Type -> TcM Core.CoreExpr
+specializeClosedFunction name expected = do
+  loc <- getSrcSpanM
+  let occurrence = L (noAnnSrcSpan loc) (mkHsVar (L (noAnnSrcSpan loc) name))
+  typed <- unsetGOptM Opt_DeferTypeErrors $
+           unsetGOptM Opt_DeferTypedHoles $
+           unsetGOptM Opt_DeferOutOfScopeVariables $
+           tcTopSpliceExprWith simplifyTopNoDefaulting Untyped $
+           tcCheckMonoExpr occurrence expected
+  zonked <- zonkTopLExpr typed
+  core <- desugarStagedExpr zonked
+  env <- getGblEnv
+  let free = exprSomeFreeVarsList (const True) core
+      unavailable v = isLocalVar v || nameIsLocalOrFrom (tcg_semantic_mod env) (getName v)
+  when (any unavailable free) $
+    failWithTc (TcRnClosedTypeEval name
+      "The specialization uses an unfinished local binding or dictionary.")
+  updTcRef (tcg_evaluated_term_uses env)
+           (`extendNameSetList` [getName v | v <- free, isGlobalId v])
+  pure core
+
+-- | Desugar code that will run during compilation. Emit any diagnostics
+-- before evaluation. See Note [Errors in desugaring a splice].
+desugarStagedExpr :: LHsExpr GhcTc -> TcM Core.CoreExpr
+desugarStagedExpr expr = do
+  (messages, result) <- initDsTc (dsLExpr expr)
+  logger <- getLogger
+  flags <- getDynFlags
+  liftIO $ printMessages logger (initDsMessageOpts flags) (initDiagOpts flags) messages
+  when (errorsOrFatalWarningsFound messages) failM
+  maybe failM pure result
+
 -- | Decode the result in the fixed compiler-side representation for its kind.
 closedTypeResultDecoder :: Type -> Maybe (String -> Maybe Type)
 closedTypeResultDecoder kind
@@ -1368,6 +1413,20 @@ built-in Show instance for the result type and returnIO to construct an
 IO String for evalString. The interpreter forces the string before it returns
 it. The compiler checks the canonical form before it constructs a literal
 or promoted constructor.
+
+For an overloaded producer, check the resolved occurrence against the
+specialized ordinary arrow. Use the same type and dictionary elaboration as
+a splice. Disable defaulting so that nested instance requirements cannot
+introduce ambiguous type arguments. Unsolved constraints are errors even
+when the caller defers term errors. A producer can ignore a dictionary.
+Reject free local references after evidence desugaring. Ordinary instance
+selection can choose a dictionary from the module currently compiling.
+Its code is unavailable at this stage.
+
+Record the imported names in this specialization before the interactive
+simplifier runs. A class selector can reduce using a dictionary unfolding.
+The resulting bytecode can refer directly to a method implementation and
+have no reference to the original dictionary object.
 
 Record the loaded dependencies through the same path as a splice. The
 producer object can change even when its interface ABI remains the same.
@@ -1442,24 +1501,7 @@ runMeta' show_code ppr_hs run_and_convert expr
         ; hsc_env <- getTopEnv
         ; expr' <- withPlugins (hsc_plugins hsc_env) spliceRunAction expr
 
-        -- Desugar
-        ; (ds_msgs, mb_ds_expr) <- initDsTc (dsLExpr expr')
-
-        -- Print any messages (even warnings) eagerly: they might be helpful if anything
-        -- goes wrong. See Note [Errors in desugaring a splice]. This happens in all
-        -- cases.
-        ; logger <- getLogger
-        ; diag_opts <- initDiagOpts <$> getDynFlags
-        ; print_config <- initDsMessageOpts <$> getDynFlags
-        ; liftIO $ printMessages logger print_config diag_opts ds_msgs
-
-        ; ds_expr <- case mb_ds_expr of
-            Nothing      -> failM   -- Case (a) from Note [Errors in desugaring a splice]
-            Just ds_expr ->  -- There still might be a fatal warning or recoverable
-                             -- Cases (b) and (c) from Note [Errors in desugaring a splice]
-              do { when (errorsOrFatalWarningsFound ds_msgs)
-                     failM
-                 ; return ds_expr }
+        ; ds_expr <- desugarStagedExpr expr'
 
         -- Compile and link it; might fail if linking fails
         ; src_span <- getSrcSpanM

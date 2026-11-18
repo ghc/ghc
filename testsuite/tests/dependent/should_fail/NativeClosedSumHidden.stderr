@@ -1,0 +1,15 @@
+NativeClosedSumHidden.hs:7:11: error: [GHC-39999]
+    • Ambiguous type variable ‘b0’ arising from a use of ‘NativeClosedSumLib.hiddenRequirement’
+      prevents the constraint ‘(Num b0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘b0’ should be.
+      Potentially matching instances:
+        instance Num Integer -- Defined in ‘GHC.Internal.Num’
+        instance Num Double -- Defined in ‘GHC.Internal.Float’
+        ...plus three others
+        ...plus one instance involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: NativeClosedSumLib.hiddenRequirement
+      In the first argument of ‘(:~:)’, namely
+        ‘NativeClosedSumLib.hiddenRequirement '[2, 3, 5]’
+      In the type signature:
+        hidden :: NativeClosedSumLib.hiddenRequirement '[2, 3, 5] :~: 0

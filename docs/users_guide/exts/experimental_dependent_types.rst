@@ -212,12 +212,23 @@ of ``Data.Char``::
     digit :: Data.Char.isDigit '7' :~: 'True
     digit = Refl
 
+    total :: Prelude.sum '[2, 3, 5] :~: 10
+    total = Refl
+
 The current implementation accepts one character literal or a promoted
 list of natural number literals. The function must take one unrestricted
 argument and return ``Char``, ``Bool`` or ``Natural``. The producer may use
 ordinary Haskell. The compiler needs its compiled code and a target
 interpreter. Safe Haskell rejects execution of these calls. If an imported
 function diverges, checking its application can also diverge.
+
+A literal can specialize an imported polymorphic function. In ``total``,
+the list fixes the container to ``[]`` and the element type to
+``Natural``. GHC uses ordinary instance resolution for ``Foldable []`` and
+``Num Natural``. Each type parameter must be determined by the input.
+A missing or ambiguous instance causes a type error at the call, even if
+the module enables :ghc-flag:`-fdefer-type-errors`. An instance defined
+in the module currently being compiled cannot supply executable code.
 
 With :extension:`TypeApplications`, the expression
 ``charVal (Proxy @(Data.Char.toUpper 'x'))`` reflects the result as a

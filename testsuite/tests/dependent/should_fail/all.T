@@ -122,3 +122,23 @@ test('NativeMethodGiven',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_fail,
      ['NativeMethodGiven', '-v0 -fdefer-type-errors -Wno-simplifiable-class-constraints -fomit-interface-pragmas'])
+test('NativeClosedSumMissing',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../should_run/NativeClosedSumLib.hs'])],
+     multimod_compile_fail,
+     ['NativeClosedSumMissing', '-v0 ' + config.ghc_th_way_flags])
+test('NativeClosedSumLocal',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../should_run/NativeClosedSumLib.hs'])],
+     multimod_compile_fail,
+     ['NativeClosedSumLocal', '-v0 ' + config.ghc_th_way_flags])
+test('NativeClosedSumHidden',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../should_run/NativeClosedSumLib.hs'])],
+     multimod_compile_fail,
+     ['NativeClosedSumHidden', '-v0 ' + config.ghc_th_way_flags])
+test('NativeClosedSumAmbiguous',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../should_run/NativeClosedSumLib.hs'])],
+     multimod_compile_fail,
+     ['NativeClosedSumAmbiguous', '-v0 ' + config.ghc_th_way_flags])
