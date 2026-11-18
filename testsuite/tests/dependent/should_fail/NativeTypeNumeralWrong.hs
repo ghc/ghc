@@ -56,3 +56,11 @@ supplied x = x
     withProduct x (\r c -> let cells = r * c in replicateNative cells x) #-}
 {-# RULES "supplied product" forall x. supplied x =
     withProduct x (\r c -> let cells = r * c in replicateNative cells x) #-}
+
+-- A signed product still uses the caller's dictionary in a later definition.
+badSigned :: Num Nat => foreach (depth :: Nat) -> foreach (stride :: Nat) -> Vec Bool (S (times depth stride))
+badSigned depth stride =
+    let area, count :: Nat
+        area = depth * stride
+        count = S area
+    in replicateNative count True

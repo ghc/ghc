@@ -4706,6 +4706,18 @@ runSourceRejectChecks = do
             , "  Select False = Bool"
             ]
                 ++ local [] consumer ["keep b x = 42"] "keep True 42"
+    -- The signed alias names the same runtime index as its RHS.
+    void $ sourceEntry "NativeSourceSignedBoolAlias" $
+        unlines $
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeFamilies, TypeOperators #-}"
+            , "module NativeSourceSignedBoolAlias where"
+            , "type family Select (b :: Bool) where"
+            , "  Select True = Int"
+            , "  Select False = Bool"
+            ]
+                ++ local [] selection
+                     (identity ++ ["f :: " ++ selection, "f b x = let c :: Bool; c = b in keep c x"])
+                     "f True 42"
     mapM_
         check
         [ ("unsupported algebraic domain", 83605, "supported structural algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
@@ -4729,10 +4741,12 @@ runSourceRejectChecks = do
         , ("constructor payload mismatch", 83865, "second argument", [], local [] selection identity "keep True False")
         ,
             ( "distinct index from a local alias"
-            , 83865
+            , 5617
             , "Select"
             , []
-            , local [] selection (identity ++ ["f :: " ++ selection, "f b x = let c :: Bool; c = b in keep c x"]) "42"
+            , local [] selection
+                (identity ++ ["f :: foreach (b :: Bool) -> foreach (other :: Bool) -> Select b -> Select b"
+                             , "f b other x = let c :: Bool; c = other in keep c x"]) "42"
             )
         , ("True payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = True"] "42")
         , ("False payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = False"] "42")

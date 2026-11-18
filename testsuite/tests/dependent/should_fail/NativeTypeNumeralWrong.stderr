@@ -70,3 +70,25 @@ NativeTypeNumeralWrong.hs:58:49: error: [GHC-83865]
       In the expression: let cells = r * c in replicateNative cells x
       In the second argument of ‘withProduct’, namely
         ‘(\ r c -> let cells = ... in replicateNative cells x)’
+
+NativeTypeNumeralWrong.hs:66:8: error: [GHC-05617]
+    • Could not deduce ‘times depth stride ~ area’
+      from the context: count ~ S area
+        bound by the local definition of ‘count’
+        at NativeTypeNumeralWrong.hs:65:9-13
+      Expected: Vec Bool (S (times depth stride))
+        Actual: Vec Bool count
+    • In the expression: replicateNative count True
+      In the expression:
+        let
+          area, count :: Nat
+          area = depth * stride
+          count = S area
+        in replicateNative count True
+      In an equation for ‘badSigned’:
+          badSigned depth stride
+            = let
+                area, count :: Nat
+                area = depth * stride
+                count = S area
+              in replicateNative count True

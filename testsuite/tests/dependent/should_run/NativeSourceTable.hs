@@ -1,5 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, FlexibleContexts, GADTs, ScopedTypeVariables, TypeApplications, TypeOperators #-}
-{-# LANGUAGE NoStarIsType #-}
+{-# LANGUAGE NoStarIsType, RankNTypes, TypeFamilies #-}
 
 module Main where
 
@@ -172,8 +172,10 @@ sharedProduct rows cols =
 sharedInnerProduct :: foreach (rows :: Nat) -> foreach (cols :: Nat)
                    -> (Nat, Nat, Vec Bool (1 + rows * cols))
 sharedInnerProduct rows cols =
-  let cells = rows * cols
-  in (S cells, S cells, replicateNative (1 + cells) True)
+  let total, cells :: Nat
+      total = 1 + cells
+      cells = rows * cols
+  in (S cells, S cells, replicateNative total True)
 
 -- | Use the caller's multiplication independently of the vector length.
 ordinaryProduct :: Num Nat => foreach (rows :: Nat) -> foreach (cols :: Nat)
@@ -276,6 +278,38 @@ main = case (flipProof, signalProof, phaseProof) of
             print (x, tailResult == Left DivideByZero, null emptyCells)
         [] -> fail "Expected a cell before the nested product"
     print (length (toList (localInfix n)), length (toList (localFormula n)))
+    print (toList (signedPrefix n m), take 1 (toList (signedPrefix bottom m)))
+    print (snd (checkedProduct atZero 0 m), snd (checkedProduct atZero n m))
+
+-- Check references to a later declaration in a shared local signature.
+signedPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Bool (1 + rows * cols)
+signedPrefix rows cols =
+  let total, cells :: Nat
+      total = 1 + cells
+      cells = rows * cols
+  in replicateNative total True
+
+-- A GADT assumption about a local name must still solve the corresponding Wanted.
+type family Flag (x :: Nat) :: Bool
+type instance Flag Z = True
+data On (x :: Nat) where
+  On :: Flag x ~ True => On x
+
+atZero :: foreach (x :: Nat) -> Maybe (On x)
+atZero Z = Just On
+atZero (S _) = Nothing
+
+requireOn :: foreach (x :: Nat) -> (Flag x :~: True) -> Bool
+requireOn _ Refl = True
+
+checkedProduct :: (foreach (x :: Nat) -> Maybe (On x))
+               -> foreach (r :: Nat) -> foreach (c :: Nat) -> (Vec Bool (times r c), Bool)
+checkedProduct witness r c =
+  let area :: Nat
+      area = r * c
+  in case witness area of
+       Just On -> (replicateNative area True, requireOn area Refl)
+       Nothing -> (replicateNative area True, False)
 
 -- The selector rule applies to Int. Local vector lengths select Num Nat.
 {-# RULES "Int multiply by one" forall (n :: Int). n * 1 = n #-}

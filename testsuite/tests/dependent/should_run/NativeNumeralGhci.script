@@ -33,3 +33,5 @@ print (length (toList (reserve 2 3)))
 let named :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); named r c = let cells = r * c in replicateNative (1 + cells) True
 print (toList (named 0 8))
 do { r <- newIORef (error "forced product" :: Nat); n <- readIORef r; print (take 1 (toList (named n 2))) }
+let signed :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); signed r c = let { size, area :: Nat; size = 1 + area; area = r * c } in replicateNative size True
+print (length (toList (signed 2 3)))

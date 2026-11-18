@@ -28,3 +28,5 @@ True
 Go
 ('x',True,True)
 (3,5)
+([True,True,True],[True])
+(True,False)
