@@ -283,15 +283,19 @@ For unused-binding warnings, a use of the private name counts as a use of
 the term and its local constructors. Put this edge before the value groups.
 A value signature in any of them can depend on the private name.
 Only a use of the name schedules an early check of the term. The early group
-contains its ordinary binding, signature, and any independent enumeration
+contains its ordinary binding, signature, and any independent data
 declarations that its signature needs. All three may follow the use in the
 source file. The typechecker checks the term once and creates equations
 from checked matches before checking the rest of the group.
 
-The early group cannot depend on the rest of the group. Accept only plain
-enumerations without deriving clauses at this point. Deriving can use
-instances from later groups. A SPECIALISE pragma can also mention arbitrary
-local types and values. Keep such bindings in the original group. Return
+The early group cannot depend on the rest of the group. An H98 datatype
+with no parameters may refer to itself in a field, as in data Nat = Z | S Nat.
+Require each field type to be a single type constructor. A dependency on
+another type in this group appears in group_ext. A private source-table
+name does not, so exclude it explicitly. Keep deriving clauses in the
+original group because they can use instances from later groups. A SPECIALISE
+pragma can also mention arbitrary local types and values. Keep such bindings
+in the original group. Return
 all requested names so the caller can report an uncertified table at the
 source binding before it checks a use of the private name.
 -}
@@ -307,10 +311,22 @@ localSourceTableBinders binds sigs =
   where
     signed = mkOccSet [ rdrNameOcc n | L _ (TypeSig _ [] [L _ n] _) <- sigs ]
     constructor_row :: LMatch GhcPs (LHsExpr GhcPs) -> Bool
-    constructor_row (L _ Match{m_pats = L _ [L _ ConPat{pat_args = PrefixCon _ []}],
-                               m_grhss = GRHSs _ (L _ (GRHS _ [] (L _ (HsVar _ (L _ r)))) :| [])
-                                              (L _ EmptyLocalBinds{})}) = isRdrDataCon r
+    constructor_row (L _ Match{m_pats = L _ [pat], m_grhss = rhss})
+      | ConPat{pat_args = PrefixCon _ fields} <- unparen pat
+      , all plain_field fields
+      , GRHSs _ (L _ (GRHS _ [] (L _ (HsVar _ (L _ r)))) :| []) (L _ EmptyLocalBinds{}) <- rhss
+      = isRdrDataCon r || r `elem` collectPatsBinders CollNoDictBinders fields
     constructor_row _ = False
+
+    unparen :: LPat GhcPs -> Pat GhcPs
+    unparen (L _ (ParPat _ p)) = unparen p
+    unparen (L _ p) = p
+
+    plain_field :: LPat GhcPs -> Bool
+    plain_field p = case unparen p of
+      VarPat{} -> True
+      WildPat{} -> True
+      _ -> False
 
 -- | Schedule local tables used in type syntax. See Note [Ordering local source tables].
 splitLocalSourceTables :: NameSet -> HsGroup GhcRn
@@ -334,8 +350,8 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
         early = [ (b, kinds) | (NonRecursive, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
                 , b `elemNameSet` wanted_set, not (b `elemNameSet` specialised)
                 , Just kinds <- [lookupNameEnv signatures b]
-                , all (\k -> not (k `elemNameSet` local_types) || k `elemNameEnv` enumerations) kinds
-                , let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv enumerations) kinds)
+                , all (\k -> not (k `elemNameSet` local_types) || k `elemNameEnv` early_datatypes) kinds
+                , let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes) kinds)
                 , nameSetAll (`elemNameSet` cons) fvs ]
         early_names = mkNameSet (map fst early)
         early_types = mkNameSet (concatMap snd early)
@@ -351,18 +367,26 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
   where
     bound_names = [ b | (_, bs) <- binds, L _ FunBind{fun_id = L _ b} <- bs, isExternalName b ]
     local_types = mkNameSet (map (tcdName . unLoc) (tyClGroupTyClDecls tycls))
-    enumerations = mkNameEnv
+    early_datatypes = mkNameEnv
       [ (t, cons) | TyClGroup{group_ext = deps, group_kisigs = [], group_tyclds =
                      [L _ DataDecl{tcdLName = L _ t, tcdModifiers = [],
                                    tcdTyVars = HsQTvs{hsq_explicit = []},
                                    tcdDataDefn = HsDataDefn{dd_derivs = [], dd_ctxt = Nothing,
                                      dd_kindSig = Nothing, dd_cons = DataTypeCons False cs}}]} <- tycls
                   , isEmptyNameSet deps
-                  , Just cons <- [traverse enum_con cs] ]
-    enum_con :: LConDecl GhcRn -> Maybe Name
-    enum_con (L _ ConDeclH98{con_name = L _ c, con_modifiers = [], con_telescope = [],
-                             con_args = PrefixCon _ []}) = Just c
-    enum_con _ = Nothing
+                  , Just cons <- [traverse prefix_con cs] ]
+    prefix_con :: LConDecl GhcRn -> Maybe Name
+    prefix_con (L _ ConDeclH98{con_name = L _ c, con_modifiers = [], con_telescope = [],
+                               con_args = PrefixCon _ fields})
+      | all independent_field fields = Just c
+    prefix_con _ = Nothing
+
+    independent_field :: HsConDeclField GhcRn -> Bool
+    independent_field CDF{cdf_type = ty, cdf_multiplicity = HsModifiedFunArr _ [] HsStandardArr{}}
+      | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- ignoreParens ty
+      = isTyConName name && isNothing (sourceTableTermOcc (nameOccName name))
+    independent_field _ = False
+
     sig_names :: Sig GhcRn -> [Name]
     sig_names (TypeSig _ _ [L _ b] _) = [b]
     sig_names (InlineSig _ (L _ b) _) = [b]

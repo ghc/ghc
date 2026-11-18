@@ -930,8 +930,8 @@ instance Diagnostic TcRnMessage where
     TcRnNoSourceTable name
       -> mkSimpleDecorated $ vcat
            [ text "No checked equations are available for" <+> quotes (ppr name) <+> text "in a type."
-           , text "A source table must match each input constructor once"
-           , text "and return a constructor in each equation." ]
+           , text "Use one clause per input constructor, with a variable or wildcard for each field."
+           , text "Each equation must return a nullary constructor or a field bound by the pattern." ]
     TcRnUntickedPromotedThing thing
       -> mkSimpleDecorated $
          text "Unticked promoted" <+> what

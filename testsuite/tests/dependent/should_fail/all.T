@@ -81,3 +81,4 @@ test('NativeSourceTableWrong',
      multimod_compile_fail,
      ['NativeSourceTableWrong', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
 test('NativeSourceTablePartial', normal, compile_fail, [''])
+test('NativeSourceFieldCoverage', normal, compile_fail, [''])

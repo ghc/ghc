@@ -13,7 +13,10 @@
 -- | Store and consume a runtime length with an indexed vector.
 module PackedVecLibrary (
     Nat (..),
+    previous,
+    isSuccessor,
     Vec (..),
+    dropFirst,
     PackedVec (..),
     LE (..),
     BoundedVec (..),
@@ -71,10 +74,25 @@ import Data.Type.Equality ((:~:) (Refl))
 -- | A runtime length. Each successor contains an ordinary lazy field.
 data Nat = Z | S Nat
 
+-- | Return zero for an empty length and the predecessor for a successor.
+previous :: Nat -> Nat
+previous Z     = Z
+previous (S n) = n
+
+-- | Inspect the outer constructor of a length.
+isSuccessor :: Nat -> Bool
+isSuccessor Z     = False
+isSuccessor (S _) = True
+
 -- | A vector with an erased length parameter.
 data Vec a (n :: Nat) where
     VNil :: Vec a Z
     VCons :: a -> Vec a n -> Vec a (S n)
+
+-- | Drop the first element, or return an empty vector if the input is empty.
+dropFirst :: Vec a n -> Vec a (previous n)
+dropFirst VNil           = VNil
+dropFirst (VCons _ rest) = rest
 
 -- | Store one runtime length and a vector indexed by that same field.
 data PackedVec a where
