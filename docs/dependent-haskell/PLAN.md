@@ -7151,3 +7151,30 @@ application. A body that needs no proof can keep the original let and RHS.
 Verify this distinction after solving, including with speculative solves.
 The solver ordering has prior art in [OutsideIn(X)](papers/README.md#outsideinx-jfp-2011).
 Conditional evidence and its elaboration are proposed work in this fork.
+
+## M91: dictionary evidence for a local index definition
+
+R03 forms the result index of a retained application. R05 preserves the
+runtime operand and validates its equality evidence. M90 accepts
+`let cells = times rows cols`. The same let written with `(*)` still
+fails at the body with GHC-83865 on the M90 compiler.
+
+- [ ] Check the ordinary binding once, including generalisation and usage.
+      Read the exact dictionary Wanted from each typed selector or literal.
+      Recover the canonical operand only for a fully checked expression.
+- [ ] Offer the local nominal equality inside the body only when the
+      surrounding evidence supplies every certified dictionary. Preserve an
+      independent ordinary result under a local Given or rewrite rule.
+- [ ] If the body needs the equality, retain its equation and method
+      dependencies, check later RULES and discharge the proof by dependent
+      application. Preserve the original lazy RHS when the proof is unused.
+- [ ] Check a local product from runtime dimensions, numerals inside an
+      operand, nested operators, shadowing, sharing, strictness, and rejection
+      under an unknown dictionary. Verify source, GHCi, and an interface-only
+      client, then update the Showcase.
+
+Agda instance search can use a parameter from the current context. For
+Haskell, the relevant parameter is the evidence that the solver chose for
+the actual RHS. OutsideIn's ordering makes that evidence available when it
+enters the implication for the body.
+[Local definitions and solver provenance](REFERENCES.md#equality-for-lazy-local-definitions).
