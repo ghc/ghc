@@ -78,6 +78,7 @@ import GHC.Types.Id ( mkLocalId, isClassOpId_maybe, sourceMethodTarget_maybe, so
 import GHC.Types.Var.Set ( elemVarSet, emptyVarSet, extendVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
+import GHC.Unit.Types ( isInteractiveModule )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -1390,62 +1391,17 @@ tcValArg _ _ _ (ETypeArg l hty ty) = return (ETypeArg l hty ty)
 tcValArg _ _ _ (EWrap (EHsWrap w)) = return (EWrap (EHsWrap w))
 tcValArg _ _ _ (EWrap ew)          = return (EWrap ew)
 
-tcValArg _ pos rn_head (ERetainedArg loc (Scaled mult ty) arg res_ty)
+tcValArg do_ql pos rn_head (ERetainedArg DepFunVisible loc ty arg res_ty)
+  = do { checked <- tcValArgExpr do_ql pos rn_head loc ty arg
+       ; return (ERetainedArg DepFunVisible loc noExtField checked res_ty) }
+tcValArg _ pos rn_head (ERetainedArg DepFunInvisible loc (Scaled mult ty) arg res_ty)
   = addArgCtxt pos rn_head arg $
     do { checked <- tcScalingUsage mult $
                      traverse (\e -> tcPolyExpr e (mkCheckExpType ty)) arg
-       ; return (ERetainedArg loc noExtField checked res_ty) }
+       ; return (ERetainedArg DepFunInvisible loc noExtField checked res_ty) }
 
-tcValArg do_ql pos rn_fun_head
-         (EValArg { ea_loc_span  = lspan
-                  , ea_arg    = larg@(L arg_loc arg)
-                  , ea_arg_ty = sc_arg_ty })
-  = addArgCtxt pos rn_fun_head larg $
-    do { -- Crucial step: expose QL results before checking exp_arg_ty
-         -- So far as the paper is concerned, this step applies
-         -- the poly-substitution Theta, learned by QL, so that we
-         -- "see" the polymorphism in that argument type. E.g.
-         --    (:) e ids, where ids :: [forall a. a->a]
-         --                     (:) :: forall p. p->[p]->[p]
-         -- Then Theta = [p :-> forall a. a->a], and we want
-         -- to check 'e' with expected type (forall a. a->a)
-         -- See Note [Instantiation variables are short lived]
-         Scaled mult exp_arg_ty <- case do_ql of
-              DoQL -> liftZonkM $ zonkScaledTcType sc_arg_ty
-              NoQL -> return sc_arg_ty
-       ; traceTc "tcValArg {" $
-         vcat [ text "arg lspan:" <+> ppr lspan
-              , text "rn_head" <+> ppr rn_fun_head
-              , text "sigma_type" <+> ppr (mkCheckExpType exp_arg_ty)
-              , text "arg:" <+> ppr larg
-              , text "arg_loc:" <+> ppr arg_loc
-              ]
-
-
-         -- Now check the argument. Fully explicit outer type applications
-         -- can already have supplied a known native callback input.
-         -- See Note [Named callbacks at known native inputs].
-       ; enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; callback_enabled <- if enabled then return True else
-           do { callback_ty <- liftZonkM (zonkTcType exp_arg_ty)
-              ; return (hasNativeDependentExpr (Core.Type callback_ty)) }
-       ; (_, callback_cache) <- case do_ql of
-           NoQL | callback_enabled -> tcRetainedCallbackArgs [] [Scaled mult exp_arg_ty]
-                               [EValArg { ea_loc_span = lspan, ea_arg = larg
-                                        , ea_arg_ty = noExtField }] Subst.emptySubst []
-           _ -> return (Nothing, [])
-       ; arg' <- tcScalingUsage mult $
-           case callback_cache of
-             [(1, (typed, actual, usage))] ->
-               do { tcEmitBindingUsage usage
-                  ; wrap <- tcSubTypeSigma (exprCtOrigin arg) GenSigCtxt actual exp_arg_ty
-                  ; return (mkHsWrap wrap (unLoc typed)) }
-             _ -> tcPolyExpr arg (mkCheckExpType exp_arg_ty)
-       ; traceTc "tcValArg" $ vcat [ ppr arg'
-                                   , text "}" ]
-       ; return (EValArg { ea_loc_span = lspan
-                         , ea_arg = L arg_loc arg'
-                         , ea_arg_ty = noExtField }) }
+tcValArg do_ql pos rn_head (EValArg loc ty arg)
+  = EValArg loc noExtField <$> tcValArgExpr do_ql pos rn_head loc ty arg
 
 tcValArg _ pos rn_fun_head
          (EValArgQL { eaql_wanted   = wanted
@@ -1537,6 +1493,55 @@ tcInstFun :: QLFlag
 -- plus the modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
 tcInstFun = tcInstFunWithExpected Nothing Nothing
+
+-- | Check a written visible value at its argument type and multiplicity.
+tcValArgExpr :: QLFlag -> Int -> (HsExpr GhcRn, SrcSpan) -> HsExprLoc
+             -> Scaled TcSigmaTypeFRR -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc)
+tcValArgExpr do_ql pos rn_fun_head lspan sc_arg_ty larg@(L arg_loc arg)
+  = addArgCtxt pos rn_fun_head larg $
+    do { -- Crucial step: expose QL results before checking exp_arg_ty
+         -- So far as the paper is concerned, this step applies
+         -- the poly-substitution Theta, learned by QL, so that we
+         -- "see" the polymorphism in that argument type. E.g.
+         --    (:) e ids, where ids :: [forall a. a->a]
+         --                     (:) :: forall p. p->[p]->[p]
+         -- Then Theta = [p :-> forall a. a->a], and we want
+         -- to check 'e' with expected type (forall a. a->a)
+         -- See Note [Instantiation variables are short lived]
+         Scaled mult exp_arg_ty <- case do_ql of
+              DoQL -> liftZonkM $ zonkScaledTcType sc_arg_ty
+              NoQL -> return sc_arg_ty
+       ; traceTc "tcValArg {" $
+         vcat [ text "arg lspan:" <+> ppr lspan
+              , text "rn_head" <+> ppr rn_fun_head
+              , text "sigma_type" <+> ppr (mkCheckExpType exp_arg_ty)
+              , text "arg:" <+> ppr larg
+              , text "arg_loc:" <+> ppr arg_loc
+              ]
+
+
+         -- Now check the argument. Fully explicit outer type applications
+         -- can already have supplied a known native callback input.
+         -- See Note [Named callbacks at known native inputs].
+       ; enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; callback_enabled <- if enabled then return True else
+           do { callback_ty <- liftZonkM (zonkTcType exp_arg_ty)
+              ; return (hasNativeDependentExpr (Core.Type callback_ty)) }
+       ; (_, callback_cache) <- case do_ql of
+           NoQL | callback_enabled -> tcRetainedCallbackArgs [] [Scaled mult exp_arg_ty]
+                               [EValArg { ea_loc_span = lspan, ea_arg = larg
+                                        , ea_arg_ty = noExtField }] Subst.emptySubst []
+           _ -> return (Nothing, [])
+       ; arg' <- tcScalingUsage mult $
+           case callback_cache of
+             [(1, (typed, actual, usage))] ->
+               do { tcEmitBindingUsage usage
+                  ; wrap <- tcSubTypeSigma (exprCtOrigin arg) GenSigCtxt actual exp_arg_ty
+                  ; return (mkHsWrap wrap (unLoc typed)) }
+             _ -> tcPolyExpr arg (mkCheckExpType exp_arg_ty)
+       ; traceTc "tcValArg" $ vcat [ ppr arg'
+                                   , text "}" ]
+       ; return (L arg_loc arg') }
 
 -- | Instantiate arguments in telescope order, with optional immutable choices
 -- and a retained expected result after ordinary VTA.
@@ -1782,7 +1787,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                 -- nested  forall a. Eq a => forall b. Show b => blah
 
     -- See Note [Explicit invisible retained arguments].
-    go1 plan fun_orig pos acc fun_ty (ERetainedArg loc _ arg _ : rest_args)
+    go1 plan fun_orig pos acc fun_ty (ERetainedArg _ loc _ arg _ : rest_args)
       = do { (binder, (operand, runtime_arg)) <-
                addArgCtxt (pos + count written_prefix_arg acc) rn_head arg $
                case coreFullView fun_ty of
@@ -1791,7 +1796,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                  _ -> failWithTc
                         (TcRnRetainedQuantificationError (RetainedExplicitArgument fun_ty))
            ; let res_ty = applyTypeToArgs fun_ty [operand]
-                 checked = ERetainedArg loc (Scaled ManyTy (varType binder)) runtime_arg res_ty
+                 checked = ERetainedArg DepFunInvisible loc (Scaled ManyTy (varType binder)) runtime_arg res_ty
            ; go plan fun_orig pos (checked : acc) res_ty rest_args }
 
     -- See Note [Inferring an invisible retained argument].
@@ -1835,8 +1840,8 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
       = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
-           ; arg' <- skipQuickLook ctxt runtime_arg (Scaled ManyTy (varType binder))
            ; let body_ty = applyTypeToArgs fun_ty [core_arg]
+                 arg' = ERetainedArg DepFunVisible ctxt (Scaled ManyTy (varType binder)) runtime_arg body_ty
            ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
 
     -- Rule ITVDQ from the GHC Proposal #281
@@ -2160,7 +2165,11 @@ tcRetainedArg domain arg
                                     then (,original) <$> tcRetainedArgVar expected arg_id
                                     else failWithTc $ TcRnRetainedQuantificationError
                                            (RetainedIndexMultiplicity (idMult arg_id)) }
-                                else unsupported }
+                                else case nameModule_maybe (getName arg_id) of
+                                  Just m | isGlobalId arg_id, isInteractiveModule m ->
+                                    failWithTc $ TcRnRetainedQuantificationError
+                                      (RetainedInteractiveIndex (getName arg_id))
+                                  _ -> unsupported }
                       _ -> unsupported }
           _ -> unsupported
 
@@ -2320,15 +2329,18 @@ expression at the binder's domain and multiplicity Many exactly once. Store
 the substituted result type in HsAppRetained. Desugar its expression to a
 runtime value application.
 
-Keep ERetainedArg separate from EValArg through application checking. It
-counts in source diagnostic positions. It does not consume a position in
-the ordinary argument cache. Skip Quick Look for this application so that
+Keep the written visibility in ERetainedArg and HsAppRetained. A visible
+operand uses ordinary value checking. Its stored result type keeps later
+passes from having to substitute the operand again. Breakpoint insertion
+recognises both visibilities. See Note [Breakpoints in retained operands]
+in GHC.HsToCore.Ticks. A written invisible operand counts in source
+diagnostic positions without consuming an ordinary argument cache position. Skip Quick Look for this application so that
 the retained result is checked without Quick Look instantiation variables.
 -}
 
 -- | Is this a written runtime argument for an invisible retained binder?
 isExplicitRetainedArg :: HsExprArg p -> Bool
-isExplicitRetainedArg ERetainedArg{} = True
+isExplicitRetainedArg ERetainedArg{ ea_retained_vis = DepFunInvisible } = True
 isExplicitRetainedArg _ = False
 
 {- Note [Immutable retained result instantiation]

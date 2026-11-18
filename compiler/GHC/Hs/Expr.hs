@@ -47,6 +47,7 @@ import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish (CoreTickish)
+import GHC.Types.Var (DepFunTyFlag(..))
 import GHC.Types.Unique.Set (UniqSet)
 import GHC.Types.ThLevelIndex
 import GHC.Core.ConLike ( conLikeName, ConLike )
@@ -245,7 +246,7 @@ type instance XAppTypeE      GhcTc = Type
 
 type instance XAppRetained   GhcPs = (EpToken "@", EpToken "{", EpToken "}")
 type instance XAppRetained   GhcRn = NoExtField
-type instance XAppRetained   GhcTc = Type
+type instance XAppRetained   GhcTc = (DepFunTyFlag, Type)
 
 -- OpApp not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
@@ -782,7 +783,7 @@ pprExpr e
   | otherwise        = pprDeeper (ppr_expr e)
 
 -----------------------
-pprApp :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
+pprApp :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
 -- Pretty-print an application (f e1 .. en)
 --
 -- If we have reached the depth limit, we don't want to print
@@ -800,7 +801,9 @@ pprApp app
       = case fun of
           HsApp _         (L _ fun') arg -> go fun' (Left arg : args)
           HsAppType _     (L _ fun') arg -> go fun' (Right (char '@' <> ppr arg) : args)
-          HsAppRetained _ (L _ fun') arg -> go fun' (Right (char '@' <> braces (pprLExpr arg)) : args)
+          HsAppRetained ext (L _ fun') arg
+            | GhcTc <- ghcPass @p, (DepFunVisible, _) <- ext -> go fun' (Left arg : args)
+            | otherwise -> go fun' (Right (char '@' <> braces (pprLExpr arg)) : args)
           _                              -> ppr_app fun args
 
     ppr_app fun args

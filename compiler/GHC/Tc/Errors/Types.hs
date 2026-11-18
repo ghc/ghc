@@ -5359,6 +5359,7 @@ data RetainedQuantificationError
   | RetainedContextPattern
   | RetainedResultWrapper
   | RetainedIndexExpression
+  | RetainedInteractiveIndex Name
   | RetainedUncheckedSourceCall Name
   | RetainedLocalSourceMethod Name
   | RetainedLiteralConversion Name Type

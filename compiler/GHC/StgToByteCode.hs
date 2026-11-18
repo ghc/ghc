@@ -40,6 +40,12 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Core.Type
 import GHC.Core.Predicate( tyCoVarsOfTypesWellScoped )
+import GHC.Core.Coercion ( abstractNativeIndices )
+import GHC.Core.TyCo.Rep ( Type(..) )
+import GHC.Core.TyCo.Tidy ( tidyType, tidyFreeTyCoVarsX )
+import GHC.Types.Var ( binderVar, isNonCoVarId, mkTyVar )
+import GHC.Types.Var.Env ( emptyTidyEnv )
+import GHC.Types.Unique.Supply ( uniqFromTag, UniqueTag(BcoTag) )
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Types.RepType
 import GHC.Core.DataCon
@@ -417,26 +423,20 @@ schemeR_wrk fvs nm original_body (args, body)
 -- | Introduce break instructions for ticked expressions.
 -- If no breakpoint information is available, the instruction is omitted.
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeER_wrk d p (StgTick bp@(Breakpoint tick_ty tick_id fvs) rhs) = do
+schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
   platform <- profilePlatform <$> getProfile
 
   -- When we find a tick we update the "last breakpoint location".
   -- We use it when constructing step-out BRK_FUNs in doCase
   -- See Note [Debugger: Stepout internal break locs]
+  bp <- prepareBreakTick tick_id tick_ty fvs
   code <- withBreakTick bp $ schemeE d 0 p rhs
 
-  -- As per Note [Stack layout when entering run_BCO], the breakpoint AP_STACK
-  -- as we yield from the interpreter is headed by a stg_apply_interp + BCO to be a valid stack.
-  -- Therefore, the var offsets are offset by 2 words
-  let idOffSets = map (fmap (second (+2))) $
-                  getVarOffSets platform d p fvs
-      ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-      toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-      toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-      breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
-                    (Right tick_id)
-
-  mibi <- newBreakInfo breakInfo
+  -- The breakpoint AP_STACK starts with stg_apply_interp and its BCO.
+  -- Skip those two words when retrieving the local variables.
+  mibi <- case bp of
+    Nothing -> return Nothing
+    Just tick -> newBreakInfo (dehydrateCgBreakInfo platform d p 2 tick (Right tick_id))
 
   return $ case mibi of
     Nothing  -> code
@@ -445,8 +445,8 @@ schemeER_wrk d p (StgTick bp@(Breakpoint tick_ty tick_id fvs) rhs) = do
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
 -- | Get the offset in words into this breakpoint's AP_STACK which contains the matching Id
-getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
-getVarOffSets platform depth env = map getOffSet
+getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Maybe Id] -> [Maybe (Id, WordOff)]
+getVarOffSets platform depth env = map (>>= getOffSet)
   where
     getOffSet id = case lookupBCEnv_maybe id env of
       Nothing     -> Nothing
@@ -1391,7 +1391,7 @@ doCase d s p scrut bndr alts
      -- alt_final2), leaving the stack with the scrutinee followed by the
      -- free variables (with depth==d_bndr)
      alt_final <- getLastBreakTick >>= \case
-       Just (Breakpoint tick_ty tick_id fvs)
+       Just tick@(BreakTick tick_id _ _ _)
          | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
          -- Construct an internal breakpoint to put at the start of this case
          -- continuation BCO, for step-out.
@@ -1405,12 +1405,7 @@ doCase d s p scrut bndr alts
           -- additional stg_ret and stg_ctoi frame headers
           -- (as per Note [Stack layout when entering run_BCO]):
           let firstVarOff = ret_info_header_w+bndr_size+ctoi_frame_header_w
-              idOffSets = map (fmap (second (+firstVarOff))) $
-                          getVarOffSets platform d p fvs
-              ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-              toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-              toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-              breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
+              breakInfo = dehydrateCgBreakInfo platform d p firstVarOff tick
                             (Left (InternalBreakLoc tick_id))
 
           mibi <- newBreakInfo breakInfo
@@ -2734,7 +2729,7 @@ data BcM_Env
         { bcm_hsc_env    :: !HscEnv
         , bcm_module     :: !Module -- current module (for breakpoints)
         , modBreaks      :: !(Maybe ModBreaks)
-        , last_bp_tick   :: !(Maybe StgTickish)
+        , last_bp_tick   :: !(Maybe BreakTick)
         }
 
 data BcM_State
@@ -2800,11 +2795,11 @@ newBreakInfo info = BcM $ \env st -> do
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
 
-withBreakTick :: StgTickish -> BcM a -> BcM a
+withBreakTick :: Maybe BreakTick -> BcM a -> BcM a
 withBreakTick bp (BcM act) = BcM $ \env st ->
-  act env{last_bp_tick=Just bp} st
+  act env{last_bp_tick=bp} st
 
-getLastBreakTick :: BcM (Maybe StgTickish)
+getLastBreakTick :: BcM (Maybe BreakTick)
 getLastBreakTick = BcM $ \env st ->
   pure (last_bp_tick env, st)
 
@@ -2817,11 +2812,106 @@ mkHpcTickBoxesLabell platform mod =
 
 -- Dehydrating CgBreakInfo
 
-dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> Either InternalBreakLoc BreakpointId -> CgBreakInfo
-dehydrateCgBreakInfo ty_vars idOffSets tick_ty bid =
-          CgBreakInfo
-            { cgb_tyvars = map toIfaceTvBndr ty_vars
-            , cgb_vars = map (fmap (\(i, offset) -> (toIfaceIdBndr i, offset))) idOffSets
-            , cgb_resty = toIfaceType tick_ty
-            , cgb_tick_id = bid
-            }
+-- | The debugger's view of the result and locals at one source location.
+-- See Note [Runtime indices at bytecode breakpoints].
+data BreakTick = BreakTick BreakpointId [TyVar] [Maybe Id] Type
+
+-- | Abstract free runtime indices before writing the debugger's type telescope.
+prepareBreakTick :: BreakpointId -> Type -> [Id] -> BcM (Maybe BreakTick)
+prepareBreakTick tick_id result fvs
+  | not (any isNonCoVarId ordinary_tyvars)
+  , not (any (anyFreeVarsOfType isNonCoVarId . idMult) fvs)
+  = return (Just (BreakTick tick_id ordinary_tyvars (map Just fvs) result))
+  | otherwise = do
+      pairs <- foldM add_unknown [] (applications ++ map TermVarTy indices)
+      return $ do
+        result' <- value_type pairs result
+        let slot v = do
+              ty <- value_type pairs (idType v)
+              mult <- abstract_type pairs (idMult v)
+              return (setIdMult (setIdType v ty) mult)
+            slots = map slot fvs
+            tvs = tyCoVarsOfTypesWellScoped (result' : concatMap local_types (catMaybes slots))
+            (tidy_env, tvs') = tidyFreeTyCoVarsX emptyTidyEnv tvs
+            tidy_var v = setIdMult (setIdType v (tidyType tidy_env (idType v)))
+                                   (tidyType tidy_env (idMult v))
+        return (BreakTick tick_id tvs' (map (fmap tidy_var) slots) (tidyType tidy_env result'))
+  where
+    local_types v = [idType v, idMult v]
+    types = result : concatMap local_types fvs
+    ordinary_tyvars = tyCoVarsOfTypesWellScoped (result : map idType fvs)
+    free_vars = tyCoVarsOfTypesWellScoped types
+    indices = filter isNonCoVarId free_vars
+    free_set = mkVarSet free_vars
+
+    -- A complete call on a free head can be hidden at its result kind.
+    -- A call involving a locally bound argument must stay under that binder.
+    applications = filter ((`subVarSet` free_set) . tyCoVarsOfType) $
+                   concatMap calls (types ++ map varType free_vars)
+    calls ty = case ty of
+      TermAppTy _ arg       -> ty : calls arg
+      TyConApp _ args       -> concatMap calls args
+      AppTy f x             -> calls f ++ calls x
+      FunTy _ ma w a b      -> concatMap calls [ma, w, a, b]
+      ForAllTy ma b body    -> concatMap calls [ma, varType (binderVar b), body]
+      DepFunTy _ v body     -> concatMap calls (body : local_types v)
+      CastTy t _            -> calls t
+      _                     -> []
+
+    -- Opaque call results have closed kinds. The remaining indices are
+    -- sorted by the free variables in their kinds.
+    add_unknown pairs index
+      | any (eqType index . fst) pairs = return pairs
+      | Just kind <- abstract_type pairs (typeKind index)
+      = do { u <- liftIO (uniqFromTag BcoTag)
+           ; return ((index, mkTyVar (mkSysTvName u (fsLit "n")) kind) : pairs) }
+      | otherwise = return pairs
+
+    abstract_type pairs ty = do
+      ty' <- abstractNativeIndices pairs ty
+      guard (not (anyFreeVarsOfType (not . isTyVar) ty'))
+      return ty'
+
+    value_type pairs ty = do
+      ty' <- abstract_type pairs ty
+      rep <- kindRep_maybe (typeKind ty)
+      rep' <- kindRep_maybe (typeKind ty')
+      guard (eqType rep rep')
+      return ty'
+
+{- Note [Runtime indices at bytecode breakpoints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a breakpoint local xs :: Vec a n, n can be a runtime Id used only in
+types. The stack need not contain a slot for it. CgBreakInfo stores a
+telescope of type variables. The debugger instantiates those binders with
+fresh RuntimeUnk variables at each stop. A runtime Id cannot be read back
+as a type variable and then used as a term.
+
+Give the debugger an existential view of each free index. Both xs and
+ys :: Vec Bool n then have the same unknown length. A separately captured
+value n :: Nat can be displayed, but supplies no equality to that unknown.
+Allocate separate type variables for distinct indices and tidy their names
+together before writing the interface types. Keep locally bound indices in
+their own scope. The result and each reported slot must keep their runtime
+representation and have only ordinary type variables free.
+
+If a local's type cannot be abstracted, its slot is absent. Keep the slot
+position for syncOccs in GHC.Runtime.Eval. A breakpoint with an unrepresentable
+result cannot describe _result. Omit its instruction and clear the enclosing
+step-out location for its body. Nested representable ticks can still stop.
+The step-out of a representable tick uses that tick's types and the offsets
+for the case continuation's stack layout.
+-}
+
+-- | Describe a source or step-out stop using the offsets for its stack frame.
+dehydrateCgBreakInfo :: Platform -> StackDepth -> BCEnv -> WordOff -> BreakTick
+                     -> Either InternalBreakLoc BreakpointId -> CgBreakInfo
+dehydrateCgBreakInfo platform depth env skip (BreakTick _ ty_vars slots result) bid =
+  CgBreakInfo
+    { cgb_tyvars = map toIfaceTvBndr ty_vars
+    , cgb_vars = map (fmap describe) (getVarOffSets platform depth env slots)
+    , cgb_resty = toIfaceType result
+    , cgb_tick_id = bid
+    }
+  where
+    describe (v, offset) = (toIfaceIdBndr v, fromIntegral (offset + skip))

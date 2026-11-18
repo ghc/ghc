@@ -182,7 +182,8 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
            -> HsExprArg p
 
   -- Kept separate from the ordinary argument cache and its positions.
-  ERetainedArg :: { ea_loc_span     :: HsExprLoc
+  ERetainedArg :: { ea_retained_vis :: DepFunTyFlag
+                  , ea_loc_span     :: HsExprLoc
                   , ea_arg_ty       :: !(XEVAType p)
                   , ea_arg          :: LHsExpr (GhcPass (XPass p))
                   , ea_retained_res :: !(XCheckedType p) }
@@ -269,6 +270,7 @@ isVisibleArg _             = False
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
   ppr (EPrag _ p)                     = text "EPrag" <+> ppr p
   ppr (ETypeArg { ea_hs_ty = hs_ty }) = char '@' <> ppr hs_ty
+  ppr (ERetainedArg { ea_retained_vis = DepFunVisible, ea_arg = arg }) = ppr arg
   ppr (ERetainedArg { ea_arg = arg }) = char '@' <> braces (ppr arg)
   ppr (EWrap wrap)                    = ppr wrap
   ppr (EValArg { ea_arg = arg, ea_loc_span = sloc })
@@ -313,7 +315,7 @@ splitHsApps e = go e []
     go (HsPragE _ p (L l fun))    args = go fun (EPrag      l p   : args)
     go (HsAppType _ (L l fun) ty) args = go fun (mkETypeArg l ty  : args)
     go (HsAppRetained _ (L l fun) arg) args
-      = go fun (ERetainedArg l noExtField arg noExtField : args)
+      = go fun (ERetainedArg DepFunInvisible l noExtField arg noExtField : args)
     go (HsApp _ (L l fun) arg)    args = go fun (mkEValArg  l arg : args)
     go fun args = do { mb_hse <- tcExpand fun
                      ; case mb_hse of
@@ -337,8 +339,8 @@ rebuildHsApps fun (arg : args)
         -> rebuildHsApps (HsApp noExtField (L l fun) arg) args
       ETypeArg { ea_hs_ty = hs_ty, ea_ty_arg = ty, ea_loc_span = l }
         -> rebuildHsApps (HsAppType ty (L l fun) hs_ty) args
-      ERetainedArg { ea_arg = arg, ea_retained_res = ty, ea_loc_span = l }
-        -> rebuildHsApps (HsAppRetained ty (L l fun) arg) args
+      ERetainedArg { ea_retained_vis = vis, ea_arg = arg, ea_retained_res = ty, ea_loc_span = l }
+        -> rebuildHsApps (HsAppRetained (vis, ty) (L l fun) arg) args
       EPrag l p
         -> rebuildHsApps (HsPragE noExtField p (L l fun)) args
       EWrap (EPar l)

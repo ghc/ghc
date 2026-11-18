@@ -84,7 +84,7 @@ import GHC.Hs
 
 import GHC.Driver.Config.HsToCore.Ticks ( initTicksConfig )
 import GHC.Driver.Session ( getDynFlags, sccProfilingEnabled )
-import GHC.HsToCore.Ticks ( TicksConfig(ticks_passes) )
+import GHC.HsToCore.Ticks ( TicksConfig(ticks_passes), TickishType(Breakpoints) )
 
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
@@ -421,7 +421,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
               ; unless (not (null cons) && cons `equalLength` domain_cons
                         && all (`elem` cons) domain_cons) case_error
               ; dflags <- getDynFlags
-              ; unless (null (ticks_passes (initTicksConfig dflags))
+              ; unless (all (== Breakpoints) (ticks_passes (initTicksConfig dflags))
                         && not (sccProfilingEnabled dflags)) $
                   failWithTc (TcRnRetainedQuantificationError RetainedCallInstrumentation)
               ; alias <- newSysLocalId (fsLit "call_index") ManyTy domain
@@ -755,8 +755,9 @@ can change a quoted Name.
 
 Require complete, unguarded constructor rows with variable or wildcard fields.
 A source wildcard or variable case can ignore its scrutinee in Haskell.
-Do not introduce this strict alias on that ordinary path. Reject active
-instrumentation: an inserted tick can obscure the checked runtime call.
+Do not introduce this strict alias on that ordinary path. Breakpoint insertion
+keeps the checked scrutinee intact. See Note [Breakpoints in retained operands]
+in GHC.HsToCore.Ticks. Other instrumentation can obscure that call.
 The dispatcher checks the original scrutinee and its usage once. It also
 keeps the original case for diagnostics with ExpandedThingTc.
 

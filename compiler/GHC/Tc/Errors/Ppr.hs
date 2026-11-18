@@ -3655,6 +3655,9 @@ pprRetainedQuantificationError reason = case reason of
     vcat [ text "GHC cannot use this expression as a retained index."
          , text "Use a local index variable, a supported constructor tree, an immediate lambda application,"
          , text "or a fully applied checked source function on variables and constructor trees." ]
+  RetainedInteractiveIndex name ->
+    vcat [ text "The binding" <+> quotes (ppr name) <+> text "comes from an earlier GHCi command."
+         , text "Bind the runtime index locally in the expression that uses it." ]
   RetainedUncheckedSourceCall fun ->
     text "No checked source equations are available for" <+> quotes (ppr fun)
       <+> text "in this retained argument."
@@ -3677,7 +3680,7 @@ pprRetainedQuantificationError reason = case reason of
   RetainedCallIndex ->
     text "An opaque call index requires an already-bound unrestricted local function and one argument of its declared domain."
   RetainedCallInstrumentation ->
-    text "Opaque call refinement does not support coverage, profiling, debug information or breakpoint instrumentation yet."
+    text "Opaque call refinement does not support coverage, profiling or source-note instrumentation yet."
   RetainedIndexLambdaStrict ->
     text "Immediate lambda applications used as retained arguments are not supported with Strict."
   RetainedLocalSignatureIndex ->

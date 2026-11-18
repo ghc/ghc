@@ -359,7 +359,8 @@ data HsExpr p
        -- NB: Has wildcards, but no implicit quantification
 
   | HsAppRetained (XAppRetained p) (LHsExpr p) (LHsExpr p)
-      -- ^ Explicit invisible retained argument, e.g. `f @{n}`.
+      -- ^ Explicit invisible retained argument, e.g. `f @{n}`. After typechecking,
+      -- this also represents a visible argument to a retained binder.
 
   -- | Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
