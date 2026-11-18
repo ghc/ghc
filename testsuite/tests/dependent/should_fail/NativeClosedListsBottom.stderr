@@ -1,0 +1,5 @@
+NativeClosedListsBottom.hs:7:8: error: [GHC-70565]
+    • Cannot evaluate ‘Lib.badElement’ in a type.
+        list codec forced the second element
+    • In the first argument of ‘(:~:)’, namely ‘Lib.badElement '[1]’
+      In the type signature: bad :: Lib.badElement '[1] :~: '[1, 2]

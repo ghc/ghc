@@ -215,9 +215,14 @@ of ``Data.Char``::
     total :: Prelude.sum '[2, 3, 5] :~: 10
     total = Refl
 
+    reversed :: Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]
+    reversed = Refl
+
 The current implementation accepts one character literal or a promoted
 list of natural number literals. The function must take one unrestricted
-argument and return ``Char``, ``Bool`` or ``Natural``. The producer may use
+argument. It can return ``Char``, ``Bool``, ``Natural`` or a list of one of
+these types. GHC forces every result element before it constructs the
+promoted list. An empty list keeps its element kind. The producer may use
 ordinary Haskell. The compiler needs its compiled code and a target
 interpreter. Safe Haskell rejects execution of these calls. If an imported
 function diverges, checking its application can also diverge.

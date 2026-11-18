@@ -24,6 +24,10 @@ test('NativeClosedChar',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedCharLib.hs'])],
      multimod_compile_and_run,
      ['NativeClosedChar', '-Werror=unused-imports ' + config.ghc_th_way_flags])
+test('NativeClosedLists',
+     [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedListsLib.hs'])],
+     multimod_compile_and_run,
+     ['NativeClosedLists', '-Werror=unused-imports -Wno-partial-type-signatures ' + config.ghc_th_way_flags])
 test('NativeSourceTable',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',
                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),

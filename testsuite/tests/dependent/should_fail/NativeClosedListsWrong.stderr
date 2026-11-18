@@ -1,0 +1,6 @@
+NativeClosedListsWrong.hs:12:9: error: [GHC-83865]
+    • Couldn't match type ‘2’ with ‘5’
+      Expected: NatListTag [5, 3, 2]
+        Actual: NatListTag [2, 3, 5]
+    • In the expression: Original
+      In an equation for ‘wrong’: wrong = Original

@@ -2552,9 +2552,9 @@ Require a literal argument before execution. Its kind can instantiate a
 polymorphic function when the declared domain determines all its
 type variables and every class constraint becomes ground. The ordinary
 expression checker solves those constraints before evaluation.
-Elaborate the result to a Natural or Char literal, or to a
-promoted Bool constructor. See Note [Closed literal type evaluation] in
-GHC.Tc.Gen.Splice for execution and result decoding.
+Elaborate Natural, Char, and Bool results to literals or promoted
+constructors. Elaborate lists of these results to promoted lists. See
+Note [Closed literal type evaluation] in GHC.Tc.Gen.Splice.
 
 A visible type argument permits wildcards even when it has none. Admit
 complete visible arguments at this entry point using the check described

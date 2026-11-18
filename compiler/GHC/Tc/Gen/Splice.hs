@@ -1320,10 +1320,10 @@ tcDecodeClosedCallOperand operand
 tcRunClosedCall :: Id -> Core.CoreExpr -> Type -> TcM Type
 tcRunClosedCall fun argument result_kind = do
   hsc_env <- getTopEnv
-  decode <- case closedTypeResultDecoder result_kind of
-    Just decoder -> return decoder
+  (dictionary_kind, list_result, decode) <- case closedTypeResultCodec result_kind of
+    Just codec -> return codec
     Nothing -> bad ("The function returns " ++ showPpr (hsc_dflags hsc_env) result_kind ++
-                    ". Closed calls in types currently support results of type Natural, Char, or Bool.")
+                    ". Closed calls in types currently support results of type Natural, Char, Bool, or lists of these types.")
   interp <- checkClosedTypeEvalStage hsc_env name
   let expected = mkVisFunTyManyU (exprType argument) result_kind
   function <- if idType fun `tcEqType` expected
@@ -1335,22 +1335,29 @@ tcRunClosedCall fun argument result_kind = do
 
   show_class <- tcLookupKnownKeyClass showClassKey
   inst_env <- tcGetInstEnvs
-  case (find ((== "show") . getOccString) (classMethods show_class),
-        lookupUniqueInstEnv inst_env show_class [result_kind]) of
+  let method = if list_result then "showList" else "show"
+  case (find ((== method) . getOccString) (classMethods show_class),
+        lookupUniqueInstEnv inst_env show_class [dictionary_kind]) of
     (Just show_id, Right (inst, []))
       | let dfun = instanceDFunId inst
       , nameModule_maybe (idName dfun) == nameModule_maybe (className show_class)
-      , idType dfun `tcEqType` mkClassPred show_class [result_kind] -> do
+      , idType dfun `tcEqType` mkClassPred show_class [dictionary_kind] -> do
           ret_id <- tcLookupKnownOccId returnIOIdOcc
           io_tc <- tcLookupKnownKeyTyCon ioTyConKey
           let render = mkCoreApps (Core.Var show_id)
-                         [Core.Type result_kind, Core.Var dfun]
+                         [Core.Type dictionary_kind, Core.Var dfun]
+              show_s = mkVisFunTyManyU stringTy stringTy
+              render_result = if list_result then show_s else stringTy
+              rendered_call = mkCoreApp render call
+              response = if list_result
+                           then mkCoreApp rendered_call (mkListExpr charTy [])
+                           else rendered_call
               ret = mkCoreApp (Core.Var ret_id) (Core.Type stringTy)
               io_string = mkTyConApp io_tc [stringTy]
-          unless (exprType render `tcEqType` mkVisFunTyManyU result_kind stringTy
+          unless (exprType render `tcEqType` mkVisFunTyManyU result_kind render_result
                   && exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
             bad "Unexpected type for the interpreter response."
-          let expr = mkCoreApp ret (mkCoreApp render call)
+          let expr = mkCoreApp ret response
           loc <- getSrcSpanM
           compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc expr
           (value, links, packages) <- either (bad . displayException) pure compiled
@@ -1403,15 +1410,25 @@ desugarStagedExpr expr = do
   when (errorsOrFatalWarningsFound messages) failM
   maybe failM pure result
 
--- | Decode the result in the fixed compiler-side representation for its kind.
-closedTypeResultDecoder :: Type -> Maybe (String -> Maybe Type)
-closedTypeResultDecoder kind
-  | kind `tcEqType` naturalTy = Just (decodeLiteral (mkNumLitTy . toInteger @Natural))
-  | kind `tcEqType` charTy = Just (decodeLiteral mkCharLitTy)
-  | kind `tcEqType` boolTy = Just (decodeLiteral promoteBool)
-  | otherwise = Nothing
+-- | Select the compiler-side decoder and the built-in Show dictionary kind.
+closedTypeResultCodec :: Type -> Maybe (Type, Bool, String -> Maybe Type)
+closedTypeResultCodec kind
+  | element `tcEqType` naturalTy = Just (codec (mkNumLitTy . toInteger @Natural))
+  | element `tcEqType` charTy    = Just (codec mkCharLitTy)
+  | element `tcEqType` boolTy    = Just (codec promoteBool)
+  | otherwise                    = Nothing
   where
+    (element, list_result) = case splitTyConApp_maybe kind of
+      Just (tc, [arg]) | tc == listTyCon -> (arg, True)
+      _                                  -> (kind, False)
+
     promoteBool b = mkTyConTy (if b then promotedTrueDataCon else promotedFalseDataCon)
+
+    codec :: (Read a, Show a) => (a -> Type) -> (Type, Bool, String -> Maybe Type)
+    codec promote = (element, list_result, decode)
+      where
+        decode | list_result = decodeLiteral (mkPromotedListTy element . map promote)
+               | otherwise   = decodeLiteral promote
 
     decodeLiteral :: (Read a, Show a) => (a -> Type) -> String -> Maybe Type
     decodeLiteral promote rendered = do
@@ -1423,10 +1440,13 @@ closedTypeResultDecoder kind
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The caller checks the source call and its literal argument before execution.
 Compile an ordinary Core application at the checked function type. Use the
-built-in Show instance for the result type and returnIO to construct an
-IO String for evalString. The interpreter forces the string before it returns
-it. The compiler checks the canonical form before it constructs a literal
-or promoted constructor.
+built-in Show instance for the scalar type and returnIO to construct an
+IO String for evalString. If the result is a list, use the showList method
+of the element dictionary. Do not select a Show instance for the list.
+A user-defined overlapping list instance could encode a different value.
+The interpreter forces the string before it returns it. The compiler
+checks the canonical form before it constructs a literal or promoted
+constructor.
 
 For an overloaded producer, check the resolved occurrence against the
 specialized ordinary arrow. Use the same type and dictionary elaboration as

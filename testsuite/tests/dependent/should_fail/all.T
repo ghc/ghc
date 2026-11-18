@@ -118,6 +118,14 @@ test('NativeClosedCharResult', normal, compile_fail, [''])
 test('NativeClosedCharWildcard', normal, compile_fail, [''])
 test('NativeClosedCharWrong', [req_interp, req_rts_linker, only_ways(['normal'])],
      compile_fail, [config.ghc_th_way_flags])
+test('NativeClosedListsWrong',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../should_run/NativeClosedListsLib.hs'])],
+     multimod_compile_fail, ['NativeClosedListsWrong', '-v0 ' + config.ghc_th_way_flags])
+test('NativeClosedListsBottom',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../should_run/NativeClosedListsLib.hs'])],
+     multimod_compile_fail, ['NativeClosedListsBottom', '-v0 ' + config.ghc_th_way_flags])
 test('NativeSourceLengthEmpty',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_fail,
