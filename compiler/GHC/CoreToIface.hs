@@ -537,6 +537,8 @@ toIfaceIdDetails name (SourceTableId owner table)
   | otherwise     = IfVanillaId
 toIfaceIdDetails _ (InstMethId {})                = IfVanillaId
 toIfaceIdDetails _ (WorkerLikeId dmds)            = IfWorkerLikeId dmds
+toIfaceIdDetails name (DFunId _ (Just (owner, methods)))
+  | name == owner = IfSourceDFunId methods
 toIfaceIdDetails _ (DFunId {})                    = IfDFunId
 toIfaceIdDetails _ (RecSelId { sel_naughty = n
                              , sel_tycon = tc

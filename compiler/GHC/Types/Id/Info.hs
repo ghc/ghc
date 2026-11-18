@@ -195,7 +195,9 @@ data IdDetails
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call.
                                 -- Type will be simple: no type families, newtypes, etc
 
-  | DFunId Bool                 -- ^ A dictionary function.
+  | DFunId Bool (Maybe (Name, [(Name, Name)])) -- ^ A dictionary function.
+       -- The optional field contains the owner and its selector/target pairs.
+       -- See Note [Checked dictionary methods] in GHC.Types.Id.
        -- Bool = True <=> a dictionary of this class cannot be bottom
        -- See Note [NON-BOTTOM-DICTS invariant] in GHC.Core
 
@@ -431,7 +433,7 @@ isJoinIdDetails_maybe (JoinId join_arity marks) = Just (join_arity, marks)
 isJoinIdDetails_maybe _                   = Nothing
 
 mkDFunIdDetails :: Class -> IdDetails
-mkDFunIdDetails cls = DFunId (isTerminatingTyCon (classTyCon cls))
+mkDFunIdDetails cls = DFunId (isTerminatingTyCon (classTyCon cls)) Nothing
 
 instance Outputable IdDetails where
     ppr = pprIdDetails
@@ -449,8 +451,9 @@ pprIdDetails other     = brackets (pp other)
    pp (RepPolyId {})          = text "RepPolyId"
    pp (PrimOpId {})           = text "PrimOp"
    pp (FCallId _)             = text "ForeignCall"
-   pp (DFunId terminating)    = text "DFunId"
+   pp (DFunId terminating methods) = text "DFunId"
                                 <> ppWhen (not terminating) (text "(may-be-bottom)")
+                                <> maybe empty (parens . ppr . snd) methods
    pp (RecSelId { sel_naughty = is_naughty })
                               = brackets $ text "RecSel" <>
                                            ppWhen is_naughty (text "(naughty)")

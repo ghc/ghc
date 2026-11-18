@@ -89,8 +89,12 @@ restoreSourceTableId :: TypeEnv -> Id -> Id
 restoreSourceTableId types fun
   | isLocalId fun, isExternalName (getName fun)
   , Just (AnId owner) <- lookupTypeEnv types (getName fun)
-  , details@(SourceTableId name _) <- idDetails owner
-  , name == getName fun = setIdDetails fun details
+  , let details = idDetails owner
+  , case details of
+      SourceTableId name _       -> name == getName fun
+      DFunId _ (Just (name, _))  -> name == getName fun
+      _                          -> False
+  = setIdDetails fun details
   | otherwise = fun
 
 -- Extend the type environment

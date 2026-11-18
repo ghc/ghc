@@ -460,6 +460,7 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
                        | decl <- decls
                        , case decl of
                             IfaceId { ifIdDetails = IfDFunId } -> False -- exclude DFuns
+                            IfaceId { ifIdDetails = IfSourceDFunId{} } -> False
                             _ -> True ]
         decl_envs = map (mk_decl_env . map snd . mi_decls) ifaces
                         :: [OccEnv IfaceDecl]
@@ -2448,6 +2449,12 @@ tcIdDetails _ _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
 tcIdDetails _ ty IfDFunId              = return (mkDFunIdDetails cls)
   where
     (_, _, cls, _) = tcSplitDFunTy ty
+
+tcIdDetails owner ty (IfSourceDFunId methods) =
+  forkM (text "Source methods of" <+> ppr owner) $
+    case sourceMethodDetails_maybe owner ty methods of
+      Just details -> return details
+      Nothing -> failIfM (text "Invalid source methods for dictionary" <+> ppr owner)
 
 tcIdDetails nm _ (IfRecSelId tc _first_con naughty fl)
   = do { tc' <- either (fmap RecSelData . tcIfaceTyCon)

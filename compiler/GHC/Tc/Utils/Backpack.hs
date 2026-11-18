@@ -399,6 +399,7 @@ thinModIface avails iface =
     non_exported_decls = filter_decls non_exported_occs
 
     dfun_pred IfaceId{ ifIdDetails = IfDFunId } = True
+    dfun_pred IfaceId{ ifIdDetails = IfSourceDFunId{} } = True
     dfun_pred _ = False
     dfun_decls = filter (dfun_pred . snd) (mi_decls iface)
 

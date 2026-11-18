@@ -505,6 +505,7 @@ rnIfaceDecl = \case
     name <-
       case details0 of
         IfDFunId -> rnIfaceNeverExported name0
+        IfSourceDFunId{} -> rnIfaceNeverExported name0
         _ | isDefaultMethodOcc (occName name0)
           -> rnIfaceNeverExported name0
         -- Typeable bindings. See Note [Grand plan for Typeable].
@@ -936,6 +937,9 @@ rnIfaceIdDetails (IfRecSelId (Left tc) con naughty fl)
   = IfRecSelId <$> fmap Left (rnIfaceTyCon tc) <*> rnIfaceGlobal con <*> pure naughty <*> rnFieldLabel fl
 rnIfaceIdDetails (IfRecSelId (Right decl) con naughty fl)
   = IfRecSelId <$> fmap Right (rnIfaceDecl decl) <*> rnIfaceGlobal con <*> pure naughty <*> rnFieldLabel fl
+rnIfaceIdDetails (IfSourceTableId table) = IfSourceTableId <$> rnIfaceGlobal table
+rnIfaceIdDetails (IfSourceDFunId methods) =
+  IfSourceDFunId <$> mapM (\(sel, target) -> (,) <$> rnIfaceGlobal sel <*> rnIfaceGlobal target) methods
 rnIfaceIdDetails details
   = pure details
 

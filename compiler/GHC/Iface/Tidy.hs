@@ -225,7 +225,12 @@ mkBootModDetailsTc logger
                where
                  id_name = idName id
 
-    exp_names = availsToNameSet exports
+    exp_names = availsToNameSet exports `unionNameSet` method_targets
+    -- No-code compilation skips desugaring. Retain the private targets
+    -- needed to use the dictionary's mandatory interface evidence.
+    -- See Note [Checked dictionary methods] in GHC.Types.Id.
+    method_targets = mkNameSet [ target | dfun <- typeEnvIds type_env
+                                        , (_, target) <- sourceMethodAliases dfun ]
 
 lookupFinalId :: TypeEnv -> Id -> Id
 lookupFinalId type_env id

@@ -47,7 +47,8 @@ module GHC.Types.Id (
         idName, idType, idMult, idScaledType, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
         recordSelectorTyCon_maybe,
-        sourceTableId_maybe,
+        sourceTableId_maybe, sourceMethodAliases, sourceMethodTarget_maybe,
+        setSourceMethodIds, sourceMethodDetails_maybe,
 
         -- ** Modifying an Id
         setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult,
@@ -146,8 +147,8 @@ import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
                 , isStableUnfolding, isCompulsoryUnfolding, isEvaldUnfolding
                 , hasSomeUnfolding, noUnfolding, evaldUnfolding )
 import GHC.Core.Type
-import GHC.Core.TyCon (TyCon, closedFamilyTyConCoAxiom_maybe, tyConName)
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.TyCon (TyCon, closedFamilyTyConCoAxiom_maybe, isTerminatingTyCon, tyConName)
+import GHC.Core.Predicate( getClassPredTys_maybe, isCoVarType )
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.Multiplicity
@@ -160,6 +161,7 @@ import GHC.Types.Name
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Types.Unique.Set (mkUniqSet, sizeUniqSet)
 import GHC.Types.Unique.Supply
 
 import GHC.Stg.EnforceEpt.TagSig
@@ -218,6 +220,65 @@ sourceTableId_maybe fun
   , Just _ <- closedFamilyTyConCoAxiom_maybe table
   = Just table
   | otherwise = Nothing
+
+-- | Record methods whose checked bodies select a certified source function.
+-- See Note [Checked dictionary methods].
+setSourceMethodIds :: Id -> [(Id, Id)] -> Id
+setSourceMethodIds dfun methods
+  | DFunId terminating _ <- idDetails dfun
+  = setIdDetails dfun (fromMaybe (DFunId terminating Nothing) details)
+  | otherwise = dfun
+  where
+    details
+      | all (isJust . sourceTableId_maybe . snd) methods
+      = sourceMethodDetails_maybe (idName dfun) (idType dfun)
+          [(idName sel, idName target) | (sel, target) <- methods]
+      | otherwise = Nothing
+
+-- | Check the mandatory selector and target names on a dictionary declaration.
+sourceMethodDetails_maybe :: Name -> Type -> [(Name, Name)] -> Maybe IdDetails
+sourceMethodDetails_maybe owner ty methods
+  | isExternalName owner, not (null methods)
+  , Just (cls, _) <- getClassPredTys_maybe ty, noFreeVarsOfType ty
+  , let selectors = map fst methods
+  , all (`elem` map idName (classMethods cls)) selectors
+  , all (isExternalName . snd) methods
+  , length selectors == sizeUniqSet (mkUniqSet selectors)
+  = Just (DFunId (isTerminatingTyCon (classTyCon cls)) (Just (owner, methods)))
+  | otherwise = Nothing
+
+-- | Return the checked aliases on this exact dictionary binder.
+sourceMethodAliases :: Id -> [(Name, Name)]
+sourceMethodAliases dfun
+  | DFunId _ (Just (owner, methods)) <- idDetails dfun
+  , idName dfun == owner = methods
+  | otherwise = []
+
+-- | Look up the runtime target for a selector applied to a ground dictionary.
+sourceMethodTarget_maybe :: Id -> Id -> Maybe Name
+sourceMethodTarget_maybe dfun selector
+  | Just (cls, _) <- getClassPredTys_maybe (idType dfun)
+  , noFreeVarsOfType (idType dfun)
+  , isClassOpId_maybe selector == Just cls
+  = lookup (idName selector) (sourceMethodAliases dfun)
+  | otherwise = Nothing
+
+{- Note [Checked dictionary methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A class selector gets its implementation from its dictionary. A retained
+call can use the equations of another function when the checked instance
+method is an alias for that function. Keep the alias on the ground DFun,
+using the actual selector and target Names. A different dictionary for
+the same class can select a different implementation.
+
+GHC ordinarily selects the field with a DFun unfolding. See
+Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance. The DFun's
+interface declaration records the pairs even when unfoldings are omitted. Its fingerprint depends on both Names. The target Id's own
+fingerprint depends on its checked family. Reconstruct the owner from the
+interface binder. Do not serialize a reference from the DFun to itself.
+A specialized or renamed binder must not inherit the original evidence.
+See Note [Source table Ids] in GHC.Tc.Gen.SourceTable.
+-}
 
 idUnique :: Id -> Unique
 idUnique  = Var.varUnique
