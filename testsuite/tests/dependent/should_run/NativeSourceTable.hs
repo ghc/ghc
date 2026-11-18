@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeApplications, TypeOperators #-}
+{-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, FlexibleContexts, GADTs, ScopedTypeVariables, TypeApplications, TypeOperators #-}
 {-# LANGUAGE NoStarIsType #-}
 
 module Main where
@@ -143,6 +143,20 @@ stepSum _ _ = Refl
 replicateSum :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> a -> Vec a (n + m)
 replicateSum n m x = replicateNative @a (n + m) x
 
+-- | Use a local product as a retained length.
+replicateProductPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat)
+                       -> Vec Bool (1 + rows * cols)
+replicateProductPrefix rows cols =
+  let cells = times rows cols
+  in replicateNative (1 + cells) True
+
+-- | Use the caller's multiplication independently of the vector length.
+ordinaryProduct :: Num Nat => foreach (rows :: Nat) -> foreach (cols :: Nat)
+                -> (Nat, Vec Bool (times rows cols))
+ordinaryProduct rows cols =
+  let cells = rows * cols
+  in (cells, replicateNative (times rows cols) True)
+
 -- The call is the only use of this source function. Its definition follows it.
 localOne :: Vec Bool 1
 localOne = replicateNative @Bool (countFlag True) True
@@ -210,6 +224,13 @@ main = case (flipProof, signalProof, phaseProof) of
         grouped :: Vec Bool ((1 + n) * m)
         grouped = replicateNative ((1 + n) * m) True
     print (toList prefix, toList grouped)
+    rightSuccessor <- try (evaluate (isSuccessor (bottom + 1)))
+    case ordinaryProduct n m of
+        (ordinaryCells, checkedVector) ->
+            print (toList (replicateProductPrefix n m),
+                   headOfNonempty (replicateProductPrefix bottom m),
+                   natToInt ordinaryCells, length (toList checkedVector),
+                   rightSuccessor == Left DivideByZero)
     lamp <- newIORef Green >>= readIORef
     print (snd (afterLamp lamp))
     let partial = toList (replicateNative (S (times bottom m)) 'x')

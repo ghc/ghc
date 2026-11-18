@@ -30,3 +30,5 @@ do { n <- readIORef ref; m <- readIORef ref; print (toList (appendNative n m (re
 :continue
 let reserve :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); reserve r c = replicateNative (1 + r * c) True
 print (length (toList (reserve 2 3)))
+let named :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); named r c = let cells = times r c in replicateNative (1 + cells) True
+print (toList (named 0 8))

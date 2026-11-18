@@ -25,3 +25,9 @@ badSecond n m = tagBoth (n + m) (-1)
 
 wrongGrouping :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Bool ((1 + rows) * cols)
 wrongGrouping rows cols = replicateNative (1 + rows * cols) True
+
+-- The local definition supplies the product, but addition inspects its first argument.
+wrongLocalSuccessor :: foreach (height :: Nat) -> foreach (width :: Nat) -> Vec Bool (1 + height * width)
+wrongLocalSuccessor height width =
+    let cells = times height width
+    in replicateNative (cells + 1) True

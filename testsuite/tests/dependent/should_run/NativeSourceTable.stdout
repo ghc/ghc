@@ -22,5 +22,6 @@ True
 [True]
 ([True,True],[False,False])
 ([False,False,False],[True,True,True,True])
+([True,True,True],True,2,2,True)
 Go
 ('x',True,True)

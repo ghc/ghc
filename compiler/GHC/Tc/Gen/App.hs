@@ -12,7 +12,7 @@
 module GHC.Tc.Gen.App
        ( tcApp
        , tcExprPrag
-       , tcRetainedInferableArg ) where
+       , tcRetainedInferableArg, tcRetainedArg ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferRho )
 

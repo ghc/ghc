@@ -59,6 +59,7 @@ import GHC.Tc.Errors.Types hiding (HoleError)
 import GHC.Core.Multiplicity
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Utils (applyTypeToArgs)
 import GHC.Core.UsageEnv
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.ConLike
@@ -68,12 +69,13 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep (Type(TermAppTy, TermVarTy))
 import GHC.Core.Coercion
-import GHC.Core.Predicate( decomposeIPPred )
+import GHC.Core.Predicate( decomposeIPPred, mkNomEqPred )
 
 import GHC.Types.Basic
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
+import GHC.Types.Var (mkTyVar)
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
@@ -667,10 +669,17 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 ************************************************************************
 -}
 
-tcExpr (HsLet x (L l binds) expr) res_ty
-  = do  { (binds', expr') <- tcLocalBinds binds $
-                             tcMonoLExpr expr res_ty
-        ; return (HsLet x (L l binds') expr') }
+tcExpr original@(HsLet x (L loc binds) body) res_ty
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; expansion <- case res_ty of
+             Check expected | enabled, hasNativeDependentExpr (Core.Type expected) ->
+               do { strict <- xoptM LangExt.Strict
+                  ; if strict then return Nothing else tcNativeLet binds body expected }
+             _ -> return Nothing
+       ; case expansion of
+           Just expr -> return (mkExpandedExprTc original expr)
+           Nothing -> do { (binds', body') <- tcLocalBinds binds (tcMonoLExpr body res_ty)
+                         ; return (HsLet x (L loc binds') body') } }
 
 tcExpr (HsCase ctxt scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.
@@ -969,6 +978,77 @@ tcExpr e res_ty
        ; case mb_hse of
            Just hse -> tcHsExpansion hse res_ty
            Nothing  -> pprPanic "tcExpr: unhandled case:" (ppr e) }
+
+-- | Elaborate a nonrecursive index definition through dependent application.
+-- See Note [Equality for lazy local definitions].
+tcNativeLet :: HsLocalBinds GhcRn -> LHsExpr GhcRn -> Type -> TcM (Maybe (HsExpr GhcTc))
+tcNativeLet (HsValBinds _ (XValBindsLR (HsVBG [(NonRecursive, [L _ binding])] []))) body expected
+  | FunBind { fun_id = name, fun_matches = MG { mg_alts = L _ [L _ match] } } <- binding
+  , Match { m_ctxt = FunRhs { mc_strictness = NoSrcStrict }, m_pats = L _ []
+          , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
+                            , grhssLocalBinds = L _ EmptyLocalBinds{} } } <- match
+  = runMaybeT $ do
+    value <- candidate rhs
+    index <- MaybeT (pure (Core.retainedArgIndex value))
+    let domain = typeKind index
+    guard (isNativeIndexType domain)
+    template_name <- liftMaybeT (newSysName (mkTyVarOcc "let_index"))
+    let template = mkTyVar template_name domain
+    result <- MaybeT (pure (abstractNativeIndices [(index, template)] expected))
+    guard (anyFreeVarsOfType (== template) result)
+    liftMaybeT $ do
+        (checked, runtime_rhs) <- tcRetainedArg domain rhs
+        let binder = mkLocalId (unLoc name) ManyTy domain
+            equality = mkNomEqPred (TermVarTy binder) index
+            signature = mkDepFunTy binder (mkPhiTy [equality] expected)
+            pat = L (l2l (getLoc name)) (VarPat noExtField name)
+            row = genSimpleMatch (LamAlt LamSingle) [pat] body
+            matches = mkMatchGroup (Generated OtherExpansion SkipPmc) noAnn (wrapGenSpan [row])
+            lambda = wrapGenSpan (HsLam noAnn LamSingle matches)
+        argument <- tcScalingUsage ManyTy (tcCheckMonoExpr runtime_rhs domain)
+        fun <- tcCheckMonoExprNC lambda signature
+        let result_ty = applyTypeToArgs signature [checked]
+            app = HsAppRetained (DepFunVisible, result_ty) fun argument
+        tcWrapResult (unLoc body) app result_ty (Check expected)
+  where
+    candidate :: LHsExpr GhcRn -> MaybeT TcM Core.CoreExpr
+    candidate (L _ expr) = case expr of
+      HsPar _ e -> candidate e
+      HsApp _ f a -> Core.App <$> candidate f <*> candidate a
+      OpApp _ a f b -> Core.mkApps <$> candidate f <*> traverse candidate [a, b]
+      HsVar _ lname -> do
+        thing <- liftMaybeT (tcLookup (unLocWithUserRdr lname))
+        case thing of
+          ATcId { tct_id = var } -> return (Core.Var var)
+          AGlobal (AnId var) -> return (Core.Var var)
+          AGlobal (AConLike (RealDataCon dc)) -> return (Core.Var (dataConWorkId dc))
+          _ -> mzero
+      _ -> mzero
+tcNativeLet _ _ _ = return Nothing
+
+{- Note [Equality for lazy local definitions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose a result mentions times rows cols, and the body binds
+cells = times rows cols. Check the body as a local function with type
+
+  foreach (cells :: Nat) -> (cells ~ times rows cols) => result
+
+Apply it to the original RHS once. The retained application checks the
+actual function identities, operands, and domain. Substitution into the
+equality makes the evidence argument reflexive. tcWrapResult still asks
+the solver to discharge the actual predicate. The evidence argument is
+an erased CoVar. The body can use cells twice or ignore it. Mark the
+synthetic lambda and its match as generated. Keep the user's spans on
+the binder, the RHS, and the body for diagnostics.
+
+Select this rule from the result type and a read-only view of the renamed
+RHS. Neither the view nor the type match constructs evidence. Leave other
+lets to tcLocalBinds, including recursive groups, signatures and Strict
+bindings. A class selector alone supplies no checked index. Choosing a
+global instance here could change the meaning of ordinary multiplication
+under a local Num dictionary. Agda's let conversion motivates the equality.
+The lazy value argument preserves Haskell sharing. See docs/dependent-haskell/REFERENCES.md.
+-}
 
 -- | Classify an opaque call after ordinary expression and usage checking.
 -- See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
