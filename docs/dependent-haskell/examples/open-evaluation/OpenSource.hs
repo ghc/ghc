@@ -1,5 +1,5 @@
 {-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
-module OpenSource (x, y, z, implicitlyBound, explicitlyBound, first, second, repeated) where
+module OpenSource (x, y, z, implicitlyBound, explicitlyBound, first, second, repeated, routedFirst, routedSecond) where
 
 import Data.Proxy (Proxy(..))
 import qualified OpenProducer
@@ -35,3 +35,11 @@ second _ y' = y'
 -- | Supply the same skolem in both operands.
 repeated :: forall a. a -> OpenProducer.second a a
 repeated x' = x'
+
+-- | Inspect a known character before returning the first rigid operand.
+routedFirst :: forall a b. a -> b -> OpenProducer.routeLeft a b
+routedFirst x' _ = x'
+
+-- | Use the default branch to return the second rigid operand.
+routedSecond :: forall a b. a -> b -> OpenProducer.routeRight a b
+routedSecond _ y' = y'

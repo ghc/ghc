@@ -6,7 +6,8 @@ if [[ $# -ne 2 ]]; then
     exit 2
 fi
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ghc=("$1" "-B$2" -v0 -O0 -package-env - -i -Werror=unused-imports -fdiagnostics-color=never -dcore-lint -dstg-lint)
+ghc=("$1" "-B$2" -v0 -O0 -package-env - -i -Werror=unused-imports -fdiagnostics-color=never -dcore-lint -dstg-lint
+     -fomit-interface-pragmas -fno-write-if-simplified-core)
 run=$(mktemp -d)
 trap 'rm -rf -- "$run"' EXIT
 cd -- "$run"
@@ -16,10 +17,12 @@ cp "$src"/{OpenSource,RunOpenSource}.hs consumer/
 
 (
     cd producer
-    "${ghc[@]}" -fno-omit-interface-pragmas -c OpenAlias.hs
-    "${ghc[@]}" -i. -fno-omit-interface-pragmas -c OpenProducer.hs
+    "${ghc[@]}" -c OpenAlias.hs
+    "${ghc[@]}" -i. -c OpenProducer.hs
 )
 cp producer/*.hi artifacts/
+"${ghc[@]}" --show-iface artifacts/OpenProducer.hi > producer.iface
+grep -Fq 'OpenAlias.route' producer.iface
 
 (
     cd consumer
@@ -27,6 +30,7 @@ cp producer/*.hi artifacts/
     "${ghc[@]}" --show-iface OpenSource.hi > usage.txt
     grep -Eq '^[[:space:]]*worker [[:xdigit:]]{32}' usage.txt
     grep -Eq '^[[:space:]]*select [[:xdigit:]]{32}' usage.txt
+    grep -Eq '^[[:space:]]*route [[:xdigit:]]{32}' usage.txt
 )
 printf 'direct open calls and type binders checked, including alias usages\n'
 
@@ -37,8 +41,8 @@ expect_reuse() {
 }
 (
     cd producer
-    expect_reuse -fno-omit-interface-pragmas -c OpenAlias.hs
-    expect_reuse -i. -fno-omit-interface-pragmas -c OpenProducer.hs
+    expect_reuse -c OpenAlias.hs
+    expect_reuse -i. -c OpenProducer.hs
 )
 (cd consumer && expect_reuse -i../artifacts -c OpenSource.hs)
 printf 'unchanged one-shot recompilation reused the producer and consumer artifacts\n'
@@ -52,14 +56,9 @@ printf 'unchanged one-shot recompilation reused the producer and consumer artifa
 )
 printf 'one-shot source calls select the expected type arguments\n'
 
-# Generate fresh home modules under --make. Keep the unfolding flag on
-# the producer files. The consumer keeps the ordinary -O0 flags.
-for name in OpenAlias OpenProducer; do
-    {
-        printf '{-# OPTIONS_GHC -fno-omit-interface-pragmas #-}\n'
-        cat "$src/$name.hs"
-    } > "manager/$name.hs"
-done
+# Use the producer's source flags under --make. The consumer still
+# omits interface pragmas.
+cp "$src"/Open{Alias,Producer}.hs manager/
 cp "$src"/{OpenSource,RunOpenSource}.hs manager/
 (
     cd manager
@@ -95,12 +94,54 @@ expect_rigid_case() {
 (cd manager && expect_rigid_case --make -i. -no-link OpenStrict.hs)
 printf 'both compilation modes report the demanded rigid argument at the strict call\n'
 
+# The wrong branch must reach ordinary body checking after its signature.
+cat > negative/OpenWrongRoute.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
+module OpenWrongRoute where
+
+import qualified OpenProducer
+
+wrong :: forall a b. a -> b -> OpenProducer.routeLeft a b
+wrong _ y = y
+HS
+if (cd negative && "${ghc[@]}" -i../artifacts -c OpenWrongRoute.hs 2> wrong.log); then
+    printf 'expected the routed projection to reject the second operand\n' >&2
+    exit 1
+fi
+if ! grep -Eq '^OpenWrongRoute\.hs:7:[0-9]+(-[0-9]+)?: error:' negative/wrong.log ||
+   ! grep -Fq "Couldn't match" negative/wrong.log; then
+    cat negative/wrong.log >&2
+    exit 1
+fi
+
+# Changing the known character branch changes the selected rigid type.
+mkdir route-worker route-client
+cp -p consumer/OpenSource.{hs,hi,o} route-client/
+(cd route-client && expect_reuse -i../artifacts -c OpenSource.hs)
+sed "s/^route 'x' l _ = l$/route 'x' _ r = r/" "$src/OpenAlias.hs" >route-worker/OpenAlias.hs
+(cd route-worker && "${ghc[@]}" -c OpenAlias.hs)
+cp route-worker/OpenAlias.hi artifacts/
+(
+    cd route-client
+    line=$(awk '/^routedFirst x/ { print NR }' OpenSource.hs)
+    if "${ghc[@]}" -i../artifacts -c OpenSource.hs >wrong-worker.log 2>&1; then
+        echo 'accepted the old result after changing the route worker' >&2
+        exit 1
+    fi
+    if ! grep -Eq "^OpenSource.hs:$line:[0-9]+(-[0-9]+)?: error:" wrong-worker.log ||
+       ! grep -Fq "Couldn't match" wrong-worker.log; then
+        cat wrong-worker.log >&2
+        exit 1
+    fi
+)
+cp producer/OpenAlias.hi artifacts/
+
 # Only the worker implementation changes. The consumer and direct alias
 # retain their original source and interface artifacts.
 sed 's/^worker x = .*$/worker _ = undefined/' "$src/OpenAlias.hs" > producer/OpenAlias.hs
 (
     cd producer
-    "${ghc[@]}" -fno-omit-interface-pragmas -fforce-recomp -c OpenAlias.hs
+    "${ghc[@]}" -fforce-recomp -c OpenAlias.hs
 )
 cp producer/OpenAlias.hi artifacts/
 if (cd consumer && "${ghc[@]}" -i../artifacts -c OpenSource.hs 2> changed.log); then

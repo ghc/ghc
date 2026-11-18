@@ -1,0 +1,4 @@
+checked literal alternatives and the identity default
+the imported case stays blocked on the exact rigid Char
+only the evaluated unboxed unit can enter the unused failure continuation
+verified case witnesses and rejected stale, forged and rigid claims

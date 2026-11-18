@@ -8,6 +8,9 @@ test('NativeOpenIdentity',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs',
                  'OpenSource.hs', 'RunOpenSource.hs', 'RunOpenSource.stdout', 'check-source.sh']]),
      run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
+test('NativeOpenCharGhci',
+     extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs', 'OpenSource.hs']]),
+     ghci_script, ['NativeOpenCharGhci.script'])
 test('NativeOpenRetry',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeOpenRetryLib.hs'])],
      multimod_compile_and_run,

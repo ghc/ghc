@@ -1,0 +1,3 @@
+:set -fbyte-code -O0 -fomit-interface-pragmas -fno-write-if-simplified-core
+:load *OpenSource.hs
+print (routedFirst False (42 :: Int), routedSecond False (42 :: Int))
