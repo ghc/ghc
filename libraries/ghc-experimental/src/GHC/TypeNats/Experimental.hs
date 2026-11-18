@@ -2,6 +2,7 @@
 {-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE TypeOperators #-}
 module GHC.TypeNats.Experimental (
+    FromNatural,
     plusSNat,
     timesSNat,
     powerSNat,

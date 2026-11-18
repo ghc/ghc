@@ -87,6 +87,7 @@ import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules (gHC_INTERNAL_TYPENATS)
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Utils.Binary
@@ -2009,6 +2010,15 @@ pprTyTcApp ctxt_prec tc tys =
                 (IfaceForAllTyFlag Required) (IA_Arg ty (IfaceForAllTyFlag Required) IA_Nil) <- tys
        -> maybeParen ctxt_prec funPrec
          $ char '?' <> ftext (getLexicalFastString n) <> dcolon <> ppr_ty topPrec ty
+
+       -- See Note [Registered type numerals] in GHC.Tc.Gen.HsType.
+       | userStyle style, not debug, not print_kinds, print_type_abbreviations
+       , let name = ifaceTyConName tc
+       , nameOccName name == mkTcOcc "NaturalLiteral"
+       , nameModule_maybe name == Just gHC_INTERNAL_TYPENATS
+       , IA_Arg target (IfaceForAllTyFlag Required)
+           (IA_Arg (IfaceLitTy lit@IfaceNumTyLit{}) (IfaceForAllTyFlag Required) IA_Nil) <- tys
+       -> maybeParen ctxt_prec sigPrec $ pprIfaceTyLit lit <+> dcolon <+> pprIfaceType target
 
        | IfaceTupleTyCon arity sort <- ifaceTyConSort info
        , not debug

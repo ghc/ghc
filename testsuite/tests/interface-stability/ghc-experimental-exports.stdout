@@ -8011,6 +8011,8 @@ module GHC.TypeLits.Experimental where
 
 module GHC.TypeNats.Experimental where
   -- Safety: None
+  type FromNatural :: forall target -> GHC.Internal.Bignum.Natural.Natural -> target
+  type family FromNatural target n
   divSNat :: forall (m :: GHC.Internal.Bignum.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Div n m)
   log2SNat :: forall (n :: GHC.Internal.Bignum.Natural.Natural). (1 GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Log2 n)
   minusSNat :: forall (m :: GHC.Internal.TypeNats.Nat) (n :: GHC.Internal.TypeNats.Nat). (m GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.- m)
@@ -13752,6 +13754,8 @@ instance GHC.Internal.Classes.Eq GHC.Internal.IO.MaskingState -- Defined in ‘G
 instance GHC.Internal.Classes.Eq GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance GHC.Internal.Classes.Eq GHC.Internal.Stack.Decode.StackEntry -- Defined in ‘GHC.Internal.Stack.Decode’
+instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Classes.Eq (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Classes.Eq GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Classes.Ord GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Ord GHC.Internal.Types.Char -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Ord GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Classes’
@@ -13782,9 +13786,13 @@ instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Ptr.FunPtr a) -- Defin
 instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Classes.Ord GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
+instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Classes.Ord (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Classes.Ord GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance forall a k (b :: k). GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. (a ~ GHC.Internal.Types.Char) => GHC.Internal.Data.String.IsString [a] -- Defined in ‘GHC.Internal.Data.String’
+instance GHC.Internal.Data.Type.Coercion.TestCoercion GHC.Internal.TypeNats.SNat -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Data.Type.Equality.TestEquality GHC.Internal.TypeNats.SNat -- Defined in ‘GHC.Internal.TypeNats’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. (GHC.Internal.Enum.Enum a, GHC.Internal.Enum.Bounded a, GHC.Internal.Classes.Eq a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
@@ -13824,6 +13832,7 @@ instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Read.Read GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Internal.Read.Read GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
+instance GHC.Internal.Read.Read GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
@@ -13853,6 +13862,8 @@ instance GHC.Internal.Show.Show GHC.Internal.Stack.Decode.Pointerness -- Defined
 instance GHC.Internal.Show.Show GHC.Internal.Stack.Decode.StackEntry -- Defined in ‘GHC.Internal.Stack.Decode’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
+instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Show.Show (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Show.Show GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Stack.Annotation.StackAnnotation GHC.Stack.Annotation.Experimental.CallStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
 instance GHC.Internal.Stack.Annotation.StackAnnotation GHC.Stack.Annotation.Experimental.ShowAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
 instance GHC.Internal.Stack.Annotation.StackAnnotation GHC.Stack.Annotation.Experimental.StringAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’

@@ -32,6 +32,8 @@ module GHC.Internal.TypeNats
   ( -- * Nat Kind
     Natural -- declared in GHC.Internal.Bignum.Natural
   , Nat
+  , FromNatural
+  , NaturalLiteral
     -- * Linking type and value level
   , KnownNat(natSing), natVal, natVal'
   , SomeNat(..)
@@ -82,6 +84,17 @@ import GHC.Internal.TypeNats.Internal(CmpNat)
 -- @since base-4.16.0.0
 
 type Nat = Natural
+
+-- | Interpret a nonnegative type literal at a registered result kind.
+-- With @ExperimentalDependentTypes@, an available instance supplies the
+-- interpretation when the expected kind is a closed lifted datatype.
+-- For example, an instance for a Peano type can map the literal to a
+-- sequence of promoted successor constructors. The instance is optional.
+type family FromNatural (target :: Type) (n :: Natural) :: target
+
+-- | Preserve the source spelling of a converted numeral for diagnostics.
+-- See Note [Registered type numerals] in GHC.Tc.Gen.HsType in the compiler.
+type NaturalLiteral (target :: Type) (n :: Natural) = FromNatural target n
 --------------------------------------------------------------------------------
 
 -- | This class gives the integer associated with a type-level natural.

@@ -88,6 +88,8 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Utils.Unify
+import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
+import GHC.Iface.Env (lookupOrig)
 import GHC.IfaceToCore
 import GHC.Tc.Solver
 import GHC.Tc.Zonk.Type
@@ -102,6 +104,7 @@ import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Class
+import GHC.Core.FamInstEnv (familyNameInstances, famInstTyCon, lookupFamInstEnv, fim_instance)
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Predicate ( getClassPredTys_maybe, isCTupleClass )
@@ -112,6 +115,7 @@ import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Unify ( BindFlag(..), tcMatchTyX_BM )
 
 import GHC.Builtin( allNameStrings )
+import GHC.Builtin.Modules (gHC_INTERNAL_TYPENATS)
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
@@ -1851,7 +1855,10 @@ tc_hs_lit_ty mode rn_ty (HsNatural _ lit) exp_kind
        when (n < 0) $
          addErr $ TcRnNegativeNumTypeLiteral lit
        checkWiredInTyCon naturalTyCon
-       checkExpKind mode rn_ty (mkNumLitTy n) naturalTy exp_kind
+       let raw = mkNumLitTy n
+       converted <- if n < 0 then pure Nothing else tcConvertedNumeral mode exp_kind raw
+       let ty = fromMaybe raw converted
+       checkExpKind mode rn_ty ty (typeKind ty) exp_kind
 tc_hs_lit_ty mode rn_ty (HsString _ s) exp_kind
   = do checkWiredInTyCon typeSymbolKindCon
        checkExpKind mode rn_ty (mkStrLitTy $ mkFastStringShortText s) typeSymbolKind exp_kind
@@ -1860,6 +1867,69 @@ tc_hs_lit_ty mode rn_ty (HsChar _ c) exp_kind
        checkExpKind mode rn_ty (mkCharLitTy c) charTy exp_kind
 tc_hs_lit_ty _mode _ lit _
   = failWithTc $ TcRnUnpromotableLit lit
+
+-- | Elaborate a literal at a known result kind. See Note [Registered type numerals].
+tcConvertedNumeral :: TcTyMode -> ExpKind -> Type -> TcM (Maybe Type)
+tcConvertedNumeral mode (Check expected) raw
+  | Just (_, HM_FamPat) <- mode_holes mode = pure Nothing
+  | otherwise = do
+      enabled <- xoptM LangExt.ExperimentalDependentTypes
+      if not enabled then pure Nothing else do
+        target <- liftZonkM (zonkTcType expected)
+        case splitTyConApp_maybe target of
+          Just (tc, args)
+            | tc /= naturalTyCon, isVanillaAlgTyCon tc, isLiftedAlgTyCon tc
+            , length args == tyConArity tc, noFreeVarsOfType target ->
+                registered target
+          _ -> pure Nothing
+  where
+    registered target = do
+      name <- lookupOrig gHC_INTERNAL_TYPENATS (mkTcOcc "FromNatural")
+      envs <- tcGetFamInstEnvs
+      env <- getGblEnv
+      let visible inst = let m = nameModule (getName inst)
+                         in m == tcg_semantic_mod env || m `elem` imp_finsts (tcg_imports env)
+      case filter visible (familyNameInstances envs name) of
+        inst : _ | let fam = famInstTyCon inst
+                       args = [target, raw]
+                 , isTypeFamilyTyCon fam, tyConArity fam == 2
+                 , any (visible . fim_instance) (lookupFamInstEnv envs fam args)
+                 -> do marker <- lookupOrig gHC_INTERNAL_TYPENATS (mkTcOcc "NaturalLiteral")
+                       tc <- tcLookupTyCon marker
+                       pure (Just (mkTyConApp tc args))
+        _ -> pure Nothing
+tcConvertedNumeral _ (Infer _) _ = pure Nothing
+
+{- Note [Registered type numerals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Core literal 3 always has kind Natural. Suppose T is a user-defined
+Peano type, and a module in the import closure provides this equation:
+
+  type instance FromNatural T n = ToPeano n
+
+In a dependent module, when a type signature expects T, elaborate 3 to
+FromNatural T (3 :: Natural). The instance and the ordinary family
+reducer determine its value. This follows the explicit conversion in
+Agda's FROMNAT and the promoted FromInteger in singletons. It does not
+require a change to the Core literal or to runtime number conversion.
+
+Keep the converted type inside the ordinary synonym NaturalLiteral T 3
+until reduction needs its expansion. GHC.Iface.Type can then display
+the source numeral with its kind in an expected type. An explicitly
+written FromNatural application can be stuck even without a registered
+instance. Do not print that application as a source numeral.
+
+Use the usual Natural literal during inference and when checking family
+patterns. Family applications cannot occur in a family pattern. A missing
+registration leaves the ordinary kind mismatch at the source numeral.
+Do not evaluate the instance RHS when deciding whether the syntax applies.
+
+Find the family by its defining Name in the instance environment. This
+also works when boot libraries contain no FromNatural declaration. Limit
+the witness to instances in scope here. Loading an unrelated interface
+can put more instances in the external package state. See Note [The
+type family instance consistency story] in GHC.Tc.Instance.Family.
+-}
 
 tc_hs_tuple_ty :: HsType GhcRn
                -> TcTyMode
