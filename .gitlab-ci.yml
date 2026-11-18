@@ -1301,10 +1301,8 @@ ghcup-metadata-nightly:
 # Update the ghcup metadata with information about this nightly pipeline
 ghcup-metadata-nightly-push:
   stage: deploy
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
+  image: debian:13
   dependencies: null
-  tags:
-    - x86_64-linux
   variables:
     BUILD_FLAVOUR: default
     GIT_SUBMODULE_STRATEGY: "none"
