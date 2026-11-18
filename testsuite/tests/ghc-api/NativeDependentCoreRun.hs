@@ -5127,10 +5127,83 @@ without evaluating either value. These are Core tests; source call indices
 and new interface forms remain outside this increment.
 -}
 
+-- | Check adjacent constructor cases before backend lowering.
+runNativeConstructorCaseChecks :: DynFlags -> [Id] -> TyCon -> IO ()
+runNativeConstructorCaseChecks flags bindings nat = do
+    let natTy = mkTyConTy nat
+        maybeNat = mkTyConApp maybeTyCon [natTy]
+        input = local 3190 "constructor_input" natTy
+        boxed = local 3191 "constructor_binding" maybeNat
+        caseBinder = local 3192 "constructor_case" maybeNat
+        field = local 3193 "constructor_field" natTy
+        just expression = mkCoreConApps justDataCon [Type natTy, expression]
+        choose scrutinee result nothing yes =
+            Case scrutinee caseBinder result
+                [ Alt (DataAlt nothingDataCon) [] nothing
+                , Alt (DataAlt justDataCon) [field] yes
+                ]
+        check label expression accepts = do
+            lintCheckedCore flags (label ++ " input") expression
+            let simplified = simpleOptNativeExpr expression
+            lintCheckedCore flags (label ++ " output") simplified
+            unless (exprType expression `eqType` exprType simplified) $
+                fail ("FAIL: " ++ label ++ "; result type changed")
+            unless (accepts simplified) $
+                fail ("FAIL: " ++ label ++ "; unexpected simplified Core: " ++ showSDoc flags (ppr simplified))
+        identityCase = Lam input $ Let (NonRec boxed (just (Var input))) $
+            choose (Var boxed) natTy (Var input) (Var field)
+    check "adjacent constructor case returns the original field" identityCase $ \expression ->
+        case expression of
+            Lam actual (Var returned) -> actual == input && returned == input
+            Lam actual (Let (NonRec alias (Var original)) (Var returned)) ->
+                actual == input && original == input && returned == alias
+            _ -> False
+
+    let opaque = helper bindings "opaqueNat"
+        producer = App (Var opaque) (Var input)
+        listTy = mkListTy natTy
+        twice = mkCoreConApps consDataCon
+            [ Type natTy, Var field
+            , mkCoreConApps consDataCon [Type natTy, Var field, mkCoreConApps nilDataCon [Type natTy]]
+            ]
+        sharingCase = Lam input $ Let (NonRec boxed (just producer)) $
+            choose (Var boxed) listTy (mkCoreConApps nilDataCon [Type natTy]) twice
+    check "constructor case shares a nontrivial field" sharingCase $ \expression ->
+        case expression of
+            Lam actual (Let (NonRec shared (App (Var original) (Var argument))) body)
+                | actual == input, original == opaque, argument == input
+                , (Var outer, [Type _, Var first, tail]) <- collectArgs body
+                , outer == dataConWorkId consDataCon
+                , (Var inner, [Type _, Var second, _]) <- collectArgs tail
+                -> inner == outer && first == shared && second == shared
+            _ -> False
+
+    let parameter = mkTyVar (mkSystemName (unique 3194) (mkTyVarOcc "boxed_index")) maybeNat
+        consume = local 3195 "consume_boxed_index" $
+            mkForAllTy unmatchableDataConTy (Bndr parameter Specified) (mkVisFunTyManyU natTy natTy)
+        indexed value = mkApps (Var consume) [Type (TermVarTy boxed), value]
+        indexedCase = Lam consume $ Lam input $ Let (NonRec boxed (just (Var input))) $
+            choose (Var boxed) natTy (indexed (Var input)) (indexed (Var field))
+    check "constructor binding used only in a native index keeps its case" indexedCase $ \expression ->
+        case expression of
+            Lam _ (Lam _ (Let (NonRec retained _) body@Case{})) ->
+                retained == boxed && boxed `elemVarSet` exprFreeVars body
+            _ -> False
+
+    let unknown = local 3196 "unknown_constructor" maybeNat
+        unknownCase = Lam unknown $ Lam input $
+            choose (Var unknown) natTy (Var input) (Var field)
+    check "unknown constructor keeps its case" unknownCase $ \expression ->
+        case expression of
+            Lam actual (Lam _ (Case (Var scrutinee) _ _ _)) ->
+                actual == unknown && scrutinee == unknown
+            _ -> False
+
 -- | Check the Core intermediate with runtime inputs and lazy recursive fields.
 runNatChecks :: HscEnv -> DynFlags -> [Id] -> [TyCon] -> IO ()
 runNatChecks environment flags bindings tycons = do
     nat <- namedTyCon "Nat"
+    runNativeConstructorCaseChecks flags bindings nat
     vec <- namedTyCon "Vec"
     add <- namedTyCon "Add"
     zero <- namedDataCon nat "Z"
@@ -6044,6 +6117,11 @@ runDomainConversionObjectCheck libdir = do
 lintNative :: DynFlags -> String -> CoreExpr -> IO ()
 lintNative flags label expression = do
     unless (hasNativeDependentExpr expression) (fail ("FAIL: " ++ label ++ "; native forms disappeared before compilation"))
+    lintCheckedCore flags label expression
+
+-- | Check an expression from a module that can contain ordinary and dependent bindings.
+lintCheckedCore :: DynFlags -> String -> CoreExpr -> IO ()
+lintCheckedCore flags label expression =
     case lintExpr (initLintConfig flags []) expression of
         Nothing -> pure ()
         Just errors -> fail ("FAIL: " ++ label ++ "; Lint rejected:\n" ++ showSDoc flags (vcat (bagToList errors)))

@@ -30,3 +30,4 @@ False
 Just 7
 [1,2,3]
 (Just 9,Just 'x')
+True

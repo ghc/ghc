@@ -111,14 +111,21 @@ forceCallback f _ = f `seq` Nothing
 forcePrefix :: foreach (n :: Nat) -> a -> [a] -> Maybe (Vec a (1 + n))
 forcePrefix n x xs = forceCallback (bottomCallback x) (fromListExact n xs)
 
+-- | An ordinary constructor with a strict field and a lazy payload.
+data Stamped a = Stamped !Int a
+
+-- | Discard the stamp after forcing it to construct the pair.
+discardStamp :: foreach (n :: Nat) -> Int -> Vec a n -> Vec a n
+discardStamp _ k xs = case Stamped k xs of Stamped _ ys -> ys
+
 -- | Observe only the Maybe constructor.
 succeeds :: Maybe a -> Bool
 succeeds Nothing = False
 succeeds (Just _) = True
 
--- | Check whether an observation demands the marked undefined spine.
-demandsSpine :: Bool -> IO Bool
-demandsSpine observation = do
+-- | Check whether evaluating an observation forces the marked exception.
+raisesDivideByZero :: Bool -> IO Bool
+raisesDivideByZero observation = do
     result <- try (evaluate observation)
     pure (result == Left DivideByZero)
 
@@ -152,11 +159,11 @@ main = do
     print (prependedRowLength size height 1 rows)
     print (prependedRowLength size 0 (1 :: Int) VNil)
     print (capturedIndex size (replicateNative size True))
-    demandsSpine (succeeds (forcePrefix size (1 :: Int) [])) >>= print
+    raisesDivideByZero (succeeds (forcePrefix size (1 :: Int) [])) >>= print
     print (succeeds (fromListExact (S Z) [throw DivideByZero :: Int]))
     print (fmap (length . toList) (fromListExact (S Z) [throw DivideByZero :: Int]))
-    demandsSpine (succeeds (fromListExact (S Z) (1 : throw DivideByZero :: [Int]))) >>= print
-    demandsSpine (succeeds (fromListExact (S (S Z)) (1 : throw DivideByZero :: [Int]))) >>= print
+    raisesDivideByZero (succeeds (fromListExact (S Z) (1 : throw DivideByZero :: [Int]))) >>= print
+    raisesDivideByZero (succeeds (fromListExact (S (S Z)) (1 : throw DivideByZero :: [Int]))) >>= print
     print (succeeds (fromListExact Z (throw DivideByZero : throw DivideByZero :: [Int])))
     print (succeeds (fromListExact (S Z) (1 : 2 : throw DivideByZero :: [Int])))
     print (succeeds (fromListExact (S (S Z)) (repeat (throw DivideByZero :: Int))))
@@ -164,3 +171,4 @@ main = do
     print (headPacked (packList (7 : throw DivideByZero :: [Int])))
     print (take 3 (toListPacked (packList ([1 ..] :: [Int]))))
     print (headPacked (clientPack (9 : throw DivideByZero :: [Int])), headPacked (clientPackAt "x"))
+    raisesDivideByZero (null (toList (discardStamp size (throw DivideByZero) row))) >>= print
