@@ -12,6 +12,10 @@ test('NativeClosedLength',
      [req_interp, req_rts_linker, extra_files([closed_eval_dir + f for f in
                                   ['check-source.sh', 'Client.hs', 'ClosedLengthProducer.hs']])],
      run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
+test('NativeClosedChar',
+     [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedCharLib.hs'])],
+     multimod_compile_and_run,
+     ['NativeClosedChar', '-Werror=unused-imports ' + config.ghc_th_way_flags])
 test('NativeSourceTable',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',
                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),

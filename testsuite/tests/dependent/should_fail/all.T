@@ -105,6 +105,11 @@ test('NativeOpenTermLimit', normal, compile_fail, [''])
 test('NativeClosedEvalSafe',
      extra_files(['../../../../docs/dependent-haskell/examples/closed-evaluation/ClosedLengthProducer.hs']),
      multimod_compile_fail, ['NativeClosedEvalSafe', '-v0'])
+test('NativeClosedCharRigid', normal, compile_fail, [''])
+test('NativeClosedCharResult', normal, compile_fail, [''])
+test('NativeClosedCharWildcard', normal, compile_fail, [''])
+test('NativeClosedCharWrong', [req_interp, req_rts_linker, only_ways(['normal'])],
+     compile_fail, [config.ghc_th_way_flags])
 test('NativeSourceLengthEmpty',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_fail,

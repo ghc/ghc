@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (observeOpenType, openTypeFailureReason, supportsOpenTypeFunction)
 import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedNatural)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedCall)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -110,6 +110,7 @@ import GHC.Core.Class
 import GHC.Core.FamInstEnv (familyNameInstances, famInstTyCon, lookupFamInstEnv, fim_instance)
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Make (mkCharExpr, mkListExpr, mkNaturalExpr)
 import GHC.Core.Predicate ( getClassPredTys_maybe, isCTupleClass )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
@@ -2355,24 +2356,16 @@ tc_app_ty mode rn_ty exp_kind
        ; case filterOut is_par hs_args of
            [HsValArg _ arg]
              | isTypeLevel (mode_tyki mode)
-             , isNothing (mode_holes mode)
+             , isNothing (mode_holes mode) || isJust (mode_complete_type_arg mode)
              , not (nameIsLocalOrFrom (tcg_semantic_mod env) name)
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
                          | isQual rdr
-                         , tcEqType (varType fun) (mkVisFunTyManyU list_kind naturalTy)
-                         -> do { numbers <- case closedNaturalList arg of
-                                   Just ns -> return ns
-                                   Nothing -> failWithTc $ TcRnClosedTypeEval name
-                                     "The argument must be a closed list of Natural literals, such as '[1, 2, 3]."
-                               ; arg_ty <- tc_check_lhs_type mode arg list_kind
-                               ; checked <- liftZonkM (zonkTcType arg_ty)
-                               ; unless (tcEqType checked (mkPromotedListTy naturalTy (map mkNumLitTy numbers))) $
-                                   failWithTc $ TcRnClosedTypeEval name
-                                     "The checked argument does not represent a list of Natural literals."
-                               ; result <- tcRunClosedNatural fun numbers
-                               ; checkExpKind mode rn_ty result naturalTy exp_kind }
+                         , Just (domain, result_kind) <- closedTypeCallKinds (varType fun)
+                         -> do { argument <- tcClosedTypeCallArgument mode name domain arg
+                               ; result <- tcRunClosedCall fun argument result_kind
+                               ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | isTypeVariableArg arg
                          , supportsOpenTypeFunction fun
                          -> do { result <- tcOpenTypeCall mode name fun arg
@@ -2381,7 +2374,6 @@ tc_app_ty mode rn_ty exp_kind
            _ -> unsupported name }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
-    list_kind = mkListTy naturalTy
     is_par HsArgPar{} = True
     is_par _ = False
     unsupported = failWithTc . TcRnNoSourceTable
@@ -2396,6 +2388,8 @@ tc_app_ty mode rn_ty exp_kind
 -- See Note [Open source calls] in GHC.Tc.Gen.OpenTypeEval.
 tcOpenTypeCall :: TcTyMode -> Name -> Id -> LHsType GhcRn -> TcM Type
 tcOpenTypeCall mode name fun arg = do
+  when (mode_complete_type_arg mode == Just False) $
+    reject "A visible type argument containing an open call must be complete. Replace its wildcards with types."
   level <- getThLevel
   bootOrSig <- tcIsHsBootOrSig
   explicitLevels <- xoptM LangExt.ExplicitLevelImports
@@ -2426,6 +2420,48 @@ isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
   isTyVarName name
 isTypeVariableArg _ = False
 
+-- | Find the domain and range of an ordinary arrow with a supported input.
+closedTypeCallKinds :: Type -> Maybe (Type, Type)
+closedTypeCallKinds ty
+  | Just (FTF_T_T, matchability, multiplicity, domain, result_kind) <- splitFunTy_maybe ty
+  , matchability `tcEqType` unmatchableDataConTy
+  , isManyTy multiplicity
+  , any (tcEqType domain) [charTy, mkListTy naturalTy]
+  = Just (domain, result_kind)
+  | otherwise = Nothing
+
+-- | Check the literal at the expected kind and build its runtime value.
+tcClosedTypeCallArgument :: TcTyMode -> Name -> Type -> LHsType GhcRn -> TcM Core.CoreExpr
+tcClosedTypeCallArgument mode name domain arg
+  | mode_complete_type_arg mode == Just False =
+      bad "A visible type argument containing a closed call must be complete. Replace its wildcards with types."
+  | domain `tcEqType` charTy =
+      case ignoreParens arg of
+        L _ (HsTyLit _ (HsChar _ _)) -> do
+          checked <- checked_argument
+          case isCharLitTy checked of
+            Just c -> return (mkCharExpr c)
+            Nothing -> bad "The checked argument does not represent a Char literal."
+        _ -> bad "The argument must be a closed Char literal, such as 'x'."
+  | otherwise = case closedNaturalList arg of
+      Just numbers -> do
+        check_literal (mkPromotedListTy naturalTy (map mkNumLitTy numbers))
+        platform <- targetPlatform <$> getDynFlags
+        return (mkListExpr naturalTy (map (mkNaturalExpr platform) numbers))
+      Nothing -> bad "The argument must be a closed list of Natural literals, such as '[1, 2, 3]."
+  where
+    checked_argument = do
+      arg_ty <- tc_check_lhs_type mode arg domain
+      liftZonkM (zonkTcType arg_ty)
+
+    check_literal expected = do
+      checked <- checked_argument
+      unless (tcEqType checked expected) $
+        bad "The checked argument does not have the expected literal representation."
+
+    bad :: String -> TcM a
+    bad = failWithTc . TcRnClosedTypeEval name
+
 -- | Read a promoted literal list before admitting the call to execution.
 closedNaturalList :: LHsType GhcRn -> Maybe [Integer]
 closedNaturalList (L _ (HsParTy _ arg)) = closedNaturalList arg
@@ -2440,16 +2476,19 @@ closedNaturalList _ = Nothing
 {- Note [Closed source calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Serokell's closed term evaluator example uses an ordinary length call as
-a vector index. Start with an imported, qualified function on a list of
-Natural literals. The renamer keeps its written qualifier and resolved
+a vector index. Support imported, qualified functions on a list of Natural
+literals or a Char literal. The renamer keeps the qualifier and resolved
 term Name after trying the ordinary type and checked source-table paths.
 The term Name is not a retained local index.
 
-Require a complete monomorphic function type and literal arguments before
-execution. This avoids running open calls or extending the constraint
-solver. Elaborate the result to an ordinary Natural literal. No residual
-call or evaluation coercion enters Core. See the R15 feature page for the
-source example and the staging boundary.
+Require a complete monomorphic function type and a literal argument before
+execution. Elaborate the result to a Natural or Char literal, or to a
+promoted Bool constructor. See Note [Closed literal type evaluation] in
+GHC.Tc.Gen.Splice for execution and result decoding.
+
+A visible type argument permits wildcards even when it has none. Admit
+complete visible arguments at this entry point using the check described
+in Note [Retained Pi type arguments].
 -}
 
 {- Note [Source opaque call indices]

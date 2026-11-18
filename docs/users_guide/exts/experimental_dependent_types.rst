@@ -198,6 +198,31 @@ and fully applied. Its operands can be local values, supported constructors,
 or further checked calls. A user-defined operator can supply equations in
 the same way as a named function.
 
+GHC can execute a qualified call to an imported ordinary function while
+checking a type. For example, both witnesses check with an ordinary import
+of ``Data.Char``::
+
+    {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+    import qualified Data.Char
+    import Data.Type.Equality ((:~:)(Refl))
+
+    upper :: Data.Char.toUpper 'x' :~: 'X'
+    upper = Refl
+
+    digit :: Data.Char.isDigit '7' :~: 'True
+    digit = Refl
+
+The current implementation accepts one character literal or a promoted
+list of natural number literals. The function must take one unrestricted
+argument and return ``Char``, ``Bool`` or ``Natural``. The producer may use
+ordinary Haskell. The compiler needs its compiled code and a target
+interpreter. Safe Haskell rejects execution of these calls. If an imported
+function diverges, checking its application can also diverge.
+
+With :extension:`TypeApplications`, the expression
+``charVal (Proxy @(Data.Char.toUpper 'x'))`` reflects the result as a
+character. A visible type argument containing such a call must be complete.
+
 An imported polymorphic function can also occur in a type when its argument
 is a rigid type variable. For example, this definition checks because
 reducing the ordinary Prelude function ``id`` returns the type variable

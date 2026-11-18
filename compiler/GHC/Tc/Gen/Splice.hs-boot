@@ -3,6 +3,7 @@
 module GHC.Tc.Gen.Splice where
 
 import GHC.Prelude
+import GHC.Core (CoreExpr)
 import GHC.Core.Type (Type)
 import GHC.Types.Name
 import GHC.Types.Var (Id)
@@ -47,4 +48,4 @@ lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 runQinTcM :: TH.Q a -> TcM a
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 finishTH :: TcM ()
-tcRunClosedNatural :: Id -> [Integer] -> TcM Type
+tcRunClosedCall :: Id -> CoreExpr -> Type -> TcM Type

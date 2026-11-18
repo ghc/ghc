@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice, tcRunClosedNatural
+     finishTH, runTopSplice, tcRunClosedCall
       ) where
 
 import GHC.Prelude
@@ -39,6 +39,7 @@ import GHC.Driver.Session (safeInferOn, safeLanguageOn)
 import GHC.Driver.Main
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
+import GHC.Driver.Ppr (showPpr)
 import GHC.Driver.Hooks
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Finder
@@ -64,7 +65,7 @@ import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Instantiate
 
 import qualified GHC.Core as Core
-import GHC.Core.Make (mkCoreApp, mkCoreApps, mkListExpr, mkNaturalExpr)
+import GHC.Core.Make (mkCoreApp, mkCoreApps)
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion( etaExpandCoAxBranch )
 import GHC.Core.Type as Type
@@ -1293,36 +1294,36 @@ Previously, we failed to abort in cases (b) and (c), leading to #19709.
 -}
 
 -- | Execute a checked closed call through the target interpreter.
--- See Note [Closed Natural type evaluation].
-tcRunClosedNatural :: Id -> [Integer] -> TcM Type
-tcRunClosedNatural fun naturals = do
+-- See Note [Closed literal type evaluation].
+tcRunClosedCall :: Id -> Core.CoreExpr -> Type -> TcM Type
+tcRunClosedCall fun argument result_kind = do
   hsc_env <- getTopEnv
+  unless (idType fun `tcEqType` mkVisFunTyManyU (exprType argument) result_kind) $
+    bad "The closed call does not have the expected ordinary function type."
+  decode <- case closedTypeResultDecoder result_kind of
+    Just decoder -> return decoder
+    Nothing -> bad ("The function returns " ++ showPpr (hsc_dflags hsc_env) result_kind ++
+                    ". Closed calls in types currently support results of type Natural, Char, or Bool.")
   interp <- checkClosedTypeEvalStage hsc_env name
-  unless (idType fun `tcEqType` mkVisFunTyManyU (mkListTy naturalTy) naturalTy
-          && all (>= 0) naturals) $
-    bad "expected [Natural] -> Natural and nonnegative arguments"
-
-  let platform = targetPlatform (hsc_dflags hsc_env)
-      argument = mkListExpr naturalTy (map (mkNaturalExpr platform) naturals)
-      call = mkCoreApp (Core.Var fun) argument
+  let call = mkCoreApp (Core.Var fun) argument
 
   show_class <- tcLookupKnownKeyClass showClassKey
   inst_env <- tcGetInstEnvs
   case (find ((== "show") . getOccString) (classMethods show_class),
-        lookupUniqueInstEnv inst_env show_class [naturalTy]) of
+        lookupUniqueInstEnv inst_env show_class [result_kind]) of
     (Just show_id, Right (inst, []))
       | let dfun = instanceDFunId inst
       , nameModule_maybe (idName dfun) == nameModule_maybe (className show_class)
-      , idType dfun `tcEqType` mkClassPred show_class [naturalTy] -> do
+      , idType dfun `tcEqType` mkClassPred show_class [result_kind] -> do
           ret_id <- tcLookupKnownOccId returnIOIdOcc
           io_tc <- tcLookupKnownKeyTyCon ioTyConKey
           let render = mkCoreApps (Core.Var show_id)
-                         [Core.Type naturalTy, Core.Var dfun]
+                         [Core.Type result_kind, Core.Var dfun]
               ret = mkCoreApp (Core.Var ret_id) (Core.Type stringTy)
               io_string = mkTyConApp io_tc [stringTy]
-          unless (exprType render `tcEqType` mkVisFunTyManyU naturalTy stringTy
+          unless (exprType render `tcEqType` mkVisFunTyManyU result_kind stringTy
                   && exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
-            bad "unexpected type for the Natural interpreter response"
+            bad "Unexpected type for the interpreter response."
           let expr = mkCoreApp ret (mkCoreApp render call)
           loc <- getSrcSpanM
           compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc expr
@@ -1334,23 +1335,39 @@ tcRunClosedNatural fun naturals = do
               liftIO $ throwIO async
             Left exn -> bad (displayException exn)
             Right rendered -> pure rendered
-          case readMaybe rendered :: Maybe Natural of
-            Just n | show n == rendered -> pure (mkNumLitTy (toInteger n))
-            _ -> bad "invalid Natural response from the interpreter"
-    _ -> bad "cannot resolve the built-in Show Natural dictionary"
+          case decode rendered of
+            Just ty -> return ty
+            Nothing -> bad "Invalid literal response from the interpreter."
+    _ -> bad "Cannot resolve the built-in Show dictionary for the result type."
   where
     name = idName fun
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name
 
-{- Note [Closed Natural type evaluation]
+-- | Decode the result in the fixed compiler-side representation for its kind.
+closedTypeResultDecoder :: Type -> Maybe (String -> Maybe Type)
+closedTypeResultDecoder kind
+  | kind `tcEqType` naturalTy = Just (decodeLiteral (mkNumLitTy . toInteger @Natural))
+  | kind `tcEqType` charTy = Just (decodeLiteral mkCharLitTy)
+  | kind `tcEqType` boolTy = Just (decodeLiteral promoteBool)
+  | otherwise = Nothing
+  where
+    promoteBool b = mkTyConTy (if b then promotedTrueDataCon else promotedFalseDataCon)
+
+    decodeLiteral :: (Read a, Show a) => (a -> Type) -> String -> Maybe Type
+    decodeLiteral promote rendered = do
+      x <- readMaybe rendered
+      guard (show x == rendered)
+      return (promote x)
+
+{- Note [Closed literal type evaluation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The caller checks the source call and its literal argument before execution.
 Compile an ordinary Core application at the checked function type. Use the
-built-in Show Natural instance and returnIO to construct IO String for
-evalString. The interpreter forces the string before returning it. The
-compiler checks the canonical decimal form before it constructs a type
-literal. No runtime reference crosses into the compiler's address space.
+built-in Show instance for the result type and returnIO to construct an
+IO String for evalString. The interpreter forces the string before it returns
+it. The compiler checks the canonical form before it constructs a literal
+or promoted constructor.
 
 Record the loaded dependencies through the same path as a splice. The
 producer object can change even when its interface ABI remains the same.
