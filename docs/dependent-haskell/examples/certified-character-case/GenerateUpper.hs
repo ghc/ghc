@@ -1,6 +1,5 @@
 module Main (main) where
 
-import CharCertificate (certOwner, certRows, certify)
 import GHC (
     CoreModule (..),
     compileToCoreModule,
@@ -12,6 +11,7 @@ import GHC (
     setSessionDynFlags,
  )
 import GHC.Core (bindersOfBinds, flattenBinds)
+import GHC.Core.CharCase (certOwner, certRows, certify)
 import GHC.Core.Lint (lintExpr)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.DynFlags (verbosity)

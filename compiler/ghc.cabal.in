@@ -353,6 +353,7 @@ Library
         GHC.Cmm.Type
         GHC.Cmm.Utils
         GHC.Core
+        GHC.Core.CharCase
         GHC.Core.Class
         GHC.Core.Coercion
         GHC.Core.Coercion.Axiom

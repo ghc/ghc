@@ -75,7 +75,7 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Sig( tcRules )
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses,
                                sourceTableDependencies)
@@ -690,8 +690,10 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       ; failIfErrsM
       ; tables_enabled <- xoptM LangExt.ExperimentalDependentTypes
       ; if tables_enabled
-        then setGblEnv tcg_env' $
-             sourceTableTyCons (tcg_binds tcg_env') >>= installSourceTables >>= installSourceMethods
+        then setGblEnv tcg_env' $ do
+             tables <- sourceTableTyCons (tcg_binds tcg_env')
+             charTables <- sourceCharTables (tcg_binds tcg_env')
+             installSourceTables (tables ++ charTables) >>= installSourceMethods
         else return tcg_env' }
 
 -- | Publish only checked method aliases that user rules cannot replace.

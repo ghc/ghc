@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
@@ -10,8 +10,9 @@ import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
-import GHC.Builtin.WiredIn.Types (integerTy, integerTyConName, listTyCon, mkListTy, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (charTy, charTyCon, integerTy, integerTyConName, listTyCon, mkListTy, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
+import GHC.Core.CharCase (certOwner, certRows, certify)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
 import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch, coAxiomBranches, coAxBranchRHS, fromBranches)
@@ -26,8 +27,12 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
+import GHC.Data.OrdList (fromOL)
 import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRulesBelow)
 import GHC.Hs
+import {-# SOURCE #-} GHC.HsToCore.Binds (dsTopLHsBinds)
+import GHC.HsToCore.Errors.Ppr () -- Diagnostic DsMessage
+import GHC.HsToCore.Monad (initDsTc)
 import GHC.Iface.Env (lookupOrig)
 import GHC.Iface.Load (loadInterfaceForName)
 import qualified GHC.LanguageExtensions as LangExt
@@ -41,18 +46,20 @@ import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBi
                            checkNoErrs, getTopEnv, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
+import GHC.Types.Avail (availNames)
 import GHC.Types.Basic (Origin(..))
+import GHC.Types.Error (errorsFound)
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkInstTyCoOcc,
-                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
+                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
 import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
-                           intersectNameSet, isEmptyNameSet, minusNameSet, nameSetElemsStable,
+                           intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
                            unionNameSet, unionNameSets, unitNameSet)
 import GHC.Types.SrcLoc
-import GHC.Types.SourceFile (hscSourceToIsBoot)
+import GHC.Types.SourceFile (hscSourceToIsBoot, isHsBootOrSig)
 import GHC.Unit.External (eps_rule_base)
 import GHC.Unit.Home (homeUnitId)
 import GHC.Unit.Home.Graph (lookupHugByModule)
@@ -683,6 +690,61 @@ sourceTableTyCons binds = do
             traverse (fmap (setIdType fun ty,) . makeFamily (varName fun) input carried result)
                      (sequence branches)
       else pure Nothing
+
+-- | Publish a direct Char worker only after its final bindings are zonked.
+-- See Note [Checked Char cases].
+sourceCharTables :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
+sourceCharTables binds = do
+  env <- getGblEnv
+  let exported = mkNameSet (concatMap availNames (tcg_exports env))
+      ruled = sourceRuleOwners (tcg_rules env)
+      eligible owner =
+        idName owner `elemNameSet` exported &&
+        not (idName owner `elemNameSet` ruled) &&
+        varType owner `eqType` mkVisFunTyManyU charTy charTy
+      candidates = [ (bind, owner) | bind <- binds
+                   , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
+                   , eligible owner ]
+  if isHsBootOrSig (tcg_src env) || null candidates
+    then pure []
+    else do
+      visible <- visibleSourceMethodRules env
+      fmap catMaybes $ forM candidates $ \(bind, owner) ->
+        if hasSourceMethodRule visible owner
+          then pure Nothing
+          else certifyBinding bind owner
+  where
+    certifyBinding bind owner = do
+      (messages, bindings) <- initDsTc (dsTopLHsBinds [bind])
+      case bindings of
+        Just core | not (errorsFound messages)
+          , [rhs] <- [expr | (ident, expr) <- fromOL core, idName ident == idName owner]
+          , Right certificate <- certify owner rhs
+          , certOwner certificate == idName owner -> do
+              let loc = nameSrcSpan (idName owner)
+                  literal (input, result) _ =
+                    mkCoAxBranch [] [] [] [mkCharLitTy input] (mkCharLitTy result) [] loc
+              var <- flip mkTyVar charTy <$> newSysName (mkTyVarOcc "c")
+              let ty = mkTyVarTy var
+                  fallback _ = mkCoAxBranch [var] [] [] [ty] ty [Nominal] loc
+              table <- makeFamily (idName owner) (ClosedInput charTy []) [] charTyCon
+                                  (map literal (certRows certificate) ++ [fallback])
+              pure (Just (owner, table))
+        _ -> pure Nothing
+
+{- Note [Checked Char cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Certify an exported direct Char worker from its solved, desugared binding.
+This check runs only at final publication. It provides no table for an
+earlier use in the defining module. Speculative desugaring keeps its
+diagnostics local. Ordinary module desugaring reports them.
+
+See Note [Character case certificates] in GHC.Core.CharCase for the
+accepted Core. Keep literal equations before the default so closed-family apartness
+governs reduction when the argument is still rigid. Reject visible rules
+for the owner before constructing the family. The usual SourceTableId
+publication and solver dependency checks apply to the resulting table.
+-}
 
 -- | The first constructor pattern, any carried variable, and the checked RHS.
 data SourceRow = SourceRow SrcSpan DataCon [Type] [Maybe Id] [Id] SourceRhs

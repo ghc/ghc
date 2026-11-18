@@ -8,6 +8,10 @@ test('NativeOpenIdentity',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs',
                  'OpenSource.hs', 'RunOpenSource.hs', 'RunOpenSource.stdout', 'check-source.sh']]),
      run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
+test('NativeOpenCharFamily',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['CharacterCase.hs', 'CharacterExport.hs']])],
+     run_command, ['bash NativeOpenCharFamily.sh "{compiler}" "{libdir}"'])
 test('NativeOpenCharGhci',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs', 'OpenSource.hs']]),
      ghci_script, ['NativeOpenCharGhci.script'])
