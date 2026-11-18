@@ -3658,6 +3658,9 @@ pprRetainedQuantificationError reason = case reason of
   RetainedUncheckedSourceCall fun ->
     text "No checked source equations are available for" <+> quotes (ppr fun)
       <+> text "in this retained argument."
+  RetainedLocalSourceMethod method ->
+    vcat [ text "Method" <+> quotes (ppr method) <+> text "belongs to an instance in this module."
+         , text "Retained method calls currently need a compiled instance interface." ]
   RetainedSourceMethodEvidence method predicate ->
     vcat [ text "GHC cannot use method" <+> quotes (ppr method) <+> text "as a retained index."
          , text "This call needs a known" <+> quotes (ppr predicate) <+> text "dictionary." ]

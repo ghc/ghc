@@ -5360,6 +5360,7 @@ data RetainedQuantificationError
   | RetainedResultWrapper
   | RetainedIndexExpression
   | RetainedUncheckedSourceCall Name
+  | RetainedLocalSourceMethod Name
   | RetainedSourceMethodEvidence Name Type
   | RetainedSourceRule Name
   | RetainedIndexMultiplicity Type

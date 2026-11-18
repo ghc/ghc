@@ -35,7 +35,6 @@ import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Types ( TcGblEnv(tcg_type_env) )
 import GHC.Tc.Types.TcRef ( TcRef )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred, ctEvLoc, ctEvEvId,
@@ -1883,16 +1882,14 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
 tcRetainedOperand :: Id -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
 tcRetainedOperand binder arg
   | isNativeIndexFunctionId binder = (,arg) <$> tcRetainedFunctionArg domain arg
-  | otherwise = do { runtime_arg <- tcRetainedMethod domain arg
-                   ; index_arg <- tcRetainedArg domain runtime_arg
-                   ; return (index_arg, runtime_arg) }
+  | otherwise = tcRetainedValueOperand domain arg
   where
     domain = varType binder
 
--- | Specialise a class selector in a retained operand to its checked method.
+-- | Check a value operand and specialise a class selector to its checked method.
 -- See Note [Dictionary selection in retained arguments].
-tcRetainedMethod :: Type -> LHsExpr GhcRn -> TcM (LHsExpr GhcRn)
-tcRetainedMethod domain arg@(L loc original)
+tcRetainedValueOperand :: Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+tcRetainedValueOperand domain arg@(L loc original)
   | (op, args@(_:_)) <- split_call arg []
   , let (L head_loc head_expr, type_arg) = case op of
           L _ (HsAppType _ f ty) -> (stripParensLHsExpr f, Just ty)
@@ -1918,21 +1915,30 @@ tcRetainedMethod domain arg@(L loc original)
             unless (supplied `tcEqType` domain) unchecked
           insts <- tcGetInstEnvs
           dfun <- case lookupUniqueInstEnv insts cls [domain] of
-            Right (inst, []) -> tcLookupIdMaybe (getName (instanceDFunId inst)) >>= maybe unchecked return
+            Right (inst, []) -> do
+              env <- getGblEnv
+              let dfun_name = getName (instanceDFunId inst)
+              -- A local method has no completed instance interface yet.
+              when (nameIsLocalOrFrom (tcg_semantic_mod env) dfun_name) $
+                failWithTc (TcRnRetainedQuantificationError (RetainedLocalSourceMethod name))
+              tcLookupIdMaybe dfun_name >>= maybe unchecked return
             _ -> unchecked
           target_name <- maybe unchecked return (sourceMethodTarget_maybe dfun sel)
           target <- tcLookupIdMaybe target_name >>= maybe unchecked return
           unless (varType target `tcEqType` classMethodInstTy sel [domain]) unchecked
 
+          let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
+              runtime_arg = L loc (mkExpandedLExpr original (mkHsApps target_head args))
+          index_arg <- tcRetainedArg domain runtime_arg
+          recordSourceMethodUse dfun sel target
           ev <- newWanted (OccurrenceOf name) Nothing (mkClassPred cls [domain])
           emitSimple (mkNonCanonical ev)
           emitDelayedErrors (unitBag (DE_SourceMethod (ctEvEvId ev) dfun name (ctEvLoc ev)))
-          recordSourceMethodUse dfun sel target
-          let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
-          return (L loc (mkExpandedLExpr original (mkHsApps target_head args)))
-        _ -> return arg
-  | otherwise = return arg
+          return (index_arg, runtime_arg)
+        _ -> ordinary
+  | otherwise = ordinary
   where
+    ordinary = (,arg) <$> tcRetainedArg domain arg
     split_call :: LHsExpr GhcRn -> [LHsExpr GhcRn] -> (LHsExpr GhcRn, [LHsExpr GhcRn])
     split_call (L _ (HsPar _ e)) args = split_call e args
     split_call (L _ (HsApp _ f a)) args = split_call f (a:args)
@@ -1951,8 +1957,9 @@ dictionary for the method occurrence in its lexical scope. Emit an
 ordinary Wanted and attach the check to that Wanted's evidence variable.
 A Given for Num Nat can select a different dictionary.
 
-Once this obligation is recorded, use the target for both the index
-and the runtime application. The expanded expression keeps the user's
+Check the target call and its rewrite rules before emitting the method
+obligation. An invalid operand or rule can already explain the error.
+Use the target for both the index and runtime. The expanded expression keeps the user's
 operator and its source span. The later argument check must not resolve
 a second dictionary. M81's source-call check verifies saturation and
 operand kinds and preserves the lazy call through erasure.

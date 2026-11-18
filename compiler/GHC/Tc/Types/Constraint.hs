@@ -1116,16 +1116,43 @@ addDelayedErrors :: WantedConstraints -> Bag DelayedError -> WantedConstraints
 addDelayedErrors wc errs
   = wc { wc_errors = errs `unionBags` wc_errors wc }
 
+{- Note [Recovering source method Wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A DE_SourceMethod check refers to one original dictionary Wanted. Recovery
+must retain that Wanted with the check. Dropping only the Wanted can make a
+valid instance look unproved after an independent expression error.
+
+Collect the checks' evidence Ids once from the captured constraint tree.
+A nested check can refer to a Wanted in an enclosing scope. Retain only
+Wanteds with these exact Ids, and keep their original implication scopes.
+Do not reconstruct evidence or retain unrelated class constraints. The check
+remains mandatory. See Note [Checked source method evidence] in
+GHC.Tc.Solver.Solve.
+-}
+
 dropMisleading :: WantedConstraints -> WantedConstraints
 -- Drop misleading constraints; really just class constraints
 -- See Note [Constraints and errors] in GHC.Tc.Utils.Monad
 --   for why this function is so strange, treating the 'simples'
 --   and the implications differently.  Sigh.
-dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_errors = errors })
-  = WC { wc_simple = filterBag insolubleWantedCt simples
+dropMisleading wanted@(WC { wc_simple = simples, wc_impl = implics, wc_errors = errors })
+  = WC { wc_simple = filterBag (\ct -> insolubleWantedCt ct || keep_guarded ct) simples
        , wc_impl   = mapBag drop_implic implics
        , wc_errors = filterBag keep_delayed_error errors }
   where
+    -- See Note [Recovering source method Wanteds].
+    guarded_wanteds = collect_guards wanted emptyVarSet
+    collect_guards :: WantedConstraints -> VarSet -> VarSet
+    collect_guards WC { wc_errors = errors, wc_impl = implics } acc
+      = foldr add_guard (foldr (collect_guards . ic_wanted) acc implics) errors
+    add_guard (DE_SourceMethod ev _ _ _) acc = extendVarSet acc ev
+    add_guard _ acc = acc
+
+    keep_guarded ct
+      | isEmptyVarSet guarded_wanteds = False
+      | Just ev <- wantedEvId_maybe ct = ev `elemVarSet` guarded_wanteds
+      | otherwise = False
+
     drop_implic implic
       = implic { ic_wanted = drop_wanted (ic_wanted implic) }
     drop_wanted (WC { wc_simple = simples, wc_impl = implics, wc_errors = errors })
@@ -1134,6 +1161,8 @@ dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_errors = errors 
            , wc_errors  = filterBag keep_delayed_error errors }
 
     keep_ct ct
+      | keep_guarded ct = True
+      | otherwise
       = case classifyPredType (ctPred ct) of
            ClassPred cls _ -> isEqualityClass cls
              -- isEqualityClass: see (CERR2) in Note [Constraints and errors]
