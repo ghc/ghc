@@ -35,12 +35,13 @@ The [remaining work table](#remaining-work-by-roadmap-area) lists their
 dependencies. The [local library and assurance tasks](#local-subset-library-and-assurance-work)
 track module boundaries and totality separately.
 
-The next Core experiment has a measured starting point. When an indexed
-function wraps a vector in `Just` and immediately matches it, final STG
-still allocates the constructor and tests its tag. A two-field ordinary
-constructor shows the same behavior. Removing that work must preserve
-lazy fields, sharing and any binders mentioned in types. This would
-address [one R05 transformation](roadmap/R05-dependent-core.md#next-increments).
+The restricted `-O0` simplifier can remove an ordinary constructor
+immediately inspected in a dependent module. For example, wrapping a
+runtime-indexed vector in `Just` and extracting it again required an
+extra 16 bytes per call in the measured loop. M97 removes that cost
+while preserving strict fields, shared thunks and index-only uses.
+[Core contract](CORE.md#cases-of-known-ordinary-constructors)
+and [allocation measurements](PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core).
 
 | Area | Demonstrated in this fork | Work before the roadmap task is complete |
 | --- | --- | --- |
@@ -194,6 +195,7 @@ can advance a card while the card remains open.
 | 35 | R03: inferred nonempty local lengths | [M94](PLAN.md#m94-infer-a-nonempty-tail-through-local-length-definitions) | Infer the tail of a vector through checked let and where definitions, then check the call against its actual argument. |
 | 36 | R03 and R04: ordinary lists at an indexed boundary | [M95](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary) | Check a requested length or package the list's own length. Match ordinary list patterns in retained equations. |
 | 37 | R03: partial constructor callbacks | [M96](PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks) | Use a checked input's runtime index in `VCons x <$> fromListExact n xs`. Preserve constructor multiplicities and check the full callback type. General callback inference remains open. |
+| 38 | R05: simplify a case of a known constructor | [M97](PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core) | Remove a measured allocation and dispatch while keeping dependencies in types, lazy field sharing and strict-field demand. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

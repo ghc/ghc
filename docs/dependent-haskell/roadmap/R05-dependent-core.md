@@ -108,9 +108,12 @@ linear actuals. The owner is R03. This increment adds no Core equality rule.
 - [x] Preserve retained-binder visibility in Core, proof operations and
       interfaces. Check a representational visibility cast through native
       object execution. See [M71](../PLAN.md#m71-visibility-of-retained-binders-in-core).
-- [ ] Extend one ordinary Core transformation with a measured benefit.
-      Preserve deep type dependencies, index identity, demand and sharing.
-      Keep other unsupported transformations gated.
+- [x] Extend one ordinary Core transformation with a measured benefit.
+      [M97](../PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core)
+      removes an adjacent allocation and constructor case. The indexed
+      `Just` and two-field examples save 16 and 24 bytes per call.
+      Keep a case needed by a type-only dependency or by strict-field
+      evaluation. The normal optimization pipeline remains open.
 - [ ] Complete native unfolding and coercion-interface handling. Broaden
       optimizer and ordinary GHC compatibility checks before release.
 

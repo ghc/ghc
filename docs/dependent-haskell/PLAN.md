@@ -7621,15 +7621,15 @@ its tag before returning the original vector. A two-field ordinary
 constructor shows the same allocation and dispatch. A constructor with
 a strict field forces that field even if the branch ignores it.
 
-- [ ] Reduce a case whose scrutinee is an immediately preceding, known
+- [x] Reduce a case whose scrutinee is an immediately preceding, known
       constructor binding. Use the actual constructor worker and its
       fields. Preserve lexical scope in the chosen alternative and keep
       shared fields lazy. Follow the treatment of value arguments in
       GHC's known-constructor rule.
-- [ ] Preserve accesses through types and coercions. Keep strict
+- [x] Preserve accesses through types and coercions. Keep strict
       and unlifted fields, proof alternatives, and unknown producers on
       their original path until their forcing and proof rules are handled.
-- [ ] Compare final STG before and after the change and measure heap
+- [x] Compare final STG before and after the change and measure heap
       allocation at two loop sizes. Check the selected result, ignored
       fields, strict fields, and scrutinizing an unknown value. Run Core
       and STG Lint, source and API controls, and both stages. Use the
@@ -7642,8 +7642,52 @@ metadata, and case result in the free-variable check before dropping
 `ds` or the case binder. A field can itself have type `Vec a n`.
 Use a fresh lazy binding for a nontrivial field so two uses share it.
 
-The baseline loop allocates 112 bytes per call when it returns the input
-vector directly. Returning it through `Just` allocates 128 bytes per
-call. Returning it through a two-field constructor allocates 136 bytes
-per call. Each slope uses the change in RTS allocated bytes between
-50,000 and 200,000 calls. The mode selection runs outside the loop.
+### Allocation and scope checks
+
+The bootstrap and self-hosted compilers produced the same allocation slopes. Each
+mode calls the same loop over a vector whose length came from IO. The
+worker that constructs and inspects the value lives in a separately
+compiled module with interface unfoldings omitted. Each slope uses the
+change in RTS allocated bytes between 50,000 and 200,000 calls. The
+mode selection runs outside the loop.
+
+```haskell
+unboxVector :: foreach (n :: Nat) -> Vec a n -> Vec a n
+unboxVector _ xs = case Just xs of
+    Just ys -> ys
+    Nothing -> xs
+
+data Pair a b = Pair a b
+
+keepSecond :: foreach (n :: Nat) -> Int -> Vec a n -> Vec a n
+keepSecond _ k xs = case Pair k xs of Pair _ ys -> ys
+```
+
+Compile the workers with the native `-O0` options and
+`-ddump-stg-final`. In the caller, read `2 :: Nat` from an `IORef`
+and build one vector at that length. At each iteration pass the
+previous vector to the worker, force its result to WHNF with `seq`,
+and decrement the iteration count. Pass the count as the unused
+`Int` field of `Pair`. Enable RTS statistics with `+RTS -T` and
+sample `allocated_bytes` after a GC on each side of the loop.
+
+| Operation | Before, bytes per call | After, bytes per call |
+| --- | ---: | ---: |
+| Return the input vector directly | 112 | 112 |
+| Construct and inspect `Just` | 128 | 112 |
+| Construct and inspect a two-field lazy constructor | 136 | 112 |
+
+The final STG for each of the last two workers loses one constructor
+allocation and one case. An unknown `Maybe` still has a case. The
+strict-field worker still forces its field. Core Lint checks the input
+and output of the simplifier. A field needed twice has one lazy
+binding. A reference to the scrutinee only in a type argument keeps the
+constructor binding and case in scope.
+
+Both native runs and self-hosted GHCi matched the 174-line Showcase.
+Both stages ran the 33-line separate-interface fixture with Core and STG
+Lint. All 64 selected normal tests, four GHCi tests and three optimized
+assembly tests passed. The latter include the existing strict-field and
+known-constructor regressions. A nested `Right` around a tuple lost its
+outer allocation and case but kept the inner tuple case. Native modules
+still require the restricted optimization settings.

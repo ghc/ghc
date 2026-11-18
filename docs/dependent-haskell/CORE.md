@@ -1184,7 +1184,7 @@ syntactic Boolean constructor. The substituted proof must be nominal primitive
 equality whose endpoints are that same promoted constructor. Replace that proof
 with checked reflexivity before substituting into the selected branch.
 
-Keep variable cases and other lazy source lets. Do not inspect unfoldings to decide an
+Keep cases on unknown variables and other lazy source lets. Do not inspect unfoldings to decide an
 opaque index. The current mode permits the existing compulsory templates for
 wired tuple sections and native newtype wrappers. These exceptions expose
 required wrappers; they do not authorize arbitrary unfolding. These rules
@@ -1193,6 +1193,22 @@ refinement from [the design references](REFERENCES.md#agda-provenance). They do
 not add arbitrary expression indices, general Pi matching, or general proof
 erasure. Run Core Lint before and after this entry. Retest the shared runtime
 index and bottom observations before claiming optimizer preservation.
+
+### Cases of known ordinary constructors
+
+Desugaring a source `case Just xs of ...` can bind `ds = Just xs`
+immediately before inspecting `ds`. When the worker has only lazy,
+lifted fields, the native simplifier can select the alternative from
+the constructor. The payload type may contain a runtime index.
+
+Keep the original case if the selected RHS, result type or field
+annotations need the eliminated binder. Bind each needed field lazily.
+Two occurrences of a field share the same producer. A matched constructor
+with a strict field can raise an exception even when the RHS ignores
+the field. It stays on the original path, as do unknown scrutinees and
+alternatives carrying native equality evidence.
+[M97 measurements](PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core)
+and [design sources](REFERENCES.md#reducing-a-known-constructor-case-in-native-core).
 
 ## Frontend identity plan
 
