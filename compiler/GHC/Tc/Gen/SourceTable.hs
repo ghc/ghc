@@ -12,6 +12,7 @@ import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
 import GHC.Builtin.WiredIn.Types (charTy, charTyCon, integerTy, integerTyConName, listTyCon, mkListTy, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
+import qualified GHC.Core as Core
 import GHC.Core.CharCase (certOwner, certRows, certify)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
@@ -64,7 +65,9 @@ import GHC.Unit.External (eps_rule_base)
 import GHC.Unit.Home (homeUnitId)
 import GHC.Unit.Home.Graph (lookupHugByModule)
 import GHC.Unit.Home.ModInfo (hm_details)
-import GHC.Unit.Module.Env (moduleSetElts)
+import GHC.Unit.Module (getModuleInstantiation, isHoleModule)
+import GHC.Unit.Module.Deps (imp_boot_mods)
+import GHC.Unit.Module.Env (lookupInstalledModuleEnv, moduleSetElts)
 import GHC.Unit.Module.ModDetails (md_rules)
 import GHC.Unit.Module.ModIface (mi_hash_fn)
 import GHC.Unit.Types (GenWithIsBoot(..), isInteractiveModule, moduleName, moduleUnitId)
@@ -691,7 +694,7 @@ sourceTableTyCons binds = do
                      (sequence branches)
       else pure Nothing
 
--- | Publish a direct Char worker only after its final bindings are zonked.
+-- | Publish a checked Char worker or imported forwarding alias only after its final bindings are zonked.
 -- See Note [Checked Char cases].
 sourceCharTables :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
 sourceCharTables binds = do
@@ -701,7 +704,7 @@ sourceCharTables binds = do
       eligible owner =
         idName owner `elemNameSet` exported &&
         not (idName owner `elemNameSet` ruled) &&
-        varType owner `eqType` mkVisFunTyManyU charTy charTy
+        varType owner `eqType` charArrow
       candidates = [ (bind, owner) | bind <- binds
                    , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
                    , eligible owner ]
@@ -712,25 +715,60 @@ sourceCharTables binds = do
       fmap catMaybes $ forM candidates $ \(bind, owner) ->
         if hasSourceMethodRule visible owner
           then pure Nothing
-          else certifyBinding bind owner
+          else certifyBinding env bind owner
   where
-    certifyBinding bind owner = do
+    charArrow = mkVisFunTyManyU charTy charTy
+
+    certifyBinding env bind owner = do
       (messages, bindings) <- initDsTc (dsTopLHsBinds [bind])
       case bindings of
         Just core | not (errorsFound messages)
-          , [rhs] <- [expr | (ident, expr) <- fromOL core, idName ident == idName owner]
-          , Right certificate <- certify owner rhs
-          , certOwner certificate == idName owner -> do
-              let loc = nameSrcSpan (idName owner)
-                  literal (input, result) _ =
-                    mkCoAxBranch [] [] [] [mkCharLitTy input] (mkCharLitTy result) [] loc
-              var <- flip mkTyVar charTy <$> newSysName (mkTyVarOcc "c")
-              let ty = mkTyVarTy var
-                  fallback _ = mkCoAxBranch [var] [] [] [ty] ty [Nominal] loc
-              table <- makeFamily (idName owner) (ClosedInput charTy []) [] charTyCon
-                                  (map literal (certRows certificate) ++ [fallback])
-              pure (Just (owner, table))
+          , [rhs] <- [expr | (ident, expr) <- fromOL core, idName ident == idName owner] ->
+            case rhs of
+              Core.Var target -> forwarding env owner target
+              _ | Right certificate <- certify owner rhs
+                , certOwner certificate == idName owner ->
+                    publish owner (certRows certificate) id
+                | otherwise -> pure Nothing
         _ -> pure Nothing
+
+    forwarding env owner target
+      | Just target_mod <- nameModule_maybe (idName target)
+      , target_mod /= tcg_semantic_mod env
+      , not (isHoleModule target_mod)
+      , (installed, Nothing) <- getModuleInstantiation target_mod
+      , Just IsBoot /= (gwib_isBoot <$> lookupInstalledModuleEnv
+                                      (imp_boot_mods (tcg_imports env)) installed)
+      , varType target `eqType` charArrow
+      , Just table <- sourceTableId_maybe target
+      , [arg] <- tyConTyVars table
+      , tyVarKind arg `eqType` charTy
+      , tyConResKind table `eqType` charTy
+      = do
+        dependencies <- sourceTableDependencies table
+        case dependencies of
+          Just callees -> do
+            let uses = [(v, Nothing) | v <- target : callees]
+            changed <- changedSourceUse uses
+            case changed of
+              Nothing -> do
+                result <- publish owner [] (\arg_ty -> mkTyConApp table [arg_ty])
+                publishSourceUses uses
+                pure result
+              Just _ -> pure Nothing
+          Nothing -> pure Nothing
+      | otherwise = pure Nothing
+
+    publish owner rows fallback = do
+      let loc = nameSrcSpan (idName owner)
+          literal (input, result) _ =
+            mkCoAxBranch [] [] [] [mkCharLitTy input] (mkCharLitTy result) [] loc
+      var <- flip mkTyVar charTy <$> newSysName (mkTyVarOcc "c")
+      let ty = mkTyVarTy var
+          default_branch _ = mkCoAxBranch [var] [] [] [ty] (fallback ty) [Nominal] loc
+      table <- makeFamily (idName owner) (ClosedInput charTy []) [] charTyCon
+                          (map literal rows ++ [default_branch])
+      pure (Just (owner, table))
 
 {- Note [Checked Char cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -744,6 +782,14 @@ accepted Core. Keep literal equations before the default so closed-family apartn
 governs reduction when the argument is still rigid. Reject visible rules
 for the owner before constructing the family. The usual SourceTableId
 publication and solver dependency checks apply to the resulting table.
+
+An exact imported variable can forward to an existing checked table.
+Require the target's own SourceTableId and the same Char domain and
+codomain. Check the target and all its checked callees for visible rules
+before publishing. The default equation references the target family, so
+the usual dependency walk checks the same chain where the solver uses it.
+The new table belongs to the alias. Re-exporting the target keeps its
+original name and requires no forwarding table.
 -}
 
 -- | The first constructor pattern, any carried variable, and the checked RHS.

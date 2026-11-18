@@ -56,6 +56,27 @@ cd ../client
 "${ghc[@]}" -i../interfaces -c NativeOpenCharFamily.hs
 [[ $(link_and_run) == '[89,201,33]' ]]
 
+# A forwarding binding has its own name. Its equation still depends on the
+# worker. A normal --make build must recheck the unchanged client.
+cd "$run"
+mkdir forwarding
+cd forwarding
+cp "$src/CharacterCase.hs" "$src/NativeOpenCharFamily.hs" .
+cat > Forward.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module Forward (convert) where
+import qualified CharacterCase
+convert :: Char -> Char
+convert = CharacterCase.upper
+HS
+sed -e 's/import qualified CharacterCase/import qualified Forward/' \
+    -e 's/CharacterCase.upper/Forward.convert/' "$src/CharacterExport.hs" >CharacterExport.hs
+"${ghc[@]}" -i. --make NativeOpenCharFamily.hs -o run
+[[ $(./run) == '[88,201,33]' ]]
+sed "s/upper 'x' = 'X'/upper 'x' = 'Y'/" "$src/CharacterCase.hs" >CharacterCase.hs
+"${ghc[@]}" -i. --make NativeOpenCharFamily.hs -o run
+[[ $(./run) == '[89,201,33]' ]]
+
 # Confirm a conflicting rule fires on the term before checking its type use.
 cd "$run"
 mkdir rules
