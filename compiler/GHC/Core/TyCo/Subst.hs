@@ -62,7 +62,7 @@ import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyCo
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr, retainedArgIndex, normaliseNativeIndexExpr,
-                                nativeSourceCallIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
+                                nativeComputedIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
 import {-# SOURCE #-} GHC.Core.Subst ( substExpr )
 import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, isNativeIndexFunctionId
                                  , nativeIndexFunctionTys_maybe, typeKind )
@@ -269,7 +269,7 @@ composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
       -- Keep the called Id when composing its arguments. See
       -- Note [Source calls in retained arguments] in GHC.Core.
       | Just (normal, _) <- normaliseNativeIndexExpr rhs = substExpr extended_subst1 normal
-      | Just _ <- nativeSourceCallIndex rhs = substExpr extended_subst1 rhs
+      | Just _ <- nativeComputedIndex rhs = substExpr extended_subst1 rhs
       | otherwise = rhs
 
 emptySubst :: Subst

@@ -1138,7 +1138,7 @@ nameNativeConstructorArgs expr
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
       | DepFunTy _ index _ <- coreFullView ty
-      , Just call_index <- nativeSourceCallIndex arg
+      , Just call_index <- nativeComputedIndex arg
       -- See Note [Naming computed retained arguments at erasure].
       = if typeKind call_index `eqType` varType index
         then build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest
@@ -1586,19 +1586,19 @@ cpeApp top_env expr
       AIApp arg@App{}
         | cp_allowNativeDependent (cpe_config env)
         , DepFunTy {} <- coreFullView (exprType fun')
-        , Just index <- nativeSourceCallIndex arg
+        , Just index <- nativeComputedIndex arg
         -- See Note [Naming computed retained arguments at erasure].
-        -> let call = prepare_call arg in
-           case nativeSourceCallIndex call of
+        -> let call = prepare_computation arg in
+           case nativeComputedIndex call of
              Just index' | index' `eqType` cpSubstTy env index
                -> rebuild_app' env as (App fun' call) floats (drop 1 ss) rt_ticks (req_depth-1)
              _ -> throwGhcException (Sorry
                "CorePrep could not preserve the index of a computed retained argument.")
         where
-          prepare_call (App f a) = App (prepare_call f) (prepare_call a)
-          prepare_call (Type ty) = Type (cpSubstTy env ty)
-          prepare_call (Var v) = lookupCorePrepEnv env v
-          prepare_call e = pprPanic "CorePrep: malformed certified call" (ppr e)
+          prepare_computation (App f a) = App (prepare_computation f) (prepare_computation a)
+          prepare_computation (Type ty) = Type (cpSubstTy env ty)
+          prepare_computation (Var v) = lookupCorePrepEnv env v
+          prepare_computation e = pprPanic "CorePrep: malformed retained computation" (ppr e)
 
       AIApp arg -> do
         -- See Note [Retained constructor arguments in CorePrep].
@@ -1639,14 +1639,16 @@ the certified family application for `plus n m`. A fresh Core variable for
 the call has a different index. A case that names the call forces it even
 when f ignores it.
 
-Preserve the certified call as a retained argument through the final Core
-Lint check. Substitute CorePrep's variables and types in its constructor
-trees. Check that the call still has the substituted index. At erasure,
+Preserve the computed tree as a retained argument through the final Core
+Lint check. Substitute CorePrep's variables and types in its constructors
+and calls. Check that the tree still has the substituted index. At erasure,
 GHC.CoreToStg.coreToStgArgs allocates one lazy thunk for the call and
-passes its name to f. Inside that thunk, name the constructed operands
-from the leaves outward. For example, plus n (S (S k)) becomes
-let x = S k; y = S x in plus n y. Each cell retains its original fields.
-No binding floats out of the call.
+passes its name to f. Inside that thunk, name each non-atomic operand
+with another lazy binding. Keep that operand's own bindings inside its
+thunk. This includes nested certified calls and constructors over calls.
+Each binding retains the actual source head and fields. No binding floats
+out of its enclosing computation. A nested call runs only when its caller
+demands that operand.
 -}
 
 {- Note [Retained constructor arguments in CorePrep]

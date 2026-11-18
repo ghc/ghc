@@ -63,7 +63,7 @@ import GHC.Iface.Tidy.StaticPtrTable
 import GHC.Iface.Env
 
 import GHC.Utils.Outputable
-import GHC.Utils.Misc( filterOut )
+import GHC.Utils.Misc( filterOut, lengthIs )
 import GHC.Utils.Panic
 import GHC.Utils.Logger as Logger
 import qualified GHC.Utils.Error as Err
@@ -1217,11 +1217,9 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
     -- final top-level binder by Unique. See Note [Local indices across Core Tidy].
     protect_calls (App fun arg)
       | App{} <- arg
-      , (Var f, args) <- collectArgs arg
-      , Just owner <- lookupVarSet top_tables f
-      , Just{} <- nativeSourceCallIndex arg
+      , Just{} <- nativeComputedIndex arg
       , DepFunTy{} <- coreFullView (exprType fun)
-      = App (protect_calls fun) (mkApps (Var (globaliseId owner)) args)
+      = App (protect_calls fun) (protect_operand arg)
       | otherwise = App (protect_calls fun) (protect_calls arg)
     protect_calls (Lam b body) = Lam b (protect_calls body)
     protect_calls (Let bind body) = Let (protect_bind bind) (protect_calls body)
@@ -1230,6 +1228,15 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
     protect_calls (Cast e co) = Cast (protect_calls e) co
     protect_calls (Tick t e) = Tick t (protect_calls e)
     protect_calls e = e
+
+    protect_operand expr
+      | (Var fun, args@(_ : _)) <- collectArgs expr
+      , Just owner <- lookupVarSet top_tables fun
+      , Just family <- sourceTableId_maybe fun
+      , args `lengthIs` tyConArity family
+      = mkApps (Var (globaliseId owner)) (map protect_operand args)
+    protect_operand (App fun arg) = App (protect_operand fun) (protect_operand arg)
+    protect_operand expr = expr
 
     protect_bind (NonRec b r) = NonRec b (protect_calls r)
     protect_bind (Rec pairs) = Rec [(b, protect_calls r) | (b, r) <- pairs]
@@ -1255,10 +1262,12 @@ original top-level Ids. Tidy then globalises those references and keeps each
 alias local. Local binder and type tidying already share the same environment.
 
 In a retained argument such as `atBit (flipBit b)`, the certified top-level
-function determines the result index. Exclude that occurrence from alias
-substitution by globalising its exact top-level binder first. Its operands
-still receive the substitution. The same RHS can pass flipBit as a first-class
-function or use it in a strict case with TermAppTy evidence. Those occurrences
+function determines the result index. Exclude each such occurrence from
+alias substitution by globalising its exact top-level binder first. Traverse
+all nested calls and constructor fields, including beneath an imported head.
+Its value operands still receive the substitution. The same RHS can pass
+flipBit as a first-class function or use it in a strict case with TermAppTy
+evidence. Those occurrences
 and their types still receive the local alias. See Note [Source calls in
 retained arguments] in GHC.Core.
 

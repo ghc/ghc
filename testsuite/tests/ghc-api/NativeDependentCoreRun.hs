@@ -6125,14 +6125,19 @@ runSourceCallIndexChecks = do
         , "flipNative False = True"
         , "flipNative True = False"
         , "type CheckedFlip = flipNative 'False"
+        , "stayNative :: Bool -> Bool"
+        , "stayNative False = False"
+        , "stayNative True = True"
         ]
     checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
     desugared <- GHC.desugarModule checked
     flags <- GHC.getSessionDynFlags
     let pairs = flattenBinds (mg_binds (GHC.coreModule desugared))
-    (certified, rhs) <- case find ((== "flipNative") . occNameString . nameOccName . varName . fst) pairs of
-        Just pair -> pure pair
-        Nothing -> fail "FAIL: source-call index fixture has no checked function"
+        binding name = case find ((== name) . occNameString . nameOccName . varName . fst) pairs of
+            Just pair -> pure pair
+            Nothing -> fail ("FAIL: missing source-call fixture binding " ++ name)
+    (certified, rhs) <- binding "flipNative"
+    (outer, outerRhs) <- binding "stayNative"
     family <- case sourceTableId_maybe certified of
         Just table -> pure table
         Nothing -> fail "FAIL: checked source function lost its equation certificate"
@@ -6192,6 +6197,45 @@ runSourceCallIndexChecks = do
                 && isNothing (retainedArgIndex (call wrongDomain listOperand))) $
             fail "FAIL: source call accepted a different family domain"
         lintNative flags "certified source-call baseline" baseline
+        let outerBound = GHC.Types.Id.setIdNotExported (localiseId outer)
+            nestedCall = App (Var outerBound) sourceCall
+            nested innerBinder =
+                Let (NonRec outerBound outerRhs) $
+                Let (NonRec innerBinder rhs) $
+                Lam operand (App keep nestedCall)
+        outerFamily <- maybe (fail "FAIL: missing outer source certificate") pure (sourceTableId_maybe outer)
+        unless (maybe False (\actual -> actual `eqType` mkTyConApp outerFamily [expected])
+                (nativeComputedIndex nestedCall)) $
+            fail "FAIL: nested source call lost the inner family index"
+        let wrapped = mkCoreConApps justDataCon [Type boolTy, nestedCall]
+            wrappedIndex = mkTyConApp (promoteDataCon justDataCon)
+                [boolTy, mkTyConApp outerFamily [expected]]
+        unless (isNothing (nativeSourceCallIndex wrapped) &&
+                maybe False (`eqType` wrappedIndex) (retainedArgIndex wrapped)) $
+            fail "FAIL: constructor around nested source calls selected a different index"
+        let nestedSubst = CoreSubst.extendIdSubst
+                (CoreSubst.mkEmptySubst (mkInScopeSet (exprFreeVars nestedCall))) retained nestedCall
+            nestedComposed = composeTCvSubst second nestedSubst
+            indexAtTrue = mkTyConApp outerFamily [expectedTrue]
+        unless (CoreSubst.substTy nestedComposed index `eqType` indexAtTrue &&
+                maybe False (`eqType` indexAtTrue)
+                    (nativeComputedIndex (CoreSubst.substExpr nestedComposed (Var retained)))) $
+            fail "FAIL: substitution lost a nested source call or its operand"
+        lintNative flags "nested source-call baseline" (nested bound)
+        reject "uncertified inner source binding" "different equations at its binding" (nested plain)
+        let fieldType = varType bound
+            boxType = mkTyConApp maybeTyCon [fieldType]
+            box = local 17905 "source_function_box" boxType
+            boxIndex = TermVarTy box
+            evidence = local 17906 "box_dictionary" (mkTyConApp eqTyCon [boxType, boxIndex, boxIndex])
+            ignoreBox = Lam box (Lam evidence (mkIntExpr (targetPlatform flags) 42))
+            field = mkCoreConApps justDataCon [Type fieldType, Var bound]
+            fieldIndex = mkTyConApp (promoteDataCon justDataCon) [fieldType, TermVarTy plain]
+            reflexive = mkCoreConApps eqDataCon
+                [Type boxType, Type fieldIndex, Type fieldIndex, Coercion (mkNomReflCo fieldIndex)]
+        -- Passing the function as a field uses its identity but never calls its equations.
+        lintNative flags "uncalled source function in a constructor field"
+            (Let (NonRec plain rhs) (mkApps ignoreBox [field, reflexive]))
         reject "uncertified source binding" "different equations at its binding"
             (expression plain rhs bound operand)
         reject "copied source certificate" "Unsupported retained runtime argument"

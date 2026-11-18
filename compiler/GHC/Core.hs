@@ -35,7 +35,7 @@ module GHC.Core (
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
-        nativeSourceCallIndex, retainedArgIndex,
+        nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex,
         exprToNativeCaseIndex, nativeIndexFunctionVar_maybe,
         nativeIndexArgKinds,
         isNativeIndexAlt, isNativeIndexAliasAlt,
@@ -142,6 +142,7 @@ import Data.Data hiding (TyCon)
 import Data.Int
 import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe (isJust)
 import Data.Word
 
 import Control.DeepSeq
@@ -2609,21 +2610,43 @@ mkCoBind cv co      = NonRec cv (Coercion co)
 exprToNativeIndex :: CoreExpr -> Maybe Type
 exprToNativeIndex expr = snd <$> normaliseNativeIndexExpr expr
 
--- | Compute the index of a monomorphic source call on constructor trees.
+-- | Compute the index of a saturated certified call at the expression root.
 -- See Note [Source calls in retained arguments].
 nativeSourceCallIndex :: CoreExpr -> Maybe Type
 nativeSourceCallIndex expr
-  | (Var fun, args@(_:_)) <- collectArgs expr
-  , Just family <- sourceTableId_maybe fun
-  , let (_, domains, result) = splitFunTys (varType fun)
-        binders = tyConTyVars family
-  , args `equalLength` domains, args `equalLength` binders
-  , result `sameNativeIndexDomain` tyConResKind family
-  , Just indices <- traverse (fmap snd . nativeIndexExpr False) args
-  , and (zipWith3 has_domain domains binders indices)
-  = Just (mkTyConApp family indices)
+  | (Var fun, _ : _) <- collectArgs expr
+  , Just _ <- sourceTableId_maybe fun
+  = snd <$> computedIndexExpr expr
+  | otherwise = Nothing
+
+-- | Compute the index of a constructor tree containing certified source calls.
+-- See Note [Source calls in retained arguments].
+nativeComputedIndex :: CoreExpr -> Maybe Type
+nativeComputedIndex expr
+  | has_call expr = snd <$> computedIndexExpr expr
   | otherwise = Nothing
   where
+    has_call expr = case collectArgs expr of
+      (Var fun, args@(_ : _)) -> isJust (sourceTableId_maybe fun) || any has_call args
+      _ -> False
+
+-- | Reuse structural constructor checks without enabling beta or cast conversion.
+computedIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
+computedIndexExpr = nativeIndexExprWith False source_call
+  where
+    source_call expr
+      | (Var fun, args@(_:_)) <- collectArgs expr
+      , Just family <- sourceTableId_maybe fun
+      , let (_, domains, result) = splitFunTys (varType fun)
+            binders = tyConTyVars family
+      , args `equalLength` domains, args `equalLength` binders
+      , result `sameNativeIndexDomain` tyConResKind family
+      = do { indices <- traverse (fmap snd . computedIndexExpr) args
+           ; if and (zipWith3 has_domain domains binders indices)
+             then Just (expr, mkTyConApp family indices)
+             else Nothing }
+      | otherwise = Nothing
+
     has_domain (Scaled mult domain) binder index =
       isManyTy mult && sameNativeIndexDomain domain (tyVarKind binder)
                     && sameNativeIndexDomain domain (typeKind index)
@@ -2632,7 +2655,7 @@ nativeSourceCallIndex expr
 retainedArgIndex :: CoreExpr -> Maybe Type
 retainedArgIndex expr = case exprToNativeIndex expr of
   Just index -> Just index
-  Nothing -> nativeSourceCallIndex expr
+  Nothing -> nativeComputedIndex expr
 
 {- Note [Source calls in retained arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2642,10 +2665,13 @@ against the actual call before substituting it into the result. Two
 functions of the same type can select different families. The compiler
 does not need to reduce either equation or read the function's unfolding.
 
-An operand is a local variable or a saturated ordinary constructor whose
-fields are themselves operands. Use the structural checks of nativeIndexExpr
-with beta and cast conversions disabled. This lets CorePrep substitute the
-variables in the checked tree without evaluating or duplicating a field.
+An operand is a local variable, a saturated certified source call, or a
+saturated ordinary constructor whose fields are themselves operands. Check
+every call's actual Id, arity and domains. Keep beta and cast conversions
+disabled in this recursive grammar. The root can be a constructor over a
+call. Require at least one call so the structural normalizer keeps its own
+policy and precedence. CorePrep substitutes variables in the checked tree
+without evaluating or duplicating a field.
 The original Core application supplies the runtime head. A family
 application on its own is insufficient to reconstruct that Id. Keep
 the expression when composing substitutions. Keep the structural
@@ -2684,7 +2710,13 @@ normaliseNativeIndexExpr = nativeIndexExpr True
 
 -- | Check variables and constructor trees, optionally exposing casts and beta redexes.
 nativeIndexExpr :: Bool -> CoreExpr -> Maybe (CoreExpr, Type)
-nativeIndexExpr allow_conversions = go emptyVarEnv
+nativeIndexExpr allow_conversions = nativeIndexExprWith allow_conversions (const Nothing)
+
+-- | Extend the structural grammar at unsupported leaves and application heads.
+-- A computed call uses this extension only with conversions disabled.
+nativeIndexExprWith :: Bool -> (CoreExpr -> Maybe (CoreExpr, Type))
+                    -> CoreExpr -> Maybe (CoreExpr, Type)
+nativeIndexExprWith allow_conversions extra = go emptyVarEnv
   where
     go :: IdEnv (CoreExpr, Type) -> CoreExpr -> Maybe (CoreExpr, Type)
     go env expr
@@ -2726,7 +2758,7 @@ nativeIndexExpr allow_conversions = go emptyVarEnv
              then Just (mkApps (Var worker) (type_args ++ fields'),
                         mkTyConApp (promoteDataCon con) (tys ++ indices))
              else Nothing }
-      | otherwise = Nothing
+      | otherwise = extra expr
 
     type_arg (Type ty) = Just ty
     type_arg _ = Nothing

@@ -652,10 +652,10 @@ coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion token
 -- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
 coreToStgArgs (call@(App _ last_arg) : args)
   | not (isTyCoArg last_arg)
-  , Just {} <- nativeSourceCallIndex call
+  , Just {} <- nativeComputedIndex call
   = do { uniq <- getCtsUnique
        ; let thunk = mkSysLocal (fsLit "retained_arg") uniq ManyTy (exprType call)
-       ; call' <- nameSourceCallOperands call
+       ; call' <- nameComputedOperands call
        ; rhs <- coreToStgRhs (thunk, call')
        ; (args', ts, binds) <- coreToStgArgs args
        ; return (StgVarArg thunk : args', ts, StgNonRec thunk rhs : binds) }
@@ -689,10 +689,10 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 
     return (arg' : stg_args, ticks' ++ ticks, binds)
 
--- | Name each constructed operand inside the ordinary source call's thunk.
+-- | Name each non-atomic operand inside its enclosing computation thunk.
 -- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
-nameSourceCallOperands :: CoreExpr -> CtsM CoreExpr
-nameSourceCallOperands call = do
+nameComputedOperands :: CoreExpr -> CtsM CoreExpr
+nameComputedOperands call = do
     let (fun, args) = collectArgs call
     (rev_binds, atoms) <- mapAccumLM name_operand [] args
     return (mkLets (reverse rev_binds) (mkApps fun atoms))
@@ -700,11 +700,10 @@ nameSourceCallOperands call = do
     name_operand binds arg
       | exprIsTrivial arg = return (binds, arg)
       | otherwise = do
-          let (con, fields) = collectArgs arg
-          (binds', atoms) <- mapAccumLM name_operand binds fields
+          rhs <- nameComputedOperands arg
           uniq <- getCtsUnique
-          let cell = mkSysLocal (fsLit "retained_con") uniq ManyTy (exprType arg)
-          return (NonRec cell (mkApps con atoms) : binds', Var cell)
+          let cell = mkSysLocal (fsLit "retained_operand") uniq ManyTy (exprType arg)
+          return (NonRec cell rhs : binds, Var cell)
 
 coreToStgTick :: Type -- type of the ticked expression
               -> CoreTickish
