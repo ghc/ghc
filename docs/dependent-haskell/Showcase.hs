@@ -802,10 +802,15 @@ main = do
     arithmeticNotation
     listBoundaries
     observe "ordinary length evaluated while checking the type" (TypeNats.natVal closedLength)
+    observe "ordinary identity applied to a type variable" (openIdentity @Int)
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])
 closedLength = Proxy
+
+-- | The ordinary polymorphic identity returns the caller's type variable.
+openIdentity :: forall a. Num a => id a
+openIdentity = 42
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()

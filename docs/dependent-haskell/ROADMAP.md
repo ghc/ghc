@@ -49,7 +49,7 @@ and [allocation measurements](PLAN.md#m97-simplify-a-case-of-an-ordinary-constru
 | Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with a written or inferred runtime operand, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
 | Function promotion (`R13`, under `R06`) | A list-length function works at any lifted element type. Multiplication calls checked addition on a recursive result. Both functions supply closed-family equations to interface clients. | General function promotion, polymorphic helper calls, and lambda/let/case expressions in types. |
-| Evaluation (`R15`, `R16`) | An ordinary imported length function computes the index of a vector during typechecking. Changing the producer object invalidates its client. | General closed expression and result domains, and reduction of ordinary `id a` with an unknown `a`. |
+| Evaluation (`R15`, `R16`) | An imported length computes a vector index. An imported polymorphic identity returns a caller's rigid type variable. The client tracks the object or interface definitions used by the respective evaluator. | More closed data domains, open calls that return other expressions, and checked evidence for residual applications. |
 | Numeric literals (`R07`) | The vector library registers an interpretation for nonnegative literals. Clients can write `Vec Bool 3`, `replicateNative 3 x` and `replicateNative (n + 1) x`. The retained calls check the actual `Num Nat` dictionary. | More general literal conversions and literal constraints such as finite bounds. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
 
@@ -156,8 +156,8 @@ argument is still unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| R15, closed evaluator | Execute the imported length function on a closed list. Accept the matching vector and reject a short vector at the binding. Recheck the consumer when only the producer implementation changes. | Serokell names bytecode or native execution. Our checked source equations use ordinary closed type families. |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Reduce `id a` with a rigid `a`. A case inspecting an unknown argument must remain suspended. | R13 includes R15 and R16. R17–R19 also depend on R05 and R16. |
+| R15, closed evaluator | Extend the checked argument and result representations to the `Data.Char.toUpper` and `Data.Char.isDigit` examples in proposal #509. | M99 executes closed Natural-list calls and checks the producer object in incremental builds. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Specify how a well-typed open call can leave a residual application or case, and what allows checking to resume. | M100 reifies a successful reduction to the original rigid argument. R17–R19 also depend on R05 and R16. |
 | R21, dependency analysis | Allow the producer to be defined in the consumer module, respecting declaration order and cycles. | A separately compiled producer lets R15 proceed while R21 remains open. |
 
 [R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
@@ -216,7 +216,7 @@ evaluator work has priority.
 | 38 | R05: simplify a case of a known constructor | [M97](PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core) | Remove a measured allocation and dispatch while keeping dependencies in types, lazy field sharing and strict-field demand. |
 | 39 | R13: the length of ordinary zip | [M98, deferred](PLAN.md#m98-the-length-of-zip-over-two-ordinary-lists) | Check equations that inspect two list spines and recurse on both tails. Preserve the empty-first equation with an unknown second input. |
 | 40 | R15: evaluate an imported closed call | [M99, verified for literal Natural lists](PLAN.md#m99-evaluate-an-imported-closed-call) | The source call computes the vector length. The unchanged client observes an ABI-preserving implementation change. |
-| 41 | R16: evaluate with a rigid argument | [M100, in progress](PLAN.md#m100-reduce-an-ordinary-identity-at-a-rigid-type-variable) | Reduce the imported identity on a symbolic operand. Reify the same source skolem, then accept the upstream signature. |
+| 41 | R16: evaluate with a rigid argument | [M100, verified for polymorphic identities](PLAN.md#m100-reduce-an-ordinary-identity-at-a-rigid-type-variable) | Both compilers accept the upstream signature. Changing a worker behind an imported alias invalidates the unchanged consumer. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

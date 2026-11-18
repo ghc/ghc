@@ -7792,11 +7792,24 @@ with `x = 42`. The caller supplies the type `a`. Compilation cannot run
       that must remain rigid from an unsolved variable that can later
       acquire a solution. The probe models the latter by resubmitting
       the same case after supplying the missing definition.
-- [ ] Connect the checked reduction to the source signature. Preserve
+- [x] Connect the checked reduction to the source signature. Preserve
       an existing type binder named `id` and normal implicit
       quantification. Report an unavailable imported definition at its
       use. Check that each definition read from a home interface can
       invalidate the client when it changes.
+
+The source fixture checks `id a`, `Prelude.id a` and `OpenProducer.select a`
+with a qualified import used only in the type. All three produce `42` at
+`Int`. A separate consumer can compile with just the producers' interfaces.
+Submitting the unchanged modules for compilation again reuses their objects.
+Replacing the worker's definition with `undefined` invalidates the consumer's
+recorded use, including when the call names an unchanged alias in another module.
+
+Both compiler stages passed the separate-client test and ran all 176
+Showcase observations with Core Lint and STG Lint. GHCi also ran the
+Showcase. All twelve selected normal-way regressions passed on the
+self-hosted compiler. They cover the open evaluator API, the two
+source evaluators and the diagnostic for exhausting the reduction limit.
 
 The [R16 feature page](roadmap/R16-open-term-evaluator.md) records the
 representation and proof obligations for residual applications. The R15

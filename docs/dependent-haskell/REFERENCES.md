@@ -4967,3 +4967,17 @@ marks a module that uses this path unsafe for Safe Haskell inference. A
 function's Haskell type gives no termination proof. [Safe Agda](https://agda.readthedocs.io/en/v2.8.0/language/safe-agda.html),
 [Safe Haskell](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/safe_haskell.html)
 and [GHC's annotation checker](../../compiler/GHC/Tc/Gen/Annotation.hs).
+
+For M100, the consumer has a fixed type variable and the producer has
+a checked Core unfolding in its interface. This makes Core a usable input
+for the first open source example. Agda's reducer distinguishes a variable
+head from an expression waiting for more information. Its clause matcher
+can suspend when it cannot inspect the next argument. The GHC evaluator
+keeps a case on an unknown scrutinee suspended, including a case with one
+default branch. GHC uses its own substitution for type arguments and
+records the fingerprints of every imported definition used for reduction.
+These checks preserve lexical identity and separate compilation.
+[Agda's reducer](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/TypeChecking/Reduce.hs#L616),
+[Agda clause matching](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/TypeChecking/CompiledClause/Match.hs#L84),
+[GHC's open-term evaluator](../../compiler/GHC/Core/OpenWhnf.hs) and
+[interface usage recording](../../compiler/GHC/Iface/Make.hs).

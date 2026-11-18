@@ -16,6 +16,11 @@ The declaration `v :: Vec (Length.length '[1, 2, 3]) Bool` accepts three
 cells. If the producer changes to return four, GHC checks the unchanged
 client again and rejects it. [Source example and compiler checks](roadmap/R15-closed-term-evaluator.md).
 
+The signature `x :: forall a. Num a => id a` also works. The compiler
+reads the ordinary imported definition of `id` and reduces `id a` to
+the caller's type variable. At `Int`, a definition `x = 42` therefore
+produces `42`. [Open source example](roadmap/R16-open-term-evaluator.md).
+
 An ordinary recursive length function now gives the return type of a
 vector constructor. For a list of `Int` read from an `IORef`, the caller can
 write `vector :: Vec Int (sourceLength xs)` and construct it with
