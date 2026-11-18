@@ -6992,24 +6992,61 @@ equation and in a vector length. A retained operand still rejects
 `1 + rows * cols` at the inner method and rejects the equivalent
 `plus 1 (times rows cols)` when checking Core's operand grammar.
 
-- [ ] Check each nested application at its enclosing operand's expected
+- [x] Check each nested application at its enclosing operand's expected
       domain. Use the actual certified function or the selected method
       dictionary at every head. Preserve fixity, visible type application,
       lexical scope, use-site diagnostics, and the source expression.
-- [ ] Reify nested saturated calls and constructors in their original
+- [x] Reify nested saturated calls and constructors in their original
       positions. Check the identity, arity, argument kinds, and result kind
       of each function. Keep the structural rules for beta reduction,
       casts, opaque calls, and strict cases.
-- [ ] Preserve the expression through substitution, Core Lint, tidying,
+- [x] Preserve the expression through substitution, Core Lint, tidying,
       and CorePrep. Check every nested owner against its defining binder.
       After erasure, give a non-atomic operand a lazy binding at the
       point where the runtime function takes that operand.
-- [ ] Demonstrate a length of `1 + rows * cols` with both dimensions
+- [x] Demonstrate a length of `1 + rows * cols` with both dimensions
       read from IO. Exercise nested calls in both operand positions,
       inside a constructor, in an interface-only client and in GHCi.
       Check partial and ignored operands, bad dictionaries, rewrites,
-      and an uncertified inner function. Keep the original source spans.
+      and an uncertified inner function. Check that `safeHead` can use
+      the leading successor without evaluating the product. Keep the
+      original source spans.
 
 Agda checks each argument against the next function domain. The Haskell
 implementation must also preserve evaluation and sharing when it translates
 Core to STG. [Computed arguments and lazy naming](REFERENCES.md#computed-arguments-and-lazy-naming).
+
+### Implementation and validation
+
+The source checker resolves each operand using the domain of its parent
+and the lexical environment at that occurrence. A nested method uses
+its selected dictionary. Core recovers the family application for each
+saturated source call, including calls inside constructor fields. It
+retains the original function Ids when composing substitutions. Core Lint
+checks the certificate on each called local function against its binder.
+Passing a function as a field uses its value identity. At erasure a call
+gets one lazy argument binding. Its nontrivial operands get bindings
+inside that computation.
+
+The native and interpreted checks distinguished lengths seven, nine and eight for
+`1 + r * c`, `(1 + r) * c` and `r * (1 + c)` at two and three.
+The ignored product left its operands unevaluated. For the partial product,
+the first cell was available and demanding its tail raised the original
+exception. Stable names agreed for two references to the outer computed
+length, and for two references to an inner product returned by a checked
+helper. The observations apply to those programs.
+
+Both compiler stages built. The bootstrap build ran 22 focused checks.
+The self-hosted build ran the same checks and a bytecode check. Seven
+negative controls identified the offending operator, literal, operand, or
+rewrite rule. Both compilers accepted a client of the unchanged M88
+producer interface. Both native runs and the self-hosted GHCi run
+reproduced all 163 Showcase output lines at `-O0`. All 43 selected normal
+tests and four GHCi tests passed.
+
+A named intermediate result still has a distinct index. Both compilers
+accept `let cells = rows * cols in toList (replicateNative (1 + cells) True)`.
+If the caller returns the vector at `Vec Bool (1 + rows * cols)`, GHC
+reports GHC-83865 because it cannot equate `cells` with `times rows cols`.
+The next R03/R05 task is to carry this equality through an ordinary term
+`let` while preserving its shared runtime binding.

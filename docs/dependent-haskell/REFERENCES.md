@@ -4710,3 +4710,23 @@ The vector library uses GHC's existing type-operator syntax.
 `NoStarIsType` makes `*` available as an operator in a type, and the
 library gives it the same fixity as term multiplication.
 [GHC 9.14.1, the kind Type and StarIsType](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/poly_kinds.html#the-kind-type).
+
+### Nested calls in retained operands
+
+Agda's rule for a dependent application substitutes its argument into
+the codomain. Apply the same rule recursively to the inner and outer
+calls. In the fork each checked source head supplies the closed family
+that denotes its result. For an overloaded operator, check the dictionary
+at that occurrence before using the target function's equations.
+[Agda 2.8.0, function application](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
+and [GHC dictionary selection in retained arguments](../../compiler/GHC/Tc/Gen/App.hs).
+
+Agda substitutes local definitions during type checking and documents
+that its let expressions do not introduce sharing. Haskell has a separate
+runtime obligation. The checked Core operand keeps its original calls.
+STG introduces a lazy binding for each nontrivial operand inside the
+computation that uses it. For example, the first cell at length
+`1 + rows * cols` can be returned before the product is demanded.
+[Agda 2.8.0, let expressions](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions),
+[the ANF paper ledger](papers/README.md#anf-and-dependent-types-jfp-2022),
+and [the Core to STG translation](../../compiler/GHC/CoreToStg.hs).

@@ -100,6 +100,9 @@ M58 and M59 expose those rules through source checking.
       runtime index. See [M85](../PLAN.md#m85-infer-the-parameters-of-a-retained-constructor-argument).
 - [x] Bind an anonymous retained argument in an equation or checked lambda.
       Keep distinct runtime arguments independent. See [M86](../PLAN.md#m86-wildcard-patterns-for-retained-arguments-and-fields).
+- [x] Check nested named and overloaded calls at their operand domains.
+      [M89](../PLAN.md#m89-nested-computations-in-retained-operands) uses
+      `1 + rows * cols` directly as a vector length.
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.

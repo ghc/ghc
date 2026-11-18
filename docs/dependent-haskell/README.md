@@ -87,9 +87,23 @@ The library defines `times (S n) m = plus m (times n m)` and
 from those equations, even when both dimensions come from IO. An
 ordinary expression can use the same multiplication, as in
 `replicateNative (rows * cols) 'x'`.
-An index type can combine the operators, as in `Vec a (1 + rows * cols)`.
-Passing that entire expression as the retained operand of
-`replicateNative` still reports GHC-83605. [M88 validation](PLAN.md#m88-compose-checked-source-equations).
+An index type and a retained operand can combine the operators. For example,
+this vector has a cell for the prefix and one for each cell of the rectangle:
+
+```haskell
+prefixed :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Bool (1 + rows * cols)
+prefixed rows cols = replicateNative (1 + rows * cols) True
+```
+
+At two rows and three columns the length is seven. Writing
+`(1 + rows) * cols` gives nine. The first cell of `prefixed` is available
+even if evaluating the product would raise an exception.
+[Nested arithmetic](PLAN.md#m89-nested-computations-in-retained-operands).
+
+Writing `let cells = rows * cols` lets you use `1 + cells` locally. If the
+function returns a vector whose signature says `1 + rows * cols`, write
+that expression directly. The checker cannot yet equate the local name
+with its definition in the result type.
 
 ### What happens on empty input?
 

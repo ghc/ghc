@@ -168,6 +168,7 @@ can advance a card while the card remains open.
 | 27 | R03 and R04: wildcard argument and field patterns | [M86](PLAN.md#m86-wildcard-patterns-for-retained-arguments-and-fields) | Ignore a runtime field while preserving its identity in later types. |
 | 28 | R05: interactive bytecode | [M87](PLAN.md#m87-persistent-dependent-definitions-in-ghci) | Store a retained function and call it from a subsequent GHCi command. |
 | 29 | R13 and R15: composition of source equations | [M88](PLAN.md#m88-compose-checked-source-equations) | Check multiplication in terms of addition and use the product as the length of a flattened rectangle. |
+| 30 | R03 and R05: nested retained operands | [M89](PLAN.md#m89-nested-computations-in-retained-operands) | Pass `1 + rows * cols` directly to a vector constructor and preserve demand on the product. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

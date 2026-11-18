@@ -850,8 +850,9 @@ recursiveLengths = do
     first VNil = Nothing
     first v@(VCons _ _) = Just (safeHead v)
 
-    safeHead :: Vec a (1 + n) -> a
-    safeHead (VCons x _) = x
+-- | Read the first cell of a vector whose length reduces to a successor.
+safeHead :: Vec a (1 + n) -> a
+safeHead (VCons x _) = x
 
 -- | Use ordinary addition on two unknown lengths in a vector result type.
 sourceAddition :: IO ()
@@ -919,3 +920,8 @@ arithmeticNotation = do
     let noCells :: Vec Char 0
         noCells = replicateNative (0 * unknownCols) 'x'
     observe "zero rows leave the column count unevaluated" (toList noCells)
+    let withPrefix :: Vec Char (1 + rows * cols)
+        withPrefix = replicateNative (1 + rows * cols) 'x'
+    observe "one cell plus a runtime rectangle" (toList withPrefix)
+    observe "safeHead before an unknown product"
+        (safeHead (replicateNative (1 + rows * unknownCols) 'x'))

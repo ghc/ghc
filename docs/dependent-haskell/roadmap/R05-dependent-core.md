@@ -60,6 +60,9 @@ linear actuals. The owner is R03. This increment adds no Core equality rule.
       keep caller and the preserved scalar-domain caller.
 - [x] Compile retained module and prompt declarations to interpreted bytecode.
       Keep typed statement results across GHCi commands. See [M87](../PLAN.md#m87-persistent-dependent-definitions-in-ghci).
+- [x] Preserve nested certified calls and constructor fields through Core
+      Lint and erasure. Give each nontrivial operand a lazy STG binding.
+      See [M89](../PLAN.md#m89-nested-computations-in-retained-operands).
 - [ ] Specify an opaque Pi instantiation rule if a typed transformation needs
       one. M61's measured whole-cast lowering needs no new primitive. Add a proof
       operation only when a measured or calculus obligation requires it.

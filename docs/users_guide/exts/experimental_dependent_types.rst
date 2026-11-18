@@ -91,6 +91,16 @@ Enable ``NoStarIsType`` to write the type operator::
     flattenRows VNil = VNil
     flattenRows (VCons row rest) = appendVec row (flattenRows rest)
 
+A retained operand can contain several checked calls. Each call uses its
+own function or method dictionary. For example::
+
+    prefixed :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Bool (1 + rows * cols)
+    prefixed rows cols = replicateNative (1 + rows * cols) True
+
+The two operators have their ordinary fixities. A caller can also write
+``plus 1 (times rows cols)``. The first cell can be produced before
+evaluating the product.
+
 The vector library's ``Num Nat`` instance also supplies checked equations
 for ``fromInteger``. A caller can use those equations at a retained
 argument, including inside an addition::
@@ -134,8 +144,9 @@ The equation for ``sourceLength (x : xs)`` gives a successor for any tail
 
 A call can also use the source function directly, as in
 ``replicateNative (plus n m) True``. The function must be monomorphic
-and fully applied to named values or supported constructor trees. A user-defined
-operator can supply these equations in the same way as a named function.
+and fully applied. Its operands can be local values, supported constructors,
+or further checked calls. A user-defined operator can supply equations in
+the same way as a named function.
 
 For a class method, the current implementation accepts a concrete
 instance of a one-parameter class. The method must return its class
