@@ -4598,11 +4598,25 @@ In GHC, the typechecked runtime literal carries its conversion in
 `ol_witness`. The packed-vector library gives `FromNatural` and
 `Num.fromInteger` separate definitions. A different instance could
 return zero for every runtime literal and still register type-level
-`3` as three successors. A future implementation that preserves
-ordinary Haskell numeric syntax must justify the actual conversion
-for the given literal. The checked `(+)` field alone provides no
-evidence for this step. For `n + 1`, Core must also admit the
-certified literal as an operand of the source call.
+`3` as three successors. M83 checks the selected method's equations over `Integer` and records
+the actual zero and successor constructors in the instance interface.
+The caller checks its selected dictionary before constructing the same
+tree in the runtime expression and in the index. GHC uses its reduction
+depth setting to bound this constructor expansion. In `n + 1` the lazy
+sum contains a constructed operand. The type of `safeHead` still uses
+ordinary type reduction on the library's independent `FromNatural` instance.
 [Overloaded literal checking](../../compiler/GHC/Tc/Gen/Head.hs),
 [literal desugaring](../../compiler/GHC/HsToCore/Match/Literal.hs),
 and [the two vector-library conversions](examples/packed-vector/PackedVecLibrary.hs).
+
+### Comparing a computed length with a function argument
+
+Agda 2.8.0's `compareAtom` reduces both inputs before inspecting their
+heads. It keeps two literals in literal form. When one side has a different
+form, it can expose the literal's constructors. The fork currently expands
+a retained numeral to the constructors certified by its Haskell instance.
+The open `safeHead` inference case concerns a different step. The available
+nominal family reductions need to reach both argument types before matching
+an unknown tail against a scoped runtime binder.
+[Agda’s conversion checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L492-L521)
+and [the fork’s inference example](PLAN.md#open-inference-case).

@@ -30,7 +30,7 @@ The supported static subset and native pipeline remain restricted.
 | Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with a written or inferred runtime operand, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
 | Type computation (`R06`, `R13`, `R15`) | A list-length function works at any lifted element type. A binary addition function recurses on the first argument and passes the second through. Clients can use the checked equations from an interface. | Recursion across multiple changing arguments, constrained polymorphism, general function evaluation, and lambda/let/case expressions in types. |
-| Numeric literals (`R07`) | The vector library registers an interpretation for nonnegative literals. Clients can write `Vec Bool 3` and `Vec a (1 + n)`. | Connecting overloaded term literals to retained indices and checking literal constraints such as finite bounds. |
+| Numeric literals (`R07`) | The vector library registers an interpretation for nonnegative literals. Clients can write `Vec Bool 3`, `replicateNative 3 x` and `replicateNative (n + 1) x`. The retained calls check the actual `Num Nat` dictionary. | More general literal conversions and literal constraints such as finite bounds. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
 
 The example `Nat` is the source datatype `data Nat = Z | S Nat`. It is not a
@@ -58,6 +58,8 @@ at compile time and leaves the sum lazy at runtime.
 M82 lets this expression use `n + m` with Prelude addition. The
 selected `Num Nat` instance defines `(+) = plus`. The compiler checks
 that dictionary before using the equations to type the vector.
+M83 extends this call to `n + 1` and accepts `replicateNative 3 x`. The
+compiler checks the concrete instance's conversion from nonnegative integers.
 General evaluation of Haskell functions in types remains open.
 
 M74 checks consecutive invisible retained arguments. The two vectors in
@@ -155,6 +157,7 @@ can advance a card while the card remains open.
 | 21 | R07 and R13: numerals and infix addition | [M80](PLAN.md#m80-numerals-and-infix-addition-in-vector-types) | Use `Vec a 3` and `Vec a (n + 1)` with the original Peano-indexed GADT. |
 | 22 | R03, R13 and R15: a computed retained argument | [M81](PLAN.md#m81-a-computed-retained-length) | Pass the ordinary call `plus n m` directly as a vector length. Keep its index through Core Lint and share its value as a lazy STG thunk. |
 | 23 | R12 and R03: a concrete class method | [M82](PLAN.md#m82-overloaded-addition-in-a-retained-argument) | Pass the overloaded `n + m` as a retained length when the selected instance's addition method is the checked `plus`. |
+| 24 | R07, R12 and R03: term numerals as retained lengths | [M83](PLAN.md#m83-ordinary-numerals-in-retained-arguments) | Use a checked `fromInteger` for `replicateNative 3 x` and `replicateNative (n + 1) x`. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -307,12 +310,12 @@ still require substantial research.
 - [ ] **R04 [Dependent sums](https://ghc.serokell.io/dh#dependent-sums)** — Unmarked. Needs/includes: R05, R22.
 - [ ] **R05 [Dependent Core language](https://ghc.serokell.io/dh#dependent-core-language)** — Unmarked. Needs/includes: no outgoing graph edge.
 - [ ] **R06 [Universal promotion](https://ghc.serokell.io/dh#universal-promotion)** — Unmarked. Needs/includes: R07, R10, R12, R13, R14.
-- [ ] **R07 [Promote literals](https://ghc.serokell.io/dh#promote-literals)** — Unmarked. Needs/includes: R08, R09, R24. M80 supplies nonnegative type numerals at registered index kinds. General overloaded term promotion and constrained family evaluation remain open.
+- [ ] **R07 [Promote literals](https://ghc.serokell.io/dh#promote-literals)** — Unmarked. Needs/includes: R08, R09, R24. M80 supplies nonnegative type numerals at registered index kinds. M83 accepts term numerals in retained arguments when the actual Peano conversion has checked equations. General overloaded term promotion and constrained family evaluation remain open.
 - [x] **R08 [Promote Char](https://ghc.serokell.io/dh#promote-char)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R09 [Promote Natural](https://ghc.serokell.io/dh#promote-natural)** — Completed. Needs/includes: no outgoing graph edge.
 - [ ] **R10 [Promote unboxed types](https://ghc.serokell.io/dh#promote-unboxed-types)** — Unmarked. Needs/includes: R11.
 - [ ] **R11 [Homogeneous equality](https://ghc.serokell.io/dh#homogeneous-equality)** — Unmarked. Needs/includes: no outgoing graph edge.
-- [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24. M82 connects a concrete instance method to a checked source function in a retained argument. General classes and abstract dictionary arguments remain open.
+- [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24. M82 connects a concrete instance method to a checked source function in a retained argument. M83 checks the selected ground `Num` instance’s conversion of a nonnegative literal. General classes and abstract dictionary arguments remain open.
 - [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23.
 - [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge.
 - [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M75–M78 reduce unary constructor equations, field projections and direct structural recursion, including lists with a polymorphic element type.

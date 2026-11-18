@@ -5,7 +5,7 @@ work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful chan
 to current GHC and complete the missing rules. The initial retained Boolean
 experiment is implemented. The current work follows the roadmap below.
 
-Last updated: 2026-11-17. Upstream compiler base:
+Last updated: 2026-11-18. Upstream compiler base:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
@@ -17,12 +17,11 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-The latest bounded increment is [M70](#m70-higher-order-calls-with-native-list-arguments),
-owned by [R03 dependent products](roadmap/R03-dependent-products.md).
-Both rebuilt stages pass higher-order calls with literal vector lists and the
-125-line Showcase through seventeen modules. R03, R05 and R23 remain open.
-The user resumed GHC execution on 2026-11-16 at
-17:53 CET.
+[M83](#m83-ordinary-numerals-in-retained-arguments) connects term numerals
+to the result type of a retained application. It advances R07 (literal
+promotion), using the concrete dictionary evidence from R12 and the
+runtime operand from R03. The source examples are `replicateNative 3 x`
+and `replicateNative (n + 1) x`.
 
 The [R23 matchability foundation](roadmap/R23-unsaturated-type-families.md)
 precedes this R05 increment. The roadmap separates this chosen order from
@@ -6612,22 +6611,22 @@ and `replicateNative (n + 1) x`. On M82 both calls give GHC-83605
 at the literal. The first result has type `Vec a 3`. The second has
 type `Vec a (n + 1)` even when `n` comes from IO.
 
-- [ ] Identify the actual `Num.fromInteger` implementation that returns
+- [x] Identify the actual `Num.fromInteger` implementation that returns
       zero at zero and one successor for each positive integer step.
       Check the constructor identities, integer guards, decrement,
       recursive dictionary and effects of rewrite rules.
-- [ ] Publish that conversion as part of the concrete dictionary's ABI.
+- [x] Publish that conversion as part of the concrete dictionary's ABI.
       The client must check the dictionary selected for the literal
       by the ordinary solver. Rebinding, an unknown dictionary, or
       different equations must not give the client the Peano proof.
-- [ ] Construct the runtime operand and its index using the same zero
+- [x] Construct the runtime operand and its index using the same zero
       and successor. Check expansion against the reduction-depth setting.
       The independent type-level `FromNatural` registration must still
       agree for a signature such as `Vec a 3` to check.
-- [ ] Preserve a checked source call with constructed operands through
+- [x] Preserve a checked source call with constructed operands through
       Core Lint and lowering. Its constructor fields and the shared sum
       must retain Haskell's ordinary demand behaviour.
-- [ ] Run the two examples and update the Showcase. Check diagnostics
+- [x] Run the two examples and update the Showcase. Check diagnostics
       at the offending literal, changed instances across an interface,
       and the existing GHC numerical and dependent-Core controls.
 
@@ -6635,3 +6634,79 @@ Agda's overloaded numerals use the selected `fromNat` operation. Its
 natural-number builtin checks the constructors of its representation.
 The Haskell rule applies these precedents to the checked instance body.
 See [runtime literal research](REFERENCES.md#a-runtime-literal-in-a-retained-argument).
+
+### Elaboration and scope
+
+The literal's renamed conversion identifies the selector. Its checked
+dictionary field identifies the constructors. GHC uses those constructors
+in both the runtime expression and its promoted index. It can use a private
+constructor through a compiled interface. The public result signature checks
+the independently registered type numeral. Interface version
+`100120261115168` records the selector and constructors on the dictionary.
+
+In `n + 1`, both `(+)` and `fromInteger` need the dictionary the solver
+selects at their occurrences. A solved dictionary can be shared across
+implication scopes. The evidence check follows actual Wanted-variable
+aliases through the enclosing scopes to the checked instance. A caller's
+`Num Nat` constraint supplies no such evidence.
+
+The certified positive branch decrements its argument using the standard
+`Integer` instances. The producer and client check rewrite rules on the
+selected conversion, its guards and the library workers for comparison and
+subtraction. GHC's primitive operations and compiled integer implementation
+supply the underlying integer semantics. The certificate covers nonnegative
+integers. For `Vec Bool 3`, the separate `FromNatural` instance must reduce
+to the same three successors.
+
+GHCi uses the same family-instance import closure as a compiled module
+when it checks the type numeral. It also includes family instances declared
+earlier at the prompt. Loading an unrelated module does not bring its
+literal registration into the current prompt scope. A function with a
+retained `Nat` argument accepts `fill 2`. An expression signature around
+the operand, as in `fill (2 :: Nat)`, is outside the current operand grammar.
+An ordinary annotated binding can still supply the argument.
+
+### Open inference case
+
+With `safeHead :: Vec a (1 + k) -> a`, the current checker accepts a local
+binding `xs :: Vec Bool (1 + n)` followed by `safeHead xs`. Writing
+`safeHead (replicateNative (1 + n) True)` directly reports an untouchable
+tail index. The call also checks as
+`safeHead @Bool @n (replicateNative (1 + n) True)` when `safeHead` binds
+`forall a k` in that order. The cached-argument matcher reduces the inferred
+vector type
+before comparing it with the unreduced argument type of `safeHead`. The
+next inference check should compare nominally reduced views of both types
+while keeping the runtime binder in scope.
+
+### Validation
+
+The bootstrap and self-hosted compilers compiled the actual vector library
+and ran an interface-only client with Core and STG Lint. Both ran sixteen
+checks of numeric lengths, operands in either order, constructed fields,
+unused elements, partial lengths and cycles. A vector of length 128 ran,
+and a literal of 200 checked with the default reduction depth. With
+`-freduction-depth=12`, 12 checked and 13 failed at the literal.
+
+Each compiler ran 24 checks of instance equations and rewrite rules. These
+included a different base or step, a shadowed comparison, a rebound
+conversion, a passed-in dictionary, a later declaration splice and an
+imported orphan rule. An unchanged client lost its proof when only the
+conversion changed. A conflicting `FromNatural` instance gave a type mismatch.
+Both interface readers rejected the other version's header. An ordinary
+`-O2` instance module and an extension-off client produced the value three.
+Native dependent modules still use `-O0`.
+
+Both stages matched the 156-line Showcase across 18 modules. The GHC test
+driver passed 33 selected normal-way tests and the GHCi script. GHCi
+evaluated `n + 1` and accepted a registration from an earlier prompt.
+A module loaded outside the current import closure did not supply its
+registration. The installed vanilla, dynamic and profiling interfaces had
+the new header after Hadrian refreshed 43 package registrations.
+
+A retained function works inside one GHCi expression. Saving it with a
+separate `let` statement leaves the prompt's result-boxing `unsafeCoerce#`
+unexpanded. A standalone function declaration instead reaches the
+unsupported native CorePrep entry. Both failures also occurred with
+`fill n = replicateNative n True` and the argument `Z`. Persistent native
+function bindings at the prompt remain open.

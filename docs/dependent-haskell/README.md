@@ -32,7 +32,10 @@ three :: Vec Bool 3
 three = sourceVector @Bool [True, False, True]
 
 allTrue :: Vec Bool 3
-allTrue = replicateAt 3 True
+allTrue = replicateNative 3 True
+
+oneMore :: foreach (n :: Nat) -> Vec Bool (n + 1)
+oneMore n = replicateNative (n + 1) True
 
 appendOne :: Vec a n -> a -> Vec a (n + 1)
 appendOne xs x = appendVec xs (VCons x VNil)
@@ -46,6 +49,11 @@ the checked `plus` function. The [runnable example](Showcase.hs) reads
 `replicateAt` takes a required type argument, so `replicateAt 3 True`
 constructs a vector at exactly that length. For a runtime length `n`,
 `replicateNative n True` constructs a vector indexed by that value.
+
+For the retained literal in `allTrue`, the compiler checks the library's
+`fromInteger` equations. Zero produces `Z`. A positive number produces one
+`S` around the conversion of its predecessor. The typechecker can then use
+the same constructors for the runtime argument and the vector's index.
 
 The length itself can be a computation. Here the caller can get both
 lengths from IO, and the result type records their sum.
@@ -90,6 +98,21 @@ case sourceVector xs of
     VNil          -> pure Nothing
     v@(VCons _ _) -> pure (Just (safeHead v))
 ```
+
+A vector with length `n + 1` also has a head for each finite `n`.
+Since addition recurses on the left, its first constructor stays unknown
+until GHC has evidence about `n`. The library's `addSucc` proves
+`n + 1` is a successor. The caller can pass zero to that proof using
+the same retained numeric syntax.
+
+```haskell
+headRight :: foreach (n :: Nat) -> Vec a (n + 1) -> a
+headRight n xs = case addSucc n 0 of
+    Refl -> safeHead xs
+```
+
+Matching on the proof evaluates `addSucc` by induction on `n`. Matching
+on `VCons` directly inspects just the outer cell.
 
 The [rejection test](../../testsuite/tests/dependent/should_fail/NativeSourceLengthEmpty.hs)
 contains both calls without the match. The [Showcase](Showcase.hs) runs

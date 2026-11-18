@@ -884,5 +884,11 @@ arithmeticNotation = do
         joined = appendVec prefix three
     observe "vector with length 3" (toList three)
     observe "replicateAt 3" (toList (replicateAt 3 True))
+    let filled :: Vec Bool 3
+        filled = replicateNative 3 True
+        oneMore :: Vec Bool (n + 1)
+        oneMore = replicateNative (n + 1) False
+    observe "replicateNative 3" (toList filled)
+    observe "replicateNative (n + 1)" (toList oneMore)
     observe "vector with length n + 3" (toList joined)
     observe "2 + 3 at runtime" ((2 + 3) :: Nat)

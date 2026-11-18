@@ -81,9 +81,30 @@ the checked equations for ``plus``. GHC checks that this call uses the
 same dictionary before relying on the sum in the result type. The
 runtime sum stays lazy.
 
+The vector library's ``Num Nat`` instance also supplies checked equations
+for ``fromInteger``. A caller can use those equations at a retained
+argument, including inside an addition::
+
+    three :: Vec Bool 3
+    three = replicateNative 3 True
+
+    oneMore :: foreach (n :: Nat) -> Vec Bool (n + 1)
+    oneMore n = replicateNative (n + 1) True
+
+The checker recognises a ground instance whose ``fromInteger n``
+first guards against ``n < 0``, returns the zero constructor for
+``n == 0``, and otherwise applies the successor constructor to
+``fromInteger (n - 1)``. Both guards use the standard ``Integer``
+operations. The instance module publishes the constructors in its
+interface. Use retained numerals in a client of that module. Each
+successor counts against ``-freduction-depth``.
+The ordinary solver must select the checked dictionary at the literal.
+A result signature still uses ``FromNatural``. GHC checks
+that the two interpretations agree when it checks the result type.
+
 A call can also use the source function directly, as in
 ``replicateNative (plus n m) True``. The function must be monomorphic
-and fully applied to named values or nullary constructors. A user-defined
+and fully applied to named values or supported constructor trees. A user-defined
 operator can supply these equations in the same way as a named function.
 
 For a class method, the current implementation accepts a concrete
