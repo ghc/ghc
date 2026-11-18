@@ -541,6 +541,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalImplicitParameterBindings"          = 50730
   GhcDiagnosticCode "TcRnIllegalTupleSection"                       = 59155
   GhcDiagnosticCode "TcRnTermNameInType"                            = 37479
+  GhcDiagnosticCode "TcRnNoSourceTable"                             = 68947
   GhcDiagnosticCode "TcRnUnexpectedKindVar"                         = 12875
   GhcDiagnosticCode "TcRnNegativeNumTypeLiteral"                    = 93632
   GhcDiagnosticCode "TcRnUnusedQuantifiedTypeVar"                   = 54180

@@ -927,6 +927,11 @@ instance Diagnostic TcRnMessage where
            quotes (ppr name) <+>
              (text "is a term-level binding") $+$
              (text " and can not be used at the type level.")
+    TcRnNoSourceTable name
+      -> mkSimpleDecorated $ vcat
+           [ text "No checked equations are available for" <+> quotes (ppr name) <+> text "in a type."
+           , text "A source table must match each input constructor once"
+           , text "and return a constructor in each equation." ]
     TcRnUntickedPromotedThing thing
       -> mkSimpleDecorated $
          text "Unticked promoted" <+> what
@@ -2373,6 +2378,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTermNameInType {}
       -> ErrorWithoutFlag
+    TcRnNoSourceTable {}
+      -> ErrorWithoutFlag
     TcRnUntickedPromotedThing {}
       -> WarningWithFlag Opt_WarnUntickedPromotedConstructors
     TcRnIllegalBuiltinSyntax {}
@@ -3057,6 +3064,8 @@ instance Diagnostic TcRnMessage where
     TcRnNotInScope err _nm
       -> scopeErrorHints err
     TcRnTermNameInType {}
+      -> noHints
+    TcRnNoSourceTable {}
       -> noHints
     TcRnUntickedPromotedThing thing
       -> [SuggestAddTick thing]

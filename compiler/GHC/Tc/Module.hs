@@ -75,8 +75,10 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Sig( tcRules )
+import GHC.Tc.Gen.SourceTable ( sourceTableTyCons )
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
+import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Solver
@@ -678,7 +680,28 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                           , tcg_fords     = fords'     ++ fords_mf
                           , tcg_patsyns   = pat_syns'  ++ patsyns_mf } } ;
 
-      ; return tcg_env' }
+        -- The interface also carries the equations of eligible source functions.
+        -- See Note [Closed source tables] in GHC.Tc.Gen.SourceTable.
+      ; tables_enabled <- xoptM LangExt.ExperimentalDependentTypes
+      ; if tables_enabled
+        then setGblEnv tcg_env' $
+             sourceTableTyCons (tcg_binds tcg_env') >>= installSourceTables
+        else return tcg_env' }
+
+-- | Add the families and their axioms to the module interface. A local use
+-- may already have required the family before we finished checking the module.
+installSourceTables :: [TyCon] -> TcM TcGblEnv
+installSourceTables tables = do
+    env <- getGblEnv
+    let new_tables = [tc | tc <- tables, isNothing (lookupTypeEnv (tcg_type_env env) (tyConName tc))]
+    if null new_tables then return env else fst <$> addTyConsToGblEnv new_tables
+
+-- | Check only the bindings in the declaration group that is now in scope.
+sourceTablesFor :: NameSet -> TcGblEnv -> TcM [TyCon]
+sourceTablesFor names env = sourceTableTyCons (filter requested (tcg_binds env))
+  where
+    requested bind = any ((`elemNameSet` names) . idName)
+                         (collectHsBindBinders CollNoDictBinders (unLoc bind))
 
 zonkTcGblEnv :: TcGblEnv
              -> TcM (TypeEnv, Bag EvBind, LHsBinds GhcTc,
@@ -792,8 +815,15 @@ tc_rn_src_decls ds
                  -- group, or else we might reify metavariables, as in #16980.
                ; ev_binds1 <- simplifyTop lie1
 
+                 -- The next group can use a table that this group defines.
+               ; enabled <- xoptM LangExt.ExperimentalDependentTypes
+               ; let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds rn_decls))
+               ; tcg_env <- if enabled
+                            then sourceTablesFor names tcg_env >>= installSourceTables
+                            else return tcg_env
+
                  -- Rename the splice expression, and get its supporting decls
-               ; (spliced_decls, splice_fvs) <- rnTopSpliceDecls splice
+               ; (spliced_decls, splice_fvs) <- setGblEnv tcg_env (rnTopSpliceDecls splice)
 
                  -- Glue them on the front of the remaining decls and loop
                ; setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
@@ -1728,7 +1758,27 @@ rnTopSrcDecls group
    }
 
 tcTopSrcDecls :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
-tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
+tcTopSrcDecls group = do
+    enabled <- xoptM LangExt.ExperimentalDependentTypes
+    env <- getGblEnv
+    case if enabled then splitLocalSourceTables (allUses (tcg_dus env)) group else Nothing of
+      Nothing -> tcTopSrcDeclGroup group
+      Just (needed, early, rest) -> do
+        (envs@(early_env, _), wanteds) <- captureTopConstraints (tcTopSrcDeclGroup early)
+        restoreEnvs envs $ do
+          evs <- simplifyTop wanteds
+          tables <- sourceTablesFor (mkNameSet (map fst needed)) early_env
+          let found = mkNameSet (map tyConName tables)
+          for_ needed $ \(term, family) ->
+            unless (family `elemNameSet` found) $
+              setSrcSpan (nameSrcSpan term) (addErr (TcRnNoSourceTable term))
+          failIfErrsM
+          addTopEvBinds evs $ do
+            tables_env <- installSourceTables tables
+            setGblEnv tables_env (tcTopSrcDeclGroup rest)
+
+tcTopSrcDeclGroup :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
+tcTopSrcDeclGroup (HsGroup { hs_tyclds = tycl_decls,
                          hs_derivds = deriv_decls,
                          hs_fords  = foreign_decls,
                          hs_defds  = default_decls,
@@ -1815,7 +1865,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         return (tcg_env', tcl_env)
     }}}}}
 
-tcTopSrcDecls _ = panic "tcTopSrcDecls: ValBindsIn"
+tcTopSrcDeclGroup _ = panic "tcTopSrcDeclGroup: ValBindsIn"
 
 ---------------------------
 tcTyClsInstDecls :: [TyClGroup GhcRn]

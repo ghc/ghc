@@ -76,3 +76,8 @@ test('T15076', normal, compile_fail, [''])
 test('T15076b', normal, compile_fail, [''])
 test('T17687', normal, compile_fail, [''])
 test('T18271', normal, compile_fail, [''])
+test('NativeSourceTableWrong',
+     extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs']),
+     multimod_compile_fail,
+     ['NativeSourceTableWrong', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeSourceTablePartial', normal, compile_fail, [''])

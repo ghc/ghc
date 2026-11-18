@@ -861,6 +861,7 @@ Library
         GHC.Tc.Gen.Match
         GHC.Tc.Gen.Pat
         GHC.Tc.Gen.Sig
+        GHC.Tc.Gen.SourceTable
         GHC.Tc.Gen.Splice
         GHC.Tc.Instance.Class
         GHC.Tc.Instance.Family

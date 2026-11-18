@@ -17,7 +17,7 @@ module GHC.Rename.Env (
         lookupOccRn, lookupOccRnGRE, lookupOccRn_maybe, lookupSameOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
-        lookupTypeOccRn, lookupOccRnNone,
+        lookupTypeOccRn, lookupTypeAppHeadRn, lookupOccRnNone, lookupSourceTables,
         lookupGlobalOccRn_maybe,
         rnLookupKnownOccName,
 
@@ -1172,8 +1172,15 @@ lookupLocalOccRn rdr_name
 -- lookupTypeOccRn looks up an optionally promoted RdrName.
 -- Used for looking up type variables.
 lookupTypeOccRn :: RdrName -> RnM GlobalRdrElt
--- see Note [Demotion]
-lookupTypeOccRn rdr_name
+lookupTypeOccRn = lookupTypeOcc False
+
+-- | Look up a name used as the head of a type application.
+lookupTypeAppHeadRn :: RdrName -> RnM GlobalRdrElt
+lookupTypeAppHeadRn = lookupTypeOcc True
+
+-- See Note [Demotion] and Note [Names of finite source functions].
+lookupTypeOcc :: Bool -> RdrName -> RnM GlobalRdrElt
+lookupTypeOcc app_head rdr_name
   = do { mb_gre <- lookupOccRn_maybe rdr_name
        ; case mb_gre of
              Just gre -> return gre
@@ -1184,7 +1191,76 @@ lookupTypeOccRn rdr_name
                           mkExactGRE eqTyConName $
                           IAmTyCon $
                           eqTyConName <$ tyConFlavour eqTyCon }
+               | Just term_rdr <- demoteRdrNameTv rdr_name
+                 -> do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+                       ; if experimental then lookup_table term_rdr
+                                         else lookup_demoted rdr_name }
                | otherwise -> lookup_demoted rdr_name }
+  where
+    lookup_table term_rdr = do
+      envs <- getRdrEnvs
+      candidates <- lookupSourceTables envs term_rdr
+      case candidates of
+        [(gre, Just table)] -> do
+          addUsedGRE AllDeprecationWarnings gre
+          return gre { gre_name = table, gre_par = NoParent
+                     , gre_info = IAmTyCon ClosedTypeFamilyFlavour }
+        [(gre, Nothing)]
+          | app_head
+          , isVarOcc (greOccName gre)
+          -> failWithTc (TcRnNoSourceTable (greName gre))
+        (gre, _) : rest
+          | any (isJust . snd) candidates -> do
+              addNameClashErrRn term_rdr (gre NE.:| map fst rest)
+              return (mkUnboundGRE (rdrNameOcc rdr_name))
+        _ -> lookup_demoted rdr_name
+
+-- | Find the in-scope term bindings and their finite source tables.
+-- See Note [Names of finite source functions].
+lookupSourceTables :: (GlobalRdrEnv, LocalRdrEnv) -> RdrName
+                      -> RnM [(GlobalRdrElt, Maybe Name)]
+lookupSourceTables (gbl, lcl) term_rdr
+  | isJust (lookupLocalRdrEnv lcl term_rdr) = return []
+  | otherwise = mapM candidate $
+      lookupGRE gbl (LookupRdrName term_rdr (RelevantGREsFOS WantNormal))
+  where
+    candidate gre = (gre,) <$> table (greName gre)
+
+    table term
+      | isVarOcc (nameOccName term), Just mod <- nameModule_maybe term = do
+          env <- getGblEnv
+          let occ = mkSourceTableOcc (nameOccName term)
+          if mod == tcg_semantic_mod env
+            then do
+              name <- lookupOrig mod occ
+              let here = isJust (lookupGRE_Name gbl name) ||
+                         name `elemNameEnv` tcg_type_env env
+              return (if here then Just name else Nothing)
+            else do
+              iface <- loadInterfaceForName (text "finite source function") term
+              name <- lookupOrig mod occ
+              if isJust (mi_hash_fn iface occ)
+                then return (Just name)
+                else do
+                  updTcRef (tcg_missing_source_tables env) (`extendNameSet` name)
+                  return Nothing
+      | otherwise = return Nothing
+
+{- Note [Names of finite source functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Under ExperimentalDependentTypes a type can mention a function such as
+flipBit. First look for a type variable with that spelling. Then resolve the
+term with the written qualifier and import list. The defining module supplies
+the name of its closed family, even when an intermediate module re-exports
+the term. A lexical term binder shadows an imported function.
+
+Record import use and deprecation warnings on the term the user wrote.
+Return the family Name to the type renamer so that the module's usages
+include the fingerprint of the equations. This also lets the type checker
+order declarations that use the local family. If the imported family is
+absent, record that fact too. See Note [Source table usage fingerprints] in
+GHC.Unit.Module.ModIface.
+-}
 
 {- Note [eqTyCon (~) compatibility fallback]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

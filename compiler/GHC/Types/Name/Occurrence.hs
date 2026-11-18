@@ -67,7 +67,7 @@ module GHC.Types.Name.Occurrence (
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
         mkSuperDictSelOcc, mkSuperDictAuxOcc,
         mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
-        mkInstTyCoOcc, mkEqPredCoOcc,
+        mkInstTyCoOcc, mkEqPredCoOcc, mkSourceTableOcc, sourceTableTermOcc,
         mkTyConRepOcc,
 
         -- ** Deconstruction
@@ -1066,6 +1066,16 @@ mk_simple_deriv sp px occ = mk_deriv sp px [occNameFS occ]
 -- of the data constructor OccName (which should be a DataName)
 -- to VarName
 mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ
+
+-- | Name of the closed family for a finite source function.
+mkSourceTableOcc :: OccName -> OccName
+mkSourceTableOcc = mk_simple_deriv tcName "T:"
+
+-- | Recover the source function's spelling from its family occurrence.
+sourceTableTermOcc :: OccName -> Maybe OccName
+sourceTableTermOcc occ
+  | isTcOcc occ, 'T':':':term <- occNameString occ = Just (mkVarOcc term)
+  | otherwise = Nothing
 
 mkSuperDictAuxOcc :: Int -> OccName -> OccName
 mkSuperDictAuxOcc index cls_tc_occ

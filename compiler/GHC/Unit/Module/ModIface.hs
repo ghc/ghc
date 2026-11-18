@@ -109,6 +109,7 @@ module GHC.Unit.Module.ModIface
    , emptyFullModIface
    , mkIfaceHashCache
    , emptyIfaceHashCache
+   , lookupUsageFingerprint
    , forceModIface
    )
 where
@@ -831,6 +832,28 @@ emptyFullModIface mod =
       , mi_hi_bytes_ = FullIfaceBinHandle Strict.Nothing
       }
 
+
+-- | Look up the fingerprint to record or compare for a used name.
+lookupUsageFingerprint :: ModIface -> OccName -> Maybe (OccName, Fingerprint)
+lookupUsageFingerprint iface occ =
+  case mi_hash_fn iface occ of
+    Nothing | Just _ <- sourceTableTermOcc occ -> Just (occ, fingerprint0)
+    entry -> entry
+
+{- Note [Source table usage fingerprints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a dependent module, suppose an imported term f has no source table.
+A signature such as idF :: f a -> f a can implicitly quantify over f.
+If the producer later defines a table for f, the same signature refers to
+the table. The term's ordinary interface type can stay the same.
+
+Record the reserved family OccName with fingerprint0 for an unsuccessful
+lookup. A successful lookup records the family's declaration fingerprint.
+Use the same lookup when checking the client's entity usages. A change to
+the equations, addition of a table or removal of a table then invalidates
+the client. Unrelated edits to the producer preserve the recorded hash.
+Use the module where the term was defined, including for a re-export.
+-}
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]

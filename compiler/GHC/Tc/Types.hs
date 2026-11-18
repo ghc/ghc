@@ -618,6 +618,10 @@ data TcGblEnv
           -- they all have a non-empty gre_imp field.
         tcg_keep      :: TcRef NameSet,
 
+        tcg_missing_source_tables :: TcRef NameSet,
+          -- ^ Imported source table names that were absent during renaming.
+          -- See Note [Source table usage fingerprints] in GHC.Unit.Module.ModIface.
+
         tcg_th_used :: TcRef Bool,
           -- ^ @True@ \<=> Template Haskell syntax used.
           --

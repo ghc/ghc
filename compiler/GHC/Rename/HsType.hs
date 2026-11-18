@@ -877,28 +877,7 @@ rnHsTyKi env (HsQualTy { hst_ctxt = lctxt, hst_body = tau })
                           , hst_body =  tau' }
                 , fvs1 `plusFN` fvs2) }
 
-rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
-  = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
-         unlessXOptM LangExt.PolyKinds $ addErr $
-         TcRnWithHsDocContext (rtke_ctxt env) $
-         TcRnUnexpectedKindVar rdr_name
-           -- Any type variable at the kind level is illegal without the use
-           -- of PolyKinds (see #14710)
-       ; gre <- rnTyVar env rdr_name
-       ; this_mod <- getModule
-       ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
-       ; let loc_gre_with_rdr = L loc $ WithUserRdr rdr_name gre
-             name = greName gre
-       ; if  | explicit_level_imports
-             -- See Note [Strict level checks with ExplicitLevelImports]
-             -> checkThLocalNameNoLift loc_gre_with_rdr
-
-             | nameIsLocalOrFrom this_mod name
-             -> checkThLocalTyName gre
-
-             | otherwise -> pure ()
-       ; checkPromotedDataConName env tv Prefix ip $ greName gre
-       ; return (HsTyVar noAnn ip $ fmap greName <$> loc_gre_with_rdr, unitFN name) }
+rnHsTyKi env tv@(HsTyVar _ ip name) = rnHsTyVar lookupTypeOccRn env tv ip name
 
 rnHsTyKi env ty@(HsOpTy _ ty1 tyop ty2)
   = setSrcSpan (getLocA tyop) $
@@ -953,7 +932,7 @@ rnHsTyKi env tyLit@(HsTyLit src lit)
        ; return (HsTyLit src (convertLit lit), emptyFNs) }
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)
-  = do { (ty1', fvs1) <- rnLHsTyKi env ty1
+  = do { (ty1', fvs1) <- rnLHsAppHead env ty1
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
        ; return (HsAppTy noExtField ty1' ty2', fvs1 `plusFN` fvs2) }
 
@@ -1105,11 +1084,41 @@ throw an error accordingly.
 -}
 
 --------------
-rnTyVar :: RnTyKiEnv -> RdrName -> RnM GlobalRdrElt
-rnTyVar env rdr_name
-  = do { gre <- lookupTypeOccRn rdr_name
-       ; checkNamedWildCard env $ greName gre
-       ; return gre }
+-- | Keep the function-head context through parentheses.
+rnLHsAppHead :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
+rnLHsAppHead env (L l tv@(HsTyVar _ ip name)) = setSrcSpanA l $ do
+  (tv', fvs) <- rnHsTyVar lookupTypeAppHeadRn env tv ip name
+  return (L l tv', fvs)
+rnLHsAppHead env (L l (HsParTy _ ty)) = do
+  (ty', fvs) <- rnLHsAppHead env ty
+  return (L l (HsParTy noAnn ty'), fvs)
+rnLHsAppHead env ty = rnLHsTyKi env ty
+
+rnHsTyVar :: (RdrName -> RnM GlobalRdrElt) -> RnTyKiEnv -> HsType GhcPs
+          -> PromotionFlag -> LocatedN RdrName -> RnM (HsType GhcRn, FreeNames)
+rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
+  = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
+         unlessXOptM LangExt.PolyKinds $ addErr $
+         TcRnWithHsDocContext (rtke_ctxt env) $
+         TcRnUnexpectedKindVar rdr_name
+           -- Any type variable at the kind level is illegal without the use
+           -- of PolyKinds (see #14710)
+       ; gre <- lookup_occ rdr_name
+       ; checkNamedWildCard env (greName gre)
+       ; this_mod <- getModule
+       ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
+       ; let loc_gre_with_rdr = L loc $ WithUserRdr rdr_name gre
+             name = greName gre
+       ; if  | explicit_level_imports
+             -- See Note [Strict level checks with ExplicitLevelImports]
+             -> checkThLocalNameNoLift loc_gre_with_rdr
+
+             | nameIsLocalOrFrom this_mod name
+             -> checkThLocalTyName gre
+
+             | otherwise -> pure ()
+       ; checkPromotedDataConName env tv Prefix ip $ greName gre
+       ; return (HsTyVar noAnn ip $ fmap greName <$> loc_gre_with_rdr, unitFN name) }
 
 rnLTyVar :: LocatedN RdrName -> RnM (LocatedN GlobalRdrElt)
 -- Called externally; does not deal with wildcards
@@ -1122,7 +1131,8 @@ rnHsTyOp :: RnTyKiEnv -> HsType GhcPs -> LHsType GhcPs
          -> RnM (LHsType GhcRn, FreeNames)
 rnHsTyOp env overall_ty tyop
   | L l (HsTyVar ann prom (L loc op)) <- tyop
-  = do { opgre <- rnTyVar env op
+  = do { opgre <- lookupTypeAppHeadRn op
+       ; checkNamedWildCard env (greName opgre)
        ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $
            if opName `hasKey` eqTyConKey -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
@@ -2333,7 +2343,7 @@ filterInScopeM :: FreeKiTyVars -> RnM FreeKiTyVars
 filterInScopeM vars
   = do { tvc <- getTermVariableCapture
        ; envs <- getRdrEnvs
-       ; return (filterInScope tvc envs vars) }
+       ; filterSourceTableNames envs (filterInScope tvc envs vars) }
 
 -- | Like 'filterInScopeM', but keep parent class variables intact.
 -- Used with associated types. See Note [Class variables and filterInScope]
@@ -2341,7 +2351,19 @@ filterInScopeNonClassM :: [Name] -> FreeKiTyVars -> RnM FreeKiTyVars
 filterInScopeNonClassM cls_tvs vars
   = do { tvc <- getTermVariableCapture
        ; envs <- getRdrEnvs
-       ; return (filterInScopeNonClass cls_tvs tvc envs vars) }
+       ; filterSourceTableNames envs (filterInScopeNonClass cls_tvs tvc envs vars) }
+
+-- | Exclude finite source functions before binding implicit type variables.
+-- See Note [Names of finite source functions] in GHC.Rename.Env.
+filterSourceTableNames :: (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> RnM FreeKiTyVars
+filterSourceTableNames envs@(_, lcl) vars = do
+  experimental <- xoptM LangExt.ExperimentalDependentTypes
+  if experimental then filterM implicit vars else return vars
+  where
+    implicit (L _ rdr)
+      | not (elemLocalRdrEnv rdr lcl), Just term_rdr <- demoteRdrNameTv rdr =
+          all (isNothing . snd) <$> lookupSourceTables envs term_rdr
+      | otherwise = return True
 
 inScope :: TermVariableCapture -> (GlobalRdrEnv, LocalRdrEnv) -> RdrName -> Bool
 inScope tvc (gbl, lcl) rdr =

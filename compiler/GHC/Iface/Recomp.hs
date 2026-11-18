@@ -811,7 +811,7 @@ checkModUsage _ UsageHomeModule{
     needInterface mod $ \iface -> do
      let
          new_mod_hash    = mi_mod_hash iface
-         new_decl_hash   = mi_hash_fn  iface
+         new_decl_hash   = lookupUsageFingerprint iface
          reason = ModuleChanged (moduleName mod)
 
      liftIO $ do

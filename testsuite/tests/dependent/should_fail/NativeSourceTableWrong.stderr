@@ -1,0 +1,6 @@
+NativeSourceTableWrong.hs:11:9: error: [GHC-83865]
+    • Couldn't match type ‘False’ with ‘True’
+      Expected: Computed :~: False
+        Actual: False :~: False
+    • In the expression: Refl
+      In an equation for ‘wrong’: wrong = Refl

@@ -352,6 +352,7 @@ initTcGblEnv :: HscEnv -> HscSource -> Bool -> Module -> RealSrcSpan -> IO TcGbl
 initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
   do { keep_var             <- newIORef emptyNameSet
      ; used_gre_var         <- newIORef []
+     ; missing_tables_var   <- newIORef emptyNameSet
      ; th_var               <- newIORef False
      ; infer_var            <- newIORef True
      ; infer_reasons_var    <- newIORef emptyMessages
@@ -422,6 +423,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_imports            = emptyImportAvails
           , tcg_import_decls       = []
           , tcg_used_gres          = used_gre_var
+          , tcg_missing_source_tables = missing_tables_var
           , tcg_dus                = emptyDUs
 
           , tcg_rn_imports = []

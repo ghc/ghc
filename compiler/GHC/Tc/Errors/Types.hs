@@ -2079,6 +2079,9 @@ data TcRnMessage where
   -}
   TcRnTermNameInType :: !RdrName -> TcRnMessage
 
+  -- | A term used in a type has no checked constructor table.
+  TcRnNoSourceTable :: !Name -> TcRnMessage
+
   {-| TcRnUntickedPromotedThing is a warning (controlled with -Wunticked-promoted-constructors)
       that is triggered by an unticked occurrence of a promoted data constructor.
 

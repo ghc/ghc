@@ -865,7 +865,7 @@ pprExternal :: Bool -> PprStyle -> Unique
             -> SDoc   -- wired-in, known-key or empty
             -> BuiltInSyntax
             -> SDoc
-pprExternal debug sty uniq mod user_qual occ pp_sort is_builtin
+pprExternal debug sty uniq mod user_qual raw_occ pp_sort is_builtin
   | debug         = pp_mod <> ppr_occ_name occ
                      <> braces (hsep [pp_sort,
                                       pprNameSpaceBrief (occNameSpace occ),
@@ -878,6 +878,10 @@ pprExternal debug sty uniq mod user_qual occ pp_sort is_builtin
                     _ -> braces (pprModuleName (moduleName mod) <> dot <> ppr_occ_name occ)
             else pprModulePrefix sty mod user_qual occ <> ppr_occ_name occ
   where
+    -- Qualify an evaluated source function using its term import.
+    -- See Note [Names of finite source functions] in GHC.Rename.Env.
+    occ | PprUser{} <- sty, not debug, Just term <- sourceTableTermOcc raw_occ = term
+        | otherwise = raw_occ
     pp_mod = ppUnlessOption sdocSuppressModulePrefixes
                (pprModule mod <> dot)
 

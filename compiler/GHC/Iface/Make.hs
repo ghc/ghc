@@ -270,7 +270,8 @@ mkRecompUsageInfo hsc_env tc_result = do
   if not (gopt Opt_WriteSelfRecompInfo dflags)
     then return Nothing
     else do
-     let used_names = mkUsedNames tc_result
+     absent <- readIORef (tcg_missing_source_tables tc_result)
+     let used_names = mkUsedNames tc_result `unionNameSet` absent
      dep_files <- (readIORef (tcg_dependent_files tc_result))
      dep_dirs  <- (readIORef (tcg_dependent_dirs tc_result))
      (needed_links, needed_pkgs) <- readIORef (tcg_th_needed_deps tc_result)

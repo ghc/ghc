@@ -13,7 +13,7 @@ Main pass of renamer
 -}
 
 module GHC.Rename.Module (
-        rnSrcDecls, addTcgDUs, findSplice, rnWarningTxt, rnLWarningTxt
+        rnSrcDecls, splitLocalSourceTables, addTcgDUs, findSplice, rnWarningTxt, rnLWarningTxt
     ) where
 
 import GHC.Prelude hiding ( head )
@@ -23,6 +23,7 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
+import GHC.Iface.Env ( lookupOrig )
 
 import GHC.Rename.HsType
 import GHC.Rename.Bind
@@ -52,7 +53,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..), RuleName )
+import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..), RuleName, RecFlag(..) )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
 import GHC.Types.Unique.Set
@@ -75,6 +76,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
+import Data.List ( partition )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
@@ -154,8 +156,14 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                     -- Excludes pattern-synonym binders
                     -- They are already in scope
    traceRn "rnSrcDecls" (ppr id_bndrs) ;
-   tc_envs <- extendGlobalRdrEnvRn (map (mkLocalVanillaGRE NoParent) id_bndrs) local_fix_env ;
-   restoreEnvs tc_envs $ do {
+   (gbl_env, lcl_env) <- extendGlobalRdrEnvRn (map (mkLocalVanillaGRE NoParent) id_bndrs) local_fix_env ;
+   -- See Note [Ordering local source tables].
+   dependent <- xoptM LangExt.ExperimentalDependentTypes ;
+   tables <- if dependent then localSourceTableBinders binds' sigs' else pure [] ;
+   let { table_names = map snd tables
+       ; rdr_env = foldl' extendGlobalRdrEnv (tcg_rdr_env gbl_env)
+                     (map (mkLocalVanillaGRE NoParent) table_names) } ;
+   restoreEnvs (gbl_env { tcg_rdr_env = rdr_env }, lcl_env) $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
 
@@ -176,7 +184,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
    let { new_lhs = makeRnValBinds noExtField binds' sigs' } ;
-   (rn_val_decls@(XValBindsLR (HsVBG _ sigs')), bind_dus) <- if is_boot
+   (rn_val_decls@(XValBindsLR (HsVBG rn_binds sigs')), bind_dus) <- if is_boot
     -- For an hs-boot, use tc_bndrs (which collects how we're renamed
     -- signatures), since val_bndr_set is empty (there are no x = ...
     -- bindings in an hs-boot.)
@@ -240,18 +248,131 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                               src_fvs5, src_fvs6, src_fvs7] ;
                 -- It is tiresome to gather the binders from type and class decls
 
-        src_dus = unitOL other_def `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
+        table_fvs = mkNameEnv [ (b, fvs) | (_, bs) <- rn_binds
+                            , L _ FunBind{fun_id = L _ b, fun_ext = fvs} <- bs ] ;
+        table_dus = mkDUs [ (unitFN table, extendNameSet (lookupNameEnv_NF table_fvs term) term)
+                          | (term, table) <- tables ] ;
+        src_dus = unitOL other_def `plusDU` table_dus `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
                 -- Instance decls may have occurrences of things bound in bind_dus
                 -- so we must put other_fvs last
 
         final_tcg_env = let tcg_env' = (last_tcg_env `addTcgDUs` src_dus)
                         in -- we return the deprecs in the env, not in the HsGroup above
-                        tcg_env' { tcg_warns = insertWarnDecls (tcg_warns tcg_env') rn_decl_warns };
+                        tcg_env' { tcg_warns = insertWarnDecls (tcg_warns tcg_env') rn_decl_warns
+                                 , tcg_rdr_env = delListFromOccEnv (tcg_rdr_env tcg_env')
+                                                   (map nameOccName table_names) };
        } ;
    traceRn "finish rnSrc" (ppr rn_group) ;
    traceRn "finish Dus" (ppr src_dus ) ;
    return (final_tcg_env, rn_group)
                     }}}}
+
+{- Note [Ordering local source tables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A value signature and a type declaration in one HsGroup may both use a
+source table. For example:
+
+  type Switched = flipBit 'False
+  flipBit :: Bool -> Bool
+  flipBit False = True
+  flipBit True  = False
+
+The renamer introduces a private type name while it renames this group.
+This name records a dependency. Remove its GRE before processing exports.
+For unused-binding warnings, a use of the private name counts as a use of
+the term and its local constructors. Put this edge before the value groups.
+A value signature in any of them can depend on the private name.
+Only a use of the name schedules an early check of the term. The early group
+contains its ordinary binding, signature, and any independent enumeration
+declarations that its signature needs. All three may follow the use in the
+source file. The typechecker checks the term once and creates equations
+from checked matches before checking the rest of the group.
+
+The early group cannot depend on the rest of the group. Accept only plain
+enumerations without deriving clauses at this point. Deriving can use
+instances from later groups. A SPECIALISE pragma can also mention arbitrary
+local types and values. Keep such bindings in the original group. Return
+all requested names so the caller can report an uncertified table at the
+source binding before it checks a use of the private name.
+-}
+
+-- | Allocate private names for signed function bindings with constructor rows.
+-- The producer checks the constructors and their coverage after typechecking.
+localSourceTableBinders :: [LHsBindLR GhcRn GhcPs] -> [LSig GhcPs] -> RnM [(Name, Name)]
+localSourceTableBinders binds sigs =
+  mapM (\n -> (n,) <$> lookupOrig (nameModule n) (mkSourceTableOcc (nameOccName n)))
+    [ n | L _ FunBind{fun_id = L _ n, fun_matches = MG{mg_alts = L _ rows}} <- binds
+        , isExternalName n, nameOccName n `elemOccSet` signed
+        , all constructor_row rows ]
+  where
+    signed = mkOccSet [ rdrNameOcc n | L _ (TypeSig _ [] [L _ n] _) <- sigs ]
+    constructor_row :: LMatch GhcPs (LHsExpr GhcPs) -> Bool
+    constructor_row (L _ Match{m_pats = L _ [L _ ConPat{pat_args = PrefixCon _ []}],
+                               m_grhss = GRHSs _ (L _ (GRHS _ [] (L _ (HsVar _ (L _ r)))) :| [])
+                                              (L _ EmptyLocalBinds{})}) = isRdrDataCon r
+    constructor_row _ = False
+
+-- | Schedule local tables used in type syntax. See Note [Ordering local source tables].
+splitLocalSourceTables :: NameSet -> HsGroup GhcRn
+                       -> Maybe ([(Name, Name)], HsGroup GhcRn, HsGroup GhcRn)
+splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds sigs),
+                                         hs_tyclds = tycls}
+  | n : _ <- bound_names
+  , let used = mkOccEnv [ (nameOccName f, f) | f <- nameSetElemsStable uses
+                         , nameModule_maybe f == nameModule_maybe n ]
+        wanted = [ (b, f) | b <- bound_names
+                          , Just f <- [lookupOccEnv used (mkSourceTableOcc (nameOccName b))] ]
+  , not (null wanted)
+  = let wanted_set = mkNameSet (map fst wanted)
+        specialised = mkNameSet [ n | L _ s <- sigs, n <- spec_name s ]
+        signatures = mkNameEnv
+          [ (b, [arg, res]) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
+            , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{})
+                (L _ (HsTyVar _ _ (L _ (WithUserRdr _ arg))))
+                (L _ (HsTyVar _ _ (L _ (WithUserRdr _ res)))) <- [unLoc (hsSigWcType sig)]
+            , isTyConName arg && isTyConName res ]
+        early = [ (b, kinds) | (NonRecursive, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
+                , b `elemNameSet` wanted_set, not (b `elemNameSet` specialised)
+                , Just kinds <- [lookupNameEnv signatures b]
+                , all (\k -> not (k `elemNameSet` local_types) || k `elemNameEnv` enumerations) kinds
+                , let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv enumerations) kinds)
+                , nameSetAll (`elemNameSet` cons) fvs ]
+        early_names = mkNameSet (map fst early)
+        early_types = mkNameSet (concatMap snd early)
+        (first_binds, rest_binds) = partition early_bind binds
+        early_bind :: (RecFlag, LHsBinds GhcRn) -> Bool
+        early_bind (_, [L _ FunBind{fun_id = L _ b}]) = b `elemNameSet` early_names
+        early_bind _ = False
+        (first_sigs, rest_sigs) = partition (any (`elemNameSet` early_names) . sig_names . unLoc) sigs
+        (first_tys, rest_tys) = partition (any ((`elemNameSet` early_types) . tcdName . unLoc) . group_tyclds) tycls
+        first = emptyRnGroup { hs_valds = XValBindsLR (HsVBG first_binds first_sigs), hs_tyclds = first_tys }
+        rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs), hs_tyclds = rest_tys }
+    in Just (wanted, first, rest)
+  where
+    bound_names = [ b | (_, bs) <- binds, L _ FunBind{fun_id = L _ b} <- bs, isExternalName b ]
+    local_types = mkNameSet (map (tcdName . unLoc) (tyClGroupTyClDecls tycls))
+    enumerations = mkNameEnv
+      [ (t, cons) | TyClGroup{group_ext = deps, group_kisigs = [], group_tyclds =
+                     [L _ DataDecl{tcdLName = L _ t, tcdModifiers = [],
+                                   tcdTyVars = HsQTvs{hsq_explicit = []},
+                                   tcdDataDefn = HsDataDefn{dd_derivs = [], dd_ctxt = Nothing,
+                                     dd_kindSig = Nothing, dd_cons = DataTypeCons False cs}}]} <- tycls
+                  , isEmptyNameSet deps
+                  , Just cons <- [traverse enum_con cs] ]
+    enum_con :: LConDecl GhcRn -> Maybe Name
+    enum_con (L _ ConDeclH98{con_name = L _ c, con_modifiers = [], con_telescope = [],
+                             con_args = PrefixCon _ []}) = Just c
+    enum_con _ = Nothing
+    sig_names :: Sig GhcRn -> [Name]
+    sig_names (TypeSig _ _ [L _ b] _) = [b]
+    sig_names (InlineSig _ (L _ b) _) = [b]
+    sig_names (SCCFunSig _ (L _ b) _) = [b]
+    sig_names _ = []
+    spec_name :: Sig GhcRn -> [Name]
+    spec_name (SpecSig _ (L _ b) _ _) = [b]
+    spec_name (SpecSigE b _ _ _) = [b]
+    spec_name _ = []
+splitLocalSourceTables _ _ = Nothing
 
 addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv
 -- This function could be defined lower down in the module hierarchy,

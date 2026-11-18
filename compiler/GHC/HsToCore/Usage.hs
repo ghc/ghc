@@ -303,7 +303,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
                       usg_safe     = imp_safe }
       where
         finsts_mod = mi_finsts iface
-        hash_env   = mi_hash_fn iface
+        hash_env   = lookupUsageFingerprint iface
         mod_hash   = mi_mod_hash iface
         imported_exports
           = if not depend_on_exports

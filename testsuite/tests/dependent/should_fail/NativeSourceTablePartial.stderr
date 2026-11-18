@@ -1,0 +1,4 @@
+NativeSourceTablePartial.hs:7:1: error: [GHC-68947]
+    No checked equations are available for ‘oneRow’ in a type.
+    A source table must match each input constructor once
+    and return a constructor in each equation.
