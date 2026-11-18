@@ -2387,19 +2387,76 @@ tcRetainedArg domain arg
            ; return (Core.App (Core.Lam binder core_body) core_arg,
                      L loc (HsLam x LamSingle matches'), arg') }
     resolve_app env expected fun arg
-      = do { (core_fun, fun') <- case unLoc fun of
-               HsVar _ name | let n = unLocWithUserRdr name
-                            , not (isDataOcc (nameOccName n)) -> do
+      = do { (core_fun, fun') <- case source_head fun of
+               Just (n, written) -> do
                      certified <- if isExternalName n
                        then tcLookupIdMaybe n >>= maybe (pure Nothing) tcLookupSourceTableId
                        else pure Nothing
                      case certified of
-                       Just v -> pure (Core.Var v, fun)
+                       Just v -> do { core <- instantiate_source v written arg
+                                    ; pure (core, fun) }
                        _ -> setSrcSpanA (getLoc fun) $
                               failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall n))
-               _ -> resolve env expected fun
+               Nothing -> resolve env expected fun
            ; (app, arg') <- apply env core_fun arg
            ; return (app, fun', arg') }
+
+    -- See Note [Erased arguments of certified source operands].
+    source_head :: LHsExpr GhcRn -> Maybe (Name, [LHsWcType GhcRn])
+    source_head = go []
+      where
+        go written (L _ (HsPar _ fun)) = go written fun
+        go written (L _ (HsAppType _ fun ty)) = go (ty : written) fun
+        go written (L _ (HsVar _ name))
+          | let n = unLocWithUserRdr name
+          , not (isDataOcc (nameOccName n)) = Just (n, written)
+        go _ _ = Nothing
+
+    -- See Note [Erased arguments of certified source operands].
+    instantiate_source :: Id -> [LHsWcType GhcRn] -> LHsExpr GhcRn -> TcM Core.CoreExpr
+    instantiate_source owner written arg = do
+      owner <- liftZonkM (zonkId owner)
+      (core, sigma) <- foldM (apply_written owner) (Core.Var owner, varType owner) written
+      let (binders, body) = tcSplitForAllInvisTyVars sigma
+          tvs = map snd binders
+      if null tvs
+        then return core
+        else do
+          actual <- tcRetainedDeclaredArgType pure arg
+          case actual of
+            Just actual
+              | isEmptyNameEnv (idConcreteTvs owner)
+              , Just (_, _, _, formal, _) <- splitFunTy_maybe body
+              , Just subst <- matchRetainedAppType tvs Subst.emptySubst formal actual
+              , Just choices <- traverse (Subst.lookupTyVar subst) tvs
+              , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
+              , and (zipWith (\tv ty ->
+                       eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                     tvs choices)
+              , eqType (Subst.substTy subst formal) actual
+              , all noQuickLookVars (sigma : actual : choices)
+              -> do { valid <- tcRetainedInstScope (sigma : actual : choices)
+                    ; if valid
+                      then return (Core.mkTyApps core choices)
+                      else unsupported }
+            _ -> unsupported
+
+    -- Check written types without inferring an earlier erased argument.
+    apply_written :: Id -> (Core.CoreExpr, TcSigmaType) -> LHsWcType GhcRn
+                  -> TcM (Core.CoreExpr, TcSigmaType)
+    apply_written owner (core, sigma) ty
+      | Just (_, binder, _) <- tcSplitForAllTyVarBinder_maybe sigma
+      , isSpecifiedForAllTyFlag (binderFlag binder)
+      = do { (choice, body) <- tcVTA (idConcreteTvs owner) sigma ty
+           ; choice <- liftZonkM (zonkTcType choice)
+           ; body <- liftZonkM (zonkTcType body)
+           ; valid <- tcRetainedInstScope [choice, body]
+           ; if valid && all noQuickLookVars [choice, body]
+                      && not (any (\v -> isTcTyVar v && isMetaTyVar v)
+                                  (tyCoVarsOfTypesList [choice, body]))
+             then return (Core.App core (Core.Type choice), body)
+             else unsupported }
+      | otherwise = unsupported
 
     apply env fun arg = case splitFunTy_maybe (exprType fun) of
       Just (_, _, _, arg_ty, _) -> do
@@ -2409,6 +2466,34 @@ tcRetainedArg domain arg
 
     unsupported :: TcM a
     unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)
+
+{- Note [Erased arguments of certified source operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained operand can call a checked source function with an erased element
+parameter. For example, sourceLength xs has type Nat when xs has a declared
+type [a]. Its certified head still has type forall a. [a] -> Nat. Instantiate
+that erased binder before reading the first runtime argument's domain.
+
+Read only the operand's existing monomorphic declaration. Match kinds and
+types with an immutable substitution. Every unwritten erased binder must be
+determined by this first argument. Check the substituted domain, binder kinds,
+lexical scope, and concreteness requirements before constructing Core type arguments.
+Do not allocate inference variables or check the operand to obtain advice.
+Keep the written expression for the later ordinary check and usage recording.
+
+A written prefix such as sourceLength @a xs uses tcVTA at each leading
+specified binder. Require known types after zonking. Do not apply tcVTA to
+an inferred binder or create a guessed instantiation before the written
+prefix. Remaining erased binders can use the same declaration matching.
+The runtime syntax keeps each written type argument. Its ordinary check uses
+the same specified binders and the same known types as these Core arguments.
+The argument's actual type must still match the instantiated domain.
+
+This step follows tcLookupSourceTableId. It does not certify a function or
+change declaration-group ordering. The defining group must have completed
+its source equations before another group can use them as an operand.
+The final retainedArgIndex check still validates saturation and all domains.
+-}
 
 -- | Resolve an index variable at its expected domain. Function values keep
 -- their complete fixed type and lexical identity.

@@ -2637,18 +2637,33 @@ computedIndexExpr = nativeIndexExprWith False source_call
     source_call expr
       | (Var fun, args@(_:_)) <- collectArgs expr
       , Just family <- sourceTableId_maybe fun
-      , let (_, domains, result) = splitFunTys (varType fun)
-            binders = tyConTyVars family
-      , args `equalLength` domains, args `equalLength` binders
-      , result `sameNativeIndexDomain` tyConResKind family
-      = do { indices <- traverse (fmap snd . computedIndexExpr) args
-           ; if and (zipWith3 has_domain domains binders indices)
-             then Just (expr, mkTyConApp family indices)
+      , let (erased, body) = splitForAllInvisTyBinders (varType fun)
+            tvs = map (binderVar . snd) erased
+            (type_args, values) = splitAt (length tvs) args
+            (family_tvs, binders) = splitAt (length tvs) (tyConTyVars family)
+      , type_args `equalLength` tvs, family_tvs `equalLength` tvs
+      , Just tys <- traverse type_arg type_args
+      , let subst = TyCoSubst.zipTvSubst tvs tys
+            family_subst = TyCoSubst.zipTvSubst family_tvs tys
+            (_, domains, result) = splitFunTys (TyCoSubst.substTy subst body)
+      , and (zipWith (has_kind subst) tvs tys)
+      , and (zipWith (has_kind family_subst) family_tvs tys)
+      , values `equalLength` domains, values `equalLength` binders
+      , result `sameNativeIndexDomain` TyCoSubst.substTy family_subst (tyConResKind family)
+      = do { indices <- traverse (fmap snd . computedIndexExpr) values
+           ; if and (zipWith3 (has_domain family_subst) domains binders indices)
+             then Just (expr, mkTyConApp family (tys ++ indices))
              else Nothing }
       | otherwise = Nothing
 
-    has_domain (Scaled mult domain) binder index =
-      isManyTy mult && sameNativeIndexDomain domain (tyVarKind binder)
+    type_arg (Type ty) = Just ty
+    type_arg _ = Nothing
+
+    has_kind subst binder ty =
+      TyCoSubst.substTy subst (tyVarKind binder) `eqType` typeKind ty
+
+    has_domain subst (Scaled mult domain) binder index =
+      isManyTy mult && sameNativeIndexDomain domain (TyCoSubst.substTy subst (tyVarKind binder))
                     && sameNativeIndexDomain domain (typeKind index)
 
 -- | Interpret a checked argument at a retained application.
@@ -2664,6 +2679,14 @@ closed family recorded by the checked term Id. Check its arity and kinds
 against the actual call before substituting it into the result. Two
 functions of the same type can select different families. The compiler
 does not need to reduce either equation or read the function's unfolding.
+
+A certified function can have leading erased parameters. For sourceLength
+@a xs, split the Type arguments from the runtime arguments. Check their kinds
+against both the function's binders and the family's binders. Instantiate the
+function domains and the family domains with these same arguments before
+checking xs. Keep a in the family application, T:sourceLength a xs. Dropping
+it loses the element type and can identify calls at different domains.
+The original Core expression keeps the same erased arguments for lowering.
 
 An operand is a local variable, a saturated certified source call, or a
 saturated ordinary constructor whose fields are themselves operands. Check
