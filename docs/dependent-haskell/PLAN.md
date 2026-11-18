@@ -7537,3 +7537,22 @@ coverage regression identifies exactly the missing successor/cons row.
 The breakpoint test stops at the source location of `appendNative`
 after the additions to the vector library. Stock Fourmolu cannot parse
 the experimental extension; the fork's parser checked all fixtures.
+
+## M96: infer retained indices for partial constructor callbacks
+
+R03 needs a callback whose input is determined by another argument.
+On M95, both `VCons x <$> fromListExact n xs` and its prefix `fmap`
+form fail with an untouchable tail index. An explicit lambda and an
+annotated callback work. Instantiating `fmap` explicitly still fails
+at the constructor, whose remaining field has multiplicity One.
+
+- [ ] Select the constructor's erased arguments from a known callback
+      type. Keep its original field multiplicities and source head for
+      GHC's ordinary constructor subsumption.
+- [ ] When checking a higher-order call, use its data argument's
+      actual index before checking a partial constructor callback.
+      Preserve the source expression, evidence and multiplicity usage.
+- [ ] Exercise prefix and infix calls, independent indices, a linear
+      capture, lazy fields, and an ordinary imported consumer. Run the
+      source examples in both stages and GHCi. Update the roadmap,
+      sources of the design and Showcase.
