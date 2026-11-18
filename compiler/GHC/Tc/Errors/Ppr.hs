@@ -3657,6 +3657,10 @@ pprRetainedQuantificationError reason = case reason of
     vcat [ text "GHC cannot use this expression as a retained index."
          , text "Build the index from local variables, supported constructors, and fully applied functions with checked equations."
          , text "An immediate application of a supported lambda is also allowed." ]
+  RetainedIndexArgumentCast actual expected ->
+    vcat [ text "GHC cannot use the cast required for this argument as a retained index."
+         , text "Expected:" <+> ppr expected
+         , text "  Actual:" <+> ppr actual ]
   RetainedInteractiveIndex name ->
     vcat [ text "The binding" <+> quotes (ppr name) <+> text "comes from an earlier GHCi command."
          , text "Bind the runtime index locally in the expression that uses it." ]

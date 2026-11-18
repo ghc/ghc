@@ -2461,7 +2461,19 @@ tcRetainedArg domain arg
     apply env fun arg = case splitFunTy_maybe (exprType fun) of
       Just (_, _, _, arg_ty, _) -> do
         (core_arg, arg') <- resolve env arg_ty arg
-        return (Core.App fun core_arg, arg')
+        let app = Core.App fun core_arg
+        -- See Note [Retained argument cast diagnostics].
+        case core_arg of
+          Core.Cast (Core.Var actual) co
+            | (Core.Var owner, args) <- Core.collectArgs app
+            , Just family <- sourceTableId_maybe owner
+            , length args == tyConArity family
+            , Nothing <- Core.nativeSourceCallIndex app
+            , not (varType actual `tcEqType` coercionRKind co)
+            -> setSrcSpanA (getLoc arg) $
+                 failWithTc (TcRnRetainedQuantificationError
+                   (RetainedIndexArgumentCast (varType actual) (coercionRKind co)))
+          _ -> return (app, arg')
       _ -> unsupported
 
     unsupported :: TcM a
@@ -2509,6 +2521,20 @@ tcRetainedArgVar expected arg_id
   | otherwise
   = do { co <- unifyType Nothing (varType arg_id) expected
        ; return (Core.Cast (Core.Var arg_id) (SubCo co)) }
+
+{- Note [Retained argument cast diagnostics]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+sourceLength @Bool xs requires [Bool] when xs has type [Int]. Variable
+resolution emits the ordinary equality wanted and keeps its nominal cast.
+The computed-index grammar cannot use that cast. Its final rejection would
+otherwise hide the argument types behind an unsupported-expression error.
+
+When a saturated certified call cannot recover its index and its argument is
+a casted variable, report the actual and expected types at that operand's
+existing span. Do not solve constraints, check the operand again, or discard
+a successful conversion. The message describes the required cast, rather
+than asserting that no nominal equality can hold in the current context.
+-}
 
 {- Note [Retained argument application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
