@@ -7458,15 +7458,82 @@ The small dependent-base task on the local R03/R04 work queue calls for
 a length-checking adapter. Use the existing example library and its
 ordinary client. Keep the representation of Nat, Vec and PackedVec.
 
-- [ ] Add `fromListExact :: foreach (n :: Nat) -> [a] -> Maybe (Vec a n)`.
+- [x] Admit repeated retained constructors when ordinary patterns distinguish
+      their rows. Preserve constructor coverage, GADT evidence, source order
+      and ordinary incomplete-pattern diagnostics.
+- [x] Retain erased type arguments in checked applications of source
+      functions. Match the runtime argument type to the instantiated
+      domain and construct the source family with the same type arguments.
+- [x] Add `fromListExact :: foreach (n :: Nat) -> [a] -> Maybe (Vec a n)`.
       Check length and list constructors together. Return Nothing for
       short or long input. On excess input leave the extra cell's fields
       unevaluated. On success leave every element unevaluated.
-- [ ] Offer `packList :: [a] -> PackedVec a` for callers that accept any
+- [x] Offer `packList :: [a] -> PackedVec a` for callers that accept any
       length. Use the established source length, vector and package.
       Keep the fields lazy so that an observer can consume a finite prefix.
-- [ ] Zip ordinary inputs after checking both against a common runtime
+- [x] Zip ordinary inputs after checking both against a common runtime
       length. Check a client without the extension through separate
       interfaces. Reject attempts to combine independently indexed vectors.
-- [ ] Check the examples in native code and GHCi. Record the traversal
+- [x] Check the examples in native code and GHCi. Record the traversal
       and proof boundaries in the Showcase, roadmap and references.
+
+
+### Compiler changes
+
+The M94 checker rejected the four equations of `fromListExact` before
+checking their bodies. It required exactly one row per retained
+constructor, and required a variable or wildcard in every later column.
+M95 checks later ordinary arguments against their refined types.
+The ordinary pattern checker reports missing list rows. Each equation
+keeps its own retained proof and field binders during lowering.
+
+The direct package constructor exposed a separate failure even with
+an imported, certified `sourceLength`. The head has type
+`forall a. [a] -> Nat`. The application checker now reads leading
+specified type arguments or infers erased arguments from the first
+operand's declared type. In Core, both `sourceLength @a xs` and its
+type-level family carry the same `a`. The validator checks the kinds,
+the instantiated argument domains and the result kind. Constructing
+a package keeps the list as the actual operand of both checked calls.
+
+In the initial experiment `VCons x <$> fromListExact n xs` left an
+untouchable tail-index variable. Both stages accepted Idris2's direct
+`do` form. The example binds the recursive result in `Maybe` and then
+constructs the vector cell. Higher-order inference for the partial
+constructor is open.
+
+A written type argument can expose a mismatch in an ordinary argument:
+`sourceLength @Bool xs` requires `xs :: [Bool]`. If `xs :: [Int]`,
+the former diagnostic pointed at the whole source call. GHC-83605
+now points at `xs` and reports the expected and actual list types.
+This diagnostic applies when the checked function's computed index
+cannot represent the required cast.
+
+### Verification
+
+A finite length of two rejects an infinite list of undefined elements.
+An exact list with undefined elements returns `Just`. An unknown spine
+before the requested end raises its exception. Constructing `packList`
+at weak head normal form leaves an undefined input alone. The vector and
+stored length support reading a finite prefix of an infinite input.
+
+The separate-interface client compiles its own inferred and explicit
+applications of `sourceLength`. Two different list variables do not
+establish equal lengths. The rejected package constructor reports
+`sourceLength ys` where it requires `sourceLength xs`. Tests also keep a
+function without checked equations and a rule on the checked function
+from supplying an index.
+
+Both compiler stages built and ran the native fixture with Core and STG
+lint at `-O0`. Each compiled its producer first and checked new clients
+using only the resulting interface. The four Showcase observations
+cover a valid zip, a mismatch, the exact singleton check, and the lazy
+package head. Both native runs and self-hosted GHCi matched all 173
+expected output lines.
+
+All 59 selected normal-way tests and four GHCi tests passed. The API
+checks include an ordinary module with the extension disabled. The
+coverage regression identifies exactly the missing successor/cons row.
+The breakpoint test stops at the source location of `appendNative`
+after the additions to the vector library. Stock Fourmolu cannot parse
+the experimental extension; the fork's parser checked all fixtures.

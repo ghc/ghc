@@ -116,6 +116,10 @@ M58 and M59 expose those rules through source checking.
       must prove that the actual vector has that type. A runtime equality
       test can supply the evidence in its success branch.
       See [M94](../PLAN.md#m94-infer-a-nonempty-tail-through-local-length-definitions).
+- [x] Use ordinary list or GADT patterns after a retained constructor.
+      M95's checked list adapter returns a vector indexed by a caller's
+      runtime length. An ordinary client can combine two checked results
+      at that same index. See [M95](../PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary).
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.

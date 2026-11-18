@@ -157,6 +157,31 @@ constructor of `cells + 1` evaluates `cells` and raises the exception.
 GHC rejects a body that returns the second length when its signature
 requires the first. [Diagnostic](../../testsuite/tests/dependent/should_fail/NativeTypeNumeralWrong.stderr).
 
+### Reading ordinary lists at an indexed boundary
+
+`fromListExact n xs` returns `Just` a vector of length `n` if the list
+has exactly that many cells. A short or long list gives `Nothing`. This
+lets an ordinary module use an API such as `zipVec`, which requires the
+same length on both inputs.
+
+```haskell
+ordinaryZipExact :: Nat -> [a] -> [b] -> Maybe [(a, b)]
+ordinaryZipExact n xs ys = do
+    left <- fromListExact n xs
+    right <- fromListExact n ys
+    pure (toList (zipVec left right))
+```
+
+`n` can come from IO. The checks run when the result is demanded. GHC
+checks at compile time that both successful calls use the same index.
+If the caller accepts any length, `packList xs` packages the list's own
+length with its vector. For example, `headPacked (packList ('p' : undefined))`
+returns `Just 'p'` without inspecting the tail. To zip two such packages,
+`zipPacked` compares their stored lengths and uses equality evidence in
+the matching branch.
+[Ordinary client](examples/packed-vector/OrdinaryVecClient.hs)
+and [list conversion](examples/packed-vector/PackedVecLibrary.hs).
+
 ### What happens on empty input?
 
 ```haskell

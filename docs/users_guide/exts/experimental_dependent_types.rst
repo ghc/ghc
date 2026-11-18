@@ -309,10 +309,26 @@ can also stop before the remaining retained arguments, as in
 ``appendAfterSuccessor``.
 Unsigned aliases of retained functions still require a complete signature and
 report GHC-83605. Constructor equations split one
-leading retained index. They require one unguarded equation per constructor.
-Constructor fields and later arguments accept variable and wildcard patterns.
-Their multiplicities must be unrestricted. The result must have lifted kind, and the outer
-match wrapper must be identity. Ordinary rank restrictions still apply.
+leading retained index. Each constructor of that index must occur in an
+unguarded equation. Later ordinary arguments can distinguish equations
+for the same retained constructor. GHC checks the ordinary patterns for
+coverage and redundancy using the usual pattern warnings. This adapter
+checks a list against a requested length::
+
+    fromListExact :: foreach (n :: Nat) -> [a] -> Maybe (Vec a n)
+    fromListExact Z [] = Just VNil
+    fromListExact Z (_ : _) = Nothing
+    fromListExact (S _) [] = Nothing
+    fromListExact (S n) (x : xs) = do
+        rest <- fromListExact n xs
+        pure (VCons x rest)
+
+In each equation, matching the leading constructor refines dependent
+argument and result types for that equation alone. Retained constructor
+fields and later retained variables accept variable and wildcard patterns.
+The arguments must have unrestricted multiplicity. The result must have
+lifted kind, and the outer match wrapper must be identity. Ordinary rank
+restrictions still apply.
 An erased ``forall`` inside a retained binder's scope remains unsupported.
 Index-dependent constraints are limited to reflexive
 Boolean equalities. Quick Look inference and optimisation pragmas for retained

@@ -4816,3 +4816,37 @@ dictionary can invalidate a candidate. A constructor equality obtained
 from a pattern can justify the call independently of that dictionary.
 [Cached application checking](../../compiler/GHC/Tc/Gen/App.hs) and
 [solver provenance](#equality-for-lazy-local-definitions).
+
+### Checking a list at a requested length
+
+Agda's `fromList` builds a vector indexed by the input's own length.
+Its clauses translate the empty list and cons directly to vector
+constructors. The fork already has this operation in `sourceVector`.
+`packList` stores the length and vector as two lazy fields of an existing
+dependent package. A consumer can inspect the vector without first
+counting the input.
+[Agda standard library v2.1, Data.Vec.Base.fromList](https://github.com/agda/agda-stdlib/blob/97bc55e47367c562b3032bf104f2a00b19716f88/src/Data/Vec/Base.agda#L308-L310).
+
+Idris2's `toVect` takes a requested natural and a list. It checks the
+two spines together and returns a vector only when they end together.
+M95 uses this contract for `fromListExact`. In lazy Haskell, the
+success branch requires the list spine through its end. A mismatch
+can discard an arbitrarily long remaining tail. The elements stay lazy.
+[Idris2 v0.8.0, Data.Vect.toVect](https://github.com/idris-lang/Idris2/blob/15a3e4e70843f7a34100f6470c04b791330788df/libs/base/Data/Vect.idr#L320-L325).
+
+Haskell's `vector-sized` also offers a checked conversion and a scoped
+consumer. Its `fromList` constructs an underlying vector, then
+`toSized` compares the stored length to the requested size. M95 works
+directly on list cells to support early rejection.
+[vector-sized v1.6.1, list conversions](https://github.com/expipiplus1/vector-sized/blob/0b864ce8957cb5c7bfb228145a7ed5f8cf2e735b/src/Data/Vector/Generic/Sized.hs#L1733-L1761)
+and [stored length check](https://github.com/expipiplus1/vector-sized/blob/0b864ce8957cb5c7bfb228145a7ed5f8cf2e735b/src/Data/Vector/Generic/Sized.hs#L1810-L1830).
+
+Agda checks patterns in clauses against the function telescope. Here a
+retained constructor supplies evidence that refines later ordinary
+domains. GHC then uses its ordinary pattern checker and its existing
+row-specific Core cases. This preserves Haskell's clause order, warnings
+and demand on fields. The existing source-family certificate associates
+a polymorphic source function with its family. Both applications must
+carry the same erased type arguments.
+[Agda 2.8.0, function definitions](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html)
+and [implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).

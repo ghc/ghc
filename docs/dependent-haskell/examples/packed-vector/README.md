@@ -48,6 +48,23 @@ package. It reads one payload constructor at a partial or cyclic length. It does
 not fully evaluate an infinite length or a cyclic bottom payload. Exception
 checks catch only `ErrorCall` and require the named marker.
 
+## Convert an ordinary list
+
+Use `fromListExact n xs` when a consumer needs a particular length.
+Success checks the whole spine up to its end. A finite bound rejects
+an infinite list after the first extra cell. Neither result inspects
+an element. The ordinary client calls it twice with the same `n` before
+using `zipVec`. Supplying the two calls with separate unknown lengths
+fails at the vector argument to `zipVec`.
+[OrdinaryVecClient.hs](OrdinaryVecClient.hs).
+
+Use `packList xs` to store the list's length with its vector. The
+constructor expression is `PackVec (sourceLength xs) (sourceVector xs)`.
+`headPacked` can inspect the vector without forcing the stored length,
+so a defined head and undefined tail still produce the first element.
+A consumer that forces both fields traverses the list for each one.
+[PackedVecLibrary.hs](PackedVecLibrary.hs).
+
 ## Filter with a computed result length
 
 `filterVec` takes an ordinary Boolean predicate and a vector. It returns

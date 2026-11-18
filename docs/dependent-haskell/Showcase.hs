@@ -797,6 +797,7 @@ main = do
     recursiveLengths
     sourceAddition
     arithmeticNotation
+    listBoundaries
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()
@@ -966,3 +967,18 @@ arithmeticNotation = do
         threeLocal = let count :: Nat; count = 3 in replicateNative count 'x'
     observe "vector at a let-bound numeral" (toList threeLocal)
     observe "head after testing the actual length" (oneCellHead Z, oneCellHead (S Z))
+
+-- | Check a size from IO or let the input list determine its own size.
+listBoundaries :: IO ()
+listBoundaries = do
+    n <- newIORef (2 :: Nat) >>= readIORef
+    xs <- newIORef "ab" >>= readIORef
+    observe "ordinary zip at a checked runtime length" (Ordinary.ordinaryZipExact n xs [1, 2 :: Int])
+    observe "ordinary zip with a short input" (Ordinary.ordinaryZipExact n xs [1 :: Int])
+    observe "safeHead after checking for exactly one cell" (first "x", first "", first "xy")
+    observe "first cell of a packaged list" (headPacked (packList ('p' : undefined)))
+  where
+    first :: [a] -> Maybe a
+    first xs = case fromListExact 1 xs of
+        Just one -> Just (safeHead one)
+        Nothing -> Nothing
