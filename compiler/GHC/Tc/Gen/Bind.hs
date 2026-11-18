@@ -7,7 +7,7 @@
 -}
 
 module GHC.Tc.Gen.Bind
-   ( tcLocalBinds, tcLocalNonRecBind
+   ( tcLocalBinds, tcNonRecLets
    , tcTopBinds
    , tcValBinds
    , tcHsBootSigs
@@ -350,27 +350,32 @@ tc_nonrec_group  top_lvl sig_fn prag_fn [lbind] thing_inside
        ; return ((NonRecursive, aux_binds), thing) }
 
   | otherwise
-  = tcNonRecValBind top_lvl sig_fn prag_fn lbind (const thing_inside)
+  = tcNonRecValBind top_lvl sig_fn prag_fn lbind $ \binds -> do
+      result <- thing_inside
+      return ((NonRecursive, binds), result)
 
 tc_nonrec_group _ _ _ binds _   -- Non-rec groups should always be a singleton
   = pprPanic "tc_nonrec_group" (ppr binds)
 
--- | Check one unsigned nonrecursive value binding and expose its checked RHS
--- while its normal let environment and usage checks are in effect.
--- See Note [Optional equality for an overloaded let] in GHC.Tc.Gen.Expr.
-tcLocalNonRecBind :: LHsBind GhcRn -> (LHsBinds GhcTc -> TcM a)
-                  -> TcM ((RecFlag, LHsBinds GhcTc), a)
-tcLocalNonRecBind = tcNonRecValBind NotTopLevel (const Nothing) emptyNameEnv
+-- | Check acyclic local value bindings with the ordinary signature environment.
+-- The continuation for each binding runs inside that binding's usage check.
+-- See Note [Signed and grouped local indices] in GHC.Tc.Gen.Expr.
+tcNonRecLets :: [LHsBind GhcRn] -> [LSig GhcRn]
+             -> (LHsBinds GhcTc -> TcM a -> TcM a) -> TcM a -> TcM a
+tcNonRecLets binds sigs inside body = do
+    (poly_ids, sig_fn) <- tcTySigs sigs
+    let check binding rest = tcNonRecValBind NotTopLevel sig_fn emptyNameEnv binding
+                                 (\checked -> inside checked rest)
+    tcExtendSigIds NotTopLevel poly_ids (foldr check body binds)
 
 tcNonRecValBind :: TopLevelFlag -> TcSigFun -> TcPragEnv -> LHsBind GhcRn
-                -> (LHsBinds GhcTc -> TcM a) -> TcM ((RecFlag, LHsBinds GhcTc), a)
+                -> (LHsBinds GhcTc -> TcM a) -> TcM a
 tcNonRecValBind top_lvl sig_fn prag_fn lbind inside
   = do { type_env <- getLclTypeEnv
        ; let closed = isClosedBndrGroup type_env [lbind]
        ; (binds, ids) <- tcPolyBinds top_lvl sig_fn prag_fn
                                     NonRecursive NonRecursive closed [lbind]
-       ; result <- tcExtendLetEnv top_lvl sig_fn closed ids (inside binds)
-       ; return ((NonRecursive, binds), result) }
+       ; tcExtendLetEnv top_lvl sig_fn closed ids (inside binds) }
 
 ---------------------
 tc_rec_group :: forall thing.

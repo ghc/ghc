@@ -38,7 +38,7 @@ import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Do
 import GHC.Tc.Gen.SourceTable (sourceTableOccurrence, optionalSourceUses, registerOptionalSourceUses)
-import GHC.Tc.Gen.Bind        ( tcLocalBinds, tcLocalNonRecBind )
+import GHC.Tc.Gen.Bind        ( tcLocalBinds, tcNonRecLets )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcRetainedCase
@@ -987,24 +987,31 @@ tcExpr e res_ty
 -- See Note [Equality for lazy local definitions].
 tcNativeLet :: HsExpr GhcRn -> LHsLocalBinds GhcRn -> LHsExpr GhcRn -> Type
             -> TcM (Maybe (HsExpr GhcTc))
-tcNativeLet original (L loc (HsValBinds ann (XValBindsLR (HsVBG [(NonRecursive, [lbind@(L _ binding)])] []))))
-            body expected
-  | FunBind { fun_id = name, fun_matches = MG { mg_alts = L _ [L _ match] } } <- binding
-  , Match { m_ctxt = FunRhs { mc_strictness = NoSrcStrict }, m_pats = L _ []
-          , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
-                            , grhssLocalBinds = L _ EmptyLocalBinds{} } } <- match
-  = do { direct <- named_argument name rhs
+tcNativeLet original (L loc (HsValBinds ann (XValBindsLR (HsVBG groups sigs)))) body expected
+  | not (null groups), all isTypeLSig sigs
+  , Just bindings <- traverse nonrec_fun groups
+  = do { direct <- case (bindings, sigs) of
+           ([L _ FunBind { fun_id = name, fun_matches = matches }], [])
+             | Just rhs <- lazyLetRhs matches -> named_argument name rhs
+           _ -> return Nothing
        ; case direct of
            Just expr -> return (Just (mkExpandedExprTc original expr))
            Nothing -> do
-             { (group, result) <- tcLocalNonRecBind lbind $ \checked -> do
-                 { refined <- tcOptionalLet checked body expected
-                 ; case refined of
-                     Just expansion -> return (Right (mkExpandedExprTc original expansion))
-                     Nothing -> Left <$> tcMonoLExpr body (Check expected) }
-             ; let ordinary body' = HsLet noExtField (L loc (HsValBinds ann (XValBindsLR (HsVBG [group] [])))) body'
-             ; return (Just (either ordinary id result)) } }
+             { expr <- tcNonRecLets bindings sigs check_group (tcMonoLExpr body (Check expected))
+             ; return (Just (mkExpandedExprTc original (unLoc expr))) } }
   where
+    nonrec_fun (NonRecursive, [binding@(L _ FunBind{})]) = Just binding
+    nonrec_fun _ = Nothing
+
+    check_group checked rest = do
+      refined <- tcOptionalLet checked rest expected
+      case refined of
+        Just expr -> return (L (noAnnSrcSpan (combineSrcSpans (locA loc) (getLocA body))) expr)
+        Nothing -> do
+          body' <- rest
+          let binds = HsValBinds ann (XValBindsLR (HsVBG [(NonRecursive, checked)] []))
+          return (L (getLoc body') (HsLet noExtField (L loc binds) body'))
+
     named_argument name rhs = runMaybeT $ do
         value <- candidate rhs
         index <- MaybeT (pure (Core.retainedArgIndex value))
@@ -1065,20 +1072,25 @@ RHS. Look up a same-module function in the completed type environment.
 An earlier occurrence can lack its source table. The prepass registers no
 equation use. The retained argument checker records the selected owners.
 Neither the view nor the type match constructs evidence. Leave other
-lets to tcLocalBinds, including recursive groups, signatures and Strict
+lets to ordinary binding checks, including recursive groups and Strict
 bindings. A class selector alone supplies no checked index. Choosing a
 global instance here could change the meaning of ordinary multiplication
 under a local Num dictionary. Agda's let conversion motivates the equality.
 The lazy value argument preserves Haskell sharing. See docs/dependent-haskell/REFERENCES.md.
 -}
 
--- | Check a local definition whose ordinary RHS selected class methods.
+-- | Check a local definition in the scope of the preceding definitions.
 -- See Note [Optional equality for an overloaded let].
-tcOptionalLet :: LHsBinds GhcTc -> LHsExpr GhcRn -> Type -> TcM (Maybe (HsExpr GhcTc))
-tcOptionalLet [L _ FunBind { fun_ext = (WpHole, []), fun_id = L _ binder
-                          , fun_matches = MG { mg_alts = L _ [L _ match] } }] body expected
-  | Match { m_pats = L _ [], m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
-                                              , grhssLocalBinds = L _ EmptyLocalBinds{} } } <- match
+tcOptionalLet :: LHsBinds GhcTc -> TcM (LHsExpr GhcTc) -> Type -> TcM (Maybe (HsExpr GhcTc))
+tcOptionalLet checked rest expected
+  | Just (binder, rhs) <- case checked of
+      [L _ (XHsBindsLR (AbsBinds { abs_sig = True, abs_tvs = [], abs_ev_vars = [], abs_ev_binds = []
+             , abs_exports = [ABE { abe_poly = public, abe_mono = mono, abe_wrap = WpHole
+                                  , abe_prags = SpecPrags [] }], abs_binds = inner }))] ->
+          do { (value, rhs) <- binding_rhs inner
+             ; guard (value == mono && varType value `tcEqType` varType public)
+             ; return (public, rhs) }
+      _ -> binding_rhs checked
   = runMaybeT $ do
       initial <- liftMaybeT (liftZonkM (zonkId binder))
       let mult = idMult initial
@@ -1088,7 +1100,6 @@ tcOptionalLet [L _ FunBind { fun_ext = (WpHole, []), fun_id = L _ binder
       guard (all (== Breakpoints) (ticks_passes (initTicksConfig flags))
              && not (sccProfilingEnabled flags))
       (canonical, owners, methods) <- MaybeT (tcOptionalLetOperand rhs)
-      guard (not (null methods))
       index <- MaybeT (pure (Core.retainedArgIndex canonical))
       guard (typeKind index `tcEqType` idType initial)
       let uses = [(dfun, sel, target) | (_, dfun, sel, target) <- methods]
@@ -1100,10 +1111,39 @@ tcOptionalLet [L _ FunBind { fun_ext = (WpHole, []), fun_id = L _ binder
       liftMaybeT $ do
           proof <- newEvVar (mkNomEqPred (TermVarTy value) index)
           traceTc "tcOptionalLet" (ppr value <+> dcolon <+> ppr (idType proof) $$ ppr guards)
-          (binds, body') <- checkSourceLetConstraints (idName value) guards proof (tcMonoLExpr body (Check expected))
+          (binds, body') <- setSrcSpan (nameSrcSpan (idName value)) $
+                            checkSourceLetConstraints (idName value) guards proof rest
           registerOptionalSourceUses binds proof dependencies
           return (XExpr (NativeLetAlias rhs (PendingSourceLetRhs binds canonical) value proof expected (mkHsDictLet binds body')))
-tcOptionalLet _ _ _ = return Nothing
+  | otherwise = return Nothing
+  where
+    binding_rhs [L _ FunBind { fun_ext = (WpHole, []), fun_id = L _ binder, fun_matches = matches }]
+      | Just rhs <- lazyLetRhs matches = Just (binder, rhs)
+    binding_rhs _ = Nothing
+
+-- | Read a single lazy value equation without guards or local declarations.
+lazyLetRhs :: MatchGroup (GhcPass p) (LHsExpr (GhcPass p)) -> Maybe (LHsExpr (GhcPass p))
+lazyLetRhs MG { mg_alts = L _ [L _ match] }
+  | Match { m_ctxt = FunRhs { mc_strictness = NoSrcStrict }, m_pats = L _ []
+          , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
+                            , grhssLocalBinds = L _ EmptyLocalBinds{} } } <- match
+  = Just rhs
+lazyLetRhs _ = Nothing
+
+{- Note [Signed and grouped local indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check all written type signatures before checking the dependency-sorted
+nonrecursive bindings. Check a binding before entering the implication for
+its remaining siblings and body. Thus a later RHS may use an earlier alias
+without making that equality available in its own definition.
+
+tcPolyCheck represents a complete signature by an AbsBinds with one export.
+The body uses the public Id. Its checked RHS binds a fresh inner Id. Read
+the RHS only when the export and equation have identity wrappers and bind
+no evidence, type variables or pragmas. A qualified or polymorphic signature
+can abstract inside the FunBind wrapper even when the AbsBinds lists are empty.
+Use ordinary let bindings for other checked forms.
+-}
 
 {- Note [Optional equality for an overloaded let]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
