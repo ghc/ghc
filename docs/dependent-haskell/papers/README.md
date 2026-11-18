@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
 Read on 2026-11-14 through 2026-11-18. The [manifest](manifest.json) records
-twenty-three works and twenty-nine downloaded PDF versions. It contains source URLs,
+twenty-four works and thirty downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -12,6 +12,8 @@ The ICFP 2014 lazy-refinement paper and selected-section notes are in
 `native-forall-totality-laziness-research-v1/`.
 The JFP 2022 ANF paper and selected-page records are in
 `native-computed-retained/papers/`.
+The OutsideIn(X) author draft and selected-page records are in
+`native-let-conversion/`.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -28,6 +30,7 @@ versions and several selective readings.
 | [A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf) | Weirich, Voizard, de Amorim and Eisenberg, ICFP 2017 | R05 | D/DC, equality assumptions, erasure and nontermination |
 | [A Role for Dependent Types in Haskell](https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf) | Weirich, Choudhury, Voizard and Eisenberg, ICFP 2019 | R05 | Nominal and representational dependent equality |
 | [A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf) | Serrano, Hage, Peyton Jones and Vytiniotis, ICFP 2020 | R03 | Instantiation, known variables and ordinary final checking |
+| [OutsideIn(X)](https://simon.peytonjones.org/assets/pdfs/outsideinx.pdf) | Vytiniotis, Peyton Jones, Schrijvers and Sulzmann, JFP 2011 | R05 | Solve simple constraints before implications and preserve local touchables. Conditional alias evidence is a project proposal. |
 | [A Graded Dependent Type System with a Usage-Aware Semantics](https://richarde.dev/papers/2021/grad/grad.pdf) | Choudhury, Eades, Eisenberg and Weirich, POPL 2021 | R03, R05 | Runtime usage, erasure and the limits of resource claims |
 | [Homotopy Type Theory](https://hott.github.io/book/hott-online-82-g578b85c.pdf) | The Univalent Foundations Program, 2013 | R03, R04, R05 | Dependent application, pairs and identity elimination |
 | [Type Inference, Haskell and Dependent Types](https://adam.gundry.co.uk/pub/thesis/) | Gundry, PhD thesis, 2013 | R03, R05, R22 | Phase-indexed contexts, conversion and erasure |
@@ -667,3 +670,21 @@ Section 7.6, “Call-by-push-value and monadic form,” discusses dependent let
 results, GHC's monadic form, and commuting conversions. The paper's runtime
 semantics is call-by-value. M81 checks the lazy Core-to-STG translation
 separately with partially defined indices.
+
+## OutsideIn(X), JFP 2011
+
+Read the abstract and PDF pages 36–43 of the author draft on 2026-11-18.
+The draft is dated 24 March 2011 and has 81 pages. The publisher record gives
+pages 333–412. These versions have different pagination. The reading used pypdf
+text extraction for the selected pages, including the rules in Figures 11–15.
+
+Sections 5.2 and 5.5 solve simple constraints before nested implications. The
+solver applies the outer substitution and adds the local assumptions for each
+implication. Only that implication's touchable variables can be unified.
+Section 5.6.2 keeps implication classification syntactic.
+
+This order informs the proposed placement of an optional local alias check.
+The project proposal would inspect the actual method Wanted evidence before
+activating an alias Given in the body implication. Exact dictionary selection,
+conditional activation and lazy let identity require separate implementation
+and soundness checks in this compiler.
