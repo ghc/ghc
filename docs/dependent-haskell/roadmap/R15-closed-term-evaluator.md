@@ -134,8 +134,28 @@ dictionary reference, the client also records the object that the
 interpreter loaded.
 [Instance recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedSumDependencies.sh).
 
-Same-module definitions require further work on R21. More argument and
-result domains, user-defined representations and general closed expressions
-remain open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).
+## List results
+
+```haskell
+reversed :: Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]
+reversed = Refl
+```
+
+The imported definition determines the order. The function's checked result
+type supplies the element kind, including for an empty list. R15 can return
+a list of `Natural`, `Char` or `Bool`. A function that throws an exception
+in a later element fails at the source call. The interpreter must finish
+reading the result before GHC accepts the proof.
+
+For a list, the interpreter uses the built-in element dictionary's
+`showList` method. A module may define its own `Show [Natural]` instance
+that prints every list as `[2,3,5]`. That instance still works for
+ordinary printing. The compiler reads the actual reversed order.
+[Source checks](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs)
+and [representation references](../REFERENCES.md#reifying-closed-list-results).
+
+Same-module definitions require further work on R21. A nested list result, a `Maybe` result and a list of a newtype over
+`Natural` are outside the supported result shapes. General closed expressions
+and user-defined representations remain open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).
 The [implementation references](../REFERENCES.md#executing-closed-calls-and-reducing-open-calls)
 give the earlier prototype and the current GHC entry points.

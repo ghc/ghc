@@ -5047,8 +5047,10 @@ The compiler has the element kind when it elaborates a closed call, even
 when the result list is empty. This gives it the information needed to
 select a scalar conversion and reconstruct the promoted list. An ordinary
 user `Show` instance may choose any text for that list, so its output
-cannot establish the type index.
-[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+cannot establish the type index. The built-in dictionary for the element
+type already supplies `showList`, including the escape rules for strings.
+[The Show class and Char instance](../../libraries/ghc-internal/src/GHC/Internal/Show.hs),
+[proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [the singletons 3.0.4 API](https://hackage-content.haskell.org/package/singletons-3.0.4/docs/Data-Singletons.html#t:SingKind).
 
 ### Checking a reduction across an interface

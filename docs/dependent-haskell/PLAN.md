@@ -7971,18 +7971,17 @@ object and rejected the unchanged body that still claimed `'A'`.
 
 ## M105: return a promoted list from a closed call
 
-R15 currently accepts lists of natural number literals as input. The
-next result shape in proposal #509 is a list whose element type can be
-promoted. Check `Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]` from source.
+R15 accepts lists of natural number literals as input. Draft
+proposal #509 includes lists whose element type can be promoted. Check `Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]` from source.
 
-- [ ] Reify a list using its checked element type and GHC's existing
+- [x] Reify a list using its checked element type and GHC's existing
       promoted list constructors. Start with the scalar result types
       already supported by R15. Preserve the element kind for an empty list.
-- [ ] Compare ordered and incorrect results, characters that require
+- [x] Compare ordered and incorrect results, characters that require
       escaping, and a failing element. Use both interpreter modes.
       An overlapping user instance for showing a list must not select the
       index the compiler constructs.
-- [ ] Keep recursive composite types explicit in the roadmap. One list
+- [x] Keep recursive composite types explicit in the roadmap. One list
       layer does not cover nested lists, sums, tuples or arbitrary data types.
 
 `singletons` associates a demoted representation with each supported
@@ -7992,5 +7991,43 @@ typed constructor for the promoted list.
 [SingKind](https://hackage-content.haskell.org/package/singletons-3.0.4/docs/Data-Singletons.html#t:SingKind)
 and [proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).
 
-Before M105, the function specialization succeeds but the client reports
-GHC-70565 at `Prelude.reverse` because the result is `[Natural]`.
+Before M105, specialization succeeded but the client reported GHC-70565
+at `Prelude.reverse` because the result was `[Natural]`. The result
+decoder selects the trusted element dictionary and uses `showList` for
+the list. The compiler reconstructs promoted cons and nil at that
+element kind. This also lets an R16 call inferred from a pattern
+provide a list to a second pending call.
+
+Both rebuilt compilers checked the witnesses. Both self-hosted
+interpreter modes rejected the false list proof and the exception in
+the second element. The inference example returned `5` in all three
+compiler and interpreter configurations. The compiled Showcase and
+GHCi agreed on all 181 lines. All 13 selected normal-way tests passed.
+
+## M106: check a closed call inside another closed call
+
+M105 returns a promoted list. R15 must still check an ordinary application
+whose argument is itself a computation. Draft proposal #509 first reduces
+the arguments of a call, then evaluates the function, then forces its
+result. This order matters when the inner call fails and the outer
+function would ignore that argument at runtime.
+[Reduction order in proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).
+
+```haskell
+total :: Prelude.sum (Prelude.reverse '[2, 3, 5]) :~: 10
+total = Refl
+```
+
+- [ ] Infer the inner application's kind and check the inner call once.
+      Use its checked value to specialize the outer function. Also test
+      an order-sensitive consumer of the reversed list.
+- [ ] Reject an outer call with invalid staging before running either
+      function. Report a failing inner call at its own source span.
+      Reject a wrong input kind and a result parameter that the operand
+      leaves ambiguous.
+- [ ] Check dependencies from both calls with separate compilation.
+      Change only the inner producer, then only the outer producer.
+      In both cases require the unchanged client to check its proof again.
+
+At the M105 baseline, GHC reports GHC-70565 at the outer `Prelude.sum`.
+It accepts the inner `reverse` when that call is checked on its own.

@@ -812,6 +812,8 @@ main = do
     observe "Prelude.sum in a type" (TypeNats.natVal (Proxy @(Prelude.sum '[2, 3, 5])))
     observe "uppercase after the pattern determines the character"
         (charVal (upperFromPattern (Proxy @'a')))
+    observe "Prelude.reverse '[2, 3, 5] equals '[5, 3, 2]"
+        (Refl :: Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2])
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])

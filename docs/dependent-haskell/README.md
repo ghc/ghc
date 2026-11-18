@@ -38,6 +38,10 @@ GHC selects the ordinary list and natural-number instances. The Showcase
 reflects the resulting type as the number `10`.
 [Source proof](../../testsuite/tests/dependent/should_run/NativeClosedSum.hs).
 
+The Showcase uses `Refl` to prove
+`Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]`. A list returned by one
+call can determine the input of another call during inference. [List evidence](roadmap/R15-closed-term-evaluator.md#list-results).
+
 The input can also come from a pattern. In
 `upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)`, matching
 `(_ :: Proxy 'a')` fixes the wildcard. The body must return `Proxy 'A'`.
