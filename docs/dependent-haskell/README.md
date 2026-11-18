@@ -72,6 +72,7 @@ _build/showcase/showcase
 | Retained imports used by a module without dependent source syntax | `ordinaryModuleCalls` |
 | Generic finite positions, function elements, runtime-indexed payloads and lazy prefixes | `genericSafeIndexing` |
 | A source function used in a result type and a proof about an imported traffic-light function | `closedSourceFunctions` |
+| Dropping the first element of a vector whose length is indexed by an ordinary predecessor function | `constructorFields` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -137,6 +138,20 @@ part of the module's type-level API. Editing a right-hand side can invalidate
 a client proof even when the function's signature stays the same. A module
 that imports only the term can call it as ordinary Haskell.
 
+A constructor equation can also return a field. The vector library defines
+`previous Z = Z` and `previous (S n) = n` once, at the term level.
+This lets it give `dropFirst` its result length directly.
+
+```haskell
+dropFirst :: Vec a n -> Vec a (previous n)
+dropFirst VNil           = VNil
+dropFirst (VCons _ rest) = rest
+```
+
+In the second clause the input length has the form `S m`. The equation
+for `previous` reduces the required length to `m`, the length of `rest`.
+The field `m` can be unknown. [Vector library](examples/packed-vector/PackedVecLibrary.hs)
+
 | Item | State |
 | --- | --- |
 | GHC source baseline | `19ff36f2aede0ca2e554016ff22c71e73aa9803b`, dated 2026-11-09 |
@@ -152,7 +167,7 @@ that imports only the term can call it as ordinary Haskell.
 | Parameterized index domains | M56 retains closed `[Bool]`, `Maybe Nat` and `Tree Bool` values through source, Core, interfaces and native lowering |
 | Safe list indexing | M60 combines `Fin (Count xs)` with a retained `[Bool]`; both stages pass runtime bounds, lazy access and equal-count reuse |
 | Source domain conversion | M58 checks nominal scalar-domain conversion and ordinary payload inference in a private body solve; recursive domain reduction uses the solver depth limit |
-| Configured fork version | `10.1.20261115.1`, with M64 interface and HIE version `100120261115164`; matching compiler and libraries rebuilt in the isolated checkout |
+| Configured fork version | `10.1.20261115.1`, interface version `100120261115165`, HIE version `100120261115164`. Both compiler stages build in the isolated checkout. |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
@@ -210,7 +225,7 @@ that imports only the term can call it as ordinary Haskell.
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | `Showcase.hs` passes both compilers with 136 output lines, including the banner, through eighteen modules. The closed-evaluation example uses a source function in its result type. |
+| Maintained showcase | `Showcase.hs` passes both compilers with 139 output lines, including the banner, through eighteen modules. Source functions compute a Boolean payload type and a vector result length. |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and

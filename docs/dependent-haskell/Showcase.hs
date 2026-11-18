@@ -786,6 +786,7 @@ main = do
     invisibleRetainedArguments
     inferredAppend
     closedSourceFunctions
+    constructorFields
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()
@@ -801,3 +802,13 @@ closedSourceFunctions = do
 
     signalProof :: Table.signal 'Table.Green :~: 'Table.Go
     signalProof = Refl
+
+-- | The term function that computes a predecessor also indexes the shorter vector.
+constructorFields :: IO ()
+constructorFields = do
+    let xs = VCons (7 :: Int) (VCons 9 VNil)
+        shorter :: Vec Int (previous ('S ('S 'Z)))
+        shorter = dropFirst xs
+    observe "dropFirst with a computed result length" (toList shorter)
+    observe "empty vector stays empty" (toList (dropFirst (VNil :: Vec Int Z)))
+    observe "successor test ignores the field" (isSuccessor (S (error "unused predecessor")))

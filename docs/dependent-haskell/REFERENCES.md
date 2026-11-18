@@ -4464,3 +4464,11 @@ strict patterns. A lifted field matched by a wildcard must remain unevaluated
 at runtime. [Clause translation](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L1344-L1381),
 [pattern translation](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L1395-L1433)
 and [Haskell pattern semantics](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-590003.17).
+
+For the list-length experiment, Agda's primitive recursion rule permits a
+self-call on a direct recursive field of the current pattern. The proposed
+Haskell check uses the identity of the bound tail in that call. A call on
+the original input or on a reconstructed list has no such justification.
+This gives a finite reduction argument for a finite input spine. Haskell
+can still supply a partial or infinite spine at runtime.
+[Agda 2.8.0 primitive recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#primitive-recursion)

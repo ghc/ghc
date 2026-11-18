@@ -6130,11 +6130,11 @@ isSuccessor (S _) = True
       proof gives GHC-68947 at `previous`. The control proves the family
       equation and prints `(S Z,True)` with a bottom predecessor field in
       the successor test.
-- [ ] Extend checked rows to shallow patterns on ordinary lifted data
+- [x] Extend checked rows to shallow patterns on ordinary lifted data
       constructors. Bind fresh variables for their lazy fields. Permit a
       returned field of the appropriate type. Keep the one-row-per-constructor
       check. In particular, a row for `S Z` leaves `S (S Z)` uncovered.
-- [ ] Prove `previous ('S n) :~: n` in an interface-only client, including
+- [x] Prove `previous ('S n) :~: n` in an interface-only client, including
       an abstract `n`. Keep `previous n` stuck for an unknown outer
       constructor. Check that `isSuccessor (S undefined)` returns `True`
       and that forcing `previous (S undefined)` raises the field's error.
@@ -6144,3 +6144,48 @@ isSuccessor (S _) = True
 Recursive calls need a later termination check. List length also needs to
 construct the successor of a recursive result. See the [Agda and singletons
 sources](REFERENCES.md#constructor-fields-and-the-next-evaluation-rule).
+
+Implementation commit `868dacb5d0` checks the identity of the field binder
+on the right-hand side. The generated branch binds one type variable per
+field in constructor order. A wildcard also binds a fresh type variable.
+The nominal axiom for `previous ('S n)` therefore returns exactly `n`.
+The current grammar accepts prefix patterns on monomorphic lifted data.
+It excludes nested patterns, strict fields, newtypes, pattern synonyms,
+and calls in the right-hand side.
+
+Both stages prove the projection for an abstract field and reject a proof
+about an unknown outer constructor at `Refl` with GHC-25897. They also
+prove the equations with only a `.hi` file. A client with
+`NoExperimentalDependentTypes` assigned `dropFirst`'s result to a
+one-element vector and printed `[9]`. Changing a two-field projection
+from the second field to the first invalidated an unchanged proof client.
+The runtime successor test ignored its bottom field. Forcing the
+projected predecessor raised the original exception. Both stages match
+139 Showcase lines across eighteen modules. Sixteen registered normal-way
+tests pass, with 74 cases skipped. Local evidence uses the
+`native-source-fields-` prefix.
+
+## M77: structural recursion on a list spine
+
+R15 owns the next reduction step. The M76 compiler rejects both
+`bitCount ('Bit 'True ('Bit 'False 'End))` and `listCount '[ 'True, 'False]`
+with GHC-68947 at the source function. Both ordinary functions return
+`S (S Z)` at runtime. A handwritten length family proves the two-element
+case with `Refl`. The list control also returns two when both elements
+are bottom. The local baseline is `native-source-length-stage1-published`.
+
+- [x] Establish the same failure on a monomorphic user datatype
+      (`data Bits = End | Bit Bool Bits`) and an ordinary list of Bool.
+- [ ] Check a recursive call on the exact tail bound by the current
+      constructor pattern. Allow its result underneath a constructor,
+      as in `bitCount (Bit _ xs) = S (bitCount xs)`. Reject a self-call on
+      the original input, a reconstructed input, or a mutually recursive
+      binding. Keep a distinct check for coverage.
+- [ ] Instantiate the built-in list constructors at `Bool` and check
+      `listCount [] = Z` and `listCount (_ : xs) = S (listCount xs)`.
+      Prove the closed two-element case using a separately compiled
+      producer. Verify lazy elements and the runtime demand on the spine.
+- [ ] Demonstrate a vector indexed by the result of this source
+      function. The experiment uses a Peano result. Promoting the
+      overloaded Prelude `length` requires additional work on dictionaries
+      and its `Int` result.
