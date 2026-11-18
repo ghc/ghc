@@ -344,7 +344,7 @@ resultRemoteResources msg res = case msg of
   WhereFrom{}               -> []
   FreeRemoteResources{}     -> []
   where
-    evalStatus :: (b -> [HValueRef]) -> EvalStatus_ b c -> [HValueRef]
+    evalStatus :: (b -> [HValueRef]) -> EvalStatus b -> [HValueRef]
     evalStatus f = \case
       EvalComplete _ (EvalSuccess b)   -> f b
       EvalComplete _ (EvalException _) -> []
