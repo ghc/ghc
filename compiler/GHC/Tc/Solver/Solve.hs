@@ -411,7 +411,10 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                         givens = mkGivens loc selected_givens
                   ; solveSimpleGivens givens
 
-                  ; residual_wanted <- solveWanteds wanteds
+                  ; residual_wanted <- case ic_source_let imp of
+                      Just (_, proof) | proof `elem` selected_givens ->
+                        withSourceLetProof proof (solveWanteds wanteds)
+                      _ -> solveWanteds wanteds
 
                   ; (has_eqs, given_insols) <- getHasGivenEqs tclvl
                         -- Call getHasGivenEqs /after/ solveWanteds, because
@@ -473,8 +476,17 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
       let solved_needs = case ic_status child of
             IC_Solved { ics_dm = dm, ics_non_dm = non_dm } -> dm `unionVarSet` non_dm
             _ -> emptyVarSet
+          -- A residual implication can reach desugaring under deferred errors.
+          -- Its unpruned Given bindings may refer to a source-let CoVar even
+          -- when no Wanted uses the Given. See Note [Conditional source let evidence].
+          retained_givens
+            | isSolvedWC (ic_wanted child) = emptyVarSet
+            | otherwise = foldEvBindsMap given_rhs emptyVarSet binds
+          given_rhs EvBind { eb_info = EvBindGiven, eb_rhs = rhs } acc =
+            nestedEvIdsOfTerm rhs `unionVarSet` acc
+          given_rhs _ acc = acc
       return (findNeededGivenEvVars binds
-        (unionVarSets (local_needs : solved_needs : nested)))
+        (unionVarSets (local_needs : solved_needs : retained_givens : nested)))
 
     -- TcLevels must be strictly increasing (see (ImplicInv) in
     -- Note [TcLevel invariants] in GHC.Tc.Utils.TcType),

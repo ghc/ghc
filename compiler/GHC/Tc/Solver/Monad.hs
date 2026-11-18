@@ -16,7 +16,7 @@ module GHC.Tc.Solver.Monad (
     runTcSEqualities,
     nestTcS, nestImplicTcS, tryShortCutTcS, nestFunDepsTcS,
     setEvBindsTcS, setTcLevelTcS,
-    getNativeBinderScope, withNativeBinderScope,
+    getNativeBinderScope, withNativeBinderScope, getSourceLetScope, withSourceLetProof,
 
     selectNextWorkItem,
     getWorkList,
@@ -179,6 +179,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Var
+import GHC.Types.Var.Env (VarEnv, emptyVarEnv, extendVarEnv)
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
 import GHC.Types.Id
@@ -1084,6 +1085,9 @@ data TcSEnv
       -- See Note [Native runtime binder scopes].
       tcs_native_binders :: VarSet,
 
+      -- See Note [Rewriting checked local indices] in GHC.Tc.Solver.Rewrite.
+      tcs_source_lets :: VarEnv CoVar,
+
       -- See Note [CoVar forall touchability].
       tcs_covar_level :: Maybe TcLevel,
 
@@ -1101,6 +1105,18 @@ instance MonadFix TcS where
 -- monad trick] in "GHC.Utils.Monad".
 mkTcS :: (TcSEnv -> TcM a) -> TcS a
 mkTcS f = TcS (oneShot f)
+
+-- | Read the selected definitions in the lexical scope of this solve.
+getSourceLetScope :: TcS (VarEnv CoVar)
+getSourceLetScope = mkTcS $ \env -> return (tcs_source_lets env)
+
+-- | Scope the equality of a checked source definition over its suffix.
+withSourceLetProof :: CoVar -> TcS a -> TcS a
+withSourceLetProof proof inside
+  | coVarRole proof == Nominal, TermVarTy value <- coVarLType proof
+  = mkTcS $ \env -> unTcS inside
+        (env { tcs_source_lets = extendVarEnv (tcs_source_lets env) value proof })
+  | otherwise = pprPanic "withSourceLetProof" (ppr proof)
 
 -- | Return the runtime binders of the current retained equality comparison.
 getNativeBinderScope :: TcS VarSet
@@ -1299,6 +1315,7 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
                           , tcs_count    = step_count
                           , tcs_inerts   = inert_var
                           , tcs_mode     = mode
+                          , tcs_source_lets = emptyVarEnv
                           , tcs_native_binders = emptyVarSet
                           , tcs_covar_level = Nothing
                           , tcs_worklist = wl_var }
@@ -1388,6 +1405,8 @@ nestImplicTcS skol_info ev_binds_var inner_tclvl (TcS thing_inside)
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
                             , tcs_outer_ev_binds = if isStaticSkolInfo skol_info then []
                                                   else tcs_ev_binds env : tcs_outer_ev_binds env
+                            , tcs_source_lets = if isStaticSkolInfo skol_info then emptyVarEnv
+                                                else tcs_source_lets env
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
        ; res <- TcM.setTcLevel inner_tclvl $
@@ -1483,6 +1502,7 @@ tryShortCutTcS (TcS thing_inside)
        ; new_ev_binds_var <- TcM.cloneEvBindsVar old_ev_binds_var
        ; let nest_env = env { tcs_mode     = mode { tcsmSkipOverlappable = True }
                             , tcs_ev_binds = new_ev_binds_var
+                            , tcs_source_lets = emptyVarEnv
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
 

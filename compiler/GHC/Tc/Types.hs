@@ -160,6 +160,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Var
+import GHC.Types.Var.Env (VarEnv)
 import GHC.Types.Var.Set (VarSet)
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
@@ -374,6 +375,10 @@ data RewriteEnv
        , re_native_lifting :: !LiftingContext
           -- ^ Source runtime binder relations in the common rewriting prefix.
           -- See Note [Lifting runtime binder domains] in GHC.Core.Coercion.
+
+       , re_source_lets :: !(VarEnv CoVar)
+          -- ^ Selected source definitions in this implication.
+          -- See Note [Rewriting checked local indices] in GHC.Tc.Solver.Rewrite.
 
        , re_native_binders :: !VarSet
           -- ^ Retained runtime binders in scope during normalization.

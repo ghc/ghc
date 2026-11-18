@@ -111,6 +111,7 @@ runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, CoHoleSet)
 runRewrite loc flav eq_rel thing_inside
   = do { dflags <- getDynFlags
        ; native_binders <- getNativeBinderScope
+       ; source_lets <- getSourceLetScope
        ; used_cos_ref  <- newTcRef emptyUnivCoDeps
        ; rewriters_ref <- newTcRef emptyCoHoleSet
        ; let fmode = RE { re_loc       = resetCtLocDepth loc
@@ -120,9 +121,11 @@ runRewrite loc flav eq_rel thing_inside
                         , re_rewriters = rewriters_ref
                         , re_used_cos  = used_cos_ref
                         , re_native_lifting = emptyLiftingContext emptyInScopeSet
+                        , re_source_lets = source_lets
                         , re_native_binders = native_binders
                         , re_fam_axioms_only = False
-                        , re_zap_coercions = isEmptyVarSet native_binders
+                        , re_zap_coercions = isEmptyVarEnv source_lets
+                                             && isEmptyVarSet native_binders
                                              && gopt Opt_ZapCoercions dflags }
        ; res <- runRewriteM thing_inside fmode
        ; rewriters <- readTcRef rewriters_ref
@@ -347,7 +350,8 @@ rewriteFamilyAxioms loc ty
   = do { (redn, rewriters) <- runRewrite loc Given NomEq $
            mkRewriteM $ \env ->
              runRewriteM (rewrite_one ty)
-               (env { re_fam_axioms_only = True, re_zap_coercions = False })
+               (env { re_fam_axioms_only = True, re_zap_coercions = False
+                    , re_source_lets = emptyVarEnv })
        ; massert (isEmptyCoHoleSet rewriters)
        ; return redn }
 
@@ -737,6 +741,30 @@ evaluation boundary in docs/dependent-haskell/REFERENCES.md#agda-provenance and
 Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 -}
 
+{- Note [Rewriting checked local indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In let { cells = r * c; count = S cells } the second equation gives
+count ~ S cells. To check the final body at S (times r c), compose this
+proof with the first one under S. Keep only the original, selected
+source-let CoVars in a lexical solver environment. The RHS of each
+nonrecursive definition can refer only to earlier definitions. Arbitrary
+Given equalities do not enter this environment.
+
+Install a proof after solving the Givens for its definition. Its scope
+covers the remaining Wanteds and their nested implications. Later Givens
+must use the same normal form as their Wanteds. For example, Flag cells
+from a GADT match must still solve a request for Flag cells. Return the
+actual coercion, weakened to the requested role, and rewrite the RHS by
+the remaining definitions and global family axioms. A local Given in the
+body can equate a family application to the alias itself. Following that
+Given while expanding the RHS would reintroduce the alias. Static forms and shortcut instance solving start
+without these local equations, like their ordinary Given environments.
+Count each expansion against the reduction depth. Record
+the CoVar as a dependency. Keep reductions with local definitions out of
+the family cache and preserve their evidence without coercion zapping.
+Axiom-only and retained-binder comparisons retain their existing scope.
+-}
+
 rewrite_one :: TcType -> RewriteM Reduction
 -- Rewrite a type to get rid of type function applications, returning
 -- the new type-function-free type, and a collection of new equality
@@ -764,8 +792,15 @@ rewrite_one ty@(TermAppTy f arg)
 rewrite_one ty@(TermVarTy v)
   | isNativeOpaqueValueId v
   = do { role <- getRole
-       ; lc <- getRewriteEnvField re_native_lifting
-       ; return $! coercionRedn (liftCoSubstNative lc role v) }
+       ; env <- getRewriteEnv
+       ; case lookupVarEnv (re_source_lets env) v of
+           Just proof | isEmptyVarSet (re_native_binders env) -> do
+             { liftTcS $ updTcRef (re_used_cos env) (addUnivCoDepCoVar proof)
+             ; let redn = downgradeRedn role Nominal (coercionRedn (mkCoVarCo proof))
+             ; let rhs_env = env { re_source_lets = delVarEnv (re_source_lets env) v
+                                 , re_fam_axioms_only = True }
+             ; mkRewriteM $ \_ -> runRewriteM (bumpReductionDepthRM ty (rewrite_reduction redn)) rhs_env }
+           _ -> return $! coercionRedn (liftCoSubstNative (re_native_lifting env) role v) }
   | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 rewrite_one ty@(DepFunTy vis b body)
@@ -1122,7 +1157,9 @@ rewriteExactFamApp tc tys =
 
                 -- See Note [The family application cache]
               ; eq_rel <- getEqRel
-              ; when (  worth_caching                 -- (FAC_WorthCaching)
+              ; source_lets <- getRewriteEnvField re_source_lets
+              ; when (  isEmptyVarEnv source_lets
+                     && worth_caching                 -- (FAC_WorthCaching)
                      && eq_rel == NomEq               -- (FAC_Role)
                      && not (univCoDepsHasHoles deps) -- (FAC_Holes)
                      ) $
