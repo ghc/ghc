@@ -8086,18 +8086,26 @@ evenSum :: Prelude.odd (Prelude.sum '[2, 3, 5]) :~: 'False
 evenSum = Refl
 ```
 
-- [ ] Choose the runtime representation from the checked result kind.
+- [x] Choose the runtime representation from the checked result kind.
       Reuse GHC's data constructors and literal builders. Check a natural
       larger than a machine word, both Boolean constructors, strings with
       escapes and empty lists of different element kinds.
-- [ ] Keep literal inference independent of the caller's claimed result.
+- [x] Keep literal inference independent of the caller's claimed result.
       A computed empty list has an element kind. An unannotated source
       `'[]` passed to `Prelude.reverse` already specializes to `[Natural]`.
-- [ ] Reject a computed empty list of the wrong element kind and a
+- [x] Reject a computed empty list of the wrong element kind and a
       polymorphic result that its operand does not determine. Run the
       existing staging and separate-compilation controls.
 
 [Kind-directed conversion in singletons](REFERENCES.md#reifying-closed-list-results).
+
+Both compiler stages accepted `odd (sum …)`. A second witness checks
+the entire value `18446744073709551617` after passing it to
+`Prelude.id`. A parity check alone would not detect truncation.
+The list-of-Booleans test and the escaped string test exercise
+constructor identity and element order. All 15 selected normal-way
+tests passed. The two compiled Showcase runs and GHCi produced the
+same 184 lines.
 
 ## M109: carry an open call in an exported equality
 
@@ -8112,9 +8120,20 @@ returns its input in the default branch.
       the mapped and default character branches. Changing one branch
       changes the declaration fingerprint even for an unaffected input.
       Omitting the optional unfolding leaves the reader without a body.
-- [ ] Tie the checked case definition to the worker's resolved name.
-      Record its declaration dependency. Check which producer data remain
-      available when ordinary optimization unfoldings are omitted.
+- [x] Check the pre-optimization Core for all 1,505 literal alternatives
+      in GHC's generated Unicode worker, including the identity default.
+      Reject a reachable recursive, partial or effectful body.
+- [x] Generate a closed family directly from the checked Unicode worker.
+      An ordinary exporter and an interface-only client use the 1,505
+      equations for ASCII, Unicode, the last mapping and the default.
+      A wrong equality and a rigid default proof fail. Editing the original
+      worker and regenerating the family changes the unchanged client's
+      result under `--make`.
+      [Reproduce the experiment](examples/certified-character-case/README.md).
+- [ ] Associate the checked case with the worker's resolved name in the
+      producer's own interface. Record its declaration dependency. Check
+      which producer data remain available when ordinary optimization
+      unfoldings are omitted.
 - [ ] Represent the saturated call in the producer interface. Keep it
       opaque when its operand is a skolem. The result of this function
       does not determine its input.

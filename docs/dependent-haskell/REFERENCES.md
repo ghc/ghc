@@ -5098,3 +5098,32 @@ that annotation. The runtime debugger uses the original Core.
 [GHC wired-in types](../../compiler/GHC/Builtin/WiredIn/Types.hs),
 [breakpoint insertion](../../compiler/GHC/Driver/Config/HsToCore/Ticks.hs)
 and [GHC's interface expression reader](../../compiler/GHC/IfaceToCore.hs).
+
+### Passing a computed result to another ordinary function
+
+The `SingKind` class in `singletons` selects demotion from the known kind.
+R15 uses the same criterion after checking a nested call. Its input is a
+promoted Core type. For a nullary promoted Boolean, GHC can recover the
+originating data constructor through `isPromotedDataCon_maybe`. Numeric
+and character literals use GHC's target-aware literal builders.
+[Singletons 3.0.4](https://hackage-content.haskell.org/package/singletons-3.0.4/docs/Data-Singletons.html#t:SingKind),
+[GHC type constructors](../../compiler/GHC/Core/TyCon.hs)
+and [Core literal builders](../../compiler/GHC/Core/Make.hs).
+
+### Evidence for the finite character fragment
+
+A verified finite table could reuse GHC's closed-family axiom machinery.
+GHC checks earlier incompatible equations before selecting the default.
+The consumer already knows how to serialize and lint a family reduction.
+The fork's source-table machinery links an ordinary definition to its
+generated family. A design that uses it for characters must certify the
+complete definition and its aliases and track the worker's declaration.
+[Closed-family reduction](../../compiler/GHC/Core/FamInstEnv.hs),
+[source-table construction](../../compiler/GHC/Tc/Gen/SourceTable.hs)
+and [interface decoding](../../compiler/GHC/IfaceToCore.hs).
+
+The [Unicode experiment](examples/certified-character-case/README.md)
+derives the ordinary family from pre-optimization Core. The client can
+reduce its exported equality with only the producer interfaces available.
+[Structural check](examples/certified-character-case/CharCertificate.hs)
+and [exported signature](examples/certified-character-case/P3.hs).

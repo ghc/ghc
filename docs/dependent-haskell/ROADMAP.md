@@ -149,15 +149,16 @@ General opaque proof projection stays open.
 **[R15, closed term evaluator](roadmap/R15-closed-term-evaluator.md) and
 [R16, open term evaluator](roadmap/R16-open-term-evaluator.md) are active.**
 They are separate subtasks of function promotion. The upstream graph has
-no dependency from one evaluator to the other. Review each against its own
-source example. R15 must execute an imported length function to check a
+no dependency from one evaluator to the other. Work on the two cards in
+parallel, with one owner and one source acceptance example per card.
+Review and test each change before integrating it. R15 must execute an imported length function to check a
 three-element vector. R16 must reduce a polymorphic identity while its
 argument is still unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Use a computed `Natural`, `Bool` or list result as the argument to another call, starting with `odd (sum …)`. | M106 checks kinds and instances before executing a chain. [M108](PLAN.md#m108-accept-a-computed-value-at-each-supported-result-kind) specifies conversion for the other result shapes. |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check proposal #509’s exported equality `Data.Char.toUpper c ~ uc` when the client instantiates `c`. [M109](PLAN.md#m109-carry-an-open-call-in-an-exported-equality) specifies what Core Lint and a separate client must check. | M104 retries a call in the producer’s inference group. M107 selects a rigid result operand across an imported character case. An application on an unknown character still needs interface representation and nominal evidence. R17–R19 also depend on R05 and R16. |
+| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Accept source operands through GHC's normal literal and constructor checking at the supported kinds. Preserve the existing interpretation of an unannotated empty list. | [M108](PLAN.md#m108-accept-a-computed-value-at-each-supported-result-kind) accepts all six result shapes as computed operands. The innermost call still requires a character literal or a list of natural literals. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check proposal #509’s exported equality `Data.Char.toUpper c ~ uc` when the client instantiates `c`. [M109](PLAN.md#m109-carry-an-open-call-in-an-exported-equality) specifies what Core Lint and a separate client must check. | M107 selects a rigid result operand across an imported character case. A [separate experiment](examples/certified-character-case/README.md) derives a closed family from the Unicode worker and checks its nominal equality across interfaces. The public term name still needs a link to that evidence. R17–R19 also depend on R05 and R16. |
 | R21, dependency analysis | Allow the producer to be defined in the consumer module, respecting declaration order and cycles. | A separately compiled producer lets R15 proceed while R21 remains open. |
 
 [R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
@@ -224,6 +225,7 @@ evaluator work has priority.
 | 46 | R15: lists as results | [M105](PLAN.md#m105-return-a-promoted-list-from-a-closed-call) | Prelude's ordinary `reverse` checks a list equality. The checked scalar element kind determines how to read the result, including for an empty list. |
 | 47 | R15: nested closed calls | [M106](PLAN.md#m106-check-a-closed-call-inside-another-closed-call) | A reversed list supplies the argument to an ordinary `sum`. The client records dependencies on both producers. |
 | 48 | R16: observe a character case | [M107](PLAN.md#m107-observe-a-character-case-with-rigid-result-operands) | An imported worker selects between two rigid types. The API regression records and checks the selected branches against its typed Core. |
+| 49 | R15: use computed operands | [M108](PLAN.md#m108-accept-a-computed-value-at-each-supported-result-kind) | The result kind determines the next operand's representation, including an arbitrary-precision natural and lists of Boolean or character values. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -384,8 +386,8 @@ still require substantial research.
 - [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24. M82 connects a concrete instance method to a checked source function in a retained argument. M83 checks the selected ground `Num` instance’s conversion of a nonnegative literal. General classes and abstract dictionary arguments remain open.
 - [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23.
 - [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge.
-- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M99, M101 and M103 support qualified closed calls on a character or a list of natural number literals. The argument can determine a polymorphic function's specialization. M105 reads back one list layer of a supported scalar type. M106 composes qualified unary calls. General closed evaluation remains open. See the [active card](roadmap/R15-closed-term-evaluator.md).
-- [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M100 and M102 handle rigid projections. M104 retries a call before generalization when a pattern fixes a signature wildcard. See the [open-term examples and checks](roadmap/R16-open-term-evaluator.md).
+- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M99, M101 and M103 support qualified closed calls on a character or a list of natural number literals. The argument can determine a polymorphic function's specialization. M105 reads back one list layer of a supported scalar type. M106 composes qualified unary calls. M108 passes all supported result shapes between calls. General closed evaluation remains open. See the [active card](roadmap/R15-closed-term-evaluator.md).
+- [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M100 and M102 handle rigid projections. M104 retries a call before generalization when a pattern fixes a signature wildcard. M107 selects a branch with a known character and a rigid result operand. The exported equality in M109 remains open. See the [open-term examples and checks](roadmap/R16-open-term-evaluator.md).
 - [ ] **R17 [Type-level lambdas](https://ghc.serokell.io/dh#type-level-lambdas)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R18 [Type-level let-bindings](https://ghc.serokell.io/dh#type-level-let-bindings)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R19 [Type-level case-expressions](https://ghc.serokell.io/dh#type-level-case-expressions)** — Unmarked. Needs/includes: R05, R16.

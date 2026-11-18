@@ -8,7 +8,7 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-18.
+Updated 2026-11-19.
 
 An imported `length :: [Natural] -> Natural` can now compute a vector
 index during compilation. The producer uses ordinary Haskell `foldr`.
@@ -56,6 +56,8 @@ extension switched off. [Inference example](roadmap/R16-open-term-evaluator.md#i
 
 One closed call can supply another's argument directly.
 `Prelude.sum (Prelude.reverse '[2, 3, 5])` computes the index `10`.
+The Showcase proves that passing this sum to `Prelude.odd` yields
+`'False`.
 [Nested calls](roadmap/R15-closed-term-evaluator.md#nested-closed-calls).
 
 An ordinary recursive length function now gives the return type of a
