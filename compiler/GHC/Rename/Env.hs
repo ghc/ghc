@@ -1218,11 +1218,14 @@ lookupTypeOcc app_head rdr_name
           , isVarOcc (greOccName gre)
           -> do { this_mod <- tcg_semantic_mod <$> getGblEnv
                 ; let name = greName gre
-                ; if isQual term_rdr && isLexVarId (occNameFS (greOccName gre))
+                ; if isLexVarId (occNameFS (greOccName gre))
                      && isImportedGRE gre && not (nameIsLocalOrFrom this_mod name)
                     then do { unless (any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)) $
-                                failWithTc (TcRnClosedTypeEval name
-                                  "A SOURCE import does not provide executable code.")
+                                if isQual term_rdr
+                                  then failWithTc (TcRnClosedTypeEval name
+                                    "A SOURCE import does not provide executable code.")
+                                  else failWithTc (TcRnOpenTypeEval name Nothing
+                                    "A SOURCE import does not provide a checked definition.")
                             ; addUsedGRE AllDeprecationWarnings gre
                             ; return gre }
                     else failWithTc (TcRnNoSourceTable name) }
@@ -1284,8 +1287,11 @@ order declarations that use the local family. If the imported family is
 absent, record that fact too. See Note [Source table usage fingerprints] in
 GHC.Unit.Module.ModIface.
 
-If the table is absent, keep an imported qualified function's term Name
-at an application head. See Note [Closed source calls] in GHC.Tc.Gen.HsType.
+If the table is absent, keep an imported function's term Name at an
+application head. With an implicit outer quantifier, an unqualified name
+can already have a type binder. The ordinary type lookup still wins.
+See Note [Closed source calls] in GHC.Tc.Gen.HsType and Note [Open source
+calls] in GHC.Tc.Gen.OpenTypeEval.
 -}
 
 {- Note [eqTyCon (~) compatibility fallback]

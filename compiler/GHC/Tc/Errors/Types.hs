@@ -2084,6 +2084,8 @@ data TcRnMessage where
 
   -- | GHC could not execute an imported function during type elaboration.
   TcRnClosedTypeEval :: !Name -> !String -> TcRnMessage
+  -- | The second name identifies a definition demanded by an open call.
+  TcRnOpenTypeEval :: !Name -> !(Maybe Name) -> !String -> TcRnMessage
 
   {-| TcRnUntickedPromotedThing is a warning (controlled with -Wunticked-promoted-constructors)
       that is triggered by an unticked occurrence of a promoted data constructor.

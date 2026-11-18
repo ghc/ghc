@@ -198,6 +198,25 @@ and fully applied. Its operands can be local values, supported constructors,
 or further checked calls. A user-defined operator can supply equations in
 the same way as a named function.
 
+An imported polymorphic function can also occur in a type when its argument
+is a rigid type variable. For example, this definition checks because
+reducing the ordinary Prelude function ``id`` returns the type variable
+``a`` unchanged::
+
+    {-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
+
+    x :: forall a. Num a => id a
+    x = 42
+
+The current implementation accepts an imported function of type
+``forall u. u -> u`` when it reduces to its argument of kind ``Type``.
+A user-defined function can participate if its interface provides the
+Core unfoldings that reduction needs. Compile the producer with
+:ghc-flag:`-fno-omit-interface-pragmas` to retain available unfoldings.
+The client records each definition it uses. The usual type variable
+lookup takes precedence. For example, an explicit type binder named
+``id`` still denotes that binder.
+
 For a class method, the current implementation accepts a concrete
 instance of a one-parameter class. The method must return its class
 parameter and name a checked function as its complete definition.

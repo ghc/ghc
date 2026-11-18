@@ -3,6 +3,11 @@
 # test('T11311', normal, compile_and_run, [''])
 test('T11964', normal, multimod_compile, ['T11964', '-v0'])
 closed_eval_dir = '../../../../docs/dependent-haskell/examples/closed-evaluation/'
+open_eval_dir = '../../../../docs/dependent-haskell/examples/open-evaluation/'
+test('NativeOpenIdentity',
+     extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs',
+                 'OpenSource.hs', 'RunOpenSource.hs', 'RunOpenSource.stdout', 'check-source.sh']]),
+     run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
 test('NativeClosedLength',
      [req_interp, req_rts_linker, extra_files([closed_eval_dir + f for f in
                                   ['check-source.sh', 'Client.hs', 'ClosedLengthProducer.hs']])],

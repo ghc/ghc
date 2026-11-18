@@ -1,0 +1,11 @@
+passed symbolic term is typed at the kind of the source skolem
+passed Prelude.id returns the symbolic operand at the skolem's kind
+passed a distinct neutral keeps its identity at the same spelling and kind
+passed imported Prelude.id with a rigid argument
+passed nested closure under same-spelling binders
+passed projection does not demand its divergent operand
+passed divergent operand itself runs out of fuel
+passed neutral application retains a suspended operand
+passed rigid case preserves its strict scrutinee and alternatives
+passed unsolved case records a resumable unknown
+passed supplying the missing definition allows the case to reduce

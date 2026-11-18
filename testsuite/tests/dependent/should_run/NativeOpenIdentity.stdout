@@ -1,0 +1,6 @@
+direct open calls and type binders checked, including alias usages
+unchanged one-shot recompilation reused the producer and consumer artifacts
+one-shot source calls return 42 at Int
+home modules under --make return 42 at Int
+the unchanged consumer rejected the changed worker
+missing interface definition rejected at the source application

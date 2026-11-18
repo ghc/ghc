@@ -377,6 +377,7 @@ Library
         GHC.Core.Map.Expr
         GHC.Core.Map.Type
         GHC.Core.Multiplicity
+        GHC.Core.OpenWhnf
         GHC.Core.Opt.Arity
         GHC.Core.Opt.CallArity
         GHC.Core.Opt.CallerCC
@@ -859,6 +860,7 @@ Library
         GHC.Tc.Gen.Head
         GHC.Tc.Gen.HsType
         GHC.Tc.Gen.Match
+        GHC.Tc.Gen.OpenTypeEval
         GHC.Tc.Gen.Pat
         GHC.Tc.Gen.Sig
         GHC.Tc.Gen.SourceTable

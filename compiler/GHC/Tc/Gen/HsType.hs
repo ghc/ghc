@@ -87,6 +87,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
+import GHC.Tc.Gen.OpenTypeEval (observeOpenType, openTypeFailureReason, supportsOpenTypeFunction)
 import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedNatural)
 import GHC.Tc.Utils.Unify
@@ -126,6 +127,7 @@ import GHC.Types.Error
 import GHC.Types.Id ( mkLocalId )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
+import GHC.Types.Name.Set (unionNameSet)
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -554,13 +556,13 @@ tcRetainedAmbientIndices invalid_reason hs_ty
     invalid_index = failWithTc $ TcRnRetainedQuantificationError invalid_reason
 
     -- Keep only free runtime occurrences. Telescope binders have their own Ids.
-    -- Imported qualified calls are handled by tc_app_ty.
+    -- Imported source calls are handled by tc_app_ty.
     ambient_names :: Data a => a -> [(SrcSpan, Name)]
     ambient_names thing
-      | Just (L loc (HsTyVar _ _ (L _ (WithUserRdr rdr name))))
+      | Just (L loc (HsTyVar _ _ (L _ (WithUserRdr _ name))))
           <- (cast thing :: Maybe (LHsType GhcRn))
       , isVarName name
-      , not (isQual rdr && isExternalName name) = [(locA loc, name)]
+      , not (isExternalName name) = [(locA loc, name)]
       | Just (L _ (HsForEachTy _ bndrs _)) <- (cast thing :: Maybe (LHsType GhcRn))
       = let bound = mapMaybe hsLTyVarName bndrs
         in filter (\(_, name) -> name `notElem` bound) (concat (gmapQ ambient_names thing))
@@ -2346,7 +2348,6 @@ tc_app_ty mode rn_ty exp_kind
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
 tc_app_ty mode rn_ty exp_kind
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
-  , isQual rdr
   , isVarName name
   , isExternalName name
   = setSrcSpanA loc $
@@ -2359,7 +2360,8 @@ tc_app_ty mode rn_ty exp_kind
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
-                         | tcEqType (varType fun) (mkVisFunTyManyU list_kind naturalTy)
+                         | isQual rdr
+                         , tcEqType (varType fun) (mkVisFunTyManyU list_kind naturalTy)
                          -> do { numbers <- case closedNaturalList arg of
                                    Just ns -> return ns
                                    Nothing -> failWithTc $ TcRnClosedTypeEval name
@@ -2371,6 +2373,10 @@ tc_app_ty mode rn_ty exp_kind
                                      "The checked argument does not represent a list of Natural literals."
                                ; result <- tcRunClosedNatural fun numbers
                                ; checkExpKind mode rn_ty result naturalTy exp_kind }
+                         | isTypeVariableArg arg
+                         , supportsOpenTypeFunction fun
+                         -> do { result <- tcOpenTypeCall mode name fun arg
+                               ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name }
   where
@@ -2385,6 +2391,40 @@ tc_app_ty mode rn_ty exp_kind
        ; checkExpKind mode rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
+
+-- | Check a named rigid operand and record definitions used to reduce the call.
+-- See Note [Open source calls] in GHC.Tc.Gen.OpenTypeEval.
+tcOpenTypeCall :: TcTyMode -> Name -> Id -> LHsType GhcRn -> TcM Type
+tcOpenTypeCall mode name fun arg = do
+  level <- getThLevel
+  bootOrSig <- tcIsHsBootOrSig
+  explicitLevels <- xoptM LangExt.ExplicitLevelImports
+  case level of
+    Comp | not bootOrSig && not explicitLevels -> pure ()
+    _ -> reject "This call requires an ordinary module outside quotes and splices, without ExplicitLevelImports."
+  checked <- tc_check_lhs_type mode arg liftedTypeKind
+  operand <- liftZonkM (zonkTcType checked)
+  case getTyVar_maybe operand of
+    Just skolem -> do
+      outcome <- observeOpenType fun skolem
+      case outcome of
+        Left reason -> let (definition, message) = openTypeFailureReason reason
+                       in failWithTc (TcRnOpenTypeEval name definition message)
+        Right (result, used) -> do
+          env <- getGblEnv
+          updTcRef (tcg_open_term_uses env) (`unionNameSet` used)
+          pure result
+    Nothing -> reject "The argument must be a rigid type variable of kind Type."
+  where
+    reject :: String -> TcM a
+    reject = failWithTc . TcRnOpenTypeEval name Nothing
+
+-- | Let the open evaluator kind-check only named operands.
+isTypeVariableArg :: LHsType GhcRn -> Bool
+isTypeVariableArg (L _ (HsParTy _ arg)) = isTypeVariableArg arg
+isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
+  isTyVarName name
+isTypeVariableArg _ = False
 
 -- | Read a promoted literal list before admitting the call to execution.
 closedNaturalList :: LHsType GhcRn -> Maybe [Integer]

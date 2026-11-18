@@ -1,0 +1,4 @@
+NativeOpenTermLimit.hs:5:25: error: [GHC-70566]
+    • Cannot reduce the open call to ‘id’ in a type.
+        Reduction exceeded the open evaluation step limit (-freduction-depth).
+    • In the type signature: x :: forall a. Num a => id a

@@ -101,6 +101,7 @@ test('NativeLetMethodRule',
      multimod_compile_fail,
      ['NativeLetMethodRule', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
 test('NativeSourceLengthFamily', req_th, compile_fail, [''])
+test('NativeOpenTermLimit', normal, compile_fail, [''])
 test('NativeClosedEvalSafe',
      extra_files(['../../../../docs/dependent-haskell/examples/closed-evaluation/ClosedLengthProducer.hs']),
      multimod_compile_fail, ['NativeClosedEvalSafe', '-v0'])

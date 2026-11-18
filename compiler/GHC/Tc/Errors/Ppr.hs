@@ -934,6 +934,11 @@ instance Diagnostic TcRnMessage where
            , text "Build the result from constructors, bound variables, or fully applied functions with checked equations."
            , text "In a recursive call, pass a field of the first argument directly."
            , text "If there is a second argument, bind it with a variable and pass it unchanged in recursive calls." ]
+    TcRnOpenTypeEval name definition reason
+      -> mkSimpleDecorated $ hang
+           (text "Cannot reduce the open call to" <+> quotes (ppr name) <+> text "in a type.")
+           2 (vcat ([text "While reading the definition of" <+> quotes (ppr d) <> dot
+                    | Just d <- [definition]] ++ [text reason]))
     TcRnClosedTypeEval name reason
       -> mkSimpleDecorated $ hang
            (text "Cannot evaluate" <+> quotes (ppr name) <+> text "in a type.")
@@ -2388,6 +2393,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnClosedTypeEval {}
       -> ErrorWithoutFlag
+    TcRnOpenTypeEval {}
+      -> ErrorWithoutFlag
     TcRnUntickedPromotedThing {}
       -> WarningWithFlag Opt_WarnUntickedPromotedConstructors
     TcRnIllegalBuiltinSyntax {}
@@ -3076,6 +3083,8 @@ instance Diagnostic TcRnMessage where
     TcRnNoSourceTable {}
       -> noHints
     TcRnClosedTypeEval {}
+      -> noHints
+    TcRnOpenTypeEval {}
       -> noHints
     TcRnUntickedPromotedThing thing
       -> [SuggestAddTick thing]
