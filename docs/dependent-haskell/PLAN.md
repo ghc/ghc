@@ -6744,3 +6744,19 @@ Both stages matched all 158 Showcase output lines. The test driver passed
 33 selected normal-way tests and the registered GHCi script. These include
 the native Core and bounded family-depth controls. This change uses the
 existing nominal family axioms and interface format.
+
+## M85: infer the parameters of a retained constructor argument
+
+At M84 the call `safeHead (sourceVector (x : xs))` fails at the list cell.
+Writing `sourceVector @a` succeeds. The constructor's fields already determine
+the missing type even when `a` mentions a runtime index.
+
+- [ ] Read the declared field types of saturated constructors in a visible
+      retained argument. Use them to select erased parameters before ordinary
+      instantiation. Keep the existing scope and kind checks.
+- [ ] Check the generic list cell, a nested two-parameter datatype, an
+      extension-off client and an element type containing a runtime index.
+      Check conflicting fields at their source locations and run the positive
+      examples with undefined tails and fields.
+- [ ] Update the Showcase, R03 and the user's guide. Run the existing
+      dependent application and empty-vector controls with the new checker.
