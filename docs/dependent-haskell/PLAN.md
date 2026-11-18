@@ -6424,3 +6424,34 @@ The existing `Sum p Refl` witness checks and returns a two-element vector.
 The next Core rule must preserve lazy evaluation, tie the actual called Id
 to its checked equations across an interface, and give Core Lint the same
 judgment as the source typechecker.
+
+## M81: a computed retained length
+
+The source target is `replicateNative @Bool (plus n m) True` at
+`Vec Bool (plus n m)`. Both names can come from IO. R03 owns retained
+application, and R13 and R15 own the producer's equations. On M80 a
+direct call gives GHC-83605. A named length and an explicit `Sum p Refl`
+witness already work.
+
+- [ ] Connect each accepted source function Id to its checked closed
+      family. Preserve this link in ordinary and no-code interfaces.
+      Check the actual function identity, domain, arity and result.
+- [ ] Use that family application when substituting a saturated call in
+      a retained result. Preserve the runtime head during substitution.
+      Keep the call intact through mandatory Core Lint. An ordinary
+      local function or a different family cannot supply its equations.
+- [ ] Name the computed length with an ordinary lazy STG binding after
+      checking Core. For the first source case, use monomorphic heads
+      with atomic operands. A partial sum must produce its first
+      successor without forcing the tail. A function that ignores the
+      length must return even when both inputs are bottom.
+- [ ] Compile an interface-only client and run the examples with both
+      stages. Check the source location of rejected calls. Update the
+      runnable Showcase and the R03 and R13 work queue with the results.
+
+Agda substitutes the argument into the dependent result. In this fork
+a checked closed family expresses that substitution for a source call.
+The call stays visible until the result type has been checked. Naming it
+earlier in Core would replace its index with that of a fresh runtime
+variable. A strict case for this name would also force the call.
+See [type-preserving naming and Agda let substitution](REFERENCES.md#core-contract-audit-and-bounded-beta-exposure).
