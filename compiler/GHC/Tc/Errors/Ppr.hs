@@ -3625,25 +3625,25 @@ pprRetainedQuantificationError reason = case reason of
   RetainedMatrixFallback ->
     text "A retained constructor matrix permits only one final equation with bare variables or wildcards in both selected index columns."
   RetainedMatrixPattern ->
-    vcat [text "A retained constructor matrix requires constructor patterns in both selected index columns, with bare variable fields."
+    vcat [text "A retained constructor matrix requires constructor patterns in both selected index columns, with variables or wildcards as fields."
          ,text "One final equation can use bare variables or wildcards in both columns."]
   RetainedMatrixContext ->
     text "Constraints within a retained constructor matrix are not supported yet."
   RetainedCasePatterns ->
-    text "Dependent case refinement requires one unguarded match for each constructor, with bare variable fields."
+    text "Dependent case refinement requires one unguarded match for each constructor, with variables or wildcards as fields."
   RetainedCaseQuotation ->
     text "Dependent case refinement does not support Template Haskell quotations."
   RetainedConstructorQuotation ->
     text "Constructor equations with later retained arguments do not support Template Haskell quotations yet."
   RetainedConstructorArguments ->
-    text "Retained constructor fields and later arguments currently require bare variable patterns and unrestricted multiplicities."
+    text "Retained constructor fields and later arguments currently require bare variable patterns or wildcards and unrestricted multiplicities."
   RetainedPatternType ty ->
     vcat [ text "Retained constructor refinement does not support this type yet:"
          , ppr ty ]
   RetainedVariablePattern ->
-    text "The retained argument currently requires a bare variable pattern."
+    text "The retained argument currently requires a bare variable pattern or a wildcard."
   RetainedFunctionPatterns ->
-    text "Function-valued retained binders currently require one equation with bare variable patterns in retained columns."
+    text "Function-valued retained binders currently require one equation with bare variable patterns or wildcards in retained columns."
   RetainedContextPattern ->
     text "A strict prefix pattern before a retained context is not supported when later value patterns remain."
   RetainedResultWrapper ->
@@ -3692,7 +3692,7 @@ pprRetainedQuantificationError reason = case reason of
     text "Promotion of constructors with retained fields is not supported yet."
   RetainedPackagePattern ->
     vcat [ text "A retained package pattern requires prefix constructor syntax and unrestricted multiplicity."
-         , text "Retained fields require bare variables or constructor patterns for their index domain, with bare variable fields."
+         , text "Retained fields require bare variables, wildcards, or constructor patterns for their index domain. Constructor fields must be variables or wildcards."
          , text "Lazy patterns and pattern bindings are not supported yet." ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc

@@ -101,7 +101,7 @@ firstCell x xs = headOfNonempty (sourceVector (x : xs))
 data Parcel a b = Leaf a b | Layer (Parcel a b)
 
 parcelTag :: forall a b. foreach (p :: Parcel a b) -> Proxy p
-parcelTag _p = Proxy
+parcelTag _ = Proxy
 
 -- The later tag fixes the first addend before the vector determines the tail.
 withPrefix :: Vec a (p + k) -> Proxy p -> [a]

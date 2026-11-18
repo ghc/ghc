@@ -15,7 +15,8 @@ module GHC.Tc.Gen.Pat
    , LetBndrSpec(..)
    , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcMatchPats
-   , tcRetainedCon, retainedConPat, retainedConIndex
+   , bindRetainedConFields, isRetainedVarPat
+   , tcRetainedCon, retainedConPat, retainedConIndex, bindRetainedWildcard
    , addDataConStupidTheta
    , zipPatsBndrs
    )
@@ -1303,6 +1304,30 @@ retainedConPat (L loc pat@(ConPat { pat_args = InfixCon _ left right }))
   = L loc (pat { pat_args = PrefixCon noExtField [left, right] })
 retainedConPat pat = pat
 
+-- | A bare retained binder can bind a source variable or a wildcard.
+isRetainedVarPat :: LPat GhcRn -> Bool
+isRetainedVarPat (L _ VarPat{}) = True
+isRetainedVarPat (L _ WildPat{}) = True
+isRetainedVarPat _ = False
+
+-- | Bind an anonymous retained value at the identity used by its dependants.
+-- See Note [Wildcard retained binders] in GHC.Tc.Gen.Match.
+bindRetainedWildcard :: Name -> LPat GhcRn -> LPat GhcRn
+bindRetainedWildcard name (L loc WildPat{}) = L loc (VarPat noExtField (noLocA name))
+bindRetainedWildcard _ pat = pat
+
+-- | Bind anonymous fields to the Ids used in the promoted constructor index.
+-- See Note [Parameterized retained constructor patterns].
+bindRetainedConFields :: [Id] -> LPat GhcRn -> LPat GhcRn
+bindRetainedConFields fields = go . retainedConPat
+  where
+    go :: LPat GhcRn -> LPat GhcRn
+    go (L loc (ParPat x inner)) = L loc (ParPat x (go inner))
+    go (L loc con@(ConPat { pat_args = PrefixCon x pats }))
+      = L loc (con { pat_args = PrefixCon x
+          (zipWithEqual (bindRetainedWildcard . idName) fields pats) })
+    go pat = pprPanic "bindRetainedConFields: not a checked constructor" (ppr pat)
+
 -- | Form the complete promoted constructor index of checked runtime fields.
 -- See Note [Parameterized retained constructor patterns].
 retainedConIndex :: Type -> DataCon -> [Id] -> Type
@@ -1330,6 +1355,7 @@ tcRetainedCon domain source_pat = case unLoc (retainedConPat source_pat) of
   where
     field (L loc (VarPat _ (L _ name))) (Scaled _ ty)
       = setSrcSpanA loc $ return (mkLocalId name ManyTy ty)
+    field (L _ WildPat{}) (Scaled _ ty) = newSysLocalId (fsLit "_") ManyTy ty
     field (L loc _) _
       = setSrcSpanA loc $
         failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
@@ -1345,6 +1371,10 @@ A structural domain can contain opaque parameter fields. Keep each field's
 actual Id and instantiated type in the promoted constructor index. The nominal whole
 constructor proof transports later fields through a family that exposes that
 Id. It does not project equality through an unmatchable function application.
+
+A wildcard subfield gets a fresh Id. Use this Id both in the constructor
+index and as the field binder in the checked pattern. When a case becomes
+a retained function, pass the bound fields into its generated clauses.
 
 The renamer retains built-in list patterns and infix constructor patterns.
 Expose only the selected empty list as nil and an infix constructor as its
@@ -1419,6 +1449,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                Just template ->
                  do { name <- case unLoc pat of
                         VarPat _ (L _ name) -> return name
+                        WildPat{} -> newSysName (mkVarOcc "_")
                         _ -> newSysName (mkVarOcc "retained_field")
                     -- Keep the incoming field identity and domain.
                     -- See Note [Refining later retained domains] in GHC.Tc.Gen.Match.
@@ -1426,10 +1457,10 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                           subst' = CoreSubst.extendIdSubst
                             (extendSubstInScope subst index) template (Var index)
                     ; unless (isManyTy (scaledMult original_ty) && isNativeRetainedBinder index) bad_pattern
-                    ; case unLoc pat of
-                        VarPat{} ->
+                    ; case bindRetainedWildcard name pat of
+                        field@(L _ VarPat{}) ->
                           do { (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
-                                  (position, pat, original_ty) $
+                                  (position, field, original_ty) $
                                   check_fields subst' refinements (position + 1) args pats
                              ; return (pat' : pats', res) }
                         _ ->
@@ -1445,7 +1476,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                              ; (ev_binds, (pat', (pats', res))) <-
                                  checkConstraints (PatSkol (RealDataCon index_con) match_ctxt) [] [cv] $
                                    tcConArg (RealDataCon con) penv
-                                     (position, retainedConPat pat, original_ty) $
+                                     (position, bindRetainedConFields fields pat, original_ty) $
                                      check_fields subst' (refinements ++ [(index, mkCoVarCo cv)])
                                        (position + 1) args pats
                              ; let L loc checked = pat'
@@ -1477,8 +1508,8 @@ Name for the retained Id. tcPatBndr uses that same Name, type, and multiplicity
 when it checks the field. Extend the substitution and its in-scope set before
 checking later fields and the RHS. Do not put this Id among the erased skolems.
 
-Retained fields accept bare variables or closed constructor patterns with
-bare variable subfields. A constructor pattern receives a fresh whole-field
+Retained fields accept variables, wildcards, or closed constructor patterns
+whose fields are variables or wildcards. A constructor pattern receives a fresh whole-field
 Id in an outer generated as-pattern. Its inner ConPat carries the nominal
 whole-index equality. Keep the actual source subfield Ids. Transport each
 later field type under that equality with tcRetainedCoercion, then retain
@@ -1491,7 +1522,7 @@ outermost so match selection uses its exact Id. Ordinary row failure keeps
 the existing equation order; no complete source-case group is required.
 See docs/dependent-haskell/REFERENCES.md#source-package-patterns.
 
-A retained function field must have a bare variable pattern. Bind its actual
+A retained function field can use a variable or wildcard pattern. Bind its
 Id before checking later payload fields. Reuse the closed Many head policy
 from Note [Function-valued retained binders] in GHC.Core.Type. Constructor
 decomposition remains a scalar operation; it supplies no function equality.

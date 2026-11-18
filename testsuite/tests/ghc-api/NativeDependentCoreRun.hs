@@ -2325,6 +2325,16 @@ sourceEntry moduleName source = do
 -- | Run retained source code through checking, desugaring, and native lowering.
 runSourceChecks :: GHC.Ghc ()
 runSourceChecks = do
+    -- Strict forces the anonymous argument. The case must retain its index.
+    void $ sourceEntry "NativeSourceStrictWildcard" $ unlines
+        [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Strict #-}"
+        , "module NativeSourceStrictWildcard where"
+        , "import Data.Proxy"
+        , "tag :: foreach (b :: Bool) -> Proxy b"
+        , "tag _ = Proxy"
+        , "entry :: Proxy True"
+        , "entry = tag True"
+        ]
     expression <- sourceEntry "NativeSourceKeep" retainedSource
     environment <- GHC.getSession
     flags <- GHC.getSessionDynFlags
@@ -3232,7 +3242,7 @@ runCaseSourceChecks = do
     forM_
         [ ("NativeSourceCaseIncomplete", 83605, "Dependent case refinement requires", "S k -> VCons x (replicateCaseNative k x)")
         , ("NativeSourceCaseGuarded", 83605, "Dependent case refinement requires", "Z -> VNil; S k | True -> VCons x (replicateCaseNative k x)")
-        , ("NativeSourceCaseWildcard", 83605, "Dependent case refinement requires", "Z -> VNil; S _ -> VCons x VNil")
+        , ("NativeSourceCaseWildcard", 5617, "Vec", "Z -> VNil; S _ -> VCons x VNil")
         , ("NativeSourceCaseWrongLength", 83865, "Vec", "Z -> VNil; S k -> VNil")
         , ("NativeSourceCaseEscapingPredecessor", 5617, "Vec", "Z -> VNil; S k -> replicateCaseNative k x")
         ]
@@ -4007,13 +4017,14 @@ runPackageSourceRejectChecks = do
         , ("RefinedUniversal", 83605, "equality specifications", [], [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
         , ("Promotion", 83605, "Promotion of constructors with retained fields", [], [], package ++ ["type Bad = 'PackVec"])
         , ("PatternWrongPredecessor", 5617, "rest", [], [], package ++ ["bad :: PackedVec Int -> PackedVec Int", "bad (PackVec (S k) (VCons x rest)) = PackVec (S k) rest"])
+        , ("IndependentWildcards", 83865, "bad _ _ xs = xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m", "bad _ _ xs = xs"])
         , ("PatternIndependent", 5617, "rest", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> PackedVec Int", "bad m (PackVec (S k) (VCons x rest)) = PackVec m rest"])
         , ("PatternGuardScope", 83865, "xs", [], [], package ++ ["bad :: PackedVec Int -> PackedVec Int", "bad (PackVec (S k) (VCons x rest)) | False = PackVec k rest", "bad (PackVec n xs) = PackVec (S n) xs"])
         , ("PatternFieldEscape", 25897, "rest", [], [], package ++ ["bad :: PackedVec Int -> Vec Int n", "bad (PackVec (S k) (VCons x rest)) = rest"])
         , ("PatternNestedField", 83605, "bare variable patterns", [], [], package ++ ["bad :: PackedVec Int -> Int", "bad (PackVec (S (S k)) xs) = 0"])
         , ("PatternWrongDomain", 83605, "index domain", [], [], package ++ ["bad :: PackedVec Int -> Int", "bad (PackVec True xs) = 0"])
         , ("PatternWrongArity", 83605, "Retained fields require bare variables", [], [], package ++ ["bad :: PackedVec Int -> Int", "bad (PackVec (S k j) xs) = 0"])
-        , ("RetainedWildcard", 83605, "Retained fields require bare variables", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec _ xs) = 0"])
+        , ("RetainedLazyField", 83605, "Retained fields require bare variables", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec ~_ xs) = 0"])
         , ("LazyPattern", 83605, "Lazy patterns and pattern bindings", [], [], package ++ ["bad :: PackedVec a -> Int", "bad ~(PackVec n xs) = 0"])
         , ("LetPattern", 83605, "Lazy patterns and pattern bindings", [], [], package ++ ["bad :: PackedVec a -> Int", "bad p = let PackVec n xs = p in 0"])
         , ("IndexMismatch", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> PackedVec Int", "bad n m xs = PackVec @Int m xs"])
@@ -4033,7 +4044,7 @@ runPackageSourceRejectChecks = do
         , ("RightZeroForged", 83865, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (n :: Nat) -> Add n Z :~: n", "bad n = Refl"])
         , ("ReverseIndexEscape", 83865, "reverseNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = reverseNative @Int n xs"])
         , ("ReverseWrongPredecessor", 5617, "rest", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)", "bad n m xs acc = case n of", "  Z -> case xs of VNil -> acc", "  S k -> case xs of VCons x rest -> reverseAppendNative @a (S k) m rest acc"])
-        , ("LaterWildcard", 83605, "bare variable pattern", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z _ xs ys = ys", "bad (S k) later xs ys = ys"])
+        , ("LaterBang", 83605, "bare variable pattern", ["BangPatterns"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z !_ xs ys = ys", "bad (S k) later xs ys = ys"])
         , ("LaterConstructor", 83605, "constructor patterns in both selected index columns", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z Z xs ys = ys", "bad (S k) later xs ys = ys"])
         , ("MatrixIncomplete", 83605, "each pair of constructors", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing"])
         , ("MatrixDuplicate", 83605, "matched by an earlier equation", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing", "bad (S left) (S right) = Nothing", "bad Z Z = Nothing"])
@@ -4643,8 +4654,8 @@ runNatSourceRejectChecks = do
             )
         ,
             ( "NativeSourceNatWildcard"
-            , 83605
-            , "Retained constructor fields and later arguments"
+            , 5617
+            , "Vec"
             , "      replicateNative (S k) x = VCons x (replicateNative k x)"
             , ["      replicateNative (S _) x = VCons x VNil"]
             )
@@ -4702,7 +4713,7 @@ runSourceRejectChecks = do
         , ("anonymous retained binder", 83605, "requires a variable name", [], local [] "foreach (_ :: Bool) -> Int -> Int" identity "42")
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
         , ("inner erased forall", 83605, "within the scope of a retained binder", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
-        , ("non-variable retained pattern", 83605, "bare variable pattern", [], local [] selection ["keep _ x = x"] "42")
+        , ("strict retained pattern", 83605, "bare variable pattern", ["BangPatterns"], local [] selection ["keep !_ x = x"] "42")
         , ("multiple variable equations", 83605, "one unguarded clause for each constructor", [], local [] selection (identity ++ identity) "42")
         , ("producer expression argument", 83605, "No checked source equations are available for", [], local [] consumer identity "keep (not False) 42")
         , ("nonreflexive indexed constraint", 18872, "True", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
@@ -4730,8 +4741,8 @@ runSourceRejectChecks = do
         , ("missing constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True = 42"] "42")
         , ("duplicate constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
         , ("guarded constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
-        , ("unsupported later constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", [], local [] selection ["keep True _ = 42", "keep False x = x"] "42")
-        , ("linear constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
+        , ("unsupported later constructor argument", 83605, "unrestricted multiplicities", [], local [] selection ["keep True 0 = 42", "keep False x = x"] "42")
+        , ("linear constructor argument", 83605, "unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
         ,
             ( "independent choose and keep indices"
             , 83865

@@ -218,13 +218,13 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
   = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionPatterns
   | otherwise
   = case unLoc (mg_alts matches) of
-      [L _ (Match { m_pats = L _ pats })]
+      [L loc match@(Match { m_pats = L pat_loc pats })]
         | not (first_retained_constructor pats) ->
-          tcRetainedVarMatches herald ctxt ty (filter isVisArgLPat pats) $ \pat_tys rhs_ty boundary ->
-            tcMatches mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty
-              (case boundary of
-                 Nothing -> matches
-                 Just prefix -> splitRetainedContext prefix matches)
+          tcRetainedVarMatches herald ctxt ty (filter isVisArgLPat pats) $ \pat_tys rhs_ty boundary names ->
+            let match' = match { m_pats = L pat_loc (bindRetainedWildcards names pats) }
+                prepared = matches { mg_alts = L (getLoc (mg_alts matches)) [L loc match'] }
+            in tcMatchesFrom (const match) mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty
+                 (maybe prepared (`splitRetainedContext` prepared) boundary)
       _ | DepFunTy DepFunVisible binder _ <- coreFullView ty ->
           do { index <- newSysLocalId (fsLit "retained") ManyTy (varType binder)
              ; let body_ty = applyTypeToArgs ty [Var index]
@@ -251,9 +251,8 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     variable_retained_patterns :: Type -> [LPat GhcRn] -> Bool
     variable_retained_patterns _ [] = True
     variable_retained_patterns ty (pat : pats) = case coreFullView ty of
-      DepFunTy DepFunVisible _ body -> case unLoc pat of
-        VarPat{} -> variable_retained_patterns body pats
-        _ -> False
+      DepFunTy DepFunVisible _ body ->
+        isRetainedVarPat pat && variable_retained_patterns body pats
       FunTy af _ _ _ body
         | isVisibleFunArg af -> variable_retained_patterns body pats
         | otherwise -> variable_retained_patterns body (pat : pats)
@@ -342,9 +341,10 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
               ; let capture_names = zip (map idName captures) names
                     add_arguments (L match_loc match@(Match { m_pats = L pats_loc pats }), (con, fields))
                       = let extra = map (noLocA . VarPat noExtField . noLocA) names
+                            subject_pats = map (bindRetainedConFields fields) pats
                             rewritten = rewriteRetainedCase (idName index) con fields capture_names match
                         in L match_loc (rewritten { m_ctxt = LamAlt LamSingle
-                                                  , m_pats = L pats_loc (pats ++ extra) })
+                                                  , m_pats = L pats_loc (subject_pats ++ extra) })
                     matches' = matches { mg_alts = L loc (map add_arguments (zip alternatives constructors)) }
                     dictionary_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) dictionaries
                     capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize . varType) captures
@@ -381,7 +381,7 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
     case_pattern pat = case unLoc (retainedConPat pat) of
       ParPat _ inner -> case_pattern inner
       ConPat { pat_args = PrefixCon _ fields }
-        -> all (\(L _ field) -> case field of VarPat{} -> True; _ -> False) fields
+        -> all isRetainedVarPat fields
       _ -> False
     case_error :: TcM a
     case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
@@ -447,10 +447,11 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
               ; let capture_names = zip (map idName captures) names
                     add_arguments (L match_loc match@(Match { m_pats = L pats_loc pats }), (con, fields))
                       = let extra = map (noLocA . VarPat noExtField . noLocA) names
+                            subject_pats = map (bindRetainedConFields fields) pats
                             rewritten = renameRetainedMatch capture_names
                                           (rewrite_call con fields match)
                         in L match_loc (rewritten { m_ctxt = LamAlt LamSingle
-                                                  , m_pats = L pats_loc (pats ++ extra) })
+                                                  , m_pats = L pats_loc (subject_pats ++ extra) })
                     matches' = matches { mg_alts = L loc (map add_arguments (zip alternatives constructors)) }
                     dictionary_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) dictionaries
                     capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize) capture_cos
@@ -521,7 +522,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
     case_pattern pat = case unLoc (retainedConPat pat) of
       ParPat _ inner -> case_pattern inner
       ConPat { pat_args = PrefixCon _ fields }
-        -> all (\(L _ field) -> case field of VarPat{} -> True; _ -> False) fields
+        -> all isRetainedVarPat fields
       _ -> False
     case_error :: TcM a
     case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
@@ -583,7 +584,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
         pattern_constructor pat = case unLoc (retainedConPat pat) of
           ParPat _ inner -> pattern_constructor inner
           ConPat { pat_con = L _ name, pat_args = PrefixCon _ fields }
-            | all (\(L _ field) -> case field of VarPat{} -> True; _ -> False) fields
+            | all isRetainedVarPat fields
             -> do { con_like <- tcLookupConLike name
                   ; return $ case con_like of
                       RealDataCon con
@@ -752,7 +753,7 @@ Seed the transport substitution with all free variables of the whole call,
 including constructor fields. Reject quotations before any source rewrite
 can change a quoted Name.
 
-Require complete, unguarded constructor rows with bare variable fields.
+Require complete, unguarded constructor rows with variable or wildcard fields.
 A source wildcard or variable case can ignore its scrutinee in Haskell.
 Do not introduce this strict alias on that ordinary path. Reject active
 instrumentation: an inserted tick can obscure the checked runtime call.
@@ -913,36 +914,42 @@ separate work. No equality comes from a local definition or an unfolding.
 -- | Introduce runtime index identities before checking the remaining patterns.
 tcRetainedVarMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> Type
                      -> [LPat GhcRn]
-                     -> ([ExpPatType] -> ExpRhoType -> Maybe Int -> TcM a) -> TcM a
+                     -> ([ExpPatType] -> ExpRhoType -> Maybe Int -> [Maybe Name] -> TcM a) -> TcM a
 tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty initial_pats
   where
+    finish acc rhs_ty boundary thing_inside =
+      let args = reverse acc
+      in thing_inside (map fst args) rhs_ty boundary
+           [name | (pat_ty, name) <- args, isVisibleExpPatType pat_ty]
+
     go acc ty pats thing_inside
       | (theta, _) <- tcSplitPhiTy ty, not (null theta)
-      = do { let prefix = length (filter isVisibleExpPatType acc)
+      = do { let prefix = length (filter (isVisibleExpPatType . fst) acc)
            ; strict <- xoptM LangExt.Strict
            ; unless (null pats || (not strict && all nonforcing_pattern (take prefix initial_pats))) $
                failWithTc (TcRnRetainedQuantificationError RetainedContextPattern)
-           ; thing_inside (reverse acc) (mkCheckExpType ty) (Just prefix) }
-    go acc ty [] thing_inside = thing_inside (reverse acc) (mkCheckExpType ty) Nothing
+           ; finish acc (mkCheckExpType ty) (Just prefix) thing_inside }
+    go acc ty [] thing_inside = finish acc (mkCheckExpType ty) Nothing thing_inside
     go acc ty (pat : pats) thing_inside
       | DepFunTy DepFunVisible binder _ <- coreFullView ty
       = setSrcSpanA (getLoc pat) $
         do { name <- case unLoc pat of
                VarPat _ (L _ name) -> return name
+               WildPat{} -> newSysName (mkVarOcc "_")
                _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
            ; let index = mkLocalId name ManyTy (varType binder)
                  pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
-           ; go (pat_ty : acc) (applyTypeToArgs ty [Var index]) pats thing_inside }
+           ; go ((pat_ty, Just name) : acc) (applyTypeToArgs ty [Var index]) pats thing_inside }
       | FunTy{} <- coreFullView ty
       = do { (co, _ma, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (length initial_pats, initial_ty) ty
            ; unless (isIdHsWrapper (mkWpCastN co)) $
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
-           ; go (mkCheckExpFunPatTy arg_ty : acc) rhs_ty pats thing_inside }
+           ; go ((mkCheckExpFunPatTy arg_ty, Nothing) : acc) rhs_ty pats thing_inside }
       | otherwise
       = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
                \pat_tys rhs_ty ->
                  do { rhs_ty <- readExpType rhs_ty
-                    ; go (reverse pat_tys ++ acc) rhs_ty pats thing_inside }
+                    ; go (map (, Nothing) (reverse pat_tys) ++ acc) rhs_ty pats thing_inside }
            ; unless (isIdHsWrapper wrap) $
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
            ; return result }
@@ -955,6 +962,35 @@ tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty init
       AsPat _ _ inner -> nonforcing_pattern inner
       SigPat _ inner _ -> nonforcing_pattern inner
       _ -> False
+
+-- | Give each retained wildcard its column's internal Name.
+-- See Note [Wildcard retained binders].
+bindRetainedWildcards :: [Maybe Name] -> [LPat GhcRn] -> [LPat GhcRn]
+bindRetainedWildcards (name : names) (pat : pats)
+  | isVisArgLPat pat = maybe pat (`bindRetainedWildcard` pat) name
+                       : bindRetainedWildcards names pats
+  | otherwise = pat : bindRetainedWildcards (name : names) pats
+bindRetainedWildcards _ pats = pats
+
+{- Note [Wildcard retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In keep :: foreach (n :: Nat) -> Vec a n -> Vec a n, the clause
+keep _ xs = xs discards the source name. The type of xs still refers to
+the first runtime argument. A checked WildPat would make selectMatchVar
+allocate a second Id during desugaring.
+
+Bind a fresh system Name for each anonymous retained parameter in a
+single equation. Use that Name to open the function type and to check
+the variable pattern. A constructor row already has a shared index Id
+for each retained column. Use that Id's Name for a wildcard in its
+column. A retained package field likewise needs the Id substituted into
+the remaining field types. No branch equality follows from a wildcard.
+
+The outer pattern keeps the source span of the wildcard. The internal
+binder has no source occurrence. The renamer has already resolved the
+RHS and its quotations. Ordinary variable-pattern desugaring preserves
+the argument's demand, including the module's Strict setting.
+-}
 
 -- | Check a constrained suffix as an expression inside its retained prefix.
 -- Keep its guards and local bindings inside the evidence lambdas.
@@ -1057,6 +1093,14 @@ Agda checks a telescope by extending its context before checking the remainder.
 See the pinned Rules.Term and LHSResult sources in
 docs/dependent-haskell/REFERENCES.md#agda-provenance.
 -}
+
+-- | Names shared by the visible runtime index columns of constructor equations.
+retainedColumnNames :: Id -> [RetainedConArg] -> [Maybe Name]
+retainedColumnNames first plan = Just (idName first) : foldr column [] plan
+  where
+    column (RetainedConIndex index) rest = Just (idName index) : rest
+    column RetainedConValue rest = Nothing : rest
+    column RetainedConDict{} rest = rest
 
 -- | Select a later retained constructor column without counting dictionaries.
 retainedMatrixColumn :: [RetainedConArg]
@@ -1203,10 +1247,13 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                  first_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType first_index))
                  renamed@(Match { m_pats = L renamed_loc renamed_pats })
                    = renameRetainedMatch names match
+                 constructor_columns = case row of
+                   Just ((_, first_fields), (_, second_fields)) ->
+                     [(0, first_fields), (second_column+1, second_fields)]
+                   Nothing -> []
                  prepared = renamed { m_pats = L renamed_loc
-                   (retainedConPats [0, second_column+1] $ case row of
-                      Just _ -> renamed_pats
-                      Nothing -> bind_wildcards 0 renamed_pats) }
+                   (retainedConPats constructor_columns $
+                    bindRetainedWildcards (retainedColumnNames first_index plan) renamed_pats) }
                  check = tcMatchWithSource tcBody
                    (invis_pat_tys ++ first_arg : refined_args)
                    (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc prepared)
@@ -1236,20 +1283,6 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
            ; return (L checked_loc (checked { m_pats = L pats_loc checked_pats'
                        , m_grhss = grhss { grhssGRHSs = fmap cast_rhs (grhssGRHSs grhss) } })) }
 
-    -- Bind each selected anonymous index to its existing shared Id.
-    bind_wildcards :: Int -> [LPat GhcRn] -> [LPat GhcRn]
-    bind_wildcards _ [] = []
-    bind_wildcards column (pat@(L pat_loc inner) : pats)
-      | not (isVisArgLPat pat) = pat : bind_wildcards column pats
-      | otherwise
-      = let shared | column == 0 = first_index
-                   | otherwise = second_index
-            pat' | WildPat{} <- inner
-                 , column == 0 || column == second_column+1
-                 = L pat_loc (VarPat noExtField (L (l2l pat_loc) (idName shared)))
-                 | otherwise = pat
-        in pat' : bind_wildcards (column+1) pats
-
     check_later _ [] [] = return []
     check_later column (argument : args) (pat@(L pat_loc inner) : pats)
       | RetainedConIndex shared <- argument
@@ -1258,12 +1291,11 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
           VarPat _ (L _ name) ->
             do { names <- check_later (column+1) args pats
                ; return ((name, idName shared) : names) }
+          WildPat{} -> check_later (column+1) args pats
           _ | column == second_column -> check_later (column+1) args pats
             | otherwise -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
       | otherwise
-      = do { case unLoc pat of
-               VarPat{} -> return ()
-               _ -> setSrcSpanA pat_loc argument_error
+      = do { unless (isRetainedVarPat pat) (setSrcSpanA pat_loc argument_error)
            ; check_later (column+1) args pats }
     check_later _ _ _ = argument_error
 
@@ -1403,7 +1435,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  Nothing -> return ()
                  Just span -> setSrcSpan span $
                    failWithTc (TcRnRetainedQuantificationError RetainedConstructorQuotation)
-           ; mapM_ (\pat -> unless (bare_variable pat) $
+           ; mapM_ (\pat -> unless (isRetainedVarPat pat) $
                         setSrcSpanA (getLoc pat) argument_error)
                (drop 1 (filter isVisArgLPat pats))
            ; let constructor_index = retainedConIndex (varType index) con fields
@@ -1421,7 +1453,9 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                                  argument_plan arg_tys arg_cos
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
                  renamed = renameRetainedMatch names match
-                 match' = renamed { m_pats = fmap (insert_dictionaries argument_plan . retainedConPats [0]) (m_pats renamed) }
+                 prepare = insert_dictionaries argument_plan . retainedConPats [(0, fields)]
+                         . bindRetainedWildcards (retainedColumnNames index argument_plan)
+                 match' = renamed { m_pats = fmap prepare (m_pats renamed) }
                  check = tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
                            (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc match')
            ; (ev_binds, L checked_loc checked) <-
@@ -1475,27 +1509,25 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
     retained_names (RetainedConDict _ : args) pats = retained_names args pats
     retained_names (RetainedConIndex shared : args) (L pat_loc pat : pats)
       = setSrcSpanA pat_loc $
-        do { name <- case pat of
-               VarPat _ (L _ name) -> return name
-               _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
-           ; names <- retained_names args pats
-           ; return ((name, idName shared) : names) }
+        case pat of
+          VarPat _ (L _ name) -> ((name, idName shared) :) <$> retained_names args pats
+          WildPat{} -> retained_names args pats
+          _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
     retained_names (RetainedConValue : args) (_ : pats) = retained_names args pats
     retained_names _ _ = argument_error
 
-    bare_variable (L _ VarPat{}) = True
-    bare_variable _ = False
 
--- | Expose constructor syntax at selected visible retained columns only.
+-- | Install the fields used in the proofs for the selected constructor columns.
 -- See Note [Parameterized retained constructor patterns] in GHC.Tc.Gen.Pat.
-retainedConPats :: [Int] -> [LPat GhcRn] -> [LPat GhcRn]
+retainedConPats :: [(Int, [Id])] -> [LPat GhcRn] -> [LPat GhcRn]
 retainedConPats columns = go 0
   where
     go _ [] = []
     go column (pat : pats)
       | not (isVisArgLPat pat) = pat : go column pats
-      | otherwise = (if column `elem` columns then retainedConPat pat else pat)
-                    : go (column+1) pats
+      | otherwise = case lookup column columns of
+          Just fields -> bindRetainedConFields fields pat : go (column+1) pats
+          Nothing -> pat : go (column+1) pats
 
 -- | Bind checked nominal constructor evidence on its actual pattern fields.
 addRetainedConProof :: EvVar -> TcEvBinds -> Pat GhcTc -> Pat GhcTc
@@ -1545,7 +1577,7 @@ selectMatchVar choose this Id. tidy1 removes the identical alias. The retained
 lambda and all its index occurrences therefore have the same Unique, without
 adding a field to MatchGroupTc. Keep exactly one unguarded equation for each
 constructor of the index domain. This gives the native proof case complete coverage.
-Later arguments currently require bare variable patterns and Many multiplicity.
+Later arguments accept variables or wildcards and require Many multiplicity.
 
 A later retained binder also needs one shared runtime Id across all equations.
 Consume each DepFunTy in telescope order and instantiate its codomain with that
@@ -1697,8 +1729,16 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
-tcMatches ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
-                                          , mg_ext = (origin, _) })
+tcMatches = tcMatchesFrom id
+
+-- | Check prepared clauses and report errors against their source equations.
+tcMatchesFrom :: (AnnoBody body, Outputable (body GhcTc))
+              => (Match GhcRn (LocatedA (body GhcRn)) -> Match GhcRn (LocatedA (body GhcRn)))
+              -> HsMatchContextRn -> TcMatchAltChecker body -> [ExpPatType] -> ExpRhoType
+              -> MatchGroup GhcRn (LocatedA (body GhcRn))
+              -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
+tcMatchesFrom source ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
+                                                     , mg_ext = (origin, _) })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in exp_ty
     -- when in inference mode, so we must do it ourselves,
@@ -1719,7 +1759,7 @@ tcMatches ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
   | otherwise
   = do { let exp_ty' = adjustExpTypeForCaseBranches exp_ty matches
              tc_match match = tcCollectingUsage $
-                              tcMatch tc_body pat_tys exp_ty' match
+                              tcMatchWithSource tc_body pat_tys exp_ty' (source (unLoc match)) match
        ; (usages, matches') <- mapAndUnzipM tc_match matches
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType (filter_out_forall_pat_tys pat_tys)
@@ -1774,16 +1814,6 @@ In tcMatches, we might encounter an empty list of matches if the user wrote
 -}
 
 -------------
-tcMatch :: (AnnoBody body)
-        => TcMatchAltChecker body
-        -> [ExpPatType]          -- Expected pattern types
-        -> ExpRhoType            -- Expected result-type of the Match.
-        -> LMatch GhcRn (LocatedA (body GhcRn))
-        -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
-
-tcMatch tc_body pat_tys rhs_ty match
-  = tcMatchWithSource tc_body pat_tys rhs_ty (unLoc match) match
-
 -- | Check a rewritten equation with its original source in the error context.
 tcMatchWithSource :: (AnnoBody body)
                   => TcMatchAltChecker body
