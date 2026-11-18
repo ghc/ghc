@@ -4492,3 +4492,14 @@ type and the list as its two Core arguments. Only the list argument is required
 in surface syntax. The family header fixes the arity. Its kind alone does
 not. [Pinned promotion implementation and arity note](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L1289-L1335)
 and [GHC family declarations](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#type-family-declarations).
+
+Agda's standard library gives `fromList` a vector result indexed by the
+length of its input list. The cons clause keeps the input head and calls
+`fromList` on the tail. M78 uses that signature and those two clauses for
+`sourceVector`. Its length function accepts the same abstract element
+type as the list. [Agda standard library v2.3, `Data.Vec.Base.fromList`](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L308-L310).
+
+Agda's primitive recursion section also gives the rule for addition in
+M79. The first argument loses a successor at each call. The second
+argument passes through unchanged. This lets the base equation return
+the second argument even when it is abstract. [Agda 2.8.0 primitive recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#primitive-recursion).

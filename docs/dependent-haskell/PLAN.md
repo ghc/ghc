@@ -6232,14 +6232,14 @@ for arbitrary lists. The aim is to let an ordinary
       cons equation for an abstract tail. In a type synonym the ordinary
       function gives GHC-68947 with an inferred element type. Writing
       `sourceLength @Bool` gives GHC-76037 at the function name.
-- [ ] Bind the specified element type in the private family and in each
+- [x] Bind the specified element type in the private family and in each
       axiom branch. A checked self-call must pass the same element type.
       Preserve the scope of the field variables. Keep the existing coverage,
       family-pattern validity and direct-field checks.
-- [ ] Resolve the ordinary function as a type application head both with
+- [x] Resolve the ordinary function as a type application head both with
       and without a written `@a`. Preserve type-variable shadowing, import
       tracking and use of the function in a later or earlier declaration.
-- [ ] Construct a vector of an arbitrary lifted element type with the source
+- [x] Construct a vector of an arbitrary lifted element type with the source
       length as its index. Prove the rigid-element and abstract-tail cases
       through a separate interface. Check explicit and inferred element
       types, stuck inputs, runtime demand, and a change to the cons equation.
@@ -6247,3 +6247,60 @@ for arbitrary lists. The aim is to let an ordinary
 The intended family binder order follows the arity rule in
 [`singletons-th`](REFERENCES.md#constructor-fields-and-the-next-evaluation-rule).
 Class constraints and the overloaded Prelude `length` remain separate work.
+
+The elaborated function has a type abstraction for the body skolem.
+Its inferred recursive application contains a `WpTyApp`. A written
+`sourceLength @a xs` has an `HsAppType` with the checked argument. The
+producer compares that argument to the body skolem, then gives the family
+and each branch fresh Core binders. The resulting family takes its element
+type before its list. A recursive call therefore stays at the same
+element type through a separately compiled interface.
+
+`sourceVector` accepts a named list with an inferred element type. For a
+Boolean list literal at a fixed result length, `sourceVector @Bool [True,
+False]` checks in ordinary and extension-enabled clients. Omitting
+`@Bool` there gives GHC-83605 on the first constructor for both the new
+function and the existing `genericVector`. Passing a named list of
+`Int` works. Writing overloaded integer literals directly in a retained
+list operand remains outside the operand grammar.
+
+At implementation commit `f9c1e4d1df`, both stages prove the closed and
+open equations with only the producer's
+interface. A proof client whose only use of the function is
+`P.sourceLength @Bool` rechecks after the cons equation changes, in both
+`--make` and one-shot compilation. A caller can take the head of a vector
+built from `True : xs` even when `xs` raises an exception. A known empty
+list and an unchecked list from an `IORef` give different GHC-83865
+diagnostics at the call. Both stages pass the 145-line Showcase across
+eighteen modules. All 19 selected normal-way tests pass, with 74 other
+cases skipped. Local evidence uses the `native-poly-source-length-` prefix.
+Stock Fourmolu rejects this fork's language extension. Cabal-gild also
+reports a formatting difference in the generated compiler package file,
+which this increment does not edit.
+
+## M79: addition from an ordinary two-argument function
+
+R13 and R15 next need a second ordinary term argument. With the extension
+enabled in the producer, both M78 compilers accept an adjacent unary
+predecessor. The binary function below runs as a term.
+
+```haskell
+plus Z     m = m
+plus (S n) m = S (plus n m)
+```
+
+A separate client gets GHC-68947 when it tries to use
+either equation from the interface. A handwritten family proves the base
+and successor cases with an abstract second operand.
+
+- [x] Check the unary positive control, both rejected uses, and the
+      handwritten proof without a producer object in the search path.
+- [ ] Check complete constructor coverage in the first argument and bind
+      the second argument as a variable. Check that the recursive call
+      decreases the first argument and passes the same second variable.
+- [ ] Prove both equations through a separate interface and use the
+      source function as the length of an appended vector. Verify that
+      observing the outer successor can leave the second operand lazy.
+
+Agda uses this definition of addition to introduce primitive recursion.
+See [the reference for the two-argument rule](REFERENCES.md#constructor-fields-and-the-next-evaluation-rule).

@@ -11,13 +11,46 @@ functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 Updated 2026-11-18.
 
 An ordinary recursive length function now gives the return type of a
-vector constructor. For a list `xs` read from an `IORef`, the caller can
-write `vector :: Vec Bool (listCount xs)` and construct it with
-`boolVector xs`. GHC checks the empty and cons branches at compile time.
-It can also prove a concrete length from the producer's interface alone.
-The current function accepts `[Bool]` and returns a Peano natural. The
-next step is a single length function for arbitrary lifted element types.
-See [the implementation and its limits](PLAN.md#m77-structural-recursion-on-a-list-spine).
+vector constructor. For a list of `Int` read from an `IORef`, the caller can
+write `vector :: Vec Int (sourceLength xs)` and construct it with
+`sourceVector xs`. GHC checks the empty and cons branches at compile time.
+The same length function accepts a list of any lifted element type and
+returns a Peano natural. From the producer's interface alone, GHC can prove
+that adding one element increases the length by one, even when it knows
+neither the element type nor the tail. See [the implementation and its limits](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type).
+
+### What happens on empty input?
+
+```haskell
+safeHead :: Vec a ('S n) -> a
+safeHead (VCons x _) = x
+```
+
+The successor in the argument type requires at least one element. GHC
+rejects `safeHead (sourceVector @Int [])` at the call site.
+
+```text
+Couldn't match type ‘Z’ with ‘S n0’
+  Expected: Vec Int (S n0)
+    Actual: Vec Int (sourceLength '[])
+```
+
+For a list `xs` read from an `IORef`, GHC knows the vector's length is
+`sourceLength xs` but cannot tell whether it is zero. A caller can handle
+both possible values. The `VCons` pattern supplies the successor equality
+that `safeHead` requires.
+
+```haskell
+case sourceVector xs of
+    VNil          -> pure Nothing
+    v@(VCons _ _) -> pure (Just (safeHead v))
+```
+
+The [rejection test](../../testsuite/tests/dependent/should_fail/NativeSourceLengthEmpty.hs)
+contains both calls without the match. The [Showcase](Showcase.hs) runs
+the two successful branches. If the input is already known to be
+`True : xs`, the cons equation gives `S (sourceLength xs)`, which suffices
+even if evaluating `xs` would diverge.
 
 ## Project documents
 
@@ -76,7 +109,7 @@ _build/showcase/showcase
 | Generic finite positions, function elements, runtime-indexed payloads and lazy prefixes | `genericSafeIndexing` |
 | A source function used in a result type and a proof about an imported traffic-light function | `closedSourceFunctions` |
 | Dropping the first element of a vector whose length is indexed by an ordinary predecessor function | `constructorFields` |
-| A vector indexed by the recursive length of an IO-sourced list, including demand on its spine and elements | `recursiveLengths` |
+| A vector indexed by the recursive length of an IO-sourced list, demand on its spine, and reuse of one length function at `Int` and function element types | `recursiveLengths` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -229,7 +262,7 @@ The field `m` can be unknown. [Vector library](examples/packed-vector/PackedVecL
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | Both compilers produce the same 142 lines, including the banner, from eighteen source modules. Source functions select a Boolean payload type and compute vector lengths from a predecessor or a list spine. |
+| Maintained showcase | Both compilers produce the same 145 lines, including the banner, from eighteen source modules. An ordinary polymorphic length indexes a vector. The caller handles both possible shapes of a list read at runtime. |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and

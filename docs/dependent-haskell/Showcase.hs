@@ -823,3 +823,17 @@ recursiveLengths = do
     observe "vector indexed by a recursive source length" (toList vector)
     observe "list length ignores bottom elements" (natToInt (listCount [undefined, undefined]))
     observe "first length constructor ignores the tail" (isSuccessor (listCount (False : undefined)))
+    ints <- newIORef ([11, 22] :: [Int]) >>= readIORef
+    let numbers :: Vec Int (sourceLength @Int ints)
+        numbers = sourceVector ints
+    observe "Int vector indexed by the same polymorphic length" (toList numbers)
+    observe "source length of a list of functions" (natToInt (sourceLength [not, id]))
+    empty <- newIORef ([] :: [Int]) >>= readIORef
+    observe "heads of empty and nonempty runtime lists" (first (sourceVector empty), first numbers)
+  where
+    first :: Vec a n -> Maybe a
+    first VNil = Nothing
+    first v@(VCons _ _) = Just (safeHead v)
+
+    safeHead :: Vec a ('S n) -> a
+    safeHead (VCons x _) = x
