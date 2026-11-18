@@ -6910,3 +6910,38 @@ printing preserves the matchability, and a kind-dependent binder stays
 visible with default settings. The original debugger golden passes.
 All 41 selected normal tests and all four selected GHCi tests passed.
 [Interactive results and debugger provenance](REFERENCES.md#persistent-dependent-definitions-and-interactive-results).
+
+## M88: compose checked source equations
+
+R13 owns this increment. It advances R15 evaluation and R03 retained
+applications. On M87 the following ordinary definition runs, but a type
+that mentions `times` fails in its defining module and through an interface.
+
+```haskell
+times :: Nat -> Nat -> Nat
+times Z     m = Z
+times (S n) m = plus m (times n m)
+```
+
+- [ ] Check a saturated call to another certified monomorphic function in
+      a source equation. Its parameters determine the expected kinds of the
+      arguments. Check each recursive self call on a proper field of the
+      matched constructor with the original carried operand.
+- [ ] Schedule local prerequisites independently of declaration order.
+      Require an acyclic graph of calls between functions. Retrieve an
+      imported helper by its defining identity. An ordinary function with
+      an unchecked helper must still run as a term.
+- [ ] Preserve the helper equation and rewrite dependencies through private
+      helpers, interfaces and recompilation. Exercise earlier and later
+      rewrite rules, unverified functions, cycles and nondecreasing calls.
+- [ ] Define type and term `(*)` through `times` in the vector example.
+      Check the open zero and successor equations, closed arithmetic,
+      a vector indexed by two runtime dimensions, and demand on partial
+      operands. Compare the source program and the separate-interface client.
+
+Agda's multiplication uses addition around a recursive call. Each function
+has its own decreasing argument. GHC's ordinary family termination check
+excludes a nested family application in a recursive argument. The generated
+axiom therefore needs the checked source decrease and an independently
+certified callee. [Agda 2.8.0 natural operations](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#functions-on-natural-numbers)
+and [GHC's family decidability conditions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#decidability-of-type-synonym-instances).
