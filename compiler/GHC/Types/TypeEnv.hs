@@ -33,7 +33,7 @@ import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
-import GHC.Types.Id.Info (IdDetails(..))
+import GHC.Types.Id.Info (IdDetails(..), SourceDFun(sdf_owner))
 import GHC.Types.TyThing
 
 -- | A map from 'Name's to 'TyThing's, constructed by typechecking
@@ -92,7 +92,7 @@ restoreSourceTableId types fun
   , let details = idDetails owner
   , case details of
       SourceTableId name _       -> name == getName fun
-      DFunId _ (Just (name, _))  -> name == getName fun
+      DFunId _ (Just source)     -> sdf_owner source == getName fun
       _                          -> False
   = setIdDetails fun details
   | otherwise = fun

@@ -2450,9 +2450,9 @@ tcIdDetails _ ty IfDFunId              = return (mkDFunIdDetails cls)
   where
     (_, _, cls, _) = tcSplitDFunTy ty
 
-tcIdDetails owner ty (IfSourceDFunId methods) =
+tcIdDetails owner ty (IfSourceDFunId methods literal) =
   forkM (text "Source methods of" <+> ppr owner) $
-    case sourceMethodDetails_maybe owner ty methods of
+    case sourceDFunDetails_maybe owner ty methods literal of
       Just details -> return details
       Nothing -> failIfM (text "Invalid source methods for dictionary" <+> ppr owner)
 

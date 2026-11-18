@@ -938,8 +938,9 @@ rnIfaceIdDetails (IfRecSelId (Left tc) con naughty fl)
 rnIfaceIdDetails (IfRecSelId (Right decl) con naughty fl)
   = IfRecSelId <$> fmap Right (rnIfaceDecl decl) <*> rnIfaceGlobal con <*> pure naughty <*> rnFieldLabel fl
 rnIfaceIdDetails (IfSourceTableId table) = IfSourceTableId <$> rnIfaceGlobal table
-rnIfaceIdDetails (IfSourceDFunId methods) =
+rnIfaceIdDetails (IfSourceDFunId methods literal) =
   IfSourceDFunId <$> mapM (\(sel, target) -> (,) <$> rnIfaceGlobal sel <*> rnIfaceGlobal target) methods
+                 <*> traverse (\(sel, z, s) -> (,,) <$> rnIfaceGlobal sel <*> rnIfaceGlobal z <*> rnIfaceGlobal s) literal
 rnIfaceIdDetails details
   = pure details
 

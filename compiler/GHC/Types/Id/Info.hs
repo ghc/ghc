@@ -15,7 +15,7 @@ Haskell. [WDP 94/11])
 module GHC.Types.Id.Info (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails, isJoinIdDetails,
-        mkDFunIdDetails,
+        mkDFunIdDetails, SourceDFun(..), SourceLiteralNames,
         JoinArity, isJoinIdDetails_maybe,
 
         RecSelParent(..), recSelParentName, recSelFirstConName,
@@ -195,8 +195,8 @@ data IdDetails
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call.
                                 -- Type will be simple: no type families, newtypes, etc
 
-  | DFunId Bool (Maybe (Name, [(Name, Name)])) -- ^ A dictionary function.
-       -- The optional field contains the owner and its selector/target pairs.
+  | DFunId Bool (Maybe SourceDFun) -- ^ A dictionary function.
+       -- The optional field identifies the owner and its checked methods.
        -- See Note [Checked dictionary methods] in GHC.Types.Id.
        -- Bool = True <=> a dictionary of this class cannot be bottom
        -- See Note [NON-BOTTOM-DICTS invariant] in GHC.Core
@@ -432,6 +432,16 @@ isJoinIdDetails_maybe :: IdDetails -> Maybe (JoinArity, (Maybe [CbvMark]))
 isJoinIdDetails_maybe (JoinId join_arity marks) = Just (join_arity, marks)
 isJoinIdDetails_maybe _                   = Nothing
 
+-- | Names of the fromInteger selector and its zero and successor constructors.
+type SourceLiteralNames = (Name, Name, Name)
+
+-- | Mandatory information for a dictionary with checked source methods.
+data SourceDFun = SourceDFun
+  { sdf_owner   :: Name
+  , sdf_methods :: [(Name, Name)]
+  , sdf_literal :: Maybe SourceLiteralNames
+  }
+
 mkDFunIdDetails :: Class -> IdDetails
 mkDFunIdDetails cls = DFunId (isTerminatingTyCon (classTyCon cls)) Nothing
 
@@ -453,13 +463,15 @@ pprIdDetails other     = brackets (pp other)
    pp (FCallId _)             = text "ForeignCall"
    pp (DFunId terminating methods) = text "DFunId"
                                 <> ppWhen (not terminating) (text "(may-be-bottom)")
-                                <> maybe empty (parens . ppr . snd) methods
+                                <> maybe empty pp_source methods
    pp (RecSelId { sel_naughty = is_naughty })
                               = brackets $ text "RecSel" <>
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
    pp (JoinId arity marks)    = text "JoinId" <> parens (int arity) <> parens (ppr marks)
    pp (InstMethId name)       = text "InstMethId" <> parens (ppr name)
+
+   pp_source d = parens (ppr (sdf_methods d) <+> maybe empty ppr (sdf_literal d))
 
 {-
 ************************************************************************

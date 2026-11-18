@@ -565,7 +565,7 @@ data IfaceIdDetails
     , ifRecSelIdIsNaughty  :: Bool
     , ifRecSelIdFieldLabel :: FieldLabel }
   | IfDFunId
-  | IfSourceDFunId [(IfExtName, IfExtName)]
+  | IfSourceDFunId [(IfExtName, IfExtName)] (Maybe (IfExtName, IfExtName, IfExtName))
 
 -- | Iface type for LambdaFormInfo. Fields not relevant for imported Ids are
 -- omitted in this type.
@@ -1963,7 +1963,9 @@ instance Outputable IfaceIdDetails where
                                   then text "<naughty>"
                                   else Outputable.empty
   ppr IfDFunId          = text "DFunId"
-  ppr (IfSourceDFunId methods) = text "DFunId" <+> text "SourceMethods" <+> ppr methods
+  ppr (IfSourceDFunId methods literal) =
+    text "DFunId" <+> ppWhen (not (null methods)) (text "SourceMethods" <+> ppr methods)
+                 <+> maybe Outputable.empty (\cons -> text "SourceLiteral" <+> ppr cons) literal
 
 instance Outputable IfaceInfoItem where
   ppr (HsUnfold lb unf)     = text "Unfolding"
@@ -2086,8 +2088,9 @@ freeNamesIfIdDetails IfVanillaId         = emptyNameSet
 freeNamesIfIdDetails (IfSourceTableId table) = unitFN table
 freeNamesIfIdDetails (IfWorkerLikeId {}) = emptyNameSet
 freeNamesIfIdDetails IfDFunId            = emptyNameSet
-freeNamesIfIdDetails (IfSourceDFunId methods) =
-  mkNameSet [n | (sel, target) <- methods, n <- [sel, target]]
+freeNamesIfIdDetails (IfSourceDFunId methods literal) =
+  mkNameSet ([n | (sel, target) <- methods, n <- [sel, target]]
+            ++ maybe [] (\(sel, z, s) -> [sel, z, s]) literal)
 
 -- All other changes are handled via the version info on the tycon
 freeNamesIfFamFlav :: IfaceFamTyConFlav -> NameSet
@@ -2832,7 +2835,9 @@ instance Binary IfaceIdDetails where
     put_ bh (IfWorkerLikeId dmds) = putByte bh 2 >> put_ bh dmds
     put_ bh IfDFunId              = putByte bh 3
     put_ bh (IfSourceTableId table) = putByte bh 4 >> put_ bh table
-    put_ bh (IfSourceDFunId methods) = putByte bh 5 >> put_ bh methods
+    put_ bh (IfSourceDFunId methods Nothing) = putByte bh 5 >> put_ bh methods
+    put_ bh (IfSourceDFunId methods (Just literal)) =
+      putByte bh 6 >> put_ bh methods >> put_ bh literal
     get bh = do
         h <- getByte bh
         case h of
@@ -2846,7 +2851,8 @@ instance Binary IfaceIdDetails where
                     ; return (IfWorkerLikeId dmds) }
             3 -> return IfDFunId
             4 -> IfSourceTableId <$> get bh
-            5 -> IfSourceDFunId <$> get bh
+            5 -> IfSourceDFunId <$> get bh <*> pure Nothing
+            6 -> IfSourceDFunId <$> get bh <*> (Just <$> get bh)
             _ -> panic "Binary IfaceIdDetails: unknown tag"
 
 instance Binary IfaceInfoItem where
@@ -3288,7 +3294,7 @@ instance NFData IfaceIdDetails where
     IfRecSelId (Left tycon) b c d -> rnf tycon `seq` rnf b `seq` rnf c `seq` rnf d
     IfRecSelId (Right decl) b c d -> rnf decl `seq` rnf b `seq` rnf c `seq` rnf d
     IfDFunId -> ()
-    IfSourceDFunId methods -> rnf methods
+    IfSourceDFunId methods literal -> rnf methods `seq` rnf literal
 
 instance NFData IfaceInfoItem where
   rnf = \case
