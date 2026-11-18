@@ -182,6 +182,20 @@ the matching branch.
 [Ordinary client](examples/packed-vector/OrdinaryVecClient.hs)
 and [list conversion](examples/packed-vector/PackedVecLibrary.hs).
 
+A partial constructor can prefix a successful checked row:
+
+```haskell
+prefixRowExact :: forall a. foreach (n :: Nat) -> a -> [a] -> Maybe (Vec a (1 + n))
+prefixRowExact n x xs = VCons x <$> fromListExact n xs
+```
+
+The checked input determines the callback's tail index. The prefix `fmap`
+form also works. With a runtime `n` of `2`, prefixing `'x'` to `"ab"`
+gives `Just "xab"` after `toList`. A short input `"a"` gives `Nothing`.
+GHC still checks the full callback type and its field multiplicities.
+This bounded inference rule does not infer arbitrary callbacks.
+[Partial constructor callbacks](PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks).
+
 ### What happens on empty input?
 
 ```haskell

@@ -968,6 +968,10 @@ arithmeticNotation = do
     observe "vector at a let-bound numeral" (toList threeLocal)
     observe "head after testing the actual length" (oneCellHead Z, oneCellHead (S Z))
 
+-- | Prefix a checked row without changing its runtime tail index.
+prefixRowExact :: forall a. foreach (n :: Nat) -> a -> [a] -> Maybe (Vec a (1 + n))
+prefixRowExact n x xs = VCons x <$> fromListExact n xs
+
 -- | Check a size from IO or let the input list determine its own size.
 listBoundaries :: IO ()
 listBoundaries = do
@@ -977,6 +981,8 @@ listBoundaries = do
     observe "ordinary zip with a short input" (Ordinary.ordinaryZipExact n xs [1 :: Int])
     observe "safeHead after checking for exactly one cell" (first "x", first "", first "xy")
     observe "first cell of a packaged list" (headPacked (packList ('p' : undefined)))
+    observe "checked row prefix with a runtime length"
+        (toList <$> prefixRowExact n 'x' xs, toList <$> prefixRowExact n 'x' "a")
   where
     first :: [a] -> Maybe a
     first xs = case fromListExact 1 xs of
