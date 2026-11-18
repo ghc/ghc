@@ -154,7 +154,7 @@ booleans = do
 
     -- Ignore the retained index and ordinary payload.
     keep :: foreach (b :: Bool) -> Select b -> Int
-    keep b payload = 42
+    keep _ _ = 42
 
     -- Obtain the matching Show dictionary after refinement.
     renderChoice :: foreach (b :: Bool) -> Select b -> String
@@ -271,7 +271,7 @@ functions = do
   where
     -- Ignore the retained head, index and payload.
     keepCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n) -> Int
-    keepCall f n payload = 42
+    keepCall _ _ _ = 42
 
     -- Preserve the original payload at its exact call index.
     idCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> Vec Int (f n) -> Vec Int (f n)
@@ -384,8 +384,8 @@ leadingContext (S predecessor) xs later ys = show (toList xs, toList ys)
 
 -- | Use equality evidence between retained argument positions.
 keepWithLaterEvidence :: foreach (n :: Nat) -> foreach (m :: Nat) -> (n ~ m) => foreach (k :: Nat) -> Vec Int m -> Vec Int k -> (Vec Int n, Vec Int k)
-keepWithLaterEvidence Z m k xs ys = (xs, ys)
-keepWithLaterEvidence (S predecessor) middle final xs ys = (xs, ys)
+keepWithLaterEvidence Z _ _ xs ys = (xs, ys)
+keepWithLaterEvidence (S _) _ _ xs ys = (xs, ys)
 
 -- | Read distinct indices and observe their separate argument positions.
 laterArguments :: IO ()

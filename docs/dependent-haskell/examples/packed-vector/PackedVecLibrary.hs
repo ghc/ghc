@@ -354,8 +354,8 @@ ignorePacked (PackVec n xs) = 42
 
 -- | Match the vector without evaluating its stored runtime length.
 headPacked :: PackedVec a -> Maybe a
-headPacked (PackVec n VNil) = Nothing
-headPacked (PackVec m (VCons x xs)) = Just x
+headPacked (PackVec _ VNil) = Nothing
+headPacked (PackVec _ (VCons x _)) = Just x
 
 -- | Inspect the stored length and return the head with its packed tail.
 unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)

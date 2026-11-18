@@ -115,6 +115,12 @@ case sourceVector xs of
     v@(VCons _ _) -> pure (Just (safeHead v))
 ```
 
+The same distinction applies when an equation ignores the length.
+In `keep _ xs = xs` at type `foreach (n :: Nat) -> Vec a n -> Vec a n`,
+the input and output share the caller’s length. The wildcard leaves it
+unnamed. An unused length can remain unevaluated under the default lazy
+pattern semantics. [Retained wildcard patterns](PLAN.md#m86-wildcard-patterns-for-retained-arguments-and-fields).
+
 A vector with length `n + 1` also has a head for each finite `n`.
 Since addition recurses on the left, its first constructor stays unknown
 until GHC has evidence about `n`. The library's `addSucc` proves
@@ -318,7 +324,7 @@ The field `m` can be unknown. [Vector library](examples/packed-vector/PackedVecL
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
 | Bounded source filter | Both compiler stages run the three-field source package; the filter constructs a checked LE proof while unused, partial and cyclic proof fields retain their tested laziness |
-| Source package patterns | Nested vector/proof patterns, wildcard proof fields and guarded clauses pass in both stages; separate cases preserve each row's runtime index Ids |
+| Source package patterns | Anonymous runtime length fields, nested vector/proof patterns, wildcard proof fields and guarded clauses pass in both stages; separate cases preserve each row's runtime index Ids |
 | Source vector tails | Source uncons and repeated draining use the actual runtime predecessor; partial fields stay lazy and the tested cyclic input produces a bounded prefix |
 | Source equality and zip | Both compiler stages pass 136 observations; ordinary `Refl` aligns independently computed lengths; four equality-scope errors have pinned codes and source locations |
 | Source append | Both stages pass 180 observations; a runtime sum and ordinary equality witness determine the result length; declaration-only imports, partial VTA and unused retained fields pass |

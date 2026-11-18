@@ -4636,3 +4636,19 @@ binder. The final argument check still checks every field at its source
 location. [Agda 2.8.0, parameterized datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#parametrized-datatypes),
 [implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 and [the fork's constructor inference tests](PLAN.md#m85-infer-the-parameters-of-a-retained-constructor-argument).
+
+### Unnamed runtime arguments in dependent patterns
+
+Agda 2.8.0 represents a solved wildcard with a variable and records that
+the user wrote a wildcard. Its telescope can therefore mention a value the
+right-hand side has no source name for. M86 uses this rule for functions
+and dependent packages. Each fresh wildcard gets a distinct identity. A
+constructor branch uses the same anonymous field in its constructor equality
+and its checked pattern. [Agda’s left-hand side checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L468-L481)
+and [the earlier two-column wildcard implementation](#anonymous-terminal-fallback-equations).
+
+Demand follows Haskell’s pattern rules. Forcing a retained argument must
+preserve its identity in the remaining argument and result types. GHC's
+existing explicit `seq` rule handles an analogous capture when an
+unrestricted runtime value occurs in a type. [GHC's strict pattern semantics](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/strict.html#strict-by-default-pattern-bindings)
+and [the fork’s desugaring of seq](../../compiler/GHC/HsToCore/Expr.hs).

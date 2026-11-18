@@ -145,10 +145,15 @@ result type. For example::
     {-# LANGUAGE ExperimentalDependentTypes #-}
 
     keep :: foreach (b :: Bool) -> Select b -> Select b
-    keep b x = x
+    keep _ x = x
 
 Here ``Select`` denotes a type family indexed by ``Bool``. The argument ``b`` is
 an ordinary runtime Boolean whose identity can occur in the result type.
+The wildcard leaves this argument unnamed in the equation. The payload
+and result still have the same index. Under Haskell's usual lazy pattern
+semantics, calling ``keep`` does not force the Boolean. In a module with
+:extension:`Strict`, the wildcard has the same demand as a named argument.
+
 Applications retain that value argument. They accept supported constructors,
 named local values and checked source calls as described above. The
 compiler checks their types without evaluating the runtime arguments.
@@ -220,8 +225,8 @@ can also stop before the remaining retained arguments, as in
 Unsigned aliases of retained functions still require a complete signature and
 report GHC-83605. Constructor equations split one
 leading retained index. They require one unguarded equation per constructor.
-Constructor fields and later arguments require bare variable patterns and
-unrestricted multiplicities. The result must have lifted kind, and the outer
+Constructor fields and later arguments accept variable and wildcard patterns.
+Their multiplicities must be unrestricted. The result must have lifted kind, and the outer
 match wrapper must be identity. Ordinary rank restrictions still apply.
 An erased ``forall`` inside a retained binder's scope remains unsupported.
 Index-dependent constraints are limited to reflexive
@@ -233,7 +238,7 @@ positions report GHC-43582.
 Source ``case`` expressions can refine a named local retained index when the
 result type is checked. The rule also refines referenced local values whose
 types depend on that index. It requires one unguarded branch per constructor
-and bare variable fields. The result must have lifted kind. Parentheses around
+and accepts variables or wildcards for its fields. The result must have lifted kind. Parentheses around
 the scrutinee are accepted. Generalized locals require unrestricted
 multiplicities. Guards, defaults, nested constructor patterns,
 Template Haskell quotations, and general motive inference remain unsupported.

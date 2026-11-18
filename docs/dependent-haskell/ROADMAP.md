@@ -63,6 +63,8 @@ compiler checks the concrete instance's conversion from nonnegative integers.
 M84 lets a caller take the head of `replicateNative (1 + n) x` directly.
 M85 also accepts `safeHead (sourceVector (x : xs))`. The list constructor
 determines the element type even if it contains a runtime index.
+M86 allows an unused length to be written as `_` in a function equation or
+a package pattern. Later fields and the result still refer to the same length.
 General evaluation of Haskell functions in types remains open.
 
 M74 checks consecutive invisible retained arguments. The two vectors in
@@ -163,6 +165,7 @@ can advance a card while the card remains open.
 | 24 | R07, R12 and R03: term numerals as retained lengths | [M83](PLAN.md#m83-ordinary-numerals-in-retained-arguments) | Use a checked `fromInteger` for `replicateNative 3 x` and `replicateNative (n + 1) x`. |
 | 25 | R03: infer a runtime index from a nested call | [M84](PLAN.md#m84-infer-a-nonempty-vectors-tail-at-a-nested-application) | Match the checked successor equations in `safeHead (replicateNative (1 + n) x)` and preserve the unevaluated tail. |
 | 26 | R03: infer parameters from constructor fields | [M85](PLAN.md#m85-infer-the-parameters-of-a-retained-constructor-argument) | Read the fields of a saturated constructor in a retained argument to select erased parameters. |
+| 27 | R03 and R04: wildcard argument and field patterns | [M86](PLAN.md#m86-wildcard-patterns-for-retained-arguments-and-fields) | Ignore a runtime field while preserving its identity in later types. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

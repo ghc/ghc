@@ -6787,20 +6787,52 @@ See the [constructor field inference references](REFERENCES.md#inferring-erased-
 
 ## M86: wildcard patterns for retained arguments and fields
 
-A wildcard in a definition discards its source name. The value can still
+A wildcard in a definition leaves its argument unnamed. The value can still
 occur in the type of a later argument or the result. At M85 the ordinary
 equation `keep _ x = x` fails for a dependent argument. The named version
 works. R03 needs this binding rule for functions. R04 needs it for packages.
 
-- [ ] Use the same internal identity for an anonymous retained parameter in
+- [x] Use the same internal identity for an anonymous retained parameter in
       the checked pattern and its dependent suffix. Apply the rule to named
       definitions, checked lambdas, constructor rows and package fields.
-- [ ] Bind anonymous fields of a matched index constructor at the identity
+- [x] Bind anonymous fields of a matched index constructor at the identity
       used by the constructor equality. Preserve source order and scope.
-- [ ] Verify default and Strict demand on bottom, independent indices,
+- [x] Verify default and Strict demand on bottom, independent indices,
       ordinary linearity checks, extension-off imports and source diagnostics.
       Update the Showcase, reference ledger, roadmap and user documentation.
 
 Agda records the source wildcard and keeps an internal variable in the
 checked telescope. The earlier matrix fallback uses the same distinction.
 See [anonymous terminal fallback equations](REFERENCES.md#anonymous-terminal-fallback-equations).
+
+### Implementation and validation
+
+In `keep _ xs = xs`, the checker binds a fresh internal name for the
+wildcard. It uses this identity in the type of `xs` and the result. A
+constructor row uses its existing shared column identity. A constructor
+field uses the identity in the branch equality. An incorrect coercion
+between independent indices reports GHC-83865 at the offending payload.
+Its error context shows the wildcard equation as written.
+
+M85 also failed Core Lint on the named definition `tag n = Proxy` at type
+`foreach (n :: Nat) -> Proxy n` under `Strict`. The case that forced the
+argument shadowed the runtime index. Its alternative returned a proxy for
+the fresh case binder. The desugarer now collects runtime Ids from the types
+in scope and uses an unused case binder when it forces an unrestricted
+index in this set. This preserves the outer identity in the result and in
+captured argument types. See Note [Forcing a runtime index] in
+`GHC.HsToCore.Utils`.
+
+Both stages passed 42 source checks and 59 runtime observations at `-O0`
+with Core and STG Lint. These covered lazy fields, strict callbacks, nested
+strict bindings, constructor and case equations, linear payloads and error
+spans. A separate extension-off module defined named and wildcard strict
+lambdas at an imported retained type synonym. Both forced a bottom argument
+and returned a proxy for a finite argument.
+
+Both stages reproduced all 158 Showcase lines. The driver passed 41 selected
+normal-way tests and the GHCi numeral test. Ordinary strict functions, linear
+payloads, strict lets and explicit `seq` produced the same normalized
+preoptimization Core as M85 in the comparison fixture. Across eight bindings
+with 8, 24 and 48 strict arguments, whole-compiler allocation was within
+0.05% of M85 on this machine. These measurements cover the fixture only.
