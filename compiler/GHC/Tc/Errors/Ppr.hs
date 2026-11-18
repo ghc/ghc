@@ -931,7 +931,7 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ vcat
            [ text "No checked equations are available for" <+> quotes (ppr name) <+> text "in a type."
            , text "Match the first argument with one clause per constructor, using variables or wildcards for its fields."
-           , text "Build the result from constructors and bound variables."
+           , text "Build the result from constructors, bound variables, or fully applied functions with checked equations."
            , text "In a recursive call, pass a field of the first argument directly."
            , text "If there is a second argument, bind it with a variable and pass it unchanged in recursive calls." ]
     TcRnUntickedPromotedThing thing
@@ -3650,7 +3650,7 @@ pprRetainedQuantificationError reason = case reason of
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedSourceRule fun ->
     text "A rewrite rule can change the result of" <+> quotes (ppr fun)
-      <> text ", which a retained argument uses as an index."
+      <> text ", which GHC uses to check a dependent type."
   RetainedIndexExpression ->
     vcat [ text "GHC cannot use this expression as a retained index."
          , text "Use a local index variable, a supported constructor tree, an immediate lambda application,"

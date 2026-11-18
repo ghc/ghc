@@ -42,6 +42,8 @@ import GHC.Types.Var.Env
 import GHC.Driver.Config.Core.Lint( initLintConfig )
 import GHC.Driver.DynFlags
 import GHC.Tc.Utils.Monad (rewriterTcMPlugins)
+import qualified GHC.Tc.Utils.Monad as TcM
+import GHC.Tc.Gen.SourceTable (sourceTableFamilyUse)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
@@ -1865,18 +1867,23 @@ try_to_reduce tc tys tc_rewriters
              record_deps :: Maybe Reduction -> TcS (Maybe Reduction)
              record_deps mb_redn
                | Just redn <- mb_redn
-               = do { updTcRef (re_used_cos rewrite_env)
+               = do { wrapTcS $ TcM.setCtLocM (re_loc rewrite_env) $
+                        sourceTableFamilyUse tc
+                    ; updTcRef (re_used_cos rewrite_env)
                         ( `addUnivCoDep` reductionCoercion redn )
                     ; return mb_redn }
                | otherwise
                = return mb_redn
+
+             match_fam = wrapTcS $ TcM.setCtLocM (re_loc rewrite_env) $
+                           matchFamTcM tc tys
 
        ; result <- liftTcS $
            if re_fam_axioms_only rewrite_env
               || not (isEmptyVarSet (re_native_binders rewrite_env))
            -- Global family axioms do not emit constraints or update caches.
            -- See Note [Rewriting retained dependent functions].
-           then matchFam tc tys
+           then match_fam
            else firstJustsM
               [ -- STEP 1a & STEP 4a
                 record_deps
@@ -1885,7 +1892,7 @@ try_to_reduce tc tys tc_rewriters
                 record_deps
                   =<< lookupFamAppCache tc tys
               , -- STEP 1c & STEP 4c
-                matchFam tc tys
+                match_fam
               ]
        ; traverse downgrade result }
   where

@@ -76,7 +76,8 @@ import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Sig( tcRules )
 import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
-                               hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses)
+                               hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
+                               sourceTableDependencies)
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
@@ -113,8 +114,6 @@ import GHC.Hs hiding ( FunDep(..) )
 import GHC.Hs.Dump
 
 import GHC.Core.PatSyn
-import GHC.Core (ruleActivation)
-import GHC.Core.Rules (getRules)
 import GHC.Core.Predicate ( classMethodTy )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
@@ -148,7 +147,6 @@ import GHC.Types.DefaultEnv
 import GHC.Types.Fixity.Env
 import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
-import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Var (setIdDetails)
 import GHC.Types.Var.Env
 import GHC.Types.TypeEnv
@@ -190,7 +188,7 @@ import Control.Monad.Trans.Writer.CPS
 import Data.Data ( Data )
 import Data.Function (on)
 import Data.Functor.Classes ( liftEq )
-import Data.List ( sort, sortBy )
+import Data.List ( find, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord
@@ -724,45 +722,67 @@ installSourceMethods env
         tcExtendGlobalValEnv [setSourceLiteralCons (setSourceMethodIds dfun pairs) literal
                              | (dfun, pairs, literal) <- checked] getGblEnv
 
+{- Note [Source table dependency closure]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source equation can call another certified function. Its family RHS keeps
+that function's family identity. Recover the transitive term owners before
+checking rules. A rule on any owner invalidates the caller's certificate.
+Keep each local callee alive so its Id remains available to importers.
+An unused runtime function needs no certificate and produces no rule error.
+-}
+
 -- | Add the families and their axioms to the module interface. A local use
 -- may already have required the family before we finished checking the module.
+-- See Note [Source table dependency closure].
 installSourceTables :: [(Id, TyCon)] -> TcM TcGblEnv
 installSourceTables [] = getGblEnv
 installSourceTables tables = do
     env <- getGblEnv
     let types = tcg_type_env env
         new_tables = [tc | (_, tc) <- tables, isNothing (lookupTypeEnv types (tyConName tc))]
-        boot_names = bootExports (tcg_self_boot env)
-        boot_functions = [fun | (fun, _) <- tables, idName fun `elemNameSet` boot_names]
-    rewriting <- goptM Opt_EnableRewriteRules
-    boot_rules <- if rewriting && not (null boot_functions)
-      then do
-        rule_env <- visibleSourceMethodRules env
-        pure (mkNameSet [idName fun | fun <- boot_functions
-                            , any (not . isNeverActive . ruleActivation) (getRules rule_env (globaliseId fun))])
-      else pure emptyNameSet
-    let ruled = sourceRuleOwners (tcg_rules env) `unionNameSet` boot_rules
-    used <- readTcRef (tcg_source_table_uses env)
-    ids <- forM tables $ \(fun, candidate) -> do
-      let name = idName fun
-          table = case lookupTypeEnv types (tyConName candidate) of
-                    Just (ATyCon installed) -> installed
-                    _ -> candidate
-          owner = case lookupTypeEnv types name of
-                    Just (AnId existing) -> existing
-                    _ -> fun
-          ordinary = case idDetails owner of
-                       SourceTableId {} -> setIdDetails owner VanillaId
-                       _ -> owner
-      if name `elemNameSet` ruled then do
-        when (tyConName table `elemNameSet` used) $
-          setSrcSpan (nameSrcSpan name) (addErr (TcRnRetainedQuantificationError (RetainedSourceRule name)))
-        pure ordinary
-      else case idDetails ordinary of
-        VanillaId -> pure (setIdDetails ordinary (SourceTableId name table))
-        _ -> pure ordinary
-    tcExtendGlobalValEnv ids $
-      if null new_tables then getGblEnv else fst <$> addTyConsToGblEnv new_tables
+        prepare (fun, candidate) =
+          let table = case lookupTypeEnv types (tyConName candidate) of
+                        Just (ATyCon installed) -> installed
+                        _ -> candidate
+              owner = case lookupTypeEnv types (idName fun) of
+                        Just (AnId existing) -> existing
+                        _ -> fun
+              ordinary = case idDetails owner of
+                           SourceTableId {} -> setIdDetails owner VanillaId
+                           _ -> owner
+          in (ordinary, table)
+        prepared = map prepare tables
+        candidates = [setIdDetails fun (SourceTableId (idName fun) table)
+                     | (fun, table) <- prepared]
+    -- Make all checked owners available while recovering the dependency closure.
+    tcExtendGlobalValEnv candidates $ do
+      dependencies <- mapM (sourceTableDependencies . snd) prepared
+      -- Dependency lookup can load interfaces that contain rules.
+      rewriting <- goptM Opt_EnableRewriteRules
+      visible <- if rewriting then Just <$> visibleSourceMethodRules env else pure Nothing
+      used <- readTcRef (tcg_source_table_uses env)
+      let ruled = sourceRuleOwners (tcg_rules env)
+          changed fun = idName fun `elemNameSet` ruled
+                        || maybe False (`hasSourceMethodRule` fun) visible
+      ids <- forM (zip prepared dependencies) $ \((fun, table), callees) -> do
+        let name = idName fun
+            reject diagnostic = do
+              when (tyConName table `elemNameSet` used) $
+                setSrcSpan (nameSrcSpan name) (addErr diagnostic)
+              pure fun
+        case callees of
+          Nothing -> reject (TcRnNoSourceTable name)
+          Just deps | Just bad <- find changed (fun : deps)
+            -> reject (TcRnRetainedQuantificationError (RetainedSourceRule (idName bad)))
+          Just deps -> do
+            for_ deps $ \callee ->
+              when (nameIsLocalOrFrom (tcg_semantic_mod env) (idName callee)) $
+                keepAlive (idName callee)
+            pure $ case idDetails fun of
+              VanillaId -> setIdDetails fun (SourceTableId name table)
+              _ -> fun
+      tcExtendGlobalValEnv ids $
+        if null new_tables then getGblEnv else fst <$> addTyConsToGblEnv new_tables
 
 -- | Check only the bindings in the declaration group that is now in scope.
 sourceTablesFor :: NameSet -> TcGblEnv -> TcM [(Id, TyCon)]
@@ -1835,7 +1855,8 @@ tcTopSrcDecls group = do
         (envs@(early_env, _), wanteds) <- captureTopConstraints (tcTopSrcDeclGroup early)
         restoreEnvs envs $ do
           evs <- simplifyTop wanteds
-          tables <- sourceTablesFor (mkNameSet (map fst needed)) early_env
+          let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds early))
+          tables <- sourceTablesFor names early_env
           let found = mkNameSet (map (tyConName . snd) tables)
           for_ needed $ \(term, family) ->
             unless (family `elemNameSet` found) $

@@ -321,6 +321,14 @@ variable that the recursive call must pass unchanged. Only fields of the
 first pattern can supply the decreasing argument. Check each recursive operand
 in the typed producer before constructing an axiom. Return all requested
 names so the caller can report an uncertified table at the source binding.
+
+A call to another signed source function introduces a dependency between
+the equations. For example, times (S n) m = plus m (times n m) needs plus
+before the equations for times. Walk the existing binding SCCs in dependency
+order. Admit a singleton only when its other local value dependencies are
+already available. Then walk back from the requested functions to collect
+their prerequisites. Keep the original SCCs for typechecking. The typed
+producer checks the callee's identity and the decrease of each self call.
 -}
 
 -- | Allocate private names for signed function bindings with constructor rows.
@@ -368,6 +376,7 @@ localSourceTableBinders binds sigs =
             | r `elem` fields || r `elem` carried -> null args
             | is_self r, Just (field : rest) <- traverse variable args
             -> field `elem` fields && rest == carried
+            | not (is_self r), not (null args) -> all (check []) args
           _ -> False
         variable :: LHsExpr GhcPs -> Maybe RdrName
         variable e = case unLoc (stripParensLHsExpr e) of
@@ -411,10 +420,21 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
             , L _ HsSig{sig_bndrs = outer, sig_body = body} <- [dropWildCards sig]
             , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) arg res <- [unLoc (ignoreParens body)]
             , Just domain <- [domain_dependencies outer arg], Just rest <- [result_dependencies outer res] ]
-        early = [ (b, kinds) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
-                , b `elemNameSet` wanted_set, not (b `elemNameSet` specialised)
-                , Just kinds <- [lookupNameEnv signatures b]
-                , independent b kinds fvs ]
+        declared = mkOccSet [ nameOccName f | f <- nameSetElemsStable (duDefs dus)
+                                            , nameModule_maybe f == nameModule_maybe n ]
+        candidates = [ (b, kinds, values) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
+                     , mkSourceTableOcc (nameOccName b) `elemOccSet` declared
+                     , not (b `elemNameSet` specialised), Just kinds <- [lookupNameEnv signatures b]
+                     , let values = (fvs `intersectNameSet` local_values) `delFromNameSet` b
+                     , independent_types kinds (fvs `minusNameSet` local_values) ]
+        ready = foldl' schedule emptyNameSet candidates
+        schedule done (b, _, deps) | isEmptyNameSet (deps `minusNameSet` done) = extendNameSet done b
+                                   | otherwise = done
+        needed = foldr include wanted_set candidates
+        include (b, _, deps) rest | b `elemNameSet` rest, b `elemNameSet` ready = unionNameSet deps rest
+                                  | otherwise = rest
+        early = [ (b, kinds) | (b, kinds, _) <- candidates
+                             , b `elemNameSet` ready, b `elemNameSet` needed ]
         early_names = mkNameSet (map fst early)
         early_types = mkNameSet (concatMap snd early)
         (first_binds, rest_binds) = partition early_bind binds
@@ -440,12 +460,13 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       [ maybe uses (uses `minusNameSet`) defs | (defs, uses) <- fromOL dus
       , not (maybe False (nameSetAny (isJust . sourceTableTermOcc . nameOccName)) defs) ]
     local_values = mkNameSet (collectHsValBinders CollNoDictBinders vals)
-    independent b kinds fvs = case use of
-      TableInTerm -> not ((fvs `delFromNameSet` b) `intersectsNameSet` local_values)
+    local_binders = mkNameSet (hsGroupBinders group)
+    independent_types kinds fvs = case use of
+      TableInTerm -> True
       TableInType ->
         let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes) kinds)
         in all (\k -> not (k `elemNameSet` local_types) || k `elemNameEnv` early_datatypes) kinds
-           && nameSetAll (`elemNameSet` extendNameSet cons b) fvs
+           && nameSetAll (`elemNameSet` cons) (fvs `intersectNameSet` local_binders)
     type_name :: LHsType GhcRn -> Maybe Name
     type_name ty = case unLoc (ignoreParens ty) of
       HsTyVar _ _ (L _ (WithUserRdr _ name))

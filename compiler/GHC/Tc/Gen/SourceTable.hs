@@ -1,5 +1,6 @@
 -- | Closed type families for checked functions that match one constructor.
 module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, tcLookupSourceTableId,
+                              sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
                               checkSourceMethodUses) where
@@ -11,13 +12,14 @@ import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INT
 import GHC.Builtin.WiredIn.Types (integerTy, integerTyConName, listTyCon, mkListTy, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
-import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch)
+import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch, coAxiomBranches, coAxBranchRHS, fromBranches)
 import GHC.Core.ConLike (ConLike(..))
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.InstEnv (instanceDFunId, lookupUniqueInstEnv)
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
+import GHC.Core.TyCo.FVs (tyConsOfTypes)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString (fsLit)
@@ -25,22 +27,23 @@ import GHC.Data.Bag (isEmptyBag)
 import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRulesBelow)
 import GHC.Hs
 import GHC.Iface.Env (lookupOrig)
+import GHC.Iface.Load (loadInterfaceForName)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Tc.Errors.Types (RetainedQuantificationError(..), TcRnMessage(..))
 import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), isEmptyEvBindsMap)
 import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
-import GHC.Tc.Utils.Env (tcLookupId, tcGetInstEnvs)
+import GHC.Tc.Utils.Env (tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
 import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBindsMap,
-                           getTopEnv, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
+                           getTopEnv, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Basic (Origin(..))
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkInstTyCoOcc,
-                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, tvName)
+                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
 import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
                            intersectNameSet, isEmptyNameSet, minusNameSet, nameSetElemsStable,
@@ -53,18 +56,20 @@ import GHC.Unit.Home.Graph (lookupHugByModule)
 import GHC.Unit.Home.ModInfo (hm_details)
 import GHC.Unit.Module.Env (moduleSetElts)
 import GHC.Unit.Module.ModDetails (md_rules)
+import GHC.Unit.Module.ModIface (mi_hash_fn)
 import GHC.Unit.Types (GenWithIsBoot(..), isInteractiveModule, moduleName, moduleUnitId)
 import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
-import GHC.Types.Unique.Set (mkUniqSet)
+import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet)
 import GHC.Types.Var (Id, VarBndr(..), mkTyVar, varName)
 import GHC.Utils.Monad (allM)
+import GHC.Utils.Outputable (text)
 
 import Control.Monad (foldM, forM_, guard, unless, when, zipWithM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<|>))
-import Data.List (find)
+import Data.List (find, partition, sortBy)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (catMaybes, isNothing, mapMaybe)
 
@@ -81,9 +86,122 @@ tcLookupSourceTableId actual = do
                 | otherwise = Just actual
     case checked of
       Just fun | Just table <- sourceTableId_maybe fun -> do
-        updTcRef (tcg_source_table_uses env) (`extendNameSet` tyConName table)
-        return (Just fun)
+        dependencies <- sourceTableDependencies table
+        case dependencies of
+          Nothing -> return Nothing
+          Just callees -> do
+            recordSourceUses [(v, Nothing) | v <- fun : callees]
+            forM_ (fun : callees) $ \owner ->
+              when (nameModule_maybe (idName owner) == Just (tcg_semantic_mod env)) $
+                keepAlive (idName owner)
+            updTcRef (tcg_source_table_uses env) (`extendNameSet` tyConName table)
+            return (Just fun)
       _ -> return Nothing
+
+-- | Recover the exact owner of a source family without recording a use.
+sourceTableOwner :: TyCon -> TcM (Maybe Id)
+sourceTableOwner table
+  | Just occ <- sourceTableTermOcc (nameOccName (tyConName table))
+  , Just mod <- nameModule_maybe (tyConName table) = do
+      name <- lookupOrig mod occ
+      env <- getGblEnv
+      owner <- if mod == tcg_semantic_mod env
+        then pure $ case lookupTypeEnv (tcg_type_env env) name of
+          Just (AnId fun) -> Just fun
+          _ -> Nothing
+        else do
+          absent <- importedSourceOwnerAbsent table
+          if absent then pure Nothing else tcLookupIdMaybe name
+      pure $ do
+        fun <- owner
+        actual <- sourceTableId_maybe fun
+        guard (tyConName actual == tyConName table)
+        pure fun
+  | otherwise = pure Nothing
+
+-- | Confirm that an imported interface omits a source table's term owner.
+importedSourceOwnerAbsent :: TyCon -> TcM Bool
+importedSourceOwnerAbsent table = do
+    env <- getGblEnv
+    case (sourceTableTermOcc (nameOccName (tyConName table)), nameModule_maybe (tyConName table)) of
+      (Just occ, Just mod) | mod /= tcg_semantic_mod env -> do
+        iface <- loadInterfaceForName (text "source table owner") (tyConName table)
+        pure (isNothing (mi_hash_fn iface occ))
+      _ -> pure False
+
+-- | Collect source families in a stable order, including beneath synonyms.
+sourceFamilyTyCons :: [Type] -> [TyCon]
+sourceFamilyTyCons tys = sortBy (\a b -> stableNameCmp (tyConName a) (tyConName b))
+    [tc | tc <- nonDetEltsUniqSet (tyConsOfTypes tys)
+        , not (isNothing (sourceTableTermOcc (nameOccName (tyConName tc))))]
+
+-- | Read distinct source families from a closed table's right-hand sides.
+sourceTableCallees :: TyCon -> Maybe [TyCon]
+sourceTableCallees table = do
+    axiom <- closedFamilyTyConCoAxiom_maybe table
+    pure [tc | tc <- sourceFamilyTyCons $
+                      map coAxBranchRHS (fromBranches (coAxiomBranches axiom))
+             , tyConName tc /= tyConName table]
+
+-- | Recover all checked callees from closed source equations.
+-- See Note [Composed source equations].
+sourceTableDependencies :: TyCon -> TcM (Maybe [Id])
+sourceTableDependencies root = walk (unitNameSet (tyConName root)) [] [root]
+  where
+    walk _ owners [] = pure (Just (reverse owners))
+    walk seen owners (table : rest)
+      | Just referenced <- sourceTableCallees table = do
+          let wanted = [tc | tc <- referenced, not (tyConName tc `elemNameSet` seen)]
+          found <- traverse sourceTableOwner wanted
+          case sequence found of
+            Nothing -> pure Nothing
+            Just callees -> walk (extendNameSetList seen (map tyConName wanted))
+                                 (reverse callees ++ owners) (wanted ++ rest)
+      | otherwise = pure Nothing
+
+-- | Guard source families in a type, including families beneath synonyms.
+sourceTableTypeUses :: Type -> TcM ()
+sourceTableTypeUses ty = mapM_ sourceTableFamilyUse (sourceFamilyTyCons [ty])
+
+-- | Check a source family when its axiom supplies type equality evidence.
+-- See Note [Source family evidence uses].
+sourceTableFamilyUse :: TyCon -> TcM ()
+sourceTableFamilyUse table
+  | isNothing (sourceTableTermOcc (nameOccName (tyConName table))) = pure ()
+  | otherwise = do
+      owner <- sourceTableOwner table
+      checked <- maybe (pure Nothing) tcLookupSourceTableId owner
+      when (isNothing checked) $ do
+        -- See Note [Legacy private source leaves].
+        absent <- importedSourceOwnerAbsent table
+        case sourceTableCallees table of
+          Just [] | absent -> do
+            env <- getGblEnv
+            updTcRef (tcg_source_table_uses env) (`extendNameSet` tyConName table)
+          _ -> failWithTc (TcRnRetainedQuantificationError
+                           (RetainedUncheckedSourceCall (maybe (tyConName table) idName owner)))
+
+{- Note [Source family evidence uses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An imported value can have a generated source family in its type. A caller
+can reduce this family without spelling a source function or enabling
+ExperimentalDependentTypes. Check the family owner and its callees when
+the solver uses a family reduction. Check only the active family head.
+A type in an unused argument does not establish a use of that argument's
+axiom. Cache and plugin reductions need the same check.
+-}
+
+{- Note [Legacy private source leaves]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An older interface can export a type synonym that mentions a private source
+table but omit the private term. Allow this type-only use if the interface
+has no declaration for the term and the closed axiom has no distinct source
+family in its RHS. Record the table Name for recompilation.
+
+A present term without SourceTableId is not a legacy omission. Reject it.
+Retained calls and composed helper edges always require the exact owner.
+Do not use this exception when resolving their dependencies.
+-}
 
 -- | Load the rules visible to the module, including rules from home boot cycles.
 visibleSourceMethodRules :: TcGblEnv -> TcM RuleEnv
@@ -306,16 +424,41 @@ A fresh binder with copied details has a different Unique.
 Store the family Name in the function's interface declaration. This makes
 its ABI depend on the equations. The typechecker reads the same declaration
 when it uses a no-code interface or follows a re-export. An hs-boot file has
-no checked body and therefore supplies no certificate. A private family can
-outlive its private term in an interface, so keep the reference one-way.
+no checked body and therefore supplies no certificate. Keep a private owner
+alive when a type uses its table. Imported type aliases need this owner to
+check its rewrite dependencies.
 
-The only function the checked equations can call is their owner. Constructor
-workers have no rewrite rules. See getRules in GHC.Core.Rules. Exclude a
-source rule that can rewrite the owner. An import cycle through an hs-boot
+Constructor workers have no rewrite rules. See getRules in GHC.Core.Rules.
+Exclude a source rule that can rewrite the owner or a checked callee.
+An import cycle through an hs-boot
 file can make a home rule for this Id visible to the producer. Check those
 rules when rewriting is enabled. A declaration splice can add a rule after
 an earlier group used the certificate. Recheck those uses at module finish.
 As elsewhere in GHC, Core plugins must preserve the semantics of the program.
+
+Note [Composed source equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source equation can call another checked monomorphic function:
+
+  times Z     m = Z
+  times (S n) m = plus m (times n m)
+
+The self call still decreases the original first operand and preserves the
+carried operand. The call to plus uses its own checked termination argument.
+Collect local tables in dependency order. Publish a candidate to the collector
+only after all its branches pass. A cycle between different owners has no
+first checked member, so the collector rejects it and its dependents.
+Do not resolve a failed local candidate through an earlier installed table.
+
+Helper calls must be saturated and have no type or evidence arguments.
+Check their term argument types against the nominal family binder kinds and
+check the result kind before constructing the family application. This also
+excludes higher-order operands and polymorphic helper instantiations.
+
+The family RHS records each helper's family Name. Recover its exact owner
+through SourceTableId when installing or using a table. Follow this closure
+to guard rewrite rules in downstream modules, including type-only uses.
+Speculative collection must not record a use or keep a rejected owner alive.
 
 Note [The second argument of a source equation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -348,16 +491,62 @@ return an outer successor. Skip binary equations in that case.
 sourceTableTyCons :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
 sourceTableTyCons binds = do
     strict <- xoptM LangExt.Strict
-    catMaybes <$> mapM (certify strict) (mapMaybe (sourceRows . unLoc) binds)
+    collect strict [] candidates
   where
-    certify strict (fun, body_tv, evidence, rows) = do
+    candidates = mapMaybe (sourceRows . unLoc) binds
+    candidate_names = extendNameSetList emptyNameSet [idName f | (f, _, _, _) <- candidates]
+    local_names = extendNameSetList emptyNameSet $
+      concatMap (map idName . collectHsBindBinders CollNoDictBinders . unLoc) binds
+
+    collect strict checked pending = do
+      let available = extendNameSetList emptyNameSet (map (idName . fst) checked)
+          ready (_, _, _, rows) = all (\f -> not (idName f `elemNameSet` candidate_names)
+                                               || idName f `elemNameSet` available)
+                                    (concatMap rowCalls rows)
+          (next, later) = partition ready pending
+      if null next then pure checked else do
+        tables <- catMaybes <$> traverse (certify strict checked) next
+        collect strict (checked ++ tables) later
+
+    rowCalls (SourceRow _ _ _ _ _ rhs) = sourceCalls rhs
+
+    lookupCall checked actual = do
+      env <- getGblEnv
+      let current = case lookupTypeEnv (tcg_type_env env) (idName actual) of
+            Just (AnId fun) | fun == actual -> sourceTableId_maybe fun
+            _ -> Nothing
+          predecessor = snd <$> find ((== actual) . fst) checked
+      table <- if idName actual `elemNameSet` local_names
+        then pure predecessor
+        else pure $ if nameModule_maybe (idName actual) == Just (tcg_semantic_mod env)
+                    then current else sourceTableId_maybe actual
+      ty <- liftZonkM (zonkTcType (varType actual))
+      pure $ do
+        fam <- table
+        (args, result) <- ordinaryArrows ty
+        guard (not (null args) && length args == tyConArity fam)
+        guard (eqTypes args (map tyVarKind (tyConTyVars fam)))
+        guard (result `eqType` tyConResKind fam)
+        pure (fam, args, result)
+
+    ordinaryArrows ty = case splitFunTy_maybe ty of
+      Just (FTF_T_T, ma, mult, arg, rest) -> do
+        guard (ma `eqType` unmatchableDataConTy && isManyTy mult)
+        _ <- ordinaryDataType arg
+        (args, result) <- ordinaryArrows rest
+        pure (arg : args, result)
+      _ -> do
+        _ <- ordinaryDataType ty
+        pure ([], ty)
+
+    certify strict checked (fun, body_tv, evidence, rows) = do
       clean <- allM emptyEvidence evidence
       if clean then do
         ty <- liftZonkM (zonkTcType (varType fun))
         case checkedDomains strict body_tv ty rows of
           Nothing -> pure Nothing
           Just (input, carried, result) -> do
-            branches <- traverse (sourceBranch input carried result) rows
+            branches <- traverse (sourceBranch (lookupCall checked) input carried result) rows
             traverse (fmap (setIdType fun ty,) . makeFamily (varName fun) input carried result)
                      (sequence branches)
       else pure Nothing
@@ -367,6 +556,14 @@ data SourceRow = SourceRow SrcSpan DataCon [Type] [Maybe Id] [Id] SourceRhs
 
 -- | The expression forms allowed in one source equation.
 data SourceRhs = Field Id | Construct DataCon [SourceRhs] | Recur [Type] Id
+               | Call Id [SourceRhs]
+
+-- | Collect non-self calls, including calls inside operands.
+sourceCalls :: SourceRhs -> [Id]
+sourceCalls (Field _) = []
+sourceCalls (Construct _ args) = concatMap sourceCalls args
+sourceCalls (Recur _ _) = []
+sourceCalls (Call fun args) = fun : concatMap sourceCalls args
 
 -- | The input type of a closed table, or the body skolem of a polymorphic list table.
 data SourceInput = ClosedInput Type [Type] | PolyList TyVar
@@ -484,7 +681,7 @@ sourceRow self (L loc (Match { m_pats = L _ (pat : rest), m_grhss = rhss }))
       _                -> Nothing
 sourceRow _ _ = Nothing
 
--- | Recognise constructors and self calls that preserve the carried argument.
+-- | Recognise constructors, helper calls, and decreasing self calls.
 sourceRhs :: (Id -> Bool) -> [Id] -> HsExpr GhcTc -> Maybe SourceRhs
 sourceRhs self carried = go []
   where
@@ -496,6 +693,7 @@ sourceRhs self carried = go []
     go args (XExpr (ConLikeTc (RealDataCon con))) = Construct con <$> traverse (go []) args
     go [] (HsVar _ (L _ v)) = Just (Field v)
     go args (HsVar _ (L _ f)) | self f = call [] args
+    go args (HsVar _ (L _ f)) | isExternalName (idName f) = Call f <$> traverse (go []) args
     go args (XExpr (WrapExpr (WpTyApp ty) (HsVar _ (L _ f)))) | self f = call [ty] args
     go args (HsAppType ty fun _)
       | HsVar _ (L _ f) <- unLoc (stripParensLHsExpr fun), self f = call [ty] args
@@ -524,11 +722,13 @@ freshInput (PolyList sk) = do
     pure ([a], mkListTy ty, [ty])
 
 -- | Check a branch before supplying the family at its recursive calls.
-sourceBranch :: SourceInput -> [Type] -> TyCon -> SourceRow -> TcM (Maybe (TyCon -> CoAxBranch))
-sourceBranch input carried_types result (SourceRow loc con pat_args fields carried output) = do
+sourceBranch :: (Id -> TcM (Maybe (TyCon, [Type], Type)))
+             -> SourceInput -> [Type] -> TyCon -> SourceRow -> TcM (Maybe (TyCon -> CoAxBranch))
+sourceBranch lookup_call input carried_types result (SourceRow loc con pat_args fields carried output) = do
     args <- liftZonkM (zonkTcTypes pat_args)
     carried_tys <- liftZonkM (zonkTcTypes (map varType carried))
     same_calls <- checkCalls output
+    callees <- traverse (\f -> fmap (f,) <$> lookup_call f) (sourceCalls output)
     if same_calls && eqTypes args pattern_args && eqTypes carried_tys carried_types
        && length fields == dataConSourceArity con then do
       (quantified, domain, params) <- freshInput input
@@ -537,12 +737,13 @@ sourceBranch input carried_types result (SourceRow loc con pat_args fields carri
       tvs <- zipWithM fieldVar fields field_types
       carried_tvs <- zipWithM (fieldVar . Just) carried carried_types
       pure $ do
+        checked_callees <- sequence callees
         let lhs = mkTyConApp (promoteDataCon con) (params ++ mkTyVarTys tvs)
             patterns = family_args ++ [lhs] ++ mkTyVarTys carried_tvs
             binders = quantified ++ tvs ++ carried_tvs
             carried_scope = zip (map Just carried) carried_tvs
         guard (all isTyFamFree patterns)
-        rhs <- check_rhs domain family_args (zip fields tvs) carried_scope (mkTyConTy result) output
+        rhs <- check_rhs checked_callees domain family_args (zip fields tvs) carried_scope (mkTyConTy result) output
         pure (\fam -> mkCoAxBranch binders [] [] patterns (rhs fam)
                         (map (const Nominal) binders) loc)
     else pure Nothing
@@ -553,6 +754,7 @@ sourceBranch input carried_types result (SourceRow loc con pat_args fields carri
 
     checkCalls (Field _) = pure True
     checkCalls (Construct _ args) = allM checkCalls args
+    checkCalls (Call _ args) = allM checkCalls args
     checkCalls (Recur tys _) = eqTypes call_args <$> liftZonkM (zonkTcTypes tys)
 
     fieldVar field ty = do
@@ -560,7 +762,7 @@ sourceBranch input carried_types result (SourceRow loc con pat_args fields carri
       name <- newSysName occ
       pure (mkTyVar name ty)
 
-    check_rhs domain family_args fields_scope carried_scope expected rhs = case rhs of
+    check_rhs callees domain family_args fields_scope carried_scope expected rhs = case rhs of
       Field v -> do
         tv <- lookup (Just v) (fields_scope ++ carried_scope)
         guard (tyVarKind tv `eqType` expected)
@@ -575,8 +777,13 @@ sourceBranch input carried_types result (SourceRow loc con pat_args fields carri
         (tc, []) <- ordinaryDataType expected
         guard (dataConTyCon dc == tc && length args == dataConSourceArity dc)
         let arg_tys = map scaledThing (dataConOrigArgTys dc)
-        children <- zipWithM (check_rhs domain family_args fields_scope carried_scope) arg_tys args
+        children <- zipWithM (check_rhs callees domain family_args fields_scope carried_scope) arg_tys args
         pure (\fam -> mkTyConApp (promoteDataCon dc) [child fam | child <- children])
+      Call fun args -> do
+        (table, arg_tys, res_ty) <- lookup fun callees
+        guard (length args == length arg_tys && res_ty `eqType` expected)
+        children <- zipWithM (check_rhs callees domain family_args fields_scope carried_scope) arg_tys args
+        pure (\fam -> mkTyConApp table [child fam | child <- children])
 
 -- | Give the table the representation of a closed, non-injective family.
 makeFamily :: Name -> SourceInput -> [Type] -> TyCon -> [TyCon -> CoAxBranch] -> TcM TyCon

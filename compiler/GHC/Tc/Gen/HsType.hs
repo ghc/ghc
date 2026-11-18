@@ -87,6 +87,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
+import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -3031,6 +3032,16 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
        ; thing <- tcLookup name
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
+
+           -- An ordinary module can import a synonym for a checked computation.
+           -- See Note [Source table dependency closure] in GHC.Tc.Module.
+           AGlobal (ATyCon tc)
+             | Just rhs <- synTyConRhs_maybe tc
+             -> do { sourceTableTypeUses rhs
+                   ; return (mkTyConTy tc, tyConKind tc) }
+             | isJust (sourceTableTermOcc (nameOccName (tyConName tc)))
+             -> do { sourceTableTypeUses (mkTyConTy tc)
+                   ; return (mkTyConTy tc, tyConKind tc) }
 
            -- See Note [Recursion through the kinds]
            (tcTyThingTyCon_maybe -> Just tc) -- TyCon or TcTyCon

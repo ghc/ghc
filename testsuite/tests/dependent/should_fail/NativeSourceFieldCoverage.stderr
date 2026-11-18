@@ -1,6 +1,6 @@
 NativeSourceFieldCoverage.hs:10:15: error: [GHC-68947]
     No checked equations are available for ‘incomplete’ in a type.
     Match the first argument with one clause per constructor, using variables or wildcards for its fields.
-    Build the result from constructors and bound variables.
+    Build the result from constructors, bound variables, or fully applied functions with checked equations.
     In a recursive call, pass a field of the first argument directly.
     If there is a second argument, bind it with a variable and pass it unchanged in recursive calls.
