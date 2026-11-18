@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
 Read on 2026-11-14 through 2026-11-18. The [manifest](manifest.json) records
-twenty-four works and thirty downloaded PDF versions. It contains source URLs,
+twenty-five works and thirty-one downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -13,7 +13,8 @@ The ICFP 2014 lazy-refinement paper and selected-section notes are in
 The JFP 2022 ANF paper and selected-page records are in
 `native-computed-retained/papers/`.
 The OutsideIn(X) author draft and selected-page records are in
-`native-let-conversion/`.
+`native-let-conversion/`. The POPL 2004 `seq` paper and selected-page
+records are in `serokell-evaluators/`.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -50,6 +51,7 @@ versions and several selective readings.
 | [Combining Proofs and Programs in a Dependently Typed Language](https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf) | Casinghino, Sjöberg and Weirich, POPL 2014 | R05 | Logical and programmatic fragments. The core proves closed logical CBV termination. Open-term normalization, Zombie's richer feature set and lazy-Haskell totality are separate boundaries. |
 | [Refinement Types For Haskell](https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf) | Vazou, Seidel, Jhala, Vytiniotis and Peyton-Jones, ICFP 2014 | R05, optional assurance | Potential divergence, weak-head values, finite values and decreasing recursion metrics. No guarantee is transferred to this compiler. |
 | [ANF preserves dependent types up to extensional equality](https://doi.org/10.1017/S0956796822000090) | Koronkevich, Rakow, Ahmed and Bowman, JFP 2022 | R05 | Dependency-preserving naming, continuation typing and the limits of a naive coercion translation. |
+| [Free Theorems in the Presence of seq](https://janis-voigtlaender.eu/JV04.html) | Johann and Voigtländer, POPL 2004 | R16 | A polymorphic type does not determine whether a function demands an argument. |
 
 ## Singletons, Haskell 2012
 
@@ -688,3 +690,24 @@ The project proposal would inspect the actual method Wanted evidence before
 activating an alias Given in the body implication. Exact dictionary selection,
 conditional activation and lazy let identity require separate implementation
 and soundness checks in this compiler.
+
+## Free theorems and seq, POPL 2004
+
+The local text extraction covers PDF pages 1–3 of the authors’ version.
+The selected reading covers the abstract and introduction on PDF pages
+1–2. The author bibliography gives the publication pages 99–110 and
+DOI 10.1145/982962.964010.
+[Author bibliography](https://janis-voigtlaender.eu/JV04.html).
+
+Section 1 gives `seq :: forall a b. a -> b -> b`. It evaluates its
+first argument to weak head normal form before returning its second.
+If the first argument is bottom, the result is bottom even if the
+second argument is defined. The introduction uses `seq` to show why
+standard free theorems can fail in Haskell.
+[Authors’ PDF, pages 1–2](https://www.orchid.inf.tu-dresden.de/gdp/reports/p76-voigtlaender.pdf#page=1).
+
+For M102, a producer's polymorphic type does not justify selecting an
+operand. The evaluator checks the actual Core unfolding. If that
+unfolding demands a rigid operand, the case stays stuck. The paper
+explains the strictness obligation. It supplies no correctness proof
+for the evaluator.

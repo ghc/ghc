@@ -5009,3 +5009,18 @@ available to the interpreter before execution.
 [Foldable method and list instance](../../libraries/ghc-internal/src/GHC/Internal/Data/Foldable.hs),
 [GHC's staged expression checker](../../compiler/GHC/Tc/Gen/Splice.hs)
 and [Agda 2.8.0 instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html).
+
+### Strict and lazy open projections
+
+Johann and Voigtländer give the polymorphic type of `seq` and show how a
+strict first argument changes the behavior of a function that returns its
+second argument. This matters directly to M102. The lazy and strict
+versions of `second :: a -> b -> b` have identical signatures. The
+strict version must evaluate its first argument to weak-head normal form
+before it can return the second.
+The evaluator follows the imported body and preserves the resulting Core
+case. Agda's case-tree examples provide a related criterion for blocking
+on an unknown input.
+[Johann and Voigtländer, POPL 2004](https://janis-voigtlaender.eu/JV04.html),
+[Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [R16 source checks](roadmap/R16-open-term-evaluator.md#selecting-between-two-type-variables).

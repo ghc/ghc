@@ -7864,18 +7864,22 @@ left :: forall a b. a -> b -> const a b
 left x _ = x
 ```
 
-- [ ] Check the invisible type binders, operand types and result of the
+- [x] Check the invisible type binders, operand types and result of the
       imported function. Admit a saturated ordinary arrow whose operands
       and result are bound by that telescope. Preserve each source skolem's
       identity, including repeated uses of one skolem.
-- [ ] Reduce `const a b` to `a` and an independently defined second
+- [x] Reduce `const a b` to `a` and an independently defined second
       projection to `b`. Run the resulting definitions at two different
       types and record the checked unfoldings the consumer used.
-- [ ] Reject a strict second projection at the source call when it must
+- [x] Reject a strict second projection at the source call when it must
       inspect rigid `a` before returning `b`. Report which operand blocked
       the case. Keep each observation inside type elaboration.
 
-Before M102, the consumer reports GHC-68947 at both projection heads.
+Before M102, the consumer reported GHC-68947 at both projection heads.
+Both compilers now select the expected operands. They reject the strict
+variant at the source function name under both one-shot compilation and
+`--make`. GHCi and both compiled Showcases matched all 178 outputs.
+All eight selected normal-way regressions passed on the self-hosted compiler.
 
 ## M103: infer a closed overloaded call from its argument
 

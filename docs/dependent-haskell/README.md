@@ -21,6 +21,12 @@ reads the ordinary imported definition of `id` and reduces `id a` to
 the caller's type variable. At `Int`, a definition `x = 42` therefore
 produces `42`. [Open source example](roadmap/R16-open-term-evaluator.md).
 
+The same evaluator can select between two rigid types. A signature
+`first :: forall a b. a -> b -> const a b` gets its result type from
+Prelude's ordinary `const`. Making an imported projection strict in an
+unknown argument produces an error at the call.
+[Projection examples](roadmap/R16-open-term-evaluator.md#selecting-between-two-type-variables).
+
 A type can also call an ordinary installed library function on a known
 character. The Showcase reflects `Data.Char.toUpper 'x'` as `'X'` and checks
 `Data.Char.isDigit '7' :~: 'True` with `Refl`.

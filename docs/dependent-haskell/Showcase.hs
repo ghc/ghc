@@ -806,6 +806,7 @@ main = do
     observe "ordinary length evaluated while checking the type" (TypeNats.natVal closedLength)
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
+    observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])
@@ -818,6 +819,10 @@ openIdentity = 42
 -- | Reflect an upper-case character and prove that seven is a digit.
 checkedCharacters :: (Char, Data.Char.isDigit '7' :~: 'True)
 checkedCharacters = (charVal (Proxy @(Data.Char.toUpper 'x')), Refl)
+
+-- | The result type selects the first operand even when the argument types differ.
+openLeft :: forall a b. a -> b -> const a b
+openLeft x _ = x
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()

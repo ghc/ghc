@@ -21,6 +21,26 @@ With `TypeApplications`, a caller can also write `Proxy @(Prelude.id a)`
 for a rigid `a`. GHC checks whether the whole visible argument is complete
 before it reduces the call.
 
+## Selecting between two type variables
+
+```haskell
+first :: forall a b. a -> b -> const a b
+first x _ = x
+```
+
+The compiler reads the ordinary definition of Prelude's `const`. It gives
+each distinct source type variable a symbolic operand and checks which one
+the function returns. The same variable in two argument positions has one
+identity. An independently defined `second _ y = y` selects `b`. Changing
+the pattern to `second !_ y = y` makes Core inspect the first operand.
+When `a` is rigid, evaluation stops at that case and GHC-70566 names `a`
+at the call. The source harness runs both projections with `Bool` and
+`Int` and checks the strict version under separate compilation and
+`--make`. [Producer](../examples/open-evaluation/OpenProducer.hs)
+and [consumer](../examples/open-evaluation/OpenSource.hs). The
+[strictness references](../REFERENCES.md#strict-and-lazy-open-projections)
+give the Haskell and Agda precedents for this check.
+
 ## Current experiment
 
 Use the actual typed unfolding for Prelude's `id`. A source skolem
