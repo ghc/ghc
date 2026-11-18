@@ -2417,15 +2417,11 @@ mkEtaForAllMCo ma (Bndr tcv vis) ty mco
             | otherwise                   -> mk_fco (mkRepReflCo ty)
       MCo co                              -> mk_fco co
   where
-    mk_fco co = MCo (mkForAllCo tcv coreTyLamForAllTyFlag vis (mkNomReflCo ma) MRefl co)
-    -- coreTyLamForAllTyFlag: See Note [The EtaInfo mechanism], particularly
-    -- the (EtaInfo Invariant).  (sym co) wraps a lambda that always has
-    -- a ForAllTyFlag of coreTyLamForAllTyFlag; see Note [Required foralls in Core]
-    -- in GHC.Core.TyCo.Rep
-    --
-    -- Orientation: remember, the output of mkEtaForAllCo goes into an `EI bs mco`,
-    -- and is SymCo'd in `etaInfoAbs`.  Hence the orientation of the visibility
-    -- flags.  A bit of a brain-strain (#27557).
+    mk_fco co = MCo (mkForAllCo tcv vis coreTyLamForAllTyFlag (mkNomReflCo ma) MRefl co)
+    -- etaInfoApp casts the original function to the type of the new lambdas.
+    -- etaInfoAbs casts those lambdas back with the symmetric coercion.
+    -- See Note [The EtaInfo mechanism] and Note [Required foralls in Core]
+    -- in GHC.Core.TyCo.Rep (#27557).
 
 {-
 ************************************************************************

@@ -1,3 +1,3 @@
-wombat [InlPrag=INLINE (sat-args=1)] :: forall a. Num a => a -> a
+wombat [InlPrag=INLINE (sat-args=1)]
 wombat
       map @a @a (wombat @a $dNum) ys

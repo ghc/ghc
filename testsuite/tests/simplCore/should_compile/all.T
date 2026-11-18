@@ -616,8 +616,10 @@ test('T4081', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-a
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
 test('T27296', [], makefile_test, ['T27296'])
 test('T27296b', [], makefile_test, ['T27296b'])
-test('T27589', [grep_errmsg(r'wombat')], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
-test('T27590', [grep_errmsg(r'wombat')], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
+# Check the INLINE arity and occurrences of wombat. Its type can wrap onto a new line.
+wombat_calls = grep_errmsg(r'^(.*\bwombat\b.*?)(?: :: |$)', [1])
+test('T27589', wombat_calls, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
+test('T27590', wombat_calls, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
 test('T27556', [only_ways('ghci'), extra_hc_opts('-O -fno-unoptimized-core-for-interpreter')], ghci_script, ['T27556.script'])
 
 # Check the stack of source notes at the top of the body of 'ordering'
