@@ -286,6 +286,26 @@ simpleOptNativeExpr expr
     init_env = (emptyEnv opts) { soe_subst = init_subst, soe_native = True }
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 
+{- Note [Boxing retained GHCi results]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC.Tc.Module.tcGhciStmts returns the new bindings as a list of Any. Its
+generated unsafeCoerce# application keeps the complete type of the bound
+variable. For a lifted value it has this form:
+
+  unsafeCoerce# @LiftedRep @LiftedRep @ty @(Any @Type) (x :: ty)
+
+The executable RHS of unsafeCoerce# is an error stub. For this saturated
+application, use its compulsory unfolding, including the UnsafeRefl evidence
+and the cast of x. The ordinary beta rules instantiate the template. The
+case scrutinises unsafeEqualityProof, so returning the binding does not
+evaluate x. CoreToStg erases these proof cases. The interactive environment
+stores the original typed Id with the resulting heap reference.
+
+Check the known key, local Id, types and representations before admitting
+the unfolding in native mode. See Note [Wiring in unsafeCoerce#] in
+GHC.HsToCore and Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy.
+-}
+
 -- | Simplify native program RHSs without changing top-level binding identities.
 -- See Note [Restricted dependent simplification].
 simpleOptNativeProgram :: HasDebugCallStack => CoreProgram -> CoreProgram
@@ -594,6 +614,7 @@ simple_app env (Var v) as
     || v `hasKey` leftSectionKey
     || v `hasKey` rightSectionKey
     || v `hasKey` coerceKey
+    || (v `hasKey` unsafeCoercePrimIdKey && is_ghci_result_box as)
     || maybe False isNewDataCon (isDataConWrapId_maybe v)
   , let unf = idUnfolding v
   , isCompulsoryUnfolding unf
@@ -605,6 +626,17 @@ simple_app env (Var v) as
     -- Note [Desugaring unlifted newtypes]. Test cases: T17021, T21650_{a,b}.
   , Just rhs <- maybeUnfoldingTemplate unf -- Always succeeds if isCompulsoryUnfolding does
   = simple_app (soeZapSubst env) rhs as
+
+  where
+    -- See Note [Boxing retained GHCi results].
+    is_ghci_result_box [ ApplyToArg (_, Type from_rep), ApplyToArg (_, Type to_rep)
+                       , ApplyToArg (_, Type from_ty),  ApplyToArg (_, Type to_ty)
+                       , ApplyToArg (_, Var value) ]
+      = isLiftedRuntimeRep from_rep && isLiftedRuntimeRep to_rep
+        && isLocalId value && idType value `eqType` from_ty
+        && tcIsLiftedTypeKind (typeKind from_ty)
+        && to_ty `eqType` anyTypeOfKind liftedTypeKind
+    is_ghci_result_box _ = False
 
 simple_app env (Var v) []
   = lookupIdSubst (soe_subst env) v
