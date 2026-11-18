@@ -7,7 +7,7 @@
 -}
 
 module GHC.Tc.Gen.Bind
-   ( tcLocalBinds
+   ( tcLocalBinds, tcLocalNonRecBind
    , tcTopBinds
    , tcValBinds
    , tcHsBootSigs
@@ -350,22 +350,27 @@ tc_nonrec_group  top_lvl sig_fn prag_fn [lbind] thing_inside
        ; return ((NonRecursive, aux_binds), thing) }
 
   | otherwise
-  =     -- A single non-recursive binding
-        -- We want to keep non-recursive things non-recursive
-        -- so that we desugar unlifted bindings correctly
-    do { type_env <- getLclTypeEnv
-       ; let closed = isClosedBndrGroup type_env [lbind]
-       ; (bind', ids) <- tcPolyBinds top_lvl sig_fn prag_fn
-                                      NonRecursive NonRecursive
-                                      closed
-                                      [lbind]
-
-       ; thing <- tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
-
-       ; return ( (NonRecursive, bind'), thing ) }
+  = tcNonRecValBind top_lvl sig_fn prag_fn lbind (const thing_inside)
 
 tc_nonrec_group _ _ _ binds _   -- Non-rec groups should always be a singleton
   = pprPanic "tc_nonrec_group" (ppr binds)
+
+-- | Check one unsigned nonrecursive value binding and expose its checked RHS
+-- while its normal let environment and usage checks are in effect.
+-- See Note [Optional equality for an overloaded let] in GHC.Tc.Gen.Expr.
+tcLocalNonRecBind :: LHsBind GhcRn -> (LHsBinds GhcTc -> TcM a)
+                  -> TcM ((RecFlag, LHsBinds GhcTc), a)
+tcLocalNonRecBind = tcNonRecValBind NotTopLevel (const Nothing) emptyNameEnv
+
+tcNonRecValBind :: TopLevelFlag -> TcSigFun -> TcPragEnv -> LHsBind GhcRn
+                -> (LHsBinds GhcTc -> TcM a) -> TcM ((RecFlag, LHsBinds GhcTc), a)
+tcNonRecValBind top_lvl sig_fn prag_fn lbind inside
+  = do { type_env <- getLclTypeEnv
+       ; let closed = isClosedBndrGroup type_env [lbind]
+       ; (binds, ids) <- tcPolyBinds top_lvl sig_fn prag_fn
+                                    NonRecursive NonRecursive closed [lbind]
+       ; result <- tcExtendLetEnv top_lvl sig_fn closed ids (inside binds)
+       ; return ((NonRecursive, binds), result) }
 
 ---------------------
 tc_rec_group :: forall thing.

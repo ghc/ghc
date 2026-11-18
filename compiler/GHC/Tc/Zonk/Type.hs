@@ -77,6 +77,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set (elemVarSet)
 import GHC.Types.Id
 import GHC.Types.TypeEnv
 import GHC.Types.Basic
@@ -1108,6 +1109,30 @@ zonkExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
                          ; return (value', proof') }) $ \(value', proof') ->
          do { body' <- zonkLExpr body
             ; return (XExpr (NativeCaseAlias scrut' value' proof' result_ty' body')) } }
+
+-- See Note [Checked optional let alias] in GHC.Hs.Expr.
+zonkExpr (XExpr (NativeLetAlias rhs canonical value proof result_ty body))
+  = do { rhs' <- zonkLExpr rhs
+       ; canonical' <- zonk_canonical canonical
+       ; runZonkBndrT (do { value' <- zonkIdBndrX value
+                         ; proof' <- zonkEvBndrX proof
+                         ; return (value', proof') }) $ \(value', proof') ->
+         do { result_ty' <- zonkTcTypeToTypeX result_ty
+            ; body' <- zonkLExpr body
+            ; return (XExpr (NativeLetAlias rhs' canonical' value' proof' result_ty' body')) } }
+  where
+    zonk_canonical :: SourceLetRhs -> ZonkTcM SourceLetRhs
+    zonk_canonical (PendingSourceLetRhs (TcEvBinds var) rhs) = do
+      needs <- case var of
+        EvBindsVar { ebv_binds = ref } -> ebs_needs <$> readTcRef ref
+        CoEvBindsVar { ebv_needs = ref } -> readTcRef ref
+      if proof `elemVarSet` needs
+        then CheckedSourceLetRhs . Just <$> zonkCoreExpr rhs
+        else return (CheckedSourceLetRhs Nothing)
+    zonk_canonical PendingSourceLetRhs{} =
+      panic "NativeLetAlias: pending RHS has immutable evidence"
+    zonk_canonical (CheckedSourceLetRhs rhs) =
+      CheckedSourceLetRhs <$> traverse zonkCoreExpr rhs
 
 zonkExpr e@(XExpr (ConLikeTc {}))
   = return e

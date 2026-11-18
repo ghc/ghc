@@ -37,8 +37,8 @@ import GHC.Tc.Gen.Expand( tcExpand )
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Do
-import GHC.Tc.Gen.SourceTable (sourceTableOccurrence)
-import GHC.Tc.Gen.Bind        ( tcLocalBinds )
+import GHC.Tc.Gen.SourceTable (sourceTableOccurrence, optionalSourceUses, registerOptionalSourceUses)
+import GHC.Tc.Gen.Bind        ( tcLocalBinds, tcLocalNonRecBind )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcRetainedCase
@@ -89,6 +89,9 @@ import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
+import GHC.Driver.Config.HsToCore.Ticks (initTicksConfig)
+import GHC.Driver.Session (sccProfilingEnabled)
+import GHC.HsToCore.Ticks (TicksConfig(ticks_passes), TickishType(Breakpoints))
 import GHC.Driver.DynFlags
 
 import GHC.Utils.Misc
@@ -675,10 +678,10 @@ tcExpr original@(HsLet x (L loc binds) body) res_ty
        ; expansion <- case res_ty of
              Check expected | enabled, hasNativeDependentExpr (Core.Type expected) ->
                do { strict <- xoptM LangExt.Strict
-                  ; if strict then return Nothing else tcNativeLet binds body expected }
+                  ; if strict then return Nothing else tcNativeLet original (L loc binds) body expected }
              _ -> return Nothing
        ; case expansion of
-           Just expr -> return (mkExpandedExprTc original expr)
+           Just expr -> return expr
            Nothing -> do { (binds', body') <- tcLocalBinds binds (tcMonoLExpr body res_ty)
                          ; return (HsLet x (L loc binds') body') } }
 
@@ -982,36 +985,49 @@ tcExpr e res_ty
 
 -- | Elaborate a nonrecursive index definition through dependent application.
 -- See Note [Equality for lazy local definitions].
-tcNativeLet :: HsLocalBinds GhcRn -> LHsExpr GhcRn -> Type -> TcM (Maybe (HsExpr GhcTc))
-tcNativeLet (HsValBinds _ (XValBindsLR (HsVBG [(NonRecursive, [L _ binding])] []))) body expected
+tcNativeLet :: HsExpr GhcRn -> LHsLocalBinds GhcRn -> LHsExpr GhcRn -> Type
+            -> TcM (Maybe (HsExpr GhcTc))
+tcNativeLet original (L loc (HsValBinds ann (XValBindsLR (HsVBG [(NonRecursive, [lbind@(L _ binding)])] []))))
+            body expected
   | FunBind { fun_id = name, fun_matches = MG { mg_alts = L _ [L _ match] } } <- binding
   , Match { m_ctxt = FunRhs { mc_strictness = NoSrcStrict }, m_pats = L _ []
           , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
                             , grhssLocalBinds = L _ EmptyLocalBinds{} } } <- match
-  = runMaybeT $ do
-    value <- candidate rhs
-    index <- MaybeT (pure (Core.retainedArgIndex value))
-    let domain = typeKind index
-    guard (isNativeIndexType domain)
-    template_name <- liftMaybeT (newSysName (mkTyVarOcc "let_index"))
-    let template = mkTyVar template_name domain
-    result <- MaybeT (pure (abstractNativeIndices [(index, template)] expected))
-    guard (anyFreeVarsOfType (== template) result)
-    liftMaybeT $ do
-        (checked, runtime_rhs) <- tcRetainedArg domain rhs
-        let binder = mkLocalId (unLoc name) ManyTy domain
-            equality = mkNomEqPred (TermVarTy binder) index
-            signature = mkDepFunTy binder (mkPhiTy [equality] expected)
-            pat = L (l2l (getLoc name)) (VarPat noExtField name)
-            row = genSimpleMatch (LamAlt LamSingle) [pat] body
-            matches = mkMatchGroup (Generated OtherExpansion SkipPmc) noAnn (wrapGenSpan [row])
-            lambda = wrapGenSpan (HsLam noAnn LamSingle matches)
-        argument <- tcScalingUsage ManyTy (tcCheckMonoExpr runtime_rhs domain)
-        fun <- tcCheckMonoExprNC lambda signature
-        let result_ty = applyTypeToArgs signature [checked]
-            app = HsAppRetained (DepFunVisible, result_ty) fun argument
-        tcWrapResult (unLoc body) app result_ty (Check expected)
+  = do { direct <- named_argument name rhs
+       ; case direct of
+           Just expr -> return (Just (mkExpandedExprTc original expr))
+           Nothing -> do
+             { (group, result) <- tcLocalNonRecBind lbind $ \checked -> do
+                 { refined <- tcOptionalLet checked body expected
+                 ; case refined of
+                     Just expansion -> return (Right (mkExpandedExprTc original expansion))
+                     Nothing -> Left <$> tcMonoLExpr body (Check expected) }
+             ; let ordinary body' = HsLet noExtField (L loc (HsValBinds ann (XValBindsLR (HsVBG [group] [])))) body'
+             ; return (Just (either ordinary id result)) } }
   where
+    named_argument name rhs = runMaybeT $ do
+        value <- candidate rhs
+        index <- MaybeT (pure (Core.retainedArgIndex value))
+        let domain = typeKind index
+        guard (isNativeIndexType domain)
+        template_name <- liftMaybeT (newSysName (mkTyVarOcc "let_index"))
+        let template = mkTyVar template_name domain
+        result <- MaybeT (pure (abstractNativeIndices [(index, template)] expected))
+        guard (anyFreeVarsOfType (== template) result)
+        liftMaybeT $ do
+            (checked, runtime_rhs) <- tcRetainedArg domain rhs
+            let binder = mkLocalId (unLoc name) ManyTy domain
+                equality = mkNomEqPred (TermVarTy binder) index
+                signature = mkDepFunTy binder (mkPhiTy [equality] expected)
+                pat = L (l2l (getLoc name)) (VarPat noExtField name)
+                row = genSimpleMatch (LamAlt LamSingle) [pat] body
+                matches = mkMatchGroup (Generated OtherExpansion SkipPmc) noAnn (wrapGenSpan [row])
+                lambda = wrapGenSpan (HsLam noAnn LamSingle matches)
+            argument <- tcScalingUsage ManyTy (tcCheckMonoExpr runtime_rhs domain)
+            fun <- tcCheckMonoExprNC lambda signature
+            let result_ty = applyTypeToArgs signature [checked]
+                app = HsAppRetained (DepFunVisible, result_ty) fun argument
+            tcWrapResult (unLoc body) app result_ty (Check expected)
     candidate :: LHsExpr GhcRn -> MaybeT TcM Core.CoreExpr
     candidate (L _ expr) = case expr of
       HsPar _ e -> candidate e
@@ -1027,7 +1043,7 @@ tcNativeLet (HsValBinds _ (XValBindsLR (HsVBG [(NonRecursive, [L _ binding])] []
           AGlobal (AConLike (RealDataCon dc)) -> return (Core.Var (dataConWorkId dc))
           _ -> mzero
       _ -> mzero
-tcNativeLet _ _ _ = return Nothing
+tcNativeLet _ _ _ _ = return Nothing
 
 {- Note [Equality for lazy local definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1054,6 +1070,62 @@ bindings. A class selector alone supplies no checked index. Choosing a
 global instance here could change the meaning of ordinary multiplication
 under a local Num dictionary. Agda's let conversion motivates the equality.
 The lazy value argument preserves Haskell sharing. See docs/dependent-haskell/REFERENCES.md.
+-}
+
+-- | Check a local definition whose ordinary RHS selected class methods.
+-- See Note [Optional equality for an overloaded let].
+tcOptionalLet :: LHsBinds GhcTc -> LHsExpr GhcRn -> Type -> TcM (Maybe (HsExpr GhcTc))
+tcOptionalLet [L _ FunBind { fun_ext = (WpHole, []), fun_id = L _ binder
+                          , fun_matches = MG { mg_alts = L _ [L _ match] } }] body expected
+  | Match { m_pats = L _ [], m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
+                                              , grhssLocalBinds = L _ EmptyLocalBinds{} } } <- match
+  = runMaybeT $ do
+      initial <- liftMaybeT (liftZonkM (zonkId binder))
+      let mult = idMult initial
+          flexible = maybe False isMetaTyVar (getTyVar_maybe mult)
+      guard (isNativeIndexId (setIdMult initial ManyTy) && (isManyTy mult || flexible))
+      flags <- liftMaybeT getDynFlags
+      guard (all (== Breakpoints) (ticks_passes (initTicksConfig flags))
+             && not (sccProfilingEnabled flags))
+      (canonical, owners, methods) <- MaybeT (tcOptionalLetOperand rhs)
+      guard (not (null methods))
+      index <- MaybeT (pure (Core.retainedArgIndex canonical))
+      guard (typeKind index `tcEqType` idType initial)
+      let uses = [(dfun, sel, target) | (_, dfun, sel, target) <- methods]
+          guards = [(wanted, dfun) | (wanted, dfun, _, _) <- methods]
+      dependencies <- MaybeT (optionalSourceUses owners uses)
+      liftMaybeT (tcSubMult (OccurrenceOf (idName initial)) ManyTy mult)
+      value <- liftMaybeT (liftZonkM (zonkId binder))
+      guard (isNativeIndexId value)
+      liftMaybeT $ do
+          proof <- newEvVar (mkNomEqPred (TermVarTy value) index)
+          traceTc "tcOptionalLet" (ppr value <+> dcolon <+> ppr (idType proof) $$ ppr guards)
+          (binds, body') <- checkSourceLetConstraints (idName value) guards proof (tcMonoLExpr body (Check expected))
+          registerOptionalSourceUses binds proof dependencies
+          return (XExpr (NativeLetAlias rhs (PendingSourceLetRhs binds canonical) value proof expected (mkHsDictLet binds body')))
+tcOptionalLet _ _ _ = return Nothing
+
+{- Note [Optional equality for an overloaded let]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For let cells = rows * cols, check the binding with the ordinary let
+generalisation and usage rules. Inspect the checked RHS inside the scope
+of the resulting binding. A simple monomorphic RHS can supply both the
+dictionary Wanted for the written (*) and a candidate checked product.
+An abstracted binding or a binding with wrappers keeps ordinary checking.
+A nonrecursive binder can still have a flexible multiplicity. The recovered
+RHS uses only unrestricted operands. Set the binder to Many in its original
+scope before the body enters an implication. Preserve a rigid One.
+
+Capture the body's constraints under an implication. Let the solver offer
+cells ~# times rows cols only if the evidence for the original RHS selects
+the dictionary that certifies times. A Given Num Nat can supply a different
+method. The program may still use cells at runtime without its equality.
+The body can also return a vector built independently at times rows cols.
+
+When the body uses the proof, record the method and equation dependencies
+and validate the eventual RULES. Desugaring must discharge that same proof
+by retained application at the canonical product. Otherwise desugar the
+written RHS once as an ordinary lazy let.
 -}
 
 -- | Classify an opaque call after ordinary expression and usage checking.

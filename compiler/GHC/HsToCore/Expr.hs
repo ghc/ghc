@@ -45,8 +45,9 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Instance.Class (lookupHasFieldLabel)
 
 import GHC.Core
+import GHC.Core.Coercion ( coVarLType, coVarRType, coVarRole, mkNomReflCo )
 import GHC.Core.Dependent ( hasNativeDependentExprRhs )
-import GHC.Core.FVs( exprFreeVarsList, exprsFreeVarsList )
+import GHC.Core.FVs( exprFreeVars, exprFreeVarsList, exprsFreeVarsList )
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
@@ -321,6 +322,36 @@ dsExpr e@(XExpr ext_expr_tc)
         -> do { scrut' <- dsLExpr scrut
               ; body' <- dsLExpr body
               ; return (Case scrut' value result_ty [Alt DEFAULT [proof] body']) }
+
+      -- See Note [Checked optional let alias] in GHC.Hs.Expr.
+      NativeLetAlias rhs canonical_rhs value proof result_ty body
+        -> do { body' <- dsLExpr body
+              ; if proof `elemVarSet` exprFreeVars body'
+                then do
+                  { env <- getGblEnv
+                  ; let restore (Var v) = Var (restoreSourceTableId (ds_type_env env) v)
+                        restore (App f x) = App (restore f) (restore x)
+                        restore arg = arg
+                  ; canonical <- case canonical_rhs of
+                      CheckedSourceLetRhs (Just operand) -> return (restore operand)
+                      _ -> pprPanic "NativeLetAlias: unrecorded proof" (ppr value $$ ppr proof)
+                  ; case retainedArgIndex canonical of
+                      Just index
+                        | isNativeOpaqueValueId value
+                        , coVarRole proof == Nominal
+                        , coVarLType proof `eqType` TermVarTy value
+                        , coVarRType proof `eqType` index
+                        , exprType canonical `eqType` idType value
+                        , typeKind index `eqType` idType value
+                        -> let result = mkApps (mkLams [value, proof] body')
+                                              [canonical, Coercion (mkNomReflCo index)]
+                           in if exprType result `eqType` result_ty
+                              then return result
+                              else pprPanic "NativeLetAlias result type" (ppr result_ty $$ ppr result)
+                      _ -> pprPanic "NativeLetAlias canonical index"
+                             (ppr canonical $$ ppr value $$ ppr (idType proof)) }
+                else do { rhs' <- dsLExpr rhs
+                        ; return (Let (NonRec value rhs') body') } }
 
       -- Hpc Support
       HsTick tickish e -> do

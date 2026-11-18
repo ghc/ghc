@@ -565,6 +565,7 @@ isCallSite HsAppType{} = True
 isCallSite HsAppRetained{} = True
 isCallSite HsCase{}    = True
 isCallSite (XExpr NativeCaseAlias{}) = True
+isCallSite (XExpr NativeLetAlias{}) = True
 isCallSite (XExpr (ExpandedThingTc (HSE _ e)))
   = isCallSite (unLoc e)
 
@@ -719,6 +720,11 @@ addTickHsExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
   = do { scrut' <- addTickIndex scrut
        ; body' <- bindNativeCaseIds [value, proof] (addTickLHsExpr body)
        ; return (XExpr (NativeCaseAlias scrut' value proof result_ty body')) }
+
+addTickHsExpr (XExpr (NativeLetAlias rhs canonical value proof result_ty body))
+  = do { rhs' <- addTickLHsExpr rhs
+       ; body' <- bindNativeCaseIds [value, proof] (addTickLHsExpr body)
+       ; return (XExpr (NativeLetAlias rhs' canonical value proof result_ty body')) }
 
 addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually

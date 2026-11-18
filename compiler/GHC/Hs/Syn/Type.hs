@@ -168,6 +168,7 @@ hsExprType (HsFunArr x _ _ _) = dataConCantHappen x
 hsExprType (XExpr (WrapExpr wrap e)) = hsWrapperType wrap $ hsExprType e
 hsExprType (XExpr (ExpandedThingTc (HSE _ e)))  = lhsExprType e
 hsExprType (XExpr (NativeCaseAlias _ _ _ result_ty _)) = result_ty
+hsExprType (XExpr (NativeLetAlias _ _ _ _ result_ty _)) = result_ty
 hsExprType (XExpr (ConLikeTc con)) = conLikeType con
 hsExprType (XExpr (HsTick _ e)) = lhsExprType e
 hsExprType (XExpr (HsBinTick _ _ e)) = lhsExprType e

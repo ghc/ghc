@@ -1376,6 +1376,8 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
             -> [ toHie e ]
           NativeCaseAlias scrut _ _ _ body
             -> [ toHie scrut, toHie body ]
+          NativeLetAlias rhs _ _ _ _ body
+            -> [ toHie rhs, toHie body ]
           ConLikeTc con
             -> [ toHie $ C Use $ L mspan $ conLikeName con ]
           HsTick _ expr

@@ -734,6 +734,7 @@ deriving instance Data a => Data (WithUserRdr a)
 
 -- -------------------------------
 --------------------------------------
+deriving instance Data SourceLetRhs
 deriving instance Data XXExprGhcTc
 deriving instance Data XXPatGhcTc
 
