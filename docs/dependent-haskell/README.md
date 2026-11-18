@@ -71,6 +71,26 @@ An abstract `Num Nat` dictionary supplied by a caller cannot establish
 those equations. The [Showcase](Showcase.hs) also passes an undefined
 sum to a function that ignores its length.
 
+Multiplication counts the cells in a rectangular vector. Enable
+`NoStarIsType` to use `*` as a type operator. Here each row has
+`cols` cells, so appending it to the remaining rows gives exactly
+`cols + (remainingRows * cols)` cells.
+
+```haskell
+flattenRows :: Vec (Vec a cols) rows -> Vec a (rows * cols)
+flattenRows VNil = VNil
+flattenRows (VCons row rest) = appendVec row (flattenRows rest)
+```
+
+The library defines `times (S n) m = plus m (times n m)` and
+`times Z m = Z`. GHC checks the successor branch of `flattenRows`
+from those equations, even when both dimensions come from IO. An
+ordinary expression can use the same multiplication, as in
+`replicateNative (rows * cols) 'x'`.
+An index type can combine the operators, as in `Vec a (1 + rows * cols)`.
+Passing that entire expression as the retained operand of
+`replicateNative` still reports GHC-83605. [M88 validation](PLAN.md#m88-compose-checked-source-equations).
+
 ### What happens on empty input?
 
 ```haskell

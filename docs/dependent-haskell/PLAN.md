@@ -6923,18 +6923,21 @@ times Z     m = Z
 times (S n) m = plus m (times n m)
 ```
 
-- [ ] Check a saturated call to another certified monomorphic function in
+- [x] Check a saturated call to another certified monomorphic function in
       a source equation. Its parameters determine the expected kinds of the
       arguments. Check each recursive self call on a proper field of the
       matched constructor with the original carried operand.
-- [ ] Schedule local prerequisites independently of declaration order.
+- [x] Schedule local prerequisites independently of declaration order.
       Require an acyclic graph of calls between functions. Retrieve an
       imported helper by its defining identity. An ordinary function with
       an unchecked helper must still run as a term.
-- [ ] Preserve the helper equation and rewrite dependencies through private
+- [x] Preserve the helper equation and rewrite dependencies through private
       helpers, interfaces and recompilation. Exercise earlier and later
       rewrite rules, unverified functions, cycles and nondecreasing calls.
-- [ ] Define type and term `(*)` through `times` in the vector example.
+      Check a consumer without the extension that uses an imported synonym
+      or reduces the result type of an imported value. Keep old interfaces
+      usable when they contain only a private leaf family and its axiom.
+- [x] Define type and term `(*)` through `times` in the vector example.
       Check the open zero and successor equations, closed arithmetic,
       a vector indexed by two runtime dimensions, and demand on partial
       operands. Compare the source program and the separate-interface client.
@@ -6945,3 +6948,38 @@ excludes a nested family application in a recursive argument. The generated
 axiom therefore needs the checked source decrease and an independently
 certified callee. [Agda 2.8.0 natural operations](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#functions-on-natural-numbers)
 and [GHC's family decidability conditions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#decidability-of-type-synonym-instances).
+
+### Evidence and remaining scope
+
+Both compilers checked the two multiplication equations for unknown operands.
+A consumer checked those proofs and `flattenRows` with only producer
+interfaces available. The same-module proof passed with the helper declared
+after its caller. Private, qualified and re-exported helpers passed. A
+boot-only signature supplied no equations. With cached interfaces an
+unchanged build compiled nothing. Changing the base equation of `plus`
+rebuilt the helper, `times` and its client. The old proof of six then failed.
+
+An ordinary module can use the type of an imported function without
+mentioning multiplication. At first, a client that imported a rewrite for
+`plus` could still use the result of `flattenRows` at a concrete length.
+The solver now checks the dependencies of the source family when it uses
+its reduction as evidence. The invalid call reports GHC-83605 at
+`flattenRows`. Explicit and inferred uses of an imported `Proxy` value also
+reject the conflicting rewrite. Their controls without the rule pass.
+Both builds read a frozen M86 interface that exports an alias and its
+private leaf family but omits the private term.
+
+Each stage passed 38 focused checks, including 15 expected rejections with
+checked diagnostics. In the ordinary `-O2` program, zero times an undefined
+column count returned zero. A positive product could expose its first
+successor before forcing the remaining rows. Native code from both stages
+and self-hosted interpreted source reproduced all 161 Showcase lines at
+`-O0`. All 43 selected normal tests and four GHCi tests passed.
+
+The next source gap is a nested computation in a retained operand.
+`1 + 2 * 3` reduces to seven in a type. Both stages accept
+`replicateNative (rows * cols) 'x'`. Both reject
+`replicateNative (1 + rows * cols) True` with GHC-83605 at `*`.
+Writing `plus 1 (times rows cols)` also reaches the retained-expression
+restriction. This requires a change to retained application checking and
+lowering. [Equation provenance](REFERENCES.md#composition-of-source-equations).

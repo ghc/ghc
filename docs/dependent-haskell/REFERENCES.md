@@ -4686,3 +4686,27 @@ evaluation of the original value nor a new field in saved bytecode.
 [GHC 9.14.1, the debugger and polymorphism](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/ghci.html#breakpoints-and-inspecting-variables),
 [GHCi’s runtime type variables](../../compiler/GHC/Runtime/Eval.hs),
 and [breakpoint metadata generation](../../compiler/GHC/StgToByteCode.hs).
+
+### Composition of source equations
+
+Agda defines multiplication by adding one row to the product for the
+remaining rows. The recursive call decreases the first operand. Addition
+uses its own structural recursion. M88 takes both equations from the
+library's checked source. A helper must already have an independent
+certificate before its caller can use it.
+[Agda 2.8.0, builtin natural operations](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#functions-on-natural-numbers)
+and [termination checking](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#structural-recursion).
+
+In the generated equation for `times (S n) m`, one closed family
+application occurs inside another. GHC's ordinary family decidability
+check excludes this form. The source checker can justify the equation
+because the self call uses the original constructor field and the graph
+of calls between distinct functions is acyclic. A handwritten version
+of the nested family equation was checked with `UndecidableInstances`.
+[GHC's decidability conditions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#decidability-of-type-synonym-instances)
+and [the checked producer](../../compiler/GHC/Tc/Gen/SourceTable.hs).
+
+The vector library uses GHC's existing type-operator syntax.
+`NoStarIsType` makes `*` available as an operator in a type, and the
+library gives it the same fixity as term multiplication.
+[GHC 9.14.1, the kind Type and StarIsType](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/poly_kinds.html#the-kind-type).

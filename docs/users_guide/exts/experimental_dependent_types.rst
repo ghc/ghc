@@ -80,6 +80,17 @@ the checked equations for ``plus``. GHC checks that this call uses the
 same dictionary before relying on the sum in the result type. The
 runtime sum stays lazy.
 
+A recursive equation can also call another checked function. For example,
+``times (S n) m = plus m (times n m)`` uses the checked equations for
+``plus``. The recursive call decreases the first argument of ``times``.
+The vector library defines both the type operator ``(*)`` and the
+ordinary ``Num Nat`` multiplication method using ``times``.
+Enable ``NoStarIsType`` to write the type operator::
+
+    flattenRows :: Vec (Vec a cols) rows -> Vec a (rows * cols)
+    flattenRows VNil = VNil
+    flattenRows (VCons row rest) = appendVec row (flattenRows rest)
+
 The vector library's ``Num Nat`` instance also supplies checked equations
 for ``fromInteger``. A caller can use those equations at a retained
 argument, including inside an addition::
