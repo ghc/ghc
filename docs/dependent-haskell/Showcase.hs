@@ -787,6 +787,7 @@ main = do
     inferredAppend
     closedSourceFunctions
     constructorFields
+    recursiveLengths
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()
@@ -812,3 +813,13 @@ constructorFields = do
     observe "dropFirst with a computed result length" (toList shorter)
     observe "empty vector stays empty" (toList (dropFirst (VNil :: Vec Int Z)))
     observe "successor test ignores the field" (isSuccessor (S (error "unused predecessor")))
+
+-- | Use a recursive source function as the result index for a runtime list.
+recursiveLengths :: IO ()
+recursiveLengths = do
+    values <- newIORef [True, False, True] >>= readIORef
+    let vector :: Vec Bool (listCount values)
+        vector = boolVector values
+    observe "vector indexed by a recursive source length" (toList vector)
+    observe "list length ignores bottom elements" (natToInt (listCount [undefined, undefined]))
+    observe "first length constructor ignores the tail" (isSuccessor (listCount (False : undefined)))

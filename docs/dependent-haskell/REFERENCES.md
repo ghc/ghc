@@ -4466,9 +4466,29 @@ at runtime. [Clause translation](https://github.com/goldfirere/singletons/blob/8
 and [Haskell pattern semantics](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-590003.17).
 
 For the list-length experiment, Agda's primitive recursion rule permits a
-self-call on a direct recursive field of the current pattern. The proposed
+self-call on a direct recursive field of the current pattern. The M77
 Haskell check uses the identity of the bound tail in that call. A call on
 the original input or on a reconstructed list has no such justification.
 This gives a finite reduction argument for a finite input spine. Haskell
 can still supply a partial or infinite spine at runtime.
 [Agda 2.8.0 primitive recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#primitive-recursion)
+
+The generated equation for cons has one family call. Its argument is the
+tail variable from the left-hand side. It is smaller than the cons pattern,
+contains no family application and uses the variable once. These are the
+corresponding GHC checks for calls in a type family equation. A Haskell
+module can enable `UndecidableInstances`; M77 still checks each source call
+before it emits an axiom. [GHC family decidability conditions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#decidability-of-type-synonym-instances).
+
+GHC also checks family applications in the patterns on the left-hand side.
+The list constructors carry an invisible element argument in those patterns.
+M77 uses the same `isTyFamFree` predicate as `lint_family_branch` when checking
+that argument. [GHC type instance declarations](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#type-instance-declarations).
+
+For a polymorphic list length, `singletons-th` supplies a second precedent.
+Its generated family declares specified type parameters in source order.
+For `forall a. [a] -> Nat`, the corresponding family takes the element
+type and the list as its two Core arguments. Only the list argument is required
+in surface syntax. The family header fixes the arity. Its kind alone does
+not. [Pinned promotion implementation and arity note](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L1289-L1335)
+and [GHC family declarations](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#type-family-declarations).

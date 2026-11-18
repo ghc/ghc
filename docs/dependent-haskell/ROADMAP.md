@@ -29,7 +29,7 @@ The supported static subset and native pipeline remain restricted.
 | Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
 | Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with a written or inferred runtime operand, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
-| Type computation (`R06`, `R13`) | Existing promoted constructors and saturated type families, with explicit equality proofs | Ordinary function promotion, closed and open evaluation, and lambda/let/case expressions in types. |
+| Type computation (`R06`, `R13`, `R15`) | A type can use an ordinary unary function that matches constructors, returns a field, or recurses on a direct field. Imported equations can prove the result with `Refl`. | Polymorphic source functions, general closed and open evaluation, and lambda/let/case expressions in types. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
 
 The example `Nat` is the source datatype `data Nat = Z | S Nat`. It is not a
@@ -60,9 +60,23 @@ The imported `flipBit` determines a payload type. The three equations of a
 traffic-light function reduce in a client with only the object interface.
 Both use checked clauses from the producer. M76 adds shallow field patterns.
 An ordinary predecessor function now computes the return index of `dropFirst`.
-R15 remains open for recursive calls, including the roadmap's list-length example.
-See [M75](PLAN.md#m75-closed-evaluation-of-a-source-function) and
-[M76](PLAN.md#m76-constructor-fields-in-a-source-equation).
+M77 admits structural recursion on the tail of a list. An ordinary
+`listCount :: [Bool] -> Nat` now indexes the result of a vector
+constructor in the public example.
+
+```haskell
+boolVector :: foreach (xs :: [Bool]) -> Vec Bool (listCount xs)
+boolVector []       = VNil
+boolVector (b : bs) = VCons b (boolVector bs)
+```
+
+GHC checks the cons branch using the source equation
+`listCount (b : bs) = S (listCount bs)`. This works with an unknown tail,
+including a list read from an `IORef`. The producer exports the checked
+equations in its interface. R15 remains open for polymorphic and overloaded
+functions, including Prelude's `length`. See [M75](PLAN.md#m75-closed-evaluation-of-a-source-function),
+[M76](PLAN.md#m76-constructor-fields-in-a-source-equation), and
+[M77](PLAN.md#m77-structural-recursion-on-a-list-spine).
 
 M62 supplied the earlier 88-line source group through fourteen modules.
 M56 provides
@@ -121,7 +135,8 @@ can advance a card while the card remains open.
 | 15 | R03: consecutive invisible runtime operands | Complete bounded increment: M74 | The interface-only vector append infers two lengths and checks their sum in the result type. Constructor inference respects term scope and records import usage. |
 | 16 | R15: closed evaluation of source functions; advances R13 and R21 | M75 finite constructor tables | Check the complete table once and export its equations. A body change invalidates an unchanged client proof. |
 | 17 | R15: constructor fields in a source equation | [M76](PLAN.md#m76-constructor-fields-in-a-source-equation) | The checked `previous` clause returns the length of the tail. A `VCons` branch can therefore return its tail directly from `dropFirst`. |
-| 18 | R15: structural recursion on a list spine | [M77 baseline](PLAN.md#m77-structural-recursion-on-a-list-spine) | A checked tail call and a constructed right-hand side are needed to compute a Peano length. Both runtime controls pass. Both direct source proofs currently give GHC-68947. |
+| 18 | R15: structural recursion on a list spine | [M77](PLAN.md#m77-structural-recursion-on-a-list-spine) | A checked recursive call on the tail computes the Peano result index of `boolVector`. A call on the rebuilt list has no checked equation. |
+| 19 | R13 and R15: parametric list length | [M78](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type) | Generate one family for `forall a. [a] -> Nat`. Prove the cons equation for an abstract element type and tail. The handwritten family passes these controls. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -282,7 +297,7 @@ still require substantial research.
 - [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24.
 - [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23.
 - [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge.
-- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. Locally, M75 and M76 reduce unary constructor equations and field projections.
+- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. Locally, M75–M77 reduce unary constructor equations, field projections and direct structural recursion over a monomorphic input.
 - [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge.
 - [ ] **R17 [Type-level lambdas](https://ghc.serokell.io/dh#type-level-lambdas)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R18 [Type-level let-bindings](https://ghc.serokell.io/dh#type-level-let-bindings)** — Unmarked. Needs/includes: R05, R16.
@@ -480,7 +495,9 @@ L1 to R20; and I1 to R01. The current queue above owns the next work.
   divergence, caching, staging, and error behavior. A closed computation such
   as list length must work in an actual type without a parallel handwritten
   type family. A runtime executable alone does not close this task.
-  Advances `R15`.
+  M77 meets the list-length example for `[Bool]` and a Peano result. Its
+  checked equations work across an interface. General closed evaluation
+  remains open. Advances `R15`.
 - [ ] **E2: Specify and implement open evaluation.** Depends on C1. Select and
   document normalization rules for expressions with rigid variables. Include
   stuck terms and capture avoidance. A lambda application to a rigid variable

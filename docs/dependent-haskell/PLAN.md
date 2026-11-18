@@ -6176,16 +6176,74 @@ are bottom. The local baseline is `native-source-length-stage1-published`.
 
 - [x] Establish the same failure on a monomorphic user datatype
       (`data Bits = End | Bit Bool Bits`) and an ordinary list of Bool.
-- [ ] Check a recursive call on the exact tail bound by the current
+- [x] Check a recursive call on the exact tail bound by the current
       constructor pattern. Allow its result underneath a constructor,
       as in `bitCount (Bit _ xs) = S (bitCount xs)`. Reject a self-call on
       the original input, a reconstructed input, or a mutually recursive
       binding. Keep a distinct check for coverage.
-- [ ] Instantiate the built-in list constructors at `Bool` and check
+- [x] Instantiate the built-in list constructors at `Bool` and check
       `listCount [] = Z` and `listCount (_ : xs) = S (listCount xs)`.
       Prove the closed two-element case using a separately compiled
       producer. Verify lazy elements and the runtime demand on the spine.
-- [ ] Demonstrate a vector indexed by the result of this source
+- [x] Demonstrate a vector indexed by the result of this source
       function. The experiment uses a Peano result. Promoting the
       overloaded Prelude `length` requires additional work on dictionaries
       and its `Int` result.
+
+The producer checks the identity of the recursive function and the identity
+and type of the field passed to it. The generated cons equation reduces
+when the tail is abstract. An application to an unknown list stays stuck.
+The ordinary function keeps its runtime pattern match. The first `S`
+requires the first cons. Computing the full length requires the finite
+spine and leaves the elements unevaluated.
+
+An interface-only client proves equations for `[Bool]`, a monomorphic
+`Bits`, and a separately declared `Chain Bool`. Changing only the cons
+branch to return the recursive result invalidates an unchanged proof
+of the old length. The new proof typechecks. A module that disables the
+extension can still call the ordinary function. The formal basis for
+the direct-field check is in [the research notes](REFERENCES.md#constructor-fields-and-the-next-evaluation-rule).
+
+Core Lint caught an invalid axiom for a function on `[Element ()]`, where
+`Element` is an open type family. The promoted nil and cons both carry
+`Element ()` as an invisible argument. The producer now applies Core
+Lint's family-free check to the generated left-hand side. A field variable
+can still have kind `Element ()` when the constructor pattern matches an
+ordinary enclosing datatype.
+
+Both rebuilt compilers pass the interface, recompilation and runtime
+checks at implementation commit `b497b4100b`. A client with the extension
+disabled checks `boolVector [True, False]` against a vector of length two.
+At `-O2`, observing three successors of the length of an infinite list
+returns three without forcing its elements. Both stages produce the same
+142 Showcase lines across eighteen modules. All 18 selected normal-way
+tests pass. The driver skips 74 other cases. Local evidence uses the
+`native-source-length-` prefix.
+
+## M78: one list-length function for every lifted element type
+
+R13 and R15 share the next step. The M77 length function requires
+`[Bool]`. The public library also has a handwritten `GenericCount` family
+for arbitrary lists. The aim is to let an ordinary
+`sourceLength :: forall a. [a] -> Nat` perform that computation in a type.
+
+- [x] Establish a separate-producer control. The handwritten closed family
+      proves a closed length, a singleton with an abstract element, and the
+      cons equation for an abstract tail. In a type synonym the ordinary
+      function gives GHC-68947 with an inferred element type. Writing
+      `sourceLength @Bool` gives GHC-76037 at the function name.
+- [ ] Bind the specified element type in the private family and in each
+      axiom branch. A checked self-call must pass the same element type.
+      Preserve the scope of the field variables. Keep the existing coverage,
+      family-pattern validity and direct-field checks.
+- [ ] Resolve the ordinary function as a type application head both with
+      and without a written `@a`. Preserve type-variable shadowing, import
+      tracking and use of the function in a later or earlier declaration.
+- [ ] Construct a vector of an arbitrary lifted element type with the source
+      length as its index. Prove the rigid-element and abstract-tail cases
+      through a separate interface. Check explicit and inferred element
+      types, stuck inputs, runtime demand, and a change to the cons equation.
+
+The intended family binder order follows the arity rule in
+[`singletons-th`](REFERENCES.md#constructor-fields-and-the-next-evaluation-rule).
+Class constraints and the overloaded Prelude `length` remain separate work.

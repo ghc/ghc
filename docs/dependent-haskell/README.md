@@ -8,13 +8,16 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Last updated: 2026-11-17.
+Updated 2026-11-18.
 
-M70 supports `fmap toList (lookupGeneric [vector] 0)` for a vector with an
-actual runtime index, with or without the dependent source extension.
-Both rebuilt stages pass 125 Showcase lines through seventeen modules,
-including the banner. Seven selected registered tests pass, with 54 other
-ways skipped. See [the implementation record](PLAN.md#m70-higher-order-calls-with-native-list-arguments).
+An ordinary recursive length function now gives the return type of a
+vector constructor. For a list `xs` read from an `IORef`, the caller can
+write `vector :: Vec Bool (listCount xs)` and construct it with
+`boolVector xs`. GHC checks the empty and cons branches at compile time.
+It can also prove a concrete length from the producer's interface alone.
+The current function accepts `[Bool]` and returns a Peano natural. The
+next step is a single length function for arbitrary lifted element types.
+See [the implementation and its limits](PLAN.md#m77-structural-recursion-on-a-list-spine).
 
 ## Project documents
 
@@ -73,6 +76,7 @@ _build/showcase/showcase
 | Generic finite positions, function elements, runtime-indexed payloads and lazy prefixes | `genericSafeIndexing` |
 | A source function used in a result type and a proof about an imported traffic-light function | `closedSourceFunctions` |
 | Dropping the first element of a vector whose length is indexed by an ordinary predecessor function | `constructorFields` |
+| A vector indexed by the recursive length of an IO-sourced list, including demand on its spine and elements | `recursiveLengths` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -225,7 +229,7 @@ The field `m` can be unknown. [Vector library](examples/packed-vector/PackedVecL
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | `Showcase.hs` passes both compilers with 139 output lines, including the banner, through eighteen modules. Source functions compute a Boolean payload type and a vector result length. |
+| Maintained showcase | Both compilers produce the same 142 lines, including the banner, from eighteen source modules. Source functions select a Boolean payload type and compute vector lengths from a predecessor or a list spine. |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
