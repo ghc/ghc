@@ -74,6 +74,8 @@ servWithCustom verbose hook pipe restore customHandler = loop
       Shutdown -> return ()
       RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc
       RunModFinalizers st qrefs -> wrapRunTH $ runModFinalizerRefs pipe st qrefs
+      -- Keep the protocol masked. Catch interrupts inside the action.
+      EvalString ref -> evalStringWith restore ref >>= reply
       _other -> run msg >>= reply
 
   reply :: forall a. (Binary a, Show a) => a -> IO ()

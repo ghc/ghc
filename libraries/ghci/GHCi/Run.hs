@@ -9,7 +9,7 @@
 -- compiler/GHC/Runtime/Interpreter.hs.
 --
 module GHCi.Run
-  ( run, redirectInterrupts
+  ( run, redirectInterrupts, evalStringWith
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -224,9 +224,13 @@ evalIO r = do
   tryEval (unsafeCoerce io :: IO ())
 
 evalString :: HValueRef -> IO (EvalResult String)
-evalString r = do
+evalString = evalStringWith id
+
+-- | Run a string action with the supplied masking state.
+evalStringWith :: (IO String -> IO String) -> HValueRef -> IO (EvalResult String)
+evalStringWith restore r = do
   io <- localRef r
-  tryEval $ do
+  tryEval $ restore $ do
     r <- unsafeCoerce io :: IO String
     evaluate (force r)
 

@@ -1,0 +1,2 @@
+import Control.Exception (getMaskingState)
+:cmd getMaskingState >>= \s -> pure ("putStrLn " ++ show (show s))

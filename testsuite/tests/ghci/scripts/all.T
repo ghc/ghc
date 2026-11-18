@@ -326,6 +326,8 @@ test('T17549', normal, ghci_script, ['T17549.script'])
 test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'),
                 req_rts_linker ],
      ghci_script, ['T17669.script'])
+test('ExternalEvalStringMask', [extra_run_opts('-fexternal-interpreter'), req_rts_linker],
+     ghci_script, ['ExternalEvalStringMask.script'])
 test('T18330', [copy_files, extra_files(['T18330.extra', 'T18330.hs'])
                , filter_stdout_lines(r'ghci>.*')
                , extra_hc_opts('-v1')]
