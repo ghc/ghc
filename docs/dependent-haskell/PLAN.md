@@ -6433,19 +6433,19 @@ application, and R13 and R15 own the producer's equations. On M80 a
 direct call gives GHC-83605. A named length and an explicit `Sum p Refl`
 witness already work.
 
-- [ ] Connect each accepted source function Id to its checked closed
+- [x] Connect each accepted source function Id to its checked closed
       family. Preserve this link in ordinary and no-code interfaces.
       Check the actual function identity, domain, arity and result.
-- [ ] Use that family application when substituting a saturated call in
+- [x] Use that family application when substituting a saturated call in
       a retained result. Preserve the runtime head during substitution.
       Keep the call intact through mandatory Core Lint. An ordinary
       local function or a different family cannot supply its equations.
-- [ ] Name the computed length with an ordinary lazy STG binding after
+- [x] Name the computed length with an ordinary lazy STG binding after
       checking Core. For the first source case, use monomorphic heads
       with atomic operands. A partial sum must produce its first
       successor without forcing the tail. A function that ignores the
       length must return even when both inputs are bottom.
-- [ ] Compile an interface-only client and run the examples with both
+- [x] Compile an interface-only client and run the examples with both
       stages. Check the source location of rejected calls. Update the
       runnable Showcase and the R03 and R13 work queue with the results.
 
@@ -6454,4 +6454,45 @@ a checked closed family expresses that substitution for a source call.
 The call stays visible until the result type has been checked. Naming it
 earlier in Core would replace its index with that of a fresh runtime
 variable. A strict case for this name would also force the call.
-See [type-preserving naming and Agda let substitution](REFERENCES.md#core-contract-audit-and-bounded-beta-exposure).
+See [computed arguments and lazy naming](REFERENCES.md#computed-arguments-and-lazy-naming).
+
+### Validation
+
+Both rebuilt compilers accepted a client given only the producer's
+interface. Changing a checked equation invalidated the unchanged client.
+Removing the equations or supplying only an hs-boot signature produced
+GHC-83605 at the call. A rule that rewrites the certified function also
+blocked the call, including a rule introduced after a declaration splice.
+A rule on a different function allowed the proof to compile.
+The new interface version is `100120261115166`. The M80 and M81 readers
+each rejected an interface from the other version.
+
+With the source equations written on `(+) :: Nat -> Nat -> Nat`, the
+signature and the retained operand can both use `n + m`. The test read
+`1` and `2` from separate IORefs and produced `[True,True,True]`.
+The term `plus n m` also worked in the packed-vector library, where the
+type synonym `n + m` names the same sum. An ignored computed index
+returned `17` with two undefined addends. At length `plus n bottom`,
+with `n` read as one, the first element was available. Demanding the
+tail raised the expected exception. The STG dump for a call with a
+dependent payload contains one updatable thunk for `plus n m`.
+
+Both stages matched 154 Showcase lines from 18 modules and the existing
+562-line packed-vector output. An ordinary source function compiled
+at `-O2` exported its equations with `-fomit-interface-pragmas`. A
+`NoExperimentalDependentTypes` client used them at `-O0`. Modules
+with native dependent Core still require `-O0`. Fourmolu's installed
+parser rejects the experimental extension. Cabal Gild reports existing
+formatting in the generated package description.
+
+All 26 selected normal-way tests passed across the suite and the focused
+rerun. The suite passed 25 initially. The Core API fixture needed the
+type of its test RHS and an internal name for its nested binder.
+After those fixture corrections it passed the binding, substitution,
+SimpleOpt and Lint checks. The driver skipped 100 cases in other ways.
+
+The next arithmetic example uses `Prelude.(+)` directly in the
+retained operand. This requires evidence for the selected `Num`
+instance's method. Constructed operands such as `plus (S n) Z` and
+polymorphic calls such as `sourceLength xs` are also open.
+[Instance-method precedents](REFERENCES.md#instance-methods-used-as-indices).

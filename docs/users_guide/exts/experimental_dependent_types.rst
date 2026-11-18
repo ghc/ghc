@@ -67,6 +67,34 @@ The library also provides ``replicateAt 3 x :: Vec a 3``, using
 length in the type. For a length ``n`` read at runtime, its retained
 counterpart is ``replicateNative n x :: Vec a n``.
 
+A checked source function can also compute a retained argument. For
+example, both lengths in the following program can come from IO::
+
+    fillSum :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Bool (n + m)
+    fillSum n m = replicateNative @Bool (plus n m) True
+
+GHC uses the equations certified for that particular ``plus`` to check
+the result type. The executable passes the computed sum lazily. This
+form accepts a fully applied monomorphic source function whose operands
+are named values or nullary constructors. A local parameter of type
+``Nat -> Nat -> Nat`` alone supplies no such equations. The producer's
+interface supplies them to separately compiled clients.
+
+The ordinary function can also be an operator. For example, if
+``NativeAdd`` defines the Peano equations on ``(+) :: Nat -> Nat -> Nat``,
+a client can write::
+
+    import Prelude hiding ((+))
+    import NativeAdd ((+))
+    import PackedVecLibrary (Nat, Vec, replicateNative)
+
+    fillSum :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Bool (n + m)
+    fillSum n m = replicateNative @Bool (n + m) True
+
+With the standard ``Prelude.(+)``, GHC cannot yet use the selected
+``Num Nat`` method as a retained index. Ordinary numeric term expressions
+still use that instance.
+
 Retained arguments
 ------------------
 
@@ -80,9 +108,9 @@ result type. For example::
 
 Here ``Select`` denotes a type family indexed by ``Bool``. The argument ``b`` is
 an ordinary runtime Boolean whose identity can occur in the result type.
-Applications retain that value argument. They accept supported constructors or
-named local values. They do not construct singleton witnesses or
-evaluate an index to determine its type.
+Applications retain that value argument. They accept supported constructors,
+named local values and checked source calls as described above. The
+compiler checks their types without evaluating the runtime arguments.
 
 Constructor equations can specialise the result type::
 

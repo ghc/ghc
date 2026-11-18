@@ -52,6 +52,9 @@ In M79, `Add n m` names the result of the ordinary Peano function
 `plus n m`. The public append signatures use that source function directly.
 M80 adds the infix spelling `n + m` and decimal lengths. A required
 type argument makes `replicateAt 3 True :: Vec Bool 3` possible.
+M81 accepts `replicateNative (plus n m) True :: Vec Bool (n + m)`
+when both lengths come from IO. It checks the function's equations
+at compile time and leaves the sum lazy at runtime.
 General evaluation of Haskell functions in types remains open.
 
 M74 checks consecutive invisible retained arguments. The two vectors in
@@ -147,6 +150,7 @@ can advance a card while the card remains open.
 | 19 | R13 and R15: parametric list length | [M78](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type) | One checked family proves the cons equation for an abstract element type and tail. The named length function indexes a vector built from a list of `Int` read at runtime. |
 | 20 | R13 and R15: a second ordinary argument | [M79](PLAN.md#m79-addition-from-an-ordinary-two-argument-function) | The runtime addition function computes the length index of vector append. The second length can stay unknown. |
 | 21 | R07 and R13: numerals and infix addition | [M80](PLAN.md#m80-numerals-and-infix-addition-in-vector-types) | Use `Vec a 3` and `Vec a (n + 1)` with the original Peano-indexed GADT. |
+| 22 | R03, R13 and R15: a computed retained argument | [M81](PLAN.md#m81-a-computed-retained-length) | Pass the ordinary call `plus n m` directly as a vector length. Keep its index through Core Lint and share its value as a lazy STG thunk. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

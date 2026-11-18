@@ -810,6 +810,14 @@ Convert the fields recursively and check each field domain. Map workers to their
 ordinary promoted constructors. A variable stays opaque even if its unfolding
 is a known constructor. No index conversion evaluates a value.
 
+A retained argument can also be a saturated call to a checked source function.
+For `plus n m`, the runtime Id identifies the closed family for its equations.
+Core Lint checks the actual head, arity and operand kinds. CorePrep preserves
+the call because naming it with a fresh Core variable would change the index
+of its dependent payload and result. Core-to-STG introduces a shared thunk
+after type erasure. See Note [Source calls in retained arguments] in GHC.Core
+and Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
+
 CorePrep names a retained constructor argument with a checked case alias:
 `case S k of t { DEFAULT [cv] -> ... }`. Core Lint derives
 `cv :: TermVarTy t ~# 'S (TermVarTy k)` from the exact scrutinee. It requires

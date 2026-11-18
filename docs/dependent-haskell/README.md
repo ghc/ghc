@@ -47,6 +47,22 @@ the checked `plus` function. The [runnable example](Showcase.hs) reads
 constructs a vector at exactly that length. For a runtime length `n`,
 `replicateNative n True` constructs a vector indexed by that value.
 
+The length itself can be a computation. Here the caller can get both
+lengths from IO, and the result type records their sum.
+
+```haskell
+fillSum :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Bool (n + m)
+fillSum n m = replicateNative @Bool (plus n m) True
+```
+
+GHC uses the checked equations of the `plus` that appears in the call.
+A module can instead define those equations on `(+) :: Nat -> Nat -> Nat`.
+With `import Prelude hiding ((+))` and that operator in scope, both
+the signature and the body can use `n + m`. The standard overloaded
+`Num` method still requires evidence tying the selected instance to the
+checked equations. The [Showcase](Showcase.hs) also passes an undefined
+sum to a function that ignores its length.
+
 ### What happens on empty input?
 
 ```haskell
@@ -182,6 +198,9 @@ standalone NoEDT list inference control still rejects.
 M80 runs 151 lines through eighteen modules in both compiler stages. The
 numeric examples exercise a static length, a runtime length and a sum
 in a vector result type. See [M80 validation](PLAN.md#m80-numerals-and-infix-addition-in-vector-types).
+M81 adds three observations. Both stages reproduce all 154 lines.
+The new examples pass a sum directly to a retained binder, ignore an
+undefined length and read the first cell of a vector with a partial length.
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,
@@ -238,7 +257,7 @@ The field `m` can be unknown. [Vector library](examples/packed-vector/PackedVecL
 | Parameterized index domains | M56 retains closed `[Bool]`, `Maybe Nat` and `Tree Bool` values through source, Core, interfaces and native lowering |
 | Safe list indexing | M60 combines `Fin (Count xs)` with a retained `[Bool]`; both stages pass runtime bounds, lazy access and equal-count reuse |
 | Source domain conversion | M58 checks nominal scalar-domain conversion and ordinary payload inference in a private body solve; recursive domain reduction uses the solver depth limit |
-| Configured fork version | `10.1.20261115.1`, interface version `100120261115165`, HIE version `100120261115164`. Both compiler stages build in the isolated checkout. |
+| Configured fork version | `10.1.20261115.1`, interface version `100120261115166`, HIE version `100120261115164`. Both compiler stages build in the isolated checkout. |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |

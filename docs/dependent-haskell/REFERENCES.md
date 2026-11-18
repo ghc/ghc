@@ -397,8 +397,9 @@ binders, changed-domain congruence, and alias-expression serialization stay gate
 [Koronkevich, Rakow, Ahmed, and Bowman, *ANF preserves dependent types up to
 extensional equality*](https://doi.org/10.1017/S0956796822000090), JFP 32, e12
 (2022), studies this naming problem. Section 4.1 retains the identity of the
-bound computation in continuation typing. Section 7.4 shows why inserting
-coercions alone does not establish the general preservation result. Section 7.6
+bound computation in continuation typing. In the attempted translation in
+section 7.4, the branch result after an explicit coercion fails to match
+the computation that its continuation expects. Section 7.6
 also discusses commuting conversions and GHC's monadic form. Its calculus uses
 equality reflection and call-by-value evaluation. Its proof does not establish
 correctness for lazy Haskell or System FC. Use it to guide a checked transport
@@ -4534,3 +4535,47 @@ type argument. After the numeral reduces, ordinary type class instances
 construct the empty vector or its next cell. A separate retained function
 accepts a length from IO. [Agda vector replication](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L246-L248)
 and [GHC required type arguments](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/required_type_arguments.html).
+
+### Computed arguments and lazy naming
+
+Agda checks an application by substituting the supplied argument into the
+dependent result. For M81 the argument is the application of a checked
+source function. Its generated family represents the same application in
+the result type, even when its arguments come from IO.
+[Agda 2.8.0, function application](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html).
+
+A fresh name for an argument changes the index available in the typing
+context. Koronkevich et al. carry information about the bound computation
+in continuation typing. Agda substitutes local definitions during type
+checking. The Haskell implementation keeps the source call in the checked
+Core application and introduces a shared thunk when translating to STG.
+This choice preserves Haskell's demand on the call without requiring a
+general equality rule for local definitions. The [paper ledger](papers/README.md#anf-and-dependent-types-jfp-2022)
+records the PDF pages used for this comparison.
+[Koronkevich et al., sections 4.1 and 7.4](https://www.cambridge.org/core/journals/journal-of-functional-programming/article/anf-preserves-dependent-types-up-to-extensional-equality/73FC888A23E5E87BAE16B158ABE349C8)
+and [Agda 2.8.0, local definitions](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions).
+
+### Instance methods used as indices
+
+The next example under R12 is the ordinary `Num` selector in
+`replicateNative (n + m) x`. Agda models an overloaded operation as a
+field of the selected instance record. A local record can give that field
+a different implementation. The `singletons-th` instance promoter
+similarly uses the method declarations of the particular instance.
+[Agda 2.8.0, instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#defining-type-classes)
+and [pinned instance promotion in singletons-th](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L541-L565).
+
+In GHC, the checked application contains the dictionary selected for
+that occurrence. A possible next step is to connect its addition method
+to the certified source function when the instance definition is exactly
+`(+) = plus`. A dictionary supplied by a caller needs separate evidence.
+Ordinary optimisation unfoldings can be omitted from an interface.
+In the stripped packed-vector interface, `$fNumNat` has `DFunId`
+and an empty information list. The separate `plus` declaration names
+its checked family. The dictionary entry supplies no link between them.
+An implementation must preserve the connection under
+`-fomit-interface-pragmas`. A certificate for addition would still say
+nothing about the independent `fromInteger` method.
+[GHC's evidence representation](../../compiler/GHC/Tc/Types/Evidence.hs),
+[instance method checking](../../compiler/GHC/Tc/TyCl/Instance.hs),
+and [interface exposure policy](../../compiler/GHC/Driver/Config/Tidy.hs).

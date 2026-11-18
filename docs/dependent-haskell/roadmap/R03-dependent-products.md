@@ -17,6 +17,11 @@ all Core transformations. Normal optimization remains a broader release gate.
 
 ## Supported subset and evidence
 
+A retained length can be a checked source call such as `plus n m`.
+Its two inputs can come from IO. The result index remains the same
+through compilation, and the runtime sum stays lazy.
+[Computed retained length](../PLAN.md#m81-a-computed-retained-length).
+
 - Runtime Bool and Peano Nat indices, checked equations and bounded lambdas.
 - Closed parameterized domains such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
 - Retained workers and function fields through separate interfaces.

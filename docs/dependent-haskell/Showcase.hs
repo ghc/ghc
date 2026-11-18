@@ -29,6 +29,7 @@ import Control.Monad (unless)
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Kind (Type)
 import Data.List (isInfixOf)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:) (Refl))
 import qualified FunctionFieldClient
 import qualified FunctionFieldLibrary as FunctionFields
@@ -853,6 +854,23 @@ sourceAddition = do
         joined = appendHidden xs ys
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
     observe "outer successor ignores the second addend" (isSuccessor (plus (S Z) undefined))
+
+    let filled :: Vec Bool (n + m)
+        filled = replicateNative @Bool (plus n m) True
+    observe "replicate at a computed runtime length" (toList filled)
+
+    bottom <- newIORef (bottomValue @Nat "showcase-sum-tail") >>= readIORef
+    let tag :: Proxy (bottom + m)
+        tag = tagLength (plus bottom m)
+        partial :: Vec Bool (n + bottom)
+        partial = replicateNative @Bool (plus n bottom) True
+    case tag of Proxy -> observe "ignore a computed runtime length" True
+    case partial of
+        VCons x _ -> observe "first cell at a partial runtime length" x
+        VNil -> fail "Expected one cell before the unknown tail"
+  where
+    tagLength :: foreach (k :: Nat) -> Proxy k
+    tagLength _k = Proxy
 
 -- | Use decimal numerals in the original vector GADT and add runtime indices.
 arithmeticNotation :: IO ()
