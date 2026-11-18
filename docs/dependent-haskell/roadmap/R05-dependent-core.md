@@ -58,6 +58,8 @@ linear actuals. The owner is R03. This increment adds no Core equality rule.
       selected regression cohort pass. The independent audit passes.
       Partial-WHNF and demand checks use bytecode. NCG checks a fully applied
       keep caller and the preserved scalar-domain caller.
+- [x] Compile retained module and prompt declarations to interpreted bytecode.
+      Keep typed statement results across GHCi commands. See [M87](../PLAN.md#m87-persistent-dependent-definitions-in-ghci).
 - [ ] Specify an opaque Pi instantiation rule if a typed transformation needs
       one. M61's measured whole-cast lowering needs no new primitive. Add a proof
       operation only when a measured or calculus obligation requires it.

@@ -6691,12 +6691,12 @@ A module loaded outside the current import closure did not supply its
 registration. The installed vanilla, dynamic and profiling interfaces had
 the new header after Hadrian refreshed 43 package registrations.
 
-A retained function works inside one GHCi expression. Saving it with a
+At M83 a retained function worked inside one GHCi expression. Saving it with a
 separate `let` statement leaves the prompt's result-boxing `unsafeCoerce#`
 unexpanded. A standalone function declaration instead reaches the
 unsupported native CorePrep entry. Both failures also occurred with
-`fill n = replicateNative n True` and the argument `Z`. Persistent native
-function bindings at the prompt remain open.
+`fill n = replicateNative n True` and the argument `Z`. M87 adds support
+for both prompt entry points.
 
 ## M84: infer a nonempty vector’s tail at a nested application
 
@@ -6845,13 +6845,68 @@ that function reaches the `unsafeCoerce#` fallback. A multiline declaration
 goes through module simplification and tidying, then reaches an unchecked
 CorePrep entry. R05 needs a checked path from these commands to bytecode.
 
-- [ ] Store a lifted result using GHCi's existing result carrier. Preserve
+- [x] Store a lifted result using GHCi's existing result carrier. Preserve
       its complete type, including polymorphism, without evaluating it.
-- [ ] Compile retained declarations through the checked program CorePrep
+- [x] Compile retained declarations through the checked program CorePrep
       and STG paths. Exercise both declarations entered at the prompt and
       interpreted source modules. Preserve GHCi's option and linking checks.
-- [ ] Use retained definitions across commands. Check IO inputs, bottom,
+- [x] Use retained definitions across commands. Check IO inputs, bottom,
       type queries, shadowing and recovery after a rejected definition.
       Record the supported scope of runtime names from preceding commands.
-- [ ] Extend the registered GHCi script and the Showcase instructions. Record
+- [x] Extend the registered GHCi script and the Showcase instructions. Record
       the bytecode and scope decisions in the roadmap and reference ledger.
+
+### Implementation and validation
+
+GHCi installs the original typed Ids after successful evaluation. Its
+statement code uses the built-in compulsory unfolding to return a lifted
+heap reference at type `Any`. The native simplifier now accepts this
+saturated boxing operation on a local value of the original lifted type.
+A declaration batch goes through native simplification, tidying and
+checked program CorePrep. Interpreted source modules use the same path.
+
+GHCi can now keep `fill :: foreach (n :: Nat) -> Vec Bool (1 + n)`
+across commands. The object-loaded producer passed 26 prompt checks. An
+invalid redefinition preserved the old function. A successful redefinition
+left an earlier closure referring to its original binding. An ignored
+index read from an IORef stayed lazy. A value bound by a previous command
+has a global prompt name. Passing it directly as a runtime index reports
+GHC-83605 at that use. A local alias in the consuming expression worked.
+
+Preserve visibility and the substituted result on checked retained
+applications. Breakpoint insertion visits the operand for its free
+variables but leaves its expression intact. The same rule protects the
+scrutinee of a checked opaque call case. Its zero and successor branches
+ran under instrumentation with an unevaluated input and predecessor.
+
+At a breakpoint, abstract each representable free runtime index to a
+shared debugger type variable of the same kind. The internal and external
+interpreters both stopped inside an interpreted module, inspected two
+vectors and the result at one length, distinguished a third length, and
+stepped out to a caller with a dependent result. Ordinary captured values
+remained available. A captured callable with an index depending on its own
+bound operand had no representable slot. Its closed control, the sibling
+vector and the scalar at the same stop stayed inspectable. Execution
+resumed in all three cases. See Note [Runtime indices at bytecode breakpoints]
+in `GHC.StgToByteCode`.
+
+A no-link bytecode build wrote a `.hi` and `.gbc` when requested. A fresh
+external GHCi loaded the saved bytes without recompiling, stopped in the
+worker, checked that an argument and the result shared a length, and
+returned 87. The file hashes and timestamps stayed the same. An independent
+process rejected a damaged copy at its bytecode header.
+
+The Showcase uses decimal lengths for IO inputs, the packaged three-element
+vector, and the argument of `previous 2`. Both compiler stages built and
+reproduced the 158-line Showcase at `-O0`. The self-hosted GHCi also ran
+all 158 lines from interpreted source. The bootstrap executable in this
+build has no interactive mode.
+
+The ordinary debugger test `break006` exposed a diagnostic change that also
+occurred at M86. The generated quantifier for the dictionary function
+appeared in a candidate `Show (Maybe a)` instance. Instance headers now
+omit this prefix under GHC's usual forall display rules. Explicit-forall
+printing preserves the matchability, and a kind-dependent binder stays
+visible with default settings. The original debugger golden passes.
+All 41 selected normal tests and all four selected GHCi tests passed.
+[Interactive results and debugger provenance](REFERENCES.md#persistent-dependent-definitions-and-interactive-results).

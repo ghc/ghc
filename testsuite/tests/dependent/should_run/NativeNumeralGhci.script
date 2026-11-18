@@ -1,5 +1,5 @@
-:set -fobject-code -O0 -fomit-interface-pragmas -fno-write-if-simplified-core
-:load PackedVecLibrary
+:set -fbyte-code -O0 -fomit-interface-pragmas -fno-write-if-simplified-core
+:load *PackedVecLibrary.hs
 :seti -XDataKinds -XExperimentalDependentTypes -XTypeOperators -XTypeFamilies
 let { fill :: foreach (n :: Nat) -> Vec Bool (n + 1); fill n = replicateNative (n + 1) True } in print (toList (fill 2))
 import Data.Proxy
@@ -8,3 +8,23 @@ data Tone = Blue
 type instance FromNatural Tone n = 'Blue
 let witness :: Proxy (3 :: Tone); witness = Proxy
 case witness of Proxy -> putStrLn "prompt numeral"
+import Data.IORef
+let fill :: foreach (n :: Nat) -> Vec Bool (1 + n); fill n = replicateNative (1 + n) True
+ref <- newIORef (2 :: Nat)
+do { n <- readIORef ref; print (toList (fill n)) }
+let previous = toList (fill 1)
+:{
+fill :: foreach (n :: Nat) -> Vec Bool (1 + n)
+fill n = replicateNative (1 + n) False
+:}
+print (previous, toList (fill 1))
+:{
+keep :: foreach (n :: Nat) -> Vec Bool n -> Int
+keep _ _ = 42
+:}
+do { r <- newIORef (error "forced index" :: Nat); n <- readIORef r; print (keep n (replicateNative n False)) }
+:break PackedVecLibrary.appendNative
+do { n <- readIORef ref; m <- readIORef ref; print (toList (appendNative n m (replicateNative n True) (replicateNative m False))) }
+:type (xs, ys, _result)
+:delete *
+:continue

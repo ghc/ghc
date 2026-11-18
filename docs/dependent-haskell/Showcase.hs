@@ -19,6 +19,11 @@
 {-# LANGUAGE TypeOperators #-}
 
 -- | Runnable examples of the completed Dependent Haskell source features.
+-- In GHCi, load PackedVecLibrary with the options in the adjacent README.
+-- Enter these as separate commands to keep a retained function at the prompt.
+--
+-- > let fill :: foreach (n :: Nat) -> Vec Bool (1 + n); fill n = replicateNative (1 + n) True
+-- > toList (fill 2)
 module Main (main) where
 
 import qualified BetaCallClient as Beta
@@ -165,9 +170,9 @@ booleans = do
 -- | Show runtime indices, packages, algorithms, proofs and ordinary inference.
 vectors :: IO ()
 vectors = do
-    indexCell <- newIORef (S (S (S Z)))
+    indexCell <- newIORef (3 :: Nat)
     n <- readIORef indexCell
-    otherCell <- newIORef (S (S (S Z)))
+    otherCell <- newIORef (3 :: Nat)
     m <- readIORef otherCell
     let xs :: Vec Int n
         xs = replicateNative @Int n 7
@@ -188,7 +193,7 @@ vectors = do
     case zipPacked package (PackVec m ys) of
         Nothing -> fail "expected equal packages"
         Just paired -> observe "zip packages" (withPacked paired (\size values -> toList values))
-    let sample = PackVec (S (S (S Z))) (VCons (1 :: Int) (VCons 2 (VCons 3 VNil)))
+    let sample = PackVec 3 (VCons (1 :: Int) (VCons 2 (VCons 3 VNil)))
     observe "reverse preserves length" (renderPacked (reversePacked sample))
     observe "append computes its result length" (renderPacked (appendPacked sample package))
     cutoffCell <- newIORef (1 :: Int)
@@ -252,7 +257,7 @@ vectors = do
 -- | Pass runtime function values as retained binders and use exact call evidence.
 functions :: IO ()
 functions = do
-    cell <- newIORef (S (S Z))
+    cell <- newIORef (2 :: Nat)
     n <- readIORef cell
     let f :: Nat -> Nat
         f = Opaque.identityNat
@@ -292,7 +297,7 @@ functions = do
 -- | Store the actual function and input used by a later payload type.
 functionFields :: IO ()
 functionFields = do
-    cell <- newIORef (S (S (S Z)))
+    cell <- newIORef (3 :: Nat)
     n <- readIORef cell
     let successor :: Nat -> Nat
         successor size = S size
@@ -329,7 +334,7 @@ algebraicFunctionFields = do
 -- | Open either constructor without sharing their retained field binders.
 alternatives :: IO ()
 alternatives = do
-    cell <- newIORef (S (S Z))
+    cell <- newIORef (2 :: Nat)
     n <- readIORef cell
     observe "absent package constructor" (fmap renderPacked (Packages.toPacked (Packages.Unavailable :: Packages.Availability Int)))
     observe "present package constructor" (fmap renderPacked (Packages.toPacked (Packages.makeAvailable n)))
@@ -390,9 +395,9 @@ keepWithLaterEvidence (S _) _ _ xs ys = (xs, ys)
 -- | Read distinct indices and observe their separate argument positions.
 laterArguments :: IO ()
 laterArguments = do
-    firstCell <- newIORef Z
-    middleCell <- newIORef (S (S Z))
-    lastCell <- newIORef (S (S (S Z)))
+    firstCell <- newIORef (0 :: Nat)
+    middleCell <- newIORef (2 :: Nat)
+    lastCell <- newIORef (3 :: Nat)
     n <- readIORef firstCell
     m <- readIORef middleCell
     k <- readIORef lastCell
@@ -417,7 +422,7 @@ parameterizedDomains = do
     bs <- readIORef listCell
     observe "runtime list as retained index" (toList (Parameterized.listVector bs))
     observe "list-indexed package" (Parameterized.openListVector (Parameterized.packListVector bs))
-    natCell <- newIORef (S (S Z))
+    natCell <- newIORef (2 :: Nat)
     n <- readIORef natCell
     observe "optional retained Nat" (Parameterized.optionalRoundtrip n)
     treeCell <- newIORef (Parameterized.Node (Parameterized.Leaf True) (Parameterized.Leaf False))
@@ -426,12 +431,12 @@ parameterizedDomains = do
     _ <- evaluate (Parameterized.packListVector (error "unused retained list"))
     observe "list package does not force its index" ()
     observe "opaque call ignores retained list"
-        (Parameterized.observeListCall (\ignored -> S (S Z)) (error "unused opaque call list"))
+        (Parameterized.observeListCall (\ignored -> 2) (error "unused opaque call list"))
 
 -- | Convert nominally equal scalar domains and preserve function demand.
 domainConversion :: IO ()
 domainConversion = do
-    lengthCell <- newIORef (S (S Z))
+    lengthCell <- newIORef (2 :: Nat)
     n <- readIORef lengthCell
     tokenCell <- newIORef (Parameterized.DomainToken :: Parameterized.TargetToken)
     token <- readIORef tokenCell
@@ -469,13 +474,13 @@ domainConversion = do
 -- | Compare complete workers and retain their runtime function demand.
 fixedFunctionDomains :: IO ()
 fixedFunctionDomains = do
-    lengthCell <- newIORef (S (S Z))
+    lengthCell <- newIORef (2 :: Nat)
     n <- readIORef lengthCell
     identityCell <- newIORef (id :: Nat -> Nat)
     selectedIdentity <- readIORef identityCell
     successorCell <- newIORef (S :: Nat -> Nat)
     selectedSuccessor <- readIORef successorCell
-    constantCell <- newIORef (const (S (S Z)) :: Nat -> Nat)
+    constantCell <- newIORef (const 2 :: Nat -> Nat)
     selectedConstant <- readIORef constantCell
     let f :: Nat -> Nat
         f = selectedIdentity
@@ -532,7 +537,7 @@ closedListIndexing = do
 -- | Select retained workers with explicit types and preserve their demand.
 completeFunctionArguments :: IO ()
 completeFunctionArguments = do
-    lengthCell <- newIORef (S (S Z))
+    lengthCell <- newIORef (2 :: Nat)
     functionCell <- newIORef (id :: Nat -> Nat)
     n <- readIORef lengthCell
     selected <- readIORef functionCell
@@ -655,7 +660,7 @@ genericListIndexing = do
     observe "generic partial vector prefix" (length (take 1 (toList (genericVector partial))))
     let cyclic = 17 : cyclic :: [Int]
     observe "generic cyclic list prefix" (take 3 (toList (genericVector cyclic)))
-    sizeRef <- newIORef (S (S Z))
+    sizeRef <- newIORef (2 :: Nat)
     n <- readIORef sizeRef
     let vector = replicateNative @Int n 23
     let vectors = [vector]
@@ -678,7 +683,7 @@ genericListIndexing = do
 -- | Use imported retained APIs from a module without dependent source syntax.
 ordinaryModuleCalls :: IO ()
 ordinaryModuleCalls = do
-    sizeRef <- newIORef (S (S Z))
+    sizeRef <- newIORef (2 :: Nat)
     n <- readIORef sizeRef
     observe "ordinary module runtime replicate" (Ordinary.ordinaryReplicate n (7 :: Int))
     valuesRef <- newIORef ([11, 22] :: [Int])
@@ -701,7 +706,7 @@ genericSafeIndexing = do
     let functions = [id, (* 2)] :: [Int -> Int]
     observe "generic checked function position"
         (fmap ($ 21) (Parameterized.lookupGeneric functions position))
-    sizeRef <- newIORef (S (S Z))
+    sizeRef <- newIORef (2 :: Nat)
     n <- readIORef sizeRef
     let vector = replicateNative @Int n 7
     let vectors = [vector]
@@ -735,7 +740,7 @@ makeInvisibleVector = replicateNative @Int n 7
 -- | Compare omitted and explicit calls with an IO-sourced runtime index.
 invisibleRetainedArguments :: IO ()
 invisibleRetainedArguments = do
-    n <- newIORef (S (S Z)) >>= readIORef
+    n <- newIORef (2 :: Nat) >>= readIORef
     let vector :: Vec Int n
         vector = makeInvisibleVector @{n}
     observe "invisible retained length" (readInvisibleLength vector)
@@ -811,7 +816,7 @@ closedSourceFunctions = do
 constructorFields :: IO ()
 constructorFields = do
     let xs = VCons (7 :: Int) (VCons 9 VNil)
-        shorter :: Vec Int (previous ('S ('S 'Z)))
+        shorter :: Vec Int (previous 2)
         shorter = dropFirst xs
     observe "dropFirst with a computed result length" (toList shorter)
     observe "empty vector stays empty" (toList (dropFirst (VNil :: Vec Int Z)))
@@ -859,7 +864,7 @@ sourceAddition = do
         joined :: Vec Bool (n + m)
         joined = appendHidden xs ys
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
-    observe "outer successor ignores the second addend" (isSuccessor (plus (S Z) undefined))
+    observe "outer successor ignores the second addend" (isSuccessor (1 + undefined))
 
     let filled :: Vec Bool (n + m)
         filled = replicateNative (n + m) True

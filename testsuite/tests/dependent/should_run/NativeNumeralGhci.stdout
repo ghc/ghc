@@ -1,2 +1,12 @@
 [True,True,True]
 prompt numeral
+[True,True,True]
+([True,True],[False,False])
+42
+Breakpoint 0 activated at PackedVecLibrary.hs:227:26-40
+Stopped in PackedVecLibrary.appendNative, PackedVecLibrary.hs:227:26-40
+_result :: Vec a (n + n1) = _
+xs :: Vec a n = _
+ys :: Vec a n1 = _
+(xs, ys, _result) :: (Vec a n, Vec a n1, Vec a (plus n n1))
+[True,True,False,False]

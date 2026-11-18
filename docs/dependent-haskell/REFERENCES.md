@@ -4514,6 +4514,12 @@ Neither requires the user's constructors to be named `Z` and `S`.
 [Agda 2.8.0 literal overloading](https://agda.readthedocs.io/en/v2.8.0/language/literal-overloading.html#natural-numbers)
 and [builtin naturals](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#natural-numbers).
 
+Agda's addition equations inspect the left operand. For an unknown `n`,
+`1 + n` reduces to a successor. The vector example uses the same equations,
+so `safeHead` needs no proof at that length. Agda also specializes arithmetic
+on closed built-in naturals. The fork's vector library evaluates its own
+Peano definition. [Agda 2.8.0, functions on natural numbers](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#functions-on-natural-numbers).
+
 GHC already has built-in type numerals at kind `Natural` and an arithmetic
 operator in `GHC.TypeNats`. Promotion in `singletons-th` translates an
 integer expression through its promoted `FromInteger`. The M80 design
@@ -4652,3 +4658,31 @@ preserve its identity in the remaining argument and result types. GHC's
 existing explicit `seq` rule handles an analogous capture when an
 unrestricted runtime value occurs in a type. [GHC's strict pattern semantics](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/strict.html#strict-by-default-pattern-bindings)
 and [the fork’s desugaring of seq](../../compiler/GHC/HsToCore/Expr.hs).
+
+### Persistent dependent definitions and interactive results
+
+Agda's interactive type query checks an expression in the loaded top-level
+context. Its computation command parses in that context and evaluates the
+checked expression. GHCi adds a requirement specific to Haskell: an earlier
+interactive binding can denote a lazy heap value, and shadowing must
+preserve the identity of the old binding for closures that captured it.
+[Agda 2.8.0, interactive commands](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Interaction/InteractionTop.hs#L493-L504)
+and [GHC 9.14.1, shadowing at the prompt](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/ghci.html#shadowing-and-the-ghci1-module-name).
+
+GHC already packages a statement's typed results into a list of lifted
+values. M87 uses the existing compulsory unfolding for this boxing
+operation. A stored function keeps its type and its closure. A declaration
+batch uses the checked program-to-bytecode path.
+[Statement result construction](../../compiler/GHC/Tc/Module.hs),
+[compulsory unfolding](../../compiler/GHC/Core/SimpleOpt.hs),
+and [interactive declaration compilation](../../compiler/GHC/Driver/Main/Interactive.hs).
+
+For a stopped computation, GHCi already gives a fresh unknown type
+variable to each polymorphic variable whose value it cannot recover.
+Apply the same rule to a free runtime index in the result and local types:
+give all occurrences of the same index one unknown of its declared kind.
+Use a separate unknown for each independent index. This requires neither
+evaluation of the original value nor a new field in saved bytecode.
+[GHC 9.14.1, the debugger and polymorphism](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/ghci.html#breakpoints-and-inspecting-variables),
+[GHCi’s runtime type variables](../../compiler/GHC/Runtime/Eval.hs),
+and [breakpoint metadata generation](../../compiler/GHC/StgToByteCode.hs).

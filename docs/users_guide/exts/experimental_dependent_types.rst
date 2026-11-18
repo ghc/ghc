@@ -16,9 +16,8 @@ This extension is disabled by default. It enables ``foreach`` in types and
 checks a restricted subset of explicit value signatures. The experiment uses a
 native dependent Core representation. The restricted module path supports
 native top-level signatures and local retained functions. Interfaces encode
-retained binders with scoped local Id names. Native module unfoldings remain
-unsupported. The regression harness also
-executes checked local declarations through a native bytecode entry.
+retained binders with scoped local Id names. GHCi can load these modules as
+interpreted source and keep local declarations between commands.
 
 Natural numerals in vector indices
 ----------------------------------
@@ -158,6 +157,20 @@ Applications retain that value argument. They accept supported constructors,
 named local values and checked source calls as described above. The
 compiler checks their types without evaluating the runtime arguments.
 
+In GHCi, a retained definition can be used in later commands. For example,
+with the vector library loaded, enter the definition and use it at the
+next prompt::
+
+    ghci> let fill :: foreach (n :: Nat) -> Vec Bool n; fill n = replicateNative n True
+    ghci> toList (fill 2)
+    [True,True]
+
+A multiline declaration group between ``:{`` and ``:}`` works as well.
+Use ``:seti -XExperimentalDependentTypes`` to enable the syntax at the
+prompt. A length obtained from IO can be bound in the same expression
+that applies the retained function, as in
+``do { n <- readIORef ref; print (toList (fill n)) }``.
+
 Constructor equations can specialise the result type::
 
     choose :: foreach (b :: Bool) -> Select b
@@ -296,10 +309,11 @@ function or assign a type meta-variable. Family axioms reduce at nominal and
 representational roles. Existing phantom normalization leaves family heads
 unreduced; ordinary forall binder kinds normalize at nominal role.
 
-To compile an ordinary executable, use
-``-O0 -fomit-interface-pragmas -fno-write-if-simplified-core``. The restricted
-module pipeline forces Core Lint and STG Lint. Profiling, plugins, non-object
-module backends, and optimized module options remain unsupported.
+Use ``-O0 -fomit-interface-pragmas -fno-write-if-simplified-core`` for
+object code and bytecode. The restricted module pipeline forces Core Lint
+and STG Lint. GHCi can interpret a module in memory. A no-link build can
+also write bytecode for a later GHCi session. Profiling, module plugins,
+JavaScript code generation, and optimized module options remain unsupported.
 Native-containing ``INLINE``, ``INLINABLE``, and class-default unfoldings also
 remain unsupported. Their current builders run ordinary optimization during
 desugaring.

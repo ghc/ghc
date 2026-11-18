@@ -175,6 +175,42 @@ _build/stage1/bin/ghc --make -O0 -fomit-interface-pragmas \
 _build/showcase/showcase
 ```
 
+### Try a retained function in GHCi
+
+Run `_build/stage1/bin/ghc --interactive` from the repository root.
+The star in the load command selects the interpreted source.
+
+```text
+:set -fbyte-code -O0 -fomit-interface-pragmas -fno-write-if-simplified-core
+:load *docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs
+:seti -XExperimentalDependentTypes -XDataKinds -XTypeOperators
+let fill :: foreach (n :: Nat) -> Vec Bool (1 + n); fill n = replicateNative (1 + n) True
+toList (fill 2)
+[True,True,True]
+```
+
+A signature and its equations can also be entered between `:{` and `:}`.
+GHCi keeps the function available for subsequent commands. To use a
+length from IO, keep its binding in the expression that consumes it.
+
+```text
+import Data.IORef
+ref <- newIORef (2 :: Nat)
+do { n <- readIORef ref; print (toList (fill n)) }
+[True,True,True]
+```
+
+A value bound in a previous command, such as `n <- readIORef ref`, is a
+prompt-level binding. A retained application accepts a local alias, for
+example `let localN = n in toList (fill localN)`.
+
+At a breakpoint in `appendNative`, GHCi can display the types of both
+input vectors and the result. The two input lengths remain independent.
+The result length contains their sum, even when neither length is available
+as a debugger local.
+
+### Showcase groups
+
 | Source feature | Showcase group |
 | --- | --- |
 | Boolean result types, runtime input and ignored bottom arguments | `booleans` |
@@ -3665,8 +3701,8 @@ The missing, unrelated, escaping and representational evidence controls still
 reject. The source inventory comes from these fixture changes and successful
 runs; it is not a printed runtime counter. The quiet total includes the existing
 standalone splice control, which earlier reported subtotals omitted.
-The API provider compiles as object
-code without linking. Native bytecode module compilation remains unsupported.
+At M35 the API provider compiled as object code without linking.
+M87 adds [interpreted module loading](#try-a-retained-function-in-ghci).
 
 At M35, fully applied `withQ (error ...) f` rejects at `f` with GHC-91028 when
 its result does not determine the erased parameter. The complete expected
