@@ -7691,3 +7691,52 @@ assembly tests passed. The latter include the existing strict-field and
 known-constructor regressions. A nested `Right` around a tuple lost its
 outer allocation and case but kept the inner tuple case. Native modules
 still require the restricted optimization settings.
+
+## M98: the length of zip over two ordinary lists
+
+R15 and R13 need a checked computation that inspects more than one
+argument. Zip two ordinary lists, possibly with different element types
+or lengths, and return a vector indexed by the number of pairs produced.
+The first empty input ends the computation. If the first list is empty,
+leave the second spine unevaluated.
+
+```haskell
+zipLength :: forall a b. [a] -> [b] -> Nat
+zipLength [] _ = Z
+zipLength (_ : _) [] = Z
+zipLength (_ : xs) (_ : ys) = S (zipLength xs ys)
+
+zipRows :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
+        -> Vec (a, b) (zipLength xs ys)
+```
+
+On M97 the standalone ordinary definition compiles. A separate module
+asking for the polymorphic empty-first equation reports GHC-68947 at
+`zipLength`. A monomorphic producer also compiles, but a nested-case
+consumer reports GHC-83865 at `VNil`: the expected index remains
+`zipLength '[] ys`. The existing source checker handles one inspected
+column and one unchanged argument. The two tails here both change.
+
+- [ ] Check two shallow pattern columns from the zonked function. Check
+      coverage at each inspected constructor. Start with the monomorphic
+      case to isolate pattern coverage and recursive argument selection.
+      Extend the same checked result to independent lifted element types.
+- [ ] Retain the source order of scrutiny in the generated family.
+      Reduce `zipLength '[] ys` for any `ys`. Reduce the empty-second
+      equation only when the first list is known to have a cell. Prove
+      structural decrease on the first tail and use the checked second
+      field as the second recursive operand.
+- [ ] Check separate producer and consumer modules. Exercise both empty
+      shapes, unequal lengths, a finite prefix of an infinite input,
+      lazy elements, and a bottom spine on either side. Reject a
+      nondecreasing call and an equality that would inspect the second
+      list before the first. Recheck an unchanged client after changing
+      a producer equation.
+- [ ] Run the vector producer from source and add it to the Showcase.
+      Use the existing nested-case path to separate source equation
+      checking from the syntax of two retained clause patterns.
+
+The proposed family can use three ordered branches. In the empty-second
+branch the first pattern must still be a cons. An unrestricted equation
+for an unknown first list could give a type-level result where the
+runtime computation is stuck. [Case-tree and demand references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).

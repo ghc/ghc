@@ -4902,3 +4902,24 @@ check also includes free runtime variables in types and coercions.
 [GHC's `knownCon`](../../compiler/GHC/Core/Opt/Simplify/Iteration.hs),
 [Haskell 2010 pattern matching, section 3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html),
 and [Haskell evaluation provenance](#haskell-evaluation-provenance).
+
+### The length of zip and demand in a case tree
+
+A proposed length for zipping two ordinary lists tests the first spine,
+then tests the second spine only if the first has a cell. Agda's `max`
+example shows why a source equation need not reduce when its first
+argument is unknown: the compiled tree must make its first split.
+Its vector `zipWith` example permits fewer rows because its inputs
+already have the same length. Ordinary lists need both mismatched
+shapes. [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [multiple-argument coverage](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-multiple-arguments).
+
+GHC's `zip` and `zipWith` distinguish an empty first list from an
+unknown first list. In particular, `zip [] undefined` returns `[]`;
+evaluating `zip undefined []` raises the exception. The list library
+documents the same demand issue for fusion. A type-level reduction
+must preserve that choice of discriminator. The equation for an empty
+second list can require a known cons in the first position. Neither
+coverage nor structural recursion makes all Haskell spines finite.
+[GHC.Internal.List, Note [Fusion for foldrN] and zip](../../libraries/ghc-internal/src/GHC/Internal/List.hs)
+and [Agda 2.8.0 structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#primitive-recursion).
