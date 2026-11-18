@@ -108,6 +108,32 @@ the client while the installed interfaces stay byte-identical.
 [Character witnesses](../../../testsuite/tests/dependent/should_run/NativeClosedChar.hs)
 and [link dependency recording](../../../compiler/GHC/HsToCore/Usage.hs).
 
+## Overloaded library functions
+
+```haskell
+total :: Prelude.sum '[2, 3, 5] :~: 10
+total = Refl
+```
+
+The ordinary type of `sum` has domain `t a`. Matching it against
+`[Natural]` determines both type arguments. The type checker then checks
+the imported occurrence against `[Natural] -> Natural` as a term. It
+selects the `Foldable []` and `Num Natural` instances. The same source
+test calls a producer that doubles the total, a `Foldable` function that
+returns `Bool`, and a polymorphic identity on a character. A missing or
+ambiguous dictionary prevents execution even when the producer would
+ignore it. An instance from the module under compilation fails the
+ordinary stage check. [Source witnesses](../../../testsuite/tests/dependent/should_run/NativeClosedSum.hs).
+
+The specialization records the imported names that supply its evidence.
+This matters when the simplifier replaces a class method call with its
+implementation. The instance object can disappear from the evaluated
+code. The unchanged client must still recheck its proof when the instance
+selects another method implementation. If the bytecode retains a
+dictionary reference, the client also records the object that the
+interpreter loaded.
+[Instance recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedSumDependencies.sh).
+
 Same-module definitions require further work on R21. More argument and
 result domains, user-defined representations and general closed expressions
 remain open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).

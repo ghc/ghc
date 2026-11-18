@@ -807,6 +807,7 @@ main = do
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
+    observe "Prelude.sum in a type" (TypeNats.natVal (Proxy @(Prelude.sum '[2, 3, 5])))
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])

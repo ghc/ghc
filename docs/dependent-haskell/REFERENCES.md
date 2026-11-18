@@ -5024,3 +5024,29 @@ on an unknown input.
 [Johann and Voigtländer, POPL 2004](https://janis-voigtlaender.eu/JV04.html),
 [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
 and [R16 source checks](roadmap/R16-open-term-evaluator.md#selecting-between-two-type-variables).
+
+### Retrying a check during inference
+
+Agda stores a constraint with its blocker and its checking context. Its
+constraint scheduler can wake a blocked constraint when a problem is
+solved. For the GHC partial-signature experiment, the binding group owns
+the inference variables. Its existing solver offers a place to retry
+after solving ordinary constraints and before generalization. An inferred
+literal can then be checked by the closed evaluator. A universally
+quantified input in an exported signature has a different lifetime.
+[Agda's constraint insertion](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/TypeChecking/Monad/Constraints.hs#L232-L259),
+[Agda's wakeup](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/TypeChecking/Monad/Constraints.hs#L300-L322)
+and [GHC inference](../../compiler/GHC/Tc/Solver.hs).
+
+### Reifying closed list results
+
+Proposal #509 treats the promotability of a list as a property of its
+element type. The `SingKind` class in `singletons` associates each supported
+kind with a term representation and supplies conversions in both directions.
+The compiler has the element kind when it elaborates a closed call, even
+when the result list is empty. This gives it the information needed to
+select a scalar conversion and reconstruct the promoted list. An ordinary
+user `Show` instance may choose any text for that list, so its output
+cannot establish the type index.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+and [the singletons 3.0.4 API](https://hackage-content.haskell.org/package/singletons-3.0.4/docs/Data-Singletons.html#t:SingKind).

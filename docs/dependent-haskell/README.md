@@ -32,6 +32,12 @@ character. The Showcase reflects `Data.Char.toUpper 'x'` as `'X'` and checks
 `Data.Char.isDigit '7' :~: 'True` with `Refl`.
 [Closed character examples](roadmap/R15-closed-term-evaluator.md#closed-character-calls).
 
+An overloaded library call can supply a type index. In
+`Prelude.sum '[2, 3, 5] :~: 10`, the literal list fixes the specialization.
+GHC selects the ordinary list and natural-number instances. The Showcase
+reflects the resulting type as the number `10`.
+[Source proof](../../testsuite/tests/dependent/should_run/NativeClosedSum.hs).
+
 An ordinary recursive length function now gives the return type of a
 vector constructor. For a list of `Int` read from an `IORef`, the caller can
 write `vector :: Vec Int (sourceLength xs)` and construct it with

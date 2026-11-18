@@ -7888,14 +7888,14 @@ R15 now needs to select dictionaries for proposal #509's
 `Natural`. The ordinary definition should determine both the result and
 the required instances.
 
-- [ ] Check the actual library identifier, all type arguments and class
+- [x] Check the actual library identifier, all type arguments and class
       constraints. Compare with independent imported functions returning
       `Natural` and `Bool`. Require the checked argument to determine the
       specialization before running the code.
-- [ ] Use normal instance resolution. Detect missing dictionaries and
+- [x] Use normal instance resolution. Detect missing dictionaries and
       evidence that depends on the module currently compiling. Check the
       missing-instance case even when the client defers ordinary type errors.
-- [ ] Accept a proof that the sum equals 10. Reject a false result,
+- [x] Accept a proof that the sum equals 10. Reject a false result,
       a rigid list, and an input that leaves an ambiguous specialization.
       Preserve M99 and M101's code dependency recording.
 
@@ -7908,10 +7908,75 @@ arguments by resolving the evidence in scope.
 [GHC's Foldable class](../../libraries/ghc-internal/src/GHC/Internal/Data/Foldable.hs)
 and [Agda 2.8.0 instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html).
 
-Before M103, the source declaration reports GHC-68947 at `Prelude.sum`.
+Before M103, the source declaration reported GHC-68947 at `Prelude.sum`.
 A GHC API check against the installed library matched the declared
 argument `t a` of both `sum` and `Data.Foldable.null` to `[Natural]`.
 Both type-constructor heads have matchable arrows on this fork. The match
 fixed `t` to `[]` and `a` to `Natural`. The inferred result types were
 `Natural` and `Bool`, respectively. The probe stopped before dictionary
 selection and execution.
+
+Both compiler stages reflected the sum as 10 and ran all 179 Showcase
+lines. GHCi produced the same output. Both interpreter modes passed the
+separate producer checks. Changing only the instance object invalidated
+the unchanged client. In optimized orphan and non-orphan cases the
+selector rule eliminated the dictionary object. The client's interface
+still recorded the selected dictionary's declaration fingerprint. All
+nineteen selected normal-way regressions passed, including ordinary
+defaulting, Template Haskell and deferred-error controls.
+
+## M104: retry a type call after inference determines its input
+
+R16 needs a source example in which the checker learns the operand after
+reading the signature. A named wildcard denotes an inference variable.
+Here the pattern requires that variable to be the character `'a'`.
+
+```haskell
+upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+upper (_ :: Proxy 'a') = Proxy @'A'
+```
+
+- [ ] Attach the pending call to the partial signature that owns the input
+      variable. Preserve its source span and staging restrictions.
+- [ ] Solve the binding's ordinary constraints. Once the input is known,
+      evaluate the call and check its result through ordinary nominal
+      equality. A result may make a second call ready. Check that an
+      unresolved input stays an error even when type errors are deferred.
+- [ ] Reject a body that claims the wrong result. Keep nested scopes,
+      incomplete inference, and compile-time execution in Safe modules
+      or quotations under test. Check that no pending operation or
+      result placeholder can escape into a generalized signature.
+
+The baseline accepts the analogous ordinary closed type family. The
+character primitive succeeds with a literal input. Before M104, the signature above failed at the source call with GHC-68947. Proposal #509 also describes an exported
+constraint with a rigid input. That signature requires a representation
+that can survive until a client chooses the character. An operation owned
+by one inference group addresses the local example only.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+and [R16](roadmap/R16-open-term-evaluator.md).
+
+## M105: return a promoted list from a closed call
+
+R15 currently accepts lists of natural number literals as input. The
+next result shape in proposal #509 is a list whose element type can be
+promoted. Check `Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]` from source.
+
+- [ ] Reify a list using its checked element type and GHC's existing
+      promoted list constructors. Start with the scalar result types
+      already supported by R15. Preserve the element kind for an empty list.
+- [ ] Compare ordered and incorrect results, characters that require
+      escaping, and a failing element. Use both interpreter modes.
+      An overlapping user instance for showing a list must not select the
+      index the compiler constructs.
+- [ ] Keep recursive composite types explicit in the roadmap. One list
+      layer does not cover nested lists, sums, tuples or arbitrary data types.
+
+`singletons` associates a demoted representation with each supported
+kind through `SingKind`. R15 can use the same principle to select a checked
+representation at the interpreter boundary. The compiler already has a
+typed constructor for the promoted list.
+[SingKind](https://hackage-content.haskell.org/package/singletons-3.0.4/docs/Data-Singletons.html#t:SingKind)
+and [proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).
+
+Before M105, the function specialization succeeds but the client reports
+GHC-70565 at `Prelude.reverse` because the result is `[Natural]`.
