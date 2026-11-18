@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeApplications, TypeOperators #-}
 
 module Main where
 
@@ -6,7 +6,8 @@ import ClosedTableLibrary
 import Control.Exception (ArithException(DivideByZero), evaluate, throw, try)
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import PackedVecLibrary (Nat(..), boolVector, isSuccessor, listCount, natToInt, previous, toList)
+import PackedVecLibrary (Nat(..), boolVector, isSuccessor, listCount, natToInt, previous,
+                         sourceLength, sourceVector, toList)
 
 type Flipped = '[flipBit 'False, flipBit 'True]
 
@@ -50,6 +51,25 @@ lengthProof = Refl
 tailProof :: Proxy (xs :: [Bool]) -> listCount ('True ': xs) :~: 'S (listCount xs)
 tailProof _ = Refl
 
+type EmptyInts = sourceLength @Int '[]
+
+emptyProof :: EmptyInts :~: 'Z
+emptyProof = Refl
+
+polyStep :: forall a (x :: a) (xs :: [a]). Proxy x -> Proxy xs
+         -> sourceLength @a (x ': xs) :~: 'S (sourceLength xs)
+polyStep _ _ = Refl
+
+-- Both the type and the recursive term can supply the specified argument.
+type Singleton = count @Bool '[ 'False]
+
+count :: forall a. [a] -> Nat
+count []       = Z
+count (_ : xs) = S (count @a xs)
+
+localSingleton :: Singleton :~: 'S 'Z
+localSingleton = Refl
+
 -- The recursive equation can precede its input datatype in this group.
 bitCount :: Bits -> Nat
 bitCount End = Z
@@ -74,3 +94,5 @@ main = case (flipProof, signalProof, phaseProof) of
     print (isSuccessor (listCount (True : throw DivideByZero)))
     spine <- try (evaluate (natToInt (listCount (True : throw DivideByZero))))
     print (spine == Left DivideByZero)
+    let ints = [11, 22] :: [Int]
+    print (toList (sourceVector @Int ints))

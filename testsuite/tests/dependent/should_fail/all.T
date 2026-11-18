@@ -84,3 +84,7 @@ test('NativeSourceTablePartial', normal, compile_fail, [''])
 test('NativeSourceFieldCoverage', normal, compile_fail, [''])
 test('NativeSourceLengthRecursion', normal, compile_fail, [''])
 test('NativeSourceLengthFamily', req_th, compile_fail, [''])
+test('NativeSourceLengthEmpty',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     multimod_compile_fail,
+     ['NativeSourceLengthEmpty', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])

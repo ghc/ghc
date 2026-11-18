@@ -73,6 +73,7 @@ import GHC.Data.Graph.Directed ( SCC, flattenSCC, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
+import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 
 import Control.Monad
 import Data.Bifunctor ( first )
@@ -300,8 +301,11 @@ in the original group.
 
 A table such as listCount :: [Bool] -> Nat can refer to itself. Move its
 singleton SCC with its original recursion flag. For a list domain the
-element type supplies the declaration dependency. The constructor pattern
-supplies the fields. Check the identity and type of each recursive operand
+element type supplies the declaration dependency. In
+sourceLength :: forall a. [a] -> Nat, the signature binds a, so only Nat
+can add a dependency. Compare the renamed element Name with the binder.
+Only schedule a lifted type binder with no further kind dependencies.
+The constructor pattern supplies the fields. Check each recursive operand
 in the typed producer before constructing an axiom. Return all requested
 names so the caller can report an uncertified table at the source binding.
 -}
@@ -337,6 +341,9 @@ localSourceTableBinders binds sigs =
         check :: [LHsExpr GhcPs] -> LHsExpr GhcPs -> Bool
         check args expr = case unLoc (stripParensLHsExpr expr) of
           HsApp _ fun arg -> check (arg : args) fun
+          HsAppType _ fun _
+            | HsVar _ (L _ r) <- unLoc (stripParensLHsExpr fun)
+            , is_self r -> check args fun
           HsVar _ (L _ r)
             | isRdrDataCon r -> all (check []) args
             | r `elem` fields -> null args
@@ -373,9 +380,10 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
   = let wanted_set = mkNameSet (map fst wanted)
         specialised = mkNameSet [ n | L _ s <- sigs, n <- spec_name s ]
         signatures = mkNameEnv
-          [ (b, [domain, result]) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
-            , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) arg res <- [unLoc (hsSigWcType sig)]
-            , Just domain <- [domain_dependency arg], Just result <- [type_name res] ]
+          [ (b, domain ++ [result]) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
+            , L _ HsSig{sig_bndrs = outer, sig_body = body} <- [dropWildCards sig]
+            , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) arg res <- [unLoc (ignoreParens body)]
+            , Just domain <- [domain_dependencies outer arg], Just result <- [type_name res] ]
         early = [ (b, kinds) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
                 , b `elemNameSet` wanted_set, not (b `elemNameSet` specialised)
                 , Just kinds <- [lookupNameEnv signatures b]
@@ -401,12 +409,34 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
         | isTyConName name, isNothing (sourceTableTermOcc (nameOccName name)) -> Just name
       _ -> Nothing
 
-    domain_dependency :: LHsType GhcRn -> Maybe Name
-    domain_dependency ty = case unLoc (ignoreParens ty) of
-      HsListTy _ element -> type_name element
+    domain_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [Name]
+    domain_dependencies outer ty = case (outer_vars outer, list_element ty) of
+      (Just [], element) -> (:[]) <$> type_name (fromMaybe ty element)
+      (Just [a], Just element)
+        | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- ignoreParens element
+        , name == a -> Just []
+      _ -> Nothing
+
+    list_element :: LHsType GhcRn -> Maybe (LHsType GhcRn)
+    list_element ty = case unLoc (ignoreParens ty) of
+      HsListTy _ element -> Just element
       HsAppTy _ list element
-        | Just con <- type_name list, nameUnique con == listTyConKey -> type_name element
-      _ -> type_name ty
+        | Just con <- type_name list, nameUnique con == listTyConKey -> Just element
+      _ -> Nothing
+
+    outer_vars :: HsOuterSigTyVarBndrs GhcRn -> Maybe [Name]
+    outer_vars (HsOuterImplicit names) = Just names
+    outer_vars (HsOuterExplicit _ Nothing []) = Just []
+    outer_vars (HsOuterExplicit _ Nothing [L _ (HsTvb _ SpecifiedSpec (HsBndrVar _ (L _ a)) kind)])
+      | plain_kind kind = Just [a]
+    outer_vars _ = Nothing
+
+    plain_kind :: HsBndrKind GhcRn -> Bool
+    plain_kind HsBndrNoKind{} = True
+    plain_kind (HsBndrKind _ k)
+      | HsStarTy{} <- unLoc (ignoreParens k) = True
+      | Just n <- type_name k = nameUnique n == liftedTypeKindTyConKey
+    plain_kind _ = False
 
     local_types = mkNameSet (map (tcdName . unLoc) (tyClGroupTyClDecls tycls))
     early_datatypes = mkNameEnv

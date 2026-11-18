@@ -19,6 +19,8 @@ module PackedVecLibrary (
     dropFirst,
     listCount,
     boolVector,
+    sourceLength,
+    sourceVector,
     PackedVec (..),
     LE (..),
     BoundedVec (..),
@@ -105,6 +107,16 @@ listCount (_ : xs) = S (listCount xs)
 boolVector :: foreach (xs :: [Bool]) -> Vec Bool (listCount xs)
 boolVector []       = VNil
 boolVector (b : bs) = VCons b (boolVector bs)
+
+-- | Count the spine of a list at any lifted element type.
+sourceLength :: forall a. [a] -> Nat
+sourceLength []       = Z
+sourceLength (_ : xs) = S (sourceLength xs)
+
+-- | Preserve each element in a vector whose index is its source list's length.
+sourceVector :: forall a. foreach (xs :: [a]) -> Vec a (sourceLength xs)
+sourceVector []       = VNil
+sourceVector (x : xs) = VCons x (sourceVector @a xs)
 
 -- | Store one runtime length and a vector indexed by that same field.
 data PackedVec a where

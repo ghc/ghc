@@ -939,7 +939,7 @@ rnHsTyKi env (HsAppTy _ ty1 ty2)
 rnHsTyKi env (HsAppKindTy _ ty k)
   = do { kind_app <- xoptM LangExt.TypeApplications
        ; unless kind_app (addErr (typeAppErr KindLevel k))
-       ; (ty', fvs1) <- rnLHsTyKi env ty
+       ; (ty', fvs1) <- rnLHsAppHead env ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
        ; return (HsAppKindTy noExtField ty' k', fvs1 `plusFN` fvs2) }
 
@@ -1084,7 +1084,8 @@ throw an error accordingly.
 -}
 
 --------------
--- | Keep the function-head context through parentheses.
+-- | Use the same function-head lookup for an ordinary argument and a
+-- visible kind argument. Parentheses preserve the function-head context.
 rnLHsAppHead :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnLHsAppHead env (L l tv@(HsTyVar _ ip name)) = setSrcSpanA l $ do
   (tv', fvs) <- rnHsTyVar lookupTypeAppHeadRn env tv ip name
