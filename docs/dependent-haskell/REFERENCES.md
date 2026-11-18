@@ -4883,3 +4883,22 @@ callback index in `VCons x <$> fromListExact n xs`. The rule does not assign
 native indices to mutable type variables or infer arbitrary callbacks.
 Agda's contextual metavariables and evaluation rules do not establish
 these Haskell scope, multiplicity or laziness properties.
+
+### Reducing a known constructor case in native Core
+
+Agda's compiled-clause matcher replaces a matched constructor argument
+with its fields and applies the resulting substitution to the selected
+clause. Its compiler distinguishes a runtime field from an erased
+argument. In this fork the field can be a Haskell thunk whose type
+mentions a runtime length. Substitution must preserve both its value
+and the runtime binders used by its type.
+[Agda compiled-clause matching at `7273757e`](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/TypeChecking/CompiledClause/Match.hs#L138-L164) and [Agda 2.8.0 run-time irrelevance](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html).
+
+The existing GHC simplifier binds the constructor's fields, preserving
+sharing and any evaluation required to construct the value. For a strict
+field, choosing the right branch alone can hide an exception. The
+restricted path needs the original force in this case. Its dependency
+check also includes free runtime variables in types and coercions.
+[GHC's `knownCon`](../../compiler/GHC/Core/Opt/Simplify/Iteration.hs),
+[Haskell 2010 pattern matching, section 3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html),
+and [Haskell evaluation provenance](#haskell-evaluation-provenance).

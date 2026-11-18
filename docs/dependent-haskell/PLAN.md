@@ -7610,3 +7610,40 @@ They include the existing Quick Look and linear constructor tests, editor
 metadata, and the ordinary-client API driver. The measured infix call also
 works with an independently declared mapping operator. General callback
 inference and operator sections remain open.
+
+## M97: simplify a case of an ordinary constructor in dependent Core
+
+R05 requires an ordinary Core transformation with a measured benefit.
+On the M96 compiler, a source function wraps a vector of runtime length
+in `Just` and immediately matches on it. Desugaring binds the constructor
+to a fresh local variable. Final STG still allocates the `Just` and tests
+its tag before returning the original vector. A two-field ordinary
+constructor shows the same allocation and dispatch. A constructor with
+a strict field forces that field even if the branch ignores it.
+
+- [ ] Reduce a case whose scrutinee is an immediately preceding, known
+      constructor binding. Use the actual constructor worker and its
+      fields. Preserve lexical scope in the chosen alternative and keep
+      shared fields lazy. Follow the treatment of value arguments in
+      GHC's known-constructor rule.
+- [ ] Preserve accesses through types and coercions. Keep strict
+      and unlifted fields, proof alternatives, and unknown producers on
+      their original path until their forcing and proof rules are handled.
+- [ ] Compare final STG before and after the change and measure heap
+      allocation at two loop sizes. Check the selected result, ignored
+      fields, strict fields, and scrutinizing an unknown value. Run Core
+      and STG Lint, source and API controls, and both stages. Use the
+      existing restricted optimization path.
+
+The measured Core shape is `let ds = Just xs in case ds of ...`.
+Matching only a literal constructor scrutinee would miss the source
+example. For the chosen branch, include the field types, multiplicities,
+metadata, and case result in the free-variable check before dropping
+`ds` or the case binder. A field can itself have type `Vec a n`.
+Use a fresh lazy binding for a nontrivial field so two uses share it.
+
+The baseline loop allocates 112 bytes per call when it returns the input
+vector directly. Returning it through `Just` allocates 128 bytes per
+call. Returning it through a two-field constructor allocates 136 bytes
+per call. Each slope uses the change in RTS allocated bytes between
+50,000 and 200,000 calls. The mode selection runs outside the loop.
