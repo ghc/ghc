@@ -97,5 +97,6 @@ test('T25834', normal, compile, [''])
 test('GADTSingletons', normal, compile, [''])
 
 test('NativeSourceCallIface',
-     extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs']),
+     extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',
+                  'NativeMethodAliases.hs', 'NativeMethodAliasClient.hs']),
      makefile_test, ['NativeSourceCallIface'])

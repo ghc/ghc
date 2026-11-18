@@ -93,3 +93,7 @@ test('NativeTypeNumeralWrong',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_fail,
      ['NativeTypeNumeralWrong', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeMethodGiven',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     multimod_compile_fail,
+     ['NativeMethodGiven', '-v0 -fdefer-type-errors -Wno-simplifiable-class-constraints -fomit-interface-pragmas'])

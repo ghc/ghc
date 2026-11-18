@@ -20,3 +20,12 @@ wrongCall = atBit (flipBit False)
 
 unknownCall :: (Bool -> Bool) -> Flag True
 unknownCall f = atBit (f False)
+
+class Step a where
+    step :: a -> a
+
+instance Step Bool where
+    step = flipBit
+
+localMethod :: Flag True
+localMethod = atBit (step False)

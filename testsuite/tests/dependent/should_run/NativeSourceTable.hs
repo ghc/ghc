@@ -110,7 +110,7 @@ stepSum :: Proxy (n :: Nat) -> Proxy (m :: Nat)
 stepSum _ _ = Refl
 
 replicateSum :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> a -> Vec a (n + m)
-replicateSum n m x = replicateNative @a (plus n m) x
+replicateSum n m x = replicateNative @a (n + m) x
 
 -- The call is the only use of this source function. Its definition follows it.
 localOne :: Vec Bool 1

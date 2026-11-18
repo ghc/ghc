@@ -16,3 +16,9 @@ NativeSourceTableWrong.hs:22:24: error: [GHC-83605]
     • No checked source equations are available for ‘f’ in this retained argument.
     • In the expression: atBit (f False)
       In an equation for ‘unknownCall’: unknownCall f = atBit (f False)
+
+NativeSourceTableWrong.hs:31:22: error: [GHC-83605]
+    • Method ‘step’ belongs to an instance in this module.
+      Retained method calls currently need a compiled instance interface.
+    • In the expression: atBit (step False)
+      In an equation for ‘localMethod’: localMethod = atBit (step False)

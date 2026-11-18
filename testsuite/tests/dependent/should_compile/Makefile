@@ -7,7 +7,7 @@ T13938:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T13938a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T13938.hs
 
-source_call_hc = '$(TEST_HC)' $(TEST_HC_OPTS) -v0 -fomit-interface-pragmas -i -iinterfaces -outputdir interfaces
+source_call_hc = '$(TEST_HC)' $(TEST_HC_OPTS) -v0 -fno-force-recomp -fomit-interface-pragmas -fno-write-if-simplified-core -i -iinterfaces -outputdir interfaces
 
 NativeSourceCallIface:
 	mkdir -p interfaces changed
@@ -17,3 +17,10 @@ NativeSourceCallIface:
 	$(source_call_hc) -fno-code -fwrite-interface -fforce-recomp -c changed/ClosedTableLibrary.hs
 	! $(source_call_hc) -c NativeSourceCallIface.hs 2>changed.stderr
 	grep -q 'GHC-83865' changed.stderr
+	$(source_call_hc) -fno-code -fwrite-interface -c NativeMethodAliases.hs
+	$(source_call_hc) -c NativeMethodAliasClient.hs
+	sed 's/forward = turn/forward = stay/' NativeMethodAliases.hs > changed/NativeMethodAliases.hs
+	$(source_call_hc) -fno-code -fwrite-interface -fforce-recomp -c changed/NativeMethodAliases.hs
+	! $(source_call_hc) -c NativeMethodAliasClient.hs 2>changed-method.stderr
+	grep -q 'GHC-83865' changed-method.stderr
+	grep -q 'forwardProof' changed-method.stderr
