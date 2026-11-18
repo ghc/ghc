@@ -750,13 +750,13 @@ invisibleRetainedArguments = do
 -- | Recover both runtime lengths from the vector declarations.
 inferredAppend :: IO ()
 inferredAppend = do
-    n <- newIORef (S (S Z)) >>= readIORef
-    m <- newIORef (S Z) >>= readIORef
+    n <- newIORef (2 :: Nat) >>= readIORef
+    m <- newIORef (1 :: Nat) >>= readIORef
     let xs :: Vec Int n
         xs = replicateNative @Int n 7
         ys :: Vec Int m
         ys = replicateNative @Int m 9
-        joined :: Vec Int (plus n m)
+        joined :: Vec Int (n + m)
         joined = appendHidden xs ys
     observe "append with inferred lengths" (toList joined)
     observe "append with first length written" (toList (appendHidden @{n} xs ys))
@@ -789,6 +789,7 @@ main = do
     constructorFields
     recursiveLengths
     sourceAddition
+    arithmeticNotation
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()
@@ -836,19 +837,34 @@ recursiveLengths = do
     first VNil = Nothing
     first v@(VCons _ _) = Just (safeHead v)
 
-    safeHead :: Vec a ('S n) -> a
+    safeHead :: Vec a (1 + n) -> a
     safeHead (VCons x _) = x
 
 -- | Use ordinary addition on two unknown lengths in a vector result type.
 sourceAddition :: IO ()
 sourceAddition = do
-    n <- newIORef (S Z) >>= readIORef
-    m <- newIORef (S (S Z)) >>= readIORef
+    n <- newIORef (1 :: Nat) >>= readIORef
+    m <- newIORef (2 :: Nat) >>= readIORef
     let xs :: Vec Bool n
         xs = replicateNative n True
         ys :: Vec Bool m
         ys = replicateNative m False
-        joined :: Vec Bool (plus n m)
+        joined :: Vec Bool (n + m)
         joined = appendHidden xs ys
-    observe "runtime sum and appended vector" (natToInt (plus n m), toList joined)
+    observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
     observe "outer successor ignores the second addend" (isSuccessor (plus (S Z) undefined))
+
+-- | Use decimal numerals in the original vector GADT and add runtime indices.
+arithmeticNotation :: IO ()
+arithmeticNotation = do
+    let three :: Vec Bool 3
+        three = sourceVector @Bool [True, False, True]
+    n <- newIORef (2 :: Nat) >>= readIORef
+    let prefix :: Vec Bool n
+        prefix = replicateNative n False
+        joined :: Vec Bool (n + 3)
+        joined = appendVec prefix three
+    observe "vector with length 3" (toList three)
+    observe "replicateAt 3" (toList (replicateAt 3 True))
+    observe "vector with length n + 3" (toList joined)
+    observe "2 + 3 at runtime" ((2 + 3) :: Nat)

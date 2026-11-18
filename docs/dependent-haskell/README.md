@@ -23,19 +23,44 @@ uses an ordinary two-argument addition function. Its type is
 [polymorphic list length](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type)
 and [source addition](PLAN.md#m79-addition-from-an-ordinary-two-argument-function).
 
+### Numeric indices
+
+The packed-vector example accepts these signatures on the original GADT.
+
+```haskell
+three :: Vec Bool 3
+three = sourceVector @Bool [True, False, True]
+
+allTrue :: Vec Bool 3
+allTrue = replicateAt 3 True
+
+appendOne :: Vec a n -> a -> Vec a (n + 1)
+appendOne xs x = appendVec xs (VCons x VNil)
+```
+
+The library registers its Peano interpretation with
+`GHC.TypeNats.Experimental.FromNatural`. Its `Num Nat` instance supplies
+runtime numbers. The type operator and the `Num` addition method both use
+the checked `plus` function. The [runnable example](Showcase.hs) reads
+`2 :: Nat` from an `IORef` and appends three elements to that runtime length.
+`replicateAt` takes a required type argument, so `replicateAt 3 True`
+constructs a vector at exactly that length. For a runtime length `n`,
+`replicateNative n True` constructs a vector indexed by that value.
+
 ### What happens on empty input?
 
 ```haskell
-safeHead :: Vec a ('S n) -> a
+safeHead :: Vec a (1 + n) -> a
 safeHead (VCons x _) = x
 ```
 
-The successor in the argument type requires at least one element. GHC
-rejects `safeHead (sourceVector @Int [])` at the call site.
+Addition inspects its first argument. Thus `1 + n` reduces to `S n`
+even when the tail length comes from IO. GHC rejects
+`safeHead (sourceVector @Int [])` at the call site.
 
 ```text
 Couldn't match type ‘Z’ with ‘S n0’
-  Expected: Vec Int (S n0)
+  Expected: Vec Int ((1 :: Nat) + n0)
     Actual: Vec Int (sourceLength '[])
 ```
 
@@ -115,6 +140,7 @@ _build/showcase/showcase
 | Dropping the first element of a vector whose length is indexed by an ordinary predecessor function | `constructorFields` |
 | A vector indexed by the recursive length of an IO-sourced list, demand on its spine, and reuse of one length function at `Int` and function element types | `recursiveLengths` |
 | Ordinary addition used in a vector result type and at runtime with an unevaluated second operand | `sourceAddition` |
+| Decimal indices, infix length arithmetic and ordinary numeric terms | `arithmeticNotation` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -153,6 +179,9 @@ lines. See [the M69 record](PLAN.md#m69-generic-safe-list-indexing).
 M70 adds one observation for the literal `fmap` call. The existing callback
 checker uses the actual vector index from the cached lookup result. The
 standalone NoEDT list inference control still rejects.
+M80 runs 151 lines through eighteen modules in both compiler stages. The
+numeric examples exercise a static length, a runtime length and a sum
+in a vector result type. See [M80 validation](PLAN.md#m80-numerals-and-infix-addition-in-vector-types).
 See [the work queue](ROADMAP.md#current-work-queue) for the next increments.
 The examples check ignored and demanded error values separately.
 The imported providers keep their own language extensions. In particular,

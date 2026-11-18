@@ -6,8 +6,8 @@ import ClosedTableLibrary
 import Control.Exception (ArithException(DivideByZero), evaluate, throw, try)
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import PackedVecLibrary (Nat(..), boolVector, isSuccessor, listCount, natToInt, plus, previous,
-                         sourceLength, sourceVector, toList)
+import PackedVecLibrary (type (+), Vec(..), Nat(..), appendVec, boolVector, isSuccessor, listCount, natToInt, plus, previous,
+                         replicateAt, sourceLength, sourceVector, toList)
 
 type Flipped = '[flipBit 'False, flipBit 'True]
 
@@ -80,6 +80,27 @@ data Bits = End | Bit Bool Bits
 bitsProof :: bitCount ('Bit 'False 'End) :~: 'S 'Z
 bitsProof = Refl
 
+literalThree :: Vec Bool 3
+literalThree = VCons True (VCons False (VCons True VNil))
+
+headOfNonempty :: Vec a (1 + n) -> a
+headOfNonempty (VCons x _) = x
+
+appendOne :: Vec a n -> a -> Vec a (n + 1)
+appendOne xs x = appendVec xs (VCons x VNil)
+
+literalSum :: (1 + 2) :~: (3 :: Nat)
+literalSum = Refl
+
+-- A change to left association would make this expression equal to three.
+infixr 5 <.>
+(<.>) :: Nat -> Nat -> Nat
+Z   <.> m = S m
+S n <.> m = S (S (n <.> m))
+
+fixityProof :: (0 <.> 0 <.> 0) :~: (2 :: Nat)
+fixityProof = Refl
+
 baseSum :: Proxy (m :: Nat) -> plus 'Z m :~: m
 baseSum _ = Refl
 
@@ -104,3 +125,5 @@ main = case (flipProof, signalProof, phaseProof) of
     let ints = [11, 22] :: [Int]
     print (toList (sourceVector @Int ints))
     print (natToInt (plus (S Z) (S Z)), isSuccessor (plus (S Z) (throw DivideByZero)))
+    print (toList literalThree, headOfNonempty literalThree, natToInt (2 + 3))
+    print (toList (replicateAt 3 True), length (toList (replicateAt 3 (undefined :: Int))))

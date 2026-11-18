@@ -20,6 +20,56 @@ retained binders with scoped local Id names. Native module unfoldings remain
 unsupported. The regression harness also
 executes checked local declarations through a native bytecode entry.
 
+Natural numerals in vector indices
+----------------------------------
+
+A library can give its index type an interpretation for nonnegative type
+numerals. Import ``FromNatural`` from ``GHC.TypeNats.Experimental`` in the
+package ``ghc-experimental``. Define an instance for the index kind. For
+example, these declarations register a Peano kind::
+
+    import GHC.TypeNats.Experimental (FromNatural)
+    import qualified GHC.TypeNats as TN
+
+    data Nat = Z | S Nat
+
+    type family ToPeano (n :: TN.Nat) :: Nat where
+      ToPeano 0 = 'Z
+      ToPeano n = 'S (ToPeano (n TN.- 1))
+
+    type instance FromNatural Nat n = ToPeano n
+
+This definition of ``ToPeano`` requires :extension:`UndecidableInstances`.
+In a module with :extension:`ExperimentalDependentTypes`, a numeral in
+``Vec a 3`` now has the expected kind ``Nat``. The checked instance
+determines its value. When GHC infers the kind of a numeral, or expects
+``GHC.TypeNats.Nat``, the ordinary built-in literal rules apply.
+Family instance patterns keep the ordinary rules for literals.
+When a proof needs the full Peano representation of a numeral, each
+successor takes a reduction step in this example. Large proofs can
+reach GHC's family reduction depth limit.
+
+The packed-vector example defines ``type n + m = plus n m`` and shares
+the ordinary definition of ``plus`` with its ``Num Nat`` instance. It can
+therefore write signatures such as these::
+
+    three     :: Vec Bool 3
+    safeHead  :: Vec a (1 + n) -> a
+    appendOne :: Vec a n -> a -> Vec a (n + 1)
+
+The first argument of ``plus`` controls reduction. In ``safeHead``,
+``1 + n`` reduces to a successor without inspecting ``n``. Each caller
+still uses the ordinary term-level ``fromInteger`` for its runtime literals.
+An arbitrary ``Num`` instance cannot establish a runtime index equality.
+
+The library also provides ``replicateAt 3 x :: Vec a 3``, using
+:extension:`RequiredTypeArguments`. The first argument specifies the
+length in the type. For a length ``n`` read at runtime, its retained
+counterpart is ``replicateNative n x :: Vec a n``.
+
+Retained arguments
+------------------
+
 The syntax retains a value argument whose identity can occur in the
 result type. For example::
 

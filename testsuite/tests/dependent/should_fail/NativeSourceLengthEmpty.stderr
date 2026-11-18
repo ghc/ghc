@@ -1,6 +1,6 @@
 NativeSourceLengthEmpty.hs:11:18: error: [GHC-83865]
     • Couldn't match type ‘Z’ with ‘S n0’
-      Expected: Vec Int (S n0)
+      Expected: Vec Int ((1 :: Nat) + n0)
         Actual: Vec Int (sourceLength '[])
     • In the first argument of ‘safeHead’, namely
         ‘(sourceVector @Int [])’
@@ -10,7 +10,7 @@ NativeSourceLengthEmpty.hs:11:18: error: [GHC-83865]
 NativeSourceLengthEmpty.hs:16:20: error: [GHC-83865]
     • Couldn't match type: sourceLength xs
                      with: S n1
-      Expected: Vec Int (S n1)
+      Expected: Vec Int ((1 :: Nat) + n1)
         Actual: Vec Int (sourceLength xs)
     • In the first argument of ‘safeHead’, namely ‘(sourceVector xs)’
       In the first argument of ‘pure’, namely

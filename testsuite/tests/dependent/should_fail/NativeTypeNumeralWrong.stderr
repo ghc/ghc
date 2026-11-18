@@ -1,0 +1,16 @@
+NativeTypeNumeralWrong.hs:9:7: error: [GHC-83865]
+    • Couldn't match type ‘Z’ with ‘S Z’
+      Expected: Vec Bool (2 :: Nat)
+        Actual: Vec Bool (S Z)
+    • In the expression: VCons True VNil
+      In an equation for ‘two’: two = VCons True VNil
+
+NativeTypeNumeralWrong.hs:17:13: error: [GHC-83865]
+    • Couldn't match type ‘b <||> False’ with ‘True’
+      Expected: (b <||> False) :~: True
+        Actual: True :~: True
+    • In the expression: Refl
+      In an equation for ‘unknown’: unknown _ = Refl
+    • Relevant bindings include
+        unknown :: Proxy b -> (b <||> False) :~: True
+          (bound at NativeTypeNumeralWrong.hs:17:1)

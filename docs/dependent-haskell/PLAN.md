@@ -6338,17 +6338,81 @@ On M79, `Vec Bool 3` gives GHC-83865 at the literal. It has kind
 Using a signed, ordinary infix addition in a type gives GHC-76037 at
 `+`. The named, prefix form of the checked function already works.
 
-- [ ] Check a decimal literal at an expected, registered kind. Keep the
+- [x] Check a decimal literal at an expected, registered kind. Keep the
       built-in natural default when there is no expected kind. Check
       missing registrations, negative literals and separate interfaces.
-- [ ] Check an ordinary infix source definition and recursive infix call.
+- [x] Check an ordinary infix source definition and recursive infix call.
       Respect an existing type operator, qualification and declared fixity.
       Recheck unchanged clients after a fixity or conversion change.
-- [ ] Run a program with the original vector at length `3`, with append
+- [x] Run a program with the original vector at length `3`, with append
       at length `n + 3`, and with ordinary runtime arithmetic. A custom
       `Num` instance must not supply evidence for a type equality.
 
 See [the numeral sources](REFERENCES.md#numerals-and-arithmetic-operators).
+
+The registration hook in `GHC.TypeNats.Experimental` is an ordinary open
+family. A module can provide an instance for a closed lifted datatype and
+choose its own representation. The compiler looks for the defining family
+by its original name. A matching instance must come from the module or
+its transitive family-instance imports. A literal at a known, registered
+kind elaborates to that family applied to the kind and a built-in natural.
+A private synonym records the source spelling for diagnostics. A literal
+at an inferred kind still defaults to the built-in natural.
+
+The packed-vector library maps natural literals to Peano constructors
+and shares `plus` between its type-level `(+)` and the ordinary `Num`
+method. A source operator with checked equations can also be used directly
+in a type. An in-scope type operator takes precedence. GHC uses the fixity
+of the term when it resolves an ordinary function in infix type syntax.
+That use records a dependency on the term as well as its equations.
+
+For a static length, `replicateAt 3 True` takes a visible type argument.
+Two ordinary `ReplicateLength` instances build the cells. A runtime length
+can come from `readIORef` and be passed to `replicateNative`. A bare
+overloaded runtime literal still gives GHC-83605 in that retained operand
+position. An arbitrary `fromInteger` method can disagree with the family's
+conversion. A class dictionary by itself gives no proof that the indices
+are equal.
+
+### Validation
+
+Both compiler stages built and ran the 18-module Showcase with Core Lint
+and STG Lint. Its 151 lines include a vector of length three,
+`replicateAt 3 True`, a vector of length `n + 3` with `n` read from IO,
+and `(2 + 3) :: Nat` printing `5`. A client compiled at `-O2` checked
+`(1 + 2) :~: (3 :: Nat)` with `Refl` and ran `replicateAt 3 True`.
+Both stages also matched all 562 existing packed-vector output lines.
+The tests check that counting the cells of a replicated vector leaves
+an undefined element unevaluated.
+
+A wrong vector length reports `Expected: Vec Bool (2 :: Nat)`.
+Calling `safeHead` on an empty vector reports the expected index as
+`(1 :: Nat) + n0`. A mismatched qualified operator prints as infix.
+Separate-compilation checks covered two independently registered kinds,
+a source-free interface, an orphan registration and a re-exported
+operator fixity. Changing the conversion or the fixity invalidated the
+old proof in dependency-order builds. Symbolic numerals stayed compact.
+Forcing a large Peano conversion reached the ordinary family reduction
+depth limit.
+
+The required binder of `replicateAt` exposed a reversed visibility cast
+when CorePrep eta-expanded its floated binding. The application now casts
+the required forall to the visibility of a Core lambda. The abstraction
+uses the symmetric coercion. The mixed vector module reproduces this case.
+See Note [The EtaInfo mechanism] in GHC.Core.Opt.Arity.
+
+All 25 selected normal-way tests passed across the initial run and the
+two-test rerun. The initial run passed 23, including T27557. T27589 and
+T27590 had identical INLINE arities and call sites with the earlier and
+rebuilt compilers. Their output filters now handle a signature that the
+pretty-printer puts on a second line. Both then passed.
+
+The Linux public export delta adds the family and lists nine existing
+instances from its defining module. The MinGW expectation uses the same
+delta. Windows execution and the full GHC testsuite were outside these
+checks. The installed Fourmolu cannot parse the experimental extension.
+The Cabal Gild check reports existing formatting in the generated
+package description.
 
 ### Next application boundary
 

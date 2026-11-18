@@ -4527,3 +4527,10 @@ equations map zero to zero and a positive natural to one successor of
 the preceding natural. They can leave an abstract input stuck. M80 uses
 that definition for the vector library's particular index type.
 [Pinned `Data.Type.Nat.FromGHC`](https://github.com/phadej/vec/blob/df95689f85798832d834a8035fa37bc0d4f66363/fin/src/Data/Type/Nat.hs#L410-L418).
+
+Agda's vector replication accepts the length and builds one cell for
+each successor. In the Haskell library, `replicateAt 3 x` uses a required
+type argument. After the numeral reduces, ordinary type class instances
+construct the empty vector or its next cell. A separate retained function
+accepts a length from IO. [Agda vector replication](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L246-L248)
+and [GHC required type arguments](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/required_type_arguments.html).

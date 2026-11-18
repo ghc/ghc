@@ -29,7 +29,8 @@ The supported static subset and native pipeline remain restricted.
 | Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
 | Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with a written or inferred runtime operand, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
-| Type computation (`R06`, `R13`, `R15`) | An ordinary unary function can match constructors, return a field, or recurse on a direct field. One list-length function works for any lifted element type. Imported equations can prove the result with `Refl`. | Functions with multiple term arguments, constrained polymorphism, general closed and open evaluation, and lambda/let/case expressions in types. |
+| Type computation (`R06`, `R13`, `R15`) | A list-length function works at any lifted element type. A binary addition function recurses on the first argument and passes the second through. Clients can use the checked equations from an interface. | Recursion across multiple changing arguments, constrained polymorphism, general function evaluation, and lambda/let/case expressions in types. |
+| Numeric literals (`R07`) | The vector library registers an interpretation for nonnegative literals. Clients can write `Vec Bool 3` and `Vec a (1 + n)`. | Connecting overloaded term literals to retained indices and checking literal constraints such as finite bounds. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
 
 The example `Nat` is the source datatype `data Nat = Z | S Nat`. It is not a
@@ -49,6 +50,8 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
 
 In M79, `Add n m` names the result of the ordinary Peano function
 `plus n m`. The public append signatures use that source function directly.
+M80 adds the infix spelling `n + m` and decimal lengths. A required
+type argument makes `replicateAt 3 True :: Vec Bool 3` possible.
 General evaluation of Haskell functions in types remains open.
 
 M74 checks consecutive invisible retained arguments. The two vectors in
@@ -296,7 +299,7 @@ still require substantial research.
 - [ ] **R04 [Dependent sums](https://ghc.serokell.io/dh#dependent-sums)** — Unmarked. Needs/includes: R05, R22.
 - [ ] **R05 [Dependent Core language](https://ghc.serokell.io/dh#dependent-core-language)** — Unmarked. Needs/includes: no outgoing graph edge.
 - [ ] **R06 [Universal promotion](https://ghc.serokell.io/dh#universal-promotion)** — Unmarked. Needs/includes: R07, R10, R12, R13, R14.
-- [ ] **R07 [Promote literals](https://ghc.serokell.io/dh#promote-literals)** — Unmarked. Needs/includes: R08, R09, R24.
+- [ ] **R07 [Promote literals](https://ghc.serokell.io/dh#promote-literals)** — Unmarked. Needs/includes: R08, R09, R24. M80 supplies nonnegative type numerals at registered index kinds. General overloaded term promotion and constrained family evaluation remain open.
 - [x] **R08 [Promote Char](https://ghc.serokell.io/dh#promote-char)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R09 [Promote Natural](https://ghc.serokell.io/dh#promote-natural)** — Completed. Needs/includes: no outgoing graph edge.
 - [ ] **R10 [Promote unboxed types](https://ghc.serokell.io/dh#promote-unboxed-types)** — Unmarked. Needs/includes: R11.

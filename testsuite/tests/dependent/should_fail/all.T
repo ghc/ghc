@@ -89,3 +89,7 @@ test('NativeSourceLengthEmpty',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_fail,
      ['NativeSourceLengthEmpty', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeTypeNumeralWrong',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     multimod_compile_fail,
+     ['NativeTypeNumeralWrong', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])

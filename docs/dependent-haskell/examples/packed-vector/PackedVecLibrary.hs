@@ -1,14 +1,18 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Store and consume a runtime length with an indexed vector.
 module PackedVecLibrary (
@@ -26,8 +30,11 @@ module PackedVecLibrary (
     BoundedVec (..),
     Add,
     plus,
+    type (+),
     Sum (..),
     replicateNative,
+    ReplicateLength,
+    replicateAt,
     transportElement,
     transportElementEta,
     transportElementWith,
@@ -47,6 +54,7 @@ module PackedVecLibrary (
     zipVec,
     zipPacked,
     sumNat,
+    appendVec,
     appendNative,
     appendHidden,
     appendPacked,
@@ -73,7 +81,10 @@ module PackedVecLibrary (
     genericRefinedNested,
 ) where
 
+import Control.Exception (ArithException(Underflow), throw)
 import Data.Kind (Type)
+import qualified GHC.TypeNats as TN
+import GHC.TypeNats.Experimental (FromNatural)
 import Data.Type.Equality ((:~:) (Refl))
 
 -- | A runtime length. Each successor contains an ordinary lazy field.
@@ -137,6 +148,61 @@ plus :: Nat -> Nat -> Nat
 plus Z     m = m
 plus (S n) m = S (plus n m)
 
+-- | Natural literals and arithmetic on runtime lengths.
+instance Num Nat where
+    (+) = plus
+    Z * _ = Z
+    S n * m = plus m (n * m)
+    n - Z = n
+    Z - S _ = throw Underflow
+    S n - S m = n - m
+    abs n = n
+    signum Z = Z
+    signum (S _) = S Z
+    fromInteger n
+      | n < 0 = throw Underflow
+      | n == 0 = Z
+      | otherwise = S (fromInteger (n - 1))
+
+-- | Display a finite length in decimal.
+instance Show Nat where
+    showsPrec precedence n = showsPrec precedence (natValue n :: Integer)
+
+-- | Read a built-in natural as a Peano index. See Note [Peano numerals].
+type family ToPeano (n :: TN.Nat) :: Nat where
+    ToPeano 0 = 'Z
+    ToPeano n = 'S (ToPeano (n TN.- 1))
+
+type instance FromNatural Nat n = ToPeano n
+
+-- | Construct a vector when its length is given as a type argument.
+class ReplicateLength (n :: Nat) where
+    -- | Put the supplied value in each cell.
+    replicateKnown :: a -> Vec a n
+
+instance ReplicateLength 'Z where
+    replicateKnown _ = VNil
+
+instance ReplicateLength n => ReplicateLength ('S n) where
+    replicateKnown x = VCons x (replicateKnown x)
+
+-- | The required type argument selects the length, as in @replicateAt 3 x@.
+replicateAt :: forall (n :: Nat) -> forall a. ReplicateLength n => a -> Vec a n
+replicateAt (type n) x = replicateKnown @n x
+
+-- | Use the same addition definition in vector signatures and ordinary code.
+type (n :: Nat) + (m :: Nat) = plus n m
+infixl 6 type +
+
+{- Note [Peano numerals]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The conversion from a built-in natural follows FromGHC in the fin
+library. The instance selects this conversion when a type literal has
+expected kind Nat. The Num instance supplies term literals. Both use
+zero and successor. A Num instance alone gives GHC no such equation
+in a type. The type operator and the Num method both use plus.
+-}
+
 -- | The original name for the length index of an appended vector.
 type Add (n :: Nat) (m :: Nat) = plus n m
 
@@ -152,7 +218,7 @@ sumNat n m = case n of
         Sum p Refl -> Sum (S p) Refl
 
 -- | Append two vectors with an erased sum index.
-appendVec :: Vec a n -> Vec a m -> Vec a (plus n m)
+appendVec :: Vec a n -> Vec a m -> Vec a (n + m)
 appendVec VNil ys = ys
 appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
 
@@ -455,8 +521,12 @@ toList (VCons x xs) = x : toList xs
 
 -- | Observe a finite runtime length.
 natToInt :: Nat -> Int
-natToInt Z = 0
-natToInt (S n) = 1 + natToInt n
+natToInt = natValue
+
+-- | Count the successors using the requested numeric representation.
+natValue :: Num a => Nat -> a
+natValue Z = 0
+natValue (S n) = 1 + natValue n
 
 {- Note [Generic list indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
