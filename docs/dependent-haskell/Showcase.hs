@@ -833,10 +833,13 @@ recursiveLengths = do
     observe "source length of a list of functions" (natToInt (sourceLength [not, id]))
     empty <- newIORef ([] :: [Int]) >>= readIORef
     observe "heads of empty and nonempty runtime lists" (first (sourceVector empty), first numbers)
-    observe "safeHead of a known list cell" (safeHead (sourceVector @Bool (False : values)))
+    observe "safeHead of a known list cell" (firstCell False values)
     n <- newIORef (bottomValue @Nat "unused tail length") >>= readIORef
     observe "safeHead at length 1 + n" (safeHead (replicateNative (1 + n) True))
   where
+    firstCell :: a -> [a] -> a
+    firstCell x xs = safeHead (sourceVector (x : xs))
+
     first :: Vec a n -> Maybe a
     first VNil = Nothing
     first v@(VCons _ _) = Just (safeHead v)

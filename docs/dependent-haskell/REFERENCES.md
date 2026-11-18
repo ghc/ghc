@@ -4623,3 +4623,16 @@ scoped runtime value instantiate the erased tail parameter of `safeHead`.
 [Agda’s conversion checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L492-L521),
 [its comparison of constructor arguments](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L602-L613),
 and [the fork’s inference example](PLAN.md#m84-infer-a-nonempty-vectors-tail-at-a-nested-application).
+
+### Inferring erased parameters from constructor fields
+
+Agda's list constructor has fields of types `A` and `List A`. Its implicit
+argument rules let the type of an explicit argument determine a hidden
+parameter. M85 uses the corresponding information in GHC's data constructor
+signature. When checking `sourceVector (x : xs)`, the declaration of either
+field can determine the element type. The fork matches declarations before
+ordinary instantiation because the choice can mention a retained runtime
+binder. The final argument check still checks every field at its source
+location. [Agda 2.8.0, parameterized datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#parametrized-datatypes),
+[implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+and [the fork's constructor inference tests](PLAN.md#m85-infer-the-parameters-of-a-retained-constructor-argument).

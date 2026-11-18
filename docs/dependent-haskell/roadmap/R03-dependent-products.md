@@ -95,6 +95,9 @@ M58 and M59 expose those rules through source checking.
       `replicateNative (1 + n) x` or `sourceVector @a (x : xs)`. The first
       element is available without evaluating the tail.
       See [M84](../PLAN.md#m84-infer-a-nonempty-vectors-tail-at-a-nested-application).
+- [x] Infer erased parameters from the fields of a saturated retained
+      constructor argument, including a list whose element type refers to a
+      runtime index. See [M85](../PLAN.md#m85-infer-the-parameters-of-a-retained-constructor-argument).
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.

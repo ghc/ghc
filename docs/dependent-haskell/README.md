@@ -88,8 +88,15 @@ firstCopy :: foreach (n :: Nat) -> a -> a
 firstCopy n x = safeHead (replicateNative (1 + n) x)
 ```
 
-GHC rejects
-`safeHead (sourceVector @Int [])` at the call site.
+A list cell also determines its element type and proves the vector is
+nonempty. The tail can come from IO or remain unevaluated.
+
+```haskell
+firstCell :: a -> [a] -> a
+firstCell x xs = safeHead (sourceVector (x : xs))
+```
+
+GHC rejects `safeHead (sourceVector @Int [])` at the call site.
 
 ```text
 Couldn't match type ‘Z’ with ‘S n0’

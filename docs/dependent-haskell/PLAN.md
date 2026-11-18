@@ -6731,7 +6731,7 @@ Ordinary subsumption checks the original argument and supplies its coercion.
 
 Both compiler stages ran the generic `firstCopy` example with an undefined
 tail length. They also ran `safeHead (sourceVector @a (x : xs))` with an
-undefined list tail. This generic list example requires `@a` on the inner
+undefined list tail. At M84 this generic list example required `@a` on the inner
 call. Without it, GHC-83605 points at `x : xs`: the retained constructor
 operand does not yet determine the erased element type. An extension-off
 module could call the imported functions directly. The empty vector, an
@@ -6751,12 +6751,36 @@ At M84 the call `safeHead (sourceVector (x : xs))` fails at the list cell.
 Writing `sourceVector @a` succeeds. The constructor's fields already determine
 the missing type even when `a` mentions a runtime index.
 
-- [ ] Read the declared field types of saturated constructors in a visible
+- [x] Read the declared field types of saturated constructors in a visible
       retained argument. Use them to select erased parameters before ordinary
       instantiation. Keep the existing scope and kind checks.
-- [ ] Check the generic list cell, a nested two-parameter datatype, an
+- [x] Check the generic list cell, a nested two-parameter datatype, an
       extension-off client and an element type containing a runtime index.
       Check conflicting fields at their source locations and run the positive
       examples with undefined tails and fields.
-- [ ] Update the Showcase, R03 and the user's guide. Run the existing
+- [x] Update the Showcase, R03 and the user's guide. Run the existing
       dependent application and empty-vector controls with the new checker.
+
+### Implementation and validation
+
+For a visible retained operand, inspect the renamed constructor and its
+original field types. A saturated constructor of an eligible algebraic type
+can supply a complete result type. Match its parameters against declared
+fields in source order. A nested constructor can supply a field type.
+Once a field fixes a parameter, the normal checker checks later uses of that
+parameter. For `x :: a` and `ys :: [b]`, GHC-25897 points at `ys` in
+`sourceVector (x : ys)` and reports the expected `[a]` and actual `[b]`.
+
+Both stages passed 22 compile cases against separately compiled interfaces
+and ran 13 positive calls with Core and STG Lint enabled at `-O0`. These
+include prefix cons, an ordinary singleton list, a nested two-parameter
+constructor and an extension-off client. A list of vectors kept its scoped
+runtime index in the element type. The runtime checks supplied undefined
+tails and fields through IORefs. Empty and phantom cases with no evidence
+for instance selection still needed explicit element types. An overloaded
+number or an overloaded list supplied no element-type choice in these cases.
+
+Both stages matched all 158 Showcase lines. The test driver passed 33
+selected normal-way tests and the registered numeral GHCi script. The
+updated `NativeSourceTable` also checks nested constructor inference.
+See the [constructor field inference references](REFERENCES.md#inferring-erased-parameters-from-constructor-fields).
