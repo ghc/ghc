@@ -14,7 +14,7 @@ module GHC.Tc.TyCl.Instance
    ( tcInstDecls1
    , tcInstDeclsDeriv
    , tcInstDecls2
-   , checkedSourceMethods
+   , checkedSourceMethods, CheckedSourceMethod(..)
    )
 where
 
@@ -52,6 +52,8 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Evidence
 
 import GHC.Builtin.KnownKeys ( unsatisfiableIdKey )
+import GHC.Builtin.KnownOccs ( eqClassOpOcc, fromIntegerClassOpOcc, minusClassOpOcc )
+import GHC.Builtin.Modules ( gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, mkGhcInternalModule )
 
 import GHC.Core        ( Expr(..), mkVarApps )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
@@ -66,7 +68,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.Class
-import GHC.Builtin.WiredIn.Types ( matchableDataConTy, unmatchableDataConTy )
+import GHC.Builtin.WiredIn.Types ( integerTy, integerTyConName, matchableDataConTy, unmatchableDataConTy )
 
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
@@ -1338,18 +1340,25 @@ So right here in tcInstDecls2 we must re-extend the type envt with
 the default method Ids replete with their INLINE pragmas.  Urk.
 -}
 
--- | Find ground dictionaries whose checked method fields alias source functions.
--- Each result records the class selector, the instance method and its target.
+-- | The checked RHS of an instance method. A literal conversion also records
+-- the operations it uses and the head of any known first type argument.
+data CheckedSourceMethod
+  = SourceMethodAlias Id
+  | SourceLiteralMethod DataCon DataCon [(Id, Maybe Name)]
+
+-- | Find ground dictionaries whose checked method fields have known equations.
+-- Each result records the class selector, the instance method and its equations.
 -- See Note [Certifying a source method alias].
-checkedSourceMethods :: TcGblEnv -> [(DFunId, [(Id, Id, Id)])]
+checkedSourceMethods :: TcGblEnv -> [(DFunId, [(Id, Id, CheckedSourceMethod)])]
 checkedSourceMethods env = mapMaybe dictionary binds
   where
     binds = map unLoc (tcg_binds env)
     instances = mkVarSet (map instanceDFunId (tcg_insts env))
-    aliases = mkVarEnv (mapMaybe method_alias binds)
+    bodies = mkVarEnv (mapMaybe method_body binds)
+    top_evidence = mkVarEnv [(eb_lhs b, eb_rhs b) | b <- bagToList (tcg_ev_binds env)]
 
     dictionary binding = do
-      (dfun, local, VarBind{var_id = bound, var_rhs = L _ rhs}) <- abstraction isDFunId binding
+      (dfun, local, _, VarBind{var_id = bound, var_rhs = L _ rhs}) <- abstraction isDFunId binding
       guard (dfun `elemVarSet` instances && local == bound)
       (cls, [inst_ty]) <- getClassPredTys_maybe (idType dfun)
       guard (noFreeVarsOfType inst_ty && isTyFamFree inst_ty)
@@ -1357,12 +1366,14 @@ checkedSourceMethods env = mapMaybe dictionary binds
       let selectors = classAllSelIds cls
       guard (con == tyConSingleDataCon (classTyCon cls) && con_ty `eqType` inst_ty
              && selectors `equalLength` fields && all lazy_id fields)
-      let methods = [(sel, meth, target) | (sel, meth) <- zip selectors fields
+      let methods = [(sel, meth, body) | (sel, meth) <- zip selectors fields
                     , sel `elem` classMethods cls
                     , InstMethId owner <- [idDetails meth], owner == idName dfun
-                    , Just value <- [lookupVarEnv aliases meth]
-                    , Just target <- [checked_target value]
-                    , idType target `eqType` classMethodInstTy sel [inst_ty]]
+                    , idType meth `eqType` classMethodInstTy sel [inst_ty]
+                    , Just (evs, match) <- [lookupVarEnv bodies meth]
+                    , Just body <- [case checked_alias meth match of
+                        Just target -> Just (SourceMethodAlias target)
+                        Nothing -> checkedSourceLiteral dfun sel inst_ty top_evidence evs match]]
       guard (not (null methods))
       pure (dfun, methods)
 
@@ -1373,8 +1384,11 @@ checkedSourceMethods env = mapMaybe dictionary binds
       Just (con, ty, fields)
     dictionary_args _ _ = Nothing
 
-    checked_target value = do
-      guard (isExternalName (idName value))
+    checked_alias meth match = do
+      Match{m_pats = L _ [], m_grhss = GRHSs _ (L _ (GRHS _ [] rhs) :| [])
+                                                 (L _ EmptyLocalBinds{})} <- pure match
+      HsVar _ (L _ value) <- pure (unLoc (stripParensLHsExpr rhs))
+      guard (isExternalName (idName value) && idType meth `eqType` idType value)
       target <- if nameIsLocalOrFrom (tcg_semantic_mod env) (idName value)
                 then case lookupTypeEnv (tcg_type_env env) (idName value) of
                        Just (AnId actual) | actual == value -> Just actual
@@ -1383,31 +1397,125 @@ checkedSourceMethods env = mapMaybe dictionary binds
       guard (isJust (sourceTableId_maybe target) && isTauTy (idType target))
       pure target
 
-    method_alias binding = do
-      (meth, local, inner) <- abstraction is_method binding
-      (_, mono, FunBind{fun_id = L _ bound, fun_ext = (WpHole, []),
+    method_body binding = do
+      (meth, local, outer_evs, inner) <- abstraction is_method binding
+      (_, mono, inner_evs, FunBind{fun_id = L _ bound, fun_ext = (WpHole, []),
                            fun_matches = MG{mg_ext = MatchGroupTc{mg_origin = FromSource},
                                             mg_alts = L _ [L _ match]}}) <- abstraction (== local) inner
       guard (mono == bound)
-      Match{m_pats = L _ [], m_grhss = GRHSs _ (L _ (GRHS _ [] rhs) :| [])
-                                                 (L _ EmptyLocalBinds{})} <- pure match
-      HsVar _ (L _ target) <- pure (unLoc (stripParensLHsExpr rhs))
-      guard (idType meth `eqType` idType target)
-      pure (meth, target)
+      pure (meth, (inner_evs ++ outer_evs, match))
 
     is_method v = case idDetails v of { InstMethId{} -> True; _ -> False }
 
-    abstraction :: (Id -> Bool) -> HsBind GhcTc -> Maybe (Id, Id, HsBind GhcTc)
+    abstraction :: (Id -> Bool) -> HsBind GhcTc -> Maybe (Id, Id, [TcEvBinds], HsBind GhcTc)
     abstraction wanted (XHsBindsLR AbsBinds{abs_tvs = [], abs_ev_vars = [], abs_sig = True,
                   abs_exports = [ABE{abe_poly = poly, abe_mono = mono, abe_wrap = WpHole,
                                      abe_prags = SpecPrags []}],
                   abs_ev_binds = evs, abs_binds = [L _ inner]})
-      | wanted poly, idType poly `eqType` idType mono, all lazy_evidence evs = Just (poly, mono, inner)
+      | wanted poly, idType poly `eqType` idType mono, all lazy_evidence evs = Just (poly, mono, evs, inner)
     abstraction _ _ = Nothing
 
     lazy_id v = isCoVar v || typeLevity_maybe (idType v) == Just Lifted
     lazy_evidence (EvBinds bs) = allBag (lazy_id . eb_lhs) bs
     lazy_evidence (TcEvBinds {}) = False
+
+-- | Check the selected fromInteger method on nonnegative Integer inputs.
+-- See Note [Certifying a source literal conversion].
+checkedSourceLiteral :: DFunId -> Id -> Type -> VarEnv EvTerm -> [TcEvBinds]
+                     -> Match GhcTc (LHsExpr GhcTc) -> Maybe CheckedSourceMethod
+checkedSourceLiteral dfun selector target top_evidence evs match = do
+    guard (in_module num_module fromIntegerClassOpOcc selector)
+    Match{m_pats = L _ [L _ (VarPat _ (L _ n))],
+          m_grhss = GRHSs _ (negative :| [zero, positive]) (L _ EmptyLocalBinds{})} <- pure match
+    guard (idType n `eqType` integerTy)
+    (lt, _) <- guarded negative
+    (eq, zero_expr) <- guarded zero
+    (yes, step_expr) <- guarded positive
+    lt_ops <- binary n gHC_CLASSES (mkVarOcc "<") 0 lt
+    eq_ops <- binary n gHC_CLASSES eqClassOpOcc 0 eq
+    HsVar _ (L _ otherwise_id) <- pure (expression yes)
+    guard (in_module gHC_INTERNAL_BASE (mkVarOcc "otherwise") otherwise_id)
+    XExpr (ConLikeTc (RealDataCon z)) <- pure (expression zero_expr)
+    HsApp _ successor rec <- pure (expression step_expr)
+    XExpr (ConLikeTc (RealDataCon s)) <- pure (expression successor)
+    HsApp _ convert arg <- pure (expression rec)
+    (op, actual) <- selection target (expression convert)
+    guard (op == selector && actual == dfun)
+    sub_ops <- binary n num_module minusClassOpOcc 1 arg
+    pure (SourceLiteralMethod z s ((otherwise_id, Nothing) : lt_ops ++ eq_ops ++ sub_ops))
+  where
+    num_module = mkGhcInternalModule (fsLit "GHC.Internal.Num")
+    in_module mod occ v = getOccName v == occ && nameModule_maybe (idName v) == Just mod
+
+    guarded (L _ (GRHS _ [L _ (BodyStmt _ test NoSyntaxExprTc NoSyntaxExprTc)] rhs)) =
+      Just (test, rhs)
+    guarded _ = Nothing
+
+    expression :: LHsExpr GhcTc -> HsExpr GhcTc
+    expression (L _ (HsPar _ e)) = expression e
+    expression (L _ (XExpr (ExpandedThingTc (HSE _ e)))) = expression e
+    expression (L _ e) = e
+
+    evidence = extendVarEnvList top_evidence
+      [(eb_lhs b, eb_rhs b) | EvBinds bs <- evs, b <- bagToList bs]
+    -- Follow only variables. A cast, an application or a cyclic binding
+    -- supplies no certificate for the selected runtime dictionary.
+    resolve visited d
+      | isDFunId d = Just d
+      | d `elemVarSet` visited = Nothing
+      | Just (EvExpr (Var next)) <- lookupVarEnv evidence d =
+          resolve (extendVarSet visited d) next
+      | otherwise = Nothing
+
+    selection ty (XExpr (WrapExpr (WpCompose (WpEvApp (EvExpr (Var ev))) (WpTyApp arg))
+                                  (HsVar _ (L _ op)))) = do
+      guard (arg `eqType` ty)
+      dict <- resolve emptyVarSet ev
+      cls <- isClassOpId_maybe op
+      (actual_cls, [actual_ty]) <- getClassPredTys_maybe (idType dict)
+      guard (actual_cls == cls && actual_ty `eqType` ty)
+      pure (op, dict)
+    selection _ _ = Nothing
+
+    integer_op mod occ e = do
+      (op, dict) <- selection integerTy e
+      guard (in_module mod occ op)
+      let dict_mod | mod == num_module = num_module
+                   | otherwise = gHC_INTERNAL_NUM_INTEGER
+      guard (nameModule_maybe (idName dict) == Just dict_mod)
+      pure [(op, Just integerTyConName), (dict, Nothing)]
+
+    binary n mod occ k e = do
+      HsApp _ lhs arg <- pure (expression e)
+      HsApp _ fun var <- pure (expression lhs)
+      HsVar _ (L _ x) <- pure (expression var)
+      guard (x == n)
+      ops <- integer_op mod occ (expression fun)
+      HsOverLit _ (OverLit (OverLitTc False witness lit_ty) (HsIntegral lit)) <- pure (expression arg)
+      guard (not (il_neg lit) && il_value lit == k && lit_ty `eqType` integerTy)
+      HsApp _ convert raw <- pure witness
+      HsLit _ (XLit (HsInteger _ k' raw_ty)) <- pure (expression raw)
+      guard (k == k' && raw_ty `eqType` integerTy)
+      (ops ++) <$> integer_op num_module fromIntegerClassOpOcc (expression convert)
+
+{- Note [Certifying a source literal conversion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a nonnegative literal, follow the checked implementation of the selected
+Num.fromInteger field. Its negative guard must compare the same Integer input
+with zero. That branch is unreachable and can, for example, throw Underflow.
+The zero branch must return a nullary constructor. The remaining branch must
+apply a unary constructor to the same method at the same dictionary on n - 1.
+setSourceLiteralCons checks both constructors against the result datatype.
+
+Each Integer operation must use its GHC.Internal class selector and ground
+Integer dictionary. Follow variable evidence aliases from the zonked method
+and module. Check the literal witnesses for both 0 and 1. RebindableSyntax
+can otherwise give a different value to the same literal text. Refuse rules
+on these operations that can match their Integer arguments.
+
+The certificate describes zero and successor for this ground Num instance.
+It makes no claim about negative inputs or any FromNatural type instance.
+-}
 
 {- Note [Certifying a source method alias]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

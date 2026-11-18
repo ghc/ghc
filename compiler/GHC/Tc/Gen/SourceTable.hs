@@ -1,43 +1,50 @@
 -- | Closed type families for checked functions that match one constructor.
 module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, tcLookupSourceTableId,
-                              visibleSourceMethodRules, hasSourceMethodRule,
-                              recordSourceMethodUse, checkSourceMethodUses) where
+                              visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
+                              sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
+                              checkSourceMethodUses) where
 
 import GHC.Prelude
 
-import GHC.Builtin.WiredIn.Types (listTyCon, mkListTy, unmatchableDataConTy)
-import GHC.Core (isAutoRule, isBuiltinRule, ruleActivation)
+import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
+import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
+import GHC.Builtin.WiredIn.Types (integerTy, integerTyConName, listTyCon, mkListTy, unmatchableDataConTy)
+import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
 import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch)
 import GHC.Core.ConLike (ConLike(..))
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
+import GHC.Core.InstEnv (instanceDFunId, lookupUniqueInstEnv)
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
 import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRulesBelow)
 import GHC.Hs
+import GHC.Iface.Env (lookupOrig)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Tc.Errors.Types (RetainedQuantificationError(..), TcRnMessage(..))
 import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), isEmptyEvBindsMap)
 import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
-import GHC.Tc.Utils.Env (tcLookupId)
+import GHC.Tc.Utils.Env (tcLookupId, tcGetInstEnvs)
 import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBindsMap,
                            getTopEnv, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Basic (Origin(..))
-import GHC.Types.Id (globaliseId, idName, setIdType, sourceTableId_maybe)
+import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkInstTyCoOcc,
-                       isVarOcc, mkTyVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, tvName)
-import GHC.Types.Name.Set (NameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
+                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, tvName)
+import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv)
+import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
                            intersectNameSet, isEmptyNameSet, minusNameSet, nameSetElemsStable,
-                           unionNameSets, unitNameSet)
+                           unionNameSet, unionNameSets, unitNameSet)
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile (hscSourceToIsBoot)
 import GHC.Unit.External (eps_rule_base)
@@ -46,7 +53,7 @@ import GHC.Unit.Home.Graph (lookupHugByModule)
 import GHC.Unit.Home.ModInfo (hm_details)
 import GHC.Unit.Module.Env (moduleSetElts)
 import GHC.Unit.Module.ModDetails (md_rules)
-import GHC.Unit.Types (GenWithIsBoot(..), IsBootInterface(..), isInteractiveModule, moduleName, moduleUnitId)
+import GHC.Unit.Types (GenWithIsBoot(..), isInteractiveModule, moduleName, moduleUnitId)
 import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
@@ -56,6 +63,7 @@ import GHC.Utils.Monad (allM)
 
 import Control.Monad (foldM, forM_, guard, unless, when, zipWithM)
 import Control.Monad.IO.Class (liftIO)
+import Control.Applicative ((<|>))
 import Data.List (find)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (catMaybes, isNothing, mapMaybe)
@@ -103,29 +111,88 @@ visibleSourceMethodRules env = do
 -- | Test for a visible user rewrite on the exact Id. Every class selector
 -- has a built-in dictionary selection rule. That rule selects this field.
 hasSourceMethodRule :: RuleEnv -> Id -> Bool
-hasSourceMethodRule rules fun = any user_rule (getRules rules (globaliseId fun))
+hasSourceMethodRule rules = hasSourceMethodRuleAt rules Nothing
+
+-- | Skip rules whose first rough-match type constructor differs from the
+-- actual type constructor. For example, eqString cannot rewrite (==) @Integer.
+hasSourceMethodRuleAt :: RuleEnv -> Maybe Name -> Id -> Bool
+hasSourceMethodRuleAt rules first fun = any user_rule (getRules rules (globaliseId fun))
   where
-    user_rule rule = not (isBuiltinRule rule || isAutoRule rule || isNeverActive (ruleActivation rule))
+    user_rule BuiltinRule{} = False
+    user_rule Rule{ru_rough = Just other : _} | Just actual <- first, actual /= other = False
+    user_rule rule = not (isAutoRule rule || isNeverActive (ruleActivation rule))
 
 -- | Check the selected method at the occurrence, and record its semantic dependencies.
 recordSourceMethodUse :: Id -> Id -> Id -> TcM ()
-recordSourceMethodUse dfun selector target = do
+recordSourceMethodUse dfun selector target =
+    recordSourceUses [(v, Nothing) | v <- [selector, dfun, target]]
+
+-- | The public implementations used by the standard Integer dictionaries.
+-- Guard the comparison bodies that can inline as well as their method heads.
+sourceLiteralWorkers :: TcM [Id]
+sourceLiteralWorkers = traverse (\(mod, occ) -> lookupOrig mod (mkVarOcc occ) >>= tcLookupId) $
+    (gHC_TYPES, "isTrue#") :
+    [(gHC_INTERNAL_NUM_INTEGER, occ) | occ <- ["integerLt", "integerEq", "integerSub"
+                                             , "integerLt#", "integerEq#", "integerCompare"]]
+
+-- | Check rules on the selected conversion and its standard Integer operations.
+-- See Note [Certifying a source literal conversion] in GHC.Tc.TyCl.Instance.
+recordSourceLiteralUse :: Id -> Id -> TcM ()
+recordSourceLiteralUse dfun selector = do
+    let num_module = mkGhcInternalModule (fsLit "GHC.Internal.Num")
+        lookup_id mod occ = lookupOrig mod occ >>= tcLookupId
+        unchecked :: TcM a
+        unchecked = failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall (idName selector)))
+    (zero, _) <- maybe unchecked pure (sourceLiteralCons_maybe dfun selector)
+    cmp <- lookup_id gHC_CLASSES (mkVarOcc "<")
+    eq <- lookup_id gHC_CLASSES eqClassOpOcc
+    sub <- lookup_id num_module minusClassOpOcc
+    otherwise_id <- lookup_id gHC_INTERNAL_BASE (mkVarOcc "otherwise")
+    -- This also loads the Integer module's ground comparison dictionaries.
+    workers <- sourceLiteralWorkers
+    insts <- tcGetInstEnvs
+    let integer_dict op mod = case isClassOpId_maybe op of
+          Just cls | Right (inst, []) <- lookupUniqueInstEnv insts cls [integerTy]
+                   , let d = instanceDFunId inst
+                   , nameModule_maybe (idName d) == Just mod -> pure d
+          _ -> unchecked
+    ord_d <- integer_dict cmp gHC_INTERNAL_NUM_INTEGER
+    eq_d  <- integer_dict eq  gHC_INTERNAL_NUM_INTEGER
+    num_d <- integer_dict sub num_module
+    recordSourceUses $
+       (selector, Just (tyConName (dataConTyCon zero))) :
+       [(op, Just integerTyConName) | op <- [cmp, eq, sub, selector]] ++
+       [(v, Nothing) | v <- [dfun, ord_d, eq_d, num_d, otherwise_id] ++ workers]
+
+-- | Record rule heads and their ABI dependencies after checking the visible rules.
+recordSourceUses :: [(Id, Maybe Name)] -> TcM ()
+recordSourceUses ops = do
     env <- getGblEnv
     visible <- visibleSourceMethodRules env
-    let local = sourceRuleOwners (tcg_rules env)
-        changed v = idName v `elemNameSet` local || hasSourceMethodRule visible v
-        ids = [selector, dfun, target]
-    case find changed ids of
-      Just v -> failWithTc (TcRnRetainedQuantificationError (RetainedSourceRule (idName v)))
-      Nothing -> updTcRef (tcg_source_table_uses env) (`extendNameSetList` map idName ids)
+    let changed (v, arg) = idName v `elemNameSet` sourceRuleOwnersAt arg (tcg_rules env)
+                           || hasSourceMethodRuleAt visible arg v
+        add acc (v, arg) = extendNameEnv_C combine acc (idName v) (maybe emptyNameSet unitNameSet arg)
+        combine a b | isEmptyNameSet a || isEmptyNameSet b = emptyNameSet
+                    | otherwise = unionNameSet a b
+    case find changed ops of
+      Just (v, _) -> failWithTc (TcRnRetainedQuantificationError (RetainedSourceRule (idName v)))
+      Nothing -> do
+        updTcRef (tcg_source_table_uses env) (`extendNameSetList` map (idName . fst) ops)
+        updTcRef (tcg_source_rule_types env) (\uses -> foldl' add uses ops)
 
--- | Check rules declared or imported after an earlier retained method application.
+-- | Check rules declared or imported after an earlier retained application.
 -- Report a local rule at its declaration, including one added by a splice.
 checkSourceMethodUses :: TcGblEnv -> TcM ()
 checkSourceMethodUses env = do
     uses <- filterNameSet (isVarOcc . nameOccName) <$> readTcRef (tcg_source_table_uses env)
     unless (isEmptyNameSet uses) $ do
-      let local = [(rule, uses `intersectNameSet` sourceRuleOwners [rule]) | rule <- tcg_rules env]
+      types <- readTcRef (tcg_source_rule_types env)
+      let arguments name | Just ts <- lookupNameEnv types name, not (isEmptyNameSet ts)
+                         = map Just (nameSetElemsStable ts)
+                         | otherwise = [Nothing]
+          affected rule name = any (\arg -> name `elemNameSet` sourceRuleOwnersAt arg [rule]) (arguments name)
+          local = [(rule, filterNameSet (affected rule) (uses `intersectNameSet` sourceRuleOwners [rule]))
+                  | rule <- tcg_rules env]
           imported = uses `minusNameSet` unionNameSets (map snd local)
           report name = addErr (TcRnRetainedQuantificationError (RetainedSourceRule name))
       forM_ local $ \(rule, names) ->
@@ -134,24 +201,42 @@ checkSourceMethodUses env = do
         visible <- visibleSourceMethodRules env
         forM_ (nameSetElemsStable imported) $ \name -> do
           v <- tcLookupId name
-          when (hasSourceMethodRule visible v) (report name)
+          when (any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name)) (report name)
 
--- | Find source functions that a user rule can rewrite. A checked wrapper
--- can hide the head of the source application on the rule's left side.
+-- | Find source functions that a user rule can rewrite.
 sourceRuleOwners :: [LRuleDecl GhcTc] -> NameSet
-sourceRuleOwners rules = unionNameSets
-    [ maybe lhs_fvs unitNameSet (headOf (unLoc lhs))
+sourceRuleOwners = sourceRuleOwnersAt Nothing
+
+-- | Exclude a local rule only when its first applied type constructor is known
+-- and differs from the actual one. A polymorphic rule can match any argument.
+sourceRuleOwnersAt :: Maybe Name -> [LRuleDecl GhcTc] -> NameSet
+sourceRuleOwnersAt arg rules = unionNameSets
+    [ case headOf (unLoc lhs) of
+        Just (_, Just ty) | Just expected <- arg, Just (tc, _) <- tcSplitTyConApp_maybe ty
+                          , isGenerativeTyCon tc Nominal, tyConName tc /= expected -> emptyNameSet
+        Just (owner, _) -> unitNameSet owner
+        Nothing -> lhs_fvs
     | L _ HsRule{rd_ext = (HsRuleRn lhs_fvs _, _), rd_lhs = lhs, rd_act = act} <- rules
     , not (isNeverActive act) ]
   where
-    headOf :: HsExpr GhcTc -> Maybe Name
-    headOf (HsVar _ (L _ f)) = Just (varName f)
+    headOf :: HsExpr GhcTc -> Maybe (Name, Maybe Type)
+    headOf (HsVar _ (L _ f)) = Just (varName f, Nothing)
     headOf (HsApp _ f _) = headOf (unLoc f)
-    headOf (HsAppType _ f _) = headOf (unLoc f)
+    headOf (HsAppType ty f _) = add_app (Just ty) <$> headOf (unLoc f)
     headOf (HsPar _ f) = headOf (unLoc f)
-    headOf (XExpr (WrapExpr _ f)) = headOf f
+    headOf (XExpr (WrapExpr _ f)) | isNothing arg = headOf f
+    headOf (XExpr (WrapExpr w f)) = add_app <$> first_arg w <*> headOf f
     headOf (XExpr (ExpandedThingTc (HSE _ expansion))) = headOf (unLoc expansion)
     headOf _ = Nothing
+
+    add_app arg (f, inner) = (f, inner <|> arg)
+    first_arg (WpCompose outer inner) = (<|>) <$> first_arg inner <*> first_arg outer
+    first_arg (WpTyApp ty) = Just (Just ty)
+    first_arg WpHole = Just Nothing
+    first_arg WpLet{} = Just Nothing
+    first_arg WpEvApp{} = Just Nothing
+    first_arg (WpSubType w) = first_arg w
+    first_arg _ = Nothing
 
 {- Note [Closed source tables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -353,6 +353,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
   do { keep_var             <- newIORef emptyNameSet
      ; used_gre_var         <- newIORef []
      ; source_table_uses    <- newIORef emptyNameSet
+     ; source_rule_types    <- newIORef emptyNameEnv
      ; th_var               <- newIORef False
      ; infer_var            <- newIORef True
      ; infer_reasons_var    <- newIORef emptyMessages
@@ -424,6 +425,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_import_decls       = []
           , tcg_used_gres          = used_gre_var
           , tcg_source_table_uses    = source_table_uses
+          , tcg_source_rule_types    = source_rule_types
           , tcg_dus                = emptyDUs
 
           , tcg_rn_imports = []

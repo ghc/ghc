@@ -75,8 +75,8 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Sig( tcRules )
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, visibleSourceMethodRules,
-                               hasSourceMethodRule, checkSourceMethodUses)
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
+                               hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses)
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
@@ -703,17 +703,26 @@ installSourceMethods env
   | otherwise = case checkedSourceMethods env of
       [] -> pure env
       methods -> setGblEnv env $ do
+        let literals = [() | (_, fields) <- methods, (_, _, SourceLiteralMethod{}) <- fields]
+        -- Load the workers before collecting rules from their interfaces.
+        workers <- if null literals then pure [] else sourceLiteralWorkers
         rules <- visibleSourceMethodRules env
         let local_rules = sourceRuleOwners (tcg_rules env)
             plain v = not (idName v `elemNameSet` local_rules || hasSourceMethodRule rules v)
-            checked = [(dfun, pairs) | (dfun, fields) <- methods, plain dfun
-                      , let pairs = [(sel, target) | (sel, meth, target) <- fields
-                                    , all plain [sel, meth, target]]
-                      , not (null pairs)]
-        for_ checked $ \(_, pairs) -> for_ pairs $ \(_, target) ->
+            workers_ok = all plain workers
+            plain_at (v, first) = not (idName v `elemNameSet` sourceRuleOwnersAt first (tcg_rules env)
+                                       || hasSourceMethodRuleAt rules first v)
+            checked = [(dfun, pairs, literal) | (dfun, fields) <- methods, plain dfun
+                      , let pairs = [(sel, target) | (sel, meth, SourceMethodAlias target) <- fields
+                                                 , all plain [sel, meth, target]]
+                            literal = listToMaybe [(sel, z, s) | (sel, meth, SourceLiteralMethod z s ops) <- fields
+                                      , workers_ok, plain meth, plain_at (sel, Just (tyConName (dataConTyCon z))), all plain_at ops]
+                      , not (null pairs) || isJust literal]
+        for_ checked $ \(_, pairs, _) -> for_ pairs $ \(_, target) ->
           when (nameIsLocalOrFrom (tcg_semantic_mod env) (idName target)) $
             keepAlive (idName target)
-        tcExtendGlobalValEnv [setSourceMethodIds dfun pairs | (dfun, pairs) <- checked] getGblEnv
+        tcExtendGlobalValEnv [setSourceLiteralCons (setSourceMethodIds dfun pairs) literal
+                             | (dfun, pairs, literal) <- checked] getGblEnv
 
 -- | Add the families and their axioms to the module interface. A local use
 -- may already have required the family before we finished checking the module.

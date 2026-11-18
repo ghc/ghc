@@ -624,6 +624,10 @@ data TcGblEnv
           -- DFun, selector and source target of a retained method application.
           -- See Note [Source table usage fingerprints] in GHC.Unit.Module.ModIface.
 
+        tcg_source_rule_types :: TcRef (NameEnv NameSet),
+          -- ^ Known first type arguments to retained rule heads. An empty
+          -- set requires checking all rules for the head.
+
         tcg_th_used :: TcRef Bool,
           -- ^ @True@ \<=> Template Haskell syntax used.
           --
