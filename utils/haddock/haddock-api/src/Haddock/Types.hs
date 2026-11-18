@@ -840,7 +840,7 @@ type instance Anno (CType DocNameI) = SrcSpanAnnA
 type instance Anno (Header DocNameI) = SrcSpanAnnA
 type instance Anno (HsModifierOf (LocatedA (HsType DocNameI)) DocNameI) = SrcSpanAnnA
 type instance Anno (HsContextDetails DocNameI a) = SrcSpanAnnA
-type instance Anno (HsGadtTelescope DocNameI) = SrcSpanAnnA
+type instance Anno (HsGadtArg DocNameI) = SrcSpanAnnA
 
 type XRecCond a =
   ( XParTy a ~ (EpToken "(", EpToken ")")
@@ -907,6 +907,8 @@ type instance XXHsForAllTelescope DocNameI = DataConCantHappen
 
 type instance XGadtForAll DocNameI = NoExtField
 type instance XGadtPar DocNameI = NoExtField
+type instance XGadtCtx DocNameI = NoExtField
+type instance XGadtValArg DocNameI = NoExtField
 type instance XXGadtArg DocNameI = DataConCantHappen
 
 type instance XTyVarBndr DocNameI = NoExtField

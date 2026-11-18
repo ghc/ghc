@@ -1547,9 +1547,16 @@ instance (ToHie arg, ToHie rec) => ToHie (HsConDetails (GhcPass p) arg rec) wher
   toHie (RecCon _ rec)     = toHie rec
   toHie (InfixCon _ a b)   = concatM [ toHie a, toHie b]
 
+instance ToHie (LocatedA (HsGadtArg GhcRn)) where
+  toHie (L _ arg) = concatM $ case arg of
+    HsGadtForAll{}    -> []
+    HsGadtPar{}       -> []
+    HsGadtCtx _ ctxt  -> [toHie ctxt]
+    HsGadtValArg _ fld -> [toHie fld]
+
 instance ToHie (HsConDeclGADTDetails GhcRn) where
   toHie (PrefixConGADT _ args) = toHie args
-  toHie (RecConGADT _ rec) = toHie rec
+  toHie (RecConGADT _ mb_cxt rec) = concatM [toHie mb_cxt, toHie rec]
 
 instance HiePass p => ToHie (LocatedAn NoEpAnns (HsCmdTop (GhcPass p))) where
   toHie (L span top) = concatM $ makeNodeA top span : case top of
@@ -1761,8 +1768,6 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
       ConDeclGADT { con_names = names
                   , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
-                  , con_inner_bndrs = inner_bndrs
-                  , con_cxts = cxts
                   , con_g_args = args
                   , con_res_ty = typ
                   , con_doc = doc} ->
@@ -1771,17 +1776,17 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             map (C $ TyVarBind (mkScope outer_bndrs_loc) (ResolvedScopes [sigmaScope]))
                 imp_vars
         , toHie $ tvScopes (ResolvedScopes [phiScope]) NoScope exp_bndrs
-        , toHie cxts
         , toHie args
         , toHie typ
         , toHie doc
         ]
         where
+          cxts = gadtDetailsContexts args
           rhsScope = combineScopes argsScope tyScope
           ctxScope = foldr combineScopes NoScope (map mkScope cxts)
           argsScope = case args of
-            PrefixConGADT _ xs -> scaled_args_scope xs
-            RecConGADT _ x     -> mkScope x
+            PrefixConGADT _ xs -> scaled_args_scope (gadtArgValueFields xs)
+            RecConGADT _ _ x   -> mkScope x
           tyScope = mkScope typ
           phiScope = combineScopes ctxScope rhsScope
           sigmaScope = foldr combineScopes phiScope (map (mkScope . getLoc) exp_bndrs)
@@ -1790,7 +1795,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             HsOuterExplicit{} -> []
           exp_bndrs =
             [ L l (updateHsTyVarBndrFlag Invisible b) | L l b <- hsOuterExplicitBndrs outer_bndrs ]
-            ++ concatMap hsForAllTelescopeBndrs (gadtArgTelescopes inner_bndrs)
+            ++ concatMap hsForAllTelescopeBndrs (gadtDetailsForAlls args)
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets
                  , con_doc = doc} ->

@@ -955,18 +955,17 @@ data ConDecl pass
       { con_g_ext   :: XConDeclGADT pass
       , con_modifiers :: [LHsModifier pass]
       , con_names   :: NonEmpty (LIdP pass)
-      -- The following fields describe the type after the '::'
-      -- See Note [GADT abstract syntax]
+        -- The following fields describe the type after the '::'
+        -- See Note [GADT abstract syntax]
       , con_outer_bndrs :: XRec pass (HsOuterSigTyVarBndrs pass)
         -- ^ The outermost type variable binders, be they explicit or implicit;
         --   cf. HsSigType that also stores the outermost sig_bndrs separately
         --   from the forall telescopes in sig_body.
         --   See Note [Representing type signatures] in Language.Haskell.Syntax.Type
-      , con_inner_bndrs :: [LHsGadtTelescope pass]
-        -- ^ The forall telescopes other than the outermost invisible forall,
-        --   interleaved with the parentheses that enclose them.
-      , con_cxts    :: [LHsContext pass]         -- ^ User-written contexts
-      , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
+      , con_g_args  :: HsConDeclGADTDetails pass
+        -- ^ Arguments; never infix. Prefix constructors store their foralls,
+        --   parentheses, contexts and value arguments here in source order.
+        --   Record constructors store their optional context and fields here.
       , con_res_ty  :: LHsType pass              -- ^ Result type
 
       , con_doc     :: Maybe (LHsDoc pass) -- ^ A possible Haddock
@@ -1078,30 +1077,30 @@ the GADT type, in precisely that order. For instance:
     MkT5 :: forall a. Int -> Eq a => a -> T
       -- Rejected, `Eq a` is nested
     MkT6 :: (forall a. a -> T)
-      -- OK, the parentheses are recorded in con_inner_bndrs.
+      -- OK, the parentheses and forall are recorded in con_g_args.
     MkT7 :: (Eq a => a -> T)
       -- OK, ditto
 
 For the full details, see the "Formal syntax for GADTs" section of the GHC
 User's Guide. GHC enforces that GADT constructors do not have nested `forall`s
-or contexts in a single place:
+or contexts, but we want to revisit that for prefix constructors as per
+GHC Proposal #402, "Stable GADT constructor syntax". Therefore, we delay rejection
+of such constructors:
 
-   GHC, in the process of splitting apart a GADT's type,
-   extracts out the leading `forall`s and the adjacent contexts (if they are
-   provided). To accomplish this splitting, the parser uses the
-   GHC.Hs.Type.splitLHsGadtTy function, which records the parentheses that
-   surround the leading `forall`s in con_inner_bndrs (as these parentheses are
-   syntactically significant), and the contexts in con_cxts.
-   If the body returned by splitLHsGadtTy still contains any `forall`s or
-   contexts, then they must be nested, so they will be rejected.
+    GHC, in the process of splitting apart a GADT's type,
+    separates interleaved `forall`s, contexts, and value arguments into a list of
+    HsGadArg. To accomplish this splitting, the parser uses the
+    GHC.Hs.Type.splitLHsGadtTy function, which records the interleaved parentheses too.
+    If the list returned by splitLHsGadtTy contains any `forall`s after contexts or
+    contexts after value arguments, then they must be nested, so they will be rejected.
 
-   Note that this step applies to both prefix and record GADTs alike, as they
-   both have syntax which permits `forall`s and contexts. The difference is
-   where this step happens:
+    Note that this step applies to both prefix and record GADTs, as they
+    both have syntax which permits `forall`s and contexts. The difference is
+    where this step happens:
 
-   * For prefix GADTs, this happens in the renamer (in rnConDecl), as we cannot
-     split until after the type operator fixities have been resolved.
-   * For record GADTs, this happens in the parser (in mkGadtDecl).
+    * For prefix GADTs, this happens in the typechecker (in checkGadtConstructorShape),
+      as Core cannot accept such interleaved `forall`s and contexts.
+    * For record GADTs, this happens in the parser (in mkGadtDecl).
 -}
 
 -- | The arguments in a Haskell98-style data constructor.
@@ -1115,8 +1114,10 @@ type HsConDeclH98Details pass
 -- derived Show instances—see Note [Infix GADT constructors] in
 -- GHC.Tc.TyCl—but that is an orthogonal concern.)
 data HsConDeclGADTDetails pass
-   = PrefixConGADT !(XPrefixConGADT pass) [HsConDeclField pass]
-   | RecConGADT !(XRecConGADT pass) (XRec pass [LHsConDeclRecField pass])
+   = PrefixConGADT !(XPrefixConGADT pass) [LHsGadtArg pass]
+   | RecConGADT    !(XRecConGADT pass)
+                   (Maybe (LHsContext pass))
+                   (XRec pass [LHsConDeclRecField pass])
    | XConDeclGADTDetails !(XXConDeclGADTDetails pass)
 
 type family XPrefixConGADT       p

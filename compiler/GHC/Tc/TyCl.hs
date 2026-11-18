@@ -23,7 +23,8 @@ module GHC.Tc.TyCl (
         checkFamTelescope,
 
         -- Used by GHC.HsToCore.Quote
-        IsPrefixConGADT(..), unannotatedMultIsLinear
+        IsPrefixConGADT(..), unannotatedMultIsLinear,
+        gadtConstructorShapeViolation
     ) where
 
 import GHC.Prelude
@@ -2224,14 +2225,62 @@ kcConH98Args exp_kind con_args = case con_args of
   RecCon _ (L _ flds) -> kcConArgTys exp_kind $
                          map (cdrf_spec . unLoc) flds
 
+checkGadtConstructorShape :: HsConDeclGADTDetails GhcRn
+                          -> TcM ()
+checkGadtConstructorShape args =
+  whenIsJust (gadtConstructorShapeViolation args) $ \l ->
+    addErrAt l $ TcRnNestedForallsContexts NFC_GadtConSig
+
+-- | PrefixConGADT can interleave arbitrary parts
+-- of signature (foralls, contexts, value arguments) since #27425
+-- This allows us to express difference between PrefixConGADT and
+-- RecConGADT - the later can't have multiple foralls, parenthesis and
+-- contexts.
+--
+-- However typechecker and Core don't know how to handle interleaved prefix
+-- GADTs yet. We want to change that eventually, see #27426 and
+-- GHC Proposal #402 "Stable GADT constructor syntax".
+--
+-- This check rejects PrefixConGADT arguments layouts that aren't supported.
+--
+-- Current layouts should follow general shape:
+--   a list of foralls, both required and implicit, then a list of contexts,
+--   then a list of value arguments; parentheses can be at any point.
+--
+-- This check is shared between typechecking and TH quotations.
+gadtConstructorShapeViolation :: HsConDeclGADTDetails GhcRn -> Maybe SrcSpan
+gadtConstructorShapeViolation RecConGADT{} = Nothing
+gadtConstructorShapeViolation (PrefixConGADT _ gadt_args) = go_forall gadt_args
+  where
+    -- NB: we only report first error and exit traversal after that
+
+    -- Skip all foralls and parentheses, go deeper otherwise
+    go_forall (L _ HsGadtForAll{} : rest) = go_forall rest
+    go_forall rest = go_par rest go_forall go_ctxt
+
+    -- Skip all contexts and parentheses, report foralls, go deeper otherwise
+    go_ctxt (L _ HsGadtCtx{} : rest) = go_ctxt rest
+    go_ctxt (L l HsGadtForAll{} : _) = Just (locA l)
+    go_ctxt rest = go_par rest go_ctxt go_val
+
+    -- Skip all value args and parentheses, report foralls and contexts
+    go_val (L _ HsGadtValArg{} : rest) = go_val rest
+    go_val (L l HsGadtForAll{} : _) = Just (locA l)
+    go_val (L l HsGadtCtx{} : _) = Just (locA l)
+    go_val rest = go_par rest go_val (panic "unknown GADT arg variant")
+
+    -- recursion helper. If next item is par, then stay on current
+    -- recursion level, otherwise jump to the next level
+    go_par [] _ _ = Nothing
+    go_par (L _ HsGadtPar{} : rest) current _next = current rest
+    go_par rest _current next = next rest
+
 -- Kind-check the types of arguments to a GADT data constructor.
 kcConGADTArgs :: ConArgKind                       -- Expected kind of the argument(s)
               -> HsConDeclGADTDetails GhcRn
               -> TcM ()
-kcConGADTArgs exp_kind con_args = case con_args of
-  PrefixConGADT _ tys     -> kcConArgTys exp_kind tys
-  RecConGADT _ (L _ flds) -> kcConArgTys exp_kind $
-                             map (cdrf_spec . unLoc) flds
+kcConGADTArgs exp_kind con_args =
+  kcConArgTys exp_kind (gadtDetailsValueFields con_args)
 
 kcConDecls :: TcKind  -- Result kind of tycon
                       -- Used only in H98 case
@@ -2269,15 +2318,13 @@ kcConDecl new_or_data _tc_res_kind
                       -- Note [kcConDecls: kind-checking data type decls]
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_cxts = cxts
                        , con_g_args = args
                        , con_res_ty = res_ty })
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (DataConDefCtxt names) $
     -- Not sure this is right, should just extend rather than skolemise but no test
-    bind_con_tvbs outer_bndrs inner_bndrs $
-    do { _ <- tcHsContext cxts
+    bind_con_tvbs outer_bndrs args $
+    do { _ <- tcHsContext (gadtDetailsContexts args)
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
@@ -2291,10 +2338,12 @@ kcConDecl new_or_data _tc_res_kind
        ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr arg_exp_kind)
        ; return () }
   where
-    bind_con_tvbs outer_bndrs inner_bndrs thing_inside
+    bind_con_tvbs outer_bndrs args thing_inside
       -- Why "_Tv"? See Note [Using TyVarTvs for kind-checking GADTs]
       = discardResult $ bindOuterSigTKBndrs_Tv outer_bndrs $
-                        bindExplicitTKBndrs_Tv (gadtTelescopeBndrs inner_bndrs) $
+                        bindExplicitTKBndrs_Tv
+                          (concatMap hsForAllTelescopeBndrs
+                                      (gadtDetailsForAlls args)) $
                         thing_inside
 
 {- Note [kcConDecls: kind-checking data type decls]
@@ -4181,17 +4230,18 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   -- we get the res_kind by typechecking the result type.
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_cxts = cxts, con_g_args = hs_args
+                       , con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (DataConDefCtxt names) $
-    do { traceTc "tcConDecl 1 gadt" (ppr names)
+    do { checkGadtConstructorShape hs_args
+       ; traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
        ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (tvbs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
-              tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
-              do { ctxt <- tcHsContext cxts
+              tcGadtConTyVarBndrs skol_info outer_bndrs
+                                  (gadtDetailsArgs hs_args) $
+              do { ctxt <- tcHsContext (gadtDetailsContexts hs_args)
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
 
@@ -4377,9 +4427,9 @@ tcConIsInfixGADT :: Name
 tcConIsInfixGADT con details
   = case details of
            RecConGADT{} -> return False
-           PrefixConGADT _ arg_tys       -- See Note [Infix GADT constructors]
+           PrefixConGADT _ args       -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
-               , [_ty1,_ty2] <- arg_tys
+               , [_ty1,_ty2] <- gadtArgValueFields args
                   -> do { fix_env <- getFixityEnv
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
@@ -4403,9 +4453,9 @@ tcConGADTArgs :: ConArgKind   -- expected kind of arguments
                               -- might have a specific kind
               -> HsConDeclGADTDetails GhcRn
               -> TcM [(Scaled TcType, HsSrcBang)]
-tcConGADTArgs exp_kind (PrefixConGADT _ btys)
-  = mapM (tcConArg exp_kind IsPrefixConGADT) btys
-tcConGADTArgs exp_kind (RecConGADT _ fields)
+tcConGADTArgs exp_kind (PrefixConGADT _ args)
+  = mapM (tcConArg exp_kind IsPrefixConGADT) (gadtArgValueFields args)
+tcConGADTArgs exp_kind (RecConGADT _ _ fields)
   = tcRecHsConDeclRecFields exp_kind fields
 
 tcConArg :: ConArgKind   -- expected kind for args; always OpenKind for datatypes,

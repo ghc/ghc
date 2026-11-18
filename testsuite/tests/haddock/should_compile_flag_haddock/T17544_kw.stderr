@@ -229,8 +229,6 @@
               []))
             (HsOuterImplicit
              (NoExtField)))
-           []
-           []
            (PrefixConGADT
             (NoExtField)
             [])
@@ -339,41 +337,47 @@
              []))
            (HsOuterImplicit
             (NoExtField)))
-          []
-          []
           (PrefixConGADT
            (NoExtField)
-           [(CDF
-             ((,)
-              ((,,)
-               (EpaDelta { <no location info> } (SameLine 0) [])
-               (EpTok
-                (EpaSpan { <no location info> }))
-               (EpaDelta { <no location info> } (SameLine 0) []))
-              (NoSourceText))
-             (NoSrcUnpack)
-             (NoSrcStrict)
-             (HsModifiedFunArr
-              (NoExtField)
+           [(L
+             (EpAnn
+              (EpaSpan { T17544_kw.hs:17:18-26 })
               []
-              (HsStandardArr
-               (EpArrow
-                (EpUniTok
-                 (EpaSpan { T17544_kw.hs:17:21-22 })
-                 (NormalSyntax)))))
-             (L
-              (EpAnn
-               (EpaSpan { T17544_kw.hs:17:18-19 })
-               []
-               (EpaComments
-                []))
-              (HsTupleTy
-               (AnnParens
-                (EpTok (EpaSpan { T17544_kw.hs:17:18 }))
-                (EpTok (EpaSpan { T17544_kw.hs:17:19 })))
-               (HsBoxedOrConstraintTuple)
+              (EpaComments
                []))
-             (Nothing))])
+             (HsGadtValArg
+              (NoExtField)
+              (CDF
+               ((,)
+                ((,,)
+                 (EpaDelta { <no location info> } (SameLine 0) [])
+                 (EpTok
+                  (EpaSpan { <no location info> }))
+                 (EpaDelta { <no location info> } (SameLine 0) []))
+                (NoSourceText))
+               (NoSrcUnpack)
+               (NoSrcStrict)
+               (HsModifiedFunArr
+                (NoExtField)
+                []
+                (HsStandardArr
+                 (EpArrow
+                  (EpUniTok
+                   (EpaSpan { T17544_kw.hs:17:21-22 })
+                   (NormalSyntax)))))
+               (L
+                (EpAnn
+                 (EpaSpan { T17544_kw.hs:17:18-19 })
+                 []
+                 (EpaComments
+                  []))
+                (HsTupleTy
+                 (AnnParens
+                  (EpTok (EpaSpan { T17544_kw.hs:17:18 }))
+                  (EpTok (EpaSpan { T17544_kw.hs:17:19 })))
+                 (HsBoxedOrConstraintTuple)
+                 []))
+               (Nothing))))])
           (L
            (EpAnn
             (EpaSpan { T17544_kw.hs:17:24-26 })

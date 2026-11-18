@@ -997,9 +997,11 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     fieldPart = case con of
       ConDeclGADT{con_g_args = con_args'} -> case con_args' of
         -- GADT record declarations
-        RecConGADT _ _ -> doConstrArgsWithDocs []
+        RecConGADT{} -> doConstrArgsWithDocs []
         -- GADT prefix data constructors
-        PrefixConGADT _ args | hasArgDocs -> doConstrArgsWithDocs (map hsConDeclFieldToHsTypeNoMult args)
+        PrefixConGADT _ args | hasArgDocs ->
+          doConstrArgsWithDocs (map hsConDeclFieldToHsTypeNoMult
+            [ fld | L _ (HsGadtValArg _ fld) <- args ])
         _ -> empty
       ConDeclH98{con_args = con_args'} -> case con_args' of
         -- H98 record declarations

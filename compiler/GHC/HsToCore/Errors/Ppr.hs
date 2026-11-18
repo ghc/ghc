@@ -199,6 +199,8 @@ instance Diagnostic DsMessage where
                -> mkMsg "Non-linear fields in data constructors" empty
              ThDataConVisibleForall
                -> mkMsg "Visible forall in data constructors" empty
+             ThDataConInterleavedForallOrContext
+               -> mkMsg "Interleaved forall or context in a GADT constructor" empty
              ThUnexpectedModifier mods
                -> mkMsg "Modifier" $ text "At most one modifier is supported" $$ pprLHsModifiers mods
              ThUnexpectedModifierExpr mods

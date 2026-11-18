@@ -62,7 +62,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.DynFlags
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 
-import GHC.Utils.Misc   ( lengthExceeds )
+import GHC.Utils.Misc   ( filterOut, lengthExceeds )
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 
@@ -2135,7 +2135,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
                failWith $ TcRnTypeDataForbids TypeDataForbidsFieldAnnotations
            }
 
-    has_labelled_fields (ConDeclGADT { con_g_args = RecConGADT _ _ }) = True
+    has_labelled_fields (ConDeclGADT { con_g_args = RecConGADT{} }) = True
     has_labelled_fields (ConDeclH98 { con_args = RecCon _ flds })
       = not (null (unLoc flds))
     has_labelled_fields _ = False
@@ -2149,7 +2149,8 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
           = True
         unannotated _ = False
 
-    con_arg_fields (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = args
+    con_arg_fields (ConDeclGADT { con_g_args = PrefixConGADT _ args })
+      = gadtArgValueFields args
     con_arg_fields (ConDeclH98 { con_args = PrefixCon _ args }) = args
     con_arg_fields (ConDeclH98 { con_args = InfixCon _ arg1 arg2 }) = [arg1, arg2]
     con_arg_fields _ = []
@@ -2650,8 +2651,6 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
 
 rnConDecl (ConDeclGADT { con_names   = names
                        , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_cxts    = cxts
                        , con_g_args  = args
                        , con_res_ty  = res_ty
                        , con_modifiers = mods
@@ -2666,18 +2665,14 @@ rnConDecl (ConDeclGADT { con_names   = names
               -- See #14808.
               implicit_bndrs =
                 extractHsOuterTvBndrs outer_bndrs           $
-                extractHsGadtTelescopes inner_bndrs         $
-                extractHsTysRdrTyVars (hsConDeclTheta cxts) $
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
 
         ; let ctxt = ConDeclCtx (toList new_names)
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
-          bindHsGadtTelescopes ctxt inner_bndrs $ \inner_bndrs' ->
-    do  { (new_cxts, fvs1)   <- mapFvRn (rnContext ctxt) cxts
-        ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
-        ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+    do  { ((new_args, new_res_ty), fvs1) <-
+            rnConDeclGADTDetails (unLoc (head new_names)) ctxt args res_ty
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
 
          -- Ensure that there are no nested `forall`s or contexts, per
@@ -2686,15 +2681,13 @@ rnConDecl (ConDeclGADT { con_names   = names
        ; addNoNestedForallsContextsErr ctxt
            NFC_GadtConSig new_res_ty
 
-        ; let all_fvs = fvs1 `plusFN` fvs2 `plusFN` fvs3 `plusFN` mods_fvs
+        ; let all_fvs = fvs1 `plusFN` mods_fvs
 
         ; traceRn "rnConDecl (ConDeclGADT)"
-            (ppr names $$ ppr outer_bndrs' $$ ppr inner_bndrs')
+            (ppr names $$ ppr outer_bndrs' $$ ppr (gadtDetailsArgs new_args))
         ; new_mb_doc <- traverse rnLHsDoc mb_doc
         ; return (ConDeclGADT { con_g_ext = noExtField, con_names = new_names
                               , con_outer_bndrs = L outer_bndrs_loc outer_bndrs'
-                              , con_inner_bndrs = inner_bndrs'
-                              , con_cxts = new_cxts
                               , con_g_args = new_args, con_res_ty = new_res_ty
                               , con_doc = new_mb_doc, con_modifiers = mods' },
                   all_fvs) } }
@@ -2719,13 +2712,79 @@ rnConDeclGADTDetails ::
       Name
    -> HsDocContext
    -> HsConDeclGADTDetails GhcPs
-   -> RnM (HsConDeclGADTDetails GhcRn, FreeNames)
-rnConDeclGADTDetails _ doc (PrefixConGADT _ tys)
-  = do { (new_tys, fvs) <- mapFvRn (rnHsConDeclField doc) tys
-       ; return (PrefixConGADT noExtField new_tys, fvs) }
-rnConDeclGADTDetails con doc (RecConGADT _ flds)
-  = do { (new_flds, fvs) <- rnRecHsConDeclRecFields con doc flds
-       ; return (RecConGADT noExtField new_flds, fvs) }
+   -> LHsType GhcPs
+   -> RnM ((HsConDeclGADTDetails GhcRn, LHsType GhcRn), FreeNames)
+rnConDeclGADTDetails _ doc (PrefixConGADT _ tys) res_ty
+  = do { checkInvalidRecordShape doc tys
+       ; rnHsGadtArgs doc tys $ \new_tys -> do
+           (new_res_ty, fvs) <- rnLHsType doc res_ty
+           return ((PrefixConGADT noExtField new_tys, new_res_ty), fvs) }
+rnConDeclGADTDetails con doc (RecConGADT _ mb_ctxt flds) res_ty
+  = do { (new_ctxt, fvs1) <- mapMaybeFvRn (rnContext doc) mb_ctxt
+       ; (new_flds, fvs2) <- rnRecHsConDeclRecFields con doc flds
+       ; (new_res_ty, fvs3) <- rnLHsType doc res_ty
+       ; return ((RecConGADT noExtField new_ctxt new_flds, new_res_ty),
+                 fvs1 `plusFN` fvs2 `plusFN` fvs3) }
+
+-- | Report invalid record-constructor shapes before the renamer erases
+-- @HsRecTy@.
+--
+-- If the last GADT argument is a record type, then we should validate the rest.
+--
+-- There are a few invalid cases:
+--   - there should be no foralls or value arguments in the list
+--   - there should be no several consecutive constraint contexts
+--
+-- Value arguments are checked during renaming, throwing 'TcRnIllegalRecordSyntax'.
+--
+-- This check is performed to add a more precise error message for some common cases.
+checkInvalidRecordShape :: HsDocContext -> [LHsGadtArg GhcPs] -> RnM ()
+checkInvalidRecordShape doc args =
+  case reverse args of
+    (L _ (HsGadtValArg _ fld) : pre_rev)
+      | isRecFieldType (cdf_type fld)
+      -> case filterOut isPar (reverse pre_rev) of
+           L l HsGadtForAll{} : _ -> report l
+           L _ HsGadtCtx{} : L l HsGadtCtx{} : _    -> report l
+           L _ HsGadtCtx{} : L l HsGadtForAll{} : _ -> report l
+           _ -> return ()
+    _ -> return ()
+  where
+    report l = addErrAt (locA l) $
+      TcRnWithHsDocContext doc (TcRnNestedForallsContexts NFC_GadtConSig)
+
+    isRecFieldType (L _ (XHsType HsRecTy{})) = True
+    isRecFieldType _                         = False
+
+    isPar (L _ HsGadtPar{}) = True
+    isPar _                 = False
+
+rnHsGadtArgs :: HsDocContext
+             -> [LHsGadtArg GhcPs]
+             -> ([LHsGadtArg GhcRn] -> RnM (a, FreeNames))
+             -> RnM (a, FreeNames)
+rnHsGadtArgs _ [] thing_inside = thing_inside []
+
+rnHsGadtArgs doc (L l HsGadtPar{} : args) thing_inside =
+  rnHsGadtArgs doc args $ \args' ->
+    thing_inside (L l (HsGadtPar noExtField) : args')
+
+rnHsGadtArgs doc (L l (HsGadtForAll _ tele) : args) thing_inside =
+  bindHsForAllTelescope doc tele $ \tele' ->
+  rnHsGadtArgs doc args $ \args' ->
+    thing_inside (L l (HsGadtForAll noExtField tele') : args')
+
+rnHsGadtArgs doc (L l (HsGadtCtx _ ctxt) : args) thing_inside = do
+  (new_ctxt, fvs1) <- rnContext doc ctxt
+  (res, fvs2) <- rnHsGadtArgs doc args $ \args' ->
+    thing_inside (L l (HsGadtCtx noExtField new_ctxt) : args')
+  return (res, fvs1 `plusFN` fvs2)
+
+rnHsGadtArgs doc (L l (HsGadtValArg _ fld) : args) thing_inside = do
+  (new_fld, fvs1) <- rnHsConDeclField doc fld
+  (res, fvs2) <- rnHsGadtArgs doc args $ \args' ->
+    thing_inside (L l (HsGadtValArg noExtField new_fld) : args')
+  return (res, fvs1 `plusFN` fvs2)
 
 rnRecHsConDeclRecFields ::
      Name

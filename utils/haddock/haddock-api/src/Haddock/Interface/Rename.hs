@@ -476,10 +476,14 @@ renameHsBndrVis :: HsBndrVis GhcRn -> RnM (HsBndrVis DocNameI)
 renameHsBndrVis (HsBndrRequired _) = return (HsBndrRequired noExtField)
 renameHsBndrVis (HsBndrInvisible at) = return (HsBndrInvisible at)
 
-renameHsGadtTelescope :: LHsGadtTelescope GhcRn -> RnM (LHsGadtTelescope DocNameI)
-renameHsGadtTelescope (L l HsGadtPar{}) = pure $ L l $ HsGadtPar noExtField
-renameHsGadtTelescope (L l (HsGadtForAll _ tele)) =
+renameHsGadtArg :: LHsGadtArg GhcRn -> RnM (LHsGadtArg DocNameI)
+renameHsGadtArg (L l HsGadtPar{}) = pure $ L l $ HsGadtPar noExtField
+renameHsGadtArg (L l (HsGadtForAll _ tele)) =
   L l . HsGadtForAll noExtField <$> renameHsForAllTelescope tele
+renameHsGadtArg (L l (HsGadtCtx _ ctxt)) =
+  L l . HsGadtCtx noExtField <$> renameLContext ctxt
+renameHsGadtArg (L l (HsGadtValArg _ fld)) =
+  L l . HsGadtValArg noExtField <$> renameHsConDeclField fld
 
 renameHsForAllTelescope :: HsForAllTelescope GhcRn -> RnM (HsForAllTelescope DocNameI)
 renameHsForAllTelescope tele = case tele of
@@ -757,8 +761,6 @@ renameCon
   ConDeclGADT
     { con_names = lnames
     , con_outer_bndrs = outer_bndrs
-    , con_inner_bndrs = inner_bndrs
-    , con_cxts = lcontexts
     , con_g_args = details
     , con_res_ty = res_ty
     , con_modifiers = mods
@@ -766,8 +768,6 @@ renameCon
     } = do
     lnames' <- mapM renameNameL lnames
     outer_bndrs' <- mapM renameOuterTyVarBndrs outer_bndrs
-    inner_bndrs' <- mapM renameHsGadtTelescope inner_bndrs
-    lcontexts' <- traverse renameLContext lcontexts
     details' <- renameGADTDetails details
     res_ty' <- renameLType res_ty
     mods' <- renameModifiers mods
@@ -777,8 +777,6 @@ renameCon
           { con_g_ext = noExtField
           , con_names = lnames'
           , con_outer_bndrs = outer_bndrs'
-          , con_inner_bndrs = inner_bndrs'
-          , con_cxts = lcontexts'
           , con_g_args = details'
           , con_res_ty = res_ty'
           , con_modifiers = mods'
@@ -817,10 +815,12 @@ renameH98Details (InfixCon x a b) = do
 renameGADTDetails
   :: HsConDeclGADTDetails GhcRn
   -> RnM (HsConDeclGADTDetails DocNameI)
-renameGADTDetails (RecConGADT _ (L l fields)) = do
+renameGADTDetails (RecConGADT _ mb_cxt (L l fields)) = do
   fields' <- mapM renameHsConDeclRecFieldField fields
-  return (RecConGADT noExtField (L (locA l) fields'))
-renameGADTDetails (PrefixConGADT _ ps) = PrefixConGADT noExtField <$> mapM renameHsConDeclField ps
+  mb_cxt' <- traverse renameLContext mb_cxt
+  return (RecConGADT noExtField mb_cxt' (L (locA l) fields'))
+renameGADTDetails (PrefixConGADT _ ps) =
+  PrefixConGADT noExtField <$> mapM renameHsGadtArg ps
 
 renameHsConDeclRecFieldField :: LHsConDeclRecField GhcRn -> RnM (LHsConDeclRecField DocNameI)
 renameHsConDeclRecFieldField (L l (HsConDeclRecField _ names t)) = do

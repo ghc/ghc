@@ -809,39 +809,62 @@ mkGadtDecl :: SrcSpan
            -> P (LConDecl GhcPs)
 mkGadtDecl loc mods names dcol ty = do
 
-  (args, res_ty, (ops, cps), csa) <-
-    case body_ty of
-     L ll (HsFunTy _ hsArr (L (EpAnn _ _ cs) (XHsType (HsRecTy (oc,cc) (L l rf)))) res_ty) -> do
-       arr <- case hsArr of
-         HsModifiedFunArr _ [] (HsStandardArr (EpArrow arr)) -> return arr
-         _ -> do addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
-                                 (PsErrIllegalGadtRecordModifier hsArr)
-                 return noAnn
+  args <- case splitRecGadtArgs gadt_args of
+    Just (mb_cxt, (oc, cc), hsArr, rec_ty, L l_fields rf) -> do
+      arr <- case hsArr of
+        HsModifiedFunArr _ [] (HsStandardArr (EpArrow arr)) -> return arr
+        _ -> do addError $ mkPlainErrorMsgEnvelope (getLocA rec_ty) $
+                                (PsErrIllegalGadtRecordModifier hsArr)
+                return noAnn
+      return (RecConGADT (oc, cc, arr) mb_cxt (L l_fields rf))
+    Nothing ->
+      return (PrefixConGADT noExtField gadt_args)
 
-       return ( RecConGADT (oc, cc, arr) (L (EpAnn (spanAsAnchor l) noAnn cs) rf), res_ty
-              , ([], []), epAnnComments ll)
-     _ -> do
-       let ((ops, cps), cs, arg_types, res_type) = splitHsFunType body_ty
-       return (PrefixConGADT noExtField arg_types, res_type, (ops,cps), cs)
-
-  let l = EpAnn (spanAsAnchor loc) noAnn csa
+  let l = EpAnn (spanAsAnchor loc) noAnn emptyComments
 
   pure $ L l ConDeclGADT
-                     { con_g_ext  = AnnConDeclGADT ops cps dcol
+                     { con_g_ext  = AnnConDeclGADT [] [] dcol
                      , con_names  = names
                      , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
-                     , con_inner_bndrs = inner_bndrs
-                     , con_cxts = cxts
                      , con_g_args = args
                      , con_res_ty = res_ty
                      , con_modifiers = mods
                      , con_doc    = Nothing }
   where
-    (outer_bndrs, inner_bndrs, cxts, body_ty) = splitLHsGadtTy ty
+    (outer_bndrs, gadt_args, res_ty) = splitLHsGadtTy ty
     outer_bndrs_loc = case outer_bndrs of
       HsOuterImplicit{} -> getLoc ty
       HsOuterExplicit an _ -> EpAnn (entry an) noAnn emptyComments
 
+-- | Try to detect valid GADT record constructor from interleaved GADT args
+splitRecGadtArgs :: [LHsGadtArg GhcPs]
+                 -> Maybe ( Maybe (LHsContext GhcPs)
+                          , (EpToken "{", EpToken "}")
+                          , HsModifiedFunArr GhcPs
+                          , LHsType GhcPs
+                          , LocatedA [LHsConDeclRecField GhcPs] )
+splitRecGadtArgs (L _ arg : rest)
+  -- Case 1: record type without constraints
+  | null rest
+  , Just (toks, mult, rec_ty, fields) <- rec_val_arg arg
+  = Just (Nothing, toks, mult, rec_ty, fields)
+
+  -- Case 2: constraints, then record type
+  | HsGadtCtx _ ctxt <- arg
+  , [L _ should_be_rec] <- rest
+  , Just (toks, mult, rec_ty, fields) <- rec_val_arg should_be_rec
+  = Just (Just ctxt, toks, mult, rec_ty, fields)
+
+  where
+    rec_val_arg (HsGadtValArg _ (CDF _ _ _ mult
+                                   rec_ty@(L l_rec (XHsType (HsRecTy (oc,cc)
+                                     (L l_fields fields)))) _))
+      = let fields' = L (EpAnn (spanAsAnchor l_fields) noAnn
+                               (epAnnComments l_rec)) fields
+        in Just ((oc,cc), mult, rec_ty, fields')
+    rec_val_arg _ = Nothing
+
+splitRecGadtArgs _ = Nothing
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.

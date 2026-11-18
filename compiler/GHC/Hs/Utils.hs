@@ -1673,8 +1673,9 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
 
     get_flds_gadt :: FieldIndices p -> HsConDeclGADTDetails (GhcPass p)
                   -> (Either VisArity [Located Int], FieldIndices p)
-    get_flds_gadt seen (RecConGADT _ flds) = first Right $ get_flds seen flds
-    get_flds_gadt seen (PrefixConGADT _ args) = (Left (length args), seen)
+    get_flds_gadt seen (RecConGADT _ _ flds) = first Right $ get_flds seen flds
+    get_flds_gadt seen (PrefixConGADT _ args) =
+      (Left (length (gadtArgValueFields args)), seen)
 
     get_flds :: FieldIndices p -> LocatedA [LHsConDeclRecField (GhcPass p)]
              -> ([Located Int], FieldIndices p)

@@ -702,7 +702,7 @@ contexts flattened into one?
   (nested)    MkR :: Eq a => Show a => {fld :: a} -> R a
   (flattened) MkR :: (Eq a, Show a) => {fld :: a} -> R a
 
-We flatten (see prepend_cxt), for two reasons:
+We flatten (see prepend_cxt_args), for two reasons:
 
 1. To keep the output of -ddump-splices valid source code for record GADT
    constructors. They accept at most one context in source syntax, so the
@@ -757,24 +757,30 @@ cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
     add_cxt (L loc (HsContext _ cxt1)) (Just (L _ (HsContext _ cxt2)))
       = Just (L loc (HsContext noAnn (cxt1 ++ cxt2)))
 
-    -- Why not simply prepend_cxt=(:)? See Note [Contexts of nested ForallC]
-    prepend_cxt :: LHsContext GhcPs -> [LHsContext GhcPs] -> [LHsContext GhcPs]
-    prepend_cxt lcxt = map_mb_head (add_cxt lcxt)
-      where
-        map_mb_head :: (Maybe a -> Maybe a) -> [a] -> [a]
-        map_mb_head f []     = maybeToList (f Nothing)
-        map_mb_head f (x:xs) = maybeToList (f (Just x)) ++ xs
+    prepend_cxt_args :: LHsContext GhcPs -> [LHsGadtArg GhcPs] -> [LHsGadtArg GhcPs]
+    prepend_cxt_args lcxt args =
+      case args of
+        L l (HsGadtCtx x cxt0) : rest ->
+          case add_cxt lcxt (Just cxt0) of
+            Just cxt' -> L l (HsGadtCtx x cxt') : rest
+            Nothing   -> rest
+        _ -> case mkHsContextMaybe lcxt of
+               Nothing   -> args
+               Just cxt' -> noLocA (HsGadtCtx noExtField cxt') : args
 
     -- Nested foralls and contexts end up flattened (see tests/th/GadtConSigs_th_dump1.stderr)
     add_forall :: [LHsTyVarBndr Hs.Specificity GhcPs] -> LHsContext GhcPs
                -> ConDecl GhcPs -> ConDecl GhcPs
     add_forall tvs' cxt' con@(ConDeclGADT { con_outer_bndrs = L l outer_bndrs
-                                          , con_inner_bndrs = inner_bndrs
-                                          , con_cxts = cxts })
+                                          , con_g_args = con_args })
       = con { con_outer_bndrs = L l outer_bndrs'
-            , con_inner_bndrs = inner_bndrs
-            , con_cxts = prepend_cxt cxt' cxts }
+            , con_g_args = add_cxt_args con_args }
       where
+        add_cxt_args (PrefixConGADT x ts)
+          = PrefixConGADT x (prepend_cxt_args cxt' ts)
+        add_cxt_args (RecConGADT x mb_cxt flds)
+          = RecConGADT x (add_cxt cxt' mb_cxt) flds
+
         outer_bndrs'
           | null all_tvs = mkHsOuterImplicit
           | otherwise    = mkHsOuterExplicit noAnn all_tvs
@@ -796,7 +802,8 @@ cvtConstr _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
         { c'      <- mapM do_con_name c
         ; args    <- mapM cvt_arg strtys
         ; ty'     <- cvtType ty
-        ; mk_gadt_decl c' (PrefixConGADT noExtField args) ty'}
+        ; let gadt_args = map (noLocA . HsGadtValArg noExtField) args
+        ; mk_gadt_decl c' (PrefixConGADT noExtField gadt_args) ty'}
 
 cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
     Nothing -> failWith RecGadtNoCons
@@ -805,7 +812,7 @@ cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM (cvt_id_arg parent_con) varstrtys
         ; lrec_flds <- returnLA rec_flds
-        ; mk_gadt_decl c' (RecConGADT noAnn lrec_flds) ty' }
+        ; mk_gadt_decl c' (RecConGADT noAnn Nothing lrec_flds) ty' }
 
 mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> CvtM (LConDecl GhcPs)
@@ -815,8 +822,6 @@ mk_gadt_decl names args res_ty
                    { con_g_ext  = noAnn
                    , con_names  = names
                    , con_outer_bndrs = outer_bndrs
-                   , con_inner_bndrs = []
-                   , con_cxts = []
                    , con_g_args = args
                    , con_res_ty = res_ty
                    , con_modifiers = []

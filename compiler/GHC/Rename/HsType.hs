@@ -28,7 +28,7 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindHsOuterTyVarBndrs, bindHsForAllTelescope, bindHsGadtTelescopes,
+        bindHsOuterTyVarBndrs, bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars, filterInScopeM,
@@ -36,7 +36,7 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVars, extractRdrKindSigVars,
         extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
         extractHsOuterTvBndrs, extractHsTyArgRdrKiTyVars,
-        extractHsGadtTelescopes,
+        extractHsGadtArgs,
         nubL, nubN,
 
         -- Error helpers
@@ -1248,20 +1248,6 @@ bindHsForAllTelescope doc tele thing_inside =
         checkForAllTelescopeWildcardBndrs doc bndrs'
         thing_inside $ mkHsForAllInvisTele noAnn bndrs'
 
-bindHsGadtTelescopes :: HsDocContext
-                     -> [LHsGadtTelescope GhcPs]
-                     -> ([LHsGadtTelescope GhcRn] -> RnM (a, FreeNames))
-                     -> RnM (a, FreeNames)
-bindHsGadtTelescopes _ [] thing_inside =
-  thing_inside []
-bindHsGadtTelescopes doc (L l HsGadtPar{} : args) thing_inside =
-  bindHsGadtTelescopes doc args $ \args' ->
-    thing_inside (L l (HsGadtPar noExtField) : args')
-bindHsGadtTelescopes doc (L l (HsGadtForAll _ tele) : args) thing_inside =
-  bindHsForAllTelescope doc tele $ \tele' ->
-  bindHsGadtTelescopes        doc args $ \args' ->
-    thing_inside (L l (HsGadtForAll noExtField tele') : args')
-
 -- See Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type
 checkForAllTelescopeWildcardBndrs :: HsDocContext
                                   -> [LHsTyVarBndr flag (GhcPass p)]
@@ -2178,8 +2164,10 @@ extractRdrKindSigVars (L _ resultSig) = case resultSig of
 extractConDeclGADTDetailsTyVars ::
   HsConDeclGADTDetails GhcPs -> FreeKiTyVars -> FreeKiTyVars
 extractConDeclGADTDetailsTyVars con_args = case con_args of
-  PrefixConGADT _ args    -> extract_scaled_ltys args
-  RecConGADT _ (L _ flds) -> extract_scaled_ltys $ map (cdrf_spec . unLoc) $ flds
+  PrefixConGADT _ args       -> extractHsGadtArgs args
+  RecConGADT _ mb_cxt (L _ flds) ->
+    let flds_fvs = extract_scaled_ltys (map (cdrf_spec . unLoc) flds)
+    in maybe flds_fvs (\ctxt -> extract_lctxt ctxt . flds_fvs) mb_cxt
 
 -- | Get type/kind variables mentioned in the kind signature, preserving
 -- left-to-right order:
@@ -2288,15 +2276,19 @@ extractHsOuterTvBndrs outer_bndrs body_fvs =
     HsOuterImplicit{}                  -> body_fvs
     HsOuterExplicit{hso_bndrs = bndrs} -> extract_hs_tv_bndrs bndrs [] body_fvs
 
-extractHsGadtTelescopes :: [LHsGadtTelescope GhcPs]
-                        -> FreeKiTyVars -- Free in body
-                        -> FreeKiTyVars -- Free in result
-extractHsGadtTelescopes []                           body_fvs = body_fvs
-extractHsGadtTelescopes (L _ HsGadtPar{} : args)         body_fvs =
-  extractHsGadtTelescopes args body_fvs
-extractHsGadtTelescopes (L _ (HsGadtForAll _ tele) : args) body_fvs =
+extractHsGadtArgs :: [LHsGadtArg GhcPs]
+                  -> FreeKiTyVars -- Free in body
+                  -> FreeKiTyVars -- Free in result
+extractHsGadtArgs []                            body_fvs = body_fvs
+extractHsGadtArgs (L _ HsGadtPar{} : args)      body_fvs =
+  extractHsGadtArgs args body_fvs
+extractHsGadtArgs (L _ (HsGadtForAll _ tele) : args) body_fvs =
   extract_hs_for_all_telescope tele [] $
-  extractHsGadtTelescopes args body_fvs
+  extractHsGadtArgs args body_fvs
+extractHsGadtArgs (L _ (HsGadtCtx _ ctxt) : args) body_fvs =
+  extract_lctxt ctxt $ extractHsGadtArgs args body_fvs
+extractHsGadtArgs (L _ (HsGadtValArg _ fld) : args) body_fvs =
+  extract_scaled_lty fld $ extractHsGadtArgs args body_fvs
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr flag GhcPs]
                     -> FreeKiTyVars  -- Accumulator

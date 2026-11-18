@@ -202,6 +202,7 @@ data ThRejectionReason
   | ThSplicesWithinDeclBrackets
   | ThNonLinearDataCon
   | ThDataConVisibleForall
+  | ThDataConInterleavedForallOrContext
   | ThUnexpectedModifier [LHsModifier GhcRn]
   | ThUnexpectedModifierExpr [LHsModifierOf (LocatedA (HsExpr GhcRn)) GhcRn]
 

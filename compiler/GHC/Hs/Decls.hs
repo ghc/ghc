@@ -75,6 +75,8 @@ module GHC.Hs.Decls (
   HsConDeclH98Details, HsConDeclGADTDetails(..),
   AnnConDeclH98(..), AnnConDeclGADT(..),
   hsConDeclTheta,
+  gadtDetailsForAlls, gadtDetailsContexts, gadtDetailsValueFields,
+  gadtDetailsArgs,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -884,10 +886,34 @@ getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
   InfixCon{}    -> Nothing
 getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
   PrefixConGADT{} -> Nothing
-  RecConGADT _ flds -> Just flds
+  RecConGADT _ _ flds -> Just flds
 
 hsConDeclTheta :: Foldable t => t (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta = concatMap (hsc_ctxt . unLoc)
+
+-- | Extract the interleaved argument list from a prefix GADT constructor.
+gadtDetailsArgs :: HsConDeclGADTDetails (GhcPass p) -> [LHsGadtArg (GhcPass p)]
+gadtDetailsArgs (PrefixConGADT _ args) = args
+gadtDetailsArgs RecConGADT{}           = []
+
+-- | Extract the forall telescopes from a GADT constructor's arguments.
+gadtDetailsForAlls :: HsConDeclGADTDetails (GhcPass p)
+                   -> [HsForAllTelescope (GhcPass p)]
+gadtDetailsForAlls (PrefixConGADT _ args) = gadtArgTelescopes args
+gadtDetailsForAlls RecConGADT{}           = []
+
+-- | Extract the contexts from a GADT constructor's arguments.
+gadtDetailsContexts :: HsConDeclGADTDetails (GhcPass p)
+                    -> [LHsContext (GhcPass p)]
+gadtDetailsContexts (PrefixConGADT _ args) = gadtArgContexts args
+gadtDetailsContexts (RecConGADT _ mb_cxt _) = maybeToList mb_cxt
+
+-- | Extract the value arguments from a GADT constructor's arguments.
+gadtDetailsValueFields :: HsConDeclGADTDetails (GhcPass p)
+                       -> [HsConDeclField (GhcPass p)]
+gadtDetailsValueFields (PrefixConGADT _ args) = gadtArgValueFields args
+gadtDetailsValueFields (RecConGADT _ _ (L _ flds)) =
+  map (cdrf_spec . unLoc) flds
 
 ppDataDefnHeader
  :: (OutputableBndrId p)
@@ -969,38 +995,52 @@ pprConDecl (ConDeclH98 { con_name = L _ con
 
 pprConDecl (ConDeclGADT { con_names = cons
                         , con_outer_bndrs = L _ outer_bndrs
-                        , con_inner_bndrs = inner_bndrs
-                        , con_cxts = cxts, con_g_args = args
+                        , con_g_args = args
                         , con_res_ty = res_ty, con_modifiers = mods, con_doc = doc })
   = pprMaybeWithDoc doc $ pprLHsModifiers mods <+> ppr_con_names (toList cons) <+> dcolon
-    <+> sep [ppr_outer_bndrs, ppr_inner_bndrs (
-                sep [ pprLHsContext cxts,
-                      sep (ppr_args args ++ [ppr res_ty])])]
+    <+> sep [ppr_outer_bndrs, ppr_args args]
   where
-    ppr_args (PrefixConGADT _ args) = map (pprHsConDeclFieldWith (\arr tyDoc -> tyDoc <+> pprHsModifiedFunArr arr)) args
-    ppr_args (RecConGADT _ fields) = [pprHsConDeclRecFields (unLoc fields) <+> arrow]
+    ppr_args (RecConGADT _ mb_cxt fields) =
+      sep [ maybe empty pprLHsContextAlways mb_cxt
+          , sep [ pprHsConDeclRecFields (unLoc fields) <+> arrow
+                , ppr res_ty ] ]
 
-    -- pprint all parentheses and foralls, so parse == parse . ppr . parse
-    ppr_inner_bndrs :: SDoc -> SDoc
-    ppr_inner_bndrs tyDoc = foldr ppr_inner_bndr (tyDoc <> close_parens) inner_bndrs
+    ppr_args (PrefixConGADT _ args) =
+      foldr ppr_arg (ppr res_ty) args <> close_parens
+      where
+        ppr_arg (L _ HsGadtPar{}) rest = lparen <> rest
+        ppr_arg (L _ (HsGadtForAll _ tele)) rest
+          | HsForAllInvis {hsf_invis_bndrs=[]} <- tele = empty_forall <+> rest
+          | otherwise = pprHsForAllTelescope tele <+> rest
+        ppr_arg (L _ (HsGadtCtx _ ctxt)) rest =
+          sep [pprLHsContextAlways ctxt, rest]
+        ppr_arg (L _ (HsGadtValArg _ fld)) rest =
+          sep [ pprHsConDeclFieldWith
+                  (\arr tyDoc -> tyDoc <+> pprHsModifiedFunArr arr) fld
+              , rest ]
 
-    ppr_inner_bndr (L _ HsGadtPar{})           rest = lparen <> rest
-    ppr_inner_bndr (L _ (HsGadtForAll _ tele)) rest
-      | HsForAllInvis {hsf_invis_bndrs=[]} <- tele = empty_forall <+> rest
-      | otherwise = pprHsForAllTelescope tele <+> rest
+        -- for each open paren generate a closed one
+        close_parens = hcat [ rparen | L _ HsGadtPar{} <- args ]
 
-    -- for each open paren generate a closed one
-    close_parens = hcat [ rparen | L _ HsGadtPar{} <- inner_bndrs ]
-
-    -- pprint empty explicit outer forall as `forall.` if there are inner binders, because otherwise
-    -- `forall. forall a. ...` would become `forall a. ...` and that would parse into
-    -- different AST, thus breaking parse == parse . ppr . parse property
+    -- pprint empty explicit outer forall as `forall.` if there are inner
+    -- binders, because otherwise `forall. forall a. ...` would become
+    -- `forall a. ...` and that would parse into different AST, thus breaking
+    -- the parse == parse . ppr . parse property
     ppr_outer_bndrs
       | HsOuterExplicit{hso_bndrs = []} <- outer_bndrs
-      , not (null inner_bndrs)
+      , has_inner_args
       = empty_forall
       | otherwise
       = pprHsOuterSigTyVarBndrs outer_bndrs
+
+    -- Only a leading forall or parenthesis counts as an inner binder: these
+    -- were the entries of the old @con_inner_bndrs@ field. Contexts and value
+    -- arguments used to be stored separately, and did not cause the empty
+    -- outer forall to be printed.
+    has_inner_args = case args of
+      PrefixConGADT _ (L _ HsGadtForAll{} : _) -> True
+      PrefixConGADT _ (L _ HsGadtPar{} : _)    -> True
+      _                                        -> False
 
     empty_forall = forAllLit <> dot
 

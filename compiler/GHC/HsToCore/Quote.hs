@@ -42,7 +42,8 @@ import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.ErrCtxt
-import GHC.Tc.TyCl ( IsPrefixConGADT(..), unannotatedMultIsLinear )
+import GHC.Tc.TyCl ( IsPrefixConGADT(..), unannotatedMultIsLinear
+                   , gadtConstructorShapeViolation )
 
 
 import GHC.Core.Class
@@ -897,22 +898,23 @@ repC (L _ (ConDeclH98 { con_name = con
 
 repC (L l (ConDeclGADT { con_names  = cons
                        , con_outer_bndrs = L _ outer_bndrs
-                       , con_inner_bndrs = inner_bndrs
-                       , con_cxts   = cxts
                        , con_g_args = args
                        , con_res_ty = res_ty }))
+  | Just bad_loc <- gadtConstructorShapeViolation args
+  = notHandledL bad_loc ThDataConInterleavedForallOrContext
+
   | no_explicit_forall, no_context
   -- No explicit variables, no context  ==>  No need for a ForallC
   -- See Note [Don't quantify implicit type variables in quotes]
   = addSimpleTyVarBinds FreshNamesOnly (hsOuterTyVarNames outer_bndrs) $
-    repGadtDataCons cons args res_ty
+    rep_details
 
   | Just invis_inner_bndrs <- m_invis_inner_bndrs
   = addHsOuterSigTyVarBinds outer_bndrs $ \ outer_bndrs' ->
     -- the contexts are flattened and attached to the innermost ForallC
     let loop last_bndrs' [] = do
-          ctxt' <- repContexts cxts
-          c'    <- repGadtDataCons cons args res_ty
+          ctxt' <- repContexts (gadtDetailsContexts args)
+          c'    <- rep_details
           rep2 forallCOcc ([unC last_bndrs', unC ctxt', unC c'])
         loop last_bndrs' (bndrs : bndrs_s) =
           addHsTyVarBinds FreshNamesOnly bndrs $ \bndrs' -> do
@@ -925,10 +927,14 @@ repC (L l (ConDeclGADT { con_names  = cons
   = notHandledL (locA l) ThDataConVisibleForall
 
   where
-    inner_teles = gadtArgTelescopes inner_bndrs
+    inner_teles = gadtDetailsForAlls args
+
+    rep_details = case args of
+      PrefixConGADT _ ps -> repGadtDataCons cons (gadtArgValueFields ps) res_ty
+      RecConGADT _ _ ips -> repRecGadtDataCons cons ips res_ty
 
     no_explicit_forall = nullOuterExplicit outer_bndrs && null inner_teles
-    no_context         = null cxts
+    no_context         = null (gadtDetailsContexts args)
 
     m_invis_inner_bndrs :: Maybe [[LHsTyVarBndr Specificity GhcRn]]
     m_invis_inner_bndrs = traverse get_invis_bndrs inner_teles
@@ -2937,21 +2943,25 @@ repH98DataCon con details
              rep2 recCOcc [unC con', unC arg_vtys]
 
 repGadtDataCons :: NonEmpty (LocatedN Name)
-                -> HsConDeclGADTDetails GhcRn
+                -> [HsConDeclField GhcRn]
                 -> LHsType GhcRn
                 -> MetaM (Core (M TH.Con))
-repGadtDataCons cons details res_ty
+repGadtDataCons cons ps res_ty
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
-         case details of
-           PrefixConGADT _ ps -> do
-             arg_tys <- repPrefixConArgs IsPrefixConGADT ps
-             res_ty' <- repLTy res_ty
-             rep2 gadtCOcc [ unC (nonEmptyCoreList' cons'), unC arg_tys, unC res_ty']
-           RecConGADT _ ips -> do
-             arg_vtys <- repRecConArgs ips
-             res_ty'  <- repLTy res_ty
-             rep2 recGadtCOcc [unC (nonEmptyCoreList' cons'), unC arg_vtys,
-                                unC res_ty']
+         arg_tys <- repPrefixConArgs IsPrefixConGADT ps
+         res_ty' <- repLTy res_ty
+         rep2 gadtCOcc [ unC (nonEmptyCoreList' cons'), unC arg_tys, unC res_ty']
+
+repRecGadtDataCons :: NonEmpty (LocatedN Name)
+                   -> LocatedA [LHsConDeclRecField GhcRn]
+                   -> LHsType GhcRn
+                   -> MetaM (Core (M TH.Con))
+repRecGadtDataCons cons ips res_ty
+    = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
+         arg_vtys <- repRecConArgs ips
+         res_ty'  <- repLTy res_ty
+         rep2 recGadtCOcc [unC (nonEmptyCoreList' cons'), unC arg_vtys,
+                            unC res_ty']
 
 -- TH currently only supports linear constructors.
 -- We also accept the (->) arrow when -XLinearTypes is off, because this

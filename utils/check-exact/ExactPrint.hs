@@ -429,8 +429,15 @@ This is done in
 https://gitlab.haskell.org/ghc/ghc/-/merge_requests/16644, using
 
   data InnerBindings
-    = InnerMore (LHsGadtTelescope GhcPs) InnerBindings
-    | InnerDone ([LHsContext GhcPs], HsConDeclGADTDetails GhcPs, LHsType GhcPs)
+    = InnerMore (LHsGadtArg GhcPs) InnerBindings
+    | InnerDone InnerBindingsDone
+
+  data InnerBindingsDone
+    = InnerPrefix (XPrefixConGADT GhcPs) (LHsType GhcPs)
+    | InnerRecord (XRecConGADT GhcPs)
+                  (Maybe (LHsContext GhcPs))
+                  (LocatedA [LHsConDeclRecField GhcPs])
+                  (LHsType GhcPs)
 
 The key part of the ExactPrint instance for this is
 
@@ -4421,8 +4428,7 @@ instance ExactPrint (ConDecl GhcPs) where
   exact (ConDeclGADT { con_g_ext = AnnConDeclGADT ops cps dcol
                      , con_names = cons
                      , con_outer_bndrs = outer_bndrs
-                     , con_inner_bndrs = inner_bndrs
-                     , con_cxts = cxts, con_g_args = args
+                     , con_g_args = args
                      , con_modifiers = mods
                      , con_res_ty = res_ty, con_doc = doc }) = do
     mods' <- mapM markAnnotated mods
@@ -4435,34 +4441,45 @@ instance ExactPrint (ConDecl GhcPs) where
       L _ (HsOuterImplicit _) -> return outer_bndrs
       _ -> markAnnotated outer_bndrs
 
-    let ib = toInnerBindings inner_bndrs (cxts, args, res_ty)
+    let ib = toInnerBindings args res_ty
     ib' <- markAnnotated ib
-    let (inner_bndrs', (cxts', args', res_ty')) = fromInnerBindings ib'
+    let (args', res_ty') = fromInnerBindings ib'
 
     return (ConDeclGADT { con_g_ext = AnnConDeclGADT [] [] dcol'
                         , con_names = cons'
                         , con_outer_bndrs = outer_bndrs'
-                        , con_inner_bndrs = inner_bndrs'
-                        , con_cxts = cxts', con_g_args = args'
+                        , con_g_args = args'
                         , con_modifiers = mods'
                         , con_res_ty = res_ty', con_doc = doc })
 
 -- ---------------------------------------------------------------------
 
 data InnerBindings
-  = InnerMore (LHsGadtTelescope GhcPs) InnerBindings
-  | InnerDone ([LHsContext GhcPs], HsConDeclGADTDetails GhcPs, LHsType GhcPs)
+  = InnerMore (LHsGadtArg GhcPs) InnerBindings
+  | InnerDone InnerBindingsDone
 
-toInnerBindings :: [LHsGadtTelescope GhcPs]
-                -> ([LHsContext GhcPs], HsConDeclGADTDetails GhcPs, LHsType GhcPs) -> InnerBindings
-toInnerBindings [] inner = InnerDone inner
-toInnerBindings (b:bs) inner = InnerMore b (toInnerBindings bs inner)
+data InnerBindingsDone
+  = InnerPrefix (XPrefixConGADT GhcPs) (LHsType GhcPs)
+  | InnerRecord (XRecConGADT GhcPs)
+                (Maybe (LHsContext GhcPs))
+                (LocatedA [LHsConDeclRecField GhcPs])
+                (LHsType GhcPs)
 
-fromInnerBindings :: InnerBindings -> ([LHsGadtTelescope GhcPs], ([LHsContext GhcPs], HsConDeclGADTDetails GhcPs, LHsType GhcPs))
+toInnerBindings :: HsConDeclGADTDetails GhcPs -> LHsType GhcPs -> InnerBindings
+toInnerBindings (PrefixConGADT x args) res_ty =
+  foldr InnerMore (InnerDone (InnerPrefix x res_ty)) args
+toInnerBindings (RecConGADT x mb_cxt fields) res_ty =
+  InnerDone (InnerRecord x mb_cxt fields res_ty)
+
+fromInnerBindings :: InnerBindings
+                  -> (HsConDeclGADTDetails GhcPs, LHsType GhcPs)
 fromInnerBindings = go []
   where
     go acc (InnerMore b n) = go (b:acc) n
-    go acc (InnerDone x) = (acc,x)
+    go acc (InnerDone (InnerPrefix x res_ty)) =
+      (PrefixConGADT x acc, res_ty)
+    go _ (InnerDone (InnerRecord x mb_cxt fields res_ty)) =
+      (RecConGADT x mb_cxt fields, res_ty)
 
 instance ExactPrint InnerBindings where
   getAnnotationEntry (InnerMore (L li _) _) = fromAnn li
@@ -4475,26 +4492,30 @@ instance ExactPrint InnerBindings where
     tele' <- markAnnotated tele
     n' <- markAnnotated n
     return (InnerMore (L li (HsGadtForAll x tele')) n')
-  exact  (InnerMore (L l (HsGadtPar (lp, rp))) xs) = do
+  exact (InnerMore (L l (HsGadtPar (lp, rp))) xs) = do
     lp' <- markEpToken lp
     xs' <- markAnnotated xs
     rp' <- markEpToken rp
     return (InnerMore (L l (HsGadtPar (lp',rp'))) xs')
-  exact (InnerDone (cxts, args, res_ty)) = do
-    cxts' <- mapM markAnnotated cxts
-    args' <-
-      case args of
-          (PrefixConGADT x args0) -> do
-            args0' <- mapM markAnnotated args0
-            return (PrefixConGADT x args0')
-          (RecConGADT (oc,cc,rarr) fields) -> do
-            oc' <- markEpToken oc
-            fields' <- markAnnotated fields
-            cc' <- markEpToken cc
-            rarr' <- markEpUniToken rarr
-            return (RecConGADT (oc',cc',rarr') fields')
+  exact (InnerMore (L l (HsGadtCtx x ctxt)) xs) = do
+    ctxt' <- markAnnotated ctxt
+    xs' <- markAnnotated xs
+    return (InnerMore (L l (HsGadtCtx x ctxt')) xs')
+  exact (InnerMore (L l (HsGadtValArg x fld)) xs) = do
+    fld' <- markAnnotated fld
+    xs' <- markAnnotated xs
+    return (InnerMore (L l (HsGadtValArg x fld')) xs')
+  exact (InnerDone (InnerPrefix x res_ty)) = do
     res_ty' <- markAnnotated res_ty
-    return (InnerDone (cxts', args', res_ty'))
+    return (InnerDone (InnerPrefix x res_ty'))
+  exact (InnerDone (InnerRecord (oc,cc,rarr) mb_cxt fields res_ty)) = do
+    mb_cxt' <- markAnnotated mb_cxt
+    oc' <- markEpToken oc
+    fields' <- markAnnotated fields
+    cc' <- markEpToken cc
+    rarr' <- markEpUniToken rarr
+    res_ty' <- markAnnotated res_ty
+    return (InnerDone (InnerRecord (oc',cc',rarr') mb_cxt' fields' res_ty'))
 
 -- ---------------------------------------------------------------------
 

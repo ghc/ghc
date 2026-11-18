@@ -3548,7 +3548,7 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
 ---------------
 tcGadtConTyVarBndrs :: SkolemInfo
                     -> HsOuterSigTyVarBndrs GhcRn
-                    -> [LHsGadtTelescope GhcRn]
+                    -> [LHsGadtArg GhcRn]
                     -> TcM a -> TcM ([TcTyVarBinder], a)
 tcGadtConTyVarBndrs skol_info outer inner thing_inside
   = do { (outer_bndrs, (inner_tvbs, a)) <-

@@ -694,19 +694,19 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
   addHaddock (L l_con_decl con_decl) =
     extendHdkA (locA l_con_decl) $
     case con_decl of
-      ConDeclGADT { con_g_ext, con_names, con_outer_bndrs, con_inner_bndrs
-                  , con_cxts, con_g_args, con_res_ty, con_modifiers } -> do
+      ConDeclGADT { con_g_ext, con_names, con_outer_bndrs
+                  , con_g_args, con_res_ty, con_modifiers } -> do
         con_doc' <- getConDoc (getLocA (NE.head con_names))
         con_g_args' <-
           case con_g_args of
             PrefixConGADT x ts -> PrefixConGADT x <$> addHaddock ts
-            RecConGADT arr (L l_rec flds) -> do
+            RecConGADT arr mb_cxt (L l_rec flds) -> do
               flds' <- traverse addHaddock flds
-              pure $ RecConGADT arr (L l_rec flds')
+              pure $ RecConGADT arr mb_cxt (L l_rec flds')
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
           ConDeclGADT { con_g_ext, con_names,
-                        con_outer_bndrs, con_inner_bndrs, con_cxts, con_modifiers,
+                        con_outer_bndrs, con_modifiers,
                         con_doc = lexLHsDocString <$> con_doc',
                         con_g_args = con_g_args',
                         con_res_ty = con_res_ty' }
@@ -781,6 +781,14 @@ instance HasHaddock (LocatedA (HsConDeclRecField GhcPs)) where
     extendHdkA (locA l_fld) $ liftHdkA $ do
       cdf_doc <- fmap lexLHsDocString <$> getPrevNextDoc (locA l_fld)
       return $ L l_fld (HsConDeclRecField ext nms (cfs { cdf_doc }))
+
+instance HasHaddock (LocatedA (HsGadtArg GhcPs)) where
+  addHaddock (L l_arg arg) =
+    case arg of
+      HsGadtValArg ext fld -> do
+        fld' <- addHaddock fld
+        pure (L l_arg (HsGadtValArg ext fld'))
+      _ -> pure (L l_arg arg)
 
 {- Note [Leading and trailing comments on H98 constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

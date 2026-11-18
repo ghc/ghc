@@ -39,7 +39,7 @@ module GHC.Hs.Type (
         HsLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs, pprHsArgsApp,
-        HsGadtTelescope(..),
+        HsGadtArg(..), LHsGadtArg,
         LHsTypeArg, lhsTypeArgSrcSpan,
         OutputableBndrFlag,
 
@@ -72,7 +72,8 @@ module GHC.Hs.Type (
         hsLTyVarName, hsLTyVarNames,
         hsForAllTelescopeBndrs,
         hsForAllTelescopeNames,
-        gadtArgTelescopes, gadtTelescopeBndrs, mkHsGadtForAlls,
+        gadtArgTelescopes, gadtTelescopeBndrs, gadtArgContexts,
+        gadtArgValueFields, mkHsGadtForAlls,
         hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
@@ -87,7 +88,7 @@ module GHC.Hs.Type (
         -- Printing
         pprHsType, pprHsForAll, pprHsForAllTelescope,
         pprHsOuterFamEqnTyVarBndrs, pprHsOuterSigTyVarBndrs,
-        pprLHsContext,
+        pprLHsContext, pprLHsContextAlways,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
 
@@ -624,13 +625,19 @@ hsForAllTelescopeNames :: HsForAllTelescope (GhcPass p) -> [IdP (GhcPass p)]
 hsForAllTelescopeNames (HsForAllVis _ bndrs) = hsLTyVarNames bndrs
 hsForAllTelescopeNames (HsForAllInvis _ bndrs) = hsLTyVarNames bndrs
 
-gadtArgTelescopes :: [LHsGadtTelescope (GhcPass p)] -> [HsForAllTelescope (GhcPass p)]
+gadtArgTelescopes :: [LHsGadtArg (GhcPass p)] -> [HsForAllTelescope (GhcPass p)]
 gadtArgTelescopes args = [ tele | L _ (HsGadtForAll _ tele) <- args ]
 
-gadtTelescopeBndrs :: [LHsGadtTelescope (GhcPass p)] -> [LHsTyVarBndr ForAllTyFlag (GhcPass p)]
+gadtTelescopeBndrs :: [LHsGadtArg (GhcPass p)] -> [LHsTyVarBndr ForAllTyFlag (GhcPass p)]
 gadtTelescopeBndrs = concatMap hsForAllTelescopeBndrs . gadtArgTelescopes
 
-mkHsGadtForAlls :: [HsForAllTelescope (GhcPass p)] -> [HsGadtTelescope (GhcPass p)]
+gadtArgContexts :: [LHsGadtArg (GhcPass p)] -> [LHsContext (GhcPass p)]
+gadtArgContexts args = [ ctxt | L _ (HsGadtCtx _ ctxt) <- args ]
+
+gadtArgValueFields :: [LHsGadtArg (GhcPass p)] -> [HsConDeclField (GhcPass p)]
+gadtArgValueFields args = [ fld | L _ (HsGadtValArg _ fld) <- args ]
+
+mkHsGadtForAlls :: [HsForAllTelescope (GhcPass p)] -> [HsGadtArg (GhcPass p)]
 mkHsGadtForAlls = map (HsGadtForAll noExtField)
 
 hsExplicitLTyVarNames :: LHsQTyVars (GhcPass p) -> [IdP (GhcPass p)]
@@ -768,6 +775,10 @@ type instance XGadtPar GhcPs = (EpToken "(", EpToken ")")
 type instance XGadtPar GhcRn = NoExtField
 type instance XGadtPar GhcTc = NoExtField
 
+type instance XGadtCtx (GhcPass _) = NoExtField
+
+type instance XGadtValArg (GhcPass _) = NoExtField
+
 type instance XXGadtArg (GhcPass _) = DataConCantHappen
 
 type instance XPrefixCon      (GhcPass p) = NoExtField
@@ -897,60 +908,47 @@ splitLHsSigmaTyInvis ty
   = (tvs, ctxt, ty2)
 
 -- | Decompose a GADT type into its constituent parts.
--- Returns @(outer_bndrs, inner_bndrs, ctxts, body)@, where:
+-- Returns @(outer_bndrs, args, body)@, where:
 --
 -- * @outer_bndrs@ are 'HsOuterExplicit' if the type has explicit, outermost
 --   type variable binders. Otherwise, they are 'HsOuterImplicit'.
 --
--- * @inner_bndrs@ are the remaining @forall@ telescopes, interleaved with the
---   parentheses that enclose them.
+-- * @args@ are the remaining @forall@ telescopes, contexts, parentheses and
+--   value arguments, in source order.
 --
--- * @ctxts@ are the contexts adjacent to the @forall@s, if any.
---
--- * @body@ is the body of the type after the optional @forall@s and contexts.
+-- * @body@ is the result type.
 --
 -- This function does look through parentheses, but it does not discard them:
--- they are syntactically significant, so they are recorded in @inner_bndrs@.
--- See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
--- in "GHC.Hs.Decls" for why this is important.
+-- they are syntactically significant, so they are recorded in @args@.
+-- See @Note [GADT abstract syntax]@ in "GHC.Hs.Decls".
 splitLHsGadtTy ::
      LHsSigType GhcPs
-  -> (HsOuterSigTyVarBndrs GhcPs, [LHsGadtTelescope GhcPs], [LHsContext GhcPs], LHsType GhcPs)
+  -> (HsOuterSigTyVarBndrs GhcPs, [LHsGadtArg GhcPs], LHsType GhcPs)
 splitLHsGadtTy (L _ sig_ty)
   | (outer_bndrs, sigma_ty) <- split_outer_bndrs sig_ty
-  , (inner_bndrs, phi_ty)   <- split_inner_bndrs sigma_ty
-  , (outer_theta, phi_ty')  <- splitLHsQualTy_KP phi_ty
-  , (inner_theta, rho_ty)   <- split_ctxts phi_ty'
-  = case rho_ty of
-      -- Record GADTs are not allowed to have multiple foralls or contexts.
-      -- Detect and undo the split to get a proper error message later.
-      L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _)
-        | not (null inner_bndrs) -> (outer_bndrs, [], [], sigma_ty)
-        | not (null inner_theta) -> (outer_bndrs, inner_bndrs, toList outer_theta, phi_ty')
-      -- All good: either a prefix GADT con, or a record GADT con with at most
-      -- one forall and at most one context.
-      _ -> let theta_tys = toList outer_theta ++ inner_theta
-           in (outer_bndrs, inner_bndrs, theta_tys, rho_ty)
+  , (args, rho_ty) <- split_args sigma_ty
+  = (outer_bndrs, args, rho_ty)
   where
     split_outer_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
     split_outer_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
       (outer_bndrs, body_ty)
 
-    split_inner_bndrs ::
-      LHsType GhcPs -> ([LHsGadtTelescope GhcPs], LHsType GhcPs)
-    split_inner_bndrs (L l HsForAllTy { hst_tele = tele
-                                      , hst_body = body })
-      = let ~(args, t) = split_inner_bndrs body
+    split_args :: LHsType GhcPs -> ([LHsGadtArg GhcPs], LHsType GhcPs)
+    split_args (L l HsForAllTy { hst_tele = tele
+                               , hst_body = body })
+      = let (args, t) = split_args body
         in (L l (HsGadtForAll noExtField tele) : args, t)
-    split_inner_bndrs (L l (HsParTy toks ty))
-      = let ~(args, t) = split_inner_bndrs ty
+    split_args (L l (HsParTy toks ty))
+      = let (args, t) = split_args ty
         in (L l (HsGadtPar toks) : args, t)
-    split_inner_bndrs t = ([], t)
-
-    split_ctxts :: LHsType GhcPs -> ([LHsContext GhcPs], LHsType GhcPs)
-    split_ctxts (L _ HsQualTy { hst_ctxt = ctxt, hst_body = body })
-      = let { ~(ctxts, t) = split_ctxts body } in (ctxt : ctxts, t)
-    split_ctxts t = ([], t)
+    split_args (L l HsQualTy { hst_ctxt = ctxt
+                             , hst_body = body })
+      = let (args, t) = split_args body
+        in (L l (HsGadtCtx noExtField ctxt) : args, t)
+    split_args (L l (HsFunTy _ mult arg body))
+      = let (args, t) = split_args body
+        in (L l (HsGadtValArg noExtField (mkConDeclField mult arg)) : args, t)
+    split_args t = ([], t)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
@@ -1321,9 +1319,11 @@ instance OutputableBndrId p
       text "HsForAllInvis:" <+> ppr bndrs
 
 instance OutputableBndrId p
-       => Outputable (HsGadtTelescope (GhcPass p)) where
+       => Outputable (HsGadtArg (GhcPass p)) where
     ppr (HsGadtForAll _ tele) = text "HsGadtForAll" <+> ppr tele
     ppr (HsGadtPar _)         = text "HsGadtPar"
+    ppr (HsGadtCtx _ ctxt)    = text "HsGadtCtx" <+> ppr ctxt
+    ppr (HsGadtValArg _ fld)  = text "HsGadtValArg" <+> pprHsConDeclFieldNoMult fld
 
 instance (OutputableBndrId p, OutputableBndrFlag flag p)
        => Outputable (HsTyVarBndr flag (GhcPass p)) where
@@ -1653,4 +1653,4 @@ type instance Anno (HsConDeclRecField (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsModifierOf ty (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno (HsGadtTelescope (GhcPass p)) = SrcSpanAnnA
+type instance Anno (HsGadtArg (GhcPass p)) = SrcSpanAnnA

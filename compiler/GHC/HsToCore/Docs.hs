@@ -437,8 +437,9 @@ h98ConArgDocs con_args = case con_args of
 
 gadtConArgDocs :: HsConDeclGADTDetails GhcRn -> HsType GhcRn -> IntMap (HsDoc GhcRn)
 gadtConArgDocs con_args res_ty = case con_args of
-  PrefixConGADT _ args -> con_arg_docs 0 $ map cdf_doc args ++ [res_doc]
-  RecConGADT _ _       -> con_arg_docs 1 [res_doc]
+  PrefixConGADT _ args -> con_arg_docs 0 $
+                          map cdf_doc (gadtArgValueFields args) ++ [res_doc]
+  RecConGADT{}         -> con_arg_docs 1 [res_doc]
   where
     res_doc = case res_ty of
       HsDocTy _ _ lds -> Just lds

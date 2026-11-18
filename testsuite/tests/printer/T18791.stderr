@@ -126,48 +126,54 @@
               []))
             (HsOuterImplicit
              (NoExtField)))
-           []
-           []
            (PrefixConGADT
             (NoExtField)
-            [(CDF
-              ((,)
-               ((,,)
-                (EpaDelta { <no location info> } (SameLine 0) [])
-                (EpTok
-                 (EpaSpan { <no location info> }))
-                (EpaDelta { <no location info> } (SameLine 0) []))
-               (NoSourceText))
-              (NoSrcUnpack)
-              (NoSrcStrict)
-              (HsModifiedFunArr
-               (NoExtField)
+            [(L
+              (EpAnn
+               (EpaSpan { T18791.hs:5:10-17 })
                []
-               (HsStandardArr
-                (EpArrow
-                 (EpUniTok
-                  (EpaSpan { T18791.hs:5:14-15 })
-                  (NormalSyntax)))))
-              (L
-               (EpAnn
-                (EpaSpan { T18791.hs:5:10-12 })
-                []
-                (EpaComments
-                 []))
-               (HsTyVar
-                (EpTok
-                 (EpaSpan { <no location info> }))
-                (NotPromoted)
+               (EpaComments
+                []))
+              (HsGadtValArg
+               (NoExtField)
+               (CDF
+                ((,)
+                 ((,,)
+                  (EpaDelta { <no location info> } (SameLine 0) [])
+                  (EpTok
+                   (EpaSpan { <no location info> }))
+                  (EpaDelta { <no location info> } (SameLine 0) []))
+                 (NoSourceText))
+                (NoSrcUnpack)
+                (NoSrcStrict)
+                (HsModifiedFunArr
+                 (NoExtField)
+                 []
+                 (HsStandardArr
+                  (EpArrow
+                   (EpUniTok
+                    (EpaSpan { T18791.hs:5:14-15 })
+                    (NormalSyntax)))))
                 (L
                  (EpAnn
                   (EpaSpan { T18791.hs:5:10-12 })
-                  (NameAnnTrailing
-                   [])
+                  []
                   (EpaComments
                    []))
-                 (Unqual
-                  {OccName: Int}))))
-              (Nothing))])
+                 (HsTyVar
+                  (EpTok
+                   (EpaSpan { <no location info> }))
+                  (NotPromoted)
+                  (L
+                   (EpAnn
+                    (EpaSpan { T18791.hs:5:10-12 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   (Unqual
+                    {OccName: Int}))))
+                (Nothing))))])
            (L
             (EpAnn
              (EpaSpan { T18791.hs:5:17 })

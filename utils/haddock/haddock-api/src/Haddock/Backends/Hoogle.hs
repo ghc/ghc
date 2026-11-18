@@ -339,8 +339,6 @@ ppCtor
   ( ConDeclGADT
       { con_names = names
       , con_outer_bndrs = L _ outer_bndrs
-      , con_inner_bndrs = inner_bndrs
-      , con_cxts = cxts
       , con_g_args = args
       , con_res_ty = res_ty
       }
@@ -349,14 +347,14 @@ ppCtor
     where
       typeSig = operator name ++ " :: " ++ outHsSigType sDocContext con_sig_ty
       name = out sDocContext $ unL <$> names
-      con_sig_ty = HsSig noExtField outer_bndrs $
-                   mkGadtArgTys inner_bndrs phi_ty
+      con_sig_ty = HsSig noExtField outer_bndrs phi_ty
         where
-          phi_ty = foldr mkQualTy tau_ty cxts
-          tau_ty = foldr mkFunTy res_ty $
-            case args of
-              PrefixConGADT _ pos_args -> map cdf_type pos_args
-              RecConGADT _ (L _ flds) -> map (cdf_type . cdrf_spec . unL) flds
+          phi_ty = case args of
+            PrefixConGADT _ gadt_args -> mkGadtArgTys gadt_args res_ty
+            RecConGADT _ mb_cxt (L _ flds) ->
+              let tau_ty = foldr mkFunTy res_ty $
+                           map (cdf_type . cdrf_spec . unL) flds
+              in maybe id mkQualTy mb_cxt tau_ty
           mkFunTy :: LHsType GhcRn -> LHsType GhcRn -> LHsType GhcRn
           mkFunTy a b = noLocA (HsFunTy noExtField (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) a b)
 
@@ -365,13 +363,18 @@ ppCtor
             noLocA (HsQualTy{ hst_xqual = noExtField
                             , hst_ctxt = ctxt, hst_body = body})
 
-          mkGadtArgTy :: LHsGadtTelescope GhcRn -> LHsType GhcRn -> LHsType GhcRn
+          mkGadtArgTy :: LHsGadtArg GhcRn -> LHsType GhcRn -> LHsType GhcRn
           mkGadtArgTy (L l (HsGadtForAll _ tele)) body =
             L l (HsForAllTy { hst_xforall = noExtField
                                , hst_tele = tele, hst_body = body })
           mkGadtArgTy (L l HsGadtPar{}) body = L l (HsParTy noAnn body)
+          mkGadtArgTy (L l (HsGadtCtx _ ctxt)) body =
+            L l (HsQualTy{ hst_xqual = noExtField
+                         , hst_ctxt = ctxt, hst_body = body})
+          mkGadtArgTy (L _ (HsGadtValArg _ fld)) body =
+            mkFunTy (cdf_type fld) body
 
-          mkGadtArgTys :: [LHsGadtTelescope GhcRn] -> LHsType GhcRn -> LHsType GhcRn
+          mkGadtArgTys :: [LHsGadtArg GhcRn] -> LHsType GhcRn -> LHsType GhcRn
           mkGadtArgTys = flip (foldr mkGadtArgTy)
 
 ppFixity :: SDocContext -> (Name, Fixity) -> [String]

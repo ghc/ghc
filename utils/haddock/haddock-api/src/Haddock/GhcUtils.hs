@@ -219,8 +219,6 @@ getGADTConType :: ConDecl DocNameI -> LHsSigType DocNameI
 getGADTConType
   ( ConDeclGADT
       { con_outer_bndrs = outer_bndrs
-      , con_inner_bndrs = inner_bndrs
-      , con_cxts = cxts
       , con_g_args = args
       , con_res_ty = res_ty
       }
@@ -229,17 +227,16 @@ getGADTConType
       ( HsSig
           { sig_ext = noExtField
           , sig_bndrs = unLoc outer_bndrs
-          , sig_body = mkGadtArgTys inner_bndrs phi_ty
+          , sig_body = phi_ty
           }
       )
     where
       phi_ty :: LHsType DocNameI
-      phi_ty = foldr mkQualTy tau_ty cxts
-
-      tau_ty :: LHsType DocNameI
-      tau_ty = case args of
-        RecConGADT _ flds -> mkFunTy (noLocA (XHsType (HsRecTy (unLoc flds)))) res_ty
-        PrefixConGADT _ pos_args -> foldr hsConDeclFieldToFunTy res_ty pos_args
+      phi_ty = case args of
+        PrefixConGADT _ gadt_args -> mkGadtArgTys gadt_args res_ty
+        RecConGADT _ mb_cxt flds ->
+          let tau_ty = mkFunTy (noLocA (XHsType (HsRecTy (unLoc flds)))) res_ty
+          in maybe tau_ty (`mkQualTy` tau_ty) mb_cxt
 
       mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
       mkFunTy a b = noLocA (HsFunTy noAnn (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) a b)
@@ -249,13 +246,18 @@ getGADTConType
         noLocA (HsQualTy{ hst_xqual = noAnn
                         , hst_ctxt = ctxt, hst_body = body})
 
-      mkGadtArgTy :: LHsGadtTelescope DocNameI -> LHsType DocNameI -> LHsType DocNameI
+      mkGadtArgTy :: LHsGadtArg DocNameI -> LHsType DocNameI -> LHsType DocNameI
       mkGadtArgTy (L l (HsGadtForAll _ tele)) body =
         L l (HsForAllTy { hst_xforall = noAnn
                            , hst_tele = tele, hst_body = body })
       mkGadtArgTy (L l HsGadtPar{}) body = L l (HsParTy noAnn body)
+      mkGadtArgTy (L l (HsGadtCtx _ ctxt)) body =
+        L l (HsQualTy{ hst_xqual = noAnn
+                     , hst_ctxt = ctxt, hst_body = body})
+      mkGadtArgTy (L _ (HsGadtValArg _ fld)) body =
+        hsConDeclFieldToFunTy fld body
 
-      mkGadtArgTys :: [LHsGadtTelescope DocNameI] -> LHsType DocNameI -> LHsType DocNameI
+      mkGadtArgTys :: [LHsGadtArg DocNameI] -> LHsType DocNameI -> LHsType DocNameI
       mkGadtArgTys = flip (foldr mkGadtArgTy)
 
 getGADTConType (ConDeclH98{}) = panic "getGADTConType"
@@ -390,9 +392,12 @@ restrictCons names decls = [L p d | L p (Just d) <- fmap keep <$> decls]
               InfixCon _ _ _ -> Just d
             ConDeclGADT{con_g_args = con_args'} -> case con_args' of
               PrefixConGADT{} -> Just d
-              RecConGADT _ fields
+              RecConGADT _ mb_cxt fields
                 | all field_avail (unLoc fields) -> Just d
-                | otherwise -> Just (d{con_g_args = PrefixConGADT noExtField (field_types $ unLoc fields)})
+                | otherwise -> Just (d{con_g_args = PrefixConGADT noExtField
+                    (maybe id (\c -> (noLocA (HsGadtCtx noExtField c):)) mb_cxt
+                     $ map (noLocA . HsGadtValArg noExtField)
+                            (field_types $ unLoc fields))})
       where
         -- see above
 

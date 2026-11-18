@@ -1467,9 +1467,10 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con) =
     fieldPart = case con of
       ConDeclGADT{con_g_args = con_args'} -> case con_args' of
         -- GADT record declarations
-        RecConGADT _ _ -> [doConstrArgsWithDocs []]
+        RecConGADT{} -> [doConstrArgsWithDocs []]
         -- GADT prefix data constructors
-        PrefixConGADT _ args | hasArgDocs -> [doConstrArgsWithDocs args]
+        PrefixConGADT _ args | hasArgDocs ->
+          [doConstrArgsWithDocs [ fld | L _ (HsGadtValArg _ fld) <- args ]]
         _ -> []
       ConDeclH98{con_args = con_args'} -> case con_args' of
         -- H98 record declarations

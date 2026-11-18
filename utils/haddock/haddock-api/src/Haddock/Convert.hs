@@ -566,8 +566,6 @@ synifyDataCon use_gadt_syntax dc =
             , hso_bndrs = map synifyTyVarBndr outer_tvbs
             }
 
-    inner_bndrs = map noLocA $ mkHsGadtForAlls (mk_telescopes inner_tvbs)
-
     mk_telescopes bs
       | (invis, other) <- split_invis_tvbs bs, not (null invis)
       = mkHsForAllInvisTele noAnn (map synifyTyVarBndr invis) : mk_telescopes other
@@ -611,8 +609,12 @@ synifyDataCon use_gadt_syntax dc =
 
     mk_gadt_arg_tys :: HsConDeclGADTDetails GhcRn
     mk_gadt_arg_tys
-      | use_named_field_syntax = RecConGADT noExtField (noLocA field_tys)
-      | otherwise = PrefixConGADT noExtField linear_tys
+      | use_named_field_syntax = RecConGADT noExtField ctx (noLocA field_tys)
+      | otherwise =
+          PrefixConGADT noExtField $
+            map noLocA (mkHsGadtForAlls (mk_telescopes inner_tvbs))
+            ++ maybeToList (fmap (\c -> noLocA (HsGadtCtx noExtField c)) ctx)
+            ++ map (noLocA . HsGadtValArg noExtField) linear_tys
    in
     -- finally we get synifyDataCon's result!
     if use_gadt_syntax
@@ -624,8 +626,6 @@ synifyDataCon use_gadt_syntax dc =
               { con_g_ext = noExtField
               , con_names = pure name
               , con_outer_bndrs = noLocA outer_bndrs
-              , con_inner_bndrs = inner_bndrs
-              , con_cxts = maybeToList ctx
               , con_g_args = hat
               , con_res_ty = synifyType WithinType emptyVarSet res_ty
               , con_modifiers = []

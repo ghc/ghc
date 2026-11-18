@@ -21,7 +21,8 @@ module Language.Haskell.Syntax.Type (
         isHsBndrInvisible,
         isHsBndrWildCard,
         HsForAllTelescope(..),
-        HsGadtTelescope(..), LHsGadtTelescope, XGadtForAll, XGadtPar, XXGadtArg,
+        HsGadtArg(..), LHsGadtArg,
+        XGadtForAll, XGadtPar, XGadtCtx, XGadtValArg, XXGadtArg,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -393,15 +394,16 @@ data HsForAllTelescope pass
     }
   | XHsForAllTelescope !(XXHsForAllTelescope pass)
 
--- | A type for interleaved GADT foralls and parentheses, inspired by HsArg.
+-- | A type for interleaved GADT foralls, parentheses, contexts, and value
+-- arguments, inspired by HsArg.
 --
 -- Here's an example:
 --
 --  data D where
 --    MkD :: forall x y. -- these go to the `con_outer_bndrs` field
---             forall a b. ( forall c. forall d. ( forall. ...
---             ↑           ↑ ↑         ↑         ↑ ↑
---             1           2 3         4         5 6
+--             forall a b. ( forall c. forall d. Eq a => ( forall. a -> ...
+--             ↑           ↑ ↑         ↑         ↑       ↑ ↑       ↑
+--             1           2 3         4         5       6 7       8
 --
 -- That would correspond to a list
 --
@@ -409,10 +411,12 @@ data HsForAllTelescope pass
 --   2 → , HsGadtPar
 --   3 → , HsGadtForAll
 --   4 → , HsGadtForAll
---   5 → , HsGadtPar
---   6 → , HsGadtForAll
+--   5 → , HsGadtCtx
+--   6 → , HsGadtPar
+--   7 → , HsGadtForAll
+--   8 → , HsGadtValArg
 --       , ...]
-data HsGadtTelescope pass
+data HsGadtArg pass
   = HsGadtForAll !(XGadtForAll pass) (HsForAllTelescope pass)
   | HsGadtPar !(XGadtPar pass)
     -- ^ `HsGadtPar` is only usefull for pretty-printing/exact-printing for recovering
@@ -421,12 +425,16 @@ data HsGadtTelescope pass
     -- This approach differs from `HsPar`, which wraps the inner expression as if
     -- surrounding it with parentheses. We can ditch the `HsPar` approach because
     -- we know that all parentheses will be closed after the return type.
-  | XHsGadtTelescope !(XXGadtArg pass)
+  | HsGadtCtx !(XGadtCtx pass) (LHsContext pass)
+  | HsGadtValArg !(XGadtValArg pass) (HsConDeclField pass)
+  | XHsGadtArg !(XXGadtArg pass)
 
-type LHsGadtTelescope pass = XRec pass (HsGadtTelescope pass)
+type LHsGadtArg pass = XRec pass (HsGadtArg pass)
 
 type family XGadtForAll pass
 type family XGadtPar    pass
+type family XGadtCtx    pass
+type family XGadtValArg pass
 type family XXGadtArg   pass
 
 -- | Located Haskell Type Variable Binder

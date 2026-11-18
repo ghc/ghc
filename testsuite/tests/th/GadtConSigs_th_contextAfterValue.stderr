@@ -1,0 +1,2 @@
+GadtConSigs_th_contextAfterValue.hs:10:36: error: [GHC-65904]
+    Interleaved forall or context in a GADT constructor not (yet) handled by Template Haskell

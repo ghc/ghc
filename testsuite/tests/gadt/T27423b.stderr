@@ -13,7 +13,3 @@ T27423b.hs:11:22: error: [GHC-89246]
 T27423b.hs:16:26: error: [GHC-76037]
     Not in scope: type variable ‘b’
 
-T27423b.hs:21:22: error: [GHC-71492]
-    • GADT constructor type signature cannot contain nested ‘forall’s or contexts
-    • In the definition of data constructor ‘MkT4’
-
