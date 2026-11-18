@@ -10,7 +10,7 @@ import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import System.Mem.StableName (makeStableName)
 import PackedVecLibrary (type (+), type (*), Vec(..), Nat(..), appendVec, boolVector, flattenRows, isSuccessor, listCount, natToInt, plus, previous, times,
-                         replicateAt, replicateNative, sourceLength, sourceVector, toList)
+                         replicateAt, replicateNative, sameNat, sourceLength, sourceVector, toList)
 
 type Flipped = '[flipBit 'False, flipBit 'True]
 
@@ -280,6 +280,50 @@ main = case (flipProof, signalProof, phaseProof) of
     print (length (toList (localInfix n)), length (toList (localFormula n)))
     print (toList (signedPrefix n m), take 1 (toList (signedPrefix bottom m)))
     print (snd (checkedProduct atZero 0 m), snd (checkedProduct atZero n m))
+    print (headOfProduct n bottom, whereHead n bottom, toList localThree)
+    print (validatedHead Z, validatedHead (S Z), nestedHead bottom, guardedFallback True)
+
+-- The call infers the erased tail through a checked constructor.
+-- Its tail can use a caller-supplied multiplication dictionary.
+headOfProduct :: Num Nat => foreach (r :: Nat) -> foreach (c :: Nat) -> Char
+headOfProduct r c =
+  let total, area :: Nat
+      total = S area
+      area = r * c
+  in headOfNonempty (replicateNative total 's')
+
+localThree :: Vec Bool 3
+localThree = let count :: Nat; count = 3 in replicateNative count True
+
+whereHead :: foreach (r :: Nat) -> foreach (c :: Nat) -> Char
+whereHead r c = headOfNonempty (replicateNative total 'w')
+  where
+    total, area :: Nat
+    total = 1 + area
+    area = r * c
+
+-- The test supplies evidence even if the caller supplied the addition method.
+validatedHead :: Num Nat => foreach (extent :: Nat) -> Maybe Char
+validatedHead extent =
+  let size :: Nat; size = 1 + extent
+  in case sameNat size (S Z) of
+       Just Refl -> Just (headOfNonempty (replicateNative size 'g'))
+       Nothing -> Nothing
+
+nestedHead :: foreach (n :: Nat) -> Char
+nestedHead n =
+  let total, one :: Nat
+      total = plus one n
+      one = S Z
+  in headOfNonempty (replicateNative total 'n')
+
+-- A failed guard goes on to the next equation.
+guardedFallback :: Bool -> Int
+guardedFallback b | b && reject = value
+  where
+    reject = False
+    value = error "forced a value from a failed guard"
+guardedFallback _ = 42
 
 -- Check references to a later declaration in a shared local signature.
 signedPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Bool (1 + rows * cols)

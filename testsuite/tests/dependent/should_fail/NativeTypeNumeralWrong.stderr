@@ -92,3 +92,30 @@ NativeTypeNumeralWrong.hs:66:8: error: [GHC-05617]
                 area = depth * stride
                 count = S area
               in replicateNative count True
+
+NativeTypeNumeralWrong.hs:76:20: error: [GHC-83865]
+    • Couldn't match type ‘size’ with ‘S extent’
+      Expected: Vec Char ((1 :: Nat) + extent)
+        Actual: Vec Char size
+    • In the first argument of ‘headOfLocal’, namely
+        ‘(replicateNative size 'x')’
+      In the expression: headOfLocal (replicateNative size 'x')
+      In the expression:
+        let
+          size :: Nat
+          size = 1 + extent
+        in headOfLocal (replicateNative size 'x')
+
+NativeTypeNumeralWrong.hs:80:27: error: [GHC-83865]
+    • Couldn't match type ‘Z’ with ‘S n0’
+      Expected: Vec Char ((1 :: Nat) + n0)
+        Actual: Vec Char size1
+    • In the first argument of ‘headOfLocal’, namely
+        ‘(replicateNative size x)’
+      In the expression: headOfLocal (replicateNative size x)
+      In an equation for ‘emptyHead’:
+          emptyHead x
+            = headOfLocal (replicateNative size x)
+            where
+                size :: Nat
+                size = 0

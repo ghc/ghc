@@ -35,3 +35,6 @@ print (toList (named 0 8))
 do { r <- newIORef (error "forced product" :: Nat); n <- readIORef r; print (take 1 (toList (named n 2))) }
 let signed :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); signed r c = let { size, area :: Nat; size = 1 + area; area = r * c } in replicateNative size True
 print (length (toList (signed 2 3)))
+let localFirst :: Vec a (1 + n) -> a; localFirst (VCons x _) = x
+let prefixHead :: foreach (n :: Nat) -> Char; prefixHead n = let { count :: Nat; count = 1 + n } in localFirst (replicateNative count 'p')
+do { ref <- newIORef (error "forced tail length" :: Nat); n <- readIORef ref; print (prefixHead n) }

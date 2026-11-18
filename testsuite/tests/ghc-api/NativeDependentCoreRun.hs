@@ -4187,7 +4187,7 @@ runPackageSourceRejectChecks = do
         , ("PiVTAQuotationRuntimeCapture", 83605, "Template Haskell", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| id @(Vec Int k) undefined |]"])
         , ("PiVTALinearRuntimeIndexRejected", 83605, "visible type argument", ["TypeApplications", "LinearTypes"], [], localActions ++ ["bad :: Nat %1 -> Int", "bad k = length (toListLocal (id @(Vec Int k) (localVector k)))"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
-        , ("LocalSignatureAliasIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
+        , ("LocalSignatureAliasDistinctIndex", 5617, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n other = let m = other in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
         , ("LocalSignatureGlobalIndex", 25897, "localVector globalIndex", [], [], localSignatures ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: PackedVec Int", "bad = let { xs :: Vec Int globalIndex; xs = localVector globalIndex } in PackVec globalIndex xs"])
         , ("LocalSignatureWrongIndexKind", 83865, "Expected kind", [], [], localSignatures ++ ["bad :: Int -> PackedVec Int", "bad n = let { xs :: Vec Int n; xs = VNil } in PackVec Z xs"])
@@ -4245,9 +4245,10 @@ runPackageSourceRejectChecks = do
                                ]
                             ++ declarations
             sourceModuleRejects name code fragment moduleName source
-    -- Check Pi formation and immutable proof transport without adding output.
+    -- Check accepted source forms and immutable proof transport without adding output.
     forM_
         [ ("OrdinaryArrowGiven", ["TypeFamilies", "FlexibleContexts"], [], ["ordinaryArrow :: forall value. value ~ (Int -> Int) => value -> Int -> Int", "ordinaryArrow f = f"])
+        , ("LocalSignatureAliasIndex", [], [], localSignatures ++ ["good :: Nat -> PackedVec Int", "good n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("IdenticalRetainedPi", ["TypeFamilies", "FlexibleContexts"], [], ["identicalPi :: (foreach (n :: Nat) -> Vec Int n) -> (foreach (n :: Nat) -> Vec Int n)", "identicalPi f = f"])
         , ("GivenRetainedPiRhs", ["TypeFamilies", "FlexibleContexts"], [], ["fromGivenPi :: forall value. value ~ (foreach (n :: Nat) -> Vec Int n) => value -> (foreach (n :: Nat) -> Vec Int n)", "fromGivenPi f = f"])
         , ("ReflRetainedPiRhs", ["TypeFamilies", "FlexibleContexts"], ["import Data.Type.Equality ((:~:)(Refl))"], ["fromReflPi :: forall value. (value :~: (foreach (n :: Nat) -> Vec Int n)) -> value -> (foreach (n :: Nat) -> Vec Int n)", "fromReflPi proof f = case proof of Refl -> f"])

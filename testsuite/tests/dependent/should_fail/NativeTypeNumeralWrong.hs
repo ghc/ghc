@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, NoStarIsType, RankNTypes, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, GADTs, NoStarIsType, RankNTypes, TypeOperators #-}
 module NativeTypeNumeralWrong where
 
 import Data.Proxy
@@ -64,3 +64,20 @@ badSigned depth stride =
         area = depth * stride
         count = S area
     in replicateNative count True
+
+-- The caller's addition method need not expose a successor.
+headOfLocal :: Vec a (1 + n) -> a
+headOfLocal (VCons x _) = x
+
+unprovedHead :: Num Nat => foreach (extent :: Nat) -> Char
+unprovedHead extent =
+    let size :: Nat
+        size = 1 + extent
+    in headOfLocal (replicateNative size 'x')
+
+-- The vector argument cannot have a successor length.
+emptyHead :: Char -> Char
+emptyHead x = headOfLocal (replicateNative size x)
+  where
+    size :: Nat
+    size = 0

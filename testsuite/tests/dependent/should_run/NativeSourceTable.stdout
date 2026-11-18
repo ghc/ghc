@@ -30,3 +30,5 @@ Go
 (3,5)
 ([True,True,True],[True])
 (True,False)
+('s','w',[True,True,True])
+(Just 'g',Nothing,'n',42)
