@@ -1383,13 +1383,9 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
              domain_cons = case splitTyConApp_maybe (coreFullView (varType index)) of
                Just (tc, _) -> tyConDataCons tc
                _ -> []
+             columns = retainedColumnNames index argument_plan
              has_value_pattern (L _ (Match { m_pats = L _ pats })) =
-               or (zipWith refutable_value [arg | arg <- argument_plan, visible_arg arg]
-                                           (drop 1 (filter isVisArgLPat pats)))
-             visible_arg RetainedConDict{} = False
-             visible_arg _ = True
-             refutable_value RetainedConValue pat = not (isRetainedVarPat pat)
-             refutable_value _ _ = False
+               or [not (isRetainedVarPat pat) | (Nothing, pat) <- zip columns (filter isVisArgLPat pats)]
        -- See Note [Ordinary patterns after a retained constructor].
        ; unless (all (`elem` cons) domain_cons &&
                  (cons `equalLength` domain_cons || any has_value_pattern matches)) $
