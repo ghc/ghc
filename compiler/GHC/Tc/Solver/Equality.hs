@@ -35,7 +35,7 @@ import GHC.Core.DataCon ( dataConName )
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
-import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo, almostDevoidCoVarOfCo )
+import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo, almostDevoidCoVarOfCo, mkUnivCoDeps, univCoDepsHoles )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
 import GHC.Core.Reduction
@@ -653,23 +653,32 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1 _ ty2 _
 can_eq_nc ces rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
   | not $ bothRewritten ces
   = -- Rewrite the two types and try again
-    do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite_if_unrewritten (ces_rwL ces) ps_ty1
-       ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite_if_unrewritten (ces_rwR ces) ps_ty2
-       ; new_ev <- rewriteEqEvidence ev NotSwapped redn1 redn2
-                                     (rewriters1 S.<> rewriters2)
-       ; traceTcS "can_eq_nc: go round again" (ppr new_ev $$ ppr xi1 $$ ppr xi2)
-
-       -- If we tried and failed to newtype-unwrap the LHS and it was already rewritten,
-       -- then preserve ces_ntL = True. If we rewrote the LHS type, then we want
-       -- to try newtype unwrapping again (e.g. for a data family/newtype instance),
-       -- so set ces_ntL = False. Ditto for ces_ntR.
-       ; let ces' = ces { ces_ntL = ces_ntL ces && ces_rwL ces
-                        , ces_ntR = ces_ntR ces && ces_rwR ces
-                        , ces_rwL = True
-                        , ces_rwR = True
-                        }
-       ; can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
+    do { preferred <- trySourceLetEquality ev eq_rel ps_ty1 ps_ty2
+       ; case preferred of
+           Just co -> do { let holes = foldr (flip addRewriter) emptyCoHoleSet
+                                        (univCoDepsHoles (mkUnivCoDeps [co]))
+                         ; setEqIfWanted ev (CPH co holes)
+                         ; stopWith ev "Solved by direct source-let equality" }
+           Nothing -> rewrite_both }
   where
+    rewrite_both
+      = do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite_if_unrewritten (ces_rwL ces) ps_ty1
+           ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite_if_unrewritten (ces_rwR ces) ps_ty2
+           ; new_ev <- rewriteEqEvidence ev NotSwapped redn1 redn2
+                                         (rewriters1 S.<> rewriters2)
+           ; traceTcS "can_eq_nc: go round again" (ppr new_ev $$ ppr xi1 $$ ppr xi2)
+
+           -- If we tried and failed to newtype-unwrap the LHS and it was already rewritten,
+           -- then preserve ces_ntL = True. If we rewrote the LHS type, then we want
+           -- to try newtype unwrapping again (e.g. for a data family/newtype instance),
+           -- so set ces_ntL = False. Ditto for ces_ntR.
+           ; let ces' = ces { ces_ntL = ces_ntL ces && ces_rwL ces
+                            , ces_ntR = ces_ntR ces && ces_rwR ces
+                            , ces_rwL = True
+                            , ces_rwR = True
+                            }
+           ; can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
+
     rewrite_if_unrewritten :: Bool -> TcType -> TcS (Reduction, CoHoleSet)
     rewrite_if_unrewritten already_rewritten ps_ty
       | already_rewritten
@@ -2720,6 +2729,64 @@ canEqReflexive :: CtEvidence    -- ty ~ ty
 canEqReflexive ev eq_rel ty
   = do { setEqIfWanted ev (mkReflCPH eq_rel ty)
        ; stopWith ev "Solved by reflexivity" }
+
+-- | Prefer one selected definition when its RHS already proves the equality.
+-- See Note [Prefer a direct local definition].
+trySourceLetEquality :: CtEvidence -> EqRel -> Type -> Type -> TcS (Maybe Coercion)
+trySourceLetEquality ev eq_rel lhs rhs
+  | isWanted ev, is_index lhs || is_index rhs = do
+      native_binders <- getNativeBinderScope
+      if not (isEmptyVarSet native_binders) then return Nothing else do
+        definitions <- getSourceLetScope
+        let candidate ty = case coreFullView ty of
+              TermVarTy value
+                | Just proof <- lookupVarEnv definitions value
+                , coVarRole proof == Nominal
+                , coVarLType proof `tcEqType` ty -> Just proof
+              _ -> Nothing
+            attempt Nothing _ = return Nothing
+            attempt (Just proof) other
+              | coVarRType proof `tcEqType` other = return (Just (mkCoVarCo proof))
+              | otherwise = do
+                  Reduction rhs_co rhs' <- rewriteFamilyAxioms (ctEvLoc ev) (coVarRType proof)
+                  Reduction other_co other' <- rewriteFamilyAxioms (ctEvLoc ev) other
+                  return $ if rhs' `tcEqType` other'
+                    then Just (mkCoVarCo proof `mkTransCo` rhs_co `mkTransCo` mkSymCo other_co)
+                    else Nothing
+            at_role co = case eq_rel of
+              NomEq -> co
+              ReprEq -> mkSubCo co
+        forward <- attempt (candidate lhs) rhs
+        case forward of
+          Just co -> return (Just (at_role co))
+          Nothing -> fmap (fmap (at_role . mkSymCo)) (attempt (candidate rhs) lhs)
+  | otherwise = return Nothing
+  where
+    is_index ty = case coreFullView ty of
+      TermVarTy{} -> True
+      _ -> False
+
+{- Note [Prefer a direct local definition]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose total = S area, and area uses a selected multiplication method.
+The Wanted total ~ 1 + area needs only the proof total ~ S area and the
+addition axiom. Fully rewriting both sides would also unfold area. That
+would record an unnecessary method use and reject an otherwise harmless
+RULE on multiplication.
+
+Before full rewriting, try the selected definition at either endpoint.
+Compare its RHS with the opposite endpoint, using only global family
+axioms. rewriteFamilyAxioms clears the local definition map and excludes
+ordinary inert evidence, plugins and caches. Keep its bounded reduction
+and source-family certificate checks. If the endpoints agree, compose
+the actual CoVar and family coercions. setEqIfWanted records only the
+CoVars that survive in this proof. Do not mark an alias merely because
+the solver considered it.
+
+This preference solves Wanteds only and does not run inside a retained
+binder comparison. It neither changes ordinary Givens nor replaces full
+rewriting. A mismatch retains the existing nested-definition behavior.
+-}
 
 {- Note [Equalities where unification fails]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

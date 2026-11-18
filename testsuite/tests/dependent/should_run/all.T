@@ -10,3 +10,7 @@ test('NativeSourceTable',
 test('NativeNumeralGhci',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      ghci_script, ['NativeNumeralGhci.script'])
+test('NativeLetIndependentRule',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     multimod_compile_and_run,
+     ['NativeLetIndependentRule', '-fomit-interface-pragmas -fno-write-if-simplified-core'])
