@@ -6506,19 +6506,19 @@ The target under R12 and R03 is the ordinary Prelude operator in
 The class operation takes an implicit dictionary. The selected method
 must agree with the source equations used for the length.
 
-- [ ] When writing the instance interface, record which checked source
+- [x] When writing the instance interface, record which checked source
       function an explicit method of a concrete instance calls as an
       exact alias. Check the actual dictionary, selector and target.
       Preserve the link in stripped and no-code interfaces.
-- [ ] For a saturated retained operand, instantiate the selector at
+- [x] For a saturated retained operand, instantiate the selector at
       the expected index domain. Check that the ordinary solver selects
       the certified dictionary for this occurrence. Use its target
       for the runtime call and the M81 index. Keep the source span of
       the selector. An abstract dictionary cannot justify the equations.
-- [ ] Change the method in a separately compiled producer. An unchanged
+- [x] Change the method in a separately compiled producer. An unchanged
       client must lose a proof which depended on the old method. Check a
       second selector of the same type and a non-alias implementation.
-- [ ] Run the example with lengths read from IO. Check ignored sums
+- [x] Run the example with lengths read from IO. Check ignored sums
       and partially defined lengths with both compiler stages. Update
       the Showcase, the guide and the R12 work queue.
 
@@ -6526,3 +6526,81 @@ Agda resolves a class-like field relative to the selected record.
 The Haskell precedent is GHC's class selector and dictionary selection
 rule. The source-level equality must survive `-fomit-interface-pragmas`.
 See [instance-method precedents](REFERENCES.md#instance-methods-used-as-indices).
+
+### Implementation
+
+The producer matches the generated dictionary constructor and the
+checked instance method definition. It records the actual selector and
+source target on the dictionary. The client records all three names as
+ABI dependencies. Changing a method from `forward = turn` to
+`forward = stay` therefore invalidates an unchanged client even when
+both functions have the same type and keep their original equations.
+
+At the call site, GHC obtains a candidate from the method's result
+domain. A delayed constraint then checks the evidence for the ordinary
+class Wanted at the selector's span. A passed-in dictionary, including
+one obtained from a superclass, cannot establish this ground instance.
+GHC checks the operands and rewrite rules before issuing the evidence
+obligation. If a later operand fails, error recovery keeps the original
+dictionary Wanted with its check. A bad second operand should be the
+only error for a call whose first operand uses known addition.
+
+The expansion uses the certified target as the runtime function. M81
+already tracks its result index and emits a lazy STG thunk. This step
+needs no new Core expression or equality axiom. The producer publishes
+its certificate at module completion. Calls in the module that defines
+the instance can use the source function directly.
+
+A raw runtime literal is a separate operation. `replicateAt 3 True`
+uses a type argument. `replicateNative 3 True` would need evidence
+about the actual `fromInteger` used for that literal.
+See [runtime literal research](REFERENCES.md#a-runtime-literal-in-a-retained-argument).
+
+### Validation
+
+On M81 the application failed at the operator with GHC-83605. With the
+concrete instance, the executable read one and two from IO and returned
+`[True,True,True]`. Ignoring the computed index returned `17` when both
+inputs were undefined. With one as the first length and an undefined
+second length, the first vector cell was available and inspecting its
+tail raised the expected exception. The STG dump shows one updatable
+call to `plus` for each computed operand.
+
+The new interface version is `100120261115167`. The old and new readers
+each rejected the other header. A `-fno-code -fwrite-interface` producer
+retained both private method targets. An unchanged client lost its proof
+when just the selected method changed. A producer with ordinary Core
+also published its method aliases at `-O2`. A separately compiled
+`NoExperimentalDependentTypes` client used the private target at `-O0`
+and observed the returned constructor. Native dependent modules still
+require `-O0`.
+
+The incremental build initially left 43 library registrations pointing
+at installed interfaces with the old header. Hadrian's
+`--rebuild=<package-conf-target>` recopied each affected package.
+The installed vanilla, dynamic and profiling interface headers then
+agreed with the new compiler.
+
+Both stages matched the 154-line Showcase across 18 modules. Each
+passed 19 source checks of dictionary selection, including explicit
+`@Nat`, a user-defined class with different equations, and typed
+quotes. The lexical, superclass, quantified and GADT dictionary cases
+rejected at the operator with and without deferred type errors. An
+unrelated class constraint allowed the call. Seven rewrite-rule cases
+per stage covered rules on the producer, the consumer on either side
+of a declaration splice, and an imported orphan module. The self-hosted
+GHCi evaluated the ground call and rejected an abstract dictionary.
+The bootstrap command-line compiler lacks interactive mode.
+
+The GHC driver passed all 29 selected normal-way tests and skipped
+120 cases in other ways. These include the interface-only method change,
+the non-deferrable diagnostic, and both existing dictionary optimisation
+and boot-file tests for T27704. Fourmolu's installed parser rejects the
+experimental extension. Cabal Gild reports existing formatting in the
+generated package description.
+
+In a typed quote, the dictionary test uses constructor operands in the
+GADT branch. A separate test put ordinary lambda-bound lengths in that
+branch. Both direct and overloaded addition stopped at multiplicity
+checking and printed `Many` for the reported mismatch. Diagnosing this
+lambda case remains open.

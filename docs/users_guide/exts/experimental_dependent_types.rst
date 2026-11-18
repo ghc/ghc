@@ -67,33 +67,33 @@ The library also provides ``replicateAt 3 x :: Vec a 3``, using
 length in the type. For a length ``n`` read at runtime, its retained
 counterpart is ``replicateNative n x :: Vec a n``.
 
-A checked source function can also compute a retained argument. For
-example, both lengths in the following program can come from IO::
+A retained argument can also be a sum of two lengths read from IO::
+
+    import PackedVecLibrary (Nat, Vec, type (+), replicateNative)
 
     fillSum :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Bool (n + m)
-    fillSum n m = replicateNative @Bool (plus n m) True
+    fillSum n m = replicateNative (n + m) True
 
-GHC uses the equations certified for that particular ``plus`` to check
-the result type. The executable passes the computed sum lazily. This
-form accepts a fully applied monomorphic source function whose operands
-are named values or nullary constructors. A local parameter of type
-``Nat -> Nat -> Nat`` alone supplies no such equations. The producer's
-interface supplies them to separately compiled clients.
+The signature uses the library's type operator. The body uses the
+standard overloaded ``Prelude.(+)``. The library defines ``(+) = plus``
+in its ``Num Nat`` instance. Its interface records both that alias and
+the checked equations for ``plus``. GHC checks that this call uses the
+same dictionary before relying on the sum in the result type. The
+runtime sum stays lazy.
 
-The ordinary function can also be an operator. For example, if
-``NativeAdd`` defines the Peano equations on ``(+) :: Nat -> Nat -> Nat``,
-a client can write::
+A call can also use the source function directly, as in
+``replicateNative (plus n m) True``. The function must be monomorphic
+and fully applied to named values or nullary constructors. A user-defined
+operator can supply these equations in the same way as a named function.
 
-    import Prelude hiding ((+))
-    import NativeAdd ((+))
-    import PackedVecLibrary (Nat, Vec, replicateNative)
-
-    fillSum :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Bool (n + m)
-    fillSum n m = replicateNative @Bool (n + m) True
-
-With the standard ``Prelude.(+)``, GHC cannot yet use the selected
-``Num Nat`` method as a retained index. Ordinary numeric term expressions
-still use that instance.
+For a class method, the current implementation accepts a concrete
+instance of a one-parameter class. The method must return its class
+parameter and name a checked function as its complete definition.
+The producer enables :extension:`ExperimentalDependentTypes` to
+publish this information. A client reads it from the completed
+interface. Within the instance module, use ``plus n m`` directly.
+An abstract ``Num Nat`` dictionary passed to the client
+cannot establish the addition equations.
 
 Retained arguments
 ------------------

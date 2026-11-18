@@ -818,6 +818,15 @@ of its dependent payload and result. Core-to-STG introduces a shared thunk
 after type erasure. See Note [Source calls in retained arguments] in GHC.Core
 and Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
 
+For a retained class method, the typechecker can provisionally use the
+source function named by a dictionary field in the producer interface.
+Before the program reaches Core, the solver checks that the ordinary
+dictionary constraint selects that exact instance. Both the runtime
+expression and its index use the certified function. Core and STG use
+the same call representation as for a direct
+application of the function. See Note [Dictionary selection in retained
+arguments] in GHC.Tc.Gen.App.
+
 CorePrep names a retained constructor argument with a checked case alias:
 `case S k of t { DEFAULT [cv] -> ... }`. Core Lint derives
 `cv :: TermVarTy t ~# 'S (TermVarTy k)` from the exact scrutinee. It requires

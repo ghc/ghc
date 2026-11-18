@@ -52,15 +52,15 @@ lengths from IO, and the result type records their sum.
 
 ```haskell
 fillSum :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Bool (n + m)
-fillSum n m = replicateNative @Bool (plus n m) True
+fillSum n m = replicateNative (n + m) True
 ```
 
-GHC uses the checked equations of the `plus` that appears in the call.
-A module can instead define those equations on `(+) :: Nat -> Nat -> Nat`.
-With `import Prelude hiding ((+))` and that operator in scope, both
-the signature and the body can use `n + m`. The standard overloaded
-`Num` method still requires evidence tying the selected instance to the
-checked equations. The [Showcase](Showcase.hs) also passes an undefined
+Here the body uses the ordinary overloaded `Prelude.(+)`. The vector
+library defines `(+) = plus` in its `Num Nat` instance. Its interface
+records that method definition. The typechecker checks that this call
+uses the same dictionary before relying on the equations of `plus`.
+An abstract `Num Nat` dictionary supplied by a caller cannot establish
+those equations. The [Showcase](Showcase.hs) also passes an undefined
 sum to a function that ignores its length.
 
 ### What happens on empty input?
@@ -257,7 +257,7 @@ The field `m` can be unknown. [Vector library](examples/packed-vector/PackedVecL
 | Parameterized index domains | M56 retains closed `[Bool]`, `Maybe Nat` and `Tree Bool` values through source, Core, interfaces and native lowering |
 | Safe list indexing | M60 combines `Fin (Count xs)` with a retained `[Bool]`; both stages pass runtime bounds, lazy access and equal-count reuse |
 | Source domain conversion | M58 checks nominal scalar-domain conversion and ordinary payload inference in a private body solve; recursive domain reduction uses the solver depth limit |
-| Configured fork version | `10.1.20261115.1`, interface version `100120261115166`, HIE version `100120261115164`. Both compiler stages build in the isolated checkout. |
+| Configured fork version | `10.1.20261115.1`, interface version `100120261115167`, HIE version `100120261115164`. Both compiler stages build in the isolated checkout. |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |

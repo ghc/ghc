@@ -4557,7 +4557,7 @@ and [Agda 2.8.0, local definitions](https://agda.readthedocs.io/en/v2.8.0/langua
 
 ### Instance methods used as indices
 
-The next example under R12 is the ordinary `Num` selector in
+The first R12 example uses the ordinary `Num` selector in
 `replicateNative (n + m) x`. Agda models an overloaded operation as a
 field of the selected instance record. A local record can give that field
 a different implementation. The `singletons-th` instance promoter
@@ -4565,17 +4565,44 @@ similarly uses the method declarations of the particular instance.
 [Agda 2.8.0, instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#defining-type-classes)
 and [pinned instance promotion in singletons-th](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L541-L565).
 
-In GHC, the checked application contains the dictionary selected for
-that occurrence. A possible next step is to connect its addition method
-to the certified source function when the instance definition is exactly
-`(+) = plus`. A dictionary supplied by a caller needs separate evidence.
-Ordinary optimisation unfoldings can be omitted from an interface.
-In the stripped packed-vector interface, `$fNumNat` has `DFunId`
-and an empty information list. The separate `plus` declaration names
-its checked family. The dictionary entry supplies no link between them.
-An implementation must preserve the connection under
-`-fomit-interface-pragmas`. A certificate for addition would still say
-nothing about the independent `fromInteger` method.
+GHC's class-selector reduction selects a field of a particular dictionary.
+M82 checks the generated dictionary constructor, its selector slot and
+the checked method body. When the instance defines `(+) = plus`, the
+dictionary's interface records the actual selector and target. In M81
+the stripped dictionary declaration contained only `DFunId` with an empty
+information list. The extra information has to survive
+`-fomit-interface-pragmas` for an independently compiled client.
 [GHC's evidence representation](../../compiler/GHC/Tc/Types/Evidence.hs),
 [instance method checking](../../compiler/GHC/Tc/TyCl/Instance.hs),
 and [interface exposure policy](../../compiler/GHC/Driver/Config/Tidy.hs).
+
+For the client, an instance lookup supplies a candidate. A delayed check
+inspects the evidence for the ordinary dictionary constraint at that
+operator occurrence. It must lead to the certified dictionary before GHC
+can accept the index. This lets the ordinary solver decide which dictionary
+a lexical constraint or instance supplies. A certificate for addition says
+nothing about `fromInteger`, a different method of the same class.
+[Dictionary selection in retained arguments](../../compiler/GHC/Tc/Gen/App.hs)
+and [the solver's evidence check](../../compiler/GHC/Tc/Solver/Solve.hs).
+
+### A runtime literal in a retained argument
+
+Agda elaborates an overloaded numeral with the selected `fromNat`
+conversion. Its builtin natural numbers have a separate registration
+for the zero and successor constructors. These designs share the
+expression used for the value and its index.
+[Agda literal overloading](https://agda.readthedocs.io/en/v2.8.0/language/literal-overloading.html#natural-numbers)
+and [builtin natural numbers](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#natural-numbers).
+
+In GHC, the typechecked runtime literal carries its conversion in
+`ol_witness`. The packed-vector library gives `FromNatural` and
+`Num.fromInteger` separate definitions. A different instance could
+return zero for every runtime literal and still register type-level
+`3` as three successors. A future implementation that preserves
+ordinary Haskell numeric syntax must justify the actual conversion
+for the given literal. The checked `(+)` field alone provides no
+evidence for this step. For `n + 1`, Core must also admit the
+certified literal as an operand of the source call.
+[Overloaded literal checking](../../compiler/GHC/Tc/Gen/Head.hs),
+[literal desugaring](../../compiler/GHC/HsToCore/Match/Literal.hs),
+and [the two vector-library conversions](examples/packed-vector/PackedVecLibrary.hs).
