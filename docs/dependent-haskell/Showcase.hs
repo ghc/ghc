@@ -53,6 +53,7 @@ import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified NativeMultiPackage as Packages
+import qualified OpenSource
 import qualified OpaqueCallClient as Opaque
 import qualified OrdinaryVecClient as Ordinary
 import qualified ParameterizedIndexLibrary as Parameterized
@@ -82,6 +83,7 @@ Run from the repository root with this fork's matching compiler and libraries:
     -idocs/dependent-haskell/examples/packed-vector \
     -idocs/dependent-haskell/examples/qualified-pi \
     -idocs/dependent-haskell/examples/closed-evaluation \
+    -idocs/dependent-haskell/examples/open-evaluation \
     -outputdir _build/showcase docs/dependent-haskell/Showcase.hs \
     -o _build/showcase/showcase
   _build/showcase/showcase
@@ -816,6 +818,8 @@ main = do
         (Refl :: Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2])
     observe "sum of a list reversed during type checking"
         (TypeNats.natVal (Proxy @(Prelude.sum (Prelude.reverse '[2, 3, 5]))))
+    observe "an imported character case selects between two unknown types"
+        (OpenSource.routedFirst False (42 :: Int), OpenSource.routedSecond False (42 :: Int))
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])

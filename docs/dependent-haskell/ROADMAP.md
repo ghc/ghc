@@ -156,8 +156,8 @@ argument is still unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Use the inferred type of an intermediate result throughout a chain of qualified calls. Test static kind errors against a failing inner computation. | M106 handles nested ordinary calls on the supported input kinds. General closed expressions and recursive result representations remain open. |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check proposal #509’s exported equality `Data.Char.toUpper c ~ uc` when the client instantiates `c`. Specify the nominal evidence for that reduction. | M104 handles a named wildcard that becomes a literal inside the producer’s inference group. A rigid parameter can remain unknown until a client supplies it. R17–R19 also depend on R05 and R16. |
+| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Use a computed `Natural`, `Bool` or list result as the argument to another call, starting with `odd (sum …)`. | M106 checks kinds and instances before executing a chain. [M108](PLAN.md#m108-accept-a-computed-value-at-each-supported-result-kind) specifies conversion for the other result shapes. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check proposal #509’s exported equality `Data.Char.toUpper c ~ uc` when the client instantiates `c`. [M109](PLAN.md#m109-carry-an-open-call-in-an-exported-equality) specifies what Core Lint and a separate client must check. | M104 retries a call in the producer’s inference group. M107 selects a rigid result operand across an imported character case. An application on an unknown character still needs interface representation and nominal evidence. R17–R19 also depend on R05 and R16. |
 | R21, dependency analysis | Allow the producer to be defined in the consumer module, respecting declaration order and cycles. | A separately compiled producer lets R15 proceed while R21 remains open. |
 
 [R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
@@ -223,6 +223,7 @@ evaluator work has priority.
 | 45 | R16: retry after local inference | [M104](PLAN.md#m104-retry-a-type-call-after-inference-determines-its-input) | A pattern fixes the input. GHC checks the computed result before generalization. An ordinary client reads the concrete signature from the interface. |
 | 46 | R15: lists as results | [M105](PLAN.md#m105-return-a-promoted-list-from-a-closed-call) | Prelude's ordinary `reverse` checks a list equality. The checked scalar element kind determines how to read the result, including for an empty list. |
 | 47 | R15: nested closed calls | [M106](PLAN.md#m106-check-a-closed-call-inside-another-closed-call) | A reversed list supplies the argument to an ordinary `sum`. The client records dependencies on both producers. |
+| 48 | R16: observe a character case | [M107](PLAN.md#m107-observe-a-character-case-with-rigid-result-operands) | An imported worker selects between two rigid types. The API regression records and checks the selected branches against its typed Core. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

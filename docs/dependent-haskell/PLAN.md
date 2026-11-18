@@ -8037,3 +8037,95 @@ decimal fold produced `532`. Replacing only the inner or only the outer
 producer's object changed the result from `10` to `8` or `11` while the
 producer ABIs remained fixed. The selected suite covered 20 tests. The
 compiled Showcase and GHCi agreed on 182 lines.
+
+The checker now prepares the complete unary chain before it executes
+the inner action. The three-deep wrong-kind test reports the operand's
+list kind before a failing element can run. The corresponding well-kinded
+chain reports the exception at that inner function. Missing instance
+evidence also rejects the chain with deferred type errors enabled.
+
+## M107: observe a character case with rigid result operands
+
+R16 can follow an ordinary case whose scrutinee is known while the
+result types in its branches remain unknown. The worker `route` has
+type `Char -> t -> t -> t`. A consumer uses the ordinary functions
+`route 'x'` and `route '!'` through two imported polymorphic wrappers.
+
+- [x] Select the covered literal and the default branch using their
+      actual typed Core. Preserve the branch's demand on its selected
+      operand and the distinction between the caller's type variables.
+- [x] Read the worker from the producer interface and record its use
+      in the consumer interface. Reject a body that returns the other
+      rigid operand.
+- [x] Record and replay the chosen alternatives in a GHC API regression.
+      Check producer identity and the linted body. Reject a wrong result,
+      a forged default, a missing step and an extra step.
+
+Both compiler stages accepted the routed source examples. Changing only
+the worker's selected branch made the unchanged client fail at its
+binding. The 22 selected normal-way tests and the dedicated GHCi test
+passed. Both compiled Showcase runs and GHCi agreed on 183 lines.
+GHCi also stopped at a runtime breakpoint in `OpenProducer.routeLeft`
+after checking the type through that same breakpoint.
+
+M109 tracks the separate obligation to carry a blocked application across
+the interface and prove its reduction at a client.
+
+[Source case and evidence](roadmap/R16-open-term-evaluator.md#selecting-a-type-with-a-known-character)
+and [design references](REFERENCES.md#checking-a-reduction-across-an-interface).
+
+## M108: accept a computed value at each supported result kind
+
+R15 can return `Natural`, `Char`, `Bool`, and lists of those types. M106
+can pass a computed `Char` or `[Natural]` to another call. The result of
+`sum` has type `Natural`, so this proof needs the same kind-directed
+conversion in the other direction:
+
+```haskell
+evenSum :: Prelude.odd (Prelude.sum '[2, 3, 5]) :~: 'False
+evenSum = Refl
+```
+
+- [ ] Choose the runtime representation from the checked result kind.
+      Reuse GHC's data constructors and literal builders. Check a natural
+      larger than a machine word, both Boolean constructors, strings with
+      escapes and empty lists of different element kinds.
+- [ ] Keep literal inference independent of the caller's claimed result.
+      A computed empty list has an element kind. An unannotated source
+      `'[]` passed to `Prelude.reverse` already specializes to `[Natural]`.
+- [ ] Reject a computed empty list of the wrong element kind and a
+      polymorphic result that its operand does not determine. Run the
+      existing staging and separate-compilation controls.
+
+[Kind-directed conversion in singletons](REFERENCES.md#reifying-closed-list-results).
+
+## M109: carry an open call in an exported equality
+
+Use the module boundary in draft proposal #509. A producer exports a
+function with constraints `(Worker.convert c ~ uc, KnownChar uc)`.
+An ordinary client chooses a character and must supply the equality
+and the dictionary. Start with a worker that changes one literal and
+returns its input in the default branch.
+
+- [x] Test the existing unfolding as a baseline. Fresh reader processes
+      read only the producer's `.hi`, check its resolved name and replay
+      the mapped and default character branches. Changing one branch
+      changes the declaration fingerprint even for an unaffected input.
+      Omitting the optional unfolding leaves the reader without a body.
+- [ ] Tie the checked case definition to the worker's resolved name.
+      Record its declaration dependency. Check which producer data remain
+      available when ordinary optimization unfoldings are omitted.
+- [ ] Represent the saturated call in the producer interface. Keep it
+      opaque when its operand is a skolem. The result of this function
+      does not determine its input.
+- [ ] At a known operand, produce a nominal equality whose endpoints
+      Core Lint can reconstruct from checked information. Reject an
+      altered definition or branch. Check the interface in a fresh process.
+- [ ] Compile an ordinary client using only interfaces, then link it.
+      Test mapped and default characters, preserve demand on a rigid
+      operand, and invalidate the client after an unchanged-signature edit.
+      Run the exact `Data.Char.toUpper` example once its producer can
+      publish the required information.
+
+[Exported signature and evidence](roadmap/R16-open-term-evaluator.md#an-equality-that-crosses-a-module-boundary)
+and [proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).

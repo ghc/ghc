@@ -5081,8 +5081,20 @@ Draft proposal #509 specifies argument normalization before execution of
 the function. For R15 this makes an exception in the inner list visible
 at the inner call, even when the outer Haskell function ignores its
 input. The inner call has its own inferred kind. The fork uses that kind
-to specialize the outer function. Agda's case trees address a distinct
+to specialize the outer function. It checks those kinds across the chain before
+executing the prepared calls. Agda's case trees address a distinct
 question on R16, where a scrutinee can remain unknown.
 [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509),
 [GHC's bidirectional type checker](../../compiler/GHC/Tc/Gen/HsType.hs)
 and [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
+
+### Character cases in imported Core
+
+GHC's boxed `Char` has a strict primitive field. The desugared worker
+first matches the wired-in constructor and then selects an alternative
+on the primitive literal. GHCi can annotate the same expression with
+a debugger breakpoint. The open observer needs the expression under
+that annotation. The runtime debugger uses the original Core.
+[GHC wired-in types](../../compiler/GHC/Builtin/WiredIn/Types.hs),
+[breakpoint insertion](../../compiler/GHC/Driver/Config/HsToCore/Ticks.hs)
+and [GHC's interface expression reader](../../compiler/GHC/IfaceToCore.hs).

@@ -27,6 +27,12 @@ Prelude's ordinary `const`. Making an imported projection strict in an
 unknown argument produces an error at the call.
 [Projection examples](roadmap/R16-open-term-evaluator.md#selecting-between-two-type-variables).
 
+An ordinary character case can also select the type. The two projections
+in the Showcase receive the same arguments, `False` and `42 :: Int`.
+The imported worker matches `'x'` in one projection and uses its default
+branch in the other. The results have types `Bool` and `Int`.
+[Character case](roadmap/R16-open-term-evaluator.md#selecting-a-type-with-a-known-character).
+
 A type can also call an ordinary installed library function on a known
 character. The Showcase reflects `Data.Char.toUpper 'x'` as `'X'` and checks
 `Data.Char.isDigit '7' :~: 'True` with `Refl`.
@@ -346,6 +352,7 @@ _build/stage1/bin/ghc --make -O0 -fomit-interface-pragmas \
   -idocs/dependent-haskell/examples/packed-vector \
   -idocs/dependent-haskell/examples/qualified-pi \
   -idocs/dependent-haskell/examples/closed-evaluation \
+  -idocs/dependent-haskell/examples/open-evaluation \
   -outputdir _build/showcase docs/dependent-haskell/Showcase.hs \
   -o _build/showcase/showcase
 _build/showcase/showcase

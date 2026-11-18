@@ -41,6 +41,36 @@ and [consumer](../examples/open-evaluation/OpenSource.hs). The
 [strictness references](../REFERENCES.md#strict-and-lazy-open-projections)
 give the Haskell and Agda precedents for this check.
 
+## Selecting a type with a known character
+
+An ordinary producer can select between two unknown types by inspecting a
+known character. The two exported functions choose different branches.
+
+```haskell
+route :: Char -> t -> t -> t
+route 'x' l _ = l
+route _   _ r = r
+
+routeLeft, routeRight :: t -> t -> t
+routeLeft  = route 'x'
+routeRight = route '!'
+```
+
+In the client, the two operands of `OpenProducer.routeLeft a b` are
+distinct rigid type variables. The type checker reads the worker's Core,
+matches the character, and returns `a`. With `routeRight`, it returns
+`b`. Calling the two projections on `False` and `42 :: Int` returns
+`False` and `42`, respectively. If the selected path demands a rigid
+operand, GHC reports that operand at the call.
+The observer checks the wired-in character data constructor in the
+worker's Core. GHC desugars the character alternatives into a case on
+its `Char#` field. In GHCi these provider modules retain their unfoldings
+in bytecode mode. The observer reads through a debugger breakpoint when
+checking the type.
+[Worker](../examples/open-evaluation/OpenAlias.hs),
+[client](../examples/open-evaluation/OpenSource.hs)
+and [separate-compilation test](../examples/open-evaluation/check-source.sh).
+
 ## Inferring a character from a pattern
 
 ```haskell
@@ -172,10 +202,13 @@ behind the installed library function. This example has three checks.
   producer's selected branch without changing its signature must cause
   the unchanged client to check its equality again.
 
-A GHC API experiment read the desugared Core for an ordinary producer and
-its importer. The producer changed `'x'` to `'X'`, changed `'é'` to `'É'`
-and returned its input in the default branch. An experimental observer
-selected all three results and stayed blocked on the exact rigid operand.
+The [GHC API regression](../../../testsuite/tests/ghc-api/OpenCharBranchWitness.hs)
+reads the desugared Core for an ordinary producer and its importer. The producer changed `'x'` to `'X'`, changed `'é'` to `'É'`
+and returned its input in the default branch. The observer selects all three results and stays blocked on the exact rigid operand.
+The test records a proposed ground reduction and replays its selected
+alternatives against the linted definition. It rejects a changed
+producer, a missing step and a wrong result. The trace lives in memory.
+An exported equality still needs a representation and nominal evidence.
 
 The default branch exposed a demand requirement. GHC shares the default
 code in a local function that takes an unboxed unit. The observer could
@@ -192,3 +225,22 @@ A checked step for a case must also identify the imported definition and
 preserve its demand on the scrutinee. [Core Lint](../../../compiler/GHC/Core/Lint.hs),
 [GHC's literal rules](../../../compiler/GHC/Builtin/WiredIn/TypeLits.hs)
 and [research references](../REFERENCES.md#checking-a-reduction-across-an-interface).
+
+Fresh GHC API processes replayed the character cases from the ordinary
+producer's `.hi` alone. A rebuild with the same body preserved the
+declaration hash. Changing one branch invalidated the old hash, even
+when a reader inspected another branch. The check failed as expected
+when the producer omitted its optional unfolding. Persistent evidence
+therefore needs a producer declaration that supplies the checked
+information under the supported compilation flags.
+
+The next proposed interface test has three modules. An ordinary worker
+changes one character and returns the default input unchanged. A second
+module exports a `p3`-style signature over that worker. The third imports
+the signature and discharges it at a literal with only interfaces
+available. Inspect the produced nominal coercion with Core Lint, then
+change the worker and require the unchanged third module to recheck.
+GHC's built-in family prover is pure. A design that reuses it must load
+and validate its input before checking the coercion endpoints. A private
+certificate tied to the resolved producer declaration is one candidate.
+The certificate representation and the coercion remain open.

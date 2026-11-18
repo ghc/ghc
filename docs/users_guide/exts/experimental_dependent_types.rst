@@ -302,6 +302,16 @@ The client records each definition it uses. The usual type variable
 lookup takes precedence. For example, an explicit type binder named
 ``id`` still denotes that binder.
 
+The function can select an operand by inspecting a known character.
+For example, an ordinary worker can implement ``route 'x' l _ = l``
+and ``route _ _ r = r``. If an imported ``routeLeft`` has type
+``t -> t -> t`` and definition ``route 'x'``, then
+``routeLeft a b`` reduces to ``a`` in the client signature.
+The consumer records the worker definition it used. A producer loaded
+as bytecode in GHCi can supply its unfoldings with
+:ghc-flag:`-fno-unoptimized-core-for-interpreter` and
+:ghc-flag:`-fno-omit-interface-pragmas`.
+
 For a class method, the current implementation accepts a concrete
 instance of a one-parameter class. The method must return its class
 parameter and name a checked function as its complete definition.
