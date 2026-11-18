@@ -20,6 +20,7 @@ import GHC.Core.DataCon (dataConWrapperType)
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
+import GHC.Core.Utils (applyTypeToArgs)
 import GHC.Hs
 import GHC.Tc.Types.Evidence
 import GHC.Types.Id
@@ -225,10 +226,23 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
       in mkFunctionType unmatchableDataConTy mult exp_arg exp_res
     go (WpCast co)        = liftPRType $ \_ -> coercionRKind co
     go (WpEvLam v)        = liftPRType $ mkInvisFunTy (idType v)
+    -- See Note [Invisible retained operands in wrappers].
+    go (WpEvApp (EvExpr arg)) = liftPRType $ \t -> case coreFullView t of
+      DepFunTy DepFunInvisible _ _ -> applyTypeToArgs t [arg]
+      _ -> funResultTy t
     go (WpEvApp _)        = liftPRType $ funResultTy
     go (WpTyLam tv)       = liftPRType $ mkTyCoForAllTy unmatchableDataConTy tv Inferred
     go (WpTyApp ta)       = \(ty,tas) -> (ty, ta:tas)
     go (WpLet _)          = id
+
+{- Note [Invisible retained operands in wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An inferred invisible retained argument uses WpEvApp with its checked
+Core operand. See Note [Inferring an invisible retained argument] in
+GHC.Tc.Gen.App. This wrapper applies a runtime operand, so substitute its
+index into the result with applyTypeToArgs. funResultTy handles ordinary
+evidence arrows but cannot compute a retained application result.
+-}
 
 matchGroupTcType :: MatchGroupTc -> Type
 matchGroupTcType (MatchGroupTc args res _) = mkScaledFunTysU args res
