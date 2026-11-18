@@ -245,7 +245,8 @@ data IfaceDecl
   | IfaceAxiom { ifName       :: IfaceTopBndr,        -- Axiom name
                  ifTyCon      :: IfaceTyCon,     -- LHS TyCon
                  ifRole       :: Role,           -- Role of axiom
-                 ifAxBranches :: [IfaceAxBranch] -- Branches
+                 ifAxBranches :: [IfaceAxBranch], -- Branches
+                 ifAxSourceSpans :: [SrcSpan]    -- See Note [Source table locations in interfaces] in GHC.Iface.Binary
     }
 
   | IfacePatSyn { ifName          :: IfaceTopBndr,           -- Name of the pattern synonym
@@ -2428,7 +2429,7 @@ instance Binary IfaceDecl where
         put_ bh a9
         put_ bh a10
 
-    put_ bh (IfaceAxiom a1 a2 a3 a4) = do
+    put_ bh (IfaceAxiom a1 a2 a3 a4 _) = do
         putByte bh 6
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -2526,7 +2527,7 @@ instance Binary IfaceDecl where
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
-                    return (IfaceAxiom a1 a2 a3 a4)
+                    return (IfaceAxiom a1 a2 a3 a4 [])
             7 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
@@ -3210,11 +3211,11 @@ instance NFData IfaceDecl where
     IfaceClass f1 f2 f3 f4 f5 f6 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
 
-    IfaceAxiom nm tycon role ax ->
+    IfaceAxiom nm tycon role ax spans ->
       rnf nm `seq`
       rnf tycon `seq`
       rnf role `seq`
-      rnf ax
+      rnf ax `seq` rnf spans
 
     IfacePatSyn f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq`

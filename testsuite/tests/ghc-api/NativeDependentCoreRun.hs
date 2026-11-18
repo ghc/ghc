@@ -41,6 +41,7 @@ import GHC.Driver.Phases (Phase (StopLn), StopPhase (NoStop))
 import GHC.Driver.Pipeline (compileFile, oneShot)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Iface.Binary (CheckHiWay (CheckHiWay), TraceBinIFace (QuietBinIFace), readBinIface)
+import GHC.Iface.Syntax (IfaceDecl(IfaceAxiom, ifAxSourceSpans))
 import GHC.Runtime.Interpreter (evalString)
 import GHC.Types.Error (Diagnostic (diagnosticCode), DiagnosticCode (..), MsgEnvelope (..), getMessages, pprDiagnostic)
 import GHC.Types.Id
@@ -60,7 +61,7 @@ import GHC.Types.Var.Set
     , emptyVarSet, extendVarSet, filterVarSet, lookupVarSet, sizeVarSet, unionVarSet
     )
 import GHC.Unit.Module.ModGuts (CgGuts (cg_binds), ModGuts (mg_binds, mg_tcs))
-import GHC.Unit.Module.ModIface (mi_hash_fn, mi_mod_hash)
+import GHC.Unit.Module.ModIface (mi_decls, mi_hash_fn, mi_mod_hash)
 import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
 import GHC.Utils.Outputable (ppr, vcat)
 import GHC.Utils.Panic (GhcException (..))
@@ -2130,6 +2131,55 @@ runRecompilationChecks libdir = do
                         && all (`isInfixOf` showSDoc flags (pprDiagnostic (errMsgDiagnostic envelope))) ["Int", "Bool", "choose"]
             unless (any matches messages) $
                 fail ("FAIL: stale native consumer has the wrong diagnostic: " ++ showSDoc flags (vcat (map (pprDiagnostic . errMsgDiagnostic) messages)))
+    -- Moving a clause changes its source location. Changing its result
+    -- invalidates the proof, even when the interface omits unfoldings.
+    let withFlipBit body = unlines
+            [ "{-# LANGUAGE ExperimentalDependentTypes #-}"
+            , "module NativeRetainedLibrary (flipBit) where"
+            , "flipBit :: Bool -> Bool"
+            , body
+            ]
+        table falseRow = withFlipBit (falseRow ++ "\nflipBit True = False")
+        proofSource = unlines
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}"
+            , "module NativeRetainedUsage where"
+            , "import NativeRetainedLibrary (flipBit)"
+            , "import Data.Type.Equality"
+            , "proof :: flipBit 'False :~: 'True"
+            , "proof = Refl"
+            ]
+    first <- producer (table "flipBit False = True")
+    writeFile consumerSource proofSource
+    void $ consumer True
+    setModificationTime consumerSource sourceTime
+    forM_ [consumerObject, consumerInterface] $ \path -> setModificationTime path objectTime
+    moved <- producer (table "\nflipBit False = True")
+    let equationLines iface =
+            [ srcSpanStartLine loc
+            | (_, IfaceAxiom{ifAxSourceSpans = spans}) <- mi_decls iface
+            , RealSrcSpan loc _ <- spans
+            ]
+    unless (equationLines first == [4, 5] && equationLines moved == [5, 6]) $
+        fail "FAIL: source equation locations did not survive an interface round trip"
+    unless (mi_mod_hash first == mi_mod_hash moved) $
+        fail "FAIL: moving a source equation changed the module ABI"
+    checkSkipped
+    void $ producer (table "flipBit False = False")
+    wrong <- try (void (consumer False))
+    GHC.runGhc (Just libdir) $ checkSourceRejection "changed source equation" 83865 "False" wrong
+    -- An absent table permits implicit quantification over the same spelling.
+    void $ producer (withFlipBit "flipBit b = b")
+    writeFile consumerSource $ unlines
+        [ "{-# LANGUAGE ExperimentalDependentTypes #-}"
+        , "module NativeRetainedUsage where"
+        , "import NativeRetainedLibrary (flipBit)"
+        , "p :: flipBit () -> flipBit ()"
+        , "p x = x"
+        ]
+    void $ consumer True
+    void $ producer (table "flipBit False = True")
+    newTable <- try (void (consumer False))
+    GHC.runGhc (Just libdir) $ checkSourceRejection "new source table" 83865 "Bool" newTable
     putStrLn "module fingerprint/recompilation checks: ok"
 
 -- | Compile a source module, link its object code, and run the binary.

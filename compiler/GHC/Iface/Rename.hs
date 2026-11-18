@@ -628,6 +628,7 @@ rnIfaceDecl = \case
     { ifName       = name0
     , ifTyCon      = tycon0
     , ifAxBranches = ax_branches0
+    , ifAxSourceSpans = spans
     , ifRole       = role
     } -> do
     name        <- rnIfaceNeverExported name0
@@ -638,6 +639,7 @@ rnIfaceDecl = \case
         { ifName       = name
         , ifTyCon      = tycon
         , ifAxBranches = ax_branches
+        , ifAxSourceSpans = spans
         , ifRole       = role
         }
   IfacePatSyn

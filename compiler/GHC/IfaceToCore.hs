@@ -919,7 +919,7 @@ tc_iface_decl _parent ignore_prags
    mk_op_doc op_name op_ty = text "Class op" <+> sep [ppr op_name, ppr op_ty]
 
 tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
-                              , ifAxBranches = branches, ifRole = role })
+                              , ifAxBranches = branches, ifAxSourceSpans = spans, ifRole = role })
   = do { tc_tycon    <- tcIfaceTyCon tc
        -- Must be done lazily, because axioms are forced when checking
        -- for family instance consistency, and the RHS may mention
@@ -928,7 +928,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
        -- e.g. type instance F Int = ToBeDefined
        -- See #13803
        ; tc_branches <- forkM (text "Axiom branches" <+> ppr tc_name)
-                      $ tc_ax_branches branches
+                      $ tc_ax_branches spans branches
        ; let axiom = mkBranchedCoAxiom role tc_name tc_tycon tc_branches
        ; return (ACoAxiom axiom) }
 
@@ -1136,11 +1136,16 @@ tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
                         ; tvs2' <- mapM tcIfaceTyVar tvs2
                         ; return (tvs1', tvs2') }
 
-tc_ax_branches :: [IfaceAxBranch] -> IfL [CoAxBranch]
-tc_ax_branches if_branches = mapM tc_ax_branch if_branches
+tc_ax_branches :: [SrcSpan] -> [IfaceAxBranch] -> IfL [CoAxBranch]
+tc_ax_branches spans branches = do
+    this_mod <- getIfModule
+    let fallback = mkGeneralSrcSpan (fsLit "module " `appendFS` moduleNameFS (moduleName this_mod))
+        locs | not (null spans), equalLength spans branches = spans
+             | otherwise = repeat fallback
+    zipWithM tc_ax_branch locs branches
 
-tc_ax_branch :: IfaceAxBranch -> IfL CoAxBranch
-tc_ax_branch (IfaceAxBranch { ifaxbTyVars = tv_bndrs
+tc_ax_branch :: SrcSpan -> IfaceAxBranch -> IfL CoAxBranch
+tc_ax_branch loc (IfaceAxBranch { ifaxbTyVars = tv_bndrs
                             , ifaxbEtaTyVars = eta_tv_bndrs
                             , ifaxbCoVars = cv_bndrs
                             , ifaxbLHS = lhs, ifaxbRHS = rhs
@@ -1152,9 +1157,6 @@ tc_ax_branch (IfaceAxBranch { ifaxbTyVars = tv_bndrs
     { tc_lhs   <- tcIfaceAppArgs lhs
     ; tc_rhs   <- tcIfaceType rhs
     ; eta_tvs  <- bindIfaceTyVars eta_tv_bndrs return
-    ; this_mod <- getIfModule
-    ; let loc = mkGeneralSrcSpan (fsLit "module " `appendFS`
-                                  moduleNameFS (moduleName this_mod))
     ; return (CoAxBranch { cab_loc      = loc
                          , cab_tvs      = binderVars tvs
                          , cab_eta_tvs  = eta_tvs

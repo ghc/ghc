@@ -91,7 +91,10 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
               , ifRole       = role
               , ifAxBranches = map (coAxBranchToIfaceBranch tycon
                                      (map coAxBranchLHS branch_list))
-                                   branch_list }
+                                   branch_list
+              , ifAxSourceSpans = case sourceTableTermOcc (getOccName tycon) of
+                  Nothing -> []
+                  Just _  -> map coAxBranchSpan branch_list }
  where
    branch_list = fromBranches branches
 
