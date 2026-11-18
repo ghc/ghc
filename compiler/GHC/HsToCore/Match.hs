@@ -249,7 +249,8 @@ matchBangs :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchR
 matchBangs (var :| vars) ty eqns
   = do  { match_result <- match (var:vars) ty $ NE.toList $
             decomposeFirstPat getBangPat <$> eqns
-        ; return (mkEvalMatchResult (matchId var) ty match_result) }
+        ; indices <- getRuntimeIndices
+        ; return (mkEvalMatchResult indices (matchId var) ty match_result) }
 
 matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 -- Match against a coercion pattern (CoPat)
@@ -782,7 +783,8 @@ JJQC 30-Nov-1997
 matchWrapper ctxt scrs (MG { mg_alts = L _ matches
                            , mg_ext = MatchGroupTc arg_tys rhs_ty origin
                            })
-  = do  { dflags <- getDynFlags
+  = withRuntimeIndexTypes (rhs_ty : map scaledThing arg_tys ++ map idType pattern_binders) $
+    do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
         ; new_vars    <- case matches of
                            []    -> newSysLocalsDs arg_tys
@@ -823,6 +825,8 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
 
         ; return (new_vars, result_expr) }
   where
+    pattern_binders = concatMap (collectPatsBinders CollWithDictBinders . hsLMatchPats) matches
+
     -- Called once per equation in the match, or alternative in the case
     mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc)
                 -> (LdiNablas, NonEmpty LdiNablas)
@@ -952,6 +956,7 @@ matchSinglePatVar :: Id   -- See Note [Match Ids] in GHC.HsToCore.Monad
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 matchSinglePatVar var mb_scrut ctx pat ty match_result
   = assertPpr (isInternalName (idName var)) (ppr var) $
+    withRuntimeIndexTypes (ty : map idType (collectPatBinders CollWithDictBinders pat)) $
     do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
        -- Pattern match check warnings.

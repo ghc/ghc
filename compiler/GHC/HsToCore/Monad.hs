@@ -20,7 +20,7 @@ module GHC.HsToCore.Monad (
         newUnique,
         UniqSupply, newUniqueSupply,
         getGhcModeDs, dsGetFamInstEnvs, dsGetGlobalRdrEnv,
-        getCCIndexDsM,
+        getCCIndexDsM, withRuntimeIndexTypes, getRuntimeIndices,
 
         -- Looking up in the environment
         dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
@@ -102,8 +102,8 @@ import GHC.Unit.Module.ModGuts
 import GHC.Types.Name.Reader
 import GHC.Types.SourceFile
 import GHC.Types.Id
-import GHC.Types.Var (EvVar)
-import GHC.Types.Var.Set( VarSet, emptyVarSet, extendVarSetList )
+import GHC.Types.Var (EvVar, isNonCoVarId)
+import GHC.Types.Var.Set( VarSet, emptyVarSet, extendVarSetList, filterVarSet, unionVarSet )
 import GHC.Types.SrcLoc
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.Supply
@@ -583,6 +583,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env tcm_plugins ptc msg_var
         lcl_env = DsLclEnv { dsl_meta        = emptyNameEnv
                            , dsl_loc         = real_span
                            , dsl_nablas      = Ldi initNablas
+                           , dsl_runtime_indices = emptyVarSet
                            , dsl_unspecables = Just emptyVarSet
                            , dsl_in_generated_code = False
                            }
@@ -650,6 +651,18 @@ the @SrcSpan@ being carried around.
 
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
+
+-- | Add the runtime identities mentioned in the types of this scope.
+-- See Note [Forcing a runtime index] in GHC.HsToCore.Utils.
+withRuntimeIndexTypes :: [Type] -> DsM a -> DsM a
+withRuntimeIndexTypes tys = updLclEnv $ \env ->
+  env { dsl_runtime_indices = dsl_runtime_indices env `unionVarSet` indices }
+  where
+    indices = filterVarSet isNonCoVarId (tyCoVarsOfTypes tys)
+
+-- | Read the runtime identities to keep in scope when forcing a variable.
+getRuntimeIndices :: DsM VarSet
+getRuntimeIndices = dsl_runtime_indices <$> getLclEnv
 
 -- | Get the current pattern match oracle state. See 'dsl_nablas'.
 getPmNablas :: DsM LdiNablas

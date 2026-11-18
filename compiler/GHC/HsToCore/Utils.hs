@@ -60,6 +60,7 @@ import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.DataCon
+import GHC.Types.Var.Set ( VarSet, elemVarSet )
 import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -262,11 +263,37 @@ bindMatchId new (MatchId { matchId = old, matchCo = MRefl }) body
 bindMatchId new mid body
   = Let (NonRec new (matchIdExpr mid)) body
 
--- Used to force variables when desugaring strict binders. It's crucial that the
--- variable is shadowed by the case binder. See Wrinkle 1 in
--- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
-seqVar :: Var -> CoreExpr -> CoreExpr
-seqVar var body = mkDefaultCase (Var var) var body
+-- | Force a strict binding. See Note [Forcing a runtime index].
+seqVar :: VarSet -> Var -> CoreExpr -> CoreExpr
+seqVar indices var body = mkDefaultCase (Var var) (seqCaseBinder indices var) body
+
+-- | Choose the binder for a case that forces a local variable.
+-- See Note [Forcing a runtime index].
+seqCaseBinder :: VarSet -> Id -> Id
+seqCaseBinder indices var
+  | var `elemVarSet` indices, isManyTy (idMult var)
+  = mkWildValBinder (idMult var) (idType var)
+  | otherwise = var
+
+{- Note [Forcing a runtime index]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider f :: foreach (n :: Nat) -> Proxy n, with f n = Proxy under Strict.
+The case that forces n returns Proxy n. If its binder shadows n, freshening
+that binder changes the alternative to Proxy @n' while the case result is
+still Proxy n. A captured value can mention n even when the result is Int.
+For example, both arguments in the body f p can depend on n.
+
+Collect the free runtime Ids of the argument and result types once per match
+group. Include the types of pattern-bound variables and constructor evidence.
+Keep the accumulated set in scope for nested matches. A strict let group
+also includes the types of its bindings and result. A forcing case uses
+an unused binder for these indices so that references still name the outer
+Id. Ordinary matches have no such index. This check does not traverse
+nested Core bodies at each strict binder.
+
+Linear variables still need the shadowing case binder. See Wrinkle 1 in
+Note [Desugar Strict binds] in GHC.HsToCore.Binds.
+-}
 
 mkCoLetMatchResult :: HasDebugCallStack => CoreBind -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkCoLetMatchResult bind = fmap (mkCoreLet bind)
@@ -276,9 +303,9 @@ mkCoLetMatchResult bind = fmap (mkCoreLet bind)
 mkViewMatchResult :: HasDebugCallStack => Id -> CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec var' viewExpr
 
-mkEvalMatchResult :: Id -> Type -> MatchResult CoreExpr -> MatchResult CoreExpr
-mkEvalMatchResult var ty = fmap $ \e ->
-  Case (Var var) var ty [Alt DEFAULT [] e]
+mkEvalMatchResult :: VarSet -> Id -> Type -> MatchResult CoreExpr -> MatchResult CoreExpr
+mkEvalMatchResult indices var ty = fmap $ \e ->
+  Case (Var var) (seqCaseBinder indices var) ty [Alt DEFAULT [] e]
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkGuardedMatchResult pred_expr mr = MR_Fallible $ \fail -> do

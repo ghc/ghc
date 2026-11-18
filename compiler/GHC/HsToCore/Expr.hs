@@ -210,8 +210,10 @@ ds_val_bind _ (is_rec, binds) body
 
         ; case prs of
             [] -> return body
-            _  -> return (mkLets (mk_binds is_rec prs) $
-                          foldr seqVar body force_vars )
+            _  -> do { indices <- withRuntimeIndexTypes (exprType body : map (idType . fst) prs)
+                                  getRuntimeIndices
+                     ; return (mkLets (mk_binds is_rec prs) $
+                               foldr (seqVar indices) body force_vars) }
             -- We can make a non-recursive let because we make sure to return
             -- the bindings in dependency order in dsLHsBinds,
             -- see Note [Return non-recursive bindings in dependency order] in
@@ -438,7 +440,8 @@ dsExpr (HsCase ctxt discrim matches)
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
-dsExpr (HsLet _ binds body) = do
+dsExpr (HsLet _ binds body) =
+  withRuntimeIndexTypes (map idType (collectLocalBinders CollWithDictBinders (unLoc binds))) $ do
     body' <- dsLExpr body
     dsLocalBinds binds body'
 

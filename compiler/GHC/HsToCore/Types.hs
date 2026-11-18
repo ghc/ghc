@@ -121,6 +121,10 @@ data DsLclEnv
   -- The set of reaching values Nablas is augmented as we walk inwards, refined
   -- through each pattern match in turn
 
+  , dsl_runtime_indices :: VarSet
+  -- ^ Free runtime Ids in types in the surrounding scopes.
+  -- See Note [Forcing a runtime index] in GHC.HsToCore.Utils.
+
   , dsl_unspecables :: Maybe VarSet
   -- ^ See Note [Desugaring non-canonical evidence]
   -- This field collects all un-specialisable evidence variables in scope.
