@@ -16,7 +16,7 @@ module GHC.Utils.Monad
         , mapAccumLM
         , mapSndM
         , concatMapM
-        , mapMaybeM
+        , mapMaybeM, orElseM
         , anyM, allM, orM
         , foldlM, foldlM_, foldrM, foldMapM
         , whenM, unlessM
@@ -249,6 +249,14 @@ whenM mb thing = do { b <- mb
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM condM acc = do { cond <- condM
                        ; unless cond acc }
+
+-- | Monadic version of @orElse@
+infixr 4 `orElseM`
+orElseM :: Monad m => m (Maybe a) -> m a -> m a
+orElseM ma def = do { mb_r <- ma
+                    ; case mb_r of
+                        Just x  -> return x
+                        Nothing -> def }
 
 -- | Like 'filterM', only it reverses the sense of the test.
 filterOutM :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]

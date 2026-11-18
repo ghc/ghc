@@ -1,0 +1,47 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 72, types: 76, coercions: 0, joins: 1/1}
+
+Rec {
+h = \ @a @b ds e ->
+      case ds of {
+        Nothing -> e;
+        Just y -> h Nothing e
+      }
+end Rec }
+
+f = \ @a a1 b c xs ->
+      join {
+        $j ww
+          = h (Just ww)
+              (reverse1
+                 (reverse1
+                    (reverse1
+                       (reverse1
+                          (reverse1 (reverse1 (reverse1 (reverse xs) []) []) []) [])
+                       [])
+                    [])
+                 []) } in
+      case xs of {
+        [] -> jump $j c;
+        : ds ds1 ->
+          case ds of { I# ds2 ->
+          case ds2 of {
+            __DEFAULT -> jump $j c;
+            0# ->
+              case ds1 of {
+                [] -> jump $j a1;
+                : ipv ipv1 -> jump $j c
+              };
+            1# ->
+              case ds1 of {
+                [] -> jump $j b;
+                : ipv ipv1 -> jump $j c
+              }
+          }
+          }
+      }
+
+
+

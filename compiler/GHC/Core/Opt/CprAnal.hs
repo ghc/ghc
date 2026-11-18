@@ -343,7 +343,7 @@ cprTransform env id args
   -- Any local binding, except for data structure bindings
   -- See Note [Efficient Top sigs in SigEnv]
   | Just sig <- lookupSigEnv env id
-  = applyCprTy (getCprSig sig) (length args)
+  = applyCprTy (cprSigType sig) (length args)
   -- See Note [CPR for data structures]
   | Just rhs <- cprDataStructureUnfolding_maybe id
   = fst $ cprAnal env rhs
@@ -362,7 +362,7 @@ cprTransform env id args
   = cprTransformDataConWork env con args
   -- Imported function
   | otherwise
-  = applyCprTy (getCprSig (idCprSig id)) (length args)
+  = applyCprTy (cprSigType (idCprSig id)) (length args)
 
 -- | Precise, hand-written CPR transformers for select Ids
 cprTransformBespoke :: Id -> [(CprType, CoreArg)] -> Maybe CprType
@@ -870,27 +870,42 @@ Does f have the CPR property?  Well, no.
 However, if the strictness analyser has figured out (in a previous
 iteration) that it's strict, then we DON'T need to forget the CPR info.
 Instead we can retain the CPR info and do the thunk-splitting transform
-(see WorkWrap.splitThunk).
+(see Note [Thunk splitting] esp (B) CPR-led thunk splitting).
 
 This made a big difference to PrelBase.modInt, which had something like
         modInt = \ x -> let r = ... -> I# v in
                         ...body strict in r...
-r's RHS isn't a value yet; but modInt returns r in various branches, so
-if r doesn't have the CPR property then neither does modInt
+r's RHS isn't a value yet; but `modInt` returns `r` in various branches, so
+if `r` doesn't have the CPR property then neither does `modInt`
+
 Another case I found in practice (in Complex.magnitude), looks like this:
-                let k = if ... then I# a else I# b
-                in ... body strict in k ....
+        let k* = if ... then I# a else I# b
+        in ... body strict in k ....
 (For this example, it doesn't matter whether k is returned as part of
 the overall result; but it does matter that k's RHS has the CPR property.)
-Left to itself, the simplifier will make a join point thus:
-                let $j k = ...body strict in k...
-                if ... then $j (I# a) else $j (I# b)
-With thunk-splitting, we get instead
-                let $j x = let k = I#x in ...body strict in k...
-                in if ... then $j a else $j b
-This is much better; there's a good chance the I# won't get allocated.
 
-But what about botCpr? Consider
+Left to itself, the simplifier will make a join point thus:
+        let $j k = ...body strict in k...
+        if ... then $j (I# a) else $j (I# b)
+
+With thunk-splitting, we get instead
+        let k* = case (if ... then I# a else I# b) of I# z -> I# z
+        in ... body strict in k ....
+Now the simplifier should pull out the `case` to give
+        case (if ... then I# a else I# b) of I# z ->
+        let k = I# z in ... body strict in k ...
+Now case-of-if will give
+        let $j z = let k = I# z in ...body strict in k... in
+        if ... then $j a else $j b
+This is much better; there's a good chance the I# won't get allocated.
+TL'DR: During CPR analysis we want to give `k` the CPR property in `body`.
+
+What if the type involved has more than one constructor?  E.g.
+        let k* = if ... then Just a else Just b
+        in ... body strict in k ....
+That is good too: see (TS5) in Note [Thunk splitting]
+
+Finally, what about botCpr? Consider
     lvl = error "boom"
     fac -1 = lvl
     fac 0 = 1

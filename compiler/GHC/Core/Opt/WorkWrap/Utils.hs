@@ -8,7 +8,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
-   ( WwOpts(..), mkWwBodies, mkWWstr, mkWWstr_one
+   ( WwOpts(..), mkWwBodies, mkWWstr, mkWWstr_one, mkWWcpr_one
    , needsVoidWorkerArg
    , DataConPatContext(..)
    , UnboxingDecision(..), canUnboxArg
@@ -230,8 +230,7 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
         ; let (work_args, work_marks) = unzip work_args_str
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr)
-              <- mkWWcpr_entry opts res_ty' res_cpr
+        ; (useful2, wrap_fn_cpr, work_fn_cpr) <- mkWWcpr_entry opts res_ty' res_cpr
 
         ; let (work_lam_args, work_call_args, work_call_str)
                 | needsVoidWorkerArg fun_id arg_vars work_args
@@ -985,6 +984,12 @@ mkWWstr opts args str_marks
 --   * wrap_arg assumes work_args are in scope, and builds a ConApp that
 --        reconstructs the RHS of wrap_var that we pass to the original RHS
 -- See Note [Worker/wrapper for Strictness and Absence]
+--
+-- E.g. mkWWstr_one (x :: (Int,Int) with strictess saying to unbox the pair and second Int
+--        = ( True                                             -- useful
+--          , [p,q#],                                          -- work_args
+--          , \e -> case x of (p,q) -> case q of I# q# -> e    -- wrap_fn
+--          , (p, I# q) )                                      -- wrap_arg
 mkWWstr_one :: WwOpts
             -> Var
             -> StrictnessMark
@@ -1637,7 +1642,9 @@ mk_res_bndr body_ty = do
 --   1. A 'WwUse' capturing whether the split does anything useful.
 --   2. The list of transit variables (see the Note).
 --   3. The result builder expression for the wrapper.  The original case binder if not useful.
---   4. The result unpacking expression for the worker. 'nop_fn' if not useful.
+--      Assumes that the transit vars are in scope
+--   4. The result unpacking expression for the worker. 'nop_fn' if not useful
+--      Brings the transit vars into scope
 type CprWwResultOne  = (WwUse, OrdList Var,  CoreExpr , CoreExpr -> CoreExpr)
 type CprWwResultMany = (WwUse, OrdList Var, [CoreExpr], CoreExpr -> CoreExpr)
 
@@ -1768,7 +1775,7 @@ To achieve said transformation, 'mkWWcpr_entry'
      what belongs in the case scrutinee of the unpacker through the communicated
      Id `r`: The unpacking expression will be free in that variable.
      (This is a similar contract as that of 'mkWWstr_one' for strict args.)
-  3. 'mkWWstr_one' produces a bunch of *transit vars*: Those result variables
+  3. 'mkWWcpr_one' produces a bunch of *transit vars*: Those result variables
      that have to be transferred from the worker to the wrapper, where the
      constructed result can be rebuilt, `a` and `b` above. Part (3) is
      responsible for tupling them up in the worker and taking the tuple apart

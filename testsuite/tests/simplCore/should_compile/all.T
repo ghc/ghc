@@ -636,3 +636,4 @@ test('T27962a', [extra_files(['T27962.hs'])], multimod_compile, ['T27962', '-v0 
 test('T27963', [grep_errmsg(r'f/42')], compile, ['-O -ddump-rule-firings'])
 test('T27965', normal, compile, ['-O'])
 test('T27965a', normal, compile, ['-O'])
+test('T28158', normal, compile, ['-O -dno-typeable-binds -dsuppress-all -dsuppress-uniques -ddump-simpl'])
