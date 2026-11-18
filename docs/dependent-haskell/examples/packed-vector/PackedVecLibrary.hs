@@ -146,9 +146,9 @@ fromListExact :: foreach (n :: Nat) -> [a] -> Maybe (Vec a n)
 fromListExact Z [] = Just VNil
 fromListExact Z (_ : _) = Nothing
 fromListExact (S _) [] = Nothing
-fromListExact (S n) (x : xs) = case fromListExact n xs of
-    Just rest -> Just (VCons x rest)
-    Nothing -> Nothing
+fromListExact (S n) (x : xs) = do
+    rest <- fromListExact n xs
+    pure (VCons x rest)
 
 -- | Store a list's own length with its vector. Both fields are lazy.
 packList :: [a] -> PackedVec a

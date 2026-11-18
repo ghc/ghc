@@ -3725,16 +3725,6 @@ runNatContextSourceChecks = do
                 ]
             )
         ,
-            ( "NativeSourceLambdaLaterPattern"
-            , 83605
-            , "bare variable patterns"
-            , []
-            ,
-                [ "badLambda :: foreach (n :: Nat) -> Vec Int n -> String"
-                , "badLambda = \\cases { Z VNil -> \"zero\"; (S k) (VCons x xs) -> \"successor\" }"
-                ]
-            )
-        ,
             ( "NativeSourceLambdaWrongIndex"
             , 83865
             , "Vec"
@@ -4210,7 +4200,6 @@ runPackageSourceRejectChecks = do
         , ("LaterTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [|| 42 :: Int ||] in ys", "bad (S k) later xs ys = ys"])
         , ("LaterWrongResult", 5617, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = xs", "bad (S k) later xs ys = ys"])
         , ("LaterIndependentIndex", 5617, "ys", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (j :: Nat) -> Vec Int n -> Vec Int m -> Vec Int j -> Vec Int j", "bad Z first second xs ys zs = zs", "bad (S k) later final xs ys zs = ys"])
-        , ("LaterOrdinaryPattern", 83605, "unrestricted multiplicities", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right VNil ys = ys", "bad (S k) later xs ys = ys"])
         , ("LaterForgedSuccessor", 5617, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)", "bad Z right = Refl", "bad (S predecessor) later = Refl"])
         , ("SumForged", 83865, "Refl", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> Sum n m", "bad n m p = Sum p Refl"])
         , ("SumWrongEvidence", 83865, "proof", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> (p :~: n) -> Sum n m", "bad n m p proof = Sum p proof"])
@@ -4248,6 +4237,7 @@ runPackageSourceRejectChecks = do
     -- Check accepted source forms and immutable proof transport without adding output.
     forM_
         [ ("OrdinaryArrowGiven", ["TypeFamilies", "FlexibleContexts"], [], ["ordinaryArrow :: forall value. value ~ (Int -> Int) => value -> Int -> Int", "ordinaryArrow f = f"])
+        , ("LaterOrdinaryPattern", [], [], package ++ ["good :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "good Z right VNil ys = ys", "good (S k) later xs ys = ys"])
         , ("LocalSignatureAliasIndex", [], [], localSignatures ++ ["good :: Nat -> PackedVec Int", "good n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("IdenticalRetainedPi", ["TypeFamilies", "FlexibleContexts"], [], ["identicalPi :: (foreach (n :: Nat) -> Vec Int n) -> (foreach (n :: Nat) -> Vec Int n)", "identicalPi f = f"])
         , ("GivenRetainedPiRhs", ["TypeFamilies", "FlexibleContexts"], [], ["fromGivenPi :: forall value. value ~ (foreach (n :: Nat) -> Vec Int n) => value -> (foreach (n :: Nat) -> Vec Int n)", "fromGivenPi f = f"])
@@ -4719,6 +4709,18 @@ runSourceRejectChecks = do
                 ++ local [] selection
                      (identity ++ ["f :: " ++ selection, "f b x = let c :: Bool; c = b in keep c x"])
                      "f True 42"
+    -- Ordinary literal patterns use the refined argument type and keep row order.
+    void $ sourceEntry "NativeSourceLaterOrdinaryLiteral" $
+        unlines $
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeFamilies, TypeOperators #-}"
+            , "module NativeSourceLaterOrdinaryLiteral where"
+            , "type family Select (b :: Bool) where"
+            , "  Select True = Int"
+            , "  Select False = Bool"
+            ]
+                ++ local [] selection
+                     ["keep True 0 = 42", "keep True x = x", "keep False x = x"]
+                     "keep True 0 + keep True 7"
     mapM_
         check
         [ ("unsupported algebraic domain", 83605, "supported structural algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
@@ -4756,7 +4758,7 @@ runSourceRejectChecks = do
         , ("missing constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True = 42"] "42")
         , ("duplicate constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
         , ("guarded constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
-        , ("unsupported later constructor argument", 83605, "unrestricted multiplicities", [], local [] selection ["keep True 0 = 42", "keep False x = x"] "42")
+        , ("wrong later constructor argument", 83865, "False", [], local [] selection ["keep True False = 42", "keep False x = x"] "42")
         , ("linear constructor argument", 83605, "unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
         ,
             ( "independent choose and keep indices"
@@ -7279,6 +7281,46 @@ runOrdinaryRetainedModuleChecks libdir = do
         rejections :: [(String, [String], String, Int, [String])]
         rejections =
             [
+                ( "WrongSourceLengthElement"
+                , ["TypeApplications"]
+                , unlines
+                    [ "import PackedVecLibrary"
+                    , ""
+                    , "wrong :: [Int] -> PackedVec Int"
+                    , "wrong xs = PackVec (sourceLength @Bool xs) (sourceVector xs)"
+                    ]
+                , 83605
+                , ["Expected: [Bool]", "Actual: [Int]"]
+                )
+            ,
+                ( "WrongPackageLength"
+                , []
+                , unlines
+                    [ "import PackedVecLibrary"
+                    , ""
+                    , "wrong :: [a] -> [a] -> PackedVec a"
+                    , "wrong xs ys = PackVec (sourceLength xs) (sourceVector ys)"
+                    ]
+                , 83865
+                , ["sourceVector ys"]
+                )
+            ,
+                ( "IndependentListLengths"
+                , ["GADTs"]
+                , unlines
+                    [ "-- | Keep independently checked runtime lengths distinct."
+                    , "import PackedVecLibrary"
+                    , ""
+                    , "bad :: Nat -> Nat -> [Int] -> [Bool] -> Maybe [(Int, Bool)]"
+                    , "bad n m xs ys = do"
+                    , "    vx <- fromListExact n xs"
+                    , "    vy <- fromListExact m ys"
+                    , "    pure (toList (zipVec vx vy))"
+                    ]
+                , 83865
+                , ["Couldn't match type", "zipVec vx vy"]
+                )
+            ,
                 ( "IndexMismatch"
                 , ["GADTs", "TypeApplications"]
                 , unlines

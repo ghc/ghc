@@ -81,6 +81,10 @@ test('NativeSourceTableWrong',
      multimod_compile_fail,
      ['NativeSourceTableWrong', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
 test('NativeSourceTablePartial', normal, compile_fail, [''])
+test('NativeListBoundaryPartial',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     multimod_compile_fail,
+     ['NativeListBoundaryPartial', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
 test('NativeSourceFieldCoverage', normal, compile_fail, [''])
 test('NativeSourceLengthRecursion', normal, compile_fail, [''])
 test('NativeSourcePlusRecursion', normal, compile_fail, [''])

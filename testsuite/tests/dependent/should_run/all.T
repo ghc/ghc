@@ -14,3 +14,8 @@ test('NativeLetIndependentRule',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_and_run,
      ['NativeLetIndependentRule', '-fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeListBoundary',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
+                  '../../../../docs/dependent-haskell/examples/packed-vector/OrdinaryVecClient.hs']),
+     multimod_compile_and_run,
+     ['NativeListBoundary', '-fomit-interface-pragmas -fno-write-if-simplified-core'])
