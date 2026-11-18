@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
@@ -73,18 +73,25 @@ import Data.List (find, partition, sortBy)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (catMaybes, isNothing, mapMaybe)
 
+-- | Read the current defining Id without registering use of its equations.
+-- A local occurrence can still carry the Id from before equation checking.
+-- See Note [Source table Ids].
+sourceTableOccurrence :: TcGblEnv -> Id -> Maybe Id
+sourceTableOccurrence env actual
+  | nameModule_maybe name == Just (tcg_semantic_mod env)
+  = case lookupTypeEnv (tcg_type_env env) name of
+      Just (AnId fun) | fun == actual -> Just fun
+      _ -> Nothing
+  | otherwise = Just actual
+  where
+    name = varName actual
+
 -- | Resolve a checked source call through the defining term's identity.
 -- See Note [Source table Ids].
 tcLookupSourceTableId :: Id -> TcM (Maybe Id)
 tcLookupSourceTableId actual = do
     env <- getGblEnv
-    let actual_name = varName actual
-        checked | nameModule_maybe actual_name == Just (tcg_semantic_mod env)
-                = case lookupTypeEnv (tcg_type_env env) actual_name of
-                    Just (AnId fun) | fun == actual -> Just fun
-                    _ -> Nothing
-                | otherwise = Just actual
-    case checked of
+    case sourceTableOccurrence env actual of
       Just fun | Just table <- sourceTableId_maybe fun -> do
         dependencies <- sourceTableDependencies table
         case dependencies of

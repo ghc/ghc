@@ -130,6 +130,10 @@ infixr 5 <.>
 Z   <.> m = S m
 S n <.> m = S (S (n <.> m))
 
+-- | Use the completed equations of an infix function in this module.
+localInfix :: foreach (n :: Nat) -> Vec Bool (n <.> Z)
+localInfix n = let cells = n <.> Z in replicateNative cells True
+
 fixityProof :: (0 <.> 0 <.> 0) :~: (2 :: Nat)
 fixityProof = Refl
 
@@ -240,3 +244,4 @@ main = case (flipProof, signalProof, phaseProof) of
             tailResult <- try (evaluate (null rest))
             print (x, tailResult == Left DivideByZero, null emptyCells)
         [] -> fail "Expected a cell before the nested product"
+    print (length (toList (localInfix n)))

@@ -37,6 +37,7 @@ import GHC.Tc.Gen.Expand( tcExpand )
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Do
+import GHC.Tc.Gen.SourceTable (sourceTableOccurrence)
 import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
@@ -1018,9 +1019,11 @@ tcNativeLet (HsValBinds _ (XValBindsLR (HsVBG [(NonRecursive, [L _ binding])] []
       OpApp _ a f b -> Core.mkApps <$> candidate f <*> traverse candidate [a, b]
       HsVar _ lname -> do
         thing <- liftMaybeT (tcLookup (unLocWithUserRdr lname))
+        env <- liftMaybeT getGblEnv
+        let occurrence var = MaybeT (pure (Core.Var <$> sourceTableOccurrence env var))
         case thing of
-          ATcId { tct_id = var } -> return (Core.Var var)
-          AGlobal (AnId var) -> return (Core.Var var)
+          ATcId { tct_id = var } -> occurrence var
+          AGlobal (AnId var) -> occurrence var
           AGlobal (AConLike (RealDataCon dc)) -> return (Core.Var (dataConWorkId dc))
           _ -> mzero
       _ -> mzero
@@ -1042,7 +1045,10 @@ synthetic lambda and its match as generated. Keep the user's spans on
 the binder, the RHS, and the body for diagnostics.
 
 Select this rule from the result type and a read-only view of the renamed
-RHS. Neither the view nor the type match constructs evidence. Leave other
+RHS. Look up a same-module function in the completed type environment.
+An earlier occurrence can lack its source table. The prepass registers no
+equation use. The retained argument checker records the selected owners.
+Neither the view nor the type match constructs evidence. Leave other
 lets to tcLocalBinds, including recursive groups, signatures and Strict
 bindings. A class selector alone supplies no checked index. Choosing a
 global instance here could change the meaning of ordinary multiplication
