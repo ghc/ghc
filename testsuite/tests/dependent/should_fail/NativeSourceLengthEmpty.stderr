@@ -16,3 +16,14 @@ NativeSourceLengthEmpty.hs:16:20: error: [GHC-83865]
       In the first argument of ‘pure’, namely
         ‘(safeHead (sourceVector xs))’
       In a stmt of a 'do' block: pure (safeHead (sourceVector xs))
+
+NativeSourceLengthEmpty.hs:19:29: error: [GHC-83865]
+    • Couldn't match type: plus n3 (S Z)
+                     with: S n2
+      Expected: Vec Bool ((1 :: Nat) + n2)
+        Actual: Vec Bool (plus n3 (S Z))
+    • In the first argument of ‘safeHead’, namely
+        ‘(replicateNative (n + 1) True)’
+      In the expression: safeHead (replicateNative (n + 1) True)
+      In an equation for ‘rightSuccessor’:
+          rightSuccessor n = safeHead (replicateNative (n + 1) True)

@@ -14,3 +14,6 @@ fromRef :: IORef [Int] -> IO Int
 fromRef ref = do
     xs <- readIORef ref
     pure (safeHead (sourceVector xs))
+
+rightSuccessor :: foreach (n :: Nat) -> Bool
+rightSuccessor n = safeHead (replicateNative (n + 1) True)

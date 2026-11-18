@@ -12,6 +12,8 @@ True
 ([True,True,True],3)
 [False,False,False]
 ([True,True,True],[False,False])
+('a','b')
+[True]
 True
 True
 True

@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeApplications, TypeOperators #-}
+{-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeApplications, TypeOperators #-}
 
 module Main where
 
@@ -93,6 +93,10 @@ oneMore n = replicateNative (n + 1) False
 headOfNonempty :: Vec a (1 + n) -> a
 headOfNonempty (VCons x _) = x
 
+-- The later tag fixes the first addend before the vector determines the tail.
+withPrefix :: Vec a (p + k) -> Proxy p -> [a]
+withPrefix xs _ = toList xs
+
 appendOne :: Vec a n -> a -> Vec a (n + 1)
 appendOne xs x = appendVec xs (VCons x VNil)
 
@@ -153,6 +157,10 @@ main = case (flipProof, signalProof, phaseProof) of
     print (toList (replicateSum n m False))
     print (toList filledThree, toList (oneMore n))
     bottom <- newIORef (throw DivideByZero :: Nat) >>= readIORef
+    -- Both lengths expose one constructor without evaluating the tail.
+    print (headOfNonempty (replicateNative (1 + bottom) 'a'),
+           headOfNonempty (replicateNative (S bottom) 'b'))
+    print (take 1 (withPrefix (replicateNative (1 + bottom) True) (Proxy @('S 'Z))))
     let tag :: Proxy (bottom + m)
         tag = tagLength (plus bottom m)
         cells = toList (replicateSum n bottom True)
