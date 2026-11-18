@@ -1,7 +1,7 @@
-NativeClosedNestedStrict.hs:7:19: error: [GHC-70565]
+NativeClosedNestedStrict.hs:7:36: error: [GHC-70565]
     • Cannot evaluate ‘Lib.badElement’ in a type.
         list codec forced the second element
     • In the first argument of ‘(:~:)’, namely
-        ‘Lib.empty (Lib.badElement '[1])’
+        ‘Lib.empty (Prelude.reverse (Lib.badElement '[1]))’
       In the type signature:
-        bad :: Lib.empty (Lib.badElement '[1]) :~: '[]
+        bad :: Lib.empty (Prelude.reverse (Lib.badElement '[1])) :~: '[]

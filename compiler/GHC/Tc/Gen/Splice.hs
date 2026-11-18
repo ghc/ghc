@@ -28,7 +28,8 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice, tcRunClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand
+     finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedCall
+     , tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand
       ) where
 
 import GHC.Prelude
@@ -1319,19 +1320,24 @@ tcDecodeClosedCallOperand operand
 -- See Note [Closed literal type evaluation].
 tcRunClosedCall :: Id -> Core.CoreExpr -> Type -> TcM Type
 tcRunClosedCall fun argument result_kind = do
+  run <- tcPrepareClosedCall fun (exprType argument) result_kind
+  run argument
+
+-- | Check the call and build an action for its runtime operand.
+tcPrepareClosedCall :: Id -> Type -> Kind -> TcM (Core.CoreExpr -> TcM Type)
+tcPrepareClosedCall fun domain result_kind = do
   hsc_env <- getTopEnv
   (dictionary_kind, list_result, decode) <- case closedTypeResultCodec result_kind of
     Just codec -> return codec
     Nothing -> bad ("The function returns " ++ showPpr (hsc_dflags hsc_env) result_kind ++
                     ". Closed calls in types currently support results of type Natural, Char, Bool, or lists of these types.")
   interp <- checkClosedTypeEvalStage hsc_env name
-  let expected = mkVisFunTyManyU (exprType argument) result_kind
+  let expected = mkVisFunTyManyU domain result_kind
   function <- if idType fun `tcEqType` expected
                 then pure (Core.Var fun)
                 else specializeClosedFunction name expected
   unless (exprType function `tcEqType` expected) $
     bad "The closed call does not have the expected ordinary function type."
-  let call = mkCoreApp function argument
 
   show_class <- tcLookupKnownKeyClass showClassKey
   inst_env <- tcGetInstEnvs
@@ -1348,29 +1354,34 @@ tcRunClosedCall fun argument result_kind = do
                          [Core.Type dictionary_kind, Core.Var dfun]
               show_s = mkVisFunTyManyU stringTy stringTy
               render_result = if list_result then show_s else stringTy
-              rendered_call = mkCoreApp render call
-              response = if list_result
-                           then mkCoreApp rendered_call (mkListExpr charTy [])
-                           else rendered_call
               ret = mkCoreApp (Core.Var ret_id) (Core.Type stringTy)
               io_string = mkTyConApp io_tc [stringTy]
           unless (exprType render `tcEqType` mkVisFunTyManyU result_kind render_result
                   && exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
             bad "Unexpected type for the interpreter response."
-          let expr = mkCoreApp ret response
           loc <- getSrcSpanM
-          compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc expr
-          (value, links, packages) <- either (bad . displayException) pure compiled
-          recordThNeededRuntimeDeps links packages
-          outcome <- tryAllM $ liftIO $ evalString interp value
-          rendered <- case outcome of
-            Left exn | Just async <- (fromException exn :: Maybe SomeAsyncException) ->
-              liftIO $ throwIO async
-            Left exn -> bad (displayException exn)
-            Right rendered -> pure rendered
-          case decode rendered of
-            Just ty -> return ty
-            Nothing -> bad "Invalid literal response from the interpreter."
+          return $ \argument -> setSrcSpan loc $ do
+            failIfErrsM
+            unless (exprType argument `tcEqType` domain) $
+              bad "The runtime operand does not have the expected type."
+            let call = mkCoreApp function argument
+                rendered_call = mkCoreApp render call
+                response = if list_result
+                             then mkCoreApp rendered_call (mkListExpr charTy [])
+                             else rendered_call
+                expr = mkCoreApp ret response
+            compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc expr
+            (value, links, packages) <- either (bad . displayException) pure compiled
+            recordThNeededRuntimeDeps links packages
+            outcome <- tryAllM $ liftIO $ evalString interp value
+            rendered <- case outcome of
+              Left exn | Just async <- (fromException exn :: Maybe SomeAsyncException) ->
+                liftIO $ throwIO async
+              Left exn -> bad (displayException exn)
+              Right rendered -> pure rendered
+            case decode rendered of
+              Just ty -> return ty
+              Nothing -> bad "Invalid literal response from the interpreter."
     _ -> bad "Cannot resolve the built-in Show dictionary for the result type."
   where
     name = idName fun

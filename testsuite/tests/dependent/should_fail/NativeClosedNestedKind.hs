@@ -3,6 +3,7 @@ module NativeClosedNestedKind where
 
 import qualified Data.Char
 import Data.Proxy (Proxy(..))
+import qualified NativeClosedListsLib as Lib
 
-bad :: Proxy (Data.Char.toUpper (Prelude.reverse '[2, 3, 5]))
+bad :: Proxy (Data.Char.toUpper (Prelude.reverse (Lib.badElement '[1])))
 bad = Proxy

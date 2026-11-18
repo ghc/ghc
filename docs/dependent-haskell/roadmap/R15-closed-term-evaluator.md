@@ -170,6 +170,15 @@ Draft proposal #509 specifies this argument-first order for closed calls.
 [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [source tests](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs).
 
+GHC uses the declared argument and result types to check the whole chain
+before entering the interpreter. For example, applying `toUpper` to a
+list produces a kind error even if evaluating that list would throw an
+exception. If the kinds agree but an outer instance is missing, the
+instance error also takes precedence. These checks use the declared
+types of the functions. The enclosing type still has its own checks.
+[Kind error](../../../testsuite/tests/dependent/should_fail/NativeClosedNestedKind.hs)
+and [missing instance](../../../testsuite/tests/dependent/should_fail/NativeClosedNestedMissing.hs).
+
 The client records the objects for both functions. With their interfaces
 held fixed, changing either implementation can invalidate the client's
 type. [Recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedNestedDependencies.sh).

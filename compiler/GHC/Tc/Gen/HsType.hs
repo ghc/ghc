@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -2390,15 +2390,9 @@ tc_app_ty mode rn_ty exp_kind
                          -> do { result <- tcOpenTypeCall mode name instantiated args
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
                          | [arg] <- args, isQual rdr
-                         , ordinary_call || ready_partial_call arg
-                         -> do { (argument, result_kind) <-
-                                   case nestedClosedCallArgument arg of
-                                     Just _ -> tcNestedClosedCallOperand mode name (varType fun) arg
-                                     Nothing -> do
-                                       (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg Nothing
-                                       argument <- tcClosedTypeCallArgument mode name domain arg
-                                       return (argument, result_kind)
-                               ; result <- tcRunClosedCall fun argument result_kind
+                         , ordinary_call || ready_partial_call
+                         -> do { (result_kind, run) <- tcPlanClosedCall mode ordinary_call fun arg
+                               ; result <- run
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name }
@@ -2409,13 +2403,9 @@ tc_app_ty mode rn_ty exp_kind
     value_arg (HsValArg _ arg) = Just arg
     value_arg _ = Nothing
     ordinary_call = isNothing (mode_holes mode) || isJust (mode_complete_type_arg mode)
-    ready_partial_call arg
-      | Just (_, RetrySigCalls, _) <- mode_pending_calls mode = ready arg
+    ready_partial_call
+      | Just (_, RetrySigCalls, _) <- mode_pending_calls mode = True
       | otherwise = False
-      where
-        ready operand
-          | Just child <- nestedClosedCallArgument operand = ready child
-          | otherwise = isJust (closedCallLiteralKind operand)
     unsupported = failWithTc . TcRnNoSourceTable
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
@@ -2463,14 +2453,13 @@ isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
   isTyVarName name
 isTypeVariableArg _ = False
 
--- | Find the operand of a qualified unary term call.
--- The type checker verifies the resolved name and the application.
-nestedClosedCallArgument :: LHsType GhcRn -> Maybe (LHsType GhcRn)
-nestedClosedCallArgument arg
-  | L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr rdr name))) <- head_ty
+-- | Find the already resolved head and operand of a qualified unary term call.
+nestedClosedCall :: LHsType GhcRn -> Maybe (SrcSpan, Name, LHsType GhcRn)
+nestedClosedCall arg
+  | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- head_ty
   , isQual rdr, isVarName name, isExternalName name
   , [HsValArg _ operand] <- filterOut is_par args
-  = Just operand
+  = Just (locA loc, name, operand)
   | otherwise = Nothing
   where
     (head_ty, args) = splitHsAppTys (unLoc (ignoreParens arg))
@@ -2531,21 +2520,42 @@ tcClosedCallKinds name fun_ty arg inferred
     unsupported :: TcM a
     unsupported = failWithTc (TcRnNoSourceTable name)
 
--- | Check a nested argument in inference mode, then use its checked value.
-tcNestedClosedCallOperand :: TcTyMode -> Name -> Type -> LHsType GhcRn
-                          -> TcM (Core.CoreExpr, Kind)
-tcNestedClosedCallOperand mode name fun_ty arg = do
-  checkCompleteClosedCall mode name
-  tcPreflightClosedCall name
-  (operand, _) <- tc_infer_lhs_type mode arg
-  checked <- liftZonkM (zonkTcType operand)
-  (_, result_kind) <- tcClosedCallKinds name fun_ty arg (Just (typeKind checked))
-  value <- tcDecodeClosedCallOperand checked
-  case value of
-    Just argument -> return (argument, result_kind)
-    Nothing -> setSrcSpanA (getLoc arg) $
-      failWithTc (TcRnClosedTypeEval name
-        "The checked operand does not represent a supported closed value.")
+-- | Check the kind and evidence before running a unary chain.
+-- See Note [Closed source calls].
+tcPlanClosedCall :: TcTyMode -> Bool -> Id -> LHsType GhcRn -> TcM (Kind, TcM Type)
+tcPlanClosedCall mode ordinary_call fun arg = do
+  loc <- getSrcSpanM
+  let name = getName fun
+  (domain, result_kind, operand) <- case nestedClosedCall arg of
+    Just (child_loc, child_name, child_arg) -> do
+      checkCompleteClosedCall mode name
+      tcPreflightClosedCall name
+      (child_kind, run_child) <- setSrcSpan child_loc $ do
+        env <- getGblEnv
+        when (nameIsLocalOrFrom (tcg_semantic_mod env) child_name) $
+          failWithTc (TcRnNoSourceTable child_name)
+        child <- tcLookupGlobal child_name
+        case child of
+          AnId child_fun -> tcPlanClosedCall mode ordinary_call child_fun child_arg
+          _ -> failWithTc (TcRnNoSourceTable child_name)
+      (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg (Just child_kind)
+      let get_operand = do
+            checked <- run_child
+            value <- tcDecodeClosedCallOperand checked
+            case value of
+              Just argument -> return argument
+              Nothing -> setSrcSpanA (getLoc arg) $
+                failWithTc (TcRnClosedTypeEval name
+                  "The checked operand does not represent a supported closed value.")
+      return (domain, result_kind, get_operand)
+    Nothing -> do
+      unless (ordinary_call || isJust (closedCallLiteralKind arg)) $
+        failWithTc (TcRnNoSourceTable name)
+      (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg Nothing
+      argument <- tcClosedTypeCallArgument mode name domain arg
+      return (domain, result_kind, return argument)
+  run <- tcPrepareClosedCall fun domain result_kind
+  return (result_kind, setSrcSpan loc (operand >>= run))
 
 -- | Reject a closed call in an incomplete visible type argument.
 checkCompleteClosedCall :: TcTyMode -> Name -> TcM ()
@@ -2612,12 +2622,18 @@ The term Name is not a retained local index.
 
 A literal argument supplies the kind that specializes a polymorphic
 function. For a nested qualified call, check the outer call's staging
-first. Then infer the inner call's kind and evaluate it once. Use the
-checked promoted result to construct the outer runtime operand.
-Do not check the inner syntax again. The expected result kind of the
-outer call does not affect either specialization. A partial signature
-can use this path when the nested call ends in a literal. A call on a
-signature wildcard continues to use the inference retry path.
+first. Prepare the inner call and use its inferred result kind to
+specialize the outer call. No function runs until the whole chain has
+checked kinds, staging, and evidence.
+
+Each prepared call returns its result kind and an action. The action runs
+the inner call once and uses its promoted result to build the outer
+runtime operand. Save the function's source span so errors during
+execution point to the call that failed. The expected result kind of the
+outer call does not affect either specialization.
+
+A partial signature can use this path when the chain ends in a literal.
+A call on a signature wildcard continues to use the inference retry path.
 
 The declared domain must determine all type variables and every class
 constraint must become ground. The ordinary expression checker solves
