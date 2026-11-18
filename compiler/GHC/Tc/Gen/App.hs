@@ -3240,11 +3240,8 @@ tcRetainedInferableArg (L _ expr)
               ; return (case mb_id of
                           Just var -> (True, hasNativeDependentExpr (Core.Type (varType var)))
                           Nothing -> (False, False)) }
-      HsApp _ fun arg
-        -> do { (inferable, fun_anchor) <- tcRetainedInferableArg fun
-              ; if not inferable then return (False, False)
-                else do { (_, arg_anchor) <- tcRetainedInferableArg arg
-                        ; return (True, fun_anchor || arg_anchor) } }
+      HsApp _ fun arg -> application fun [arg]
+      OpApp _ lhs op rhs -> application op [lhs, rhs]
       HsAppType _ fun _ -> tcRetainedInferableArg fun
       ExplicitList _ fields
         -> do { overloaded <- xoptM LangExt.OverloadedLists
@@ -3264,6 +3261,14 @@ tcRetainedInferableArg (L _ expr)
       XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> tcRetainedInferableArg arg
       _ -> return (False, False)
   where
+    -- The renamer retains OpApp until application checking. Look for the
+    -- same declared runtime index in either spelling of the application.
+    application fun args =
+      do { (inferable, anchor) <- tcRetainedInferableArg fun
+         ; if not inferable then return (False, False)
+           else do { shapes <- mapM tcRetainedInferableArg args
+                   ; return (True, anchor || any snd shapes) } }
+
     declared_field (L _ (HsVar _ lname))
       | not (isDataOcc (nameOccName name))
       = do { mb_id <- tcLookupIdMaybe name
