@@ -11,6 +11,7 @@ where
 
 import Prelude
 import GHCi.Run
+import GHCi.Run.Breakpoints
 import GHCi.Signals
 import GHCi.TH
 import GHCi.Message
@@ -126,6 +127,8 @@ servWithCustom verbose hook pipe restore customHandler = do
   -- Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
   wrapRunTH :: forall a. (Binary a, Show a) => InboxId -> IO a -> IO (QResult a)
   wrapRunTH ii io = do
+    -- See Note [Disable breakpoints in certain threads]
+    disableThreadBreakpoints =<< myThreadId
     when verbose $ trace "wrapRunTH..."
     r <- try io
     when verbose $ trace "wrapRunTH done."
