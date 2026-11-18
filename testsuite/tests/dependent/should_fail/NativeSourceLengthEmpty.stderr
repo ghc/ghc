@@ -34,13 +34,11 @@ NativeSourceLengthEmpty.hs:22:44: error: [GHC-25897]
         Actual: [b]
       ‘b’ is a rigid type variable bound by
         the type signature for:
-          badCell :: forall a b. @GHC.Internal.Types.Unmatchable
-                     a -> [b] -> a
+          badCell :: forall a b. a -> [b] -> a
         at NativeSourceLengthEmpty.hs:21:1-24
       ‘a’ is a rigid type variable bound by
         the type signature for:
-          badCell :: forall a b. @GHC.Internal.Types.Unmatchable
-                     a -> [b] -> a
+          badCell :: forall a b. a -> [b] -> a
         at NativeSourceLengthEmpty.hs:21:1-24
     • In the expression: sourceVector (x : ys)
       In the first argument of ‘safeHead’, namely

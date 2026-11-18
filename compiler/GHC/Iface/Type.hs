@@ -233,8 +233,9 @@ own version and stores the metadata as a type-table child.
 Print an annotation after its group's separator: forall a. @ma body, or
 forall a -> @ma body. The annotation remains outside the whole group.
 Combine adjacent binders only when their annotations and visibilities agree.
-Do not remove a non-M or symbolic annotation when defaulting display variables.
+Keep symbolic annotations when defaulting display variables.
 Semantic declaration kinds come from ifKind, not from binder-only lists.
+See Note [Default forall matchability in diagnostics] for user-facing types.
 -}
 
 {- Note [Ordinary-arrow interface metadata]
@@ -1685,27 +1686,54 @@ ppr_iface_forall_part show_forall tvs ctxt sdoc
       ma == ifaceUnmatchable
     dfun_binder _ = False
 
--- | Render a semantic forall telescope with its actual annotations.
+-- | Render a semantic forall telescope with its matchability metadata.
 -- See Note [Forall interface metadata].
 pprIfaceForAllWithMatchability :: [(IfaceMatchability, IfaceForAllBndr)] -> SDoc
-pprIfaceForAllWithMatchability [] = empty
-pprIfaceForAllWithMatchability ((ma,bndr):bndrs)
-  = sep [ add_separator (forAllLit <+> fsep (map pprIfaceForAllBndr group))
-            <+> char '@' <> pprParendIfaceType ma
-        , pprIfaceForAllWithMatchability rest ]
+pprIfaceForAllWithMatchability bndrs
+  = pprDefaultUserForAll bndrs (pprIfaceForAll (map snd bndrs)) (go bndrs)
   where
-    vis = ifaceForAllTyFlag (binderFlag bndr)
-    (same, rest) = span same_group bndrs
-    group = bndr : map snd same
-    same_group (ma', bndr')
-      = ma == ma' && vis `eqForAllVis` ifaceForAllTyFlag (binderFlag bndr')
-    add_separator stuff = case vis of
-      Required -> stuff <+> arrow
-      _        -> stuff <> dot
+    go [] = empty
+    go ((ma,bndr):bndrs)
+      = sep [ add_separator (forAllLit <+> fsep (map pprIfaceForAllBndr group))
+            <+> char '@' <> pprParendIfaceType ma
+            , go rest ]
+      where
+        vis = ifaceForAllTyFlag (binderFlag bndr)
+        (same, rest) = span same_group bndrs
+        group = bndr : map snd same
+        same_group (ma', bndr')
+          = ma == ma' && vis `eqForAllVis` ifaceForAllTyFlag (binderFlag bndr')
+        add_separator stuff = case vis of
+          Required -> stuff <+> arrow
+          _        -> stuff <> dot
 
--- | Keep non-M and symbolic annotations visible in user-facing types.
+-- | Apply user-facing quantifier rules without hiding non-default metadata.
 pprUserIfaceForAllWithMatchability :: [(IfaceMatchability, IfaceForAllBndr)] -> SDoc
-pprUserIfaceForAllWithMatchability = pprIfaceForAllWithDefault ((== ifaceMatchable) . fst)
+pprUserIfaceForAllWithMatchability bndrs
+  = pprDefaultUserForAll bndrs (pprUserIfaceForAll (map snd bndrs)) $
+      pprIfaceForAllWithDefault ((== ifaceMatchable) . fst) bndrs
+
+-- | Use ordinary forall syntax for a default source-type telescope.
+-- See Note [Default forall matchability in diagnostics].
+pprDefaultUserForAll :: [(IfaceMatchability, IfaceForAllBndr)] -> SDoc -> SDoc -> SDoc
+pprDefaultUserForAll bndrs ordinary annotated
+  = getPprStyle $ \style ->
+    getPprDebug $ \debug ->
+    sdocOption sdocPrintExplicitKinds $ \print_kinds ->
+      if userStyle style && not debug && not print_kinds
+         && all ((== ifaceUnmatchable) . fst) bndrs
+      then ordinary else annotated
+
+{- Note [Default forall matchability in diagnostics]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ordinary source types default their foralls to U. A telescope containing
+only U annotations uses ordinary forall syntax in user diagnostics.
+Keep the usual rules for when to display its quantifiers. This preserves
+types such as (forall s. ST s a) without internal metadata annotations.
+Mixed, M, and symbolic telescopes retain their existing annotations.
+Debug, dump, and explicit-kind output retain all metadata. The interface
+and coercion representations do not change.
+-}
 
 -- | Apply the usual forall display rules when every binder has its contextual default.
 pprIfaceForAllWithDefault :: ((IfaceMatchability, IfaceForAllBndr) -> Bool)
