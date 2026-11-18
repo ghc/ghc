@@ -4850,3 +4850,36 @@ a polymorphic source function with its family. Both applications must
 carry the same erased type arguments.
 [Agda 2.8.0, function definitions](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html)
 and [implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
+
+### Partial constructor callbacks at a checked input
+
+Agda uses the expected datatype parameters in a branch that handles
+fully applied constructors.
+It retains checked arguments and compares the actual application result
+with its expected type. These steps motivate using an available callback
+input before choosing a constructor's erased index. The reviewed Agda
+v2.8.0 application source has file blob
+`82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+[`checkConstructorApplication`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L1030-L1071),
+[`addCheckedArgs`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L833-L844)
+and [`checkHeadApplication`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L449-L465).
+
+In the fork the partially applied constructor can get its missing index
+from the input to the callback. GHC gives data constructor fields linear
+arrows. Its application
+subsumption treats a remaining linear field arrow as multiplicity
+polymorphic. M96 preserves the original constructor head and field arrows
+so that this existing check still runs. It selects immutable erased
+arguments from callback inputs before output candidates. Selection does
+not prove equality between conflicting indices. The ordinary final check
+must use valid equality evidence or reject the callback.
+[GHC's Note [Typechecking data constructors]](../../compiler/GHC/Tc/Gen/Head.hs),
+[`tcSubTypeApp` and constructor subsumption](../../compiler/GHC/Tc/Utils/Unify.hs)
+and [Note [Retained choices for partial constructors]](../../compiler/GHC/Tc/Gen/App.hs).
+
+The higher-order call retains each checked expression and its usage in the
+existing argument cache. The input `fromListExact n xs` determines the
+callback index in `VCons x <$> fromListExact n xs`. The rule does not assign
+native indices to mutable type variables or infer arbitrary callbacks.
+Agda's contextual metavariables and evaluation rules do not establish
+these Haskell scope, multiplicity or laziness properties.

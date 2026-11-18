@@ -24,6 +24,24 @@ the map. Source programs use a runtime value as a type index, refine that index
 by pattern matching, store it with dependent fields, and run compiled code.
 The supported static subset and native pipeline remain restricted.
 
+The [Showcase](Showcase.hs) reads lengths from IO and uses them to
+replicate, append, index, and flatten vectors. [M95](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary)
+accepts an ordinary list at a requested length or packages it with its
+own length. [M96](PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks)
+uses ordinary `fmap` to add a cell while preserving the tail's runtime
+index. The largest remaining obligations are normal Core optimization,
+general computation in types, and general dependent functions and pairs.
+The [remaining work table](#remaining-work-by-roadmap-area) lists their
+dependencies. The [local library and assurance tasks](#local-subset-library-and-assurance-work)
+track module boundaries and totality separately.
+
+The next Core experiment has a measured starting point. When an indexed
+function wraps a vector in `Just` and immediately matches it, final STG
+still allocates the constructor and tests its tag. A two-field ordinary
+constructor shows the same behavior. Removing that work must preserve
+lazy fields, sharing and any binders mentioned in types. This would
+address [one R05 transformation](roadmap/R05-dependent-core.md#next-increments).
+
 | Area | Demonstrated in this fork | Work before the roadmap task is complete |
 | --- | --- | --- |
 | Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
@@ -175,6 +193,7 @@ can advance a card while the card remains open.
 | 34 | R05: retained types in editor metadata | [M93](PLAN.md#m93-retained-types-in-hie-files) | Write and read retained binders, runtime indices and opaque applications in HIE files. |
 | 35 | R03: inferred nonempty local lengths | [M94](PLAN.md#m94-infer-a-nonempty-tail-through-local-length-definitions) | Infer the tail of a vector through checked let and where definitions, then check the call against its actual argument. |
 | 36 | R03 and R04: ordinary lists at an indexed boundary | [M95](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary) | Check a requested length or package the list's own length. Match ordinary list patterns in retained equations. |
+| 37 | R03: partial constructor callbacks | [M96](PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks) | Use a checked input's runtime index in `VCons x <$> fromListExact n xs`. Preserve constructor multiplicities and check the full callback type. General callback inference remains open. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -198,7 +217,7 @@ their erased index cannot be inferred. M68 uses imported type contracts to
 enable the existing application checker. Explicit dependent
 syntax and the restricted native pipeline keep their current policies.
 Both rebuilt stages and the selected tests pass that bounded application change.
-The next R03 source candidate is generic safe indexing. The local subset and
+M69 followed with generic safe indexing. The local subset and
 dependent-base tasks below retain their own scope.
 
 The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks

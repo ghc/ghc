@@ -7496,11 +7496,11 @@ type-level family carry the same `a`. The validator checks the kinds,
 the instantiated argument domains and the result kind. Constructing
 a package keeps the list as the actual operand of both checked calls.
 
-In the initial experiment `VCons x <$> fromListExact n xs` left an
-untouchable tail-index variable. Both stages accepted Idris2's direct
-`do` form. The example binds the recursive result in `Maybe` and then
-constructs the vector cell. Higher-order inference for the partial
-constructor is open.
+At M95, `VCons x <$> fromListExact n xs` left an untouchable tail-index
+variable. Both stages accepted Idris2's direct `do` form. The example
+bound the recursive result in `Maybe` before constructing the vector
+cell. [M96](#m96-infer-retained-indices-for-partial-constructor-callbacks)
+addresses the partial constructor.
 
 A written type argument can expose a mismatch in an ordinary argument:
 `sourceLength @Bool xs` requires `xs :: [Bool]`. If `xs :: [Int]`,
@@ -7546,13 +7546,67 @@ form fail with an untouchable tail index. An explicit lambda and an
 annotated callback work. Instantiating `fmap` explicitly still fails
 at the constructor, whose remaining field has multiplicity One.
 
-- [ ] Select the constructor's erased arguments from a known callback
+- [x] Select the constructor's erased arguments from a known callback
       type. Keep its original field multiplicities and source head for
       GHC's ordinary constructor subsumption.
-- [ ] When checking a higher-order call, use its data argument's
+- [x] When checking a higher-order call, use its data argument's
       actual index before checking a partial constructor callback.
       Preserve the source expression, evidence and multiplicity usage.
-- [ ] Exercise prefix and infix calls, independent indices, a linear
+- [x] Exercise prefix and infix calls, independent indices, a linear
       capture, lazy fields, and an ordinary imported consumer. Run the
       source examples in both stages and GHCi. Update the roadmap,
       sources of the design and Showcase.
+
+The data argument determines the input to the callback. For
+`mapVec (VCons x) rows`, the row type gives the constructor its tail
+index even when the caller supplies no expected matrix type. If the
+captured fields supply the only information, use their declarations
+or infer the original application once. Preserve the occurrence usage
+so that a linear field can be captured once.
+
+An ordinary client can then call
+`fmap toList (VCons x <$> fromListExact n xs)`. The outer call needs the
+same input information whether the client writes the inner application
+in prefix or infix form. The renamer leaves the infix form as `OpApp`.
+Read the operator and operands when a partial callback can carry an
+index into its result. Keep operators that require Quick Look on their
+existing checking path. In particular, `expectMarker label marker $
+evaluate (sameNat n m)` needs the outer expected type. The typechecker
+still checks the original application.
+
+The callback keeps its source head and the constructor's original
+linear arrow. GHC checks the whole callback, including any written
+type arguments and class evidence. With independently bound lengths
+`m` and `n`, a callback that returns a vector of length `1 + m`
+where `1 + n` is required still reports GHC-83865 at `VCons x`.
+Matching on an equality witness can supply the missing evidence.
+
+The left section ``(x `VCons`)`` uses GHC's ordinary section
+elaboration. It still fails to infer the retained index in this
+experiment. A separately bound row also remains necessary in the
+tested unannotated nested `replicateNative` example. Neither form is
+needed to write the recursive list adapter.
+
+### Verification
+
+Both compilers built and ran the 32-line list fixture against a separately
+compiled library interface at `-O0` with Core and STG Lint. The 174-line
+Showcase matched in both native runs and in self-hosted GHCi. The new
+observation returns `(Just "xab",Nothing)` from two calls at the same
+IO-sourced length. The fixtures also distinguish forcing a callback to
+function weak head normal form from demanding a captured field. The
+separate packed-vector executable reproduced all 562 existing output
+lines after the infix rule preserved the expected-result path for `($)`.
+
+Ordinary clients with the extension enabled and disabled use nested
+prefix and infix applications. The wrong zip reports GHC-83865.
+Capturing a linear operand twice reports GHC-18872. The impredicative
+regression also exposed an unrelated default matchability annotation
+in ordinary diagnostics. The printer now displays `forall s. ST s a`
+at the default settings. Explicit-kind output retains the annotation.
+
+All 64 selected normal-way tests and four selected GHCi tests passed.
+They include the existing Quick Look and linear constructor tests, editor
+metadata, and the ordinary-client API driver. The measured infix call also
+works with an independently declared mapping operator. General callback
+inference and operator sections remain open.

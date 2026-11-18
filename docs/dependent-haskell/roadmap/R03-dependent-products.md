@@ -120,6 +120,11 @@ M58 and M59 expose those rules through source checking.
       M95's checked list adapter returns a vector indexed by a caller's
       runtime length. An ordinary client can combine two checked results
       at that same index. See [M95](../PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary).
+- [x] Infer a partial constructor callback's erased index from the checked
+      input in `VCons x <$> fromListExact n xs` and prefix `fmap` calls.
+      Keep constructor multiplicities and full callback subsumption.
+      See [M96](../PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks).
+      General callback inference remains open.
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.
