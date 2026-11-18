@@ -40,6 +40,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred, ctEvLoc, ctEvEvId,
                                 mkNonCanonical, DelayedError(DE_SourceMethod))
 import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
+import GHC.Tc.Types.CtLoc ( CtLoc )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
@@ -59,7 +60,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.TyCo.Subst as Subst
-import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..) )
+import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..), BindTvFun )
 import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
@@ -95,6 +96,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.Data ( Data, cast, gmapQ )
 import Data.Function
+import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.Semigroup
 
@@ -3224,48 +3226,51 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
        ; case eligible of
            Nothing -> return (fun, sigma, [], Nothing)
            Just inferable -> do
-             { let matching_type (pos, entry)
-                     = let arg = value_args !! (pos-1) in
-                       addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
-                       do { ty <- liftZonkM (zonkTcType (actual_type entry))
-                          ; loc <- getCtLocM (lexprCtOrigin arg) (Just TypeLevel)
-                          ; reductionReducedType <$> tcRewriteFamilyAxioms loc ty }
+             { let domain_at pos = scaledThing (domains !! (pos-1))
+                   matching_arg (pos, entry) =
+                     let arg = value_args !! (pos-1)
+                     in addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
+                        do { ty <- liftZonkM (zonkTcType (actual_type entry))
+                           ; loc <- getCtLocM (lexprCtOrigin arg) (Just TypeLevel)
+                           ; view <- reductionReducedType <$> tcRewriteFamilyAxioms loc ty
+                           ; return (loc, (domain_at pos, view)) }
+                   match_indices = tcMatchRetainedIndexArgs (bind_outer tvs)
              ; initial_cache <- infer_args needed_tvs inferable domains 1 args
-             ; initial_tys <- mapM matching_type initial_cache
-             ; let initial_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- initial_cache ]
-                   match_args subst pairs = foldM (\subst (formal, actual) ->
-                                        if native_worker
-                                        then matchRetainedAppType tvs subst formal actual
-                                        else tcMatchTyX_BM (bind_outer tvs) subst formal actual)
-                                      subst pairs
-                   -- See Note [Ordinary heads in native argument matching].
-             ; initial_match <- if native_worker
-                                then return (case match_args initial_subst (zip initial_templates initial_tys) of
-                                               Nothing -> match_args Subst.emptySubst (zip initial_templates initial_tys)
-                                               other -> other)
-                                else if index_route
-                                then return (match_args initial_subst (zip initial_templates initial_tys))
-                                else do
-                                  { matched <- tcRetainedMatchArgs tvs initial_subst
-                                                 (zip initial_templates initial_tys)
-                                  ; case matched of
-                                      Nothing -> tcRetainedMatchArgs tvs Subst.emptySubst
-                                                   (zip initial_templates initial_tys)
-                                      other -> return other }
-             ; (matched, cache) <- case initial_match of
-                   Just subst | index_route, hasNoConcreteTyVars fun ->
-                     do { let missing = filter (isNothing . Subst.lookupTyVar subst) tvs
-                              remaining = zipWith (\pos eligible -> eligible && isNothing (lookup pos initial_cache))
-                                                  [1..] inferable
-                        ; extra_cache <- infer_args missing remaining domains 1 args
-                        ; extra_tys <- mapM matching_type extra_cache
-                        ; let extra_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- extra_cache ]
-                        ; return (match_args subst (zip extra_templates extra_tys), initial_cache ++ extra_cache) }
-                   Just subst | not index_route, not native_worker ->
-                     tcRetainedCallbackArgs tvs domains args subst initial_cache
-                   _ -> return (initial_match, initial_cache)
-             ; actual_tys <- mapM matching_type cache
-             ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
+             ; initial_args <- mapM matching_arg initial_cache
+             ; let initial_pairs = map snd initial_args
+                   match_worker subst = foldM (\s (formal, actual) ->
+                       matchRetainedAppType tvs s formal actual) subst initial_pairs
+             ; (matched, cache, templates) <- if index_route
+                 then do
+                   { first <- match_indices initial_subst initial_args
+                   ; case first of
+                       Nothing -> return (Nothing, initial_cache, [])
+                       Just (subst, views)
+                         | hasNoConcreteTyVars fun ->
+                           do { let missing = filter (isNothing . Subst.lookupTyVar subst) tvs
+                                    remaining = zipWith (\pos eligible -> eligible && isNothing (lookup pos initial_cache))
+                                                        [1..] inferable
+                              ; extra_cache <- infer_args missing remaining domains 1 args
+                              ; extra_args <- mapM matching_arg extra_cache
+                              ; extra <- match_indices subst extra_args
+                              ; return (fst <$> extra, initial_cache ++ extra_cache,
+                                        views ++ maybe [] snd extra) }
+                         | otherwise -> return (Just subst, initial_cache, views) }
+                 else do
+                   { initial_match <- if native_worker
+                       then return (case match_worker initial_subst of
+                                      Nothing -> match_worker Subst.emptySubst
+                                      other -> other)
+                       else do { m <- tcRetainedMatchArgs tvs initial_subst initial_pairs
+                               ; case m of
+                                   Nothing -> tcRetainedMatchArgs tvs Subst.emptySubst initial_pairs
+                                   other -> return other }
+                   ; (m, cache) <- case initial_match of
+                       Just subst | not native_worker ->
+                         tcRetainedCallbackArgs tvs domains args subst initial_cache
+                       _ -> return (initial_match, initial_cache)
+                   ; return (m, cache, map (domain_at . fst) cache) }
+             ; actual_tys <- mapM (fmap (snd . snd) . matching_arg) cache
              ; choices <- case matched of
                             Just subst | native_worker
                               -> return $ do { inst_tys <- traverse (Subst.lookupTyVar subst) tvs
@@ -3336,6 +3341,57 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstCached _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+-- | Match cached index arguments and keep the formal views used for selection.
+-- See Note [Matching a computed nonempty length].
+tcMatchRetainedIndexArgs :: BindTvFun -> Subst.Subst -> [(CtLoc, (Type, Type))]
+                         -> TcM (Maybe (Subst.Subst, [Type]))
+tcMatchRetainedIndexArgs bind seed entries = runMaybeT (match_group seed entries)
+  where
+    match_group subst pairs = mapAccumLM finish selected pending
+      where
+        (selected, pending) = mapAccumL select subst pairs
+
+    -- A later argument (or field) can select an input to an earlier family.
+    select subst entry@(_, (formal, actual))
+      | Just subst' <- tcMatchTyX_BM bind subst formal actual = (subst', Left formal)
+      | otherwise = (subst, Right entry)
+
+    finish subst (Left formal) = return (subst, formal)
+    finish subst (Right (loc, (formal, actual)))
+      | Just subst' <- tcMatchTyX_BM bind subst instantiated actual = return (subst', instantiated)
+      | not (hasNativeDependentExpr (Core.Type actual)) = mzero
+      | TyConApp tc _ <- instantiated, isTypeFamilyTyCon tc
+      = do { view <- liftMaybeT (reductionReducedType <$> tcRewriteFamilyAxioms loc instantiated)
+           ; subst' <- MaybeT (pure (tcMatchTyX_BM bind subst view actual))
+           ; return (subst', view) }
+      | TyConApp tc fields <- instantiated
+      , TyConApp tc' args <- coreFullView actual
+      , tc == tc', isGenerativeTyCon tc Nominal, fields `equalLength` args
+      = do { (subst', views) <- match_group subst [(loc, pair) | pair <- zip fields args]
+           ; return (subst', mkTyConApp tc views) }
+      | otherwise = mzero
+      where
+        instantiated = coreFullView (Subst.substTy subst formal)
+
+{- Note [Matching a computed nonempty length]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider safeHead :: Vec a (1 + k) -> a applied to replicateNative (1 + n) x.
+The inner application has an inferred length S n. The formal length 1 + k
+reduces to S k by the same nominal family equations. Matching those constructors
+selects k := n while the runtime binder n is in scope.
+
+First collect the structural matches from the cached arguments. For example,
+a later Proxy flag can fix flag for an earlier Vec a (Select flag k). Check
+every remaining pair against these same immutable choices. Descend through
+equal generative type constructors, using the same rule for their fields.
+Reduce a mismatched family application at the source argument's location. Keep the successful formal views
+for the final exact-domain check. The original argument cache supplies the
+expression and type to subsumption, which constructs its own coercion.
+A stuck sum n + 1 supplies no successor equation for an unknown n.
+See Note [Family views in native argument inference] and the Agda conversion
+reference in docs/dependent-haskell/REFERENCES.md.
+-}
 
 {- Note [Family views in native argument inference]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
