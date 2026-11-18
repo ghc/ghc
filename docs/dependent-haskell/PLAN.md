@@ -6983,3 +6983,33 @@ The next source gap is a nested computation in a retained operand.
 Writing `plus 1 (times rows cols)` also reaches the retained-expression
 restriction. This requires a change to retained application checking and
 lowering. [Equation provenance](REFERENCES.md#composition-of-source-equations).
+
+## M89: nested computations in retained operands
+
+R03 owns retained application. R05 must preserve the runtime expression
+until its index has been checked. M88 accepts multiplication in a source
+equation and in a vector length. A retained operand still rejects
+`1 + rows * cols` at the inner method and rejects the equivalent
+`plus 1 (times rows cols)` when checking Core's operand grammar.
+
+- [ ] Check each nested application at its enclosing operand's expected
+      domain. Use the actual certified function or the selected method
+      dictionary at every head. Preserve fixity, visible type application,
+      lexical scope, use-site diagnostics, and the source expression.
+- [ ] Reify nested saturated calls and constructors in their original
+      positions. Check the identity, arity, argument kinds, and result kind
+      of each function. Keep the structural rules for beta reduction,
+      casts, opaque calls, and strict cases.
+- [ ] Preserve the expression through substitution, Core Lint, tidying,
+      and CorePrep. Check every nested owner against its defining binder.
+      After erasure, give a non-atomic operand a lazy binding at the
+      point where the runtime function takes that operand.
+- [ ] Demonstrate a length of `1 + rows * cols` with both dimensions
+      read from IO. Exercise nested calls in both operand positions,
+      inside a constructor, in an interface-only client and in GHCi.
+      Check partial and ignored operands, bad dictionaries, rewrites,
+      and an uncertified inner function. Keep the original source spans.
+
+Agda checks each argument against the next function domain. The Haskell
+implementation must also preserve evaluation and sharing when it translates
+Core to STG. [Computed arguments and lazy naming](REFERENCES.md#computed-arguments-and-lazy-naming).
