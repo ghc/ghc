@@ -6710,3 +6710,24 @@ unexpanded. A standalone function declaration instead reaches the
 unsupported native CorePrep entry. Both failures also occurred with
 `fill n = replicateNative n True` and the argument `Z`. Persistent native
 function bindings at the prompt remain open.
+
+## M84: infer a nonempty vector’s tail at a nested application
+
+R03 dependent-product inference depends here on the checked family equations
+from R13 and R15. At M83 both `safeHead (replicateNative (1 + n) x)` and
+`safeHead (replicateNative (S n) x)` fail with GHC-83865 when `n` comes
+from the caller. The result of the inner call determines its element type
+and the tail index. A local signature already makes the call work.
+
+- [ ] Compare an inferred argument with its formal domain using bounded
+      nominal family reduction where structural index matching fails.
+      Keep the selected runtime binder in its lexical scope. Check the
+      original cached argument with ordinary subsumption.
+- [ ] Check repeated indices, type applications, the diagnostic location
+      at the reduction limit, the empty vector and the stuck right addend.
+      Keep the existing successes that leave an unused family unevaluated.
+- [ ] Run the direct source expression on a runtime length and an undefined
+      tail. Update the Showcase, references and roadmap with the result.
+
+Agda’s comparison of both argument views is recorded under
+[computed-length conversion](REFERENCES.md#comparing-a-computed-length-with-a-function-argument).
