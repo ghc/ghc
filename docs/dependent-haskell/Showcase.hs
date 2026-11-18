@@ -860,6 +860,14 @@ namedPrefix rows cols =
     let cells = rows * cols
     in replicateNative (1 + cells) 'x'
 
+-- | Give both stages of a runtime length calculation a type signature.
+signedPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Char (1 + rows * cols)
+signedPrefix rows cols =
+    let total, cells :: Nat
+        total = 1 + cells
+        cells = rows * cols
+    in replicateNative total 'x'
+
 -- | Use ordinary addition on two unknown lengths in a vector result type.
 sourceAddition :: IO ()
 sourceAddition = do
@@ -933,3 +941,5 @@ arithmeticNotation = do
         (safeHead (replicateNative (1 + rows * unknownCols) 'x'))
     observe "one plus a let-bound product" (length (toList (namedPrefix rows cols)))
     observe "safeHead with a let-bound product" (safeHead (namedPrefix rows unknownCols))
+    observe "signed length bindings" (length (toList (signedPrefix rows cols)),
+                                      safeHead (signedPrefix rows unknownCols))

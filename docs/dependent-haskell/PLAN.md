@@ -7243,12 +7243,12 @@ when later bindings use earlier indices. M91 rejects all four controls:
 a signed product, a forward reference, a second ordinary member, and
 a successor that uses the first member.
 
-- [ ] Check all signatures in their ordinary scope. Visit the renamer's
+- [x] Check all signatures in their ordinary scope. Visit the renamer's
       acyclic binding groups in dependency order. Check each RHS once.
-- [ ] Recognise a monomorphic signed value through its checked export.
+- [x] Recognise a monomorphic signed value through its checked export.
       Use a definition's equality only within subsequent bindings and the
       body. Preserve polymorphic bindings and caller-supplied dictionaries.
-- [ ] Check forward references, transitive use, ordinary fallback, wrong
+- [x] Check forward references, transitive use, ordinary fallback, wrong
       signatures, demand, source locations, GHCi and an interface-only
       client. Update the Showcase and the R03/R05 cards.
 
@@ -7256,3 +7256,106 @@ Agda permits signatures in local definitions and earlier definitions in
 later ones. GHC orders these Haskell bindings by their dependencies and
 retains their call-by-need semantics.
 [Local definitions in Agda](REFERENCES.md#equality-for-lazy-local-definitions).
+
+### Binding and solver scope
+
+GHC checks all signatures in the original let group. It then checks the
+nonrecursive bindings in dependency order. A signed monomorphic value
+has an inner Id for its equation and a public Id for its uses. The
+equality names the public Id. A binding that abstracts over types or
+evidence keeps its ordinary checked representation.
+
+The solver selects each defining equality from its actual dictionary
+evidence. In the body it can compose `total ~ 1 + cells` with
+`cells ~ times rows cols`. It uses coercions for both steps. An
+assumption obtained by matching a GADT uses the same normal form as
+the equality it must solve. When expanding a defining RHS, the solver
+uses earlier definitions and global family axioms. It excludes a local
+assumption that might point back to the original name. Static forms
+and shortcut instance solving exclude the surrounding definitions.
+The desugarer still binds each retained operand once.
+
+Both compiler stages accepted a shared signature written before its
+definitions. They rejected a wrong signature on the RHS at the operand,
+and a conflicting rewrite rule at its declaration. The case with a
+caller-supplied dictionary identifies the equality it still needs and
+points to the exact binder of the equality it has. Both compilers built
+and ran a client with only the frozen M89 interface and object available.
+The native Showcase and self-hosted GHCi each emitted 166 lines at
+`-O0`. The grouped length was seven at two by three, and taking its first
+cell with an undefined dimension returned `'x'`.
+
+A caller can take the head of `signedPrefix` using its declared result.
+Inside a let, an inferred tail index at
+`safeHead (replicateNative total 'x')` can still be untouchable in the
+retained application. In the same source, both compilers accept
+`safeHead @Char @(r * c) (replicateNative total 'x')`. Giving the tail
+index explicitly leaves the local equality to the ordinary solver.
+The closed-result local numeral and the separate `where` binding also
+still fail. These cases need further work on R03.
+
+The next inference experiment can use the checked RHS to propose an
+erased tail argument before ordinary instantiation allocates a
+metavariable. Keep the original vector type for the subsequent equality
+check, so this proposal cannot bypass dictionary selection. Test a
+caller-supplied multiplication and an unrelated runtime index alongside
+the accepted case. The explicit-argument control isolates this experiment
+from any change to the Core equality rule.
+
+## M93: retained types in HIE files
+
+The typed-binder check for M92 exposed a panic in `getTypeIndex` when a
+module used `foreach` with `-fwrite-ide-info`. Editors need the source
+binder and its type even if a retained application discharges a local
+equality during compilation. R05 already has distinct Core and interface
+representations for the value binder, its occurrences and an opaque
+function application.
+
+- [x] Preserve the binder Name, domain, multiplicity, visibility and
+      result in the HIE type table. Keep runtime variable and function
+      occurrences distinct. Emit the typed local binder at its source span.
+- [x] Render the recovered type with GHC's interface type printer and
+      the Haddock source hyperlinker's HIE reader. Version the HIE
+      payload and reject earlier files before reading their type table.
+- [x] Write and read actual files. Check binder identity, both
+      visibilities, opaque applications, binary round trips, previous
+      version rejection and the source locations of signed local names.
+
+[Editor context and HIE encoding](REFERENCES.md#editor-context-and-hie-encoding).
+
+### Encoding and type recovery
+
+`HDepFunTy` stores the retained binder's visibility, multiplicity, public
+Name, domain and result. Its Name scopes over the result. `HTermVarTy`
+records a runtime variable, and `HTermAppTy` records an opaque function's
+Name and argument. GHC and the Haddock hyperlinker recover the corresponding
+interface types for printing. Both readers check the version before decoding
+the type table. The HIE payload suffix changes from 64 to 65.
+
+A typed source occurrence can also contain an inferred invisible
+application in an evidence wrapper. In that case GHC applies the actual
+operand to the retained binder to recover the result type. This was
+necessary to write the complete Showcase. The ordinary function-result
+operation had panicked while computing the type of an editor node.
+
+### Verification
+
+Both compiler stages wrote extended interfaces for the complete Showcase.
+The self-hosted reader recovered `Nat` at the actual unsigned and signed
+binder locations and linked their uses to the same Names. It also
+recovered an unused signed local. It read the bootstrap file with the
+same results. The registered round-trip test checked both retained
+visibilities, an opaque function application, an inferred invisible
+operand, and rejection of the preceding version by both readers.
+
+The self-hosted native and GHCi runs with editor output each reproduced
+all 166 expected lines. Haddock built and produced HTML, hyperlinked
+source and LaTeX for the fixture. Both documentation formats printed
+`foreach (n :: Nat) -> Proxy n` and `foreach (n :: Nat). Proxy n` with
+the correct separators. This verifies type signatures for the fixture.
+Haddock instance sorting for arbitrary retained types is still open.
+
+All 53 selected normal tests and four GHCi tests passed. The GHC API
+test now accepts a signed Boolean alias of the same input and rejects
+an alias of a different input. The separate quantified-constraint
+diagnostic records the branch's existing unmatchable forall annotation.

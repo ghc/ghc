@@ -4751,6 +4751,13 @@ for associating the checked RHS with one lexical binder.
 and [Agda's let environment](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L387-L399).
 See also [variable lookup](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L521-L534).
 
+Agda permits several local definitions with individual signatures. Each
+definition is available in the later RHSs and in the body. In this fork,
+Haskell name resolution determines the dependency order, including forward
+references. Each checked equality can then justify the next index without
+evaluating either binding at runtime.
+[Agda 2.8.0, local signatures and scope](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions).
+
 For a Haskell class method, the selected evidence determines the runtime
 function. A local constraint can supply a different dictionary even at a
 ground type. The solver already checks the identity of a dictionary used
@@ -4776,3 +4783,19 @@ its use in committed evidence, the rewrite-rule checks and lazy dependent
 application are design choices in this fork.
 [OutsideIn(X) reading record](papers/README.md#outsideinx-jfp-2011)
 and [the GHC implication solver](../../compiler/GHC/Tc/Solver/Solve.hs).
+
+### Editor context and HIE encoding
+
+Agda's editor can show the type of each local identifier at a goal. For
+this fork, an editor needs the public Haskell binder and its inferred
+type at its source location, including when elaboration introduces a
+different internal binder.
+[Agda 2.8.0, commands in the context of a goal](https://agda.readthedocs.io/en/v2.8.0/tools/emacs-mode.html#commands-in-context-of-a-goal).
+
+GHC already records typed source information in extended interface
+files. M93 follows the existing HIE type table and both GHC readers.
+The retained forms carry the same fields as the compiler's existing
+interface types. The HIE version identifies its binary payload.
+[GHC's extended-interface options](../users_guide/separate_compilation.rst),
+[HIE types and binary representation](../../compiler/GHC/Iface/Ext/Types.hs)
+and [GHC interface types](../../compiler/GHC/Iface/Type.hs).

@@ -171,6 +171,8 @@ can advance a card while the card remains open.
 | 30 | R03 and R05: nested retained operands | [M89](PLAN.md#m89-nested-computations-in-retained-operands) | Pass `1 + rows * cols` directly to a vector constructor and preserve demand on the product. |
 | 31 | R03 and R05: equality for lazy local definitions | [M90](PLAN.md#m90-equality-for-lazy-local-definitions) | Give a named checked product its defining index and share its runtime value. |
 | 32 | R03 and R05: dictionary evidence for local definitions | [M91](PLAN.md#m91-dictionary-evidence-for-a-local-index-definition) | Use the selected multiplication and literal conversion to check a local vector length. |
+| 33 | R03 and R05: signed and grouped local lengths | [M92](PLAN.md#m92-signed-and-grouped-local-lengths) | Check signed runtime lengths in dependency order and compose their equalities in the body. |
+| 34 | R05: retained types in editor metadata | [M93](PLAN.md#m93-retained-types-in-hie-files) | Write and read retained binders, runtime indices and opaque applications in HIE files. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

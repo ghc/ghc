@@ -122,6 +122,23 @@ The local arithmetic still works with that dictionary. Returning a vector
 at the canonical product length then requires independent evidence.
 [Dictionary selection in a let](PLAN.md#m91-dictionary-evidence-for-a-local-index-definition).
 
+Local signatures and multiple bindings also work. GHC accepts this group
+in either declaration order. The signature on the result still uses
+`1 + rows * cols`.
+
+```haskell
+let total, cells :: Nat
+    total = 1 + cells
+    cells = rows * cols
+in replicateNative total 'x'
+```
+
+Inside that let, the solver can check a call to `safeHead` when the caller
+fixes the erased tail index. For example, `safeHead @Char @(rows * cols)
+(replicateNative total 'x')` checks in a dependent result. Inferring this
+tail from `total` remains open.
+[Signed and grouped local lengths](PLAN.md#m92-signed-and-grouped-local-lengths).
+
 The order of addition also affects evaluation. With an undefined `cells`,
 `1 + cells` already has a successor constructor. Asking for the first
 constructor of `cells + 1` evaluates `cells` and raises the exception.
@@ -213,6 +230,14 @@ even if evaluating `xs` would diverge.
 - [Historical port](PORT.md): pinned commits, module mapping, and missing rules.
 - [Restricted Core](CORE.md): representation, typing, substitution, and gates.
 - This file: current status, validation results, and instructions to resume work.
+
+This fork also writes retained types to `.hie` files with
+`-fwrite-ide-info`. The reader recovers the public name and type of a signed
+local index at its definition, including when the binding is unused. Use
+a matching reader and regenerate older `.hie` files after this update.
+Haddock renders visibly supplied and inferred retained arguments with
+their source arrow and dot in HTML and LaTeX.
+[Retained HIE types](PLAN.md#m93-retained-types-in-hie-files).
 
 ## Run the showcase
 

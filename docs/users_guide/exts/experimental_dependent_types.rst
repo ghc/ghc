@@ -113,9 +113,20 @@ dictionary supplies the checked multiplication function, the body can use
 The same check applies to a numeral in a local formula, such as
 ``let cells = times rows 3``.
 
-This rule applies to a single nonrecursive, unsigned value binding inside
-a lazy let expression with a known dependent result. The checked RHS must
-supply a monomorphic value. A different dictionary can still supply the
+A lazy let expression can also name more than one intermediate length.
+The bindings can have complete monomorphic signatures::
+
+    prefixed rows cols =
+        let total, cells :: Nat
+            total = 1 + cells
+            cells = rows * cols
+        in replicateNative total True
+
+GHC checks the signatures first and follows the dependencies between
+bindings. Here the body can use ``total`` at the length
+``1 + rows * cols``. This rule applies to nonrecursive value definitions
+in a let expression with a known dependent result. Each RHS that supplies
+a length equality must yield a monomorphic value. A different dictionary can still supply the
 ordinary runtime operation. If the body needs the index equality, the
 compiler also checks rewrite rules that can affect the selected method.
 
@@ -358,9 +369,15 @@ Native-containing ``INLINE``, ``INLINABLE``, and class-default unfoldings also
 remain unsupported. Their current builders run ordinary optimization during
 desugaring.
 
-This fork uses interface version ``1001202611131`` from the configured compiler
-version ``10.1.20261113.1``. Rebuild matching libraries and packages with this
-compiler. The whole-file version check rejects interfaces from the old format.
+Use libraries and packages built with a matching compiler. The configured
+compiler at this revision is ``10.1.20261115.1``. Its ordinary interface
+version is ``100120261115168``.
+
+With :ghc-flag:`-fwrite-ide-info`, an extended interface file also records
+the visibility and type of a retained binder, references to runtime
+indices, and opaque applications of a bound function. Its version is
+separate from the ordinary interface version. Regenerate older
+``.hie`` files with this compiler before reading them.
 
 The extension implies no other extensions. In particular, it does not imply
 :extension:`KindSignatures`. The ``:: Bool`` annotation specifies the

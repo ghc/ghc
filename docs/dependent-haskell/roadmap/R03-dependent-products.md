@@ -108,9 +108,11 @@ M58 and M59 expose those rules through source checking.
       See [M90](../PLAN.md#m90-equality-for-lazy-local-definitions).
 - [x] Check a local product, including numerals and nested calls, using the
       evidence for the ordinary RHS. See [M91](../PLAN.md#m91-dictionary-evidence-for-a-local-index-definition).
-- [ ] Carry a checked length through a local binding with its own signature
-      and through a let group with several nonrecursive bindings. Preserve
-      the scope and generalisation of each binding.
+- [x] Carry a checked length through a signed value and several acyclic
+      let bindings in dependency order. Preserve ordinary signature checking
+      and generalisation. See [M92](../PLAN.md#m92-signed-and-grouped-local-lengths).
+- [ ] Infer the tail of a nonempty vector from grouped local length aliases.
+      The explicit erased argument succeeds in the [M92 control](../PLAN.md#m92-signed-and-grouped-local-lengths).
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.

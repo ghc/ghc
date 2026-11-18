@@ -68,6 +68,12 @@ linear actuals. The owner is R03. This increment adds no Core equality rule.
       See [M90](../PLAN.md#m90-equality-for-lazy-local-definitions).
 - [x] Check proof use against committed solver evidence before lowering
       an overloaded local definition. See [M91](../PLAN.md#m91-dictionary-evidence-for-a-local-index-definition).
+- [x] Compose selected local equalities through constructors and source
+      families. Keep a shared runtime binding for each named length.
+      See [M92](../PLAN.md#m92-signed-and-grouped-local-lengths).
+- [x] Write visible and invisible retained binders, runtime variables and
+      opaque applications to HIE files. Recover the typed public binder
+      for a local definition. See [M93](../PLAN.md#m93-retained-types-in-hie-files).
 - [ ] Specify an opaque Pi instantiation rule if a typed transformation needs
       one. M61's measured whole-cast lowering needs no new primitive. Add a proof
       operation only when a measured or calculus obligation requires it.
