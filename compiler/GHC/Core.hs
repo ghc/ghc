@@ -2609,7 +2609,7 @@ mkCoBind cv co      = NonRec cv (Coercion co)
 exprToNativeIndex :: CoreExpr -> Maybe Type
 exprToNativeIndex expr = snd <$> normaliseNativeIndexExpr expr
 
--- | Compute the index of a monomorphic source call with atomic operands.
+-- | Compute the index of a monomorphic source call on constructor trees.
 -- See Note [Source calls in retained arguments].
 nativeSourceCallIndex :: CoreExpr -> Maybe Type
 nativeSourceCallIndex expr
@@ -2619,14 +2619,11 @@ nativeSourceCallIndex expr
         binders = tyConTyVars family
   , args `equalLength` domains, args `equalLength` binders
   , result `sameNativeIndexDomain` tyConResKind family
-  , Just indices <- traverse atom_index args
+  , Just indices <- traverse (fmap snd . nativeIndexExpr False) args
   , and (zipWith3 has_domain domains binders indices)
   = Just (mkTyConApp family indices)
   | otherwise = Nothing
   where
-    atom_index arg
-      | (Var _, tys) <- collectArgs arg, all isTypeArg tys = exprToNativeIndex arg
-      | otherwise = Nothing
     has_domain (Scaled mult domain) binder index =
       isManyTy mult && sameNativeIndexDomain domain (tyVarKind binder)
                     && sameNativeIndexDomain domain (typeKind index)
@@ -2645,6 +2642,10 @@ against the actual call before substituting it into the result. Two
 functions of the same type can select different families. The compiler
 does not need to reduce either equation or read the function's unfolding.
 
+An operand is a local variable or a saturated ordinary constructor whose
+fields are themselves operands. Use the structural checks of nativeIndexExpr
+with beta and cast conversions disabled. This lets CorePrep substitute the
+variables in the checked tree without evaluating or duplicating a field.
 The original Core application supplies the runtime head. A family
 application on its own is insufficient to reconstruct that Id. Keep
 the expression when composing substitutions. Keep the structural
@@ -2679,7 +2680,11 @@ exprToNativeCaseIndex expr
 -- The caller must check the original expression's typing and scope with Lint.
 -- See Note [Checked native index beta exposure].
 normaliseNativeIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
-normaliseNativeIndexExpr = go emptyVarEnv
+normaliseNativeIndexExpr = nativeIndexExpr True
+
+-- | Check variables and constructor trees, optionally exposing casts and beta redexes.
+nativeIndexExpr :: Bool -> CoreExpr -> Maybe (CoreExpr, Type)
+nativeIndexExpr allow_conversions = go emptyVarEnv
   where
     go :: IdEnv (CoreExpr, Type) -> CoreExpr -> Maybe (CoreExpr, Type)
     go env expr
@@ -2689,7 +2694,7 @@ normaliseNativeIndexExpr = go emptyVarEnv
             | sameNativeIndexDomain (varType v) (typeKind index) -> Just result
             | otherwise -> Nothing
           Nothing -> Just (expr, TermVarTy v)
-      | Cast body co <- expr
+      | allow_conversions, Cast body co <- expr
       , Just delta <- nativeIndexCastCo_maybe co
       , coercionRole delta == Nominal
       = do { let delta' = subst_cast env delta
@@ -2698,7 +2703,7 @@ normaliseNativeIndexExpr = go emptyVarEnv
            ; if sameNativeIndexDomain source (typeKind index)
              then Just (Cast body' (SubCo delta'), CastTy index delta')
              else Nothing }
-      | App (Lam binder body) arg <- expr
+      | allow_conversions, App (Lam binder body) arg <- expr
       , isNativeIndexId binder
       = do { arg_result@(arg', arg_index) <- go env arg
            ; if native_atom arg'
