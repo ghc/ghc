@@ -2274,6 +2274,15 @@ module graph will be empty. Therefore `downsweepInteractiveImports` will perform
 for the unit portion of the graph, if it's not already been performed.
 
 
+Note [Interactive family instance visibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The home family instance environment also contains instances from modules
+that GHCi has loaded but the prompt has not imported. Collect the family
+instance modules from each interactive import, just as rnImports does for
+a source module. Include instances from earlier prompt declarations. A
+type numeral in Vec Bool (n + 1) can then use a visible FromNatural instance.
+See Note [Registered type numerals] in GHC.Tc.Gen.HsType.
+
 *********************************************************
 *                                                       *
                 GHCi stuff
@@ -2307,24 +2316,21 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
 
-       ; let getOrphansForModuleName m mb_pkg = do
-              iface <- loadSrcInterface (text "runTcInteractive") LookupUser m NotBoot mb_pkg
-              pure $ mi_module iface : dep_orphs (mi_deps iface)
-
-             getOrphansForModule m = do
-              iface <- loadModuleInterface (text "runTcInteractive") m
-              pure $ mi_module iface : dep_orphs (mi_deps iface)
-
-       ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
-            case i of                   -- force above: see #15111
-                IIModule n -> getOrphansForModule n
-                IIDecl i   -> getOrphansForModuleName (hsModuleName (unLoc (ideclName i)))
-                                         (renameRawPkgQual (hsc_unit_env hsc_env) (hsModuleName $ unLoc $ ideclName i) (ideclPkgQual i))
-
+       ; !(orphs, finsts) <- fmap (force . mconcat) . forM (ic_imports icxt) $ \i -> do
+             -- Force the result to release the imported interfaces. See #15111.
+             iface <- case i of
+               IIModule m -> loadModuleInterface (text "runTcInteractive") m
+               IIDecl decl -> do
+                 let m = hsModuleName (unLoc (ideclName decl))
+                     pkg = renameRawPkgQual (hsc_unit_env hsc_env) m (ideclPkgQual decl)
+                 loadSrcInterface (text "runTcInteractive") LookupUser m NotBoot pkg
+             pure (mi_module iface : dep_orphs (mi_deps iface), importedFamInstModules iface)
 
        ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)
 
-       ; let imports = emptyImportAvails { imp_orphs = orphs }
+       ; let prompt_finsts = map (nameModule . getName) ic_finsts
+             imports = emptyImportAvails { imp_orphs = orphs
+                                         , imp_finsts = moduleSetElts (mkModuleSet (prompt_finsts ++ finsts)) }
 
              upd_envs (gbl_env, lcl_env) = (gbl_env', lcl_env')
 
@@ -2339,8 +2345,7 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
                               home_fam_insts
                    , tcg_fix_env      = ic_fix_env icxt
                    , tcg_default      = ic_default icxt
-                        -- must calculate imp_orphs of the ImportAvails
-                        -- so that instance visibility is done correctly
+                        -- See Note [Interactive family instance visibility].
                    , tcg_imports      = imports }
 
                  lcl_env' = modifyLclCtxt (tcExtendLocalTypeEnv lcl_ids) lcl_env

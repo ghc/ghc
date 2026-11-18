@@ -13,7 +13,7 @@ module GHC.Rename.Names (
         ImportUserSpec(..),
         extendGlobalRdrEnvRn,
         gresFromAvails,
-        calculateAvails,
+        calculateAvails, importedFamInstModules,
         reportUnusedNames,
         checkConName,
         mkChildEnv,
@@ -513,6 +513,17 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
     hpt_deps  = homeUnitDepends unit_state
 
 
+-- | Family-instance modules made visible by importing this interface.
+-- The dependencies exclude the imported module itself.
+importedFamInstModules :: ModIface -> [Module]
+importedFamInstModules iface
+  | mi_finsts iface = assertPpr (mod `notElem` deps) (ppr mod <+> ppr deps) $
+                      mod : deps
+  | otherwise = deps
+  where
+    mod = mi_semantic_module iface
+    deps = dep_finsts (mi_deps iface)
+
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
 calculateAvails :: HomeUnit
@@ -526,7 +537,6 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan iface
-      has_finsts = mi_finsts iface
       deps       = mi_deps iface
       trust      = getSafeMode $ mi_trust iface
       trust_pkg  = mi_trust_pkg iface
@@ -556,18 +566,13 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
       -- 'dep_orphs' and 'dep_finsts' do NOT include the imported module
       -- itself, but we DO need to include this module in 'imp_orphs' and
       -- 'imp_finsts' if it defines an orphan or instance family; thus the
-      -- orph_iface/has_iface tests.
+      -- orph_iface test and importedFamInstModules.
 
       deporphs  = dep_orphs deps
-      depfinsts = dep_finsts deps
 
       orphans | orph_iface = assertPpr (not (imp_sem_mod `elem` deporphs)) (ppr imp_sem_mod <+> ppr deporphs) $
                              imp_sem_mod : deporphs
               | otherwise  = deporphs
-
-      finsts | has_finsts = assertPpr (not (imp_sem_mod `elem` depfinsts)) (ppr imp_sem_mod <+> ppr depfinsts) $
-                            imp_sem_mod : depfinsts
-             | otherwise  = depfinsts
 
       -- Trusted packages are a lot like orphans.
       trusted_pkgs | mod_safe' = dep_trusted_pkgs deps
@@ -618,7 +623,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
   in ImportAvails {
           imp_mods       = Map.singleton (mi_module iface) [imported_by],
           imp_orphs      = orphans,
-          imp_finsts     = finsts,
+          imp_finsts     = importedFamInstModules iface,
           imp_sig_mods   = sig_mods,
           imp_direct_dep_mods = direct_mods,
           imp_dep_direct_pkgs = dependent_pkgs,
