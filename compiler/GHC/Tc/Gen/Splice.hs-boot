@@ -51,5 +51,6 @@ finishTH :: TcM ()
 tcDecodeClosedCallOperand :: Type -> TcM (Maybe CoreExpr)
 
 tcCheckClosedCallContext :: Name -> TcM ()
+tcPreflightClosedCall :: Name -> TcM ()
 
 tcRunClosedCall :: Id -> CoreExpr -> Type -> TcM Type

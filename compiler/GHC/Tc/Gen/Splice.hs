@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice, tcRunClosedCall, tcCheckClosedCallContext, tcDecodeClosedCallOperand
+     finishTH, runTopSplice, tcRunClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand
       ) where
 
 import GHC.Prelude
@@ -1466,6 +1466,13 @@ Record the loaded dependencies through the same path as a splice. The
 producer object can change even when its interface ABI remains the same.
 See Note [Object File Dependencies] in GHC.HsToCore.Usage.
 -}
+
+-- | Check the outer call before entering a nested operand.
+tcPreflightClosedCall :: Name -> TcM ()
+tcPreflightClosedCall name = do
+  hsc_env <- getTopEnv
+  _ <- checkClosedTypeEvalStage hsc_env name
+  return ()
 
 -- | Check the execution context before loading code for a type.
 checkClosedTypeEvalStage :: HscEnv -> Name -> TcM Interp

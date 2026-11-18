@@ -218,6 +218,16 @@ of ``Data.Char``::
     reversed :: Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]
     reversed = Refl
 
+    nested :: Prelude.sum (Prelude.reverse '[2, 3, 5]) :~: 10
+    nested = Refl
+
+In a nested call, GHC checks the argument and uses the kind of its result
+to specialize the outer function. Here the inner call returns a list of
+``Natural``, so the outer call uses the list and ``Natural`` instances.
+GHC evaluates the inner argument once. If that call fails, the error
+points to the inner function, even when the outer function would ignore
+its argument at runtime.
+
 The current implementation accepts one character literal or a promoted
 list of natural number literals. The function must take one unrestricted
 argument. It can return ``Char``, ``Bool``, ``Natural`` or a list of one of

@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedCall, tcCheckClosedCallContext, tcDecodeClosedCallOperand)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -142,6 +142,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Driver.DynFlags
+import GHC.Driver.Ppr (showPpr)
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString
@@ -2370,7 +2371,7 @@ tc_app_ty mode rn_ty exp_kind
                          , Just (owner_level, HM_Sig) <- mode_holes mode
                          , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ operand))) <- ignoreParens arg
                          , Just _ <- lookupNameEnv wildcards operand
-                         -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg
+                         -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg Nothing
                                ; tcCheckClosedCallContext name
                                ; case call_owner of
                                    RetrySigCalls -> return ()
@@ -2390,8 +2391,13 @@ tc_app_ty mode rn_ty exp_kind
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
                          | [arg] <- args, isQual rdr
                          , ordinary_call || ready_partial_call arg
-                         -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg
-                               ; argument <- tcClosedTypeCallArgument mode name domain arg
+                         -> do { (argument, result_kind) <-
+                                   case nestedClosedCallArgument arg of
+                                     Just _ -> tcNestedClosedCallOperand mode name (varType fun) arg
+                                     Nothing -> do
+                                       (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg Nothing
+                                       argument <- tcClosedTypeCallArgument mode name domain arg
+                                       return (argument, result_kind)
                                ; result <- tcRunClosedCall fun argument result_kind
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
@@ -2404,8 +2410,12 @@ tc_app_ty mode rn_ty exp_kind
     value_arg _ = Nothing
     ordinary_call = isNothing (mode_holes mode) || isJust (mode_complete_type_arg mode)
     ready_partial_call arg
-      | Just (_, RetrySigCalls, _) <- mode_pending_calls mode = isJust (closedCallLiteralKind arg)
+      | Just (_, RetrySigCalls, _) <- mode_pending_calls mode = ready arg
       | otherwise = False
+      where
+        ready operand
+          | Just child <- nestedClosedCallArgument operand = ready child
+          | otherwise = isJust (closedCallLiteralKind operand)
     unsupported = failWithTc . TcRnNoSourceTable
 tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
@@ -2453,21 +2463,42 @@ isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
   isTyVarName name
 isTypeVariableArg _ = False
 
+-- | Find the operand of a qualified unary term call.
+-- The type checker verifies the resolved name and the application.
+nestedClosedCallArgument :: LHsType GhcRn -> Maybe (LHsType GhcRn)
+nestedClosedCallArgument arg
+  | L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr rdr name))) <- head_ty
+  , isQual rdr, isVarName name, isExternalName name
+  , [HsValArg _ operand] <- filterOut is_par args
+  = Just operand
+  | otherwise = Nothing
+  where
+    (head_ty, args) = splitHsAppTys (unLoc (ignoreParens arg))
+    is_par HsArgPar{} = True
+    is_par _ = False
+
 -- | Specialize the declared arrow using only its argument. Keep the
 -- result independent of defaulting and of the surrounding expected kind.
-tcClosedCallKinds :: Name -> Type -> LHsType GhcRn -> TcM (Type, Type)
-tcClosedCallKinds name fun_ty arg
+tcClosedCallKinds :: Name -> Type -> LHsType GhcRn -> Maybe Kind -> TcM (Type, Type)
+tcClosedCallKinds name fun_ty arg inferred
   | Just (FTF_T_T, _, _, domain, codomain) <- splitFunTy_maybe rho
   , all isTyVar tvs
   = do input <- argumentDomain domain
-       subst <- maybe unsupported return (tcMatchTy domain input)
+       subst <- case tcMatchTy domain input of
+         Just subst -> return subst
+         Nothing
+           | Just _ <- inferred -> at_operand $ do
+               dflags <- getDynFlags
+               bad ("The operand has kind " ++ showPpr dflags input ++
+                    ", which does not match the declared input type " ++ showPpr dflags domain ++ ".")
+           | otherwise -> unsupported
        let undetermined tv = maybe True (not . noFreeVarsOfType) (Subst.lookupTyVar subst tv)
            unresolved = filter undetermined tvs
            result = Subst.substTy subst codomain
            ground_class p = let pred_ty = Subst.substTy subst p
                             in noFreeVarsOfType pred_ty && isJust (getClassPredTys_maybe pred_ty)
        unless (null unresolved) $
-         bad ("The literal argument does not determine the following type parameters: "
+         bad (operand_description ++ " does not determine the following type parameters: "
               ++ unwords (map getOccString unresolved) ++ ".")
        unless (all ground_class predicates && noFreeVarsOfType result &&
                Subst.substTy subst rho `tcEqType` mkVisFunTyManyU input result) unsupported
@@ -2479,7 +2510,16 @@ tcClosedCallKinds name fun_ty arg
     predicates = mapMaybe anonPiTyBinderType_maybe binders
     list_kind = mkListTy naturalTy
     inputs = [charTy, list_kind]
+    operand_description
+      | Just _ <- inferred = "The checked operand"
+      | otherwise = "The literal argument"
+    at_operand :: TcM a -> TcM a
+    at_operand = setSrcSpanA (getLoc arg)
     argumentDomain domain
+      | Just actual <- inferred = at_operand $
+          if any (tcEqType actual) inputs
+            then return actual
+            else bad "The checked operand must have kind Char or [Natural]."
       | any (tcEqType domain) inputs = return domain
       | Just kind <- closedCallLiteralKind arg = return kind
       | not (null predicates), any (isJust . tcMatchTy domain) inputs =
@@ -2491,18 +2531,40 @@ tcClosedCallKinds name fun_ty arg
     unsupported :: TcM a
     unsupported = failWithTc (TcRnNoSourceTable name)
 
+-- | Check a nested argument in inference mode, then use its checked value.
+tcNestedClosedCallOperand :: TcTyMode -> Name -> Type -> LHsType GhcRn
+                          -> TcM (Core.CoreExpr, Kind)
+tcNestedClosedCallOperand mode name fun_ty arg = do
+  checkCompleteClosedCall mode name
+  tcPreflightClosedCall name
+  (operand, _) <- tc_infer_lhs_type mode arg
+  checked <- liftZonkM (zonkTcType operand)
+  (_, result_kind) <- tcClosedCallKinds name fun_ty arg (Just (typeKind checked))
+  value <- tcDecodeClosedCallOperand checked
+  case value of
+    Just argument -> return (argument, result_kind)
+    Nothing -> setSrcSpanA (getLoc arg) $
+      failWithTc (TcRnClosedTypeEval name
+        "The checked operand does not represent a supported closed value.")
+
+-- | Reject a closed call in an incomplete visible type argument.
+checkCompleteClosedCall :: TcTyMode -> Name -> TcM ()
+checkCompleteClosedCall mode name =
+  when (mode_complete_type_arg mode == Just False) $
+    failWithTc (TcRnClosedTypeEval name
+      "A visible type argument containing a closed call must be complete. Replace its wildcards with types.")
+
 -- | Check the literal at the expected kind and build its runtime value.
 tcClosedTypeCallArgument :: TcTyMode -> Name -> Type -> LHsType GhcRn -> TcM Core.CoreExpr
-tcClosedTypeCallArgument mode name domain arg
-  | mode_complete_type_arg mode == Just False =
-      bad "A visible type argument containing a closed call must be complete. Replace its wildcards with types."
-  | domain `tcEqType` charTy =
+tcClosedTypeCallArgument mode name domain arg = do
+  checkCompleteClosedCall mode name
+  if domain `tcEqType` charTy then
       case ignoreParens arg of
         L _ (HsTyLit _ (HsChar _ _)) -> do
           checked <- checked_argument
           decode "The checked argument does not represent a Char literal." checked
         _ -> bad "The argument must be a closed Char literal, such as 'x'."
-  | otherwise = case closedNaturalList arg of
+  else case closedNaturalList arg of
       Just numbers -> do
         checked <- checked_argument
         let expected = mkPromotedListTy naturalTy (map mkNumLitTy numbers)
@@ -2548,10 +2610,18 @@ literals or a Char literal. The renamer keeps the qualifier and resolved
 term Name after trying the ordinary type and checked source-table paths.
 The term Name is not a retained local index.
 
-Require a literal argument before execution. Its kind can instantiate a
-polymorphic function when the declared domain determines all its
-type variables and every class constraint becomes ground. The ordinary
-expression checker solves those constraints before evaluation.
+A literal argument supplies the kind that specializes a polymorphic
+function. For a nested qualified call, check the outer call's staging
+first. Then infer the inner call's kind and evaluate it once. Use the
+checked promoted result to construct the outer runtime operand.
+Do not check the inner syntax again. The expected result kind of the
+outer call does not affect either specialization. A partial signature
+can use this path when the nested call ends in a literal. A call on a
+signature wildcard continues to use the inference retry path.
+
+The declared domain must determine all type variables and every class
+constraint must become ground. The ordinary expression checker solves
+those constraints before evaluation.
 Elaborate Natural, Char, and Bool results to literals or promoted
 constructors. Elaborate lists of these results to promoted lists. See
 Note [Closed literal type evaluation] in GHC.Tc.Gen.Splice.

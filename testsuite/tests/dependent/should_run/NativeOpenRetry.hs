@@ -12,8 +12,9 @@ import qualified NativeOpenRetryLib
 upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
 upper (_ :: Proxy 'a') = Proxy @'A'
 
-mixed :: Proxy _c -> (Proxy (Data.Char.toUpper 'x'), Proxy (Data.Char.toUpper _c))
-mixed (_ :: Proxy 'a') = (Proxy @'X', Proxy @'A')
+mixed :: Proxy _c -> ( Proxy (Data.Char.toUpper 'x'), Proxy (Data.Char.toUpper _c)
+                     , Proxy (Prelude.sum (Prelude.reverse '[2, 3, 5])) )
+mixed (_ :: Proxy 'a') = (Proxy @'X', Proxy @'A', Proxy @10)
 
 nested :: Char
 nested = charVal (local (Proxy @'a'))
@@ -50,5 +51,5 @@ main = do
   print (charVal (upper (Proxy @'a')), nested, expression, charVal (fst (chain (Proxy @'a'))))
   print (natVal (empty (Proxy @'[])), natVal (large (Proxy @'[18446744073709551616, 7])))
   print (snd ordinaryNoGen)
-  let (ready, inferred) = mixed (Proxy @'a')
-  print (charVal ready, charVal inferred)
+  let (ready, inferred, total) = mixed (Proxy @'a')
+  print (charVal ready, charVal inferred, natVal total)
