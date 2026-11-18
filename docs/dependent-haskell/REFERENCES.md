@@ -4503,3 +4503,27 @@ Agda's primitive recursion section also gives the rule for addition in
 M79. The first argument loses a successor at each call. The second
 argument passes through unchanged. This lets the base equation return
 the second argument even when it is abstract. [Agda 2.8.0 primitive recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#primitive-recursion).
+
+### Numerals and arithmetic operators
+
+Agda's `FROMNAT` design gives an in-scope conversion the ordinary natural
+literal as input. The expected result type can select an instance.
+Agda also has a distinct registration for the natural datatype itself.
+Neither requires the user's constructors to be named `Z` and `S`.
+[Agda 2.8.0 literal overloading](https://agda.readthedocs.io/en/v2.8.0/language/literal-overloading.html#natural-numbers)
+and [builtin naturals](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#natural-numbers).
+
+GHC already has built-in type numerals at kind `Natural` and an arithmetic
+operator in `GHC.TypeNats`. Promotion in `singletons-th` translates an
+integer expression through its promoted `FromInteger`. The M80 design
+uses an open family to select the type-level conversion. It leaves a term
+literal's `Num` or rebound `fromInteger` interpretation with its ordinary
+typechecker. [GHC type literals](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/type_literals.html),
+[pinned `singletons-th` implementation](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons-th/src/Data/Singletons/TH/Promote.hs#L1490-L1498),
+and [Serokell's literal-promotion card](https://ghc.serokell.io/dh#promote-literals).
+
+The `fin` library supplies the Peano conversion itself. Its `FromGHC`
+equations map zero to zero and a positive natural to one successor of
+the preceding natural. They can leave an abstract input stuck. M80 uses
+that definition for the vector library's particular index type.
+[Pinned `Data.Type.Nat.FromGHC`](https://github.com/phadej/vec/blob/df95689f85798832d834a8035fa37bc0d4f66363/fin/src/Data/Type/Nat.hs#L410-L418).

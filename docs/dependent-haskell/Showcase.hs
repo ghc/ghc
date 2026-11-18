@@ -756,7 +756,7 @@ inferredAppend = do
         xs = replicateNative @Int n 7
         ys :: Vec Int m
         ys = replicateNative @Int m 9
-        joined :: Vec Int (Add n m)
+        joined :: Vec Int (plus n m)
         joined = appendHidden xs ys
     observe "append with inferred lengths" (toList joined)
     observe "append with first length written" (toList (appendHidden @{n} xs ys))
@@ -788,6 +788,7 @@ main = do
     closedSourceFunctions
     constructorFields
     recursiveLengths
+    sourceAddition
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()
@@ -837,3 +838,17 @@ recursiveLengths = do
 
     safeHead :: Vec a ('S n) -> a
     safeHead (VCons x _) = x
+
+-- | Use ordinary addition on two unknown lengths in a vector result type.
+sourceAddition :: IO ()
+sourceAddition = do
+    n <- newIORef (S Z) >>= readIORef
+    m <- newIORef (S (S Z)) >>= readIORef
+    let xs :: Vec Bool n
+        xs = replicateNative n True
+        ys :: Vec Bool m
+        ys = replicateNative m False
+        joined :: Vec Bool (plus n m)
+        joined = appendHidden xs ys
+    observe "runtime sum and appended vector" (natToInt (plus n m), toList joined)
+    observe "outer successor ignores the second addend" (isSuccessor (plus (S Z) undefined))

@@ -17,7 +17,11 @@ write `vector :: Vec Int (sourceLength xs)` and construct it with
 The same length function accepts a list of any lifted element type and
 returns a Peano natural. From the producer's interface alone, GHC can prove
 that adding one element increases the length by one, even when it knows
-neither the element type nor the tail. See [the implementation and its limits](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type).
+neither the element type nor the tail. The result of vector append also
+uses an ordinary two-argument addition function. Its type is
+`Vec a (plus n m)`, where both lengths can come from IO. See
+[polymorphic list length](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type)
+and [source addition](PLAN.md#m79-addition-from-an-ordinary-two-argument-function).
 
 ### What happens on empty input?
 
@@ -110,6 +114,7 @@ _build/showcase/showcase
 | A source function used in a result type and a proof about an imported traffic-light function | `closedSourceFunctions` |
 | Dropping the first element of a vector whose length is indexed by an ordinary predecessor function | `constructorFields` |
 | A vector indexed by the recursive length of an IO-sourced list, demand on its spine, and reuse of one length function at `Int` and function element types | `recursiveLengths` |
+| Ordinary addition used in a vector result type and at runtime with an unevaluated second operand | `sourceAddition` |
 
 The M60 program produces the expected 84 lines in both compiler stages with
 Core Lint and STG Lint enabled. It appends five safe-indexing observations to
@@ -262,7 +267,7 @@ The field `m` can be unknown. [Vector library](examples/packed-vector/PackedVecL
 | Function-valued package fields | Actual stored function/input Ids scope a generic payload at `f n`; both stages pass source24 and mixed14 through object interfaces |
 | Exported retained function signatures | Complete ordinary named signatures export head-only retained function binders; a separate object client calls the imported worker with actual package fields |
 | Native dead local bindings | Deep FV annotations permit removal of unused lifted Many locals; type-only and stable-metadata dependencies remain bound |
-| Maintained showcase | Both compilers produce the same 145 lines, including the banner, from eighteen source modules. An ordinary polymorphic length indexes a vector. The caller handles both possible shapes of a list read at runtime. |
+| Maintained showcase | An ordinary polymorphic length indexes a vector. The caller handles both possible shapes of a list read at runtime. A two-argument source function computes the length of append. |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and

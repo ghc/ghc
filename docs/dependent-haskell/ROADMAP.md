@@ -47,8 +47,9 @@ appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
              -> Vec a n -> Vec a m -> Vec a (Add n m)
 ```
 
-`Add` is still a type family. The implementation does not yet let an arbitrary
-ordinary Haskell `length` or `append` compute inside a type.
+In M79, `Add n m` names the result of the ordinary Peano function
+`plus n m`. The public append signatures use that source function directly.
+General evaluation of Haskell functions in types remains open.
 
 M74 checks consecutive invisible retained arguments. The two vectors in
 `appendHidden xs ys` supply separate runtime lengths, and the result has
@@ -141,7 +142,8 @@ can advance a card while the card remains open.
 | 17 | R15: constructor fields in a source equation | [M76](PLAN.md#m76-constructor-fields-in-a-source-equation) | The checked `previous` clause returns the length of the tail. A `VCons` branch can therefore return its tail directly from `dropFirst`. |
 | 18 | R15: structural recursion on a list spine | [M77](PLAN.md#m77-structural-recursion-on-a-list-spine) | A checked recursive call on the tail computes the Peano result index of `boolVector`. A call on the rebuilt list has no checked equation. |
 | 19 | R13 and R15: parametric list length | [M78](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type) | One checked family proves the cons equation for an abstract element type and tail. The named length function indexes a vector built from a list of `Int` read at runtime. |
-| 20 | R13 and R15: a second ordinary argument | [M79 baseline](PLAN.md#m79-addition-from-an-ordinary-two-argument-function) | Ordinary Peano addition works at runtime. A type can use the handwritten family, but direct uses of the two-argument source function give GHC-68947. |
+| 20 | R13 and R15: a second ordinary argument | [M79](PLAN.md#m79-addition-from-an-ordinary-two-argument-function) | The runtime addition function computes the length index of vector append. The second length can stay unknown. |
+| 21 | R07 and R13: numerals and infix addition | [M80](PLAN.md#m80-numerals-and-infix-addition-in-vector-types) | Use `Vec a 3` and `Vec a (n + 1)` with the original Peano-indexed GADT. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

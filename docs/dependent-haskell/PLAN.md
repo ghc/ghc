@@ -6295,12 +6295,68 @@ and successor cases with an abstract second operand.
 
 - [x] Check the unary positive control, both rejected uses, and the
       handwritten proof without a producer object in the search path.
-- [ ] Check complete constructor coverage in the first argument and bind
+- [x] Check complete constructor coverage in the first argument and bind
       the second argument as a variable. Check that the recursive call
       decreases the first argument and passes the same second variable.
-- [ ] Prove both equations through a separate interface and use the
+- [x] Prove both equations through a separate interface and use the
       source function as the length of an appended vector. Verify that
       observing the outer successor can leave the second operand lazy.
 
 Agda uses this definition of addition to introduce primitive recursion.
 See [the reference for the two-argument rule](REFERENCES.md#constructor-fields-and-the-next-evaluation-rule).
+
+The checker compares the Id in the second operand with the second pattern
+binder. It searches only the first constructor's fields for the decreasing
+operand. This matters when both arguments have the same type. Both
+`f m m` and `f n n` must fail the check in a clause for `f (S n) m`.
+An explicit bang on the second variable, or the implicit bang added under
+`Strict`, would force it before returning a constructor. Such functions
+keep their ordinary runtime bindings and supply no equations for types.
+
+`appendVec`, `appendNative` and `appendHidden` now use `plus n m` in
+their result types. For existing users of the packed-vector example,
+`Add n m` is a saturated synonym for the same index. The example's
+closed family declaration has been replaced, so Template Haskell
+reification of `Add` sees a synonym. The runtime implementation of
+append still recurses on the first vector.
+
+Both rebuilt compilers at implementation commit `8b34da445b` pass the
+open-operand proofs with a producer interface alone. Changing the base
+equation invalidates the old proof. At `-O2`, an outer successor can
+leave the second length unevaluated. Both stages produce all 562 expected
+packed-vector lines and 147 Showcase lines. All 20 selected normal-way
+tests pass. Local evidence uses the `native-source-plus-` prefix.
+
+## M80: numerals and infix addition in vector types
+
+R07 and R13 own the request to write `Vec a 3` and `Vec a (n + 1)`.
+Keep the original GADT and its Peano index. Let the library specify
+the interpretation of a numeral at its index kind.
+
+On M79, `Vec Bool 3` gives GHC-83865 at the literal. It has kind
+`GHC.TypeNats.Nat` where the GADT expects the library's `Nat`.
+Using a signed, ordinary infix addition in a type gives GHC-76037 at
+`+`. The named, prefix form of the checked function already works.
+
+- [ ] Check a decimal literal at an expected, registered kind. Keep the
+      built-in natural default when there is no expected kind. Check
+      missing registrations, negative literals and separate interfaces.
+- [ ] Check an ordinary infix source definition and recursive infix call.
+      Respect an existing type operator, qualification and declared fixity.
+      Recheck unchanged clients after a fixity or conversion change.
+- [ ] Run a program with the original vector at length `3`, with append
+      at length `n + 3`, and with ordinary runtime arithmetic. A custom
+      `Num` instance must not supply evidence for a type equality.
+
+See [the numeral sources](REFERENCES.md#numerals-and-arithmetic-operators).
+
+### Next application boundary
+
+M79 can place `plus n m` in a result type. Passing the ordinary term
+`plus n m` directly as the retained length of `replicateNative` gives
+GHC-83605 at the expression. Giving it a local name `p` preserves the
+identity of `p`. GHC then reports GHC-83865 between `p` and `plus n m`.
+The existing `Sum p Refl` witness checks and returns a two-element vector.
+The next Core rule must preserve lazy evaluation, tie the actual called Id
+to its checked equations across an interface, and give Core Lint the same
+judgment as the source typechecker.
