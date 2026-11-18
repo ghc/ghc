@@ -7359,3 +7359,23 @@ All 53 selected normal tests and four GHCi tests passed. The GHC API
 test now accepts a signed Boolean alias of the same input and rejects
 an alias of a different input. The separate quantified-constraint
 diagnostic records the branch's existing unmatchable forall annotation.
+
+## M94: infer a nonempty tail through local length definitions
+
+R03 needs an erased argument that agrees with the checked value passed
+to a function. M92 establishes the local equalities, but an ordinary
+inference variable cannot be filled with a runtime index. The M93
+compiler accepts the written tail argument and rejects its omission.
+
+- [ ] Read a checked local RHS as a candidate for immutable argument
+      selection. Expose only definitions needed to match the formal
+      type. Keep each original argument, type, and usage in its cache.
+- [ ] Check the actual argument against the instantiated domain. A
+      lexically supplied dictionary can invalidate the proposed shape.
+      Preserve the source location of a call that lacks evidence.
+- [ ] Admit qualifying local definitions at fixed ordinary and closed
+      result types. Check an unguarded equation with a where binding.
+      Preserve normal inference, generalisation, strictness, and guards.
+- [ ] Check runtime dimensions, closed numerals, sharing and bottom,
+      caller dictionaries, unrelated indices, and linear values. Run the
+      examples in both compilers and GHCi. Update the Showcase and R03.
