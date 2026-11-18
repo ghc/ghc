@@ -6836,3 +6836,22 @@ payloads, strict lets and explicit `seq` produced the same normalized
 preoptimization Core as M85 in the comparison fixture. Across eight bindings
 with 8, 24 and 48 strict arguments, whole-compiler allocation was within
 0.05% of M85 on this machine. These measurements cover the fixture only.
+
+## M87: persistent dependent definitions in GHCi
+
+At M86 a retained function runs inside one prompt expression. A later
+command can see the type of a function stored with `let`, but demanding
+that function reaches the `unsafeCoerce#` fallback. A multiline declaration
+goes through module simplification and tidying, then reaches an unchecked
+CorePrep entry. R05 needs a checked path from these commands to bytecode.
+
+- [ ] Store a lifted result using GHCi's existing result carrier. Preserve
+      its complete type, including polymorphism, without evaluating it.
+- [ ] Compile retained declarations through the checked program CorePrep
+      and STG paths. Exercise both declarations entered at the prompt and
+      interpreted source modules. Preserve GHCi's option and linking checks.
+- [ ] Use retained definitions across commands. Check IO inputs, bottom,
+      type queries, shadowing and recovery after a rejected definition.
+      Record the supported scope of runtime names from preceding commands.
+- [ ] Extend the registered GHCi script and the Showcase instructions. Record
+      the bytecode and scope decisions in the roadmap and reference ledger.
