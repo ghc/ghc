@@ -3241,7 +3241,17 @@ tcRetainedInferableArg (L _ expr)
                           Just var -> (True, hasNativeDependentExpr (Core.Type (varType var)))
                           Nothing -> (False, False)) }
       HsApp _ fun arg -> application fun [arg]
-      OpApp _ lhs op rhs -> application op [lhs, rhs]
+      OpApp _ lhs op rhs ->
+        do { ql <- wantQuickLook (unLoc op)
+           ; case ql of
+               DoQL -> return (False, False)
+               NoQL -> do
+                 { let operands = [lhs, rhs]
+                 ; shape <- application op operands
+                 ; if shape /= (True, True) then return (False, False) else
+                   do { prefixes <- mapM tcPartialCallback operands
+                      ; return (if any carries_result (catMaybes prefixes)
+                                then shape else (False, False)) } } }
       HsAppType _ fun _ -> tcRetainedInferableArg fun
       ExplicitList _ fields
         -> do { overloaded <- xoptM LangExt.OverloadedLists
@@ -3261,8 +3271,10 @@ tcRetainedInferableArg (L _ expr)
       XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> tcRetainedInferableArg arg
       _ -> return (False, False)
   where
-    -- The renamer retains OpApp until application checking. Look for the
-    -- same declared runtime index in either spelling of the application.
+    -- See Note [Partially applied callbacks].
+    carries_result (tvs, _, _, result) =
+      any (`elemVarSet` tyCoVarsOfType result) tvs
+
     application fun args =
       do { (inferable, anchor) <- tcRetainedInferableArg fun
          ; if not inferable then return (False, False)
@@ -4175,6 +4187,13 @@ mutable tail index that cannot later be filled with the runtime n.
 Defer this application alongside bare named callbacks. If the result type
 has already fixed the outer parameters, ordinary checking now sees
 the complete callback type.
+
+An enclosing application can infer this infix expression as a data argument
+when it has a native anchor and a partial callback whose result depends on
+its instantiation. Leave other infix expressions on their checking path.
+In particular, ($) needs its expected result for the evidence in
+expectMarker label marker $ evaluate (sameNat n m). See
+Note [Immutable native dollar applications].
 
 When the output parameter is still unknown, match the partially applied function's
 remaining input against that known input. Declared prefix fields can
