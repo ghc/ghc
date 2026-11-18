@@ -4,6 +4,7 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RequiredTypeArguments #-}
@@ -31,6 +32,9 @@ module PackedVecLibrary (
     Add,
     plus,
     type (+),
+    times,
+    type (*),
+    flattenRows,
     Sum (..),
     replicateNative,
     ReplicateLength,
@@ -151,8 +155,7 @@ plus (S n) m = S (plus n m)
 -- | Natural literals and arithmetic on runtime lengths.
 instance Num Nat where
     (+) = plus
-    Z * _ = Z
-    S n * m = plus m (n * m)
+    (*) = times
     n - Z = n
     Z - S _ = throw Underflow
     S n - S m = n - m
@@ -193,6 +196,20 @@ replicateAt (type n) x = replicateKnown @n x
 -- | Use the same addition definition in vector signatures and ordinary code.
 type (n :: Nat) + (m :: Nat) = plus n m
 infixl 6 type +
+
+-- | Count the cells of a rectangular vector, one row at a time.
+times :: Nat -> Nat -> Nat
+times Z     m = Z
+times (S n) m = plus m (times n m)
+
+-- | Use the same multiplication for runtime lengths and vector indices.
+type (n :: Nat) * (m :: Nat) = times n m
+infixl 7 type *
+
+-- | Append the rows of a rectangle. Its dimensions determine the result length.
+flattenRows :: Vec (Vec a cols) rows -> Vec a (rows * cols)
+flattenRows VNil = VNil
+flattenRows (VCons row rest) = appendVec row (flattenRows rest)
 
 {- Note [Peano numerals]
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,0 +1,5 @@
+NativeSourceProductRule.hs:8:7: error: [GHC-83605]
+    • A rewrite rule can change the result of ‘plus’, which GHC uses to check a dependent type.
+    • In the expression: flattenRows (VCons (VCons True VNil) VNil)
+      In an equation for ‘one’:
+          one = flattenRows (VCons (VCons True VNil) VNil)

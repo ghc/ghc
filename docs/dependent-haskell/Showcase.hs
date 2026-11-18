@@ -7,6 +7,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RequiredTypeArguments #-}
@@ -903,3 +904,18 @@ arithmeticNotation = do
     observe "replicateNative (n + 1)" (toList oneMore)
     observe "vector with length n + 3" (toList joined)
     observe "2 + 3 at runtime" ((2 + 3) :: Nat)
+    rows <- newIORef (2 :: Nat) >>= readIORef
+    cols <- newIORef (3 :: Nat) >>= readIORef
+    let row :: Vec Char cols
+        row = replicateNative cols 'x'
+        rectangle = replicateNative rows row
+        flattened :: Vec Char (rows * cols)
+        flattened = flattenRows rectangle
+        filled :: Vec Char (rows * cols)
+        filled = replicateNative (rows * cols) 'x'
+    observe "flatten a runtime 2-by-3 rectangle" (toList flattened)
+    observe "replicate at the product of two runtime lengths" (toList filled)
+    unknownCols <- newIORef (bottomValue @Nat "unused column count") >>= readIORef
+    let noCells :: Vec Char 0
+        noCells = replicateNative (0 * unknownCols) 'x'
+    observe "zero rows leave the column count unevaluated" (toList noCells)

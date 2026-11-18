@@ -84,6 +84,14 @@ test('NativeSourceTablePartial', normal, compile_fail, [''])
 test('NativeSourceFieldCoverage', normal, compile_fail, [''])
 test('NativeSourceLengthRecursion', normal, compile_fail, [''])
 test('NativeSourcePlusRecursion', normal, compile_fail, [''])
+test('NativeSourceProductRecursion',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     multimod_compile_fail,
+     ['NativeSourceProductRecursion', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeSourceProductRule',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     multimod_compile_fail,
+     ['NativeSourceProductRule', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
 test('NativeSourceLengthFamily', req_th, compile_fail, [''])
 test('NativeSourceLengthEmpty',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),

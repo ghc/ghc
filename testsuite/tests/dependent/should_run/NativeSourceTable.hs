@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeApplications, TypeOperators #-}
+{-# LANGUAGE NoStarIsType #-}
 
 module Main where
 
@@ -7,7 +8,7 @@ import Control.Exception (ArithException(DivideByZero), evaluate, throw, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import PackedVecLibrary (type (+), Vec(..), Nat(..), appendVec, boolVector, isSuccessor, listCount, natToInt, plus, previous,
+import PackedVecLibrary (type (+), type (*), Vec(..), Nat(..), appendVec, boolVector, flattenRows, isSuccessor, listCount, natToInt, plus, previous,
                          replicateAt, replicateNative, sourceLength, sourceVector, toList)
 
 type Flipped = '[flipBit 'False, flipBit 'True]
@@ -113,6 +114,9 @@ appendOne xs x = appendVec xs (VCons x VNil)
 literalSum :: (1 + 2) :~: (3 :: Nat)
 literalSum = Refl
 
+literalProduct :: (1 + 2 * 3) :~: (7 :: Nat)
+literalProduct = Refl
+
 -- A change to left association would make this expression equal to three.
 infixr 5 <.>
 (<.>) :: Nat -> Nat -> Nat
@@ -186,3 +190,11 @@ main = case (flipProof, signalProof, phaseProof) of
             print (forcedTail == Left DivideByZero)
         [] -> fail "Expected one cell before the undefined tail"
     print (toList localOne)
+    let row :: Vec Bool n
+        row = replicateNative n True
+        rectangle = replicateNative m row
+        flattened :: Vec Bool (m * n)
+        flattened = flattenRows rectangle
+        filled :: Vec Bool (m * n)
+        filled = replicateNative (m * n) False
+    case literalProduct of Refl -> print (toList flattened, toList filled)
