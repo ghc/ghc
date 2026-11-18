@@ -244,3 +244,34 @@ GHC's built-in family prover is pure. A design that reuses it must load
 and validate its input before checking the coercion endpoints. A private
 certificate tied to the resolved producer declaration is one candidate.
 The certificate representation and the coercion remain open.
+
+A finite total character mapping also admits a smaller experiment.
+The fork already binds some ordinary functions to compiler-generated
+closed families using `SourceTableId` on R13. If the compiler derives
+every literal equation and its identity fallback from the checked worker,
+the existing closed-family axiom supplies nominal evidence for this
+fragment. A forwarding equation could refer to the worker from an alias.
+Test blocked and ground inputs, interface fingerprints and client
+invalidation before selecting that design. General R16 cases can have
+expressions that such a family does not represent.
+[Source tables](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+and [GHC's closed-family branch selection](../../../compiler/GHC/Core/FamInstEnv.hs).
+
+The built library illustrates why the producer matters.
+`GHC.Internal.Unicode.toUpper` exports an unfolding that refers to
+`toSimpleUpperCase`. That function exports a wrapper that calls
+`$wtoSimpleUpperCase`. The worker's interface has its type and
+strictness information but omits its body. The complete table is
+present in the desugared Core of the original library source.
+[Unicode worker source](../../../libraries/ghc-internal/src/GHC/Internal/Unicode/Char/UnicodeData/SimpleUpperCaseMapping.hs).
+
+The [reproducible example](../examples/certified-character-case/README.md)
+derives the equations from that desugared worker. A separate module exports
+`p3 :: (Upper c ~ uc, KnownChar uc) => Proxy c -> Char`. Its client
+typechecks with only interfaces available. It gets the mapped result for
+`'x'`, for Unicode, and for the last literal in the table. It gets the
+input back for `'!'`. GHC rejects both a wrong ground equality and a
+default proof for an unknown `c`. Editing the original worker and
+regenerating the family changes the unchanged client's result from
+`'X'` to `'Y'`. The remaining compiler step is to associate the public
+`Data.Char.toUpper` name with this checked family in the producer interface.
