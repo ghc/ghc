@@ -26,6 +26,8 @@ module PackedVecLibrary (
     boolVector,
     sourceLength,
     sourceVector,
+    fromListExact,
+    packList,
     PackedVec (..),
     LE (..),
     BoundedVec (..),
@@ -137,6 +139,34 @@ sourceVector (x : xs) = VCons x (sourceVector @a xs)
 -- | Store one runtime length and a vector indexed by that same field.
 data PackedVec a where
     PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a
+
+-- | Check that a list has exactly the requested length.
+-- See Note [List conversion at an indexed boundary].
+fromListExact :: foreach (n :: Nat) -> [a] -> Maybe (Vec a n)
+fromListExact Z [] = Just VNil
+fromListExact Z (_ : _) = Nothing
+fromListExact (S _) [] = Nothing
+fromListExact (S n) (x : xs) = case fromListExact n xs of
+    Just rest -> Just (VCons x rest)
+    Nothing -> Nothing
+
+-- | Store a list's own length with its vector. Both fields are lazy.
+packList :: [a] -> PackedVec a
+packList xs = PackVec (sourceLength xs) (sourceVector xs)
+
+{- Note [List conversion at an indexed boundary]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fromListExact checks the caller's length against the list spine. The
+two empty constructors justify VNil. Matching both successors gives the
+tail its required length. Inspect the recursive result before returning
+Just. Success checks the end of the list even if the caller only needs
+the head. An extra cons suffices for rejection.
+
+packList uses the length of the input itself. sourceVector supplies a
+vector at that index, so no equality test is needed. Keep both fields
+lazy so that headPacked can read the first cell without counting the tail.
+See docs/dependent-haskell/REFERENCES.md#checking-a-list-at-a-requested-length.
+-}
 
 -- | Evidence that the first length is at most the second length.
 data LE (n :: Nat) (m :: Nat) where

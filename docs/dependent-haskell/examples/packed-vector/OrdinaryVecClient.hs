@@ -1,9 +1,9 @@
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 
 -- | Use imported retained contracts from an ordinary source module.
-module OrdinaryVecClient (ordinaryReplicate, ordinaryRoundTrip) where
+module OrdinaryVecClient (ordinaryReplicate, ordinaryRoundTrip, ordinaryZipExact) where
 
-import PackedVecLibrary (Nat, genericVector, replicateNative, toList)
+import PackedVecLibrary (Nat, fromListExact, genericVector, replicateNative, toList, zipVec)
 
 {- Note [Ordinary callers of retained APIs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -20,3 +20,10 @@ ordinaryReplicate n x = toList (replicateNative n x)
 -- | Preserve a list through a vector indexed by the actual input list.
 ordinaryRoundTrip :: [a] -> [a]
 ordinaryRoundTrip xs = toList (genericVector xs)
+
+-- | Zip two lists when both lengths match the caller's requested size.
+ordinaryZipExact :: Nat -> [a] -> [b] -> Maybe [(a, b)]
+ordinaryZipExact n xs ys = do
+    left <- fromListExact n xs
+    right <- fromListExact n ys
+    pure (toList (zipVec left right))
