@@ -7814,3 +7814,33 @@ source evaluators and the diagnostic for exhausting the reduction limit.
 The [R16 feature page](roadmap/R16-open-term-evaluator.md) records the
 representation and proof obligations for residual applications. The R15
 interpreter and object dependency checks proceed independently.
+
+## M101: evaluate closed character calls from installed libraries
+
+R15 owns this work. Proposal #509 uses two ordinary functions from
+`Data.Char` in equality types. The client must accept both witnesses.
+
+```haskell
+upper :: Data.Char.toUpper 'x' :~: 'X'
+upper = Refl
+
+digit :: Data.Char.isDigit '7' :~: 'True
+digit = Refl
+```
+
+- [ ] Check the resolved, unrestricted unary function type. Accept a
+      `Char` literal or a promoted list of `Natural` literals as input.
+      Select the result representation independently for `Natural`, `Char`
+      and `Bool`. Test `Char -> Natural` and `[Natural] -> Bool` as well.
+- [ ] Execute the checked call with the interpreter used for M99. Decode a
+      canonical result with GHC's literal and promoted constructor machinery.
+      Check Unicode, escapes, a false equality and an unsupported result type.
+- [ ] Recheck an unchanged client after replacing one producer object.
+      Inspect the package dependencies that GHC records for `Data.Char`.
+      Run the installed-library witnesses in the Showcase.
+
+A character variable remains outside the input grammar. Proposal #509 also
+describes a stuck call that reduces after the variable is instantiated.
+That requires a representation and retry rule for open calls on R16.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+and [closed evaluator](roadmap/R15-closed-term-evaluator.md).

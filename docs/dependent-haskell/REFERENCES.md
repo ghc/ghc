@@ -4981,3 +4981,16 @@ These checks preserve lexical identity and separate compilation.
 [Agda clause matching](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/TypeChecking/CompiledClause/Match.hs#L84),
 [GHC's open-term evaluator](../../compiler/GHC/Core/OpenWhnf.hs) and
 [interface usage recording](../../compiler/GHC/Iface/Make.hs).
+
+### Characters in closed calls
+
+Proposal #509 gives equality witnesses for `Data.Char.toUpper 'x'` and
+`Data.Char.isDigit 'x'`. It also gives an open call that could reduce
+after the compiler learns the character. M101 targets the closed
+examples. Agda exposes `primToUpper` and `primIsDigit` as character
+primitives. Its manual specifies their behavior through the corresponding
+Haskell `Data.Char` functions. GHC can call those ordinary functions
+directly through the R15 interpreter. At the type boundary it can reuse
+`isCharLitTy`, `mkCharLitTy` and the existing promoted Boolean constructors.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+and [Agda 2.8.0 character primitives](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#characters).
