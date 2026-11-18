@@ -7235,3 +7235,24 @@ The two native Showcase runs and self-hosted GHCi each reproduced all
 165 output lines. All 44 selected normal tests and four selected GHCi
 tests passed. One normal test required a rerun after its expected
 diagnostic was updated to match GHC's disambiguation of the local name.
+
+## M92: signed and grouped local lengths
+
+R03 needs source signatures on local indices. R05 must preserve sharing
+when later bindings use earlier indices. M91 rejects all four controls:
+a signed product, a forward reference, a second ordinary member, and
+a successor that uses the first member.
+
+- [ ] Check all signatures in their ordinary scope. Visit the renamer's
+      acyclic binding groups in dependency order. Check each RHS once.
+- [ ] Recognise a monomorphic signed value through its checked export.
+      Use a definition's equality only within subsequent bindings and the
+      body. Preserve polymorphic bindings and caller-supplied dictionaries.
+- [ ] Check forward references, transitive use, ordinary fallback, wrong
+      signatures, demand, source locations, GHCi and an interface-only
+      client. Update the Showcase and the R03/R05 cards.
+
+Agda permits signatures in local definitions and earlier definitions in
+later ones. GHC orders these Haskell bindings by their dependencies and
+retains their call-by-need semantics.
+[Local definitions in Agda](REFERENCES.md#equality-for-lazy-local-definitions).
