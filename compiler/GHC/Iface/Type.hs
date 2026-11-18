@@ -2205,14 +2205,14 @@ ppr_iface_tc_app :: (PprPrec -> (a, ForAllTyFlag) -> SDoc)
 
 ppr_iface_tc_app pp ctxt_prec tc tys =
   sdocOption sdocListTuplePuns $ \listTuplePuns ->
+  sdocOption (isSymOccForPpr (nameOccName (ifaceTyConName tc))) $ \sym ->
   if | listTuplePuns, tc `ifaceTyConHasKey` listTyConKey, [ty] <- tys
      -> brackets (pp topPrec ty)
 
      | tc `ifaceTyConHasKey` liftedTypeKindTyConKey
      -> ppr_kind_type ctxt_prec
 
-     | isSymOcc (nameOccName (ifaceTyConName tc))
-
+     | sym
      , [ ty1@(_, Required), ty2@(_, Required) ] <- tys
          -- Infix, two visible arguments (we know nothing of precedence though).
          -- Don't apply this special case if one of the arguments is invisible,
@@ -2463,8 +2463,7 @@ pprIfaceTyCon tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
 -- | Print an `IfaceTyCon` with a promotion tick if needed, possibly with parens,
 -- suitable for use in prefix contexts
 pprParendIfaceTyCon :: IfaceTyCon -> SDoc
-pprParendIfaceTyCon tc = pprPromotionQuote tc <> pprPrefixVar (isSymOcc (nameOccName tc_name)) (ppr tc_name)
-  where tc_name = ifaceTyConName tc
+pprParendIfaceTyCon tc = pprPromotionQuote tc <> pprPrefixName (ifaceTyConName tc)
 
 instance Outputable IfaceTyConInfo where
   ppr (IfaceTyConInfo { ifaceTyConIsPromoted = prom

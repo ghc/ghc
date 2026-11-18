@@ -60,7 +60,7 @@ import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNames
                          , checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
-                         , lookupTypeFixityRn )
+                         , lookupTypeFixityRn, lookupTypeFixityWithUsesRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 
 import GHC.Tc.Errors.Types
@@ -882,11 +882,11 @@ rnHsTyKi env tv@(HsTyVar _ ip name) = rnHsTyVar lookupTypeOccRn env tv ip name
 rnHsTyKi env ty@(HsOpTy _ ty1 tyop ty2)
   = setSrcSpan (getLocA tyop) $
     do  { (tyop', fvs1) <- rnHsTyOp env ty tyop
-        ; fix <- lookupTypeFixityRn tyop'
+        ; (fix, fix_fvs) <- lookupTypeFixityWithUsesRn tyop'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
         ; res_ty <- mkHsOpTyRn tyop' fix ty1' ty2'
-        ; return (res_ty, plusFNs [fvs1, fvs2, fvs3]) }
+        ; return (res_ty, plusFNs [fvs1, fvs2, fvs3, fix_fvs]) }
 
 rnHsTyKi env (HsParTy _ ty)
   = do { (ty', fvs) <- rnLHsTyKi env ty

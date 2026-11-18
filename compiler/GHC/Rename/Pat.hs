@@ -1398,9 +1398,8 @@ rn_ty_pat (HsOpTy _ ty1 tyop ty2) = do
   ty1' <- rn_lty_pat ty1
   tyop' <- rn_tyop_pat tyop
   ty2' <- rn_lty_pat ty2
-  liftRn $ do
-    fix <- lookupTypeFixityRn tyop'
-    mkHsOpTyRn tyop' fix ty1' ty2'
+  fix <- liftRnFV (lookupTypeFixityWithUsesRn tyop')
+  liftRn $ mkHsOpTyRn tyop' fix ty1' ty2'
 
 rn_ty_pat (HsParTy an ty) = do
   ty' <- rn_lty_pat ty

@@ -106,6 +106,7 @@ import GHC.Types.GREInfo
 import GHC.Types.Basic  ( TupleSort(..), tupleSortBoxity )
 
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Lexeme (isLexVarSym)
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
@@ -1191,12 +1192,19 @@ lookupTypeOcc app_head rdr_name
                           mkExactGRE eqTyConName $
                           IAmTyCon $
                           eqTyConName <$ tyConFlavour eqTyCon }
-               | Just term_rdr <- demoteRdrNameTv rdr_name
+               | Just term_rdr <- source_term_rdr rdr_name
                  -> do { experimental <- xoptM LangExt.ExperimentalDependentTypes
                        ; if experimental then lookup_table term_rdr
                                          else lookup_demoted rdr_name }
                | otherwise -> lookup_demoted rdr_name }
   where
+    source_term_rdr rdr
+      | isUnqual rdr || isQual rdr
+      , let occ = rdrNameOcc rdr
+      , isTcOcc occ, isLexVarSym (occNameFS occ)
+      = Just (setRdrNameSpace rdr varName)
+      | otherwise = demoteRdrNameTv rdr
+
     lookup_table term_rdr = do
       envs <- getRdrEnvs
       candidates <- lookupSourceTables envs term_rdr
@@ -1253,6 +1261,12 @@ flipBit. First look for a type variable with that spelling. Then resolve the
 term with the written qualifier and import list. The defining module supplies
 the name of its closed family, even when an intermediate module re-exports
 the term. A lexical term binder shadows an imported function.
+
+The parser puts an unquoted symbolic operator such as + in the type
+constructor namespace (see qtyconsym in Parser.y). If the type lookup
+fails, retry variable symbols in the term namespace. Preserve qualified
+names. A constructor symbol such as :+ still follows the DataKinds path.
+A quote or an exact name already specifies the namespace.
 
 Record import use and deprecation warnings on the term the user wrote.
 Return the family Name to the type renamer so that the module's usages

@@ -80,7 +80,7 @@ module GHC.Types.Name (
         NamedThing(..),
         getSrcLoc, getSrcSpan, getOccString, getOccFS,
 
-        pprInfixName, pprPrefixName, pprModulePrefix, pprNameUnqualified,
+        pprInfixName, pprPrefixName, isSymOccForPpr, pprModulePrefix, pprNameUnqualified,
         nameStableString,
 
         -- Re-export the OccName stuff
@@ -878,12 +878,27 @@ pprExternal debug sty uniq mod user_qual raw_occ pp_sort is_builtin
                     _ -> braces (pprModuleName (moduleName mod) <> dot <> ppr_occ_name occ)
             else pprModulePrefix sty mod user_qual occ <> ppr_occ_name occ
   where
-    -- Qualify an evaluated source function using its term import.
-    -- See Note [Names of finite source functions] in GHC.Rename.Env.
-    occ | PprUser{} <- sty, not debug, Just term <- sourceTableTermOcc raw_occ = term
-        | otherwise = raw_occ
+    occ = occNameForPpr debug sty raw_occ
     pp_mod = ppUnlessOption sdocSuppressModulePrefixes
                (pprModule mod <> dot)
+
+{- Note [Printing source table names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A diagnostic prints the family for a certified source function with the
+function's occurrence. Use that occurrence for qualification and for the
+choice between infix and prefix syntax. For example, print the family T:+
+as `n M.+ m` or `(M.+)`. Dumps and debug output keep the family occurrence.
+See Note [Names of finite source functions] in GHC.Rename.Env.
+-}
+
+occNameForPpr :: Bool -> PprStyle -> OccName -> OccName
+occNameForPpr debug sty occ
+  | PprUser{} <- sty, not debug, Just term <- sourceTableTermOcc occ = term
+  | otherwise = occ
+
+-- | Test whether the occurrence prints as an operator in this context.
+isSymOccForPpr :: OccName -> SDocContext -> Bool
+isSymOccForPpr occ ctx = isSymOcc (occNameForPpr (sdocPprDebug ctx) (sdocStyle ctx) occ)
 
 pprInternal :: Bool -> PprStyle -> Unique -> OccName -> SDoc
 pprInternal debug sty uniq occ
@@ -1001,9 +1016,9 @@ getOccFS            = occNameFS            . getOccName
 pprInfixName :: (Outputable a, NamedThing a) => a -> SDoc
 -- See Outputable.pprPrefixVar, pprInfixVar;
 -- add parens or back-quotes as appropriate
-pprInfixName  n = pprInfixVar (isSymOcc (getOccName n)) (ppr n)
+pprInfixName n = sdocOption (isSymOccForPpr (getOccName n)) $ \sym -> pprInfixVar sym (ppr n)
 
 pprPrefixName :: (Outputable a, NamedThing a) => a -> SDoc
-pprPrefixName thing = pprPrefixVar (isSymOcc (nameOccName name)) (ppr thing)
+pprPrefixName thing = sdocOption (isSymOccForPpr (nameOccName name)) $ \sym -> pprPrefixVar sym (ppr thing)
  where
    name = getName thing

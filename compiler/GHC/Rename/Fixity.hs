@@ -12,11 +12,12 @@ module GHC.Rename.Fixity
    , lookupFixityRn_help
    , lookupFieldFixityRn
    , lookupExprFixityRn
-   , lookupTypeFixityRn
+   , lookupTypeFixityRn, lookupTypeFixityWithUsesRn
    ) where
 
 import GHC.Prelude
 
+import GHC.Iface.Env (lookupOrig)
 import GHC.Iface.Load
 import GHC.Hs
 import GHC.Tc.Utils.Monad
@@ -27,6 +28,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Types.Fixity.Env
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.Set (FreeNames, emptyFNs, unitFN)
 import GHC.Types.Name.Reader
 import GHC.Types.Fixity
 import GHC.Types.SrcLoc
@@ -212,7 +214,19 @@ lookupExprFixityRn e =
     -- c.f. lookupFixity for unbound
 
 lookupTypeFixityRn :: LHsType GhcRn -> RnM Fixity
-lookupTypeFixityRn t =
-  case t of
-    L _ (HsTyVar _ _ op) -> lookupFixityRn (unLocWithUserRdr op)
-    _ -> return (Fixity minPrecedence InfixL)
+lookupTypeFixityRn t = fst <$> lookupTypeFixityWithUsesRn t
+
+-- | A private source family uses the fixity of the original term.
+-- Record that term as a dependency so that a fixity change reparses the type.
+lookupTypeFixityWithUsesRn :: LHsType GhcRn -> RnM (Fixity, FreeNames)
+lookupTypeFixityWithUsesRn (L _ (HsTyVar _ _ op))
+  | Just occ <- sourceTableTermOcc (nameOccName name)
+  , Just mod <- nameModule_maybe name = do
+      term <- lookupOrig mod occ
+      fix <- lookupFixityRn term
+      return (fix, unitFN term)
+  | otherwise = do
+      fix <- lookupFixityRn name
+      return (fix, emptyFNs)
+  where name = unLocWithUserRdr op
+lookupTypeFixityWithUsesRn _ = return (Fixity minPrecedence InfixL, emptyFNs)

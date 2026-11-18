@@ -16,6 +16,7 @@ import GHC.Data.Bag (isEmptyBag)
 import GHC.Hs
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Tc.TyCl.Build (newImplicitBinder)
+import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), isEmptyEvBindsMap)
 import GHC.Tc.Utils.Monad (TcM, getTcEvBindsMap, liftZonkM, newSysName, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
@@ -101,6 +102,12 @@ Compare the second operand of a recursive call with the row's second
 pattern Id. For the first operand, look up the Id among the fields of
 the matched constructor. When both arguments have type Nat, a call
 such as plus m m would otherwise pass the type check without decreasing.
+
+For an infix call such as n + m, tcExpand places the checked prefix
+application under an ExpandedThingTc. The ExprCtxt identifies the
+original OpApp. Check the expanded function and operands with the same
+rules as a written (+) n m. See Note [Desugar OpApp in the typechecker]
+in GHC.Tc.Gen.Head.
 
 Represent the second variable by a fresh nominal binder in each axiom
 branch. The equation can return this variable or put it in a constructor.
@@ -255,6 +262,8 @@ sourceRhs self carried = go []
     go :: [HsExpr GhcTc] -> HsExpr GhcTc -> Maybe SourceRhs
     go args (HsPar _ e)   = go args (unLoc e)
     go args (HsApp _ f x) = go (unLoc x : args) (unLoc f)
+    go args (XExpr (ExpandedThingTc (HSE (ExprCtxt (OpApp{})) expansion))) =
+      go args (unLoc expansion)
     go args (XExpr (ConLikeTc (RealDataCon con))) = Construct con <$> traverse (go []) args
     go [] (HsVar _ (L _ v)) = Just (Field v)
     go args (HsVar _ (L _ f)) | self f = call [] args

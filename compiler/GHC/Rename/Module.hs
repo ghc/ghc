@@ -351,6 +351,7 @@ localSourceTableBinders binds sigs =
         check :: [LHsExpr GhcPs] -> LHsExpr GhcPs -> Bool
         check args expr = case unLoc (stripParensLHsExpr expr) of
           HsApp _ fun arg -> check (arg : args) fun
+          OpApp _ left op right -> check (left : right : args) op
           HsAppType _ fun _
             | null carried, Just r <- variable fun, is_self r -> check args fun
           HsVar _ (L _ r)
