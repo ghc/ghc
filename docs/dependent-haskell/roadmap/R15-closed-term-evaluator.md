@@ -26,13 +26,14 @@ and [consumer](../examples/closed-evaluation/Client.hs).
 | Execute the typed call | The GHC API returns `3` with each interpreter (internal and external) and each producer format (bytecode and object). The probe checks the actual interpreter and the producer dependency reported by the compiler. |
 | Observe a change invisible to the producer ABI | Changing the fold seed from zero to one changes the object bytes and preserves the ABI hash at `-O0`. The same probe executable returns `4` with both interpreters in fresh sessions. The probe supplies producer source for target discovery. |
 | Typecheck the known result | With `Vec 3 Bool`, the client builds, prints `[True,False,True]` and rejects a two-cell body. |
-| Typecheck the computed result | Open. The renamer reports GHC-68947 on `Length.length`. No evaluation occurs. The short-vector and incremental-client checks for the computed call can run after this passes. |
+| Typecheck the computed result | The source declaration builds and prints `[True,False,True]`. GHC rejects a two-cell body at `v`. The producer is imported only by the type signature. |
+| Reuse or recheck the client | With an unchanged producer, GHC skips the client. Its interface records the producer object fingerprint. Changing only the fold seed preserves the producer ABI and makes the unchanged client fail with expected `Vec 4 Bool` and actual `Vec 3 Bool`. |
 
 Run the two scripts with absolute paths to a built compiler and its
 matching library directory. The interpreter probe requires the matching
-`ghc` package and both interpreters. The source check exits at the first
-unmet requirement. It can serve as the acceptance test as implementation
-continues.
+`ghc` package and both interpreters. A compiler built without an internal
+interpreter can run the source check with `-fexternal-interpreter` as a
+third argument.
 
 ```sh
 dir=docs/dependent-haskell/examples/closed-evaluation
@@ -42,29 +43,44 @@ dir=docs/dependent-haskell/examples/closed-evaluation
 
 ## Compiler work
 
-- [ ] Preserve the qualified imported term at a type-application head.
+- [x] Preserve the qualified imported term at a type-application head.
       Preserve ordinary type-name precedence, import usage, and the
       existing path for checked source equations. Pass the resolved
       name and source span from `lookupTypeAppHeadRn` to `tc_app_ty`.
-- [ ] Check the actual imported function type and its closed literal
+- [x] Check the actual imported function type and its closed literal
       argument before execution. Construct the typed application from the
       resolved identifier. Execute it once for that elaboration, decode
       the `Natural` result and emit an ordinary `mkNumLitTy` before
       producing Core. A printed value supplies no coercion between
       existing Core types. [Renamer](../../../compiler/GHC/Rename/Env.hs)
       and [type elaboration](../../../compiler/GHC/Tc/Gen/HsType.hs).
-- [ ] Specify which compilations can run imported code, including Safe
-      Haskell, interpreter availability and host/target compatibility.
-      Check open inputs before executing anything. Preserve a located
-      error for a missing object or an exception, and exercise cancellation
-      of a diverging computation. A Haskell function type alone gives
-      no totality or purity guarantee for an arbitrary producer.
-- [ ] Record the actual linked dependencies in the consumer interface.
+- [x] Check the execution boundary. Safe Haskell rejects the call.
+      Ordinary inferred modules that execute it lose safe-inferred status.
+      Open lists, SOURCE-only imports and explicit-level imports are rejected.
+      A missing object and a synchronous exception report GHC-70565 at
+      the application. The configured interpreter must support the compiled
+      object. Both native interpreter modes respond to a process-group
+      interrupt during evaluation of a diverging producer.
+- [x] Record the actual linked dependencies in the consumer interface.
       Compile an unchanged client again after rebuilding only the producer.
       Inspect the recorded object fingerprint and first verify that an
-      unchanged build skips the client. Its old three-cell definition must then fail at the binding. An ABI
-      check alone would miss this change. [Splice dependency recording](../../../compiler/GHC/Tc/Gen/Splice.hs)
+      unchanged build skips the client. Its old three-cell definition
+      must then fail at the binding. An ABI check alone would miss this
+      change. [Splice dependency recording](../../../compiler/GHC/Tc/Gen/Splice.hs)
       and [interface usage calculation](../../../compiler/GHC/Iface/Make.hs).
+
+The compiler checks the imported function and the literal list before
+execution. It can still reject the surrounding type or declaration after
+the call has run.
+
+The separate-client check passed with the bootstrap-built compiler using
+external iserv, and with the self-hosted compiler using each interpreter.
+The latter loads a dynamic object in its internal interpreter on this
+Linux build. The check replaces only the object named in the client's
+interface, preserving the original interfaces and other object variant.
+Further controls used an empty list and a literal larger than a machine
+word. The producer returned `70` and `18446744073709551617` respectively.
+The [Showcase](../Showcase.hs) reflects a computed index with `natVal`.
 
 Same-module definitions require further work on R21. More argument and
 result domains, user-defined representations and general closed expressions

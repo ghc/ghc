@@ -2,6 +2,11 @@
 
 # test('T11311', normal, compile_and_run, [''])
 test('T11964', normal, multimod_compile, ['T11964', '-v0'])
+closed_eval_dir = '../../../../docs/dependent-haskell/examples/closed-evaluation/'
+test('NativeClosedLength',
+     [req_interp, req_rts_linker, extra_files([closed_eval_dir + f for f in
+                                  ['check-source.sh', 'Client.hs', 'ClosedLengthProducer.hs']])],
+     run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
 test('NativeSourceTable',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',
                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),

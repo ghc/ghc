@@ -28,6 +28,7 @@
 module Main (main) where
 
 import qualified BetaCallClient as Beta
+import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
 import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -43,6 +44,7 @@ import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
 import GHC.Exts (FUN, M, U, Matchability (..), Multiplicity (Many))
+import qualified GHC.TypeNats as TypeNats
 import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
@@ -75,6 +77,7 @@ Run from the repository root with this fork's matching compiler and libraries:
     -fno-write-if-simplified-core -dcore-lint -dstg-lint \
     -idocs/dependent-haskell/examples/packed-vector \
     -idocs/dependent-haskell/examples/qualified-pi \
+    -idocs/dependent-haskell/examples/closed-evaluation \
     -outputdir _build/showcase docs/dependent-haskell/Showcase.hs \
     -o _build/showcase/showcase
   _build/showcase/showcase
@@ -798,6 +801,11 @@ main = do
     sourceAddition
     arithmeticNotation
     listBoundaries
+    observe "ordinary length evaluated while checking the type" (TypeNats.natVal closedLength)
+
+-- | The producer exports only an ordinary Haskell function.
+closedLength :: Proxy (Length.length '[1, 2, 3])
+closedLength = Proxy
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()

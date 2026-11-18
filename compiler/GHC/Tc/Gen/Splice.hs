@@ -28,13 +28,14 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice
+     finishTH, runTopSplice, tcRunClosedNatural
       ) where
 
 import GHC.Prelude
 
 import GHC.Driver.Errors
 import GHC.Driver.Plugins
+import GHC.Driver.Session (safeInferOn, safeLanguageOn)
 import GHC.Driver.Main
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
@@ -62,16 +63,19 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Instantiate
 
+import qualified GHC.Core as Core
+import GHC.Core.Make (mkCoreApp, mkCoreApps, mkListExpr, mkNaturalExpr)
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion( etaExpandCoAxBranch )
 import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep as TyCoRep
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv as InstEnv
+import GHC.Core.Utils (exprType)
 
 import GHC.Builtin.TH
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.KnownOccs (toAnnotationWrapperIdOcc)
+import GHC.Builtin.KnownOccs (returnIOIdOcc, toAnnotationWrapperIdOcc)
 import GHC.Builtin.WiredIn.Types
 
 import GHC.ThToHs
@@ -98,6 +102,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon as DataCon
 
 import GHC.Types.SrcLoc
+import GHC.Types.SourceFile (isHsBootOrSig)
 import GHC.Types.SourceText
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -127,7 +132,7 @@ import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
-import GHC.Utils.Exception (throwIO, ErrorCall(..))
+import GHC.Utils.Exception (throwIO, ErrorCall(..), SomeAsyncException)
 
 import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
@@ -158,7 +163,7 @@ import Data.Binary
 import Data.Binary.Get
 import Data.ByteString.Short (ShortByteString)
 import Data.Containers.ListUtils ( nubOrd )
-import Data.List ( sortBy )
+import Data.List ( find, sortBy )
 import Data.Maybe
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
@@ -168,6 +173,8 @@ import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
 import Data.IORef
+import Numeric.Natural (Natural)
+import Text.Read (readMaybe)
 import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
@@ -1283,6 +1290,115 @@ appropriate, as the warnings from the splice arise from an earlier stage
 of compilation.
 
 Previously, we failed to abort in cases (b) and (c), leading to #19709.
+-}
+
+-- | Execute a checked closed call through the target interpreter.
+-- See Note [Closed Natural type evaluation].
+tcRunClosedNatural :: Id -> [Integer] -> TcM Type
+tcRunClosedNatural fun naturals = do
+  hsc_env <- getTopEnv
+  interp <- checkClosedTypeEvalStage hsc_env name
+  unless (idType fun `tcEqType` mkVisFunTyManyU (mkListTy naturalTy) naturalTy
+          && all (>= 0) naturals) $
+    bad "expected [Natural] -> Natural and nonnegative arguments"
+
+  let platform = targetPlatform (hsc_dflags hsc_env)
+      argument = mkListExpr naturalTy (map (mkNaturalExpr platform) naturals)
+      call = mkCoreApp (Core.Var fun) argument
+
+  show_class <- tcLookupKnownKeyClass showClassKey
+  inst_env <- tcGetInstEnvs
+  case (find ((== "show") . getOccString) (classMethods show_class),
+        lookupUniqueInstEnv inst_env show_class [naturalTy]) of
+    (Just show_id, Right (inst, []))
+      | let dfun = instanceDFunId inst
+      , nameModule_maybe (idName dfun) == nameModule_maybe (className show_class)
+      , idType dfun `tcEqType` mkClassPred show_class [naturalTy] -> do
+          ret_id <- tcLookupKnownOccId returnIOIdOcc
+          io_tc <- tcLookupKnownKeyTyCon ioTyConKey
+          let render = mkCoreApps (Core.Var show_id)
+                         [Core.Type naturalTy, Core.Var dfun]
+              ret = mkCoreApp (Core.Var ret_id) (Core.Type stringTy)
+              io_string = mkTyConApp io_tc [stringTy]
+          unless (exprType render `tcEqType` mkVisFunTyManyU naturalTy stringTy
+                  && exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
+            bad "unexpected type for the Natural interpreter response"
+          let expr = mkCoreApp ret (mkCoreApp render call)
+          loc <- getSrcSpanM
+          compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc expr
+          (value, links, packages) <- either (bad . displayException) pure compiled
+          recordThNeededRuntimeDeps links packages
+          outcome <- tryAllM $ liftIO $ evalString interp value
+          rendered <- case outcome of
+            Left exn | Just async <- (fromException exn :: Maybe SomeAsyncException) ->
+              liftIO $ throwIO async
+            Left exn -> bad (displayException exn)
+            Right rendered -> pure rendered
+          case readMaybe rendered :: Maybe Natural of
+            Just n | show n == rendered -> pure (mkNumLitTy (toInteger n))
+            _ -> bad "invalid Natural response from the interpreter"
+    _ -> bad "cannot resolve the built-in Show Natural dictionary"
+  where
+    name = idName fun
+    bad :: String -> TcM a
+    bad = failWithTc . TcRnClosedTypeEval name
+
+{- Note [Closed Natural type evaluation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The caller checks the source call and its literal argument before execution.
+Compile an ordinary Core application at the checked function type. Use the
+built-in Show Natural instance and returnIO to construct IO String for
+evalString. The interpreter forces the string before returning it. The
+compiler checks the canonical decimal form before it constructs a type
+literal. No runtime reference crosses into the compiler's address space.
+
+Record the loaded dependencies through the same path as a splice. The
+producer object can change even when its interface ABI remains the same.
+See Note [Object File Dependencies] in GHC.HsToCore.Usage.
+-}
+
+-- | Check the execution context before loading code for a type.
+checkClosedTypeEvalStage :: HscEnv -> Name -> TcM Interp
+checkClosedTypeEvalStage hsc_env name = do
+  failIfErrsM
+  dflags <- getDynFlags
+  let reject = failWithTc . TcRnClosedTypeEval name
+  unlessXOptM LangExt.ExperimentalDependentTypes $
+    reject "Compile-time evaluation in types requires ExperimentalDependentTypes."
+  when (safeLanguageOn dflags) $
+    reject "Safe Haskell disallows executing imported functions in types."
+  level <- getThLevel
+  case level of
+    Comp -> return ()
+    _    -> reject "Closed calls in types are only supported outside quotations and splices."
+  whenXOptM LangExt.ExplicitLevelImports $
+    reject "Closed calls in types do not yet support ExplicitLevelImports."
+  boot <- tcIsHsBootOrSig
+  when boot $
+    reject "Closed calls in types are not supported in boot files or module signatures."
+  iface <- loadInterfaceForName (text "closed call in a type") name
+  when (isHsBootOrSig (mi_hsc_src iface)) $
+    reject "The defining interface is a boot file or a module signature and provides no executable definition."
+  when (safeInferOn dflags) $
+    recordUnsafeInfer emptyMessages
+  case hsc_interp hsc_env of
+    Just interp -> return interp
+    Nothing -> failWithTc (TcRnClosedTypeEval name
+                 "Compile-time evaluation requires a GHC interpreter for the target.")
+
+{- Note [Running imported code in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A closed call can load and execute code from an ordinary Haskell module.
+Apply the same Safe Haskell boundary as tcAnnotation in GHC.Tc.Gen.Annotation.
+An inferred-safe client must also lose that status when it executes a call.
+A checked source equation reduces in the ordinary solver and never enters
+this path.
+
+Start with a separately compiled definition and an ordinary compilation
+level. In a quotation or an explicitly staged import, the level at which
+a name occurs and the level at which we need its object code can differ.
+Check the staging policy before loading code. Let the configured interpreter
+and linker determine which target objects they can execute.
 -}
 
 ---------------

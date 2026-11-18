@@ -106,7 +106,7 @@ import GHC.Types.GREInfo
 import GHC.Types.Basic  ( TupleSort(..), tupleSortBoxity )
 
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Lexeme (isLexVarSym)
+import GHC.Utils.Lexeme (isLexVarId, isLexVarSym)
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
@@ -1216,7 +1216,16 @@ lookupTypeOcc app_head rdr_name
         [(gre, Nothing)]
           | app_head
           , isVarOcc (greOccName gre)
-          -> failWithTc (TcRnNoSourceTable (greName gre))
+          -> do { this_mod <- tcg_semantic_mod <$> getGblEnv
+                ; let name = greName gre
+                ; if isQual term_rdr && isLexVarId (occNameFS (greOccName gre))
+                     && isImportedGRE gre && not (nameIsLocalOrFrom this_mod name)
+                    then do { unless (any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)) $
+                                failWithTc (TcRnClosedTypeEval name
+                                  "A SOURCE import does not provide executable code.")
+                            ; addUsedGRE AllDeprecationWarnings gre
+                            ; return gre }
+                    else failWithTc (TcRnNoSourceTable name) }
         (gre, _) : rest
           | any (isJust . snd) candidates -> do
               addNameClashErrRn term_rdr (gre NE.:| map fst rest)
@@ -1274,6 +1283,9 @@ include the fingerprint of the equations. This also lets the type checker
 order declarations that use the local family. If the imported family is
 absent, record that fact too. See Note [Source table usage fingerprints] in
 GHC.Unit.Module.ModIface.
+
+If the table is absent, keep an imported qualified function's term Name
+at an application head. See Note [Closed source calls] in GHC.Tc.Gen.HsType.
 -}
 
 {- Note [eqTyCon (~) compatibility fallback]

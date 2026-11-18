@@ -10,6 +10,12 @@ functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
 Updated 2026-11-18.
 
+An imported `length :: [Natural] -> Natural` can now compute a vector
+index during compilation. The producer uses ordinary Haskell `foldr`.
+The declaration `v :: Vec (Length.length '[1, 2, 3]) Bool` accepts three
+cells. If the producer changes to return four, GHC checks the unchanged
+client again and rejects it. [Source example and compiler checks](roadmap/R15-closed-term-evaluator.md).
+
 An ordinary recursive length function now gives the return type of a
 vector constructor. For a list of `Int` read from an `IORef`, the caller can
 write `vector :: Vec Int (sourceLength xs)` and construct it with
@@ -303,6 +309,7 @@ _build/stage1/bin/ghc --make -O0 -fomit-interface-pragmas \
   -fno-write-if-simplified-core -dcore-lint -dstg-lint \
   -idocs/dependent-haskell/examples/packed-vector \
   -idocs/dependent-haskell/examples/qualified-pi \
+  -idocs/dependent-haskell/examples/closed-evaluation \
   -outputdir _build/showcase docs/dependent-haskell/Showcase.hs \
   -o _build/showcase/showcase
 _build/showcase/showcase

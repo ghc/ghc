@@ -88,6 +88,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcRunClosedNatural)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -553,11 +554,13 @@ tcRetainedAmbientIndices invalid_reason hs_ty
     invalid_index = failWithTc $ TcRnRetainedQuantificationError invalid_reason
 
     -- Keep only free runtime occurrences. Telescope binders have their own Ids.
+    -- Imported qualified calls are handled by tc_app_ty.
     ambient_names :: Data a => a -> [(SrcSpan, Name)]
     ambient_names thing
-      | Just (L loc (HsTyVar _ _ (L _ (WithUserRdr _ name))))
+      | Just (L loc (HsTyVar _ _ (L _ (WithUserRdr rdr name))))
           <- (cast thing :: Maybe (LHsType GhcRn))
-      , isVarName name = [(locA loc, name)]
+      , isVarName name
+      , not (isQual rdr && isExternalName name) = [(locA loc, name)]
       | Just (L _ (HsForEachTy _ bndrs _)) <- (cast thing :: Maybe (LHsType GhcRn))
       = let bound = mapMaybe hsLTyVarName bndrs
         in filter (\(_, name) -> name `notElem` bound) (concat (gmapQ ambient_names thing))
@@ -2342,11 +2345,72 @@ tc_app_ty mode rn_ty exp_kind
     invalid_call = failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
 tc_app_ty mode rn_ty exp_kind
+  | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
+  , isQual rdr
+  , isVarName name
+  , isExternalName name
+  = setSrcSpanA loc $
+    do { env <- getGblEnv
+       ; case filterOut is_par hs_args of
+           [HsValArg _ arg]
+             | isTypeLevel (mode_tyki mode)
+             , isNothing (mode_holes mode)
+             , not (nameIsLocalOrFrom (tcg_semantic_mod env) name)
+             -> do { thing <- tcLookupGlobal name
+                   ; case thing of
+                       AnId fun
+                         | tcEqType (varType fun) (mkVisFunTyManyU list_kind naturalTy)
+                         -> do { numbers <- case closedNaturalList arg of
+                                   Just ns -> return ns
+                                   Nothing -> failWithTc $ TcRnClosedTypeEval name
+                                     "The argument must be a closed list of Natural literals, such as '[1, 2, 3]."
+                               ; arg_ty <- tc_check_lhs_type mode arg list_kind
+                               ; checked <- liftZonkM (zonkTcType arg_ty)
+                               ; unless (tcEqType checked (mkPromotedListTy naturalTy (map mkNumLitTy numbers))) $
+                                   failWithTc $ TcRnClosedTypeEval name
+                                     "The checked argument does not represent a list of Natural literals."
+                               ; result <- tcRunClosedNatural fun numbers
+                               ; checkExpKind mode rn_ty result naturalTy exp_kind }
+                       _ -> unsupported name }
+           _ -> unsupported name }
+  where
+    (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
+    list_kind = mkListTy naturalTy
+    is_par HsArgPar{} = True
+    is_par _ = False
+    unsupported = failWithTc . TcRnNoSourceTable
+tc_app_ty mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty
        ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty hs_args
        ; checkExpKind mode rn_ty ty infered_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
+
+-- | Read a promoted literal list before admitting the call to execution.
+closedNaturalList :: LHsType GhcRn -> Maybe [Integer]
+closedNaturalList (L _ (HsParTy _ arg)) = closedNaturalList arg
+closedNaturalList (L _ (HsExplicitListTy _ IsPromoted args)) = traverse natural args
+  where
+    natural (L _ (HsParTy _ arg)) = natural arg
+    natural (L _ (HsTyLit _ (HsNatural _ IL{ il_value = n })))
+      | n >= 0 = Just n
+    natural _ = Nothing
+closedNaturalList _ = Nothing
+
+{- Note [Closed source calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Serokell's closed term evaluator example uses an ordinary length call as
+a vector index. Start with an imported, qualified function on a list of
+Natural literals. The renamer keeps its written qualifier and resolved
+term Name after trying the ordinary type and checked source-table paths.
+The term Name is not a retained local index.
+
+Require a complete monomorphic function type and literal arguments before
+execution. This avoids running open calls or extending the constraint
+solver. Elaborate the result to an ordinary Natural literal. No residual
+call or evaluation coercion enters Core. See the R15 feature page for the
+source example and the staging boundary.
+-}
 
 {- Note [Source opaque call indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

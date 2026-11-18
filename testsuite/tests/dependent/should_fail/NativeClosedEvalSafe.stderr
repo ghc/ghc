@@ -1,0 +1,5 @@
+NativeClosedEvalSafe.hs:7:18: error: [GHC-70565]
+    • Cannot evaluate ‘Length.length’ in a type.
+        Safe Haskell disallows executing imported functions in types.
+    • In the first argument of ‘Proxy’, namely ‘(Length.length '[1])’
+      In the type signature: result :: Proxy (Length.length '[1])

@@ -934,6 +934,10 @@ instance Diagnostic TcRnMessage where
            , text "Build the result from constructors, bound variables, or fully applied functions with checked equations."
            , text "In a recursive call, pass a field of the first argument directly."
            , text "If there is a second argument, bind it with a variable and pass it unchanged in recursive calls." ]
+    TcRnClosedTypeEval name reason
+      -> mkSimpleDecorated $ hang
+           (text "Cannot evaluate" <+> quotes (ppr name) <+> text "in a type.")
+           2 (vcat (map text (lines reason)))
     TcRnUntickedPromotedThing thing
       -> mkSimpleDecorated $
          text "Unticked promoted" <+> what
@@ -2382,6 +2386,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnNoSourceTable {}
       -> ErrorWithoutFlag
+    TcRnClosedTypeEval {}
+      -> ErrorWithoutFlag
     TcRnUntickedPromotedThing {}
       -> WarningWithFlag Opt_WarnUntickedPromotedConstructors
     TcRnIllegalBuiltinSyntax {}
@@ -3068,6 +3074,8 @@ instance Diagnostic TcRnMessage where
     TcRnTermNameInType {}
       -> noHints
     TcRnNoSourceTable {}
+      -> noHints
+    TcRnClosedTypeEval {}
       -> noHints
     TcRnUntickedPromotedThing thing
       -> [SuggestAddTick thing]

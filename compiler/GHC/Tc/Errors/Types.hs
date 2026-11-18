@@ -2082,6 +2082,9 @@ data TcRnMessage where
   -- | A term used in a type has no checked constructor table.
   TcRnNoSourceTable :: !Name -> TcRnMessage
 
+  -- | GHC could not execute an imported function during type elaboration.
+  TcRnClosedTypeEval :: !Name -> !String -> TcRnMessage
+
   {-| TcRnUntickedPromotedThing is a warning (controlled with -Wunticked-promoted-constructors)
       that is triggered by an unticked occurrence of a promoted data constructor.
 

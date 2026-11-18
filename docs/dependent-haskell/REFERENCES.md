@@ -4957,3 +4957,13 @@ Haskell patterns and for the evidence that Core Lint can verify.
 [GHC #27413](https://gitlab.haskell.org/ghc/ghc/-/issues/27413),
 [Agda reduction](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/TypeChecking/Reduce.hs#L616)
 and [Agda blockers](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/Syntax/Internal/Blockers.hs#L26).
+
+Safe Agda checks imports transitively and restricts features that can
+invalidate its guarantees, including unchecked termination assertions.
+GHC has a different contract for compile-time execution. Its annotation
+checker rejects running annotation code in a Safe Haskell module. R15
+uses that boundary for executing an imported ordinary function. It also
+marks a module that uses this path unsafe for Safe Haskell inference. A
+function's Haskell type gives no termination proof. [Safe Agda](https://agda.readthedocs.io/en/v2.8.0/language/safe-agda.html),
+[Safe Haskell](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/safe_haskell.html)
+and [GHC's annotation checker](../../compiler/GHC/Tc/Gen/Annotation.hs).
