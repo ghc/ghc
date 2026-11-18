@@ -7312,7 +7312,7 @@ runOrdinaryRetainedModuleChecks libdir = do
                     , "    pure (toList (zipVec left right))"
                     ]
                 , 83865
-                , ["Couldn't match type", "zipVec", "Vec Int (S n)", "Vec Int m"]
+                , ["Couldn't match type", "zipVec", "Vec Int ('S n)", "Vec Int m"]
                 )
             ,
                 ( "ConstructorPrefixLinearCaptureTwice"
