@@ -172,6 +172,19 @@ behind the installed library function. This example has three checks.
   producer's selected branch without changing its signature must cause
   the unchanged client to check its equality again.
 
+A GHC API experiment read the desugared Core for an ordinary producer and
+its importer. The producer changed `'x'` to `'X'`, changed `'é'` to `'É'`
+and returned its input in the default branch. An experimental observer
+selected all three results and stayed blocked on the exact rigid operand.
+
+The default branch exposed a demand requirement. GHC shares the default
+code in a local function that takes an unboxed unit. The observer could
+enter it with the constructor `(##)`. A test substituted an argument of
+the same type that first inspects a rigid character. That argument could
+not be discarded. Inspect the producer with `-ddump-ds-preopt` to see the
+continuation before optimization.
+[Desugaring shared pattern-match failure](../../../compiler/GHC/HsToCore/Utils.hs).
+
 The design question is how to represent and check this reduction in
 Core. The current `TermAppCo` proves congruence under one local head.
 GHC's built-in literal rules give an example of checking proof endpoints.

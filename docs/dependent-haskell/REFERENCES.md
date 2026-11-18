@@ -5067,3 +5067,10 @@ why an unknown scrutinee can block reduction even with a default branch.
 [historical Core Lint](https://github.com/goldfirere/ghc/blob/b64ef80f8002727422c05092f429c38d0527ed0b/compiler/coreSyn/CoreLint.lhs#L527-L544),
 [GHC literal axioms](../../compiler/GHC/Builtin/WiredIn/TypeLits.hs)
 and [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
+
+The compiler's `mkFailurePair` explains the unboxed-unit call seen in
+the R16 character experiment. The desugarer can share a pattern-match
+continuation as a local function. Observing its result must preserve
+the evaluation of its unlifted argument.
+[Desugarer and design note](../../compiler/GHC/HsToCore/Utils.hs)
+and [R16 case experiment](roadmap/R16-open-term-evaluator.md#an-equality-that-crosses-a-module-boundary).
