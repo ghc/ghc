@@ -19,8 +19,9 @@ prerequisites, acceptance checks and the behavior that remains unsupported.
 
 [M84](#m84-infer-a-nonempty-vectors-tail-at-a-nested-application) lets
 `safeHead` infer the tail of a vector constructed by another call.
-It advances R03 using the addition and list-length equations from R13
-and R15. M83 supplies the numeric syntax. The work queue tracks the
+[M94](#m94-infer-a-nonempty-tail-through-local-length-definitions) also
+infers the tail when a local definition names the length. These cases
+use the source equations from R13 and R15 and the numeric syntax from M83. The work queue tracks the
 remaining product, promotion and Core tasks.
 
 ## Historical source checkpoints
@@ -7286,13 +7287,13 @@ The native Showcase and self-hosted GHCi each emitted 166 lines at
 cell with an undefined dimension returned `'x'`.
 
 A caller can take the head of `signedPrefix` using its declared result.
-Inside a let, an inferred tail index at
+At the M92 checkpoint an inferred tail index at
 `safeHead (replicateNative total 'x')` can still be untouchable in the
 retained application. In the same source, both compilers accept
 `safeHead @Char @(r * c) (replicateNative total 'x')`. Giving the tail
 index explicitly leaves the local equality to the ordinary solver.
 The closed-result local numeral and the separate `where` binding also
-still fail. These cases need further work on R03.
+failed at that checkpoint. M94 addresses these three cases.
 
 The next inference experiment can use the checked RHS to propose an
 erased tail argument before ordinary instantiation allocates a
@@ -7367,15 +7368,86 @@ to a function. M92 establishes the local equalities, but an ordinary
 inference variable cannot be filled with a runtime index. The M93
 compiler accepts the written tail argument and rejects its omission.
 
-- [ ] Read a checked local RHS as a candidate for immutable argument
+- [x] Read a checked local RHS as a candidate for immutable argument
       selection. Expose only definitions needed to match the formal
       type. Keep each original argument, type, and usage in its cache.
-- [ ] Check the actual argument against the instantiated domain. A
+- [x] Check the actual argument against the instantiated domain. A
       lexically supplied dictionary can invalidate the proposed shape.
       Preserve the source location of a call that lacks evidence.
-- [ ] Admit qualifying local definitions at fixed ordinary and closed
+- [x] Admit qualifying local definitions at fixed ordinary and closed
       result types. Check an unguarded equation with a where binding.
       Preserve normal inference, generalisation, strictness, and guards.
-- [ ] Check runtime dimensions, closed numerals, sharing and bottom,
+- [x] Check runtime dimensions, closed numerals, sharing and bottom,
       caller dictionaries, unrelated indices, and linear values. Run the
       examples in both compilers and GHCi. Update the Showcase and R03.
+
+### Inference and evidence
+
+For a vector of length `total`, first match the argument's original
+type. If the formal index demands a constructor, use a constructor
+equality from the enclosing pattern when one is available. Either
+orientation of the equality can identify the constructor. Otherwise,
+look up the checked definition of `total`. For `total = 1 + area`,
+the library equations suggest `area` as the erased tail. A local alias
+can also occur inside an operand, as in `total = plus one n` with
+`one = S Z`. Looking up an alias never supplies evidence.
+
+The checker saves the typed expression and its multiplicity usage. It
+checks that original argument against the inferred domain. With a
+caller-supplied `Num Nat`, it can still use `total = S area`, even if
+the caller supplies the multiplication that computes `area`. To prove
+`total ~ 1 + area`, the solver tries the selected defining coercion for
+`total` before it unfolds `area`. An independent rule on `(*)` can
+therefore coexist with this call. A rule that can change a required
+addition is rejected at the rule declaration.
+
+An unused local definition can have a reducible RHS, such as
+`area = (S Z) * c`. Its defining equality also needs to stay lazy in
+the solver. Otherwise installing it as an assumption inspects the
+`times` equations and can reject a rule before any call needs them.
+Keep the defining proof in its implication and in the lexical map used
+by the type rewriter. Record the usual Given-equality barrier at that
+level. Solver plugins continue to receive ordinary Givens. The synthetic
+defining proof has no separate entry in their inert Given list.
+
+The same distinction applies to runtime tests. Given `count = 1 + n`
+with a caller-supplied dictionary, the checker cannot prove that
+`count` is a successor. Matching `Just Refl` from `sameNat count (S Z)`
+supplies the missing equality inside that branch. The comparison uses
+the actual runtime value and the other branch can return `Nothing`.
+
+A function with one unguarded equation can use these local definitions
+in its `where` clause. Check the declarations once in the scope of the
+patterns. Guarded and multi-equation definitions retain their usual
+guard scope and fallthrough. R03 still needs broader argument inference.
+The source equations for addition inspect the left operand, so `n + 1`
+does not expose a successor while `n` is unknown.
+
+### Verification
+
+The M93 compiler rejected the omitted tail in the signed local example.
+It accepted the same call with `@Char @(r * c)`. The new source fixtures
+use the ordinary call with no visible type arguments. They cover a
+closed numeral, unknown dimensions from IO, an undefined column count,
+and a branch that checks the actual count with `sameNat`.
+
+The zero-length negative reports “Couldn't match type ‘Z’ with ‘S n0’”
+on the vector argument and shows the original equation and its `where`
+clause. A caller-supplied dictionary yields a separate error about the
+local length. With `-fdefer-type-errors` the call emits a warning and
+raises the deferred error when its result is demanded.
+
+Both compiler stages compiled and ran a separate client with only a
+frozen packed-vector interface and object available. Core and STG lint
+passed. The native Showcase in
+both stages and the self-hosted GHCi run matched all 169 expected lines.
+The HIE reader found the same local Name at the `where` declaration and
+its earlier use. The compatibility checks covered polymorphic lets,
+partial signatures, shadowing, linear use, `Strict`, guard fallthrough
+and extension-off code.
+
+All 57 selected normal-way tests and four GHCi tests passed. The GHC API
+test now accepts `let m = n` when the result requires the index `n`.
+It still rejects an alias of a different input at the vector argument.
+Execution used `-O0`. The separate `-O1` probe reached the existing
+diagnostic for optimized native dependent Core.

@@ -133,11 +133,23 @@ let total, cells :: Nat
 in replicateNative total 'x'
 ```
 
-Inside that let, the solver can check a call to `safeHead` when the caller
-fixes the erased tail index. For example, `safeHead @Char @(rows * cols)
-(replicateNative total 'x')` checks in a dependent result. Inferring this
-tail from `total` remains open.
-[Signed and grouped local lengths](PLAN.md#m92-signed-and-grouped-local-lengths).
+The erased tail is inferred when a caller uses `safeHead` in the same
+expression. The example also works with a fixed ordinary result:
+
+```haskell
+localHead :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Char
+localHead rows cols = safeHead (replicateNative total 'x')
+  where
+    total, cells :: Nat
+    total = 1 + cells
+    cells = rows * cols
+```
+
+The caller need not know either runtime dimension. GHC checks the actual
+vector type before accepting the call. A signature that takes a `Num Nat`
+dictionary can still use a successor written as `S cells`. The caller's
+addition method can give `1 + cells` a different result.
+[Local inference and its evidence](PLAN.md#m94-infer-a-nonempty-tail-through-local-length-definitions).
 
 The order of addition also affects evaluation. With an undefined `cells`,
 `1 + cells` already has a successor constructor. Asking for the first

@@ -4799,3 +4799,20 @@ interface types. The HIE version identifies its binary payload.
 [GHC's extended-interface options](../users_guide/separate_compilation.rst),
 [HIE types and binary representation](../../compiler/GHC/Iface/Ext/Types.hs)
 and [GHC interface types](../../compiler/GHC/Iface/Type.hs).
+
+### Inferring an omitted index from a local definition
+
+Agda supports omitting arguments that can be recovered from how a function
+is used. Its local definitions can be expanded when checking a type. These
+two rules motivate trying the checked definition of a vector length while
+choosing an omitted tail index.
+[Agda 2.8.0, implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [local definitions](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions).
+
+The fork distinguishes choosing the argument from proving that it fits.
+The checker retains the expression, its inferred type and its usage, then
+checks subsumption at the selected domain. A class method from a local
+dictionary can invalidate a candidate. A constructor equality obtained
+from a pattern can justify the call independently of that dictionary.
+[Cached application checking](../../compiler/GHC/Tc/Gen/App.hs) and
+[solver provenance](#equality-for-lazy-local-definitions).

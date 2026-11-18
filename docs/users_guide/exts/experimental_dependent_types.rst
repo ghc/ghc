@@ -125,10 +125,31 @@ The bindings can have complete monomorphic signatures::
 GHC checks the signatures first and follows the dependencies between
 bindings. Here the body can use ``total`` at the length
 ``1 + rows * cols``. This rule applies to nonrecursive value definitions
-in a let expression with a known dependent result. Each RHS that supplies
-a length equality must yield a monomorphic value. A different dictionary can still supply the
-ordinary runtime operation. If the body needs the index equality, the
-compiler also checks rewrite rules that can affect the selected method.
+in a let expression with a checked dependent result or a fixed
+monomorphic result. A function with one unguarded equation can also
+use these definitions in its ``where`` clause::
+
+    safeHead :: Vec a (1 + n) -> a
+    safeHead (VCons x _) = x
+
+    localHead :: foreach (r :: Nat) -> foreach (c :: Nat) -> Char
+    localHead r c = safeHead (replicateNative total 'x')
+      where
+        total, area :: Nat
+        total = 1 + area
+        area = r * c
+
+GHC can use a defining RHS to choose the omitted index for ``safeHead``.
+It checks the original vector against the resulting argument type.
+With the checked arithmetic from this library, either dimension can be
+unknown at compile time. The outer successor suffices to take the head.
+If the local length is ``0``, type checking fails at the vector argument.
+The mismatch refers to the constructors ``Z`` and ``S`` of this ``Nat`` type.
+
+Each RHS that supplies a length equality must yield a monomorphic value.
+A different dictionary can still supply the ordinary runtime operation.
+If the body needs the index equality, the compiler also checks rewrite
+rules that can affect the selected method.
 
 The vector library's ``Num Nat`` instance also supplies checked equations
 for ``fromInteger``. A caller can use those equations at a retained

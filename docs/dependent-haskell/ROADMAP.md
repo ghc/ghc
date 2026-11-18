@@ -173,6 +173,7 @@ can advance a card while the card remains open.
 | 32 | R03 and R05: dictionary evidence for local definitions | [M91](PLAN.md#m91-dictionary-evidence-for-a-local-index-definition) | Use the selected multiplication and literal conversion to check a local vector length. |
 | 33 | R03 and R05: signed and grouped local lengths | [M92](PLAN.md#m92-signed-and-grouped-local-lengths) | Check signed runtime lengths in dependency order and compose their equalities in the body. |
 | 34 | R05: retained types in editor metadata | [M93](PLAN.md#m93-retained-types-in-hie-files) | Write and read retained binders, runtime indices and opaque applications in HIE files. |
+| 35 | R03: inferred nonempty local lengths | [M94](PLAN.md#m94-infer-a-nonempty-tail-through-local-length-definitions) | Infer the tail of a vector through checked let and where definitions, then check the call against its actual argument. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

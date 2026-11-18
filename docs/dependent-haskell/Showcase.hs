@@ -868,6 +868,24 @@ signedPrefix rows cols =
         cells = rows * cols
     in replicateNative total 'x'
 
+-- | Take the head without specifying the tail length of the local vector.
+localHead :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Char
+localHead rows cols = safeHead (replicateNative total 'x')
+  where
+    total, cells :: Nat
+    total = 1 + cells
+    cells = rows * cols
+
+-- | Accept a length computed by the caller if a runtime test finds one cell.
+-- Match S Z because the caller supplies the meaning of a term literal here.
+oneCellHead :: Num Nat => foreach (extent :: Nat) -> Maybe Char
+oneCellHead extent =
+    let count :: Nat
+        count = 1 + extent
+    in case sameNat count (S Z) of
+         Just Refl -> Just (safeHead (replicateNative count 'x'))
+         Nothing -> Nothing
+
 -- | Use ordinary addition on two unknown lengths in a vector result type.
 sourceAddition :: IO ()
 sourceAddition = do
@@ -943,3 +961,8 @@ arithmeticNotation = do
     observe "safeHead with a let-bound product" (safeHead (namedPrefix rows unknownCols))
     observe "signed length bindings" (length (toList (signedPrefix rows cols)),
                                       safeHead (signedPrefix rows unknownCols))
+    observe "safeHead inferred from a where-bound length" (localHead rows unknownCols)
+    let threeLocal :: Vec Char 3
+        threeLocal = let count :: Nat; count = 3 in replicateNative count 'x'
+    observe "vector at a let-bound numeral" (toList threeLocal)
+    observe "head after testing the actual length" (oneCellHead Z, oneCellHead (S Z))

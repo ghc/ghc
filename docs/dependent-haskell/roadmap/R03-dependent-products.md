@@ -111,8 +111,11 @@ M58 and M59 expose those rules through source checking.
 - [x] Carry a checked length through a signed value and several acyclic
       let bindings in dependency order. Preserve ordinary signature checking
       and generalisation. See [M92](../PLAN.md#m92-signed-and-grouped-local-lengths).
-- [ ] Infer the tail of a nonempty vector from grouped local length aliases.
-      The explicit erased argument succeeds in the [M92 control](../PLAN.md#m92-signed-and-grouped-local-lengths).
+- [x] Infer the tail of a nonempty vector from grouped local length aliases.
+      A checked RHS can suggest the erased argument. The ordinary solver
+      must prove that the actual vector has that type. A runtime equality
+      test can supply the evidence in its success branch.
+      See [M94](../PLAN.md#m94-infer-a-nonempty-tail-through-local-length-definitions).
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.
