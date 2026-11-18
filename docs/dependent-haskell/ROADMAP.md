@@ -49,7 +49,7 @@ and [allocation measurements](PLAN.md#m97-simplify-a-case-of-an-ordinary-constru
 | Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with a written or inferred runtime operand, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
 | Function promotion (`R13`, under `R06`) | A list-length function works at any lifted element type. Multiplication calls checked addition on a recursive result. Both functions supply closed-family equations to interface clients. | General function promotion, polymorphic helper calls, and lambda/let/case expressions in types. |
-| Evaluation (`R15`, `R16`) | An isolated GHC API probe executes an ordinary imported length function on a closed list. | The source checker rejects the same call in a vector type. It also rejects ordinary `id a` with an unknown `a`. |
+| Evaluation (`R15`, `R16`) | An ordinary imported length function computes the index of a vector during typechecking. Changing the producer object invalidates its client. | General closed expression and result domains, and reduction of ordinary `id a` with an unknown `a`. |
 | Numeric literals (`R07`) | The vector library registers an interpretation for nonnegative literals. Clients can write `Vec Bool 3`, `replicateNative 3 x` and `replicateNative (n + 1) x`. The retained calls check the actual `Num Nat` dictionary. | More general literal conversions and literal constraints such as finite bounds. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
 
@@ -146,11 +146,13 @@ General opaque proof projection stays open.
 
 ## Current work queue
 
-**[R15, closed term evaluator](roadmap/R15-closed-term-evaluator.md) is the active card.**
-Use the upstream example of a three-element vector indexed by an ordinary
-length computation. The first producer is compiled separately. The consumer
-must ultimately typecheck its vector declaration by executing the closed
-call and reading its result during type elaboration.
+**[R15, closed term evaluator](roadmap/R15-closed-term-evaluator.md) and
+[R16, open term evaluator](roadmap/R16-open-term-evaluator.md) are active.**
+They are separate subtasks of function promotion. The upstream graph has
+no dependency from one evaluator to the other. Review each against its own
+source example. R15 must execute an imported length function to check a
+three-element vector. R16 must reduce a polymorphic identity while its
+argument is still unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
@@ -160,7 +162,7 @@ call and reading its result during type elaboration.
 
 [R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
 and [R23](roadmap/R23-unsaturated-type-families.md) retain their own completion
-criteria. Revisit a dependency when it blocks the active card's executable
+criteria. Revisit a dependency when it blocks an active card's executable
 example. Treat the arrows as prerequisites or subtasks, as on Serokell's
 graph. A workaround in an example library does not close a dependency.
 
@@ -213,7 +215,8 @@ evaluator work has priority.
 | 37 | R03: partial constructor callbacks | [M96](PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks) | Use a checked input's runtime index in `VCons x <$> fromListExact n xs`. Preserve constructor multiplicities and check the full callback type. General callback inference remains open. |
 | 38 | R05: simplify a case of a known constructor | [M97](PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core) | Remove a measured allocation and dispatch while keeping dependencies in types, lazy field sharing and strict-field demand. |
 | 39 | R13: the length of ordinary zip | [M98, deferred](PLAN.md#m98-the-length-of-zip-over-two-ordinary-lists) | Check equations that inspect two list spines and recurse on both tails. Preserve the empty-first equation with an unknown second input. |
-| 40 | R15: evaluate an imported closed call | [M99, in progress](PLAN.md#m99-evaluate-an-imported-closed-call) | Both interpreters execute the ordinary producer. Type elaboration and incremental recompilation of its client remain open. |
+| 40 | R15: evaluate an imported closed call | [M99, verified for literal Natural lists](PLAN.md#m99-evaluate-an-imported-closed-call) | The source call computes the vector length. The unchanged client observes an ABI-preserving implementation change. |
+| 41 | R16: evaluate with a rigid argument | [M100, in progress](PLAN.md#m100-reduce-an-ordinary-identity-at-a-rigid-type-variable) | Reduce the imported identity on a symbolic operand. Reify the same source skolem, then accept the upstream signature. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -374,7 +377,7 @@ still require substantial research.
 - [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24. M82 connects a concrete instance method to a checked source function in a retained argument. M83 checks the selected ground `Num` instance’s conversion of a nonnegative literal. General classes and abstract dictionary arguments remain open.
 - [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23.
 - [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge.
-- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. The fork can reduce checked source equations through type families. Executing an imported closed term during type elaboration remains open. See the [active card](roadmap/R15-closed-term-evaluator.md).
+- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M99 executes qualified imports of type `[Natural] -> Natural` on promoted literal lists during type elaboration. General closed evaluation remains open. See the [active card](roadmap/R15-closed-term-evaluator.md).
 - [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. See the [open-term examples and checks](roadmap/R16-open-term-evaluator.md).
 - [ ] **R17 [Type-level lambdas](https://ghc.serokell.io/dh#type-level-lambdas)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R18 [Type-level let-bindings](https://ghc.serokell.io/dh#type-level-let-bindings)** — Unmarked. Needs/includes: R05, R16.
@@ -575,8 +578,8 @@ L1 to R20; and I1 to R01. The current queue above owns the next work.
   as list length must work in an actual type without a parallel handwritten
   type family. A runtime executable alone does not close this task.
   M77 and M78 use R13 source equations to compute Peano lengths across
-  an interface. M99 exercises the R15 interpreter path. Executing a call
-  during source elaboration remains open.
+  an interface. M99 executes an imported call during source elaboration
+  and tracks the producer object in the client interface.
 - [ ] **E2: Specify and implement open evaluation.** Depends on C1. Select and
   document normalization rules for expressions with rigid variables. Include
   stuck terms and capture avoidance. A lambda application to a rigid variable

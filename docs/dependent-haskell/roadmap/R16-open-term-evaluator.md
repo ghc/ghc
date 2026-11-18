@@ -17,6 +17,28 @@ gives the same error. An explicit closed type family with equation
 `Identity a = a` accepts this example. That control checks GHC's existing
 family reduction. It does not invoke a term evaluator.
 
+## Current experiment
+
+Use the actual typed unfolding for Prelude's `id`. A source skolem
+`a :: Type` stands for a type chosen by the caller. Give the evaluator
+a fresh neutral variable of the same kind and keep the correspondence
+to that skolem. After evaluation, only that variable can be read back
+as `a`. A same-spelling variable with a different identity must fail the
+check. This experiment has no runtime representation for types.
+
+An imported unfolding can refer to other bindings. On this build
+GHC shares the implementations of `id` and `breakpoint`. A frontend
+using unfoldings must account for each definition it actually reads,
+including definitions reached through an alias. It also needs a policy for
+a producer interface that omits the required body.
+
+Eleven GHC API checks passed on the self-hosted compiler. They include
+following that alias, reifying the original skolem, rejecting a different
+skolem's symbolic operand, and preserving a neutral case. Retrying with a
+supplied definition models resolution of a blocked variable. The probe
+does not modify the GHC solver. The source signature still needs a
+connection from type elaboration to the evaluator.
+
 ## Evidence required
 
 - [ ] Reduce an ordinary polymorphic identity applied to a rigid variable.

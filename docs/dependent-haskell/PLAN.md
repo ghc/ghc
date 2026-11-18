@@ -7757,15 +7757,47 @@ R21's work on same-module declarations.
       three for the first four runs and four for the two rebuilt-object runs.
 - [x] Establish the source baseline with a producer-only interface and
       object on the import path. The literal-index client accepts three
-      cells and rejects two on both compiler stages. The computed-index client reports GHC-68947
-      at the qualified term name.
-- [ ] Connect the checked, closed application to execution during type
+      cells and rejects two on both compiler stages. Before M99 the
+      computed-index client reported GHC-68947 at the qualified term name.
+- [x] Connect the checked, closed application to execution during type
       elaboration. Check the permitted staging and error cases. Record
       what code the compiler executed in the consumer's recompilation data.
-- [ ] Accept the computed index for three cells, reject two at the definition
+- [x] Accept the computed index for three cells, reject two at the definition
       of `v`, then reject the unchanged three-cell client when a new producer
       returns four. Add the working source feature to the Showcase.
+
+Both compilers ran the 175-line Showcase. The self-hosted compiler also
+ran it in GHCi. The object replay check keeps both installed interfaces
+byte-for-byte identical and replaces only the object the client recorded.
+The native cancellation test waits for a message from the diverging
+producer before interrupting the compiler and its interpreter together.
 
 The [R15 feature page](roadmap/R15-closed-term-evaluator.md) gives the
 source, commands and acceptance criteria. R15 remains open beyond this
 example. [R16](roadmap/R16-open-term-evaluator.md) covers open inputs.
+
+## M100: reduce an ordinary identity at a rigid type variable
+
+R16 owns this work. Its source example is `x :: forall a. Num a => id a`,
+with `x = 42`. The caller supplies the type `a`. Compilation cannot run
+`id` on a concrete runtime representation of that type.
+
+- [x] Observe a typed application of the actual imported `Prelude.id`
+      under a symbolic argument. Check the argument's kind. Reify a
+      returned neutral only when it has the identity of the corresponding
+      source skolem. Follow a referenced definition when the producer
+      exposes an alias for the function.
+- [x] Preserve lexical scope, the laziness of an unused operand and a
+      strict case that inspects a rigid variable. Distinguish a variable
+      that must remain rigid from an unsolved variable that can later
+      acquire a solution. The probe models the latter by resubmitting
+      the same case after supplying the missing definition.
+- [ ] Connect the checked reduction to the source signature. Preserve
+      an existing type binder named `id` and normal implicit
+      quantification. Report an unavailable imported definition at its
+      use. Check that each definition read from a home interface can
+      invalidate the client when it changes.
+
+The [R16 feature page](roadmap/R16-open-term-evaluator.md) records the
+representation and proof obligations for residual applications. The R15
+interpreter and object dependency checks proceed independently.
