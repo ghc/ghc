@@ -7828,14 +7828,16 @@ digit :: Data.Char.isDigit '7' :~: 'True
 digit = Refl
 ```
 
-- [ ] Check the resolved, unrestricted unary function type. Accept a
+- [x] Check the resolved, unrestricted unary function type. Accept a
       `Char` literal or a promoted list of `Natural` literals as input.
       Select the result representation independently for `Natural`, `Char`
       and `Bool`. Test `Char -> Natural` and `[Natural] -> Bool` as well.
-- [ ] Execute the checked call with the interpreter used for M99. Decode a
+- [x] Execute the checked call with the interpreter used for M99. Decode a
       canonical result with GHC's literal and promoted constructor machinery.
       Check Unicode, escapes, a false equality and an unsupported result type.
-- [ ] Recheck an unchanged client after replacing one producer object.
+      Reflect the result through a complete visible type argument and reject
+      a visible argument that still contains a wildcard.
+- [x] Recheck an unchanged client after replacing one producer object.
       Inspect the package dependencies that GHC records for `Data.Char`.
       Run the installed-library witnesses in the Showcase.
 
@@ -7844,3 +7846,68 @@ describes a stuck call that reduces after the variable is instantiated.
 That requires a representation and retry rule for open calls on R16.
 [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [closed evaluator](roadmap/R15-closed-term-evaluator.md).
+
+Both compilers ran all 177 Showcase observations. The self-hosted
+compiler also ran them in GHCi. The eleven selected normal-way tests
+passed, including the four source diagnostics. With an unchanged interface,
+the internal interpreter tracked a home producer's `.dyn_o` and the
+external interpreter tracked its `.o`. Replacing the recorded object
+changed the result of the type-level call.
+
+## M102: reduce open projections
+
+R16 now needs to distinguish two possible rigid results at the same kind.
+Check the actual imported Prelude function in the following signature.
+
+```haskell
+left :: forall a b. a -> b -> const a b
+left x _ = x
+```
+
+- [ ] Check the invisible type binders, operand types and result of the
+      imported function. Admit a saturated ordinary arrow whose operands
+      and result are bound by that telescope. Preserve each source skolem's
+      identity, including repeated uses of one skolem.
+- [ ] Reduce `const a b` to `a` and an independently defined second
+      projection to `b`. Run the resulting definitions at two different
+      types and record the checked unfoldings the consumer used.
+- [ ] Reject a strict second projection at the source call when it must
+      inspect rigid `a` before returning `b`. Report which operand blocked
+      the case. Keep each observation inside type elaboration.
+
+Before M102, the consumer reports GHC-68947 at both projection heads.
+
+## M103: infer a closed overloaded call from its argument
+
+R15 now needs to select dictionaries for proposal #509's
+`Prelude.sum '[2, 3, 5]`. Its list argument fixes the element type to
+`Natural`. The ordinary definition should determine both the result and
+the required instances.
+
+- [ ] Check the actual library identifier, all type arguments and class
+      constraints. Compare with independent imported functions returning
+      `Natural` and `Bool`. Require the checked argument to determine the
+      specialization before running the code.
+- [ ] Use normal instance resolution. Detect missing dictionaries and
+      evidence that depends on the module currently compiling. Check the
+      missing-instance case even when the client defers ordinary type errors.
+- [ ] Accept a proof that the sum equals 10. Reject a false result,
+      a rigid list, and an input that leaves an ambiguous specialization.
+      Preserve M99 and M101's code dependency recording.
+
+The proposal motivates specialization with `sum`. In this GHC checkout,
+`sum` is a method with a `Num` constraint on the element. The `Foldable []`
+instance supplies its list implementation. Both choices must be available
+to the compiler before execution. Agda also elaborates calls with instance
+arguments by resolving the evidence in scope.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509),
+[GHC's Foldable class](../../libraries/ghc-internal/src/GHC/Internal/Data/Foldable.hs)
+and [Agda 2.8.0 instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html).
+
+Before M103, the source declaration reports GHC-68947 at `Prelude.sum`.
+A GHC API check against the installed library matched the declared
+argument `t a` of both `sum` and `Data.Foldable.null` to `[Natural]`.
+Both type-constructor heads have matchable arrows on this fork. The match
+fixed `t` to `[]` and `a` to `Natural`. The inferred result types were
+`Natural` and `Bool`, respectively. The probe stopped before dictionary
+selection and execution.

@@ -17,6 +17,10 @@ renamer reported GHC-68947 at `id`. The same program now also works with
 `Prelude.id` and with an independently defined function of the same type
 whose body returns its argument. [Source examples](../examples/open-evaluation/OpenSource.hs).
 
+With `TypeApplications`, a caller can also write `Proxy @(Prelude.id a)`
+for a rigid `a`. GHC checks whether the whole visible argument is complete
+before it reduces the call.
+
 ## Current experiment
 
 Use the actual typed unfolding for Prelude's `id`. A source skolem

@@ -4986,7 +4986,7 @@ These checks preserve lexical identity and separate compilation.
 
 Proposal #509 gives equality witnesses for `Data.Char.toUpper 'x'` and
 `Data.Char.isDigit 'x'`. It also gives an open call that could reduce
-after the compiler learns the character. M101 targets the closed
+after the compiler learns the character. M101 implements the closed
 examples. Agda exposes `primToUpper` and `primIsDigit` as character
 primitives. Its manual specifies their behavior through the corresponding
 Haskell `Data.Char` functions. GHC can call those ordinary functions
@@ -4994,3 +4994,18 @@ directly through the R15 interpreter. At the type boundary it can reuse
 `isCharLitTy`, `mkCharLitTy` and the existing promoted Boolean constructors.
 [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [Agda 2.8.0 character primitives](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#characters).
+
+### Instantiating an overloaded closed function
+
+Proposal #509 uses `sum` as an example of solving constraints before
+executing a function. In this checkout, its definition is a `Foldable`
+class method with a `Num` constraint. The list instance delegates to
+`GHC.Internal.List.sum`. An evaluator needs the selected implementations
+of both classes. Agda's instance arguments also make the selected evidence
+part of the elaborated application. For GHC, ordinary expression checking
+and instance resolution can construct that application. Its Core must be
+available to the interpreter before execution.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509),
+[Foldable method and list instance](../../libraries/ghc-internal/src/GHC/Internal/Data/Foldable.hs),
+[GHC's staged expression checker](../../compiler/GHC/Tc/Gen/Splice.hs)
+and [Agda 2.8.0 instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html).

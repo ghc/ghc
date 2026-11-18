@@ -82,6 +82,32 @@ Further controls used an empty list and a literal larger than a machine
 word. The producer returned `70` and `18446744073709551617` respectively.
 The [Showcase](../Showcase.hs) reflects a computed index with `natVal`.
 
+## Closed character calls
+
+Proposal #509 uses ordinary functions from an installed library in proofs.
+The type checker can run `Data.Char.toUpper 'x'` to obtain `'X'` and
+`Data.Char.isDigit '7'` to obtain `'True`. A signature that claims
+`isDigit '7' :~: 'False` fails at `Refl`. The client imports `Data.Char`
+only for its types. [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+and [Showcase](../Showcase.hs).
+
+M101 selects the input and result representations independently. It checks
+the resolved function's ordinary unary arrow and the input literal before
+execution. A `Char` or list of `Natural` values can produce a `Natural`, a
+`Char`, or a `Bool`. A user-defined `Char -> Natural` function can therefore
+compute a numeric index. GHC reuses its character literals and DataKinds'
+promoted Boolean constructors for the result. A call with an unsupported
+result such as `Data.Char.ord :: Char -> Int` reports the actual return
+type at the function name.
+
+The client interface lists the direct `base` dependency on this Linux
+build. It fingerprints the `ghc-internal` Haskell archive with the
+external interpreter and the shared library with the internal interpreter.
+For a home module, changing just the recorded `.o` or `.dyn_o` invalidates
+the client while the installed interfaces stay byte-identical.
+[Character witnesses](../../../testsuite/tests/dependent/should_run/NativeClosedChar.hs)
+and [link dependency recording](../../../compiler/GHC/HsToCore/Usage.hs).
+
 Same-module definitions require further work on R21. More argument and
 result domains, user-defined representations and general closed expressions
 remain open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).

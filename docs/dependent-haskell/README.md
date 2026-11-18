@@ -21,6 +21,11 @@ reads the ordinary imported definition of `id` and reduces `id a` to
 the caller's type variable. At `Int`, a definition `x = 42` therefore
 produces `42`. [Open source example](roadmap/R16-open-term-evaluator.md).
 
+A type can also call an ordinary installed library function on a known
+character. The Showcase reflects `Data.Char.toUpper 'x'` as `'X'` and checks
+`Data.Char.isDigit '7' :~: 'True` with `Refl`.
+[Closed character examples](roadmap/R15-closed-term-evaluator.md#closed-character-calls).
+
 An ordinary recursive length function now gives the return type of a
 vector constructor. For a list of `Int` read from an `IORef`, the caller can
 write `vector :: Vec Int (sourceLength xs)` and construct it with

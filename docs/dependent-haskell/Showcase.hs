@@ -33,6 +33,7 @@ import qualified ClosedTableLibrary as Table
 import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
+import qualified Data.Char
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Kind (Type)
 import Data.List (isInfixOf)
@@ -45,6 +46,7 @@ import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
 import GHC.Exts (FUN, M, U, Matchability (..), Multiplicity (Many))
 import qualified GHC.TypeNats as TypeNats
+import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
@@ -803,6 +805,7 @@ main = do
     listBoundaries
     observe "ordinary length evaluated while checking the type" (TypeNats.natVal closedLength)
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
+    observe "uppercase character and digit proof from Data.Char" checkedCharacters
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])
@@ -811,6 +814,10 @@ closedLength = Proxy
 -- | The ordinary polymorphic identity returns the caller's type variable.
 openIdentity :: forall a. Num a => id a
 openIdentity = 42
+
+-- | Reflect an upper-case character and prove that seven is a digit.
+checkedCharacters :: (Char, Data.Char.isDigit '7' :~: 'True)
+checkedCharacters = (charVal (Proxy @(Data.Char.toUpper 'x')), Refl)
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()
