@@ -7050,3 +7050,27 @@ If the caller returns the vector at `Vec Bool (1 + rows * cols)`, GHC
 reports GHC-83865 because it cannot equate `cells` with `times rows cols`.
 The next R03/R05 task is to carry this equality through an ordinary term
 `let` while preserving its shared runtime binding.
+
+## M90: equality for lazy local definitions
+
+R03 and R05 need an ordinary local binding whose value also indexes the
+result. M89 rejected `let cells = rows * cols in replicateNative (1 + cells) True`
+at the declared result `Vec Bool (1 + rows * cols)`. Agda's let conversion
+permits the body to use a definition at its defining expression.
+Haskell must preserve a lazy, shared binding.
+
+- [ ] Check a nonrecursive local definition against its actual RHS. Make its
+      nominal equality available only inside the body. Keep source locations,
+      dictionary selection, and rewrite-rule checks.
+- [ ] Use dependent application to discharge the equality by reflexivity.
+      Keep one runtime argument and preserve its demand and sharing.
+- [ ] Exercise checked functions and overloaded arithmetic, conflicting
+      equations, shadowing, recursion, and ordinary bindings that need no
+      equality. Verify native and interpreted source and update the Showcase.
+
+A source control already checks on the self-hosted M89 compiler. Its local
+helper takes `foreach (cells :: Nat) -> (cells ~ rows * cols) => result`
+and receives the product once. The given equality checks the body. Applying
+the helper makes both sides of the equality the product, so the ordinary
+solver supplies reflexivity. This representation needs no new Core axiom.
+[Agda let conversion](REFERENCES.md#nested-calls-in-retained-operands).
