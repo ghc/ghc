@@ -6496,3 +6496,33 @@ retained operand. This requires evidence for the selected `Num`
 instance's method. Constructed operands such as `plus (S n) Z` and
 polymorphic calls such as `sourceLength xs` are also open.
 [Instance-method precedents](REFERENCES.md#instance-methods-used-as-indices).
+
+## M82: overloaded addition in a retained argument
+
+The target under R12 and R03 is the ordinary Prelude operator in
+`fill n m = replicateNative @Bool (n + m) True`, with result
+`Vec Bool (n + m)`. The initial program at M81 reports GHC-83605 at
+`+`. Its library already defines `instance Num Nat where (+) = plus`.
+The class operation takes an implicit dictionary. The selected method
+must agree with the source equations used for the length.
+
+- [ ] When writing the instance interface, record which checked source
+      function an explicit method of a concrete instance calls as an
+      exact alias. Check the actual dictionary, selector and target.
+      Preserve the link in stripped and no-code interfaces.
+- [ ] For a saturated retained operand, instantiate the selector at
+      the expected index domain. Check that the ordinary solver selects
+      the certified dictionary for this occurrence. Use its target
+      for the runtime call and the M81 index. Keep the source span of
+      the selector. An abstract dictionary cannot justify the equations.
+- [ ] Change the method in a separately compiled producer. An unchanged
+      client must lose a proof which depended on the old method. Check a
+      second selector of the same type and a non-alias implementation.
+- [ ] Run the example with lengths read from IO. Check ignored sums
+      and partially defined lengths with both compiler stages. Update
+      the Showcase, the guide and the R12 work queue.
+
+Agda resolves a class-like field relative to the selected record.
+The Haskell precedent is GHC's class selector and dictionary selection
+rule. The source-level equality must survive `-fomit-interface-pragmas`.
+See [instance-method precedents](REFERENCES.md#instance-methods-used-as-indices).
