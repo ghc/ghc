@@ -100,10 +100,28 @@ At two rows and three columns the length is seven. Writing
 even if evaluating the product would raise an exception.
 [Nested arithmetic](PLAN.md#m89-nested-computations-in-retained-operands).
 
-Writing `let cells = rows * cols` lets you use `1 + cells` locally. If the
-function returns a vector whose signature says `1 + rows * cols`, write
-that expression directly. The checker cannot yet equate the local name
-with its definition in the result type.
+You can name the product with an ordinary lazy `let`. The declared result
+still uses the formula. The first cell remains available if a dimension
+is undefined.
+
+```haskell
+namedPrefix :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Char (1 + rows * cols)
+namedPrefix rows cols =
+    let cells = times rows cols
+    in replicateNative (1 + cells) 'x'
+```
+
+Here `times` names the checked multiplication function. Writing `rows * cols`
+directly as a retained argument works too. In an ordinary let RHS, however,
+`(*)` takes its meaning from the caller's `Num Nat` dictionary. Inferring
+the equality for that spelling is still open.
+[Local definitions](PLAN.md#m90-equality-for-lazy-local-definitions).
+
+The order of addition also affects evaluation. With an undefined `cells`,
+`1 + cells` already has a successor constructor. Asking for the first
+constructor of `cells + 1` evaluates `cells` and raises the exception.
+GHC rejects a body that returns the second length when its signature
+requires the first. [Diagnostic](../../testsuite/tests/dependent/should_fail/NativeTypeNumeralWrong.stderr).
 
 ### What happens on empty input?
 

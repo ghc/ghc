@@ -101,6 +101,20 @@ The two operators have their ordinary fixities. A caller can also write
 ``plus 1 (times rows cols)``. The first cell can be produced before
 evaluating the product.
 
+A checked result can use the defining index of a lazy local name::
+
+    prefixed rows cols =
+        let cells = times rows cols
+        in replicateNative (1 + cells) True
+
+Here ``cells`` has the index ``times rows cols`` in the body, and two uses
+of the name share its value. This rule applies to a single nonrecursive,
+unsigned variable binding when the checked result type mentions its RHS.
+The RHS can use unrestricted local variables, monomorphic constructors,
+and saturated functions with checked equations, such as ``times``. An
+overloaded operator or numeral inside the let RHS still needs a rule for
+the selected dictionary.
+
 The vector library's ``Num Nat`` instance also supplies checked equations
 for ``fromInteger``. A caller can use those equations at a retained
 argument, including inside an addition::

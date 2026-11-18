@@ -4730,3 +4730,32 @@ computation that uses it. For example, the first cell at length
 [Agda 2.8.0, let expressions](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions),
 [the ANF paper ledger](papers/README.md#anf-and-dependent-types-jfp-2022),
 and [the Core to STG translation](../../compiler/GHC/CoreToStg.hs).
+
+### Equality for lazy local definitions
+
+Agda allows a nonrecursive let definition to be replaced by its RHS during
+type checking. The fork expresses this conversion using a retained function.
+For a local `cells = times rows cols`, the function takes `cells` and equality
+evidence between `cells` and the product. The caller supplies the product once.
+Substitution makes the equality reflexive. Passing the value lazily preserves
+sharing in the Haskell program. Agda documents that its own let substitution
+does not introduce sharing.
+[Agda 2.8.0, local definitions](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions)
+and [the GHC elaboration](../../compiler/GHC/Tc/Gen/Expr.hs).
+
+Agda checks the RHS at its declared or inferred type before entering the
+body. Its local context stores the checked term and its type under the let
+name. Variable lookup consults that context. This is the source precedent
+for associating the checked RHS with one lexical binder.
+[Agda 2.8.0, checking a let binding](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1529-L1543)
+and [Agda's let environment](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L387-L399).
+See also [variable lookup](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L521-L534).
+
+For a Haskell class method, the selected evidence determines the runtime
+function. A local constraint can supply a different dictionary even at a
+ground type. The solver already checks the identity of a dictionary used
+in a retained argument. Ordinary let bindings can also succeed without
+using any index equality. An optional refinement must preserve that case.
+[Dictionary selection](../../compiler/GHC/Tc/Solver/Solve.hs),
+[source method certificates](../../compiler/GHC/Tc/Gen/SourceTable.hs),
+and [the OutsideIn(X) reading record](papers/README.md#outsideinx-jfp-2011).

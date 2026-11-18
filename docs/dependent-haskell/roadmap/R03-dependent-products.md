@@ -103,6 +103,11 @@ M58 and M59 expose those rules through source checking.
 - [x] Check nested named and overloaded calls at their operand domains.
       [M89](../PLAN.md#m89-nested-computations-in-retained-operands) uses
       `1 + rows * cols` directly as a vector length.
+- [x] Use the defining index of a single lazy local binding in a checked
+      result when the RHS names a certified computation.
+      See [M90](../PLAN.md#m90-equality-for-lazy-local-definitions).
+- [ ] Extend local conversion to overloaded RHSs using the dictionary
+      selected for the ordinary binding.
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.

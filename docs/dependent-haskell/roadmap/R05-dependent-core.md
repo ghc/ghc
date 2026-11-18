@@ -63,6 +63,9 @@ linear actuals. The owner is R03. This increment adds no Core equality rule.
 - [x] Preserve nested certified calls and constructor fields through Core
       Lint and erasure. Give each nontrivial operand a lazy STG binding.
       See [M89](../PLAN.md#m89-nested-computations-in-retained-operands).
+- [x] Discharge a local index equality through retained application and
+      reflexivity. The value argument remains lazy.
+      See [M90](../PLAN.md#m90-equality-for-lazy-local-definitions).
 - [ ] Specify an opaque Pi instantiation rule if a typed transformation needs
       one. M61's measured whole-cast lowering needs no new primitive. Add a proof
       operation only when a measured or calculus obligation requires it.

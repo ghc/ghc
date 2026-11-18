@@ -7059,18 +7059,95 @@ at the declared result `Vec Bool (1 + rows * cols)`. Agda's let conversion
 permits the body to use a definition at its defining expression.
 Haskell must preserve a lazy, shared binding.
 
-- [ ] Check a nonrecursive local definition against its actual RHS. Make its
-      nominal equality available only inside the body. Keep source locations,
-      dictionary selection, and rewrite-rule checks.
-- [ ] Use dependent application to discharge the equality by reflexivity.
+- [x] Check a nonrecursive binding that names a variable, constructor or
+      function with checked equations. Make its nominal equality available in
+      the body and keep the original source locations.
+- [ ] Select an optional equality for an overloaded let RHS using the
+      caller's actual dictionary and the applicable rewrite rules.
+- [x] Use dependent application to discharge the equality by reflexivity.
       Keep one runtime argument and preserve its demand and sharing.
-- [ ] Exercise checked functions and overloaded arithmetic, conflicting
-      equations, shadowing, recursion, and ordinary bindings that need no
-      equality. Verify native and interpreted source and update the Showcase.
+- [x] Exercise checked functions, wrong results, shadowing, recursion, and
+      ordinary arithmetic that needs no equality. Verify native and interpreted
+      source and update the Showcase.
+- [ ] Test optional solver activation with local dictionaries, rewrite rules,
+      nested implications and speculative solving.
 
 A source control already checks on the self-hosted M89 compiler. Its local
 helper takes `foreach (cells :: Nat) -> (cells ~ rows * cols) => result`
 and receives the product once. The given equality checks the body. Applying
 the helper makes both sides of the equality the product, so the ordinary
-solver supplies reflexivity. This representation needs no new Core axiom.
-[Agda let conversion](REFERENCES.md#nested-calls-in-retained-operands).
+solver supplies reflexivity. This source checks directly.
+
+```haskell
+prefixed :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Bool (1 + rows * cols)
+prefixed rows cols =
+    let build :: foreach (cells :: Nat) -> (cells ~ rows * cols) => Vec Bool (1 + rows * cols)
+        build cells = replicateNative (1 + cells) True
+    in build (rows * cols)
+```
+
+The compiler elaborates a supported ordinary local definition using the
+same retained application rule and a primitive equality parameter.
+[Agda let conversion](REFERENCES.md#equality-for-lazy-local-definitions).
+
+### Checked source functions and constructors
+
+The source checker recognises a single nonrecursive binding when a checked
+result mentions its defining index. It compares the actual Ids and types.
+It checks the RHS at its domain and the body under an erased equality.
+The application instantiates this equality at the actual argument. The
+equality stays in scope inside the body. Generated locations mark the
+internal lambda and its match. Diagnostics retain the locations of the written terms.
+
+A same-module occurrence may still carry the Id created before its source
+equations were checked. The prepass looks up the exact defining Id in the
+module's completed type environment. An imported occurrence reads the Id
+from its interface. Committing to the application checks the owner and
+records its use. A local function parameter with the same spelling supplies
+a different Id.
+
+### Verification at `-O0`
+
+Both compiler stages accepted the named product and a qualified infix use
+against an unchanged M89 producer interface. The source tests cover a local
+variable, a constructor, and a function defined in the same module. Shadowing
+that function with an unrelated argument and using a recursive definition
+both leave the result equality unsolved. A linear capture checks when used
+once. Duplicating it produces the ordinary multiplicity error at its binder.
+
+At dimensions two and three the vector has seven cells. Its first cell is
+available with an undefined dimension. Forcing its tail raises the original
+arithmetic exception. Stable names agree for the two fields that refer to
+the local product and for the product inside two separate successors.
+The final STG for each sharing control contains one updatable product thunk.
+The helper receives the shared value and a void coercion token.
+
+Both native builds and self-hosted GHCi reproduced 164 Showcase output
+lines. The 43 selected normal tests and four GHCi tests passed at the
+final compiler revision. The wrong-successor regression reports GHC-05617 on the original
+body and names the local equality. At an undefined length, `1 + cells`
+exposes a successor and evaluating the outer constructor of `cells + 1`
+raises the exception.
+
+### Remaining work for overloaded RHSs
+
+An ordinary `cells = rows * cols` checks under a local `Num Nat` Given. A
+result can mention `times rows cols` independently while the program uses
+`cells` as an ordinary value. Rewriting the let unconditionally to a retained
+call makes such a program fail at `*`. Checking only the selector's name
+or the result of global instance lookup cannot preserve this behavior.
+
+The next experiment is to inspect the evidence for the actual ordinary RHS
+before solving the body's implication. Compare it to the certified instance
+with `sourceMethodEvidenceMatches`. A matching instance can make an optional
+local equality available. A different dictionary leaves the ordinary let in
+force. Both stages accept the ordinary use under a caller-supplied
+`Num Nat` or a local rule on `(*)` when the vector is built independently
+at `times rows cols`. Both accept `replicateNative (n * 3) True`. A local
+`cells = times n 3` still cannot supply that result equality.
+Check the selected target and applicable rewrite rules before relying
+on the equality. A body that uses the proof must discharge it by retained
+application. A body that needs no proof can keep the original let and RHS.
+Verify this distinction after solving, including with speculative solves.
+The solver ordering has prior art in [OutsideIn(X)](papers/README.md#outsideinx-jfp-2011).
+Conditional evidence and its elaboration are proposed work in this fork.
