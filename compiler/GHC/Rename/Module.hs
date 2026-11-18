@@ -305,7 +305,11 @@ element type supplies the declaration dependency. In
 sourceLength :: forall a. [a] -> Nat, the signature binds a, so only Nat
 can add a dependency. Compare the renamed element Name with the binder.
 Only schedule a lifted type binder with no further kind dependencies.
-The constructor pattern supplies the fields. Check each recursive operand
+
+For a binary function such as plus (S n) m = S (plus n m), the second
+domain is also a declaration dependency. The second pattern binds a
+variable that the recursive call must pass unchanged. Only fields of the
+first pattern can supply the decreasing argument. Check each recursive operand
 in the typed producer before constructing an axiom. Return all requested
 names so the caller can report an uncertified table at the source binding.
 -}
@@ -321,12 +325,18 @@ localSourceTableBinders binds sigs =
   where
     signed = mkOccSet [ rdrNameOcc n | L _ (TypeSig _ [] [L _ n] _) <- sigs ]
     constructor_row :: Name -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
-    constructor_row self (L _ Match{m_pats = L _ [pat], m_grhss = rhss})
+    constructor_row self (L _ Match{m_pats = L _ (pat : rest), m_grhss = rhss})
       | Just fields <- constructor_fields (unparen pat)
       , all plain_field fields
+      , Just carried <- carried_binders rest
       , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
-      = row_result self (collectPatsBinders CollNoDictBinders fields) rhs
+      = row_result self (collectPatsBinders CollNoDictBinders fields) carried rhs
     constructor_row _ _ = False
+
+    carried_binders :: [LPat GhcPs] -> Maybe [RdrName]
+    carried_binders [] = Just []
+    carried_binders [p] | VarPat _ (L _ v) <- unparen p = Just [v]
+    carried_binders _ = Nothing
 
     constructor_fields :: Pat GhcPs -> Maybe [LPat GhcPs]
     constructor_fields ConPat{pat_args = PrefixCon _ fields} = Just fields
@@ -335,22 +345,24 @@ localSourceTableBinders binds sigs =
     constructor_fields (ListPat _ []) = Just []
     constructor_fields _ = Nothing
 
-    row_result :: Name -> [RdrName] -> LHsExpr GhcPs -> Bool
-    row_result self fields = check []
+    row_result :: Name -> [RdrName] -> [RdrName] -> LHsExpr GhcPs -> Bool
+    row_result self fields carried = check []
       where
         check :: [LHsExpr GhcPs] -> LHsExpr GhcPs -> Bool
         check args expr = case unLoc (stripParensLHsExpr expr) of
           HsApp _ fun arg -> check (arg : args) fun
           HsAppType _ fun _
-            | HsVar _ (L _ r) <- unLoc (stripParensLHsExpr fun)
-            , is_self r -> check args fun
+            | null carried, Just r <- variable fun, is_self r -> check args fun
           HsVar _ (L _ r)
             | isRdrDataCon r -> all (check []) args
-            | r `elem` fields -> null args
-            | is_self r, [arg] <- args
-            , HsVar _ (L _ field) <- unLoc (stripParensLHsExpr arg)
-            -> field `elem` fields
+            | r `elem` fields || r `elem` carried -> null args
+            | is_self r, Just (field : rest) <- traverse variable args
+            -> field `elem` fields && rest == carried
           _ -> False
+        variable :: LHsExpr GhcPs -> Maybe RdrName
+        variable e = case unLoc (stripParensLHsExpr e) of
+          HsVar _ (L _ r) -> Just r
+          _ -> Nothing
         is_self r = let occ = nameOccName self in
           r == mkRdrUnqual occ ||
           r == mkRdrQual (moduleName (nameModule self)) occ ||
@@ -380,10 +392,10 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
   = let wanted_set = mkNameSet (map fst wanted)
         specialised = mkNameSet [ n | L _ s <- sigs, n <- spec_name s ]
         signatures = mkNameEnv
-          [ (b, domain ++ [result]) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
+          [ (b, domain ++ rest) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
             , L _ HsSig{sig_bndrs = outer, sig_body = body} <- [dropWildCards sig]
             , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) arg res <- [unLoc (ignoreParens body)]
-            , Just domain <- [domain_dependencies outer arg], Just result <- [type_name res] ]
+            , Just domain <- [domain_dependencies outer arg], Just rest <- [result_dependencies outer res] ]
         early = [ (b, kinds) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
                 , b `elemNameSet` wanted_set, not (b `elemNameSet` specialised)
                 , Just kinds <- [lookupNameEnv signatures b]
@@ -416,6 +428,15 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
         | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- ignoreParens element
         , name == a -> Just []
       _ -> Nothing
+
+    result_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [Name]
+    result_dependencies outer ty = case unLoc (ignoreParens ty) of
+      HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) carried result
+        | Just [] <- outer_vars outer -> do
+            deps <- domain_dependencies outer carried
+            res <- type_name result
+            pure (deps ++ [res])
+      _ -> (:[]) <$> type_name ty
 
     list_element :: LHsType GhcRn -> Maybe (LHsType GhcRn)
     list_element ty = case unLoc (ignoreParens ty) of

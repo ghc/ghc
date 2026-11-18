@@ -25,6 +25,7 @@ module PackedVecLibrary (
     LE (..),
     BoundedVec (..),
     Add,
+    plus,
     Sum (..),
     replicateNative,
     transportElement,
@@ -131,10 +132,13 @@ data LE (n :: Nat) (m :: Nat) where
 data BoundedVec a (limit :: Nat) where
     PackBounded :: foreach (len :: Nat) -> Vec a len -> LE len limit -> BoundedVec a limit
 
--- | Add erased length indices by recursion on the first operand.
-type family Add (n :: Nat) (m :: Nat) :: Nat where
-    Add Z m = m
-    Add (S n) m = S (Add n m)
+-- | Add two lengths by inspecting the first length.
+plus :: Nat -> Nat -> Nat
+plus Z     m = m
+plus (S n) m = S (plus n m)
+
+-- | The original name for the length index of an appended vector.
+type Add (n :: Nat) (m :: Nat) = plus n m
 
 -- | Store a runtime sum and evidence that it matches the erased addition.
 data Sum (n :: Nat) (m :: Nat) where
@@ -148,16 +152,16 @@ sumNat n m = case n of
         Sum p Refl -> Sum (S p) Refl
 
 -- | Append two vectors with an erased sum index.
-appendVec :: Vec a n -> Vec a m -> Vec a (Add n m)
+appendVec :: Vec a n -> Vec a m -> Vec a (plus n m)
 appendVec VNil ys = ys
 appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
 
 -- | Append vectors indexed by two retained runtime lengths.
-appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)
+appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (plus n m)
 appendNative n m xs ys = appendVec xs ys
 
 -- | Append vectors whose declarations supply both retained lengths.
-appendHidden :: forall a. foreach (n :: Nat). foreach (m :: Nat). Vec a n -> Vec a m -> Vec a (Add n m)
+appendHidden :: forall a. foreach (n :: Nat). foreach (m :: Nat). Vec a n -> Vec a m -> Vec a (plus n m)
 appendHidden xs ys = appendNative @a n m xs ys
 
 -- | Compute the sum length before packaging the appended vector.
@@ -168,7 +172,8 @@ appendPacked (PackVec n xs) (PackVec m ys) = case sumNat n m of
 {- Note [Computed runtime sum and vector append]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Agda's builtin addition and indexed vector append recurse on the first
-operand. Add and appendVec use that shape. sumNat computes a runtime p with
+operand. The ordinary function plus computes the result index of appendVec.
+Add names the same index for existing callers. sumNat computes a runtime p with
 ordinary equality evidence p :~: Add n m. The recursive Refl branch permits
 successor congruence. appendPacked matches that evidence before repackaging
 the appended vector at p. The solver does not evaluate runtime indices.

@@ -1,5 +1,6 @@
 NativeSourceLengthFamily.hs:16:15: error: [GHC-68947]
     No checked equations are available for ‘count’ in a type.
-    Use one clause per input constructor, with a variable or wildcard for each field.
-    Build the result from constructors and fields bound by that clause.
-    A recursive call must take one of those fields directly, at the input type.
+    Match the first argument with one clause per constructor, using variables or wildcards for its fields.
+    Build the result from constructors and bound variables.
+    In a recursive call, pass a field of the first argument directly.
+    If there is a second argument, bind it with a variable and pass it unchanged in recursive calls.

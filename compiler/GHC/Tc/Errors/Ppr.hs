@@ -930,9 +930,10 @@ instance Diagnostic TcRnMessage where
     TcRnNoSourceTable name
       -> mkSimpleDecorated $ vcat
            [ text "No checked equations are available for" <+> quotes (ppr name) <+> text "in a type."
-           , text "Use one clause per input constructor, with a variable or wildcard for each field."
-           , text "Build the result from constructors and fields bound by that clause."
-           , text "A recursive call must take one of those fields directly, at the input type." ]
+           , text "Match the first argument with one clause per constructor, using variables or wildcards for its fields."
+           , text "Build the result from constructors and bound variables."
+           , text "In a recursive call, pass a field of the first argument directly."
+           , text "If there is a second argument, bind it with a variable and pass it unchanged in recursive calls." ]
     TcRnUntickedPromotedThing thing
       -> mkSimpleDecorated $
          text "Unticked promoted" <+> what

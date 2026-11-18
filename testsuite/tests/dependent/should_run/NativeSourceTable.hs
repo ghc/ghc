@@ -6,7 +6,7 @@ import ClosedTableLibrary
 import Control.Exception (ArithException(DivideByZero), evaluate, throw, try)
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import PackedVecLibrary (Nat(..), boolVector, isSuccessor, listCount, natToInt, previous,
+import PackedVecLibrary (Nat(..), boolVector, isSuccessor, listCount, natToInt, plus, previous,
                          sourceLength, sourceVector, toList)
 
 type Flipped = '[flipBit 'False, flipBit 'True]
@@ -80,6 +80,13 @@ data Bits = End | Bit Bool Bits
 bitsProof :: bitCount ('Bit 'False 'End) :~: 'S 'Z
 bitsProof = Refl
 
+baseSum :: Proxy (m :: Nat) -> plus 'Z m :~: m
+baseSum _ = Refl
+
+stepSum :: Proxy (n :: Nat) -> Proxy (m :: Nat)
+        -> plus ('S n) m :~: 'S (plus n m)
+stepSum _ _ = Refl
+
 main :: IO ()
 main = case (flipProof, signalProof, phaseProof) of
   (Refl, Refl, Refl) -> do
@@ -96,3 +103,4 @@ main = case (flipProof, signalProof, phaseProof) of
     print (spine == Left DivideByZero)
     let ints = [11, 22] :: [Int]
     print (toList (sourceVector @Int ints))
+    print (natToInt (plus (S Z) (S Z)), isSuccessor (plus (S Z) (throw DivideByZero)))
