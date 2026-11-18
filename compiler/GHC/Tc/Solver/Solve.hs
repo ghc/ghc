@@ -404,10 +404,11 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        -- ; when debugIsOn check_tc_level
 
          -- Solve the nested constraints
-       ; (has_given_eqs, given_insols, residual_wanted)
+       ; (selected_givens, has_given_eqs, given_insols, residual_wanted)
             <- nestImplicTcS info ev_binds_var tclvl $
-               do { let loc    = mkGivenLoc tclvl info ct_loc_env
-                        givens = mkGivens loc given_ids
+               do { selected_givens <- select_source_let
+                  ; let loc    = mkGivenLoc tclvl info ct_loc_env
+                        givens = mkGivens loc selected_givens
                   ; solveSimpleGivens givens
 
                   ; residual_wanted <- solveWanteds wanteds
@@ -417,7 +418,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                         -- solveWanteds can augment the givens, via expandSuperClasses,
                         -- to reveal given superclass equalities
 
-                  ; return (has_eqs, given_insols, residual_wanted) }
+                  ; return (selected_givens, has_eqs, given_insols, residual_wanted) }
 
        ; traceTcS "solveImplication 2"
            (ppr given_insols $$ ppr residual_wanted)
@@ -431,8 +432,11 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
              -- Don't lose track of the insoluble givens,
              -- which signal unreachable code; put them in ic_wanted
 
-       ; res_implic <- setImplicationStatus (imp { ic_given_eqs = has_given_eqs
-                                                 , ic_wanted = final_wanted })
+       ; let selected_imp = imp { ic_given = selected_givens
+                                , ic_given_eqs = has_given_eqs
+                                , ic_wanted = final_wanted }
+       ; record_source_let_need selected_imp
+       ; res_implic <- setImplicationStatus selected_imp
 
        ; evbinds <- TcS.getTcEvBindsMap ev_binds_var
        ; traceTcS "solveImplication end }" $ vcat
@@ -441,6 +445,36 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
              , text "evbinds =" <+> ppr evbinds ]
 
        ; return res_implic }
+  where
+    select_source_let = case ic_source_let imp of
+      Nothing -> return given_ids
+      Just (_, proof) | proof `elem` given_ids -> return given_ids
+      Just (guards, proof) -> do
+        bindings <- getInScopeEvBindsVars >>= traverse TcS.getTcEvBindsMap
+        selected <- and <$> mapM (\(wanted, dfun) ->
+                      sourceMethodEvidenceMatches bindings wanted dfun) guards
+        traceTcS "select source let equality" (ppr proof <+> ppr selected)
+        return (if selected then proof : given_ids else given_ids)
+
+    -- Record partial evidence too, before deferred errors can accept the body.
+    record_source_let_need selected_imp
+      | Just (_, proof) <- ic_source_let selected_imp
+      , proof `elem` ic_given selected_imp
+      , not (isSolvedWC (ic_wanted selected_imp)) -- Solved bodies use computeSolvedStatus.
+      = do { needs <- implication_needs selected_imp
+           ; when (proof `elemVarSet` needs) $
+               wrapTcS $ TcM.addNeededEvIds (ic_binds selected_imp) (unitVarSet proof) }
+      | otherwise = return ()
+
+    implication_needs child = do
+      EBS { ebs_binds = binds, ebs_needs = local_needs } <-
+        TcS.getTcEvBindsState (ic_binds child)
+      nested <- mapM implication_needs (bagToList (wc_impl (ic_wanted child)))
+      let solved_needs = case ic_status child of
+            IC_Solved { ics_dm = dm, ics_non_dm = non_dm } -> dm `unionVarSet` non_dm
+            _ -> emptyVarSet
+      return (findNeededGivenEvVars binds
+        (unionVarSets (local_needs : solved_needs : nested)))
 
     -- TcLevels must be strictly increasing (see (ImplicInv) in
     -- Note [TcLevel invariants] in GHC.Tc.Utils.TcType),
@@ -499,6 +533,38 @@ pruneImplications wc@(WC { wc_impl = implics })
       = False
       | otherwise
       = True        -- Otherwise, keep it
+
+{- Note [Conditional source let evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked local alias can use the certified equations of an overloaded method
+only when its actual dictionary Wanted selects the certified DFun. Record the
+Wanted Ids and expected DFuns on the body's implication. Outer simple Wanteds
+are solved before nested implications. At entry to this implication, inspect
+only evidence maps in lexical scope with sourceMethodEvidenceMatches. Missing,
+Given, cyclic or different evidence supplies no alias Given and no extra error.
+The ordinary body constraints remain responsible for diagnostics.
+
+Do not put the optional proof in tcl_native_givens while checking the body.
+Once selected, add it to ic_given without discarding the immutable candidate.
+Do not add it twice on subsequent solver iterations. This keeps equality levels
+and needed CoVars under the ordinary implication rules. An unresolved candidate can be
+retried when the solver revisits an unsolved implication. A body solved without
+the proof needs no later activation. The candidate has no mutable selection
+state: cloneWC preserves its Ids and clones the evidence maps independently.
+When computeSolvedStatus finds the optional proof in need_full, retain that
+proof in this implication's ebs_needs. This includes uses in solved child
+implications before their needs are trimmed and their records are pruned.
+Before setting the implication status, also collect needs from residual child
+implications and their actual evidence maps. This records partial evidence when
+an unrelated residual error is deferred. Solved equality holes record their
+free CoVars through addTcEvCoBind. Deferred errors do not introduce a use of the
+optional proof. A caller can inspect the original evidence state after committed
+solving; a speculative clone updates only its own evidence state.
+
+The producer must emit a checked lazy alias scope for every occurrence of this
+CoVar in the final body or its evidence. Selection checks the dictionary, not
+the alias equation. Core Lint must check that equation from the actual binding.
+-}
 
 warnRedundantGivens :: SkolemInfoAnon -> Bool
 warnRedundantGivens (SigSkol ctxt _ _)
@@ -581,6 +647,7 @@ computeSolvedStatus :: Implication -> TcS ImplicStatus
 computeSolvedStatus (Implic { ic_info        = info
                             , ic_binds       = ev_binds_var
                             , ic_given       = givens
+                            , ic_source_let  = source_let
                             , ic_wanted      = WC { wc_impl = implics } })
  = do { ev_binds_state <- TcS.getTcEvBindsState ev_binds_var
 
@@ -611,6 +678,10 @@ computeSolvedStatus (Implic { ic_info        = info
       ; let need_full       = need_dm1 `unionVarSet` need_non_dm1
             pruned_ev_binds = filterEvBindsMap (keep_ev_bind need_full) ev_binds
       ; TcS.setTcEvBindsMap ev_binds_var pruned_ev_binds
+      ; case source_let of
+          Just (_, proof) | proof `elemVarSet` need_full ->
+            wrapTcS $ TcM.addNeededEvIds ev_binds_var (unitVarSet proof)
+          _ -> return ()
 
       ; traceTcS "computeSolvedStatus" $
         vcat [ text "local_needs:" <+> ppr local_needs

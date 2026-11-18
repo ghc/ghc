@@ -451,17 +451,25 @@ checkCoercionHole cv co
 zonkImplication :: Implication -> ZonkM Implication
 zonkImplication implic@(Implic { ic_skols  = skols
                                , ic_given  = given
+                               , ic_source_let = source_let
                                , ic_wanted = wanted
                                , ic_info   = info })
   = do { skols'  <- mapM zonkTyCoVarKind skols  -- Need to zonk their kinds!
                                                 -- as #7230 showed
        ; given'  <- mapM zonkEvVar given
+       ; source_let' <- traverse zonk_source_let source_let
        ; info'   <- zonkSkolemInfoAnon info
        ; wanted' <- zonkWCRec wanted
        ; return (implic { ic_skols  = skols'
                         , ic_given  = given'
+                        , ic_source_let = source_let'
                         , ic_wanted = wanted'
                         , ic_info   = info' }) }
+  where
+    zonk_source_let (guards, proof) = do
+      guards' <- mapM (\(wanted, dfun) -> (,) <$> zonkEvVar wanted <*> zonkEvVar dfun) guards
+      proof' <- zonkEvVar proof
+      return (guards', proof')
 
 zonkEvVar :: EvVar -> ZonkM EvVar
 zonkEvVar var = updateIdTypeAndMultM zonkTcType var

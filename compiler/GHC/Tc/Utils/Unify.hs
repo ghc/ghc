@@ -14,7 +14,7 @@ module GHC.Tc.Utils.Unify (
   tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeApp, tcSubTypeHoleFit,
   addSubTypeCtxt,
   tcSubTypeAmbiguity, tcSubMult,
-  checkConstraints, checkTvConstraints,
+  checkConstraints, checkTvConstraints, checkSourceLetConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
   -- Skolemisation
@@ -544,6 +544,23 @@ checkConstraints skol_info skol_tvs given thing_inside
                                                  traceCallStackDoc)
                  ; res <- thing_inside
                  ; return (emptyTcEvBinds, res) } }
+
+-- | Check a local alias body with evidence selected by its actual dictionaries.
+-- See Note [Conditional source let evidence] in GHC.Tc.Solver.Solve.
+checkSourceLetConstraints :: Name -> [(EvVar, Id)] -> CoVar -> TcM a
+                          -> TcM (TcEvBinds, a)
+checkSourceLetConstraints name guards proof thing_inside
+  = do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
+       ; ev_binds_var <- newTcEvBinds
+       ; implic <- newImplication
+       ; let implic' = implic { ic_tclvl = tclvl
+                              , ic_wanted = wanted
+                              , ic_binds = ev_binds_var
+                              , ic_info = SourceLetSkol name
+                              , ic_source_let = Just (guards, proof) }
+       ; checkImplicationInvariants implic'
+       ; emitImplication implic'
+       ; return (TcEvBinds ev_binds_var, result) }
 
 checkTvConstraints :: SkolemInfo
                    -> [TcTyVar]          -- Skolem tyvars

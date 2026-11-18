@@ -247,6 +247,9 @@ cloneImplication :: Implication -> TcM Implication
 cloneImplication implic@(Implic { ic_binds = binds, ic_wanted = inner_wanted })
   = do { binds'        <- cloneEvBindsVar binds
        ; inner_wanted' <- cloneWC inner_wanted
+       -- Keep ic_source_let immutable. Dictionary Wanted Ids are preserved
+       -- by cloneWantedCtEv; only their evidence maps are cloned.
+       -- See Note [Conditional source let evidence] in GHC.Tc.Solver.Solve.
        ; return (implic { ic_binds = binds', ic_wanted = inner_wanted' }) }
 
 ----------------------------------------------

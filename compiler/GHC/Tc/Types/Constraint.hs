@@ -876,13 +876,20 @@ tcvs_of_implic :: Implication -> DTyCoFV
 -- Only called on *zonked* things
 tcvs_of_implic (Implic { ic_skols = skols
                        , ic_given = givens
+                       , ic_source_let = source_let
                        , ic_wanted = wanted })
   | isEmptyWC wanted
   = mempty
   | otherwise
   = addBndrsFV skols  $
     addBndrsFV givens $
-    tcvs_of_wc wanted
+    tcvs_of_wc wanted `unionFV` source_let_fvs
+  where
+    source_let_fvs = case source_let of
+      Nothing -> mempty
+      Just (guards, proof) -> deepDetTypeFV (varType proof) `unionFV`
+        mapUnionFV (\(wanted, dfun) -> deepDetTypeFV (varType wanted) `unionFV`
+                                      deepDetTypeFV (varType dfun)) guards
 
 tcvs_of_errs :: DelayedError -> DTyCoFV
 tcvs_of_errs (DE_Hole hole)         = tcvs_of_hole hole
@@ -1544,6 +1551,11 @@ data Implication
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in GHC.Tc.Utils.TcType
 
+      ic_source_let :: Maybe ([(EvVar, Id)], CoVar),
+                                 -- Optional checked local alias evidence.
+                                 -- See Note [Conditional source let evidence]
+                                 -- in GHC.Tc.Solver.Solve.
+
       ic_given_eqs :: HasGivenEqs,  -- Are there Given equalities here?
 
       ic_warn_inaccessible :: Bool,
@@ -1581,6 +1593,7 @@ implicationPrototype ct_loc_env
               -- The rest have sensible default values
             , ic_skols       = []
             , ic_given       = []
+            , ic_source_let  = Nothing
             , ic_wanted      = emptyWC
             , ic_given_eqs   = MaybeGivenEqs
             , ic_status      = IC_Unsolved }
