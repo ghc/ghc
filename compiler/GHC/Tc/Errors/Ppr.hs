@@ -3616,7 +3616,8 @@ pprRetainedQuantificationError reason = case reason of
   RetainedStaging ->
     text "Retained quantification in Template Haskell quotations or splices is not supported yet."
   RetainedConstructorCoverage ->
-    text "A retained constructor match requires one unguarded clause for each constructor of its domain."
+    vcat [text "A retained constructor match requires at least one unguarded clause for each constructor of its domain."
+         ,text "Repeated constructors need a later ordinary pattern to distinguish the equations."]
   RetainedMatrixCoverage ->
     vcat [text "A retained constructor matrix requires one unguarded clause for each pair of constructors of its two index domains."
          ,text "A final equation with bare variables or wildcards in both index columns can cover the remaining pairs."]
@@ -3636,7 +3637,8 @@ pprRetainedQuantificationError reason = case reason of
   RetainedConstructorQuotation ->
     text "Constructor equations with later retained arguments do not support Template Haskell quotations yet."
   RetainedConstructorArguments ->
-    text "Retained constructor fields and later arguments currently require bare variable patterns or wildcards and unrestricted multiplicities."
+    vcat [text "Retained constructor fields and later retained variables require bare variable patterns or wildcards."
+         ,text "Arguments after a retained constructor require unrestricted multiplicities."]
   RetainedPatternType ty ->
     vcat [ text "Retained constructor refinement does not support this type yet:"
          , ppr ty ]

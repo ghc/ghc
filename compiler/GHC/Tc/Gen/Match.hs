@@ -1383,7 +1383,16 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
              domain_cons = case splitTyConApp_maybe (coreFullView (varType index)) of
                Just (tc, _) -> tyConDataCons tc
                _ -> []
-       ; unless (cons `equalLength` domain_cons && all (`elem` cons) domain_cons) $
+             has_value_pattern (L _ (Match { m_pats = L _ pats })) =
+               or (zipWith refutable_value [arg | arg <- argument_plan, visible_arg arg]
+                                           (drop 1 (filter isVisArgLPat pats)))
+             visible_arg RetainedConDict{} = False
+             visible_arg _ = True
+             refutable_value RetainedConValue pat = not (isRetainedVarPat pat)
+             refutable_value _ _ = False
+       -- See Note [Ordinary patterns after a retained constructor].
+       ; unless (all (`elem` cons) domain_cons &&
+                 (cons `equalLength` domain_cons || any has_value_pattern matches)) $
            failWithTc (TcRnRetainedQuantificationError RetainedConstructorCoverage)
        ; arg_tys <- mapM argument_type pat_tys
        ; result_ty <- readExpType rhs_ty
@@ -1440,9 +1449,6 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  Nothing -> return ()
                  Just span -> setSrcSpan span $
                    failWithTc (TcRnRetainedQuantificationError RetainedConstructorQuotation)
-           ; mapM_ (\pat -> unless (isRetainedVarPat pat) $
-                        setSrcSpanA (getLoc pat) argument_error)
-               (drop 1 (filter isVisArgLPat pats))
            ; let constructor_index = retainedConIndex (varType index) con fields
            ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
            ; arg_cos <- mapM (tcRetainedCoercion index (mkCoVarCo cv) . scaledThing) arg_tys
@@ -1526,6 +1532,24 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
     retained_names (RetainedConValue : args) (_ : pats) = retained_names args pats
     retained_names _ _ = argument_error
 
+
+{- Note [Ordinary patterns after a retained constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider fromListExact :: foreach (n :: Nat) -> [a] -> Maybe (Vec a n).
+Both Z and S can occur in two equations, one for [] and one for a cons.
+Require a row for every constructor of the retained domain. When the
+source distinguishes later ordinary patterns, let the ordinary pattern
+checker check their coverage and redundancy, including nested fields.
+retained_names still requires a variable or wildcard in a later retained
+column unless the dedicated two-index matrix rule applies.
+
+Check each row under its own retained constructor proof. Transport an
+ordinary argument to its refined type before matching the pattern. Keep
+the argument cast around the checked pattern, so its constructor fields
+and any GADT evidence stay in that row. The match compiler already emits
+separate alternatives with failure continuations for these proofs.
+See Note [Retained constructor equation scope] in GHC.HsToCore.Match.Constructor.
+-}
 
 -- | Install the fields used in the proofs for the selected constructor columns.
 -- See Note [Parameterized retained constructor patterns] in GHC.Tc.Gen.Pat.
