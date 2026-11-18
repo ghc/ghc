@@ -2,6 +2,7 @@ module GHC.Types.TypeEnv
    ( TypeEnv
    , emptyTypeEnv
    , lookupTypeEnv
+   , restoreSourceTableId
    , mkTypeEnv
    , typeEnvFromEntities
    , mkTypeEnvWithImplicits
@@ -32,6 +33,7 @@ import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
+import GHC.Types.Id.Info (IdDetails(..))
 import GHC.Types.TyThing
 
 -- | A map from 'Name's to 'TyThing's, constructed by typechecking
@@ -79,6 +81,17 @@ typeEnvFromEntities ids tcs patsyns famInsts =
   all_tcs = tcs ++ famInstsRepTyCons famInsts
 
 lookupTypeEnv = lookupNameEnv
+
+-- | Restore the semantic details of a checked source binder after desugaring.
+-- Preserve the occurrence's own type, multiplicity and optimisation information.
+-- See Note [Source table Ids] in GHC.Tc.Gen.SourceTable.
+restoreSourceTableId :: TypeEnv -> Id -> Id
+restoreSourceTableId types fun
+  | isLocalId fun, isExternalName (getName fun)
+  , Just (AnId owner) <- lookupTypeEnv types (getName fun)
+  , details@(SourceTableId name _) <- idDetails owner
+  , name == getName fun = setIdDetails fun details
+  | otherwise = fun
 
 -- Extend the type environment
 extendTypeEnv :: TypeEnv -> TyThing -> TypeEnv

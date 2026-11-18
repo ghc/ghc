@@ -75,7 +75,7 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Sig( tcRules )
-import GHC.Tc.Gen.SourceTable ( sourceTableTyCons )
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners)
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
@@ -112,6 +112,8 @@ import GHC.Hs hiding ( FunDep(..) )
 import GHC.Hs.Dump
 
 import GHC.Core.PatSyn
+import GHC.Core (ruleActivation)
+import GHC.Core.Rules (RuleEnv(..), emptyRuleEnv, getRules)
 import GHC.Core.Predicate ( classMethodTy )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
@@ -145,6 +147,8 @@ import GHC.Types.DefaultEnv
 import GHC.Types.Fixity.Env
 import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
+import GHC.Types.InlinePragma (isNeverActive)
+import GHC.Types.Var (setIdDetails)
 import GHC.Types.Var.Env
 import GHC.Types.TypeEnv
 import GHC.Types.Name
@@ -690,14 +694,52 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
 
 -- | Add the families and their axioms to the module interface. A local use
 -- may already have required the family before we finished checking the module.
-installSourceTables :: [TyCon] -> TcM TcGblEnv
+installSourceTables :: [(Id, TyCon)] -> TcM TcGblEnv
+installSourceTables [] = getGblEnv
 installSourceTables tables = do
     env <- getGblEnv
-    let new_tables = [tc | tc <- tables, isNothing (lookupTypeEnv (tcg_type_env env) (tyConName tc))]
-    if null new_tables then return env else fst <$> addTyConsToGblEnv new_tables
+    let types = tcg_type_env env
+        new_tables = [tc | (_, tc) <- tables, isNothing (lookupTypeEnv types (tyConName tc))]
+        boot_names = bootExports (tcg_self_boot env)
+        boot_functions = [fun | (fun, _) <- tables, idName fun `elemNameSet` boot_names]
+    rewriting <- goptM Opt_EnableRewriteRules
+    boot_rules <- if rewriting && not (null boot_functions)
+      then do
+        hsc <- getTopEnv
+        eps <- getEps
+        let mod = tcg_mod env
+        home_rules <- liftIO (hugRulesBelow hsc (homeUnitId (hsc_home_unit hsc))
+                              (GWIB (moduleName mod) (hscSourceToIsBoot (tcg_src env))))
+        let rule_env = emptyRuleEnv { re_home_rules = home_rules, re_eps_rules = eps_rule_base eps
+                                    , re_visible_orphs = tcVisibleOrphanMods env }
+        pure (mkNameSet [idName fun | fun <- boot_functions
+                            , any (not . isNeverActive . ruleActivation) (getRules rule_env (globaliseId fun))])
+      else pure emptyNameSet
+    let ruled = sourceRuleOwners (tcg_rules env) `unionNameSet` boot_rules
+    used <- readTcRef (tcg_source_table_uses env)
+    ids <- forM tables $ \(fun, candidate) -> do
+      let name = idName fun
+          table = case lookupTypeEnv types (tyConName candidate) of
+                    Just (ATyCon installed) -> installed
+                    _ -> candidate
+          owner = case lookupTypeEnv types name of
+                    Just (AnId existing) -> existing
+                    _ -> fun
+          ordinary = case idDetails owner of
+                       SourceTableId {} -> setIdDetails owner VanillaId
+                       _ -> owner
+      if name `elemNameSet` ruled then do
+        when (tyConName table `elemNameSet` used) $
+          setSrcSpan (nameSrcSpan name) (addErr (TcRnRetainedQuantificationError (RetainedSourceRule name)))
+        pure ordinary
+      else case idDetails ordinary of
+        VanillaId -> pure (setIdDetails ordinary (SourceTableId name table))
+        _ -> pure ordinary
+    tcExtendGlobalValEnv ids $
+      if null new_tables then getGblEnv else fst <$> addTyConsToGblEnv new_tables
 
 -- | Check only the bindings in the declaration group that is now in scope.
-sourceTablesFor :: NameSet -> TcGblEnv -> TcM [TyCon]
+sourceTablesFor :: NameSet -> TcGblEnv -> TcM [(Id, TyCon)]
 sourceTablesFor names env = sourceTableTyCons (filter requested (tcg_binds env))
   where
     requested bind = any ((`elemNameSet` names) . idName)
@@ -1761,14 +1803,14 @@ tcTopSrcDecls :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls group = do
     enabled <- xoptM LangExt.ExperimentalDependentTypes
     env <- getGblEnv
-    case if enabled then splitLocalSourceTables (allUses (tcg_dus env)) group else Nothing of
+    case if enabled then splitLocalSourceTables TableInType (tcg_dus env) group else Nothing of
       Nothing -> tcTopSrcDeclGroup group
       Just (needed, early, rest) -> do
         (envs@(early_env, _), wanteds) <- captureTopConstraints (tcTopSrcDeclGroup early)
         restoreEnvs envs $ do
           evs <- simplifyTop wanteds
           tables <- sourceTablesFor (mkNameSet (map fst needed)) early_env
-          let found = mkNameSet (map tyConName tables)
+          let found = mkNameSet (map (tyConName . snd) tables)
           for_ needed $ \(term, family) ->
             unless (family `elemNameSet` found) $
               setSrcSpan (nameSrcSpan term) (addErr (TcRnNoSourceTable term))
@@ -1777,8 +1819,30 @@ tcTopSrcDecls group = do
             tables_env <- installSourceTables tables
             setGblEnv tables_env (tcTopSrcDeclGroup rest)
 
+-- | Solve independent source functions before retained calls in the same value group.
+-- See Note [Ordering local source tables] in GHC.Rename.Module.
+tcSourceValueBinds :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
+tcSourceValueBinds group = do
+    enabled <- xoptM LangExt.ExperimentalDependentTypes
+    env <- getGblEnv
+    case if enabled then splitLocalSourceTables TableInTerm (tcg_dus env) group else Nothing of
+      Nothing -> check_group group
+      Just (_, first, rest) -> do
+        (envs@(first_env, _), wanteds) <- captureTopConstraints (check_group first)
+        restoreEnvs envs $ do
+          evs <- simplifyTop wanteds
+          let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds first))
+          tables <- sourceTablesFor names first_env
+          addTopEvBinds evs $ do
+            env' <- installSourceTables tables
+            setGblEnv env' (check_group rest)
+  where
+    check_group :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
+    check_group HsGroup{hs_valds = XValBindsLR (HsVBG binds sigs)} = tcTopBinds binds sigs
+    check_group _ = panic "tcSourceValueBinds: expected renamed value bindings"
+
 tcTopSrcDeclGroup :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
-tcTopSrcDeclGroup (HsGroup { hs_tyclds = tycl_decls,
+tcTopSrcDeclGroup group@(HsGroup { hs_tyclds = tycl_decls,
                          hs_derivds = deriv_decls,
                          hs_fords  = foreign_decls,
                          hs_defds  = default_decls,
@@ -1811,7 +1875,7 @@ tcTopSrcDeclGroup (HsGroup { hs_tyclds = tycl_decls,
                 -- may be defined in terms of the former. (For instance,
                 -- the bindings produced in a Data instance.)
         traceTc "Tc5" empty ;
-        tc_envs <- tcTopBinds val_binds val_sigs;
+        tc_envs <- tcSourceValueBinds group;
         restoreEnvs tc_envs $ do {
 
                 -- Now GHC-generated derived bindings, generics, and selectors
@@ -3215,6 +3279,7 @@ ppr_types debug type_env
       | otherwise = hasTopUserName id
                     && case idDetails id of
                          VanillaId              -> True
+                         SourceTableId {}       -> True
                          WorkerLikeId {}        -> True
                          RecSelId {}            -> True
                          ClassOpId {}           -> True

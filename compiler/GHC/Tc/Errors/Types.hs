@@ -5359,6 +5359,7 @@ data RetainedQuantificationError
   | RetainedContextPattern
   | RetainedResultWrapper
   | RetainedIndexExpression
+  | RetainedSourceRule Name
   | RetainedIndexMultiplicity Type
   | RetainedFunctionArgument
   | RetainedCallIndex

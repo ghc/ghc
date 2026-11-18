@@ -29,7 +29,7 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc
-import GHC.HsToCore.Types( LdiNablas(..) )
+import GHC.HsToCore.Types( LdiNablas(..), ds_type_env )
 import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Quote
@@ -67,6 +67,7 @@ import GHC.Types.Var.Set( isEmptyVarSet, elemVarSet )
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
+import GHC.Types.TypeEnv (restoreSourceTableId)
 
 import GHC.Unit.Module
 import GHC.Core.ConLike
@@ -889,9 +890,11 @@ ds_app_finish :: Id -> [CoreExpr] -> DsM CoreExpr
 --     nospec f dict
 -- See Note [nospecId magic] in GHC.Types.Id.Make for what `nospec` does.
 -- See Note [Desugaring non-canonical evidence]
-ds_app_finish fun_id core_args
+ds_app_finish original_id core_args
   = do { mb_unspecables <- getUnspecables
-       ; let fun_ty = idType fun_id
+       ; env <- getGblEnv
+       ; let fun_id = restoreSourceTableId (ds_type_env env) original_id
+             fun_ty = idType fun_id
              (_, pi_bndrs, _) = splitPiTys fun_ty
              free_dicts = exprsFreeVarsList
                             [ e | (e,pi_bndr) <- core_args `zip` pi_bndrs

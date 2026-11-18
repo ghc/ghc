@@ -218,7 +218,7 @@ deSugar hsc_env
           keep_alive <- readIORef keep_var
         ; let (rules_for_locals, ds_rules_for_imps) = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules bcknd export_set keep_alive
-                                                 rules_for_locals (fromOL all_prs)
+                              rules_for_locals (mapFst (restoreSourceTableId type_env) (fromOL all_prs))
 
               ds_binds = combineEvBinds ds_ev_binds final_prs
         -- Notice that we put the whole lot in a big Rec, even the foreign binds

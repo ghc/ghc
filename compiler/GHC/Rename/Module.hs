@@ -13,7 +13,7 @@ Main pass of renamer
 -}
 
 module GHC.Rename.Module (
-        rnSrcDecls, splitLocalSourceTables, addTcgDUs, findSplice, rnWarningTxt, rnLWarningTxt
+        rnSrcDecls, SourceTableUse(..), splitLocalSourceTables, addTcgDUs, findSplice, rnWarningTxt, rnLWarningTxt
     ) where
 
 import GHC.Prelude hiding ( head )
@@ -284,11 +284,20 @@ This name records a dependency. Remove its GRE before processing exports.
 For unused-binding warnings, a use of the private name counts as a use of
 the term and its local constructors. Put this edge before the value groups.
 A value signature in any of them can depend on the private name.
-Only a use of the name schedules an early check of the term. The early group
+Use of the private name in a type schedules an early check of the term. The early group
 contains its ordinary binding, signature, and any independent data
 declarations that its signature needs. All three may follow the use in the
 source file. The typechecker checks the term once and creates equations
 from checked matches before checking the rest of the group.
+
+A retained operand can use the value without mentioning the table in a type.
+For example, atBit (flipBit False) can have the expected type Mark True.
+Check independent candidates referenced by other bindings after checking the
+group's type declarations and instances, before checking the other values.
+At this point an ordinary use can have implicit dependencies on instances.
+For example, an imported constructor can require a dictionary. Check the source
+rows after solving the group's constraints. If a candidate has no equations,
+its ordinary term uses still work. Only a retained use needs the certificate.
 
 The early group cannot depend on the rest of the group. An H98 datatype
 with no parameters may refer to itself in a field, as in data Nat = Z | S Nat.
@@ -379,16 +388,21 @@ localSourceTableBinders binds sigs =
       WildPat{} -> True
       _ -> False
 
--- | Schedule local tables used in type syntax. See Note [Ordering local source tables].
-splitLocalSourceTables :: NameSet -> HsGroup GhcRn
+-- | A type use requires equations before type declarations; a value use can wait.
+data SourceTableUse = TableInType | TableInTerm
+
+-- | Schedule independent local source functions. See Note [Ordering local source tables].
+splitLocalSourceTables :: SourceTableUse -> DefUses -> HsGroup GhcRn
                        -> Maybe ([(Name, Name)], HsGroup GhcRn, HsGroup GhcRn)
-splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds sigs),
+splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG binds sigs)),
                                          hs_tyclds = tycls}
   | n : _ <- bound_names
-  , let used = mkOccEnv [ (nameOccName f, f) | f <- nameSetElemsStable uses
+  , let tables = case use of { TableInType -> allUses dus; TableInTerm -> duDefs dus }
+        used = mkOccEnv [ (nameOccName f, f) | f <- nameSetElemsStable tables
                          , nameModule_maybe f == nameModule_maybe n ]
         wanted = [ (b, f) | b <- bound_names
-                          , Just f <- [lookupOccEnv used (mkSourceTableOcc (nameOccName b))] ]
+                          , Just f <- [lookupOccEnv used (mkSourceTableOcc (nameOccName b))]
+                          , requested b f ]
   , not (null wanted)
   = let wanted_set = mkNameSet (map fst wanted)
         specialised = mkNameSet [ n | L _ s <- sigs, n <- spec_name s ]
@@ -400,9 +414,7 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
         early = [ (b, kinds) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
                 , b `elemNameSet` wanted_set, not (b `elemNameSet` specialised)
                 , Just kinds <- [lookupNameEnv signatures b]
-                , all (\k -> not (k `elemNameSet` local_types) || k `elemNameEnv` early_datatypes) kinds
-                , let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes) kinds)
-                , nameSetAll (`elemNameSet` extendNameSet cons b) fvs ]
+                , independent b kinds fvs ]
         early_names = mkNameSet (map fst early)
         early_types = mkNameSet (concatMap snd early)
         (first_binds, rest_binds) = partition early_bind binds
@@ -413,9 +425,27 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
         (first_tys, rest_tys) = partition (any ((`elemNameSet` early_types) . tcdName . unLoc) . group_tyclds) tycls
         first = emptyRnGroup { hs_valds = XValBindsLR (HsVBG first_binds first_sigs), hs_tyclds = first_tys }
         rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs), hs_tyclds = rest_tys }
-    in Just (wanted, first, rest)
+    in case use of
+         TableInTerm | null first_binds -> Nothing
+         _ -> Just (wanted, first, rest)
   where
     bound_names = [ b | (_, bs) <- binds, L _ FunBind{fun_id = L _ b} <- bs, isExternalName b ]
+    used_names = allUses dus
+    requested b f = case use of
+      TableInType -> True
+      TableInTerm -> b `elemNameSet` term_uses && not (f `elemNameSet` used_names)
+
+    -- Exclude the generated table-to-term edge and a function's own recursion.
+    term_uses = unionNameSets
+      [ maybe uses (uses `minusNameSet`) defs | (defs, uses) <- fromOL dus
+      , not (maybe False (nameSetAny (isJust . sourceTableTermOcc . nameOccName)) defs) ]
+    local_values = mkNameSet (collectHsValBinders CollNoDictBinders vals)
+    independent b kinds fvs = case use of
+      TableInTerm -> not ((fvs `delFromNameSet` b) `intersectsNameSet` local_values)
+      TableInType ->
+        let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes) kinds)
+        in all (\k -> not (k `elemNameSet` local_types) || k `elemNameEnv` early_datatypes) kinds
+           && nameSetAll (`elemNameSet` extendNameSet cons b) fvs
     type_name :: LHsType GhcRn -> Maybe Name
     type_name ty = case unLoc (ignoreParens ty) of
       HsTyVar _ _ (L _ (WithUserRdr _ name))
@@ -489,7 +519,7 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
     spec_name (SpecSig _ (L _ b) _ _) = [b]
     spec_name (SpecSigE b _ _ _) = [b]
     spec_name _ = []
-splitLocalSourceTables _ _ = Nothing
+splitLocalSourceTables _ _ _ = Nothing
 
 addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv
 -- This function could be defined lower down in the module hierarchy,

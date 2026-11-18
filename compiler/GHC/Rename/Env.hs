@@ -1250,7 +1250,7 @@ lookupSourceTables (gbl, lcl) term_rdr
               if isJust (mi_hash_fn iface occ)
                 then return (Just name)
                 else do
-                  updTcRef (tcg_missing_source_tables env) (`extendNameSet` name)
+                  updTcRef (tcg_source_table_uses env) (`extendNameSet` name)
                   return Nothing
       | otherwise = return Nothing
 

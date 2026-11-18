@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (sourceTableTyCons) where
+module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, tcLookupSourceTableId) where
 
 import GHC.Prelude
 
@@ -18,13 +18,19 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), isEmptyEvBindsMap)
-import GHC.Tc.Utils.Monad (TcM, getTcEvBindsMap, liftZonkM, newSysName, xoptM)
+import GHC.Tc.Types (TcGblEnv(..))
+import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTcEvBindsMap, liftZonkM, newSysName, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Basic (Origin(..))
+import GHC.Types.Id (setIdType, sourceTableId_maybe)
+import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkInstTyCoOcc,
-                       mkTyVarOcc, nameOccName, setOccNameSpace, tvName)
+                       mkTyVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, tvName)
+import GHC.Types.Name.Set (NameSet, extendNameSet, unionNameSets, unitNameSet)
 import GHC.Types.SrcLoc
+import GHC.Types.TypeEnv (lookupTypeEnv)
+import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.Set (mkUniqSet)
 import GHC.Types.Var (Id, VarBndr(..), mkTyVar, varName)
 import GHC.Utils.Monad (allM)
@@ -32,6 +38,40 @@ import GHC.Utils.Monad (allM)
 import Control.Monad (guard, zipWithM)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (catMaybes, isNothing, mapMaybe)
+
+-- | Resolve a checked source call through the defining term's identity.
+-- See Note [Source table Ids].
+tcLookupSourceTableId :: Id -> TcM (Maybe Id)
+tcLookupSourceTableId actual = do
+    env <- getGblEnv
+    let actual_name = varName actual
+        checked | nameModule_maybe actual_name == Just (tcg_semantic_mod env)
+                = case lookupTypeEnv (tcg_type_env env) actual_name of
+                    Just (AnId fun) | fun == actual -> Just fun
+                    _ -> Nothing
+                | otherwise = Just actual
+    case checked of
+      Just fun | Just table <- sourceTableId_maybe fun -> do
+        updTcRef (tcg_source_table_uses env) (`extendNameSet` tyConName table)
+        return (Just fun)
+      _ -> return Nothing
+
+-- | Find source functions that a user rule can rewrite. A checked wrapper
+-- can hide the head of the source application on the rule's left side.
+sourceRuleOwners :: [LRuleDecl GhcTc] -> NameSet
+sourceRuleOwners rules = unionNameSets
+    [ maybe lhs_fvs unitNameSet (headOf (unLoc lhs))
+    | L _ HsRule{rd_ext = (HsRuleRn lhs_fvs _, _), rd_lhs = lhs, rd_act = act} <- rules
+    , not (isNeverActive act) ]
+  where
+    headOf :: HsExpr GhcTc -> Maybe Name
+    headOf (HsVar _ (L _ f)) = Just (varName f)
+    headOf (HsApp _ f _) = headOf (unLoc f)
+    headOf (HsAppType _ f _) = headOf (unLoc f)
+    headOf (HsPar _ f) = headOf (unLoc f)
+    headOf (XExpr (WrapExpr _ f)) = headOf f
+    headOf (XExpr (ExpandedThingTc (HSE _ expansion))) = headOf (unLoc expansion)
+    headOf _ = Nothing
 
 {- Note [Closed source tables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -89,6 +129,29 @@ for the group. Read the evidence bindings and follow the solved type of
 each candidate. The final module zonker can run typed splices and default
 metavariables, so do not run it on the group's terms here.
 
+Note [Source table Ids]
+~~~~~~~~~~~~~~~~~~~~~~~
+A retained call needs both the runtime function and its type-level equations.
+After checking the rows, keep the public Id and its closed family together.
+Install SourceTableId on this Id in the global type environment. Desugaring
+copies these details to the matching binder and occurrences. The original
+external Name identifies the owner even if Tidy makes its name internal.
+A fresh binder with copied details has a different Unique.
+
+Store the family Name in the function's interface declaration. This makes
+its ABI depend on the equations. The typechecker reads the same declaration
+when it uses a no-code interface or follows a re-export. An hs-boot file has
+no checked body and therefore supplies no certificate. A private family can
+outlive its private term in an interface, so keep the reference one-way.
+
+The only function the checked equations can call is their owner. Constructor
+workers have no rewrite rules. See getRules in GHC.Core.Rules. Exclude a
+source rule that can rewrite the owner. An import cycle through an hs-boot
+file can make a home rule for this Id visible to the producer. Check those
+rules when rewriting is enabled. A declaration splice can add a rule after
+an earlier group used the certificate. Recheck those uses at module finish.
+As elsewhere in GHC, Core plugins must preserve the semantics of the program.
+
 Note [The second argument of a source equation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The equations for plus can inspect their first argument and carry a
@@ -117,7 +180,7 @@ return an outer successor. Skip binary equations in that case.
 -}
 
 -- | Derive closed families after solving the group's top-level constraints.
-sourceTableTyCons :: LHsBinds GhcTc -> TcM [TyCon]
+sourceTableTyCons :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
 sourceTableTyCons binds = do
     strict <- xoptM LangExt.Strict
     catMaybes <$> mapM (certify strict) (mapMaybe (sourceRows . unLoc) binds)
@@ -130,7 +193,8 @@ sourceTableTyCons binds = do
           Nothing -> pure Nothing
           Just (input, carried, result) -> do
             branches <- traverse (sourceBranch input carried result) rows
-            traverse (makeFamily (varName fun) input carried result) (sequence branches)
+            traverse (fmap (setIdType fun ty,) . makeFamily (varName fun) input carried result)
+                     (sequence branches)
       else pure Nothing
 
 -- | The first constructor pattern, any carried variable, and the checked RHS.

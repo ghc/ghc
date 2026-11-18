@@ -618,8 +618,10 @@ data TcGblEnv
           -- they all have a non-empty gre_imp field.
         tcg_keep      :: TcRef NameSet,
 
-        tcg_missing_source_tables :: TcRef NameSet,
-          -- ^ Imported source table names that were absent during renaming.
+        tcg_source_table_uses :: TcRef NameSet,
+          -- ^ Imported tables absent during renaming, and tables used by retained calls.
+          -- A Name from this module records a retained call. The renamer only
+          -- records unsuccessful lookups for Names from other modules.
           -- See Note [Source table usage fingerprints] in GHC.Unit.Module.ModIface.
 
         tcg_th_used :: TcRef Bool,

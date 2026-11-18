@@ -3648,6 +3648,9 @@ pprRetainedQuantificationError reason = case reason of
     text "A strict prefix pattern before a retained context is not supported when later value patterns remain."
   RetainedResultWrapper ->
     text "This result requires a wrapper that is not supported for retained functions yet."
+  RetainedSourceRule fun ->
+    text "A rewrite rule can change the result of" <+> quotes (ppr fun)
+      <> text ", which a retained argument uses as an index."
   RetainedIndexExpression ->
     text "A retained argument must be a local index variable, a supported constructor tree, or a supported immediate lambda application."
   RetainedIndexMultiplicity mult ->
