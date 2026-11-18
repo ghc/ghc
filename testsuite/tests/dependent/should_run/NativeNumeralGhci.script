@@ -1,6 +1,6 @@
 :set -fbyte-code -O0 -fomit-interface-pragmas -fno-write-if-simplified-core
 :load *PackedVecLibrary.hs
-:seti -XDataKinds -XExperimentalDependentTypes -XTypeOperators -XTypeFamilies
+:seti -XDataKinds -XExperimentalDependentTypes -XTypeOperators -XTypeFamilies -XNoStarIsType
 let { fill :: foreach (n :: Nat) -> Vec Bool (n + 1); fill n = replicateNative (n + 1) True } in print (toList (fill 2))
 import Data.Proxy
 import GHC.TypeNats.Experimental (FromNatural)
@@ -28,3 +28,5 @@ do { n <- readIORef ref; m <- readIORef ref; print (toList (appendNative n m (re
 :type (xs, ys, _result)
 :delete *
 :continue
+let reserve :: foreach (r :: Nat) -> foreach (c :: Nat) -> Vec Bool (1 + r * c); reserve r c = replicateNative (1 + r * c) True
+print (length (toList (reserve 2 3)))

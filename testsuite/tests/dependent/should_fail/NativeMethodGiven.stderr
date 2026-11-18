@@ -11,3 +11,10 @@ NativeMethodGiven.hs:10:37: error: [GHC-83605]
     • In the expression: replicateNative @Bool 3 True
       In an equation for ‘withLiteral’:
           withLiteral = replicateNative @Bool 3 True
+
+NativeMethodGiven.hs:13:47: error: [GHC-83605]
+    • GHC cannot use method ‘+’ as a retained index.
+      This call needs a known ‘Num Nat’ dictionary.
+    • In the expression: replicateNative @Bool (S (n + m)) True
+      In an equation for ‘nestedGiven’:
+          nestedGiven n m = replicateNative @Bool (S (n + m)) True

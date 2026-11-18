@@ -17,8 +17,17 @@ NativeTypeNumeralWrong.hs:17:13: error: [GHC-83865]
 
 NativeTypeNumeralWrong.hs:24:34: error: [GHC-83605]
     • GHC cannot use this expression as a retained index.
-      Use a local index variable, a supported constructor tree, an immediate lambda application,
-      or a fully applied checked source function on variables and constructor trees.
+      Build the index from local variables, supported constructors, and fully applied functions with checked equations.
+      An immediate application of a supported lambda is also allowed.
     • In the expression: tagBoth (n + m) (- 1)
       In an equation for ‘badSecond’:
           badSecond n m = tagBoth (n + m) (- 1)
+
+NativeTypeNumeralWrong.hs:27:27: error: [GHC-83865]
+    • Couldn't match type: plus cols (times rows cols)
+                     with: S (times rows cols)
+      Expected: Vec Bool (((1 :: Nat) + rows) * cols)
+        Actual: Vec Bool (plus (S Z) (times rows cols))
+    • In the expression: replicateNative (1 + rows * cols) True
+      In an equation for ‘wrongGrouping’:
+          wrongGrouping rows cols = replicateNative (1 + rows * cols) True

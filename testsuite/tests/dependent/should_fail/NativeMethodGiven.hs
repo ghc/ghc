@@ -8,3 +8,6 @@ withGiven n m = replicateNative @Bool (n + m) True
 
 withLiteral :: Num Nat => Vec Bool 3
 withLiteral = replicateNative @Bool 3 True
+
+nestedGiven :: Num Nat => foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Bool (S (plus n m))
+nestedGiven n m = replicateNative @Bool (S (n + m)) True

@@ -1947,14 +1947,15 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
 tcRetainedOperand :: Id -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
 tcRetainedOperand binder arg
   | isNativeIndexFunctionId binder = (,arg) <$> tcRetainedFunctionArg domain arg
-  | otherwise = tcRetainedValueOperand domain arg
+  | otherwise = tcRetainedArg domain arg
   where
     domain = varType binder
 
 -- | Check a value operand and specialise a class selector to its checked method.
 -- See Note [Dictionary selection in retained arguments].
-tcRetainedValueOperand :: Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
-tcRetainedValueOperand domain arg@(L loc original)
+tcRetainedValueOperand :: (LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn))
+                       -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+tcRetainedValueOperand resolve domain arg@(L loc original)
   | (op, args@(_:_)) <- split_call arg []
   , let (L head_loc head_expr, type_arg) = case op of
           L _ (HsAppType _ f ty) -> (stripParensLHsExpr f, Just ty)
@@ -1985,14 +1986,14 @@ tcRetainedValueOperand domain arg@(L loc original)
 
           let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
               runtime_arg = L loc (mkExpandedLExpr original (mkHsApps target_head args))
-          checked <- tcRetainedArg domain runtime_arg
+          checked <- resolve runtime_arg
           recordSourceMethodUse dfun sel target
           wantRetainedMethod sel dfun
           return checked
         _ -> ordinary
   | otherwise = ordinary
   where
-    ordinary = tcRetainedArg domain arg
+    ordinary = resolve arg
     split_call :: LHsExpr GhcRn -> [LHsExpr GhcRn] -> (LHsExpr GhcRn, [LHsExpr GhcRn])
     split_call (L _ (HsPar _ e)) args = split_call e args
     split_call (L _ (HsApp _ f a)) args = split_call f (a:args)
@@ -2070,6 +2071,14 @@ dictionary for the method occurrence in its lexical scope. Emit an
 ordinary Wanted and attach the check to that Wanted's evidence variable.
 A Given for Num Nat can select a different dictionary.
 
+Run this selection at each recursive operand's expected domain. For example,
+in n * (m + k), select multiplication at the outer domain and addition at
+the second argument's domain. The resolver continuation keeps the same local
+binder environment. This is required when a lambda binds an index used by a
+nested method call. Selection inspects the head but does not check operands.
+The continuation checks the rewritten expression once. Its head is the exact
+source target, so it cannot select the same class method again.
+
 Check the target call and its rewrite rules before emitting the method
 obligation. An invalid operand or rule can already explain the error.
 Use the target for both the index and runtime. The expanded expression keeps the user's
@@ -2112,7 +2121,11 @@ tcRetainedArg domain arg
            _ -> unsupported }
   where
     resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
-    resolve env expected original@(L loc expr)
+    resolve env expected original =
+      tcRetainedValueOperand (resolve_expr env expected) expected original
+
+    resolve_expr :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+    resolve_expr env expected original@(L loc expr)
       = setSrcSpanA loc $ case expr of
           HsPar x arg -> do
             (core, arg') <- resolve env expected arg

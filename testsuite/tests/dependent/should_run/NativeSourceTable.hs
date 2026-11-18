@@ -8,7 +8,7 @@ import Control.Exception (ArithException(DivideByZero), evaluate, throw, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import PackedVecLibrary (type (+), type (*), Vec(..), Nat(..), appendVec, boolVector, flattenRows, isSuccessor, listCount, natToInt, plus, previous,
+import PackedVecLibrary (type (+), type (*), Vec(..), Nat(..), appendVec, boolVector, flattenRows, isSuccessor, listCount, natToInt, plus, previous, times,
                          replicateAt, replicateNative, sourceLength, sourceVector, toList)
 
 type Flipped = '[flipBit 'False, flipBit 'True]
@@ -46,6 +46,13 @@ data Change = Change Signal Signal
 
 after :: Change -> Signal
 after (Change _ new) = new
+
+observeSignal :: foreach (s :: Signal) -> (Proxy s, Signal)
+observeSignal s = (Proxy, s)
+
+-- The constructor field consumes a Signal, while the nested call takes a Lamp.
+afterLamp :: foreach (l :: Lamp) -> (Proxy (after ('Change 'Stop (signal l))), Signal)
+afterLamp l = observeSignal (after (Change Stop (signal l)))
 
 lengthProof :: listCount '[ 'True, 'False] :~: 'S ('S 'Z)
 lengthProof = Refl
@@ -198,3 +205,17 @@ main = case (flipProof, signalProof, phaseProof) of
         filled :: Vec Bool (m * n)
         filled = replicateNative (m * n) False
     case literalProduct of Refl -> print (toList flattened, toList filled)
+    let prefix :: Vec Bool (1 + n * m)
+        prefix = replicateNative (1 + n * m) False
+        grouped :: Vec Bool ((1 + n) * m)
+        grouped = replicateNative ((1 + n) * m) True
+    print (toList prefix, toList grouped)
+    lamp <- newIORef Green >>= readIORef
+    print (snd (afterLamp lamp))
+    let partial = toList (replicateNative (S (times bottom m)) 'x')
+        emptyCells = toList (replicateNative (times 0 (plus bottom n)) True)
+    case partial of
+        x : rest -> do
+            tailResult <- try (evaluate (null rest))
+            print (x, tailResult == Left DivideByZero, null emptyCells)
+        [] -> fail "Expected a cell before the nested product"

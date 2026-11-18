@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, NoStarIsType, TypeOperators #-}
 module NativeTypeNumeralWrong where
 
 import Data.Proxy
@@ -22,3 +22,6 @@ tagBoth _n _m = (Proxy, Proxy)
 -- Only the second retained operand lacks a checked index.
 badSecond :: foreach (n :: Nat) -> foreach (m :: Nat) -> (Proxy (n + m), Proxy (1 :: Nat))
 badSecond n m = tagBoth (n + m) (-1)
+
+wrongGrouping :: foreach (rows :: Nat) -> foreach (cols :: Nat) -> Vec Bool ((1 + rows) * cols)
+wrongGrouping rows cols = replicateNative (1 + rows * cols) True

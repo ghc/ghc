@@ -21,3 +21,6 @@ True
 True
 [True]
 ([True,True],[False,False])
+([False,False,False],[True,True,True,True])
+Go
+('x',True,True)
