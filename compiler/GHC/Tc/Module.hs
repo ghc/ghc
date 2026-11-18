@@ -77,6 +77,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Sig( tcRules )
 import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
+                               checkOptionalSourceUses,
                                sourceTableDependencies)
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
@@ -2440,6 +2441,8 @@ tcRnStmt hsc_env rdr_stmt
     ((bound_ids, tc_expr), fix_env) <- tcUserStmt rdr_stmt ;
     zonked_expr <- zonkTopLExpr tc_expr ;
     zonked_ids  <- zonkTopBndrs bound_ids ;
+    env <- getGblEnv ;
+    checkOptionalSourceUses env ;
 
     failIfErrsM ;  -- we can't do the next step if there are
                    -- representation polymorphism errors

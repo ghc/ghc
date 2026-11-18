@@ -51,6 +51,7 @@ import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
+import GHC.Tc.Gen.SourceTable (checkOptionalSourceUses)
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Zonk.Type
@@ -1200,6 +1201,8 @@ runMeta :: (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
         -> LHsExpr GhcTc
         -> TcM hs_syn
 runMeta unwrap e = do
+    env <- getGblEnv
+    checkOptionalSourceUses env
     hooks <- getHooks
     case runMetaHook hooks of
         Nothing -> unwrap defaultRunMeta e

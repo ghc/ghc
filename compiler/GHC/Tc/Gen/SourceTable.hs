@@ -3,7 +3,8 @@ module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceRuleOwners, sourceTableO
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
-                              checkSourceMethodUses) where
+                              OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
+                              checkOptionalSourceUses, checkSourceMethodUses) where
 
 import GHC.Prelude
 
@@ -11,6 +12,7 @@ import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
 import GHC.Builtin.WiredIn.Types (integerTy, integerTyConName, listTyCon, mkListTy, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
+import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
 import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch, coAxiomBranches, coAxBranchRHS, fromBranches)
 import GHC.Core.ConLike (ConLike(..))
@@ -32,15 +34,16 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Tc.Errors.Types (RetainedQuantificationError(..), TcRnMessage(..))
 import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
-import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), isEmptyEvBindsMap)
+import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), isEmptyEvBindsMap)
 import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
-import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBindsMap,
-                           getTopEnv, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
+import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBindsMap, getTcEvBindsState,
+                           checkNoErrs, getTopEnv, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Basic (Origin(..))
-import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe)
+import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+                     sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkInstTyCoOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
@@ -62,14 +65,15 @@ import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet)
-import GHC.Types.Var (Id, VarBndr(..), mkTyVar, varName)
+import GHC.Types.Var (Id, CoVar, VarBndr(..), mkTyVar, varName)
+import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Monad (allM)
 import GHC.Utils.Outputable (text)
 
-import Control.Monad (foldM, forM_, guard, unless, when, zipWithM)
+import Control.Monad (foldM, forM, forM_, guard, unless, when, zipWithM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<|>))
-import Data.List (find, partition, sortBy)
+import Data.List (find, nubBy, partition, sortBy)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (catMaybes, isNothing, mapMaybe)
 
@@ -250,7 +254,19 @@ hasSourceMethodRuleAt rules first fun = any user_rule (getRules rules (globalise
 -- | Check the selected method at the occurrence, and record its semantic dependencies.
 recordSourceMethodUse :: Id -> Id -> Id -> TcM ()
 recordSourceMethodUse dfun selector target =
-    recordSourceUses [(v, Nothing) | v <- [selector, dfun, target]]
+    recordSourceUses (sourceMethodOps dfun selector target)
+
+-- | The selector's first type argument is fixed by this ground dictionary.
+-- Its monomorphic target and the dictionary itself can have any active rule.
+sourceMethodOps :: Id -> Id -> Id -> [(Id, Maybe Name)]
+sourceMethodOps dfun selector target =
+    [(selector, first), (dfun, Nothing), (target, Nothing)]
+  where
+    first = do
+      (_, [domain]) <- getClassPredTys_maybe (varType dfun)
+      (tc, _) <- tcSplitTyConApp_maybe domain
+      guard (isGenerativeTyCon tc Nominal)
+      return (tyConName tc)
 
 -- | The public implementations used by the standard Integer dictionaries.
 -- Guard the comparison bodies that can inline as well as their method heads.
@@ -264,11 +280,17 @@ sourceLiteralWorkers = traverse (\(mod, occ) -> lookupOrig mod (mkVarOcc occ) >>
 -- See Note [Certifying a source literal conversion] in GHC.Tc.TyCl.Instance.
 recordSourceLiteralUse :: Id -> Id -> TcM ()
 recordSourceLiteralUse dfun selector = do
+    ops <- sourceLiteralUses dfun selector
+    maybe (failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall (idName selector))))
+          recordSourceUses ops
+
+-- | Read the dependencies of a certified literal without recording a use.
+sourceLiteralUses :: Id -> Id -> TcM (Maybe [(Id, Maybe Name)])
+sourceLiteralUses dfun selector = case sourceLiteralCons_maybe dfun selector of
+  Nothing -> pure Nothing
+  Just (zero, _) -> do
     let num_module = mkGhcInternalModule (fsLit "GHC.Internal.Num")
         lookup_id mod occ = lookupOrig mod occ >>= tcLookupId
-        unchecked :: TcM a
-        unchecked = failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall (idName selector)))
-    (zero, _) <- maybe unchecked pure (sourceLiteralCons_maybe dfun selector)
     cmp <- lookup_id gHC_CLASSES (mkVarOcc "<")
     eq <- lookup_id gHC_CLASSES eqClassOpOcc
     sub <- lookup_id num_module minusClassOpOcc
@@ -279,36 +301,140 @@ recordSourceLiteralUse dfun selector = do
     let integer_dict op mod = case isClassOpId_maybe op of
           Just cls | Right (inst, []) <- lookupUniqueInstEnv insts cls [integerTy]
                    , let d = instanceDFunId inst
-                   , nameModule_maybe (idName d) == Just mod -> pure d
-          _ -> unchecked
-    ord_d <- integer_dict cmp gHC_INTERNAL_NUM_INTEGER
-    eq_d  <- integer_dict eq  gHC_INTERNAL_NUM_INTEGER
-    num_d <- integer_dict sub num_module
-    recordSourceUses $
-       (selector, Just (tyConName (dataConTyCon zero))) :
-       [(op, Just integerTyConName) | op <- [cmp, eq, sub, selector]] ++
-       [(v, Nothing) | v <- [dfun, ord_d, eq_d, num_d, otherwise_id] ++ workers]
+                   , nameModule_maybe (idName d) == Just mod -> Just d
+          _ -> Nothing
+    pure $ do
+      ord_d <- integer_dict cmp gHC_INTERNAL_NUM_INTEGER
+      eq_d  <- integer_dict eq  gHC_INTERNAL_NUM_INTEGER
+      num_d <- integer_dict sub num_module
+      pure $ (selector, Just (tyConName (dataConTyCon zero))) :
+             [(op, Just integerTyConName) | op <- [cmp, eq, sub, selector]] ++
+             [(v, Nothing) | v <- [dfun, ord_d, eq_d, num_d, otherwise_id] ++ workers]
+
+-- | The checked dependencies of one optional alias, before proof-use selection.
+data OptionalSourceUses = OptionalSourceUses [Id] [(Id, Maybe Name)] [Name]
+
+-- | Read and validate optional dependencies without recording source uses.
+optionalSourceUses :: [Id] -> [(Id, Id, Maybe Id)] -> TcM (Maybe OptionalSourceUses)
+optionalSourceUses heads methods = do
+    plan <- optionalSourceUsePlan heads methods
+    case plan of
+      Nothing -> pure Nothing
+      Just (owners, ops, tables) -> do
+        changed <- changedSourceUse ops
+        pure $ case changed of
+          Nothing -> Just (OptionalSourceUses owners ops tables)
+          Just _ -> Nothing
+
+-- | Register dependencies whose proof use is decided by the committed solver.
+-- See Note [Optional source dependencies].
+registerOptionalSourceUses :: TcEvBinds -> CoVar -> OptionalSourceUses -> TcM ()
+registerOptionalSourceUses evidence proof (OptionalSourceUses owners ops tables) = do
+    env <- getGblEnv
+    updTcRef (tcg_optional_source_uses env) ((evidence, proof, owners, ops, tables) :)
+
+-- | Resolve the exact source owners, transitive callees, and literal workers.
+optionalSourceUsePlan :: [Id] -> [(Id, Id, Maybe Id)]
+                      -> TcM (Maybe ([Id], [(Id, Maybe Name)], [Name]))
+optionalSourceUsePlan heads methods = do
+    env <- getGblEnv
+    let targets = [target | (_, _, Just target) <- methods]
+        roots = nubBy (\a b -> idName a == idName b) (heads ++ targets)
+        source fun = case sourceTableOccurrence env fun of
+          Just actual | Just table <- sourceTableId_maybe actual -> do
+            deps <- sourceTableDependencies table
+            pure ((\callees -> (actual : callees, tyConName table)) <$> deps)
+          _ -> pure Nothing
+        method (dfun, selector, Just target)
+          | sourceMethodTarget_maybe dfun selector == Just (idName target)
+          = pure (Just (sourceMethodOps dfun selector target))
+          | otherwise = pure Nothing
+        method (dfun, selector, Nothing) = sourceLiteralUses dfun selector
+    sources <- traverse source roots
+    method_ops <- traverse method methods
+    pure $ do
+      checked <- sequence sources
+      checked_methods <- sequence method_ops
+      let owners = nubBy (\a b -> idName a == idName b) (concatMap fst checked)
+      pure (owners, [(v, Nothing) | v <- owners] ++ concat checked_methods, map snd checked)
+
+-- | Find a currently visible rewrite that can change one selected operation.
+changedSourceUse :: [(Id, Maybe Name)] -> TcM (Maybe (Id, Maybe Name))
+changedSourceUse ops = do
+    env <- getGblEnv
+    visible <- visibleSourceMethodRules env
+    pure $ find (\(v, arg) -> idName v `elemNameSet` sourceRuleOwnersAt arg (tcg_rules env)
+                             || hasSourceMethodRuleAt visible arg v) ops
+
+-- | Publish only dependencies selected by final evidence, and retain pending ones.
+commitOptionalSourceUses :: TcGblEnv -> TcM ()
+commitOptionalSourceUses env = do
+    pending <- readTcRef (tcg_optional_source_uses env)
+    remaining <- fmap catMaybes $ forM pending $ \entry@(evidence, proof, owners, ops, tables) -> do
+      needed <- case evidence of
+        TcEvBinds var -> (proof `elemVarSet`) . ebs_needs <$> getTcEvBindsState var
+        EvBinds{} -> pure False
+      if needed then do
+        publishSourceUses ops
+        updTcRef (tcg_source_table_uses env) (`extendNameSetList` tables)
+        forM_ owners $ \owner ->
+          when (nameModule_maybe (idName owner) == Just (tcg_semantic_mod env)) $
+            keepAlive (idName owner)
+        pure Nothing
+      else pure (Just entry)
+    updTcRef (tcg_optional_source_uses env) (const remaining)
+
+{- Note [Optional source dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A lazy local alias can use checked source equations only when its body
+needs the alias proof. Read the certificates and visible RULES before
+checking that body. Cache the exact source owners, transitive callees,
+table Names, selected methods, and literal workers without recording use.
+
+The solver records proof use in the original evidence variable's ebs_needs.
+Speculative evidence variables do not commit that marker. Before module
+finalization or compile-time execution, publish only marked dependencies.
+Keep unmarked entries because a later solve can still use their proofs.
+Then run the ordinary late-rule check. It reports a local rule at the rule
+declaration, including a rule introduced by a splice. An ordinary alias
+whose proof is unused records no source dependency or rule restriction.
+-}
 
 -- | Record rule heads and their ABI dependencies after checking the visible rules.
 recordSourceUses :: [(Id, Maybe Name)] -> TcM ()
 recordSourceUses ops = do
+    changed <- changedSourceUse ops
+    case changed of
+      Just (v, _) -> failWithTc (TcRnRetainedQuantificationError (RetainedSourceRule (idName v)))
+      Nothing -> publishSourceUses ops
+
+-- | Record checked operations without changing the location of late-rule errors.
+publishSourceUses :: [(Id, Maybe Name)] -> TcM ()
+publishSourceUses ops = do
     env <- getGblEnv
-    visible <- visibleSourceMethodRules env
-    let changed (v, arg) = idName v `elemNameSet` sourceRuleOwnersAt arg (tcg_rules env)
-                           || hasSourceMethodRuleAt visible arg v
-        add acc (v, arg) = extendNameEnv_C combine acc (idName v) (maybe emptyNameSet unitNameSet arg)
+    let add acc (v, arg) = extendNameEnv_C combine acc (idName v) (maybe emptyNameSet unitNameSet arg)
         combine a b | isEmptyNameSet a || isEmptyNameSet b = emptyNameSet
                     | otherwise = unionNameSet a b
-    case find changed ops of
-      Just (v, _) -> failWithTc (TcRnRetainedQuantificationError (RetainedSourceRule (idName v)))
-      Nothing -> do
-        updTcRef (tcg_source_table_uses env) (`extendNameSetList` map (idName . fst) ops)
-        updTcRef (tcg_source_rule_types env) (\uses -> foldl' add uses ops)
+    updTcRef (tcg_source_table_uses env) (`extendNameSetList` map (idName . fst) ops)
+    updTcRef (tcg_source_rule_types env) (\uses -> foldl' add uses ops)
 
 -- | Check rules declared or imported after an earlier retained application.
 -- Report a local rule at its declaration, including one added by a splice.
 checkSourceMethodUses :: TcGblEnv -> TcM ()
 checkSourceMethodUses env = do
+    checkSourceMethodUsesWithPending env
+    updTcRef (tcg_optional_source_uses env) (const [])
+
+-- | Check pending aliases before execution without discarding later solver work.
+checkOptionalSourceUses :: TcGblEnv -> TcM ()
+checkOptionalSourceUses env = do
+    pending <- readTcRef (tcg_optional_source_uses env)
+    unless (null pending) (checkNoErrs (checkSourceMethodUsesWithPending env))
+
+-- | Publish committed optional dependencies and check visible rule conflicts.
+checkSourceMethodUsesWithPending :: TcGblEnv -> TcM ()
+checkSourceMethodUsesWithPending env = do
+    commitOptionalSourceUses env
     uses <- filterNameSet (isVarOcc . nameOccName) <$> readTcRef (tcg_source_table_uses env)
     unless (isEmptyNameSet uses) $ do
       types <- readTcRef (tcg_source_rule_types env)
