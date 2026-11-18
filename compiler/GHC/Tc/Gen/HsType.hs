@@ -155,7 +155,7 @@ import GHC.Data.Bag( unitBag, mapBagM_ )
 import Data.Function ( on )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.List ( mapAccumL )
+import Data.List ( intercalate, mapAccumL )
 import Control.Monad
 import Data.Data (Data, cast, gmapQ)
 import Data.Tuple( swap )
@@ -2371,7 +2371,7 @@ tc_app_ty mode rn_ty exp_kind
                          , Just (owner_level, HM_Sig) <- mode_holes mode
                          , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ operand))) <- ignoreParens arg
                          , Just _ <- lookupNameEnv wildcards operand
-                         -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg Nothing
+                         -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg RetryClosedOperand
                                ; tcCheckClosedCallContext name
                                ; case call_owner of
                                    RetrySigCalls -> return ()
@@ -2466,21 +2466,27 @@ nestedClosedCall arg
     is_par HsArgPar{} = True
     is_par _ = False
 
+-- | The information available about the operand before specialization.
+data ClosedCallOperand
+  = RetryClosedOperand
+  | SourceClosedOperand (Maybe Kind)
+  | ComputedClosedOperand Kind
+
 -- | Specialize the declared arrow using only its argument. Keep the
 -- result independent of defaulting and of the surrounding expected kind.
-tcClosedCallKinds :: Name -> Type -> LHsType GhcRn -> Maybe Kind -> TcM (Type, Type)
-tcClosedCallKinds name fun_ty arg inferred
+tcClosedCallKinds :: Name -> Type -> LHsType GhcRn -> ClosedCallOperand -> TcM (Type, Type)
+tcClosedCallKinds name fun_ty arg operand
   | Just (FTF_T_T, _, _, domain, codomain) <- splitFunTy_maybe rho
   , all isTyVar tvs
   = do input <- argumentDomain domain
        subst <- case tcMatchTy domain input of
          Just subst -> return subst
-         Nothing
-           | Just _ <- inferred -> at_operand $ do
-               dflags <- getDynFlags
-               bad ("The operand has kind " ++ showPpr dflags input ++
-                    ", which does not match the declared input type " ++ showPpr dflags domain ++ ".")
-           | otherwise -> unsupported
+         Nothing -> case operand of
+           RetryClosedOperand -> unsupported
+           _ -> at_operand $ do
+             dflags <- getDynFlags
+             bad ("The operand has kind " ++ showPpr dflags input ++
+                  ", which does not match the declared input type " ++ showPpr dflags domain ++ ".")
        let undetermined tv = maybe True (not . noFreeVarsOfType) (Subst.lookupTyVar subst tv)
            unresolved = filter undetermined tvs
            result = Subst.substTy subst codomain
@@ -2497,21 +2503,50 @@ tcClosedCallKinds name fun_ty arg inferred
     (_, binders, rho) = splitInvisPiTys fun_ty
     tvs = mapMaybe namedPiTyBinder_maybe binders
     predicates = mapMaybe anonPiTyBinderType_maybe binders
-    list_kind = mkListTy naturalTy
-    inputs = [charTy, list_kind]
-    operand_description
-      | Just _ <- inferred = "The checked operand"
-      | otherwise = "The literal argument"
+    natural_list = mkListTy naturalTy
+    retry_inputs = [charTy, natural_list]
+    scalars = [naturalTy, charTy, boolTy]
+    list_inputs = map mkListTy scalars
+    operand_description = case operand of
+      ComputedClosedOperand{} -> "The checked operand"
+      _ -> "The literal argument"
     at_operand :: TcM a -> TcM a
     at_operand = setSrcSpanA (getLoc arg)
-    argumentDomain domain
-      -- The inner call has already checked its result representation.
-      | Just actual <- inferred = return actual
-      | any (tcEqType domain) inputs = return domain
-      | Just kind <- closedCallLiteralKind arg = return kind
-      | not (null predicates), any (isJust . tcMatchTy domain) inputs =
-          bad "The argument must be a closed Char literal or a closed list of Natural literals."
-      | otherwise = unsupported
+    argumentDomain domain = case operand of
+      ComputedClosedOperand actual -> return actual
+      RetryClosedOperand
+        | any (tcEqType domain) retry_inputs -> return domain
+        | not (null predicates), any (isJust . tcMatchTy domain) retry_inputs ->
+            bad "The argument must be a closed Char literal or a closed list of Natural literals."
+        | otherwise -> unsupported
+      SourceClosedOperand (Just actual)
+        | L _ (HsExplicitListTy _ IsPromoted []) <- ignoreParens arg ->
+            case matching list_inputs of
+              [input] -> return input
+              inputs | any (tcEqType natural_list) inputs -> return natural_list
+              [] -> at_operand $ do
+                dflags <- getDynFlags
+                bad ("The empty promoted list does not match the declared input type "
+                     ++ showPpr dflags domain ++ ".")
+              _ -> at_operand $
+                bad "The declared input type does not determine the element kind of the empty list."
+        | otherwise -> return actual
+      SourceClosedOperand Nothing -> case matching (scalars ++ list_inputs) of
+        [input]
+          | input `tcEqType` charTy ->
+              bad "The argument must be a closed Char literal, such as 'x'."
+          | input `tcEqType` natural_list ->
+              bad "The argument must be a closed list of Natural literals, such as '[1, 2, 3]."
+          | otherwise -> at_operand $ do
+              dflags <- getDynFlags
+              bad ("The argument must be a closed literal of kind " ++ showPpr dflags input ++ ".")
+        [] -> unsupported
+        inputs -> at_operand $ do
+          dflags <- getDynFlags
+          let kinds = intercalate ", " (map (showPpr dflags) inputs)
+          bad ("The argument must be a closed literal of one of these kinds: " ++ kinds ++ ".")
+      where
+        matching = filter (isJust . tcMatchTy domain)
 
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name
@@ -2536,7 +2571,7 @@ tcPlanClosedCall mode ordinary_call fun arg = do
         case child of
           AnId child_fun -> tcPlanClosedCall mode ordinary_call child_fun child_arg
           _ -> failWithTc (TcRnNoSourceTable child_name)
-      (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg (Just child_kind)
+      (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg (ComputedClosedOperand child_kind)
       let get_operand = do
             checked <- run_child
             value <- tcDecodeClosedCallOperand checked
@@ -2547,9 +2582,11 @@ tcPlanClosedCall mode ordinary_call fun arg = do
                   "The checked operand does not represent a supported closed value.")
       return (domain, result_kind, get_operand)
     Nothing -> do
-      unless (ordinary_call || isJust (closedCallLiteralKind arg)) $
+      let literal_kind = closedCallLiteralKind arg
+      unless (ordinary_call || isJust literal_kind) $
         failWithTc (TcRnNoSourceTable name)
-      (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg Nothing
+      (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg
+                               (SourceClosedOperand literal_kind)
       argument <- tcClosedTypeCallArgument mode name domain arg
       return (domain, result_kind, return argument)
   run <- tcPrepareClosedCall fun domain result_kind
@@ -2562,64 +2599,54 @@ checkCompleteClosedCall mode name =
     failWithTc (TcRnClosedTypeEval name
       "A visible type argument containing a closed call must be complete. Replace its wildcards with types.")
 
--- | Check the literal at the expected kind and build its runtime value.
+-- | Check the literal at the declared input kind and build its runtime value.
 tcClosedTypeCallArgument :: TcTyMode -> Name -> Type -> LHsType GhcRn -> TcM Core.CoreExpr
 tcClosedTypeCallArgument mode name domain arg = do
   checkCompleteClosedCall mode name
-  if domain `tcEqType` charTy then
-      case ignoreParens arg of
-        L _ (HsTyLit _ (HsChar _ _)) -> do
-          checked <- checked_argument
-          decode "The checked argument does not represent a Char literal." checked
-        _ -> bad "The argument must be a closed Char literal, such as 'x'."
-  else case closedNaturalList arg of
-      Just numbers -> do
-        checked <- checked_argument
-        let expected = mkPromotedListTy naturalTy (map mkNumLitTy numbers)
-            message = "The checked argument does not have the expected literal representation."
-        unless (tcEqType checked expected) (bad message)
-        decode message checked
-      Nothing -> bad "The argument must be a closed list of Natural literals, such as '[1, 2, 3]."
+  checked <- solveEqualities "tcClosedTypeCallArgument" $
+    tc_check_lhs_type mode arg domain
+  value <- tcDecodeClosedCallOperand =<< liftZonkM (zonkTcType checked)
+  maybe (bad "The checked argument does not have the expected literal representation.") return value
   where
-    checked_argument = do
-      arg_ty <- tc_check_lhs_type mode arg domain
-      liftZonkM (zonkTcType arg_ty)
-
-    decode message checked = do
-      value <- tcDecodeClosedCallOperand checked
-      maybe (bad message) pure value
-
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name
 
--- | Identify the input kind from the source literal alone.
-closedCallLiteralKind :: LHsType GhcRn -> Maybe Type
+-- | Identify candidate kinds without constructing or evaluating a value.
+-- The ordinary type checker checks that all elements of a list have that kind.
+closedCallLiteralKind :: LHsType GhcRn -> Maybe Kind
 closedCallLiteralKind arg
-  | L _ (HsTyLit _ (HsChar _ _)) <- ignoreParens arg = Just charTy
-  | isJust (closedNaturalList arg) = Just (mkListTy naturalTy)
-  | otherwise = Nothing
-
--- | Read a promoted literal list before admitting the call to execution.
-closedNaturalList :: LHsType GhcRn -> Maybe [Integer]
-closedNaturalList (L _ (HsParTy _ arg)) = closedNaturalList arg
-closedNaturalList (L _ (HsExplicitListTy _ IsPromoted args)) = traverse natural args
+  | L _ (HsExplicitListTy _ IsPromoted elements) <- ignoreParens arg =
+      case elements of
+        [] -> Just (mkListTy naturalTy)
+        first : rest
+          | all (isJust . scalarKind) rest -> mkListTy <$> scalarKind first
+        _ -> Nothing
+  | otherwise = scalarKind arg
   where
-    natural (L _ (HsParTy _ arg)) = natural arg
-    natural (L _ (HsTyLit _ (HsNatural _ IL{ il_value = n })))
-      | n >= 0 = Just n
-    natural _ = Nothing
-closedNaturalList _ = Nothing
+    scalarKind operand = case ignoreParens operand of
+      L _ (HsTyLit _ HsNatural{}) -> Just naturalTy
+      L _ (HsTyLit _ HsChar{}) -> Just charTy
+      L _ (HsTyVar _ _ (L _ (WithUserRdr _ con)))
+        | con == trueDataConName || con == falseDataConName -> Just boolTy
+      _ -> Nothing
 
 {- Note [Closed source calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Serokell's closed term evaluator example uses an ordinary length call as
-a vector index. Support imported, qualified functions on a list of Natural
-literals or a Char literal. The renamer keeps the qualifier and resolved
+a vector index. Support imported, qualified functions on Natural, Char,
+Bool, or a promoted list of those literals. The renamer keeps the qualifier
+and resolved
 term Name after trying the ordinary type and checked source-table paths.
 The term Name is not a retained local index.
 
 A literal argument supplies the kind that specializes a polymorphic
-function. For a nested qualified call, check the outer call's staging
+function. Check the literal with the ordinary kind checker before decoding
+its runtime value. For an empty list, match the declared input against the
+supported list kinds. If more than one kind matches, prefer [Natural] to
+preserve the existing meaning of calls such as Prelude.reverse '[]. The
+expected result kind does not choose the element kind.
+
+For a nested qualified call, check the outer call's staging
 first. Prepare the inner call and use its inferred result kind to
 specialize the outer call. No function runs until the whole chain has
 checked kinds, staging, and evidence.

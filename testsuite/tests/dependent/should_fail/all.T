@@ -126,6 +126,8 @@ test('NativeClosedListsBottom',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs'])],
      multimod_compile_fail, ['NativeClosedListsBottom', '-v0 ' + config.ghc_th_way_flags])
+test('NativeClosedSourceMixed', normal, compile_fail, [''])
+test('NativeClosedSourceAmbiguous', normal, compile_fail, [''])
 test('NativeClosedComputedEmpty',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs'])],

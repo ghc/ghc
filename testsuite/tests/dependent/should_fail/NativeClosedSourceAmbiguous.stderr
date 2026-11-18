@@ -1,0 +1,7 @@
+NativeClosedSourceAmbiguous.hs:8:15: error: [GHC-70565]
+    • Cannot evaluate ‘fromIntegral’ in a type.
+        The literal argument does not determine the following type parameters: b.
+    • In the first argument of ‘Proxy’, namely
+        ‘(Prelude.fromIntegral 5 :: Natural)’
+      In the type signature:
+        bad :: Proxy (Prelude.fromIntegral 5 :: Natural)

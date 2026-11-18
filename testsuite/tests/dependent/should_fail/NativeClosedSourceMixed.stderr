@@ -1,0 +1,6 @@
+NativeClosedSourceMixed.hs:7:31: error: [GHC-83865]
+    • Expected kind ‘GHC.Internal.Bignum.Natural.Natural’,
+        but ‘'False’ has kind ‘Bool’
+    • In the first argument of ‘Proxy’, namely
+        ‘(Prelude.reverse '[5, 'False])’
+      In the type signature: bad :: Proxy (Prelude.reverse '[5, 'False])

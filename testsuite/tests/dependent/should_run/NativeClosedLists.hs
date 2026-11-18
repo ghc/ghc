@@ -14,7 +14,7 @@ import qualified NativeClosedListsLib as Lib
 reversed :: Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]
 reversed = Refl
 
-emptyInput :: Prelude.reverse '[] :~: '[]
+emptyInput :: Prelude.reverse '[] :~: ('[] :: [Natural])
 emptyInput = Refl
 
 emptyResult :: Lib.empty '[2, 3, 5] :~: '[]
@@ -51,10 +51,18 @@ computed :: ( Prelude.odd (Prelude.sum '[2, 3, 5]) :~: 'False
             , Prelude.reverse (Lib.characters '\n') :~: '[ 'λ', 'H', '\SO', '\n', '\\', '"'] )
 computed = (Refl, Refl, Refl, Refl, Refl, Refl)
 
+source :: ( Prelude.odd 5 :~: 'True
+          , Prelude.not 'False :~: 'True
+          , Prelude.and '[ 'True, 'False] :~: 'False
+          , Prelude.and '[] :~: 'True
+          , Prelude.reverse '[ 'λ', '\n'] :~: '[ '\n', 'λ'] )
+source = (Refl, Refl, Refl, Refl, Refl)
+
 main :: IO ()
 main = case (reversed, emptyInput, emptyResult, bools, emptyBools, chars) of
     (Refl, Refl, Refl, Refl, Refl, Refl)
         | show [5, 3, 2 :: Natural] == "[2,3,5]" ->
-            case (nested, computed) of
-                ((Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl, Refl)) -> print (natVal (fst (chain (Proxy @'[2, 3, 5]))))
+            case (nested, computed, source) of
+                ((Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl)) ->
+                    print (natVal (fst (chain (Proxy @'[2, 3, 5]))))
         | otherwise -> fail "ordinary Show did not select the overlapping list instance"
