@@ -532,6 +532,9 @@ toIfaceTopBndr id
 toIfaceIdDetails :: Name   -- ^ for trace/panic messages only
                  -> IdDetails -> IfaceIdDetails
 toIfaceIdDetails _ VanillaId                      = IfVanillaId
+toIfaceIdDetails name (SourceTableId owner table)
+  | name == owner = IfSourceTableId (tyConName table)
+  | otherwise     = IfVanillaId
 toIfaceIdDetails _ (InstMethId {})                = IfVanillaId
 toIfaceIdDetails _ (WorkerLikeId dmds)            = IfWorkerLikeId dmds
 toIfaceIdDetails _ (DFunId {})                    = IfDFunId

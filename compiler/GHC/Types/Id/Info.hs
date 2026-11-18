@@ -140,6 +140,10 @@ infixl  1 `setRuleInfo`,
 data IdDetails
   = VanillaId
 
+  -- | The checked source definition and its closed family of equations.
+  -- See Note [Source table Ids] in GHC.Tc.Gen.SourceTable.
+  | SourceTableId Name TyCon
+
   -- | The 'Id' for a record selector
   | RecSelId
     { sel_tycon      :: RecSelParent
@@ -437,6 +441,7 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId               = panic "pprIdDetails"
+   pp (SourceTableId _ table) = text "SourceTable" <+> ppr table
    pp (WorkerLikeId dmds)     = text "StrictWorker" <> parens (ppr dmds)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"

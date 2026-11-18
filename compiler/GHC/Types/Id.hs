@@ -47,6 +47,7 @@ module GHC.Types.Id (
         idName, idType, idMult, idScaledType, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
         recordSelectorTyCon_maybe,
+        sourceTableId_maybe,
 
         -- ** Modifying an Id
         setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult,
@@ -145,6 +146,7 @@ import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
                 , isStableUnfolding, isCompulsoryUnfolding, isEvaldUnfolding
                 , hasSomeUnfolding, noUnfolding, evaldUnfolding )
 import GHC.Core.Type
+import GHC.Core.TyCon (TyCon, closedFamilyTyConCoAxiom_maybe, tyConName)
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.DataCon
 import GHC.Core.Class
@@ -203,6 +205,19 @@ infixl  1 `setIdUnfolding`,
 
 idName   :: Id -> Name
 idName    = Var.varName
+
+-- | Recover the actual closed family for this checked top-level function.
+-- See Note [Source table Ids] in GHC.Tc.Gen.SourceTable.
+sourceTableId_maybe :: Id -> Maybe TyCon
+sourceTableId_maybe fun
+  | SourceTableId owner table <- idDetails fun
+  , idName fun == owner
+  , Just mod <- nameModule_maybe owner
+  , nameModule_maybe (tyConName table) == Just mod
+  , nameOccName (tyConName table) == mkSourceTableOcc (nameOccName owner)
+  , Just _ <- closedFamilyTyConCoAxiom_maybe table
+  = Just table
+  | otherwise = Nothing
 
 idUnique :: Id -> Unique
 idUnique  = Var.varUnique

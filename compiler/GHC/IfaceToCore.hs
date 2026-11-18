@@ -2436,6 +2436,14 @@ and Haskell evaluation boundary in docs/dependent-haskell/REFERENCES.md.
 
 tcIdDetails :: Name -> Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _ _  IfVanillaId           = return VanillaId
+tcIdDetails owner ty (IfSourceTableId table_name) = do
+    table <- forkM (text "Source table of" <+> ppr owner) $ do
+      thing <- tcIfaceGlobal table_name
+      case thing of
+        ATyCon tc | let fun = mkGlobalId (SourceTableId owner tc) owner ty vanillaIdInfo
+                  , Just _ <- sourceTableId_maybe fun -> return tc
+        _ -> failIfM (text "Invalid source table for" <+> ppr owner <+> ppr table_name)
+    return (SourceTableId owner table)
 tcIdDetails _ _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
 tcIdDetails _ ty IfDFunId              = return (mkDFunIdDetails cls)
   where

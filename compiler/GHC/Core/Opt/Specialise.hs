@@ -3070,6 +3070,7 @@ wantCallsFor _env f
 
       DFunId {}        -> True
       VanillaId {}     -> True
+      SourceTableId {} -> True
       JoinId {}        -> True
       WorkerLikeId {}  -> True
       RepPolyId {}     -> True
