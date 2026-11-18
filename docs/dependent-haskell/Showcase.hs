@@ -820,6 +820,8 @@ main = do
         (TypeNats.natVal (Proxy @(Prelude.sum (Prelude.reverse '[2, 3, 5]))))
     observe "an imported character case selects between two unknown types"
         (OpenSource.routedFirst False (42 :: Int), OpenSource.routedSecond False (42 :: Int))
+    observe "odd accepts the Natural computed by sum"
+        (Refl :: Prelude.odd (Prelude.sum '[2, 3, 5]) :~: 'False)
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length '[1, 2, 3])

@@ -1304,17 +1304,44 @@ Previously, we failed to abort in cases (b) and (c), leading to #19709.
 
 -- | Reconstruct a runtime operand from a checked ground literal type.
 tcDecodeClosedCallOperand :: Type -> TcM (Maybe Core.CoreExpr)
-tcDecodeClosedCallOperand operand
-  | kind `tcEqType` charTy = pure (mkCharExpr <$> isCharLitTy operand)
-  | kind `tcEqType` mkListTy naturalTy
-  , Just elements <- extractPromotedList_maybe operand
-  , Just numbers <- traverse isNumLitTy elements
-  , all (>= 0) numbers = do
+tcDecodeClosedCallOperand operand =
+  case closedCallValueShape (typeKind operand) of
+    Nothing -> return Nothing
+    Just (scalar, element, is_list) -> do
       platform <- targetPlatform <$> getDynFlags
-      pure (Just (mkListExpr naturalTy (map (mkNaturalExpr platform) numbers)))
-  | otherwise = pure Nothing
+      let decode = decodeScalar platform scalar
+      return $
+        if is_list
+          then do
+            elements <- extractPromotedList_maybe operand
+            mkListExpr element <$> traverse decode elements
+          else decode operand
   where
-    kind = typeKind operand
+    decodeScalar platform ClosedNatural ty = do
+      number <- isNumLitTy ty
+      guard (number >= 0)
+      return (mkNaturalExpr platform number)
+    decodeScalar _ ClosedChar ty = mkCharExpr <$> isCharLitTy ty
+    decodeScalar _ ClosedBool ty = do
+      (tc, []) <- splitTyConApp_maybe ty
+      con <- isPromotedDataCon_maybe tc
+      guard (dataConTyCon con == boolTyCon)
+      pure (Core.Var (dataConWorkId con))
+
+-- | Scalar types with a checked runtime and promoted representation.
+data ClosedCallScalar = ClosedNatural | ClosedChar | ClosedBool
+
+-- | Classify the scalar or single list layer supported by the evaluator.
+closedCallValueShape :: Kind -> Maybe (ClosedCallScalar, Kind, Bool)
+closedCallValueShape kind
+  | element `tcEqType` naturalTy = Just (ClosedNatural, naturalTy, is_list)
+  | element `tcEqType` charTy = Just (ClosedChar, charTy, is_list)
+  | element `tcEqType` boolTy = Just (ClosedBool, boolTy, is_list)
+  | otherwise = Nothing
+  where
+    (element, is_list) = case splitTyConApp_maybe kind of
+      Just (tc, [arg]) | tc == listTyCon -> (arg, True)
+      _ -> (kind, False)
 
 -- | Execute a checked closed call through the target interpreter.
 -- See Note [Closed literal type evaluation].
@@ -1423,23 +1450,19 @@ desugarStagedExpr expr = do
 
 -- | Select the compiler-side decoder and the built-in Show dictionary kind.
 closedTypeResultCodec :: Type -> Maybe (Type, Bool, String -> Maybe Type)
-closedTypeResultCodec kind
-  | element `tcEqType` naturalTy = Just (codec (mkNumLitTy . toInteger @Natural))
-  | element `tcEqType` charTy    = Just (codec mkCharLitTy)
-  | element `tcEqType` boolTy    = Just (codec promoteBool)
-  | otherwise                    = Nothing
+closedTypeResultCodec kind = do
+  (scalar, element, is_list) <- closedCallValueShape kind
+  let decode :: (Read a, Show a) => (a -> Type) -> String -> Maybe Type
+      decode promote
+        | is_list = decodeLiteral (mkPromotedListTy element . map promote)
+        | otherwise = decodeLiteral promote
+      decoder = case scalar of
+        ClosedNatural -> decode (mkNumLitTy . toInteger @Natural)
+        ClosedChar -> decode mkCharLitTy
+        ClosedBool -> decode promoteBool
+  return (element, is_list, decoder)
   where
-    (element, list_result) = case splitTyConApp_maybe kind of
-      Just (tc, [arg]) | tc == listTyCon -> (arg, True)
-      _                                  -> (kind, False)
-
     promoteBool b = mkTyConTy (if b then promotedTrueDataCon else promotedFalseDataCon)
-
-    codec :: (Read a, Show a) => (a -> Type) -> (Type, Bool, String -> Maybe Type)
-    codec promote = (element, list_result, decode)
-      where
-        decode | list_result = decodeLiteral (mkPromotedListTy element . map promote)
-               | otherwise   = decodeLiteral promote
 
     decodeLiteral :: (Read a, Show a) => (a -> Type) -> String -> Maybe Type
     decodeLiteral promote rendered = do
@@ -1457,7 +1480,10 @@ of the element dictionary. Do not select a Show instance for the list.
 A user-defined overlapping list instance could encode a different value.
 The interpreter forces the string before it returns it. The compiler
 checks the canonical form before it constructs a literal or promoted
-constructor.
+constructor. A checked result can also be the operand of a nested call.
+Use the same kind classifier to rebuild the corresponding Core literals
+and constructors. The checked kind supplies the element type of an
+empty list.
 
 For an overloaded producer, check the resolved occurrence against the
 specialized ordinary arrow. Use the same type and dictionary elaboration as

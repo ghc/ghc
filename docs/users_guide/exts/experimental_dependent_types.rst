@@ -221,6 +221,9 @@ of ``Data.Char``::
     nested :: Prelude.sum (Prelude.reverse '[2, 3, 5]) :~: 10
     nested = Refl
 
+    evenSum :: Prelude.odd (Prelude.sum '[2, 3, 5]) :~: 'False
+    evenSum = Refl
+
 In a nested call, GHC checks the argument and uses the kind of its result
 to specialize the outer function. Here the inner call returns a list of
 ``Natural``, so the outer call uses the list and ``Natural`` instances.
@@ -230,11 +233,12 @@ once. If that call fails, the error
 points to the inner function, even when the outer function would ignore
 its argument at runtime.
 
-The current implementation accepts one character literal or a promoted
-list of natural number literals. The function must take one unrestricted
-argument. It can return ``Char``, ``Bool``, ``Natural`` or a list of one of
-these types. GHC forces every result element before it constructs the
-promoted list. An empty list keeps its element kind. The producer may use
+At the innermost call, write a character literal or a promoted list of
+natural number literals. Each function takes one unrestricted argument.
+An intermediate result can be ``Natural``, ``Char``, ``Bool`` or a list of
+one of these types. The next function's argument type must match it.
+An empty list carries its element type across that boundary. GHC forces
+every result element before constructing the promoted list. The producer may use
 ordinary Haskell. The compiler needs its compiled code and a target
 interpreter. Safe Haskell rejects execution of these calls. If an imported
 function diverges, checking its application can also diverge.

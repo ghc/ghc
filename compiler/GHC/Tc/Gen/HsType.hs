@@ -2505,10 +2505,8 @@ tcClosedCallKinds name fun_ty arg inferred
     at_operand :: TcM a -> TcM a
     at_operand = setSrcSpanA (getLoc arg)
     argumentDomain domain
-      | Just actual <- inferred = at_operand $
-          if any (tcEqType actual) inputs
-            then return actual
-            else bad "The checked operand must have kind Char or [Natural]."
+      -- The inner call has already checked its result representation.
+      | Just actual <- inferred = return actual
       | any (tcEqType domain) inputs = return domain
       | Just kind <- closedCallLiteralKind arg = return kind
       | not (null predicates), any (isJust . tcMatchTy domain) inputs =

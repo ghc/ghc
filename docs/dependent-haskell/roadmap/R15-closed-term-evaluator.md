@@ -179,6 +179,15 @@ types of the functions. The enclosing type still has its own checks.
 [Kind error](../../../testsuite/tests/dependent/should_fail/NativeClosedNestedKind.hs)
 and [missing instance](../../../testsuite/tests/dependent/should_fail/NativeClosedNestedMissing.hs).
 
+Every supported result kind can also serve as an intermediate operand.
+For example, `Prelude.odd (Prelude.sum '[2, 3, 5])` returns `'False`.
+For a Boolean, the compiler recovers the data constructor that DataKinds
+promoted and uses its ordinary Core worker. For a list, it uses the
+element kind from the checked result. A computed empty list of naturals
+therefore cannot supply the Boolean list required by `and`.
+[Positive examples](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs)
+and [wrong empty-list kind](../../../testsuite/tests/dependent/should_fail/NativeClosedComputedEmpty.hs).
+
 The client records the objects for both functions. With their interfaces
 held fixed, changing either implementation can invalidate the client's
 type. [Recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedNestedDependencies.sh).

@@ -126,6 +126,10 @@ test('NativeClosedListsBottom',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs'])],
      multimod_compile_fail, ['NativeClosedListsBottom', '-v0 ' + config.ghc_th_way_flags])
+test('NativeClosedComputedEmpty',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../should_run/NativeClosedListsLib.hs'])],
+     multimod_compile_fail, ['NativeClosedComputedEmpty', '-v0 ' + config.ghc_th_way_flags])
 test('NativeClosedNestedKind',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs'])],

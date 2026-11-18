@@ -1,0 +1,7 @@
+NativeClosedComputedEmpty.hs:7:22: error: [GHC-70565]
+    • Cannot evaluate ‘and’ in a type.
+        The operand has kind [Natural], which does not match the declared input type t Bool.
+    • In the first argument of ‘(:~:)’, namely
+        ‘Prelude.and (Lib.empty '[])’
+      In the type signature:
+        wrong :: Prelude.and (Lib.empty '[]) :~: 'True

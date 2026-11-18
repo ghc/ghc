@@ -42,10 +42,19 @@ nested :: ( Prelude.sum (Prelude.reverse '[2, 3, 5]) :~: 10
           , Data.Char.toUpper (Data.Char.toLower 'Z') :~: 'Z' )
 nested = (Refl, Refl, Refl)
 
+-- The kind of a checked result determines its runtime representation.
+computed :: ( Prelude.odd (Prelude.sum '[2, 3, 5]) :~: 'False
+            , Prelude.id (Prelude.sum '[18446744073709551616, 1]) :~: 18446744073709551617
+            , Prelude.not (Data.Char.isDigit 'x') :~: 'True
+            , Prelude.and (Lib.flags '[1, 2]) :~: 'False
+            , Prelude.and (Lib.flags '[]) :~: 'True
+            , Prelude.reverse (Lib.characters '\n') :~: '[ 'λ', 'H', '\SO', '\n', '\\', '"'] )
+computed = (Refl, Refl, Refl, Refl, Refl, Refl)
+
 main :: IO ()
 main = case (reversed, emptyInput, emptyResult, bools, emptyBools, chars) of
     (Refl, Refl, Refl, Refl, Refl, Refl)
         | show [5, 3, 2 :: Natural] == "[2,3,5]" ->
-            case nested of
-                (Refl, Refl, Refl) -> print (natVal (fst (chain (Proxy @'[2, 3, 5]))))
+            case (nested, computed) of
+                ((Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl, Refl)) -> print (natVal (fst (chain (Proxy @'[2, 3, 5]))))
         | otherwise -> fail "ordinary Show did not select the overlapping list instance"
