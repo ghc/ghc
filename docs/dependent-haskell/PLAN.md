@@ -6784,3 +6784,23 @@ Both stages matched all 158 Showcase lines. The test driver passed 33
 selected normal-way tests and the registered numeral GHCi script. The
 updated `NativeSourceTable` also checks nested constructor inference.
 See the [constructor field inference references](REFERENCES.md#inferring-erased-parameters-from-constructor-fields).
+
+## M86: wildcard patterns for retained arguments and fields
+
+A wildcard in a definition discards its source name. The value can still
+occur in the type of a later argument or the result. At M85 the ordinary
+equation `keep _ x = x` fails for a dependent argument. The named version
+works. R03 needs this binding rule for functions. R04 needs it for packages.
+
+- [ ] Use the same internal identity for an anonymous retained parameter in
+      the checked pattern and its dependent suffix. Apply the rule to named
+      definitions, checked lambdas, constructor rows and package fields.
+- [ ] Bind anonymous fields of a matched index constructor at the identity
+      used by the constructor equality. Preserve source order and scope.
+- [ ] Verify default and Strict demand on bottom, independent indices,
+      ordinary linearity checks, extension-off imports and source diagnostics.
+      Update the Showcase, reference ledger, roadmap and user documentation.
+
+Agda records the source wildcard and keeps an internal variable in the
+checked telescope. The earlier matrix fallback uses the same distinction.
+See [anonymous terminal fallback equations](REFERENCES.md#anonymous-terminal-fallback-equations).
