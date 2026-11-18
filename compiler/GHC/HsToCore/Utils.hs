@@ -147,8 +147,7 @@ selectMatchVar w pat = go pat
 
     go_leaf var
       | not (hasRulesOrInline (idInfo var))
-      = assert (isManyTy w) $
-        return (mkLamBndrFromLetBndr var)
+      = return (mkLamBndrFromLetBndr var)
       | otherwise
       = new_match_var (idType var)
 

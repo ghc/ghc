@@ -51,7 +51,6 @@ import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporarily comment
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Cpr( isTopCprSig )
 import GHC.Types.InlinePragma
 import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS )
 import GHC.Types.Demand
@@ -1830,7 +1829,7 @@ simplNonRecE :: HasDebugCallStack
 
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
   | assertPpr (isId bndr && not (isJoinId bndr)) (ppr bndr) True
-  , useStrictBind env from_what bndr
+  , useStrictBind env from_what bndr rhs
   = -- Evaluate RHS strictly
     simplExprF (rhs_se `setInScopeFromE` env) rhs
                (StrictBind { sc_bndr = bndr, sc_body = body, sc_from = from_what
@@ -1865,11 +1864,10 @@ simplRecE env pairs body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
 
-useStrictBind :: SimplEnv -> FromWhat -> InId -> Bool
+useStrictBind :: SimplEnv -> FromWhat -> InId -> InExpr -> Bool
 -- Can we use a StrictBind continuation for this let-binding?
--- If so, return a binder that is suitable to become a lambda binder,
--- i.e. one satisfying `lamBndrInfoOK`; see (SB3) in Note [StrictBind]
-useStrictBind env from_what bndr
+-- See (SB3) in Note [StrictBind]
+useStrictBind env from_what bndr rhs
   -- If we are coming from a beta-reduction (FromBeta) we must
   -- establish the let-can-float invariant, so we must go via StrictBind
   -- If not, the invariant holds already, and it's optional.
@@ -1878,6 +1876,11 @@ useStrictBind env from_what bndr
 
   -- Not if the demand is non-strict
   | not (isStrUsedDmd dmd_info)
+  = False
+
+  -- Not if the RHS is ok-for-spec; no benefit. In particular if the RHS is a
+  -- value lambda, we return False: only thunks use StrictBind
+  | exprOkForSpeculation rhs
   = False
 
   -- Not if case-of-case is off
@@ -1889,13 +1892,8 @@ useStrictBind env from_what bndr
   = True
 
   -- Not for things with RULES or INLINE or NOINLINE
-  -- or with a strictnes or CPR signature -- all things we might lose
   -- See (SB3) in Note [StrictBind]
-  | isStableUnfolding (unfoldingInfo info)
-    || not (isEmptyRuleInfo (ruleInfo info))
-    || not (isAlwaysActive (inlinePragmaActivation (inlinePragInfo info)))
-    || not (isNopSig (dmdSigInfo info))
-    || not (isTopCprSig (cprSigInfo info))
+  | hasRulesOrInline info
   = False
 
   | otherwise
@@ -4243,9 +4241,8 @@ mkDupableAlt _env case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
                  , alt') }
                 -- See Note [Duplicated env]
 
-{-
-Note [Do not add unfoldings to join points at birth]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Do not add unfoldings to join points at birth]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (#15360)
 
    case (case (case (case ...))) of
@@ -4316,7 +4313,7 @@ The simplifier will find
     (Var v) with continuation
             Select (pn -> rn) (
             Select [I# a -> I# a] (
-            StrictBind body Stop
+            StrictBind body Stop))
 
 So we'll call mkDupableCont on
    Select [I# a -> I# a] (StrictBind body Stop)
@@ -4455,7 +4452,7 @@ hack and bit us in multiple small and not-so-small ways
 
 Consider this
    case (case .. ) of c {
-     I# c# -> ....c....
+     I# c# -> ....c.... }
 
 If we make a join point with c but not c# we get
   $j = \c -> ....c....
@@ -4655,30 +4652,56 @@ We simplify `rhs` with a StrictBind continuation that continues with
    invariants] in GHC.Core.  But a let-binder `x` usually has IdInfo that a
    lambda binder may not have (an unfolding, arity, a demand signature...).
 
-   So `useStrictBind_maybe` zaps that info, keeping only the occurrence info
-   and the demand info.  If it happens to stay as a let-binding arity info will
-   be re-derived, so nothing is lost.
+   So when we duplicate StrictBind, in `mkDupableContWithDmds`, we use
+   `mkLamBndrFromLetBndr` to zap that info, keeping only the occurrence
+   info and the demand info.
 
-   The exceptions are RULES, a stable unfolding, and a non-default inlining
-   activation: these cannot be re-derived, and we have nowhere convenient to
-   put them if `x` becomes a lambda binder. For example:
+   However, if the let-binder has
+    * RULES
+    * a stable unfolding
+    * a non-default inlining activation
+   we'd permanently lose these things if we lambda-bind it.  For example:
        let {-# NOINLINE x #-}
            x! = case y of { ... }
        in blah
-   If we make a join point  j x = blah, we have nowhere convenient
-   to put that NOINLINE.  Ditto INLINE or RULES.  So in these cases we
-   simply don't use StrictBind.  It's very unusual, so no harm done.
-   But it does happen; one example is this, in the Applicative (ST s)
-   instance in GHC.Internal.Control.Monad.St.Lazy.Imp
+   If we make a join point j x = blah, we have nowhere convenient to put that
+   NOINLINE.  Ditto INLINE or RULES.  It's unusual. But it happens; one example
+   is the Applicative (ST s) instance in GHC.Internal.Control.Monad.St.Lazy.Imp
          {-# NOINLINE res1 #-}
          !res1 = unST fm s
 
-   TL;DR: the sc_bndr::Id field in StrictBind always satisfies `lamBndrInfoOK`.
-   This means that in the above example { x! = case y of ... } we won't
-   float the `case y` out. And perhaps that's fine because of the NOINLNE.
-   We could imagine instead imposing these conditions only when we /duplicate/
-   the StrictBind, rather than when we /create/ it, but that would require a
-   bigger refactor.
+   So in these cases we simply don't use StrictBind -- see `useStrictBind`.  We
+   could imagine instead imposing these conditions only when we /duplicate/ the
+   StrictBind, rather than when we /create/ it, but that would require a bigger
+   refactor.  See (SB5) for why we don't worry if the binder has strictness or
+   CPR information.
+
+(SB4) Shortcoming: not using StrictBind has a cost.  If we have
+        {-# NOINLINE x #-}
+        x! = case y of (a,b) -> a
+   then isnce x is used strictly, we'd usually float that `case y` outwards -- but
+   we do so precisely by using StrictBind.  But since the NOINLINE stops us using
+   StrictBind we won't float out the case.
+
+   Fixing this would require `mkDupableCont` to return a non-duplicable tail of
+   the continuation (declining to duplicate a StrictBind with a NOINLINE, say).
+   But that's a lot of plumbing for a very narrow case. Who writes INLINE or NOINLINE
+   or RULES for a thunk?  So we just accept the shortcoming.
+
+(SB5) What if a thunk has a strictness signature, or CPR information? We
+   could make `useStrictBind` say False in these cases too, but that turns
+   out to be a net loss: keeping a thunk is worse than losing the strictness
+   information. Example, where f1,f2 are both strict:
+         let f* {- Str=<S> -} = case x of { True -> f1; False -> f2 }
+         in  body
+   Keeping it as-is would use CBV for calls of `f` in `body`.  But
+   allowing StrictBind would give us
+         join j f* = body
+         in case x of { True -> j f1; False -> j f2 }
+   which avoids the thunk. It's a trade-off.
+
+   For CPR info, see Note [Thunk splitting] in GHC.Core.Opt.WorkWrap,
+   especially (B) CPR-led thunk splitting.
 
 Note [Join point abstraction]  Historical note
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

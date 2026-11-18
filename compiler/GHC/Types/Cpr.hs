@@ -8,6 +8,7 @@
 module GHC.Types.Cpr (
     Cpr (ConCpr), topCpr, botCpr, flatConCpr, asConCpr,
     CprType (..), topCprType, botCprType, flatConCprType,
+    cprTypeArity, cprTypeCpr,
     lubCprType, applyCprTy, abstractCprTy, trimCprTy,
     UnpackConFieldsResult (..), unpackConFieldsCpr,
     CprSig (..), topCprSig, isTopCprSig, mkCprSigForArity, mkCprSig,
@@ -106,6 +107,12 @@ data CprType
                       --   'ct_arty' arguments
   }
 
+cprTypeArity :: CprType -> Arity
+cprTypeArity = ct_arty
+
+cprTypeCpr :: CprType -> Cpr
+cprTypeCpr = ct_cpr
+
 instance Eq CprType where
   a == b =  ct_cpr a == ct_cpr b
          && (ct_arty a == ct_arty b || ct_cpr a == topCpr)
@@ -167,7 +174,7 @@ seqCprTy (CprType _ cpr) = seqCpr cpr
 
 -- | The arity of the wrapped 'CprType' is the arity at which it is safe
 -- to unleash. See Note [Understanding DmdType and DmdSig] in "GHC.Types.Demand"
-newtype CprSig = CprSig { getCprSig :: CprType }
+newtype CprSig = CprSig { cprSigType :: CprType }
   deriving (Eq, Binary)
 
 -- | Turns a 'CprType' computed for the particular 'Arity' into a 'CprSig'

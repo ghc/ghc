@@ -32,7 +32,7 @@ module GHC.Types.Id.Info (
         setOneShotInfo,
 
         -- ** Zapping various forms of Info
-        zapLamInfo, zapFragileInfo,
+        zapLamInfo, zapFragileInfo, hasRulesOrInline,
         lazifyDemandInfo, floatifyDemandInfo,
         zapUsageInfo, zapUsageEnvInfo, zapUsedOnceInfo,
         zapTailCallInfo, zapCallArityInfo, trimUnfolding,
@@ -963,3 +963,10 @@ zapTailCallInfo info
 
 zapCallArityInfo :: IdInfo -> IdInfo
 zapCallArityInfo info = setCallArityInfo info 0
+
+hasRulesOrInline :: IdInfo -> Bool
+-- See (SB3) of Note [StrictBind]
+hasRulesOrInline info
+  = isStableUnfolding (unfoldingInfo info)
+    || not (isEmptyRuleInfo (ruleInfo info))
+    || not (isAlwaysActive (inlinePragmaActivation (inlinePragInfo info)))

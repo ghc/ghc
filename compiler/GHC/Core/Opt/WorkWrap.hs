@@ -598,13 +598,20 @@ tryWW ww_opts is_rec fn_id rhs
   = splitFun ww_opts new_fn_id rhs
 
   -- See Note [Thunk splitting]
-  | isNonRec is_rec, is_thunk
-  = splitThunk ww_opts is_rec new_fn_id rhs
+  | isNonRec is_rec     -- See (TS4)
+  , is_thunk  -- All join points go via splitFun
+  , not (hasRulesOrInline (fn_info))  -- See (TS9)
+  = do { -- Try strictness then CPR; see (TS5)
+         rhs' <- splitThunkStr ww_opts new_fn_id rhs `orElseM`
+                 splitThunkCpr ww_opts new_fn_id rhs `orElseM`
+                 return rhs
+       ; return [ (new_fn_id, rhs') ] }
 
   | otherwise
   = return [ (new_fn_id, rhs) ]
 
   where
+    is_join        = isJoinId fn_id
     fn_info        = idInfo fn_id
     (wrap_dmds, _) = splitDmdSig (dmdSigInfo fn_info)
     new_fn_id      = zap_join_cpr $ zap_usage fn_id
@@ -613,14 +620,13 @@ tryWW ww_opts is_rec fn_id rhs
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
         -- See Note [Zapping Used Once info in WorkWrap]
 
-    zap_join_cpr id
-      | isJoinId id = id `setIdCprSig` topCprSig
-      | otherwise   = id
+    zap_join_cpr id | is_join   = id `setIdCprSig` topCprSig
+                    | otherwise = id
         -- See Note [Don't w/w join points for CPR]
 
-    is_fun     = notNull wrap_dmds || isJoinId fn_id
-    is_thunk   = not is_fun && not (exprIsHNF rhs) && not (isJoinId fn_id)
-                            && not (isUnliftedType (idType fn_id))
+    is_fun     = notNull wrap_dmds || is_join
+    is_thunk   = not (exprIsHNF rhs)
+                 && not (isUnliftedType (idType fn_id))
 
 {-
 Note [Zapping DmdEnv after Demand Analyzer]
@@ -806,7 +812,7 @@ splitFun ww_opts fn_id rhs
 
     (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
 
-    cpr_ty = getCprSig (cprSigInfo fn_info)
+    cpr_ty = cprSigType (cprSigInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
     cpr = assertPpr (isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info)
@@ -957,114 +963,182 @@ the form [Demand=<L,1*(C(1,...(C(1,U))))>]
 
 Note [Thunk splitting]
 ~~~~~~~~~~~~~~~~~~~~~~
-Suppose x is used strictly; never mind whether it has the CPR
-property.  I'll use a '*' to mean "x* is demanded strictly".
+The worker/wrapper split mainly affects let-bound /functions/.  But we can also use
+demand and CPR information to improve let-bound /thunks/.  Specifically:
 
-      let
-        x* = x-rhs
+* (A) Demand-led thunk splitting:
+  If a thunk is demanded strictly, perhaps nestedly, we can turn it into a
+  case, perhaps nestedly.  For example
+       let x :: (Int, Int)
+           {- Dmd = SP(S,L) -}
+           x = rhs
+       in body
+   We would ultimately like to get
+        case rhs of x { (a,b) ->
+        case a of { I# a# ->
+        body
+
+   This is much better: no thunk for `rhs`; and known-data-con unfoldings for `x`
+   and `a` inside `body`.
+
+* (B) CPR-led thunk splitting:
+  If a thunk has the (possibly-nested) CPR property /and/ is demanded strictly
+  at top level, we can again generate a case
+       let x :: (Int, Int)
+           {- Dmd = S, Cpr = (_, I# _) -}
+           x = rhs
+       in body
+   The CPR info says that if `x` is evaluated (which it is), it'll return a pair,
+   whose second component can very cheaply be evaluated to a (I# b#).  We would
+   like to end up with
+        case rhs of x { (a,b) ->
+        case b of { I# b# ->
+        body
+   which is good for the same reasons as before.  See (TS3) for an example.
+
+Implementation
+~~~~~~~~~~~~~~
+The worker/wrapper pass does not generate these nested case expressions directly.
+Instead it generates a regular let-binding but, since the binder is marked as
+strict, any `case` expressions in the RHS will float out.  Specifically:
+
+(TS1) For (A), `splitThunkStr` generates the binding
+      let x! = case rhs of { (a,b) ->
+               case a of { I# a# ->
+               (I# a, b)
+  Now when the Simplifier floats the `case` expressions out, we get
+      case rhs of { (a,b) ->
+      case a of { I# a# ->
+      let x = (I# a, b)
       in body
+  which is equivalent to the expression in (A) above.
 
-splitThunk transforms like this:
-      let
-        x* = let x = x-rhs in
-             case x of { I# a -> I# a }
-      in body
+  `splitThunkStr` also works on /absent/ thunks: see (TS6).
 
-This is a little strange: we are re-using the same `x` in the RHS; and
-the RHS takes `x` apart and reboxes it. But because the outer 'let' is
-strict, and the inner let mentions `x` only once, the simplifier
-transform it to
-      case x-rhs of
-        I# a -> let x* = I# a
-                in body
+  Rather cleverly, `splitThunkStr` uses `mkWWstr_one`, the /existing/ function
+  argument w/w splitting function, to do the unpacking.  This automatically
+  deals with nested strictness.
 
-That is good: in `body` we know the form of `x`, which
-  * gives the CPR property, and
-  * allows case-of-case to happen on x
+(TS2) For (B), `splitThunkCpr` behaves exactly analogously, again
+  using `mkWWcpr_one` to do the unpacking. It works only for /demanded/ thunks.
 
-Notes
-* I tried transforming like this:
-      let
-        x* = let x = x-rhs in
-             case x of { I# a -> x }
-      in body
-  where I return `x` itself, rather than reboxing it.  But this
-  turned out to cause some regressions, which I never fully
-  investigated.
+Wrinkles:
 
-* Suppose x-rhs is itself a case:
-        x-rhs = case e of { T -> I# e1; F -> I# e2 }
-  Then we'll get
-      join j a = let x* = I# a in body
-      in case e of { T -> j e1; F -> j e2 }
-  which is good (no boxing).  But in the original, unsplit program
-  we would transform
-      let x* = case e of ... in body
-  ==> join j2 x = body
-      in case e of { T -> j2 (I# e1); F -> j (I# e2) }
+(TS3) Here's an example of (B), thunk-splitting based on CPR information.
+  Suppose we have
+        let x! = case e of { T -> Just e1; F -> Just e2 }
+        in body
+  If the Simplifier floats the `case` out, we get
+      join j2 x = body
+      in case e of { T -> j2 (Just e1); F -> j2 (Just e2) }
   which is not good (boxing).
 
-* In fact, splitThunk uses the function argument w/w splitting
-  function, mkWWstr_one, so that if x's demand is deeper (say U(U(L,L),L))
-  then the splitting will go deeper too.
+  If we first do the thunk-splitting transformation, we get
+        let x! = case (case e of { T -> Just e1; F -> Just e2 }) of
+                   Just a -> Just a
+        in body
 
-* For recursive thunks, the Simplifier is unable to float `x-rhs` out of
-  `x*`'s RHS, because `x*` occurs freely in `x-rhs`, and will just change it
-  back to the original definition, so we just split non-recursive thunks.
+  Now when the Simplifier floats we will get:
+      join j a = let x = Just a in body
+      in case e of { T -> j e1; F -> j e2 }
+  which is much better (no boxing).   But see (TS9).
 
-Note [Thunk splitting for top-level binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Top-level bindings are never strict. Yet they can be absent, as T14270 shows:
+(TS4) We only do thunk-splitting for thunks that are non-recursive
+  For recursive thunks, the Simplifier is unable to float `rhs` out of
+  x's RHS, because `x` occurs freely in `rhs`, and will just change it
+  back to the original definition.
 
-  module T14270 (mkTrApp) where
-  mkTrApp x y
-    | Just ... <- ... typeRepKind x ...
-    = undefined
-    | otherwise
-    = undefined
-  typeRepKind = Tick scc undefined
+(TS5) Notice that (B) CPR-led thunk splitting can be useful:
+  * when multi-constructor data types are involved, so that the argument-unboxing
+    mechanism (A) is impotent.  See the example in (TS3), which uses `Maybe`.
+  * when the binder is only demanded head-strictly, but CPR has nested information.
 
-(T19180 is a profiling-free test case for this)
-Note that `typeRepKind` is not exported and its only use site in
-`mkTrApp` guards a bottoming expression. Thus, demand analysis
-figures out that `typeRepKind` is absent and splits the thunk to
+  So (A) and (B) have complementary benefits.  We might do even better by
+  /combining/ (A) and (B), but at the moment we try (A) first, and then try (B)
+  if (A) is impotent.  Combining them would be more work.
 
-  typeRepKind =
-    let typeRepKind = Tick scc undefined in
-    let typeRepKind = absentError in
-    typeRepKind
+(TS6) We can also exploit /absence/.  Consider
+         let x {-# Dmd = A #-} = rhs
+         in body
+   Generally speaking `x` will be absent becuase it is passed to functions that
+   don't use it, in which case worker/wrapper on those calls will make `x` unused.
+   But suppose `x` is absent inside a /lazy/ argument:
+         let f p = (fst p, 99) in
+         let x = rhs in
+         f (True, x)
+   Here f's argument is lazy, but `x` is definitely absent, and we could replace
+   `x` with an absent filler.  Using (TS1) would give us
+         let x = absentError "urk" in ...
+   which is great.
 
-But now we have a local binding with an External Name
-(See Note [About the NameSorts]). That will trigger a CoreLint error, which we
-get around by localising the Id for the auxiliary bindings in 'splitThunk'.
+   So `splitThunkStr` works /regardless/ of the demand on `x`; whether it fires is
+   determined only by the  `useful` flag returned by `mkWWstr_one`.
+
+(TS7) Adopting (TS6) leads to one other complication: a top-level binder with
+   an External Name (see Note [About the NameSorts]) can be  Absent.  If so,
+   it must not be used as a local binder in the `Let` created by `splitThunkStr`.
+   T19180 is a test case for this rather obscure situation.
+
+   Solution: use `localiseId` to localise the binder for the `Let`.
+
+(TS8) Consider out poster child test case for `splitThunkCpr`, in (TS3).
+         x! = case e of { True -> Just 1; False -> Just 2 }
+  But suppose we have `-fworker-wrapper-cbv` enabled (reminder: see
+  Note [Worker/wrapper for strict arguments]).  Then alas `splitThunkStr`
+  will fire, but it'll be a no-op in this case.  But since it fires, `splitThunkCpr`
+  never gets a chance.
+
+  Hacky but effective solution: switch off `wo_unlift_strict` locally in `splitThunkStr`.
+
+(TS9) `splitThunkStr` implicitly relies on floating a case out of a strict binding.
+  But if the thunk has a RULE or INLINE/NOINLINE pragma that won't happen; see
+  (SB4) in Note [StrictBind] in GHC.Core.Opt.Simplify.Iteration.  So we test
+  these things before applying thunk splitting.
 -}
 
--- | See Note [Thunk splitting].
---
--- splitThunk converts the *non-recursive* binding
+-- | splitThunkStr converts the *non-recursive* binding
 --      x = e
 -- into
---      x = let x' = e in
---          case x' of I# y -> let x' = I# y in x'
--- See comments above. Is it not beautifully short?
--- Moreover, it works just as well when there are
--- several binders, and if the binders are lifted
--- E.g.     x = e
---     -->  x = let x' = e in
---              case x' of (a,b) -> let x' = (a,b)  in x'
--- Here, x' is a localised version of x, in case x is a
--- top-level Id with an External Name, because Lint rejects local binders with
--- External Names; see Note [About the NameSorts] in GHC.Types.Name.
---
--- How can we do thunk-splitting on a top-level binder?  See
--- Note [Thunk splitting for top-level binders].
-splitThunk :: WwOpts -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
-splitThunk ww_opts is_rec x rhs
-  = assert (not (isJoinId x)) $
-    do { let x' = localiseId x -- See comment above
-       ; (useful,_args, wrap_fn, fn_arg)
-           <- mkWWstr_one ww_opts x' NotMarkedStrict
-       ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn fn_arg)) ]
-       ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
-                   return res
-                   else return [(x, rhs)] }
+--      x = let x = e in
+--          case x of I# y -> I# y
+-- See Note [Thunk splitting].
+splitThunkStr :: WwOpts -> Var -> CoreExpr -> UniqSM (Maybe CoreExpr)
+splitThunkStr ww_opts x rhs
+  = -- NB: does not depend on x's demand being strict; it might be absent, see (TS6)
+    do { let x' = localiseId x -- See (TS7)
+             ww_opts' = ww_opts { wo_unlift_strict = False }  -- See (TS8)
+       ; (useful, _transit_vars, wrap_fn, fn_arg) <- mkWWstr_one ww_opts' x' NotMarkedStrict
+            -- Use mkWWstr_one: see (TS1) in Note [Thunk splitting]
+
+       ; if useful
+         then return (Just (Let (NonRec x' rhs) $
+                            wrap_fn fn_arg))
+         else return Nothing }
+
+splitThunkCpr :: WwOpts -> Var -> CoreExpr -> UniqSM (Maybe CoreExpr)
+-- See Note [Thunk splitting]
+-- Given x* = rhs, where x* is used outermost-strictly, and x* has a (nested) CPR
+-- property, say Just (Just _), return this new RHS:
+--     let x' = rhs in
+--     case x' of { Just p -> case p of { Just q ->   -- Unpacking code
+--       Just (Just q) }}                             -- Repacking code
+-- Works for multi-constructor data types, where splitThunkStr will fail
+splitThunkCpr ww_opts x rhs
+  | wo_cpr_anal ww_opts   --  See (CPR1) in Note [Phase ordering] on GHC.Opt.CprAnal
+  , isStrUsedDmd (idDemandInfo x) -- See (TS2)
+  = assertPpr (cprTypeArity cpr_type == 0) (ppr x) $   -- It's a thunk
+    do { (useful, _transit_vars, rebuild_result, unpacker) <- mkWWcpr_one ww_opts x cpr
+            -- Use mkWWcpr_one: see (TS2) in Note [Thunk splitting]
+       ; if useful
+         then return (Just (Let (NonRec x rhs) $
+                            unpacker rebuild_result))
+         else return Nothing }
+
+  | otherwise
+  = return Nothing
+  where
+    cpr_type :: CprType
+    cpr_type = cprSigType (idCprSig x)
+    cpr :: Cpr
+    cpr = cprTypeCpr cpr_type
+

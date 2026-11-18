@@ -638,4 +638,5 @@ test('T27963', [grep_errmsg(r'f/42')], compile, ['-O -ddump-rule-firings'])
 test('T27965', normal, compile, ['-O'])
 test('T27965a', normal, compile, ['-O'])
 test('T27965b', normal, compile, ['-O'])
+test('T28158', normal, compile, ['-O -dno-typeable-binds -dsuppress-all -dsuppress-uniques -ddump-simpl'])
 

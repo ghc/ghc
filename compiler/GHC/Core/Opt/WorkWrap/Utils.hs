@@ -8,7 +8,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
-   ( WwOpts(..), mkWwBodies, mkWWstr, mkWWstr_one
+   ( WwOpts(..), mkWwBodies, mkWWstr, mkWWstr_one, mkWWcpr_one
    , needsVoidWorkerArg
    , DataConPatContext(..)
    , UnboxingDecision(..), canUnboxArg
@@ -139,13 +139,18 @@ data WwOpts
   = MkWwOpts
   { -- | Environment of type/data family instances
     wo_fam_envs          :: !FamInstEnvs
+
   , -- | Options for the "Simple optimiser"
     wo_simple_opts       :: !SimpleOpts
+
   , -- | Whether to enable "Constructed Product Result" analysis.
     -- (Originally from DOI: 10.1017/S0956796803004751)
+    --  See (CPR1) in Note [Phase ordering] on GHC.Opt.CprAnal
     wo_cpr_anal          :: !Bool
+
   , -- | Used for absent argument error message
     wo_module            :: !Module
+
   , -- | Generate workers even if the only effect is some args get passed
     -- unlifted. See Note [WW for calling convention]
     wo_unlift_strict     :: !Bool }
@@ -230,8 +235,7 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
         ; let (work_args, work_marks) = unzip work_args_str
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr)
-              <- mkWWcpr_entry opts res_ty' res_cpr
+        ; (useful2, wrap_fn_cpr, work_fn_cpr) <- mkWWcpr_entry opts res_ty' res_cpr
 
         ; let (work_lam_args, work_call_args, work_call_str)
                 | needsVoidWorkerArg fun_id arg_vars work_args
@@ -662,8 +666,10 @@ canUnboxResult fam_envs ty cpr
   = DontUnbox
 
   where
-    -- See Note [non-algebraic or open body type warning]
-    open_body_ty_warning = warnPprTrace True "canUnboxResult: non-algebraic or open body type" (ppr ty) Nothing
+    -- See Note [Non-algebraic or open body type warning]
+    open_body_ty_warning
+      = warnPprTrace True "canUnboxResult: non-algebraic or open body type"
+                     (ppr ty) Nothing
 
 
 
@@ -808,7 +814,7 @@ match the number of constructor arguments; this happened in #8037.
 If so, the worker/wrapper split doesn't work right and we get a Core Lint
 bug.  The fix here is simply to decline to do w/w if that happens.
 
-Note [non-algebraic or open body type warning]
+Note [Non-algebraic or open body type warning]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are a few cases where the W/W transformation is told that something
 returns a constructor, but the type at hand doesn't really match this. One
@@ -828,73 +834,6 @@ other cases where something went avoidably wrong.
 This warning also triggers for the stream fusion library within `text`.
 We can't easily W/W constructed results like `Stream` because we have no simple
 way to express existential types in the worker's type signature.
-
-Note [WW for calling convention]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we know a function f will always evaluate a particular argument
-we might decide that it should rather get evaluated by the caller.
-We call this "unlifting" the argument.
-Sometimes the caller knows that the argument is already evaluated,
-so we won't generate any code to enter/evaluate the argument.
-This evaluation avoidance can be quite beneficial.
-Especially for recursive functions who pass the same lifted argument
-along on each iteration or walk over strict data structures.
-
-One way to achieve this is to do a W/W split, where the wrapper does
-the evaluation, and the worker can treat its arguments as unlifted.
-The wrapper is small and will be inlined at almost all call sites and
-the evaluation code in the wrapper can then cancel out with evaluation
-done by the calling context if the argument is evaluated there.
-Same idea as W/W to avoid allocation really, just for a different kind
-of work.
-
-Performing W/W might not always be a win. In particular it's easy to break
-(badly written, but common) rule frameworks by doing additional W/W splits.
-See #20364 for a more detailed explanation.
-
-Hence we have the following strategies with different trade-offs:
-
-A) Never do W/W *just* for unlifting of arguments.
-  + Very conservative - doesn't break any rules
-  - Lot's of performance left on the table
-
-B) Do W/W on just about anything where it might be
-  beneficial.
-  + Exploits pretty much every opportunity for unlifting.
-  - A bit of compile time/code size cost for all the wrappers.
-  - Can break rules which would otherwise fire. See #20364.
-
-C) Unlift *any* (non-boot exported) functions arguments if they are strict.
-  That is instead of creating a Worker with the new calling convention we
-  change the calling convention of the binding itself.
-  + Exploits every opportunity for unlifting.
-  + Maybe less bad interactions with rules.
-  - Requires tracking of boot-exported definitions.
-  - Requires either:
-    ~ Eta-expansion at *all* call sites in order to generate
-      an impedance matcher function. Leading to massive code bloat.
-      Essentially we end up creating a impromptu wrapper function
-      wherever we wouldn't inline the wrapper with a W/W approach.
-    ~ There is the option of achieving this without eta-expansion if we instead
-      expand the partial application code to check for demands on the calling
-      convention and for it to evaluate the arguments. The main downsides there
-      would be the complexity of the implementation and that it carries a
-      certain overhead even for functions who don't take advantage of this
-      functionality. I haven't tried this approach because it's not trivial to
-      implement and doing W/W splits seems to work well enough.
-
-Currently we use the first approach A) by default, with a flag that allows users
-to fall back to the more aggressive approach B).
-
-I also tried the third approach C) using eta-expansion at call sites to avoid
-modifying the PAP-handling code which wasn't fruitful. See
-https://gitlab.haskell.org/ghc/ghc/-/merge_requests/5614#note_389903.  We could
-still try to do C) in the future by having PAP calls which will evaluate the
-required arguments before calling the partially applied function. But this would
-be neither a small nor simple change so we stick with A) and a flag for B) for
-now.
-
-See also Note [EPT enforcement] and Note [CBV Function Ids: overview]
 
 Note [Worker/wrapper for strict arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -923,7 +862,7 @@ in GHC.Types.Id.Info) and the code generator guarantees that every
 call to `$wf` has a properly tagged argument (see `GHC.Stg.EnforceEpt.Rewrite`).
 
 Is this a win?  Not always:
-* It can cause slight codesize increases. This is since we push evals to every
+* It can cause slight code size increases. This is since we push evals to every
   call sites which there might be many. And the evals will only disappear at
   call sites where we already known that the argument is evaluated.
 
@@ -932,16 +871,87 @@ Is this a win?  Not always:
   if you depend on rules firing on functions marked as NOINLINE
   without marking use sites of these functions as INLINE or INLINEABLE
   then things will break.
-  But if you want a function to match in a RULE, it is /in any case/ good practice to
-  have a `INLINE[1]` or `NOINLNE[1]` pragma, to ensure that it doesn't inline until
-  the rule has had a chance to fire.
+
+  But if you want a function to match in a RULE, it is /in any case/ good
+  practice to have a `INLINE[1]` or `NOINLNE[1]` pragma, to ensure that it
+  doesn't inline until the rule has had a chance to fire.
 
 So there is a flag, `-fworker-wrapper-cbv`, to control whether we do
 w/w on strict arguments (internally `Opt_WorkerWrapperUnlift`).  The
 flag is off by default.  The choice is made in
-GHC.Core.Opt.WorkWrape.Utils.wwUseForUnlifting
+GHC.Core.Opt.WorkWrap.Utils.wwUseForUnlifting
 
-See also `Note [WW for calling convention]` in GHC.Core.Opt.WorkWrap.Utils
+See also `Note [WW for calling convention]`
+
+Note [WW for calling convention]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   NB: This Note is more of a discussion.
+       Read Note [Worker/wrapper for strict arguments] first,
+       which covers the same ground with more precision
+
+If we know a function f will always evaluate a particular argument
+we might decide that it should rather get evaluated by the caller.
+We call this "unlifting" the argument.
+Sometimes the caller knows that the argument is already evaluated,
+so we won't generate any code to enter/evaluate the argument.
+This evaluation avoidance can be quite beneficial.
+Especially for recursive functions who pass the same lifted argument
+along on each iteration or walk over strict data structures.
+
+One way to achieve this is to do a W/W split, where the wrapper does
+the evaluation, and the worker can treat its arguments as unlifted.
+The wrapper is small and will be inlined at almost all call sites and
+the evaluation code in the wrapper can then cancel out with evaluation
+done by the calling context if the argument is evaluated there.
+Same idea as W/W to avoid allocation really, just for a different kind
+of work.
+
+Performing W/W might not always be a win. In particular it's easy to break
+(badly written, but common) rule frameworks by doing additional W/W splits.
+See #20364 for a more detailed explanation.
+
+Hence we have the following strategies with different trade-offs:
+
+A) Never do W/W *just* for unlifting of arguments.
+  + Very conservative - doesn't break any rules
+  - Lots of performance left on the table
+
+B) Do W/W on just about anything where it might be beneficial.
+  + Exploits pretty much every opportunity for unlifting.
+  - A bit of compile time/code size cost for all the wrappers.
+  - Can break rules which would otherwise fire. See #20364.
+
+C) Unlift *any* (non-boot exported) functions arguments if they are strict.
+  That is instead of creating a Worker with the new calling convention we
+  change the calling convention of the binding itself.
+  + Exploits every opportunity for unlifting.
+  + Maybe less bad interactions with rules.
+  - Requires tracking of boot-exported definitions.
+  - Requires either:
+    ~ Eta-expansion at *all* call sites in order to generate
+      an impedance matcher function. Leading to massive code bloat.
+      Essentially we end up creating a impromptu wrapper function
+      wherever we wouldn't inline the wrapper with a W/W approach.
+    ~ There is the option of achieving this without eta-expansion if we instead
+      expand the partial application code to check for demands on the calling
+      convention and for it to evaluate the arguments. The main downsides there
+      would be the complexity of the implementation and that it carries a
+      certain overhead even for functions who don't take advantage of this
+      functionality. I haven't tried this approach because it's not trivial to
+      implement and doing W/W splits seems to work well enough.
+
+Currently we use the first approach (A) by default, with a flag `-fworker-wrapper-cbv`
+that allows users to fall back to the more aggressive approach (B).
+
+I also tried the third approach (C) using eta-expansion at call sites to avoid
+modifying the PAP-handling code which wasn't fruitful. See
+https://gitlab.haskell.org/ghc/ghc/-/merge_requests/5614#note_389903.  We could
+still try to do C) in the future by having PAP calls which will evaluate the
+required arguments before calling the partially applied function. But this would
+be neither a small nor simple change so we stick with A) and a flag for B) for
+now.
+
+See also Note [EPT enforcement] and Note [CBV Function Ids: overview]
 -}
 
 {-
@@ -985,6 +995,12 @@ mkWWstr opts args str_marks
 --   * wrap_arg assumes work_args are in scope, and builds a ConApp that
 --        reconstructs the RHS of wrap_var that we pass to the original RHS
 -- See Note [Worker/wrapper for Strictness and Absence]
+--
+-- E.g. mkWWstr_one (x :: (Int,Int) with strictess saying to unbox the pair and second Int
+--        = ( True                                             -- useful
+--          , [p,q#],                                          -- work_args
+--          , \e -> case x of (p,q) -> case q of I# q# -> e    -- wrap_fn
+--          , (p, I# q) )                                      -- wrap_arg
 mkWWstr_one :: WwOpts
             -> Var
             -> StrictnessMark
@@ -1008,7 +1024,7 @@ mkWWstr_one opts arg str_mark =
 
     DontUnbox
       | isStrictDmd arg_dmd || isMarkedStrict str_mark
-      , wwUseForUnlifting opts  -- See Note [WW for calling convention]
+      , wwUseForUnlifting opts  -- See Note [Worker/wrapper for strict arguments]
       , not (isFunTy arg_ty)
       , not (isUnliftedType arg_ty) -- Already unlifted!
         -- NB: function arguments have a fixed RuntimeRep,
@@ -1163,7 +1179,7 @@ function is worthy for splitting:
 2b But if e.g. a large tuple or product type is always demanded we might
    decide to "unlift" it. That is tighten the calling convention for that
    argument to require it to be passed as a pointer to the value itself.
-   See Note [WW for calling convention].
+   See Note [Worker/wrapper for strict arguments]
 
 3. In all other cases (e.g., lazy, used demand and not eval'd),
    'finaliseArgBoxities' will have cleared the Boxity flag to 'Boxed'
@@ -1604,7 +1620,9 @@ mkWWcpr_entry
              CoreExpr -> CoreExpr)     -- New worker.  'nop_fn' if not useful
 -- ^ Entrypoint to CPR W/W. See Note [Worker/wrapper for CPR] for an overview.
 mkWWcpr_entry opts body_ty body_cpr
-  | not (wo_cpr_anal opts) = return (boringSplit, nop_fn, nop_fn)
+  | not (wo_cpr_anal opts) --  See (CPR1) in Note [Phase ordering] on GHC.Opt.CprAnal
+  = return (boringSplit, nop_fn, nop_fn)
+
   | otherwise = do
     -- Part (1)
     res_bndr <- mk_res_bndr body_ty
@@ -1637,7 +1655,9 @@ mk_res_bndr body_ty = do
 --   1. A 'WwUse' capturing whether the split does anything useful.
 --   2. The list of transit variables (see the Note).
 --   3. The result builder expression for the wrapper.  The original case binder if not useful.
---   4. The result unpacking expression for the worker. 'nop_fn' if not useful.
+--      Assumes that the transit vars are in scope
+--   4. The result unpacking expression for the worker. 'nop_fn' if not useful
+--      Brings the transit vars into scope
 type CprWwResultOne  = (WwUse, OrdList Var,  CoreExpr , CoreExpr -> CoreExpr)
 type CprWwResultMany = (WwUse, OrdList Var, [CoreExpr], CoreExpr -> CoreExpr)
 
@@ -1768,7 +1788,7 @@ To achieve said transformation, 'mkWWcpr_entry'
      what belongs in the case scrutinee of the unpacker through the communicated
      Id `r`: The unpacking expression will be free in that variable.
      (This is a similar contract as that of 'mkWWstr_one' for strict args.)
-  3. 'mkWWstr_one' produces a bunch of *transit vars*: Those result variables
+  3. 'mkWWcpr_one' produces a bunch of *transit vars*: Those result variables
      that have to be transferred from the worker to the wrapper, where the
      constructed result can be rebuilt, `a` and `b` above. Part (3) is
      responsible for tupling them up in the worker and taking the tuple apart
