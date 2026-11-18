@@ -6,7 +6,7 @@ import ClosedTableLibrary
 import Control.Exception (ArithException(DivideByZero), evaluate, throw, try)
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import PackedVecLibrary (Nat(..), isSuccessor, natToInt, previous)
+import PackedVecLibrary (Nat(..), boolVector, isSuccessor, listCount, natToInt, previous, toList)
 
 type Flipped = '[flipBit 'False, flipBit 'True]
 
@@ -44,6 +44,22 @@ data Change = Change Signal Signal
 after :: Change -> Signal
 after (Change _ new) = new
 
+lengthProof :: listCount '[ 'True, 'False] :~: 'S ('S 'Z)
+lengthProof = Refl
+
+tailProof :: Proxy (xs :: [Bool]) -> listCount ('True ': xs) :~: 'S (listCount xs)
+tailProof _ = Refl
+
+-- The recursive equation can precede its input datatype in this group.
+bitCount :: Bits -> Nat
+bitCount End = Z
+bitCount (Bit _ bs) = S (bitCount bs)
+
+data Bits = End | Bit Bool Bits
+
+bitsProof :: bitCount ('Bit 'False 'End) :~: 'S 'Z
+bitsProof = Refl
+
 main :: IO ()
 main = case (flipProof, signalProof, phaseProof) of
   (Refl, Refl, Refl) -> do
@@ -54,3 +70,7 @@ main = case (flipProof, signalProof, phaseProof) of
     print (natToInt (previous (S (S Z))), isSuccessor (S (throw DivideByZero)))
     demanded <- try (evaluate (natToInt (previous (S (throw DivideByZero)))))
     print (demanded == Left DivideByZero)
+    print (toList (boolVector [False, True]), natToInt (listCount [throw DivideByZero]))
+    print (isSuccessor (listCount (True : throw DivideByZero)))
+    spine <- try (evaluate (natToInt (listCount (True : throw DivideByZero))))
+    print (spine == Left DivideByZero)

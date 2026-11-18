@@ -46,6 +46,7 @@ import GHC.Unit
 import GHC.Unit.Module.Warnings
 import GHC.Builtin( mkUnboundName )
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs (consDataCon_RDR)
 
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
@@ -53,7 +54,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..), RuleName, RecFlag(..) )
+import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..), RuleName, RecFlag )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
 import GHC.Types.Unique.Set
@@ -78,7 +79,7 @@ import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
 import Data.List ( partition )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
-import Data.Maybe ( isNothing, fromMaybe, mapMaybe, maybeToList )
+import Data.Maybe ( isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {- | @rnSourceDecl@ "renames" declarations.
@@ -295,9 +296,14 @@ another type in this group appears in group_ext. A private source-table
 name does not, so exclude it explicitly. Keep deriving clauses in the
 original group because they can use instances from later groups. A SPECIALISE
 pragma can also mention arbitrary local types and values. Keep such bindings
-in the original group. Return
-all requested names so the caller can report an uncertified table at the
-source binding before it checks a use of the private name.
+in the original group.
+
+A table such as listCount :: [Bool] -> Nat can refer to itself. Move its
+singleton SCC with its original recursion flag. For a list domain the
+element type supplies the declaration dependency. The constructor pattern
+supplies the fields. Check the identity and type of each recursive operand
+in the typed producer before constructing an axiom. Return all requested
+names so the caller can report an uncertified table at the source binding.
 -}
 
 -- | Allocate private names for signed function bindings with constructor rows.
@@ -307,16 +313,41 @@ localSourceTableBinders binds sigs =
   mapM (\n -> (n,) <$> lookupOrig (nameModule n) (mkSourceTableOcc (nameOccName n)))
     [ n | L _ FunBind{fun_id = L _ n, fun_matches = MG{mg_alts = L _ rows}} <- binds
         , isExternalName n, nameOccName n `elemOccSet` signed
-        , all constructor_row rows ]
+        , all (constructor_row n) rows ]
   where
     signed = mkOccSet [ rdrNameOcc n | L _ (TypeSig _ [] [L _ n] _) <- sigs ]
-    constructor_row :: LMatch GhcPs (LHsExpr GhcPs) -> Bool
-    constructor_row (L _ Match{m_pats = L _ [pat], m_grhss = rhss})
-      | ConPat{pat_args = PrefixCon _ fields} <- unparen pat
+    constructor_row :: Name -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
+    constructor_row self (L _ Match{m_pats = L _ [pat], m_grhss = rhss})
+      | Just fields <- constructor_fields (unparen pat)
       , all plain_field fields
-      , GRHSs _ (L _ (GRHS _ [] (L _ (HsVar _ (L _ r)))) :| []) (L _ EmptyLocalBinds{}) <- rhss
-      = isRdrDataCon r || r `elem` collectPatsBinders CollNoDictBinders fields
-    constructor_row _ = False
+      , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
+      = row_result self (collectPatsBinders CollNoDictBinders fields) rhs
+    constructor_row _ _ = False
+
+    constructor_fields :: Pat GhcPs -> Maybe [LPat GhcPs]
+    constructor_fields ConPat{pat_args = PrefixCon _ fields} = Just fields
+    constructor_fields ConPat{pat_con = L _ con, pat_args = InfixCon _ x xs}
+      | con == consDataCon_RDR = Just [x, xs]
+    constructor_fields (ListPat _ []) = Just []
+    constructor_fields _ = Nothing
+
+    row_result :: Name -> [RdrName] -> LHsExpr GhcPs -> Bool
+    row_result self fields = check []
+      where
+        check :: [LHsExpr GhcPs] -> LHsExpr GhcPs -> Bool
+        check args expr = case unLoc (stripParensLHsExpr expr) of
+          HsApp _ fun arg -> check (arg : args) fun
+          HsVar _ (L _ r)
+            | isRdrDataCon r -> all (check []) args
+            | r `elem` fields -> null args
+            | is_self r, [arg] <- args
+            , HsVar _ (L _ field) <- unLoc (stripParensLHsExpr arg)
+            -> field `elem` fields
+          _ -> False
+        is_self r = let occ = nameOccName self in
+          r == mkRdrUnqual occ ||
+          r == mkRdrQual (moduleName (nameModule self)) occ ||
+          rdrNameExactName_maybe r == Just self
 
     unparen :: LPat GhcPs -> Pat GhcPs
     unparen (L _ (ParPat _ p)) = unparen p
@@ -342,17 +373,15 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
   = let wanted_set = mkNameSet (map fst wanted)
         specialised = mkNameSet [ n | L _ s <- sigs, n <- spec_name s ]
         signatures = mkNameEnv
-          [ (b, [arg, res]) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
-            , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{})
-                (L _ (HsTyVar _ _ (L _ (WithUserRdr _ arg))))
-                (L _ (HsTyVar _ _ (L _ (WithUserRdr _ res)))) <- [unLoc (hsSigWcType sig)]
-            , isTyConName arg && isTyConName res ]
-        early = [ (b, kinds) | (NonRecursive, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
+          [ (b, [domain, result]) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
+            , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) arg res <- [unLoc (hsSigWcType sig)]
+            , Just domain <- [domain_dependency arg], Just result <- [type_name res] ]
+        early = [ (b, kinds) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
                 , b `elemNameSet` wanted_set, not (b `elemNameSet` specialised)
                 , Just kinds <- [lookupNameEnv signatures b]
                 , all (\k -> not (k `elemNameSet` local_types) || k `elemNameEnv` early_datatypes) kinds
                 , let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes) kinds)
-                , nameSetAll (`elemNameSet` cons) fvs ]
+                , nameSetAll (`elemNameSet` extendNameSet cons b) fvs ]
         early_names = mkNameSet (map fst early)
         early_types = mkNameSet (concatMap snd early)
         (first_binds, rest_binds) = partition early_bind binds
@@ -366,6 +395,19 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
     in Just (wanted, first, rest)
   where
     bound_names = [ b | (_, bs) <- binds, L _ FunBind{fun_id = L _ b} <- bs, isExternalName b ]
+    type_name :: LHsType GhcRn -> Maybe Name
+    type_name ty = case unLoc (ignoreParens ty) of
+      HsTyVar _ _ (L _ (WithUserRdr _ name))
+        | isTyConName name, isNothing (sourceTableTermOcc (nameOccName name)) -> Just name
+      _ -> Nothing
+
+    domain_dependency :: LHsType GhcRn -> Maybe Name
+    domain_dependency ty = case unLoc (ignoreParens ty) of
+      HsListTy _ element -> type_name element
+      HsAppTy _ list element
+        | Just con <- type_name list, nameUnique con == listTyConKey -> type_name element
+      _ -> type_name ty
+
     local_types = mkNameSet (map (tcdName . unLoc) (tyClGroupTyClDecls tycls))
     early_datatypes = mkNameEnv
       [ (t, cons) | TyClGroup{group_ext = deps, group_kisigs = [], group_tyclds =
@@ -383,8 +425,7 @@ splitLocalSourceTables uses group@HsGroup{hs_valds = XValBindsLR (HsVBG binds si
 
     independent_field :: HsConDeclField GhcRn -> Bool
     independent_field CDF{cdf_type = ty, cdf_multiplicity = HsModifiedFunArr _ [] HsStandardArr{}}
-      | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- ignoreParens ty
-      = isTyConName name && isNothing (sourceTableTermOcc (nameOccName name))
+      = isJust (type_name ty)
     independent_field _ = False
 
     sig_names :: Sig GhcRn -> [Name]

@@ -931,7 +931,8 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ vcat
            [ text "No checked equations are available for" <+> quotes (ppr name) <+> text "in a type."
            , text "Use one clause per input constructor, with a variable or wildcard for each field."
-           , text "Each equation must return a nullary constructor or a field bound by the pattern." ]
+           , text "Build the result from constructors and fields bound by that clause."
+           , text "A recursive call must take one of those fields directly, at the input type." ]
     TcRnUntickedPromotedThing thing
       -> mkSimpleDecorated $
          text "Unticked promoted" <+> what

@@ -3,3 +3,6 @@
 True
 (1,True)
 True
+([False,True],1)
+True
+True

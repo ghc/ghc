@@ -82,3 +82,5 @@ test('NativeSourceTableWrong',
      ['NativeSourceTableWrong', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
 test('NativeSourceTablePartial', normal, compile_fail, [''])
 test('NativeSourceFieldCoverage', normal, compile_fail, [''])
+test('NativeSourceLengthRecursion', normal, compile_fail, [''])
+test('NativeSourceLengthFamily', req_th, compile_fail, [''])

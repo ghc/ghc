@@ -1,0 +1,5 @@
+NativeSourceLengthFamily.hs:16:15: error: [GHC-68947]
+    No checked equations are available for ‘count’ in a type.
+    Use one clause per input constructor, with a variable or wildcard for each field.
+    Build the result from constructors and fields bound by that clause.
+    A recursive call must take one of those fields directly, at the input type.

@@ -17,6 +17,8 @@ module PackedVecLibrary (
     isSuccessor,
     Vec (..),
     dropFirst,
+    listCount,
+    boolVector,
     PackedVec (..),
     LE (..),
     BoundedVec (..),
@@ -93,6 +95,16 @@ data Vec a (n :: Nat) where
 dropFirst :: Vec a n -> Vec a (previous n)
 dropFirst VNil           = VNil
 dropFirst (VCons _ rest) = rest
+
+-- | Count the spine of a Boolean list without inspecting its elements.
+listCount :: [Bool] -> Nat
+listCount []       = Z
+listCount (_ : xs) = S (listCount xs)
+
+-- | Preserve the elements in a vector indexed by the ordinary length function.
+boolVector :: foreach (xs :: [Bool]) -> Vec Bool (listCount xs)
+boolVector []       = VNil
+boolVector (b : bs) = VCons b (boolVector bs)
 
 -- | Store one runtime length and a vector indexed by that same field.
 data PackedVec a where

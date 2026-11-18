@@ -1,4 +1,5 @@
 NativeSourceTablePartial.hs:7:1: error: [GHC-68947]
     No checked equations are available for ‘oneRow’ in a type.
     Use one clause per input constructor, with a variable or wildcard for each field.
-    Each equation must return a nullary constructor or a field bound by the pattern.
+    Build the result from constructors and fields bound by that clause.
+    A recursive call must take one of those fields directly, at the input type.
