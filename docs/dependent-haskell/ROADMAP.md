@@ -7,7 +7,7 @@ project priorities. The `M` checkpoints in PLAN.md record implementation and
 evidence; their numbers do not define the program's structure.
 
 The primary map is [Serokell's Dependent Haskell roadmap](https://ghc.serokell.io/dh),
-dated **2026-11-12** and reviewed on **2026-11-16**. This checklist records its
+dated **2026-11-12** and reviewed on **2026-11-18**. This checklist records its
 50 feature cards and all 67 feature-to-feature graph edges. Layout nodes are
 excluded. The graph describes prerequisites **or subtasks**. It is not a build
 order. In particular, two edges below are explicitly loose ends of a completed
@@ -48,7 +48,8 @@ and [allocation measurements](PLAN.md#m97-simplify-a-case-of-an-ordinary-constru
 | Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
 | Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with a written or inferred runtime operand, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, and predictable inference beyond the measured subset. |
 | Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
-| Type computation (`R06`, `R13`, `R15`) | A list-length function works at any lifted element type. Multiplication calls checked addition on a recursive result. Both functions supply equations to interface clients. | Recursion across multiple changing arguments, polymorphic helper calls, general function evaluation, and lambda/let/case expressions in types. |
+| Function promotion (`R13`, under `R06`) | A list-length function works at any lifted element type. Multiplication calls checked addition on a recursive result. Both functions supply closed-family equations to interface clients. | General function promotion, polymorphic helper calls, and lambda/let/case expressions in types. |
+| Evaluation (`R15`, `R16`) | An isolated GHC API probe executes an ordinary imported length function on a closed list. | The source checker rejects the same call in a vector type. It also rejects ordinary `id a` with an unknown `a`. |
 | Numeric literals (`R07`) | The vector library registers an interpretation for nonnegative literals. Clients can write `Vec Bool 3`, `replicateNative 3 x` and `replicateNative (n + 1) x`. The retained calls check the actual `Num Nat` dictionary. | More general literal conversions and literal constraints such as finite bounds. |
 | Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
 
@@ -145,16 +146,31 @@ General opaque proof projection stays open.
 
 ## Current work queue
 
-Use the roadmap card as the unit of work. Each active card has a feature page
-with its goal, supported subset, next increments and completion boundary:
+**[R15, closed term evaluator](roadmap/R15-closed-term-evaluator.md) is the active card.**
+Use the upstream example of a three-element vector indexed by an ordinary
+length computation. The first producer is compiled separately. The consumer
+must ultimately typecheck its vector declaration by executing the closed
+call and reading its result during type elaboration.
 
-- [R05: Dependent Core language](roadmap/R05-dependent-core.md).
-- [R03: Dependent products](roadmap/R03-dependent-products.md).
-- [R23: Unsaturated type families](roadmap/R23-unsaturated-type-families.md).
+| Card | Next evidence | Dependency or boundary |
+| --- | --- | --- |
+| R15, closed evaluator | Execute the imported length function on a closed list. Accept the matching vector and reject a short vector at the binding. Recheck the consumer when only the producer implementation changes. | Serokell names bytecode or native execution. Our checked source equations use ordinary closed type families. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Reduce `id a` with a rigid `a`. A case inspecting an unknown argument must remain suspended. | R13 includes R15 and R16. R17–R19 also depend on R05 and R16. |
+| R21, dependency analysis | Allow the producer to be defined in the consumer module, respecting declaration order and cycles. | A separately compiled producer lets R15 proceed while R21 remains open. |
 
-The following order is our implementation plan. These gates are separate from
-the upstream graph's prerequisites-or-subtasks relation. A completed increment
-can advance a card while the card remains open.
+[R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
+and [R23](roadmap/R23-unsaturated-type-families.md) retain their own completion
+criteria. Revisit a dependency when it blocks the active card's executable
+example. Treat the arrows as prerequisites or subtasks, as on Serokell's
+graph. A workaround in an example library does not close a dependency.
+
+### Local checkpoints
+
+The table records implementation history and proposed local work.
+M75–M88 include examples motivated by R15. Their computation rules
+compile checked clauses to type families under R13.
+M98's two-list zip is a proposed extension of that mechanism. The
+evaluator work has priority.
 
 | Order | Owner and contribution | State | Gate and next result |
 | --- | --- | --- | --- |
@@ -173,20 +189,20 @@ can advance a card while the card remains open.
 | 13 | R03: source definitions and omitted invisible runtime operands | Complete bounded increment: M72 | The imported call passes the IO-sourced Nat from a later vector declaration. Native object tests cover ignored bottom, name shadowing and located missing and conflicting operands. |
 | 14 | R03: explicit invisible runtime operands | Complete bounded increment: M73 | Written `@{n}` works with or without erased `@Int`. The interface-only client preserves demand. A wrong written index reports the later argument where the two indices disagree. |
 | 15 | R03: consecutive invisible runtime operands | Complete bounded increment: M74 | The interface-only vector append infers two lengths and checks their sum in the result type. Constructor inference respects term scope and records import usage. |
-| 16 | R15: closed evaluation of source functions; advances R13 and R21 | M75 finite constructor tables | Check the complete table once and export its equations. A body change invalidates an unchanged client proof. |
-| 17 | R15: constructor fields in a source equation | [M76](PLAN.md#m76-constructor-fields-in-a-source-equation) | The checked `previous` clause returns the length of the tail. A `VCons` branch can therefore return its tail directly from `dropFirst`. |
-| 18 | R15: structural recursion on a list spine | [M77](PLAN.md#m77-structural-recursion-on-a-list-spine) | A checked recursive call on the tail computes the Peano result index of `boolVector`. A call on the rebuilt list has no checked equation. |
-| 19 | R13 and R15: parametric list length | [M78](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type) | One checked family proves the cons equation for an abstract element type and tail. The named length function indexes a vector built from a list of `Int` read at runtime. |
-| 20 | R13 and R15: a second ordinary argument | [M79](PLAN.md#m79-addition-from-an-ordinary-two-argument-function) | The runtime addition function computes the length index of vector append. The second length can stay unknown. |
+| 16 | R13: finite tables of source equations | M75 finite constructor tables | Check the complete table once and export its equations. A body change invalidates an unchanged client proof. |
+| 17 | R13: constructor fields in a source equation | [M76](PLAN.md#m76-constructor-fields-in-a-source-equation) | The checked `previous` clause returns the length of the tail. A `VCons` branch can therefore return its tail directly from `dropFirst`. |
+| 18 | R13: structural recursion on a list spine | [M77](PLAN.md#m77-structural-recursion-on-a-list-spine) | A checked recursive call on the tail computes the Peano result index of `boolVector`. A call on the rebuilt list has no checked equation. |
+| 19 | R13: parametric list length | [M78](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type) | One checked family proves the cons equation for an abstract element type and tail. The named length function indexes a vector built from a list of `Int` read at runtime. |
+| 20 | R13: a second ordinary argument | [M79](PLAN.md#m79-addition-from-an-ordinary-two-argument-function) | The runtime addition function computes the length index of vector append. The second length can stay unknown. |
 | 21 | R07 and R13: numerals and infix addition | [M80](PLAN.md#m80-numerals-and-infix-addition-in-vector-types) | Use `Vec a 3` and `Vec a (n + 1)` with the original Peano-indexed GADT. |
-| 22 | R03, R13 and R15: a computed retained argument | [M81](PLAN.md#m81-a-computed-retained-length) | Pass the ordinary call `plus n m` directly as a vector length. Keep its index through Core Lint and share its value as a lazy STG thunk. |
+| 22 | R03 and R13: a computed retained argument | [M81](PLAN.md#m81-a-computed-retained-length) | Pass the ordinary call `plus n m` directly as a vector length. Keep its index through Core Lint and share its value as a lazy STG thunk. |
 | 23 | R12 and R03: a concrete class method | [M82](PLAN.md#m82-overloaded-addition-in-a-retained-argument) | Pass the overloaded `n + m` as a retained length when the selected instance's addition method is the checked `plus`. |
 | 24 | R07, R12 and R03: term numerals as retained lengths | [M83](PLAN.md#m83-ordinary-numerals-in-retained-arguments) | Use a checked `fromInteger` for `replicateNative 3 x` and `replicateNative (n + 1) x`. |
 | 25 | R03: infer a runtime index from a nested call | [M84](PLAN.md#m84-infer-a-nonempty-vectors-tail-at-a-nested-application) | Match the checked successor equations in `safeHead (replicateNative (1 + n) x)` and preserve the unevaluated tail. |
 | 26 | R03: infer parameters from constructor fields | [M85](PLAN.md#m85-infer-the-parameters-of-a-retained-constructor-argument) | Read the fields of a saturated constructor in a retained argument to select erased parameters. |
 | 27 | R03 and R04: wildcard argument and field patterns | [M86](PLAN.md#m86-wildcard-patterns-for-retained-arguments-and-fields) | Ignore a runtime field while preserving its identity in later types. |
 | 28 | R05: interactive bytecode | [M87](PLAN.md#m87-persistent-dependent-definitions-in-ghci) | Store a retained function and call it from a subsequent GHCi command. |
-| 29 | R13 and R15: composition of source equations | [M88](PLAN.md#m88-compose-checked-source-equations) | Check multiplication in terms of addition and use the product as the length of a flattened rectangle. |
+| 29 | R13: composition of source equations | [M88](PLAN.md#m88-compose-checked-source-equations) | Check multiplication in terms of addition and use the product as the length of a flattened rectangle. |
 | 30 | R03 and R05: nested retained operands | [M89](PLAN.md#m89-nested-computations-in-retained-operands) | Pass `1 + rows * cols` directly to a vector constructor and preserve demand on the product. |
 | 31 | R03 and R05: equality for lazy local definitions | [M90](PLAN.md#m90-equality-for-lazy-local-definitions) | Give a named checked product its defining index and share its runtime value. |
 | 32 | R03 and R05: dictionary evidence for local definitions | [M91](PLAN.md#m91-dictionary-evidence-for-a-local-index-definition) | Use the selected multiplication and literal conversion to check a local vector length. |
@@ -196,7 +212,8 @@ can advance a card while the card remains open.
 | 36 | R03 and R04: ordinary lists at an indexed boundary | [M95](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary) | Check a requested length or package the list's own length. Match ordinary list patterns in retained equations. |
 | 37 | R03: partial constructor callbacks | [M96](PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks) | Use a checked input's runtime index in `VCons x <$> fromListExact n xs`. Preserve constructor multiplicities and check the full callback type. General callback inference remains open. |
 | 38 | R05: simplify a case of a known constructor | [M97](PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core) | Remove a measured allocation and dispatch while keeping dependencies in types, lazy field sharing and strict-field demand. |
-| 39 | R15 and R13: the length of ordinary zip | [M98, in progress](PLAN.md#m98-the-length-of-zip-over-two-ordinary-lists) | Check equations that inspect two list spines and recurse on both tails. Preserve the empty-first equation with an unknown second input. |
+| 39 | R13: the length of ordinary zip | [M98, deferred](PLAN.md#m98-the-length-of-zip-over-two-ordinary-lists) | Check equations that inspect two list spines and recurse on both tails. Preserve the empty-first equation with an unknown second input. |
+| 40 | R15: evaluate an imported closed call | [M99, in progress](PLAN.md#m99-evaluate-an-imported-closed-call) | Both interpreters execute the ordinary producer. Type elaboration and incremental recompilation of its client remain open. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -357,8 +374,8 @@ still require substantial research.
 - [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24. M82 connects a concrete instance method to a checked source function in a retained argument. M83 checks the selected ground `Num` instance’s conversion of a nonnegative literal. General classes and abstract dictionary arguments remain open.
 - [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23.
 - [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge.
-- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M75–M78 reduce unary constructor equations, field projections and direct structural recursion, including lists with a polymorphic element type.
-- [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge.
+- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. The fork can reduce checked source equations through type families. Executing an imported closed term during type elaboration remains open. See the [active card](roadmap/R15-closed-term-evaluator.md).
+- [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. See the [open-term examples and checks](roadmap/R16-open-term-evaluator.md).
 - [ ] **R17 [Type-level lambdas](https://ghc.serokell.io/dh#type-level-lambdas)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R18 [Type-level let-bindings](https://ghc.serokell.io/dh#type-level-let-bindings)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R19 [Type-level case-expressions](https://ghc.serokell.io/dh#type-level-case-expressions)** — Unmarked. Needs/includes: R05, R16.
@@ -549,15 +566,17 @@ L1 to R20; and I1 to R01. The current queue above owns the next work.
   partial and hs-boot contexts. Native coercion encoding, unfolding handling
   and general optimization remain separate gates. The malformed ordinary-
   domain interface-knot gap remains open. C1, C2 and R22 stay unchecked.
-- [ ] **E1: Specify and implement closed evaluation.** Depends on a typed
-  representation from C1 and an explicit compile-time evaluation boundary.
+- [ ] **E1: Specify and implement closed evaluation.** Requires an explicit
+  compile-time execution boundary. M99 can use existing typed Core for a
+  closed call that elaborates to a literal. A call remaining in Core needs
+  a representation and checked evidence under C1.
   Select the smallest closed pure expression subset. Specify constraint,
   divergence, caching, staging, and error behavior. A closed computation such
   as list length must work in an actual type without a parallel handwritten
   type family. A runtime executable alone does not close this task.
-  M77 and M78 meet the list-length example with a Peano result, first for
-  `[Bool]` and then for `[a]`. Their checked equations work across an
-  interface. General closed evaluation remains open. Advances `R15`.
+  M77 and M78 use R13 source equations to compute Peano lengths across
+  an interface. M99 exercises the R15 interpreter path. Executing a call
+  during source elaboration remains open.
 - [ ] **E2: Specify and implement open evaluation.** Depends on C1. Select and
   document normalization rules for expressions with rigid variables. Include
   stuck terms and capture avoidance. A lambda application to a rigid variable

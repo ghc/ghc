@@ -2919,9 +2919,9 @@ its implicit calculus still needs an explicit encoding for an efficient Core
 checker. Use the papers to state obligations; do not transfer their theorems
 to this implementation without a correspondence argument.
 
-The linked open-evaluator issue #27413 and homogeneous-equality wiki returned
-bot challenges. Their bodies were not read. The checklist attributes only the
-available roadmap descriptions to those tasks.
+The 2026-11-15 review encountered bot challenges on the open-evaluator
+issue and homogeneous-equality wiki. A subsequent API read retrieved
+the open-evaluator issue. See the [evaluator references](#executing-closed-calls-and-reducing-open-calls).
 
 ## Core contract audit and bounded beta exposure
 
@@ -4923,3 +4923,37 @@ second list can require a known cons in the first position. Neither
 coverage nor structural recursion makes all Haskell spines finite.
 [GHC.Internal.List, Note [Fusion for foldrN] and zip](../../libraries/ghc-internal/src/GHC/Internal/List.hs)
 and [Agda 2.8.0 structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#primitive-recursion).
+
+## Executing closed calls and reducing open calls
+
+The 2026-11-18 review returned to Serokell's examples. A closed call to
+`length` can execute under the compiler's interpreter. An open call
+to `id` must preserve a variable across reduction. The fork's earlier
+translation of source clauses into closed families supplies useful equations
+for R13. The two evaluator cards specify further mechanisms. [Closed term
+evaluator](https://ghc.serokell.io/dh#closed-term-evaluator) and [open term
+evaluator](https://ghc.serokell.io/dh#open-term-evaluator).
+
+The open type-functions proposal (#509) describes qualified, loadable,
+fully instantiated calls. Its predecessor implemented a `TYPEFUN` pragma
+for closed families. At commit `7e5ecbd2`, that prototype calls
+`hscCompileCoreExpr` on a term identifier, applies the resulting value
+with `unsafeCoerce` and constructs a nominal universal coercion in the
+rewriter. We reviewed the changes to lookup, loading and rewriting. We
+did not build the historical compiler. The current GHC splice path gives
+a precedent for linking and recording the actual dependencies. For R15
+we can elaborate a completed call to a literal before it enters Core.
+[Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509),
+[tracking issue #19634](https://gitlab.haskell.org/ghc/ghc/-/issues/19634),
+[pinned prototype](https://gitlab.haskell.org/Haskell-mouse/ghc/-/commit/7e5ecbd2d0aca3ec94cbd3eae64c79e36857b096)
+and [GHC's splice path](../../compiler/GHC/Tc/Gen/Splice.hs).
+
+The description of open GHC issue #27413 asks how to compute weak-head
+normal form in the presence of metavariable holes. It considers typed
+Haskell syntax as an input representation. Agda's reducer records blockers
+so the checker can retry when it learns more. A rigid variable can remain
+unknown throughout checking. GHC must also account for lazy and strict
+Haskell patterns and for the evidence that Core Lint can verify.
+[GHC #27413](https://gitlab.haskell.org/ghc/ghc/-/issues/27413),
+[Agda reduction](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/TypeChecking/Reduce.hs#L616)
+and [Agda blockers](https://github.com/agda/agda/blob/7273757e5ee247d321270ef76f792c6156613b7c/src/full/Agda/Syntax/Internal/Blockers.hs#L26).

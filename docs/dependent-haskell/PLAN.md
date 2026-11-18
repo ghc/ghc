@@ -21,8 +21,9 @@ prerequisites, acceptance checks and the behavior that remains unsupported.
 `safeHead` infer the tail of a vector constructed by another call.
 [M94](#m94-infer-a-nonempty-tail-through-local-length-definitions) also
 infers the tail when a local definition names the length. These cases
-use the source equations from R13 and R15 and the numeric syntax from M83. The work queue tracks the
-remaining product, promotion and Core tasks.
+use checked source equations under R13 and the numeric syntax from M83.
+[M99](#m99-evaluate-an-imported-closed-call) follows R15's separate mechanism
+for executing an ordinary closed call during type elaboration.
 
 ## Historical source checkpoints
 
@@ -6029,7 +6030,7 @@ The local verification files have the
 
 ## M75: closed evaluation of a source function
 
-R15 owns the evaluation check. R13 owns reuse of the source definition and
+R13 owns the checked source equations in this increment.
 R21 tracks declaration ordering. Use M74 as the baseline. The independent
 producer exports an ordinary Boolean function. Its client has only the
 object interface. The runtime control returns `(True,False)`. A companion
@@ -6104,7 +6105,7 @@ prefix. Implementation commits are `8ffae4114c` and `4b2cdc63c1`.
 
 ## M76: constructor fields in a source equation
 
-R15 owns this step towards the roadmap's list-length example. Start with
+R13 owns this step towards the roadmap's list-length example. Start with
 an ordinary recursive datatype and functions that do not call themselves.
 
 ```haskell
@@ -6161,7 +6162,7 @@ tests pass, with 74 cases skipped. Local evidence uses the
 
 ## M77: structural recursion on a list spine
 
-R15 owns the next reduction step. The M76 compiler rejects both
+R13 owns this extension to the source-equation checker. The M76 compiler rejects both
 `bitCount ('Bit 'True ('Bit 'False 'End))` and `listCount '[ 'True, 'False]`
 with GHC-68947 at the source function. Both ordinary functions return
 `S (S Z)` at runtime. A handwritten length family proves the two-element
@@ -6216,7 +6217,7 @@ tests pass. The driver skips 74 other cases. Local evidence uses the
 
 ## M78: one list-length function for every lifted element type
 
-R13 and R15 share the next step. The M77 length function requires
+R13 owns the polymorphic source equation. The M77 length function requires
 `[Bool]`. The public library also has a handwritten `GenericCount` family
 for arbitrary lists. The aim is to let an ordinary
 `sourceLength :: forall a. [a] -> Nat` perform that computation in a type.
@@ -6274,7 +6275,7 @@ which this increment does not edit.
 
 ## M79: addition from an ordinary two-argument function
 
-R13 and R15 next need a second ordinary term argument. With the extension
+This R13 increment supports a second ordinary term argument. With the extension
 enabled in the producer, both M78 compilers accept an adjacent unary
 predecessor. The binary function below runs as a term.
 
@@ -6423,7 +6424,7 @@ judgment as the source typechecker.
 
 The source target is `replicateNative @Bool (plus n m) True` at
 `Vec Bool (plus n m)`. Both names can come from IO. R03 owns retained
-application, and R13 and R15 own the producer's equations. On M80 a
+application and R13 owns the producer's equations. On M80 a
 direct call gives GHC-83605. A named length and an explicit `Sum p Refl`
 witness already work.
 
@@ -6702,7 +6703,7 @@ for both prompt entry points.
 ## M84: infer a nonempty vector’s tail at a nested application
 
 R03 dependent-product inference depends here on the checked family equations
-from R13 and R15. At M83 both `safeHead (replicateNative (1 + n) x)` and
+from R13. At M83 both `safeHead (replicateNative (1 + n) x)` and
 `safeHead (replicateNative (S n) x)` fail with GHC-83865 when `n` comes
 from the caller. The result of the inner call determines its element type
 and the tail index. A local signature already makes the call work.
@@ -6914,7 +6915,7 @@ All 41 selected normal tests and all four selected GHCi tests passed.
 
 ## M88: compose checked source equations
 
-R13 owns this increment. It advances R15 evaluation and R03 retained
+R13 owns this increment. Its checked equations also support R03 retained
 applications. On M87 the following ordinary definition runs, but a type
 that mentions `times` fails in its defining module and through an interface.
 
@@ -7694,8 +7695,9 @@ still require the restricted optimization settings.
 
 ## M98: the length of zip over two ordinary lists
 
-R15 and R13 need a checked computation that inspects more than one
-argument. Zip two ordinary lists, possibly with different element types
+Deferred R13 library and source-equation increment. The [R15 evaluator](roadmap/R15-closed-term-evaluator.md) now has priority.
+
+The proposed change inspects more than one argument. Zip two ordinary lists, possibly with different element types
 or lengths, and return a vector indexed by the number of pairs produced.
 The first empty input ends the computation. If the first list is empty,
 leave the second spine unevaluated.
@@ -7740,3 +7742,30 @@ The proposed family can use three ordered branches. In the empty-second
 branch the first pattern must still be a cons. An unrestricted equation
 for an unknown first list could give a type-level result where the
 runtime computation is stuck. [Case-tree and demand references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
+
+## M99: evaluate an imported closed call
+
+R15 owns this increment. Use a separately compiled ordinary function
+with a closed `[Natural]` argument and a `Natural` result. The dependent
+consumer must derive its vector index by evaluating that call during
+elaboration. This bounds the result representation and isolates R15 from
+R21's work on same-module declarations.
+
+- [x] Execute the typed length call with both interpreters and both producer
+      formats. Check the producer dependency. After an ABI-preserving edit,
+      both object runs must observe the new value. The stage 1 probe returns
+      three for the first four runs and four for the two rebuilt-object runs.
+- [x] Establish the source baseline with a producer-only interface and
+      object on the import path. The literal-index client accepts three
+      cells and rejects two on both compiler stages. The computed-index client reports GHC-68947
+      at the qualified term name.
+- [ ] Connect the checked, closed application to execution during type
+      elaboration. Check the permitted staging and error cases. Record
+      what code the compiler executed in the consumer's recompilation data.
+- [ ] Accept the computed index for three cells, reject two at the definition
+      of `v`, then reject the unchanged three-cell client when a new producer
+      returns four. Add the working source feature to the Showcase.
+
+The [R15 feature page](roadmap/R15-closed-term-evaluator.md) gives the
+source, commands and acceptance criteria. R15 remains open beyond this
+example. [R16](roadmap/R16-open-term-evaluator.md) covers open inputs.
