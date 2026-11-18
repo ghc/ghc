@@ -42,7 +42,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoFRRNC
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr, tcPolyLExpr )
 
-import GHC.Rename.Utils ( bindLocalNames )
+import GHC.Rename.Utils ( bindLocalNames, wrapGenSpan' )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -97,10 +97,10 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
-import GHC.Types.Var ( EvVar, DepFunTyFlag(..), varType, isId, isCoVar, isVisibleFunArg )
+import GHC.Types.Var ( EvVar, DepFunTyFlag(..), varType, isId, isCoVar, isTyVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
-import GHC.Types.Basic( VisArity, Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
+import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
 import GHC.Data.Bag ( listToBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
@@ -161,7 +161,7 @@ tcFunBindMatches ctxt fun_name mult source_matches invis_pat_tys source_exp_ty
                           , text "invis_pat_tys:" <+> ppr invis_pat_tys
                           , text "pat_tys:" <+> ppr pat_tys
                           , text "rhs_ty:" <+> ppr rhs_ty ]
-                   ; tcMatches mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches }
+                   ; tcExprMatchesWithWhereFrom id mctxt (invis_pat_tys ++ pat_tys) rhs_ty matches }
         ; traceTc "tcFunBindMatches 1" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
 
         ; (wrap_fun, r)
@@ -223,7 +223,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
           tcRetainedVarMatches herald ctxt ty (filter isVisArgLPat pats) $ \pat_tys rhs_ty boundary names ->
             let match' = match { m_pats = L pat_loc (bindRetainedWildcards names pats) }
                 prepared = matches { mg_alts = L (getLoc (mg_alts matches)) [L loc match'] }
-            in tcMatchesFrom (const match) mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty
+            in tcExprMatchesWithWhereFrom (const match) mctxt (invis_pat_tys ++ pat_tys) rhs_ty
                  (maybe prepared (`splitRetainedContext` prepared) boundary)
       _ | DepFunTy DepFunVisible binder _ <- coreFullView ty ->
           do { index <- newSysLocalId (fsLit "retained") ManyTy (varType binder)
@@ -1255,9 +1255,13 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                  prepared = renamed { m_pats = L renamed_loc
                    (retainedConPats constructor_columns $
                     bindRetainedWildcards (retainedColumnNames first_index plan) renamed_pats) }
-                 check = tcMatchWithSource tcBody
-                   (invis_pat_tys ++ first_arg : refined_args)
-                   (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc prepared)
+                 check = do
+                   clause <- if length matches == 1
+                     then prepareUnguardedWhere (mkCheckExpType (pSnd (coercionKind result_co)))
+                            (L match_loc prepared)
+                     else return (L match_loc prepared)
+                   tcMatchWithSource tcBody (invis_pat_tys ++ first_arg : refined_args)
+                     (mkCheckExpType (pSnd (coercionKind result_co))) match clause
            ; (ev_binds, L checked_loc checked) <- case (row, cvs) of
                (Nothing, Nothing) ->
                  do { checked <- check; return (emptyTcEvBinds, checked) }
@@ -1457,8 +1461,13 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  prepare = insert_dictionaries argument_plan . retainedConPats [(0, fields)]
                          . bindRetainedWildcards (retainedColumnNames index argument_plan)
                  match' = renamed { m_pats = fmap prepare (m_pats renamed) }
-                 check = tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
-                           (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc match')
+                 check = do
+                   clause <- if length matches == 1
+                     then prepareUnguardedWhere (mkCheckExpType (pSnd (coercionKind result_co)))
+                            (L match_loc match')
+                     else return (L match_loc match')
+                   tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
+                     (mkCheckExpType (pSnd (coercionKind result_co))) match clause
            ; (ev_binds, L checked_loc checked) <-
                checkConstraints (PatSkol (RealDataCon con) (m_ctxt match)) []
                  (cv : refined_givens) check
@@ -1731,6 +1740,63 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
 tcMatches = tcMatchesFrom id
+
+-- | Reuse expression-let checking for a single unguarded equation's where bindings.
+-- See Note [Unguarded where aliases].
+tcExprMatchesWithWhereFrom
+  :: (Match GhcRn (LHsExpr GhcRn) -> Match GhcRn (LHsExpr GhcRn))
+  -> HsMatchContextRn -> [ExpPatType] -> ExpRhoType
+  -> MatchGroup GhcRn (LHsExpr GhcRn)
+  -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
+tcExprMatchesWithWhereFrom source ctxt pat_tys exp_ty
+                          group@MG { mg_alts = L loc [match] }
+  = do { prepared <- prepareUnguardedWhere exp_ty match
+       ; tcMatchesFrom (const (source (unLoc match))) ctxt tcBody pat_tys exp_ty
+           (group { mg_alts = L loc [prepared] }) }
+tcExprMatchesWithWhereFrom source ctxt pat_tys exp_ty group
+  = tcMatchesFrom source ctxt tcBody pat_tys exp_ty group
+
+-- | Move one eligible where group into its expression RHS without changing patterns.
+-- See Note [Unguarded where aliases].
+prepareUnguardedWhere :: ExpRhoType -> LMatch GhcRn (LHsExpr GhcRn)
+                     -> TcM (LMatch GhcRn (LHsExpr GhcRn))
+prepareUnguardedWhere (Check expected) original@(L match_loc match@Match
+  { m_grhss = grhss@GRHSs { grhssGRHSs = L rhs_loc (GRHS ext [] rhs) :| []
+                         , grhssLocalBinds = binds@(L binds_loc
+                             (HsValBinds _ (XValBindsLR (HsVBG groups sigs)))) } })
+  | isTauTy expected
+  , not (anyFreeVarsOfType (\v -> isTyVar v && isMetaTyVar v) expected)
+  , not (null groups), all nonrecursive_function groups, all isTypeLSig sigs
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; strict <- xoptM LangExt.Strict
+       ; if enabled && not strict
+         then let body = wrapGenSpan' (combineSrcSpans (getLocA rhs) (locA binds_loc))
+                          (HsLet noExtField binds rhs)
+                  local = L binds_loc (EmptyLocalBinds noExtField)
+              in return (L match_loc (match { m_grhss = grhss
+                   { grhssGRHSs = L rhs_loc (GRHS ext [] body) :| []
+                   , grhssLocalBinds = local } }))
+         else return original }
+  where
+    nonrecursive_function (NonRecursive, [L _ FunBind{}]) = True
+    nonrecursive_function _ = False
+prepareUnguardedWhere _ match = return match
+
+{- Note [Unguarded where aliases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One unguarded equation can put its where declarations in a let around its
+RHS. The patterns and the local declarations keep their original identities.
+Check the let in the pattern scope. Mark only the new let as generated
+and use the original equation for errors.
+This reuses checked expression aliases without checking any declaration twice.
+Keep inferred or mutable result types on the ordinary path. Keep Strict and
+extension-off checking unchanged.
+
+Do not move guarded or multiple equations. Their local declarations scope over
+guards, and guard failure can continue with another equation. A let in each
+RHS would lose that scope and sharing. A multi-way if would change fallthrough.
+The generic tcGRHSs path also checks commands and remains unchanged.
+-}
 
 -- | Check prepared clauses and report errors against their source equations.
 tcMatchesFrom :: (AnnoBody body, Outputable (body GhcTc))
