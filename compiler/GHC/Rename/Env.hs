@@ -1224,8 +1224,8 @@ lookupTypeOcc app_head rdr_name
                                 if isQual term_rdr
                                   then failWithTc (TcRnClosedTypeEval name
                                     "A SOURCE import does not provide executable code.")
-                                  else failWithTc (TcRnOpenTypeEval name Nothing
-                                    "A SOURCE import does not provide a checked definition.")
+                                  else failWithTc (TcRnClosedTypeEval name
+                                    "The selected SOURCE import does not provide a definition for type evaluation.")
                             ; addUsedGRE AllDeprecationWarnings gre
                             ; return gre }
                     else failWithTc (TcRnNoSourceTable name) }

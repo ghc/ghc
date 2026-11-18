@@ -1,9 +1,10 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
-{-# LANGUAGE TypeFamilies, TypeOperators #-}
+{-# LANGUAGE RequiredTypeArguments, TypeFamilies, TypeOperators #-}
 module Main (main) where
 
 #ifndef KNOWN_LENGTH
-import qualified ClosedLengthProducer as Length
+import ClosedLengthProducer (length)
+import Prelude hiding (length)
 #endif
 import GHC.TypeNats (Nat, type (+))
 
@@ -16,7 +17,7 @@ infixr 5 :.
 #ifdef KNOWN_LENGTH
 v :: Vec 3 Bool
 #else
-v :: Vec (Length.length '[1, 2, 3]) Bool
+v :: Vec (length [1,2,3]) Bool
 #endif
 #ifdef SHORT_VECTOR
 v = (True :. False :. VNil) :: Vec 2 Bool

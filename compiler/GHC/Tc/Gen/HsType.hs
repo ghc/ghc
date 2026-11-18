@@ -2389,8 +2389,8 @@ tc_app_ty mode rn_ty exp_kind
                          , all isTypeVariableArg args
                          -> do { result <- tcOpenTypeCall mode name instantiated args
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
-                         | [arg] <- args, isQual rdr
-                         , ordinary_call || ready_partial_call
+                         | [arg] <- args
+                         , ordinary_call || (isQual rdr && ready_partial_call)
                          -> do { (result_kind, run) <- tcPlanClosedCall mode ordinary_call fun arg
                                ; result <- run
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
@@ -2453,11 +2453,11 @@ isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
   isTyVarName name
 isTypeVariableArg _ = False
 
--- | Find the already resolved head and operand of a qualified unary term call.
+-- | Find the already resolved head and operand of a unary term call.
 nestedClosedCall :: LHsType GhcRn -> Maybe (SrcSpan, Name, LHsType GhcRn)
 nestedClosedCall arg
-  | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- head_ty
-  , isQual rdr, isVarName name, isExternalName name
+  | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr _ name))) <- head_ty
+  , isVarName name, isExternalName name
   , [HsValArg _ operand] <- filterOut is_par args
   = Just (locA loc, name, operand)
   | otherwise = Nothing
@@ -2520,7 +2520,7 @@ tcClosedCallKinds name fun_ty arg operand
             bad "The argument must be a closed Char literal or a closed list of Natural literals."
         | otherwise -> unsupported
       SourceClosedOperand (Just actual)
-        | L _ (HsExplicitListTy _ IsPromoted []) <- ignoreParens arg ->
+        | L _ (HsExplicitListTy _ _ []) <- ignoreParens arg ->
             case matching list_inputs of
               [input] -> return input
               inputs | any (tcEqType natural_list) inputs -> return natural_list
@@ -2615,7 +2615,7 @@ tcClosedTypeCallArgument mode name domain arg = do
 -- The ordinary type checker checks that all elements of a list have that kind.
 closedCallLiteralKind :: LHsType GhcRn -> Maybe Kind
 closedCallLiteralKind arg
-  | L _ (HsExplicitListTy _ IsPromoted elements) <- ignoreParens arg =
+  | L _ (HsExplicitListTy _ _ elements) <- ignoreParens arg =
       case elements of
         [] -> Just (mkListTy naturalTy)
         first : rest
@@ -2633,11 +2633,16 @@ closedCallLiteralKind arg
 {- Note [Closed source calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Serokell's closed term evaluator example uses an ordinary length call as
-a vector index. Support imported, qualified functions on Natural, Char,
-Bool, or a promoted list of those literals. The renamer keeps the qualifier
-and resolved
-term Name after trying the ordinary type and checked source-table paths.
-The term Name is not a retained local index.
+a vector index. Support imported functions on Natural, Char, Bool, or a
+promoted list of those literals. The renamer keeps the resolved term Name
+after trying the ordinary type and checked source-table paths. An existing
+type binder still wins. An explicit forall or the RequiredTypeArguments
+capture rule can leave an unqualified term name available.
+
+Accept the explicit promoted-list syntax chosen by the parser, with or
+without a tick. Under ListTuplePuns, an unticked singleton list is a list
+type and an unticked empty list is a type constructor. Neither is an
+explicit promoted list in the parsed syntax.
 
 A literal argument supplies the kind that specializes a polymorphic
 function. Check the literal with the ordinary kind checker before decoding
@@ -2646,7 +2651,7 @@ supported list kinds. If more than one kind matches, prefer [Natural] to
 preserve the existing meaning of calls such as Prelude.reverse '[]. The
 expected result kind does not choose the element kind.
 
-For a nested qualified call, check the outer call's staging
+For a nested call, check the outer call's staging
 first. Prepare the inner call and use its inferred result kind to
 specialize the outer call. No function runs until the whole chain has
 checked kinds, staging, and evidence.

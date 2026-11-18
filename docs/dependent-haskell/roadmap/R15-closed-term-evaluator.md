@@ -9,14 +9,15 @@ dependency on the upstream graph. [Serokell R15](https://ghc.serokell.io/dh#clos
 ## First source example
 
 ```haskell
-v :: Vec (Length.length '[1, 2, 3]) Bool
+v :: Vec (length [1,2,3]) Bool
 v = True :. False :. True :. VNil
 ```
 
 The producer defines ordinary `length :: [Natural] -> Natural` using
-`foldr`. The consumer uses a qualified name, a promoted list and GHC's
-built-in `Nat`. This fixes both the input representation and the result
-kind. Prelude's `length` returns `Int`. The dependent extension is off in
+`foldr`. The consumer imports this function unqualified and enables
+`RequiredTypeArguments`. GHC resolves `length` to that import and
+checks the three-element list at kind `[Natural]`. The vector index uses
+GHC's built-in `Nat`. Prelude's `length` returns `Int`. The dependent extension is off in
 the producer. The consumer has access to its interface and object file.
 [Producer](../examples/closed-evaluation/ClosedLengthProducer.hs)
 and [consumer](../examples/closed-evaluation/Client.hs).
@@ -197,3 +198,27 @@ Same-module definitions require further work on R21. A nested list result, a `Ma
 and user-defined representations remain open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).
 The [implementation references](../REFERENCES.md#executing-closed-calls-and-reducing-open-calls)
 give the earlier prototype and the current GHC entry points.
+
+## Ground source inputs
+
+M110 accepts the same six kinds at the innermost source call as it does
+between nested calls. `Prelude.odd 5` returns `'True`. The declaration
+of `Prelude.and` selects the Boolean element kind for `'[]`, so the call
+returns `'True`. An ambiguous output such as the result of
+`Prelude.fromIntegral 5` still needs more information than its operand
+supplies. A mixed literal list fails at the incorrectly kinded element.
+[Source proofs](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs)
+and [mixed list diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedSourceMixed.stderr).
+
+## Unqualified names and list syntax
+
+M111 uses the upstream source spelling. With `RequiredTypeArguments`,
+an in-scope term can supply an unqualified application head in a type.
+An explicit `forall.` also prevents implicit quantification of the
+function name. With neither, the existing implicit type binder keeps
+its meaning. A type binder introduced by `forall length.` still takes
+precedence. GHC's parser distinguishes `[1,2,3]` from the list type
+syntax `[x]` under `ListTuplePuns`. Use `'[x]` or `'[]` to request a
+singleton or empty promoted list when that extension is active.
+[Consumer](../examples/closed-evaluation/Client.hs)
+and [proposal #378 on term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types).

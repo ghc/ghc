@@ -37,7 +37,7 @@ chain :: Proxy _input -> (Proxy (Lib.first _reversed), Same (Lib.reverseNaturals
 chain (_ :: Proxy '[2, 3, 5]) = (Proxy @5, Same)
 
 -- The inner result determines the specialization of the outer call.
-nested :: ( Prelude.sum (Prelude.reverse '[2, 3, 5]) :~: 10
+nested :: forall. ( sum (reverse [2, 3, 5]) :~: 10
           , Lib.first (Prelude.reverse '[2, 3, 5]) :~: 5
           , Data.Char.toUpper (Data.Char.toLower 'Z') :~: 'Z' )
 nested = (Refl, Refl, Refl)
