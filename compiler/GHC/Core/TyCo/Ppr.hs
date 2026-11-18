@@ -9,7 +9,7 @@ module GHC.Core.TyCo.Ppr
         -- * Pretty-printing types
         pprType, pprParendType, pprTidiedType, pprPrecType, pprPrecTypeX,
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
-        pprSigmaType,
+        pprSigmaType, pprDFunSigmaType,
         pprTheta, pprParendTheta, pprForAll, pprUserForAll,
         pprForAllWithMatchability, pprUserForAllWithMatchability,
         pprTyVar, pprTyVars,
@@ -175,6 +175,10 @@ pprThetaArrowTy = pprIfaceContextArr . map tidyToIfaceType
 ------------------
 pprSigmaType :: Type -> SDoc
 pprSigmaType = pprIfaceSigmaType ShowForAllWhen . tidyToIfaceType
+
+-- | Print a dictionary function type for an instance header.
+pprDFunSigmaType :: Type -> SDoc
+pprDFunSigmaType = pprIfaceSigmaType ShowForAllDFun . tidyToIfaceType
 
 pprForAll :: [ForAllTyBinder] -> SDoc
 pprForAll tvs = pprIfaceForAll (toIfaceForAllTyBndrs tvs)

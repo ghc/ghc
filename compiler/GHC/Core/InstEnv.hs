@@ -38,6 +38,7 @@ import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
 import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
 import GHC.Core.RoughMap
 import GHC.Core.Class
+import GHC.Core.TyCo.Ppr ( pprDFunSigmaType )
 import GHC.Core.Unify
 import GHC.Core.FVs( orphNamesOfTypes, orphNamesOfType )
 import GHC.Hs.Decls.Overlap
@@ -244,7 +245,7 @@ pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
 
 ppr_overlap_dfun_hdr :: SDoc -> DFunId -> SDoc
 ppr_overlap_dfun_hdr flag_sdoc dfun
-  = text "instance" <+> flag_sdoc <+> pprSigmaType (idType dfun)
+  = text "instance" <+> flag_sdoc <+> pprDFunSigmaType (idType dfun)
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)

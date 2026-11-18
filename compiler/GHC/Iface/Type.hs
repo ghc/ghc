@@ -1676,8 +1676,14 @@ ppr_iface_forall_part show_forall tvs ctxt sdoc
   = sep [ case show_forall of
             ShowForAllMust -> pprIfaceForAllWithMatchability tvs
             ShowForAllWhen -> pprUserIfaceForAllWithMatchability tvs
+            ShowForAllDFun -> pprIfaceForAllWithDefault dfun_binder tvs
         , pprIfaceContextArr ctxt
         , sdoc]
+  where
+    -- See Note [Dictionary function quantifiers in instance headers].
+    dfun_binder (ma, Bndr (IfaceTvBndr _) (IfaceForAllTyFlag Specified)) =
+      ma == ifaceUnmatchable
+    dfun_binder _ = False
 
 -- | Render a semantic forall telescope with its actual annotations.
 -- See Note [Forall interface metadata].
@@ -1699,8 +1705,13 @@ pprIfaceForAllWithMatchability ((ma,bndr):bndrs)
 
 -- | Keep non-M and symbolic annotations visible in user-facing types.
 pprUserIfaceForAllWithMatchability :: [(IfaceMatchability, IfaceForAllBndr)] -> SDoc
-pprUserIfaceForAllWithMatchability bndrs
-  | any ((/= ifaceMatchable) . fst) bndrs
+pprUserIfaceForAllWithMatchability = pprIfaceForAllWithDefault ((== ifaceMatchable) . fst)
+
+-- | Apply the usual forall display rules when every binder has its contextual default.
+pprIfaceForAllWithDefault :: ((IfaceMatchability, IfaceForAllBndr) -> Bool)
+                          -> [(IfaceMatchability, IfaceForAllBndr)] -> SDoc
+pprIfaceForAllWithDefault has_default bndrs
+  | not (all has_default bndrs)
   = pprIfaceForAllWithMatchability bndrs
   | otherwise
   = sdocOption sdocPrintExplicitForalls $ \print_foralls ->
@@ -1777,7 +1788,17 @@ pprIfaceForAllCoBndr (tcv, visL, visR, _ma_co, kind_mco)
 -- Unconditionally show the forall quantifier with ('ShowForAllMust')
 -- or when ('ShowForAllWhen') the names used are free in the binder
 -- or when compiling with -fprint-explicit-foralls.
-data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
+data ShowForAllFlag = ShowForAllMust | ShowForAllWhen | ShowForAllDFun
+
+{- Note [Dictionary function quantifiers in instance headers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tcMkDFunSigmaTy in GHC.Tc.Utils.TcType gives each dictionary function a
+specified, unmatchable forall for each instance type variable. This metadata
+does not record whether the instance declaration specified matchability.
+An instance header can omit these quantifiers under the rules in
+Note [When to print foralls]. When a quantifier is shown, print its actual
+matchability. Apply this default only to the outer dictionary telescope.
+-}
 
 data ShowSub
   = ShowSub
