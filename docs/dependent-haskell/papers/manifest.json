@@ -3,38 +3,52 @@
   "cache_directory": "_build/verification/dependent-haskell-papers-2026-11-14",
   "storage_note": "PDFs and extraction artifacts remain in the ignored cache. This manifest records references and reading coverage only.",
   "verification": {
-    "verified_utc": "2026-11-17T02:00:46.548608+00:00",
-    "pdf_reader": "pypdf 7.1.0",
-    "checks": "All 28 PDF hashes and byte counts verify. The previous 21 work records and 27 version records are unchanged. The new paper has 14 extracted pages. Selected sections were read; no proof or implementation was replayed.",
-    "work_count": 22,
-    "pdf_count": 28,
-    "previous_manifest_sha256": "a07d844c579965c2bf0733b4710b33cf561577022329350fb8b5535f62b6b807",
-    "reviewed_additions": "_build/verification/native-forall-totality-laziness-research-v1/proposed-manifest-additions.json",
-    "reviewed_additions_sha256": "41c59593b699eed816c3070b0214ddb5ecfa768e172feaf4d1ac0e4d8029fd58",
-    "archive_verification": "_build/verification/native-forall-totality-laziness-research-v1/extraction.json",
-    "archive_verification_sha256": "c9535ecda6a27988a166b2416bbbae1022842e03b96f81730e8bdeb601eb5a13",
+    "verified_utc": "2026-11-18T04:32:20.091761+00:00",
+    "pdf_reader": "pypdf 7.1.0 with fontTools 4.68.0",
+    "checks": "All previous 28 PDF hashes and byte counts verify. The previous 22 work records and 28 version records are unchanged. The new publisher PDF has 53 extracted pages. Selected sections were read; no proof or implementation was replayed.",
+    "work_count": 23,
+    "pdf_count": 29,
+    "previous_manifest_sha256": "cd69dc542490835f708a93310c117aade856ceb5ca5c26bc927b20b76afd9a5c",
+    "reviewed_additions": "_build/verification/native-computed-retained/papers/proposed-manifest-additions.json",
+    "reviewed_additions_sha256": "24aacfb6d7fe63ee43677a73246bc84f5d5a89e8ff54fc4425364d4704949e35",
+    "archive_verification": "_build/verification/native-computed-retained/papers/extraction.json",
+    "archive_verification_sha256": "7d0fb88a454587110973d298ea4b08e68d61c48c21e2e3ae214ea924e30cd240",
+    "previous_archive_verification": "_build/verification/native-computed-retained/papers/previous-archive-verification.json",
+    "previous_archive_verification_sha256": "00748837877e09232ef28e460d4310591339774d668a2473326df2b8d3562af5",
     "previous_verification": {
-      "verified_utc": "2026-11-16T20:43:00.045082+00:00",
+      "verified_utc": "2026-11-17T02:00:46.548608+00:00",
       "pdf_reader": "pypdf 7.1.0",
-      "checks": "All 26 PDF hashes and byte counts verify. The original 22 version records are unchanged. Four new page counts and per-page text extractions are checked in the separate archive-verification record. No formalization or implementation was run.",
-      "work_count": 20,
-      "pdf_count": 26,
-      "previous_manifest_sha256": "60911e88f9652bb5ba74050798519123724662221000079c9611c4ada00f9d12",
-      "reviewed_additions": "_build/verification/native-arrow-matchability-observational-papers-v1/proposed-manifest-additions.json",
-      "reviewed_additions_sha256": "0f53ae3457dec0e7ff3d0a6564f2cfbbc877bb8d781d78c200818de61322159b",
-      "archive_verification": "_build/verification/native-arrow-matchability-observational-papers-v1/archive-verification.json",
-      "archive_verification_sha256": "0e7c4527eb095d924ac4d225419090b5305cd615a31a74bdfd35082084adb616",
+      "checks": "All 28 PDF hashes and byte counts verify. The previous 21 work records and 27 version records are unchanged. The new paper has 14 extracted pages. Selected sections were read; no proof or implementation was replayed.",
+      "work_count": 22,
+      "pdf_count": 28,
+      "previous_manifest_sha256": "a07d844c579965c2bf0733b4710b33cf561577022329350fb8b5535f62b6b807",
+      "reviewed_additions": "_build/verification/native-forall-totality-laziness-research-v1/proposed-manifest-additions.json",
+      "reviewed_additions_sha256": "41c59593b699eed816c3070b0214ddb5ecfa768e172feaf4d1ac0e4d8029fd58",
+      "archive_verification": "_build/verification/native-forall-totality-laziness-research-v1/extraction.json",
+      "archive_verification_sha256": "c9535ecda6a27988a166b2416bbbae1022842e03b96f81730e8bdeb601eb5a13",
       "previous_verification": {
-        "verified_utc": "2026-11-16T15:47:48.646942+00:00",
+        "verified_utc": "2026-11-16T20:43:00.045082+00:00",
         "pdf_reader": "pypdf 7.1.0",
-        "checks": "The 21 versions checked in integration-v1 are unchanged. The additional 28-page PDF matches its original fetch hash, byte count and checked page count. All 22 copies are retained.",
-        "work_count": 16,
-        "pdf_count": 22,
-        "previous_manifest_sha256": "2ee4f1780814aa221bd959815e1d7da2b1a96cd4682e288599b3045f36e69098",
-        "reviewed_additions": "_build/verification/native-roadmap-research-2026-11-16/paper-additions-v3.json",
-        "reviewed_additions_sha256": "1388565957fb418449ace53e41cc0d1bf99dccbf128664f52dafc3930f0eeec3",
-        "original_manifest_sha256": "6a6de95f86aded49c2bb52dde88694cccd66f7e2c06813648b8cb283bf859270",
-        "additional_historical_version": "icfp2017-constrained-families/author-paper"
+        "checks": "All 26 PDF hashes and byte counts verify. The original 22 version records are unchanged. Four new page counts and per-page text extractions are checked in the separate archive-verification record. No formalization or implementation was run.",
+        "work_count": 20,
+        "pdf_count": 26,
+        "previous_manifest_sha256": "60911e88f9652bb5ba74050798519123724662221000079c9611c4ada00f9d12",
+        "reviewed_additions": "_build/verification/native-arrow-matchability-observational-papers-v1/proposed-manifest-additions.json",
+        "reviewed_additions_sha256": "0f53ae3457dec0e7ff3d0a6564f2cfbbc877bb8d781d78c200818de61322159b",
+        "archive_verification": "_build/verification/native-arrow-matchability-observational-papers-v1/archive-verification.json",
+        "archive_verification_sha256": "0e7c4527eb095d924ac4d225419090b5305cd615a31a74bdfd35082084adb616",
+        "previous_verification": {
+          "verified_utc": "2026-11-16T15:47:48.646942+00:00",
+          "pdf_reader": "pypdf 7.1.0",
+          "checks": "The 21 versions checked in integration-v1 are unchanged. The additional 28-page PDF matches its original fetch hash, byte count and checked page count. All 22 copies are retained.",
+          "work_count": 16,
+          "pdf_count": 22,
+          "previous_manifest_sha256": "2ee4f1780814aa221bd959815e1d7da2b1a96cd4682e288599b3045f36e69098",
+          "reviewed_additions": "_build/verification/native-roadmap-research-2026-11-16/paper-additions-v3.json",
+          "reviewed_additions_sha256": "1388565957fb418449ace53e41cc0d1bf99dccbf128664f52dafc3930f0eeec3",
+          "original_manifest_sha256": "6a6de95f86aded49c2bb52dde88694cccd66f7e2c06813648b8cb283bf859270",
+          "additional_historical_version": "icfp2017-constrained-families/author-paper"
+        }
       }
     }
   },
@@ -1578,6 +1592,54 @@
         "R05"
       ],
       "application_boundary": "The paper studies a lazy refinement calculus and its LiquidHaskell implementation. Its Div/Wnf/Fin distinction informs the optional advisory analysis. It does not establish totality, conversion or consistency for this compiler."
+    },
+    {
+      "id": "jfp2022-anf-dependent-extensional-equality",
+      "title": "ANF preserves dependent types up to extensional equality",
+      "authors": [
+        "Paulette Koronkevich",
+        "Ramon Rakow",
+        "Amal Ahmed",
+        "William J. Bowman"
+      ],
+      "year": 2022,
+      "venue": "Journal of Functional Programming 32, e12",
+      "doi": "10.1017/S0956796822000090",
+      "bibliography_source_url": "https://doi.org/10.1017/S0956796822000090",
+      "published_extent": "53 pages; publisher PDF page numbers match PDF positions.",
+      "versions": [
+        {
+          "id": "publisher-paper",
+          "description": "Open-access 53-page publisher PDF.",
+          "pdf_filename": "../native-computed-retained/papers/anf-dependent-types-jfp2022.pdf",
+          "source_url": "https://www.cambridge.org/core/services/aop-cambridge-core/content/view/73FC888A23E5E87BAE16B158ABE349C8/S0956796822000090a.pdf/anf-preserves-dependent-types-up-to-extensional-equality.pdf",
+          "sha256": "11b8c4c68501919d7ab573f55da6ae4da94070c244fa458f99dea5f6ecdc6c61",
+          "bytes": 742555,
+          "pdf_pages": 53,
+          "accessed_utc": "2026-11-18T04:30:39.115503+00:00",
+          "reading_scope": {
+            "summary": "Selected-section review through local pypdf extraction with fontTools. No visual figure inspection, full proof audit or execution.",
+            "sections": [
+              "Title and abstract; PDF page 1",
+              "CBV evaluation paragraph and section 4.1, Dependent continuation typing; PDF pages 15-18",
+              "Section 7.4, Recovering decidability; PDF pages 32-34",
+              "Section 7.6, Call-by-push-value and monadic form; PDF pages 35-36"
+            ],
+            "excluded": [
+              "Complete source and target typing-rule audit",
+              "Full metatheory and appendix proof audit",
+              "Artifact source audit or proof replay",
+              "Compiler execution or measurements",
+              "Transfer theorem for lazy Haskell or System FC"
+            ]
+          }
+        }
+      ],
+      "reading_metadata": "../native-computed-retained/papers/extraction.json",
+      "roadmap_cards": [
+        "R05"
+      ],
+      "application_boundary": "The selected sections explain dependency-preserving naming, a failed naive coercion translation, and commuting conversions. The paper uses an equality-reflecting target and CBV runtime evaluation. It does not establish correctness for this lazy Haskell compiler or System FC."
     }
   ]
 }

@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
-Read on 2026-11-14 through 2026-11-17. The [manifest](manifest.json) records
-twenty-two works and twenty-eight downloaded PDF versions. It contains source URLs,
+Read on 2026-11-14 through 2026-11-18. The [manifest](manifest.json) records
+twenty-three works and twenty-nine downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -10,6 +10,8 @@ observational-equality PDFs are in the sibling directory
 and reading records are in `native-arrow-matchability-trellys-research-v1/`.
 The ICFP 2014 lazy-refinement paper and selected-section notes are in
 `native-forall-totality-laziness-research-v1/`.
+The JFP 2022 ANF paper and selected-page records are in
+`native-computed-retained/papers/`.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -44,6 +46,7 @@ versions and several selective readings.
 
 | [Combining Proofs and Programs in a Dependently Typed Language](https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf) | Casinghino, Sjöberg and Weirich, POPL 2014 | R05 | Logical and programmatic fragments. The core proves closed logical CBV termination. Open-term normalization, Zombie's richer feature set and lazy-Haskell totality are separate boundaries. |
 | [Refinement Types For Haskell](https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf) | Vazou, Seidel, Jhala, Vytiniotis and Peyton-Jones, ICFP 2014 | R05, optional assurance | Potential divergence, weak-head values, finite values and decreasing recursion metrics. No guarantee is transferred to this compiler. |
+| [ANF preserves dependent types up to extensional equality](https://doi.org/10.1017/S0956796822000090) | Koronkevich, Rakow, Ahmed and Bowman, JFP 2022 | R05 | Dependency-preserving naming, continuation typing and the limits of a naive coercion translation. |
 
 ## Singletons, Haskell 2012
 
@@ -638,3 +641,29 @@ outer constructor does not establish those premises. A total Haskell subset
 needs its own property and import rules. No total-subset design is selected by
 this reading. No theorem is transferred to GHC. See the version-specific scope
 in the manifest and REFERENCES.md.
+
+## ANF and dependent types, JFP 2022
+
+Read selected sections of the 53-page [publisher PDF](https://www.cambridge.org/core/services/aop-cambridge-core/content/view/73FC888A23E5E87BAE16B158ABE349C8/S0956796822000090a.pdf/anf-preserves-dependent-types-up-to-extensional-equality.pdf)
+on 2026-11-18. Printed page numbers match PDF positions. The reading covers
+the title and abstract, the CBV evaluation paragraph on page 15, section 4.1
+on pages 15–18, section 7.4 on pages 32–34, and section 7.6 on pages 35–36.
+The text was extracted with pypdf and fontTools. No figures were inspected
+visually. No full proof audit or artifact execution was performed.
+
+Section 4.1, “Dependent continuation typing,” records the specific computation
+expected by a continuation. Its bound variable has a definition in the context.
+Knowing only the variable's type loses information needed by dependent uses.
+The section proves continuation composition lemmas under this discipline.
+
+Section 7.4, “Recovering decidability,” discusses annotations for the
+equality-reflecting target. Its attempted translation with explicit `subst`
+coercions fails in conditional branches because the continuation expects an
+expression that judgmental equivalence cannot identify with the coerced result.
+This counterexample concerns that translation. It does not exclude all designs
+with explicit coercions.
+
+Section 7.6, “Call-by-push-value and monadic form,” discusses dependent let
+results, GHC's monadic form, and commuting conversions. The paper's runtime
+semantics is call-by-value. M81 checks the lazy Core-to-STG translation
+separately with partially defined indices.
