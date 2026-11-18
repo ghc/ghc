@@ -28,7 +28,7 @@ import GHC.Core.Type              ( coreFullView, isFunTy, Var (..) )
 import GHC.Core.TyCon             ( isTypeSynonymTyCon, isClassTyCon, isFamilyTyCon )
 import GHC.Types.Id               ( Id, isRecordSelector, isClassOpId )
 import GHC.Types.TyThing          ( TyThing (..) )
-import GHC.Types.Var              ( isTyVar, isFUNArg, cmpForAllTyFlagExactly )
+import GHC.Types.Var              ( isTyVar, isFUNArg, cmpForAllTyFlagExactly, DepFunTyFlag )
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -47,8 +47,9 @@ type Span = RealSrcSpan
 
 -- | Current version of @.hie@ files.
 -- See Note [HIE arrow matchability].
+-- See Note [Retained types in HIE].
 hieVersion :: Integer
-hieVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "64") :: Integer
+hieVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "65") :: Integer
 
 {- |
 GHC builds up a wealth of information about Haskell source as it compiles it.
@@ -167,8 +168,15 @@ its fixed U matchability and Many multiplicity.
 -- | A flattened version of 'Type'.
 --
 -- See Note [Efficient serialization of redundant type info]
+--
+-- See Note [Retained types in HIE].
 data HieType a
   = HTyVarTy Name
+  | HTermVarTy Name
+  | HTermAppTy Name a
+  | HDepFunTy !DepFunTyFlag (a, Name, a) a
+    -- ^ Visibility, (multiplicity, runtime binder, domain), and result.
+    -- See Note [Retained types in HIE].
   | HAppTy a (HieArgs a)
   | HTyConApp IfaceTyCon (HieArgs a)
   | HForAllTy a ((Name, a),ForAllTyFlag) a
@@ -188,6 +196,9 @@ data HieType a
 -- We compare flags exactly, as the derived instance used to.
 instance Eq a => Eq (HieType a) where
   HTyVarTy n1         == HTyVarTy n2         = n1 == n2
+  HTermVarTy n1      == HTermVarTy n2       = n1 == n2
+  HTermAppTy n1 a1   == HTermAppTy n2 a2    = n1 == n2 && a1 == a2
+  HDepFunTy v1 b1 r1 == HDepFunTy v2 b2 r2  = v1 == v2 && b1 == b2 && r1 == r2
   HAppTy f1 as1       == HAppTy f2 as2       = f1 == f2 && as1 == as2
   HTyConApp tc1 as1   == HTyConApp tc2 as2   = tc1 == tc2 && as1 == as2
   HForAllTy ma1 ((n1,k1),vis1) b1 == HForAllTy ma2 ((n2,k2),vis2) b2
@@ -202,6 +213,11 @@ instance Eq a => Eq (HieType a) where
 
 instance Outputable a => Outputable (HieType a) where
   ppr (HTyVarTy name) = ppr name
+  ppr (HTermVarTy name) = ppr name
+  ppr (HTermAppTy name arg) = parens $ ppr name <+> ppr arg
+  ppr (HDepFunTy vis (mult, name, domain) body) =
+    text "foreach" <+> ppr name O.<> text ":" <+> ppr domain
+      <+> brackets (text (show vis)) <+> ppr body <+> ppr mult
   ppr (HAppTy fun arg) = parens $ ppr fun <+> ppr arg
   ppr (HTyConApp tc args) = parens $ ppr tc <+> ppr args
   ppr (HForAllTy ma ((name, ty), flag) body) =
@@ -213,6 +229,26 @@ instance Outputable a => Outputable (HieType a) where
   ppr (HLitTy lit) = ppr lit
   ppr (HCastTy ty) = text "cast" <+> ppr ty
   ppr HCoercionTy = text "<coercion>"
+
+{- Note [Retained types in HIE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Keep runtime indices separate from type variables. HTermVarTy stores the
+runtime Name. HTermAppTy stores the runtime function Name and its index
+argument. These Names preserve identifier identity in the HIE name table.
+The corresponding IfaceTermVar and IfaceTermAppTy forms render these nodes.
+
+HDepFunTy stores visibility, multiplicity, binder Name, domain and result.
+The binder scopes over the result only. Multiplicity and domain are outside
+its scope. Do not encode a retained binder as HForAllTy: its argument is a
+runtime value. Both visible and invisible retained binders use this format.
+Derived traversals visit multiplicity, domain and result. Equality and binary
+serialization retain every field. The HIE and Haddock renderers recover
+IfaceDepFunTy with the same visibility and binder fields.
+
+Tags 9 through 11 extend the type table. The suffix in hieVersion changes
+from 64 to 65. Both HIE readers reject previous versions before decoding the
+type table. The ordinary interface format does not change.
+-}
 
 type HieTypeFlat = HieType TypeIndex
 
@@ -254,6 +290,18 @@ instance Binary (HieType TypeIndex) where
     putByte bh 7
     put_ bh a
   put_ bh (HCoercionTy) = putByte bh 8
+  put_ bh (HTermVarTy name) = do
+    putByte bh 9
+    put_ bh name
+  put_ bh (HTermAppTy name arg) = do
+    putByte bh 10
+    put_ bh name
+    put_ bh arg
+  put_ bh (HDepFunTy vis bndr body) = do
+    putByte bh 11
+    put_ bh vis
+    put_ bh bndr
+    put_ bh body
 
   get bh = do
     (t :: Word8) <- get bh
@@ -267,6 +315,9 @@ instance Binary (HieType TypeIndex) where
       6 -> HLitTy <$> get bh
       7 -> HCastTy <$> get bh
       8 -> return HCoercionTy
+      9 -> HTermVarTy <$> get bh
+      10 -> HTermAppTy <$> get bh <*> get bh
+      11 -> HDepFunTy <$> get bh <*> get bh <*> get bh
       _ -> panic "Binary (HieArgs Int): invalid tag"
 
 

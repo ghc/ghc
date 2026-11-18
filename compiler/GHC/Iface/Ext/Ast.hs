@@ -1376,8 +1376,13 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
             -> [ toHie e ]
           NativeCaseAlias scrut _ _ _ body
             -> [ toHie scrut, toHie body ]
-          NativeLetAlias rhs _ _ _ _ body
-            -> [ toHie rhs, toHie body ]
+          NativeLetAlias rhs _ value _ _ body ->
+            let binder = nameSrcSpan (varName value)
+                binding = combineSrcSpans binder (getLocA rhs)
+                scope = mkScope (combineSrcSpans binding (getLocA body))
+            in [ toHie $ C (ValBind RegularBind scope (getRealSpan binding))
+                           (L (noAnnSrcSpan binder :: SrcSpanAnnN) value)
+               , toHie rhs, toHie body ]
           ConLikeTc con
             -> [ toHie $ C Use $ L mspan $ conLikeName con ]
           HsTick _ expr

@@ -39,7 +39,6 @@ import Data.Traversable           ( for )
 import Data.Coerce
 import GHC.Utils.Monad.StrictState hiding (get)
 import GHC.Utils.Panic.Plain( assert )
-import GHC.Utils.Panic ( pprPanic )
 import Control.Monad.Trans.Reader
 import qualified Data.Tree as Tree
 
@@ -161,6 +160,10 @@ hieTypeToIface :: HieTypeFix -> IfaceType
 hieTypeToIface = foldType go
   where
     go (HTyVarTy n) = IfaceTyVar $ (mkIfLclName (occNameFS $ getOccName n))
+    go (HTermVarTy n) = IfaceTermVar (mkIfLclName (occNameFS $ getOccName n))
+    go (HTermAppTy n arg) = IfaceTermAppTy (mkIfLclName (occNameFS $ getOccName n)) arg
+    go (HDepFunTy vis (mult, n, domain) body) =
+      IfaceDepFunTy vis (mult, mkIfLclName (occNameFS $ getOccName n), domain) body
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ma ((n,k),af) t) = let b = (mkIfLclName (occNameFS $ getOccName n), k)
@@ -226,12 +229,13 @@ getTypeIndex t
         HTS (extendTypeMap tm t i) (IM.insert i ht tt) fi
       return i
 
-    go ty@(TermVarTy {})
-      = pprPanic "getTypeIndex: unsupported runtime index" (ppr ty)
-    go ty@(TermAppTy {})
-      = pprPanic "getTypeIndex: unsupported opaque runtime call index" (ppr ty)
-    go ty@(DepFunTy {})
-      = pprPanic "getTypeIndex: unsupported retained function" (ppr ty)
+    go (TermVarTy v) = return $ HTermVarTy (varName v)
+    go (TermAppTy fun arg) = HTermAppTy (varName fun) <$> getTypeIndex arg
+    go (DepFunTy vis binder body) = do
+      mult <- getTypeIndex (idMult binder)
+      domain <- getTypeIndex (varType binder)
+      result <- getTypeIndex body
+      return $ HDepFunTy vis (mult, varName binder, domain) result
     go (TyVarTy v) = return $ HTyVarTy $ varName v
     go ty@(AppTy _ _) = do
       let (head,args) = splitAppTys ty

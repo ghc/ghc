@@ -154,6 +154,10 @@ recoverFullIfaceTypes sDocContext flattened ast = fmap (printed A.!) ast
     -- Unfold an 'HieType' whose subterms have already been unfolded
     go :: HieType IfaceType -> IfaceType
     go (HTyVarTy n) = IfaceTyVar (mkIfLclName $ getOccFS n)
+    go (HTermVarTy n) = IfaceTermVar (mkIfLclName $ getOccFS n)
+    go (HTermAppTy n arg) = IfaceTermAppTy (mkIfLclName $ getOccFS n) arg
+    go (HDepFunTy vis (mult, n, domain) body) =
+      IfaceDepFunTy vis (mult, mkIfLclName $ getOccFS n, domain) body
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ma ((n, k), af) t) =
