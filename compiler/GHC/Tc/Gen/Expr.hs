@@ -84,6 +84,8 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 
+import GHC.Types.Var.Env (emptyVarEnv)
+
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
@@ -676,7 +678,10 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 tcExpr original@(HsLet x (L loc binds) body) res_ty
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
        ; expansion <- case res_ty of
-             Check expected | enabled, hasNativeDependentExpr (Core.Type expected) ->
+             Check expected | enabled
+                            , hasNativeDependentExpr (Core.Type expected)
+                              || (isTauTy expected && not (anyFreeVarsOfType
+                                            (\v -> isTyVar v && isMetaTyVar v) expected)) ->
                do { strict <- xoptM LangExt.Strict
                   ; if strict then return Nothing else tcNativeLet original (L loc binds) body expected }
              _ -> return Nothing
@@ -798,7 +803,8 @@ tcExpr (HsStatic free_names expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie) <- captureConstraints $
-                          updLclCtxt (\ctxt -> ctxt { tcl_native_givens = [] }) $
+                          updLclCtxt (\ctxt -> ctxt { tcl_native_givens = []
+                                                   , tcl_source_let_views = emptyVarEnv }) $
                           addErrCtxt (StaticFormCtxt expr) $
                           tcCheckPolyExprNC expr expr_ty
 
@@ -1031,7 +1037,7 @@ tcNativeLet original (L loc (HsValBinds ann (XValBindsLR (HsVBG groups sigs)))) 
                 matches = mkMatchGroup (Generated OtherExpansion SkipPmc) noAnn (wrapGenSpan [row])
                 lambda = wrapGenSpan (HsLam noAnn LamSingle matches)
             argument <- tcScalingUsage ManyTy (tcCheckMonoExpr runtime_rhs domain)
-            fun <- tcCheckMonoExprNC lambda signature
+            fun <- tcWithSourceLetView binder index (tcCheckMonoExprNC lambda signature)
             let result_ty = applyTypeToArgs signature [checked]
                 app = HsAppRetained (DepFunVisible, result_ty) fun argument
             tcWrapResult (unLoc body) app result_ty (Check expected)
@@ -1112,7 +1118,8 @@ tcOptionalLet checked rest expected
           proof <- newEvVar (mkNomEqPred (TermVarTy value) index)
           traceTc "tcOptionalLet" (ppr value <+> dcolon <+> ppr (idType proof) $$ ppr guards)
           (binds, body') <- setSrcSpan (nameSrcSpan (idName value)) $
-                            checkSourceLetConstraints (idName value) guards proof rest
+                            checkSourceLetConstraints (idName value) guards proof $
+                            tcWithSourceLetView value index rest
           registerOptionalSourceUses binds proof dependencies
           return (XExpr (NativeLetAlias rhs (PendingSourceLetRhs binds canonical) value proof expected (mkHsDictLet binds body')))
   | otherwise = return Nothing

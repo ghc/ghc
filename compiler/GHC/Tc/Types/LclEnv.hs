@@ -35,7 +35,7 @@ module GHC.Tc.Types.LclEnv (
 
 import GHC.Prelude
 
-import GHC.Tc.Utils.TcType ( TcLevel )
+import GHC.Tc.Utils.TcType ( TcLevel, TcType )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
 import GHC.Core.UsageEnv ( UsageEnv )
@@ -45,6 +45,7 @@ import GHC.Types.Name.Env ( NameEnv )
 import GHC.Types.SrcLoc ( RealSrcSpan )
 import GHC.Types.Basic ( TopLevelFlag )
 import GHC.Types.Var ( EvVar )
+import GHC.Types.Var.Env ( VarEnv )
 
 import GHC.Types.Error ( Messages )
 
@@ -101,6 +102,9 @@ data TcLclCtxt
                                             -- including equality CoVars.
                                             -- See Note [Lexical native Givens]
                                             -- in GHC.Tc.Utils.Monad.
+        tcl_source_let_views :: VarEnv TcType, -- Candidates for argument selection.
+                                            -- See Note [Inferring through local definitions]
+                                            -- in GHC.Tc.Gen.App.
         tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
                                             -- and for tidying type
 
@@ -261,4 +265,4 @@ cannot capture dictionaries introduced inside the proc.
 
 data ArrowCtxt   -- Note [Escaping the arrow scope]
   = NoArrowCtxt
-  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints) [EvVar]
+  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints) [EvVar] (VarEnv TcType)

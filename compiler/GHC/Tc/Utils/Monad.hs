@@ -18,7 +18,7 @@ module GHC.Tc.Utils.Monad(
   discardResult,
   getTopEnv, updTopEnv, updTopEnvIO, getGblEnv, updGblEnv,
   setGblEnv, getLclEnv, updLclEnv, updLclCtxt, setLclEnv, restoreLclEnv,
-  tcExtendNativeGivens,
+  tcExtendNativeGivens, tcWithSourceLetView,
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
   xoptM, doptM, goptM, woptM,
@@ -492,6 +492,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
                 tcl_native_givens = [],
+                tcl_source_let_views = emptyVarEnv,
                 tcl_tclvl      = topTcLevel
                 },
                 tcl_usage      = usage_var,
@@ -593,6 +594,12 @@ updLclEnv upd = updEnv (\ env@(Env { env_lcl = lcl }) ->
 
 updLclCtxt :: (TcLclCtxt -> TcLclCtxt) -> TcRnIf gbl TcLclEnv a -> TcRnIf gbl TcLclEnv a
 updLclCtxt = updLclEnv . modifyLclCtxt
+
+-- | Scope a checked definition for choosing an omitted argument.
+-- See Note [Inferring through local definitions] in GHC.Tc.Gen.App.
+tcWithSourceLetView :: Id -> TcType -> TcM a -> TcM a
+tcWithSourceLetView value rhs = updLclCtxt $ \ctxt ->
+    ctxt { tcl_source_let_views = extendVarEnv (tcl_source_let_views ctxt) value rhs }
 
 -- | Record actual native-dependent Given parameters, including CoVars,
 -- in their lexical evidence scope.
@@ -1015,7 +1022,8 @@ newArrowScope :: TcM a -> TcM a
 newArrowScope
   = updLclEnv $ \env ->
       modifyLclCtxt (\ctx -> ctx { tcl_arrow_ctxt = ArrowCtxt (getLclEnvRdrEnv env)
-                                                  (tcl_lie env) (tcl_native_givens ctx) }) env
+                                                  (tcl_lie env) (tcl_native_givens ctx)
+                                                  (tcl_source_let_views ctx) }) env
 
 -- Return to the stored environment (from the enclosing proc)
 escapeArrowScope :: TcM a -> TcM a
@@ -1023,10 +1031,11 @@ escapeArrowScope
   = updLclEnv $ \ env ->
     case getLclEnvArrowCtxt env of
       NoArrowCtxt       -> env
-      ArrowCtxt rdr_env lie givens -> env
+      ArrowCtxt rdr_env lie givens views -> env
         { tcl_lcl_ctxt = (tcl_lcl_ctxt env) { tcl_arrow_ctxt = NoArrowCtxt
                                           , tcl_rdr = rdr_env
-                                          , tcl_native_givens = givens }
+                                          , tcl_native_givens = givens
+                                          , tcl_source_let_views = views }
         , tcl_lie = lie }
 
 {-

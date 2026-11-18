@@ -50,6 +50,7 @@ import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Reduction ( reductionReducedType )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
 import GHC.Core.FVs ( exprFreeVarsList )
@@ -71,7 +72,7 @@ import GHC.Builtin.KnownKeys
 
 import GHC.Driver.DynFlags ( DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
 import GHC.Types.TyThing ( TyThing(AnId, AConLike) )
-import GHC.Types.Basic ( TypeOrKind(TypeLevel), intGtLimit )
+import GHC.Types.Basic ( TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
 import GHC.Types.Id ( mkLocalId, isClassOpId_maybe, isDFunId, sourceTableId_maybe, sourceMethodTarget_maybe, sourceLiteralCons_maybe )
@@ -82,7 +83,7 @@ import GHC.Unit.Types ( isInteractiveModule )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
-import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
+import GHC.Types.Var.Env  ( VarEnv, emptyTidyEnv, mkInScopeSet, delVarEnv, lookupVarEnv )
 
 import GHC.Data.Maybe
 import GHC.Data.Bag ( unitBag )
@@ -966,9 +967,8 @@ tcRetainedDeclaredTypeView ty
   where
     refine ty given
       | isCoVar given
-      , let co = mkCoVarCo given
+      , Just (index, co) <- orient (mkCoVarCo given)
       , coercionRole co == Nominal
-      , TermVarTy index <- coercionLKind co
       , isNativeIndexId index
       , TyConApp tc _ <- coreFullView (coercionRKind co)
       , Just con <- isPromotedDataCon_maybe tc
@@ -982,6 +982,11 @@ tcRetainedDeclaredTypeView ty
                Just _ -> coercionRKind <$> tcRetainedCoercion index co ty }
       | otherwise = return ty
 
+    orient co
+      | TermVarTy index <- coercionLKind co = Just (index, co)
+      | TermVarTy index <- coercionRKind co = Just (index, mkSymCo co)
+      | otherwise = Nothing
+
 {- Note [Declared retained argument refinement]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A constructor branch can have retained ~# S k while a declared argument keeps
@@ -992,7 +997,10 @@ ordinary solver checks the argument.
 
 Use only the actual lexical evidence parameters in tcl_native_givens. This
 list is newest first. Apply checked nominal constructor proofs from outer to
-inner scope. The existing tcRetainedCoercion supplies the type view. Check the
+inner scope. Orient an actual nominal proof toward the runtime index before
+checking its constructor endpoint. For example, matching Refl can supply
+S Z ~# size rather than size ~# S Z. The symmetric coercion proves the same
+view. The existing tcRetainedCoercion supplies the type view. Check the
 original declaration's runtime scope first. Keep its Id and stored type.
 First probe the existing abstractNativeIndices grammar with a fresh immutable
 template. Unsupported input casts or coercion types keep the current type.
@@ -3480,7 +3488,7 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
              ; let initial_pairs = map snd initial_args
                    match_worker subst = foldM (\s (formal, actual) ->
                        matchRetainedAppType tvs s formal actual) subst initial_pairs
-             ; (matched, cache, templates) <- if index_route
+             ; (matched, cache, pairs) <- if index_route
                  then do
                    { first <- match_indices initial_subst initial_args
                    ; case first of
@@ -3509,8 +3517,8 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                        Just subst | not native_worker ->
                          tcRetainedCallbackArgs tvs domains args subst initial_cache
                        _ -> return (initial_match, initial_cache)
-                   ; return (m, cache, map (domain_at . fst) cache) }
-             ; actual_tys <- mapM (fmap (snd . snd) . matching_arg) cache
+                   ; pairs <- mapM (fmap snd . matching_arg) cache
+                   ; return (m, cache, pairs) }
              ; choices <- case matched of
                             Just subst | native_worker
                               -> return $ do { inst_tys <- traverse (Subst.lookupTyVar subst) tvs
@@ -3523,8 +3531,7 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                    , not nested || any (hasNativeDependentExpr . Core.Type) inst_tys
                    , not native_worker || not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
                    , and (zipWith (kind_agrees subst) tvs inst_tys)
-                   , and (zipWith (\formal actual -> eqType (Subst.substTy subst formal) actual)
-                                  templates actual_tys)
+                   , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
                    -> do { valid <- tcRetainedInstScope inst_tys
                          ; if valid
                            then if nested || isJust after_vta
@@ -3582,10 +3589,10 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstCached _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
 
--- | Match cached index arguments and keep the formal views used for selection.
+-- | Match cached index arguments and keep both views used for selection.
 -- See Note [Matching a computed nonempty length].
 tcMatchRetainedIndexArgs :: BindTvFun -> Subst.Subst -> [(CtLoc, (Type, Type))]
-                         -> TcM (Maybe (Subst.Subst, [Type]))
+                         -> TcM (Maybe (Subst.Subst, [(Type, Type)]))
 tcMatchRetainedIndexArgs bind seed entries = runMaybeT (match_group seed entries)
   where
     match_group subst pairs = mapAccumLM finish selected pending
@@ -3593,26 +3600,111 @@ tcMatchRetainedIndexArgs bind seed entries = runMaybeT (match_group seed entries
         (selected, pending) = mapAccumL select subst pairs
 
     -- A later argument (or field) can select an input to an earlier family.
-    select subst entry@(_, (formal, actual))
-      | Just subst' <- tcMatchTyX_BM bind subst formal actual = (subst', Left formal)
+    select subst entry@(_, pair@(formal, actual))
+      | Just subst' <- tcMatchTyX_BM bind subst formal actual = (subst', Left pair)
       | otherwise = (subst, Right entry)
 
-    finish subst (Left formal) = return (subst, formal)
+    finish subst (Left pair) = return (subst, pair)
     finish subst (Right (loc, (formal, actual)))
-      | Just subst' <- tcMatchTyX_BM bind subst instantiated actual = return (subst', instantiated)
+      | Just subst' <- tcMatchTyX_BM bind subst instantiated actual
+      = return (subst', (instantiated, actual))
       | not (hasNativeDependentExpr (Core.Type actual)) = mzero
-      | TyConApp tc _ <- instantiated, isTypeFamilyTyCon tc
-      = do { view <- liftMaybeT (reductionReducedType <$> tcRewriteFamilyAxioms loc instantiated)
-           ; subst' <- MaybeT (pure (tcMatchTyX_BM bind subst view actual))
-           ; return (subst', view) }
-      | TyConApp tc fields <- instantiated
-      , TyConApp tc' args <- coreFullView actual
-      , tc == tc', isGenerativeTyCon tc Nominal, fields `equalLength` args
-      = do { (subst', views) <- match_group subst [(loc, pair) | pair <- zip fields args]
-           ; return (subst', mkTyConApp tc views) }
-      | otherwise = mzero
+      | otherwise = do
+          view <- case instantiated of
+            TyConApp tc _ | isTypeFamilyTyCon tc ->
+              liftMaybeT (reductionReducedType <$> tcRewriteFamilyAxioms loc instantiated)
+            _ -> return instantiated
+          match_view subst loc view actual
       where
         instantiated = coreFullView (Subst.substTy subst formal)
+
+    match_view subst loc formal actual
+      | Just subst' <- tcMatchTyX_BM bind subst formal actual
+      = return (subst', (formal, actual))
+      | TermVarTy v <- coreFullView actual
+      = do { exposed <- MaybeT (tcSourceLetHead v)
+           ; match_view subst loc formal exposed }
+      | TyConApp tc fields <- formal, isGenerativeTyCon tc Nominal
+      , TyConApp tc' args <- coreFullView actual, tc == tc', fields `equalLength` args
+      = do { (subst', views) <- match_group subst [(loc, pair) | pair <- zip fields args]
+           ; return (subst', (mkTyConApp tc (map fst views), mkTyConApp tc (map snd views))) }
+      | otherwise = mzero
+
+-- | Expose the outer shape of a checked local RHS for immutable selection.
+-- See Note [Inferring through local definitions].
+tcSourceLetHead :: Id -> TcM (Maybe Type)
+tcSourceLetHead value = do
+    declared <- tcRetainedDeclaredTypeView (TermVarTy value)
+    if not (eqType declared (TermVarTy value))
+      then return (Just declared)
+      else do
+        views <- tcl_source_let_views . tcl_lcl_ctxt <$> getLclEnv
+        case lookupVarEnv views value of
+          Nothing -> return Nothing
+          Just rhs -> do
+            fam_envs <- tcGetFamInstEnvs
+            limit <- reductionDepth <$> getDynFlags
+            return (sourceLetHead fam_envs limit (delVarEnv views value) rhs)
+
+-- | Find a constructor by following local definitions and checked source families.
+sourceLetHead :: FamInstEnvs -> IntWithInf -> VarEnv Type -> Type -> Maybe Type
+sourceLetHead fam_envs limit views rhs = simplify_fields <$> expose 1 views rhs
+  where
+    expose depth env ty
+      | intGtLimit depth limit = Nothing
+      | TermVarTy v <- head_ty, Just def <- lookupVarEnv env v
+      = expose (depth + 1) (delVarEnv env v) def
+      | TyConApp tc args <- head_ty, source_family tc
+      = case reduce tc args of
+          Just result -> next result
+          Nothing     -> try_args tc [] args
+      | otherwise = Just head_ty
+      where
+        head_ty = coreFullView ty
+        next = expose (depth + 1) env
+        try_args _  _   [] = Just head_ty
+        try_args tc rev (arg:rest) = do
+          arg' <- next arg
+          let rev' = arg' : rev
+          case if eqType arg' arg then Nothing else reduce tc (reverse rev' ++ rest) of
+            Just result -> next result
+            Nothing     -> try_args tc rev' rest
+
+    source_family tc = isTypeFamilyTyCon tc &&
+                       isJust (sourceTableTermOcc (nameOccName (tyConName tc)))
+    reduce tc args = reductionReducedType <$> reduceTyFamApp_maybe fam_envs Nominal tc args
+
+    -- plus (S Z) n exposes S (plus Z n). Select n directly. Only discard
+    -- a family application when one axiom returns one of its own operands.
+    simplify_fields (TyConApp tc fields) | isJust (isPromotedDataCon_maybe tc)
+      = mkTyConApp tc (map simplify_operand fields)
+    simplify_fields ty = ty
+    simplify_operand ty@(TyConApp tc args)
+      | source_family tc, Just result <- reduce tc args, any (eqType result) args = result
+      | otherwise = ty
+    simplify_operand ty = ty
+
+{- Note [Inferring through local definitions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider safeHead :: Vec a (1 + n) -> a at a vector of length total.
+If total = S area, the omitted argument can be area even when the
+definition of area uses an arbitrary dictionary. Try the structural
+match first. At an opaque variable, prefer an actual lexical constructor
+Given. Otherwise consult the checked RHS of its definition. Follow aliases
+and reduce generated source family heads until the outer constructor is
+available. For plus one n, try the equation before inspecting the arguments.
+If necessary, expose one and retry before inspecting n. Leave constructor
+fields for structural matching.
+
+The local environment contains candidate types only. A method on the
+RHS might ultimately select a caller-supplied dictionary. Reading the
+candidate supplies no equality and records no source-equation use. Keep
+the original inferred expression, type and usage in RetainedArgCache.
+tcValArgsWithCache must check that type against the instantiated domain.
+The M92 implication solver can supply a defining equality only when its
+ordinary evidence justifies it. Static and arrow scopes delimit the
+candidate environment in the same way as lexical native evidence.
+-}
 
 {- Note [Matching a computed nonempty length]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
