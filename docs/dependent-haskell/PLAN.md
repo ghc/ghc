@@ -17,17 +17,11 @@ specifications record bounded increments and their historical checkpoints.
 Each new increment must name one owning roadmap card, related cards, required
 prerequisites, acceptance checks and the behavior that remains unsupported.
 
-[M83](#m83-ordinary-numerals-in-retained-arguments) connects term numerals
-to the result type of a retained application. It advances R07 (literal
-promotion), using the concrete dictionary evidence from R12 and the
-runtime operand from R03. The source examples are `replicateNative 3 x`
-and `replicateNative (n + 1) x`.
-
-The [R23 matchability foundation](roadmap/R23-unsaturated-type-families.md)
-precedes this R05 increment. The roadmap separates this chosen order from
-actual feature prerequisites. Keep ordinary
-evaluation, function promotion, first-class sums and the remaining promotion
-domains visible there.
+[M84](#m84-infer-a-nonempty-vectors-tail-at-a-nested-application) lets
+`safeHead` infer the tail of a vector constructed by another call.
+It advances R03 using the addition and list-length equations from R13
+and R15. M83 supplies the numeric syntax. The work queue tracks the
+remaining product, promotion and Core tasks.
 
 ## Historical source checkpoints
 
@@ -6666,18 +6660,11 @@ retained `Nat` argument accepts `fill 2`. An expression signature around
 the operand, as in `fill (2 :: Nat)`, is outside the current operand grammar.
 An ordinary annotated binding can still supply the argument.
 
-### Open inference case
+### Inference at M83
 
-With `safeHead :: Vec a (1 + k) -> a`, the current checker accepts a local
-binding `xs :: Vec Bool (1 + n)` followed by `safeHead xs`. Writing
-`safeHead (replicateNative (1 + n) True)` directly reports an untouchable
-tail index. The call also checks as
-`safeHead @Bool @n (replicateNative (1 + n) True)` when `safeHead` binds
-`forall a k` in that order. The cached-argument matcher reduces the inferred
-vector type
-before comparing it with the unreduced argument type of `safeHead`. The
-next inference check should compare nominally reduced views of both types
-while keeping the runtime binder in scope.
+At M83, `safeHead (replicateNative (1 + n) True)` reported an untouchable
+tail index. A signed local vector or the explicit type arguments `@Bool @n`
+let the call check. M84 resolves the direct call.
 
 ### Validation
 
@@ -6719,15 +6706,39 @@ from R13 and R15. At M83 both `safeHead (replicateNative (1 + n) x)` and
 from the caller. The result of the inner call determines its element type
 and the tail index. A local signature already makes the call work.
 
-- [ ] Compare an inferred argument with its formal domain using bounded
+- [x] Compare an inferred argument with its formal domain using bounded
       nominal family reduction where structural index matching fails.
       Keep the selected runtime binder in its lexical scope. Check the
       original cached argument with ordinary subsumption.
-- [ ] Check repeated indices, type applications, the diagnostic location
+- [x] Check repeated indices, type applications, the diagnostic location
       at the reduction limit, the empty vector and the stuck right addend.
       Keep the existing successes that leave an unused family unevaluated.
-- [ ] Run the direct source expression on a runtime length and an undefined
+- [x] Run the direct source expression on a runtime length and an undefined
       tail. Update the Showcase, references and roadmap with the result.
 
 Agda’s comparison of both argument views is recorded under
 [computed-length conversion](REFERENCES.md#comparing-a-computed-length-with-a-function-argument).
+
+### Implementation and validation
+
+The cached index-argument matcher first collects structural matches. A later
+tag can determine a family input in an earlier vector argument. For a
+remaining mismatch with a runtime index, compare fields under a common
+generative type constructor, or reduce a formal type family using the choices
+already made. Keep the actual argument's source location during reduction.
+Every cached domain must still match the candidate after substitution.
+Ordinary subsumption checks the original argument and supplies its coercion.
+
+Both compiler stages ran the generic `firstCopy` example with an undefined
+tail length. They also ran `safeHead (sourceVector (x : xs))` with an
+undefined list tail. An extension-off
+module could call the imported functions directly. The empty vector, an
+unknown list, a stuck `n + 1`, conflicting tails and a representational
+newtype mismatch still failed. A family that drops a parameter supplied no
+choice for it. A long finite family accepted at the default depth and
+reported GHC-40404 at the nested argument with `-freduction-depth=12`.
+
+Both stages matched all 158 Showcase output lines. The test driver passed
+33 selected normal-way tests and the registered GHCi script. These include
+the native Core and bounded family-depth controls. This change uses the
+existing nominal family axioms and interface format.

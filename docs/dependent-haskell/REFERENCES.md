@@ -4615,8 +4615,11 @@ Agda 2.8.0's `compareAtom` reduces both inputs before inspecting their
 heads. It keeps two literals in literal form. When one side has a different
 form, it can expose the literal's constructors. The fork currently expands
 a retained numeral to the constructors certified by its Haskell instance.
-The open `safeHead` inference case concerns a different step. The available
-nominal family reductions need to reach both argument types before matching
-an unknown tail against a scoped runtime binder.
-[Agda’s conversion checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L492-L521)
-and [the fork’s inference example](PLAN.md#open-inference-case).
+In M84, immutable argument matching first tries the declared domain. When
+its length has a different head from the inferred native index, the fork
+uses GHC's bounded nominal family rewrite to expose a constructor. The
+ordinary argument checker supplies the equality evidence. This lets a
+scoped runtime value instantiate the erased tail parameter of `safeHead`.
+[Agda’s conversion checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L492-L521),
+[its comparison of constructor arguments](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L602-L613),
+and [the fork’s inference example](PLAN.md#m84-infer-a-nonempty-vectors-tail-at-a-nested-application).

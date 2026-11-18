@@ -79,7 +79,16 @@ safeHead (VCons x _) = x
 ```
 
 Addition inspects its first argument. Thus `1 + n` reduces to `S n`
-even when the tail length comes from IO. GHC rejects
+even when the tail length comes from IO. The following call checks directly.
+The vector produces its first cell even if evaluating `n` would raise an
+exception.
+
+```haskell
+firstCopy :: foreach (n :: Nat) -> a -> a
+firstCopy n x = safeHead (replicateNative (1 + n) x)
+```
+
+GHC rejects
 `safeHead (sourceVector @Int [])` at the call site.
 
 ```text
@@ -115,7 +124,7 @@ Matching on the proof evaluates `addSucc` by induction on `n`. Matching
 on `VCons` directly inspects just the outer cell.
 
 The [rejection test](../../testsuite/tests/dependent/should_fail/NativeSourceLengthEmpty.hs)
-contains both calls without the match. The [Showcase](Showcase.hs) runs
+covers empty, unknown and unreduced lengths. The [Showcase](Showcase.hs) runs
 the two successful branches. If the input is already known to be
 `True : xs`, the cons equation gives `S (sourceLength xs)`, which suffices
 even if evaluating `xs` would diverge.

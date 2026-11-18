@@ -102,6 +102,17 @@ The ordinary solver must select the checked dictionary at the literal.
 A result signature still uses ``FromNatural``. GHC checks
 that the two interpretations agree when it checks the result type.
 
+A consumer can infer the tail of a vector produced by another call::
+
+    firstCopy :: foreach (n :: Nat) -> a -> a
+    firstCopy n x = safeHead (replicateNative (1 + n) x)
+
+The addition equations reduce the formal length ``1 + k`` of ``safeHead``
+to ``S k`` and the argument length to ``S n``. GHC can then choose ``k``
+to be the caller's runtime ``n``. The first element is available without
+forcing that tail length. With an unknown left addend, ``n + 1`` needs a
+proof of nonemptiness or a pattern match on the vector.
+
 A call can also use the source function directly, as in
 ``replicateNative (plus n m) True``. The function must be monomorphic
 and fully applied to named values or supported constructor trees. A user-defined
