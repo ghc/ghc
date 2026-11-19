@@ -156,3 +156,8 @@ test('NativeClosedSumDependencies',
      [req_interp, req_rts_linker, only_ways(['normal'])],
      run_command, ['bash NativeClosedSumDependencies.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
+
+test('NativeClosedCallback',
+     [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedCallbackLib.hs'])],
+     run_command, ['bash NativeClosedCallback.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])

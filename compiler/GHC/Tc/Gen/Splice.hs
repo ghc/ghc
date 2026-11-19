@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedApplication, tcPrepareClosedResult
+     finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult
      , tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable
       ) where
 
@@ -1882,21 +1882,29 @@ tcPrepareClosedApplication fun domains result_kind = do
   let name = idName fun
       bad = failWithTc . TcRnClosedTypeEval name
       expected = foldr mkVisFunTyManyU result_kind domains
-  tcPreflightClosedCall name
-  function <- if idType fun `tcEqType` expected
-                then pure (Core.Var fun)
-                else specializeClosedFunction name expected
-  unless (exprType function `tcEqType` expected) $
-    bad "The closed call does not have the expected ordinary function type."
-  -- Even a fused call can be simplified using an imported unfolding.
-  env <- getGblEnv
-  updTcRef (tcg_evaluated_term_uses env) (`extendNameSet` name)
+  function <- tcPrepareClosedFunctionValue fun expected
   loc <- getSrcSpanM
   return $ \arguments -> setSrcSpan loc $ do
     unless (length arguments == length domains &&
             and (zipWith tcEqType (map exprType arguments) domains)) $
       bad "The runtime operands do not have the expected types."
     return (mkCoreApps function arguments)
+
+-- | Prepare an imported function at its checked ordinary runtime type.
+tcPrepareClosedFunctionValue :: Id -> Type -> TcM Core.CoreExpr
+tcPrepareClosedFunctionValue fun expected = do
+  let name = idName fun
+  tcPreflightClosedCall name
+  function <- if idType fun `tcEqType` expected
+                then pure (Core.Var fun)
+                else specializeClosedFunction name expected
+  unless (exprType function `tcEqType` expected) $
+    failWithTc (TcRnClosedTypeEval name
+      "The closed call does not have the expected ordinary function type.")
+  -- Even a fused call can be simplified using an imported unfolding.
+  env <- getGblEnv
+  updTcRef (tcg_evaluated_term_uses env) (`extendNameSet` name)
+  return function
 
 -- | Render and interpret a complete runtime expression at a type boundary.
 tcPrepareClosedResult :: Name -> Kind -> TcM (Core.CoreExpr -> TcM Type)

@@ -17,7 +17,7 @@ module GHC.Rename.Env (
         lookupOccRn, lookupOccRnGRE, lookupOccRn_maybe, lookupSameOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
-        lookupTypeOccRn, lookupTypeAppHeadRn, lookupOccRnNone, lookupSourceTables,
+        lookupTypeOccRn, lookupTypeAppHeadRn, lookupTypeCallOperandRn, lookupOccRnNone, lookupSourceTables,
         lookupGlobalOccRn_maybe,
         rnLookupKnownOccName,
 
@@ -1180,8 +1180,12 @@ lookupTypeOccRn = lookupTypeOcc BareTypeOccurrence
 lookupTypeAppHeadRn :: Bool -> RdrName -> RnM GlobalRdrElt
 lookupTypeAppHeadRn = lookupTypeOcc . TypeApplicationHead
 
--- | Only an application head can fall back to an ordinary function.
-data TypeOccurrence = BareTypeOccurrence | TypeApplicationHead Bool
+-- | Look up a possible callback in an ordinary source call operand.
+lookupTypeCallOperandRn :: RdrName -> RnM GlobalRdrElt
+lookupTypeCallOperandRn = lookupTypeOcc TypeCallOperand
+
+-- | Restrict ordinary function lookup to source call heads and operands.
+data TypeOccurrence = BareTypeOccurrence | TypeApplicationHead Bool | TypeCallOperand
 
 -- See Note [Demotion] and Note [Names of finite source functions].
 lookupTypeOcc :: TypeOccurrence -> RdrName -> RnM GlobalRdrElt
@@ -1209,6 +1213,10 @@ lookupTypeOcc position rdr_name
       = Just (setRdrNameSpace rdr varName)
       | otherwise = demoteRdrNameTv rdr
 
+    ordinaryPosition BareTypeOccurrence = Nothing
+    ordinaryPosition (TypeApplicationHead open) = Just open
+    ordinaryPosition TypeCallOperand = Just False
+
     lookup_table term_rdr = do
       envs <- getRdrEnvs
       candidates <- lookupSourceTables envs term_rdr
@@ -1218,7 +1226,7 @@ lookupTypeOcc position rdr_name
           return gre { gre_name = table, gre_par = NoParent
                      , gre_info = IAmTyCon ClosedTypeFamilyFlavour }
         [(gre, Nothing)]
-          | TypeApplicationHead open_operands <- position
+          | Just open_operands <- ordinaryPosition position
           , isVarOcc (greOccName gre)
           -> do { this_mod <- tcg_semantic_mod <$> getGblEnv
                 ; level <- getThLevel
@@ -1236,7 +1244,8 @@ lookupTypeOcc position rdr_name
                             ; addUsedGRE AllDeprecationWarnings gre
                             ; return gre }
                     else case level of
-                      Comp | isQual term_rdr || open_operands
+                      Comp | TypeApplicationHead{} <- position
+                           , isQual term_rdr || open_operands
                            , isLocalGRE gre, not explicit_levels
                            , isLexVarId (occNameFS (greOccName gre))
                            , nameModule_maybe name == Just this_mod

@@ -1087,8 +1087,26 @@ throw an error accordingly.
 rnHsAppTy :: RnTyKiEnv -> Bool -> LHsType GhcPs -> LHsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 rnHsAppTy env open fun arg = do
   (fun', fun_fvs) <- rnLHsAppHead env (open && isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc) arg) fun
-  (arg', arg_fvs) <- rnLHsTyKi env arg
+  (arg', arg_fvs) <- if sourceCallHead fun'
+                    then rn_operand arg
+                    else rnLHsTyKi env arg
   return (HsAppTy noExtField fun' arg', fun_fvs `plusFN` arg_fvs)
+  where
+    sourceCallHead :: LHsType GhcRn -> Bool
+    sourceCallHead (L _ (HsAppTy _ head_ty _)) = sourceCallHead head_ty
+    sourceCallHead (L _ (HsParTy _ ty)) = sourceCallHead ty
+    sourceCallHead (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
+      isVarName name || isJust (sourceTableTermOcc (nameOccName name))
+    sourceCallHead _ = False
+
+    rn_operand :: LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
+    rn_operand (L l tv@(HsTyVar _ NotPromoted name)) = setSrcSpanA l $ do
+      (tv', fvs) <- rnHsTyVar lookupTypeCallOperandRn env tv NotPromoted name
+      return (L l tv', fvs)
+    rn_operand (L l (HsParTy _ ty)) = do
+      (ty', fvs) <- rn_operand ty
+      return (L l (HsParTy noAnn ty'), fvs)
+    rn_operand ty = rnLHsTyKi env ty
 
 -- | Carry the operand test to the head of a parenthesized application.
 rnLHsAppHead :: RnTyKiEnv -> Bool -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)

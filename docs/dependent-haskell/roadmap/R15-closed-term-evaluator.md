@@ -969,3 +969,19 @@ still checks under the projection rule. At input `8` the siblings are
 `'a'` and `'b'`. Although both selected numbers are `9`, GHC reports
 GHC-83605 when equality would require the guarded projection.
 [Input-sensitive reflexivity test](../../../testsuite/tests/dependent/should_run/NativeClosedPartialPair.sh).
+
+## M165. Named functions as closed operands
+
+A complete closed call can pass an imported ordinary function as an
+operand. For example, `Prelude.map Prelude.not '[ 'True, 'False]`
+produces `'[ 'False, 'True]`. The same planner accepts a separately
+compiled worker and callback. A polymorphic callback can take its type
+from the other operands. The planner requires an ordinary arrow with no
+class constraints on the callback.
+
+Lookup keeps ordinary type bindings ahead of a term fallback. The
+typechecker checks the callback against the enclosing call before the
+interpreter runs. The checked callback enters the same runtime Core
+expression as the other operands. The compiler records its interface and
+linker dependencies and reifies the final result. Function-valued results
+and open higher-order aliases remain outside this path.

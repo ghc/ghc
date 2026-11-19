@@ -92,7 +92,7 @@ import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourceCaseKindUse, isSourceConstructorCase, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField)
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -2758,6 +2758,7 @@ data ClosedCallTree
   = ClosedLiteral Name (LHsType GhcRn) Type
   | ClosedBoundary (LHsType GhcRn) Kind
   | CheckedBoundary ClosedCallValue
+  | ClosedCallback SrcSpan Id Type
   | ClosedFamilyApplication SrcSpan Name TyCon [Kind] [Kind] Kind [ClosedCallTree]
   | ClosedApplication SrcSpan Id [(TyVar, Type)] [Type] [Type] Kind [ClosedCallTree]
 
@@ -2784,6 +2785,8 @@ tcPlanOrdinaryCall mode ordinary hint fun args
   , [domain] <- domains, noFreeVarsOfType domain
   , Just (tc, [element]) <- splitTyConApp_maybe domain, tc == listTyCon
   , not (any (tcEqType element) closedCallScalarKinds)
+  = plan
+  | ordinary, any (isJust . bareClosedCallback) args
   = plan
   | [arg] <- args
   , not ordinary || isJust (closedCallLiteralKind arg) || isJust (nestedClosedCall arg)
@@ -2886,6 +2889,21 @@ tcPlanClosedTree mode ordinary hint root arguments = do
         _ -> bad_family owner
 
     collect_arg outer_call name arg expected
+      | ordinary, Just (loc, rdr, child) <- bareClosedCallback arg
+      = setSrcSpan loc $ do
+          callback <- tcClosedCallback rdr child
+          let (_, binders, rho) = splitInvisPiTys (varType callback)
+              tvs = mapMaybe namedPiTyBinder_maybe binders
+              (_, arrows, result) = splitFunTys rho
+              domains = map scaledThing arrows
+          unless (all isTyVar tvs && equalLength tvs binders &&
+                  not (null domains) && rho `tcEqType` foldr mkVisFunTyManyU result domains) $
+            failWithTc (TcRnClosedTypeEval (getName callback)
+              "A closed callback must have an ordinary function type without constraints.")
+          (subst, _) <- newMetaTyVars tvs
+          let actual = Subst.substTy subst rho
+          discardResult (unifyKind (Just (HsTypeRnThing (unLoc arg))) actual expected)
+          return (ClosedCallback loc callback actual)
       | Just (loc, rdr, child, args) <- nestedClosedCall arg
       , isSourceFamilyName child, ordinary
       = setSrcSpan loc $ do
@@ -2963,6 +2981,12 @@ tcPlanClosedTree mode ordinary hint root arguments = do
         failWithTc (TcRnClosedTypeEval name
           "The constructor literal does not determine a closed operand kind.")
       return (ClosedLiteral name arg checked)
+    verify (ClosedCallback loc fun ty) = setSrcSpan loc $ do
+      checked <- liftZonkM (zonkTcType ty)
+      unless (noFreeVarsOfType checked && isTyFamFree checked) $
+        failWithTc (TcRnClosedTypeEval (getName fun)
+          "The enclosing call does not determine the callback's ordinary type.")
+      return (ClosedCallback loc fun checked)
     verify tree@CheckedBoundary{} = return tree
     verify ClosedBoundary{} = panic "tcPlanClosedTree: unprepared boundary"
     verify (ClosedApplication loc fun vars constraints inputs result children) = setSrcSpan loc $ do
@@ -2992,6 +3016,9 @@ tcPlanClosedTree mode ordinary hint root arguments = do
     bad_family owner = failWithTc (TcRnClosedTypeEval owner
       "The operands do not determine the checked family's input and result kinds.")
 
+    prepare (ClosedCallback loc fun ty) = setSrcSpan loc $ do
+      core <- tcPrepareClosedFunctionValue fun ty
+      return (OrdinaryClosedCall loc (getName fun) (return core))
     prepare (CheckedBoundary value) = return value
     prepare (ClosedLiteral name arg literal) = setSrcSpanA (getLoc arg) $ do
       loc <- getSrcSpanM
@@ -3145,25 +3172,52 @@ tcClosedCaseExecutableOwner rdr name args staging
   , isQual rdr || isUnqual rdr
   = do
       table <- tcLookupTyCon name
-      owner <- if sourceCaseVisibleArity table == Just (length args)
+      owner <- if sourceCaseVisibleArity table == Just (length args) ||
+                  any (isJust . bareClosedCallback) args
                  then sourceTableOwner table
                  else pure Nothing
       case owner of
         Just fun -> do
-          rdr_env <- getGlobalRdrEnv
-          let occurrence = nameOccName (getName fun)
-              term_rdr = case isQual_maybe rdr of
-                Just (qualifier, _) -> mkRdrQual qualifier occurrence
-                Nothing -> mkRdrUnqual occurrence
-              imported gre = greName gre == getName fun &&
-                             any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
-          if any imported (lookupGRE rdr_env (LookupRdrName term_rdr (RelevantGREsFOS WantNormal)))
+          imported <- isClosedOrdinaryImport rdr (getName fun)
+          if imported
             then do
               executable <- tcHasClosedCallExecutable (getName fun)
               pure (fun <$ guard executable)
             else pure Nothing
         Nothing -> pure Nothing
   | otherwise = pure Nothing
+
+-- | Recover a bare imported callback without interpreting it as a type.
+bareClosedCallback :: LHsType GhcRn -> Maybe (SrcSpan, RdrName, Name)
+bareClosedCallback arg
+  | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- ignoreParens arg
+  , isExternalName name, isVarName name || isSourceFamilyName name
+  = Just (locA loc, rdr, name)
+  | otherwise = Nothing
+
+-- | Select the exact imported term, including re-exports of a certified owner.
+tcClosedCallback :: RdrName -> Name -> TcM Id
+tcClosedCallback rdr name = do
+  owner <- closedFamilyOwner name
+  imported <- isClosedOrdinaryImport rdr owner
+  unless imported $ failWithTc (TcRnClosedTypeEval owner
+    "A closed callback needs an ordinary non-SOURCE import.")
+  thing <- tcLookupGlobal owner
+  case thing of
+    AnId fun -> return fun
+    _ -> failWithTc (TcRnNoSourceTable owner)
+
+-- | Check that the written name permits executable use of the exact term.
+isClosedOrdinaryImport :: RdrName -> Name -> TcM Bool
+isClosedOrdinaryImport rdr name = do
+  rdr_env <- getGlobalRdrEnv
+  let occurrence = nameOccName name
+      term_rdr = case isQual_maybe rdr of
+        Just (qualifier, _) -> mkRdrQual qualifier occurrence
+        Nothing -> mkRdrUnqual occurrence
+      imported gre = greName gre == name &&
+                     any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
+  return (any imported (lookupGRE rdr_env (LookupRdrName term_rdr (RelevantGREsFOS WantNormal))))
 
 -- | A checked family inside an ordinary tree can also have two literal operands.
 admissibleFamilyOperands :: [LHsType GhcRn] -> Maybe Bool -> Bool
@@ -3175,6 +3229,7 @@ closedOperandStaging = runMaybeT . fmap or . traverse contains_staged_call
   where
     -- A tree of only checked families can stay on the nominal route.
     contains_staged_call operand
+      | Just _ <- bareClosedCallback operand = return True
       | Just (_, _, head_name, args) <- nestedClosedCall operand = do
           children <- traverse contains_staged_call args
           return (isVarName head_name || or children)
@@ -3485,6 +3540,15 @@ expression at the span of its outer observation. An exception raised by
 a thunk need not come from the function that returned that thunk.
 The expected result kind can specialize an operand when the declared
 function type relates their kinds.
+
+For map not '[True, False], the first operand is an ordinary function.
+The renamer first checks the type namespace at that occurrence. Keep the
+written qualifier when looking up the imported term, including the term
+that owns a generated source family. Check its ordinary arrow type with
+the other operands. Pass the specialized Core expression to the outer
+call. Only the result list needs to cross the boundary back into Type.
+Record the callback among the evaluated names so recompilation accounts
+for its unfolding as well as any linked code.
 
 A partial signature can use this path when the chain ends in a literal.
 A call on a signature wildcard continues to use the inference retry path.

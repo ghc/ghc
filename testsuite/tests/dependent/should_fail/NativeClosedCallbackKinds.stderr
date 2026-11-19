@@ -1,0 +1,8 @@
+NativeClosedCallbackKinds.hs:9:19: error: [GHC-83865]
+    • Couldn't match kind ‘P.Char’ with ‘P.Bool’
+      Expected kind ‘P.Bool -> P.Bool’,
+        but ‘C.toUpper’ has kind ‘P.Char -> P.Char’
+    • In the first argument of ‘(:~:)’, namely
+        ‘W.eachBool C.toUpper '[ 'P.True]’
+      In the type signature:
+        bad :: W.eachBool C.toUpper '[ 'P.True] :~: '[ 'P.False]
