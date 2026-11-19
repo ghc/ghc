@@ -8,17 +8,29 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-At compiler checkpoint `e04f9add03`, both native stages and self-hosted
-GHCi agree on all 261 lines of the [Showcase](Showcase.hs). A type lambda
-can match two GADT constructors that give its field different kinds.
-A type-level `let` can share one inferred kind across case branches.
-An ordinary module can use `getConst` to extract a packaged value while
-leaving its runtime index unevaluated. [Package and eliminator](examples/packed-vector/RetainedNat.hs).
+At compiler checkpoint `004f679c42`, both native stages and self-hosted
+GHCi agree on all 264 lines of the [Showcase](Showcase.hs). A function
+can return a vector at the length stored in its input package:
 
-The self-host passed all 30 focused tests. The normal-way dependent
-directory passed 266 of 298 exercised cases. The same 32 cases failed
-with the same diagnostics as at `88cef2bf98`. The separate polykinds
-comparison at `88cef2bf98` accepted 116 of 124 unmodified programs.
+```haskell
+payload :: foreach (p :: PackedVec a) -> Vec a (PackedLength.packageLength p)
+payload (PackVec _ xs) = xs
+```
+
+`packageLength` is an ordinary imported Haskell function. Its compiled
+interface supplies the equation that relates the result to the first
+field. The generic `project` example uses a closed `Witness` family
+and runs with both `Vec Char` and `Const Int`. Reading the constant
+payload leaves its witness unevaluated.
+[Vector projection](examples/packed-vector/PackedProjection.hs),
+[ordinary length function](examples/packed-vector/PackedLength.hs)
+and [generic projection](examples/packed-vector/RetainedNat.hs).
+
+All 34 focused tests passed across the initial run and the corrected
+GHC API rerun. The normal-way dependent directory passed 267 of 299 exercised cases.
+The same 32 cases failed with the same diagnostics as at `e04f9add03`.
+The separate polykinds comparison at `88cef2bf98` accepted 116 of
+124 unmodified programs.
 The eight remaining programs compile with explicit matchability on
 their kind synonyms.
 [Users' guide](../users_guide/exts/experimental_dependent_types.rst) and

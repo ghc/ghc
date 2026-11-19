@@ -9351,3 +9351,26 @@ A second build reuses the outputs. This checkpoint uses the restricted
 optimizer for modules with native dependent Core.
 [Package](examples/packed-vector/RetainedNat.hs), [mapper](roadmap/R16-open-term-evaluator.md#checking-an-identity-traversal-with-rules-enabled)
 and [indexed type lambda](examples/open-evaluation/TypeLambda.hs).
+
+## R04 and R16. Return the payload at a package's own witness
+
+Compiler `004f679c42` checks the ordinary `packageLength` worker and
+uses its equation in the result type of `payload`. A second projection
+uses a closed `Witness` family over an arbitrary admitted payload family.
+The bootstrap compiler, self-hosted compiler and self-hosted GHCi agree
+on the 264 Showcase lines. Both the family-result and retained-package
+upgrade checks pass. The package worker rebuilds once when the old
+interface lacks the projection equation. The test covers home and
+registered datatype providers and rejects a changed result.
+
+Of the 34 focused normal-way tests, 33 passed initially. The GHC API
+runner expected `not False` to have no checked equations. Both the
+M177 compiler and this compiler accepted that expression and returned
+`42` at a payload type indexed by the result. The corrected test
+checks that positive example and rejects a partial function with no
+checked equation. The registered rerun passed. The standalone runner
+also matched all 37 golden lines. The dependent directory passed 267
+of 299 exercised cases with the same 32 diagnostics as at `e04f9add03`.
+[Concrete projection](examples/packed-vector/PackedProjection.hs),
+[generic projection](examples/packed-vector/RetainedNat.hs)
+and [package upgrade check](examples/closed-evaluation/check-readback-upgrade.sh).

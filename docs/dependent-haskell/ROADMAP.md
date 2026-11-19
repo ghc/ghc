@@ -189,10 +189,20 @@ The normal-way dependent directory passes 266 of 298 exercised cases.
 Its 32 remaining failures match the previous diagnostics.
 [Package tests](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
-The source checkpoint uses the restricted native optimizer. A separate
-R05 compiler runs a Gentle iteration on algebraic indices, function
-fields and a result coercion. The next integration check must preserve
-an index when a top-level binding also has an unfolding.
+At `004f679c42`, all three modes produce the same 264 Showcase lines.
+The new examples project the payload of a vector package, check the
+length of a known package in a type, and apply the same projection to
+two payload families. The normal-way dependent directory passes 267
+of 299 cases with the same 32 diagnostics. An upgrade from M177
+rechecks the ordinary length function once, including when the datatype
+comes from an installed package. A second build reuses the outputs.
+[R04 source and interface checks](roadmap/R04-dependent-sums.md#project-a-payload-at-the-length-of-its-input-package).
+
+The source checkpoint uses the restricted native optimizer. In a
+separate R05 build, one Gentle iteration preserves term identities in
+recursive groups and casts with nominal domain evidence. The normal
+`-O1` pipeline still needs independent checks for optimizer passes,
+worker unfoldings and cross-module compilation.
 
 [R15](roadmap/R15-closed-term-evaluator.md) and
 [R16](roadmap/R16-open-term-evaluator.md) are separate subtasks of function promotion. The upstream graph has
@@ -205,8 +215,9 @@ when some of its operands are unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R04/R22, dependent sums and existentials](roadmap/R04-dependent-sums.md) | Project a payload whose type refers to the same package's runtime length. | A retained GADT and a rank-2 consumer already express local unpacking. A first-class projection needs the type checker to refer to the package itself. |
-| [R05, dependent Core](roadmap/R05-dependent-core.md#occurrence-analysis) | Preserve the coercion in `transportElement` through an ordinary simplifier iteration. | Algebraic indices and function fields pass the Gentle tests. A module with a retained function coercion still takes the restricted path. |
+| [R04, dependent sums](roadmap/R04-dependent-sums.md) | Use an ordinary imported first projection even when the payload family is an unknown parameter. | The concrete vector projection uses the ordinary `packageLength`. The generic projection currently uses the closed `Witness` family. |
+| [R22, existential quantification](roadmap/R22-existential-quantification.md) | Check the native erased binder and open an unknown package across an interface. | Its witness erases. Opening an unused payload must preserve laziness. |
+| [R05, dependent Core](roadmap/R05-dependent-core.md#occurrence-analysis) | Run the ordinary optimization schedule while keeping every runtime index in scope. | The worker and its unfolding must use the same bound index. Absence at runtime does not imply absence from the result type. |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Extend scalar readback to more result shapes while preserving demand. | Both projections and the native object-upgrade check pass with the self-hosted compiler. The unselected exceptional sibling stays lazy. [Readback design](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field). |
 | [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check more rules used by the installed `Prelude.map`. | The compiler checks an identity traversal rule on an ordinary mapper. An imported orphan rule that changes the head invalidates a cached proof. |
 | [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Extend the dependency check to more signed producers while retaining cycle, strictness and rewrite-rule diagnostics. | A producer can call through a closed family in its own signature. A separate client checks the resulting `Payload Word` using only compiled interfaces. [Provider](examples/open-evaluation/FamilySignature.hs). |
