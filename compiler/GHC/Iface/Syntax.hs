@@ -2173,6 +2173,8 @@ freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
 freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
+freeNamesIfType (IfaceExistsTy (_, arg) body)
+  = freeNamesIfType arg &&& freeNamesIfType body
 freeNamesIfType (IfaceForAllTy ma tv t)
   = freeNamesIfType ma &&& freeNamesIfVarBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy _ ma w s t) = freeNamesIfType ma &&& freeNamesIfType w &&& freeNamesIfType s &&& freeNamesIfType t

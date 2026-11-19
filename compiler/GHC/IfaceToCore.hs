@@ -1907,6 +1907,14 @@ tcIfaceType = go
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
+    go (IfaceExistsTy bndr body)
+      = bindIfaceTyVar bndr $ \tv -> do
+          unless (isLiftedTypeKind (varType tv)) $
+            failIfM (text "Existential binder must have kind Type:" <+> ppr tv)
+          body' <- go body
+          unless (isLiftedTypeKind (typeKind body')) $
+            failIfM (text "Existential payload must have kind Type:" <+> ppr body')
+          return (ExistsTy tv body')
     go (IfaceDepFunTy vis bndr@(mult, name, domain) body)
       -- See Note [Retained binders in interfaces].
       -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.

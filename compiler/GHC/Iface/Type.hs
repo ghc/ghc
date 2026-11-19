@@ -194,6 +194,7 @@ data IfaceType
   | IfaceForAllTy  IfaceMatchability IfaceForAllBndr IfaceType
       -- See Note [Forall interface metadata].
   -- See Note [Retained Boolean interface types].
+  | IfaceExistsTy IfaceTvBndr IfaceType
   | IfaceDepFunTy !DepFunTyFlag IfaceIdBndr IfaceType
       -- See Note [Retained interface visibility].
   | IfaceTermVar IfLclName
@@ -865,6 +866,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceFreeTermVar {})   = False
     go (IfaceTermAppTy {})     = False
     go (IfaceFreeTermAppTy {}) = False
+    go (IfaceExistsTy {})      = False
     go (IfaceDepFunTy {})      = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ ma w arg res) = go ma && go w && go arg && go res
@@ -892,6 +894,7 @@ visibleTypeVarOccurencies = go
     go (IfaceFreeTermVar {})    = mempty
     go (IfaceTermAppTy _ arg)   = go arg
     go (IfaceFreeTermAppTy _ arg) = go arg
+    go (IfaceExistsTy (_, arg) res) = go arg <> go res
     go (IfaceDepFunTy _vis (w, _, arg) res) = go w <> go arg <> go res
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ ma w arg res) = go ma <> go w <> go arg <> go res
@@ -932,6 +935,7 @@ substIfaceType env ty
     go ty@(IfaceFreeTermVar {}) = ty
     go (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go arg)
     go (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun (go arg)
+    go (IfaceExistsTy {})    = pprPanic "substIfaceType: cannot substitute under existential binder" (ppr ty)
     go (IfaceDepFunTy {})    = pprPanic "substIfaceType: native dependent Core not implemented" (ppr ty)
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
@@ -1333,6 +1337,10 @@ ppr_ty ctxt_prec (IfaceTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
 ppr_ty ctxt_prec (IfaceFreeTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
+ppr_ty ctxt_prec (IfaceExistsTy (var, arg) res)
+  = maybeParen ctxt_prec funPrec $
+      sep [text "exists" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg) <> dot,
+           ppr_ty_nested res]
 ppr_ty ctxt_prec (IfaceDepFunTy vis (_, var, arg) res)
   = maybeParen ctxt_prec funPrec $
     case vis of
@@ -1515,6 +1523,9 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
 
     go subs rank1 (IfaceForAllTy ma bndr ty)
       = IfaceForAllTy (go subs False ma) (go_ifacebndr subs bndr) (go subs rank1 ty)
+
+    go subs rank1 (IfaceExistsTy (var, arg) res)
+      = IfaceExistsTy (var, go subs False arg) (go subs rank1 res)
 
     go subs rank1 (IfaceDepFunTy vis (w, var, arg) res)
       = IfaceDepFunTy vis (go subs False w, var, go subs False arg) (go subs rank1 res)
@@ -2725,6 +2736,8 @@ putIfaceType _ (IfaceFreeTermAppTy fun _)
   = pprPanic "Can't serialise IfaceFreeTermAppTy" (ppr fun)
 putIfaceType bh (IfaceTermAppTy fun arg)
   = do { putByte bh 12; put_ bh fun; put_ bh arg }
+putIfaceType bh (IfaceExistsTy bndr body)
+  = do { putByte bh 13; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceDepFunTy vis bndr body)
   = do { putByte bh 10; put_ bh vis; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceTermVar var)
@@ -2798,6 +2811,7 @@ getIfaceType bh = do
                        ; return (IfaceDepFunTy vis bndr body) }
               11 -> IfaceTermVar <$> get bh
               12 -> IfaceTermAppTy <$> get bh <*> get bh
+              13 -> IfaceExistsTy <$> get bh <*> get bh
               _  -> ioError (userError ("getIfaceType: invalid type tag " ++ show h))
 
 instance Binary IfLclName where
@@ -3006,6 +3020,7 @@ instance NFData (DefMethSpec IfaceType) where
 instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()
+    IfaceExistsTy bndr res -> rnf bndr `seq` rnf res
     IfaceDepFunTy vis bndr res -> vis `seq` rnf bndr `seq` rnf res
     IfaceTermVar var -> rnf var
     IfaceFreeTermVar var -> var `seq` ()
