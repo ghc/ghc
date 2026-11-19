@@ -175,6 +175,17 @@ failures match the previous checkpoint. Eight diagnostics now identify
 the arrow synonym involved. The separate polykinds comparison accepts
 116 of 124 programs. It recovers `T14174a` with its original source.
 
+At `bc3798ad63`, the specializer respects disabled rewrite rules. A
+fresh proof about a negated list head agrees with the runtime call.
+Both compiler stages rebuilt. All five focused self-hosted tests passed.
+[Regression and flags](roadmap/R16-open-term-evaluator.md#keep-a-checked-mapper-equation-consistent-with-specialization).
+
+The next integration has 259 matching native Showcase lines on the
+bootstrap compiler. The additional cases read fields from constructors
+with different GADT indices and share local type definitions across
+case branches. The source tests also pass one Gentle simplifier
+iteration with algebraic indices and function fields.
+
 [R15](roadmap/R15-closed-term-evaluator.md) and
 [R16](roadmap/R16-open-term-evaluator.md) are separate subtasks of function promotion. The upstream graph has
 no dependency from one evaluator to the other. Work on them in parallel.
@@ -186,13 +197,14 @@ when some of its operands are unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R05, dependent Core](roadmap/R05-dependent-core.md#occurrence-analysis) | Run an ordinary simplifier iteration on retained data and preserve proof scope and lazy demand. | An isolated occurrence pass keeps a runtime binding whose only use is a vector index. The ordinary optimized pipeline still needs changes for retained applications and case proofs. |
+| [R04/R22, dependent sums and existentials](roadmap/R04-dependent-sums.md) | Project a payload whose type refers to the same package's runtime length. | A retained GADT and a rank-2 consumer already express local unpacking. A first-class projection needs the type checker to refer to the package itself. |
+| [R05, dependent Core](roadmap/R05-dependent-core.md#occurrence-analysis) | Preserve the coercion in `transportElement` through an ordinary simplifier iteration. | Algebraic indices and function fields pass the Gentle tests. A module with a retained function coercion still takes the restricted path. |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Extend scalar readback to more result shapes while preserving demand. | Both projections and the native object-upgrade check pass with the self-hosted compiler. The unselected exceptional sibling stays lazy. [Readback design](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field). |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check which mapper equations remain valid when the consumer enables rewrite rules. | An optimized client infers the index from an [imported witness](examples/boundary-evidence/UseMapWitness.hs), including inside `Maybe` and lists. Constructing a fresh `Refl` still needs the mapper's equation. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check whether a consumer may prove a mapper equation with an identity traversal rule in scope. | The specialization regression covers both flag settings. An applicable orphan rule that changes the head must invalidate a cached proof. |
 | [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Extend the dependency check to more signed producers while retaining cycle, strictness and rewrite-rule diagnostics. | A producer can call through a closed family in its own signature. A separate client checks the resulting `Payload Word` using only compiled interfaces. [Provider](examples/open-evaluation/FamilySignature.hs). |
-| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Preserve index refinement when a case inside a lambda matches two different GADT indices. | A constructor case on a lambda argument works under `Map`. Its branches can use the whole matched value with its original kind. [Source and client](roadmap/R17-type-level-lambdas.md#matching-a-lambda-argument). |
-| [R18, type-level lets](roadmap/R18-type-level-lets.md) | Preserve the checked local definition when branches in the body of a let refer to it. | A case in the RHS of a let sees the outer scope. Both uses of its result share a type. An ill-kinded branch still fails if the let-bound name is unused. [Source](examples/open-evaluation/TypeLet.hs). |
-| [R19, type-level cases](roadmap/R19-type-level-cases.md) | Check nested cases with lexical captures and different constructor result indices. | An interface client reduces a known constructor. Matching stays stuck on an unknown input, including when both alternatives return the same type. |
+| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Check additional lambdas whose arguments have indexed constructor patterns. | An explicit polymorphic kind lets a stripped-interface client prove both GADT branches. A splice in a capture kind executes once. |
+| [R18, type-level lets](roadmap/R18-type-level-lets.md) | Extend the local RHS forms that can be checked once and used under a case. | Two case branches constrain one local `'Nothing`. Separate let bindings can choose different kinds. |
+| [R19, type-level cases](roadmap/R19-type-level-cases.md) | Cover nested eliminations that refine a GADT index and use a local type. | An interface-only client checks a known constructor. An unknown scrutinee remains stuck. |
 | [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Recheck ordinary GHC compatibility as more type-level functions use inferred and explicit kinds. | Both the private compatibility run and the self-hosted test accept `T14174a` unchanged. The other 123 polykinds results agree in the private comparison. The compiler identifies the unmatchable synonym when a data declaration requires M. [Compatibility examples](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell). |
 
 The previous source controls now pass for a private parcel with an
