@@ -86,7 +86,7 @@ import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
 import GHC.Types.Var (Id, CoVar, VarBndr(..), isId, mkTyVar, varName)
 import GHC.Types.Var.Set (elemVarSet)
-import GHC.Utils.Misc (lengthIs)
+import GHC.Utils.Misc (lengthAtLeast, lengthIs)
 import GHC.Utils.Monad (allM, anyM)
 import GHC.Utils.Outputable (text)
 import GHC.Utils.Panic (panic)
@@ -211,8 +211,15 @@ sourceTableFamilyUse :: TyCon -> TcM ()
 sourceTableFamilyUse table = sourceTableFamilyUseAt table Nothing
 
 -- | Record evidence use at an application, including cache and plugin reductions.
+-- See Note [Source family evidence uses].
 sourceTableFamilyAppUse :: TyCon -> [Type] -> TcM ()
 sourceTableFamilyAppUse table args
+  | not (args `lengthAtLeast` tyConArity table)
+  , not (isNothing (sourceTableTermOcc (nameOccName (tyConName table)))) = do
+      -- Carry the exact identity through interfaces. A bare callback
+      -- does not use an equation or publish a RULE restriction.
+      env <- getGblEnv
+      updTcRef (tcg_source_table_uses env) (`extendNameSet` tyConName table)
   | Just visible <- sourceCaseVisibleArity table <|>
                       (length (dropWhile isInvisibleTyConBinder (tyConBinders table)) <$ sourcePairBuilderField table)
   , lengthIs args (tyConArity table) = do
@@ -256,6 +263,13 @@ sourceTableFamilyUseAt table first
 
 {- Note [Source family evidence uses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For Each Flip xs, a partial family can appear as an operand. Export
+the identity of Flip so an ordinary reader can instantiate Each. In
+the empty branch the reader needs no equation of Flip. In the cons
+branch, rewriting Flip x uses an equation. Record that use in the
+client itself, including when it has only the original alias interface.
+See NativeOpenMap for the changed-clause and matching-rule tests.
+
 An imported value can have a generated source family in its type. A caller
 can reduce this family without spelling a source function or enabling
 ExperimentalDependentTypes. Check the family owner and its callees when

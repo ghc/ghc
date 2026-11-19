@@ -1,10 +1,11 @@
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications, TypeOperators #-}
-module OpenMapProof (eachEmpty, eachCons) where
+module OpenMapProof (eachEmpty, eachCons, negateHead, redStops) where
 
+import qualified ClosedTableLibrary as C
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (FUN, U, Multiplicity(Many))
-import OpenMapSource (Each)
+import OpenMapSource (Each, NegateAll, Signals)
 
 -- | An empty list needs no callback application.
 eachEmpty :: forall (f :: FUN @U 'Many Bool Bool).
@@ -16,3 +17,13 @@ eachCons :: forall (f :: FUN @U 'Many Bool Bool) (x :: Bool) (xs :: [Bool]).
             Proxy f -> Proxy x -> Proxy xs
             -> Each f (x ': xs) :~: (f x ': Each f xs)
 eachCons _ _ _ = Refl
+
+-- | Complement the head without supplying the rest of the list.
+negateHead :: forall (xs :: [Bool]). Proxy xs
+           -> NegateAll ('True ': xs) :~: ('False ': NegateAll xs)
+negateHead _ = Refl
+
+-- | A red light contributes one stop instruction for any remaining lights.
+redStops :: forall (xs :: [C.Lamp]). Proxy xs
+         -> Signals ('C.Red ': xs) :~: ('C.Stop ': Signals xs)
+redStops _ = Refl

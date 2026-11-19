@@ -2340,7 +2340,12 @@ tcInferTyAppHead mode (L _ (HsTyVar _ _ (L _ (WithUserRdr _ tv)))) args
        case sourceCaseVisibleArity table of
          Just arity | lengthIs [() | HsValArg{} <- args] arity
            -> return (mkTyConTy table, tyConKind table)
-         _ -> tcTyVar mode tv
+         _ -> do
+           -- Keep legacy eager checking for fully applied source tables.
+           let source_arity = length (dropWhile isInvisibleTyConBinder (tyConBinders table))
+           when (length [() | HsValArg{} <- args] >= source_arity) $
+             sourceTableFamilyUse table
+           tcTyVar mode tv
   | otherwise = tcTyVar mode tv
 tcInferTyAppHead mode ty _
   = tc_infer_lhs_type mode ty
@@ -2461,6 +2466,9 @@ tc_app_ty mode rn_ty exp_kind
        ; case executable of
            Just owner -> run loc (\hint -> tcPlanExecutableCase mode ordinary_call hint owner args)
            Nothing
+             | ordinary_call, any nominalCallback args
+             -> do { mapM_ checkNominalCallback args
+                   ; tc_app_ty_generic mode rn_ty exp_kind }
              | ordinary_call, staging == Just True
              -> do { table <- tcLookupTyCon name
                    ; if supportsClosedFamilyTree table args
@@ -3194,6 +3202,24 @@ bareClosedCallback arg
   , isExternalName name, isVarName name || isSourceFamilyName name
   = Just (locA loc, rdr, name)
   | otherwise = Nothing
+
+-- | A checked bare function can enter the nominal route without object code.
+nominalCallback :: LHsType GhcRn -> Bool
+nominalCallback arg
+  | Just (_, _, name) <- bareClosedCallback arg = isSourceFamilyName name
+  | otherwise = False
+
+-- | Verify provenance of a named callback without using its equation.
+checkNominalCallback :: LHsType GhcRn -> TcM ()
+checkNominalCallback arg
+  | Just (loc, rdr, name) <- bareClosedCallback arg, isSourceFamilyName name
+  = setSrcSpan loc $ do
+      fun <- tcClosedCallback rdr name
+      table <- tcLookupTyCon name
+      owner <- sourceTableOwner table
+      unless (owner == Just fun) $
+        failWithTc (TcRnNoSourceTable (getName fun))
+  | otherwise = return ()
 
 -- | Select the exact imported term, including re-exports of a certified owner.
 tcClosedCallback :: RdrName -> Name -> TcM Id

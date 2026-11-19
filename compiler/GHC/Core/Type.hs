@@ -266,7 +266,7 @@ import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    , manyDataConTy, oneDataConTy, matchableDataConTy, unmatchableDataConTy
    , liftedRepTy )
 
-import GHC.Types.Name( Name, hasKnownKey, nameOccName, sourceTableTermOcc )
+import GHC.Types.Name( Name, hasKnownKey )
 import GHC.Builtin.KnownKeys
 
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
@@ -1904,12 +1904,11 @@ coAxNthLHS ax ind =
   mkTyConApp (coAxiomTyCon ax) (coAxBranchLHS (coAxiomNthBranch ax ind))
 
 -- | A partial user family retains only known unmatchable visible binders.
--- Check the instantiated kind, not merely the TyCon's declared telescope.
+-- See Note [Partial type family applications].
 isUnsaturatedUserFamily :: TyCon -> [Type] -> Bool
 isUnsaturatedUserFamily tc args
   | isTypeFamilyTyCon tc
   , Nothing <- builtInClosedTyFamTyCon_maybe tc
-  , Nothing <- sourceTableTermOcc (nameOccName (tyConName tc))
   , let missing = tyConArity tc - length args
   , missing > 0 =
       unmatchable missing (piResultTys (tyConKind tc) args)
@@ -1921,6 +1920,23 @@ isUnsaturatedUserFamily tc args
       , isManyTy mult, ma `eqType` unmatchableDataConTy =
           unmatchable (n - 1) result
       | otherwise = False
+
+{- Note [Partial type family applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Each Flip xs can pass Flip as a function. The family axiom for Flip
+expects an argument. Until the application reaches its arity, rewrite
+its arguments by congruence and leave its head intact. Only a saturated
+application can be a TyFamLHS or enter the family reduction cache.
+Data family representation axioms have their own eta-reduced arity.
+
+Check each missing arrow in the instantiated kind, including its
+matchability. Equality of applications at U gives no inverse for the
+arguments. In particular, failure to split two partial applications
+does not establish their apartness. The source validity check controls
+which modules can write a partial family. Core Lint must also accept
+a legal partial application obtained from an imported interface.
+See proposal #242 and the R23 card in docs/dependent-haskell/roadmap.
+-}
 
 isFamFreeTy :: Type -> Bool
 isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
