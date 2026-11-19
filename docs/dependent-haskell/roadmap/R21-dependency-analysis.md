@@ -133,3 +133,38 @@ used the stale object. The compiler rejects the call with the old
 object present. R15 tracks interpreter execution separately.
 [Type-functions draft](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [R15](R15-closed-term-evaluator.md).
+
+## M138. Deriving clauses and module defaults
+
+A local function can now occur in a type in a module that derives
+instances or declares defaults. The scheduler checks the datatypes
+needed by attached and standalone deriving declarations in the first
+pass. It checks the types named by default declarations there too.
+It passes these declarations to GHC's ordinary instance and default
+checking code. Subsequent passes inherit the resulting environments.
+[Source scheduler](../../../compiler/GHC/Tc/Module.hs).
+
+The source regression derives stock instances and `Generic`, derives
+`Show` separately for a second datatype, and derives a local class
+with a default method. A local type synonym supplies `Double` in
+`default (ReportNumber)`. The ordinary interface-only consumer uses
+the selected result at `Bool`, calls the derived methods, and observes
+`"1.0"` and `"2.0"` from overloaded expressions checked in different
+passes. The Showcase uses a local `Show` instance at `Routed Bool String`.
+[Producer](../../../testsuite/tests/dependent/should_run/NativeLocalOpenDerived.hs),
+[ordinary consumer and cycle control](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh)
+and [Showcase library](../examples/open-evaluation/LocalOpen.hs).
+
+A deriving clause may itself need the unfinished function. GHC reports
+which declaration needs that function at the type-level call. A local
+explicit instance still blocks this scheduling path. Using a derived
+instance to typecheck ordinary code also leaves a separate evaluator
+question. An open observation that actually calls the class selector
+needs a definition the evaluator can follow.
+
+For the next explicit-instance case, the instance head must be available
+when the ordinary producer solves its constraints. The method bodies can
+refer to other value declarations in the module. GHC's `tcTyClsInstDecls`
+prepares the instance environment. Its `tcInstDecls2` checks the methods
+after the ordinary bindings. A split
+must preserve both sets of dependencies.

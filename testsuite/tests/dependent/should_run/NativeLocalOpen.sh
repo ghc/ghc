@@ -118,6 +118,37 @@ proof = Refl
 SOURCE
 "${ghc[@]}" -c NativeLocalOpenChain.hs
 
+cp "$src/NativeLocalOpenDerived.hs" .
+"${ghc[@]}" -c NativeLocalOpenDerived.hs
+cp NativeLocalOpenDerived.hi ../client/
+(
+    cd ../client
+    cat > DerivedConsumer.hs <<'SOURCE'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main where
+import GHC.Generics (from, to)
+import NativeLocalOpenDerived
+selectedAtBool :: Later Char Bool
+selectedAtBool = to (from Dusk) > Noon
+main :: IO ()
+main = print (selectedAtBool, show (Ticket Dusk), label (Ticket Noon), earlyLabel (), lateLabel)
+SOURCE
+    "${ghc[@]}" -c DerivedConsumer.hs
+    "${ghc[@]}" DerivedConsumer.o ../producer/NativeLocalOpenDerived.o -o derived
+    test "$(./derived)" = '(True,"Ticket Dusk","Dusk","1.0","2.0")'
+)
+
+cat > DerivingCycle.hs <<'SOURCE'
+{-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures #-}
+module DerivingCycle where
+import Data.Kind (Type)
+type Result :: Type -> Type
+type Result a = DerivingCycle.choose a
+data Payload = Payload (Result Bool) deriving Show
+choose x = const x (show (undefined :: Payload))
+SOURCE
+expect_rejection DerivingCycle 5 '\[GHC-70566\]' 'whose declaration uses the local function choose'
+
 cat > NativeLocalOpenStrict.hs <<'SOURCE'
 {-# LANGUAGE BangPatterns, ExperimentalDependentTypes, StandaloneKindSignatures #-}
 module NativeLocalOpenStrict where

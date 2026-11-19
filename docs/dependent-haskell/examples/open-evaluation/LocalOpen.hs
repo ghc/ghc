@@ -2,7 +2,7 @@
 {-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 
-module LocalOpen (Selected, keepFirst, LastOf, lastOf, LazyFirst, lazyFirst, Routed, route) where
+module LocalOpen (Selected, keepFirst, LastOf, lastOf, LazyFirst, lazyFirst, Routed, route, routeLabel) where
 
 import Data.Kind (Type)
 
@@ -47,7 +47,11 @@ route :: a -> a -> a
 route x y = follow Second x y
 
 -- | Select which argument to return.
-data Route = First | Second
+data Route = First | Second deriving (Show)
+
+-- | Display the route at the type selected by the local function.
+routeLabel :: Routed Bool String
+routeLabel = show Second
 
 -- | An ordinary result synonym used by the helper's signature.
 type ResultOf a = a

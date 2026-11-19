@@ -1925,10 +1925,17 @@ function is a mixed cycle. If a type needs a different local function,
 stage the ready functions first, then retry the remaining calls with their
 checked definitions in scope. Each pass removes at least one demand.
 See Note [Prepare TyClGroup FVs] in GHC.Rename.Module.
+Instance selection and defaulting can affect expressions that never
+name the relevant declaration. Bring all deriving clauses, standalone
+deriving declarations and default declarations into the first pass along
+with their required type groups. tcTyClsInstDecls installs the defaults
+and derives the instances before checking the selected functions.
+Later groups inherit both environments. If an instance or default
+needs a type that depends on an unfinished local value, report the edge.
 Keep INLINE pragmas with their bindings. Split a shared
-signature between the groups at its original location. A same-group instance or
-default can affect solver choices without a reference in the producer.
-Leave those groups outside this first split. The ordinary late source
+signature between the groups at its original location. Explicit instance
+declarations can require local method bodies or family equations. Leave
+those groups outside this split. The ordinary late source
 RULE check validates the owners the observer actually uses. An unrelated
 RULE does not stop the split. A producer after a splice cannot be renamed
 from the group's prefix. For a producer in an earlier group, use the binds
@@ -1954,11 +1961,16 @@ tcLocalOpenGroup :: [(Name, SrcSpan)] -> HsGroup GhcRn -> TcM (TcGblEnv, TcLclEn
 tcLocalOpenGroup demands group@HsGroup
   { hs_valds = XValBindsLR (HsVBG binds sigs)
   , hs_tyclds = tycls
-  , hs_derivds = [], hs_defds = [] }
+  , hs_derivds = standalone, hs_defds = defaults }
   | all (null . group_instds) tycls
-  , all no_deriving (tyClGroupTyClDecls tycls)
   = do
-      let (selected, ready, blocked) = foldl' tryDemand (emptyNameSet, [], []) demands
+      when (hasSplice (standalone, defaults)) $
+        rejectLocalOpen demands "A splice prevents checking a standalone deriving or default declaration early."
+      prerequisites <- case closeLocalNames (typeDeps "the deriving and default declarations" needsTerm)
+                                            emptyNameSet instance_default_roots of
+        Left reason -> rejectLocalOpen demands reason
+        Right names -> pure names
+      let (selected, ready, blocked) = foldl' tryDemand (prerequisites, [], []) demands
       case (ready, reverse blocked) of
         ([], (demand, reason) : _) -> rejectLocalOpen [demand] reason
         _ -> pure ()
@@ -1967,8 +1979,9 @@ tcLocalOpenGroup demands group@HsGroup
           (early_tys, rest_tys) = partition (any ((`elemNameSet` selected) . tcdName . unLoc)
                                                  . group_tyclds) tycls
           early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs)
-                               , hs_tyclds = early_tys }
-          rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs), hs_tyclds = rest_tys }
+                               , hs_tyclds = early_tys, hs_derivds = standalone, hs_defds = defaults }
+          rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs)
+                       , hs_tyclds = rest_tys, hs_derivds = [], hs_defds = [] }
       (envs@(early_env, _), wanted) <- captureTopConstraints (tcTopSrcDeclGroup early)
       restoreEnvs envs $ do
         evs <- checkNoErrs (simplifyTop wanted)
@@ -1979,6 +1992,12 @@ tcLocalOpenGroup demands group@HsGroup
   where
     group_names = mkNameSet (hsGroupBinders group)
     value_names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds group))
+    instance_default_roots =
+      [tcdName (unLoc decl) | decl <- tyClGroupTyClDecls tycls, not (no_deriving decl)]
+      ++ localUses group_names (standalone, defaults)
+    needsTerm dep term = "Checking the deriving and default declarations requires "
+                      ++ getOccString dep ++ ", whose declaration uses the local function "
+                      ++ getOccString term ++ "."
     types = mkNameEnv [(binder, (leader, tg)) | tg <- tycls, first : _ <- [group_tyclds tg]
                                              , let leader = tcdName (unLoc first)
                                              , binder <- hsTyClForeignBinders [tg] []]
@@ -2012,7 +2031,8 @@ tcLocalOpenGroup demands group@HsGroup
                 let rhs_deps = (fvs `intersectNameSet` group_names) `minusNameSet` value_names
                     required = unionNameSets (rhs_deps : sig_deps)
                     values = members `unionNameSet` (fvs `intersectNameSet` value_names)
-                checked <- closeLocalNames (typeDeps root name) (extendNameSet selected name)
+                checked <- closeLocalNames (typeDeps ("local dependency " ++ getOccString name)
+                                              (valueNeedsTerm root name)) (extendNameSet selected name)
                                            (nameSetElemsStable required)
                 foldM (visit root) checked (nameSetElemsStable values)
           _ -> Left ("The local dependency " ++ getOccString name
@@ -2031,23 +2051,28 @@ tcLocalOpenGroup demands group@HsGroup
       _ -> Left ("The local dependency " ++ getOccString name
                  ++ " has a signature or pragma that cannot be checked early.")
 
-    typeDeps root owner dep = case lookupNameEnv types dep of
+    valueNeedsTerm root owner dep term
+      | term == root = "This call forms a type dependency cycle through " ++ getOccString owner
+                       ++ " and " ++ getOccString dep ++ "."
+      | otherwise = "The declaration of " ++ getOccString dep ++ " requires the local function "
+                    ++ getOccString term ++ " before it can be observed."
+
+    typeDeps owner needs_term dep = case lookupNameEnv types dep of
       Just (leader, tg)
         | dep /= leader -> Right (unitNameSet leader)
         | let decls = (group_tyclds tg, group_kisigs tg)
-        , term : _ <- localUses value_names decls ->
-            if term == root
-            then Left ("This call forms a type dependency cycle through " ++ getOccString owner
-                       ++ " and " ++ getOccString dep ++ ".")
-            else Left ("The declaration of " ++ getOccString dep ++ " requires the local function "
-                       ++ getOccString term ++ " before it can be observed.")
+        , term : _ <- localUses value_names decls -> Left (needs_term dep term)
         | all (ordinaryType . unLoc) (group_tyclds tg)
-        , not (hasSplice (group_tyclds tg, group_kisigs tg)) -> Right (group_ext tg)
-      _ -> Left ("The local dependency " ++ getOccString owner
-                 ++ " refers to the same-group declaration " ++ getOccString dep
-                 ++ ", which cannot be checked early.")
+        , not (hasSplice (group_tyclds tg, group_kisigs tg)) ->
+            -- group_ext contains type dependencies. A class default method
+            -- can also use a local constructor, selector or class method.
+            Right (group_ext tg `unionNameSet` mkNameSet
+                    [use | L _ decl@ClassDecl{} <- group_tyclds tg, use <- localUses group_names decl])
+      _ -> Left ("Cannot check " ++ owner ++ " before the same-group declaration "
+                 ++ getOccString dep ++ ".")
     ordinaryType SynDecl{} = True
     ordinaryType DataDecl{} = True
+    ordinaryType ClassDecl{} = True
     ordinaryType _ = False
 
     selectedBind names (L _ FunBind{fun_id = L _ b}) = b `elemNameSet` names
@@ -2059,7 +2084,7 @@ tcLocalOpenGroup demands group@HsGroup
     empty_deriving _ = False
 tcLocalOpenGroup demands _ =
     rejectLocalOpen demands
-      "Early checking of local definitions does not support same-group instances, deriving, or defaults."
+      "Early checking of local definitions does not support same-group explicit instances."
 
 -- | Return the owners of signatures and pragmas relevant to scheduling.
 signatureOwners :: Sig GhcRn -> [Name]
