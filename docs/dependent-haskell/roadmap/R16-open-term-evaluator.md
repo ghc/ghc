@@ -965,3 +965,32 @@ Knowing the first element of the first row gives a `Just` result
 without supplying its tail or any other row. The ordinary client
 compiles from interfaces at `-O0`, `-O1`, and `-O2`.
 [Row-head proof](../examples/open-evaluation/OpenMapProof.hs).
+
+### M170. Use the installed Boolean callback
+
+`InstalledNotSource` defines `NegateAll xs = W.each P.not xs`. The
+mapper and the callback come from ordinary Haskell modules. An ordinary
+client proves `NegateAll ('True ': xs) :~: ('False ': NegateAll xs)`
+from interfaces alone. The defining module of `P.not` must have been
+compiled with the new checker. An older installed package reports
+GHC-64152 at the written callback. [Alias](../examples/open-evaluation/InstalledNotSource.hs)
+and [ordinary client](../examples/open-evaluation/InstalledNotProof.hs).
+
+An orphan rule can change `not True` to `True`. The regression test
+imports that rule through a re-export and checks that the ordinary
+optimizer fires it. The empty-list proof still compiles. The proof
+that uses the head fails with GHC-83605. A separate test replaces
+the object for a closed call while keeping its interface fixed.
+[Installed callback and rule](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledNot.sh)
+and [closed call and interface invalidation](../../../testsuite/tests/dependent/should_run/NativeOpenMap.sh).
+
+The producer checks the argument and result constructors of ordinary
+enumerations. The same code handles `Bool -> Bool` and `Lamp -> Signal`.
+Recompilation also finds functions on imported wired-in enumerations,
+including `Ordering`. [Upgrade check](../examples/open-evaluation/check-enum-upgrade.sh)
+and [Agda comparison](../REFERENCES.md#an-ordinary-enumeration-function-as-a-callback).
+
+The remaining part of the roadmap example is the mapper. The installed
+`Prelude.map` has fusion rules. Its interface can omit the recursive
+unfolding. Evidence for the mapper must survive compilation of its
+defining module and account for rules visible where a proof uses it.

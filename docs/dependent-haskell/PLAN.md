@@ -9129,3 +9129,20 @@ defined in ordinary modules. The consumer proves the first result from
 a known row constructor with its element and both tails still unknown.
 The ordinary clients for this example and for a partial family compile
 from interfaces with Core and STG Lint at `-O0`, `-O1`, and `-O2`.
+
+## M170. Use an ordinary enumeration callback from an installed interface
+
+An ordinary producer can supply equations for a function between public
+boxed enumerations. Inspect its constructor cases after type checking.
+Keep the ordinary executable available for a direct closed call.
+Mark the origin in the interface so the importing compiler can choose
+the correct route. An older reader rejects the new producer format
+before reading any of its declarations. Unaffected modules keep their
+existing interface format. [Interface and migration checks](examples/open-evaluation/check-enum-upgrade.sh).
+
+Use the ordinary mapper with the installed `Prelude.not`, then remove
+access to the package's object code. An ordinary client checks the
+first result when the tail is unknown. Check the empty and cons cases
+again with an inherited rule that changes `not True`. For an old
+package that supplies no checked equations, identify the callback at
+its source location. [Source example and checks](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback).

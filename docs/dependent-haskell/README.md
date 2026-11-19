@@ -21,6 +21,14 @@ Look for `redStops` in the ordinary client and `Signals` in the
 dependent exporter. [Client proofs](examples/open-evaluation/OpenMapProof.hs)
 and [source aliases](examples/open-evaluation/OpenMapSource.hs).
 
+The mapper also accepts `Prelude.not` from a rebuilt ordinary library.
+For every tail `xs`, the client proves that negating `True ': xs`
+produces `False ': NegateAll xs`. An inherited rule that changes
+`not True` invalidates this proof while preserving the empty-list case.
+[Alias](examples/open-evaluation/InstalledNotSource.hs),
+[proof](examples/open-evaluation/InstalledNotProof.hs),
+and [remaining work on Prelude.map](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback).
+
 A separate ordinary client can prove `pick (make 7) :~: 7` when
 `make n = (n, error "unused")`, using only the two interfaces and an
 exported alias. An ordinary `firstViaHelper` can also build an optional

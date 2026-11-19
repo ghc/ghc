@@ -73,6 +73,7 @@ import qualified LazyParcel
 import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenMapProof
+import qualified InstalledNotProof
 import qualified OpenBuildWorker as Build
 import qualified SpineWorker as Spine
 import qualified OpenConstructorSource
@@ -976,6 +977,10 @@ main = do
         (OpenMapProof.eachCons (Proxy @FlipFlag) (Proxy @'True) (Proxy @'[ 'False]))
     observe "map Boolean negation and traffic signals over an unknown tail"
         (OpenMapProof.negateHead (Proxy @'[]), OpenMapProof.redStops (Proxy @'[]))
+    observe "map an ordinary enumeration callback over an unknown tail"
+        (OpenMapProof.ordinaryRedStops (Proxy @'[]))
+    observe "use Prelude.not on a known head with an unknown tail"
+        (InstalledNotProof.negateHead (Proxy @'[]))
     observe "collect row heads with an ordinary polymorphic callback"
         (OpenMapProof.firstRowHead (Proxy @'True) (Proxy @'Spine.Empty) (Proxy @'[]))
 

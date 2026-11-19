@@ -5754,3 +5754,20 @@ fusion rule with its source definition. The visible rules for `build`
 and `foldr` introduce additional obligations in this fork.
 [HERMIT paper](https://doi.org/10.1145/2804302.2804303)
 and [reading notes and checked scope](papers/README.md#checking-ghc-rewrite-equations-with-hermit-haskell-2015).
+
+### An ordinary enumeration function as a callback
+
+Agda's standard library defines Boolean negation by two constructor
+clauses. Its list `map` applies the callback to the head and passes it
+unchanged to the recursive call. Together the definitions determine
+the first output of `map not (true ∷ xs)` for any `xs`.
+[Agda Boolean operations](https://agda.github.io/agda-stdlib/v2.3/Data.Bool.Base.html)
+and [Agda list operations](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html).
+
+M170 uses the same source pattern for ordinary Haskell enumerations.
+GHC also needs to distinguish an equation read from a module interface
+from the result of executing a closed application. A change to the
+callback's clauses can invalidate an interface proof. Replacing its
+object can change a closed result with the old interface still present.
+These are GHC separate-compilation decisions. [Ordinary mapper and callback](examples/open-evaluation/OpenMapWorker.hs)
+and [checks for both changes](../../testsuite/tests/dependent/should_run/NativeOpenMap.sh).

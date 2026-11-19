@@ -46,6 +46,11 @@ test('NativeOpenInstalledUpper',
                                         'NativeOpenInstalledInterfaces.sh'])],
      run_command,
      ['bash NativeOpenInstalledUpper.sh "{compiler}" "{libdir}" "{ghc_pkg}"'])
+test('NativeOpenInstalledNot',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['OpenMapWorker.hs', 'InstalledNotSource.hs', 'InstalledNotProof.hs']]
+                  + ['NativeOpenInstalledInterfaces.sh'])],
+     run_command, ['bash NativeOpenInstalledNot.sh "{compiler}" "{libdir}" "{ghc_pkg}"'])
 test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludePairExport.hs',
