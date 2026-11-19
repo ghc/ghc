@@ -252,7 +252,20 @@ data Type
                     -- in the list of a TyConApp, when applying a promoted
                     -- GADT data constructor
 
+  | ExistsTy !TyVar Type -- ^ See Note [Lifted erased existentials].
+
   deriving Data.Data
+
+{- Note [Lifted erased existentials]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ExistsTy a body binds a in body. The binder and body both have kind Type.
+The witness has no runtime representation. The package has the same lifted
+representation as its payload. ExistsTy is not a Pi type, so Core type
+application and forall coercion projections cannot eliminate it.
+
+This slice provides type formation only. It adds no term operations or
+coercion forms. See draft GHC proposal #473, alternative Core.
+-}
 
 {- Note [Restricted retained dependent types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2447,6 +2460,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty (TyVarTy tv)        = tyvar tv
     go_ty (TermVarTy v)       = termvar v
     go_ty (TermAppTy f arg)   = termvar f M.<> go_ty arg
+    go_ty (ExistsTy b body) = go_ty (varType b) M.<> tycobinder b (go_ty body)
     go_ty (DepFunTy _ b body) = go_ty (varType b) M.<> termbinder b (go_ty body)
     go_ty (LitTy l)           = lit l
     go_ty (AppTy t1 t2)       = go_ty t1 M.<> go_ty t2
@@ -2546,6 +2560,7 @@ typeSize (FunTy _ ma _ t1 t2)       = typeSize ma + typeSize t1 + typeSize t2
 typeSize (ForAllTy ma (Bndr tv _) t) = typeSize ma + typeSize (varType tv) + typeSize t
 typeSize (TermAppTy f arg)         = 1 + typeSize (varType f) + typeSize arg
 typeSize (TermVarTy v)             = 1 + typeSize (varType v)
+typeSize (ExistsTy b t)            = 1 + typeSize (varType b) + typeSize t
 typeSize (DepFunTy _ b t)          = 1 + typeSize (varType b) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co

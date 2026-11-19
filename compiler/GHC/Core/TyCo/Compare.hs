@@ -415,6 +415,14 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
               Nothing  -> v1 == v2
               Just env -> rnOccL env v1 == rnOccR env v2
 
+      (ExistsTy v1 body1, ExistsTy v2 body2)
+        -> case mb_env of
+             Nothing -> generic_eq_type_x syn_flag mult_flag
+                          (Just (initRnEnv t1 t2)) t1 t2
+             Just env -> go (varType v1) (varType v2)
+                      && generic_eq_type_x syn_flag mult_flag
+                           (Just (rnBndr2 env v1 v2)) body1 body2
+
       (DepFunTy vis1 v1 body1, DepFunTy vis2 v2 body2)
         -> vis1 == vis2 && case mb_env of
               Nothing -> generic_eq_type_x syn_flag mult_flag
@@ -484,6 +492,7 @@ hasCasts (CoercionTy {}) = True
 hasCasts (AppTy t1 t2)   = hasCasts t1 || hasCasts t2
 hasCasts (TermAppTy _ arg) = hasCasts arg
 hasCasts (ForAllTy ma _ ty) = hasCasts ma || hasCasts ty
+hasCasts (ExistsTy v ty) = hasCasts (varType v) || hasCasts ty
 hasCasts (DepFunTy _ v ty) = hasCasts (varType v) || hasCasts ty
 hasCasts _               = False   -- TyVarTy, TermVarTy, TyConApp, FunTy, LitTy
 
@@ -731,6 +740,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
         `thenCmpTy` go env a1 a2
     go env (TermVarTy v1)      (TermVarTy v2)
       = liftOrdering $ rnOccL env v1 `nonDetCmpVar` rnOccR env v2
+    go env (ExistsTy v1 t1) (ExistsTy v2 t2)
+      = go env (varType v1) (varType v2)
+        `thenCmpTy` go (rnBndr2 env v1 v2) t1 t2
     go env (DepFunTy vis1 v1 t1) (DepFunTy vis2 v2 t2)
       = liftOrdering (compare vis1 vis2)
         `thenCmpTy` go env (varType v1) (varType v2)
@@ -782,6 +794,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (FunTy {})      = 6
             get_rank (ForAllTy {})   = 7
             get_rank (DepFunTy {})   = 8
+            get_rank (ExistsTy {})   = 11
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ
@@ -933,6 +946,10 @@ mayLookIdentical orig_ty1 orig_ty2
 
     go env _top (TermVarTy v1) (TermVarTy v2)
       = return $ rnOccL env v1 == rnOccR env v2
+
+    go env _top (ExistsTy v1 ty1) (ExistsTy v2 ty2)
+      = (&&) <$> go env False (varType v1) (varType v2)
+             <*> go (rnBndr2 env v1 v2) False ty1 ty2
 
     go env _top (DepFunTy vis1 v1 ty1) (DepFunTy vis2 v2 ty2)
       | vis1 == vis2

@@ -2168,6 +2168,16 @@ lintType (TermAppTy f arg)
            (text "Opaque runtime call argument has the wrong kind:" <+> ppr arg
             $$ text "Expected:" <+> ppr domain) }
 
+lintType (ExistsTy b body)
+  = do { lintL (isTyVar b)
+           (text "Existential binder is not a type variable:" <+> ppr b)
+       ; lintBinder LambdaBind b $
+         do { lintL (isLiftedTypeKind (varType b))
+                (text "Existential binder must have kind Type:" <+> ppr b)
+            ; lintType body
+            ; lintL (isLiftedTypeKind (typeKind body))
+                (text "Existential payload must have kind Type:" <+> ppr body) } }
+
 lintType (DepFunTy vis b body)
   = do { lintL (isNativeOpaqueValueId b)
            (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))

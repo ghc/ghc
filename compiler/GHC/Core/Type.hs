@@ -1843,6 +1843,7 @@ isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
 isTauTy (TyVarTy _)       = True
 isTauTy (TermAppTy _ arg) = isTauTy arg
 isTauTy (TermVarTy _)     = True
+isTauTy (ExistsTy {})     = False
 isTauTy (DepFunTy {})     = False
 isTauTy (LitTy {})        = True
 isTauTy (TyConApp tc tys) = all isTauTy tys && isTauTyCon tc
@@ -1954,6 +1955,7 @@ isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
 isFamFreeTy (TermAppTy _ arg) = isFamFreeTy arg
 isFamFreeTy (TermVarTy _)     = True
+isFamFreeTy (ExistsTy b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (DepFunTy _ b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
@@ -2727,6 +2729,7 @@ typeKind (TermAppTy f _)        = case nativeIndexFunctionTys_maybe f of
   Just (_, res) -> res
   Nothing -> pprPanic "typeKind: invalid native function" (ppr f)
 typeKind (TermVarTy v)          = varType v
+typeKind (ExistsTy {})           = liftedTypeKind
 typeKind (DepFunTy {})          = liftedTypeKind
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co

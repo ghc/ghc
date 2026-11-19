@@ -953,6 +953,9 @@ almost_devoid_co_var_of_type (TermAppTy f arg) cv
   && almost_devoid_co_var_of_type arg cv
 almost_devoid_co_var_of_type (TermVarTy v) cv
   = almost_devoid_co_var_of_type (varType v) cv
+almost_devoid_co_var_of_type (ExistsTy v ty) cv
+  = almost_devoid_co_var_of_type (varType v) cv
+  && almost_devoid_co_var_of_type ty cv
 almost_devoid_co_var_of_type (DepFunTy _ v ty) cv
   = almost_devoid_co_var_of_type (varType v) cv
   && almost_devoid_co_var_of_type ty cv
@@ -1005,6 +1008,9 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
     go (TermAppTy f arg) = go (TermVarTy f) `mappend` go arg
     go (TermVarTy v)     = Pair (tyCoVarsOfType $ varType v) (unitVarSet v)
+    go (ExistsTy v ty)
+      = ((`delVarSet` v) <$> go ty) `mappend`
+        invisible (tyCoVarsOfType $ varType v)
     go (DepFunTy _ v ty)
       = ((`delVarSet` v) <$> go ty) `mappend`
         invisible (tyCoVarsOfType $ varType v)
@@ -1068,6 +1074,7 @@ isInjectiveInType tv ty
     go (TyVarTy tv')                    = tv' == tv
     go (TermAppTy {})                   = False
     go (TermVarTy v)                    = v == tv
+    go (ExistsTy {})                    = False
     go (DepFunTy _ v ty)                  = go (varType v) || (tv /= v && go ty)
     -- See Note [Matchability and injective variables].
     go (AppTy f a)                      = injectiveAppTy f && (go f || go a)
@@ -1140,6 +1147,7 @@ inj_vars_of_type look_under_tfs = go
     go (TyVarTy v)                      = deepUnitFV (go . varType) v
     go (TermAppTy {})                   = mempty
     go (TermVarTy v)                    = deepUnitFV (go . varType) v
+    go (ExistsTy {})                    = mempty
     go (DepFunTy _ v ty)                  = go (varType v) `mappend`
                                           addBndrFV v (go ty)
     -- See Note [Matchability and injective variables].
@@ -1194,6 +1202,8 @@ invisibleVarsOfType = go
     go (TyVarTy v)         = go (tyVarKind v)
     go (TermAppTy f arg)   = go (varType f) `unionVarSet` go arg
     go (TermVarTy v)       = go (varType v)
+    go (ExistsTy v ty)
+      = tyCoVarsOfType (varType v) `unionVarSet` (go ty `delVarSet` v)
     go (DepFunTy _ v ty)
       = tyCoVarsOfType (varType v) `unionVarSet` (go ty `delVarSet` v)
     go (AppTy f a)         = go f `unionVarSet` go a
@@ -1348,6 +1358,7 @@ tyConsOfType ty
      go (TyVarTy {})                = emptyUniqSet
      go (TermAppTy f arg)           = go (varType f) `unionUniqSets` go arg
      go (TermVarTy v)               = go (varType v)
+     go (ExistsTy v ty)             = go (varType v) `unionUniqSets` go ty
      go (DepFunTy _ v ty)             = go (varType v) `unionUniqSets` go ty
      go (LitTy {})                  = emptyUniqSet
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` tyConsOfTypes tys
@@ -1500,6 +1511,11 @@ occCheckExpand vs_to_avoid ty
       | Just v' <- lookupVarEnv env v = return (TermVarTy v')
       | bad_var_occ as v              = Nothing
       | otherwise                    = return ty
+
+    go cxt@(as, env) (ExistsTy v body)
+       = do { kind' <- go cxt (varType v)
+            ; let v' = setVarType v kind'
+            ; ExistsTy v' <$> go (as `delVarSet` v, extendVarEnv env v v') body }
 
     go cxt@(as, env) (DepFunTy vis v body_ty)
        = do { arg_ty <- go cxt (varType v)
