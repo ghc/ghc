@@ -19,6 +19,39 @@ native top-level signatures and local retained functions. Interfaces encode
 retained binders with scoped local Id names. GHCi can load these modules as
 interpreted source and keep local declarations between commands.
 
+Local definitions and functions in types
+---------------------------------------
+
+A type synonym can name an intermediate type with ``let``, select a
+type by matching a constructor, or partially apply a type lambda::
+
+    {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers #-}
+    {-# LANGUAGE StandaloneKindSignatures, TypeFamilies #-}
+    module SurfaceGuide (PairUp, Payload, WithError, Result) where
+    import Data.Kind (Type)
+    import GHC.Exts (U)
+
+    type PairUp a = let b = Maybe a in (b, b)
+
+    type Payload b = case b of
+      True  -> Int
+      False -> Bool
+
+    type WithError :: Type %U -> Type
+    type WithError = (\err result -> Either err result) String
+
+    type Result = WithError (Payload 'True)
+
+Here ``Result`` reduces to ``Either String Int``. A module importing the
+synonym can use that equality without enabling the extension. The
+unmatchable arrow in ``WithError`` uses :extension:`Modifiers`.
+
+A type-level let binds one variable in the body. GHC checks its
+right-hand side in the enclosing scope, even if the body ignores it.
+The lambda and case forms currently require a top-level synonym on the
+outside. A case alternative can bind distinct fields of a constructor.
+The case stays stuck while the outer constructor of the scrutinee is unknown.
+
 Natural numerals in vector indices
 ----------------------------------
 
