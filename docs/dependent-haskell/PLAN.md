@@ -8222,3 +8222,39 @@ and GHCi produced the same 187 lines. The wider dependent-directory run
 passed 177 cases and failed 36. Rebuilding the compiler and base library
 from `496701ecc8` reproduced all 36 failures with the same diagnostics.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+## M113: check fully applied ordinary functions
+
+Accept an imported function applied to all its value arguments. Use
+`Prelude.gcd 18 24 :~: 6` as the source check. Infer the function's
+type arguments from all operands and solve its dictionaries once.
+The result type can check a result, but cannot resolve an otherwise
+undetermined parameter.
+
+- [x] Match known input kinds before defaulting an empty list.
+- [x] Check the arity, kinds, result representation and evidence before
+      executing a nested operand. Preserve the source span of a conflict.
+- [x] Normalize operands in source order and execute the full application.
+
+[Closed evaluator card](roadmap/R15-closed-term-evaluator.md#functions-with-several-arguments).
+
+## M114: project a type from a known pair
+
+Check `Prelude.fst '(a,b)` and `Prelude.snd '(a,b)` through the
+ordinary imported definitions. Retain the identities of `a` and `b`.
+
+- [x] Check each argument against the specialized function's input kind.
+      Bind the fields of a known pair without evaluating them.
+- [x] Leave an unknown pair neutral. Report the variable if the function
+      needs its constructor. Allow a function to ignore that argument.
+- [x] Record the definitions used. Changing an imported first projection
+      to a second projection must invalidate the unchanged caller.
+
+[Open evaluator card](roadmap/R16-open-term-evaluator.md#projecting-a-pair-of-unknown-types).
+
+Both compilers passed the source checks for M113 and M114. The self-hosted
+compiler passed with the internal and external interpreters for closed
+calls. Each compiled Showcase and the GHCi run matched all 189 expected
+lines. The two GHC API tests and the dedicated GHCi test passed. The
+normal-way dependent directory passed 182 of 218 cases. All 36 remaining
+failures had the same per-test output as at `37408c9881`.

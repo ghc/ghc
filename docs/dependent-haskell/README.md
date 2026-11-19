@@ -8,7 +8,7 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 187 lines.
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 189 lines.
 The full dependent-directory check still has 36 failures that reproduce on
 the previous fork tip. Fifteen reject existing programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
@@ -29,6 +29,13 @@ The same evaluator can select between two rigid types. A signature
 Prelude's ordinary `const`. Making an imported projection strict in an
 unknown argument produces an error at the call.
 [Projection examples](roadmap/R16-open-term-evaluator.md#selecting-between-two-type-variables).
+
+The compiler can now check `Prelude.gcd 18 24 :~: 6`. For an open
+call such as `Prelude.fst '(a,b)`, the result is the caller's original
+`a`. If the caller supplies an unknown pair `p`, the same projection
+reports that it needs the constructor of `p`.
+[Closed calls](roadmap/R15-closed-term-evaluator.md#functions-with-several-arguments)
+and [pair projections](roadmap/R16-open-term-evaluator.md#projecting-a-pair-of-unknown-types).
 
 An ordinary character case can also select the type. The two projections
 in the Showcase receive the same arguments, `False` and `42 :: Int`.

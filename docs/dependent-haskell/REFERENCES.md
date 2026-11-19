@@ -5177,3 +5177,21 @@ records the dependency that supplied its result.
 [Solver's family-only reduction](../../compiler/GHC/Tc/Solver.hs),
 [source owner and evidence checks](../../compiler/GHC/Tc/Gen/SourceTable.hs)
 and [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
+
+### Saturated closed calls and open pair projections
+
+The type-functions draft at `f0b6af30a6e1` requires full application,
+instance resolution, and normalization of the operands before execution.
+For R15, GHC matches the declared inputs under one substitution. A later
+operand can fix the element kind of an earlier empty list. The fork checks
+arguments in source order when it runs their prepared computations.
+[Type-functions proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+and [GHC's one-way type matching](../../compiler/GHC/Core/Unify.hs).
+
+Agda's case trees establish when evaluation needs a constructor. For R16,
+the actual Haskell definitions of `fst` and `snd` determine which pair
+field the observer demands. It can also encounter a rigid variable of pair
+kind. That variable supplies no information about either field. This
+choice preserves the Haskell case's strictness on the outer pair.
+[Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [GHC's boxed pair projections](../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs).

@@ -829,6 +829,10 @@ main = do
         [CharacterExport.p3 (Proxy @'x'), CharacterExport.p3 (Proxy @'!')]
     observe "Unicode code points from an exported Data.Char.toUpper equality"
         (map fromEnum [UnicodeExport.p3 (Proxy @'é'), UnicodeExport.p3 (Proxy @'\x1e943')])
+    observe "greatest common divisor checked in a type"
+        (TypeNats.natVal (Proxy @(Prelude.gcd 18 24)))
+    observe "first and second projections from a pair of unknown types"
+        (OpenSource.tupleFirst False (42 :: Int), OpenSource.tupleSecond False (42 :: Int))
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length [1, 2, 3])

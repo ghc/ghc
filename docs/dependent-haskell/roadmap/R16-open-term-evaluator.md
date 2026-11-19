@@ -301,11 +301,20 @@ characters at the call.
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledUpper.hs)
 and [separate-package test](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledUpper.sh).
 
-## Next source test
+## Projecting a pair of unknown types
 
-`first :: forall a b. a -> b -> Prelude.fst '(a,b)` currently fails at
-`Prelude.fst` with GHC-68947. The result must be the caller's original
-`a`. The ordinary function demands the outer pair. Selecting its first
-field leaves the second field unevaluated. Cover the analogous `snd`,
-a rigid pair with no known constructor, and a changed imported definition
-that selects the other field. [The ordinary projections](../../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs).
+`first :: forall a b. a -> b -> Prelude.fst '(a,b)` checks with the body
+`first x _ = x`. GHC reads the ordinary library definition. Its case
+finds the pair constructor and returns the caller's original `a`.
+`Prelude.snd '(a,b)` selects `b`. Changing an imported projection from
+first to second changes the type of its unchanged client.
+[Source examples](../examples/open-evaluation/OpenSource.hs)
+and [the ordinary projections](../../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs).
+
+A variable `p :: (Type, Type)` supplies no constructor. A function can
+ignore `p` and return another argument of kind `Type`. Asking for
+`Prelude.fst p` stops at a case on `p` and reports GHC-70566. The observer
+also leaves a divergent field unevaluated when the function selects the
+other field. It cannot yet express a projection that remains stuck in
+an exported result type. [Source diagnostics](../examples/open-evaluation/check-source.sh)
+and [Core observer checks](../../../testsuite/tests/ghc-api/OpenTermWhnf.hs).

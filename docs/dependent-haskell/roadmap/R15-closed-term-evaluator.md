@@ -236,11 +236,21 @@ type while `c` is unknown.
 [Mixed source proofs](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs)
 and [nominal family reduction](../../../compiler/GHC/Tc/Solver.hs).
 
-## Next source test
+## Functions with several arguments
 
-`Prelude.gcd 18 24 :~: 6` currently fails with GHC-68947. Its two
-operands determine the same `Natural` parameter. The compiler must
-check the complete arrow and its `Integral` dictionary before it
-evaluates either operand. Use a noncommutative function to check
-argument order. Use a function on two lists to check that a later
-Boolean element can determine the kind of an earlier empty list.
+`Prelude.gcd 18 24 :~: 6` checks with `Refl`. Both integers select
+`Natural`. GHC resolves `Integral Natural` once for the whole application.
+`Prelude.subtract 2 7 :~: 5` checks the order of the two inputs.
+A helper with type `(Foldable f, Eq a) => f a -> f a -> Bool` can take
+`'[]` and `'[ 'True]`. The second operand fixes the first at `[Bool]`.
+[Source proofs](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs).
+
+GHC checks arity, kinds, staging and instances before executing any
+operand. It reports a conflicting kind at the first inconsistent operand.
+It then normalizes the operands in source order. An ignored nested call
+can therefore fail during type checking. Runtime Haskell keeps its usual
+lazy evaluation. The current interpreter accepts leading invisible
+parameters and returns scalars or lists of the supported scalar types.
+Closed calls returning a pair, such as `Prelude.quotRem 17 5`, still need a
+way to represent both result fields.
+[Source of the evaluation rule](../REFERENCES.md#saturated-closed-calls-and-open-pair-projections).
