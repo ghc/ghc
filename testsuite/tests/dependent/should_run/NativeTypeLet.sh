@@ -34,6 +34,12 @@ reuse = Refl
 
 nested :: Nested 'False :~: '( 'False, 'False)
 nested = Refl
+
+yes :: CaseResult 'True :~: Either Bool Bool
+yes = Refl
+
+no :: CaseResult 'False :~: Either Char Char
+no = Refl
 HS
 "${g[@]}" -c OrdinaryLet.hs
 
@@ -47,6 +53,24 @@ reject() {
         exit 1
     fi
 }
+
+cat >UnusedCase.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
+module UnusedCase where
+type Bad = let ignored = case 'True of { True -> Maybe 'True; False -> Int } in Bool
+HS
+reject UnusedCase 3:56 83865 'In the first argument of'
+
+cat >RigidCase.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module RigidCase where
+import Data.Proxy
+import Data.Type.Equality
+import TypeLet
+bad :: Proxy b -> CaseResult b :~: Either Bool Bool
+bad _ = Refl
+HS
+reject RigidCase 7:9 83865 'Refl'
 
 cat >Recursive.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}

@@ -1001,6 +1001,8 @@ main = do
     observe "retain the kind of a matched Nothing"
         (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    observe "bind the result of a constructor case"
+        (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
     observe "select the result type by a constructor" NativeCase.roadmap
     observe "pass a constructor to uncurry with two unknown fields"
         (OpenBuildSource.uncurried (Proxy @Int) (Proxy @Char))

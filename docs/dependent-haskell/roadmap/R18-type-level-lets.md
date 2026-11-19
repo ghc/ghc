@@ -27,6 +27,15 @@ A retained vector result can use `let k = 1 + n in Vec a k` when
 characters. Taking the first character also succeeds with an exceptional
 tail length. [Runtime example](../Showcase.hs).
 
+A let RHS can also match a constructor. In
+`let flag = case flag of { True -> Bool; False -> Char } in Either flag flag`,
+the case inspects the outer Boolean. Both arguments to `Either` use the
+locally bound result. The provider checks an unused case RHS, and an
+ordinary interface client must know the constructor to prove which result
+type was selected. General case expressions in the body of a let remain
+open. [Agda let scope](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions)
+and [Eisenberg and Stolarek on case lifting, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf).
+
 The source form supports one variable per binding and nested lets.
 Binding groups, local patterns, and combining lets with general
 type-level lambdas and cases remain open. Raw Template Haskell type

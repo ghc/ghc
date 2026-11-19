@@ -22,7 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias), HsTypeCaseAlt(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -297,6 +297,10 @@ liftTypeCases group =
             result = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
                        (map (typeName . snd) captures ++ [scrutinee'])
         in (result, (fam, (occ, owner_occ)) : nested, next)
+    -- A let binder scopes over its body. Its RHS sees the enclosing parameters.
+    liftRhs owner captures (L loc (XHsType (HsTypeLet ann v rhs body))) salt =
+      let (rhs', cases, next) = liftRhs owner captures rhs salt
+      in (L loc (XHsType (HsTypeLet ann v rhs' body)), cases, next)
     liftRhs owner captures (L loc (HsParTy ann ty)) salt =
       let (ty', cases, next) = liftRhs owner captures ty salt
       in (L loc (HsParTy ann ty'), cases, next)
