@@ -111,12 +111,12 @@ proof = Refl
 HS
 cp Worker.original.hi OpenMapWorker.hi
 cp Worker.original.o OpenMapWorker.o
-"${ghc[@]}" -c ClosedSignal.hs
+"${ghc[@]}" -fexternal-interpreter -c ClosedSignal.hs
 "${ghc[@]}" --show-iface ClosedSignal.hi >closed.iface
 grep -Eq '^ *addDependentFile "([^"]*/)?OpenMapWorker\.o" [[:xdigit:]]{32}' closed.iface
 cp Worker.changed.o OpenMapWorker.o
 cmp Worker.original.hi OpenMapWorker.hi
-if "${ghc[@]}" -c ClosedSignal.hs >closed.log 2>&1 ||
+if "${ghc[@]}" -fexternal-interpreter -c ClosedSignal.hs >closed.log 2>&1 ||
    ! grep -Fq 'proof = Refl' closed.log; then
     cat closed.log >&2
     exit 1

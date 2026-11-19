@@ -8,7 +8,8 @@ fi
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 flags=(-O0 -package-env - -fomit-interface-pragmas -fno-write-if-simplified-core)
 old=("$1" "-B$2" "${flags[@]}")
-new=("$3" "-B$4" "${flags[@]}")
+# Hold the package interfaces fixed when comparing compiler recompilation keys.
+new=("$3" "-B$2" "${flags[@]}")
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 cd "$out"
@@ -48,3 +49,11 @@ if "${old[@]}" --show-iface Turn.hi >downgrade.log 2>&1 ||
 fi
 "${new[@]}" --make -no-link "${modules[@]}" >warm.log 2>&1
 if grep -Fq 'Compiling ' warm.log; then cat warm.log >&2; exit 1; fi
+
+# Installing a rebuilt Prelude can independently change the ABI of an import.
+new=("$3" "-B$4" "${flags[@]}")
+"${new[@]}" -v0 --make -no-link "${modules[@]}"
+"${new[@]}" --show-iface Turn.hi >installed.iface
+grep -Fq 'ExecutableSourceTable T:turn' installed.iface
+"${new[@]}" --make -no-link "${modules[@]}" >installed-warm.log 2>&1
+if grep -Fq 'Compiling ' installed-warm.log; then cat installed-warm.log >&2; exit 1; fi

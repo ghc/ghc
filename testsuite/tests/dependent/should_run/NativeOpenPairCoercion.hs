@@ -15,8 +15,7 @@ import GHC.Core.Type (mkTyConApp)
 import GHC.Data.Bag (isEmptyBag)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Types.Basic (Boxity(Boxed))
-import GHC.Types.Id (idDetails)
-import GHC.Types.Id.Info (IdDetails(SourceTableId))
+import GHC.Types.Id (sourceTableId_maybe)
 import GHC.Types.Name (nameOccName)
 import GHC.Types.Name.Occurrence (occNameString)
 import System.Environment (getArgs)
@@ -89,6 +88,4 @@ family info occ = do
     name <- maybe (fail ("Missing worker " ++ occ)) pure $
       find ((== occ) . occNameString . nameOccName) (modInfoExports info)
     Just (AnId owner) <- modInfoLookupName info name
-    case idDetails owner of
-      SourceTableId _ table -> pure table
-      _ -> fail ("No checked source family for " ++ occ)
+    maybe (fail ("No checked source family for " ++ occ)) pure (sourceTableId_maybe owner)
