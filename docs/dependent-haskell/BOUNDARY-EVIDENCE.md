@@ -297,3 +297,22 @@ The self-hosted compiler verified these results with Core and STG lint.
 [the Thoralf plugin](https://richarde.dev/papers/2018/thoralf/thoralf.pdf),
 [QuickCheck](https://hackage-content.haskell.org/package/QuickCheck)
 and [the QuickSpec paper and its choice of observations](papers/README.md#quickspec-tap-2010).
+
+## An imported equality and caller rewrite rules
+
+A module compiled with rewrite rules disabled can prove
+`NegateAll ('True ': xs) :~: ('False ': NegateAll xs)`, where
+`NegateAll xs` is the checked application of `Prelude.map Prelude.not`.
+The provider exports a `Checked (NegateAll '[ 'True])`. It contains a
+head indexed by a hidden list and an equality with the public list.
+The caller matches the imported `Refl` to return the head at the public
+index. Discarding the equality gives a type error at the returned head.
+The caller supplies the public index as a visible type argument. Leaving
+it to inference currently requires a fresh family reduction. A fresh
+`Refl` at the concrete equation also gives GHC-83605 with rules enabled.
+
+The caller uses a rule that replaces the builder introduced by the
+ordinary runtime `map` call. The executable prints `(False,True)`.
+The first value comes from the head carried by the imported witness.
+The second comes from the caller's rewritten runtime call.
+[Run the example](examples/boundary-evidence/check-map-witness.sh).
