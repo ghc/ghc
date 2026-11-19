@@ -41,7 +41,7 @@ import qualified GHC.Boot.TH.Syntax as TH
 --            import "ghc-internal"     qualified GHC.Internal.TH.Syntax as TH
 import qualified GHC.Boot.TH.Ppr as TH
 
-import GHC.Builtin.WiredIn.Types( boxedRepDataConTyCon, matchabilityTy, tYPETyCon, pretendNameIsInScope )
+import GHC.Builtin.WiredIn.Types( boxedRepDataConTyCon, matchabilityTy, tYPETyCon, pretendNameIsInScope, unmatchableDataConTy )
 import GHC.Builtin.KnownKeys -- A bunch of keys
 
 import GHC.Types.Name.Reader
@@ -49,7 +49,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Warnings
 
 import GHC.Core.Coercion
-import GHC.Core.Unify     ( tcMatchTys )
+import GHC.Core.Unify     ( tcMatchTys, tcMatchTyKis )
 import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Core.DataCon
@@ -1771,6 +1771,13 @@ instance Diagnostic TcRnMessage where
            text "give different types for field", quotes (ppr field_name)]
     TcRnClassExtensionDisabled cls reason -> mkSimpleDecorated $
       pprDisabledClassExtension cls reason
+    TcRnDataConParentTypeMismatch data_con res_ty_tmpl
+      | Just synonym <- dataFamResultForallMismatch (dataConTyCon data_con)
+                          res_ty_tmpl (dataConOrigResTy data_con)
+      -> mkSimpleDecorated $
+         vcat [ text "The return-kind synonym" <+> quotes (ppr synonym)
+                <+> text "supplies an unmatchable (U) invisible forall."
+              , text "This data family instance requires a matchable (M) invisible forall." ]
     TcRnDataConParentTypeMismatch data_con res_ty_tmpl -> mkSimpleDecorated $
       hang (text "Data constructor" <+> quotes (ppr data_con) <+>
             text "returns type" <+> quotes (ppr actual_res_ty))
@@ -8506,3 +8513,29 @@ pprHsCtxt = \case
     ppr_stmt (TransStmt { trS_by = by, trS_using = using
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
+
+-- | Identify an invisible binder supplied by a data family's result synonym
+-- that prevents matching the generated Haskell 98 constructor result.
+dataFamResultForallMismatch :: TyCon -> Type -> Type -> Maybe Name
+dataFamResultForallMismatch rep_tc expected actual
+  | not (isGadtSyntaxTyCon rep_tc)
+  , Just (fam, expected_args) <- splitTyConAppNoView_maybe expected
+  , Just (actual_fam, actual_args) <- splitTyConAppNoView_maybe actual
+  , actual_fam == fam
+  , isDataFamilyTyCon fam
+  , let arity = tyConArity fam
+  , (prefix, [TyVarTy var]) <- splitAt arity expected_args
+  , var `elem` tyConTyVars rep_tc
+  , Just (syn, _) <- splitTyConAppNoView_maybe (tyConResKind fam)
+  , isTypeSynonymTyCon syn
+  , Just (ma, Bndr _ vis, _) <-
+      splitForAllForAllTyBinder_maybe (typeKind (mkTyConApp fam prefix))
+  , isInvisibleForAllTyFlag vis
+  , ma `tcEqType` unmatchableDataConTy
+  -- The representation kind uses mkTyConKind, whose binders are M.
+  -- Check the arguments separately. Matching the complete application
+  -- cannot decompose the data family's U result forall.
+  , isJust (tcMatchTyKis expected_args actual_args)
+  = Just (tyConName syn)
+  | otherwise
+  = Nothing

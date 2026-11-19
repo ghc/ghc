@@ -223,6 +223,7 @@ test('NativeClosedMatchability',
 test('NativeOpenMatchability',
      [only_ways(['normal']),
       extra_files(['../should_compile/T14038.hs', '../../polykinds/T14174a.hs',
+                   '../../polykinds/T15874.hs',
                    'NativeOpenMatchabilityClient.hs', 'NativeOpenMatchabilityConflict.hs'])],
      run_command, ['bash NativeOpenMatchability.sh "{compiler}" "{libdir}"'])
 

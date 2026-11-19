@@ -84,6 +84,24 @@ predicts this break and gives U as the default for a synonym RHS.
 [Source test](../../../testsuite/tests/dependent/should_run/NativePercentArrowOnlyModifiers.hs)
 and [proposal rationale](../REFERENCES.md#matchability-and-multiplicity-on-arrows).
 
+In `T15874`, the original `type Varianced = forall (var :: Var). Type`
+supplies an invisible U forall. The data-family instance requires M.
+GHC-45219 names the synonym and both matchabilities, including when the
+synonym came from a stripped interface. A provider that needs both uses
+can declare the index explicitly:
+
+```haskell
+type Varianced :: forall (m :: Matchability). Type
+type Varianced @m = forall (var :: Var). @m Type
+```
+
+A data-family result kind can then use bare `Varianced` and get M. An
+ordinary term signature can use the same spelling and get U. This keeps
+the matchabilities independent and preserves the distinct binder rules in
+[proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers).
+[Original source](../../../testsuite/tests/polykinds/T15874.hs) and
+[diagnostic and compatibility controls](../../../testsuite/tests/dependent/should_run/NativeOpenMatchability.sh).
+
 In `T20875`, the equation `ToKind TRUE = Type -> Type` checks its right
 side as an ordinary type. Its arrow gets U. The type constructor `Maybe`
 has an M arrow in its kind. Writing `FUN @M 'Many Type Type` in the

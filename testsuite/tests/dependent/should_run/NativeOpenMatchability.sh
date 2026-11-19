@@ -81,3 +81,80 @@ if "${ghc[@]}" -c DistinctIndices.hs >indices.log 2>&1 ||
     cat indices.log >&2
     exit 1
 fi
+
+# Preserve the original compatibility case and identify the invisible forall.
+cp "$src/T15874.hs" .
+reject_parent() {
+  local source=$1 span=$2
+  if "${ghc[@]}" -c "$source" > failure.log 2>&1; then
+    printf 'Expected failure in %s\n' "$source" >&2
+    exit 1
+  fi
+  grep -Fq "$span: error: [GHC-45219]" failure.log || { cat failure.log >&2; exit 1; }
+}
+reject_parent T15874.hs T15874.hs:18:24
+grep -Fq '‘Varianced’ supplies an unmatchable (U) invisible forall' failure.log
+grep -Fq 'requires a matchable (M) invisible forall' failure.log
+cat >IndexedForall.hs <<'HS'
+{-# LANGUAGE DataKinds, PolyKinds, RankNTypes, TypeApplications, TypeFamilies, StandaloneKindSignatures, TypeAbstractions #-}
+module IndexedForall where
+import Data.Kind (Type)
+import GHC.Exts (Matchability)
+data Var = Op
+type Varianced :: forall (m :: Matchability). Type
+type Varianced @m = forall (var :: Var). @m Type
+data family Parser :: Varianced
+data instance Parser = P
+parsed :: Parser @Op
+parsed = P
+term :: Varianced
+term = undefined
+HS
+"${ghc[@]}" -c IndexedForall.hs
+"${ghc[@]}" -fprint-explicit-kinds --show-iface IndexedForall.hi >forall.iface
+grep -Fq "type Parser :: Varianced @'GHC.Internal.Types.Matchable" forall.iface
+grep -Fq "term :: Varianced @'GHC.Internal.Types.Unmatchable" forall.iface
+
+cat > ../provider/Fixed.hs <<'EOF'
+{-# LANGUAGE DataKinds, RankNTypes, KindSignatures #-}
+module Fixed (Varianced) where
+import Data.Kind (Type)
+data Var = Op
+type Varianced = forall (var :: Var). Type
+EOF
+(cd ../provider && "${ghc[@]}" -fomit-interface-pragmas -c Fixed.hs)
+cp ../provider/Fixed.hi .
+cat > Imported.hs <<'EOF'
+{-# LANGUAGE TypeFamilies #-}
+module Imported where
+import Fixed (Varianced)
+data family Parser :: Varianced
+data instance Parser = P
+EOF
+reject_parent Imported.hs Imported.hs:5:24
+grep -Fq '‘Varianced’ supplies an unmatchable (U) invisible forall' failure.log
+
+cat > WrongParent.hs <<'EOF'
+{-# LANGUAGE GADTs #-}
+module WrongParent where
+data Other = Other
+data Ordinary a where
+  Wrong :: Other
+EOF
+reject_parent WrongParent.hs WrongParent.hs:5:3
+grep -Fq 'Data constructor ‘Wrong’ returns type ‘Other’' failure.log
+
+cat > WrongFamilyParent.hs <<'EOF'
+{-# LANGUAGE GADTs, TypeFamilies #-}
+module WrongFamilyParent where
+data Other = Other
+data family Parser a
+data instance Parser Bool where
+  Wrong :: Other
+EOF
+if "${ghc[@]}" -c WrongFamilyParent.hs > failure.log 2>&1; then
+  printf 'Expected failure in WrongFamilyParent.hs\n' >&2
+  exit 1
+fi
+grep -Fq 'WrongFamilyParent.hs:6:3: error: [GHC-83865]' failure.log
+grep -Fq 'with actual type ‘Other’' failure.log
