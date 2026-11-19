@@ -1086,7 +1086,7 @@ throw an error accordingly.
 -- Only a spine of symbolic operands can request local open evaluation.
 rnHsAppTy :: RnTyKiEnv -> Bool -> LHsType GhcPs -> LHsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 rnHsAppTy env open fun arg = do
-  (fun', fun_fvs) <- rnLHsAppHead env (open && isOpenTypeOperandWith isRdrTyVar arg) fun
+  (fun', fun_fvs) <- rnLHsAppHead env (open && isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc) arg) fun
   (arg', arg_fvs) <- rnLHsTyKi env arg
   return (HsAppTy noExtField fun' arg', fun_fvs `plusFN` arg_fvs)
 

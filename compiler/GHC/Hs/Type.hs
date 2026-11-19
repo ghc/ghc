@@ -715,16 +715,23 @@ hsTyKindSig lty =
     _                 -> Nothing
 
 ---------------------
--- | An operand for open evaluation is a named variable or a pair of them.
--- The renamer tests the spelling and the typechecker tests the resolved Name.
-isOpenTypeOperandWith :: (IdOccP (GhcPass p) -> Bool) -> LHsType (GhcPass p) -> Bool
-isOpenTypeOperandWith variable operand = case unLoc (ignoreParens operand) of
-  HsExplicitTupleTy _ _ [x, y] -> is_variable x && is_variable y
-  _ -> is_variable operand
+-- | Recognize a symbolic operand. A constructor spine must contain at least
+-- one variable. Leave fully closed constructor operands on the closed path.
+isOpenTypeOperandWith :: (IdOccP (GhcPass p) -> Bool) -> (IdOccP (GhcPass p) -> Bool)
+                      -> LHsType (GhcPass p) -> Bool
+isOpenTypeOperandWith variable constructor = (== Just True) . symbolic
   where
-    is_variable ty = case unLoc (ignoreParens ty) of
-      HsTyVar _ NotPromoted (L _ name) -> variable name
-      _ -> False
+    symbolic ty = case unLoc (ignoreParens ty) of
+      HsTyVar _ NotPromoted (L _ name) | variable name -> Just True
+      HsExplicitTupleTy _ _ [x, y] -> or <$> traverse symbolic [x, y]
+      _ -> case spine ty [] of
+        (HsTyVar _ IsPromoted (L _ name), fields) | constructor name ->
+          or <$> traverse symbolic fields
+        _ -> Nothing
+
+    spine ty fields = case unLoc (ignoreParens ty) of
+      HsAppTy _ fun field -> spine fun (field : fields)
+      head_ty -> (head_ty, fields)
 
 ignoreParens :: LHsType (GhcPass p) -> LHsType (GhcPass p)
 ignoreParens (L _ (HsParTy _ ty)) = ignoreParens ty

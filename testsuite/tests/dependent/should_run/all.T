@@ -13,6 +13,10 @@ test('NativeLocalOpen',
       extra_files(['NativeLocalOpenProducer.hs', 'NativeLocalOpenSibling.hs'])],
      run_command, ['bash NativeLocalOpen.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
+test('NativeOpenConstructor',
+     [only_ways(['normal']), extra_files([open_eval_dir + 'OpenConstructorWorker.hs',
+                                         open_eval_dir + 'OpenConstructorSource.hs'])],
+     run_command, ['bash NativeOpenConstructor.sh "{compiler}" "{libdir}"'])
 test('NativeOpenCharFamily',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['CharacterCase.hs', 'CharacterExport.hs']])],

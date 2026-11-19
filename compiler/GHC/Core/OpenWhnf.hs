@@ -5,6 +5,7 @@ module GHC.Core.OpenWhnf
   , Suspension
   , CaseContinuation(..)
   , openWhnfM, openWhnfWithLocalM, openWhnfTraceM, CaseStep(..)
+  , openDataConFieldTypes
   ) where
 
 import GHC.Prelude
@@ -13,14 +14,20 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT, get, put)
 import GHC.Builtin.WiredIn.Types (charDataCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy)
-import GHC.Core.DataCon (dataConWorkId)
-import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreAlt, CoreExpr, Expr(..), isTyCoArg)
+import GHC.Core.DataCon
+  ( DataCon, dataConWorkId, dataConTyCon, dataConFullSig, dataConRepArity
+  , dataConRepArgBinders, dataConStupidTheta, dataConImplBangs
+  , dataConWrapId_maybe, isBanged, isTypeDataCon )
+import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreAlt, CoreExpr, Expr(..), collectArgs, isTyCoArg)
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
 import GHC.Core.TyCo.Compare (eqType)
-import GHC.Core.Type (Type, isLiftedTypeKind, tyCoVarsOfType, typeKind)
+import GHC.Core.TyCon (isBoxedDataTyCon)
+import GHC.Core.TyCo.Rep (scaledThing)
+import GHC.Core.Type (Type, isLiftedTypeKind, substTyWith, tyCoVarsOfType, typeKind)
 import GHC.Core.Utils (exprType, findAlt)
 import GHC.Types.Basic (Boxity(Boxed), IntWithInf, intGtLimit)
+import GHC.Types.Id (isDataConWorkId_maybe)
 import GHC.Types.Literal (Literal(LitChar))
 import GHC.Types.Tickish (GenTickish(Breakpoint))
 import GHC.Types.Var (Var, isId, isTyVar, varType)
@@ -49,6 +56,7 @@ data Whnf
   | Literal Literal
   | BoxedChar Char
   | BoxedPair Suspension Suspension
+  | BoxedData DataCon [Suspension]
   | Neutral Neutral
 
 -- | An unknown head and its suspended eliminations.
@@ -63,6 +71,7 @@ data Neutral
 data CaseStep
   = SelectBoxedChar Char AltCon
   | SelectBoxedPair AltCon
+  | SelectBoxedData DataCon AltCon
   | SelectLiteral Literal AltCon
   | SelectLambdaDefault
   | ContinueWithUnit
@@ -72,10 +81,11 @@ data CaseStep
 -- See Note [Observing open Core].
 openWhnfM :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> VarSet -> CoreExpr
           -> m (Either EvalFailure Whnf)
-openWhnfM limit obtain = openWhnfWithLocalM limit obtain (const (pure ()))
+openWhnfM limit obtain = openWhnfWithLocalM limit (\v _ -> obtain v) (const (pure ()))
 
--- | Report a lexical variable when its suspended binding is demanded.
-openWhnfWithLocalM :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> (Var -> m ())
+-- | Provide demanded definitions with their first syntactic type argument.
+-- Report lexical variables separately when their suspended bindings are demanded.
+openWhnfWithLocalM :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
                   -> VarSet -> CoreExpr -> m (Either EvalFailure Whnf)
 openWhnfWithLocalM limit obtain local =
   openWhnfTraceWithLocalM limit obtain local (const (pure ()))
@@ -84,31 +94,37 @@ openWhnfWithLocalM limit obtain local =
 -- continuation step in the order in which the observer performs them.
 openWhnfTraceM :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr))
               -> (CaseStep -> m ()) -> VarSet -> CoreExpr -> m (Either EvalFailure Whnf)
-openWhnfTraceM limit obtain = openWhnfTraceWithLocalM limit obtain (const (pure ()))
+openWhnfTraceM limit obtain = openWhnfTraceWithLocalM limit (\v _ -> obtain v) (const (pure ()))
 
-openWhnfTraceWithLocalM :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> (Var -> m ())
+openWhnfTraceWithLocalM :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
                        -> (CaseStep -> m ()) -> VarSet -> CoreExpr -> m (Either EvalFailure Whnf)
 openWhnfTraceWithLocalM limit obtain local record unsolved expr =
-  runExceptT $ evalStateT (evaluate limit obtain local record unsolved (Suspension emptyVarEnv expr)) 1
+  runExceptT $ evalStateT (evaluate limit obtain local record unsolved Nothing (Suspension emptyVarEnv expr)) 1
 
-evaluate :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> (Var -> m ())
-         -> (CaseStep -> m ()) -> VarSet -> Suspension -> StateT Int (ExceptT EvalFailure m) Whnf
-evaluate limit obtain local record unsolved (Suspension env expr) = do
+evaluate :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
+         -> (CaseStep -> m ()) -> VarSet -> Maybe Type -> Suspension
+         -> StateT Int (ExceptT EvalFailure m) Whnf
+evaluate limit obtain local record unsolved first_type (Suspension env expr) = do
   steps <- get
   if intGtLimit steps limit then lift (throwE Exhausted) else put (steps + 1)
   case expr of
+    _ | Just (con, fields) <- constructorApplication expr, con /= pairCon ->
+          pure (BoxedData con (map (Suspension env) fields))
     Var v
       | Just binding <- lookupVarEnv env v -> do
           lift (lift (local v))
           recur binding
       | otherwise -> do
-          definition <- lift (lift (obtain v))
+          definition <- lift (lift (obtain v first_type))
           case definition of
+            Just rhs@(Var target)
+              | varType target `eqType` varType v ->
+                  recurHead first_type (Suspension emptyVarEnv rhs)
             Just rhs -> recur (Suspension emptyVarEnv rhs)
             Nothing
               | v `elemVarSet` unsolved -> pure (Neutral (Unsolved v))
               | otherwise -> pure (Neutral (Rigid v))
-    Tick Breakpoint{} body -> recur (Suspension env body)
+    Tick Breakpoint{} body -> recurHead first_type (Suspension env body)
     Lit lit -> pure (Literal lit)
     Lam binder body -> pure (Lambda binder (Suspension env body))
     App (Var worker) arg
@@ -124,7 +140,10 @@ evaluate limit obtain local record unsolved (Suspension env expr) = do
       , exprType x `eqType` a, exprType y `eqType` b ->
           pure (BoxedPair (Suspension env x) (Suspension env y))
     App fun arg -> do
-      headValue <- recur (Suspension env fun)
+      let head_type = case arg of
+            Type ty -> Just ty
+            _ -> Nothing
+      headValue <- recurHead head_type (Suspension env fun)
       case headValue of
         Lambda binder (Suspension closure body)
           | Type argTy <- arg, isTyVar binder ->
@@ -167,12 +186,10 @@ evaluate limit obtain local record unsolved (Suspension env expr) = do
               lift (lift (record (SelectBoxedChar c DEFAULT)))
               recur (Suspension (extendVarEnv env binder suspended) body)
           | otherwise -> lift (throwE MissingAlternative)
-        BoxedPair first second
-          | Just (Alt key fields body) <- findAlt (DataAlt pairCon) alts
-          , Just fieldsEnv <- pairFields key fields first second -> do
-              lift (lift (record (SelectBoxedPair key)))
-              recur (Suspension (extendVarEnvList env ((binder, suspended) : fieldsEnv)) body)
-          | otherwise -> lift (throwE MissingAlternative)
+        BoxedPair first second ->
+          selectData SelectBoxedPair pairCon [first, second] binder suspended alts
+        BoxedData con fields ->
+          selectData (SelectBoxedData con) con fields binder suspended alts
         Literal lit
           | Just (Alt key [] body) <- findAlt (LitAlt lit) alts -> do
               lift (lift (record (SelectLiteral lit key)))
@@ -186,16 +203,61 @@ evaluate limit obtain local record unsolved (Suspension env expr) = do
         _ -> lift (throwE UnsupportedCore)
     _ -> lift (throwE UnsupportedCore)
   where
-    recur = evaluate limit obtain local record unsolved
+    recurHead = evaluate limit obtain local record unsolved
+    recur = recurHead Nothing
     pairCon = tupleDataCon Boxed 2
     pairWorker = dataConWorkId pairCon
-    pairFields (DataAlt con) [x,y] first second
-      | con == pairCon, matches x first, matches y second =
-          Just [(x, first), (y, second)]
-    pairFields DEFAULT [] _ _ = Just []
-    pairFields _ _ _ _ = Nothing
+    selectData step con fields binder suspended alts
+      | Just (Alt key binders body) <- findAlt (DataAlt con) alts
+      , Just bindings <- altBindings key con binders fields = do
+          lift (lift (record (step key)))
+          recur (Suspension (extendVarEnvList env ((binder, suspended) : bindings)) body)
+      | otherwise = lift (throwE MissingAlternative)
+
+    altBindings (DataAlt chosen) con binders fields
+      | chosen == con, length binders == length fields
+      , and (zipWith matches binders fields) = Just (zip binders fields)
+    altBindings DEFAULT _ [] _ = Just []
+    altBindings _ _ _ _ = Nothing
+
     matches field (Suspension _ body) =
       liftedBinder field && varType field `eqType` exprType body
+
+-- | Read a fully applied ordinary constructor worker and its suspended fields.
+constructorApplication :: CoreExpr -> Maybe (DataCon, [CoreExpr])
+constructorApplication expr
+  | (Var worker, args) <- collectArgs expr
+  , Just con <- isDataConWorkId_maybe worker
+  , let (types, fields) = span isTyCoArg args
+  , Just parameters <- traverse typeArgument types
+  , Just expected <- openDataConFieldTypes con parameters
+  , length expected == length fields
+  , all (not . isTyCoArg) fields
+  , and (zipWith eqType expected (map exprType fields))
+  = Just (con, fields)
+  | otherwise = Nothing
+  where
+    typeArgument (Type ty) = Just ty
+    typeArgument _ = Nothing
+
+-- | Recognize lifted, lazy constructor fields with the ordinary representation.
+-- Both the source operand decoder and the Core observer use this check.
+openDataConFieldTypes :: DataCon -> [Type] -> Maybe [Type]
+openDataConFieldTypes con parameters
+  | isBoxedDataTyCon (dataConTyCon con), not (isTypeDataCon con)
+  , null (dataConRepArgBinders con), null (dataConStupidTheta con)
+  , Nothing <- dataConWrapId_maybe con
+  , all (not . isBanged) (dataConImplBangs con)
+  , (vars, [], [], [], fields, result) <- dataConFullSig con
+  , length vars == length parameters
+  , and (zipWith eqType (map varType vars) (map typeKind parameters))
+  , length fields == dataConRepArity con
+  , let instantiate = substTyWith vars parameters
+        field_types = map (instantiate . scaledThing) fields
+  , isLiftedTypeKind (typeKind (instantiate result))
+  , all (isLiftedTypeKind . typeKind) field_types
+  = Just field_types
+  | otherwise = Nothing
 
 -- | Only lifted term binders can enter the lazy environment.
 liftedBinder :: Var -> Bool
@@ -208,11 +270,20 @@ Extend the function's saved environment when entering its body. This keeps
 an ignored lifted operand lazy. Use Core's capture-avoiding substitution
 for type arguments.
 
-A saturated boxed pair is already in weak head normal form. Preserve both
-fields as independent suspensions. A pair alternative binds the fields
-without forcing either one. A neutral scrutinee still blocks case
-selection. See the ordinary fst and snd definitions in
-GHC.Internal.Data.Tuple.
+A definition lookup receives the first syntactic argument when it is a
+type. Follow the application spine, transparent ticks and same-typed
+variable aliases to find it. Crossing a suspension, entering any other
+body, or inspecting a case starts a new observation. A type argument
+from the caller cannot justify a specialization of a recursive call.
+
+A saturated worker for an ordinary lazy boxed constructor is in weak
+head normal form. Preserve its fields as independent suspensions. Use
+the actual DataCon and typed alternative binders to select and bind its
+fields. A neutral scrutinee still blocks case selection. The ordinary
+source operand decoder also checks this worker shape. It does not
+bypass a strict field or a representation-changing wrapper.
+
+Keep the dedicated boxed pair and Char trace steps for existing clients.
 
 A case must inspect its scrutinee even when it has only a DEFAULT branch.
 If the scrutinee is neutral, retain the alternatives, the binder and their

@@ -129,7 +129,7 @@ import GHC.Types.Error
 import GHC.Types.Id ( mkLocalId )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Set (nameSetElemsStable, unionNameSet)
+import GHC.Types.Name.Set (mkNameSet, unionNameSet)
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -2491,10 +2491,9 @@ tcOpenTypeCall mode name instantiated args = do
           lookup_owner n = case lookupNameEnv locals n of
             Just (owner, _) -> pure owner
             Nothing -> tcLookupId n
-      when (name `elemNameEnv` locals) $ do
-        dependencies <- traverse lookup_owner (nameSetElemsStable used)
-        recordSourceUses [(definition, Nothing) | definition <- dependencies]
-      updTcRef (tcg_evaluated_term_uses env) (`unionNameSet` used)
+      dependencies <- forM used $ \(n, first) -> (, first) <$> lookup_owner n
+      recordSourceUses dependencies
+      updTcRef (tcg_evaluated_term_uses env) (`unionNameSet` mkNameSet (map fst used))
       pure result
   where
     checkOperand (arg, kind) = do
@@ -2504,9 +2503,10 @@ tcOpenTypeCall mode name instantiated args = do
     reject :: String -> TcM a
     reject = failWithTc . TcRnOpenTypeEval name Nothing
 
--- | Admit a rigid type variable or a promoted pair of rigid variables.
+-- | Admit a rigid variable or a promoted constructor with symbolic fields.
 isOpenTypeOperand :: LHsType GhcRn -> Bool
 isOpenTypeOperand = isOpenTypeOperandWith (\(WithUserRdr _ name) -> isTyVarName name)
+                                             (\(WithUserRdr _ name) -> isDataConName name)
 
 -- | Find a resolved term call or a unary checked family call.
 nestedClosedCall :: LHsType GhcRn -> Maybe (SrcSpan, RdrName, Name, [LHsType GhcRn])

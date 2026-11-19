@@ -519,3 +519,44 @@ when a different call to that group would diverge. A demanded
 monomorphic recursion binder contributes its source function to the
 late rewrite-rule check.
 [Recursive source examples](R21-dependency-analysis.md#m131-mutually-recursive-value-bindings).
+
+### Eliminating a known user constructor
+
+A data declaration can supply the outer constructor while its fields
+remain symbolic. For example, `pick ('LeftFields a b)` selects `b`
+from the second field. The ordinary producer publishes its Core
+unfoldings in the interface. A client with an interface that omits
+the needed unfolding gets GHC-70566 at the call.
+The same ordinary `pick` can select `b` from
+`'RightFields b a`, where it is the first field. Neither call needs a
+runtime value for `a` or `b`. A nested constructor can expose another
+case without forcing its fields.
+[Ordinary producer](../examples/open-evaluation/OpenConstructorWorker.hs)
+and [type-level calls](../examples/open-evaluation/OpenConstructorSource.hs).
+
+The source checker uses the promoted constructor's resolved DataCon,
+its parent kind, and its field types. It builds a saturated ordinary
+worker with suspended fields. The Core observer uses the same worker
+check. It selects a case by DataCon identity and checks the alternative
+binders before binding fields in declaration order. It also recognizes
+a nullary ordinary worker without reading an unfolding. A rigid
+scrutinee still blocks the case. A strict pattern on a symbolic field
+still blocks the reduction. This slice checks lazy boxed constructors
+with ordinary representations and leaves strict or unpacked constructor
+fields, GADT evidence, and representation-changing wrappers outside
+the operand decoder.
+[Core observer](../../../compiler/GHC/Core/OpenWhnf.hs)
+and [checked operand decoder](../../../compiler/GHC/Tc/Gen/OpenTypeEval.hs).
+
+The compiler returns only a supplied rigid type. It does not create
+a new coercion or an equation for an unknown constructor. The existing
+source-rule checker checks the definitions that the observer demands,
+including imported definitions. It records the first known type argument
+of each demand, including a repeated demand of a cached definition. An
+unknown occurrence keeps all rules for that definition in scope. The
+regression checks an interface-only exporter, both field orders, and
+strict and rigid demand. It also checks matching and disjoint rules on
+the imported eliminator, including two demands at different types.
+Changing one field's strictness makes the unchanged exporter recompile
+from the new interface.
+[Regression](../../../testsuite/tests/dependent/should_run/NativeOpenConstructor.sh).
