@@ -16,6 +16,16 @@ that fact in this fork.
    continue to export an ordinary API to other clients.
    [Closed evaluator](roadmap/R15-closed-term-evaluator.md).
 
+GHC already runs Haskell during compilation. A Template Haskell splice
+can run a search and emit a witness expression. GHC then typechecks that
+expression at the splice site. A typechecker plugin can also participate
+when GHC encounters an unsolved constraint during inference. The plugin
+below uses that hook so the caller can request a witness with an ordinary
+class method. Either route can use a partial search procedure. The type
+of the returned witness determines which fact the caller can use.
+[Template Haskell splices](../users_guide/exts/template_haskell.rst)
+and [typechecker plugins](../users_guide/extending_ghc.rst#typechecker-plugins).
+
 ## A first plugin experiment
 
 The ordinary example module exports `offered :: Natural -> [Natural]`.
@@ -55,6 +65,42 @@ dictionary. Core Lint checks the resulting Core. A user-supplied Boolean
 or an SMT solver's exit code cannot by itself construct a membership path.
 [GHC's plugin evidence interface](../users_guide/extending_ghc.rst#typechecker-plugins)
 and [Agda's decidable propositions and witnesses](https://agda.github.io/agda-stdlib/v2.3/Relation.Nullary.Decidable.Core.html).
+
+## Running a search in a splice
+
+The same obligation has a plugin-free spelling. The ordinary
+`emitMembership` function searches the supplied list and generates an
+expression built from `Here` and `There`.
+
+```haskell
+labelEight :: Member 8 (OrdinaryOffer.offered 7)
+labelEight = $(emitMembership 8 (OrdinaryOffer.offered 7))
+```
+
+The two appearances of `offered 7` have different jobs. In the splice,
+the producer supplies the list to search. In the signature, the closed
+evaluator makes the actual list indices available to GHC. For `[7,8]`,
+the splice emits `There Here`. GHC checks its type at the binding. A
+generator that accidentally searches `offered 8` returns `Here`, which
+puts the label in the wrong field for the declared input. GHC can detect
+that mistake even though the search itself uses ordinary Haskell.
+
+The emitted expression uses only `Here` and `There`. This restriction
+matters in Haskell. A splice could emit `undefined :: Member 9 '[7,8]`.
+That expression typechecks, but a caller that inspects the supposed path
+raises an exception. A general-purpose checker can return an ordinary
+description of a candidate path. A small evidence builder can admit only
+the finite sequence of constructors, as this example does.
+
+The example uses a pure producer. A search that reads an external file
+observes that file at build time. Reuse across builds requires a declared
+dependency on the file. Runtime IO can produce a different value.
+
+The search stops at its first match. The signature currently requires
+R15 to read back the whole finite list. A successful search alone gives
+no termination guarantee for that second step.
+[Compile-time search](examples/boundary-evidence/EmitMembership.hs)
+and [dependent client](examples/boundary-evidence/SplicedOffer.hs).
 
 ## What does an observation establish?
 
@@ -130,6 +176,9 @@ The self-hosted compiler verified these results with Core and STG lint.
 | Ordinary producer returns `[7,8]`. | The plugin-free consumer selects `"eight"` with the computed path and `"seven"` with the known-head path. |
 | Request `9`, request `8` in a completely unknown list, or disable the plugin at the original request. | GHC reports an unsolved `Locate` constraint at the binding. |
 | Change the producer body to return `[7,9]` with the same signature. | GHC rechecks the unchanged binding for label `8` and rejects it. |
+| Search `offered 7` with a splice for label `8`. | The generated path selects the second field. |
+| Change only the search input to `8`. | GHC rejects the generated `Here` at the binding for input `7`. |
+| Change the producer to return `[8,7]` at input `7`. | The unchanged splice recompiles and selects the first field. |
 | Compare `lazyTrue` and `strictTrue`. | Both closed proofs check. At an exceptional input, the first returns `True` and the second raises. |
 | Change `strictTrue x` to return `x`. | GHC rejects the unchanged proof at `False`. |
 

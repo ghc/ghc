@@ -96,3 +96,36 @@ if "${observe[@]}" >disagreement.log 2>&1 ||
     exit 1
 fi
 printf '%s\n' 'GHC rejected the changed result at False.'
+
+mkdir "$out/splices"
+cd "$out/splices"
+cp -- "$src"/{BoundaryEvidence,OrdinaryOffer,EmitMembership,SplicedOffer}.hs .
+splice=("${ghc[@]}" -i -i. --make -fomit-interface-pragmas -fno-write-if-simplified-core)
+"${splice[@]}" -main-is SplicedOffer SplicedOffer.hs -o spliced-offer
+[[ $(./spliced-offer) == second ]]
+printf '%s\n' 'The spliced path selected the second field.'
+
+cat >WrongOffer.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
+module WrongOffer where
+import BoundaryEvidence (Member)
+import EmitMembership (emitMembership)
+import qualified OrdinaryOffer
+bad :: Member 8 (OrdinaryOffer.offered 7)
+bad = $(emitMembership 8 (OrdinaryOffer.offered 8))
+HS
+line=$(awk '/^bad = / {print NR}' WrongOffer.hs)
+if "${splice[@]}" -ddump-splices -no-link WrongOffer.hs >wrong.log 2>&1 ||
+   ! grep -Eq "^WrongOffer[.]hs:$line:[0-9]+(-[0-9]+)?: error:" wrong.log ||
+   ! grep -Fq "Couldn't match type" wrong.log ||
+   ! grep -Fq 'Here' wrong.log; then
+    cat wrong.log >&2
+    exit 1
+fi
+printf '%s\n' 'GHC rejected the generated path for a different producer input.'
+
+# Keep the label and input fixed. Move the matching field to the head.
+sed -i.bak 's/\[start, start + 1\]/[start + 1, start]/' OrdinaryOffer.hs
+"${splice[@]}" -main-is SplicedOffer SplicedOffer.hs -o spliced-offer
+[[ $(./spliced-offer) == first ]]
+printf '%s\n' 'Changing the producer regenerated a path to the first field.'
