@@ -217,8 +217,34 @@ instance at the source call. Data-family constructor promotion is a
 separate upstream feature, R14. The example uses the constructors in
 ordinary terms. [Registration and cycle checks](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
 
-A family equation can also mention a local function that needs no
-instances. For example, `type instance Payload Int = M.ident Bool`
-needs only `ident x = x`. The current scheduler requires instance
-prerequisites before the first value group. Distinguishing this acyclic
-case from a real cycle is the next source check.
+## M152. Independent local producers for type instances
+
+A standalone equation such as `type instance Payload Int = M.ident Bool`
+can use an independent local producer. For an open type family declared
+in the same splice group, the scheduler can defer the equation and its
+family until the producer has checked. It passes the solved producer
+Core to the ordinary family instance checker. The symbolic observer
+can return a checked closed type such as `Bool` or `Maybe Bool`.
+A strict producer that demands this operand still stops. A type supplies
+no runtime value. The scheduler keeps all same-group equations for the
+family together and preserves their renamed
+dependencies. An ordinary client can use the resulting axioms through
+the producer's interface. GHC rejects conflicting equations in its
+usual family consistency check. The example gives its later synonym a
+standalone kind signature so its operand is a rigid binder during open
+observation.
+
+This split requires the family to be absent from the early dependency
+closure, which includes the instance, deriving and default declarations
+checked early. If an earlier declaration depends on that family, GHC
+rejects the postponement at the original dependent call. Imported
+families, associated equations and data-family instances retain their
+existing scheduling bounds. [Source and cycle
+checks](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
+In the [shared example](../examples/open-evaluation/IndependentFamily.hs)
+the second producer uses the family after its equations are installed.
+When the family comes from an import, the same independent identity
+still gets GHC-70566 at the source call. Checking such an equation
+early requires knowing which other declarations can use that imported
+family.

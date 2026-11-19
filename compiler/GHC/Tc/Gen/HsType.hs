@@ -2377,7 +2377,7 @@ tc_app_ty mode rn_ty exp_kind
              (Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
                , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction fun
-               , equalLength domains args, all isOpenTypeOperand args
+               , equalLength domains args, all is_local_open_operand args
                -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
                      ; checkExpKind mode rn_ty result result_kind exp_kind }
              (Just _, Just [arg])
@@ -2388,6 +2388,14 @@ tc_app_ty mode rn_ty exp_kind
              _ -> unsupported name
            else imported_call env rdr name }
   where
+    is_local_open_operand arg = isOpenTypeOperand arg || is_type_constructor_app arg
+
+    -- The observer checks that the completed type is closed and family-free.
+    is_type_constructor_app arg = case unLoc (ignoreParens arg) of
+      HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) -> isTyConName name
+      HsAppTy _ fun operand -> is_type_constructor_app fun && is_type_constructor_app operand
+      _ -> False
+
     imported_call env rdr name =
       case value_args of
            Just args
@@ -2498,13 +2506,14 @@ tcOpenTypeCall mode name instantiated result_kind args = do
   case level of
     Comp | not bootOrSig && not explicitLevels -> pure ()
     _ -> reject "This call requires an ordinary module outside quotes and splices, without ExplicitLevelImports."
-  operands <- mapM checkOperand args
-  outcome <- observeOpenType instantiated result_kind operands
+  env <- getGblEnv
+  let local = nameIsLocalOrFrom (tcg_semantic_mod env) name
+  operands <- mapM (checkOperand local) args
+  outcome <- observeOpenType local instantiated result_kind operands
   case outcome of
     Left reason -> let (definition, message) = openTypeFailureReason reason
                    in failWithTc (TcRnOpenTypeEval name definition message)
     Right (result, used, constructors) -> do
-      env <- getGblEnv
       let locals = tcg_local_open_defs env
           lookup_owner n = case lookupNameEnv locals n of
             Just (owner, _) -> pure owner
@@ -2514,8 +2523,11 @@ tcOpenTypeCall mode name instantiated result_kind args = do
       updTcRef (tcg_evaluated_term_uses env) (\seen -> seen `unionNameSet` constructors `unionNameSet` mkNameSet (map fst used))
       pure result
   where
-    checkOperand (arg, kind) = do
-      checked <- tc_check_lhs_type mode arg kind
+    checkOperand local (arg, kind) = setSrcSpanA (getLoc arg) $ do
+      let check = tc_check_lhs_type mode arg kind
+      -- Report an insoluble kind equality before observing a local operand.
+      -- A cast with an unsolved kind equality is not an opaque Type.
+      checked <- if local then solveEqualities "tcOpenTypeCall operand" check else check
       liftZonkM (zonkTcType checked)
 
     reject :: String -> TcM a

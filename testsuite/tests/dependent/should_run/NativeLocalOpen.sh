@@ -181,19 +181,62 @@ sed -e 's/LocalAssociated/EquationCycle/g' \
 line=$(awk '/^    type Flag Token =/ {print NR}' EquationCycle.hs)
 expect_rejection EquationCycle "$line" '\[GHC-70566\]' 'unfinished local function keep'
 
+cp "$src/IndependentFamily.hs" .
+"${ghc[@]}" -c IndependentFamily.hs
+cp IndependentFamily.hi ../client/
+(
+    cd ../client
+    cat > FamilyConsumer.hs <<'SOURCE'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module FamilyConsumer where
+import IndependentFamily
+
+ordinary :: Bool
+ordinary = result
+
+sibling :: Payload Char
+sibling = EQ
+SOURCE
+    "${ghc[@]}" -c FamilyConsumer.hs
+)
+
+sed -e 's/IndependentFamily/StrictFamily/g' \
+    -e '1s/ExperimentalDependentTypes/BangPatterns, ExperimentalDependentTypes/' \
+    -e 's/^ident x = x$/ident !x = x/' \
+    IndependentFamily.hs > StrictFamily.hs
+line=$(awk '/^type instance Payload Int =/ { print NR }' StrictFamily.hs)
+expect_rejection StrictFamily "$line" '\[GHC-70566\]' 'Reduction cannot inspect the value of a type operand.'
+
+sed -e 's/IndependentFamily/CompoundFamily/g' \
+    -e 's/ident Bool$/ident (Maybe Bool)/' \
+    -e 's/True/Just True/g' IndependentFamily.hs > CompoundFamily.hs
+"${ghc[@]}" -c CompoundFamily.hs
+sed -e 's/IndependentFamily/WrongKindFamily/g' \
+    -e 's/ident Bool$/ident Maybe/' IndependentFamily.hs > WrongKindFamily.hs
+line=$(awk '/^type instance Payload Int =/ { print NR }' WrongKindFamily.hs)
+expect_rejection WrongKindFamily "$line" '\[GHC-83865\]' 'Expecting one more argument to'
+column=$(awk '/^type instance Payload Int =/ { print index($0, "Maybe") }' WrongKindFamily.hs)
+grep -Eq "^WrongKindFamily\.hs:$line:$column(-[0-9]+)?: error:" reject.log || { cat reject.log >&2; exit 1; }
+
+sed -e 's/IndependentFamily/ConflictingFamily/g' \
+    -e 's/^type instance Payload Char = Ordering$/type instance Payload Int = Ordering/' \
+    IndependentFamily.hs > ConflictingFamily.hs
+line=$(awk '/^type instance Payload Int =/ { print NR }' ConflictingFamily.hs | paste -sd '|')
+expect_rejection ConflictingFamily "($line)" '\[GHC-34447\]' 'Conflicting family instance declarations'
+
 # A family instance may need the very producer that uses its constructors.
 for family in AssociatedData StandaloneData StandaloneType; do
     case "$family" in
         AssociatedData) pattern='marked :: Payload'; replacement='marked :: AssociatedData.keep Bool'
-                        reason='An associated data instance' ;;
+                        reason='An associated data instance requires the unfinished local function keep' ;;
         StandaloneData) pattern='contents :: Flag Token'; replacement='contents :: StandaloneData.keep Bool'
-                        reason='This data instance' ;;
+                        reason='This data instance requires the unfinished local function keep' ;;
         StandaloneType) pattern='type instance Flag Token = Payload'; replacement='type instance Flag Token = StandaloneType.keep Bool'
-                        reason='This type instance' ;;
+                        reason='Cannot defer this type instance because the earlier declarations require Flag' ;;
     esac
     sed -e "s/LocalDataFamily/$family/g" -e "s/$pattern/$replacement/" "$src/LocalDataFamily.hs" >"$family.hs"
     line=$(awk -v term="$family.keep Bool" 'index($0,term) {print NR}' "$family.hs")
-    expect_rejection "$family" "$line" '\[GHC-70566\]' "$reason requires the unfinished local function keep"
+    expect_rejection "$family" "$line" '\[GHC-70566\]' "$reason"
     [[ $(grep -c 'error: \[GHC-70566\]' reject.log) == 1 ]]
 done
 

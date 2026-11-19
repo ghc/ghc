@@ -1987,7 +1987,10 @@ tcLocalOpenGroup demands group@HsGroup
   , hs_tyclds = tycls
   , hs_derivds = standalone, hs_defds = defaults } finish
   = do
-      instances <- traverse instance_group [inst | tg <- tycls, inst <- group_instds tg]
+      instances <- traverse (instance_group . snd) early_instances
+      for_ late $ \(_, inst) ->
+        when (hasSplice inst) $
+          rejectLocalOpen (instance_calls (getLocA inst)) "This deferred type instance contains a splice."
       when (hasSplice (standalone, defaults)) $
         rejectLocalOpen demands "A splice prevents checking a standalone deriving or default declaration early."
       let heads = concatMap (nameSetElemsStable . group_ext) instances
@@ -1999,6 +2002,11 @@ tcLocalOpenGroup demands group@HsGroup
       prerequisites <- case prerequisite_types of
         Left reason -> rejectLocalOpen demands reason
         Right names -> pure names
+      for_ late_calls $ \(inst, family, leader) ->
+        when (leader `elemNameSet` prerequisites) $
+          rejectLocalOpen (instance_calls (getLocA inst))
+            ("Cannot defer this type instance because the earlier declarations require "
+             ++ getOccString family ++ ". This may form a type dependency cycle.")
       let (selected, ready, blocked) = foldl' tryDemand (prerequisites, [], []) demands
       case (ready, reverse blocked) of
         ([], (demand, reason) : _) -> rejectLocalOpen [demand] reason
@@ -2012,7 +2020,8 @@ tcLocalOpenGroup demands group@HsGroup
                                , hs_tyclds = early_tys ++ instances
                                , hs_derivds = standalone, hs_defds = defaults }
           rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs)
-                       , hs_tyclds = rest_tys, hs_derivds = [], hs_defds = [] }
+                       , hs_tyclds = rest_tys ++ map (uncurry make_instance_group) late
+                       , hs_derivds = [], hs_defds = [] }
       ((envs@(early_env, _), methods), wanted) <- captureTopConstraints $
         tcTopSrcDeclGroupWithMethods (not (null instances)) early
       restoreEnvs envs $ do
@@ -2030,6 +2039,17 @@ tcLocalOpenGroup demands group@HsGroup
   where
     group_names = mkNameSet (hsGroupBinders group)
     value_names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds group))
+    all_instances = [(group_ext tg, inst) | tg <- tycls, inst <- group_instds tg]
+    (late, early_instances) = partition (belongs_to_late_family . snd) all_instances
+    late_calls = mapMaybe (late_family_instance . snd) all_instances
+    late_families = mkNameSet [family | (_, family, _) <- late_calls]
+    late_family_leaders = mkNameSet [leader | (_, _, leader) <- late_calls]
+    belongs_to_late_family inst =
+      case unLoc inst of
+        TyFamInstD{tfid_inst = TyFamInstDecl{tfid_eqn = FamEqn{feqn_tycon = L _ family}}} ->
+          family `elemNameSet` late_families
+        _ -> False
+
     instance_group inst = do
       names <- case unLoc inst of
         ClsInstD{cid_inst = ClsInstDecl
@@ -2043,8 +2063,30 @@ tcLocalOpenGroup demands group@HsGroup
         TyFamInstD{tfid_inst = equation} -> instance_part "This type instance" [getLocA inst] equation
         DataFamInstD{dfid_inst = data_inst} -> instance_part "This data instance" [getLocA inst] data_inst
       let deps = [leader | name <- names, Just (leader, _) <- [lookupNameEnv types name]]
-      pure TyClGroup { group_ext = mkNameSet deps, group_tyclds = []
-                     , group_kisigs = [], group_roles = [], group_instds = [inst] }
+      pure (make_instance_group (mkNameSet deps) inst)
+
+    make_instance_group deps inst =
+      TyClGroup { group_ext = deps, group_tyclds = []
+                , group_kisigs = [], group_roles = [], group_instds = [inst] }
+
+    -- See Note [Deferring a local type instance].
+    late_family_instance inst
+      | TyFamInstD{tfid_inst = equation@TyFamInstDecl
+           {tfid_eqn = FamEqn{feqn_tycon = L _ family}}} <- unLoc inst
+      , not (hasSplice equation)
+      , not (null (localUses value_names equation))
+      , Just (leader, tg) <- lookupNameEnv types family
+      , any (declares_open_family family . unLoc) (group_tyclds tg) = Just (inst, family, leader)
+      | otherwise = Nothing
+    declares_open_family name FamDecl{tcdFam = FamilyDecl{fdLName = L _ family, fdInfo = info}} =
+      name == family && isOpenTypeFamilyInfo info
+    declares_open_family _ _ = False
+
+    instance_calls loc =
+      case filter ((`isSubspanOf` loc) . snd) demands of
+        [] -> demands
+        calls -> calls
+
     instance_part :: Data a => String -> [SrcSpan] -> a -> TcM [Name]
     instance_part what locations part
       | hasSplice part = rejectLocalOpen demands (what ++ " contains a splice.")
@@ -2099,8 +2141,8 @@ tcLocalOpenGroup demands group@HsGroup
                 let rhs_deps = (fvs `intersectNameSet` group_names) `minusNameSet` value_names
                     required = unionNameSets (rhs_deps : sig_deps)
                     values = members `unionNameSet` (fvs `intersectNameSet` value_names)
-                checked <- closeLocalNames (typeDeps ("local dependency " ++ getOccString name)
-                                              (valueNeedsTerm root name)) (extendNameSet selected name)
+                checked <- closeLocalNames (producerTypeDeps root name)
+                                           (extendNameSet selected name)
                                            (nameSetElemsStable required)
                 foldM (visit root) checked (nameSetElemsStable values)
           _ -> Left ("The local dependency " ++ getOccString name
@@ -2124,6 +2166,13 @@ tcLocalOpenGroup demands group@HsGroup
                        ++ " and " ++ getOccString dep ++ "."
       | otherwise = "The declaration of " ++ getOccString dep ++ " requires the local function "
                     ++ getOccString term ++ " before it can be observed."
+
+    producerTypeDeps root owner dep
+      | dep `elemNameSet` late_family_leaders =
+          Left ("The local function " ++ getOccString owner ++ " requires "
+                ++ getOccString dep ++ " before the dependent type instance can be checked.")
+      | otherwise =
+          typeDeps ("local dependency " ++ getOccString owner) (valueNeedsTerm root owner) dep
 
     typeDeps _ _ dep | dep `elemNameSet` instance_binders = Right emptyNameSet
     typeDeps owner needs_term dep = case lookupNameEnv types dep of
@@ -2155,6 +2204,25 @@ tcLocalOpenGroup demands group@HsGroup
 tcLocalOpenGroup demands _ _ =
     rejectLocalOpen demands
       "Early checking of local definitions requires renamed value bindings."
+
+{- Note [Deferring a local type instance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A standalone type instance can need a local function in its RHS.
+Delay an equation only for an open type family declared in the same
+group. Keep class instances, data instances, deriving and defaults in
+their ordinary early pass. The earlier batches must not check the
+family declaration. This excludes references from their signatures,
+bodies and instance environments, including transitive references.
+Imported or earlier declarations cannot refer to the fresh family.
+
+Keep all same-group equations for that family together and retain each
+equation's renamed dependencies. Put the singleton instance groups after
+the remaining type groups, in their original order. See Note [Put instances
+at the end] in GHC.Rename.Module. The ordinary family instance checker
+checks the LHS, RHS and consistency with other equations. The continuation keeps
+the needed, solved Core in scope. This split does not move a splice or
+change the class instance environment used to check an early producer.
+-}
 
 -- | Return the owners of signatures and pragmas relevant to scheduling.
 signatureOwners :: Sig GhcRn -> [Name]

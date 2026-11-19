@@ -34,7 +34,7 @@ import GHC.Tc.Gen.SourceTable (groundFirstHead)
 import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcRn,
                            liftIO, newTcRef, newUnique, readTcRef, tcg_imports,
                            tcg_rdr_env, tcg_semantic_mod, tcg_local_open_defs, tcg_local_open_owners, updTcRef)
-import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), tcEqType)
+import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), isTyFamFree, noFreeVarsOfType, tcEqType)
 import GHC.Types.Basic (Boxity(Boxed))
 import GHC.Types.Id (Id, idName, idType, isClassOpId_maybe, mkSysLocal)
 import GHC.Types.Name (Name, getOccString, nameModule_maybe, stableNameCmp)
@@ -62,19 +62,22 @@ data OpenTypeFailure
   | UnavailableDefinition Name DefinitionFailure
   | CannotReduce EvalFailure
   | RigidCase Name
+  | GroundTypeCase
   | UnexpectedNeutral
   | HiddenConstructor Name
 
 -- | A checked source argument and its lazy constructor fields.
 data OpenArgument
   = OpenRigid TyVar
+  | OpenGroundType Type
   | OpenPair TyVar TyVar
   | OpenConstructor DataCon [Type] [OpenArgument]
 
 -- | Apply the instantiated function to symbolic operands of the checked kind.
-observeOpenType :: CoreExpr -> Kind -> [Type]
+observeOpenType :: Bool -- ^ Permit opaque ground types for a checked local definition.
+                -> CoreExpr -> Kind -> [Type]
                 -> TcM (Either OpenTypeFailure (Type, [(Name, Maybe Name)], NameSet))
-observeOpenType instantiated result_kind operands
+observeOpenType local_call instantiated result_kind operands
   | Just args <- traverse checkedOperand operands = runExceptT $ do
       limit <- reductionDepth <$> lift getDynFlags
       ((_, origins), revArgs) <- lift $
@@ -119,7 +122,7 @@ observeOpenType instantiated result_kind operands
                   Just _ -> record (idName v) (first_type >>= groundFirstHead . (:[]))
                   Nothing -> pure ()
                 pure result
-          let origin v = mkTyVarTy <$> lookupVarEnv origins v
+          let origin v = lookupVarEnv origins v
               constructorGRE con = lookupGRE_Name (tcg_rdr_env env) (dataConName con)
               visible con = pure $ case constructorGRE con of
                 Just gre -> isLocalGRE gre || any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
@@ -129,7 +132,10 @@ observeOpenType instantiated result_kind operands
             Left (ReadbackEvaluation failure) -> throwE (CannotReduce failure)
             Left (ReadbackHidden con) -> throwE (HiddenConstructor (tyConName (dataConTyCon con)))
             Left (ReadbackOpaque (Neutral (CaseBlocked (Rigid actual) _)))
-              | Just skolem <- lookupVarEnv origins actual -> throwE (RigidCase (varName skolem))
+              | Just ty <- origin actual ->
+                  case getTyVar_maybe ty of
+                    Just skolem -> throwE (RigidCase (varName skolem))
+                    Nothing -> throwE GroundTypeCase
             Left (ReadbackOpaque _) -> throwE UnexpectedNeutral
             Right (result, constructors) -> do
               dependencies <- lift (readTcRef uses)
@@ -168,6 +174,9 @@ observeOpenType instantiated result_kind operands
       , and (zipWith tcEqType prefix parameters)
       , and (zipWith tcEqType (map typeKind fields) field_types)
       = OpenConstructor con parameters <$> traverse checkedOperand fields
+      | local_call, isLiftedTypeKind (typeKind ty)
+      , noFreeVarsOfType ty, isTyFamFree ty
+      = Just (OpenGroundType ty)
       | otherwise = Nothing
 
     buildArgument (state, args) operand = do
@@ -175,6 +184,10 @@ observeOpenType instantiated result_kind operands
       pure (state', arg : args)
 
     buildOperand state (OpenRigid skolem) = symbolFor state skolem
+    -- See Note [Ground type operands of local calls].
+    buildOperand (symbols, origins) (OpenGroundType ty) = do
+      symbol <- freshSymbol liftedTypeKind
+      pure ((symbols, extendVarEnv origins symbol ty), Var symbol)
     buildOperand state (OpenPair x y) = do
       (state', first) <- symbolFor state x
       (state'', second) <- symbolFor state' y
@@ -187,11 +200,25 @@ observeOpenType instantiated result_kind operands
       case lookupVarEnv symbols skolem of
         Just symbol -> pure (state, Var symbol)
         Nothing -> do
-          unique <- newUnique
-          let symbol = mkSysLocal (fsLit "open-type-operand") unique manyDataConTy (tyVarKind skolem)
-          pure ((extendVarEnv symbols skolem symbol, extendVarEnv origins symbol skolem),
+          symbol <- freshSymbol (tyVarKind skolem)
+          pure ((extendVarEnv symbols skolem symbol, extendVarEnv origins symbol (mkTyVarTy skolem)),
                 Var symbol)
-observeOpenType _ _ _ = pure (Left InvalidInput)
+
+    freshSymbol kind = do
+      unique <- newUnique
+      pure (mkSysLocal (fsLit "open-type-operand") unique manyDataConTy kind)
+observeOpenType _ _ _ _ = pure (Left InvalidInput)
+
+{- Note [Ground type operands of local calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked local definition can project an ordinary type such as Bool.
+Like a skolem of kind Type, the type is an opaque operand of the
+observer. Store its checked source type as the symbol's origin.
+Readback can return that exact type. Evaluation cannot inspect the
+source type or treat it as a runtime constructor. A case demanding
+its value remains stuck. Keep runtime literal evaluation on the
+ordinary imported-code path.
+-}
 
 -- | A demanded external definition was unavailable to the observer.
 data DefinitionFailure
@@ -329,6 +356,8 @@ openTypeFailureReason (CannotReduce failure) =
 openTypeFailureReason (RigidCase scrutinee) =
   (Nothing, "Reduction stopped at a case on the rigid argument " ++ getOccString scrutinee ++
     ". A checked equation can retain this case until the argument's constructor is known.")
+openTypeFailureReason GroundTypeCase =
+  (Nothing, "Reduction cannot inspect the value of a type operand. A type operand supplies no runtime value.")
 openTypeFailureReason (HiddenConstructor name) =
   (Nothing, "A result constructor of " ++ getOccString name ++ " is not in scope through an ordinary import.")
 openTypeFailureReason UnexpectedNeutral =
