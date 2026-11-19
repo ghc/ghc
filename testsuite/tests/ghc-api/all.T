@@ -5,6 +5,10 @@ test('ghcApi', normal, compile_and_run, ['-package ghc'])
 test('NativeDependentCore', [extra_run_opts(f'"{config.libdir}"')],
      compile_and_run, ['-package ghc'])
 
+test('NativeExistentialCore', [req_host_target_ghc, only_ways(['normal']),
+                               extra_run_opts(f'"{config.libdir}"')],
+     compile_and_run, ['-package ghc -package array -package containers'])
+
 test('OpenTermWhnf', [extra_run_opts(f'"{config.libdir}"')],
      compile_and_run, ['-package ghc'])
 

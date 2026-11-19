@@ -1,0 +1,5 @@
+rejected malformed interface .binder
+rejected malformed interface .payload
+rejected malformed interface .self-scope
+rejected malformed interface .payload-scope
+checked type binder scope, substitution, alpha equality, Core Lint and binary signature roundtrip
