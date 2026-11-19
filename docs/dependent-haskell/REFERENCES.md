@@ -5312,3 +5312,24 @@ dependencies. A metatheoretic account of this addition remains open.
 [System F with type equality coercions, TLDI 2007](https://www.microsoft.com/en-us/research/publication/system-f-with-type-equality-coercions/),
 [Closed Type Families with Overlapping Equations, POPL 2014](https://simon.peytonjones.org/assets/pdfs/closed-type-families.pdf)
 and [local Core contract](CORE.md#nominal-evidence-for-a-composition-of-strict-pair-cases).
+
+### Reifying enumerations and tracing pair fields
+
+Agda's datatype rules introduce a finite set of named constructors,
+including nullary constructors. R15 uses GHC's existing promoted
+constructors for that role. It checks source visibility separately.
+GHC already records implicit uses of constructors for built-in
+`DataToTag` dictionaries. The closed evaluator reuses that mechanism
+when a constructor is visible only through a re-export.
+[Agda 2.8.0 simple datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#simple-datatypes),
+[GHC DataKinds](../users_guide/exts/data_kinds.rst)
+and [GHC's DataToTag instance solver](../../compiler/GHC/Tc/Instance/Class.hs).
+
+Agda gives each field of a pair a projection and defines `swap` in
+its standard library. The local R16 proof follows the selected
+positions through strict Haskell constructor cases. A common inner
+scrutinee can be opaque or bottom. This choice preserves the demand
+of both expressions and limits their dependencies on ordinary source rules.
+[Agda 2.8.0 pair projections](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#example-the-pair-type-constructor),
+[Agda standard library 2.3 `Data.Product.Base`](https://agda.github.io/agda-stdlib/v2.3/Data.Product.Base.html)
+and [the local Core rule](../../compiler/GHC/Builtin/CoercionRules.hs).

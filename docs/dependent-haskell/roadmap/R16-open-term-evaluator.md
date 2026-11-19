@@ -469,3 +469,28 @@ forced.
 [Core law](../CORE.md#nominal-evidence-for-a-composition-of-strict-pair-cases),
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledPair.hs)
 and [Agda's projection and eta rules](../REFERENCES.md#closed-constructor-arguments-and-composition-of-strict-pair-cases).
+
+### Following a projection through strict pair constructors
+
+`duplicateFirst (x, _) = (x, x)` produces a pair whose two fields come
+from the same input. Thus `snd (duplicateFirst p) ~ fst p` holds for
+an unknown `p`. Replacing the right side with `snd p` fails even when
+the two fields have the same kind. The actual branch binders identify
+the field. Their kinds alone cannot identify it.
+
+A proof can cross several strict cases on either side of the equality.
+For example, applying `duplicateRight` after `swap` makes both fields
+refer to the original first field. When two paths agree at a common
+input, the proof can leave that input opaque. The solver records only
+the source equations needed to reach that agreement. In an ordinary
+client, the two projections of `duplicate (exchange p)` still agreed
+under a rewrite rule for `exchange`. Adding a rule that could change the
+fields of `duplicate` invalidated the unchanged client at its call.
+[Compiled source examples](../../../testsuite/tests/dependent/should_run/NativeOpenPairCoercionUsage.hs)
+and [checked Core premises](../../../testsuite/tests/dependent/should_run/NativeOpenPairCoercion.hs).
+
+The same interface format can carry the new named proof. A consumer
+built before this change can still read newly compiled proofs of the old
+exchange law. It reports an unknown rule when it encounters a new
+reconstruction proof. The new reader also accepts existing exchange
+proofs. [Core contract](../CORE.md#nominal-evidence-for-a-composition-of-strict-pair-cases).

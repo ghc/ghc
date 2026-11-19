@@ -8420,3 +8420,38 @@ self-hosted compiler also passed the ordinary splice and plugin examples.
 The normal-way dependent directory passed 199 of 235 cases, including
 the Core Lint test. Each of the 36 failures had the same diagnostics as
 at M122. The full GHC testsuite was not run.
+
+## M124: reify public enumeration constructors in closed calls
+
+- [x] Check a separately compiled ordinary enumerated result, a direct
+      constructor operand and a nested ordinary consumer. Preserve DataKinds
+      identity across modules with identically spelled constructors.
+- [x] Recognize the constructor semantics in H98 and GADT syntax. Check
+      constructor visibility before execution and report the abstract type
+      without exposing private constructors.
+- [x] Change a producer object without changing any interface bytes. Remove
+      access through a re-export without changing any objects. Require the
+      unchanged client to reject its old proof in both cases.
+- [x] Run the self-hosted compiler, Showcase and registered source cases.
+
+[Source and abstraction checks](roadmap/R15-closed-term-evaluator.md#returning-an-ordinary-user-defined-enumeration).
+
+## M125: follow strict field projections through pair reconstructions
+
+- [x] Identify each output binder of a certified reconstruction. Select
+      through exchanges, identity reconstructions and either duplication.
+      Admit finite chains on both sides of an equality.
+- [x] Keep the exchange-only interface rule. Use a distinct named rule for
+      the general proof. Check an exchange in both reader directions and
+      check the old reader's diagnostic for a new proof.
+- [x] Verify that the proof leaves a common inner input opaque and rejects
+      the wrong same-kind field. Check both compiler stages, the Showcase
+      and the normal-way dependent directory.
+
+[Source examples and interface behavior](roadmap/R16-open-term-evaluator.md#following-a-projection-through-strict-pair-constructors).
+
+Both compiler stages built. Native execution and GHCi agreed on all 199
+Showcase lines. The two interpreter modes passed the enumeration and
+recompilation controls. The normal-way dependent directory passed 205
+of 241 cases. All 36 prior failures had the same individual output as
+at M123. The full GHC testsuite was not run.

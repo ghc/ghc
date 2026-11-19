@@ -60,6 +60,7 @@ import qualified Language.Haskell.TH as TH
 import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
 import qualified OpenSource
+import qualified Signal
 import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
 import qualified OrdinaryVecClient as Ordinary
@@ -787,6 +788,11 @@ inferredAppend = do
     observe "append with first length written" (toList (appendHidden @{n} xs ys))
 
 -- | Run each completed source feature group with finite runtime observations.
+-- | Both strict cases select the first input field even when the pair is unknown.
+duplicateProjection :: forall (p :: (Bool, Char)). Proxy p
+                    -> Prelude.snd (PreludePairExport.duplicateFirst p) :~: Prelude.fst p
+duplicateProjection _ = Refl
+
 main :: IO ()
 main = do
     putStrLn "Dependent Haskell: completed source features"
@@ -861,6 +867,11 @@ main = do
     observe "project through a swap proved for an unknown pair"
         ( PreludePairExport.abstractFirst (Proxy @'( 'True, 'x'))
         , PreludePairExport.abstractSecond (Proxy @'( 'True, 'x')) )
+    observe "check a user-defined signal and pass it to another ordinary call"
+        ( Refl :: Signal.at 2 :~: 'Signal.Stop
+        , Refl :: Signal.shouldStop (Signal.at 3) :~: 'False )
+    observe "project the second copy of an unknown pair's first field"
+        (duplicateProjection (Proxy @'( 'True, 'x')))
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

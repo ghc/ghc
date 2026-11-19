@@ -363,18 +363,47 @@ optional elements with Core and STG lint enabled. The normal-way
 dependent directory passed 198 of 234 cases. The 36 failures had the
 same individual output as at M119.
 
-## Next source case for a user-defined result
+## Returning an ordinary user-defined enumeration
 
-An ordinary module can export `data Signal = Stop | Go` and
-`signal :: Natural -> Signal`. Check `P.signal 0 :~: 'P.Stop` and pass
-the computed signal to a second ordinary function. Require an import
-of both constructors. A module that exports only the abstract type
-must retain control over its representation.
+The ordinary `Signal` module exports `data Signal = Stop | Go`. It
+enables no dependent features. A client checks which constructor
+`Signal.at` returns and can pass that constructor to another ordinary
+function.
 
-The proposed first case uses the existing DataKinds constructor
-identities for a monomorphic boxed enumeration. Two modules can both
-define `Stop`. The consumer must get the constructor of the actual
-result type. Change the producer, or remove a constructor from the
-module export list, and check that GHC rechecks the unchanged consumer.
-These are acceptance cases for the next R15 increment.
-[GHC's DataKinds rules](../../users_guide/exts/data_kinds.rst).
+```haskell
+evenSignal :: Signal.at 2 :~: 'Signal.Stop
+evenSignal = Refl
+
+mayProceed :: Signal.shouldStop (Signal.at 3) :~: 'False
+mayProceed = Refl
+```
+
+The interpreter inspects the actual boxed constructor. The compiler
+uses its ordinal in this datatype and the original DataKinds constructor
+identity. A different module can declare constructors with the same
+spelling and in a different order. The result type selects the correct
+declaration. For example, if the consumer imports both as qualified
+modules, GHC-70565 reports an operand of kind `B.Token` where `A.Token`
+is required. An enumeration written with GADT declaration syntax also
+works if all its constructors are ordinary nullary constructors.
+[Ordinary producer](../examples/closed-evaluation/Signal.hs)
+and [source controls](../../../testsuite/tests/dependent/should_run/NativeClosedEnums.hs).
+
+The caller must bring every constructor into scope with a non-SOURCE
+import. A qualified import or a re-export suffices. An optimized
+interface can contain the representation of an abstract type. Access to
+that metadata alone does not authorize inspection. GHC-70565 identifies
+the type and the import requirement, without printing its private
+constructors. GHC also checks a direct constructor operand at its own
+source span. It records implicit constructor uses for unused-import
+checks and recompilation.
+[Abstract result](../../../testsuite/tests/dependent/should_fail/NativeClosedEnumAbstract.hs)
+and [partially imported operand](../../../testsuite/tests/dependent/should_fail/NativeClosedEnumOperand.hs).
+
+A one-shot client was reusable with unchanged inputs. Changing the
+recorded producer object while preserving all interface bytes
+invalidated its old equality. Removing constructor access from the
+re-export interface also invalidated the client with the original
+objects still installed. A general user-defined datatype with fields
+needs a representation for its field kinds, constructor evidence and
+possible recursive occurrences.

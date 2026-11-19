@@ -2823,3 +2823,24 @@ proof produced a diagnostic naming the unknown rule.
 [Rule and branch checker](../../compiler/GHC/Builtin/CoercionRules.hs),
 [solver](../../compiler/GHC/Tc/Solver/Equality.hs)
 and [Core Lint controls](../../testsuite/tests/dependent/should_run/NativeOpenPairCoercion.hs).
+
+### Projections through several reconstructions
+
+The compiler reads the exact output binders of each strict boxed-pair
+case. They can come from the same input. Following the projected
+position produces a sequence of input pairs and field positions. Two
+paths are equal if they reach the same scrutinee and the same field
+with the same kinds. Use the outermost common point that proves the
+claim. This avoids using an equation for a shared inner computation.
+A constructor case that forces an extra field cannot supply such an
+equation.
+
+The existing `BoxedPairComposition` rule still proves an exchange
+followed by the opposite projection. The solver also emits that rule
+for the reverse direction by symmetry. The `BoxedPairReconstruction`
+rule checks the more general paths. Both use two nominal reflexive
+premises. An old format-69 reader can read newly written exchange-only
+interfaces. It reports the new rule by name when it needs a proof it
+cannot check. Both behaviors were checked with the prior binary.
+[Structural verifier](../../compiler/GHC/Builtin/CoercionRules.hs)
+and [ordinary source cases](../../testsuite/tests/dependent/should_run/NativeOpenPairCoercionUsage.hs).

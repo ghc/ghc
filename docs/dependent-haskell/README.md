@@ -8,11 +8,19 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 197 lines.
-The normal-way dependent directory passed 199 of 235 cases. All 36 failures
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 199 lines.
+The normal-way dependent directory passed 205 of 241 cases. All 36 failures
 produced the same output as on the previous fork tip. Fifteen reject existing
 programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+An ordinary source module can now return a public enumeration, including
+a user-defined `Signal`. A dependent client checks the actual
+constructor and passes it to another ordinary call. A projection from
+an unknown pair also works through strict duplication and chains of
+pair constructions.
+[Closed enumeration example](roadmap/R15-closed-term-evaluator.md#returning-an-ordinary-user-defined-enumeration)
+and [open field examples](roadmap/R16-open-term-evaluator.md#following-a-projection-through-strict-pair-constructors).
 
 The [boundary example](BOUNDARY-EVIDENCE.md#running-a-search-in-a-splice)
 runs an ordinary Haskell search during compilation. Its result is a

@@ -2,7 +2,7 @@
 {-# LANGUAGE PolyKinds, TypeFamilies, TypeOperators #-}
 module PreludePairExport
   (first, second, swapped, nestedFirst, nestedSecond,
-   abstractFirst, abstractSecond, get, swapIndex, secondIndex) where
+   abstractFirst, abstractSecond, get, swapIndex, secondIndex, duplicateFirst) where
 
 import Data.Proxy (Proxy(..))
 import qualified Data.Tuple
@@ -55,3 +55,7 @@ swapIndex _ = Proxy
 -- | Carry the second field through an ordinary proxy.
 secondIndex :: forall k l (p :: (k, l)). Proxy p -> Proxy (Prelude.snd p)
 secondIndex _ = Proxy
+
+-- | Build a pair from the first field of its input.
+duplicateFirst :: (a, b) -> (a, a)
+duplicateFirst (x, _) = (x, x)
