@@ -328,3 +328,50 @@ selected when the caller supplies `p`. The observer's suspended case
 contains a local environment and cannot serve as interface evidence.
 [Function promotion](https://ghc.serokell.io/dh#function-promotion)
 and [the observer's case representation](../../../compiler/GHC/Core/OpenWhnf.hs).
+
+### Interface experiment and rewrite rules
+
+A separate compiler based on `7d109d984b` published a nominal equation
+for an ordinary user-defined projection. It checked the typed Core for
+a case on the pair with a single alternative returning one of its field
+binders. It preserved the order and visibility of the function's type
+parameters. An ordinary client used the exporter and producer interfaces
+to select fields at `Type`, `Bool` and `Char`. Changing the producer
+from first to second invalidated the unchanged client. A function that
+also forced the ignored field did not receive the equation.
+
+The experiment exposed a compatibility requirement. Consider an ordinary
+`choose :: (a, a) -> a` that returns the first field. The published
+compiler checks the following equality, even if a rule for
+`choose @Bool` appears later in the module or in a declaration splice.
+
+```haskell
+proof :: Prelude.id (Worker.choose (Prelude.quotRem 17 5)) :~: 3
+proof = Refl
+```
+
+Recording only the owner of the family equation made GHC-83605 reject
+that proof. Reusing the ordinary evaluator for an already imported rule
+fixed the imported case. Recording the concrete first type-argument
+head at nominal reductions also preserved the proof for both the later
+written and splice-generated `Bool` rules. Rules that could change a
+nominal `Bool` proof still caused that proof to be rejected.
+
+One compatibility case remains. Add this semantics-preserving rule
+after the proof in the same module:
+
+```haskell
+{-# RULES "choose/first" [~1] forall x y. Worker.choose @Natural (x,y) = x #-}
+```
+
+The published compiler evaluates the ground call and accepts the module.
+The candidate commits to nominal family evidence, then rejects the module
+at `Refl`, even though the rule returns the same first field. Choosing
+ordinary evaluation for a previously supported closed call must happen
+before its type uses nominal evidence. The separate interface-only route
+must continue to work when the projection has no loadable object. These
+are gates for publishing equations for installed `Prelude.fst` and
+`Prelude.snd`. The published compiler can already select a field from
+a written pair of rigid type variables.
+[Source-family rule checks](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+and [the closed evaluator](R15-closed-term-evaluator.md#returning-a-pair).
