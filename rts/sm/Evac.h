@@ -13,8 +13,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 // Use a register argument for evacuate, if available.
 // Earlier, the regparm attribute was used whenever __GNUC__ >= 2, but this
 // generated warnings on PPC. So the use is restricted further.
@@ -40,5 +38,3 @@ void evacuate_BLACKHOLE(StgClosure **p);
 void evacuate_BLACKHOLE1(StgClosure **p);
 
 extern W_ thunk_selector_depth;
-
-#include "EndPrivate.h"

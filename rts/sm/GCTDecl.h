@@ -11,8 +11,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 /* The gct variable is thread-local and points to the current thread's
    gc_thread structure. It is heavily accessed, and thus high
    performance access is crucial to parallel (-threaded) workloads.
@@ -102,5 +100,3 @@ extern __thread gc_thread* gct;
 #endif
 
 #endif // THREADED_RTS
-
-#include "EndPrivate.h"

@@ -13,8 +13,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void    scavenge_loop (void);
 void    scavenge_capability_mut_lists (Capability *cap);
 void    scavengeTSO (StgTSO *tso);
@@ -40,5 +38,3 @@ StgPtr  scavenge_AP1 (StgAP *ap);
 StgPtr  scavenge_continuation1(StgContinuation *pap);
 void    scavenge_compact1 (StgCompactNFData *str);
 #endif
-
-#include "EndPrivate.h"

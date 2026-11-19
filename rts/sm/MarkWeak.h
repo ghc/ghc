@@ -13,8 +13,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 extern StgTSO *resurrected_threads;
 
 void    collectFreshWeakPtrs   ( void );
@@ -22,5 +20,3 @@ void    initWeakForGC          ( void );
 bool    traverseWeakPtrList    ( StgWeak **dead_weak_ptr_list, StgTSO **resurrected_threads );
 void    markWeakPtrList        ( void );
 void    scavengeLiveWeak       ( StgWeak * );
-
-#include "EndPrivate.h"

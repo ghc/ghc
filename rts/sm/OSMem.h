@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void osMemInit(void);
 void *osGetMBlocks(uint32_t n);
 void osFreeMBlocks(void *addr, uint32_t n);
@@ -91,5 +89,3 @@ void osDecommitMemory(void *p, W_ len);
 // before the program terminates.
 void osReleaseHeapMemory(void);
 #endif
-
-#include "EndPrivate.h"

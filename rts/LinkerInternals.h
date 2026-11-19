@@ -427,8 +427,6 @@ typedef struct _RtsSymbolInfo {
     unsigned long size; // symbol size: only used for COMMON symbols
 } RtsSymbolInfo;
 
-#include "BeginPrivate.h"
-
 void exitLinker( void );
 
 void freeObjectCode (ObjectCode *oc);
@@ -503,5 +501,3 @@ void initSegment(Segment *s, void *start, size_t size, SegmentProt prot, int n_s
 void freeSegments(ObjectCode *oc);
 
 void initLinkerRtsSyms(StrHashTable *symhash);
-
-#include "EndPrivate.h"

@@ -12,8 +12,6 @@
 
 #include "Capability.h"
 
-#include "BeginPrivate.h"
-
 /* All these allocation functions return NULL on failure. If the context
  * allows, then propagatethe failure upwards, e.g. to a CMM primop where a
  * heap overflow exception can be thrown. Otherwise, use:
@@ -49,5 +47,3 @@ StgArrBytes *allocateArrBytesPinned (Capability *cap,
                                      StgWord nbytes,
                                      StgWord alignment,
                                      CostCentreStack *ccs);
-
-#include "EndPrivate.h"

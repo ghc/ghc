@@ -8,8 +8,6 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-#include "BeginPrivate.h"
-
 #if defined(x86_64_HOST_ARCH)
 #define PEi386_IMAGE_OFFSET 4
 #else
@@ -149,5 +147,3 @@ uint8_t getSymStorageClass ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint8_t getSymNumberOfAuxSymbols ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint16_t getSymType ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint8_t* getSymShortName ( COFF_HEADER_INFO *info, COFF_symbol* sym );
-
-#include "EndPrivate.h"

@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 bdescr *allocLargeChunk (W_ min, W_ max);
 bdescr *allocLargeChunkOnNode (uint32_t node, W_ min, W_ max);
 
@@ -33,5 +31,3 @@ extern W_ n_alloc_blocks;   // currently allocated blocks
 extern W_ hw_alloc_blocks;  // high-water allocated blocks
 
 RTS_PRIVATE void clear_free_list(void);
-
-#include "EndPrivate.h"

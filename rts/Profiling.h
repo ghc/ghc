@@ -15,8 +15,6 @@
 #include "Arena.h"
 #endif
 
-#include "BeginPrivate.h"
-
 #if defined(PROFILING)
 #define PROFILING_ONLY(s) s
 #else
@@ -60,5 +58,3 @@ extern Mutex ccs_mutex;
 #endif
 
 #endif
-
-#include "EndPrivate.h"

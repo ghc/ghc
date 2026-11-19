@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #if defined(CMINUSMINUS)
 
 /* Lock closure, equivalent to ccall lockClosure but the condition is inlined.
@@ -125,5 +123,3 @@ EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info)
 }
 
 #endif /* CMINUSMINUS */
-
-#include "EndPrivate.h"

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "BeginPrivate.h"
-
 #if defined(aarch64_HOST_ARCH)
 // On AArch64 MAP_32BIT is not available but we are still bound by the small
 // memory model. Consequently we still try using the MAP_LOW_MEM allocation
@@ -84,5 +82,3 @@ void munmapForLinker (void *addr, size_t bytes, const char *caller);
 // sufficiently different to warrant its own interface.
 void *mmapForLinker (size_t bytes, MemoryAccess prot, uint32_t flags, int fd, int offset);
 #endif
-
-#include "EndPrivate.h"

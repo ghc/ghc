@@ -12,8 +12,6 @@
 
 #include "LinkerInternals.h"
 
-#include "BeginPrivate.h"
-
 // Currently live objects
 extern ObjectCode *objects;
 
@@ -41,5 +39,3 @@ void checkUnload(void);
 
 // Call on loaded object code
 void insertOCSectionIndices(ObjectCode *oc);
-
-#include "EndPrivate.h"

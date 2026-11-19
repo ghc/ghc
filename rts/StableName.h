@@ -8,8 +8,6 @@
 
 #include "sm/GC.h" // for evac_fn below
 
-#include "BeginPrivate.h"
-
 void    initStableNameTable   ( void );
 void    freeSnEntry           ( snEntry *sn );
 void    exitStableNameTable   ( void );
@@ -51,5 +49,3 @@ extern unsigned int SNT_size;
 // needed by Schedule.c:forkProcess()
 extern Mutex stable_name_mutex;
 #endif
-
-#include "EndPrivate.h"

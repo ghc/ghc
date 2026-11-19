@@ -16,8 +16,6 @@
 #define NEED_M32 1
 #endif
 
-#include "BeginPrivate.h"
-
 #if defined(NEED_M32)
 #define M32_NO_RETURN    /* Nothing */
 #else
@@ -34,5 +32,3 @@ void m32_allocator_free(m32_allocator *alloc) M32_NO_RETURN;
 void m32_allocator_flush(m32_allocator *alloc) M32_NO_RETURN;
 
 void * m32_alloc(m32_allocator *alloc, size_t size, size_t alignment) M32_NO_RETURN;
-
-#include "EndPrivate.h"

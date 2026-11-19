@@ -27,8 +27,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #if defined(HAVE_PREEMPTION)
 void newFdWakeup(int *fd_r, int *fd_w);
 void closeFdWakeup(int fd_r, int fd_w);
@@ -37,6 +35,3 @@ void closeFdWakeup(int fd_r, int fd_w);
 void sendFdWakeup(int fd_w);
 void collectFdWakeup(int fd_r);
 #endif
-
-#include "EndPrivate.h"
-

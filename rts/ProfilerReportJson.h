@@ -13,8 +13,6 @@
 #include "Rts.h"
 #include "Profiling.h"
 
-#include "BeginPrivate.h"
-
 #if defined(PROFILING)
 
 void writeCCSReportJson(FILE *prof_file,
@@ -22,5 +20,3 @@ void writeCCSReportJson(FILE *prof_file,
                         ProfilerTotals totals );
 
 #endif
-
-#include "EndPrivate.h"

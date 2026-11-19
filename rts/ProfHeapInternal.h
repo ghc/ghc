@@ -11,8 +11,6 @@
 #include "Hash.h"
 #include "Arena.h"
 
-#include "BeginPrivate.h"
-
 /* -----------------------------------------------------------------------------
  * Counters
  *
@@ -57,5 +55,3 @@ typedef struct {
 
 void initLDVCtr(counter *ctr);
 counter* heapInsertNewCounter(Census *census, StgWord identity);
-
-#include "EndPrivate.h"

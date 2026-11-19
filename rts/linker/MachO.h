@@ -3,8 +3,6 @@
 #include "Rts.h"
 #include "MachOTypes.h"
 
-#include "BeginPrivate.h"
-
 void   ocInit_MachO                 ( ObjectCode* oc );
 void   ocDeinit_MachO               ( ObjectCode* oc );
 int    ocVerifyImage_MachO          ( ObjectCode* oc );
@@ -17,5 +15,3 @@ int    machoGetMisalignment         ( FILE * );
 int    ocAllocateExtras_MachO       ( ObjectCode* oc );
 
 SectionKind getSectionKind_MachO    ( MachOSection *macho );
-
-#include "EndPrivate.h"

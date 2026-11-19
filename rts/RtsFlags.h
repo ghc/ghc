@@ -11,8 +11,6 @@
 
 #include <stdbool.h>
 
-#include "BeginPrivate.h"
-
 /* Routines that operate-on/to-do-with RTS flags: */
 
 #if defined(mingw32_HOST_OS)
@@ -25,9 +23,6 @@ void setupRtsFlags        (int *argc, char *argv[], RtsConfig rtsConfig);
 void freeRtsArgs          (void);
 
 extern RtsConfig rtsConfig;
-
-#include "EndPrivate.h"
-
 /* These prototypes may also be defined by ClosureMacros.h. We don't want to
  * define them twice (#24918).
  */

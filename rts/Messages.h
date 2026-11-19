@@ -13,8 +13,6 @@
 #include "Schedule.h" // for SCHED_INTERRUPTING
 #include "SMPClosureOps.h"
 
-#include "BeginPrivate.h"
-
 uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg);
 StgTSO * blackHoleOwner (StgClosure *bh);
 
@@ -37,9 +35,6 @@ doneWithMsgThrowTo (Capability *cap, MessageThrowTo *m)
     unlockClosure((StgClosure*)m, &stg_MSG_NULL_info);
     LDV_RECORD_CREATE(m);
 }
-
-#include "EndPrivate.h"
-
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
 extern RTS_PUBLIC volatile StgWord64 whitehole_executeMessage_spin;
 #endif

@@ -16,8 +16,6 @@
 #include "WSDeque.h"
 #include "GetTime.h" // for Ticks
 
-#include "BeginPrivate.h"
-
 /* -----------------------------------------------------------------------------
    General scheme
 
@@ -209,5 +207,3 @@ typedef struct gc_thread_ {
 extern uint32_t n_gc_threads;
 
 extern gc_thread **gc_threads;
-
-#include "EndPrivate.h"

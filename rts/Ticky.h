@@ -8,11 +8,7 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void PrintTickyInfo(void);
 
 void emitTickyCounterSamples(void);
 void emitTickyCounterDefs(void);
-
-#include "EndPrivate.h"

@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 /* We often want to refer to individual elements of the timeout queue.
  * They are actually the same type as the overall queue (because it's just a
  * tree of nodes, and the overall queue is just a reference to the root node).
@@ -154,6 +152,3 @@ StgTimeout *findMinTimeoutQueue(StgTimeoutQueue *root)
 {
     return root;
 }
-
-#include "EndPrivate.h"
-

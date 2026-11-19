@@ -14,8 +14,6 @@
 
 #include "Ticker.h"
 
-#include "BeginPrivate.h"
-
 bool anyUserHandlers(void);
 
 #if !defined(THREADED_RTS) && defined(RTS_USER_SIGNALS)
@@ -26,5 +24,3 @@ void startSignalHandlers(Capability *cap);
 #endif
 
 extern StgInt *signal_handlers;
-
-#include "EndPrivate.h"

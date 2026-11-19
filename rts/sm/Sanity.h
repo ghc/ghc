@@ -10,8 +10,6 @@
 
 #if defined(DEBUG)
 
-#include "BeginPrivate.h"
-
 # if defined(PAR)
 # define PVM_PE_MASK    0xfffc0000
 # define MAX_PVM_PES    MAX_PES
@@ -40,6 +38,5 @@ void memInventory (bool show);
 void checkBQ (StgTSO *bqe, StgClosure *closure);
 
 void checkSTACK (StgStack *stack);
-#include "EndPrivate.h"
 
 #endif /* DEBUG */

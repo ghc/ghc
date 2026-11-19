@@ -14,8 +14,6 @@
 #include "RetainerSet.h"
 #include "TraverseHeap.h"
 
-#include "BeginPrivate.h"
-
 void initRetainerProfiling ( void );
 void endRetainerProfiling  ( void );
 void retainerProfile       ( void );
@@ -26,7 +24,4 @@ RetainerSet* retainerSetOf( const StgClosure *c );
 // Used by GC.c
 W_ retainerStackBlocks(void);
 extern traverseState g_retainerTraverseState;
-
-#include "EndPrivate.h"
-
 #endif /* PROFILING */

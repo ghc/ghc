@@ -15,8 +15,6 @@
 
 #include "GCUtils.h"
 
-#include "BeginPrivate.h"
-
 INLINE_HEADER void
 push_mark_stack(StgPtr p)
 {
@@ -66,5 +64,3 @@ mark_stack_empty(void)
 {
     return (((W_)mark_sp & BLOCK_MASK) == 0 && mark_stack_bd->link == NULL);
 }
-
-#include "EndPrivate.h"

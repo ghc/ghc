@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 typedef void (*TickProc)(int);
 
 /* The ticker is initialised in a paused state. Use unpauseTicker to start. */
@@ -55,5 +53,3 @@ void unpauseTicker(void);
 #if defined(THREADED_RTS)
 void wakeUpRtsViaTicker(void);
 #endif
-
-#include "EndPrivate.h"

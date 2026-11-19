@@ -13,8 +13,6 @@
 
 #include "GetTime.h"
 
-#include "BeginPrivate.h"
-
 /*
    Note [Definition of a Task]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -319,5 +317,3 @@ serialisableTaskId (Task *task)
     return (TaskId) (uintptr_t) task;
 #endif
 }
-
-#include "EndPrivate.h"

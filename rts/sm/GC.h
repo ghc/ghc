@@ -15,8 +15,6 @@
 
 #include "rts/storage/HeapAlloc.h"
 
-#include "BeginPrivate.h"
-
 struct GcConfig {
     // which generation are we requesting be collected?
     uint32_t collect_gen;
@@ -95,5 +93,3 @@ void releaseGCThreads (Capability *cap, bool idle_cap[]);
 #endif
 
 #define WORK_UNIT_WORDS 128
-
-#include "EndPrivate.h"

@@ -10,9 +10,7 @@
 
 #if !defined(CMINUSMINUS)
 #include "RtsFlags.h"
-#include "BeginPrivate.h"
 #endif
-
 
 /* Note [Thunks, blackholes, and indirections]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -498,7 +496,3 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
 }
 
 #endif /* CMINUSMINUS */
-
-#if !defined(CMINUSMINUS)
-#include "EndPrivate.h"
-#endif

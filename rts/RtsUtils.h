@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 /* -----------------------------------------------------------------------------
  * (Checked) dynamic allocation
  * -------------------------------------------------------------------------- */
@@ -64,5 +62,3 @@ void checkFPUStack(void);
 
 // Drop the given extension from a filepath.
 void dropExtension(char *path, const char *extension);
-
-#include "EndPrivate.h"

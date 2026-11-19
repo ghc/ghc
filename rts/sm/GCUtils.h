@@ -15,8 +15,6 @@
 
 #include "GCTDecl.h"
 
-#include "BeginPrivate.h"
-
 #define ACQUIRE_ALLOC_BLOCK_SPIN_LOCK() ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync)
 #define RELEASE_ALLOC_BLOCK_SPIN_LOCK() RELEASE_SPIN_LOCK(&gc_alloc_block_sync)
 
@@ -74,5 +72,3 @@ recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
     // N.B. we are allocating into our Capability-local mut_list, therefore
     // we don't need an atomic increment.
 }
-
-#include "EndPrivate.h"

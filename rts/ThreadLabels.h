@@ -9,13 +9,9 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void    labelThread          (Capability  *cap,
                               StgTSO      *tso,
                               StgArrBytes *label);
 void    setThreadLabel       (Capability  *cap,
                               StgTSO      *tso,
                               char        *label);
-
-#include "EndPrivate.h"

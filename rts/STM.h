@@ -36,8 +36,6 @@
 #define STM_UNIPROC
 #endif
 
-#include "BeginPrivate.h"
-
 /*----------------------------------------------------------------------
 
    GC interaction
@@ -209,5 +207,3 @@ void stmWriteTVar(Capability *cap,
 #define NO_TREC ((StgTRecHeader *)(void *)&stg_NO_TREC_closure)
 
 /*----------------------------------------------------------------------*/
-
-#include "EndPrivate.h"
