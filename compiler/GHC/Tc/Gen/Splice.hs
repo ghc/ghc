@@ -68,7 +68,8 @@ import GHC.Tc.Utils.Instantiate
 
 import qualified GHC.Core as Core
 import GHC.Core.FVs (exprSomeFreeVarsList)
-import GHC.Core.Make (mkCoreApp, mkCoreApps, mkCharExpr, mkListExpr, mkNaturalExpr)
+import GHC.Core.Make (mkCoreApp, mkCoreApps, mkCharExpr, mkListExpr, mkNaturalExpr
+                     , mkCoreBoxedTuple, mkSingleAltCase)
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion( etaExpandCoAxBranch )
 import GHC.Core.Type as Type
@@ -168,7 +169,7 @@ import Data.Binary
 import Data.Binary.Get
 import Data.ByteString.Short (ShortByteString)
 import Data.Containers.ListUtils ( nubOrd )
-import Data.List ( find, sortBy )
+import Data.List ( find, sortBy, stripPrefix )
 import Data.Maybe
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
@@ -1304,19 +1305,26 @@ Previously, we failed to abort in cases (b) and (c), leading to #19709.
 
 -- | Reconstruct a runtime operand from a checked ground literal type.
 tcDecodeClosedCallOperand :: Type -> TcM (Maybe Core.CoreExpr)
-tcDecodeClosedCallOperand operand =
-  case closedCallValueShape (typeKind operand) of
-    Nothing -> return Nothing
-    Just (scalar, element, is_list) -> do
-      platform <- targetPlatform <$> getDynFlags
-      let decode = decodeScalar platform scalar
-      return $
-        if is_list
-          then do
-            elements <- extractPromotedList_maybe operand
-            mkListExpr element <$> traverse decode elements
-          else decode operand
+tcDecodeClosedCallOperand operand = do
+  platform <- targetPlatform <$> getDynFlags
+  return $ do
+    shape <- closedCallValueShape (typeKind operand)
+    value <- decode platform shape operand
+    guard (exprType value `tcEqType` typeKind operand)
+    return value
   where
+    decode platform (ClosedScalar scalar) ty = decodeScalar platform scalar ty
+    decode platform (ClosedList scalar) ty = do
+      elements <- extractPromotedList_maybe ty
+      mkListExpr (closedScalarKind scalar) <$> traverse (decodeScalar platform scalar) elements
+    decode platform (ClosedPair left right) ty = do
+      (x, y) <- isPromotedPairType ty
+      guard (typeKind x `tcEqType` closedShapeKind left &&
+             typeKind y `tcEqType` closedShapeKind right)
+      a <- decode platform left x
+      b <- decode platform right y
+      return (mkCoreBoxedTuple [a, b])
+
     decodeScalar platform ClosedNatural ty = do
       number <- isNumLitTy ty
       guard (number >= 0)
@@ -1331,17 +1339,37 @@ tcDecodeClosedCallOperand operand =
 -- | Scalar types with a checked runtime and promoted representation.
 data ClosedCallScalar = ClosedNatural | ClosedChar | ClosedBool
 
--- | Classify the scalar or single list layer supported by the evaluator.
-closedCallValueShape :: Kind -> Maybe (ClosedCallScalar, Kind, Bool)
-closedCallValueShape kind
-  | element `tcEqType` naturalTy = Just (ClosedNatural, naturalTy, is_list)
-  | element `tcEqType` charTy = Just (ClosedChar, charTy, is_list)
-  | element `tcEqType` boolTy = Just (ClosedBool, boolTy, is_list)
-  | otherwise = Nothing
+-- | Value shapes supported in both directions by the closed-call evaluator.
+data ClosedCallShape
+  = ClosedScalar ClosedCallScalar
+  | ClosedList ClosedCallScalar
+  | ClosedPair ClosedCallShape ClosedCallShape
+
+-- | Recover the kind at a leaf of the result.
+closedScalarKind :: ClosedCallScalar -> Kind
+closedScalarKind ClosedNatural = naturalTy
+closedScalarKind ClosedChar = charTy
+closedScalarKind ClosedBool = boolTy
+
+-- | Build the kind used for a case binder or a promoted constructor.
+closedShapeKind :: ClosedCallShape -> Kind
+closedShapeKind (ClosedScalar scalar) = closedScalarKind scalar
+closedShapeKind (ClosedList scalar) = mkListTy (closedScalarKind scalar)
+closedShapeKind (ClosedPair left right) = mkBoxedTupleTy [closedShapeKind left, closedShapeKind right]
+
+-- | Classify a checked result or computed operand by its kind.
+closedCallValueShape :: Kind -> Maybe ClosedCallShape
+closedCallValueShape kind = case splitTyConApp_maybe kind of
+  Just (tc, [arg]) | tc == listTyCon -> ClosedList <$> scalar arg
+  Just (tc, [a, b]) | tc == pairTyCon ->
+    ClosedPair <$> closedCallValueShape a <*> closedCallValueShape b
+  _ -> ClosedScalar <$> scalar kind
   where
-    (element, is_list) = case splitTyConApp_maybe kind of
-      Just (tc, [arg]) | tc == listTyCon -> (arg, True)
-      _ -> (kind, False)
+    scalar ty
+      | ty `tcEqType` naturalTy = Just ClosedNatural
+      | ty `tcEqType` charTy = Just ClosedChar
+      | ty `tcEqType` boolTy = Just ClosedBool
+      | otherwise = Nothing
 
 -- | Execute a checked closed call through the target interpreter.
 -- See Note [Closed literal type evaluation].
@@ -1354,10 +1382,11 @@ tcRunClosedCall fun argument result_kind = do
 tcPrepareClosedCall :: Id -> [Type] -> Kind -> TcM ([Core.CoreExpr] -> TcM Type)
 tcPrepareClosedCall fun domains result_kind = do
   hsc_env <- getTopEnv
-  (dictionary_kind, list_result, decode) <- case closedTypeResultCodec result_kind of
-    Just codec -> return codec
+  shape <- case closedCallValueShape result_kind of
+    Just shape -> return shape
     Nothing -> bad ("The function returns " ++ showPpr (hsc_dflags hsc_env) result_kind ++
-                    ". Closed calls in types currently support results of type Natural, Char, Bool, or lists of these types.")
+                    ". Closed calls in types currently support results of type Natural, Char, Bool, " ++
+                    "lists of these types, or boxed pairs of supported results.")
   interp <- checkClosedTypeEvalStage hsc_env name
   let expected = foldr mkVisFunTyManyU result_kind domains
   function <- if idType fun `tcEqType` expected
@@ -1366,55 +1395,91 @@ tcPrepareClosedCall fun domains result_kind = do
   unless (exprType function `tcEqType` expected) $
     bad "The closed call does not have the expected ordinary function type."
 
-  show_class <- tcLookupKnownKeyClass showClassKey
-  inst_env <- tcGetInstEnvs
-  let method = if list_result then "showList" else "show"
-  case (find ((== method) . getOccString) (classMethods show_class),
-        lookupUniqueInstEnv inst_env show_class [dictionary_kind]) of
-    (Just show_id, Right (inst, []))
-      | let dfun = instanceDFunId inst
-      , nameModule_maybe (idName dfun) == nameModule_maybe (className show_class)
-      , idType dfun `tcEqType` mkClassPred show_class [dictionary_kind] -> do
-          ret_id <- tcLookupKnownOccId returnIOIdOcc
-          io_tc <- tcLookupKnownKeyTyCon ioTyConKey
-          let render = mkCoreApps (Core.Var show_id)
-                         [Core.Type dictionary_kind, Core.Var dfun]
-              show_s = mkVisFunTyManyU stringTy stringTy
-              render_result = if list_result then show_s else stringTy
-              ret = mkCoreApp (Core.Var ret_id) (Core.Type stringTy)
-              io_string = mkTyConApp io_tc [stringTy]
-          unless (exprType render `tcEqType` mkVisFunTyManyU result_kind render_result
-                  && exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
-            bad "Unexpected type for the interpreter response."
-          loc <- getSrcSpanM
-          return $ \arguments -> setSrcSpan loc $ do
-            failIfErrsM
-            unless (length arguments == length domains &&
-                    and (zipWith tcEqType (map exprType arguments) domains)) $
-              bad "The runtime operands do not have the expected types."
-            let call = mkCoreApps function arguments
-                rendered_call = mkCoreApp render call
-                response = if list_result
-                             then mkCoreApp rendered_call (mkListExpr charTy [])
-                             else rendered_call
-                expr = mkCoreApp ret response
-            compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc expr
-            (value, links, packages) <- either (bad . displayException) pure compiled
-            recordThNeededRuntimeDeps links packages
-            outcome <- tryAllM $ liftIO $ evalString interp value
-            rendered <- case outcome of
-              Left exn | Just async <- (fromException exn :: Maybe SomeAsyncException) ->
-                liftIO $ throwIO async
-              Left exn -> bad (displayException exn)
-              Right rendered -> pure rendered
-            case decode rendered of
-              Just ty -> return ty
-              Nothing -> bad "Invalid literal response from the interpreter."
-    _ -> bad "Cannot resolve the built-in Show dictionary for the result type."
+  render <- closedCallRenderer name shape
+  ret_id <- tcLookupKnownOccId returnIOIdOcc
+  io_tc <- tcLookupKnownKeyTyCon ioTyConKey
+  let ret = mkCoreApp (Core.Var ret_id) (Core.Type stringTy)
+      io_string = mkTyConApp io_tc [stringTy]
+  unless (exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
+    bad "Unexpected type for the interpreter response."
+  loc <- getSrcSpanM
+  return $ \arguments -> setSrcSpan loc $ do
+    failIfErrsM
+    unless (length arguments == length domains &&
+            and (zipWith tcEqType (map exprType arguments) domains)) $
+      bad "The runtime operands do not have the expected types."
+    let call = mkCoreApps function arguments
+        response = render call
+    unless (exprType response `tcEqType` stringTy) $
+      bad "Unexpected type for the interpreter response."
+    compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc (mkCoreApp ret response)
+    (value, links, packages) <- either (bad . displayException) pure compiled
+    recordThNeededRuntimeDeps links packages
+    outcome <- tryAllM $ liftIO $ evalString interp value
+    rendered <- case outcome of
+      Left exn | Just async <- (fromException exn :: Maybe SomeAsyncException) ->
+        liftIO $ throwIO async
+      Left exn -> bad (displayException exn)
+      Right rendered -> pure rendered
+    case decodeClosedCallResult shape rendered of
+      Just ty | typeKind ty `tcEqType` result_kind -> return ty
+      _ -> bad "Invalid literal response from the interpreter."
   where
     name = idName fun
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name
+
+-- | Build the renderer before any nested operand executes.
+closedCallRenderer :: Name -> ClosedCallShape -> TcM (Core.CoreExpr -> Core.CoreExpr)
+closedCallRenderer name shape = do
+  show_class <- tcLookupKnownKeyClass showClassKey
+  inst_env <- tcGetInstEnvs
+  let empty_string = mkListExpr charTy []
+      show_s = mkVisFunTyManyU stringTy stringTy
+      builtinShow scalar is_list = do
+        let dictionary_kind = closedScalarKind scalar
+            method = if is_list then "showList" else "show"
+            domain = if is_list then mkListTy dictionary_kind else dictionary_kind
+            range = if is_list then show_s else stringTy
+        case (find ((== method) . getOccString) (classMethods show_class),
+              lookupUniqueInstEnv inst_env show_class [dictionary_kind]) of
+          (Just show_id, Right (inst, []))
+            | let dfun = instanceDFunId inst
+            , nameModule_maybe (idName dfun) == nameModule_maybe (className show_class)
+            , idType dfun `tcEqType` mkClassPred show_class [dictionary_kind] -> do
+                let render = mkCoreApps (Core.Var show_id)
+                               [Core.Type dictionary_kind, Core.Var dfun]
+                unless (exprType render `tcEqType` mkVisFunTyManyU domain range) $
+                  failWithTc (TcRnClosedTypeEval name "Unexpected type for the interpreter response.")
+                return render
+          _ -> failWithTc (TcRnClosedTypeEval name
+                 "Cannot resolve the built-in Show dictionary for the result type.")
+      renderScalar scalar = mkCoreApp <$> builtinShow scalar False
+      renderList scalar = do
+        render <- builtinShow scalar True
+        return $ \value -> mkCoreApps render [value, empty_string]
+      renderToken quote render value suffix = mkCoreApps quote [render value, suffix]
+      renderFields quote current = case current of
+        ClosedScalar scalar -> renderToken quote <$> renderScalar scalar
+        ClosedList scalar -> renderToken quote <$> renderList scalar
+        ClosedPair left right -> do
+          let left_kind = closedShapeKind left
+              right_kind = closedShapeKind right
+          pair <- mkSysLocalM (fsLit "closed_pair") ManyTy (closedShapeKind current)
+          a <- mkSysLocalM (fsLit "closed_left") ManyTy left_kind
+          b <- mkSysLocalM (fsLit "closed_right") ManyTy right_kind
+          render_left <- renderFields quote left
+          render_right <- renderFields quote right
+          return $ \value suffix ->
+            mkSingleAltCase value pair (Core.DataAlt (tupleDataCon Boxed 2)) [a, b]
+              (render_left (Core.Var a) (render_right (Core.Var b) suffix))
+  case shape of
+    ClosedScalar scalar -> renderScalar scalar
+    ClosedList scalar -> renderList scalar
+    ClosedPair{} -> do
+      quote <- builtinShow ClosedChar True
+      render <- renderFields quote shape
+      return $ \value -> render value empty_string
 
 -- | Use ordinary term checking to supply type and dictionary arguments.
 specializeClosedFunction :: Name -> Type -> TcM Core.CoreExpr
@@ -1449,27 +1514,48 @@ desugarStagedExpr expr = do
   when (errorsOrFatalWarningsFound messages) failM
   maybe failM pure result
 
--- | Select the compiler-side decoder and the built-in Show dictionary kind.
-closedTypeResultCodec :: Type -> Maybe (Type, Bool, String -> Maybe Type)
-closedTypeResultCodec kind = do
-  (scalar, element, is_list) <- closedCallValueShape kind
-  let decode :: (Read a, Show a) => (a -> Type) -> String -> Maybe Type
-      decode promote
-        | is_list = decodeLiteral (mkPromotedListTy element . map promote)
-        | otherwise = decodeLiteral promote
-      decoder = case scalar of
-        ClosedNatural -> decode (mkNumLitTy . toInteger @Natural)
-        ClosedChar -> decode mkCharLitTy
-        ClosedBool -> decode promoteBool
-  return (element, is_list, decoder)
+-- | Decode the canonical response from the interpreter.
+decodeClosedCallResult :: ClosedCallShape -> String -> Maybe Type
+decodeClosedCallResult shape rendered = case shape of
+  ClosedScalar scalar -> decodeScalar scalar False rendered
+  ClosedList scalar -> decodeScalar scalar True rendered
+  ClosedPair{} -> do
+    (value, rest) <- decodeFields shape rendered
+    guard (null rest)
+    return value
   where
+    decodeFields current input = case current of
+      ClosedScalar scalar -> decodeToken scalar False input
+      ClosedList scalar -> decodeToken scalar True input
+      ClosedPair left right -> do
+        (a, after_left) <- decodeFields left input
+        (b, after_right) <- decodeFields right after_left
+        return (mkPromotedPairTy (closedShapeKind left) (closedShapeKind right) a b, after_right)
+
+    decodeToken scalar is_list input = do
+      [(token, _)] <- pure (reads @String input)
+      rest <- stripPrefix (show token) input
+      value <- decodeScalar scalar is_list token
+      return (value, rest)
+
+    decodeScalar scalar is_list = case scalar of
+      ClosedNatural -> decodeLiteral scalar is_list (mkNumLitTy . toInteger @Natural)
+      ClosedChar -> decodeLiteral scalar is_list mkCharLitTy
+      ClosedBool -> decodeLiteral scalar is_list promoteBool
+
     promoteBool b = mkTyConTy (if b then promotedTrueDataCon else promotedFalseDataCon)
 
-    decodeLiteral :: (Read a, Show a) => (a -> Type) -> String -> Maybe Type
-    decodeLiteral promote rendered = do
-      x <- readMaybe rendered
-      guard (show x == rendered)
-      return (promote x)
+    decodeLiteral :: (Read a, Show a) => ClosedCallScalar -> Bool -> (a -> Type)
+                  -> String -> Maybe Type
+    decodeLiteral scalar is_list promote
+      | is_list = decodeCanonical (mkPromotedListTy (closedScalarKind scalar) . map promote)
+      | otherwise = decodeCanonical promote
+
+    decodeCanonical :: (Read a, Show a) => (a -> Type) -> String -> Maybe Type
+    decodeCanonical promote input = do
+      value <- readMaybe input
+      guard (show value == input)
+      return (promote value)
 
 {- Note [Closed literal type evaluation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1485,6 +1571,13 @@ constructor. A checked result can also be the operand of a nested call.
 Use the same kind classifier to rebuild the corresponding Core literals
 and constructors. The checked kind supplies the element type of an
 empty list.
+
+For a boxed pair, use one Core case on the producer application. Render each
+leaf with its scalar or list renderer. Quote each leaf as a separate string
+token with the built-in Char showList. Its suffix concatenates the tokens.
+The compiler decodes the tokens in shape order and rebuilds the promoted
+pair. No Show instance for the pair takes part in reification. Forcing the
+complete response forces every field, even if a later caller ignores it.
 
 For an overloaded producer, check the resolved occurrence against the
 specialized ordinary arrow. Use the same type and dictionary elaboration as

@@ -39,6 +39,11 @@ test('NativeClosedLists',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedListsLib.hs'])],
      multimod_compile_and_run,
      ['NativeClosedLists', '-Werror=unused-imports -Wno-partial-type-signatures ' + config.ghc_th_way_flags])
+test('NativeClosedReturnedPair',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['NativeClosedReturnedPairLib.hs', 'NativeClosedReturnedPairRejects.hs'])],
+     run_command, ['bash NativeClosedReturnedPair.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeClosedNestedDependencies',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['NativeClosedListsLib.hs', 'NativeOpenRetryLib.hs'])],
