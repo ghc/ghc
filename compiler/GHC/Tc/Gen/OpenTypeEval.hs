@@ -339,7 +339,8 @@ openDefinitionIface hscEnv mod installed = do
 openTypeFailureReason :: OpenTypeFailure -> (Maybe Name, String)
 openTypeFailureReason InvalidInput =
   (Nothing, "The open evaluator could not represent an operand at the required kind. " ++
-    "It instantiates lifted polymorphic parameters at Type. Other instantiations need checked source equations.")
+    "Use rigid variables or ordinary boxed constructors with lazy fields for symbolic inputs. " ++
+    "The evaluator instantiates lifted polymorphic parameters at Type.")
 openTypeFailureReason (UnavailableDefinition name failure) =
   (Just name, case failure of
     UnavailableModule -> "A referenced definition does not come from an ordinary imported module."
