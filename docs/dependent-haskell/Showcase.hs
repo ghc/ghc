@@ -1284,6 +1284,9 @@ listBoundaries = do
     observe "ordinary zip with a short input" (Ordinary.ordinaryZipExact n xs [1 :: Int])
     observe "safeHead after checking for exactly one cell" (first "x", first "", first "xy")
     observe "first cell of a packaged list" (headPacked (packList ('p' : undefined)))
+    let p = packList xs
+    observe "project the vector at the length stored in its own package"
+        (toList (PackedProjection.payload p))
     observe "project the length of a known dependent package in a type"
         (Refl :: PackedProjection.Length PackedProjection.One :~: 'S 'Z)
     let vector = Retain n (replicateNative n 'x') :: Retained (Vec Char)

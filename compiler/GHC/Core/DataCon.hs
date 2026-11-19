@@ -1318,9 +1318,10 @@ dataConHasPromotedRetained = isJust . promotedRetainedFields
 promotedRetainedFields :: DataCon -> Maybe (Id, Type -> Type)
 promotedRetainedFields con
   | [Just witness, Nothing] <- dataConRepArgBinders con
-  , (_, [], [], [], [Scaled witness_mult witness_ty, Scaled payload_mult body], result) <- dataConFullSig con
+  , (univs, [], [], [], [Scaled witness_mult witness_ty, Scaled payload_mult body], result) <- dataConFullSig con
+  , map binderVar (dataConUserTyVarBinders con) == univs
   , isManyTy witness_mult, isOneTy payload_mult || isManyTy payload_mult
-  , isNativeIndexType witness_ty
+  , isNativeClosedIndexType witness_ty
   , witness_ty `eqType` varType witness
   , not (anyFreeVarsOfType isId result)
   , Just (head_tc, args) <- splitTyConAppNoView_maybe body

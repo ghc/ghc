@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}
 -- | Project a witness from a known dependent package in a type.
-module PackedProjection (Length, One) where
+module PackedProjection (Length, One, payload) where
 
 import PackedVecLibrary
 
@@ -10,3 +10,7 @@ type family Length (p :: PackedVec a) :: Nat where
 
 -- | A package containing one Boolean.
 type One = 'PackVec ('S 'Z) ('VCons 'True 'VNil)
+
+-- | Return the vector indexed by the length of this package.
+payload :: foreach (p :: PackedVec a) -> Vec a (Length p)
+payload (PackVec _ xs) = xs

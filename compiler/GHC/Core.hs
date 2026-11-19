@@ -114,7 +114,7 @@ import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.DataCon
 import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon, isBoxedDataTyCon,
-                        tyConTyVars, tyConResKind )
+                        tyConTyVars, tyConResKind, tyConKind )
 import GHC.Unit.Module
 
 import GHC.Types.InlinePragma
@@ -2887,8 +2887,17 @@ sameNativeIndexDomain left right
 -- Validate its parent with 'nativeIndexDataConTyArgs' before calling this.
 nativeIndexArgKinds :: DataCon -> [Type] -> [Type] -> Bool
 nativeIndexArgKinds con tys indices
-  = indices `equalLength` fields && and (zipWith same_domain indices fields)
+  | dataConHasPromotedRetained con
+  = check (piResultTys (tyConKind (promoteDataCon con)) tys) indices
+  | otherwise = indices `equalLength` fields && and (zipWith same_domain indices fields)
   where
+    check kind [] = kind `eqType` mkTyConApp (dataConTyCon con) tys
+    check kind (index : rest)
+      | Just (_, binder, _) <- splitPiTy_maybe kind
+      , sameNativeIndexDomain (typeKind index) (piTyBinderType binder)
+      = check (piResultTy kind index) rest
+      | otherwise = False
+
     fields = dataConInstOrigArgTys con tys
     same_domain index (Scaled _ ty)
       = sameNativeIndexDomain (typeKind index) ty
@@ -2928,7 +2937,7 @@ isNativeIndexAlt (Alt (DataAlt con) args _)
   | length args > dataConRepArity con
   , isVanillaAlgTyCon (dataConTyCon con)
   , isBoxedDataTyCon (dataConTyCon con)
-  , null (dataConRepArgBinders con)
+  , null (dataConRepArgBinders con) || dataConHasPromotedRetained con
   , (_, [], [], [], _, _) <- dataConFullSig con
   = True
 isNativeIndexAlt _ = False

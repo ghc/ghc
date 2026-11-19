@@ -1346,13 +1346,29 @@ tcRetainedCon domain source_pat = case unLoc (retainedConPat source_pat) of
        ; case con_like of
            RealDataCon con
              | Just args <- nativeIndexDataConTyArgs domain con
-             , let field_tys = dataConInstOrigArgTys con args
-             , pats `equalLength` field_tys ->
-               do { fields <- zipWithM field pats field_tys
-                  ; return (Just (con, fields)) }
+             -> check_fields con args pats
+
            _ -> return Nothing }
   _ -> return Nothing
   where
+    check_fields con args pats
+      | dataConHasPromotedRetained con
+      , [witness_pat, payload_pat] <- pats
+      , [Just template, Nothing] <- dataConRepArgBinders con
+      , (univs, [], [], [], [witness_ty, payload_ty], _) <- dataConFullSig con
+      = do { let subst = mkTvSubstPrs (zip univs args)
+           ; witness <- field witness_pat (mapScaledType (substTy subst) witness_ty)
+           ; let dep_subst = CoreSubst.extendIdSubst (extendSubstInScope subst witness)
+                                                  template (Var witness)
+           ; payload <- field payload_pat (mapScaledType (substTy dep_subst) payload_ty)
+           ; return (Just (con, [witness, payload])) }
+      | null (dataConRepArgBinders con)
+      , let field_tys = dataConInstOrigArgTys con args
+      , pats `equalLength` field_tys
+      = do { fields <- zipWithM field pats field_tys
+           ; return (Just (con, fields)) }
+      | otherwise = return Nothing
+
     field (L loc (VarPat _ (L _ name))) (Scaled _ ty)
       = setSrcSpanA loc $ return (mkLocalId name ManyTy ty)
     field (L _ WildPat{}) (Scaled _ ty) = newSysLocalId (fsLit "_") ManyTy ty

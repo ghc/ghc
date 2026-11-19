@@ -11,7 +11,18 @@ g+=("$@")
 cd "$out/provider"
 cp "$src"/{PackedVecLibrary,RetainedNat,PackedProjection}.hs .
 "${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedProjection.hs
-cp PackedVecLibrary.hi RetainedNat.hi PackedProjection.hi "$out/client/"
+cat >Mixed.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
+module Mixed (witness) where
+import Data.Proxy
+import PackedProjection
+import PackedVecLibrary
+type family Payload (n :: Nat) :: Vec Bool n
+witness :: foreach (n :: Nat) -> Proxy (Length ('PackVec n (Payload n)))
+witness _ = Proxy
+HS
+"${g[@]}" -fomit-interface-pragmas -c Mixed.hs
+cp PackedVecLibrary.hi RetainedNat.hi PackedProjection.hi Mixed.hi "$out/client/"
 cd "$out/client"
 cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
@@ -66,6 +77,60 @@ type Bad = 'PackVec 'Z ('VCons 'True 'VNil)
 HS
 if "${g[@]}" -c WrongIndex.hs >bad.log 2>&1 || ! grep -Fq 'WrongIndex.hs:4:' bad.log ||
    ! grep -Fq '[GHC-83865]' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
+
+cat >MixedClient.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module MixedClient where
+import Data.Proxy
+import Mixed
+import PackedVecLibrary
+readWitness :: foreach (n :: Nat) -> Proxy n
+readWitness n = witness n
+HS
+"${g[@]}" -c MixedClient.hs
+
+cat >RuntimeProjection.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import Control.Exception (ErrorCall, displayException, evaluate, try)
+import Data.List (isPrefixOf)
+import PackedProjection
+import PackedVecLibrary
+
+consume :: PackedVec a -> [a]
+consume p = toList (payload p)
+
+fields :: Nat -> PackedVec Int
+fields n = PackVec n (error "payload")
+
+main :: IO ()
+main = do
+    case consume (packList [7 :: Int]) of
+      [7] -> pure ()
+      _ -> fail "wrong vector"
+    outcome <- try (evaluate (consume (fields (error "witness"))))
+    case outcome of
+      Left e | "payload" `isPrefixOf` displayException (e :: ErrorCall) ->
+        putStrLn "the projected payload leaves the witness lazy"
+      _ -> fail "wrong field evaluated"
+HS
+"${g[@]}" -c RuntimeProjection.hs
+"${g[@]}" RuntimeProjection.o ../provider/{PackedProjection,PackedVecLibrary}.o -o projection
+./projection
+
+cat >WrongProjection.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module WrongProjection where
+import PackedProjection
+import PackedVecLibrary
+wrong :: foreach (p :: PackedVec a) -> Vec a ('S (Length p))
+wrong (PackVec _ xs) = xs
+HS
+if "${g[@]}" -c WrongProjection.hs >bad.log 2>&1 ||
+   ! grep -Fq 'WrongProjection.hs:6:24: error: [GHC-05617]' bad.log; then
     cat bad.log >&2
     exit 1
 fi

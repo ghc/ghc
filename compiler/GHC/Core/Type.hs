@@ -63,7 +63,7 @@ module GHC.Core.Type (
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys, DepFunTyFlag(..), mkDepFunTy, mkDepFunTyWithVis, isBoolIndexId,
         mkPiTysM, mkPiTysU,
-        isNativeIndexId, isNativeIndexType, nativeIndexDataConTyArgs,
+        isNativeIndexId, isNativeIndexType, isNativeClosedIndexType, nativeIndexDataConTyArgs,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
         nativeIndexFunctionTypeTys_maybe,
         isNativeOpaqueValueId, isNativeOpaqueValueType,
@@ -243,7 +243,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType, eqTypes )
 import GHC.Core.TyCon
 import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConTyCon, dataConFullSig, dataConRepArgTys, dataConStupidTheta
-   , dataConWrapId_maybe, dataConRepArgBinders )
+   , dataConWrapId_maybe, dataConRepArgBinders, dataConHasPromotedRetained )
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
@@ -2376,6 +2376,10 @@ See #14939.
 isNativeIndexType :: Type -> Bool
 isNativeIndexType = nativeIndexType True
 
+-- | Check a closed structural domain without opaque or retained fields.
+isNativeClosedIndexType :: Type -> Bool
+isNativeClosedIndexType = nativeIndexType False
+
 -- | Check a structural schema or a closed function-free endpoint.
 -- See Note [Function fields in native index domains].
 nativeIndexType :: Bool -> Type -> Bool
@@ -2392,7 +2396,9 @@ nativeIndexType structural_fields = go []
       , tcIsLiftedTypeKind (typeKind ty)
       , all argument args
       , null (tyConStupidTheta tc)
-      , Just fields <- concat <$> traverse (con_fields ty args) (tyConDataCons tc)
+      , let cons = tyConDataCons tc
+            package_root = structural_fields && null path && isSingleton cons
+      , Just fields <- concat <$> traverse (con_fields package_root ty args) cons
       = all (field ((tc, args) : path)) fields
       | otherwise = False
 
@@ -2411,7 +2417,18 @@ nativeIndexType structural_fields = go []
       | otherwise = noFreeVarsOfType arg && isTauTy arg
                     && isNativeOpaqueValueType arg
 
-    con_fields domain args con
+    con_fields package_root domain args con
+      | package_root
+      -- The promoted telescope checks the dependent payload kind. Only its
+      -- witness needs to be a structural domain in its own right.
+      , dataConHasPromotedRetained con
+      , (univs, [], [], [], _, res) <- dataConFullSig con
+      , univs `equalLength` args
+      , substTyWith univs args res `eqType` domain
+      , null (dataConStupidTheta con)
+      , Nothing <- dataConWrapId_maybe con
+      , [witness, payload] <- instantiate rep_args
+      = Just [(False, scaledThing witness), (True, scaledThing payload)]
       | null (dataConRepArgBinders con)
       , (univs, [], [], [], orig_args, res) <- dataConFullSig con
       , univs `equalLength` args
@@ -2472,7 +2489,7 @@ nativeIndexFunctionTypeTys_maybe ty
       <- coreFullView ty
   , af == FTF_T_T, eqType ma unmatchableDataConTy, isManyTy mult
   , noFreeVarsOfType mult
-  , nativeIndexType False arg, nativeIndexType False res
+  , isNativeClosedIndexType arg, isNativeClosedIndexType res
   = Just (arg, res)
   | otherwise = Nothing
 
@@ -2632,10 +2649,17 @@ mutually recursive uniform domains. It rejects growing arguments and parameter
 permutations. It does not assume finite or total runtime values.
 
 Reject existential variables, constructor constraints, datatype
-contexts, newtypes, type data, and wrappers. Retained field constructors need a
-separate promotion rule, even when a named field is unused by the later types.
-Inspect their metadata before the full signature. A recursive interface field
-can otherwise force the same domain thunk which is already being checked.
+contexts, newtypes, type data, and wrappers. Inspect retained field metadata
+before the full signature. A recursive interface field can otherwise force the
+same domain thunk which is already being checked.
+
+A structural root may have one constructor with a checked promoted witness
+telescope. Require a closed ordinary structural type for its witness, as in
+Note [Promoting one retained witness] in GHC.Core.DataCon. This check excludes
+retained fields when inspecting the witness domain itself. The dependent
+payload is opaque to structural inspection, since the promoted telescope
+checks its exact kind. Do not admit retained constructors in nested
+structural fields or in strict function endpoints.
 
 Original and representation fields must have the same complete domain. Thus a
 promoted constructor's arguments match

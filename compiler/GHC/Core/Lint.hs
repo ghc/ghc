@@ -1822,10 +1822,15 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
         Just tys -> return tys
         Nothing -> failWithL (text "Unsupported native index constructor domain:" <+> ppr scrut_ty)
     ; let payload_ty = piResultTys (dataConRepType con) ty_args
-          multiplicities = map scaledMult (dataConInstArgTys con ty_args)
+          multiplicities
+            | dataConHasPromotedRetained con = map scaledMult (dataConRepArgTys con)
+            | otherwise = map scaledMult (dataConInstArgTys con ty_args)
     ; lintBinders CasePatBind fields $ do
-      { let expected = mkNomEqPred index
-                         (mkTyConApp (promoteDataCon con) (ty_args ++ map TermVarTy fields))
+      { let indices = map TermVarTy fields
+      ; lintL (nativeIndexArgKinds con ty_args indices)
+          (text "Invalid field kinds in native index evidence:" <+> ppr fields)
+      ; let expected = mkNomEqPred index
+                         (mkTyConApp (promoteDataCon con) (ty_args ++ indices))
       ; ensureEqTys (varType cv) expected
           (text "Invalid nominal index branch evidence:" <+> ppr cv <+> dcolon <+> ppr (varType cv))
       ; lintBinder CasePatBind cv $ do

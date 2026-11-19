@@ -36,7 +36,7 @@ A direct constructor pattern on this polymorphic `Const` still needs
 separate inference work.
 [Interface and escape controls](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
-## Missing projection
+## Project a payload at the length of its input package
 
 Agda's `Σ` record gives the second projection a result type indexed by
 the first projection of the same pair. The corresponding source test
@@ -49,18 +49,23 @@ payload :: foreach (p :: PackedVec a) -> Vec a (packageLength p)
 payload (PackVec _ xs) = xs
 ```
 
-The current compiler rejects the retained domain `PackedVec a` at the
-signature (GHC-83605). A closed type family can project the witness from a known promoted
-`PackVec`. A client with only the interface can prove the lengths of an
-empty and a one-element package. Supplying a zero witness and a
-one-element vector is a kind error at the payload. [Known package
-projection](../examples/packed-vector/PackedProjection.hs).
-A signature such as `PackedVec a -> Vec a n` correctly fails with
-GHC-25897. Its caller could choose a different `n` from the stored length.
+With an explicit closed `Length` family, the compiler can check
+`payload :: foreach (p :: PackedVec a) -> Vec a (Length p)`.
+Matching `PackVec` supplies nominal evidence about the actual input.
+An ordinary interface-only client can return its vector as a list.
+Asking for `Vec a ('S (Length p))` fails at the returned field.
+A caller that demands the payload encounters an exception in that
+field even if the stored length also raises an exception.
+[Projection source](../examples/packed-vector/PackedProjection.hs).
+
+The version with the ordinary imported `packageLength` function still
+fails during function promotion. Checking its source equation
+requires the first pattern field to scope over the kind of the second.
 
 - [x] Represent a single retained witness before a payload whose final
   type argument is that witness in the promoted constructor kind.
-- [ ] Relate the length of the input package to the field bound by the
+- [x] Relate the length of the input package to the field bound by the
   match. Only the input package remains in scope in the exported type.
-- [ ] Check the projection through a compiled interface. Check a
+- [x] Check the projection through a compiled interface. Check a
   mismatched index and the two independent field-demand examples.
+- [ ] Use the ordinary imported first projection in the result signature.
