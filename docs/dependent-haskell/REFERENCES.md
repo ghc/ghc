@@ -5524,3 +5524,20 @@ even though the same source compiled in a fresh directory.
 [Interface recompilation](../../compiler/GHC/Iface/Recomp.hs),
 [fingerprints](../../compiler/GHC/Iface/Recomp/Flags.hs)
 and [two-compiler reproduction](examples/open-evaluation/check-pair-upgrade.sh).
+
+M143 shares a metavariable between the argument and result kinds of
+ordinary calls in the same expression. This uses the type inferred for
+one argument to instantiate an implicit parameter of another. Agda's
+account of omitted arguments gives the corresponding elaboration
+principle. Haskell still resolves each ordinary class constraint before
+the call can run. [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [computed operands in both orders](roadmap/R15-closed-term-evaluator.md#m143-sharing-the-kinds-of-computed-operands).
+
+M144 uses the order of constructor inspection from the actual Haskell
+case expression. Agda's case-tree example explains why a match may
+remain stuck at a variable even when an equation looks applicable on
+paper. Matching a Haskell sum also has to preserve which fields are
+forced. The producer checks that each branch returns a lazy field.
+[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
+[Haskell 2010 pattern matching](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-610003.17)
+and [sum projection controls](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum).

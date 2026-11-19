@@ -2988,3 +2988,10 @@ client that supplies the constructor uses that axiom for its nominal
 equality. A stricter worker loses the equation. A rewrite rule that can
 change the worker at the instantiated types prevents use of its axiom.
 [Interface and rule checks](roadmap/R16-open-term-evaluator.md#m142-exporting-a-swap-from-an-ordinary-module).
+
+For an ordinary sum, the producer checks every constructor before it
+emits a closed family. Each branch returns the variable bound at the
+selected field. Leaving the scrutinee unknown preserves the case as a
+family application. Matching the promoted constructor later supplies
+the nominal coercion. Adding demand on another field invalidates that
+derivation. [Sum projection and its source controls](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum).

@@ -8,9 +8,9 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. Native execution and GHCi agree on all 216 Showcase lines.
-The normal-way dependent directory passed 235 of 270 exercised cases.
-The 35 remaining failures produced the same output as at M139 (`085a34e5a7`).
+Updated 2026-11-19. Native execution and GHCi agree on all 218 Showcase lines.
+The normal-way dependent directory passed 237 of 272 exercised cases.
+The 35 remaining failures produced the same output as at M142 (`94908818ba`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
@@ -36,13 +36,19 @@ recovers the erased length from its singleton and checks both cells,
 that it returns `'[4, 5]`.
 [Runnable proof](Showcase.hs) and [ordinary library](examples/closed-evaluation/ExistentialVec.hs).
 
-An imported case can select a symbolic field from a known constructor.
 The ordinary function `pick` returns the second field of `LeftFields`
-and the first field of `RightFields`. The dependent client checks both
-uses from the producer interface. Within one module a similar function
+and the first field of `RightFields`. A dependent exporter can write
+`type Pick p = W.pick p` while the input is unknown. A separate
+ordinary client that supplies either constructor can prove which field
+it gets from the stripped interfaces. Within one module a similar function
 can now depend on a locally declared datatype or a synonym that calls
-another function. [Imported case](examples/open-evaluation/OpenConstructorSource.hs)
+another function. [Sum projection](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum)
 and [local declaration ordering](roadmap/R21-dependency-analysis.md#m134-local-type-and-value-dependencies).
+
+In a closed call, `Prelude.max (Prelude.sum '[1, 2])
+(Prelude.fromIntegral (Prelude.length '[1, 2, 3]))` checks at `3`. The
+result of `sum` determines the conversion type in either argument order.
+[Computed operands](roadmap/R15-closed-term-evaluator.md#m143-sharing-the-kinds-of-computed-operands).
 
 The ordinary vector library defines `safeHead :: Vec ('S n) a -> a`.
 In the Showcase, `IndexedVec.safeHead (IndexedVec.two 3) :~: 3` checks

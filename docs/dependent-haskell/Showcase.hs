@@ -68,6 +68,7 @@ import qualified LazyParcel
 import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenConstructorSource
+import qualified OpenConstructorWorker as W
 import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
 import qualified OpenSource
@@ -919,6 +920,14 @@ main = do
         (LegacyKindArgument.maybeField (Just True))
     observe "supply the pair to an exported swap after typechecking its definition"
         (Refl :: OpenBuildSource.Swap '( 'True, 'x') :~: '( 'x', 'True))
+    observe "a computed sibling fixes a nested numeric conversion"
+        (Refl :: Prelude.max (Prelude.sum '[1, 2]) (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) :~: 3)
+    observe "supply either constructor to a projection checked at an unknown input"
+        (Refl :: Pick ('W.LeftFields 'True 'x') :~: 'x', Refl :: Pick ('W.RightFields 'y' 'False) :~: 'y')
+
+-- | Keep the ordinary projection in the type until a client supplies a constructor.
+type Pick :: W.Choice Bool Char -> Char
+type Pick p = W.pick p
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

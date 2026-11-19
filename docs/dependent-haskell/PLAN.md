@@ -8737,3 +8737,37 @@ remaining failures matched M139 individually. Fourteen reject existing
 programs that should compile. In a separate comparison of 124 ordinary
 polykinded source programs, the same 115 compiled on M139 and M142.
 The full GHC testsuite was not run.
+
+## M143: infer a common type for computed operands
+
+- [x] Instantiate the ordinary functions in a saturated application and
+      share their argument and result kinds before selecting dictionaries.
+      Keep the existing boundaries for checked families and empty lists.
+- [x] Exercise both argument orders and an ignored throwing operand.
+      Keep the ambiguity and incompatible-kind errors at their source sites.
+
+[Closed evaluator](roadmap/R15-closed-term-evaluator.md#m143-sharing-the-kinds-of-computed-operands).
+
+## M144: defer a projection over an ordinary sum
+
+- [x] Check an exhaustive Core case on its input. For each constructor,
+      publish a family equation that returns the selected lazy field.
+      Check the function's own type parameter order.
+- [x] Keep the application in an exported type until a client supplies a
+      constructor. Exercise an ordinary client with only interfaces and
+      check strict workers, hidden constructors and specialized rules.
+- [x] In an incremental build from M142, recheck possible producers once.
+      Use the old interface to identify modules that cannot publish a
+      sum projection.
+
+[Ordinary sum projection](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum)
+and [compiler upgrade](examples/open-evaluation/check-sum-upgrade.sh).
+
+Both compiler stages built. The normal dependent tests exercised 272
+cases and passed 237. All 35 failures matched M142 individually. The
+two new diagnostic tests passed. Native execution in both stages and
+GHCi agreed on all 218 Showcase lines. The ordinary-polykinds comparison
+accepted the same 115 of 124 programs on M142 and the candidate.
+The boundary harness also checked the plugin, splice, external candidate
+and the two Boolean observations. The full GHC testsuite was outside
+this verification run.
