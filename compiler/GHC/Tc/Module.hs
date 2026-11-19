@@ -790,7 +790,9 @@ installSourceTables tables = do
               pure fun
         case callees of
           Nothing -> reject (TcRnNoSourceTable name)
-          Just deps | Just bad <- find changed (fun : deps)
+          Just deps | Just bad <- find changed (case origin of
+                        FinalCoreSourceTable -> deps
+                        _ -> fun : deps)
             -> reject (TcRnRetainedQuantificationError (RetainedSourceRule (idName bad)))
           Just deps -> do
             for_ deps $ \callee ->

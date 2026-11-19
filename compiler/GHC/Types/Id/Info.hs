@@ -457,6 +457,7 @@ pprIdDetails other     = brackets (pp other)
      where label = case origin of
              NominalSourceTable -> "SourceTable"
              ExecutableSourceTable -> "ExecutableSourceTable"
+             FinalCoreSourceTable -> "FinalCoreSourceTable"
    pp (WorkerLikeId dmds)     = text "StrictWorker" <> parens (ppr dmds)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"

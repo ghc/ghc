@@ -1,7 +1,7 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, sourcePairBuilderField, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, sourcePairBuilderField, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
-                              sourceTableFamilyAppUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, isMonomorphicEnumCaseType, groundFirstHead,
+                              sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, isMonomorphicEnumCaseType, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
@@ -11,7 +11,7 @@ import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
-import GHC.Builtin.WiredIn.Types (charTy, charTyCon, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, charTy, charTyCon, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import qualified GHC.Core as Core
 import GHC.Core.CharCase (certOwner, certRows, certify)
@@ -37,6 +37,8 @@ import GHC.Data.Graph.Directed (Node(..), SCC(..), stronglyConnCompFromEdgedVert
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
 import GHC.Data.OrdList (fromOL)
+import GHC.Driver.Backend (backendGeneratesCode)
+import GHC.Driver.Session (GeneralFlag(Opt_EnableRewriteRules), backend, HasDynFlags(getDynFlags))
 import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRulesBelow)
 import GHC.Hs
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsTopLHsBinds)
@@ -52,7 +54,7 @@ import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), is
 import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
 import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobalRdrEnv, getTcEvBindsMap, getTcEvBindsState,
-                           checkNoErrs, getTopEnv, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
+                           checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
@@ -85,7 +87,7 @@ import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
-import GHC.Types.Var (Id, CoVar, VarBndr(..), isId, mkTyVar, setIdDetails, varName)
+import GHC.Types.Var (Id, CoVar, idDetails, VarBndr(..), isId, mkTyVar, setIdDetails, varName)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (lengthAtLeast, lengthIs)
 import GHC.Utils.Monad (allM, anyM)
@@ -202,9 +204,22 @@ sourceTableTypeUses :: Type -> TcM ()
 sourceTableTypeUses ty
   | TyConApp tc args <- coreFullView ty = do
       unless (isNothing (sourceTableTermOcc (nameOccName (tyConName tc)))) $
-        sourceTableFamilyAppUse tc args
+        record_or_use tc (Just args)
       mapM_ sourceTableTypeUses args
-  | otherwise = mapM_ sourceTableFamilyUse (sourceFamilyTyCons [ty])
+  | otherwise = mapM_ (\tc -> record_or_use tc Nothing) (sourceFamilyTyCons [ty])
+
+-- | A saturated reference can be stored without consuming an equation.
+sourceTableReferenceUse :: TyCon -> TcM ()
+sourceTableReferenceUse table = record_or_use table Nothing
+
+record_or_use :: TyCon -> Maybe [Type] -> TcM ()
+record_or_use table args = do
+    owner <- sourceTableOwner table
+    case owner of
+      Just fun | finalCoreMapperOwner fun -> do
+        env <- getGblEnv
+        updTcRef (tcg_source_table_uses env) (`extendNameSet` tyConName table)
+      _ -> maybe (sourceTableFamilyUse table) (sourceTableFamilyAppUse table) args
 
 -- | Check a source family when its axiom supplies type equality evidence.
 -- See Note [Source family evidence uses].
@@ -457,12 +472,16 @@ changedSourceUse :: [(Id, Maybe Name)] -> TcM (Maybe (Id, Maybe Name))
 changedSourceUse ops = do
     env <- getGblEnv
     visible <- visibleSourceMethodRules env
+    rewriting <- goptM Opt_EnableRewriteRules
     let check [] = pure Nothing
-        check (op@(v, arg) : rest) = do
-          local <- sourceRuleOwnersAtTc arg (tcg_rules env)
-          if idName v `elemNameSet` local || hasSourceMethodRuleAt visible arg v
-            then pure (Just op)
-            else check rest
+        check (op@(v, arg) : rest)
+          | finalCoreMapperOwner v =
+              if rewriting then pure (Just op) else check rest
+          | otherwise = do
+              local <- sourceRuleOwnersAtTc arg (tcg_rules env)
+              if idName v `elemNameSet` local || hasSourceMethodRuleAt visible arg v
+                then pure (Just op)
+                else check rest
     check ops
 
 -- | Publish only dependencies selected by final evidence, and retain pending ones.
@@ -504,7 +523,10 @@ recordSourceUses :: [(Id, Maybe Name)] -> TcM ()
 recordSourceUses ops = do
     changed <- changedSourceUse ops
     case changed of
-      Just (v, _) -> failWithTc (TcRnRetainedQuantificationError (RetainedSourceRule (idName v)))
+      Just (v, _) -> failWithTc (TcRnRetainedQuantificationError
+        (if finalCoreMapperOwner v
+           then RetainedFinalCoreRulesEnabled (idName v)
+           else RetainedSourceRule (idName v)))
       Nothing -> publishSourceUses ops
 
 -- | Record checked operations without changing the location of late-rule errors.
@@ -535,7 +557,11 @@ checkSourceMethodUsesWithPending :: TcGblEnv -> TcM ()
 checkSourceMethodUsesWithPending env = do
     commitOptionalSourceUses env
     uses <- filterNameSet (isVarOcc . nameOccName) <$> readTcRef (tcg_source_table_uses env)
-    unless (isEmptyNameSet uses) $ do
+    rewriting <- goptM Opt_EnableRewriteRules
+    checked_uses <- if rewriting then pure uses else
+      mkNameSet <$> filterM (fmap (maybe True (not . finalCoreMapperOwner)) . tcLookupIdMaybe)
+        (nameSetElemsStable uses)
+    unless (isEmptyNameSet checked_uses) $ do
       types <- readTcRef (tcg_source_rule_types env)
       let arguments name | Just ts <- lookupNameEnv types name, not (isEmptyNameSet ts)
                          = map Just (nameSetElemsStable ts)
@@ -543,10 +569,10 @@ checkSourceMethodUsesWithPending env = do
           affected rule name = anyM (\arg -> elemNameSet name <$> sourceRuleOwnersAtTc arg [rule]) (arguments name)
           report name = addErr (TcRnRetainedQuantificationError (RetainedSourceRule name))
       local <- forM (tcg_rules env) $ \rule -> do
-        let candidates = uses `intersectNameSet` sourceRuleOwners [rule]
+        let candidates = checked_uses `intersectNameSet` sourceRuleOwners [rule]
         names <- filterM (affected rule) (nameSetElemsStable candidates)
         pure (rule, mkNameSet names)
-      let imported = uses `minusNameSet` unionNameSets (map snd local)
+      let imported = checked_uses `minusNameSet` unionNameSets (map snd local)
       forM_ local $ \(rule, names) ->
         setSrcSpanA (getLoc rule) (mapM_ report (nameSetElemsStable names))
       unless (isEmptyNameSet imported) $ do
@@ -810,15 +836,20 @@ sourceCaseTables :: LHsBinds GhcTc -> TcM ([(Id, TyCon)], [TyCon])
 sourceCaseTables binds = do
   env <- getGblEnv
   char_tables <- xoptM LangExt.ExperimentalDependentTypes
+  dflags <- getDynFlags
   rdr_env <- getGlobalRdrEnv
   let exported = mkNameSet (concatMap availNames (tcg_exports env))
       ruled = sourceRuleOwners (tcg_rules env)
       enum_enabled = not char_tables
       imported = ordinaryImport rdr_env
       eligible_case = eligibleCase env exported enum_enabled imported
+      final_candidate owner = backendGeneratesCode (backend dflags)
+        && case constructorCaseType (varType owner) of
+             Just (ConstructorCaseType _ tc _ _ 1 _) -> tc == listTyCon
+             _ -> False
       eligible owner =
         idName owner `elemNameSet` exported &&
-        not (idName owner `elemNameSet` ruled) &&
+        (final_candidate owner || not (idName owner `elemNameSet` ruled)) &&
         ((char_tables && varType owner `eqType` charArrow) ||
          not (isNothing (pairCaseType (varType owner))) ||
          not (isNothing (pairBuilderType (varType owner))) ||
@@ -830,10 +861,21 @@ sourceCaseTables binds = do
     then pure ([], [])
     else do
       visible <- visibleSourceMethodRules env
+      let changed owner = idName owner `elemNameSet` ruled || hasSourceMethodRule visible owner
       root_cores <- fmap catMaybes $ forM candidates $ \(bind, owner) ->
-        if hasSourceMethodRule visible owner
+        if changed owner
           then pure Nothing
           else fmap (owner,) <$> bindingCore bind owner
+      final_tables <- fmap catMaybes $ forM candidates $ \(bind, owner) ->
+        if changed owner && final_candidate owner
+          then do
+            rhs <- bindingCore bind owner
+            case rhs >>= directListMapper owner of
+              Just (signature, rows) -> do
+                table <- publishConstructorCase owner signature rows
+                pure (Just (setIdDetails owner (SourceTableId (idName owner) table FinalCoreSourceTable), table))
+              Nothing -> pure Nothing
+          else pure Nothing
       let localCall v = isId v && nameModule_maybe (idName v) == Just (tcg_semantic_mod env)
           references = map idName . exprSomeFreeVarsList localCall
           reachable = concatMap (references . snd)
@@ -858,7 +900,7 @@ sourceCaseTables binds = do
           helper_tables = mkNameEnv [(tyConName table, table) | (_, table) <- helpers]
           used = helperClosure helper_tables emptyNameSet (calleeNames roots)
           referenced (_, table) = tyConName table `elemNameSet` used
-      pure (roots ++ filter referenced helpers, catMaybes fields)
+      pure (final_tables ++ roots ++ filter referenced helpers, catMaybes fields)
   where
     charArrow = mkVisFunTyManyU charTy charTy
 
@@ -1258,6 +1300,62 @@ data ConstructorCaseTree
 
 -- | A complete path through the Core cases and its checked result.
 data ConstructorCaseRow = ConstructorCaseRow [ConstructorCaseTree] ConstructorCaseTree
+
+{- Note [Final Core source equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check a ruled mapper's complete lazy list equations at final typechecking
+publication. At this point the module has checked all user declarations.
+The new private family is available to neither user declarations nor the
+helper collector. A no-code producer does not create it.
+
+Before Tidy the driver checks the final optimized definition of the same
+owner with the same structural test. This check covers the actual callback,
+constructors, recursive arguments and demand. A changed or missing owner
+loses both the provisional IdDetails and family. Ordinary compilation
+continues. See keepValidatedSourceMappers in GHC.Driver.Main.Passes.
+
+The final worker check says what the produced binding does. It does not
+prove the rules that another module can use to rewrite a call. The distinct
+interface origin therefore limits use of an equation to a consumer with
+rewrite rules disabled. Forming a type records the interface dependency
+without using the equation. The solver checks the current flag when it
+uses an equation, including through an imported alias.
+-}
+
+-- | The two equations for a lazy constructor-to-constructor list map.
+-- Check the same complete shape before and after optimizing its owner.
+directListMapper :: Id -> Core.CoreExpr -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
+directListMapper owner body = do
+  result@(ConstructorCaseType _ tc _ _ position _, rows) <-
+    checkedConstructorCase (const False) (const Nothing) owner body
+  guard (tc == listTyCon && position == 1)
+  case rows of
+    [ ConstructorCaseRow [CaseField _, CaseConstructor nil _ []] (CaseConstructor retNil _ [])
+      , ConstructorCaseRow [CaseField callback, CaseConstructor cons _ [CaseField h, CaseField t]]
+          (CaseConstructor retCons _ [CaseApply f x, CaseSelf _ [f', xs]]) ]
+      | nil == nilDataCon, retNil == nilDataCon, cons == consDataCon, retCons == consDataCon
+      , callback == f, callback == f', h == x, t == xs -> pure result
+    _ -> Nothing
+
+-- | Identify an owner whose nominal equations require disabled caller rules.
+-- See Note [Final Core source equations].
+finalCoreMapperOwner :: Id -> Bool
+finalCoreMapperOwner v = case idDetails v of
+  SourceTableId _ _ FinalCoreSourceTable -> True
+  _ -> False
+
+-- | Remember exact owners before optimization.
+finalCoreMappers :: [Core.CoreBind] -> [Id]
+finalCoreMappers = filter finalCoreMapperOwner . map fst . Core.flattenBinds
+
+-- | Confirm the same owner and the same checked equations after optimization.
+verifyFinalCoreMapper :: [Core.CoreBind] -> Id -> Bool
+verifyFinalCoreMapper binds original =
+  case [(v, rhs) | (v, rhs) <- Core.flattenBinds binds, idName v == idName original] of
+    [(owner, expression)]
+      | varType owner `eqType` varType original ->
+          not (isNothing (directListMapper owner expression))
+    _ -> False
 
 -- | Read exhaustive cases on exact bound operands and check each result.
 checkedConstructorCase :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr

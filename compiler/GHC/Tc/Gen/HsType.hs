@@ -91,7 +91,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, isSourceConstructorCase, isMonomorphicEnumCaseType, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField)
+                              sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, isMonomorphicEnumCaseType, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -2344,7 +2344,7 @@ tcInferTyAppHead mode (L _ (HsTyVar _ _ (L _ (WithUserRdr _ tv)))) args
            -- Keep legacy eager checking for fully applied source tables.
            let source_arity = length (dropWhile isInvisibleTyConBinder (tyConBinders table))
            when (length [() | HsValArg{} <- args] >= source_arity) $
-             sourceTableFamilyUse table
+             sourceTableReferenceUse table
            tcTyVar mode tv
   | otherwise = tcTyVar mode tv
 tcInferTyAppHead mode ty _

@@ -103,6 +103,7 @@ import qualified GHC.ByteCode.Serialize as ByteCode
 import GHC.Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, rejectNativeDependentExpr )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
+import GHC.Core.TyCon (tyConName)
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.Opt.Pipeline
@@ -145,6 +146,9 @@ import GHC.Types.CostCentre
 import GHC.Types.Error
 import GHC.Types.ForeignStubs
 import GHC.Types.Id
+import GHC.Types.Id.Info (IdDetails(VanillaId))
+import GHC.Types.Var (setIdDetails)
+import GHC.Types.Name.Set (mkNameSet, elemNameSet)
 import GHC.Types.IPE
 import GHC.Types.Name
 import GHC.Types.Name.Ppr
@@ -158,6 +162,7 @@ import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
+import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper)
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -874,7 +879,8 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       -- Just cause we desugared doesn't mean we are generating code, see above.
       Just desugared_guts | backendGeneratesCode bcknd -> do
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
-          simplified_guts <- hscSimplify' plugins desugared_guts
+          optimized <- hscSimplify' plugins desugared_guts
+          let simplified_guts = keepValidatedSourceMappers desugared_guts optimized
 
           (cg_guts, details) <-
               liftIO $ hscTidy hsc_env simplified_guts
@@ -926,6 +932,27 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
         if ms_mod summary == gHC_PRIM
           then return $ HscUpdate (getGhcPrimIface (hsc_hooks hsc_env))
           else return $ HscUpdate iface
+
+-- | Drop provisional certificates whose exact owner no longer checks.
+-- The typechecker creates them after checking all source uses. The family
+-- cannot occur in a user declaration or another certificate in this module.
+-- See Note [Final Core source equations] in GHC.Tc.Gen.SourceTable.
+keepValidatedSourceMappers :: ModGuts -> ModGuts -> ModGuts
+keepValidatedSourceMappers original final
+  | null failed = final
+  | otherwise = final { mg_binds = map clearBind (mg_binds final)
+                      , mg_tcs = filter (not . invalidFamily) (mg_tcs final) }
+  where
+    failed = filter (not . verifyFinalCoreMapper (mg_binds final))
+                    (finalCoreMappers (mg_binds original))
+    owners = mkNameSet (map idName failed)
+    families = mkNameSet [tyConName table | owner <- failed, Just table <- [sourceTableId_maybe owner]]
+    invalidFamily tc = tyConName tc `elemNameSet` families
+    clearOwner v
+      | idName v `elemNameSet` owners = setIdDetails v VanillaId
+      | otherwise = v
+    clearBind (NonRec v rhs) = NonRec (clearOwner v) rhs
+    clearBind (Rec pairs) = Rec [(clearOwner v, rhs) | (v, rhs) <- pairs]
 
 {- Note [Stop TcM plugins after desugaring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

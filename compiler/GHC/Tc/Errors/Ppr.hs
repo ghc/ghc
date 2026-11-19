@@ -3676,6 +3676,10 @@ pprRetainedQuantificationError reason = case reason of
     text "A strict prefix pattern before a retained context is not supported when later value patterns remain."
   RetainedResultWrapper ->
     text "This result requires a wrapper that is not supported for retained functions yet."
+  RetainedFinalCoreRulesEnabled fun ->
+    vcat [ text "GHC can use the checked equation for" <+> quotes (ppr fun)
+            <+> text "only when rewrite rules are disabled."
+         , text "Use -fno-enable-rewrite-rules in the module that needs this equation." ]
   RetainedSourceRule fun ->
     text "A rewrite rule can change the result of" <+> quotes (ppr fun)
       <> text ", which GHC uses to check a dependent type."

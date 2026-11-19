@@ -27,6 +27,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Plugins
 
 
+
 import GHC.Iface.Syntax
 import GHC.Iface.Binary (sourceTableLocations)
 import GHC.Iface.Recomp.Binary
@@ -555,19 +556,28 @@ checkFlagHash hsc_env iface self_recomp = do
         recursive_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v7" :: String)
         carried_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v8" :: String)
         callback_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v9" :: String)
+        enum_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v10" :: String)
         new_fp = caseTreeFingerprint base_fp
+        dflags = hsc_dflags hsc_env
+        final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
+       | old_fp == enum_case_fp, final_possible
+         -> recheck "Compiler now validates optimized source mappers"
+       | old_fp == enum_case_fp
+         -> up_to_date logger (text "Module cannot export a final Core mapper")
        | old_fp == base_fp, any couldHaveSumProjection candidates
          -> recheck "Compiler now checks sum projections"
        | old_fp `elem` [base_fp, sum_fp, projection_fp, result_fp, helper_fp, pair_builder_fp,
                         reachable_helper_fp, private_case_fp, recursive_case_fp, carried_case_fp, callback_case_fp]
        , couldExportEnumCallback iface
          -> recheck "Compiler now checks ordinary enumeration callbacks"
+       | old_fp == callback_case_fp, final_possible
+         -> recheck "Compiler now validates optimized source mappers"
        | old_fp == callback_case_fp
-         -> up_to_date logger (text "Module cannot export an enumeration callback")
+         -> up_to_date logger (text "Module has no new callback equations to check")
        | old_fp == carried_case_fp, not (null candidates) || couldExportCallbackCase iface
          -> recheck "Compiler now checks constructor cases with callbacks"
        | old_fp == carried_case_fp
@@ -613,7 +623,7 @@ checkFlagHash hsc_env iface self_recomp = do
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
-caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v10" :: String)
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v11" :: String)
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
 -- See Note [Recompiling constructor case producers].
@@ -670,6 +680,7 @@ couldExportCallbackCase iface = any candidate (mi_decls iface)
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     local_data = mkNameSet [n | (_, IfaceData{ifName = n}) <- mi_decls iface]
+    candidate (_, IfaceId{ifIdDetails = IfSourceTableId{}}) = False
     candidate (_, IfaceId{ifName = n, ifType = ty}) = n `elemNameSet` exports && outer ty
     candidate _ = False
 

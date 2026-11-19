@@ -1479,4 +1479,7 @@ convImportLevelSpec ImportDeclQuote = QuoteLevel
 convImportLevelSpec ImportDeclSplice = SpliceLevel
 
 -- | Select the source route for a closed call with available object code.
-data SourceTableOrigin = NominalSourceTable | ExecutableSourceTable
+data SourceTableOrigin
+  = NominalSourceTable
+  | ExecutableSourceTable
+  | FinalCoreSourceTable

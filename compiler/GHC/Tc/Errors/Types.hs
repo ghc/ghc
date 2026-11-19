@@ -5375,6 +5375,7 @@ data RetainedQuantificationError
   | RetainedLiteralDepth Integer
   | RetainedSourceMethodEvidence Name Type
   | RetainedSourceRule Name
+  | RetainedFinalCoreRulesEnabled Name
   | RetainedIndexMultiplicity Type
   | RetainedFunctionArgument
   | RetainedCallIndex

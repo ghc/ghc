@@ -54,7 +54,7 @@ import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Iface.Ext.Fields (readFieldWith, writeFieldWith, deleteField)
 import GHC.Iface.Syntax (IfaceDecl(..), IfaceIdDetails(..))
-import GHC.Types.Basic (SourceTableOrigin(ExecutableSourceTable))
+import GHC.Types.Basic (SourceTableOrigin(ExecutableSourceTable, FinalCoreSourceTable))
 import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)
 
 import GHC.Data.FastMutInt
@@ -157,7 +157,7 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
-    unless (check_ver == enumCallbackIfaceVersion) $
+    unless (check_ver == enumCallbackIfaceVersion || check_ver == finalCoreIfaceVersion) $
       errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
     check_tag <- get bh
@@ -274,7 +274,8 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
     put_ bh (binaryInterfaceMagic platform)
 
     -- The version, profile tag, and source hash go next
-    let version | any hasEnumCallback (mi_decls mod_iface) = enumCallbackIfaceVersion
+    let version | any hasFinalCore (mi_decls mod_iface) = finalCoreIfaceVersion
+                | any hasEnumCallback (mi_decls mod_iface) = enumCallbackIfaceVersion
                 | otherwise = show hiVersion
     put_ bh version
     let tag = profileBuildTag profile
@@ -290,6 +291,13 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
 -- these producer interfaces before it reaches the new tag.
 enumCallbackIfaceVersion :: String
 enumCallbackIfaceVersion = show hiVersion ++ "-enum-callbacks-v1"
+
+finalCoreIfaceVersion :: String
+finalCoreIfaceVersion = show hiVersion ++ "-final-core-mapper-v1"
+
+hasFinalCore :: (a, IfaceDecl) -> Bool
+hasFinalCore (_, IfaceId{ifIdDetails = IfSourceTableId _ FinalCoreSourceTable}) = True
+hasFinalCore _ = False
 
 -- | Test whether the declaration requires the executable-source tag.
 hasEnumCallback :: (a, IfaceDecl) -> Bool

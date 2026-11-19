@@ -76,6 +76,7 @@ import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified InstalledNotProof
+import qualified PreludeMapProof
 import qualified OpenBuildWorker as Build
 import qualified SpineWorker as Spine
 import qualified OpenConstructorSource
@@ -987,6 +988,8 @@ main = do
         (OpenMapProof.ordinaryRedStops (Proxy @'[]))
     observe "use Prelude.not on a known head with an unknown tail"
         (InstalledNotProof.negateHead (Proxy @'[]))
+    observe "use Prelude.map and Prelude.not on an empty list and an unknown tail"
+        (PreludeMapProof.preludeNil, PreludeMapProof.preludeNegateHead (Proxy @'[]))
     observe "collect row heads with an ordinary polymorphic callback"
         (OpenMapProof.firstRowHead (Proxy @'True) (Proxy @'Spine.Empty) (Proxy @'[]))
 

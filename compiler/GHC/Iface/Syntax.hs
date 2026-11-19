@@ -1960,6 +1960,7 @@ instance Outputable IfaceIdDetails where
     where label = case origin of
             NominalSourceTable -> "SourceTable"
             ExecutableSourceTable -> "ExecutableSourceTable"
+            FinalCoreSourceTable -> "FinalCoreSourceTable"
   ppr (IfWorkerLikeId dmd) = text "StrWork" <> parens (ppr dmd)
   ppr (IfRecSelId tc _c b _fl) = text "RecSel" <+> ppr tc
                             <+> if b
@@ -2839,6 +2840,7 @@ instance Binary IfaceIdDetails where
     put_ bh IfDFunId              = putByte bh 3
     put_ bh (IfSourceTableId table NominalSourceTable) = putByte bh 4 >> put_ bh table
     put_ bh (IfSourceTableId table ExecutableSourceTable) = putByte bh 7 >> put_ bh table
+    put_ bh (IfSourceTableId table FinalCoreSourceTable) = putByte bh 8 >> put_ bh table
     put_ bh (IfSourceDFunId methods Nothing) = putByte bh 5 >> put_ bh methods
     put_ bh (IfSourceDFunId methods (Just literal)) =
       putByte bh 6 >> put_ bh methods >> put_ bh literal
@@ -2858,6 +2860,7 @@ instance Binary IfaceIdDetails where
             5 -> IfSourceDFunId <$> get bh <*> pure Nothing
             6 -> IfSourceDFunId <$> get bh <*> (Just <$> get bh)
             7 -> flip IfSourceTableId ExecutableSourceTable <$> get bh
+            8 -> flip IfSourceTableId FinalCoreSourceTable <$> get bh
             _ -> panic "Binary IfaceIdDetails: unknown tag"
 
 instance Binary IfaceInfoItem where
