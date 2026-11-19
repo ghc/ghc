@@ -23,10 +23,16 @@ Modifiers are a way to attach types to various places in the syntax tree.
 They're intended as a general hook to allow new features without introducing new
 syntax.
 
-Currently, the only recognised modifier is the ``Multiplicity`` modifier of
-:extension:`LinearTypes`. There are proposals for more modifiers to be
-recognised in future. Unrecognised modifiers are permitted but ignored, and
-warned about with the flag ``-Wunrecognised-modifiers``.
+This fork recognises a modifier of kind ``Matchability`` on a function
+arrow. With :extension:`LinearTypes`, GHC also recognises multiplicity
+modifiers. GHC ignores unrecognised modifiers and warns about them with
+``-Wunrecognised-modifiers``.
+
+Import ``U`` and ``M`` from ``GHC.Exts`` to write an unmatchable or
+matchable arrow. For example, ``(a %U -> b) -> [a] -> [b]`` accepts
+an unmatchable callback, such as a type family. An arrow can have one
+modifier of each kind. With :extension:`LinearTypes`, ``a %1 %U -> b``
+and ``a %U %1 -> b`` describe the same arrow.
 
 With ``-XModifiers`` enabled, modifiers of the form ``%t``, where ``t`` is a
 type, may be placed in various positions. For example:
@@ -111,11 +117,12 @@ and limitations.
   ``Int %m -> Int %(m :: Multiplicity) -> Int`` is accepted, taking the first
   ``m`` as ``Multiplicity`` as well.
 
-* Modifiers inside Template Haskell quotes are generally ignored. (A single
-  modifier is permitted in front of arrows, so that linear arrows can still be
-  parsed.)
-
-* Template Haskell data types don't contain any representation of modifiers.
+* In a quoted type, GHC uses the kind of each arrow modifier to construct
+  the Template Haskell arrow. An explicitly kinded binder such as
+  ``forall (m :: Matchability). Int %m -> Bool`` supplies that information.
+  Give a compound modifier its own kind annotation in a raw quotation.
+  Template Haskell has no general representation for modifiers in other
+  positions.
 
 * Haddock doesn't document non-multiplicity modifiers.
 

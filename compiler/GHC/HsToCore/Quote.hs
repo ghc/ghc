@@ -49,7 +49,7 @@ import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core
-import GHC.Core.Type( pattern ManyTy, mkFunTy, defaultForAllMatchability, tyConAppTyCon )
+import GHC.Core.Type( pattern ManyTy, mkFunTy, defaultForAllMatchability, tyConAppTyCon, isMultiplicityTy )
 import GHC.Core.Make
 import GHC.Core.Utils
 
@@ -69,10 +69,12 @@ import GHC.Utils.Monad
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
+import Data.Either (partitionEithers)
 import qualified GHC.Data.List.NonEmpty as NE
 
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
+import GHC.Types.TyThing (TyThing(ATyCon))
 import GHC.Types.Var
 import GHC.Types.Name.Reader (RdrName(..), ExactRdrName(..), WithUserRdr(..))
 import GHC.Types.ForeignCall
@@ -1333,11 +1335,22 @@ addHsTyVarBinds :: forall flag flag' a. RepTV flag flag'
                 -> MetaM (Core (M a))
 addHsTyVarBinds fresh_or_reuse exp_tvs thing_inside
   = do { fresh_exp_names <- mkGenSyms' fresh_or_reuse (hsLTyVarNames exp_tvs)
-       ; term <- addBinds fresh_exp_names $
+       ; term <- addBindsWithKinds fresh_exp_names (mapMaybe binder_kind exp_tvs) $
                  do { kbs <- repListM (tyVarBndrOcc @flag @flag') repTyVarBndr
                                       exp_tvs
                     ; thing_inside kbs }
        ; wrapGenSyms fresh_exp_names term }
+
+  where
+    binder_kind (L _ (HsTvb _ _ (HsBndrVar _ (L _ nm)) (HsBndrKind _ ki)))
+      = (nm,) <$> quoteKindName ki
+    binder_kind _ = Nothing
+
+-- | Preserve a written kind head without typechecking untyped quotation syntax.
+quoteKindName :: LHsType GhcRn -> Maybe Name
+quoteKindName (L _ (HsParTy _ ty)) = quoteKindName ty
+quoteKindName (L _ (HsTyVar _ _ (L _ (WithUserRdr _ n)))) = Just n
+quoteKindName _ = Nothing
 
 addQTyVarBinds :: FreshOrReuse
                -> LHsQTyVars GhcRn -- the binders to be added
@@ -1522,25 +1535,39 @@ repTy tyki (HsAppKindTy _ ty ki) = do
                                 ty1 <- repLTyAt tyki ty
                                 ki1 <- repLTy KindLevel ki
                                 repTappKind ty1 ki1
-repTy tyki (HsFunTy _ w f a) = do
-                            f1   <- repLTy (independentForallContext tyki) f
-                            a1   <- repLTyAt tyki a
-                            mMult <- getSingleMult w (HsTyVar noAnn NotPromoted)
-                            case mMult of
-                              Nothing -> do
-                                tcon <- repArrowTyCon
-                                repTapps tcon [f1, a1]
-                              Just m -> do
-                                w1 <- repLTy (independentForallContext tyki) m
-                                tcon <- repMulArrowTyCon
-                                repTapps tcon [w1, f1, a1]
+repTy tyki (HsFunTy _ w@(HsModifiedFunArr _ mods arr) f a) = do
+  f1 <- repLTy (independentForallContext tyki) f
+  a1 <- repLTyAt tyki a
+  modifiers <- lift $ xoptM LangExt.Modifiers
+  (mMult, mMa) <- if modifiers
+    then do
+      (multiplicities, matchabilities) <- partitionEithers <$> mapM quoteArrowModifier mods
+      case (arr, multiplicities, matchabilities) of
+        (HsStandardArr _, [], []) -> pure (Nothing, Nothing)
+        (HsStandardArr _, [m], []) -> pure (Just m, Nothing)
+        (HsStandardArr _, [], [ma]) -> pure (Nothing, Just ma)
+        (HsStandardArr _, [m], [ma]) -> pure (Just m, Just ma)
+        (HsLinearArr _, [], []) -> pure (Just linearMult, Nothing)
+        (HsLinearArr _, [], [ma]) -> pure (Just linearMult, Just ma)
+        _ -> notHandled $ ThUnexpectedModifier mods
+    else (, Nothing) <$> legacyMult w
+  (head_ty, args) <- case mMult of
+    Nothing -> (, [f1,a1]) <$> repArrowTyCon
+    Just m -> do
+      tcon <- repMulArrowTyCon
+      m' <- repLTy (independentForallContext tyki) m
+      pure (tcon, [m', f1, a1])
+  tcon <- case mMa of
+    Nothing -> pure head_ty
+    Just ma -> repLTy KindLevel ma >>= repTappKind head_ty
+  repTapps tcon args
   where
-    getSingleMult (HsModifiedFunArr _ mods arr) mk_var = case (arr, mods) of
+    linearMult = noLocA (HsTyVar noAnn NotPromoted (noLocA (noUserRdr oneDataConName)))
+    legacyMult (HsModifiedFunArr _ mods arr) = case (arr, mods) of
       (HsStandardArr _, []) -> pure Nothing
-      (HsStandardArr _, [L _ (HsModifier _ m)]) -> pure $ Just m
-      (HsStandardArr _, mods) -> notHandled $ ThUnexpectedModifier mods
-      (HsLinearArr _, []) -> pure $ Just $ noLocA $ mk_var $ noLocA $ noUserRdr oneDataConName
-      (HsLinearArr _, mods) -> notHandled $ ThUnexpectedModifier mods
+      (HsStandardArr _, [L _ (HsModifier _ m)]) -> pure (Just m)
+      (HsLinearArr _, []) -> pure (Just linearMult)
+      _ -> notHandled $ ThUnexpectedModifier mods
 repTy tyki (HsListTy _ t)        = do
                                 t1   <- repLTy (independentForallContext tyki) t
                                 tcon <- repListTyCon
@@ -1644,7 +1671,7 @@ repE (HsVar _ (L _ (WithUserRdr _ x))) =
      ; case mb_val of
         Nothing            -> do { str <- lift $ globalVar x
                                  ; repVarOrCon x str }
-        Just (DsBound y)   -> repVarOrCon x (coreVar y)
+        Just (DsBound y _) -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
                                  ; return (MkC e') } }
 repE (HsHole (HoleVar (L _ uv))) = do
@@ -1835,6 +1862,42 @@ repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
 repE e@(HsAppRetained{}) = notHandled (ThExpressionForm e)
 repE e@(HsStar{}) = notHandled (ThExpressionForm e)
+
+-- | Classify only kind information available without typechecking a raw quote.
+-- An explicit kind signature or scoped binder kind is enough. For a resolved
+-- global atom, use its declaration's kind. Keep unknown kinds unsupported.
+quoteArrowModifier :: LHsModifier GhcRn
+                   -> MetaM (Either (LHsType GhcRn) (LHsType GhcRn))
+quoteArrowModifier modifier@(L loc (HsModifier printed ty)) = do
+  linear <- lift $ xoptM LangExt.LinearTypes
+  kind <- case printed of
+    ModifierPrintsAs1 | linear -> pure (Just multiplicityTyConName)
+    _ -> go ty
+  case kind of
+    Just n | n == multiplicityTyConName, linear -> pure (Left ty)
+           | n == matchabilityTyConName -> pure (Right ty)
+    _ -> notHandledL (locA loc) (ThUnclassifiedArrowModifier modifier)
+  where
+    go (L _ (HsParTy _ t)) = go t
+    go (L _ (HsKindSig _ _ ki)) = pure (quoteKindName ki)
+    go (L _ (HsTyVar _ _ (L _ (WithUserRdr _ n)))) = lift $ do
+      mb <- dsLookupMetaEnv n
+      this_mod <- getModule
+      case mb of
+        Just (DsBound _ ki) -> pure ki
+        Nothing
+          | Just owner <- nameModule_maybe n, owner /= this_mod
+          , isTcClsNameSpace (occNameSpace (nameOccName n)) -> do
+              thing <- dsLookupGlobal n
+              case thing of
+                ATyCon tc
+                  | isMultiplicityTy (tyConKind tc) -> pure (Just multiplicityTyConName)
+                  | eqType (tyConKind tc) matchabilityTy -> pure (Just matchabilityTyConName)
+                _ -> pure Nothing
+          | n == oneDataConName || n == manyDataConName -> pure (Just multiplicityTyConName)
+          | n == matchableDataConName || n == unmatchableDataConName -> pure (Just matchabilityTyConName)
+        _ -> pure Nothing
+    go _ = pure Nothing
 
 repFunArrMult :: HsModifiedFunArrOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
 repFunArrMult (HsModifiedFunArr _ mods arr) = case (arr, mods) of
@@ -2360,7 +2423,13 @@ addBinds :: [GenSymBind] -> MetaM a -> MetaM a
 -- Add a list of fresh names for locally bound entities to the
 -- meta environment (which is part of the state carried around
 -- by the desugarer monad)
-addBinds bs m = mapReaderT (dsExtendMetaEnv (mkNameEnv [(n,DsBound id) | (n,id) <- bs])) m
+addBinds bs = addBindsWithKinds bs []
+
+addBindsWithKinds :: [GenSymBind] -> [(Name, Name)] -> MetaM a -> MetaM a
+addBindsWithKinds bs kinds =
+  mapReaderT (dsExtendMetaEnv (mkNameEnv [(n, DsBound v (lookupNameEnv env n)) | (n,v) <- bs]))
+  where
+    env = mkNameEnv kinds
 
 -- Look up a locally bound name
 --
@@ -2395,7 +2464,7 @@ lookupOccDsM n
   = do {  mb_val <- dsLookupMetaEnv n ;
           case mb_val of
                 Nothing           -> globalVar n
-                Just (DsBound x)  -> return (coreVar x)
+                Just (DsBound x _) -> return (coreVar x)
                 Just (DsSplice _) -> pprPanic "repE:lookupOcc" (ppr n) }
 
 -- Not bound by the meta-env

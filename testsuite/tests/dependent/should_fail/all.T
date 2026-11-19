@@ -254,3 +254,5 @@ test('NativeClosedCallbackKinds',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedCallbackLib.hs'])],
      multimod_compile_fail, ['NativeClosedCallbackKinds', '-v0 ' + config.ghc_th_way_flags])
+
+test('NativePercentArrowQuoteUnknown', [req_th, only_ways(['normal'])], compile_fail, [''])

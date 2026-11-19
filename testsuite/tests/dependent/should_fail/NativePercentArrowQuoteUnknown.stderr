@@ -1,0 +1,6 @@
+NativePercentArrowQuoteUnknown.hs:5:25: error: [GHC-65904]
+    A modifier of unknown kind not (yet) handled by Template Haskell
+      Add a Multiplicity or Matchability kind annotation to %p
+  |
+5 | bad = [t| forall p. Int %p -> Int |]
+  |                         ^^

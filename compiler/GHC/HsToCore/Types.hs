@@ -17,7 +17,7 @@ import Data.IORef
 
 import GHC.Types.CostCentre.State
 import GHC.Types.Error
-import GHC.Types.Name( KnownKeyNameMaps )
+import GHC.Types.Name( Name, KnownKeyNameMaps )
 import GHC.Types.Name.Env
 import GHC.Types.TypeEnv( TypeEnv )
 import GHC.Types.SrcLoc
@@ -137,9 +137,10 @@ data DsLclEnv
 type DsMetaEnv = NameEnv DsMetaVal
 
 data DsMetaVal
-  = DsBound Id         -- Bound by a pattern inside the [| |].
-                       -- Will be dynamically alpha renamed.
-                       -- The Id has type THSyntax.Var
+  = DsBound Id (Maybe Name)
+    -- Bound inside a quotation and renamed when the quotation runs.
+    -- The Id has type THSyntax.Var. A type binder can have a written
+    -- kind name, which classifies an arrow modifier in a raw quotation.
 
   | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
                             -- the PendingSplices on a Hs*Bracket

@@ -166,3 +166,7 @@ AddClassMethod:
 .PHONY: TypeLambdaPrint
 TypeLambdaPrint:
 	$(CHECK_EXACT) $(LIBDIR) TypeLambdaPrint.hs
+
+.PHONY: PercentPrint
+PercentPrint:
+	$(CHECK_EXACT) $(LIBDIR) PercentPrint.hs

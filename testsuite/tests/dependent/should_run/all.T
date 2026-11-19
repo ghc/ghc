@@ -221,3 +221,7 @@ test('NativePercentArrow',
                    'NativePercentArrowDuplicate.hs', 'NativePercentArrowWrong.hs',
                    'NativePercentArrowNoModifiers.hs'])],
      run_command, ['bash NativePercentArrow.sh "{compiler}" "{libdir}"'])
+test('NativePercentArrowQuote',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['NativePercentArrowProvider.hs'])],
+     multimod_compile, ['NativePercentArrowQuote', '-v0 -dcore-lint ' + config.ghc_th_way_flags])

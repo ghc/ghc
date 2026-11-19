@@ -202,6 +202,9 @@ instance Diagnostic DsMessage where
                -> mkMsg "Non-linear fields in data constructors" empty
              ThDataConVisibleForall
                -> mkMsg "Visible forall in data constructors" empty
+             ThUnclassifiedArrowModifier (L _ modifier)
+               -> mkMsg "A modifier of unknown kind" $
+                    text "Add a Multiplicity or Matchability kind annotation to" <+> pprHsModifier modifier
              ThUnexpectedModifier mods
                -> mkMsg "Modifier" $ text "At most one modifier is supported" $$ pprLHsModifiers mods
              ThUnexpectedModifierExpr mods
