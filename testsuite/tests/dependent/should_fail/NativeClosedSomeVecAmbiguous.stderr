@@ -1,0 +1,6 @@
+NativeClosedSomeVecAmbiguous.hs:7:28: error: [GHC-70565]
+    • Cannot evaluate ‘P.readHidden’ in a type.
+        The constructor literal does not determine a closed operand kind.
+    • In the first argument of ‘Proxy’, namely
+        ‘(P.readHidden ('P.Pack 3))’
+      In the type signature: bad :: Proxy (P.readHidden ('P.Pack 3))

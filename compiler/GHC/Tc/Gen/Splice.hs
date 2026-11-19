@@ -1345,10 +1345,9 @@ tcDecodeClosedCallOperand owner operand = do
               case closedImportedGRE rdr_env con of
                 Just gre -> return (unitNameEnv (dataConName con) gre)
                 Nothing -> Left (InaccessibleClosedOperand tc)
-          (ClosedConstructorPlan source_args _, fields) <- closedConstructorPlan kind kinds con
-          let (type_args, values) = splitAt (length source_args) args
-          ensure (equalLength type_args source_args &&
-                  and (zipWith tcEqType type_args source_args))
+          let (type_args, values) = splitAt (length (dataConUserTyVars con)) args
+          (ClosedConstructorPlan source_args _, fields) <-
+            closedConstructorPlan (Just type_args) kind kinds con
           ensure (equalLength fields values &&
                   and (zipWith (\field value -> field `tcEqType` typeKind value) fields values))
           found <- traverse (decode platform rdr_env) values
@@ -1518,7 +1517,7 @@ closedCallValueShape rdr_env kind = do
               when (null possible) $ Trans.lift (Left UnsupportedClosedShape)
               let visible = all (isJust . closedImportedGRE rdr_env) possible
                   inaccessible = InaccessibleClosedData tc (not (equalLength possible constructors))
-              plans <- Trans.lift $ case traverse (closedConstructorPlan here args) possible of
+              plans <- Trans.lift $ case traverse (closedConstructorPlan Nothing here args) possible of
                 Left UnrecoverableClosedIndex | not visible -> Left inaccessible
                 checked -> checked
               unless visible $ Trans.lift (Left inaccessible)
@@ -1639,10 +1638,11 @@ nominalClosedIndexTyCon tc =
   (isPromotedDataCon tc || isVanillaAlgTyCon tc) && isInjectiveTyCon tc Nominal
 
 -- | Instantiate the source fields, erased arguments and worker evidence.
+-- A checked promoted operand can supply its source arguments directly.
 -- See Note [Recovering constructor-local indices in closed calls].
-closedConstructorPlan :: Kind -> [Type] -> DataCon
+closedConstructorPlan :: Maybe [Type] -> Kind -> [Type] -> DataCon
                       -> Either ClosedShapeError (ClosedConstructorPlan, [Type])
-closedConstructorPlan here args con
+closedConstructorPlan checked_args here args con
   | (universals, existentials, specs, [], _, _) <- dataConFullSig con
   , null (dataConRepArgBinders con)
   , equalLength universals args
@@ -1662,22 +1662,36 @@ closedConstructorPlan here args con
                       | spec <- specs, let (tv, rhs) = eqSpecPair spec]
           recovery_error | null existentials = UnsupportedClosedShape
                          | otherwise = UnrecoverableClosedIndex
-      indices <- maybe (Left recovery_error) Right
-                   (closedConstructorIndices existentials equations)
+      (local_args, indices) <- case checked_args of
+        Just provided
+          | equalLength provided user_vars, all closedGroundType provided -> do
+            locals <- maybe (Left UnsupportedClosedShape) Right $
+              traverse (`lookup` zip user_vars provided) existentials
+            return (locals, [])
+          | otherwise -> Left UnsupportedClosedShape
+        Nothing -> do
+          inferred <- maybe (Left recovery_error) Right
+                        (closedConstructorIndices existentials equations)
+          return ([ty | ClosedIndex ty _ _ <- inferred], inferred)
       let variables = universals ++ existentials
-          arguments = args ++ [ty | ClosedIndex ty _ _ <- indices]
+          arguments = args ++ local_args
           instantiate = substTyWith variables arguments
           fields = map (instantiate . scaledThing) (dataConOrigArgTys con)
           rep = map (instantiate . scaledThing) (dataConRepArgTys con)
           (evidence, rep_fields) = splitAt (length specs) rep
           expected_evidence = map instantiate (eqSpecPreds specs)
       unless (instantiate (dataConOrigResTy con) `tcEqType` here &&
+              all (\(lhs, rhs) -> instantiate lhs `tcEqType` instantiate rhs) equations &&
               all closedGroundField fields && dataConRepArity con == length rep &&
               equalLength evidence expected_evidence && and (zipWith tcEqType evidence expected_evidence) &&
               equalLength fields rep_fields && and (zipWith tcEqType fields rep_fields)) $
         Left UnsupportedClosedShape
       source_args <- maybe (Left UnsupportedClosedShape) Right
                        (traverse (`lookup` zip variables arguments) user_vars)
+      unless (and (zipWith (\tv arg -> instantiate (tyVarKind tv) `tcEqType` typeKind arg)
+                          user_vars source_args) &&
+              maybe True (and . zipWith tcEqType source_args) checked_args) $
+        Left UnsupportedClosedShape
       return (ClosedConstructorPlan source_args indices, fields)
   | otherwise = Left UnsupportedClosedShape
 
@@ -1993,6 +2007,11 @@ codec type. Lift through the field at Nominal before downgrading that
 whole field coercion to Representational. The wire has only the tag and
 source fields. Promoted applications and runtime wrappers use the
 statically solved source arguments.
+
+A checked promoted operand already carries the source constructor's
+erased arguments. Use those arguments directly. Check the resulting
+index equations and field kinds before applying the ordinary wrapper.
+This operand path does not learn indices from an interpreter response.
 
 The codec admits a recursive indexed type with the same ordinary
 arguments when one index strictly decreases to its structural subterm.

@@ -22,3 +22,6 @@ data Wrapped (i :: N) where
 
 blocked :: Natural -> Wrapped 'Z
 blocked _ = errorWithoutStackTrace "evaluated a producer with a noninjective result index"
+
+readHidden :: Hidden -> Natural
+readHidden _ = errorWithoutStackTrace "evaluated an ambiguous erased index"
