@@ -27,6 +27,10 @@ when GHC encounters an unsolved constraint during inference. The plugin
 below uses that hook so the caller can request a witness with an ordinary
 class method. Either route can use a partial search procedure. The type
 of the returned witness determines which fact the caller can use.
+For a question about program equivalence, specify the observations that
+the witness covers. The Boolean example checks agreement on two inputs.
+One more Haskell context distinguishes the same functions.
+[Boolean observation](#what-does-an-observation-establish),
 [Template Haskell splices](../users_guide/exts/template_haskell.rst)
 and [typechecker plugins](../users_guide/extending_ghc.rst#typechecker-plugins).
 
@@ -140,10 +144,62 @@ and [TH file dependencies](../../libraries/ghc-internal/src/GHC/Internal/TH/Mona
 
 ## What does an observation establish?
 
-Record the input, the observation, and the claim before choosing a checker.
-For example, a program can ask whether a parser returns `Right`, what
-integer it contains, or whether its result is in normal form. These
-observations can demand different amounts of a lazy result.
+Running Haskell at compile time can establish equivalence for a specified
+finite set of observations. In the runnable example, the ordinary
+function `BoolObservation.sameResult` applies two functions to one input
+and demands their Boolean results using `(==)`.
+
+```haskell
+lazyTrue _   = True
+strictTrue x = x `seq` True
+sameResult x = lazyTrue x == strictTrue x
+```
+
+The dependent client checks both defined inputs. Each equality below says
+that one call to the named observer returned `True`.
+
+```haskell
+agreement :: (B.sameResult 'False :~: 'True, B.sameResult 'True :~: 'True)
+agreement = (Refl, Refl)
+```
+
+GHC checks two actual `Refl` constructors, covering all of `{False, True}`.
+A signature alone admits `undefined` even at a false lifted equality
+type, and demanding that value raises an exception. The first `Refl`
+here permits a client to replace `B.sameResult 'False` with `'True` in an
+index.
+
+Now supply `errorWithoutStackTrace "missing Bool"` as the argument and
+demand the result. `lazyTrue` returns `True`. Evaluating `strictTrue`
+raises the exception. The harness checks both outcomes on that same
+input. [Ordinary observer](examples/boundary-evidence/BoolObservation.hs),
+[checked equalities and distinguishing context](examples/boundary-evidence/ObserveBoth.hs)
+and [Haskell 2010 on strict evaluation, §6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html).
+
+**Contextual equivalence** quantifies over every permitted program context.
+For example, in a lazy calculus whose observation is convergence, substituting
+either expression into any closing context must give the same answer to
+“does evaluation reach a value?” One distinguishing context refutes that
+claim. To justify general substitution from a finite comparison, a separate
+argument must show that those observations suffice for the language and
+property in question.
+
+For a closed computation `e :: ()` in the pure fragment, the expression `seq e True` is equivalent to `True` under
+this observation exactly when `e` reaches `()`. A procedure that decided
+all such equivalences would decide termination.
+[Schmidt-Schauß, Sabel and Machkasova, Definition 2.2](https://lmcs.episciences.org/930/pdf#page=6).
+
+The two membership examples make the same distinction. Template Haskell
+emits constructor syntax that GHC checks at the splice. The trusted solver
+plugin supplies a method dictionary containing a path. Both yield
+`Member 8 (OrdinaryOffer.offered 7)`. The exact proposition determines
+where a client can use the evidence. This experiment uses GHC’s existing
+equality rules. Observational type theory addresses equality and transport
+inside a type theory. [Observational type theory and partial Haskell](REFERENCES.md#observational-equality-and-partial-haskell).
+
+Agreement on a parser’s result tag can justify substitution in a type
+indexed by that tag. Other callers can also inspect the payload or force
+the input.
 
 | Check | What the client can use |
 | --- | --- |
@@ -152,33 +208,6 @@ observations can demand different amounts of a lazy result.
 | Run QuickCheck with selected seeds and generators. | A counterexample or a report of the cases that passed. A report can guide proof search. A universal claim needs separate evidence. |
 | Reflect a definition into a logic and discharge a verification condition. | The theorem justified by that logic, its translation, and its assumptions about the Haskell program. |
 | Check input obtained later from IO. | A runtime branch can carry a witness for the value it actually checked. |
-
-Consider two functions with the same ordinary type.
-
-```haskell
-lazyTrue, strictTrue :: Bool -> Bool
-lazyTrue _   = True
-strictTrue x = x `seq` True
-```
-
-They agree when the observation asks for their result on `False` and
-`True`. A context that asks for the result on `undefined` distinguishes
-them. Calling this *agreement on the two defined Booleans* tells a
-client exactly when it can use the result. Full contextual equivalence
-would have to account for every observation available in the language.
-Observational type theory concerns the design of equality and transport
-in a type theory. The boundary experiment uses Core's existing equality
-rules. The runnable example asks GHC for two separate `Refl` witnesses.
-It then demands the results on an exceptional input at runtime.
-[Ordinary functions](examples/boundary-evidence/BoolObservation.hs)
-and [the two-input observation](examples/boundary-evidence/ObserveBoth.hs). [Observational equality and partial Haskell](REFERENCES.md#observational-equality-and-partial-haskell).
-
-The distinction determines where a client can use an equality. A proof
-that two parsers return the same tag on a particular input lets a client
-replace one tag with the other in a type indexed by that tag. Replacing
-the parser itself would also affect callers that inspect its payload or
-force its input. Arbitrary Haskell can search for evidence at either
-scope. The obligation states which substitutions the evidence justifies.
 
 ## Where totality matters
 

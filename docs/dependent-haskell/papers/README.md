@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
 Read on 2026-11-14 through 2026-11-19. The [manifest](manifest.json) records
-twenty-six works and thirty-two downloaded PDF versions. It contains source URLs,
+twenty-seven works and thirty-three downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -15,7 +15,8 @@ The JFP 2022 ANF paper and selected-page records are in
 The OutsideIn(X) author draft and selected-page records are in
 `native-let-conversion/`. The POPL 2004 `seq` paper and selected-page
 records are in `serokell-evaluators/`. This directory also holds the
-QuickSpec paper, its text extraction, and its verification record.
+QuickSpec paper and its verification record, and the LMCS 2015 call-by-need
+paper and its selected-page extraction.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -54,6 +55,7 @@ versions and several selective readings.
 | [ANF preserves dependent types up to extensional equality](https://doi.org/10.1017/S0956796822000090) | Koronkevich, Rakow, Ahmed and Bowman, JFP 2022 | R05 | Dependency-preserving naming, continuation typing and the limits of a naive coercion translation. |
 | [Free Theorems in the Presence of seq](https://janis-voigtlaender.eu/JV04.html) | Johann and Voigtländer, POPL 2004 | R16 | A polymorphic type does not determine whether a function demands an argument. |
 | [QuickSpec: Guessing Formal Specifications using Testing](https://smallbone.se/papers/quickspec.pdf) | Claessen, Smallbone and Hughes, TAP 2010 | R15, R16 | Candidate equations for an optional boundary checker. |
+| [Simulation in the Call-by-Need Lambda-Calculus with Letrec, Case, Constructors, and Seq](https://lmcs.episciences.org/930) | Schmidt-Schauß, Sabel and Machkasova, LMCS 2015 | R05, R16 | Contextual equivalence, convergence and the observations available through `seq`. |
 
 ## Singletons, Haskell 2012
 
@@ -734,3 +736,23 @@ a law on this basis. GHC still needs evidence for the exact dependent
 obligation. [Heap example, pages 8–9](https://smallbone.se/papers/quickspec.pdf#page=8),
 [fixed-point example, page 12](https://smallbone.se/papers/quickspec.pdf#page=12)
 and [boundary evidence](../BOUNDARY-EVIDENCE.md).
+
+## Contextual equivalence in a call-by-need calculus, LMCS 2015
+
+Definition 2.2 compares expressions by convergence in every context of the
+calculus. In the authors’ deterministic LR calculus, reaching a lambda
+counts as convergence without evaluating its body. Page 4 uses `seq E True` as a
+distinguishing context. It returns `True` when `E` is a lambda
+whose body diverges, but diverges when `E` itself diverges.
+[Publisher PDF, page 4](https://lmcs.episciences.org/930/pdf#page=4)
+and [Definition 2.2, page 6](https://lmcs.episciences.org/930/pdf#page=6).
+
+Proposition 7.2 and Theorems 7.5–7.6 relate the authors’ applicative
+tests and simulations to contextual approximation in LR. The [boundary
+example](../BOUNDARY-EVIDENCE.md#what-does-an-observation-establish)
+checks agreement on two specified Boolean inputs. Applying the paper’s
+theorem to this fork would require a correspondence with its semantics.
+The reading covers the abstract, selected introduction passages,
+Definition 2.2 and the theorem statements on pages 45–46.
+[Theorem 7.6, page 46](https://lmcs.episciences.org/930/pdf#page=46)
+and [journal record](https://lmcs.episciences.org/930).

@@ -3992,6 +3992,14 @@ programs. Pointwise equality also does not make arbitrary lifted Haskell
 functions interchangeable: `seq` distinguishes bottom from a lambda with a
 bottom body. See [Haskell 2010, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html).
 
+Schmidt-Schauß, Sabel and Machkasova define contextual equivalence by
+convergence in every context of a specified calculus. Their language
+includes lazy evaluation and `seq`. This makes precise what a client
+would need to replace one function everywhere. The boundary example
+instead gives an equality for each named Boolean observation.
+[Paper and reading record](papers/README.md#contextual-equivalence-in-a-call-by-need-calculus-lmcs-2015),
+[Definition 2.2, page 6](https://lmcs.episciences.org/930/pdf#page=6) and [the fork's two checked observations](BOUNDARY-EVIDENCE.md#what-does-an-observation-establish).
+
 The [paper ledger](papers/README.md) now records four selectively read PDFs:
 Altenkirch, McBride and Swierstra (2007); Pujet and Tabareau (2022);
 Sirman, Lennon-Bertrand and Krishnaswami (TYPES 2024, published 2025); and
