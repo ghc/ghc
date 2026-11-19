@@ -1909,8 +1909,11 @@ kind signature can make a synonym's binder rigid. The term producer still
 needs a checked body. Its ordinary forall
 is erased and does not bind a retained term in the caller's type.
 
-Move only independent signed value SCCs. Use resolved signature Names
-and the existing RHS dependency information. A same-group instance or
+Follow the producer's resolved RHS dependencies in renamed SCC order.
+The producer and any unsigned helper use ordinary inference. Check
+selected signatures for dependencies on declarations that have not
+been checked. Keep INLINE pragmas with their bindings. Split a shared
+signature between the groups at its original location. A same-group instance or
 default can affect solver choices without a reference in the producer.
 Leave those groups outside this first split. The ordinary late source
 RULE check validates the owners the observer actually uses. An unrelated
@@ -1920,8 +1923,10 @@ and evidence solved before the splice. Build the Core map on demand.
 
 Solve and zonk the early binds before desugaring. Drop duplicate
 desugaring messages and keep ordinary runtime compilation unchanged.
-Pass only the checked Core to the existing observer. The type checker
-cannot execute an object for the current module.
+Follow the checked bindings' resolved term references to find helpers
+from earlier groups. Inspect only the resulting closure for pending
+typed splices. Pass only its checked Core to the observer. The type
+checker cannot execute an object for the current module.
 -}
 
 -- | Check the independently schedulable local definitions first.
@@ -1932,14 +1937,11 @@ tcLocalOpenGroup demands group@HsGroup
   , hs_derivds = [], hs_defds = [] }
   | all (null . group_instds) tycls
   , all no_deriving (tyClGroupTyClDecls tycls)
-  , let (early_binds, rest_binds) = partition (any requestedBind . snd) binds
-        (early_sigs, rest_sigs) = partition (mentionsRequested . unLoc) sigs
-  , Just signed <- traverse completeSignature early_sigs
-  , mkNameSet signed == requested
-  , Just bodies <- traverse independentBind early_binds
-  , mkNameSet bodies == requested
   = do
-      let early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs) }
+      selected <- foldM closeDemand emptyNameSet demands
+      let (early_binds, rest_binds) = partition (any (selectedBind selected) . snd) binds
+          (early_sigs, rest_sigs) = splitSignatures selected sigs
+          early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs) }
           rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs) }
       (envs@(early_env, _), wanted) <- captureTopConstraints (tcTopSrcDeclGroup early)
       restoreEnvs envs $ do
@@ -1948,50 +1950,112 @@ tcLocalOpenGroup demands group@HsGroup
                          (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
         addTopEvBinds evs $ withLocalOpenDefinitions definitions (tcTopSrcTables rest)
   where
-    requested = mkNameSet (map fst demands)
     group_names = mkNameSet (hsGroupBinders group)
-    requestedBind (L _ FunBind{fun_id = L _ b}) = b `elemNameSet` requested
-    requestedBind _ = False
-    independentBind (NonRecursive, [bind@(L _ FunBind{fun_id = L _ b, fun_ext = fvs})])
-      | isEmptyNameSet (fvs `intersectNameSet` group_names), not (hasSplice bind) = Just b
-    independentBind _ = Nothing
-    completeSignature (L _ (TypeSig _ [] [L _ n] sig))
-      | isCompleteHsSig sig, not (usesNames group_names sig), not (hasSplice sig) = Just n
-    completeSignature _ = Nothing
-    mentionsRequested (TypeSig _ _ ns _) = any ((`elemNameSet` requested) . unLoc) ns
-    mentionsRequested (InlineSig _ (L _ n) _) = n `elemNameSet` requested
-    mentionsRequested (SCCFunSig _ (L _ n) _) = n `elemNameSet` requested
-    mentionsRequested (SpecSig _ (L _ n) _ _) = n `elemNameSet` requested
-    mentionsRequested (SpecSigE n _ _ _) = n `elemNameSet` requested
-    mentionsRequested _ = False
+    value_names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds group))
+    types = mkNameEnv [(tcdName (unLoc decl), decl) | decl <- tyClGroupTyClDecls tycls]
+    graph = mkNameEnv
+      [ (owner, scc)
+      | scc@(_, scc_binds) <- binds
+      , bind <- scc_binds
+      , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
+    signatures = foldr addSignature emptyNameEnv sigs
+    addSignature (L _ sig) env =
+      foldr (\owner acc -> extendNameEnv_C (++) acc owner [sig]) env (signatureOwners sig)
+
+    closeDemand selected demand@(name, _) =
+      case closeLocalNames (dependencies name) selected [name] of
+        Right result -> pure result
+        Left reason -> rejectLocalOpen [demand] reason
+
+    dependencies root name = case lookupNameEnv graph name of
+      Just (Recursive, _) ->
+        Left ("The local term dependency forms a cycle through " ++ getOccString name ++ ".")
+      Just (NonRecursive, [bind@(L _ FunBind{fun_ext = fvs})])
+        | hasSplice bind -> Left ("A pending splice prevents observing " ++ getOccString name ++ ".")
+        | otherwise -> do
+            mapM_ (checkSignature root name) (fromMaybe [] (lookupNameEnv signatures name))
+            case nameSetElemsStable ((fvs `intersectNameSet` group_names) `minusNameSet` value_names) of
+              dep : _ -> Left (typeDependency root name dep)
+              [] -> Right (fvs `intersectNameSet` value_names)
+      _ -> Left ("The local dependency " ++ getOccString name
+                 ++ " is not an independent function binding.")
+
+    checkSignature root name sig = case sig of
+      TypeSig _ [] _ tau
+        | not (isCompleteHsSig tau) ->
+            Left ("The signature of " ++ getOccString name ++ " contains a wildcard.")
+        | hasSplice tau ->
+            Left ("The signature of " ++ getOccString name ++ " contains a splice.")
+        | Just dep <- firstLocalUse group_names tau -> Left (typeDependency root name dep)
+        | otherwise -> Right ()
+      InlineSig{} -> Right ()
+      _ -> Left ("The local dependency " ++ getOccString name
+                 ++ " has a signature or pragma that cannot be checked early.")
+
+    typeDependency root name dep
+      | Just decl <- lookupNameEnv types dep, usesNames (unitNameSet root) decl =
+          "This call forms a type dependency cycle through " ++ getOccString name
+          ++ " and " ++ getOccString dep ++ "."
+      | otherwise =
+          "The local dependency " ++ getOccString name
+          ++ " refers to the same-group declaration " ++ getOccString dep ++ "."
+
+    selectedBind names (L _ FunBind{fun_id = L _ b}) = b `elemNameSet` names
+    selectedBind _ _ = False
     no_deriving (L _ DataDecl{tcdDataDefn = HsDataDefn{dd_derivs = ds}}) =
       all empty_deriving ds
     no_deriving _ = True
     empty_deriving (L _ HsDerivingClause{deriv_clause_tys = L _ (DctMulti _ [])}) = True
     empty_deriving _ = False
-tcLocalOpenGroup demands group = do
-    let sigs = case hs_valds group of
-          XValBindsLR (HsVBG _ lsigs) -> lsigs
-          _ -> []
-        cycles (owner, _) = or
-          [ usesNames (unitNameSet (tcdName (unLoc decl))) sig
-          | L _ (TypeSig _ _ owners sig) <- sigs
-          , any ((== owner) . unLoc) owners
-          , decl <- tyClGroupTyClDecls (hs_tyclds group)
-          , usesNames (unitNameSet owner) decl ]
-        message
-          | any cycles demands = "This type use and the producer's type signature form a dependency cycle."
-          | otherwise = "This call needs an independent local definition with a complete signature in the same declaration group."
-    rejectLocalOpen demands message
+tcLocalOpenGroup demands _ =
+    rejectLocalOpen demands
+      "Early checking of local definitions does not support same-group instances, deriving, or defaults."
+
+-- | Return the owners of signatures and pragmas relevant to scheduling.
+signatureOwners :: Sig GhcRn -> [Name]
+signatureOwners (TypeSig _ _ ns _) = map unLoc ns
+signatureOwners (InlineSig _ (L _ n) _) = [n]
+signatureOwners (SCCFunSig _ (L _ n) _) = [n]
+signatureOwners (SpecSig _ (L _ n) _ _) = [n]
+signatureOwners (SpecSigE n _ _ _) = [n]
+signatureOwners _ = []
+
+-- | Keep each shared signature with its corresponding set of owners.
+splitSignatures :: NameSet -> [LSig GhcRn] -> ([LSig GhcRn], [LSig GhcRn])
+splitSignatures selected = foldr split ([], [])
+  where
+    split sig@(L loc (TypeSig ext mods owners tau)) (early, rest) =
+      case partition ((`elemNameSet` selected) . unLoc) owners of
+        ([], _) -> (early, sig : rest)
+        (_, []) -> (sig : early, rest)
+        (before, after) ->
+          (L loc (TypeSig ext mods before tau) : early,
+           L loc (TypeSig ext mods after tau) : rest)
+    split sig@(L _ decl) (early, rest)
+      | any (`elemNameSet` selected) (signatureOwners decl) = (sig : early, rest)
+      | otherwise = (early, sig : rest)
 
 -- | Desugar only demanded bindings after their owning group has solved.
 localOpenDefinitions :: [(Name, SrcSpan)] -> Bag EvBind -> LHsBinds GhcTc
                      -> TcM (NameEnv (Id, CoreExpr))
 localOpenDefinitions demands evidence binds = do
     let requested = mkNameSet (map fst demands)
-        selected bind = any ((`elemNameSet` requested) . idName)
-                          (collectHsBindBinders CollNoDictBinders (unLoc bind))
-        relevant = filter selected binds
+        named_binds =
+          [ (mkNameSet (map idName owners), bind)
+          | bind <- binds
+          , let owners = collectHsBindBinders CollNoDictBinders (unLoc bind)
+          , not (null owners) ]
+        local_names = unionNameSets (map fst named_binds)
+        by_owner = mkNameEnv
+          [ (owner, bind) | (owners, bind) <- named_binds, owner <- nameSetElemsStable owners ]
+        dependencies name = do
+          case lookupNameEnv by_owner name of
+            Just bind -> Right (mkNameSet (localOpenReferences bind) `intersectNameSet` local_names)
+            Nothing -> Left "No checked Core definition is available for this call."
+    selected <- case closeLocalNames dependencies emptyNameSet (nameSetElemsStable requested) of
+      Right names -> pure names
+      Left reason -> rejectLocalOpen demands reason
+    let relevant = [bind | (owners, bind) <- named_binds, intersectsNameSet owners selected]
     when (any hasPendingTypedSplice relevant) $
       rejectLocalOpen demands "This earlier definition contains a pending typed splice."
     (_, _, zonked, _, _, _, _) <- zonkTopDecls evidence relevant [] [] [] []
@@ -2000,7 +2064,7 @@ localOpenDefinitions demands evidence binds = do
           [ (idName owner, (owner, rhs))
           | core <- maybeToList proposal, not (errorsFound messages)
           , (owner, rhs) <- fromOL core
-          , idName owner `elemNameSet` requested
+          , idName owner `elemNameSet` selected
           , exprType rhs `eqType` idType owner ]
         missing = filter (not . (`elemNameEnv` definitions) . fst) demands
     unless (null missing) $
@@ -2014,6 +2078,26 @@ localOpenDefinitions demands evidence binds = do
       Just HsTypedSplice{} -> True
       _ -> or (gmapQ hasPendingTypedSplice node)
 
+-- | Close the requested names over the eligible bindings in the graph.
+closeLocalNames :: (Name -> Either String NameSet) -> NameSet -> [Name] -> Either String NameSet
+closeLocalNames dependencies = foldM (visit emptyNameSet)
+  where
+    visit visiting done name
+      | name `elemNameSet` done = Right done
+      | name `elemNameSet` visiting =
+          Left ("The local term dependency contains a cycle through " ++ getOccString name ++ ".")
+      | otherwise = do
+          uses <- dependencies name
+          checked <- foldM (visit (extendNameSet visiting name)) done (nameSetElemsStable uses)
+          pure (extendNameSet checked name)
+
+-- | Collect resolved term references from one checked binding.
+localOpenReferences :: Data a => a -> [Name]
+localOpenReferences node = case cast node :: Maybe (HsExpr GhcTc) of
+    Just (HsVar _ (L _ v)) -> [idName v]
+    Just HsTypedSplice{} -> []
+    _ -> concat (gmapQ localOpenReferences node)
+
 -- | Confine the checked definitions to the current typechecking continuation.
 withLocalOpenDefinitions :: NameEnv (Id, CoreExpr)
                          -> TcM (TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv)
@@ -2025,9 +2109,12 @@ withLocalOpenDefinitions definitions check = do
     pure (checked_env { tcg_local_open_defs = old_defs }, checked_lcl)
 
 usesNames :: Data a => NameSet -> a -> Bool
-usesNames names node
-  | Just name <- cast node = name `elemNameSet` names
-  | otherwise = or (gmapQ (usesNames names) node)
+usesNames names = isJust . firstLocalUse names
+
+firstLocalUse :: Data a => NameSet -> a -> Maybe Name
+firstLocalUse names node
+  | Just name <- cast node = if name `elemNameSet` names then Just name else Nothing
+  | otherwise = listToMaybe (catMaybes (gmapQ (firstLocalUse names) node))
 
 hasSplice :: Data a => a -> Bool
 hasSplice node =

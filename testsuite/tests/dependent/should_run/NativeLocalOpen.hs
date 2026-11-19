@@ -2,7 +2,7 @@
 
 module Main where
 
-import NativeLocalOpenProducer (Backward, Forward, Prior)
+import NativeLocalOpenProducer (Apply, Backward, Forward, Prior)
 
 forward :: Forward Char
 forward = 'x'
@@ -10,8 +10,8 @@ forward = 'x'
 backward :: Backward Bool Char
 backward = True
 
-prior :: Prior Int
-prior = 7
+prior :: Apply Maybe (Prior Int)
+prior = Just 7
 
 main :: IO ()
 main = print (forward, backward, prior)

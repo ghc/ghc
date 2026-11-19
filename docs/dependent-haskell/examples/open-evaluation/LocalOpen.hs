@@ -1,7 +1,8 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 
-module LocalOpen (Selected, keepFirst) where
+module LocalOpen (Selected, keepFirst, LastOf, lastOf) where
 
 import Data.Kind (Type)
 
@@ -16,3 +17,11 @@ keepFirst x _ = x
 -- | Choose the first operand without inspecting the second.
 select :: a -> a -> a
 select x _ = x
+
+-- | Select the second type using the same definition that runs on values.
+type LastOf :: Type -> Type -> Type
+type LastOf a b = lastOf a b
+
+-- | Reverse the inputs to the local first-argument selector.
+lastOf :: a -> a -> a
+lastOf x y = select y x

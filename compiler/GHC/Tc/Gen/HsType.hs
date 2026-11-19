@@ -2369,7 +2369,7 @@ tc_app_ty mode rn_ty exp_kind
   , isExternalName name
   = setSrcSpanA loc $
     do { env <- getGblEnv
-       ; if isQual rdr && nameIsLocalOrFrom (tcg_semantic_mod env) name
+       ; if nameIsLocalOrFrom (tcg_semantic_mod env) name
            then case (lookupNameEnv (tcg_local_open_defs env) name, value_args) of
              (Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
@@ -2487,9 +2487,13 @@ tcOpenTypeCall mode name instantiated args = do
                    in failWithTc (TcRnOpenTypeEval name definition message)
     Right (result, used) -> do
       env <- getGblEnv
-      forM_ (lookupNameEnv (tcg_local_open_defs env) name) $ \(owner, _) -> do
-        dependencies <- traverse tcLookupId (nameSetElemsStable used)
-        recordSourceUses [(definition, Nothing) | definition <- owner : dependencies]
+      let locals = tcg_local_open_defs env
+          lookup_owner n = case lookupNameEnv locals n of
+            Just (owner, _) -> pure owner
+            Nothing -> tcLookupId n
+      when (name `elemNameEnv` locals) $ do
+        dependencies <- traverse lookup_owner (nameSetElemsStable used)
+        recordSourceUses [(definition, Nothing) | definition <- dependencies]
       updTcRef (tcg_evaluated_term_uses env) (`unionNameSet` used)
       pure result
   where

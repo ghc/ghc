@@ -72,24 +72,25 @@ observeOpenType instantiated operands
         then do
           readDefinitions <- lift (newTcRef (emptyVarEnv, emptyNameSet))
           locals <- lift (tcg_local_open_defs <$> getGblEnv)
-          let obtain v
-                | Just (_, rhs) <- lookupNameEnv locals (idName v)
-                = if tcEqType (exprType rhs) (idType v)
-                    then pure (Just rhs)
-                    else throwE (UnavailableDefinition (idName v) WrongTemplateType)
-                | not (isGlobalId v) = pure Nothing
-                | otherwise = do
-                    (known, _) <- lift (readTcRef readDefinitions)
-                    case lookupVarEnv known v of
-                      Just rhs -> pure (Just rhs)
-                      Nothing -> do
+          let remember v rhs = do
+                lift (updTcRef readDefinitions $ \(cache, used) ->
+                  (extendVarEnv cache v rhs, extendNameSet used (idName v)))
+                pure (Just rhs)
+              obtain v = do
+                (known, _) <- lift (readTcRef readDefinitions)
+                case lookupVarEnv known v of
+                  Just rhs -> pure (Just rhs)
+                  Nothing
+                    | Just (_, rhs) <- lookupNameEnv locals (idName v) ->
+                        if tcEqType (exprType rhs) (idType v)
+                          then remember v rhs
+                          else throwE (UnavailableDefinition (idName v) WrongTemplateType)
+                    | not (isGlobalId v) -> pure Nothing
+                    | otherwise -> do
                         definition <- lift (readOpenDefinition v)
                         case definition of
                           Left failure -> throwE (UnavailableDefinition (idName v) failure)
-                          Right rhs -> do
-                            lift (updTcRef readDefinitions $ \(cache, used) ->
-                              (extendVarEnv cache v rhs, extendNameSet used (idName v)))
-                            pure (Just rhs)
+                          Right rhs -> remember v rhs
           outcome <- openWhnfM limit obtain emptyVarSet application
           case outcome of
             Left failure -> throwE (CannotReduce failure)
@@ -274,7 +275,10 @@ At -O0, interface loading normally ignores optimizer pragmas. Read the
 needed template from the complete interface when the observer demands its
 Id. The package interface table can already have dropped mi_decls. Keep
 this read separate from optimizer configuration. Record the Name of every
-template used, including aliases. The compiler's usual interface usage
+template used, including aliases. Record a local definition when it is
+unfolded, too. Scheduling a local argument makes its body available,
+but a lazy function can ignore it. Only the bodies the observer used
+supply dependencies for the source RULE check. The compiler's usual interface usage
 fingerprints include these declaration dependencies. The observer charges
 each observation step against the same configurable limit used for type
 reduction. A zero command-line value disables the limit, as in the solver.

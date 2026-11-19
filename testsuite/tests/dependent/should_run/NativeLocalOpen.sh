@@ -19,7 +19,7 @@ cp "$src/NativeLocalOpen.hs" .
 ./client
 
 cd ../producer
-sed 's/^backward x _ = x$/backward _ y = y/' NativeLocalOpenProducer.hs >changed
+sed 's/^select x _ = x$/select _ y = y/' NativeLocalOpenProducer.hs >changed
 mv changed NativeLocalOpenProducer.hs
 "${ghc[@]}" -c NativeLocalOpenProducer.hs
 cp NativeLocalOpenProducer.hi ../client/
@@ -53,6 +53,33 @@ keep x = x
 SOURCE
 expect_rejection NativeLocalOpenCycle 5 '\[GHC-70566\]' 'dependency cycle'
 
+cat > NativeLocalOpenTermCycle.hs <<'SOURCE'
+{-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures #-}
+module NativeLocalOpenTermCycle where
+import Data.Kind (Type)
+type Result :: Type -> Type
+type Result a = NativeLocalOpenTermCycle.choose a
+choose x = loop x
+loop x = loop x
+SOURCE
+expect_rejection NativeLocalOpenTermCycle 5 '\[GHC-70566\]' 'loop'
+
+cat > NativeLocalOpenHelperType.hs <<'SOURCE'
+{-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures #-}
+module NativeLocalOpenHelperType where
+import Data.Kind (Type)
+type Result :: Type -> Type
+type Result a = NativeLocalOpenHelperType.choose a
+type Payload a = a
+choose x = helper x
+helper :: a -> Result a
+helper x = x
+SOURCE
+expect_rejection NativeLocalOpenHelperType 5 '\[GHC-70566\]' 'dependency cycle through helper and Result'
+sed 's/^helper :: a -> Result a$/helper :: a -> Payload a/' NativeLocalOpenHelperType.hs >changed
+mv changed NativeLocalOpenHelperType.hs
+expect_rejection NativeLocalOpenHelperType 5 '\[GHC-70566\]' 'same-group declaration Payload'
+
 cat > NativeLocalOpenStrict.hs <<'SOURCE'
 {-# LANGUAGE BangPatterns, ExperimentalDependentTypes, StandaloneKindSignatures #-}
 module NativeLocalOpenStrict where
@@ -63,6 +90,41 @@ keep :: a -> a
 keep !x = x
 SOURCE
 expect_rejection NativeLocalOpenStrict 5 '\[GHC-70566\]' 'rigid argument a'
+
+cat > NativeLocalOpenRules.hs <<'SOURCE'
+{-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures #-}
+{-# OPTIONS_GHC -fenable-rewrite-rules -Wno-inline-rule-shadowing #-}
+module NativeLocalOpenRules where
+import Data.Kind (Type)
+type Selected :: Type -> Type -> Type
+type Selected a b = NativeLocalOpenRules.choose a b
+choose :: a -> a -> a
+choose x y = select x (unused y)
+select :: a -> a -> a
+select x _ = x
+unused :: a -> a
+unused x = x
+{-# RULES "unused/strict" forall x. unused x = x `seq` x #-}
+SOURCE
+"${ghc[@]}" -c NativeLocalOpenRules.hs
+cat >>NativeLocalOpenRules.hs <<'SOURCE'
+{-# RULES "select/second" forall x y. select x y = y #-}
+SOURCE
+expect_rejection NativeLocalOpenRules 14 '\[GHC-83605\]' 'select'
+
+cat > NativeLocalOpenPriorHelper.hs <<'SOURCE'
+{-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures, TemplateHaskell #-}
+module NativeLocalOpenPriorHelper where
+import Data.Kind (Type)
+choose :: a -> a
+choose x = helper x
+helper :: a -> a
+helper = $$([|| \x -> x ||])
+$(pure [])
+type Selected :: Type -> Type
+type Selected a = NativeLocalOpenPriorHelper.choose a
+SOURCE
+expect_rejection NativeLocalOpenPriorHelper 10 '\[GHC-70566\]' 'pending typed splice'
 
 cat > NativeLocalOpenSplice.hs <<'SOURCE'
 {-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures, TemplateHaskell #-}

@@ -1,1 +1,1 @@
-('x',True,7)
+('x',True,Just 7)

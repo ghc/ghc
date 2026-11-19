@@ -1232,7 +1232,7 @@ lookupTypeOcc app_head rdr_name
                             ; addUsedGRE AllDeprecationWarnings gre
                             ; return gre }
                     else case level of
-                      Comp | isQual term_rdr, isLocalGRE gre, not explicit_levels
+                      Comp | isLocalGRE gre, not explicit_levels
                            , isLexVarId (occNameFS (greOccName gre))
                            , nameModule_maybe name == Just this_mod
                            , Just ref <- demands ->

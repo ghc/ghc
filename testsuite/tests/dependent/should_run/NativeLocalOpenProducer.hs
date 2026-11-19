@@ -1,8 +1,9 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module NativeLocalOpenProducer (Forward, Backward, Prior) where
+module NativeLocalOpenProducer (Forward, Backward, Prior, Apply) where
 
 import Data.Kind (Type)
 import Foreign.C.Types (CInt (..))
@@ -12,17 +13,29 @@ foreign import ccall unsafe "stdlib.h abs" c_abs :: CInt -> CInt
 type Forward :: Type -> Type
 type Forward a = NativeLocalOpenProducer.forward a
 
-forward :: a -> a
-forward x = x
+{-# NOINLINE forward #-}
+forward x = helper x
+
+helper, outside :: a -> a
+helper x = x
+outside x = x
 
 backward :: a -> a -> a
-backward x _ = x
+backward x y = route x y
+
+route x y = select x y
+
+select :: a -> a -> a
+select x _ = x
 
 type Backward :: Type -> Type -> Type
-type Backward a b = NativeLocalOpenProducer.backward a b
+type Backward a b = backward a b
+
+type Apply :: (Type -> Type) -> Type -> Type
+type Apply backward a = backward a
 
 prior :: a -> a
-prior x = x
+prior x = forward x
 
 $(pure [])
 

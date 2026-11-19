@@ -506,3 +506,9 @@ instead demands its unknown argument, observation reports that demand
 at the call. The compiled synonym can be used from an ordinary module.
 [Source example](../examples/open-evaluation/LocalOpen.hs)
 and [declaration and splice boundaries](R21-dependency-analysis.md).
+
+M128 extends the same observer to chains of local helpers. It records
+each definition it unfolds. An undemanded argument can refer to another
+checked helper without adding that helper to the proof's rule dependencies.
+[Two local selections](../examples/open-evaluation/LocalOpen.hs)
+and [helper and rewrite-rule controls](R21-dependency-analysis.md#m128-following-a-local-dependency-chain).

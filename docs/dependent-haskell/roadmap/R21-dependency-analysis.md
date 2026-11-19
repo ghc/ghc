@@ -45,11 +45,36 @@ the producer to select its second argument changed the exported synonym.
 The unchanged client then failed where it supplied a Boolean for the
 newly selected `Char` type.
 
-The first slice schedules qualified calls and independent same-group
-producers. A local dependency on another binding in that group,
-nonempty deriving, local instances, defaults, and deferred errors
-remain outside this scheduling path. Unqualified references remain
-a follow-up.
+## M128. Following a local dependency chain
+
+The scheduler starts at the function mentioned in a type and follows
+its local dependencies. It uses the renamer's existing value-binding
+groups and their order. Ordinary inference can supply the types of
+both the function and its helpers. A shared signature can cover a
+selected function and an unrelated one. Each group keeps the part
+that belongs to its own bindings.
+
+For example, `type LastOf a b = lastOf a b` observes the ordinary
+definition `lastOf x y = select y x`. When `select x _ = x`, the
+result type is `b`. This unqualified use follows the usual term lookup
+with `RequiredTypeArguments`. An explicitly bound type variable with
+the same name still takes precedence.
+[Source example](../examples/open-evaluation/LocalOpen.hs).
+
+Scheduling a helper makes its checked body available. Its rewrite rules
+affect the proof only if the observer uses that body. In the regression,
+`select x (unused y)` returns `x`. A rule on `unused` is accepted.
+Adding a rule that changes `select` to choose its second argument is
+rejected at the rule. Changing the two-calls-deep helper's definition
+also invalidates the unchanged ordinary client.
+[Rule and recompilation checks](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
+The scheduler can follow previously solved helpers across a top-level
+splice. A pending typed splice in a reachable body still blocks early
+observation. This slice reports a recursive term group and a cycle through
+a type declaration separately. Mixed dependencies on same-group type
+declarations, local instances, nonempty deriving, defaults and deferred
+errors remain open.
 
 ## Closed calls
 
