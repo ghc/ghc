@@ -1,8 +1,8 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, ExplicitForAll #-}
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-unoptimized-core-for-interpreter -fno-omit-interface-pragmas -fexpose-all-unfoldings #-}
 
-module OpenConstructorWorker (Choice (..), Nested (..), pick, route, routeCached, cachedPick, pickNested, demand) where
+module OpenConstructorWorker (Choice (..), Nested (..), pick, reordered, Envelope, unwrap, route, routeCached, cachedPick, pickNested, demand) where
 
 -- | Store two fields in either order.
 data Choice a b = LeftFields a b | RightFields b a
@@ -14,6 +14,19 @@ data Nested a = Nested (Maybe a)
 pick :: Choice a b -> b
 pick (LeftFields _ y) = y
 pick (RightFields y _) = y
+
+-- | Select the same field with the type parameters declared in reverse order.
+reordered :: forall b a. Choice a b -> b
+reordered (LeftFields _ y) = y
+reordered (RightFields y _) = y
+
+-- | A representation whose constructors stay private.
+data Envelope a = Wrapped a | Sealed a
+
+-- | Read the private payload at runtime.
+unwrap :: Envelope a -> a
+unwrap (Wrapped x) = x
+unwrap (Sealed x) = x
 
 -- | An alias also used through its interface.
 {-# INLINE route #-}

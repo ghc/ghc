@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourcePairCaseKindUse, isSourcePairCase, sourceTableOwner)
+                              sourceCaseKindUse, isSourceConstructorCase, sourceTableOwner)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -2332,11 +2332,11 @@ tcInferTyAppHead :: TcTyMode -> LHsType GhcRn -> [LHsTypeArg GhcRn] -> TcM (TcTy
 -- saturation
 tcInferTyAppHead mode (L _ (HsTyVar _ _ (L _ (WithUserRdr _ tv)))) args
   -- A bare head supplies no rule-use information when this application
-  -- immediately supplies the one visible argument of a pair certificate.
+  -- immediately supplies the one visible argument of a constructor certificate.
   | isSourceFamilyName tv
   , [_] <- [() | HsValArg{} <- args]
   = do table <- tcLookupTyCon tv
-       if isSourcePairCase table
+       if isSourceConstructorCase table
          then return (mkTyConTy table, tyConKind table)
          else tcTyVar mode tv
   | otherwise = tcTyVar mode tv
@@ -2445,7 +2445,7 @@ tc_app_ty mode rn_ty exp_kind
   , [HsValArg _ arg] <- filterOut is_par hs_args
   , isTypeLevel (mode_tyki mode)
   , ordinary_call || (isQual rdr && ready_partial_call)
-  = do { executable <- tcClosedPairExecutableOwner rdr name arg
+  = do { executable <- tcClosedCaseExecutableOwner rdr name arg
        ; case executable of
            Nothing -> tc_app_ty_generic mode rn_ty exp_kind
            Just owner -> setSrcSpanA loc $
@@ -2925,7 +2925,7 @@ tcPlanClosedHead :: TcTyMode -> Bool -> Maybe Kind -> RdrName -> Name
 tcPlanClosedHead mode ordinary_call hint rdr name args
   | [arg] <- args
   , isSourceFamilyName name = do
-      executable <- tcClosedPairExecutableOwner rdr name arg
+      executable <- tcClosedCaseExecutableOwner rdr name arg
       case executable of
         Just owner -> tcPlanOrdinaryCall mode ordinary_call hint owner [arg]
         Nothing -> do
@@ -2940,15 +2940,15 @@ tcPlanClosedHead mode ordinary_call hint rdr name args
         AnId fun -> tcPlanOrdinaryCall mode ordinary_call hint fun args
         _ -> failWithTc (TcRnNoSourceTable name)
 
--- | Preserve the ordinary execution route for an existing staged pair call.
--- See Note [Selecting the closed pair case route].
-tcClosedPairExecutableOwner :: RdrName -> Name -> LHsType GhcRn -> TcM (Maybe Id)
-tcClosedPairExecutableOwner rdr name arg
+-- | Preserve the ordinary execution route for an existing staged constructor case call.
+-- See Note [Selecting the closed constructor case route].
+tcClosedCaseExecutableOwner :: RdrName -> Name -> LHsType GhcRn -> TcM (Maybe Id)
+tcClosedCaseExecutableOwner rdr name arg
   | Just True <- contains_staged_call arg
   , isQual rdr || isUnqual rdr
   = do
       table <- tcLookupTyCon name
-      owner <- if isSourcePairCase table then sourceTableOwner table else pure Nothing
+      owner <- if isSourceConstructorCase table then sourceTableOwner table else pure Nothing
       case owner of
         Just fun -> do
           rdr_env <- getGlobalRdrEnv
@@ -2975,10 +2975,10 @@ tcClosedPairExecutableOwner rdr name arg
       | closedConstructorLiteral operand = Just False
       | otherwise = Nothing
 
-{- Note [Selecting the closed pair case route]
+{- Note [Selecting the closed constructor case route]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An ordinary computed operand needs the staged evaluator. If the linker can
-plan execution of the checked pair function, use the ordinary plan before
+plan execution of the checked constructor case function, use the ordinary plan before
 registering any nominal family use. This preserves existing staged calls
 even if later declarations add a rule for the projection. An imported
 constraint, a rigid operand, or an unavailable executable still uses the
@@ -2996,7 +2996,7 @@ tcPlanSourceFamilyCall :: TcTyMode -> Bool -> Name -> LHsType GhcRn -> TcM (Kind
 tcPlanSourceFamilyCall mode ordinary_call name arg = do
   loc <- getSrcSpanM
   table <- tcLookupTyCon name
-  unless (isSourcePairCase table) (sourceTableFamilyUse table)
+  unless (isSourceConstructorCase table) (sourceTableFamilyUse table)
   owner <- case sourceTableTermOcc (nameOccName name) of
     Just occ -> lookupOrig (nameModule name) occ
     Nothing -> return name
@@ -3018,7 +3018,7 @@ tcPlanSourceFamilyCall mode ordinary_call name arg = do
   -- Keep the existing ground source-family grammar. The polymorphic route
   -- must determine every invisible kind from a single prepared operand.
   when (null ty_params && not (supported domain && supported result)) unsupported
-  unless (null ty_params || isSourcePairCase table) unsupported
+  unless (null ty_params || isSourceConstructorCase table) unsupported
   let specialize actual
         | null ty_params = do
             unless (actual `tcEqType` domain) $
@@ -3060,7 +3060,7 @@ tcPlanSourceFamilyCall mode ordinary_call name arg = do
         tc_check_lhs_type mode arg checked_domain
       zonked <- liftZonkM (zonkTcType checked)
       return (kinds, checked_domain, checked_result, return zonked)
-  when (isSourcePairCase table) (sourcePairCaseKindUse table kind_args)
+  when (isSourceConstructorCase table) (sourceCaseKindUse table kind_args)
   let run = setSrcSpan loc $ do
         input <- run_arg
         unless (typeKind input `tcEqType` input_kind && noFreeVarsOfType input) $
