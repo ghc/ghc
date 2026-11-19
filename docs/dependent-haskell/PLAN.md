@@ -8929,3 +8929,22 @@ still explains which constructor inputs the evaluator supports.
 M150 and this compiler accepted the same 115 of 124 ordinary
 polykinds programs. The boundary plugin and splice checks passed,
 including invalidation after a producer or candidate file changed.
+
+## M155: follow private helpers through a constructor result
+
+- [x] Collect the local helpers referenced by the desugared case. Check
+      each acyclic group in dependency order. Retain only equations used
+      by a published case.
+- [x] Prove the result across stripped interfaces. Change the leaf,
+      add a rule on the leaf, or introduce a cycle. Check that the old
+      proof fails. The updated compiler also upgrades the M154 worker
+      and reuses it on the warm build.
+- [x] Compare the self-hosted Showcase and dependent directory with M154.
+
+Both compiler stages built at `14dddd7b14`. Native execution and GHCi
+agreed on all 230 Showcase lines. The dependent directory passed 239
+of 274 exercised cases. The remaining 35 failures matched M154
+individually. Both compilers accepted the same 115 of 124 ordinary
+polykinds programs. The boundary plugin and splice checks passed.
+
+[Three private helpers](roadmap/R16-open-term-evaluator.md#m155-reachable-helper-chains).

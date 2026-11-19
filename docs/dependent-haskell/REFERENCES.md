@@ -5644,3 +5644,11 @@ GHC's normal instance checker then checks the equations together.
 [Agda interleaved mutual blocks](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
 [GHC family instances](../users_guide/exts/type_families.rst) and
 [the two local producers](examples/open-evaluation/IndependentFamily.hs).
+
+Agda checks a recursive group's calls for a decrease that guarantees
+termination. M155 admits private helper chains with an acyclic call
+graph. GHC checks a callee before using its equation in a caller and
+declines a recursive component. This establishes a finite chain of
+checked equations for the supported constructor results.
+[Agda 2.8 termination checking](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html)
+and [private helper chains](roadmap/R16-open-term-evaluator.md#m155-reachable-helper-chains).

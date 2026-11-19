@@ -867,3 +867,12 @@ actual `9` and expected `8`. The interpreter can already compute
 the demanded field. The open question is how to represent the
 partially observed operand of a projection in an exported type
 while retaining the guards on both source functions.
+
+Two other ordinary workers both return `(8, 'x')` at input `7`.
+M154 proves equality of their selected numbers. With a matching
+rewrite rule on the projection, the same `Refl` reports GHC-83605.
+A proposed partial readback must preserve the successful equality
+and keep the rule check at proof use. Treating an apparent error call
+as proof that a field cannot return would be incorrect. An ordinary
+producer rule that rewrites `errorWithoutStackTrace` at `Char` to
+`'x'` actually fired in the control.

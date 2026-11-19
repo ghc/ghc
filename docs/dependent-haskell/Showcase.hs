@@ -954,7 +954,7 @@ main = do
     -- NativeClosedPartialPair checks the same proof with only the two interfaces.
     observe "prove a direct projection of a pair with an exceptional field"
         (Refl :: Prelude.fst (Build.partialPair 7) :~: 7)
-    observe "build a public constructor through a private helper"
+    observe "build a public constructor through three private helpers"
         (Refl :: MarkedHead ('Spine.More 'x' 'Spine.Empty) :~: 'Just ('Spine.Marked 'x'))
 
 -- | Keep the helper equation in the ordinary worker's case.

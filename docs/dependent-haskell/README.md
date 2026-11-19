@@ -10,15 +10,17 @@ functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
 Updated 2026-11-19. Native execution and GHCi agree on all 230 Showcase lines.
 The normal-way dependent directory passed 239 of 274 exercised cases.
-The 35 remaining failures produced the same output as at M150 (`7d8cd2b0a4`).
+The 35 remaining failures produced the same output as at M154 (`78a9058621`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
 A separate ordinary client can prove `pick (make 7) :~: 7` when
 `make n = (n, error "unused")`, using only the two interfaces and an
 exported alias. An ordinary `firstViaHelper` can also build an optional
-head by calling a private identity inside `Just`. A second helper can
-wrap the head in a public lazy constructor. A family equation can
+head by calling a private identity inside `Just`. In `firstViaMark`,
+three private helpers pass the head to the public `Marked` constructor.
+Changing the last helper to produce `Unmarked` rejects the unchanged
+client's proof. A family equation can
 use an independent local function before another producer needs that
 equation. [Current source examples](Showcase.hs)
 and [next cases](ROADMAP.md#current-work-queue).
