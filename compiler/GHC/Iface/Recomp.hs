@@ -540,55 +540,66 @@ checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp -> IO RecompileRequired
 checkFlagHash hsc_env iface self_recomp = do
     let logger   = hsc_logger hsc_env
     let FingerprintWithValue old_fp old_flags = mi_sr_flag_hash self_recomp
-    let (previous_fp, new_flags) = fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
-        new_fp = sumProjectionFingerprint previous_fp
-    if old_fp == new_fp
-      then up_to_date logger (text "Module flags unchanged")
-      else if old_fp == previous_fp
-      then if mayExportSumProjection iface
-           then out_of_date_hash logger (CustomReason "Compiler now checks sum projections")
-                  (text "Sum projection publication changed") old_fp new_fp
-           else up_to_date logger (text "Module cannot export a sum projection")
-      else if old_fp == computeFingerprint putNameLiterally new_flags
-      then out_of_date_hash logger (CustomReason "Compiler now checks ordinary pair equations")
-             (text "Ordinary pair-equation publication changed") old_fp new_fp
-      else do
+    let (base_fp, new_flags) = fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
+        sum_fp = computeFingerprint putNameLiterally (base_fp, "sum-projections-v1" :: String)
+        new_fp = caseTreeFingerprint base_fp
+        candidates = exportedCaseDatatypes iface
+        recheck reason = out_of_date_hash logger (CustomReason reason)
+                           (text reason) old_fp new_fp
+    if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
+       | old_fp == base_fp, any couldHaveSumProjection candidates
+         -> recheck "Compiler now checks sum projections"
+       | old_fp == base_fp || old_fp == sum_fp
+         -> if null candidates
+              then up_to_date logger (text "Module cannot export a constructor case")
+              else recheck "Compiler now checks constructor case trees"
+       | old_fp == computeFingerprint putNameLiterally new_flags
+         -> recheck "Compiler now checks ordinary pair equations"
+       | otherwise -> do
         -- Do not perform this computation unless -ddump-hi-diffs is on
         let diffs = case old_flags of
                       Nothing -> pure [missingExtraFlagInfo]
                       Just old_flags -> checkIfaceFlags old_flags new_flags
         out_of_date logger FlagsChanged (fmap vcat diffs)
 
--- | Record that the compiler checked this source for sum projections.
--- See Note [Recompiling sum projection producers].
-sumProjectionFingerprint :: Fingerprint -> Fingerprint
-sumProjectionFingerprint fp = computeFingerprint putNameLiterally (fp, "sum-projections-v1" :: String)
+-- | Record that the compiler checked for equations derived from constructor cases.
+caseTreeFingerprint :: Fingerprint -> Fingerprint
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v1" :: String)
 
--- | Test a necessary property of the local input datatype in an older interface.
-mayExportSumProjection :: ModIface -> Bool
-mayExportSumProjection iface = any (candidate . snd) (mi_decls iface)
+-- | Local datatypes that a producer could scrutinize in a published equation.
+-- See Note [Recompiling constructor case producers].
+exportedCaseDatatypes :: ModIface -> [[IfaceConDecl]]
+exportedCaseDatatypes iface =
+    [ cons | (_, IfaceData{ifName = name, ifBinders = _ : _, ifCons = IfDataTyCon False cons})
+               <- mi_decls iface
+           , not (null cons), exported name, all (exported . ifConName) cons ]
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     exported name = name `elemNameSet` exports
-    candidate IfaceData{ ifName = name, ifBinders = _ : _
-                       , ifCons = IfDataTyCon False cons@(_ : _ : _) }
-      = exported name && all (\con -> exported (ifConName con) && not (null (ifConArgTys con))) cons
-    candidate _ = False
 
-{- Note [Recompiling sum projection producers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A sum projection needs a local parameterized datatype with at least two
-constructors. The producer exports the type and every constructor. Each
-alternative returns a field, so every constructor must have a field.
-These are necessary conditions even when a synonym hides the datatype
-in the function signature. The full Core check belongs in
-GHC.Tc.Gen.SourceTable. See Note [Checked sum projections] there.
+-- | M144 checked direct projections from two or more constructors with fields.
+couldHaveSumProjection :: [IfaceConDecl] -> Bool
+couldHaveSumProjection cons@(_ : _ : _) = all (not . null . ifConArgTys) cons
+couldHaveSumProjection _ = False
 
-When the flags match the preceding compiler, use the old interface to
-skip modules that could never have supplied such an equation. Record the
-new fingerprint when writing the interface, including when no function
-qualifies. Ordinary use of binary-only packages keeps the old interface.
+{- Note [Recompiling constructor case producers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old home interface can lack an equation for unchanged source. Check the
+declarations in that interface before deciding whether to reuse it. All
+constructor case certificates require a local parameterized datatype with
+every constructor exported. A synonym in the worker's type can hide its
+domain, so inspect the local data declarations.
+See Note [Checked sum projections] in GHC.Tc.Gen.SourceTable.
+
+M144 first checked direct projections of sums with at least one field per
+constructor. A case tree can also inspect a single-constructor wrapper or
+return a separate argument from a nullary alternative. An interface that
+could not publish an M144 projection can still need this upgrade even if
+the intervening compiler reused it. Record the new key on every write,
+including when the Core checks find no equation. An older binary-only
+interface still supports ordinary imports.
 -}
+
 
 checkIfaceFlags :: IfaceDynFlags -> IfaceDynFlags -> IO [SDoc]
 checkIfaceFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)
@@ -1257,7 +1268,7 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
               else FingerprintWithValue flag_hash Nothing
 
       return (IfaceSelfRecomp
-                { mi_sr_flag_hash = include_detailed_flags (sumProjectionFingerprint flag_hash, flags)
+                { mi_sr_flag_hash = include_detailed_flags (caseTreeFingerprint flag_hash, flags)
                 , mi_sr_hpc_hash = hpc_hash
                 , mi_sr_opt_hash = opt_hash
                 , mi_sr_plugin_hash = plugin_hash

@@ -668,11 +668,41 @@ equation. An abstract or unrelated module can reuse its old interface.
 Binary-only packages need a producer rebuild to gain the new equation.
 [Two-compiler upgrade check](../examples/open-evaluation/check-sum-upgrade.sh).
 
-A function such as `pickNested (Nested (Just x)) _ = x` tests a field
-before choosing its result. The current observer handles an exposed
-constructor at the call site. Publishing the nested pattern for a
-future client requires recording that second demand. At `Nested Type`,
-the current compiler reports GHC-70566 at the unknown scrutinee.
-A client should eventually recover `x` for `Nested (Just x)` and the
-fallback for `Nested Nothing`. The `Just` branch must leave the
-fallback unevaluated.
+## M146. Nested constructor cases with a fallback
+
+GHC can now publish a residual for the ordinary
+`pickNested :: forall a. Nested a -> a -> a`. The producer's checked
+Core tests the outer `Nested` and then its `Maybe` field. One equation
+matches `Nested (Just x)` and returns `x` without inspecting the
+fallback. The other matches `Nested Nothing` and returns the fallback.
+An ordinary downstream module can check both branches through stripped
+interfaces. A residual remains stuck while either demanded constructor
+is unknown.
+
+The constructor projection check follows exhaustive Core cases on
+an argument or a field those cases bind. Each equation repeats each
+constructor test along its branch. A branch can select an in-scope
+field or the optional second argument. The same check accepts a
+single-constructor projection or a binary selector with no nested case.
+A branch can leave other fields unknown and can return the fallback
+after a nullary constructor, including one with a phantom parameter.
+The check requires a local exported input datatype and visible
+constructors for the ordinary boxed datatypes in the patterns. It
+rejects strict fields, evidence, default alternatives and cases on
+expressions other than bound operands. Rule checks use the invisible
+prefix before the one or two visible operands.
+[Producer](../examples/open-evaluation/OpenConstructorWorker.hs)
+and [interface, demand and rule tests](../../../testsuite/tests/dependent/should_run/NativeOpenConstructor.sh).
+
+An older interface may lack these equations even if it passed an earlier
+upgrade check. M144 reused a local one-constructor wrapper built with
+M142. The current compiler checks both generations when the old
+interface declares a parameterized datatype with its constructors
+exported. A module that hides its constructors can keep its old interface.
+The next invocation reuses the rebuilt modules. [Three-compiler upgrade](../examples/open-evaluation/check-case-upgrade.sh).
+
+A branch that constructs a result, such as `firstMaybe (More x _) =
+Just x`, needs to represent that constructor and its symbolic fields on
+the right-hand side of the equation. The current case checker accepts a
+bound field or fallback there. General normalization of a case on an
+unknown term remains open.
