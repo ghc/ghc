@@ -1,9 +1,8 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
 module NativeClosedSourceAmbiguous where
 
 import Data.Proxy (Proxy(..))
-import Numeric.Natural (Natural)
 import Prelude
 
-bad :: Proxy (Prelude.fromIntegral 5 :: Natural)
+bad :: Proxy (Prelude.fromIntegral (Prelude.length '[1,2,3]))
 bad = Proxy

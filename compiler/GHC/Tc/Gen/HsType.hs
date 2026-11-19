@@ -2399,7 +2399,7 @@ tc_app_ty mode rn_ty exp_kind
                          , Just (owner_level, HM_Sig) <- mode_holes mode
                          , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ operand))) <- ignoreParens arg
                          , Just _ <- lookupNameEnv wildcards operand
-                         -> do { (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg RetryClosedOperand
+                         -> do { (domain, result_kind) <- tcClosedCallKinds Nothing name (varType fun) arg RetryClosedOperand
                                ; tcCheckClosedCallContext name
                                ; case call_owner of
                                    RetrySigCalls -> return ()
@@ -2419,7 +2419,8 @@ tc_app_ty mode rn_ty exp_kind
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
-                         -> do { (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call fun args
+                         -> do { hint <- closedCallResultHint ordinary_call exp_kind
+                               ; (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call hint fun args
                                ; checkClosedCallExpectedKind rn_ty exp_kind result_kind
                                ; run <- prepareClosedCallResult result_kind plan
                                ; result <- run
@@ -2447,7 +2448,8 @@ tc_app_ty mode rn_ty exp_kind
        ; case executable of
            Nothing -> tc_app_ty_generic mode rn_ty exp_kind
            Just owner -> setSrcSpanA loc $
-             do { (kind, plan) <- tcPlanOrdinaryCall mode ordinary_call owner [arg]
+             do { hint <- closedCallResultHint ordinary_call exp_kind
+                ; (kind, plan) <- tcPlanOrdinaryCall mode ordinary_call hint owner [arg]
                 ; checkClosedCallExpectedKind rn_ty exp_kind kind
                 ; run <- prepareClosedCallResult kind plan
                 ; result <- run
@@ -2552,19 +2554,20 @@ closedOperandMismatch owner actual expected = do
   failWithTc (TcRnClosedTypeEval owner
     ("The operand has kind " ++ a ++ ", which does not match the declared input type " ++ e ++ "."))
 
--- | Specialize the declared arrow using only its argument. Keep the
--- result independent of defaulting and of the surrounding expected kind.
-tcClosedCallKinds :: Name -> Type -> LHsType GhcRn -> ClosedCallOperand -> TcM (Type, Type)
-tcClosedCallKinds name fun_ty arg operand
+-- | Specialize the declared arrow from the argument and a known result kind.
+tcClosedCallKinds :: Maybe Kind -> Name -> Type -> LHsType GhcRn
+                  -> ClosedCallOperand -> TcM (Type, Type)
+tcClosedCallKinds hint name fun_ty arg operand
   | Just (FTF_T_T, _, _, domain, codomain) <- splitFunTy_maybe rho
   , all isTyVar tvs
   = do input <- argumentDomain domain
-       subst <- case tcMatchTy domain input of
+       operand_subst <- case tcMatchTy domain input of
          Just subst -> return subst
          Nothing -> case operand of
            RetryClosedOperand -> unsupported
            _ -> at_operand (closedOperandMismatch name input domain)
-       let undetermined tv = maybe True (not . noFreeVarsOfType) (Subst.lookupTyVar subst tv)
+       let subst = refineClosedCallResult hint codomain operand_subst
+           undetermined tv = maybe True (not . noFreeVarsOfType) (Subst.lookupTyVar subst tv)
            unresolved = filter undetermined tvs
            result = Subst.substTy subst codomain
            ground_class p = let pred_ty = Subst.substTy subst p
@@ -2629,6 +2632,36 @@ tcClosedCallKinds name fun_ty arg operand
     unsupported :: TcM a
     unsupported = failWithTc (TcRnNoSourceTable name)
 
+-- | Use an already known expected kind as an input to ordinary specialization.
+-- See Note [Expected result kinds for closed calls].
+closedCallResultHint :: Bool -> ExpKind -> TcM (Maybe Kind)
+closedCallResultHint True (Check expected) = do
+  kind <- liftZonkM (zonkTcType expected)
+  return (kind <$ guard (noFreeVarsOfType kind && isTyFamFree kind))
+closedCallResultHint _ _ = return Nothing
+
+-- | Extend the operand substitution when the result still contains a parameter.
+refineClosedCallResult :: Maybe Kind -> Kind -> Subst.Subst -> Subst.Subst
+refineClosedCallResult (Just expected) codomain subst
+  | let result = Subst.substTy subst codomain
+  , not (noFreeVarsOfType result), isTyFamFree result
+  = fromMaybe subst (tcMatchTyX subst codomain expected)
+refineClosedCallResult _ _ subst = subst
+
+{- Note [Expected result kinds for closed calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A Vec index supplies a known Nat kind. A cast such as fromIntegral can
+use that kind to determine its result parameter. The operand must
+still determine its own checked kind. A missing dictionary or a type
+parameter absent from both input and result stays an error.
+
+Take the hint only from a ground, family-free Check context. Do not
+guess from an inference variable, default a dictionary, or change
+the pending partial-signature path. A result determined by operands
+keeps its existing expected-kind check. Nested calls can use a hint
+only at a separately checked type boundary.
+-}
+
 -- | An ordinary application can remain Core until its result is observed.
 -- See Note [Closed source calls].
 data ClosedCallValue
@@ -2656,8 +2689,8 @@ closedCallRuntimeOperand name arg (ClosedFamilyValue action) = do
 
 -- | Check the kind and evidence before running a unary chain.
 -- See Note [Closed source calls].
-tcPlanClosedCall :: TcTyMode -> Bool -> Id -> LHsType GhcRn -> TcM (Kind, ClosedCallValue)
-tcPlanClosedCall mode ordinary_call fun arg = do
+tcPlanClosedCall :: TcTyMode -> Bool -> Maybe Kind -> Id -> LHsType GhcRn -> TcM (Kind, ClosedCallValue)
+tcPlanClosedCall mode ordinary_call hint fun arg = do
   loc <- getSrcSpanM
   let name = getName fun
   (domain, result_kind, operand) <- case nestedClosedCall arg of
@@ -2666,13 +2699,13 @@ tcPlanClosedCall mode ordinary_call fun arg = do
       tcPreflightClosedCall name
       (child_kind, run_child) <-
         setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call child_rdr child_name child_arg)
-      (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg (ComputedClosedOperand child_kind)
+      (domain, result_kind) <- tcClosedCallKinds hint name (varType fun) arg (ComputedClosedOperand child_kind)
       return (domain, result_kind, closedCallRuntimeOperand name arg run_child)
     Nothing -> do
       let literal_kind = closedCallLiteralKind arg
       unless (ordinary_call || isJust literal_kind) $
         failWithTc (TcRnNoSourceTable name)
-      (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg
+      (domain, result_kind) <- tcClosedCallKinds hint name (varType fun) arg
                                (SourceClosedOperand literal_kind)
       argument <- tcClosedTypeCallArgument mode name domain arg
       return (domain, result_kind, return argument)
@@ -2680,8 +2713,8 @@ tcPlanClosedCall mode ordinary_call fun arg = do
   return (result_kind, OrdinaryClosedCall loc name (operand >>= apply . (:[])))
 
 -- | Prepare a source call without evaluating its operands.
-tcPlanOrdinaryCall :: TcTyMode -> Bool -> Id -> [LHsType GhcRn] -> TcM (Kind, ClosedCallValue)
-tcPlanOrdinaryCall mode ordinary fun args
+tcPlanOrdinaryCall :: TcTyMode -> Bool -> Maybe Kind -> Id -> [LHsType GhcRn] -> TcM (Kind, ClosedCallValue)
+tcPlanOrdinaryCall mode ordinary hint fun args
   | not (equalLength domains args) = do
       checkCompleteClosedCall mode name
       tcPreflightClosedCall name
@@ -2697,7 +2730,7 @@ tcPlanOrdinaryCall mode ordinary fun args
   | otherwise = plan_default
   where
     plan_default
-      | [arg] <- args = tcPlanClosedCall mode ordinary fun arg
+      | [arg] <- args = tcPlanClosedCall mode ordinary hint fun arg
       | otherwise = do
           loc <- getSrcSpanM
           checkCompleteClosedCall mode name
@@ -2706,8 +2739,9 @@ tcPlanOrdinaryCall mode ordinary fun args
           let (known, empty) = partitionWith split_operand (zip3 args domains operands)
               in_scope = mkInScopeSet (tyCoVarsOfTypes (rho : predicates))
           known_subst <- foldM match_known (Subst.mkEmptySubst in_scope) known
-          subst <- choose_empty known_subst empty
-          let inputs = map (Subst.substTy subst) domains
+          operand_subst <- choose_empty known_subst empty
+          let subst = refineClosedCallResult hint codomain operand_subst
+              inputs = map (Subst.substTy subst) domains
               result = Subst.substTy subst codomain
               unresolved = filter (maybe True (not . noFreeVarsOfType) . Subst.lookupTyVar subst) tvs
               ground_class p = let pred_ty = Subst.substTy subst p
@@ -2780,6 +2814,13 @@ tcPlanOrdinaryCall mode ordinary fun args
       -- other inputs and the declared domain leave its element unknown.
       solveEqualities "tcPlanClosedConstructorCall: empty lists" $
         zipWithM_ default_joint_empty args input_types
+      forM_ hint $ \expected -> do
+        actual <- liftZonkM (zonkTcType result_type)
+        when (not (noFreeVarsOfType actual) && isTyFamFree actual &&
+              not (anyFreeVarsOfType (\var -> not (isTyVar var && isMetaTyVar var)) actual) &&
+              isJust (tcMatchTy actual expected)) $
+          solveEqualities "tcPlanClosedConstructorCall: expected result" $
+            discardResult (unifyKind Nothing result_type expected)
       inst_variables <- liftZonkM (zonkTcTypes variables)
       inputs <- liftZonkM (zonkTcTypes input_types)
       result <- liftZonkM (zonkTcType result_type)
@@ -2881,7 +2922,7 @@ tcPlanClosedHead mode ordinary_call rdr name args
   , isSourceFamilyName name = do
       executable <- tcClosedPairExecutableOwner rdr name arg
       case executable of
-        Just owner -> tcPlanOrdinaryCall mode ordinary_call owner [arg]
+        Just owner -> tcPlanOrdinaryCall mode ordinary_call Nothing owner [arg]
         Nothing -> do
           (kind, run) <- tcPlanSourceFamilyCall mode ordinary_call name arg
           return (kind, ClosedFamilyValue run)
@@ -2891,7 +2932,7 @@ tcPlanClosedHead mode ordinary_call rdr name args
         failWithTc (TcRnNoSourceTable name)
       thing <- tcLookupGlobal name
       case thing of
-        AnId fun -> tcPlanOrdinaryCall mode ordinary_call fun args
+        AnId fun -> tcPlanOrdinaryCall mode ordinary_call Nothing fun args
         _ -> failWithTc (TcRnNoSourceTable name)
 
 -- | Preserve the ordinary execution route for an existing staged pair call.

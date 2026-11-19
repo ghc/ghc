@@ -2,7 +2,7 @@
 module NativeClosedSumLib
     ( weighted, containsAny, identity
     , unavailable, Local (..), local, ambiguous, hiddenRequirement
-    , unavailablePair, ambiguousPair
+    , unavailablePair, ambiguousPair, countOptional
     ) where
 
 import Numeric.Natural (Natural)
@@ -44,3 +44,8 @@ unavailablePair _ _ = 0
 
 ambiguousPair :: (Num a, Num b) => a -> a -> b
 ambiguousPair _ _ = 0
+
+-- | Count a present value when the caller selects it.
+countOptional :: Num n => Maybe a -> Bool -> n
+countOptional (Just _) True = 1
+countOptional _ _ = 0

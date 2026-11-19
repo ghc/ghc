@@ -1,0 +1,7 @@
+NativeClosedResultDictionary.hs:7:15: error: [GHC-39999]
+    • No instance for ‘Num Bool’ arising from a use of ‘fromIntegral’
+    • In the expression: fromIntegral
+      In the first argument of ‘Proxy’, namely
+        ‘(Prelude.fromIntegral 5 :: Bool)’
+      In the type signature:
+        bad :: Proxy (Prelude.fromIntegral 5 :: Bool)

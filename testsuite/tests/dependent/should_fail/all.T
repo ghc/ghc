@@ -127,7 +127,9 @@ test('NativeClosedListsBottom',
       extra_files(['../should_run/NativeClosedListsLib.hs'])],
      multimod_compile_fail, ['NativeClosedListsBottom', '-v0 ' + config.ghc_th_way_flags])
 test('NativeClosedSourceMixed', normal, compile_fail, [''])
-test('NativeClosedSourceAmbiguous', normal, compile_fail, [''])
+for name in ['NativeClosedSourceAmbiguous', 'NativeClosedLengthNoCast', 'NativeClosedResultDictionary']:
+    test(name, [req_interp, req_rts_linker, only_ways(['normal'])],
+         compile_fail, [config.ghc_th_way_flags])
 test('NativeClosedComputedEmpty',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs'])],
@@ -197,8 +199,9 @@ test('NativeClosedSaturatedMissing',
       extra_files(['../should_run/NativeClosedListsLib.hs', '../should_run/NativeClosedSumLib.hs'])],
      multimod_compile_fail, ['NativeClosedSaturatedMissing', '-v0 ' + config.ghc_th_way_flags])
 test('NativeClosedSaturatedAmbiguous',
-     [extra_files(['../should_run/NativeClosedSumLib.hs'])],
-     multimod_compile_fail, ['NativeClosedSaturatedAmbiguous', '-v0'])
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../should_run/NativeClosedSumLib.hs'])],
+     multimod_compile_fail, ['NativeClosedSaturatedAmbiguous', '-v0 ' + config.ghc_th_way_flags])
 test('NativeClosedNestedStrict',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs'])],

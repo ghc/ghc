@@ -1,0 +1,8 @@
+NativeClosedLengthNoCast.hs:7:15: error: [GHC-83865]
+    • Couldn't match kind ‘Int’
+                     with ‘GHC.Internal.Bignum.Natural.Natural’
+      Expected kind ‘Nat’, but ‘Prelude.length '[1, 2, 3]’ has kind ‘Int’
+    • In the first argument of ‘Proxy’, namely
+        ‘(Prelude.length '[1, 2, 3] :: Nat)’
+      In the type signature:
+        bad :: Proxy (Prelude.length '[1, 2, 3] :: Nat)
