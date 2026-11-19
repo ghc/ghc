@@ -8989,3 +8989,30 @@ separate module supplies no checked equation for a rigid spine.
 GHC-68947 points at `W.erase xs`. For R21, replacing the local identity
 body with `keep x = Prelude.id x` puts an imported function outside
 the early group. GHC-70566 points at `keep` in the family equation.
+
+## M159: expose one constructor of a recursive result
+
+- Derive the nominal equation from the ordinary Core case. Check that a
+  recursive call below a lazy constructor uses a proper field of the
+  matched input with the same type parameters.
+- Prove the first output cell for a rigid tail through stripped interfaces.
+  Reject an invented tail, a nondecreasing call and an extra strict match.
+  Upgrade an M158 producer and check reuse on the next build.
+
+## M160: use an imported function in a local family producer
+
+- Read the imported function's complete type before moving the local
+  producer. Check the quantified kinds, arguments and result for hidden
+  constraints and family applications.
+- Check the actual imported body when observation demands it. Test strict
+  and lazy projections, a matching rewrite rule, and a change to the
+  imported body without a change to its signature.
+
+Both compiler stages built. The two native Showcase runs and the
+self-hosted GHCi run agreed on all 233 lines. The ordinary provider
+retains its selector unfolding in bytecode mode. A build that omitted
+the unfolding reported GHC-70566 at the family equation. The normal-way
+dependent directory passed 240 of 275 cases. The remaining 35 failures
+matched M158 individually. Both compilers accepted the same 115 of
+124 ordinary polykinds programs. The boundary checks and the interface
+upgrade from M158 passed.

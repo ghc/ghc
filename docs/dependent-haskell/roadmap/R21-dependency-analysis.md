@@ -293,6 +293,12 @@ the difference in dictionary selection.
 
 ## M160. Independent imported function types
 
+The scheduler can use the signature in a stripped interface to check the
+local binding. Computing its result still requires the imported body
+or a checked equation. The example provider exposes the unfoldings of its
+two selectors in object and bytecode builds. GHCi otherwise reports
+GHC-70566 at the family equation when it tries to read `importedFirst`.
+
 An early producer can call an imported function whose complete
 interface type belongs to the family-free fragment. The check covers
 invisible binder kinds as well as all input and result types. It

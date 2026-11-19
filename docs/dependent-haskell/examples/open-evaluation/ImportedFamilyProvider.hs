@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns, FlexibleContexts, FlexibleInstances, NoExperimentalDependentTypes, TypeFamilies #-}
-{-# OPTIONS_GHC -fno-omit-interface-pragmas #-}
+{-# OPTIONS_GHC -fno-unoptimized-core-for-interpreter -fno-omit-interface-pragmas #-}
 module ImportedFamilyProvider (Payload, hidden, Branch(..), importedFirst, importedStrict) where
 
 -- | Select the payload type of an ordinary argument.

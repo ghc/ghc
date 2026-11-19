@@ -5672,3 +5672,19 @@ exported result. Haskell can construct the outer `Just` before the
 helper inspects the spine. Its source clauses determine when the
 contained element can be identified. [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
 and [private helper example](examples/open-evaluation/SpineWorker.hs).
+
+M159 uses a structural decrease that Agda also recognizes. In the
+recursive clause, the next input is a proper subterm bound by the
+constructor pattern. In Haskell, reaching a lazy output constructor
+does not require the recursive call to return. The client can therefore
+check one output cell while its tail is still unknown.
+[Agda structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#structural-recursion)
+and [the ordinary recursive worker](examples/open-evaluation/SpineWorker.hs).
+
+M160 separates dependencies needed to check a function's type from
+those needed to compute with its body. Agda's interleaved blocks also
+allow a function to use a declared signature before its clauses appear.
+GHC must additionally account for dictionary selection and rewrite
+rules. Changing only the body of an imported projection changes the
+family equation in the example. [Agda mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
+and [imported function test](../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
