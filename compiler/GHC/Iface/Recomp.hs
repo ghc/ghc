@@ -415,7 +415,8 @@ checkVersions hsc_env mod_summary iface self_recomp
             then return $ outOfDateItemBecause SourceFileChanged Nothing else do {
        ; if not (isHomeModule home_unit (mi_module iface))
             then return $ outOfDateItemBecause ThisUnitIdChanged Nothing else do {
-       ; recomp <- liftIO $ checkFlagHash hsc_env iface self_recomp
+       ; flags_recomp <- checkFlagHash hsc_env iface self_recomp
+       ; recomp <- liftIO $ pure flags_recomp
                              `recompThen` checkOptimHash hsc_env self_recomp
                              `recompThen` checkHpcHash hsc_env self_recomp
                              `recompThen` checkMergedSignatures hsc_env mod_summary self_recomp
@@ -546,7 +547,7 @@ checkHie dflags mod_summary =
              _ -> UpToDate
 
 -- | Check the flags haven't changed
-checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp -> IO RecompileRequired
+checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp -> IfG RecompileRequired
 checkFlagHash hsc_env iface self_recomp = do
     let logger   = hsc_logger hsc_env
     let FingerprintWithValue old_fp old_flags = mi_sr_flag_hash self_recomp
@@ -570,13 +571,16 @@ checkFlagHash hsc_env iface self_recomp = do
         open_matchability_fp = caseTreeFingerprint base_fp
         old_readback_fp = readbackRecipeFingerprint open_matchability_fp
         intermediate_kind_fp = familyKindMatchabilityFingerprint old_readback_fp
-        new_fp = familyResultMatchabilityFingerprint intermediate_kind_fp
+        result_kind_fp = familyResultMatchabilityFingerprint intermediate_kind_fp
+        new_fp = retainedCaseFingerprint result_kind_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
-    if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
+    previous <- liftIO $ if
+       | old_fp == new_fp || old_fp == result_kind_fp
+         -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
        , couldSeparateFamilyResultMatchability iface
          -> recheck "Compiler now separates family result and parameter matchability"
@@ -658,6 +662,17 @@ checkFlagHash hsc_env iface self_recomp = do
                       Nothing -> pure [missingExtraFlagInfo]
                       Just old_flags -> checkIfaceFlags old_flags new_flags
         out_of_date logger FlagsChanged (fmap vcat diffs)
+    case previous of
+      UpToDate
+        | old_fp /= new_fp
+        , old_fp `elem` (result_kind_fp : intermediate_kind_fp : old_readback_fp :
+                         open_matchability_fp : closed_matchability_fp : archived)
+        , mi_hsc_src iface == HsSrcFile -> do
+          candidate <- couldExportRetainedCase iface (mi_sr_usages self_recomp)
+          if candidate
+            then liftIO $ recheck "Compiler now checks retained package case projections"
+            else pure UpToDate
+      _ -> pure previous
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -718,6 +733,109 @@ familyKindMatchabilityFingerprint fp =
 familyResultMatchabilityFingerprint :: Fingerprint -> Fingerprint
 familyResultMatchabilityFingerprint fp =
     computeFingerprint putNameLiterally (fp, "family-result-matchability-v1" :: String)
+
+-- | Record that source tables can check a retained package constructor.
+retainedCaseFingerprint :: Fingerprint -> Fingerprint
+retainedCaseFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "retained-package-case-v1" :: String)
+
+-- | Find exported ordinary worker signatures whose direct domain uses a
+-- retained package telescope from a normal import or a local declaration.
+-- The actual source certification still checks the body and RULES.
+-- See Note [Recompiling retained package workers].
+couldExportRetainedCase :: ModIface -> [Usage] -> IfG Bool
+couldExportRetainedCase iface usages = anyM candidate (mi_decls iface)
+  where
+    exportNames = mkNameSet . concatMap availNames . mi_exports
+    exports = exportNames iface
+
+    candidate (_, IfaceId{ifIdDetails = IfSourceTableId{}}) = pure False
+    candidate (_, IfaceId{ifName = name, ifType = ty})
+      | name `elemNameSet` exports, Just (domain, result) <- operand ty
+      , not (isWiredInName domain), Just owner <- nameModule_maybe domain
+      = if owner == mi_semantic_module iface
+        then pure (any (package exports domain result owner) (mi_decls iface))
+        else if any (fromModuleWithConstructor owner) usages then do
+          mb_provider <- readProvider owner
+          pure $ case mb_provider of
+            Just provider | mi_hsc_src provider == HsSrcFile ->
+              any (package (exportNames provider) domain result owner) (mi_decls provider)
+            _ -> False
+        else pure False
+    candidate _ = pure False
+
+    readProvider owner = do
+      env <- getTopEnv
+      liftIO $ lookupHugByModule owner (hsc_HUG env) >>= \case
+        Just hmi -> pure (Just (hm_iface hmi))
+        Nothing -> case moduleUnit owner of
+          RealUnit (Definite uid) -> do
+            let installed = mkModule uid (moduleName owner)
+            found <- findAndReadIface env (text "Checking retained package")
+                         installed owner NotBoot
+            pure $ case found of
+              Succeeded (provider, _) -> Just provider
+              Failed _ -> Nothing
+          _ -> pure Nothing
+
+    operand (IfaceForAllTy ma (Bndr IfaceTvBndr{} _) body)
+      | nullaryName ma == Just unmatchableDataConName = operand body
+    operand (IfaceFunTy FTF_T_T ma mult (IfaceTyConApp tc IA_Arg{}) res@IfaceTyConApp{})
+      | nullaryName ma == Just unmatchableDataConName
+      , nullaryName mult == Just manyDataConName
+      = Just (ifaceTyConName tc, res)
+    operand _ = Nothing
+
+    nullaryName (IfaceTyConApp tc IA_Nil) = Just (ifaceTyConName tc)
+    nullaryName _ = Nothing
+
+    package names domain result owner (_, IfaceData{ifName = name, ifCons = IfDataTyCon False [con]})
+      | name == domain
+      , name `elemNameSet` names, ifConName con `elemNameSet` names
+      , not (ifConWrapper con), null (ifConExTCvs con), null (ifConEqSpec con)
+      , null (ifConCtxt con)
+      , [Just witness, Nothing] <- ifConArgBinders con
+      , [(mult, witness_kind), (_, IfaceTyConApp _ payload_args)] <- ifConArgTys con
+      , witness_kind == result
+      , nullaryName mult == Just manyDataConName
+      , IfaceTermVar use : _ <- reverse (appArgsIfaceTypes payload_args)
+      = witness == use && (owner == mi_semantic_module iface ||
+                           any (usesConstructor owner (ifConName con)) usages)
+    package _ _ _ _ _ = False
+
+    fromModule owner UsageHomeModule{usg_mod_name = mod_name, usg_unit_id = unit}
+      = owner == mkModule (RealUnit (Definite unit)) mod_name
+    fromModule owner UsagePackageModule{usg_mod = mod_name} = owner == mod_name
+    fromModule _ _ = False
+
+    fromModuleWithConstructor owner usage@UsageHomeModule{usg_entities = entities}
+      = fromModule owner usage && any (isDataOcc . fst) entities
+    fromModuleWithConstructor owner usage = fromModule owner usage
+
+    usesConstructor owner name usage@UsageHomeModule{usg_entities = entities}
+      = fromModule owner usage && any ((== nameOccName name) . fst) entities
+    usesConstructor owner _ usage = fromModule owner usage
+
+{- Note [Recompiling retained package workers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An imported datatype can now give an ordinary worker a source table.
+The old worker interface lacks the table. The worker needs a source
+rebuild before a consumer checks a projection. Keep all earlier upgrade
+reasons. If a recognized older flag hash otherwise allows reuse, inspect
+exported ordinary signatures with a direct datatype operand. Read that
+datatype's interface to find its retained witness and dependent payload.
+The direct result must be the witness type.
+A home use records the constructor occurrence.
+Package uses have only module-level usage. Read the full defining
+interface directly when the home graph does not have it. The external
+package table can discard declarations. Do not repopulate it during this
+check.
+
+This check is only a reason to rebuild source. It does not admit a
+certificate from a stale installed interface, or certify a fresh
+worker that fails a body, visibility, or RULE check. Interfaces with
+the current key do not repeat this check.
+-}
 
 -- | Check old family headers that may need an independent result selector.
 -- See Note [Recompiling families with independent matchability indices].
@@ -1607,7 +1725,8 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = familyResultMatchabilityFingerprint
+          current_flag_hash = retainedCaseFingerprint
+                            $ familyResultMatchabilityFingerprint
                             $ familyKindMatchabilityFingerprint
                             $ readbackRecipeFingerprint
                             $ caseTreeFingerprint flag_hash

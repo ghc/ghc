@@ -5,14 +5,15 @@ export LC_ALL=C
 # Run with two matching native toolchains. The old compiler predates the
 # readback recipes and the matchability inference. The optional build directory
 # supplies the old boot interfaces for the original GHC.Internal.Err source.
-family_upgrade=
+upgrade=
 case ${1:-} in
-    --family-kinds|--family-results) family_upgrade=$1; shift ;;
+    --family-kinds|--family-results|--packed-projections) upgrade=$1; shift ;;
 esac
-if (( $# < 4 || $# > 5 )) || { [[ -n $family_upgrade ]] && (( $# != 4 )); }; then
+if (( $# < 4 || $# > 5 )) || { [[ $upgrade == --family-* ]] && (( $# != 4 )); }; then
     echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB [OLD_GHC_INTERNAL_BUILD]" >&2
     echo "       $0 --family-kinds M177_GHC M177_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-results INTERMEDIATE_GHC INTERMEDIATE_LIB NEW_GHC NEW_LIB" >&2
+    echo "       $0 --packed-projections OLD_GHC OLD_LIB NEW_GHC NEW_LIB [NEW_GHC_PKG]" >&2
     exit 2
 fi
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -22,7 +23,12 @@ old_lib=$(realpath "$2")
 new_ghc=$(realpath "$3")
 new_lib=$(realpath "$4")
 boot_dir=
-if (( $# == 5 )); then boot_dir=$(realpath "$5"); fi
+ghc_pkg=
+if (( $# == 5 )); then
+    if [[ $upgrade == --packed-projections ]]; then ghc_pkg=$(realpath "$5")
+    else boot_dir=$(realpath "$5")
+    fi
+fi
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 mkdir "$work"/{home,binary,err,bare}
@@ -41,7 +47,100 @@ replace() {
     mv -f "$2.new" "$2"
 }
 
-if [[ -n $family_upgrade ]]; then
+if [[ $upgrade == --packed-projections ]]; then
+    packed="$repo/docs/dependent-haskell/examples/packed-vector"
+    check_projection() (
+        # In the installed variant keep the producer package off the source path.
+        cd "$1"
+        shift
+        args=(-v1 -O0 -fomit-interface-pragmas "${sanity[@]}" "$@")
+        cp "$packed"/{PackedLength,PackedProjection}.hs .
+        cat >Unrelated.hs <<'HS'
+module Unrelated where
+import PackedVecLibrary (Nat(..))
+answer :: Int -> Nat
+answer _ = Z
+HS
+        roots=(PackedLength.hs Unrelated.hs)
+        untouched=(Unrelated.hi Unrelated.o)
+        if (( $# == 0 )); then
+            cp "$packed"/PackedVecLibrary.hs .
+            cat >AbstractUser.hs <<'HS'
+module AbstractUser where
+import PackedVecLibrary (Nat(..), PackedVec)
+ignore :: PackedVec a -> Nat
+ignore _ = Z
+HS
+            roots+=(AbstractUser.hs)
+            untouched+=({PackedVecLibrary,AbstractUser}.{hi,o})
+        fi
+        "${old[@]}" "${args[@]}" --make -no-link "${roots[@]}"
+        "${old[@]}" "${args[@]}" --show-iface PackedLength.hi >worker.old
+        if grep -F 'T:packageLength' worker.old; then
+            echo "The old worker already has a projection equation." >&2
+            exit 1
+        fi
+        mkdir stale
+        cp PackedLength.hi PackedProjection.hs stale/
+        if [[ -f PackedVecLibrary.hi ]]; then cp PackedVecLibrary.hi stale/; fi
+        if (cd stale && "${new[@]}" "${args[@]}" -c PackedProjection.hs) >stale.log 2>&1 ||
+           ! grep -Fq 'No checked equations are available' stale.log; then cat stale.log >&2; exit 1; fi
+
+        sha256sum "${untouched[@]}" >untouched.sha
+        roots+=(PackedProjection.hs)
+        "${new[@]}" "${args[@]}" --make -no-link "${roots[@]}" >upgrade.log 2>&1 ||
+            { cat upgrade.log >&2; exit 1; }
+        grep -F 'Compiling PackedLength [Compiler now checks retained package case projections]' upgrade.log
+        if grep -E 'Compiling (PackedVecLibrary|AbstractUser|Unrelated)( |$)' upgrade.log; then exit 1; fi
+        sha256sum -c untouched.sha --quiet
+        "${new[@]}" "${args[@]}" --show-iface PackedLength.hi >worker.new
+        grep -Fq 'T:packageLength' worker.new
+        sha256sum ./*.hi ./*.o >warm.sha
+        "${new[@]}" "${args[@]}" --make -no-link "${roots[@]}" >warm.log 2>&1 ||
+            { cat warm.log >&2; exit 1; }
+        if grep -F 'Compiling ' warm.log; then exit 1; fi
+        sha256sum -c warm.sha --quiet
+
+        sed 's/packageLength (PackVec n _) = n/packageLength (PackVec n _) = S n/' PackedLength.hs >PackedLength.new
+        mv PackedLength.new PackedLength.hs
+        if "${new[@]}" "${args[@]}" --make -no-link "${roots[@]}" >changed.log 2>&1 ||
+           ! grep -Fq 'Compiling PackedProjection [PackedLength changed]' changed.log ||
+           ! grep -Fq '[GHC-05617]' changed.log; then cat changed.log >&2; exit 1; fi
+    )
+
+    check_projection "$work/home"
+    if [[ -n $ghc_pkg ]]; then
+        mkdir "$work/provider"
+        (
+            cd "$work/provider"
+            unit=retained-upgrade-0.1
+            pkg=("$ghc_pkg" --global-package-db "$old_lib/package.conf.d")
+            base=$("${pkg[@]}" field base id --simple-output)
+            "${pkg[@]}" init "$work/provider-db"
+            cp "$packed/PackedVecLibrary.hs" .
+            "${old[@]}" "${sanity[@]}" -O0 -fomit-interface-pragmas -this-unit-id "$unit" -c PackedVecLibrary.hs
+            cat >provider.conf <<CONF
+name: retained-upgrade
+version: 0.1
+id: $unit
+key: $unit
+exposed: True
+exposed-modules: PackedVecLibrary
+import-dirs: $PWD
+depends: $base
+CONF
+            "${pkg[@]}" --package-db "$work/provider-db" register provider.conf
+            rm PackedVecLibrary.hs
+            sha256sum PackedVecLibrary.{hi,o} >provider.sha
+        )
+        check_projection "$work/binary" -package-db "$work/provider-db" -package-id retained-upgrade-0.1
+        (cd "$work/provider" && sha256sum -c provider.sha --quiet)
+    fi
+    echo 'Packed projection upgraded, warm artifacts were reused, and the stale and changed proofs were rejected.'
+    exit 0
+fi
+
+if [[ $upgrade == --family-* ]]; then
     cd "$work/home"
     cat >IndependentIndices.hs <<'HS'
 {-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
@@ -62,7 +161,7 @@ answer = 42
 HS
 fi
 
-if [[ $family_upgrade == --family-kinds ]]; then
+if [[ $upgrade == --family-kinds ]]; then
     cat >FamilyKinds.hs <<'HS'
 {-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
 module FamilyKinds (PFrom) where
@@ -98,7 +197,7 @@ HS
     exit 0
 fi
 
-if [[ $family_upgrade == --family-results ]]; then
+if [[ $upgrade == --family-results ]]; then
     cat >TwoFamilyResults.hs <<'HS'
 {-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
 module TwoFamilyResults where
