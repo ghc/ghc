@@ -47,3 +47,4 @@ test('TypeLambdaPrint', ignore_stderr, makefile_test, ['TypeLambdaPrint'])
 
 test('TypeLetPrint', ignore_stderr, makefile_test, ['TypeLetPrint'])
 test('PercentPrint', ignore_stderr, makefile_test, ['PercentPrint'])
+test('TypeCasePrint', ignore_stderr, makefile_test, ['TypeCasePrint'])

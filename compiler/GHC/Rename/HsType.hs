@@ -19,7 +19,7 @@ module GHC.Rename.HsType (
         newTyVarNameRn,
         rnHsConDeclRecFields,
         lookupField, mkHsOpTyRn,
-        rnLTyVar,
+        rnLTyVar, classifyTypeCasePattern,
 
         rnHsConDeclField, rnRetainedSigType,
 
@@ -51,8 +51,10 @@ import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName, check
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
 import GHC.Driver.Flags
+import GHC.Data.List.SetOps (findDupsEq)
+import GHC.Parser.PostProcess (setRdrNameSpace)
 
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet), HsTypeGhcRnExt(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase), HsTypeGhcRnExt(..), HsTypeCaseAlt(..))
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -997,6 +999,16 @@ rnHsTyKi env (XHsType (HsTypeLet (let_kw, _, _) binder rhs body)) = do
   return (XHsType (HsTypeLetRn (fmap (const name) binder) rhs' body'),
           rhs_fvs `plusFN` body_fvs)
 
+rnHsTyKi _ (XHsType (HsTypeCase (case_kw, _) _ _ alts)) = do
+  enabled <- xoptM LangExt.ExperimentalDependentTypes
+  if not enabled
+    then setSrcSpan (getEpTokenSrcSpan case_kw) $ failWithTc TcRnTypeCaseDisabled
+    else case [ pat | L _ (HsTypeCaseAlt pat _ _) <- alts
+                    , isNothing (classifyTypeCasePattern pat) ] of
+      pat : _ -> setSrcSpanA (getLoc pat) $
+        failWithTc TcRnTypeCasePattern
+      [] -> setSrcSpan (getEpTokenSrcSpan case_kw) $ failWithTc TcRnTypeCaseContext
+
 rnHsTyKi env ty@(XHsType (HsRecTy {})) = do
   -- Record types (which only show up temporarily in constructor
   -- signatures) should have been removed by now
@@ -1020,6 +1032,31 @@ rnHsTyKi env ty@(HsExplicitTupleTy _ ip tys)
 rnHsTyKi env (HsWildCardTy h)
   = do { checkAnonWildCard env
        ; return (HsWildCardTy h, emptyFNs) }
+
+
+-- | Recognize a flat constructor pattern and collect its branch-local binders.
+-- The closed family must demand its scrutinee, so a bare variable or wildcard
+-- cannot form an alternative. See Note [Lifting type cases] in GHC.Rename.Module.
+classifyTypeCasePattern :: LHsType GhcPs -> Maybe (LHsType GhcPs, [RdrName])
+classifyTypeCasePattern pat = do
+  (pat', bound) <- constructorPattern pat
+  guard (null (findDupsEq (==) bound))
+  pure (pat', bound)
+  where
+    constructorPattern (L loc (HsParTy ann pat)) = do
+      (pat', bound) <- constructorPattern pat
+      pure (L loc (HsParTy ann pat'), bound)
+    constructorPattern (L loc (HsAppTy ann con field)) = do
+      (con', bound) <- constructorPattern con
+      case unLoc field of
+        HsTyVar _ NotPromoted (L _ name) | isRdrTyVar name ->
+          pure (L loc (HsAppTy ann con' field), name : bound)
+        HsWildCardTy{} -> pure (L loc (HsAppTy ann con' field), bound)
+        _ -> Nothing
+    constructorPattern (L loc (HsTyVar ann _ name))
+      | isRdrTc (unLoc name) || isRdrDataCon (unLoc name)
+      = Just (L loc (HsTyVar ann IsPromoted (fmap (`setRdrNameSpace` srcDataName) name)), [])
+    constructorPattern _ = Nothing
 
 {-
 Note [Strict level checks with ExplicitLevelImports]

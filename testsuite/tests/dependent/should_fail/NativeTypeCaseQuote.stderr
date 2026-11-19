@@ -1,0 +1,9 @@
+NativeTypeCaseQuote.hs:5:9: error: [GHC-97233]
+    • A type case is supported only in the right-hand side of a top-level type synonym.
+    • In the Template Haskell quotation:
+        [t| case 'True of
+              True -> Int
+              False -> Bool |]
+  |
+5 | q = [t| case 'True of { True -> Int; False -> Bool } |]
+  |         ^^^^

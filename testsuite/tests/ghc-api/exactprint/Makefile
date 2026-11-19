@@ -174,3 +174,7 @@ TypeLetPrint:
 .PHONY: PercentPrint
 PercentPrint:
 	$(CHECK_EXACT) $(LIBDIR) PercentPrint.hs
+
+.PHONY: TypeCasePrint
+TypeCasePrint:
+	$(CHECK_EXACT) $(LIBDIR) TypeCasePrint.hs

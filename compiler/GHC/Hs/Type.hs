@@ -20,7 +20,7 @@ module GHC.Hs.Type (
         pprHsModifiedFunArr, pprHsModifier, pprLHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsTypeGhcPsExt(..), HsTypeGhcRnExt(..),
+        HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeGhcRnExt(..),
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -562,9 +562,17 @@ data HsTypeGhcPsExt
   | HsTypeLet (EpToken "let", EpToken "=", EpToken "in") (LocatedN RdrName)
               (LHsType GhcPs) (LHsType GhcPs)
 
+  | HsTypeCase (EpToken "case", EpToken "of")
+               (Maybe (EpToken "{", EpToken "}"))
+               (LHsType GhcPs) [LocatedA HsTypeCaseAlt]
+
   | HsRecTy     (EpToken "{", EpToken "}")
                 (Located [LHsConDeclRecField GhcPs])
     -- See Note [Parsing data type declarations]
+
+-- | A parsed constructor alternative in a type case.
+data HsTypeCaseAlt
+  = HsTypeCaseAlt (LHsType GhcPs) (EpUniToken "->" "→") (LHsType GhcPs)
 
 {- Note [Parsing data type declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1660,6 +1668,10 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
     HsRecTy _ flds  -> pprHsConDeclRecFields (unLoc flds)
     HsTypeLambda _ vars body -> parens (char '\\' <> hsep (map ppr vars) <+> arrow <+> ppr_mono_lty body)
+    HsTypeCase _ _ scrutinee alts ->
+      text "case" <+> ppr_mono_lty scrutinee <+> text "of"
+        $$ nest 2 (vcat [ppr_mono_lty pat <+> arrow <+> ppr_mono_lty rhs
+                       | L _ (HsTypeCaseAlt pat _ rhs) <- alts])
     HsTypeLet _ v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
         <+> text "in" <+> ppr_mono_lty body
@@ -1734,6 +1746,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsRecTy{}   -> False
         HsTypeLambda{} -> False
         HsTypeLet{} -> p >= topPrec
+        HsTypeCase{} -> p >= topPrec
       GhcRn -> case t of
         HsCoreTyRn ty -> go_core_ty ty
         HsTypeLetRn{} -> p >= topPrec

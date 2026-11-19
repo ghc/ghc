@@ -240,3 +240,15 @@ test('NativePercentArrowQuote',
 test('NativePercentArrowPpr',
      [req_interp, only_ways(['normal'])],
      run_command, ['bash NativePercentArrowPpr.sh "{compiler}" "{libdir}"'])
+
+test('NativeTypeCase',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + 'NativeCase.hs', 'NativeTypeCaseClient.hs', 'NativeTypeCaseRigid.hs',
+                   'NativeTypeCaseInvalid.hs', 'NativeTypeCaseEscape.hs', 'NativeTypeCaseBadPattern.hs',
+                   'NativeTypeCaseFallback.hs', 'NativeTypeCaseDisabled.hs', 'NativeTypeCaseBranchKind.hs',
+                   'NativeTypeCaseScrutinee.hs'])],
+     run_command, ['bash NativeTypeCase.sh "{compiler}" "{libdir}"'])
+test('NativeTypeCaseReify',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([open_eval_dir + 'NativeCase.hs'])],
+     multimod_compile, ['NativeTypeCaseReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])

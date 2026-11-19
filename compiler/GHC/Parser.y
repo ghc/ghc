@@ -43,7 +43,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Driver.Backpack.Syntax
@@ -2344,6 +2344,14 @@ is connected to the first type too.
 type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
+        | 'case' ctype 'of' vocurly typecase_alts close
+                                       {% amsA' (sLL $1 $5 $ XHsType
+                                           (HsTypeCase (epTok $1, epTok $3) Nothing
+                                                $2 (reverse (unLoc $5)))) }
+        | 'case' ctype 'of' '{' typecase_alts '}'
+                                       {% amsA' (sLL $1 $6 $ XHsType
+                                           (HsTypeCase (epTok $1, epTok $3) (Just (epTok $4, epTok $6))
+                                                $2 (reverse (unLoc $5)))) }
         | 'let' vocurly tyvar '=' ctype close 'in' ctype
                                        {% amsA' (sLL $1 $> $
                                           XHsType (HsTypeLet (epTok $1, epTok $4, epTok $7)
@@ -2365,6 +2373,20 @@ type :: { LHsType GhcPs }
                                                                      (reverse $ unLoc $2)
                                                                      (HsLinearArr $ epTok $3)
                                           in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
+
+typecase_alts :: { Located [LocatedA HsTypeCaseAlt] }
+        : typecase_alt                   { sL1 $1 [$1] }
+        | typecase_alts ';' typecase_alt {% case unLoc $1 of
+              a:as -> do { a' <- addTrailingSemiA a (mzEpTok $2)
+                         ; return (sLL $1 $> ($3 : a' : as)) }
+              [] -> return (sL1 $3 [$3]) }
+        | typecase_alts ';'              {% case unLoc $1 of
+              a:as -> do { a' <- addTrailingSemiA a (mzEpTok $2)
+                         ; return (sLL $1 $> (a' : as)) }
+              [] -> return $1 }
+
+typecase_alt :: { LocatedA HsTypeCaseAlt }
+        : btype '->' ctype               {% amsA' (sLL $1 $> (HsTypeCaseAlt $1 (epUniTok $2) $3)) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }

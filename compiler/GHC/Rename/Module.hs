@@ -22,6 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeCase), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -209,6 +210,76 @@ liftTypeLambdas group =
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
 
+{- Note [Lifting type cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Use a checked closed family to match a type case. Each source branch
+becomes one equation. Only constructor patterns are admitted, so a
+rigid scrutinee cannot select an equation. Keep lexical captures as
+additional arguments. Hide a captured argument's name in any branch
+where a pattern binds that spelling. Put the family and its owning
+synonym in the same kind-checking SCC.
+-}
+liftTypeCases :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
+liftTypeCases group =
+  let (groups, hidden) = unzip (map liftGroup (hs_tyclds group))
+  in (group { hs_tyclds = groups }, concat hidden)
+  where
+    liftGroup decls =
+      let (defs, lifted) = unzip (map liftDecl (group_tyclds decls))
+          (families, hidden) = unzip (concat lifted)
+      in (decls { group_tyclds = defs ++ families }, hidden)
+
+    liftDecl (L loc syn@SynDecl{tcdLName = owner, tcdRhs = rhs,
+                                tcdTyVars = HsQTvs{hsq_explicit = params}})
+      | Just captures <- traverse capture params
+      = let (rhs', cases, _) = liftRhs owner captures rhs (0 :: Int)
+        in (L loc syn{tcdRhs = rhs'}, cases)
+    liftDecl decl = (decl, [])
+
+    liftRhs owner captures (L loc (XHsType (HsTypeCase _ _ scrutinee alts))) salt
+      | Just patterns <- traverse checkAlt alts
+      = let owner_occ = rdrNameOcc (unLoc owner)
+            occ = mkTcOcc ("$case:" ++ occNameString owner_occ ++ ":" ++ show salt)
+            name = L (getLoc owner) (mkRdrUnqual occ)
+            scrut_var = L (getLoc owner) (mkRdrUnqual (mkTyVarOcc "$scrutinee"))
+            scrut_binder = L loc (HsTvb noAnn (HsBndrRequired noExtField)
+                           (HsBndrVar noExtField scrut_var) (HsBndrNoKind noExtField))
+            eqns = map (branch name captures) patterns
+            fam = L loc (FamDecl noExtField
+                    (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just eqns)) TopLevel
+                       name (HsQTvs noExtField (map fst captures ++ [scrut_binder]))
+                       Prefix (L (l2l loc) (NoSig noExtField)) Nothing))
+            (scrutinee', nested, next) = liftRhs owner captures scrutinee (salt + 1)
+            result = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
+                       (map (typeName . snd) captures ++ [scrutinee'])
+        in (result, (fam, (occ, owner_occ)) : nested, next)
+    liftRhs owner captures (L loc (HsParTy ann ty)) salt =
+      let (ty', cases, next) = liftRhs owner captures ty salt
+      in (L loc (HsParTy ann ty'), cases, next)
+    liftRhs owner captures (L loc (HsAppTy ann f x)) salt =
+      let (f', left, next) = liftRhs owner captures f salt
+          (x', right, end) = liftRhs owner captures x next
+      in (L loc (HsAppTy ann f' x'), left ++ right, end)
+    liftRhs _ _ ty salt = (ty, [], salt)
+
+    capture b@(L _ (HsTvb _ (HsBndrRequired _) (HsBndrVar _ n) _)) = Just (b, n)
+    capture _ = Nothing
+
+    typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
+
+    checkAlt (L loc (HsTypeCaseAlt pat _ rhs)) = do
+      (pat', bound) <- classifyTypeCasePattern pat
+      pure (loc, pat', bound, rhs)
+
+    branch name captures (loc, pat, bound, rhs) =
+      let pat_capture index (_, n@(L name_loc var))
+            | var `elem` bound =
+                typeName (L name_loc (mkRdrUnqual (mkTyVarOcc ("$case-capture:" ++ show index))))
+            | otherwise = typeName n
+          pats = zipWith pat_capture [0 :: Int ..] captures ++ [pat]
+      in L loc (FamEqn ([], [], noAnn) name mkHsOuterImplicit
+                       (map (HsValArg noExtField) pats) Prefix rhs)
+
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
 It also does the following error checks:
@@ -229,8 +300,9 @@ rnSrcDecls :: HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 -- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls group = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
-  let (expanded, hidden) = if enabled then liftTypeLambdas group else (group, [])
-  rnSrcDeclsWithLambdas hidden expanded
+  let (with_cases, case_names) = if enabled then liftTypeCases group else (group, [])
+      (expanded, lambda_names) = if enabled then liftTypeLambdas with_cases else (group, [])
+  rnSrcDeclsWithLambdas (case_names ++ lambda_names) expanded
 
 -- | Rename the declarations and keep each lifted family in its owner's group.
 rnSrcDeclsWithLambdas :: [(OccName, OccName)] -> HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)

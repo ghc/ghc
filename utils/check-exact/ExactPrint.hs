@@ -48,7 +48,7 @@ import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet)) -- Required for HsConDetails type-family instances
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase), HsTypeCaseAlt(..)) -- Required for HsConDetails type-family instances
 import GHC.TypeLits
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
@@ -4128,6 +4128,18 @@ instance ExactPrint (HsType GhcPs) where
     body' <- markAnnotated body
     close' <- markEpToken close
     return (XHsType (HsTypeLambda (open', lam', arr', close') binders' body'))
+  exact (XHsType (HsTypeCase (case_tok, of_tok) braces scrutinee alts)) = do
+    case_tok' <- markEpToken case_tok
+    scrutinee' <- markAnnotated scrutinee
+    of_tok' <- markEpToken of_tok
+    (braces', alts') <- case braces of
+      Nothing -> (Nothing,) <$> mapM markAnnotated alts
+      Just (open, close) -> do
+        open' <- markEpToken open
+        alts' <- mapM markAnnotated alts
+        close' <- markEpToken close
+        return (Just (open', close'), alts')
+    return (XHsType (HsTypeCase (case_tok', of_tok') braces' scrutinee' alts'))
   exact (XHsType (HsTypeLet (let_tok, eq, in_tok) var rhs body)) = do
     let' <- markEpToken let_tok
     var' <- markAnnotated var
@@ -4297,6 +4309,12 @@ instance ExactPrint (HsSigType GhcPs) where
     return (HsSig a bndrs' ty')
 
 -- ---------------------------------------------------------------------
+
+instance ExactPrint HsTypeCaseAlt where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor alt _ _ _ = alt
+  exact (HsTypeCaseAlt pat arr rhs) =
+    HsTypeCaseAlt <$> markAnnotated pat <*> markEpUniToken arr <*> markAnnotated rhs
 
 instance ExactPrint (LocatedN RdrName) where
   getAnnotationEntry (L sann _) = fromAnn sann

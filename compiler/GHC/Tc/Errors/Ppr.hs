@@ -53,7 +53,8 @@ import GHC.Core.Unify     ( tcMatchTys )
 import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Core.DataCon
-import GHC.Core.Coercion.Axiom (CoAxBranch, coAxiomTyCon, coAxiomSingleBranch)
+import GHC.Core.Coercion.Axiom (CoAxBranch, coAxiomTyCon, coAxiomSingleBranch,
+                                coAxiomBranches, fromBranches, coAxBranchLHS, coAxBranchRHS)
 import GHC.Core.ConLike
 import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
@@ -136,7 +137,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Foldable ( fold )
 import Data.Function (on)
-import Data.List ( groupBy, sortBy, sortOn, tails, partition, unfoldr )
+import Data.List ( groupBy, sortBy, sortOn, tails, partition, unfoldr, stripPrefix )
 import Data.Ord ( comparing )
 import Data.Bifunctor
 
@@ -1106,6 +1107,13 @@ instance Diagnostic TcRnMessage where
     TcRnTypeLetDisabled
       -> mkSimpleDecorated $ text "A type-level" <+> quotes (text "let")
                               <+> text "requires -XExperimentalDependentTypes."
+    TcRnTypeCaseDisabled
+      -> mkSimpleDecorated $ text "A type-level" <+> quotes (text "case")
+                              <+> text "requires -XExperimentalDependentTypes."
+    TcRnTypeCasePattern
+      -> mkSimpleDecorated $ text "A type case pattern needs a data constructor with distinct variable or wildcard fields."
+    TcRnTypeCaseContext
+      -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
            text "This type lambda needs the right-hand side of a top-level synonym with ordinary parameters."
@@ -2459,6 +2467,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTypeLetDisabled{}
       -> ErrorWithoutFlag
+    TcRnTypeCaseDisabled{}
+      -> ErrorWithoutFlag
+    TcRnTypeCasePattern{} -> ErrorWithoutFlag
+    TcRnTypeCaseContext{} -> ErrorWithoutFlag
     TcRnTypeLambdaContext{}
       -> ErrorWithoutFlag
     TcRnInvalidVisibleKindArgument{}
@@ -3167,6 +3179,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnTypeLetDisabled{}
       -> noHints
+    TcRnTypeCaseDisabled{}
+      -> noHints
+    TcRnTypeCasePattern{} -> noHints
+    TcRnTypeCaseContext{} -> noHints
     TcRnTypeLambdaContext{}
       -> noHints
     TcRnInvalidVisibleKindArgument{}
@@ -4821,6 +4837,47 @@ mismatchInvisibleBits (CouldNotDeduce { cnd_ea = mb_ea })
       Just (CND_ExpectedActual _ ty1 ty2) ->
         mayLookIdentical ty1 ty2
 
+-- | Recognize the private Name emitted by liftTypeCases in GHC.Rename.Module.
+typeCaseOwner :: Name -> Maybe SDoc
+typeCaseOwner name = do
+  key <- stripPrefix "$case:" (occNameString (getOccName name))
+  case break (== ':') (reverse key) of
+    (_ : _, ':' : owner) | not (null owner) -> Just (text (reverse owner))
+    _ -> Nothing
+
+-- | Find the generated head in an application context.
+typeCaseHeadOwner :: LHsType GhcRn -> Maybe SDoc
+typeCaseHeadOwner (L _ ty) = case ty of
+  HsTyVar _ _ (L _ (WithUserRdr _ name)) -> typeCaseOwner name
+  HsAppTy _ f _ -> typeCaseHeadOwner f
+  HsAppKindTy _ f _ -> typeCaseHeadOwner f
+  HsParTy _ f -> typeCaseHeadOwner f
+  _ -> Nothing
+
+-- | Display a lowered case in an equality diagnostic. Read its existing
+-- closed-family equations without reducing the scrutinee.
+pprTypeCaseMismatch :: Type -> SDoc
+pprTypeCaseMismatch ty
+  | Just (tc, args) <- splitTyConAppNoView_maybe ty
+  , Just owner <- typeCaseOwner (tyConName tc)
+  = case (reverse (filterOutInvisibleTypes tc args), closedFamilyTyConCoAxiom_maybe tc) of
+      (scrutinee : captures, Just ax)
+        | length args == tyConArity tc
+        , let (tidy_env, _) = tidyOpenTypesX emptyTidyEnv (scrutinee : captures)
+        , Just rows <- traverse (row tidy_env tc (reverse captures)) (fromBranches (coAxiomBranches ax))
+        -> text "case" <+> ppr scrutinee <+> text "of"
+             <+> braces (sep (punctuate semi rows))
+      _ -> text "the type case in" <+> quotes owner
+  | otherwise = ppr ty
+  where
+    row tidy_env tc captures branch = do
+      pat : formals <- pure (reverse (filterOutInvisibleTypes tc (coAxBranchLHS branch)))
+      vars <- traverse getTyVar_maybe (reverse formals)
+      guard (length vars == length captures)
+      let body = substTyWith vars captures (coAxBranchRHS branch)
+      [pat', body'] <- pure (tidyOpenTypes tidy_env [pat, body])
+      pure (pprTidiedType pat' <+> text "->" <+> pprTidiedType body')
+
 -- | Turn a 'MismatchMsg' into an 'SDoc'.
 --
 -- Use 'mismatchInvisibleBits' to compute which invisible bits should be
@@ -4853,15 +4910,15 @@ pprMismatchMsg ctxt
 
       | isAtomicTy ty1 || isAtomicTy ty2
       = -- Print with quotes
-        sep [ text herald1 <+> quotes (ppr ty1)
+        sep [ text herald1 <+> quotes (pprTypeCaseMismatch ty1)
             , nest padding $
-              text herald2 <+> quotes (ppr ty2) ]
+              text herald2 <+> quotes (pprTypeCaseMismatch ty2) ]
 
       | otherwise
       = -- Print with vertical layout
-        vcat [ text herald1 <> colon <+> ppr ty1
+        vcat [ text herald1 <> colon <+> pprTypeCaseMismatch ty1
              , nest padding $
-               text herald2 <> colon <+> ppr ty2 ]
+               text herald2 <> colon <+> pprTypeCaseMismatch ty2 ]
 
     herald1 = conc [ "Couldn't match"
                    , if is_repr then "representation of" else ""
@@ -8155,6 +8212,10 @@ pprHsCtxt = \case
       what | Just n <- isSigMaybe ctxt = quotes (ppr n)
            | otherwise                 = pprUserTypeCtxt ctxt
 
+  FunAppCtxt (FunAppCtxtTy fn arg) _
+    | Just owner <- typeCaseHeadOwner fn ->
+        hang (text "When checking the type case in" <+> quotes owner <> comma)
+          2 (text "at" <+> quotes (ppr arg))
   FunAppCtxt fun_arg arg_no ->
     hang (hsep [ text "In the", speakNth arg_no, text "argument of"
                , quotes fun <> text ", namely"])
@@ -8218,6 +8279,8 @@ pprHsCtxt = \case
             Just (tc, _) -> isAlgTyCon tc
             Nothing      -> False
 
+  TyConDeclCtxt name _ | Just owner <- typeCaseOwner name ->
+    text "In the type case in" <+> quotes owner
   TyConDeclCtxt name flav ->
     hsep [ text "In the", ppr flav
          , text "declaration for", quotes (ppr name) ]
@@ -8238,6 +8301,8 @@ pprHsCtxt = \case
       ppr_cons :: [LocatedN Name] -> SDoc
       ppr_cons [con] = quotes (ppr con)
       ppr_cons cons  = interpp'SP cons
+  ClosedFamEqnCtxt tc | Just owner <- typeCaseOwner (tyConName tc) ->
+    text "In a branch of the type case in" <+> quotes owner
   ClosedFamEqnCtxt tc ->
     text "In the equations for closed type family" <+>
            quotes (ppr tc)

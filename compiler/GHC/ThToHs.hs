@@ -2231,7 +2231,7 @@ cvtName = cvtNameWith False
 
 cvtNameWith :: Bool -> OccName.NameSpace -> TH.Name -> CvtM RdrName
 cvtNameWith allow_lifted ctxt_ns (TH.Name occ flavour)
-  | not (okOcc ctxt_ns occ_str || (allow_lifted && liftedLambdaName)) =
+  | not (okOcc ctxt_ns occ_str || (allow_lifted && liftedFamilyName)) =
       failWith (IllegalOccName ctxt_ns occ_str)
   | otherwise
   = do { loc <- getL
@@ -2244,9 +2244,9 @@ cvtNameWith allow_lifted ctxt_ns (TH.Name occ flavour)
 
     -- Reifying a synonym can return a reference to a private lifted family.
     -- Only an exact original type occurrence can round-trip the internal spelling.
-    liftedLambdaName
+    liftedFamilyName
       | TH.NameG TH.TcClsName _ _ <- flavour
-      , ctxt_ns == OccName.tcClsName = "$lambda:" `isPrefixOf` occ_str
+      , ctxt_ns == OccName.tcClsName = any (`isPrefixOf` occ_str) ["$lambda:", "$case:"]
       | otherwise = False
 
 okOcc :: OccName.NameSpace -> String -> Bool

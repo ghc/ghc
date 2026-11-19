@@ -4580,6 +4580,15 @@ data TcRnMessage where
 
   -- | A type lambda appears outside the supported declaration context.
   TcRnTypeLambdaContext :: TcRnMessage
+
+  -- | A type-level case needs ExperimentalDependentTypes.
+  TcRnTypeCaseDisabled :: TcRnMessage
+
+  -- | A type case alternative cannot be represented by a constructor pattern.
+  TcRnTypeCasePattern :: TcRnMessage
+
+  -- | A type case occurs outside the supported synonym RHS.
+  TcRnTypeCaseContext :: TcRnMessage
   deriving Generic
 
 ----

@@ -5909,7 +5909,8 @@ checkFamFlag :: Name -> TcM ()
 -- client might have a go!
 checkFamFlag tc_name
   = do { idx_tys <- xoptM LangExt.TypeFamilies
-       ; lifted_lambda <- if "$lambda:" `List.isPrefixOf` occNameString (nameOccName tc_name)
+       ; lifted_lambda <- if any (`List.isPrefixOf` occNameString (nameOccName tc_name))
+                                  ["$lambda:", "$case:"]
                           then xoptM LangExt.ExperimentalDependentTypes
                           else pure False
        ; unless (idx_tys || lifted_lambda) $

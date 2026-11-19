@@ -9274,3 +9274,12 @@ When a nested binder shadows a captured kind, preserve the outer kind
 for earlier parameters and use the inner binder in the body. Check
 both explicitly and implicitly scoped kind variables.
 [Source and scope controls](roadmap/R17-type-level-lambdas.md).
+
+## R19. Select a type by matching a constructor
+
+Support a source case in a top-level type synonym. Lift its alternatives
+to a private closed family and pass the lexical captures and scrutinee.
+A client with only the public interface can reduce a known constructor.
+For a rigid unknown scrutinee, keep the case stuck. Diagnose a bad
+pattern or branch at its source location. Show the checked case in a
+client error. [Roadmap example](https://ghc.serokell.io/dh#type-level-case-expressions).

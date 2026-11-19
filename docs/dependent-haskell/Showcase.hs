@@ -78,6 +78,7 @@ import qualified InterpretedKind
 import qualified InvisibleFamily
 import qualified TypeLambda
 import qualified TypeLet
+import qualified NativeCase
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -994,6 +995,7 @@ main = do
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "partially apply a two-argument type lambda" TypeLambda.partial
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    observe "select the result type by a constructor" NativeCase.roadmap
     observe "pass a constructor to uncurry with two unknown fields"
         (OpenBuildSource.uncurried (Proxy @Int) (Proxy @Char))
     observe "prove one map step for an arbitrary callback and tail"

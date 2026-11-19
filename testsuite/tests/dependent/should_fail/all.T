@@ -259,3 +259,6 @@ test('NativeTypeLetQuote', [req_th, only_ways(['normal'])], compile_fail, [''])
 
 test('NativePercentArrowQuoteUnknown', [req_th, only_ways(['normal'])],
      compile_fail, ['-fdiagnostics-show-caret'])
+
+test('NativeTypeCaseQuote', [req_th, only_ways(['normal'])],
+     compile_fail, ['-fdiagnostics-show-caret'])

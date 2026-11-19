@@ -36,7 +36,7 @@ next implementation obligations:
 | [R05: dependent Core](roadmap/R05-dependent-core.md#research) | The D/DC specification, dependent roles, GraD and current Core. Review opaque Pi elimination and substitution of generic domain metadata. |
 | [R17: type-level lambdas](roadmap/R17-type-level-lambdas.md#prior-art) | Serokell supplies the source example. Agda supplies a comparison for anonymous binders. Eisenberg and Stolarek supply the family lifting technique. Proposal #242 supplies unmatchable application. |
 | [R18: type-level lets](roadmap/R18-type-level-lets.md) | Check each RHS in its enclosing scope and substitute its checked type at uses. Compare [Agda's nonrecursive let](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions) with [Eisenberg and Stolarek's lifting translation, §4.7](https://richarde.dev/papers/2014/promotion/promotion.pdf). |
-| [R19: type-level cases](https://ghc.serokell.io/dh#type-level-case-expressions) | The prototype passes the scrutinee and lexical captures to a private closed family. Check when its branches may reduce on unknown inputs. [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf). |
+| [R19: type-level cases](roadmap/R19-type-level-cases.md) | Pass the scrutinee and lexical captures to a private closed family. Check when its branches may reduce on unknown inputs. [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf). |
 | [R23: unsaturated type families](roadmap/R23-unsaturated-type-families.md#prior-art-and-current-boundary) | Proposal #242, the higher-order type-level paper and the pinned 2024 implementation. Read the native integration correction with the draft. |
 
 ### Matchability and multiplicity on arrows
