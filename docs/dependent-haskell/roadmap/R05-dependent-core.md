@@ -43,6 +43,23 @@ M68 makes the existing application contract available to ordinary importing
 modules. Both stages check native dictionary scope and reject escaping or
 linear actuals. The owner is R03. This increment adds no Core equality rule.
 
+## Occurrence analysis
+
+The ordinary occurrence analyser can remove a runtime binding that occurs
+only in a type. In the source probe, `b = opaque source` supplies the
+index of a vector in a type application. Removing the binding makes
+Core Lint report `Invalid runtime index: b :: Bool`. A second example
+uses an earlier lambda binder only in a later binder's type. The ordinary
+pass marks the earlier binder dead.
+
+A private compiler counts those uses and visits the types of lambda
+binders from the innermost to the outermost. Its standalone occurrence
+pass then preserves the two bindings. Core and STG Lint pass. An
+ordinary interface client observes that `choose` forces its Boolean and
+`keep` can return the vector without forcing it. The next check is an
+ordinary simplifier iteration. Dependent source modules still require
+the restricted optimization pipeline.
+
 ## Next increments
 
 - [x] Specify and run an opaque whole-function cast probe. Use genuinely
