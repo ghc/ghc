@@ -4,13 +4,16 @@ export LC_ALL=C
 src=$PWD
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
-mkdir "$out"/{provider,client}
+mkdir "$out"/{provider,projection,client}
 g=("$1" "-B$2" -v0 -package-env - -O0 -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 shift 2
 g+=("$@")
 cd "$out/provider"
-cp "$src"/{PackedVecLibrary,RetainedNat,PackedProjection}.hs .
-"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedProjection.hs
+cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength}.hs .
+"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs
+cp PackedVecLibrary.hi PackedLength.hi "$src/PackedProjection.hs" "$out/projection/"
+cd "$out/projection"
+"${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs
 cat >Mixed.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
 module Mixed (witness) where
@@ -22,7 +25,7 @@ witness :: foreach (n :: Nat) -> Proxy (Length ('PackVec n (Payload n)))
 witness _ = Proxy
 HS
 "${g[@]}" -fomit-interface-pragmas -c Mixed.hs
-cp PackedVecLibrary.hi RetainedNat.hi PackedProjection.hi Mixed.hi "$out/client/"
+cp PackedVecLibrary.hi ../provider/{RetainedNat,PackedLength}.hi PackedProjection.hi Mixed.hi "$out/client/"
 cd "$out/client"
 cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
@@ -118,7 +121,7 @@ main = do
       _ -> fail "wrong field evaluated"
 HS
 "${g[@]}" -c RuntimeProjection.hs
-"${g[@]}" RuntimeProjection.o ../provider/{PackedProjection,PackedVecLibrary}.o -o projection
+"${g[@]}" RuntimeProjection.o ../projection/PackedProjection.o ../provider/{PackedLength,PackedVecLibrary}.o -o projection
 ./projection
 
 cat >WrongProjection.hs <<'HS'
@@ -134,6 +137,16 @@ if "${g[@]}" -c WrongProjection.hs >bad.log 2>&1 ||
     cat bad.log >&2
     exit 1
 fi
+
+cat >AtFamily.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module AtFamily where
+import PackedProjection
+import PackedVecLibrary
+atFamily :: foreach (p :: PackedVec a) -> Vec a (Length p)
+atFamily (PackVec _ xs) = xs
+HS
+"${g[@]}" -c AtFamily.hs
 
 cp "$src/NativePackageOperand.hs" .
 "${g[@]}" -c NativePackageOperand.hs

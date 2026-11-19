@@ -18,6 +18,7 @@ import GHC.Core.CharCase (certOwner, certRows, certify)
 import GHC.Core.OpenWhnf (openDataConFieldTypes)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
+import GHC.Core.Coercion (abstractNativeIndices)
 import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch, coAxiomBranches, coAxiomRole,
                                 coAxBranchCoVars, coAxBranchLHS, coAxBranchRHS, coAxBranchTyVars,
                                 fromBranches)
@@ -29,7 +30,7 @@ import GHC.Core.InstEnv (instanceDFunId, lookupUniqueInstEnv)
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCo.FVs (tyConsOfTypes)
-import GHC.Core.TyCo.Rep (Type(TyConApp))
+import GHC.Core.TyCo.Rep (Type(TyConApp, TermVarTy))
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Utils (exprType)
@@ -978,10 +979,13 @@ sourceCaseTables binds = do
     eligibleCase env exported enum_enabled imported owner
       | isMonomorphicEnumCaseType (varType owner)
       = enum_enabled && maybe False enumVisible (caseArrow (varType owner))
-      | Just (ConstructorCaseType _ tc _ _ position _) <- constructorCaseType (varType owner)
+      | Just (ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
       = (position == 1 && tc == listTyCon) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
-         publicCaseType env exported (const False) tc)
+         publicCaseType env exported (const False) tc) ||
+        (maybe False (\(_, domain, _) -> isRetainedCaseRoot domain tc)
+                     (splitCaseOperand position domains) &&
+         publicCaseType env exported imported tc)
       | otherwise = False
       where
         enumVisible (input, output) =
@@ -1213,6 +1217,10 @@ sourceCaseVisibleArity table
       con <- isPromotedDataCon_maybe promoted
       let (parameters, fields) = splitAt (length (dataConUserTyVars con)) args
       guard (lengthIs parameters (length (dataConUserTyVars con)))
+      unless (null (dataConRepArgBinders con)) $ do
+        let domain = mkTyConApp (dataConTyCon con) parameters
+        guard (isRetainedCaseRoot domain (dataConTyCon con))
+        guard (Core.nativeIndexArgKinds con parameters fields)
       pure (con, fields)
 
 -- | Identify the lifted parameter telescope and result of a boxed pair case.
@@ -1278,6 +1286,31 @@ constructorCaseType tau = do
       | ma `eqType` unmatchableDataConTy
       , isTyVar v, varType v `eqType` liftedTypeKind = Just binder
     liftedBinder _ = Nothing
+
+{- Note [Retained field kinds in source equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The structural root admits a checked single-constructor telescope. Match
+the actual Core alternative fields against that telescope in order. The
+payload Id's type names the witness Id from the same alternative.
+Check both fields and the result before publishing an equation.
+
+The axiom has type variables instead of runtime Ids. Publish the witness
+before the payload. Use the earlier variables to abstract the payload's
+kind. Match the result Id to the exact pattern leaf. The resulting RHS
+does not introduce a free runtime Id or a new axiom about evaluation.
+The ordinary visibility, constructor coverage, and RULE checks still
+apply. Interface recognition checks the instantiated promoted argument
+kinds again before classifying the table as a constructor case.
+-}
+
+-- | Check the retained constructor and its actual structural root domain.
+-- See Note [Retained field kinds in source equations].
+isRetainedCaseRoot :: Type -> TyCon -> Bool
+isRetainedCaseRoot domain tc
+  | [con] <- tyConDataCons tc
+  , dataConHasPromotedRetained con
+  = not (isNothing (nativeIndexDataConTyArgs domain con))
+  | otherwise = False
 
 -- | Read a lifted ordinary arrow with no dictionary or coercion operand.
 caseArrow :: Type -> Maybe (Type, Type)
@@ -1438,9 +1471,16 @@ checkedConstructorCase visible helper owner rhs = do
 
     checkAlt signature parameters result patterns aliases scrutinee tc args (Core.Alt (Core.DataAlt dc) fields body) = do
       guard (dataConTyCon dc == tc && dataConUserTyVars dc == dataConUnivTyVars dc)
-      kinds <- openDataConFieldTypes dc args
-      guard (all isId fields && eqTypes (map varType fields) kinds)
-      guard (all (casePublicKind public parameters) kinds)
+      let domain = mkTyConApp tc args
+          kinds = map varType fields
+      if isRetainedCaseRoot domain tc then
+        do { guard (all isNativeOpaqueValueId fields)
+           ; guard (Core.nativeIndexArgKinds dc args (map TermVarTy fields))
+           ; guard (all (casePublicKind public (parameters ++ map TermVarTy fields)) kinds) }
+      else
+        do { expected <- openDataConFieldTypes dc args
+           ; guard (all isId fields && eqTypes kinds expected)
+           ; guard (all (casePublicKind public parameters) kinds) }
       let replace (CaseField v)
             | v == scrutinee = (True, CaseConstructor dc args (map CaseField fields))
           replace field@CaseField{} = (False, field)
@@ -1596,8 +1636,8 @@ publishConstructorRows owner telescope domains result rows = do
                       . expandTypeSynonyms
     operands <- mapM (fresh "arg" . instantiate) domains
     branches <- forM rows $ \(ConstructorCaseRow patterns result_value) -> do
-      (lhs, leaves) <- unzip <$> traverse (publishPattern instantiate) patterns
-      let fields = concat leaves
+      (lhs, scoped) <- publishPatterns instantiate [] patterns
+      let fields = reverse scoped
           vars = quantifiers ++ map snd fields
           branch family = mkCoAxBranch vars [] [] (mkTyVarTys quantifiers ++ lhs)
                       (publishResult family instantiate fields result_value)
@@ -1608,13 +1648,27 @@ publishConstructorRows owner telescope domains result rows = do
   where
     fresh occ kind = flip mkTyVar kind <$> newSysName (mkTyVarOcc occ)
 
-    publishPattern instantiate (CaseField ident) = do
-      field <- fresh "field" (instantiate (varType ident))
-      pure (mkTyVarTy field, [(ident, field)])
-    publishPattern instantiate (CaseConstructor dc parameters children) = do
-      (fields, leaves) <- unzip <$> traverse (publishPattern instantiate) children
-      pure (mkTyConApp (promoteDataCon dc) (map instantiate parameters ++ fields), concat leaves)
-    publishPattern _ _ = panic "publishConstructorCase: call in pattern"
+    -- See Note [Retained field kinds in source equations].
+    publishPatterns _ scoped [] = pure ([], scoped)
+    publishPatterns instantiate scoped (pattern : patterns) = do
+      (pat, scoped') <- publishPattern instantiate scoped pattern
+      (pats, scoped'') <- publishPatterns instantiate scoped' patterns
+      pure (pat : pats, scoped'')
+
+    publishPattern instantiate scoped (CaseField ident) = do
+      let kind = instantiate (varType ident)
+          indices = [(TermVarTy runtime, type_var) | (runtime, type_var) <- scoped]
+          checked_kind
+            | not (anyFreeVarsOfType isId kind) = kind
+            | Just abstracted <- abstractNativeIndices indices kind
+            , not (anyFreeVarsOfType isId abstracted) = abstracted
+            | otherwise = panic "publishConstructorCase: unchecked field kind"
+      field <- fresh "field" checked_kind
+      pure (mkTyVarTy field, (ident, field) : scoped)
+    publishPattern instantiate scoped (CaseConstructor dc parameters children) = do
+      (fields, scoped') <- publishPatterns instantiate scoped children
+      pure (mkTyConApp (promoteDataCon dc) (map instantiate parameters ++ fields), scoped')
+    publishPattern _ _ _ = panic "publishConstructorCase: call in pattern"
 
     publishResult _ _ fields (CaseField selected) = fieldType fields selected
     publishResult family instantiate fields (CaseConstructor dc args children) =

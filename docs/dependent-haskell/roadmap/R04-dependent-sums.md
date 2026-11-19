@@ -58,9 +58,13 @@ A caller that demands the payload encounters an exception in that
 field even if the stored length also raises an exception.
 [Projection source](../examples/packed-vector/PackedProjection.hs).
 
-The version with the ordinary imported `packageLength` function still
-fails during function promotion. Checking its source equation
-requires the first pattern field to scope over the kind of the second.
+The exported `payload` uses an ordinary imported `packageLength` in its
+result type. The compiler checks the worker's case and publishes the
+equation that returns its first field. It binds the witness before
+checking the kind of the payload. A worker that first forces the vector
+has different demand and cannot supply that equation. A rewrite rule
+that changes the returned length also prevents its use.
+[Ordinary worker](../examples/packed-vector/PackedLength.hs).
 
 - [x] Represent a single retained witness before a payload whose final
   type argument is that witness in the promoted constructor kind.
@@ -68,4 +72,4 @@ requires the first pattern field to scope over the kind of the second.
   match. Only the input package remains in scope in the exported type.
 - [x] Check the projection through a compiled interface. Check a
   mismatched index and the two independent field-demand examples.
-- [ ] Use the ordinary imported first projection in the result signature.
+- [x] Use the ordinary imported first projection in the result signature.
