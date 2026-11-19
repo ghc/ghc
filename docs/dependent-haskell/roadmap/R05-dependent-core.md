@@ -63,10 +63,14 @@ a case result or a later alternative field. Preserving its scope keeps
 the original lazy demand. A client can call a function with an
 exceptional index and obtain `20` from the unused branch.
 
-Modules with a function-valued index, a retained cast or local rewrite
-rules still use the restricted pipeline. The next step is to preserve
-the equality binder when an ordinary case transformation processes a
-retained function field. General `-O1` remains open.
+An opaque function head can also occur in an index. A default case for
+that call binds nominal evidence. Preserve the binder during case
+preparation and merging. A separately compiled client observes that
+`const True` leaves its exceptional argument unevaluated. A function
+that demands the same argument still raises the exception.
+Modules with retained coercions or local rewrite rules use the
+restricted pipeline. General `-O1` remains open.
+[Function field and ordinary client](../../../testsuite/tests/dependent/should_run/NativeFunctionIndex.sh).
 [Source controls](../../../testsuite/tests/dependent/should_run/NativeSimplifierProvider.hs)
 and [interface client](../../../testsuite/tests/dependent/should_run/NativeSimplifierClient.hs).
 

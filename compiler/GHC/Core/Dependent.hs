@@ -12,7 +12,7 @@ module GHC.Core.Dependent (
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Type (isNativeIndexType)
+import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
@@ -63,8 +63,8 @@ hasNativeDependentProgram :: CoreProgram -> [CoreRule] -> Bool
 hasNativeDependentProgram binds rules =
     runScan AllMetadata (foldMap scanBind binds <> foldMap scanRule rules)
 
--- | Admit algebraic retained binders and constructor proofs.
--- Reject function-valued index binders, alias proofs and retained casts.
+-- | Admit algebraic index domains and checked opaque function heads.
+-- Retained casts and local rules still require the restricted pipeline.
 supportsNativeGentle :: CoreProgram -> Bool
 supportsNativeGentle binds =
     not (runScanFor CheckGentle AllMetadata (foldMap scanBind binds))
@@ -147,7 +147,7 @@ scanBind (Rec pairs) = foldMap (\(b, rhs) -> scanBinder b <> scanExpr rhs) pairs
 -- | Inspect a case alternative and its binders.
 scanAlt :: CoreAlt -> NativeScan
 scanAlt alt@(Alt con bs rhs)
-    | isNativeIndexAliasAlt alt = NativeScan (pure True)
+    | isNativeIndexAliasAlt alt = gentleForm children
     | isNativeIndexAlt alt = gentleForm children
     | otherwise = children
   where
@@ -233,10 +233,10 @@ scanSynonym tc
 -- | Inspect syntax and synonym bodies, including unused synonym arguments.
 scanType :: Type -> NativeScan
 scanType (TyVarTy tv) = scanVarKind tv
-scanType (TermVarTy v) = gentleForm (scanAlgebraicIndex v)
-scanType (TermAppTy _ _) = NativeScan (pure True)
+scanType (TermVarTy v) = gentleForm (scanRetainedIndex v)
+scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
 scanType (DepFunTy _ b body) =
-    gentleForm (scanAlgebraicIndex b <> scanType body)
+    gentleForm (scanRetainedIndex b <> scanType body)
 scanType (LitTy _) = mempty
 scanType (TyConApp tc args) = foldMap scanType args <> scanSynonym tc
 scanType (AppTy fun arg) = scanType fun <> scanType arg
@@ -247,14 +247,18 @@ scanType (ForAllTy ma (Bndr var _) body) =
 scanType (CastTy ty co) = scanType ty <> scanCo co
 scanType (CoercionTy co) = scanCo co
 
--- | Check the existing native algebraic index contract.
-scanAlgebraicIndex :: Var -> NativeScan
-scanAlgebraicIndex v = NativeScan (pure (not (isNativeIndexType (varType v))))
+-- | Check the existing algebraic and opaque function index contracts.
+scanRetainedIndex :: Var -> NativeScan
+scanRetainedIndex v = NativeScan (pure (not (isNativeIndexType (varType v) || isNativeIndexFunctionId v)))
+
+-- | Check the head and its annotation without examining the function body.
+scanCallHead :: Id -> NativeScan
+scanCallHead f = NativeScan (pure (not (isNativeIndexFunctionId f))) <> scanVarKind f
 
 -- | Inspect coercion annotations and dependencies.
 scanCo :: Coercion -> NativeScan
 scanCo (DepFunCo {}) = NativeScan (pure True)
-scanCo (TermAppCo _ _) = NativeScan (pure True)
+scanCo (TermAppCo f co) = gentleForm (scanCallHead f <> scanCo co)
 scanCo (Refl ty) = scanType ty
 scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco
 scanCo (TyConAppCo _ _ args) = foldMap scanCo args

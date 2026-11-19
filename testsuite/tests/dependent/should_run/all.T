@@ -260,8 +260,15 @@ test('NativeTypeCaseReify',
 test('NativeSimplifier',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeSimplifierProvider.hs', 'NativeSimplifierClient.hs',
-                   '../../../../docs/dependent-haskell/examples/qualified-pi/FunctionFieldLibrary.hs'])],
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeSimplifier.sh "{compiler}" "{libdir}"'])
+
+test('NativeFunctionIndex',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeFunctionIndexClient.hs',
+                   '../../../../docs/dependent-haskell/examples/qualified-pi/FunctionFieldLibrary.hs',
+                   '../../../../docs/dependent-haskell/examples/qualified-pi/FunctionFieldClient.hs'])],
+     run_command, ['bash NativeFunctionIndex.sh "{compiler}" "{libdir}"'])
 
 test('NativeRetainedPackage',
      [req_host_target_ghc, only_ways(['normal']),

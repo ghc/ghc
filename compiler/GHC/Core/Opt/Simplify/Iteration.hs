@@ -3532,11 +3532,18 @@ simplAlts (saf,env0) scrut case_bndr alts cont'
               env2       = modifyInScope env1 case_bndr2
               -- See Note [Case binder evaluated-ness]
               fam_envs   = seFamEnvs env0
+              alias_proof = sm_core_mode (seMode env0) == RetainedCore
+                         && any isNativeIndexAliasAlt alts
+                            -- See Note [Retained default alternatives].
 
-        ; (alt_env', scrut', case_bndr') <- improveSeq fam_envs (saf,env2) scrut
-                                                       case_bndr case_bndr2 alts
+        ; (alt_env', scrut', case_bndr') <-
+            if alias_proof
+            then return (env2, scrut, case_bndr2)
+            else improveSeq fam_envs (saf,env2) scrut case_bndr case_bndr2 alts
 
-        ; (imposs_deflt_cons, in_alts) <- prepareAlts scrut' case_bndr alts
+        ; (imposs_deflt_cons, in_alts) <-
+            if alias_proof then return ([], alts)
+                           else prepareAlts scrut' case_bndr alts
           -- NB: it's possible that the returned in_alts is empty: this is handled
           --     by the caller (rebuildCase) in the missingAlt function
           -- NB: pass case_bndr::InId, not case_bndr' :: OutId, to prepareAlts
@@ -3549,8 +3556,19 @@ simplAlts (saf,env0) scrut case_bndr alts cont'
         ; let alts_ty' = contResultType cont'
         -- See Note [Avoiding space leaks in OutType]
         ; seqType alts_ty' `seq`
-          mkCase (seMode env0) scrut' case_bndr' alts_ty' alts' }
+            if alias_proof
+            then return (Case scrut' case_bndr' alts_ty' alts')
+            else mkCase (seMode env0) scrut' case_bndr' alts_ty' alts' }
 
+{- Note [Retained default alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A default alternative can bind nominal evidence that relates the case binder
+to the runtime function call. See Note [Opaque native call indices] in
+GHC.Core.TyCo.Rep. Keep the scrutinee, case binder and proof in their original
+scope. prepareAlts calls findDefault and addDefault, which keep only the RHS
+of a default alternative. mkCase can also merge a default alternative and
+discard its binders. Neither operation can preserve the proof.
+-}
 
 ------------------------------------
 improveSeq :: (FamInstEnv, FamInstEnv)

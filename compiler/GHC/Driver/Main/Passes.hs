@@ -1518,10 +1518,10 @@ hscSimplify' plugins ds_result = do
 {- Note [Retained Core in the Gentle simplifier]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Run one Gentle iteration only after the native module check and restricted
-SimpleOpt. The eligibility scan admits algebraic retained binders and
-constructor proofs. It excludes function-valued index applications, alias
-proofs, retained casts, and local rules. The restricted native pipeline
-handles the other inputs. This check does not admit native modules to -O1.
+SimpleOpt. The eligibility scan admits algebraic retained binders, checked
+opaque function heads, and their proofs. It excludes retained casts and
+local rules. The restricted native pipeline handles the other inputs.
+This check does not admit native modules to -O1.
 
 A local Id can occur only in a type or coercion. Occurrence analysis must
 keep this Id in scope without adding runtime demand. A type or multiplicity
