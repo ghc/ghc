@@ -543,6 +543,9 @@ checkFlagHash hsc_env iface_mod self_recomp = do
     let (new_fp, new_flags) = fingerprintDynFlags hsc_env iface_mod putNameLiterally
     if old_fp == new_fp
       then up_to_date logger (text "Module flags unchanged")
+      else if old_fp == computeFingerprint putNameLiterally new_flags
+      then out_of_date_hash logger (CustomReason "Compiler now checks ordinary pair equations")
+             (text "Ordinary pair-equation publication changed") old_fp new_fp
       else do
         -- Do not perform this computation unless -ddump-hi-diffs is on
         let diffs = case old_flags of

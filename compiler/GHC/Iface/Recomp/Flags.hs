@@ -20,6 +20,7 @@ import GHC.Types.SafeHaskell
 import GHC.Utils.Fingerprint
 import GHC.Iface.Recomp.Binary
 import GHC.Iface.Flags
+import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.EnumSet as EnumSet
 import System.FilePath (normalise)
@@ -116,7 +117,25 @@ fingerprintDynFlags hsc_env this_mod nameio =
           , ifaceCallerCCFilters = callerCcFilters
           }
 
-    in (computeFingerprint nameio f, f)
+        -- See Note [Recompiling ordinary pair producers].
+        fp | xopt LangExt.ExperimentalDependentTypes dflags = computeFingerprint nameio f
+           | otherwise = computeFingerprint nameio (f, "ordinary-pair-equations-v1" :: String)
+    in (fp, f)
+
+{- Note [Recompiling ordinary pair producers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary module can now publish an equation for an exported pair case.
+An older interface remains readable, but it cannot supply an equation
+that its compiler never generated. When --make has the source, recheck
+the producer even if its source and flags are unchanged. Include the
+change in the ordinary module's self-recompilation fingerprint. This
+costs one rebuild of each old ordinary home module. An unchanged second
+build can reuse it, even if the module supplies no equations.
+
+Modules with ExperimentalDependentTypes already ran the pair check.
+Keep their existing flags fingerprint. Installed interfaces can still be
+read without access to their source or object code.
+-}
 
 -- Fingerprint the optimisation info. We keep this separate from the rest of
 -- the flags because GHCi users (especially) may wish to ignore changes in
