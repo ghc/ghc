@@ -12,7 +12,7 @@ module GHC.Core.Dependent (
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId)
+import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
@@ -64,7 +64,7 @@ hasNativeDependentProgram binds rules =
     runScan AllMetadata (foldMap scanBind binds <> foldMap scanRule rules)
 
 -- | Admit algebraic index domains and checked opaque function heads.
--- Retained casts and local rules still require the restricted pipeline.
+-- Retained casts with a domain proof and local rules use the restricted pipeline.
 supportsNativeGentle :: CoreProgram -> Bool
 supportsNativeGentle binds =
     not (runScanFor CheckGentle AllMetadata (foldMap scanBind binds))
@@ -233,7 +233,8 @@ scanSynonym tc
 -- | Inspect syntax and synonym bodies, including unused synonym arguments.
 scanType :: Type -> NativeScan
 scanType (TyVarTy tv) = scanVarKind tv
-scanType (TermVarTy v) = gentleForm (scanRetainedIndex v)
+scanType (TermVarTy v) =
+    gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
 scanType (DepFunTy _ b body) =
     gentleForm (scanRetainedIndex b <> scanType body)
@@ -257,7 +258,9 @@ scanCallHead f = NativeScan (pure (not (isNativeIndexFunctionId f))) <> scanVarK
 
 -- | Inspect coercion annotations and dependencies.
 scanCo :: Coercion -> NativeScan
-scanCo (DepFunCo {}) = NativeScan (pure True)
+scanCo (DepFunCo _ _ b MRefl body) =
+    gentleForm (scanRetainedIndex b <> scanCo body)
+scanCo DepFunCo{} = NativeScan (pure True)
 scanCo (TermAppCo f co) = gentleForm (scanCallHead f <> scanCo co)
 scanCo (Refl ty) = scanType ty
 scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco

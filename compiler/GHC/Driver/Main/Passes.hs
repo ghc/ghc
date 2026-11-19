@@ -1519,7 +1519,7 @@ hscSimplify' plugins ds_result = do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Run one Gentle iteration only after the native module check and restricted
 SimpleOpt. The eligibility scan admits algebraic retained binders, checked
-opaque function heads, and their proofs. It excludes retained casts and
+opaque function heads, and their proofs. It excludes retained casts with a domain proof and
 local rules. The restricted native pipeline handles the other inputs.
 This check does not admit native modules to -O1.
 

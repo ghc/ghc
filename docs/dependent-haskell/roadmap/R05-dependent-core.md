@@ -68,8 +68,11 @@ that call binds nominal evidence. Preserve the binder during case
 preparation and merging. A separately compiled client observes that
 `const True` leaves its exceptional argument unevaluated. A function
 that demands the same argument still raises the exception.
-Modules with retained coercions or local rewrite rules use the
-restricted pipeline. General `-O1` remains open.
+A cast of a retained function can enter Gentle when its domain
+coercion is reflexive. The `transportElement` example changes the
+element type of the result vector while preserving its runtime length.
+A domain coercion or local rewrite rule still selects the restricted
+pipeline. General `-O1` remains open.
 [Function field and ordinary client](../../../testsuite/tests/dependent/should_run/NativeFunctionIndex.sh).
 [Source controls](../../../testsuite/tests/dependent/should_run/NativeSimplifierProvider.hs)
 and [interface client](../../../testsuite/tests/dependent/should_run/NativeSimplifierClient.hs).
