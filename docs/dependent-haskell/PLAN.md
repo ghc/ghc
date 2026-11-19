@@ -8329,3 +8329,30 @@ The self-hosted compiler passed with the internal and external
 interpreters. The two compiled Showcases and the GHCi run produced
 the same 192 lines. The normal-way dependent directory passed 190 of
 226 cases. All 36 failures had the same individual output as at M116.
+
+## M119: export checked projections of unknown pairs
+
+- [x] Certify the typed Core of a directly defined boxed-pair projection.
+      Preserve its kind parameters and their order. Reject a body that also
+      forces the unused field.
+- [x] Use the producer and exporter interfaces to check an ordinary
+      client's equalities for fields of kinds `Type`, `Bool`, and `Char`.
+      Reject an incorrect field and a rigid equality without a given.
+- [x] Preserve closed calls under matching, disjoint, and generated rules.
+      Check native objects, missing transitive objects, serialized
+      bytecode, already-loaded code, and mixed closed calls.
+- [x] Publish the installed Prelude projections. Check a metadata-only
+      package database and the full registration, with both interpreters.
+- [x] Verify both compiler stages, the Showcase, the closed sum and open
+      projection in one expression, and the dependent directory on the
+      combined branch.
+
+[Installed projection example and evidence](roadmap/R16-open-term-evaluator.md#exporting-a-projection-of-an-unknown-pair).
+
+Both compiler stages built. The native executables and GHCi agreed on all
+193 Showcase lines. The internal and external interpreters both checked
+`snd (quotRem (fromMaybe 0 (listToMaybe '[17,5])) 5) :~: 2`.
+The normal-way dependent directory passed 192 of 228 cases. The 36 failures
+had the same individual output as at M118.
+Seven existing linker, serialized bytecode, and Template Haskell tests
+also passed in the normal way. The full GHC testsuite was not run.

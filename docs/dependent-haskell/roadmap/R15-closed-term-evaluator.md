@@ -285,7 +285,7 @@ The compiler reconstructs the promoted value with the corresponding
 DataKinds constructor. A later ordinary call can receive it as an operand.
 For example, forcing `Just undefined` fails at the producer even when the
 later call only tests for `Nothing`. A client-defined `Show` instance
-cannot supply either the constructor or its fields.
+for the result datatype cannot supply either the constructor or its fields.
 [Source proofs](../../../testsuite/tests/dependent/should_run/NativeClosedChoices.hs)
 and [failure in a present field](../../../testsuite/tests/dependent/should_fail/NativeClosedPresentBottom.hs).
 
@@ -296,3 +296,13 @@ the interpreter runs the producer. Changing only the recorded producer
 object from `Right (Just (3, True))` to `Right (Just (4, True))`
 invalidates the old proof. In that check, the producer interfaces are
 byte-for-byte identical. [Lookalike datatype diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedOtherEither.stderr).
+
+The known-name rebinding test covers recognition of the result datatype.
+The renderer still obtains the `Show` class and `returnIO` through GHC's
+known-name lookup. The tests above use the standard definitions of those
+response primitives. The effect of replacing them is a separate R15 check.
+
+An attempted closed call to `Data.Maybe.fromJust` requires an implicit
+`HasCallStack` argument. The current staged call checker reports
+GHC-91416 at that use. The integration test uses `fromMaybe` with an
+explicit default.

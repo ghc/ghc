@@ -28,8 +28,15 @@ The example plugin uses GHC's existing `tcPluginSolve` hook. The fork's
 closed evaluator supplies the result of the ordinary call. The plugin
 searches for the requested label. A match at the head gives the
 constructor `Here`. A match one position later gives `There Here`.
-Those constructors have indexed types. The checked module exports
-`labelEight :: Member 8 (OrdinaryOffer.offered 7)`. A second module uses
+Those constructors have indexed types. The checked module requests the
+path by calling the class method.
+
+```haskell
+labelEight :: Member 8 (OrdinaryOffer.offered 7)
+labelEight = location
+```
+
+A second module uses
 `fieldAt labelEight` to select the second field. It imports the witness
 and the data declarations with the extension off and the plugin disabled.
 An absent label leaves the constraint unsolved. A completely unknown

@@ -5234,3 +5234,46 @@ string representation is local to the compiler and interpreter.
 [Agda 2.8.0 Maybe](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Maybe.agda),
 [Agda standard library 2.3 sum](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Sum/Base.agda#L25-L38)
 and [GHC's result decoder](../../compiler/GHC/Tc/Gen/Splice.hs).
+
+### Projections of an unknown pair in an exported equality
+
+Agda's record documentation gives separate field types to the two pair
+projections. Both projections take a pair variable. R16 uses the two
+field parameters of GHC's boxed tuple and certifies only a case whose
+body returns the chosen binder unchanged. The nominal equation can
+remain in a signature until the caller supplies a pair constructor.
+The compiler uses GHC's linker plan to preserve the existing behavior
+of closed calls with executable operands and later rewrite rules.
+[Agda 2.8.0 pair projections](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#example-the-pair-type-constructor),
+[Serokell open evaluator](https://ghc.serokell.io/dh#open-term-evaluator),
+[GHC's tuple definitions](../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs)
+and [GHC's link dependency planner](../../compiler/GHC/Linker/Deps.hs).
+
+### Running checkers at the dependent boundary
+
+The [boundary experiment](BOUNDARY-EVIDENCE.md) uses an explicit witness
+for a concrete obligation. Agda's decidability library connects the
+result of a decision with its proof. The fork can use existing GHC
+plugins to return ordinary Core evidence. Thoralf gives the contrasting
+case in which an SMT translation is part of the trusted reasoning.
+[Agda's decision and witness operations](https://agda.github.io/agda-stdlib/v2.3/Relation.Nullary.Decidable.Core.html),
+[GHC's plugin evidence contract](../users_guide/extending_ghc.rst#typechecker-plugins)
+and [Thoralf implementation and paper](#thoralf-and-ghc-plugin-interfaces).
+
+QuickCheck tests generated cases. QuickSpec infers candidate equations
+from observations. Both help find counterexamples and choose properties
+for further checking. Liquid Haskell's refinement reflection relates
+function definitions to verification conditions. Its treatment of lazy
+Haskell explains why assumptions about which values terminate matter for
+a universal claim. These are different guarantees a boundary library can
+present to its caller.
+[QuickCheck](https://hackage-content.haskell.org/package/QuickCheck),
+[QuickSpec paper](https://smallbone.se/papers/quickspec.pdf),
+[Refinement Reflection](https://arxiv.org/abs/1711.03842)
+and [Refinement Types for Haskell](https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf).
+
+For runtime values, Dagand, Tabareau and Tanter give a constructive Coq
+account of partial conversions between ordinary and indexed values.
+This provides prior art for the failure branch of `fromListExact` and
+for a boundary that makes the checked invariant visible in its result.
+[Foundations of dependent interoperability, JFP 2018](https://doi.org/10.1017/S0956796818000011).

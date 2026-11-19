@@ -312,16 +312,16 @@ first to second changes the type of its unchanged client.
 and [the ordinary projections](../../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs).
 
 A variable `p :: (Type, Type)` supplies no constructor. A function can
-ignore `p` and return another argument of kind `Type`. Asking for
-`Prelude.fst p` stops at a case on `p` and reports GHC-70566. The observer
-also leaves a divergent field unevaluated when the function selects the
-other field. It cannot yet express a projection that remains stuck in
-an exported result type. [Source diagnostics](../examples/open-evaluation/check-source.sh)
+ignore `p` and return another argument of kind `Type`. For a producer
+that supplies only an ordinary unfolding, asking for `OpenProducer.pairFirst p`
+stops at a case on `p` and reports GHC-70566. The observer leaves a
+divergent field unevaluated when the function selects the other field.
+For installed Prelude projections, GHC can now preserve the application
+in an exported constraint. [Source diagnostics](../examples/open-evaluation/check-source.sh)
 and [Core observer checks](../../../testsuite/tests/ghc-api/OpenTermWhnf.hs).
 
-For an exported `fst p ~ x`, a checked family equation for the actual
-projection is one possible R13 implementation. Its kind must support
-both `'(Int,Bool)` and `'( 'True, 'x')`. A general R16 implementation
+For an exported `fst p ~ x`, M119 uses a checked family equation for
+the actual projection. Its kind supports both `'(Int,Bool)` and `'( 'True, 'x')`. A general R16 implementation
 must also represent cases that have no such family. It needs a stable
 reference to the definition and nominal evidence for the alternative
 selected when the caller supplies `p`. The observer's suspended case
@@ -376,12 +376,58 @@ remain on disk after an object that it imports has been removed. With
 only the interfaces present, the client accepted the nominal proof.
 Restoring just the worker object made the candidate try to execute it.
 GHC-70565 then named the missing transitive object. Restoring both objects
-made the same proof pass. The experiment must consult the executable
-dependencies of the worker before choosing ordinary evaluation.
+made the same proof pass.
 
-Publishing equations for installed `Prelude.fst` and `Prelude.snd` also
-requires checks against the real package database and a separate copy
-containing only interfaces. The published compiler can already select
-a field from a written pair of rigid type variables.
-[Source-family rule checks](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+The revised bootstrap compiler uses GHC's linker dependency plan before
+it chooses ordinary evaluation. All three cases now pass. In one-shot
+compilation a serialized `.gbc` and `.hi` also suffice. A worker already
+loaded by a Template Haskell splice remains executable while its object
+is absent. The probe can discover embedded Core without compiling it
+or extracting foreign objects. The interpreter loads the code only when
+the type checker selects ordinary evaluation.
+
+Another regression test supplies a checked `Data.Char.toUpper 'a'` call
+as input to an ordinary function returning a pair. A projection of that
+pair must preserve a later matching rule. The published compiler accepted
+it, the first candidate rejected it with GHC-83605, and the revised
+bootstrap compiler accepts it. The client interface retains the rule.
+
+### Exporting a projection of an unknown pair
+
+The in-tree compiler certifies the ordinary definitions of
+`Prelude.fst` and `Prelude.snd` in `GHC.Internal.Data.Tuple`. The
+ordinary boxed case in each definition returns one field unchanged.
+The exported equation reduces at a pair constructor. When the pair
+`p` is unknown, the application can remain in an exported constraint.
+
+```haskell
+first :: forall k l (p :: (k, l)) (x :: k).
+         Prelude.fst p ~ x => Proxy p -> Proxy x -> x :~: Prelude.fst p
+first _ _ = Refl
+```
+
+The exporter uses the given equality. Removing it makes GHC reject
+`Refl` at the binding. A client can use `first` and `second` with
+`ExperimentalDependentTypes` off. It checks `Int` and `Bool` for
+`'(Int, Bool)` and checks `'True` and `'x'` for `'( 'True, 'x')`.
+It reads only the producer and exporter interfaces while checking
+these equalities. It links with the original objects to run the program.
+The package test also preserves previously accepted calls to `fst` and
+`snd` on the result of `quotRem` under later rewrite rules.
+[Exporter](../examples/open-evaluation/PreludePairExport.hs),
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledPair.hs)
+and [installed package check](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledPair.sh).
+
+Both the internal interpreter and a prebuilt matching external interpreter
+passed the installed check. This GHC normally builds the external interpreter
+at startup. Building it requires the original libraries. Supplying the
+executable with `-pgmi` allows the test to remove those libraries from
+the consumer's package database.
+[Interpreter setup](../../../compiler/GHC/Runtime/Interpreter/Init.hs)
 and [the closed evaluator](R15-closed-term-evaluator.md#returning-a-pair).
+
+The next composition is `Prelude.fst (Data.Tuple.swap p) :~: Prelude.snd p`
+for a rigid `p :: (Bool, Char)`. The current compiler reports GHC-68947
+at `Data.Tuple.swap` because its interface supplies no checked equation
+for `swap`. This identifies a source test for a function that builds a
+pair from its fields.

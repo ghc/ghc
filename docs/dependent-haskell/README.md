@@ -8,8 +8,8 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 192 lines.
-The normal-way dependent directory passed 190 of 226 cases. All 36 failures
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 193 lines.
+The normal-way dependent directory passed 192 of 228 cases. All 36 failures
 produced the same output as on the previous fork tip. Fifteen reject existing
 programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
@@ -34,10 +34,10 @@ unknown argument produces an error at the call.
 The compiler checks `Prelude.gcd 18 24 :~: 6` and can return both
 fields of `Prelude.quotRem 17 5` as the promoted pair `'(3,2)`. For an open
 call such as `Prelude.fst '(a,b)`, the result is the caller's original
-`a`. If the caller supplies an unknown pair `p`, the same projection
-reports that it needs the constructor of `p`.
+`a`. An exporter can mention `Prelude.fst p ~ x` while `p` is unknown.
+An ordinary client can use the equality after supplying a pair.
 [Closed calls](roadmap/R15-closed-term-evaluator.md#functions-with-several-arguments)
-and [pair projections](roadmap/R16-open-term-evaluator.md#projecting-a-pair-of-unknown-types).
+and [exported pair projections](roadmap/R16-open-term-evaluator.md#exporting-a-projection-of-an-unknown-pair).
 
 A closed call can also return a constructor. GHC checks
 `Data.List.uncons '[2,3,5] :~: 'Just '(2, '[3,5])` with `Refl`. The
@@ -354,6 +354,7 @@ even if evaluating `xs` would diverge.
 
 - [Program roadmap](ROADMAP.md): the main work queue, all fifty upstream cards, dependencies and local completion boundaries.
 - Active feature pages: [R03 dependent products](roadmap/R03-dependent-products.md), [R05 dependent Core](roadmap/R05-dependent-core.md), and [R23 unsaturated type families](roadmap/R23-unsaturated-type-families.md).
+- [Evidence at the boundary](BOUNDARY-EVIDENCE.md) explains which facts an interface supplies, which can be checked by running ordinary Haskell, and how a client can use the result.
 - [Subset, library and assurance tasks](ROADMAP.md#local-subset-library-and-assurance-work): module interoperability, a small dependent-base and optional totality research.
 - [Implementation plan](PLAN.md): bounded specifications, acceptance checks and historical `M` checkpoints. Each new increment names its owning roadmap card.
 - [Runnable showcase](Showcase.hs): source features in one maintained program. The verification state is recorded below.
