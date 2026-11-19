@@ -1,0 +1,10 @@
+NativeClosedComputedSiblingsMismatch.hs:6:56: error: [GHC-83865]
+    • Couldn't match kind ‘Char’
+                     with ‘GHC.Internal.Bignum.Natural.Natural’
+      Expected kind ‘[GHC.Internal.Bignum.Natural.Natural]’,
+        but ‘'[ 'x']’ has kind ‘[Char]’
+    • In the first argument of ‘(:~:)’, namely
+        ‘Prelude.max (Prelude.sum '[1, 2]) (Prelude.head '[ 'x'])’
+      In the type signature:
+        bad :: Prelude.max (Prelude.sum '[1, 2]) (Prelude.head '[ 'x'])
+               :~: 3

@@ -3,7 +3,7 @@ module NativeClosedSumLib
     ( weighted, containsAny, identity
     , unavailable, Local (..), local, ambiguous, hiddenRequirement
     , unavailablePair, ambiguousPair, countOptional
-    , keepNatural, chooseLeft, chooseRight, ignoreNatural, bottomSigned, ignoreBool
+    , keepNatural, chooseLeft, chooseRight, ignoreNatural, ignoreSame, bottomSigned, ignoreBool
     ) where
 
 import Numeric.Natural (Natural)
@@ -74,3 +74,8 @@ bottomSigned _ = errorWithoutStackTrace "ran a closed operand ignored by its con
 -- | Fix an argument to Bool without forcing its value.
 ignoreBool :: Bool -> Natural
 ignoreBool _ = 0
+
+
+-- | Ignore two computations with the same inferred type.
+ignoreSame :: a -> a -> Bool
+ignoreSame _ _ = True

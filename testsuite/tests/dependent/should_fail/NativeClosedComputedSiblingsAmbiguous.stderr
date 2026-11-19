@@ -1,0 +1,7 @@
+NativeClosedComputedSiblingsAmbiguous.hs:6:15: error: [GHC-70565]
+    • Cannot evaluate ‘max’ in a type.
+        The operands do not determine the following type parameters: a.
+    • In the first argument of ‘Proxy’, namely
+        ‘(Prelude.max (Prelude.fromIntegral (Prelude.length '[1])) (Prelude.fromIntegral (Prelude.length '[2])))’
+      In the type signature:
+        bad :: Proxy (Prelude.max (Prelude.fromIntegral (Prelude.length '[1])) (Prelude.fromIntegral (Prelude.length '[2])))

@@ -245,3 +245,7 @@ test('NativeClosedSumAmbiguous',
       extra_files(['../should_run/NativeClosedSumLib.hs'])],
      multimod_compile_fail,
      ['NativeClosedSumAmbiguous', '-v0 ' + config.ghc_th_way_flags])
+
+for name in ['NativeClosedComputedSiblingsAmbiguous', 'NativeClosedComputedSiblingsMismatch']:
+    test(name, [req_interp, req_rts_linker, only_ways(['normal'])],
+         compile_fail, [config.ghc_th_way_flags])

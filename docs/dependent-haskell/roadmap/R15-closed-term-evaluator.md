@@ -695,19 +695,43 @@ It still executes their combined Core expression on demand. A test passes
 a conversion of an exceptional `Int` to a function that ignores its
 argument. The result is `'True`. A requested `Num Bool` instance still
 fails at the conversion even when the outer function ignores the value.
-Two computed siblings can still leave an overloaded result ambiguous
-when neither has an enclosing kind and their common type must be inferred.
-For example, `Prelude.max (Prelude.sum '[1, 2])
-(Prelude.fromIntegral (Prelude.length '[1, 2, 3]))` reports the unresolved
-result parameter at `fromIntegral`. The first call determines a
-`Natural`, but the planner has not shared that information with the
-second call.
+At this checkpoint, a computed sibling could not determine another
+computed sibling's type.
 [Positive and demand checks](../../../testsuite/tests/dependent/should_run/NativeClosedNestedExpected.hs)
 and [unsatisfied dictionary](../../../testsuite/tests/dependent/should_fail/NativeClosedNestedResultDictionary.hs).
 
-For the next increment, instantiate each ordinary function once and
-collect the argument and result equalities for the whole application.
-Check both argument orders before preparing any dictionaries. The
-acceptance cases include a genuinely ambiguous result, incompatible
-operands and an ignored exception. Constructor literals and empty lists
-must keep their existing checks as the planner takes over those cases.
+## M143. Sharing the kinds of computed operands
+
+```haskell
+proof :: Prelude.max (Prelude.sum '[1, 2])
+                     (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) :~: 3
+proof = Refl
+```
+
+`sum` takes a list of `Natural` and returns a `Natural`. Its result fixes
+the shared operand type of `max`. That fixes the result of `fromIntegral`,
+even if the conversion appears first. An enclosing result kind and a
+constructor literal can still constrain the same application.
+
+The planner instantiates each ordinary application in the tree once.
+The kind solver checks their shared constraints before the planner
+prepares the ordinary producer dictionaries. A checked-family operand
+and a nested legacy empty-list application retain their own admission
+checks. Each boundary supplies its checked kind to the tree. Bare empty
+lists default to `Natural` only after the applicable operand constraints
+have been collected.
+
+The compiler combines the original Core applications for the final
+observer. An ignored conversion can contain a throwing operand without
+forcing it. Two conversions without a target type remain ambiguous.
+Incompatible computed kinds fail before execution.
+[Both orders and the demand check](../../../testsuite/tests/dependent/should_run/NativeClosedNestedExpected.hs),
+[ambiguous computed siblings](../../../testsuite/tests/dependent/should_fail/NativeClosedComputedSiblingsAmbiguous.hs)
+and [incompatible computed siblings](../../../testsuite/tests/dependent/should_fail/NativeClosedComputedSiblingsMismatch.hs).
+
+An interface-only projection still checks its argument separately. In
+`(P.pick (W.pair (Prelude.fromIntegral (Prelude.length '[1,2,3])) 'x') :: Nat)`,
+`P.pick` selects the first field. Its expected result fixes that field's
+kind to `Nat`. The current checker asks the ordinary pair builder to
+infer the whole pair first and reports GHC-70565 at `W.pair`. Passing
+this constraint through the projection is the next source check.

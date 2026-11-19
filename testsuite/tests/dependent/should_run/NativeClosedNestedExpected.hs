@@ -33,6 +33,22 @@ jointRight = Refl
 lazy :: P.ignoreNatural (Prelude.fromIntegral (P.bottomSigned 1)) :~: 'True
 lazy = Refl
 
+-- | A computed sibling determines the conversion kind in either argument order.
+computedLeft :: Prelude.max (Prelude.sum '[1, 2])
+                            (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) :~: 3
+computedLeft = Refl
+
+computedRight :: Prelude.max (Prelude.fromIntegral (Prelude.length '[1, 2, 3]))
+                             (Prelude.sum '[1, 2]) :~: 3
+computedRight = Refl
+
+-- | Inferring the operand kind does not force its runtime value.
+computedLazy :: P.ignoreSame (Prelude.fromIntegral (P.bottomSigned 1))
+                             (Prelude.sum '[1, 2]) :~: 'True
+computedLazy = Refl
+
 main :: IO ()
-main = case (unary, parentResult, siblingLeft, siblingRight, jointLeft, jointRight, lazy) of
-  (Refl, Refl, Refl, Refl, Refl, Refl, Refl) -> putStrLn "nested expected kinds"
+main = case (unary, parentResult, siblingLeft, siblingRight, jointLeft, jointRight, lazy,
+             computedLeft, computedRight, computedLazy) of
+  (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl) ->
+    putStrLn "nested expected kinds"
