@@ -1059,10 +1059,39 @@ kind default. Existing aliases retain their metadata and their source shape.
 checkDeclKindMatchability :: TyClDecl GhcRn -> TcKind -> TcM ()
 checkDeclKindMatchability decl kind
   = do { kind <- liftZonkM $ zonkTcType kind
-       ; forM_ (declKindPrefix decl kind) $ \ (ma, _) ->
-           discardResult $ unifyType Nothing ma expected_ma }
+       ; forM_ (zip [0..] (declKindPrefix decl kind)) $ \ (i, (ma, _)) ->
+           checkDeclArrowMatchability kind i ma expected_ma }
   where
     expected_ma = tyConFlavourMatchability (tyClDeclFlavour decl)
+
+-- | Preserve the source synonym in an error for a consumed declaration arrow.
+checkDeclArrowMatchability :: Kind -> Int -> Matchability -> Matchability -> TcM ()
+checkDeclArrowMatchability kind index actual expected
+  | actual `tcEqType` unmatchableDataConTy
+  , expected `tcEqType` matchableDataConTy
+  , Just name <- synonymAt index kind = do
+      mod <- tcg_semantic_mod <$> getGblEnv
+      addErrCtxt (DeclKindSynonymCtxt name (nameIsLocalOrFrom mod name)) check
+  | otherwise = check
+  where
+    check = discardResult $ unifyType Nothing actual expected
+
+    -- An alias can merely forward a U arrow supplied by its caller.
+    -- Only report metadata supplied by the unsubstituted synonym RHS.
+    synonymAt i ty
+      | Just (tc, _) <- splitTyConAppNoView_maybe ty
+      , let name = tyConName tc
+      , not (isWiredInName name)
+      , Just rhs <- synTyConRhs_maybe tc
+      , Just ma <- arrowAt i rhs
+      , ma `tcEqType` unmatchableDataConTy = Just name
+      | i > 0, Just (_, _, rest) <- splitPiTy_maybe ty =
+          synonymAt (i - 1) rest
+      | otherwise = Nothing
+
+    arrowAt i ty = do
+      (ma, _, rest) <- splitPiTy_maybe ty
+      if i == 0 then Just ma else arrowAt (i - 1) rest
 
 -- | Select exactly the prefix consumed by header matching and data eta expansion.
 -- See Note [Checked declaration-kind matchability].
@@ -6623,11 +6652,11 @@ maybeEtaExpandAlgTyCon flav skol_info tcbs res_kind
 etaExpandAlgTyCon :: SkolemInfo
                   -> [TcTyConBinder] -> Kind
                   -> TcM ([TcTyConBinder], Kind)
-etaExpandAlgTyCon skol_info tcbs res_kind
-  = do { (ma_tcbs, res_kind) <- splitTyConKind skol_info in_scope avoid_occs res_kind
+etaExpandAlgTyCon skol_info tcbs declared_kind
+  = do { (ma_tcbs, res_kind) <- splitTyConKind skol_info in_scope avoid_occs declared_kind
        ; solveEqualities "etaExpandAlgTyCon matchability" $
-           forM_ ma_tcbs $ \ (ma, _) ->
-             discardResult $ unifyType Nothing ma matchableDataConTy
+           forM_ (zip [0..] ma_tcbs) $ \ (i, (ma, _)) ->
+             checkDeclArrowMatchability declared_kind i ma matchableDataConTy
        ; return (map snd ma_tcbs, res_kind) }
   where
     tyvars     = binderVars tcbs

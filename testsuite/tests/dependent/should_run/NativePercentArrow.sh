@@ -27,3 +27,47 @@ import GHC.Exts (M)
 data R = R { unR %M :: Int }
 HS
 reject Record 'GHC-49969'
+
+# An alias's default U arrow is valid for terms but unsuitable for a data kind.
+cat >ArrowAlias.hs <<'HS'
+{-# LANGUAGE GADTs, TypeOperators #-}
+module ArrowAlias where
+import Data.Kind (Type)
+data TyFun a b
+type a ~> b = TyFun a b -> Type
+data Symbol :: Type ~> Type
+HS
+reject ArrowAlias 'ArrowAlias.hs:6:1: error: [GHC-83865]'
+grep -Fq 'supplies an unmatchable (U) arrow.' bad.log
+grep -Fq 'This declaration requires a matchable (M) arrow.' bad.log
+grep -Fq "in the synonym's definition" bad.log
+
+sed -e 's/module ArrowAlias/module AliasProvider/' -e '/^data Symbol/d' ArrowAlias.hs >AliasProvider.hs
+"${g[@]}" -c AliasProvider.hs
+rm AliasProvider.hs
+sed -e 's/module ArrowAlias/module ImportedAlias/' \
+    -e '/^data TyFun/,+1c import AliasProvider (type (~>))' ArrowAlias.hs >ImportedAlias.hs
+reject ImportedAlias 'ImportedAlias.hs:5:1: error: [GHC-83865]'
+grep -Fq 'supplies an unmatchable (U) arrow.' bad.log
+grep -Fq 'import a matchable synonym' bad.log
+
+sed -e '1s/TypeOperators/TypeApplications, DataKinds/' \
+    -e 's/module ImportedAlias/module WiredArrow/' \
+    -e 's/import AliasProvider.*/import GHC.Exts (U)/' \
+    -e 's/Type ~> Type/(->) @U Type Type/' ImportedAlias.hs >WiredArrow.hs
+reject WiredArrow 'WiredArrow.hs:5:1: error: [GHC-83865]'
+if grep -Fq 'kind synonym' bad.log; then cat bad.log >&2; exit 1; fi
+
+# A trailing synonym can supply the bad arrow. A forwarding alias does not.
+sed -e 's/module ArrowAlias/module TrailingAlias/' \
+    -e 's/data Symbol :: Type ~> Type/data Symbol :: Type -> (Type ~> Type)/' \
+    ArrowAlias.hs >TrailingAlias.hs
+reject TrailingAlias 'TrailingAlias.hs:6:1: error: [GHC-83865]'
+grep -Fq 'supplies an unmatchable (U) arrow.' bad.log
+
+sed -e 's/module WiredArrow/module ForwardedArrow/' \
+    -e '/^data Symbol/i type Identity a = a' \
+    -e 's/Symbol :: (->) @U Type Type/Symbol :: Identity ((->) @U Type Type)/' \
+    WiredArrow.hs >ForwardedArrow.hs
+reject ForwardedArrow 'ForwardedArrow.hs:6:1: error: [GHC-83865]'
+if grep -Fq 'kind synonym' bad.log; then cat bad.log >&2; exit 1; fi

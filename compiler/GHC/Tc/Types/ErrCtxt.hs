@@ -376,6 +376,8 @@ data HsCtxt
   | MergeSignaturesCtxt !UnitState !ModuleName ![InstantiatedModule]
   -- | While checking that a module implements a Backpack signature.
   | CheckImplementsCtxt !UnitState !Module !InstantiatedModule
+  -- | An algebraic declaration consumes a synonym's unmatchable arrow.
+  | DeclKindSynonymCtxt !Name !Bool -- ^ True for a synonym defined in this module
 
 
 isHsCtxtLandmark :: HsCtxt -> Bool

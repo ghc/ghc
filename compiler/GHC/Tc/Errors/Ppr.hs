@@ -8306,6 +8306,13 @@ pprHsCtxt = \case
   ClosedFamEqnCtxt tc ->
     text "In the equations for closed type family" <+>
            quotes (ppr tc)
+  DeclKindSynonymCtxt name local ->
+    vcat [ text "The kind synonym" <+> quotes (ppr name)
+           <+> text "supplies an unmatchable (U) arrow."
+         , text "This declaration requires a matchable (M) arrow."
+         , if local
+           then text "Use '%M ->' in the synonym's definition, or use a separate matchable synonym here."
+           else text "Use a kind with a matchable arrow or import a matchable synonym." ]
   TySynErrCtxt tc ->
     text "In the expansion of type synonym" <+> quotes (ppr tc)
   RoleAnnotErrCtxt name ->
