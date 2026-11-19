@@ -318,3 +318,13 @@ also leaves a divergent field unevaluated when the function selects the
 other field. It cannot yet express a projection that remains stuck in
 an exported result type. [Source diagnostics](../examples/open-evaluation/check-source.sh)
 and [Core observer checks](../../../testsuite/tests/ghc-api/OpenTermWhnf.hs).
+
+For an exported `fst p ~ x`, a checked family equation for the actual
+projection is one possible R13 implementation. Its kind must support
+both `'(Int,Bool)` and `'( 'True, 'x')`. A general R16 implementation
+must also represent cases that have no such family. It needs a stable
+reference to the definition and nominal evidence for the alternative
+selected when the caller supplies `p`. The observer's suspended case
+contains a local environment and cannot serve as interface evidence.
+[Function promotion](https://ghc.serokell.io/dh#function-promotion)
+and [the observer's case representation](../../../compiler/GHC/Core/OpenWhnf.hs).

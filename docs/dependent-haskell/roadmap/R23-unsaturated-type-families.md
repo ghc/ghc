@@ -25,6 +25,23 @@ keep rejecting actual incompatible matchability annotations.
 [defunctionalization](../../../testsuite/tests/dependent/should_compile/T12442.hs)
 and [reflection](../../../testsuite/tests/dependent/should_compile/RaeJobTalk.hs).
 
+In `T20875`, the equation `ToKind TRUE = Type -> Type` checks its right
+side as an ordinary type. Its arrow gets U. The type constructor `Maybe`
+has an M arrow in its kind. Writing `FUN @M 'Many Type Type` in the
+equation makes this example compile. Writing `FUN @U 'Many Type Type`
+reproduces the rejection. An unannotated equation with the same right
+side can also describe a runtime function, where `keep x = x` needs U.
+Changing the default for every family equation would break that program.
+
+For the U case, GHC-83865 now reports the disagreement between
+`Matchable` and `Unmatchable` at `Maybe`. The original expected family
+can hide the arrow from the diagnostic's argument count. A family that
+reduces to `Type` can still produce the advice to supply another argument.
+Restoring the unannotated program remains open.
+[Matchability control](../../../testsuite/tests/dependent/diagnostics/FamilyArrowMatchability.hs),
+[arity control](../../../testsuite/tests/dependent/diagnostics/FamilyArrowArity.hs)
+and [proposal #242 on annotation-free arrows](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html).
+
 Of the 21 output mismatches, three successful compilations printed
 different kinds. In sixteen compile-fail tests the substantive rejection
 was preserved. Two other negative tests now fail in an earlier declaration.

@@ -5195,3 +5195,15 @@ kind. That variable supplies no information about either field. This
 choice preserves the Haskell case's strictness on the outer pair.
 [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
 and [GHC's boxed pair projections](../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs).
+
+### A local term definition used by a type
+
+Serokell's declaration analysis describes how GHC groups declarations and
+which dependencies need a signature or a definition. R21 asks GHC to
+extend this ordering across the term and type levels. An open call such
+as `keep a` needs the definition of `keep`. The closed-call interpreter
+also needs code it can load. Draft #509 expressly requires that the
+function come from another module. [Serokell's declaration analysis](https://serokell.io/blog/dependency-analysis-haskell),
+[R21](https://ghc.serokell.io/dh#dependency-analysis),
+[type-functions draft](https://github.com/ghc-proposals/ghc-proposals/pull/509)
+and [the fork's two-order source check](roadmap/R21-dependency-analysis.md).

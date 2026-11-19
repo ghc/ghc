@@ -8258,3 +8258,24 @@ calls. Each compiled Showcase and the GHCi run matched all 189 expected
 lines. The two GHC API tests and the dedicated GHCi test passed. The
 normal-way dependent directory passed 182 of 218 cases. All 36 remaining
 failures had the same per-test output as at `37408c9881`.
+
+## M115: distinguish matchability errors from missing arguments
+
+A family in an expected kind can hide an arrow. Counting only syntactically
+visible binders gave the wrong advice for `Maybe :: ToKind TRUE`.
+When the remaining equality is between matchabilities, show that
+equality and retain the original expected kind in the diagnostic.
+
+- [x] Check explicit M and U at the same family equation. Keep accepting a
+      runtime lambda at an unannotated family RHS.
+- [x] Report GHC-83865 with the two incompatible matchabilities for U.
+- [x] Keep the argument-count hint when the family reduces to `Type`.
+- [ ] Restore the affected ordinary programs. The reporting change
+      preserves the type checker's acceptance and rejection decisions.
+
+[R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+Both compilers passed the M, U and runtime-function controls. Of 220
+normal-way dependent-directory cases, 184 passed and 36 failed. The
+set of failures is identical to M114. Six now report the conflicting
+matchabilities where they previously suggested another argument.

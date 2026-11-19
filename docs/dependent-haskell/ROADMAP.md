@@ -159,7 +159,7 @@ when some of its operands are unknown.
 | --- | --- | --- |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Check a compound result such as `Prelude.quotRem 17 5` against the promoted pair `'(3,2)`. | [M111](PLAN.md#m111-use-the-closed-evaluator-with-the-roadmaps-source-spelling) checks `Vec (length [1,2,3]) Bool`. [M113](PLAN.md#m113-check-fully-applied-ordinary-functions) checks fully applied functions such as `gcd` with a shared instance. The interpreter currently reifies scalars and one list layer. |
 | [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Keep a blocked open projection in an exported type until the caller supplies its pair. | [M109](PLAN.md#m109-carry-an-open-call-in-an-exported-equality) exports checked character equations. [M114](PLAN.md#m114-project-a-type-from-a-known-pair) reduces `Prelude.fst '(a,b)`; a rigid pair itself can still block. General residual expressions need a representation and nominal evidence (R05). |
-| R21, dependency analysis | Allow the producer to be defined in the consumer module, respecting declaration order and cycles. | A separately compiled producer lets R15 proceed while R21 remains open. A local identity fails with GHC-68947 in both declaration orders. Making its checked body available for open evaluation is separate from loading runtime code for a closed call. |
+| [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Allow the producer to be defined in the consumer module, respecting declaration order and cycles. | A separately compiled producer lets R15 proceed while R21 remains open. A local identity fails with GHC-68947 in both declaration orders. Making its checked body available for open evaluation is separate from loading runtime code for a closed call. |
 
 [R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
 and [R23](roadmap/R23-unsaturated-type-families.md) retain their own completion
@@ -233,6 +233,7 @@ evaluator work has priority.
 | 53 | R15/R16: compose a family result with an ordinary call | [M112](PLAN.md#m112-pass-a-checked-family-result-to-the-closed-evaluator) | The solver supplies the inner character and the interpreter runs the outer function. Each records its own dependency. |
 | 54 | R15: check ordinary functions with several arguments | [M113](PLAN.md#m113-check-fully-applied-ordinary-functions) | `gcd 18 24` computes six; later operands determine the kind of earlier empty lists. |
 | 55 | R16: project a rigid type from a boxed pair | [M114](PLAN.md#m114-project-a-type-from-a-known-pair) | The imported `fst` and `snd` select original type variables. A demanded rigid pair still blocks. |
+| 56 | R23: diagnose arrow matchability after family reduction | [M115](PLAN.md#m115-distinguish-matchability-errors-from-missing-arguments) | GHC reports conflicting matchabilities at `Maybe` and retains the hint for a genuinely missing argument. Ordinary program compatibility remains open. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
