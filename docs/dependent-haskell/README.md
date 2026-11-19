@@ -139,6 +139,12 @@ GHC selects the ordinary list and natural-number instances. The Showcase
 reflects the resulting type as the number `10`.
 [Source proof](../../testsuite/tests/dependent/should_run/NativeClosedSum.hs).
 
+The installed `Prelude.length` returns an `Int`. A vector indexed by
+GHC's `Nat` can use
+`Vec (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) Bool`.
+GHC gets the conversion's result type from the index and checks that
+the vector has three cells. [Vector example](roadmap/R15-closed-term-evaluator.md#m139-using-the-installed-prelude-length-in-a-vector-index).
+
 The Showcase uses `Refl` to prove
 `Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]`. A list returned by one
 call can determine the input of another call during inference. [List evidence](roadmap/R15-closed-term-evaluator.md#list-results).

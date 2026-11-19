@@ -8668,3 +8668,25 @@ object replay and optimized-rule replay checks. The open constructor,
 derived-instance and defaulting checks passed. The normal-way dependent
 directory passed 227 of 263 exercised cases. All 36 failures matched
 M135 individually. The full GHC testsuite was not run.
+
+## M139: use the expected kind of a closed call
+
+- [x] Specialize the ordinary producer from its checked inputs and a known
+      result kind. Use the same rule for unary calls, saturated calls and
+      calls with constructor literals.
+- [x] Check a three-cell vector with the installed `Prelude.length` and
+      `Prelude.fromIntegral`. Check an explicit `Nat` annotation and a
+      negative `Int` intermediate consumed by `abs`.
+- [x] Preserve ambiguity when the result is unknown or a parameter occurs
+      only in a dictionary. Check a fixed `Int` result at an expected
+      `Nat` and a missing `Num Bool` instance under error deferral.
+
+[Vector, proofs and diagnostics](roadmap/R15-closed-term-evaluator.md#m139-using-the-installed-prelude-length-in-a-vector-index).
+
+Both compiler stages built. The internal and external interpreters checked
+the installed Prelude calls. A two-cell body with an explicit length
+produced `Expected: Vec 3 Bool` and `Actual: Vec 2 Bool`. Native
+execution in both stages and GHCi produced the same 213 Showcase lines.
+The normal-way dependent directory passed 229 of 265 exercised cases.
+All 36 failures matched M138 individually. The full GHC testsuite was
+not run.

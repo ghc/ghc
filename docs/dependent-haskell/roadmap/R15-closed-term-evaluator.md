@@ -652,3 +652,29 @@ the rule. It eliminates both calls, so the provider object cannot
 invalidate the proof. Replacing only its interface changes the rule's
 result from `7` to `8`. GHC rejects the unchanged client's proof at
 `Refl`. [Optimized interface replay](../../../testsuite/tests/dependent/should_run/NativeClosedFusedRule.sh).
+
+## M139. Using the installed Prelude length in a vector index
+
+```haskell
+vector :: Vec (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) Bool
+vector = VCons True (VCons False (VCons True VNil))
+```
+
+`Vec` declares its first parameter at kind `Nat`. The list fixes the
+input to `Prelude.length`, which returns an `Int`. The declared index
+then fixes the result of `fromIntegral` to `Nat`. GHC checks the
+`Integral Int` and `Num Natural` instances before executing the
+closed application. It observes the final `3`. The signed intermediate
+can stay in ordinary Core. A second example passes a negative `Int`
+through `abs` before conversion. [Vector and proofs](../../../testsuite/tests/dependent/should_run/NativeClosedSum.hs).
+
+A written result annotation can also supply the kind. A bare
+`Proxy (Prelude.fromIntegral 5)` leaves it unknown. Asking for
+`Bool` requires a `Num Bool` instance, even with deferred type errors.
+Using `Prelude.length` directly as a `Nat` still produces a kind
+mismatch at the call. The expected kind currently reaches the outer
+call. An enclosing ordinary function cannot yet pass its known input
+kind down to an overloaded nested call.
+[Ambiguous result](../../../testsuite/tests/dependent/should_fail/NativeClosedSourceAmbiguous.hs),
+[missing instance](../../../testsuite/tests/dependent/should_fail/NativeClosedResultDictionary.hs)
+and [missing conversion](../../../testsuite/tests/dependent/should_fail/NativeClosedLengthNoCast.hs).

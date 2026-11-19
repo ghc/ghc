@@ -23,6 +23,8 @@
 
 -- | Runnable examples of the completed Dependent Haskell source features.
 -- See BOUNDARY-EVIDENCE.md for the optional plugin, splice, and observation examples.
+-- In FileOffer.hs, an external search supplies a position for
+-- @Member 8 (OrdinaryOffer.offered 7)@. GHC checks the generated path.
 -- In GHCi, load PackedVecLibrary with the options in the adjacent README.
 -- Enter these as separate commands to keep a retained function at the prompt.
 --
@@ -831,6 +833,7 @@ main = do
     arithmeticNotation
     listBoundaries
     observe "ordinary length evaluated while checking the type" (TypeNats.natVal closedLength)
+    observe "installed Prelude.length converted to a Nat index" (TypeNats.natVal installedLength)
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
@@ -918,6 +921,10 @@ reflectPair _ = (TypeNats.natVal (Proxy @q), TypeNats.natVal (Proxy @r))
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length [1, 2, 3])
 closedLength = Proxy
+
+-- | Use Prelude's Int result and request a Nat from its ordinary conversion.
+installedLength :: Proxy (Prelude.fromIntegral (Prelude.length '[1, 2, 3]) :: TypeNats.Nat)
+installedLength = Proxy
 
 -- | The ordinary polymorphic identity returns the caller's type variable.
 openIdentity :: forall a. Num a => id a

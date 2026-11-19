@@ -5458,3 +5458,20 @@ with a default method in this example.
 [Haskell derived instances](https://www.haskell.org/onlinereport/haskell2010/haskellch11.html),
 [Haskell default declarations, section 4.3.4](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html)
 and [GHC deriving strategies](../../docs/users_guide/exts/deriving_strategies.rst).
+
+### Checking a closed call against a known result kind
+
+Serokell's closed-evaluator example uses the length of a literal list
+as a vector index. In the installed Prelude, `length` returns `Int`.
+`fromIntegral` has a separate result parameter subject to `Num`.
+M139 uses the `Nat` kind in the vector declaration to choose that
+parameter. Agda also uses a declared type when inserting implicit
+arguments. The Haskell Report specifies numeric defaulting for
+unresolved overloading. M139 uses an already known type and runs
+the ordinary GHC instance solver. An ambiguous result still produces
+an error. [Serokell closed evaluator](https://ghc.serokell.io/dh#closed-term-evaluator),
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+[Haskell Report, section 4.3.4](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html),
+[Foldable.length](../../libraries/ghc-internal/src/GHC/Internal/Data/Foldable.hs),
+[fromIntegral](../../libraries/ghc-internal/src/GHC/Internal/Real.hs)
+and [Nat](../../libraries/ghc-internal/src/GHC/Internal/TypeNats.hs).

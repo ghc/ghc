@@ -33,6 +33,25 @@ reproduces the rejection. An unannotated equation with the same right
 side can also describe a runtime function, where `keep x = x` needs U.
 Changing the default for every family equation would break that program.
 
+Both uses can occur in one module. GHC 9.14.1 accepts the following
+declarations together. The fork rejects `Maybe` at the second equation.
+
+```haskell
+type family K (b :: Bool) :: Type
+type instance K 'True = Type -> Type
+
+type family Interpret (b :: Bool) :: K b
+type instance Interpret 'True = Maybe
+
+identity :: K 'True
+identity x = x
+```
+
+The kind of `Maybe` needs M. The term `identity` needs U.
+Both refer to the same `K 'True`. An explicit extra parameter on `K`
+can distinguish these uses in the fork. That solution changes the
+source interface. Compatibility requires checking the original module.
+
 For the U case, GHC-83865 now reports the disagreement between
 `Matchable` and `Unmatchable` at `Maybe`. The original expected family
 can hide the arrow from the diagnostic's argument count. A family that
