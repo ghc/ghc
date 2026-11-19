@@ -111,7 +111,7 @@ import GHC.Iface.Decl    ( coAxiomToIfaceDecl )
 import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Load
 
-import GHC.Builtin.WiredIn.Types ( mkListTy, anyTypeOfKind, matchableDataConTy, unmatchableDataConTy )
+import GHC.Builtin.WiredIn.Types ( mkListTy, anyTypeOfKind, manyDataConTy, matchableDataConTy, unmatchableDataConTy )
 import GHC.Builtin.Modules( mAIN_NAME, gHC_PRIM, rOOT_MAIN, isWiredInOnlyModule )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
@@ -1907,8 +1907,13 @@ tcIndependentFamilyProducers demands group@HsGroup
         selected = [d | d <- demands, any (in_equation d) pending]
         ordinary_solver = null (solverTcMPlugins plugins) && null (defaultingTcMPlugins plugins) &&
                           isNullUFM (rewriterTcMPlugins plugins)
-    case independentClosure binds sigs (map fst selected) of
-      Just names | not (null selected), ordinary_solver -> do
+    candidate <- case independentClosure (tcg_semantic_mod env) binds sigs (map fst selected) of
+      Just (names, imported) | not (null selected), ordinary_solver -> do
+        safe <- allM independentImport (nameSetElemsStable imported)
+        pure (if safe then Just (names, imported) else Nothing)
+      _ -> pure Nothing
+    case candidate of
+      Just (names, imported) -> do
         let (early_binds, rest_binds) = partition (any (selectedBind names) . snd) binds
             (early_sigs, rest_sigs) = splitSignatures names sigs
             early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs) }
@@ -1918,7 +1923,7 @@ tcIndependentFamilyProducers demands group@HsGroup
           evs <- checkNoErrs (simplifyTop wanted)
           checked@(definitions, _) <- localOpenDefinitions selected
             (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
-          unless (isEmptyBag evs && all (independentCore names . snd)
+          unless (isEmptyBag evs && all (independentCore (names `unionNameSet` imported) . snd)
                                              (nonDetNameEnvElts definitions)) $
             rejectLocalOpen selected "The checked producer requires evidence outside the independent fragment."
           addTopEvBinds evs $ withLocalOpenDefinitions checked $
@@ -1927,15 +1932,19 @@ tcIndependentFamilyProducers demands group@HsGroup
 tcIndependentFamilyProducers demands group finish = tcLocalOpenGroup demands group finish
 
 -- | Close a producer over complete signatures and lexical variable applications.
-independentClosure :: [(RecFlag, [LHsBind GhcRn])] -> [LSig GhcRn] -> [Name] -> Maybe NameSet
-independentClosure binds sigs roots =
-    either (const Nothing) Just (closeLocalNames deps emptyNameSet roots)
+independentClosure :: Module -> [(RecFlag, [LHsBind GhcRn])] -> [LSig GhcRn]
+                   -> [Name] -> Maybe (NameSet, NameSet)
+independentClosure this_mod binds sigs roots = do
+    names <- either (const Nothing) Just (closeLocalNames deps emptyNameSet roots)
+    let local = filterNameSet (nameIsLocalOrFrom this_mod) names
+    pure (local, names `minusNameSet` local)
   where
     signatures = signaturesByOwner sigs
     functions = mkNameEnv
       [(name, matches) | (NonRecursive, [L _ FunBind{fun_id = L _ name, fun_matches = matches}]) <- binds]
 
     deps name
+      | isExternalName name, not (nameIsLocalOrFrom this_mod name) = Right emptyNameSet
       | Just matches <- lookupNameEnv functions name
       , Just pragmas <- lookupNameEnv signatures name
       , [sig] <- filter is_type_sig pragmas
@@ -1982,44 +1991,65 @@ independentClosure binds sigs roots =
       HsLam _ LamSingle matches -> match_refs locals matches
       _ -> Nothing
 
+-- | Verify an imported occurrence from its interface, without using its body.
+independentImport :: Name -> TcM Bool
+independentImport name = do
+    ident <- tcLookupIdMaybe name
+    pure (maybe False (independentType emptyNameSet . idType) ident)
+
 -- | Recheck pre-optimisation Core emitted by the source fragment.
 independentCore :: NameSet -> CoreExpr -> Bool
 independentCore producers = go emptyNameSet emptyNameSet
   where
     go tyvars locals (Core.Var v)
       | getName v `elemNameSet` locals =
-          independent_type tyvars (varType v)
+          independentType tyvars (varType v)
       | getName v `elemNameSet` producers =
-          independent_type emptyNameSet (varType v)
+          independentType emptyNameSet (varType v)
       | otherwise = False
     go tyvars locals (Core.Lam v body)
-      | isTyVar v, isLiftedTypeKind (varType v) =
+      | isTyVar v, independentConstant liftedTypeKind (varType v) =
           go (extendNameSet tyvars (getName v)) locals body
-      | isId v, not (isCoVar v), isManyTy (idMult v), independent_type tyvars (varType v) =
+      | isId v, not (isCoVar v), independentConstant manyDataConTy (idMult v), independentType tyvars (varType v) =
           go tyvars (extendNameSet locals (getName v)) body
       | otherwise = False
     go tyvars locals (Core.App fun operand) = go tyvars locals fun && go tyvars locals operand
-    go tyvars _ (Core.Type ty) = independent_type tyvars ty
+    go tyvars _ (Core.Type ty) = independentType tyvars ty
     go _ _ _ = False
 
-    independent_type tyvars (TyVarTy var) = getName var `elemNameSet` tyvars
-    independent_type tyvars (FunTy {ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult,
-                                    ft_arg = input, ft_res = result}) =
-      ma `eqType` unmatchableDataConTy && isManyTy mult &&
-      independent_type tyvars input && independent_type tyvars result
-    independent_type tyvars (ForAllTy ma (Bndr var (Invisible _)) body) =
-      ma `eqType` unmatchableDataConTy && isTyVar var && isLiftedTypeKind (varType var) &&
-      independent_type (extendNameSet tyvars (getName var)) body
-    independent_type _ ty = isLiftedTypeKind ty
+-- | Types in the independent fragment contain only lifted variables and arrows.
+independentType :: NameSet -> Type -> Bool
+independentType tyvars (TyVarTy var) = getName var `elemNameSet` tyvars
+independentType tyvars FunTy{ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult,
+                             ft_arg = input, ft_res = result} =
+  independentConstant unmatchableDataConTy ma && independentConstant manyDataConTy mult &&
+  independentType tyvars input && independentType tyvars result
+independentType tyvars (ForAllTy ma (Bndr var (Invisible _)) body) =
+  independentConstant unmatchableDataConTy ma && isTyVar var &&
+  independentConstant liftedTypeKind (varType var) &&
+  independentType (extendNameSet tyvars (getName var)) body
+independentType _ ty = independentConstant liftedTypeKind ty
+
+-- | Match a wired-in type constant without ignoring casts in its arguments.
+independentConstant :: Type -> Type -> Bool
+independentConstant expected actual
+  | TyConApp left xs <- coreFullView expected
+  , TyConApp right ys <- coreFullView actual =
+      left == right && equalLength xs ys && and (zipWith independentConstant xs ys)
+  | otherwise = False
 
 {- Note [Independent imported-family producers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An imported family can be named by an imported signature or a class
 instance. A renamed name closure alone cannot justify moving an ordinary
 producer ahead of that family's equation. Check a separate early batch
-with only signed lexical lambda/application bindings. Reject imported
-values, annotations and syntax with overloaded operations. Allow named
-dependencies only inside the same closed family-free fragment.
+with only signed lexical lambda/application bindings. Reject
+annotations and syntax with overloaded operations. An imported Id
+can enter this batch if its entire declared type is independent.
+Check all binder kinds, argument types and arrow metadata. This
+check uses its interface, without evaluating or certifying its body.
+The observer checks the body and source RULE dependencies only if
+the checked producer needs the imported Id.
 
 For example, in "keep x = const x (hidden Proxy)", the dictionary for
 hidden may change when the family equation comes into scope. Observing

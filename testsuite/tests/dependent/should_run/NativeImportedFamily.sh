@@ -55,6 +55,33 @@ sed -e 's/BlindCycle/ErasedCycle/g' \
     -e 's/(hidden Proxy)/(True :: Payload Int)/' BlindCycle.hs >ErasedCycle.hs
 expect_cycle ErasedCycle
 
+cat >StrictImport.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}
+module StrictImport where
+import ImportedFamilyProvider (Payload, importedStrict)
+type instance Payload Int = StrictImport.keep Bool Char
+keep :: forall a b. a -> b -> b
+keep x y = importedStrict x y
+HS
+if "${ghc[@]}" -c StrictImport.hs >strict.log 2>&1 ||
+   ! grep -Eq '^StrictImport\.hs:4:[0-9]+(-[0-9]+)?: error: \[GHC-70566\]' strict.log ||
+   ! grep -Fq 'Reduction cannot inspect the value of a type operand.' strict.log; then
+    cat strict.log >&2
+    exit 1
+fi
+
+sed -e 's/StrictImport/RuleImport/g' -e 's/importedStrict/importedFirst/g' \
+    -e 's/forall a b. a -> b -> b/forall a. a -> a -> a/' StrictImport.hs > RuleImport.hs
+cat >>RuleImport.hs <<'HS'
+{-# RULES "imported-family/change" forall x y. importedFirst x y = y `seq` x #-}
+HS
+if "${ghc[@]}" -fenable-rewrite-rules -Wno-inline-rule-shadowing -c RuleImport.hs >rule.log 2>&1 ||
+   ! grep -Eq '^RuleImport\.hs:7:[0-9]+(-[0-9]+)?: error: \[GHC-83605\]' rule.log ||
+   ! grep -Fq 'importedFirst' rule.log; then
+    cat rule.log >&2
+    exit 1
+fi
+
 # A hidden dictionary is a genuine dependency even when observation ignores it.
 cat >Dictionary.hs <<'HS'
 {-# LANGUAGE CPP, TypeFamilies #-}
@@ -79,5 +106,18 @@ without=$(./without)
 with=$(./with)
 if [[ $without != '(False,False)' || $with != '(False,True)' ]]; then
     printf 'Dictionary control produced %s without the equation and %s with it\n' "$without" "$with" >&2
+    exit 1
+fi
+
+# With the same signature, the provider can choose the other opaque type.
+cd ../producer
+sed 's/^importedFirst x _ = x$/importedFirst _ y = y/' ImportedFamilyProvider.hs > changed
+mv changed ImportedFamilyProvider.hs
+"${ghc[@]}" -fforce-recomp -c ImportedFamilyProvider.hs
+line=$(awk '/^  observed _ = True$/ {print NR}' ImportedFamily.hs)
+if "${ghc[@]}" -fforce-recomp -c ImportedFamily.hs >changed.log 2>&1 ||
+   ! grep -Eq "^ImportedFamily\.hs:$line:[0-9]+(-[0-9]+)?: error: \[GHC-(83865|18872)\]" changed.log ||
+   ! grep -Fq "Couldn't match" changed.log || ! grep -Fq 'Char' changed.log; then
+    cat changed.log >&2
     exit 1
 fi

@@ -290,3 +290,21 @@ must preserve the dictionary selected under the complete instance
 environment. A second producer that calls `const x (hidden Proxy)`
 returns `x` in both runs. Observing that result alone cannot detect
 the difference in dictionary selection.
+
+## M160. Independent imported function types
+
+An early producer can call an imported function whose complete
+interface type belongs to the family-free fragment. The check covers
+invisible binder kinds as well as all input and result types. It
+admits lifted type variables and ordinary unrestricted arrows. Class
+contexts and family-dependent types stay outside the fragment.
+
+The shared example uses `Prelude.id` and an ordinary imported
+projection. The scheduler checks their types before moving the local
+producer. Open evaluation checks each demanded unfolding and records
+the original function for RULE validation. A strict imported helper
+cannot inspect the supplied type operand, and a matching RULE on an
+observed helper rejects the proof. Changing the imported projection
+to choose the other operand changes the family equation to `Char`.
+The original Boolean method then fails to typecheck. [Separate
+compilation, demand and RULE checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
