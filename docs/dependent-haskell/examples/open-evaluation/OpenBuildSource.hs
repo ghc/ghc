@@ -1,9 +1,9 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds, PolyKinds #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeOperators #-}
 
-module OpenBuildSource (Make, exact, nested, rigid, pair, swapped) where
+module OpenBuildSource (Make, exact, nested, rigid, pair, swapped, Swap) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -33,3 +33,7 @@ pair _ _ = Refl
 -- | Check both field positions after swapping a known pair.
 swapped :: forall a b. Proxy a -> Proxy b -> B.swapPair '(a, b) :~: '(b, a)
 swapped _ _ = Refl
+
+-- | Export the call even when the pair constructor is unknown here.
+type Swap :: (k, l) -> (l, k)
+type Swap p = B.swapPair p

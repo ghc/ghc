@@ -125,11 +125,16 @@ import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import qualified OpenProducer
 
-stuck :: forall (p :: (Type, Type)). Proxy p -> Proxy (OpenProducer.pairFirst p)
+stuck :: forall (p :: (Type, Type)). Proxy p -> Proxy (OpenProducer.strictPairFirst p)
 stuck _ = undefined
 HS
 cp negative/OpenRigidPair.hs manager/
-rigid_pair_site=$(awk '/^stuck ::/ {print NR ":" index($0, "OpenProducer.pairFirst")}' negative/OpenRigidPair.hs)
+sed -e 's/module OpenRigidPair/module CheckedPair/' \
+    -e 's/OpenProducer.strictPairFirst/OpenProducer.pairFirst/' negative/OpenRigidPair.hs >negative/CheckedPair.hs
+cp negative/CheckedPair.hs manager/
+(cd negative && "${ghc[@]}" -i../artifacts -c CheckedPair.hs)
+(cd manager && "${ghc[@]}" --make -i. -no-link CheckedPair.hs)
+rigid_pair_site=$(awk '/^stuck ::/ {print NR ":" index($0, "OpenProducer.strictPairFirst")}' negative/OpenRigidPair.hs)
 expect_rigid_pair() {
     if "${ghc[@]}" "$@" > rigid-pair.log 2>&1 ||
        ! grep -Fxq "OpenRigidPair.hs:$rigid_pair_site: error: [GHC-70566]" rigid-pair.log ||

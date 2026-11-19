@@ -11,6 +11,8 @@ mkdir "$out"/{worker,exporter,client}
 cd "$out/worker"
 cp "$src"/{OpenBuildWorker,NativeOpenBuildControls}.hs .
 "${ghc[@]}" -c OpenBuildWorker.hs NativeOpenBuildControls.hs
+"${ghc[@]}" --show-iface OpenBuildWorker.hi >worker.iface
+grep -Fq 'T:swapPair' worker.iface
 cp OpenBuildWorker.hi NativeOpenBuildControls.hi ../exporter/
 cd ../exporter
 cp "$src/OpenBuildSource.hs" .
@@ -61,12 +63,12 @@ cat > RigidSwap.hs <<'SOURCE'
 module RigidSwap where
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
-import Data.Type.Equality ((:~:))
+import Data.Type.Equality ((:~:)(Refl))
 import qualified OpenBuildWorker as B
 blocked :: forall (p :: (Type, Type)). Proxy p -> B.swapPair p :~: p
-blocked _ = undefined
+blocked _ = Refl
 SOURCE
-expect_rejection RigidSwap 7 '\[GHC-70566\]' 'rigid argument p'
+expect_rejection RigidSwap 8 '\[GHC-(25897|83865)\]' 'In the expression: Refl'
 
 cat > Wrong.hs <<'SOURCE'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
@@ -87,6 +89,34 @@ cp "$src/NativeOpenBuild.hs" .
 "${ghc[@]}" NativeOpenBuild.o ../exporter/OpenBuildSource.o ../worker/OpenBuildWorker.o -o client
 ./client
 
+cat > RuledSwap.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+{-# OPTIONS_GHC -Wno-orphans -Wno-inline-rule-shadowing #-}
+module RuledSwap where
+import Data.Type.Equality ((:~:)(Refl))
+import OpenBuildSource (Swap)
+import qualified OpenBuildWorker as B
+bad :: Swap '( 'True, 'False) :~: '( 'False, 'True)
+bad = Refl
+{-# RULES "use the input pair" forall (p :: (Bool, Bool)). B.swapPair p = p #-}
+SOURCE
+expect_rejection RuledSwap 8 '\[GHC-83605\]' 'swapPair' -fenable-rewrite-rules
+
+cat > Disjoint.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+{-# OPTIONS_GHC -Wno-orphans -Wno-inline-rule-shadowing #-}
+module Disjoint where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import qualified OpenBuildWorker as B
+proof :: forall (a :: Bool) (b :: Bool). Proxy a -> Proxy b -> B.swapPair '(a, b) :~: '(b, a)
+proof _ _ = Refl
+{-# RULES "use the input pair" forall (p :: (Char, Char)). B.swapPair p = p #-}
+SOURCE
+"${ghc[@]}" -fenable-rewrite-rules -c Disjoint.hs
+sed -e 's/module Disjoint/module Matching/' -e 's/(Char, Char)/(Bool, Bool)/' Disjoint.hs >Matching.hs
+expect_rejection Matching 8 '\[GHC-83605\]' 'swapPair' -fenable-rewrite-rules
+
 # Recheck the unchanged exporter after a body-only change in the producer.
 cd ../worker
 sed 's/^build x y = Shell x y$/build x y = OtherShell x y/' "$src/OpenBuildWorker.hs" > OpenBuildWorker.hs
@@ -95,3 +125,39 @@ cp OpenBuildWorker.hi ../exporter/
 cd ../exporter
 test -s OpenBuildSource.o
 expect_rejection OpenBuildSource 19 '\[GHC-(25897|83865)\]' 'In the expression: Refl'
+
+# A stricter ordinary producer cannot supply the previous pair equation.
+cd ../worker
+sed 's/^swapPair (x, y) = (y, x)$/swapPair (x, y) = x `seq` (y, x)/' \
+    "$src/OpenBuildWorker.hs" >OpenBuildWorker.hs
+"${ghc[@]}" -c OpenBuildWorker.hs
+"${ghc[@]}" --show-iface OpenBuildWorker.hi >strict.iface
+if grep -Fq 'T:swapPair' strict.iface; then exit 1; fi
+cp OpenBuildWorker.hi ../exporter/
+cd ../exporter
+swap_line=$(awk '/^type Swap p =/ { print NR }' OpenBuildSource.hs)
+expect_rejection OpenBuildSource "$swap_line" '\[GHC-70566\]' 'B.swapPair p'
+
+# The certificate needs neither an INLINE pragma nor an executable unfolding.
+cd ../worker
+sed '/^{-# OPTIONS_GHC/d; /^{-# INLINE/d' "$src/OpenBuildWorker.hs" >OpenBuildWorker.hs
+"${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c OpenBuildWorker.hs
+cp OpenBuildWorker.hi ../client/
+cd ../client
+cat > Bare.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, StandaloneKindSignatures #-}
+module Bare where
+import qualified OpenBuildWorker as B
+type Swap :: (k, l) -> (l, k)
+type Swap p = B.swapPair p
+SOURCE
+"${ghc[@]}" -fomit-interface-pragmas -c Bare.hs
+cat > Concrete.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module Concrete where
+import Bare (Swap)
+import Data.Type.Equality ((:~:)(Refl))
+answer :: Swap '( 'True, 'x') :~: '( 'x', 'True)
+answer = Refl
+SOURCE
+"${ghc[@]}" -c Concrete.hs

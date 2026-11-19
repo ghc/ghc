@@ -80,7 +80,7 @@ import GHC.HsToCore.Monad (initDsTc)
 import GHC.Core (CoreExpr)
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses,
                                sourceTableDependencies)
@@ -694,12 +694,12 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       ; setGblEnv tcg_env' (checkSourceMethodUses tcg_env')
       ; failIfErrsM
       ; tables_enabled <- xoptM LangExt.ExperimentalDependentTypes
-      ; if tables_enabled
-        then setGblEnv tcg_env' $ do
-             tables <- sourceTableTyCons (tcg_binds tcg_env')
-             charTables <- sourceCharTables (tcg_binds tcg_env')
-             installSourceTables (tables ++ charTables) >>= installSourceMethods
-        else return tcg_env' }
+      ; setGblEnv tcg_env' $ do
+          let binds = tcg_binds tcg_env'
+          tables <- if tables_enabled then sourceTableTyCons binds else pure []
+          cases <- sourceCaseTables binds
+          env <- installSourceTables (tables ++ cases)
+          if tables_enabled then installSourceMethods env else pure env }
 
 -- | Publish only checked method aliases that user rules cannot replace.
 -- See Note [Certifying a source method alias] in GHC.Tc.TyCl.Instance.

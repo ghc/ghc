@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourcePairCaseKindUse, isSourcePairCase, sourceTableOwner, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
@@ -80,12 +80,13 @@ import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet)
 import GHC.Types.Var (Id, CoVar, VarBndr(..), isId, mkTyVar, varName)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (lengthIs)
-import GHC.Utils.Monad (allM)
+import GHC.Utils.Monad (allM, anyM)
 import GHC.Utils.Outputable (text)
 
-import Control.Monad (foldM, forM, forM_, guard, unless, when, zipWithM)
+import Control.Monad (filterM, foldM, forM, forM_, guard, unless, when, zipWithM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<|>))
+import Data.Functor.Identity (Identity(..))
 import Data.List (find, nubBy, partition, sortBy)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (catMaybes, isNothing, mapMaybe)
@@ -200,8 +201,8 @@ sourceTableFamilyUse table = sourceTableFamilyUseAt table Nothing
 sourceTableFamilyAppUse :: TyCon -> [Type] -> TcM ()
 sourceTableFamilyAppUse table args
   | isSourcePairCase table, lengthIs args (tyConArity table) = do
-      checked <- liftZonkM (zonkTcTypes args)
-      sourceTableFamilyUseAt table (groundFirstHead checked)
+      kinds <- liftZonkM (zonkTcTypes (take (tyConArity table - 1) args))
+      sourceTableFamilyUseAt table (groundFirstHead kinds)
   | otherwise = sourceTableFamilyUse table
 
 -- | Check the specialized kinds in a closed pair plan before running its operand.
@@ -245,6 +246,14 @@ ExperimentalDependentTypes. Check the family owner and its callees when
 the solver uses a family reduction. Check only the active family head.
 A type in an unused argument does not establish a use of that argument's
 axiom. Cache and plugin reductions need the same check.
+
+For a checked pair case, the final family argument represents the term
+pair. The preceding kind arguments instantiate the ordinary function.
+Use that prefix when comparing an explicit type argument in a rewrite
+rule. A pair of unknown Booleans still rules out a Char specialization.
+Before final zonking, the first type argument of a rule with a typed
+term binder can be a filled metavariable. Read that argument before
+comparing heads. An unresolved argument still permits a match.
 -}
 
 {- Note [Legacy private source leaves]
@@ -411,8 +420,13 @@ changedSourceUse :: [(Id, Maybe Name)] -> TcM (Maybe (Id, Maybe Name))
 changedSourceUse ops = do
     env <- getGblEnv
     visible <- visibleSourceMethodRules env
-    pure $ find (\(v, arg) -> idName v `elemNameSet` sourceRuleOwnersAt arg (tcg_rules env)
-                             || hasSourceMethodRuleAt visible arg v) ops
+    let check [] = pure Nothing
+        check (op@(v, arg) : rest) = do
+          local <- sourceRuleOwnersAtTc arg (tcg_rules env)
+          if idName v `elemNameSet` local || hasSourceMethodRuleAt visible arg v
+            then pure (Just op)
+            else check rest
+    check ops
 
 -- | Publish only dependencies selected by final evidence, and retain pending ones.
 commitOptionalSourceUses :: TcGblEnv -> TcM ()
@@ -489,11 +503,13 @@ checkSourceMethodUsesWithPending env = do
       let arguments name | Just ts <- lookupNameEnv types name, not (isEmptyNameSet ts)
                          = map Just (nameSetElemsStable ts)
                          | otherwise = [Nothing]
-          affected rule name = any (\arg -> name `elemNameSet` sourceRuleOwnersAt arg [rule]) (arguments name)
-          local = [(rule, filterNameSet (affected rule) (uses `intersectNameSet` sourceRuleOwners [rule]))
-                  | rule <- tcg_rules env]
-          imported = uses `minusNameSet` unionNameSets (map snd local)
+          affected rule name = anyM (\arg -> elemNameSet name <$> sourceRuleOwnersAtTc arg [rule]) (arguments name)
           report name = addErr (TcRnRetainedQuantificationError (RetainedSourceRule name))
+      local <- forM (tcg_rules env) $ \rule -> do
+        let candidates = uses `intersectNameSet` sourceRuleOwners [rule]
+        names <- filterM (affected rule) (nameSetElemsStable candidates)
+        pure (rule, mkNameSet names)
+      let imported = uses `minusNameSet` unionNameSets (map snd local)
       forM_ local $ \(rule, names) ->
         setSrcSpanA (getLoc rule) (mapM_ report (nameSetElemsStable names))
       unless (isEmptyNameSet imported) $ do
@@ -509,12 +525,24 @@ sourceRuleOwners = sourceRuleOwnersAt Nothing
 -- | Exclude a local rule only when its first applied type constructor is known
 -- and differs from the actual one. A polymorphic rule can match any argument.
 sourceRuleOwnersAt :: Maybe Name -> [LRuleDecl GhcTc] -> NameSet
-sourceRuleOwnersAt arg rules = unionNameSets
+sourceRuleOwnersAt arg rules = runIdentity (sourceRuleOwnersWith Identity arg rules)
+
+-- | Before final zonking, the inferred type argument of a local rule can
+-- still refer to a filled metavariable. See Note [Source family evidence uses].
+sourceRuleOwnersAtTc :: Maybe Name -> [LRuleDecl GhcTc] -> TcM NameSet
+sourceRuleOwnersAtTc = sourceRuleOwnersWith (liftZonkM . zonkTcType)
+
+-- | Select active rule heads, using the supplied view of their first type argument.
+sourceRuleOwnersWith :: Monad m => (Type -> m Type) -> Maybe Name -> [LRuleDecl GhcTc] -> m NameSet
+sourceRuleOwnersWith zonk arg rules = unionNameSets <$> sequence
     [ case headOf (unLoc lhs) of
-        Just (_, Just ty) | Just expected <- arg, Just (tc, _) <- tcSplitTyConApp_maybe ty
-                          , isGenerativeTyCon tc Nominal, tyConName tc /= expected -> emptyNameSet
-        Just (owner, _) -> unitNameSet owner
-        Nothing -> lhs_fvs
+        Just (owner, Just ty) | Just expected <- arg -> do
+          actual <- zonk ty
+          pure $ case tcSplitTyConApp_maybe actual of
+            Just (tc, _) | isGenerativeTyCon tc Nominal, tyConName tc /= expected -> emptyNameSet
+            _ -> unitNameSet owner
+        Just (owner, _) -> pure (unitNameSet owner)
+        Nothing -> pure lhs_fvs
     | L _ HsRule{rd_ext = (HsRuleRn lhs_fvs _, _), rd_lhs = lhs, rd_act = act} <- rules
     , not (isNeverActive act) ]
   where
@@ -734,15 +762,17 @@ sourceTableTyCons binds = do
 
 -- | Publish checked Char and boxed pair equations from final zonked bindings.
 -- See Note [Checked Char cases] and Note [Checked pair cases].
-sourceCharTables :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
-sourceCharTables binds = do
+sourceCaseTables :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
+sourceCaseTables binds = do
   env <- getGblEnv
+  char_tables <- xoptM LangExt.ExperimentalDependentTypes
   let exported = mkNameSet (concatMap availNames (tcg_exports env))
       ruled = sourceRuleOwners (tcg_rules env)
       eligible owner =
         idName owner `elemNameSet` exported &&
         not (idName owner `elemNameSet` ruled) &&
-        (varType owner `eqType` charArrow || not (isNothing (pairCaseType (varType owner))))
+        ((char_tables && varType owner `eqType` charArrow) ||
+         not (isNothing (pairCaseType (varType owner))))
       candidates = [ (bind, owner) | bind <- binds
                    , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
                    , eligible owner ]
@@ -939,6 +969,12 @@ publishPairCase owner (PairCase telescope first second selected) = do
 {- Note [Checked pair cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 A checked boxed case can publish one nominal constructor equation.
+Check exported ordinary functions when finalizing the producer module.
+The family and its axiom belong to that module. A dependent client can
+keep a call on an unknown pair in its interface. A later client can
+reduce the application when the pair constructor becomes known. Ordinary
+term uses keep the original Id. The dependent client's renamer selects
+the family only when ExperimentalDependentTypes is enabled there.
 The two bound field types become kind parameters in that equation.
 A homogeneous term type shares one kind parameter but still introduces
 two independent fields. The actual case determines which fields go into the equation. Returning the exact alternative binder requires no
