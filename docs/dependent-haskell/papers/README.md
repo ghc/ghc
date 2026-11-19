@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
-Read on 2026-11-14 through 2026-11-18. The [manifest](manifest.json) records
-twenty-five works and thirty-one downloaded PDF versions. It contains source URLs,
+Read on 2026-11-14 through 2026-11-19. The [manifest](manifest.json) records
+twenty-six works and thirty-two downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -14,7 +14,8 @@ The JFP 2022 ANF paper and selected-page records are in
 `native-computed-retained/papers/`.
 The OutsideIn(X) author draft and selected-page records are in
 `native-let-conversion/`. The POPL 2004 `seq` paper and selected-page
-records are in `serokell-evaluators/`.
+records are in `serokell-evaluators/`. This directory also holds the
+QuickSpec paper, its text extraction, and its verification record.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -52,6 +53,7 @@ versions and several selective readings.
 | [Refinement Types For Haskell](https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf) | Vazou, Seidel, Jhala, Vytiniotis and Peyton-Jones, ICFP 2014 | R05, optional assurance | Potential divergence, weak-head values, finite values and decreasing recursion metrics. No guarantee is transferred to this compiler. |
 | [ANF preserves dependent types up to extensional equality](https://doi.org/10.1017/S0956796822000090) | Koronkevich, Rakow, Ahmed and Bowman, JFP 2022 | R05 | Dependency-preserving naming, continuation typing and the limits of a naive coercion translation. |
 | [Free Theorems in the Presence of seq](https://janis-voigtlaender.eu/JV04.html) | Johann and Voigtländer, POPL 2004 | R16 | A polymorphic type does not determine whether a function demands an argument. |
+| [QuickSpec: Guessing Formal Specifications using Testing](https://smallbone.se/papers/quickspec.pdf) | Claessen, Smallbone and Hughes, TAP 2010 | R15, R16 | Candidate equations for an optional boundary checker. |
 
 ## Singletons, Haskell 2012
 
@@ -711,3 +713,24 @@ operand. The evaluator checks the actual Core unfolding. If that
 unfolding demands a rigid operand, the case stays stuck. The paper
 explains the strictness obligation. It supplies no correctness proof
 for the evaluator.
+
+## QuickSpec, TAP 2010
+
+QuickSpec builds terms from a typed signature. The user selects a finite,
+subterm-closed universe, usually by limiting term depth. QuickSpec evaluates
+those terms on generated variable assignments and groups equal results.
+In the 2010 algorithm, testing stops after 200 consecutive tests fail to
+split a group. Pruning preserves derivability of equations within the
+chosen universe. Some surviving equations can still be false, as the
+case studies report. [Author PDF, pages 1–6 and 14](https://smallbone.se/papers/quickspec.pdf)
+and [publication record](https://research.chalmers.se/en/publication/525705).
+
+The heap example includes an exceptional `undefined` value at each type
+and compares heaps through their `toList` results. The fixed-point example
+distinguishes an expression that raises an exception at zero from one
+that returns a value. The paper gives no completeness result for Haskell
+contexts using `seq` or for divergence. An optional checker can propose
+a law on this basis. GHC still needs evidence for the exact dependent
+obligation. [Heap example, pages 8–9](https://smallbone.se/papers/quickspec.pdf#page=8),
+[fixed-point example, page 12](https://smallbone.se/papers/quickspec.pdf#page=12)
+and [boundary evidence](../BOUNDARY-EVIDENCE.md).

@@ -216,4 +216,4 @@ The self-hosted compiler verified these results with Core and STG lint.
 [Liquid Haskell refinement reflection](https://arxiv.org/abs/1711.03842),
 [the Thoralf plugin](https://richarde.dev/papers/2018/thoralf/thoralf.pdf),
 [QuickCheck](https://hackage-content.haskell.org/package/QuickCheck)
-and [QuickSpec's candidate equations](https://research.chalmers.se/en/publication/525705).
+and [the QuickSpec paper and its choice of observations](papers/README.md#quickspec-tap-2010).
