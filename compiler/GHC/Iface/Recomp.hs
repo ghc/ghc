@@ -38,7 +38,7 @@ import GHC.Iface.Env
 
 import GHC.Core
 import GHC.Core.DataCon (isNullarySrcDataCon)
-import GHC.Core.TyCon (isBoxedDataTyCon, isVanillaAlgTyCon, tyConArity, tyConDataCons)
+import GHC.Core.TyCon (Injectivity(..), isBoxedDataTyCon, isVanillaAlgTyCon, tyConArity, tyConDataCons, isVisibleTyConBinder)
 import GHC.Tc.Utils.Monad
 import GHC.Hs
 
@@ -58,6 +58,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Types.Annotations
 import GHC.Types.Avail
 import GHC.Types.Basic ( ImportLevel(..), TupleSort(BoxedTuple) )
+import GHC.Types.Var (VarBndr(Bndr))
 import GHC.Types.TyThing (TyThing(ATyCon))
 import GHC.Types.UnresolvedImport
 import GHC.Types.Name
@@ -557,6 +558,11 @@ checkFlagHash hsc_env iface self_recomp = do
         carried_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v8" :: String)
         callback_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v9" :: String)
         enum_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v10" :: String)
+        final_mapper_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v11" :: String)
+        archived = [base_fp, sum_fp, projection_fp, result_fp, helper_fp, pair_builder_fp,
+                    reachable_helper_fp, private_case_fp, recursive_case_fp, carried_case_fp,
+                    callback_case_fp, enum_case_fp, final_mapper_fp]
+        closed_matchability_fp = closedMatchabilityFingerprint base_fp
         new_fp = caseTreeFingerprint base_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
@@ -564,6 +570,14 @@ checkFlagHash hsc_env iface self_recomp = do
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
+       | old_fp `elem` (closed_matchability_fp : archived), couldInferOpenMatchability iface
+         -> recheck "Compiler now infers open-family matchability"
+       | old_fp == closed_matchability_fp
+         -> up_to_date logger (text "Module has no open family used as a kind")
+       | old_fp `elem` archived, couldInferClosedMatchability iface
+         -> recheck "Compiler now infers closed-family matchability"
+       | old_fp == final_mapper_fp
+         -> up_to_date logger (text "Module has no closed arrow family")
        | old_fp == enum_case_fp, final_possible
          -> recheck "Compiler now validates optimized source mappers"
        | old_fp == enum_case_fp
@@ -623,10 +637,52 @@ checkFlagHash hsc_env iface self_recomp = do
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
-caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v11" :: String)
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "open-family-matchability-v1" :: String)
+
+closedMatchabilityFingerprint :: Fingerprint -> Fingerprint
+closedMatchabilityFingerprint fp = computeFingerprint putNameLiterally (fp, "closed-family-matchability-v1" :: String)
+
+-- | An old interface preserves the resolved heads of its declared family
+-- kinds. Include associated families because they are nested in IfaceClass.
+couldInferOpenMatchability :: ModIface -> Bool
+couldInferOpenMatchability iface =
+    any candidate families
+  where
+    families = concatMap (familyDecls . snd) (mi_decls iface)
+    familyDecls decl@IfaceFamily{} = [decl]
+    familyDecls IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
+      [decl | IfaceAT decl _ <- ats]
+    familyDecls _ = []
+
+    heads = mkNameSet [head_name | IfaceFamily{ifBinders = bs, ifResKind = res} <- families
+                                , kind <- res : [k | Bndr (IfaceTvBndr (_, k)) _ <- bs]
+                                , IfaceTyConApp head_tc _ <- [kind]
+                                , let head_name = ifaceTyConName head_tc]
+    candidate IfaceFamily{ifName = n, ifBinders = bs, ifResKind = res, ifFamInj = NotInjective,
+                          ifFamFlav = IfaceOpenTypeFamilyTyCon} =
+      any isVisibleTyConBinder bs && isIfaceLiftedTypeKind res &&
+      n `elemNameSet` heads
+    candidate _ = False
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
 -- See Note [Recompiling constructor case producers].
+-- | Old interfaces omit the inferred index and do not distinguish written
+-- arrows from explicit metadata. Recheck closed family definitions whose
+-- compiled equations may have gained a binder. Their changed ABI invalidates
+-- source clients through the normal fingerprint checks.
+couldInferClosedMatchability :: ModIface -> Bool
+couldInferClosedMatchability = any candidate . mi_decls
+  where
+    candidate (_, IfaceFamily
+      { ifBinders = _ : _, ifFamInj = NotInjective
+      , ifFamFlav = IfaceClosedTypeFamilyTyCon
+          (IfaceClosedTyFamTyCon (Just (_, equations))) }) =
+        any has_arrow equations
+    candidate _ = False
+
+    has_arrow IfaceAxBranch{ifaxbRHS = IfaceFunTy FTF_T_T _ _ _ _} = True
+    has_arrow _ = False
+
 exportedCaseDatatypes :: ModIface -> [[IfaceConDecl]]
 exportedCaseDatatypes iface =
     [ cons | (_, IfaceData{ifName = name, ifBinders = _ : _, ifCons = IfDataTyCon False cons})

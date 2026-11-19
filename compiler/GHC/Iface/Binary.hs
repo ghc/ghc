@@ -34,6 +34,7 @@ module GHC.Iface.Binary (
 import GHC.Prelude
 
 import GHC.Builtin   ( knownKeyOccMap, wiredInNamesMap )
+import GHC.Builtin.KnownKeys (matchabilityTyConKey)
 import GHC.Builtin.Uniques( knownUniqueTupleName )
 
 import GHC.Utils.Panic
@@ -53,9 +54,12 @@ import GHC.Platform.Profile
 import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Iface.Ext.Fields (readFieldWith, writeFieldWith, deleteField)
-import GHC.Iface.Syntax (IfaceDecl(..), IfaceIdDetails(..))
+import GHC.Iface.Syntax (IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassBody(..), IfaceAT(..), IfaceIdDetails(..))
 import GHC.Types.Basic (SourceTableOrigin(ExecutableSourceTable, FinalCoreSourceTable))
-import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)
+import GHC.Iface.Type (IfaceType(..), IfaceBndr(..), IfaceAppArgs(..), IfaceTyCon(..), IfaceTyConBinder,
+                       getIfaceType, putIfaceType, ifaceTypeSharedByte)
+import GHC.Core.TyCon (isInferredTyConBinder)
+import GHC.Types.Var (VarBndr(..))
 
 import GHC.Data.FastMutInt
 import GHC.Data.Maybe( orElse )
@@ -157,7 +161,8 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
-    unless (check_ver == enumCallbackIfaceVersion || check_ver == finalCoreIfaceVersion) $
+    unless (check_ver `elem` [enumCallbackIfaceVersion, finalCoreIfaceVersion,
+                              matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion]) $
       errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
     check_tag <- get bh
@@ -274,7 +279,9 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
     put_ bh (binaryInterfaceMagic platform)
 
     -- The version, profile tag, and source hash go next
-    let version | any hasFinalCore (mi_decls mod_iface) = finalCoreIfaceVersion
+    let version | any (hasOpenMatchabilityScheme . snd) (mi_decls mod_iface) = openMatchabilityIfaceVersion
+                | any hasMatchabilityScheme (mi_decls mod_iface) = matchabilitySchemeIfaceVersion
+                | any hasFinalCore (mi_decls mod_iface) = finalCoreIfaceVersion
                 | any hasEnumCallback (mi_decls mod_iface) = enumCallbackIfaceVersion
                 | otherwise = show hiVersion
     put_ bh version
@@ -294,6 +301,33 @@ enumCallbackIfaceVersion = show hiVersion ++ "-enum-callbacks-v1"
 
 finalCoreIfaceVersion :: String
 finalCoreIfaceVersion = show hiVersion ++ "-final-core-mapper-v1"
+
+-- | Keep the old header for modules without a new type scheme.
+-- A previous compiler must reject a changed family or synonym interface
+-- before decoding old applications against its new binder list.
+matchabilitySchemeIfaceVersion :: String
+matchabilitySchemeIfaceVersion = show hiVersion ++ "-matchability-schemes-v1"
+
+-- | Older readers must not load an associated family with a new binder list.
+openMatchabilityIfaceVersion :: String
+openMatchabilityIfaceVersion = show hiVersion ++ "-matchability-schemes-v2"
+
+hasOpenMatchabilityScheme :: IfaceDecl -> Bool
+hasOpenMatchabilityScheme IfaceFamily
+  { ifBinders = b : _, ifFamFlav = IfaceOpenTypeFamilyTyCon } = matchabilityBinder b
+hasOpenMatchabilityScheme IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
+  any (\(IfaceAT decl _) -> hasOpenMatchabilityScheme decl) ats
+hasOpenMatchabilityScheme _ = False
+
+hasMatchabilityScheme :: (a, IfaceDecl) -> Bool
+hasMatchabilityScheme (_, IfaceSynonym{ifBinders = b : _}) = matchabilityBinder b
+hasMatchabilityScheme (_, IfaceFamily{ifBinders = b : _}) = matchabilityBinder b
+hasMatchabilityScheme _ = False
+
+matchabilityBinder :: IfaceTyConBinder -> Bool
+matchabilityBinder b@(Bndr (IfaceTvBndr (_, IfaceTyConApp tc IA_Nil)) _) =
+  isInferredTyConBinder b && ifaceTyConName tc `hasKnownKey` matchabilityTyConKey
+matchabilityBinder _ = False
 
 hasFinalCore :: (a, IfaceDecl) -> Bool
 hasFinalCore (_, IfaceId{ifIdDetails = IfSourceTableId _ FinalCoreSourceTable}) = True

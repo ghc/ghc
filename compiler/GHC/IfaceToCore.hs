@@ -1936,6 +1936,13 @@ tcIfaceType = go
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc
            ; tks' <- mapM go (appArgsIfaceTypes tks)
+           ; case (tks, tks') of
+               (IA_Arg _ (IfaceForAllTyFlag vis) _, arg : _) ->
+                 checkImportedMatchabilityPrefix tc' $
+                   case vis of
+                     Inferred -> isMatchabilityArgument arg
+                     _ -> False
+               _ -> return ()
            ; case isPromotedDataCon_maybe tc' of
                Just con
                  | let (tys, fields) = splitAt (length (dataConUnivTyVars con)) tks'
@@ -2052,6 +2059,28 @@ Note [Native Boolean evidence in interfaces]. Module unfolding generation
 remains separately gated.
 -}
 
+-- | A stale caller can refer to the same family Name with the old visible
+-- first argument. Preserve valid partial applications, which omit a suffix.
+checkImportedMatchabilityPrefix :: TyCon -> Bool -> IfL ()
+checkImportedMatchabilityPrefix tc valid_prefix
+  | not (isWiredInName name) = do
+      owner <- getIfModule
+      when (nameModule name /= owner) $
+        case tyConBinders tc of
+          b : _ | isInferredTyConBinder b
+                , tyVarKind (binderVar b) `eqType` matchabilityTy
+                , not valid_prefix ->
+            failIfM (text "Incompatible interface dependency:" <+> ppr name
+                     $$ text "An inferred matchability argument is missing."
+                     $$ text "Rebuild the module that refers to it:" <+> ppr owner)
+          _ -> return ()
+  | otherwise = return ()
+  where
+    name = tyConName tc
+
+isMatchabilityArgument :: Type -> Bool
+isMatchabilityArgument arg = typeKind arg `eqType` matchabilityTy
+
 tcIfaceTupleTy :: TupleSort -> PromotionFlag -> IfaceAppArgs -> IfL Type
 tcIfaceTupleTy sort is_promoted args
  = do { args' <- tcIfaceAppArgs args
@@ -2114,7 +2143,15 @@ tcIfaceCo = go
       = failIfM (text "Native dependent coercion interfaces are not implemented.")
     go (IfaceTermAppCo {})
       = failIfM (text "Opaque runtime call congruence interfaces are not implemented.")
-    go (IfaceTyConAppCo r tc cs) = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
+    go (IfaceTyConAppCo r tc cs)
+      = do { tc' <- tcIfaceTyCon tc
+           ; cs' <- mapM go cs
+           ; case cs' of
+               co : _ -> checkImportedMatchabilityPrefix tc'
+                           (isMatchabilityArgument (coercionLKind co) &&
+                            isMatchabilityArgument (coercionRKind co))
+               _ -> return ()
+           ; return (TyConAppCo r tc' cs') }
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2
     go (IfaceForAllCo tcv visL visR ma k co)
       = do { ma' <- go ma

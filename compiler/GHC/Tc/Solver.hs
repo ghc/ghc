@@ -9,6 +9,7 @@ module GHC.Tc.Solver(
        solveEqualities,
        pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX,
        pushLevelAndSolveKindArrows, pushLevelAndSolveKindArrowsX,
+       inferSynonymMatchabilities,
        reportUnsolvedEqualities,
        simplifyWantedsTcM,
        tcCheckGivens,
@@ -50,13 +51,13 @@ import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (matchableDataConTy, unmatchableDataConTy)
 import GHC.Core.Predicate
 import GHC.Core.Reduction ( Reduction )
 import GHC.Core.Type
 import GHC.Core.Ppr
 import GHC.Driver.Ppr (showPpr)
-import GHC.Core.TyCon    ( TyConBinder )
+import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon, tyConArity )
 
 import GHC.Types.Name
 import GHC.Types.Id
@@ -234,8 +235,19 @@ pushLevelAndSolveKindArrows skol_info tcbs action =
 pushLevelAndSolveKindArrowsX :: String -> TcM a -> TcM (TcLevel, WantedConstraints, a)
 pushLevelAndSolveKindArrowsX = solveEqualitiesAtLevel True
 
+-- | Solve justified metadata choices while leaving undetermined slots for
+-- synonym generalization.
+inferSynonymMatchabilities :: TcM a -> TcM a
+inferSynonymMatchabilities action = do
+  (_, wanted, result) <- solveEqualitiesSelectingMetadata True False "synonym metadata" action
+  emitConstraints wanted
+  return result
+
 solveEqualitiesAtLevel :: Bool -> String -> TcM a -> TcM (TcLevel, WantedConstraints, a)
-solveEqualitiesAtLevel infer_arrows callsite thing_inside
+solveEqualitiesAtLevel infer_arrows = solveEqualitiesSelectingMetadata infer_arrows True
+
+solveEqualitiesSelectingMetadata :: Bool -> Bool -> String -> TcM a -> TcM (TcLevel, WantedConstraints, a)
+solveEqualitiesSelectingMetadata infer_arrows default_unresolved callsite thing_inside
   = do { traceTc "pushLevelAndSolveEqualitiesX {" (text "Called from" <+> text callsite)
        ; (tclvl, (wanted, res))
             <- pushTcLevelM $
@@ -247,7 +259,10 @@ solveEqualitiesAtLevel infer_arrows callsite thing_inside
                   ; defaulted <- case defaults of
                       Nothing -> return False
                       Just ref -> do { arrows <- TcM.readTcRef ref
-                                     ; or <$> mapM (defaultArrow owner) arrows }
+                                     ; if null arrows then return False else do
+                                         residual <- TcM.liftZonkM $
+                                           mapM TcM.zonkTcType (residualPredicates wanted)
+                                         or <$> mapM (defaultArrow owner residual) arrows }
                   ; wanted <- if defaulted && not (isSolvedWC wanted)
                                 then runTcSEqualities (simplifyTopWanteds wanted)
                                 else return wanted
@@ -260,14 +275,44 @@ solveEqualitiesAtLevel infer_arrows callsite thing_inside
     setDefaults Nothing env | Nothing <- tcl_kind_arrow_defaults env = env
     setDefaults defaults env = env { tcl_kind_arrow_defaults = defaults }
 
-    defaultArrow owner original = do
+    defaultArrow owner residual original = do
       current <- TcM.liftZonkM (TcM.zonkTcType (mkTyVarTy original))
       case getTyVar_maybe current of
         Just tv | isPromotableMetaTyVar tv, not (isTyVarTyVar tv)
                 , not (owner `strictlyDeeperThan` tcTyVarLevel tv) -> do
-          TcM.liftZonkM (TcM.writeMetaTyVar tv unmatchableDataConTy)
-          return True
+          let candidates = concatMap (familyArrowChoices tv) residual
+              wants_m = any (`tcEqType` matchableDataConTy) candidates
+              wants_u = any (`tcEqType` unmatchableDataConTy) candidates
+              choice | wants_m && not wants_u = Just matchableDataConTy
+                     | wants_u && not wants_m = Just unmatchableDataConTy
+                     | default_unresolved = Just unmatchableDataConTy
+                     | otherwise = Nothing
+          case choice of
+            Just ma -> TcM.liftZonkM (TcM.writeMetaTyVar tv ma) >> return True
+            Nothing -> return False
         _ -> return False
+
+-- | Inspect residual wanteds under explicit skolems too. The only value
+-- this check can select is a closed metadata constructor.
+residualPredicates :: WantedConstraints -> [PredType]
+residualPredicates wanted =
+  map ctPred (bagToList (wc_simple wanted)) ++
+  concatMap (residualPredicates . ic_wanted) (bagToList (wc_impl wanted))
+
+-- | Find a default that makes a residual nominal family equality reflexive.
+-- Every other argument already agrees. The ordinary solver must still check
+-- the whole wanted after defaulting.
+familyArrowChoices :: TcTyVar -> PredType -> [Type]
+familyArrowChoices tv pred_ty
+  | Just (Nominal, lhs, rhs) <- getEqPredTys_maybe pred_ty
+  , Just (f, a : as) <- tcSplitTyConApp_maybe lhs
+  , Just (g, b : bs) <- tcSplitTyConApp_maybe rhs
+  , f == g, isTypeFamilyTyCon f, length as + 1 == tyConArity f
+  , length as == length bs, and (zipWith tcEqType as bs)
+  = [concrete | (var, concrete) <- [(a,b), (b,a)]
+              , getTyVar_maybe var == Just tv
+              , tcEqType concrete matchableDataConTy || tcEqType concrete unmatchableDataConTy]
+  | otherwise = []
 
 {- Note [Owning omitted arrows in kind-valued arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -281,6 +326,12 @@ here. Nested complete checks replace the owner. Nested solveEqualities calls
 can float constraints to it. An application spine has neither the expected
 kind of its enclosing context nor the rest of the declaration's constraints.
 It must not default on its own.
+
+A stuck wanted can still select an owned default. For K ?m b ~ K M b,
+choosing M makes the application reflexive when its other arguments
+already agree. Recheck the unchanged wanted after defaulting. This rule
+does not justify an inverse conclusion from equality of two families.
+It only selects an unfilled variable's default while checking a wanted.
 -}
 
 -- | Type-check a thing that emits only equality constraints, solving any

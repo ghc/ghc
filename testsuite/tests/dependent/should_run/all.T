@@ -196,3 +196,9 @@ test('NativeTypeLambdaReify',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'TypeLambda.hs'])],
      multimod_compile, ['NativeTypeLambdaReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
+
+test('NativeClosedMatchability',
+     [only_ways(['normal']),
+      extra_files(['NativeClosedMatchabilityProvider.hs',
+                   'NativeClosedMatchabilityClient.hs', 'NativeClosedMatchabilityConflict.hs'])],
+     run_command, ['bash NativeClosedMatchability.sh "{compiler}" "{libdir}"'])

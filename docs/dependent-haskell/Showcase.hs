@@ -69,6 +69,7 @@ import qualified LocalAssociated
 import qualified IndependentFamily
 import qualified ImportedFamily
 import qualified MixedFamily
+import qualified InterpretedKind
 import qualified InvisibleFamily
 import qualified TypeLambda
 import qualified LocalDataFamily
@@ -979,6 +980,7 @@ main = do
         (Refl :: MapFlags FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
     observe "pass a type family with an unapplied invisible binder"
         (Refl :: InvisibleFamily.Observed :~: 'True)
+    observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "pass a constructor to uncurry with two unknown fields"
         (OpenBuildSource.uncurried (Proxy @Int) (Proxy @Char))

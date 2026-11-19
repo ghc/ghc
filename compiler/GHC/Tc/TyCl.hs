@@ -37,7 +37,7 @@ import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
-                    , pushLevelAndSolveKindArrows, pushLevelAndSolveKindArrowsX
+                    , pushLevelAndSolveKindArrows, pushLevelAndSolveKindArrowsX, inferSynonymMatchabilities
                     , reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -62,7 +62,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 
 import GHC.Builtin.WiredIn.Types ( oneDataConTy, unitTy, makeRecoveryTyCon
-                               , manyDataConTy, unmatchableDataConTy )
+                               , manyDataConTy, unmatchableDataConTy, matchabilityTy )
 
 import GHC.Rename.Env( lookupConstructorFields )
 
@@ -86,6 +86,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
+import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
@@ -113,7 +114,7 @@ import Control.Monad
 import Data.Foldable ( toList, traverse_ )
 import GHC.Utils.Monad.StrictIdentity
 import qualified Data.List as List
-import Data.List ( partition)
+import Data.List ( nub, partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Traversable ( for )
@@ -365,6 +366,8 @@ tcTyAndClassDecls tyclds_s
   -- Type check each group in dependency order folding the global env
   = checkNoErrs $ go mempty tyclds_s
   where
+    open_indices = openFamiliesUsedAsKinds tyclds_s
+
     go :: TcTyClGroupsAccum
        -> [TyClGroup GhcRn]
        -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
@@ -376,11 +379,11 @@ tcTyAndClassDecls tyclds_s
           th_bndrs   = ttcga_th_bndrs acc
       return (tcg_env, inst_info, deriv_info, th_bndrs)
     go acc gs =
-      tcTyClGroupsPass gs $ \acc' n gs' ->
+      tcTyClGroupsPass open_indices gs $ \acc' n gs' ->
         if n == 0 then
           -- Case (3b) of the algorithm in Note [Retrying TyClGroups]
           -- The pass made no progress. We are stuck. Report errors and exit.
-          tcFailedTyClGroups gs'
+          tcFailedTyClGroups open_indices gs'
         else
           -- Case (3b) of the algorithm in Note [Retrying TyClGroups]
           -- The pass made some progress. Iterate.
@@ -389,27 +392,28 @@ tcTyAndClassDecls tyclds_s
 -- Check the remaining TyClGroups that are known to fail,
 -- extending the environment with fake tycons to report more errors.
 -- See Note [Recover from validity error]
-tcFailedTyClGroups :: [TyClGroup GhcRn] -> TcM a
-tcFailedTyClGroups [] = failM
-tcFailedTyClGroups (g:gs) = do
+tcFailedTyClGroups :: NameSet -> [TyClGroup GhcRn] -> TcM a
+tcFailedTyClGroups _ [] = failM
+tcFailedTyClGroups open_indices (g:gs) = do
   tcg_env <- getGblEnv
   m_result <-
     if isReadyTyClGroup tcg_env g
-    then attemptM (tcTyClGroup g)
+    then attemptM (tcTyClGroup open_indices g)
     else return Nothing
   let tcg_env' = maybe tcg_env fst m_result
-  setGblEnv tcg_env' $ tcFailedTyClGroups gs
+  setGblEnv tcg_env' $ tcFailedTyClGroups open_indices gs
 
 -- Type check as many TyClGroups as possible, skipping any failures.
 -- thing_inside runs in the extended environment.
 tcTyClGroupsPass :: forall a.
-     [TyClGroup GhcRn]     -- Mutually-recursive groups in lexical dependency order
+     NameSet
+  -> [TyClGroup GhcRn]     -- Mutually-recursive groups in lexical dependency order
   -> (TcTyClGroupsAccum
       -> Int               -- Number of successfully checked groups
       -> [TyClGroup GhcRn] -- Remaining groups in lexical dependency order
       -> TcM a)
   -> TcM a
-tcTyClGroupsPass all_gs thing_inside = go True ttcgs_zero mempty nilOL all_gs
+tcTyClGroupsPass open_indices all_gs thing_inside = go True ttcgs_zero mempty nilOL all_gs
   where
     go :: Bool                -- Strict pass, True <=> fail on unusable {-# UNPACK #-}
        -> TcTyClGroupsStats
@@ -465,7 +469,7 @@ tcTyClGroupsPass all_gs thing_inside = go True ttcgs_zero mempty nilOL all_gs
         tryTcDiscardingErrs' validate
                              (return on_flawed)
                              (return on_failed)
-                             (on_success <$> set_opts (tcTyClGroup g))
+                             (on_success <$> set_opts (tcTyClGroup open_indices g))
 
 data TcTyClGroupsStats =
   TcTyClGroupsStats
@@ -525,11 +529,11 @@ isReadyTyClGroup :: TcGblEnv -> TyClGroup GhcRn -> Bool
 isReadyTyClGroup tcg_env TyClGroup{group_ext = deps} =
   nameSetAll (\n -> n `elemNameEnv` tcg_type_env tcg_env) deps
 
-tcTyClGroup :: TyClGroup GhcRn
+tcTyClGroup :: NameSet -> TyClGroup GhcRn
             -> TcM (TcGblEnv, TcTyClGroupsAccum)
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
-tcTyClGroup (TyClGroup { group_tyclds = tyclds
+tcTyClGroup open_indices (TyClGroup { group_tyclds = tyclds
                        , group_roles  = roles
                        , group_kisigs = kisigs
                        , group_instds = instds })
@@ -545,7 +549,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
                     check_kisig kisig@(L _ (StandaloneKindSig _ (L _ name) _))
                       = tcStandaloneKindSig (lookupNameEnv_NF decl_env name) kisig
               ; kisig_env <- mkNameEnv <$> traverse check_kisig kisigs
-              ; tcTyClDecls tyclds kisig_env role_annots }
+              ; tcTyClDecls open_indices tyclds kisig_env role_annots }
        ; let tyclss = map fst tyclss_with_validity_infos
            -- Step 1.5: Make sure we don't have any type synonym cycles
 
@@ -602,16 +606,17 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
 type KindSigEnv = NameEnv Kind
 
 tcTyClDecls
-  :: [LTyClDecl GhcRn]
+  :: NameSet
+  -> [LTyClDecl GhcRn]
   -> KindSigEnv
   -> RoleAnnotEnv
   -> TcM ([(TyCon, [TyFamEqnValidityInfo])], [DerivInfo], NameSet)
-tcTyClDecls tyclds kisig_env role_annots
+tcTyClDecls open_indices tyclds kisig_env role_annots
   = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
-         (tc_tycons, kindless) <- checkNoErrs $
-                                  kcTyClGroup kisig_env tyclds
+         (tc_tycons, kindless, metadata) <- checkNoErrs $
+                                  kcTyClGroup open_indices kisig_env tyclds
             -- checkNoErrs: If the TyCons are ill-kinded, stop now.  Else we
             -- can get follow-on errors. Example: #23252, where the TyCon
             -- had an ill-scoped kind forall (d::k) k (a::k). blah
@@ -646,7 +651,7 @@ tcTyClDecls tyclds kisig_env role_annots
              tcExtendKindEnvWithTyCons tc_tycons $
 
                  -- Kind and type check declarations for this group
-               mapAndUnzipM (tcTyClDecl roles) tyclds
+               mapAndUnzipM (tcTyClDecl metadata roles) tyclds
            ; return (tycons, concat data_deriv_infos, kindless)
            } }
   where
@@ -1218,7 +1223,7 @@ been generalized.
 
 -}
 
-kcTyClGroup :: KindSigEnv -> [LTyClDecl GhcRn] -> TcM ([PolyTcTyCon], NameSet)
+kcTyClGroup :: NameSet -> KindSigEnv -> [LTyClDecl GhcRn] -> TcM ([PolyTcTyCon], NameSet, NameEnv SynonymMetadata)
 
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This binds the TyCons and Classes of the group, but not the DataCons
@@ -1226,7 +1231,7 @@ kcTyClGroup :: KindSigEnv -> [LTyClDecl GhcRn] -> TcM ([PolyTcTyCon], NameSet)
 -- and Note [Inferring kinds for type declarations]
 --
 -- The NameSet returned contains kindless tycon names, without CUSK or SAKS.
-kcTyClGroup kisig_env decls
+kcTyClGroup open_indices kisig_env decls
   = do  { mod <- getModule
         ; traceTc "---- kcTyClGroup ---- {"
                   (text "module" <+> ppr mod $$ vcat (map ppr decls))
@@ -1260,7 +1265,7 @@ kcTyClGroup kisig_env decls
                          -- knock-on errors if we have tycons with
                          -- malformed kinds
 
-        ; inferred_tcs
+        ; (inferred_tcs, metadata0)
             <- tcExtendKindEnvWithTyCons checked_tcs  $
                pushLevelAndSolveKindArrows unkSkolAnon [] $
                      -- We are going to kind-generalise, so unification
@@ -1275,11 +1280,11 @@ kcTyClGroup kisig_env decls
                     -- NB: the environment extension overrides the tycon
                     --     promotion-errors bindings
                     --     See Note [Type environment evolution]
-                  ; checkNoErrs $
+                  ; metadata <- checkNoErrs $
                     tcExtendKindEnvWithTyCons mono_tcs $
-                    mapM_ kcLTyClDecl kindless_decls
+                    mapM (kcLTyClDecl (isSingleton decls)) kindless_decls
 
-                  ; return mono_tcs }
+                  ; return (mono_tcs, mkNameEnv (catMaybes metadata)) }
 
         -- Step 3: generalisation
         -- Finally, go through each tycon and give it its final kind,
@@ -1287,15 +1292,136 @@ kcTyClGroup kisig_env decls
         -- in order.
         ; let inferred_tc_env = mkNameEnv $
                                 map (\tc -> (tyConName tc, tc)) inferred_tcs
-        ; generalized_tcs <- concatMapM (generaliseTyClDecl inferred_tc_env)
+        ; generalized_tcs0 <- concatMapM (generaliseTyClDecl inferred_tc_env)
                                         kindless_decls
 
-        ; let poly_tcs = checked_tcs ++ generalized_tcs
+        ; with_metadata <- traverse (inferArrowIndices metadata0 kindless_decls) generalized_tcs0
+        ; let (generalized_tcs, plans) = unzip with_metadata
+              metadata = mkNameEnv [(tyConName tc, plan)
+                                   | (tc, Just plan) <- zip generalized_tcs plans]
+        ; poly_tcs <- traverse (inferOpenMatchability open_indices kisig_env)
+                    (checked_tcs ++ generalized_tcs)
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
-        ; return (poly_tcs, kindless_names) }
+        ; return (poly_tcs, kindless_names, metadata) }
   where
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
+
+{- Note [Inferred synonym matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An indexed family can occur below an ordinary type constructor. Do not
+default its omitted metadata while checking a synonym RHS. The result
+kind may be Type and need not mention any of the choices in the RHS.
+
+The initial kind check records each checked instantiation. First solve
+its ordinary constraints, including justified choices for opaque
+family applications. Add the remaining variables to the inferred
+TyCon prefix. The final synonym check consumes the same plan. It
+checks the resolved head and the number of arguments at each site.
+Explicit visible arguments still use the ordinary application checker.
+
+This inference currently applies to a synonym without a complete kind
+signature in a singleton SCC. A mutually dependent kind check would
+have to make its schemes available to other declarations before
+checking their uses. The closed-family index similarly requires a
+definition in the current declaration. An open family cannot inspect
+the equations in other modules before its kind is published.
+-}
+
+-- Checked application sites and their metadata, in application order.
+type SynonymMetadata = [(Name, [Type])]
+
+-- | Add the still-unconstrained RHS indices to the inferred prefix.
+inferArrowIndices :: NameEnv SynonymMetadata -> [LTyClDecl GhcRn]
+                  -> PolyTcTyCon -> TcM (PolyTcTyCon, Maybe SynonymMetadata)
+inferArrowIndices metadata decls tc
+  | Just raw <- lookupNameEnv metadata (tyConName tc), not (null raw) = do
+      choices <- traverse (\(name, tys) -> (name,) <$> liftZonkM (zonkTcTypes tys)) raw
+      let params = map (\v -> mkTyVar (getName v) matchabilityTy)
+                   $ nub [v | (_, tys) <- choices, ty <- tys, Just v <- [getTyVar_maybe ty]
+                            , isMetaTyVar v]
+          subst ty
+            | Just v <- getTyVar_maybe ty
+            , Just var <- lookupNameEnv (mkNameEnv [(getName a, a) | a <- params]) (getName v) =
+                mkTyVarTy var
+            | otherwise = ty
+      pure (prefix params, Just [(name, map subst tys) | (name, tys) <- choices])
+  | isLiftedTypeKind (tyConResKind tc)
+  , not (null (tyConVisibleTyVars tc))
+  , not (any inferredMatchabilityIndex (tyConBinders tc))
+  , [FamDecl { tcdFam = FamilyDecl
+       { fdInfo = ClosedTypeFamily _ (Just eqns), fdInjectivityAnn = Nothing } }] <-
+      [d | L _ d <- decls, tcdName d == tyConName tc]
+  , any (matchabilityArrow . feqn_rhs . unLoc) eqns = do
+      ma <- newFlexiTyVar matchabilityTy
+      pure (prefix [mkTyVar (getName ma) matchabilityTy], Nothing)
+  | otherwise = pure (tc, Nothing)
+  where
+    prefix [] = tc
+    prefix indices = mkTcTyCon (tyConName tc)
+      (foldr (\v -> mkForAllTy unmatchableDataConTy (Bndr v Inferred)) (tyConKind tc) indices)
+      (mkNamedTyConBinders Inferred indices ++ tyConBinders tc)
+      0 (tyConResKind tc) (tcTyConScopedTyVars tc) True (tyConFlavour tc)
+
+{- Note [Matchability schemes for open families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An open family's arity is fixed before its instances are checked. If a
+local declaration uses it as a kind, an inferred index lets a later
+instance interpret a written bare arrow both as an ordinary function
+type and as a kind for an applicable type constructor.
+
+The declaration pass collects the resolved family heads before checking
+the SCCs. This lets a later declaration select a scheme for an earlier
+family. An importer cannot change the arity of a family already in an
+interface. An owner can declare the index in a standalone signature when
+there is no local declaration use. Preserve explicit signatures and
+injectivity annotations.
+-}
+
+-- | Infer only from a declaration-site use of the exact family as a kind.
+-- Imported families keep the scheme that their owner has published.
+openFamiliesUsedAsKinds :: [TyClGroup GhcRn] -> NameSet
+openFamiliesUsedAsKinds groups =
+  intersectNameSet local_open_families referenced_families
+  where
+    declarations = [fam | tg <- groups, L _ decl <- group_tyclds tg, fam <- families decl]
+    local_open_families = mkNameSet
+      [unLoc name | FamilyDecl{fdInfo = OpenTypeFamily{}, fdLName = name,
+                                fdInjectivityAnn = Nothing} <- declarations]
+    referenced_families = mkNameSet
+      [name | fam <- declarations, kind <- declaredKinds fam, Just name <- [kindHead kind]]
+
+    families (FamDecl{tcdFam = f}) = [f]
+    families (ClassDecl{tcdCExt = (HsNestedGroup{ng_ats = ats}, _)}) = map unLoc ats
+    families _ = []
+
+    declaredKinds FamilyDecl{fdTyVars = HsQTvs{hsq_explicit = args},
+                             fdResultSig = L _ result} =
+      [kind | L _ HsTvb{tvb_kind = HsBndrKind _ kind} <- args] ++
+      maybeToList (famResultKindSignature result)
+
+    kindHead kind = case unLoc (ignoreParens kind) of
+      HsAppTy _ f _ -> kindHead f
+      HsAppKindTy _ f _ -> kindHead f
+      HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) -> Just name
+      _ -> Nothing
+
+-- | Install one inferred index when the local family will be used as a kind.
+inferOpenMatchability :: NameSet -> KindSigEnv -> PolyTcTyCon -> TcM PolyTcTyCon
+inferOpenMatchability candidates signatures tc
+  | tyConName tc `elemNameSet` candidates
+  , not (tyConName tc `elemNameEnv` signatures)
+  , OpenFamilyFlavour IAmType _ <- tyConFlavour tc
+  , tyConResKind tc `eqType` liftedTypeKind
+  , not (null (tyConVisibleTyVars tc))
+  , not (any ((`eqType` matchabilityTy) . tyVarKind . binderVar) (tyConBinders tc)) = do
+      ma <- newFlexiTyVar matchabilityTy
+      let index = mkTyVar (getName ma) matchabilityTy
+      pure (mkTcTyCon (tyConName tc)
+              (mkForAllTy unmatchableDataConTy (Bndr index Inferred) (tyConKind tc))
+              (mkNamedTyConBinders Inferred [index] ++ tyConBinders tc)
+              0 (tyConResKind tc) (tcTyConScopedTyVars tc) True (tyConFlavour tc))
+  | otherwise = pure tc
 
 type ScopedPairs = [(Name, TcTyVar)]
   -- The ScopedPairs for a TcTyCon are precisely
@@ -2150,17 +2276,31 @@ However, there are two twists:
 -}
 
 ------------------------------------------------------------------------
-kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
+kcLTyClDecl :: Bool -> LTyClDecl GhcRn -> TcM (Maybe (Name, SynonymMetadata))
   -- See Note [Kind checking for type and class decls]
   -- Called only for declarations without a signature (no CUSKs or SAKs here)
-kcLTyClDecl (L loc decl)
+kcLTyClDecl collect_metadata (L loc decl)
   = setSrcSpanA loc $
     do { tycon <- tcLookupTcTyCon tc_name   -- Always a MonoTcTyCon
        ; traceTc "kcTyClDecl {" (ppr tc_name)
-       ; addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
+       ; metadata <- addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
          addErrCtxt (tcMkDeclCtxt decl) $
-         kcTyClDecl decl tycon
-       ; traceTc "kcTyClDecl done }" (ppr tc_name) }
+         case decl of
+           SynDecl{tcdRhs = rhs} | collect_metadata -> tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
+             inferSynonymMatchabilities $ do
+             ref <- newTcRef []
+             let choose name n = do
+                   indices <- replicateM n (newFlexiTyVar matchabilityTy)
+                   owner <- tcl_kind_arrow_defaults <$> getLclEnv
+                   forM_ owner $ \defaults -> updTcRef defaults (indices ++)
+                   let vars = mkTyVarTys indices
+                   updTcRef ref ((name, vars) :)
+                   pure vars
+             _ <- tcCheckSynonymMetadata choose rhs (tyConResKind tycon)
+             Just . (tc_name,) . reverse <$> readTcRef ref
+           _ -> kcTyClDecl decl tycon >> pure Nothing
+       ; traceTc "kcTyClDecl done }" (ppr tc_name)
+       ; return metadata }
   where
     tc_name = tcdName decl
 
@@ -3033,8 +3173,8 @@ The IRs are already well-equipped to handle unlifted types, and unlifted
 datatypes are just a new sub-class thereof.
 -}
 
-tcTyClDecl :: RolesInfo -> LTyClDecl GhcRn -> TcM ((TyCon, [TyFamEqnValidityInfo]), [DerivInfo])
-tcTyClDecl roles_info (L loc decl)
+tcTyClDecl :: NameEnv SynonymMetadata -> RolesInfo -> LTyClDecl GhcRn -> TcM ((TyCon, [TyFamEqnValidityInfo]), [DerivInfo])
+tcTyClDecl metadata roles_info (L loc decl)
   | Just thing <- wiredInNameTyThing_maybe (tcdName decl)
   = case thing of -- See Note [Declarations for wired-in things]
       ATyCon tc -> return ((tc, []), wiredInDerivInfo tc decl)
@@ -3043,7 +3183,7 @@ tcTyClDecl roles_info (L loc decl)
   | otherwise
   = setSrcSpanA loc $ tcAddDeclCtxt decl $
     do { traceTc "---- tcTyClDecl ---- {" (ppr decl)
-       ; (tc_vi@(tc, _), deriv_infos) <- tcTyClDecl1 Nothing roles_info decl
+       ; (tc_vi@(tc, _), deriv_infos) <- tcTyClDecl1 (lookupNameEnv metadata (tcdName decl)) roles_info decl
        ; traceTc "---- tcTyClDecl end ---- }" (ppr tc)
        ; return (tc_vi, deriv_infos) }
 
@@ -3067,18 +3207,17 @@ wiredInDerivInfo tycon decl
 wiredInDerivInfo _ _ = []
 
   -- "type family" declarations
-tcTyClDecl1 :: Maybe Class -> RolesInfo -> TyClDecl GhcRn -> TcM ((TyCon, [TyFamEqnValidityInfo]), [DerivInfo])
-tcTyClDecl1 parent _roles_info (FamDecl { tcdFam = fd })
+tcTyClDecl1 :: Maybe SynonymMetadata -> RolesInfo -> TyClDecl GhcRn -> TcM ((TyCon, [TyFamEqnValidityInfo]), [DerivInfo])
+tcTyClDecl1 _ _roles_info (FamDecl { tcdFam = fd })
   = fmap noDerivInfos $
-    tcFamDecl1 parent fd
+    tcFamDecl1 Nothing fd
 
   -- "type" synonym declaration
-tcTyClDecl1 _parent roles_info
+tcTyClDecl1 metadata roles_info
             (SynDecl { tcdLName = L _ tc_name
                      , tcdRhs   = rhs })
-  = assert (isNothing _parent )
-    fmap ( noDerivInfos . noEqnValidityInfos ) $
-    tcTySynRhs roles_info tc_name rhs
+  = fmap ( noDerivInfos . noEqnValidityInfos ) $
+    tcTySynRhs metadata roles_info tc_name rhs
 
   -- "data/newtype" declaration
 tcTyClDecl1 _parent roles_info
@@ -3570,14 +3709,30 @@ tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
                                        , ppr inj_ktvs, ppr inj_bools ])
        ; return $ Injective inj_bools }
 
-tcTySynRhs :: RolesInfo -> Name
+tcTySynRhs :: Maybe SynonymMetadata -> RolesInfo -> Name
            -> LHsType GhcRn -> TcM TyCon
-tcTySynRhs roles_info tc_name hs_ty
+tcTySynRhs metadata roles_info tc_name hs_ty
   = bindTyClTyVars tc_name $ \ kind tc_bndrs _nb_eta res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (getLclEnvRdrEnv env))
        ; rhs_ty <- pushLevelAndSolveKindArrows skol_info tc_bndrs $
-                   tcCheckLHsTypeInContext hs_ty (TheKind res_kind)
+                   case metadata of
+                     Just plan -> do
+                       ref <- newTcRef plan
+                       let choose name n = do
+                             rest <- readTcRef ref
+                             case rest of
+                               (owner, tys) : next | owner == name, length tys == n ->
+                                 writeTcRef ref next >> pure tys
+                               _ -> pprPanic "synonym metadata sites changed" (ppr name)
+                       ty <- tcCheckSynonymMetadata choose hs_ty res_kind
+                       rest <- readTcRef ref
+                       unless (null rest) $ pprPanic "unused synonym metadata sites" (ppr tc_name)
+                       pure ty
+                     Nothing -> case tc_bndrs of
+                       b : _ | inferredMatchabilityIndex b ->
+                         tcCheckMatchabilitySynRhs (mkTyVarTy (binderVar b)) hs_ty res_kind
+                       _ -> tcCheckLHsTypeInContext hs_ty (TheKind res_kind)
 
          -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
          -- Example: (typecheck/should_fail/T17567)
@@ -3870,11 +4025,19 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_ty)))
                <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
                   bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
-                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
+                  do { (lhs_ty, rhs_kind, index) <- case tyConBinders fam_tc of
+                           b : _ | inferredMatchabilityIndex b -> do
+                             (lhs, kind, ma) <- tcInferredMatchabilityFamPats fam_tc hs_pats
+                             pure (lhs, kind, Just ma)
+                           _ -> do
+                             (lhs, kind) <- tcFamTyPats fam_tc hs_pats
+                             pure (lhs, kind, Nothing)
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
                      ; addConsistencyConstraints mb_clsinfo lhs_ty
-                     ; rhs_ty <- tcCheckLHsTypeInContext hs_rhs_ty (TheKind rhs_kind)
+                     ; rhs_ty <- case index of
+                           Just ma -> tcCheckMatchabilitySynRhs ma hs_rhs_ty rhs_kind
+                           Nothing -> tcCheckLHsTypeInContext hs_rhs_ty (TheKind rhs_kind)
                      ; return (lhs_ty, rhs_ty) }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs

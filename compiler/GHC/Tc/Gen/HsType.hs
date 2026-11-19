@@ -37,7 +37,8 @@ module GHC.Tc.Gen.HsType (
 
         -- Type checking type and class decls, and instances thereof
         bindTyClTyVars, bindTyClTyVarsAndZonk,
-        tcFamTyPats,
+        tcFamTyPats, tcInferredMatchabilityFamPats, matchabilityArrow, tcCheckMatchabilityArrow,
+        inferredMatchabilityIndex, tcCheckMatchabilitySynRhs, tcCheckSynonymMetadata,
         maybeEtaExpandAlgTyCon, tcbVisibilities,
         etaExpandAlgTyCon,
 
@@ -1285,14 +1286,25 @@ tcFamTyPats :: TyCon
 -- Check the LHS of a type/data family instance
 -- e.g.   type instance F ty1 .. tyn = ...
 -- Used for both type and data families
-tcFamTyPats fam_tc hs_pats
+tcFamTyPats = tcFamTyPatsX []
+
+-- | Give an inferred metadata binder a LHS argument before checking the RHS.
+tcInferredMatchabilityFamPats :: TyCon -> HsFamEqnPats GhcRn
+                               -> TcM (TcType, TcKind, TcType)
+tcInferredMatchabilityFamPats fam_tc hs_pats = do
+  ma <- newFlexiTyVarTy matchabilityTy
+  (lhs, result_kind) <- tcFamTyPatsX [ma] fam_tc hs_pats
+  pure (lhs, result_kind, ma)
+
+tcFamTyPatsX :: [TcType] -> TyCon -> HsFamEqnPats GhcRn -> TcM (TcType, TcKind)
+tcFamTyPatsX prefix fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
 
        ; mode <- mkHoleMode TypeLevel HM_FamPat
                  -- HM_FamPat: See Note [Wildcards in family instances] in
                  -- GHC.Rename.Module
-       ; let fun_ty = mkTyConApp fam_tc []
+       ; let fun_ty = mkTyConApp fam_tc prefix
        ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty hs_pats
 
        -- Hack alert: see Note [tcFamTyPats: zonking the result kind]
@@ -1481,6 +1493,7 @@ data TcTyMode
              , mode_indices :: NameEnv Id
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
                -- See Note [Pending calls in partial signatures] in GHC.Tc.Solver.
+             , mode_synonym_metadata :: Maybe (Name -> Int -> TcM [Type])
              , mode_complete_type_arg :: Maybe Bool }
                -- Nothing outside a visible type argument. Just records
                -- completeness of the whole argument, not the current child.
@@ -1506,6 +1519,7 @@ mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
                       , mode_declaration = False
                       , mode_indices = emptyNameEnv
                       , mode_pending_calls = Nothing
+                      , mode_synonym_metadata = Nothing
                       , mode_complete_type_arg = Nothing }
 
 typeLevelMode, kindLevelMode :: TcTyMode
@@ -1521,6 +1535,7 @@ mkHoleMode tyki hm
                           , mode_holes = Just (lvl,hm)
                           , mode_indices = emptyNameEnv
                           , mode_pending_calls = Nothing
+                          , mode_synonym_metadata = Nothing
                           , mode_complete_type_arg = Nothing }) }
 
 instance Outputable HoleMode where
@@ -2165,6 +2180,68 @@ combinations of extensions.
 tc_fun_type :: TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType
 tc_fun_type mode = tc_fun_type_x (tc_check_lhs_type mode) (pure unmatchableDataConTy) mode
+
+-- | Recognize the existing kind scheme used by the inferred arrow index.
+inferredMatchabilityIndex :: TyConBinder -> Bool
+inferredMatchabilityIndex b =
+  isInferredTyConBinder b && tcEqType (tyVarKind (binderVar b)) matchabilityTy
+
+-- | Check a synonym RHS with controlled instantiation of metadata.
+tcCheckSynonymMetadata :: (Name -> Int -> TcM [Type])
+                       -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckSynonymMetadata get_indices rhs kind =
+  tc_check_lhs_type (typeLevelMode {mode_synonym_metadata = Just get_indices}) rhs kind
+
+hasInferredMatchability :: TyCon -> Bool
+hasInferredMatchability tc
+  | b : _ <- tyConBinders tc, inferredMatchabilityIndex b =
+      case tyConFlavour tc of
+        ClosedTypeFamilyFlavour -> True
+        OpenFamilyFlavour IAmType _ -> True
+        TypeSynonymFlavour -> True
+        _ -> False
+  | otherwise = False
+
+-- | Check an omitted arrow or pass the index directly through a type alias.
+tcCheckMatchabilitySynRhs :: TcType -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckMatchabilitySynRhs ma hs_ty kind
+  | matchabilityArrow hs_ty = tcCheckMatchabilityArrow ma hs_ty kind
+  | otherwise = tcCheckIndexedMatchability typeLevelMode (pure ma) hs_ty kind
+
+-- | Supply metadata to a direct application of a declared indexed type.
+tcCheckIndexedMatchability :: TcTyMode -> TcM TcType -> LHsType GhcRn
+                            -> TcKind -> TcM TcType
+tcCheckIndexedMatchability mode index hs_ty@(L loc _) kind
+  | (hs_fun@(L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))), hs_args)
+      <- splitHsAppTys (unLoc (ignoreParens hs_ty))
+  , isTyConName name =
+      setSrcSpanA loc $ do
+        (fun_ty, _) <- tcInferTyAppHead mode hs_fun hs_args
+        case fun_ty of
+          TyConApp tc [] | hasInferredMatchability tc -> do
+            ma <- index
+            (ty, inferred) <- tcInferTyApps mode hs_fun (mkTyConApp tc [ma]) hs_args
+            checkExpKind mode (unLoc hs_ty) ty inferred (Check kind)
+          _ -> ordinary
+  | otherwise = ordinary
+  where
+    ordinary = tc_check_lhs_type mode hs_ty kind
+
+-- | Match the source arrow whose metadata can come from a declaration.
+matchabilityArrow :: LHsType GhcRn -> Bool
+matchabilityArrow hs_ty
+  | L _ (HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) _ _) <- ignoreParens hs_ty
+  = True
+  | otherwise = False
+
+-- | Check one omitted arrow using its declaration's metadata index.
+tcCheckMatchabilityArrow :: TcType -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckMatchabilityArrow ma hs_ty kind
+  | L l (HsFunTy _ arr a b) <- ignoreParens hs_ty
+  , matchabilityArrow hs_ty
+  = setSrcSpanA l $
+      tc_fun_type_x (tcCheckMatchabilitySynRhs ma) (pure ma) typeLevelMode arr a b (Check kind)
+  | otherwise = tcCheckLHsType hs_ty kind
 
 -- | Check an ordinary arrow with the supplied checker for its child types.
 -- See Note [Higher-order retained signatures].
@@ -3703,6 +3780,12 @@ tcInferTyApps mode hs_ty fun hs_args
 
 tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
   = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
+       ; fun <- case (mode_synonym_metadata mode, fun) of
+           (Just get_indices, TyConApp tc []) | hasInferredMatchability tc -> do
+             args <- get_indices (tyConName tc)
+                       (length (takeWhile inferredMatchabilityIndex (tyConBinders tc)))
+             pure (mkTyConApp tc args)
+           _ -> pure fun
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args Nothing
        ; traceTc "tcInferTyApps }" (ppr f_args <+> dcolon <+> ppr res_k)
        ; return (f_args, res_k) }
@@ -3870,9 +3953,11 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
 
     -- A visible argument is used as a kind when it supplies the whole kind
     -- of the next visible argument. Keep this limited to the checked telescope.
+    -- An indexed family may expose its metadata on reduction, as in
+    -- Bridge (K 'True) Maybe. Use the same owned default as for a bare
+    -- arrow so the equality solver can select M before the U default.
     check_kind_value binder inner args arg expected
-      | L _ HsFunTy{} <- ignoreParens arg
-      , TypeLevel <- mode_tyki mode
+      | TypeLevel <- mode_tyki mode
       , isEmptyNameEnv (mode_indices mode)
       , Named (Bndr tv _) <- binder
       , isLiftedTypeKind expected
@@ -3894,12 +3979,19 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
       check_arrows defaults arg expected
     check_arrows defaults (L loc (HsFunTy _ mult domain range)) expected =
       setSrcSpanA loc $
-      tc_fun_type_x (check_arrows defaults) fresh mode mult domain range (Check expected)
-      where
-        fresh = do { ma <- newFlexiTyVar matchabilityTy
-                   ; updTcRef defaults (ma :)
-                   ; return (mkTyVarTy ma) }
-    check_arrows _ arg expected = tc_check_lhs_type mode arg expected
+      tc_fun_type_x (check_arrows defaults) (fresh_kind_arrow defaults)
+                    mode mult domain range (Check expected)
+    check_arrows defaults arg expected =
+      let deferred_mode = case mode_synonym_metadata mode of
+            Just _ -> mode
+            Nothing -> mode {mode_synonym_metadata =
+                       Just (\_ n -> replicateM n (fresh_kind_arrow defaults))}
+      in tc_check_lhs_type deferred_mode arg expected
+
+    fresh_kind_arrow defaults =
+      do { ma <- newFlexiTyVar matchabilityTy
+         ; updTcRef defaults (ma :)
+         ; return (mkTyVarTy ma) }
 
     -- Detect a registered runtime Name in a source argument.
     -- See Note [Immutable native kind arguments].
@@ -5896,6 +5988,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
                          , mode_declaration = False
                          , mode_indices = emptyNameEnv
                          , mode_pending_calls = Nothing
+                         , mode_synonym_metadata = Nothing
                          , mode_complete_type_arg = Nothing }
                  -- Inherit the HoleInfo from the context
 
