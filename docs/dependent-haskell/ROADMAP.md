@@ -176,7 +176,7 @@ when some of its operands are unknown.
 | --- | --- | --- |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Prove `pick (bump 7) :~: 8` without forcing the other field. Preserve reflexivity when two different functions return equal, fully defined pairs. | [M157](roadmap/R15-closed-term-evaluator.md#when-equality-needs-the-whole-operand) exposed a compatibility regression. [M161](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable) proves which fields an explicit observer returned across an object-only change. Automatic projection still uses the M153 path. |
 | [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Export `NegateAll xs = Prelude.map Prelude.not xs`. Prove that supplying a `True` head produces a `False` head without supplying the tail. | [M170](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback) proves the equation with the installed `Prelude.not` and an ordinary rule-free mapper. The remaining function is `Prelude.map`, including its visible fusion rules. |
-| [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | An ordinary client can now use the family result of the unsigned `keep x = maybe x id (Just x)`. Mixed declaration cycles and family-dependent signatures remain open. | [M164](roadmap/R21-dependency-analysis.md#m164-inferred-independent-producer-types) checks the producer before admitting the family equation. |
+| [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Check a family equation whose local producer needs a local datatype. Preserve real cycles through constructor fields. | The [mixed declaration example](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations) checks ordinary constructor prerequisites and a scoped expression signature. Families in producer signatures and more general declaration groups remain open. |
 
 The previous source controls now pass for a private parcel with an
 exceptional second field, a constructor containing two unknown types,
@@ -319,6 +319,7 @@ evaluator work has priority.
 | 106 | R16: preserve a callback while mapping over an unknown list | [M168](PLAN.md#m168-check-the-list-equation-of-a-higher-order-source-function) | A rule-free mapper exports the cons equation for an arbitrary callback and tail. |
 | 107 | R13 and R16: instantiate the callback with a checked source function | [M169](PLAN.md#m169-carry-a-checked-named-callback-across-an-interface) | A traffic-light callback determines the head of the result through interfaces alone. |
 | 108 | R16: use a callback from an installed ordinary module | [M170](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback) | A client checks the head using `Prelude.not` and the rules visible at the proof. |
+| 109 | R21: order local datatypes, a term, and an imported family equation | [M171](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations) | A field whose type is `Payload Double` accepts `True`. Adding a cyclic dependency in another constructor's field rejects the equation. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

@@ -1914,37 +1914,97 @@ tcIndependentFamilyProducers demands group@HsGroup
         selected = [d | d <- demands, any (in_equation d) pending]
         ordinary_solver = null (solverTcMPlugins plugins) && null (defaultingTcMPlugins plugins) &&
                           isNullUFM (rewriterTcMPlugins plugins)
-    candidate <- case independentClosure (tcg_semantic_mod env) binds sigs (map fst selected) of
-      Just (names, imported) | not (null selected), ordinary_solver -> do
-        verified <- traverse independentImport (nameSetElemsStable imported)
-        pure ((names,) . mkNameSet <$> sequence verified)
+    let this_mod = tcg_semantic_mod env
+        data_groups = mkNameEnv
+          [(tcdName (unLoc decl), tg) | tg <- groups, decl <- group_tyclds tg]
+        constructor_owners = mkNameEnv
+          [(con, tcdName (unLoc decl))
+          | tg <- groups, decl@(L _ DataDecl{tcdDataDefn = defn}) <- group_tyclds tg
+          , DataTypeCons False cons <- [dd_cons defn], con_decl <- cons, L _ con <- getConNames (unLoc con_decl)]
+        data_dependencies name
+          | not (nameIsLocalOrFrom this_mod name) = Right emptyNameSet
+          | otherwise = case lookupNameEnv data_groups name of
+              Just tg
+                | Just fv_sets <- traverse independentDataDecl (group_tyclds tg)
+                , null (group_kisigs tg), null (group_instds tg)
+                , not (hasSplice (group_tyclds tg)) ->
+                    Right (unionNameSets (group_ext tg : fv_sets))
+              _ -> Left "a datatype dependency"
+        data_prerequisites constructors =
+          either (const Nothing) Just $
+            closeLocalNames data_dependencies emptyNameSet
+              (mapMaybe (lookupNameEnv constructor_owners) (nameSetElemsStable constructors))
+        check_data_import name
+          | isTyConName name = do
+              thing <- tcLookupGlobal name
+              pure $ case thing of
+                ATyCon tc -> independentDataKind tc
+                _ -> False
+          | otherwise = pure False
+    candidate <- case independentClosure this_mod constructor_owners binds sigs (map fst selected) of
+      Just (names, constructors, imported)
+        | not (null selected), ordinary_solver
+        , Just prerequisites <- data_prerequisites constructors -> do
+            let local_data = filterNameSet (nameIsLocalOrFrom this_mod) prerequisites
+                imported_data = prerequisites `minusNameSet` local_data
+            checked_data <- and <$> traverse check_data_import (nameSetElemsStable imported_data)
+            if checked_data then do
+              verified <- traverse independentImport (nameSetElemsStable imported)
+              pure ((names, constructors, local_data,) . mkNameSet <$> sequence verified)
+            else pure Nothing
       _ -> pure Nothing
     case candidate of
-      Just (names, imported) -> do
-        let (early_binds, rest_binds) = partition (any (selectedBind names) . snd) binds
+      Just (names, constructors, data_names, imported) -> do
+        let (early_groups, rest_groups) = partition
+              (any ((`elemNameSet` data_names) . tcdName . unLoc) . group_tyclds) groups
+            (early_binds, rest_binds) = partition (any (selectedBind names) . snd) binds
             (early_sigs, rest_sigs) = splitSignatures names sigs
-            early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs) }
-            rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs) }
+            early = emptyRnGroup { hs_tyclds = early_groups
+                                 , hs_valds = XValBindsLR (HsVBG early_binds early_sigs) }
+            rest = group { hs_tyclds = rest_groups
+                         , hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs) }
         (envs@(early_env, _), wanted) <- captureTopConstraints (tcTopSrcDeclGroup early)
         restoreEnvs envs $ do
           evs <- checkNoErrs (simplifyTop wanted)
           checked@(definitions, _) <- localOpenDefinitions selected
             (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
-          unless (isEmptyBag evs && all (independentCore (names `unionNameSet` imported) . snd)
-                                             (nonDetNameEnvElts definitions)) $
+          workers <- traverse independentImport (nameSetElemsStable constructors)
+          let allowed = unionNameSets [names, imported, mkNameSet (catMaybes workers)]
+          unless (all isJust workers && isEmptyBag evs &&
+                    all (independentCore allowed . snd) (nonDetNameEnvElts definitions)) $
             rejectLocalOpen selected "The checked producer requires evidence outside the independent fragment."
           addTopEvBinds evs $ withLocalOpenDefinitions checked $
             tcTopSrcDeclsThen (filter (not . (`elemNameSet` names) . fst) demands) rest finish
       _ -> tcLocalOpenGroup demands group finish
 tcIndependentFamilyProducers demands group finish = tcLocalOpenGroup demands group finish
 
+-- | Select ordinary declarations and retain resolved dependencies omitted
+-- from the local SCC graph, including references to imported families.
+independentDataDecl :: LTyClDecl GhcRn -> Maybe NameSet
+independentDataDecl (L _ DataDecl
+  { tcdDExt = DataDeclRn{tcdFVs = fvs}, tcdModifiers = []
+  , tcdTyVars = HsQTvs{hsq_explicit = params}
+  , tcdDataDefn = HsDataDefn{dd_derivs = [], dd_ctxt = Nothing, dd_kindSig = Nothing,
+                            dd_cons = DataTypeCons False cons} })
+  | all bare_binder params, all vanilla_con cons =
+      let bound = mkNameSet (mapMaybe (hsTyVarName . unLoc) params)
+      in Just (fvs `minusNameSet` bound)
+  where
+    bare_binder (L _ HsTvb{tvb_kind = HsBndrNoKind _}) = True
+    bare_binder _ = False
+    vanilla_con (L _ ConDeclH98{con_modifiers = [], con_telescope = []}) = True
+    vanilla_con _ = False
+independentDataDecl _ = Nothing
+
 -- | Close a producer over independent signatures and lexical applications.
-independentClosure :: Module -> [(RecFlag, [LHsBind GhcRn])] -> [LSig GhcRn]
-                   -> [Name] -> Maybe (NameSet, NameSet)
-independentClosure this_mod binds sigs roots = do
+independentClosure :: Module -> NameEnv Name -> [(RecFlag, [LHsBind GhcRn])] -> [LSig GhcRn]
+                   -> [Name] -> Maybe (NameSet, NameSet, NameSet)
+independentClosure this_mod constructors binds sigs roots = do
     names <- foldM (visit emptyNameSet) emptyNameSet roots
     let local = filterNameSet (nameIsLocalOrFrom this_mod) names
-    pure (local, names `minusNameSet` local)
+    let local_cons = filterNameSet (`elemNameEnv` constructors) local
+        local_binds = local `minusNameSet` local_cons
+    pure (local_binds, local_cons, names `minusNameSet` local)
   where
     signatures = signaturesByOwner sigs
     functions = mkNameEnv
@@ -1961,12 +2021,13 @@ independentClosure this_mod binds sigs roots = do
           pure (extendNameSet checked name)
 
     deps name
+      | name `elemNameEnv` constructors = Just emptyNameSet
       | isExternalName name, not (nameIsLocalOrFrom this_mod name) = Just emptyNameSet
       | Just matches <- lookupNameEnv functions name
       , let pragmas = fromMaybe [] (lookupNameEnv signatures name)
       , all ordinary_pragma pragmas
-      , independent_signature (filter is_type_sig pragmas)
-      , Just refs <- match_refs emptyNameSet matches
+      , Just tyvars <- independent_signature (filter is_type_sig pragmas)
+      , Just refs <- match_refs tyvars emptyNameSet matches
       = Just refs
       | otherwise = Nothing
 
@@ -1976,12 +2037,13 @@ independentClosure this_mod binds sigs roots = do
     ordinary_pragma InlineSig{} = True
     ordinary_pragma _ = False
 
-    independent_signature [] = True
+    independent_signature [] = Just emptyNameSet
     independent_signature [TypeSig _ [] _ (HsWC _ (L _ HsSig
       { sig_bndrs = outer, sig_body = body }))]
-      | Just params <- signature_binders outer, not (null params) =
-          arrow_type (mkNameSet params) body
-    independent_signature _ = False
+      | Just params <- signature_binders outer, not (null params)
+      , let bound = mkNameSet params
+      , arrow_type bound body = Just bound
+    independent_signature _ = Nothing
     signature_binders HsOuterImplicit{hso_ximplicit = quantified} = Just quantified
     signature_binders HsOuterExplicit{hso_matchability = Nothing, hso_bndrs = quantified} =
       traverse bare_binder quantified
@@ -1994,23 +2056,28 @@ independentClosure this_mod binds sigs roots = do
       HsTyVar _ NotPromoted (L _ (WithUserRdr _ n)) -> n `elemNameSet` params
       _ -> False
 
-    match_refs locals (MG {mg_alts = L _ [L _ Match
+    match_refs tyvars locals (MG {mg_alts = L _ [L _ Match
       { m_pats = L _ pats
       , m_grhss = GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) }]}) = do
       binders <- traverse pat_binders pats
-      expr_refs (locals `unionNameSet` mkNameSet (catMaybes binders)) rhs
-    match_refs _ _ = Nothing
+      expr_refs tyvars (locals `unionNameSet` mkNameSet (catMaybes binders)) rhs
+    match_refs _ _ _ = Nothing
     pat_binders (L _ (VarPat _ (L _ n))) = Just (Just n)
     pat_binders (L _ WildPat{}) = Just Nothing
     pat_binders (L _ (ParPat _ p)) = pat_binders p
     pat_binders _ = Nothing
-    expr_refs locals (L _ expr) = case expr of
+    expr_refs tyvars locals (L _ expr) = case expr of
       HsVar _ (L _ (WithUserRdr _ n)) ->
         Just (if n `elemNameSet` locals then emptyNameSet else unitNameSet n)
-      HsPar _ e -> expr_refs locals e
-      HsApp _ fun arg -> unionNameSet <$> expr_refs locals fun <*> expr_refs locals arg
-      HsLam _ LamSingle matches -> match_refs locals matches
+      HsPar _ e -> recur e
+      HsApp _ fun arg -> unionNameSet <$> recur fun <*> recur arg
+      HsLam _ LamSingle matches -> match_refs tyvars locals matches
+      ExprWithTySig _ e (HsWC [] (L _ HsSig
+        { sig_bndrs = HsOuterImplicit{hso_ximplicit = []}, sig_body = ty }))
+        | arrow_type tyvars ty -> recur e
       _ -> Nothing
+      where
+        recur = expr_refs tyvars locals
 
 -- | Verify an imported occurrence and return the name found in checked Core.
 independentImport :: Name -> TcM (Maybe Name)
@@ -2118,8 +2185,10 @@ independentConstant expected actual
 An imported family can be named by an imported signature or a class
 instance. A renamed name closure alone cannot justify moving an ordinary
 producer ahead of that family's equation. Check a separate early batch
-with lexical lambda/application bindings. Reject
-annotations and syntax with overloaded operations. An imported Id
+with lexical lambda/application bindings. An expression signature may
+mention only ordinary arrows and the producer's scoped type variables.
+Reject named types, wildcards and newly quantified annotation variables,
+and syntax with overloaded operations. An imported Id
 can enter this batch if its entire declared type is independent.
 Check all binder kinds, argument types and arrow metadata. This
 check uses its interface, without evaluating or certifying its body.
@@ -2135,14 +2204,23 @@ hidden may change when the family equation comes into scope. Observing
 that keep returns x cannot establish which dictionary GHC selected.
 Even an ignored type annotation may use the very equation we are
 checking. Inspect the renamed syntax before desugaring can erase it.
+Compare resolved names. A type with the same spelling as a producer's
+type variable can resolve to a different binder.
 
 Check the ordinary bindings and solve them without the candidate
 equation. Keep normal top-level inference for an unsigned binding.
 The source dependency graph still excludes recursive SCCs. Check
 each inferred monomorphic binding and its wrapper in the solved Core
-before observing the actual producer body. The regular source checker
-then receives its original type groups, instances, methods, defaults
-and deriving declarations.
+before observing the actual producer body.
+
+A constructor in the producer can require a local datatype. Move its
+entire renamed type SCC, including role annotations, before checking
+the producer. Follow the local dependencies in group_ext. Also check
+DataDeclRn.tcdFVs, which retains imported references omitted from
+group_ext. An imported family in a field can depend on the pending
+equation. Reject it before moving any group. The regular source checker
+then receives the remaining type groups and all instances, methods,
+defaults and deriving declarations.
 With a typechecker plugin, the early batch could have effects or solve
 constraints differently. Use the ordinary declaration order in that case.
 -}

@@ -349,3 +349,22 @@ ordinary client code through the interface. The client prints
 group remains outside the early batch. The scheduler checks resolved
 body dependencies even when signatures break the renamer's typing
 cycle. [Interface and rejection checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
+## Mixed type and term declarations
+
+An imported family equation can use a local function that mentions a
+local data constructor. In `MixedFamily`, `Payload Double` depends on
+`keep`. The body of `keep` mentions `Envelope`. An unused constructor
+of `Envelope` has a `Wrap a` field. GHC checks `Wrap` and `Envelope`,
+then `keep`, then the family equation. This lets a later constructor
+accept `True :: Payload Double`. An ordinary client reads the field
+through the interface. [Source](../examples/open-evaluation/MixedFamily.hs)
+and [consumer](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
+Move the whole group of mutually dependent type declarations identified
+by the renamer. Keep its role annotations. Check imported references
+in the field types as well. If the field of `Wrap` uses `Payload Double`,
+there is a real cycle even though `keep` never applies that constructor.
+GHC reports GHC-70566 at the reference to `keep` in the family equation.
+An expression signature such as `(id :: a -> a)` can precede the
+equation when `a` is the producer's scoped type variable.

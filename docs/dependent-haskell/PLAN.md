@@ -9146,3 +9146,19 @@ first result when the tail is unknown. Check the empty and cons cases
 again with an inherited rule that changes `not True`. For an old
 package that supplies no checked equations, identify the callback at
 its source location. [Source example and checks](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback).
+
+## M171. Order constructor declarations before an imported family producer
+
+The local function `keep` uses an `Envelope` constructor. The equation
+for `Payload Double` uses `keep`, and a field of `Stored` uses the
+equation. Check the datatype prerequisites of the producer as whole
+groups, including their role declarations. Accept an ordinary arrow
+annotation over a scoped variable. Check both a hidden family in an
+annotation and a transitive field dependency that would make the
+ordering cyclic. [Source example, result and controls](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations).
+
+Both shared compiler stages built. Native execution and self-hosted
+GHCi agreed on 243 Showcase lines. The normal dependent directory
+passed 245 of 280 cases. Its 35 failures had the same individual
+diagnostics as M169. Both compilers accepted the same 115 of 124
+ordinary polykinds programs in the comparison.

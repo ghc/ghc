@@ -8,9 +8,10 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-At M169, native execution and GHCi agreed on all 240 Showcase lines.
-The normal-way dependent directory passed 244 of 279 exercised cases.
-The 35 remaining failures produced the same output as at M165 (`4b61d58af8`).
+At M171, native execution at both compiler stages and self-hosted GHCi
+agreed on all 243 Showcase lines. The normal-way dependent directory
+passed 245 of 280 exercised cases. The 35 remaining failures produced
+the same output as at M169 (`3b2aecbe55`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
@@ -28,6 +29,11 @@ produces `False ': NegateAll xs`. An inherited rule that changes
 [Alias](examples/open-evaluation/InstalledNotSource.hs),
 [proof](examples/open-evaluation/InstalledNotProof.hs),
 and [remaining work on Prelude.map](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback).
+
+The mixed declaration example uses a local constructor in a function
+that determines a type family result. A later constructor uses that
+result as a Boolean field. An ordinary client can read it through the
+interface. [MixedFamily](examples/open-evaluation/MixedFamily.hs).
 
 A separate ordinary client can prove `pick (make 7) :~: 7` when
 `make n = (n, error "unused")`, using only the two interfaces and an

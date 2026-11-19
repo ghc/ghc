@@ -68,6 +68,7 @@ import qualified LocalInstance
 import qualified LocalAssociated
 import qualified IndependentFamily
 import qualified ImportedFamily
+import qualified MixedFamily
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -961,6 +962,8 @@ main = do
         (Refl :: MarkedHead ('Spine.More 'x' 'Spine.Empty) :~: 'Just ('Spine.Marked 'x'))
     observe "infer a local function used in an imported family equation"
         (ImportedFamily.importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
+    observe "check a local datatype before an imported family equation"
+        (case MixedFamily.mixedResult of MixedFamily.Stored flag -> flag)
     observe "select the second element through a private case"
         (Refl :: Spine.secondOrFirst ('Spine.More 'x' ('Spine.More 'y' 'Spine.Empty)) :~: 'Just 'y')
     observe "rebuild one spine cell while its tail remains unknown"

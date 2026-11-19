@@ -11,21 +11,27 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 mkdir "$out"/{producer,client}
 cd "$out/producer"
-cp "$src"/{ImportedFamilyProvider,ImportedFamily}.hs .
-"${ghc[@]}" -c ImportedFamilyProvider.hs ImportedFamily.hs
+cp "$src"/{ImportedFamilyProvider,ImportedFamily,MixedFamily}.hs .
+"${ghc[@]}" -c ImportedFamilyProvider.hs ImportedFamily.hs MixedFamily.hs
 
-# The consumer must typecheck before it has either of the producer objects.
+"${ghc[@]}" --show-iface MixedFamily.hi >mixed.iface
+grep -Fq 'type role Envelope nominal' mixed.iface
+
+# The consumer checks the producer interfaces before linking their objects.
 cp ./*.hi ../client/
 cd ../client
 cat >Client.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
 import ImportedFamily (importedFamilyResults)
+import MixedFamily (Stored(..), mixedResult)
 main :: IO ()
-main = print (importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
+main = case mixedResult of
+    Stored True -> print (importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
+    Stored False -> fail "expected a True payload"
 HS
 "${ghc[@]}" -c Client.hs
-"${ghc[@]}" Client.o ../producer/{ImportedFamily,ImportedFamilyProvider}.o -o client
+"${ghc[@]}" Client.o ../producer/{ImportedFamily,ImportedFamilyProvider,MixedFamily}.o -o client
 ./client
 
 expect_cycle() {
@@ -55,6 +61,11 @@ sed -e 's/BlindCycle/ErasedCycle/g' \
     -e 's/(hidden Proxy)/(True :: Payload Int)/' BlindCycle.hs >ErasedCycle.hs
 expect_cycle ErasedCycle
 
+sed -e 's/ErasedCycle/AliasAnnotationCycle/g' \
+    -e '/^keep ::/i type Dependency = Payload Int' \
+    -e 's/True :: Payload Int/True :: Dependency/' ErasedCycle.hs >AliasAnnotationCycle.hs
+expect_cycle AliasAnnotationCycle
+
 sed -e 's/BlindCycle/NestedTypeCycle/g' -e '/^import Data.Proxy/d' \
     -e 's/(Payload, hidden)/(Payload, hiddenNested)/' \
     -e 's/(hidden Proxy)/(hiddenNested Nothing)/' BlindCycle.hs >NestedTypeCycle.hs
@@ -63,6 +74,12 @@ expect_cycle NestedTypeCycle
 sed -e 's/NestedTypeCycle/UnsignedNestedTypeCycle/g' -e '/^keep ::/d' \
     NestedTypeCycle.hs >UnsignedNestedTypeCycle.hs
 expect_cycle UnsignedNestedTypeCycle
+
+# The Wrapped alternative needs this equation even though keep uses Envelope.
+sed -e 's/MixedFamily/TransitiveFieldCycle/g' \
+    -e 's/data Wrap a = Wrap a/data Wrap a = Wrap (Payload Double) a/' \
+    ../producer/MixedFamily.hs >TransitiveFieldCycle.hs
+expect_cycle TransitiveFieldCycle
 
 cat >RecursiveProducer.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}

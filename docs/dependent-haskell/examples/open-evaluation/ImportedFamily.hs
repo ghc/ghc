@@ -1,4 +1,4 @@
-{-# LANGUAGE ExperimentalDependentTypes, MonoLocalBinds, TypeFamilies #-}
+{-# LANGUAGE ExperimentalDependentTypes, MonoLocalBinds, ScopedTypeVariables, TypeFamilies #-}
 module ImportedFamily (importedFamilyResults) where
 import Data.Proxy (Proxy(..))
 import ImportedFamilyProvider (Payload, importedFirst)
@@ -20,7 +20,7 @@ lambda :: forall a. a -> a
 lambda x = (\a _ -> a) x x
 
 identity :: forall a. a -> a
-identity x = Prelude.id x
+identity x = (Prelude.id :: a -> a) x
 
 viaMaybe :: a -> a
 viaMaybe x = Prelude.maybe x Prelude.id (Just x)

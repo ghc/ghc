@@ -5771,3 +5771,11 @@ callback's clauses can invalidate an interface proof. Replacing its
 object can change a closed result with the old interface still present.
 These are GHC separate-compilation decisions. [Ordinary mapper and callback](examples/open-evaluation/OpenMapWorker.hs)
 and [checks for both changes](../../testsuite/tests/dependent/should_run/NativeOpenMap.sh).
+
+Agda permits a datatype declaration and its constructors to appear at
+different positions in an interleaved mutual block. Haskell's renamer
+already groups mutually dependent type declarations. R21 uses those
+groups to check a local constructor before the term that requires it.
+The extra dependency on an imported type family comes from Haskell's
+open family instances. [Agda interleaved mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
+and [mixed Haskell declarations](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations).
