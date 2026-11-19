@@ -543,6 +543,7 @@ checkFlagHash hsc_env iface self_recomp = do
     let (base_fp, new_flags) = fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
         sum_fp = computeFingerprint putNameLiterally (base_fp, "sum-projections-v1" :: String)
         projection_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v1" :: String)
+        result_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v2" :: String)
         new_fp = caseTreeFingerprint base_fp
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
@@ -550,6 +551,10 @@ checkFlagHash hsc_env iface self_recomp = do
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
        | old_fp == base_fp, any couldHaveSumProjection candidates
          -> recheck "Compiler now checks sum projections"
+       | old_fp == result_fp
+         -> if null candidates
+              then up_to_date logger (text "Module cannot export a constructor case")
+              else recheck "Compiler now checks constructor case helpers"
        | old_fp == projection_fp
          -> if null candidates
               then up_to_date logger (text "Module cannot export a constructor case")
@@ -569,7 +574,7 @@ checkFlagHash hsc_env iface self_recomp = do
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
-caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v2" :: String)
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v3" :: String)
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
 -- See Note [Recompiling constructor case producers].
@@ -603,8 +608,8 @@ could not publish an M144 projection can still need this upgrade even if
 the intervening compiler reused it. Record the new key on every write,
 including when the Core checks find no equation. M146 only returned
 fields and arguments. Reuse the same necessary candidate test when
-upgrading to constructor results. An older binary-only interface still
-supports ordinary imports.
+upgrading to constructor results and to checked helper calls in those
+results. An older binary-only interface still supports ordinary imports.
 -}
 
 

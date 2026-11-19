@@ -734,7 +734,55 @@ Changing only the constructed result from `Just (Just x)` to
 A result such as `Just (helper x)` needs evidence for the helper as
 well as the constructors. With only a stripped worker interface, GHC
 reports GHC-70566 at the call on a rigid spine. Its current suggestion
-to use a rigid variable does not identify the missing equation. The
-next case needs both helper evidence and a diagnostic for its absence.
+to use a rigid variable does not identify the missing equation. M151 adds helper evidence and refines the observer diagnostic.
 [Ordinary worker](../examples/open-evaluation/SpineWorker.hs)
 and [compiler upgrade](../examples/open-evaluation/check-case-upgrade.sh).
+
+## M151. Checked helper calls inside constructor results
+
+A branch can now build `Just (helper x)` when GHC has a checked
+equation for the exact saturated helper call at the required kind.
+For a local polymorphic identity, GHC checks that its solved Core
+returns its own argument. A case equation can also reference an
+already certified imported helper. The case branch retains the
+helper's family application beneath the constructor.
+
+The existing family dependency check follows those applications.
+It checks helper rules, preserves the defining Id in the interface,
+and retains the dependency when a separate module exports an alias.
+A private helper remains absent from source exports. Changing its
+identity body to force the argument, or adding a rewrite rule that
+replaces it, removes the equation in this subset. Potentially
+eligible producers recompile once to add this support.
+
+This check follows the demand in GHC's desugared case tree. Agda
+likewise uses the selected path in a compiled case tree to determine
+which clauses give definitional reductions. The helper here needs
+separate nominal evidence. [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [stripped-interface helper test](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh).
+
+The [ordinary worker](../examples/open-evaluation/SpineWorker.hs) also
+defines `firstViaHelper` for the Showcase. In the separate-module
+test, changing an imported helper to select the other field invalidates
+the unchanged client's proof through both interfaces. M154 supplies
+the equation that a case needs to export `Just (wrap x)` for a local
+`wrap x = Just x`.
+
+## M154. A helper can construct its result
+
+The private helper in `firstViaWrap (More x _) = Just (wrap x)` can
+itself build a result. The checked body of `wrap` constructs `Just x`.
+The same check accepts a public user-defined constructor in
+`firstViaMark`. An ordinary client proves these results through a
+separate alias and stripped producer interface with both head and
+tail rigid.
+
+The helper uses the same typed constructor check as a case branch.
+Its signature must have a lifted type parameter and ordinary term
+arguments. Its solved Core can return an input variable or saturate public lazy
+constructor workers. It cannot scrutinize a variable, use a binding
+outside its inputs, or call another helper. This keeps the helper
+proof finite and excludes cycles. Existing rules and interface
+dependencies still apply to the helper's exact Id.
+[Producer](../examples/open-evaluation/SpineWorker.hs)
+and [source gate](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh).

@@ -311,13 +311,15 @@ openDefinitionIface hscEnv mod installed = do
 -- | Describe why a candidate cannot elaborate to a type.
 openTypeFailureReason :: OpenTypeFailure -> (Maybe Name, String)
 openTypeFailureReason InvalidInput =
-  (Nothing, "Use rigid variables or ordinary boxed constructors with lazy fields at the declared input kinds.")
+  (Nothing, "The open evaluator could not represent an operand at the required kind. " ++
+    "It instantiates lifted polymorphic parameters at Type. Other instantiations need checked source equations.")
 openTypeFailureReason (UnavailableDefinition name failure) =
   (Just name, case failure of
     UnavailableModule -> "A referenced definition does not come from an ordinary imported module."
     UnavailableLocalMethod -> "Evaluation needs a local class method whose definition is unavailable at this call."
     CannotReadInterface -> "The interface for a referenced definition could not be read."
-    MissingTemplate -> "The interface for a referenced definition contains no usable Core unfolding."
+    MissingTemplate -> "The interface for a referenced definition contains no usable Core unfolding. " ++
+      "Use an interface that exposes the unfolding or provides a checked equation for this call."
     WrongTemplateType -> "The type of a referenced unfolding disagrees with its declared type.")
 openTypeFailureReason (CannotReduce failure) =
   (Nothing, case failure of
@@ -325,7 +327,8 @@ openTypeFailureReason (CannotReduce failure) =
     UnsupportedCore -> "Reduction reached an unsupported Core expression."
     MissingAlternative -> "Reduction reached a case without a matching alternative.")
 openTypeFailureReason (RigidCase scrutinee) =
-  (Nothing, "Reduction stopped at a case on the rigid argument " ++ getOccString scrutinee ++ ".")
+  (Nothing, "Reduction stopped at a case on the rigid argument " ++ getOccString scrutinee ++
+    ". A checked equation can retain this case until the argument's constructor is known.")
 openTypeFailureReason (HiddenConstructor name) =
   (Nothing, "A result constructor of " ++ getOccString name ++ " is not in scope through an ordinary import.")
 openTypeFailureReason UnexpectedNeutral =

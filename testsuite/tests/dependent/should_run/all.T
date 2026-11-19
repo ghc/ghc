@@ -20,6 +20,9 @@ test('NativeOpenConstructor',
                                          open_eval_dir + 'OpenConstructorSource.hs',
                                          open_eval_dir + 'SpineWorker.hs'])],
      run_command, ['bash NativeOpenConstructor.sh "{compiler}" "{libdir}"'])
+test('NativeOpenConstructorHelpers',
+     [only_ways(['normal']), extra_files([open_eval_dir + 'SpineWorker.hs'])],
+     run_command, ['bash NativeOpenConstructorHelpers.sh "{compiler}" "{libdir}"'])
 test('NativeOpenBuild',
      [only_ways(['normal']), extra_files([open_eval_dir + 'OpenBuildWorker.hs',
                                          open_eval_dir + 'OpenBuildSource.hs', 'NativeOpenBuildControls.hs'])],
