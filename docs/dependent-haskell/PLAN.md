@@ -8565,3 +8565,59 @@ the vector, its two independently indexed fields, and the three rejection
 cases. The boundary plugin and splice checks also passed. The normal-way
 dependent directory passed 216 of 252 exercised cases. All 36 failures
 matched the M129 diagnostics individually. The full GHC testsuite was not run.
+
+## M132: consume a written existential package
+
+- [x] Use the checked promoted constructor's actual erased arguments.
+      Validate the result kind, constructor fields and worker representation.
+- [x] Apply an ordinary consumer to a vector packaged with its length.
+      Preserve the diagnostic for an ambiguous erased argument.
+
+[Written operand](roadmap/R15-closed-term-evaluator.md#m132-written-existential-operands).
+
+## M133: select symbolic fields by constructor
+
+- [x] Reduce a case on a known, fully applied lazy boxed constructor.
+      Check both alternatives and a nested constructor from an interface.
+- [x] Keep fields suspended. Report a demand on a rigid field or on an
+      unknown scrutinee at the source call.
+- [x] Track the first known type argument on each demand of an unfolding.
+      Check a disjoint rule, a matching rule on a cached helper, and
+      recompilation after a field's strictness changes.
+
+[Source and interface regression](roadmap/R16-open-term-evaluator.md#eliminating-a-known-user-constructor).
+
+## M134: order mixed type and value dependencies
+
+- [x] Map constructors to their datatype group. Keep the renamer's
+      kind signatures, role declarations and mutual groups together.
+- [x] Check the functions whose prerequisites are ready. Retry the
+      remaining functions with the checked definitions in scope.
+- [x] Check an alternating chain through a type synonym and local
+      functions. Report a cycle through a helper at the dependent call.
+
+[Mixed declaration examples](roadmap/R21-dependency-analysis.md#m134-local-type-and-value-dependencies).
+
+## M135: reify a package at its witnessed index
+
+- [x] Check the witness and payload constructors and their scope before
+      executing the producer. Generate typed, independently polymorphic
+      Core functions to observe the two fields.
+- [x] Recover the index from the witness. Validate the payload at that
+      index and construct the DataKinds result. Check zero, one and two
+      vector cells and a second datatype with a different field order.
+- [x] Reject a missing witness, an inaccessible constructor and a
+      deliberately inconsistent payload. Demanding an exceptional
+      witness reports the exception.
+
+[Runtime package and checks](roadmap/R15-closed-term-evaluator.md#m135-reading-a-runtime-existential-package).
+
+Both compiler stages built. The two native Showcase runs and GHCi
+agreed on all 209 output lines. The internal and external interpreters
+checked the positive vector and fare proofs, constructor visibility,
+and malformed payload controls with Core and STG lint. Changing only
+the producer object made GHC reject the old second cell in an unchanged
+client. The open constructor, mixed dependency, boundary plugin and
+splice regressions passed. The normal-way dependent directory passed
+221 of 257 exercised cases. All 36 failures matched M131 individually.
+The full GHC testsuite was not run.

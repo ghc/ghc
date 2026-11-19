@@ -8,11 +8,26 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 205 lines.
-The normal-way dependent directory passed 216 of 252 exercised cases. All 36 failures
-produced the same output as at M129 (`236f02cd1c`). Fifteen reject existing
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 209 lines.
+The normal-way dependent directory passed 221 of 257 exercised cases. All 36 failures
+produced the same output as at M131 (`71e63770eb`). Fifteen reject existing
 programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+An ordinary library function now returns `SomeVec Natural` and chooses
+the length from its input. At `4`, the dependent client proves
+`E.readSomeVec (E.someVec 4) :~: '[4, 5]`. GHC recovers the erased
+length from the singleton inside the package and checks its vector at
+that length. The producer and consumer both have ordinary Haskell types.
+[Runnable proof](Showcase.hs) and [ordinary library](examples/closed-evaluation/ExistentialVec.hs).
+
+An imported case can select a symbolic field from a known constructor.
+The ordinary function `pick` returns the second field of `LeftFields`
+and the first field of `RightFields`. The dependent client checks both
+uses from the producer interface. Within one module a similar function
+can now depend on a locally declared datatype or a synonym that calls
+another function. [Imported case](examples/open-evaluation/OpenConstructorSource.hs)
+and [local declaration ordering](roadmap/R21-dependency-analysis.md#m134-local-type-and-value-dependencies).
 
 The ordinary vector library defines `safeHead :: Vec ('S n) a -> a`.
 In the Showcase, `IndexedVec.safeHead (IndexedVec.two 3) :~: 3` checks

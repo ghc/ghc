@@ -5404,3 +5404,32 @@ Dependent Haskell.
 [Agda's mutual definitions](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html),
 [Agda's termination checker](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html)
 and [A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf).
+
+### Packing an index, matching a constructor, and ordering declarations
+
+Agda's dependent pair stores a first component and a second component
+whose type can mention the first. The ordinary Haskell package used here
+stores a singleton and a vector indexed by the same variable. DataKinds
+records the variable's instantiation in a checked constructor application.
+M132 uses that instantiation when it passes the package to an ordinary
+consumer. M135 inspects a singleton returned by a producer and validates
+the accompanying indexed payload before constructing a promoted value.
+[Agda dependent products](https://agda.github.io/agda-stdlib/v2.3/Data.Product.Base.html),
+[Eisenberg and Weirich on singletons](https://richarde.dev/papers/2012/singletons/paper.pdf)
+and [the local package](examples/closed-evaluation/ExistentialVec.hs).
+
+Agda's pattern clauses select an equation once the required constructor
+is known. For M133 the Haskell case inspects its scrutinee. An ordinary
+lazy field stays suspended until the selected branch demands it. GHC's
+Core alternative gives both the constructor and the order of the field
+binders. [Agda pattern matching](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html)
+and [Core observer](../../compiler/GHC/Core/OpenWhnf.hs).
+
+Serokell describes how GHC groups top-level declarations by dependency.
+Agda's interleaved mutual blocks show a related reason to distinguish
+introducing a datatype from checking a use of its constructors. M134 uses
+Haskell's existing declaration groups. A local type can become ready
+after GHC checks a function it mentions. The source needs no new block
+syntax. [Serokell's dependency analysis](https://serokell.io/blog/dependency-analysis-haskell),
+[Agda's interleaved declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
+and [GHC's declaration scheduler](../../compiler/GHC/Tc/Module.hs).

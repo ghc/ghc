@@ -2907,3 +2907,43 @@ even when the two functions share the same inferred type.
 [Declaration scheduler](../../compiler/GHC/Tc/Module.hs),
 [weak-head evaluator](../../compiler/GHC/Core/OpenWhnf.hs)
 and [sibling-rule test](../../testsuite/tests/dependent/should_run/NativeLocalOpenSibling.hs).
+
+### Constructor cases with open fields
+
+The observer recognizes a saturated ordinary boxed constructor worker.
+It checks the type arguments, the representation and the types of the
+lifted fields. A known constructor determines the Core alternative. The
+alternative binds each field to its expression and lexical environment.
+A case on an unknown field blocks if the branch demands it. A successful
+source observation at this checkpoint returns one of the caller's rigid
+type variables. The observer installs no coercion axiom.
+[Core observer](../../compiler/GHC/Core/OpenWhnf.hs)
+and [checked source application](../../compiler/GHC/Tc/Gen/OpenTypeEval.hs).
+
+An observation can unfold an imported helper at more than one type. The
+ordinary source-rule check uses the first known type argument at each
+occurrence. An alias to a variable of the same type preserves its
+pending type application. Returning to the cache for an unfolding still
+records that occurrence. A demand with unknown specialization requires
+checking every active rule for its owner.
+[Interface examples](roadmap/R16-open-term-evaluator.md#eliminating-a-known-user-constructor).
+
+### An existential index carried by a runtime witness
+
+The package case binds a fresh index, its witness, and its payload.
+For a vector, the encoder for the witness has the shape
+`forall n. SN n -> ShowS`. The encoder for the payload has the shape
+`forall n. Vec n a -> ShowS` at the known element type `a`. Each
+recursive alternative uses its own bound predecessor variable and
+checks the role and endpoints of the case's equality. Its recursive
+field already has the type required by the next call. The interpreter
+returns constructor tags and ordinary fields.
+
+The decoder first reconstructs the witness and the index it establishes.
+It checks the payload against that same index, including each base
+case. It checks the reconstructed field kinds before applying the
+promoted package constructor. The plan records the datatype and constructor
+dependencies before evaluating the producer. A written package already
+contains its erased arguments in the kind-checked promoted application.
+[Planning, rendering and decoding](../../compiler/GHC/Tc/Gen/Splice.hs)
+and [witnessed source results](roadmap/R15-closed-term-evaluator.md#m135-reading-a-runtime-existential-package).

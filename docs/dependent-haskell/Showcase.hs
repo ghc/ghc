@@ -39,6 +39,7 @@ import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
 import qualified Data.Char
 import qualified Data.Either
+import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Kind (Type)
 import Data.List (isInfixOf)
@@ -61,6 +62,7 @@ import qualified IndexedVec
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
+import qualified OpenConstructorSource
 import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
 import qualified OpenSource
@@ -888,6 +890,15 @@ main = do
         (Refl :: IndexedVec.safeHead (IndexedVec.two 3) :~: 3)
     observe "ignore a recursive helper in a type and at runtime"
         (Refl :: LocalOpen.LazyFirst Char Bool :~: Char, LocalOpen.lazyFirst 'x' 'y')
+    observe "read the cells of a vector packaged with its length"
+        (Refl :: E.readSomeVec ('E.SomeVec ('E.SS ('E.SS 'E.SZ))
+                    ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))) :~: '[4, 5])
+    observe "select a type with a locally declared route"
+        (Refl :: LocalOpen.Routed Char Bool :~: Bool, LocalOpen.route 'x' 'y')
+    observe "select unknown fields from known constructors"
+        (OpenConstructorSource.left True 'x', OpenConstructorSource.nested (7 :: Int) 'z')
+    observe "read a length witness returned by an ordinary function"
+        (Refl :: E.readSomeVec (E.someVec 4) :~: '[4, 5], E.readSomeVec (E.someVec 4))
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)
