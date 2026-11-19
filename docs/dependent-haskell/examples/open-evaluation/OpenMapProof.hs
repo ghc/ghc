@@ -1,11 +1,12 @@
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications, TypeOperators #-}
-module OpenMapProof (eachEmpty, eachCons, negateHead, redStops) where
+module OpenMapProof (eachEmpty, eachCons, negateHead, redStops, firstRowHead) where
 
 import qualified ClosedTableLibrary as C
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (FUN, U, Multiplicity(Many))
-import OpenMapSource (Each, NegateAll, Signals)
+import OpenMapSource (Each, Heads, NegateAll, Signals)
+import qualified SpineWorker as S
 
 -- | An empty list needs no callback application.
 eachEmpty :: forall (f :: FUN @U 'Many Bool Bool).
@@ -27,3 +28,9 @@ negateHead _ = Refl
 redStops :: forall (xs :: [C.Lamp]). Proxy xs
          -> Signals ('C.Red ': xs) :~: ('C.Stop ': Signals xs)
 redStops _ = Refl
+
+-- | The head of the first row determines the first result.
+firstRowHead :: forall (x :: Bool) (tail :: S.Spine Bool) (rows :: [S.Spine Bool]).
+                Proxy x -> Proxy tail -> Proxy rows
+             -> Heads ('S.More x tail ': rows) :~: ('Just x ': Heads rows)
+firstRowHead _ _ _ = Refl

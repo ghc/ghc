@@ -72,6 +72,7 @@ import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
 import qualified OpenBuildSource
+import qualified OpenMapProof
 import qualified OpenBuildWorker as Build
 import qualified SpineWorker as Spine
 import qualified OpenConstructorSource
@@ -967,6 +968,27 @@ main = do
         (filledCell (Proxy :: Proxy ('Spine.Empty :: Spine.Spine Bool)) (Proxy :: Proxy ('Just 'True)))
     observe "apply Prelude.map to Prelude.not at a known list"
         (Refl :: Prelude.map Prelude.not '[ 'True, 'False] :~: '[ 'False, 'True])
+    observe "pass an unapplied type family to another family"
+        (Refl :: MapFlags FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
+    observe "pass a constructor to uncurry with two unknown fields"
+        (OpenBuildSource.uncurried (Proxy @Int) (Proxy @Char))
+    observe "prove one map step for an arbitrary callback and tail"
+        (OpenMapProof.eachCons (Proxy @FlipFlag) (Proxy @'True) (Proxy @'[ 'False]))
+    observe "map Boolean negation and traffic signals over an unknown tail"
+        (OpenMapProof.negateHead (Proxy @'[]), OpenMapProof.redStops (Proxy @'[]))
+    observe "collect row heads with an ordinary polymorphic callback"
+        (OpenMapProof.firstRowHead (Proxy @'True) (Proxy @'Spine.Empty) (Proxy @'[]))
+
+-- | Complement one flag at the type level.
+type family FlipFlag (b :: Bool) :: Bool where
+    FlipFlag 'False = 'True
+    FlipFlag 'True = 'False
+
+-- | Apply an unmatchable Boolean function to each list element.
+type MapFlags :: FUN @U 'Many Bool Bool -> [Bool] -> [Bool]
+type family MapFlags f xs where
+    MapFlags f '[] = '[]
+    MapFlags f (x ': xs) = f x ': MapFlags f xs
 
 -- | Prove the first output cell without supplying the input tail.
 erasedCell :: forall (xs :: Spine.Spine Bool). Proxy xs

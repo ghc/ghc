@@ -6,7 +6,7 @@ ghc=("$1" "-B$2" -O0 -v0 -package-env - -fomit-interface-pragmas
      -fno-write-if-simplified-core -dcore-lint -dstg-lint)
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
-cp "$src"/{OpenMapWorker,OpenMapSource,OpenMapProof,ClosedTableLibrary}.hs "$out/"
+cp "$src"/{OpenMapWorker,OpenMapSource,OpenMapProof,ClosedTableLibrary,SpineWorker}.hs "$out/"
 cd "$out"
 cp OpenMapWorker.hs Worker.source
 
@@ -17,9 +17,9 @@ compile_worker() {
 }
 compile_worker
 grep -Fq 'T:each ' worker.iface
-"${ghc[@]}" -c ClosedTableLibrary.hs
+"${ghc[@]}" -c ClosedTableLibrary.hs SpineWorker.hs
 mv ClosedTableLibrary.hs Callback.source
-rm ClosedTableLibrary.o
+rm ClosedTableLibrary.o SpineWorker.hs SpineWorker.o
 "${ghc[@]}" -c OpenMapSource.hs
 rm OpenMapSource.hs OpenMapSource.o
 "${ghc[@]}" -c OpenMapProof.hs

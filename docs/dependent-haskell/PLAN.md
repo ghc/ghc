@@ -9077,3 +9077,55 @@ matched M163 individually. The compilers accepted the same 115 of 124
 ordinary polykinds programs. The interface upgrades and boundary checks
 passed. Replacing only the callback object kept the installed interface
 byte-identical and caused the unchanged proof to fail.
+
+## M166. Pass an unapplied type family
+
+Use an ordinary closed family `Flip` as an argument to
+`Each :: FUN @U 'Many Bool Bool -> [Bool] -> [Bool]`. Reduce `Flip`
+when its argument becomes available. Preserve its identity through an
+imported type synonym and a changed open family instance. Check the
+role of each operand. An equality between two results of an unmatchable
+function cannot, in general, establish equality of its inputs.
+[R23 design and proposal](roadmap/R23-unsaturated-type-families.md#prior-art-and-current-boundary).
+
+## M167. Pass a constructor to an ordinary helper during open evaluation
+
+Check `uncurry Store (x,y)` when both fields are rigid. Recognize a
+partially applied worker for a lazy boxed constructor and eta-expand its
+missing value arguments. Reuse the saturated worker check when the
+helper supplies those arguments. Exercise hidden constructors, strict
+fields, and the list constructor passed by the installed fusion rule.
+
+## M168. Check the list equation of a higher-order source function
+
+Check a rule-free worker `each f (x:xs) = f x : each f xs` in ordinary
+Core. The input list is the second argument. The equation must retain
+the original callback, apply it to the head, and recurse on the
+original tail. Export the equation to an ordinary reader through
+stripped interfaces. Test changed callbacks, extra demands, and
+nondecreasing recursion. The installed Prelude function also needs
+the [fusion rule check](roadmap/R16-open-term-evaluator.md#passing-a-function-as-the-carried-operand).
+
+## M169. Carry a checked named callback across an interface
+
+Use the original `flipBit` and traffic-light `signal` definitions as
+callbacks to an ordinary list mapper. Check the equation for one input
+cell with its tail still unknown. Record the callback identity when
+forming the alias. Check the callback's equation and its rewrite rules
+when the proof uses it. Recompile the callback with a changed clause
+and retry the original client with the old alias interface.
+[Interface proofs](roadmap/R16-open-term-evaluator.md#checking-an-ordinary-mapper-across-interfaces).
+
+Both compiler stages built. Native execution at both stages and
+self-hosted GHCi agreed on all 240 Showcase lines. The normal dependent directory passed
+244 of 279 exercised cases. All 35 failures matched M165 individually.
+Both compilers accepted the same 115 of 124 ordinary polykinds programs.
+The previous compiler's rule-free mapper acquired its equation on
+recompilation. An unchanged unrelated module and the subsequent warm
+build were reused. The boundary plugin and splice checks passed.
+
+The `Heads` example uses both a mapper and a polymorphic callback
+defined in ordinary modules. The consumer proves the first result from
+a known row constructor with its element and both tails still unknown.
+The ordinary clients for this example and for a partial family compile
+from interfaces with Core and STG Lint at `-O0`, `-O1`, and `-O2`.

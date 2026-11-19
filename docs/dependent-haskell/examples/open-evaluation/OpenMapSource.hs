@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, StandaloneKindSignatures, TypeApplications #-}
-module OpenMapSource (Each, NegateAll, Signals) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, StandaloneKindSignatures, TypeApplications #-}
+module OpenMapSource (Each, NegateAll, Signals, Heads) where
 
 import qualified ClosedTableLibrary as C
 import GHC.Exts (FUN, U, Multiplicity(Many))
 import qualified OpenMapWorker as W
+import qualified SpineWorker as S
 
 -- | Use the ordinary mapper with an unmatchable Boolean callback.
 type Each :: FUN @U 'Many Bool Bool -> [Bool] -> [Bool]
@@ -16,3 +17,7 @@ type NegateAll xs = W.each C.flipBit xs
 -- | Compute instructions from the colours of the traffic lights.
 type Signals :: [C.Lamp] -> [C.Signal]
 type Signals xs = W.each C.signal xs
+
+-- | Collect the optional heads of rows using an ordinary polymorphic callback.
+type Heads :: [S.Spine a] -> [Maybe a]
+type Heads rows = W.each S.firstMaybe rows

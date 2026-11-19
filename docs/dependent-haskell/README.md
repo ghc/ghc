@@ -8,11 +8,18 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. Native execution and GHCi agree on all 234 Showcase lines.
-The normal-way dependent directory passed 240 of 275 exercised cases.
-The 35 remaining failures produced the same output as at M160 (`8ce7c7370e`).
+At M169, native execution and GHCi agreed on all 240 Showcase lines.
+The normal-way dependent directory passed 244 of 279 exercised cases.
+The 35 remaining failures produced the same output as at M165 (`4b61d58af8`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+An ordinary source function can now map a checked callback over a list
+whose tail is unknown. An importing module proves that a list starting
+with a red traffic light produces instructions starting with `Stop`.
+Look for `redStops` in the ordinary client and `Signals` in the
+dependent exporter. [Client proofs](examples/open-evaluation/OpenMapProof.hs)
+and [source aliases](examples/open-evaluation/OpenMapSource.hs).
 
 A separate ordinary client can prove `pick (make 7) :~: 7` when
 `make n = (n, error "unused")`, using only the two interfaces and an

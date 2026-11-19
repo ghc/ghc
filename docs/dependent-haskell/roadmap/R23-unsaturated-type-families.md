@@ -1,10 +1,11 @@
 # R23: Unsaturated type families
 
 Upstream: [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families).
-Upstream status: accepted, awaiting implementation. Local status: M63 has
-selected ordinary-arrow build/check evidence. M64 implements explicit forall
-metadata. The generic native client, unsaturated family applications in
-source, and compatibility with existing Haskell programs remain open.
+Serokell marks the proposal as accepted. The fork records matchability
+on ordinary arrows and forall binders. M166 lets a user pass an unapplied
+family at a known unmatchable arrow. Full inference, partial applications
+with remaining invisible binders, and ordinary-program compatibility
+remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Compatibility with existing Haskell

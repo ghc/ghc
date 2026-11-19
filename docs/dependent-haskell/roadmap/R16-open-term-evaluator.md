@@ -924,3 +924,44 @@ produces a cons. A proof about this call must account for the visible
 rules on the functions introduced by the first rewrite.
 [Reproduce the three builds](../examples/open-evaluation/check-map-fusion.sh)
 and [installed rule definitions](../../../libraries/ghc-internal/src/GHC/Internal/Base.hs).
+
+The next proof experiment compares the ordinary definition with the
+fusion rule's right-hand side. Two expressions can both wait for
+`xs` and then return different heads. Check both continuations on
+`[]` and on the same cons cell with a rigid head and tail. For the
+cons branch, compare field demand and the application of the callback.
+A recursive proof step would require both sides to produce the same
+lazy constructor and recurse on the corresponding input tail. Record
+any helper used to unfold the rule's right-hand side. Its visible
+rules can change either branch. This is a proposed proof check.
+[HERMIT's proof of map composition and its scope](../papers/README.md#checking-ghc-rewrite-equations-with-hermit-haskell-2015).
+
+### Checking an ordinary mapper across interfaces
+
+M168 follows the ordinary worker's case on its second argument.
+For the empty branch, the result is the empty list. For the cons
+branch, the output constructor contains the original callback applied
+to the input head. The recursive call carries the same callback into
+the input tail. The compiler follows a local variable binding that
+names the callback before the case. It rejects a worker that forces the
+callback, replaces it, or recurses on the original list.
+[Worker](../examples/open-evaluation/OpenMapWorker.hs)
+and [ordinary client's two general proofs](../examples/open-evaluation/OpenMapProof.hs).
+
+M169 lets a named function with checked equations serve as the
+callback. One example changes the list's element type. For any tail
+`xs` of traffic lights, the client proves
+`Signals ('Red ': xs) :~: ('Stop ': Signals xs)`. The ordinary mapper,
+callback and alias interfaces suffice. A rule for the callback can
+invalidate the cons proof. The empty-list proof still checks because
+that branch never applies the callback. Changing a callback clause
+requires rechecking an unchanged client even when its alias interface
+is unchanged. [Source aliases](../examples/open-evaluation/OpenMapSource.hs)
+and [client and recompilation checks](../../../testsuite/tests/dependent/should_run/NativeOpenMap.sh).
+
+Both the mapper and the callback can come from ordinary modules.
+`Heads rows` maps the polymorphic `firstMaybe` over a list of rows.
+Knowing the first element of the first row gives a `Just` result
+without supplying its tail or any other row. The ordinary client
+compiles from interfaces at `-O0`, `-O1`, and `-O2`.
+[Row-head proof](../examples/open-evaluation/OpenMapProof.hs).

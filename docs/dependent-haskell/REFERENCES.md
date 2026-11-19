@@ -5737,3 +5737,20 @@ list. R16 also needs to preserve the application in an exported equation
 when the tail is unknown. Haskell's executable dependency tracking and
 rewrite rules affect each check. [Agda standard library 2.3, Data.List.Base](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html)
 and [the two evaluator cards](ROADMAP.md#current-work-queue).
+
+Agda's list `zip` passes the pair constructor to `zipWith`.
+Its `unzipWith` passes the list cons constructor to `Product.zip`.
+M167 uses the same source pattern with Haskell's `uncurry`. The GHC
+evaluator needs the worker's instantiated field types to eta-expand a
+partial application. It must also preserve the laziness and visibility
+of the result. [Agda standard library 2.3, Data.List.Base](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html)
+and [GHC's open Core evaluator](../../compiler/GHC/Core/OpenWhnf.hs).
+
+Farmer, Sculthorpe and Gill turn a GHC rewrite rule into a HERMIT
+lemma and replay equational steps on Core. Their list example checks
+map composition and treats an undefined spine as a separate case.
+R16 can reuse those proof obligations when comparing the installed
+fusion rule with its source definition. The visible rules for `build`
+and `foldr` introduce additional obligations in this fork.
+[HERMIT paper](https://doi.org/10.1145/2804302.2804303)
+and [reading notes and checked scope](papers/README.md#checking-ghc-rewrite-equations-with-hermit-haskell-2015).

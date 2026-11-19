@@ -34,7 +34,7 @@ test('NativeOpenBuild',
      run_command, ['bash NativeOpenBuild.sh "{compiler}" "{libdir}"'])
 test('NativeOpenMap',
      [only_ways(['normal']),
-      extra_files([open_eval_dir + f for f in ['OpenMapWorker.hs', 'OpenMapSource.hs', 'OpenMapProof.hs']]
+      extra_files([open_eval_dir + f for f in ['OpenMapWorker.hs', 'OpenMapSource.hs', 'OpenMapProof.hs', 'SpineWorker.hs']]
                   + ['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs'])],
      run_command, ['bash NativeOpenMap.sh "{compiler}" "{libdir}"'])
 test('NativeOpenCharFamily',
