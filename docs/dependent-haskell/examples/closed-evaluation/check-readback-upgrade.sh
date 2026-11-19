@@ -54,17 +54,17 @@ if [[ $upgrade == --packed-projections ]]; then
         cd "$1"
         shift
         args=(-v1 -O0 -fomit-interface-pragmas "${sanity[@]}" "$@")
-        cp "$packed"/{PackedLength,PackedProjection}.hs .
+        cp "$packed"/{PackedLength,PackedProjection,RetainedWitness,RetainedProjection}.hs .
         cat >Unrelated.hs <<'HS'
 module Unrelated where
 import PackedVecLibrary (Nat(..))
 answer :: Int -> Nat
 answer _ = Z
 HS
-        roots=(PackedLength.hs Unrelated.hs)
+        roots=(PackedLength.hs RetainedWitness.hs Unrelated.hs)
         untouched=(Unrelated.hi Unrelated.o)
         if (( $# == 0 )); then
-            cp "$packed"/PackedVecLibrary.hs .
+            cp "$packed"/{PackedVecLibrary,RetainedNat}.hs .
             cat >AbstractUser.hs <<'HS'
 module AbstractUser where
 import PackedVecLibrary (Nat(..), PackedVec)
@@ -72,40 +72,54 @@ ignore :: PackedVec a -> Nat
 ignore _ = Z
 HS
             roots+=(AbstractUser.hs)
-            untouched+=({PackedVecLibrary,AbstractUser}.{hi,o})
+            untouched+=({PackedVecLibrary,RetainedNat,AbstractUser}.{hi,o})
         fi
         "${old[@]}" "${args[@]}" --make -no-link "${roots[@]}"
-        "${old[@]}" "${args[@]}" --show-iface PackedLength.hi >worker.old
-        if grep -F 'T:packageLength' worker.old; then
-            echo "The old worker already has a projection equation." >&2
-            exit 1
-        fi
         mkdir stale
-        cp PackedLength.hi PackedProjection.hs stale/
-        if [[ -f PackedVecLibrary.hi ]]; then cp PackedVecLibrary.hi stale/; fi
-        if (cd stale && "${new[@]}" "${args[@]}" -c PackedProjection.hs) >stale.log 2>&1 ||
-           ! grep -Fq 'No checked equations are available' stale.log; then cat stale.log >&2; exit 1; fi
+        cp {PackedLength,RetainedWitness}.hi {PackedProjection,RetainedProjection}.hs stale/
+        if [[ -f PackedVecLibrary.hi ]]; then cp {PackedVecLibrary,RetainedNat}.hi stale/; fi
+        for worker in PackedLength RetainedWitness; do
+            "${old[@]}" "${args[@]}" --show-iface "$worker.hi" >worker.old
+            if grep -E 'T:(packageLength|witness)' worker.old; then
+                echo "The old $worker already has a projection equation." >&2
+                exit 1
+            fi
+        done
+        for projection in PackedProjection RetainedProjection; do
+            if (cd stale && "${new[@]}" "${args[@]}" -c "$projection.hs") >stale.log 2>&1 ||
+               ! grep -Fq 'No checked equations are available' stale.log; then cat stale.log >&2; exit 1; fi
+        done
 
         sha256sum "${untouched[@]}" >untouched.sha
-        roots+=(PackedProjection.hs)
+        roots+=(PackedProjection.hs RetainedProjection.hs)
         "${new[@]}" "${args[@]}" --make -no-link "${roots[@]}" >upgrade.log 2>&1 ||
             { cat upgrade.log >&2; exit 1; }
-        grep -F 'Compiling PackedLength [Compiler now checks retained package case projections]' upgrade.log
-        if grep -E 'Compiling (PackedVecLibrary|AbstractUser|Unrelated)( |$)' upgrade.log; then exit 1; fi
+        for worker in PackedLength RetainedWitness; do
+            grep -F "Compiling $worker [Compiler now checks retained package case projections]" upgrade.log
+        done
+        if grep -E 'Compiling (PackedVecLibrary|RetainedNat|AbstractUser|Unrelated)( |$)' upgrade.log; then exit 1; fi
         sha256sum -c untouched.sha --quiet
         "${new[@]}" "${args[@]}" --show-iface PackedLength.hi >worker.new
         grep -Fq 'T:packageLength' worker.new
+        "${new[@]}" "${args[@]}" --show-iface RetainedWitness.hi >worker.new
+        grep -Fq 'T:witness' worker.new
         sha256sum ./*.hi ./*.o >warm.sha
         "${new[@]}" "${args[@]}" --make -no-link "${roots[@]}" >warm.log 2>&1 ||
             { cat warm.log >&2; exit 1; }
         if grep -F 'Compiling ' warm.log; then exit 1; fi
         sha256sum -c warm.sha --quiet
 
-        sed 's/packageLength (PackVec n _) = n/packageLength (PackVec n _) = S n/' PackedLength.hs >PackedLength.new
-        mv PackedLength.new PackedLength.hs
-        if "${new[@]}" "${args[@]}" --make -no-link "${roots[@]}" >changed.log 2>&1 ||
-           ! grep -Fq 'Compiling PackedProjection [PackedLength changed]' changed.log ||
-           ! grep -Fq '[GHC-05617]' changed.log; then cat changed.log >&2; exit 1; fi
+        expect_changed_worker() {
+            local worker=$1 projection=$2
+            local equation=$3
+            sed "s/^$equation = n/$equation = S n/" "$worker.hs" >worker.new.hs
+            mv worker.new.hs "$worker.hs"
+            if "${new[@]}" "${args[@]}" --make -no-link "$projection.hs" >changed.log 2>&1 ||
+               ! grep -Fq "Compiling $projection [$worker changed]" changed.log ||
+               ! grep -Fq '[GHC-05617]' changed.log; then cat changed.log >&2; exit 1; fi
+        }
+        expect_changed_worker PackedLength PackedProjection 'packageLength (PackVec n _)'
+        expect_changed_worker RetainedWitness RetainedProjection 'witness (Retain n _)'
     )
 
     check_projection "$work/home"
@@ -117,21 +131,22 @@ HS
             pkg=("$ghc_pkg" --global-package-db "$old_lib/package.conf.d")
             base=$("${pkg[@]}" field base id --simple-output)
             "${pkg[@]}" init "$work/provider-db"
-            cp "$packed/PackedVecLibrary.hs" .
-            "${old[@]}" "${sanity[@]}" -O0 -fomit-interface-pragmas -this-unit-id "$unit" -c PackedVecLibrary.hs
+            cp "$packed"/{PackedVecLibrary,RetainedNat}.hs .
+            "${old[@]}" "${sanity[@]}" -O0 -fomit-interface-pragmas -this-unit-id "$unit" \
+                --make -no-link RetainedNat.hs
             cat >provider.conf <<CONF
 name: retained-upgrade
 version: 0.1
 id: $unit
 key: $unit
 exposed: True
-exposed-modules: PackedVecLibrary
+exposed-modules: PackedVecLibrary RetainedNat
 import-dirs: $PWD
 depends: $base
 CONF
             "${pkg[@]}" --package-db "$work/provider-db" register provider.conf
-            rm PackedVecLibrary.hs
-            sha256sum PackedVecLibrary.{hi,o} >provider.sha
+            rm {PackedVecLibrary,RetainedNat}.hs
+            sha256sum {PackedVecLibrary,RetainedNat}.{hi,o} >provider.sha
         )
         check_projection "$work/binary" -package-db "$work/provider-db" -package-id retained-upgrade-0.1
         (cd "$work/provider" && sha256sum -c provider.sha --quiet)

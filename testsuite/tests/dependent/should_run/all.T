@@ -261,7 +261,9 @@ test('NativeRetainedPackage',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/RetainedNat.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedLength.hs',
-                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedProjection.hs'])],
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedProjection.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/RetainedWitness.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/RetainedProjection.hs'])],
      run_command, ['bash NativeRetainedPackage.sh "{compiler}" "{libdir}"'])
 
 test('NativePackageLength',

@@ -81,7 +81,7 @@ binds the witness before applying `p` to it. The same `project`
 implementation works at `Vec Char` and at `Const Int`.
 
 ```haskell
-project :: foreach (q :: Retained p) -> p (Witness q)
+project :: foreach (q :: Retained p) -> p (RetainedWitness.witness q)
 project (Retain _ value) = value
 ```
 
@@ -89,4 +89,15 @@ The checker compares the actual kind of the supplied family with its
 declared kind. It requires a lifted payload type. This check preserves
 the matchability of the family argument. The result still depends on the
 caller’s package when the family is unknown.
-[Generic implementation](../examples/packed-vector/RetainedNat.hs).
+The ordinary worker matches `Retain` and returns its first field. The
+checker publishes its equation with the declared arrow kind of `p`.
+A caller can use the project function through its interface with
+`ExperimentalDependentTypes` disabled. Returning the successor
+instead of the stored witness fails at the payload.
+[Generic projection](../examples/packed-vector/RetainedProjection.hs) and
+[ordinary witness](../examples/packed-vector/RetainedWitness.hs).
+
+The upgrade checks rebuild an eligible old witness worker once, then
+reuse both the worker and the unchanged consumer. An interface-only
+old worker cannot supply the missing equation.
+[Upgrade runner](../examples/closed-evaluation/check-readback-upgrade.sh).

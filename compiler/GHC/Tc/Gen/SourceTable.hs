@@ -1258,7 +1258,7 @@ data ConstructorCaseType = ConstructorCaseType [ForAllTyBinder] TyCon [Type] [Ty
 constructorCaseType :: Type -> Maybe ConstructorCaseType
 constructorCaseType tau = do
     let (telescope, body) = splitForAllForAllTyBinders tau
-    binders <- traverse liftedBinder telescope
+    binders <- traverse ordinaryBinder telescope
     let quantified = [v | Bndr v _ <- binders]
         kinds = mkTyVarTys quantified
     (first, rest) <- caseArrow body
@@ -1270,6 +1270,9 @@ constructorCaseType tau = do
       (Nothing, Nothing) -> Just (first, [], [first], 0, rest)
       _ -> Nothing
     (tc, args) <- caseDatatype domain
+    let binder_kinds = map (varType . binderVar) binders
+    guard (all isLiftedTypeKind binder_kinds ||
+           (isRetainedCaseRoot domain tc && all noFreeVarsOfType binder_kinds))
     parameters <- catMaybes <$> traverse domainParameter args
     guard ((isMonomorphicEnumCaseType tau || not (null parameters)) &&
            sizeUniqSet (mkUniqSet parameters) == length parameters &&
@@ -1282,10 +1285,10 @@ constructorCaseType tau = do
     domainParameter ty
       | ty `eqType` liftedTypeKind = Just Nothing
       | otherwise = Just <$> getTyVar_maybe ty
-    liftedBinder (ma, binder@(Bndr v (Invisible _)))
+    ordinaryBinder (ma, binder@(Bndr v (Invisible _)))
       | ma `eqType` unmatchableDataConTy
-      , isTyVar v, varType v `eqType` liftedTypeKind = Just binder
-    liftedBinder _ = Nothing
+      , isTyVar v = Just binder
+    ordinaryBinder _ = Nothing
 
 {- Note [Retained field kinds in source equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1296,7 +1299,8 @@ Check both fields and the result before publishing an equation.
 
 The axiom has type variables instead of runtime Ids. Publish the witness
 before the payload. Use the earlier variables to abstract the payload's
-kind. Match the result Id to the exact pattern leaf. The resulting RHS
+kind. A payload family parameter keeps its declared arrow kind and
+matchability. Match the result Id to the exact pattern leaf. The resulting RHS
 does not introduce a free runtime Id or a new axiom about evaluation.
 The ordinary visibility, constructor coverage, and RULE checks still
 apply. Interface recognition checks the instantiated promoted argument
@@ -1476,7 +1480,7 @@ checkedConstructorCase visible helper owner rhs = do
       if isRetainedCaseRoot domain tc then
         do { guard (all isNativeOpaqueValueId fields)
            ; guard (Core.nativeIndexArgKinds dc args (map TermVarTy fields))
-           ; guard (all (casePublicKind public (parameters ++ map TermVarTy fields)) kinds) }
+           ; guard (all (publicFieldKind parameters (map TermVarTy fields)) kinds) }
       else
         do { expected <- openDataConFieldTypes dc args
            ; guard (all isId fields && eqTypes kinds expected)
@@ -1493,6 +1497,12 @@ checkedConstructorCase visible helper owner rhs = do
       rows <- checkBody signature parameters result patterns' aliases Nothing body
       pure (dc, rows)
     checkAlt _ _ _ _ _ _ _ _ _ = Nothing
+
+    publicFieldKind parameters fields kind
+      | Just (family, index) <- splitAppTy_maybe kind
+      , any (eqType family) parameters, any (eqType index) fields
+      = True
+      | otherwise = casePublicKind public (parameters ++ fields) kind
 
     checkBody signature parameters result patterns aliases first_case body = case body of
       Core.Case (Core.Var next) _ _ _ ->
@@ -1630,7 +1640,7 @@ publishConstructorRows :: Id -> [ForAllTyBinder] -> [Type] -> Type -> [Construct
 publishConstructorRows owner telescope domains result rows = do
     kind_binders <- forM telescope $ \(Bndr variable visibility) -> do
       name <- newSysName (nameOccName (varName variable))
-      pure (mkNamedTyConBinder visibility (mkTyVar name liftedTypeKind))
+      pure (mkNamedTyConBinder visibility (mkTyVar name (varType variable)))
     let quantifiers = [v | Bndr v _ <- kind_binders]
         instantiate = substTyWith [v | Bndr v _ <- telescope] (mkTyVarTys quantifiers)
                       . expandTypeSynonyms

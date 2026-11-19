@@ -9,11 +9,11 @@ g=("$1" "-B$2" -v0 -package-env - -O0 -i -i. -dcore-lint -dstg-lint -fdiagnostic
 shift 2
 g+=("$@")
 cd "$out/provider"
-cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength}.hs .
-"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs
-cp PackedVecLibrary.hi PackedLength.hi "$src/PackedProjection.hs" "$out/projection/"
+cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness}.hs .
+"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs RetainedWitness.hs
+cp {PackedVecLibrary,PackedLength,RetainedNat,RetainedWitness}.hi "$src"/{PackedProjection,RetainedProjection}.hs "$out/projection/"
 cd "$out/projection"
-"${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs
+"${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs RetainedProjection.hs
 cat >Mixed.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
 module Mixed (witness) where
@@ -25,7 +25,7 @@ witness :: foreach (n :: Nat) -> Proxy (Length ('PackVec n (Payload n)))
 witness _ = Proxy
 HS
 "${g[@]}" -fomit-interface-pragmas -c Mixed.hs
-cp PackedVecLibrary.hi ../provider/{RetainedNat,PackedLength}.hi PackedProjection.hi Mixed.hi "$out/client/"
+cp {PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness,PackedProjection,RetainedProjection,Mixed}.hi "$out/client/"
 cd "$out/client"
 cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
@@ -33,6 +33,7 @@ module Main where
 import Data.Functor.Const (getConst)
 import PackedVecLibrary
 import RetainedNat
+import RetainedProjection (project)
 
 main :: IO ()
 main = do
@@ -44,7 +45,7 @@ main = do
   print (getConst (project q))
 HS
 "${g[@]}" -c Main.hs
-"${g[@]}" Main.o ../provider/{PackedVecLibrary,RetainedNat}.o -o run
+"${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
 ./run
 cat >Escape.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
@@ -175,3 +176,21 @@ reject_family() {
 reject_family WRONG_FAMILY_RESULT 'wrongFamilyResult (Retain' '[GHC-83865]'
 reject_family WRONG_FAMILY_KIND 'type WrongFamily =' '[GHC-83865]'
 reject_family SHIFTED_WITNESS "    ShiftWitness ('Shift" '[GHC-83605]'
+
+# Keep the dependent source unchanged while the ordinary worker changes.
+(
+    cd "$out/provider"
+    sed 's/witness (Retain n _) = n/witness (Retain n _) = S n/' \
+        "$src/RetainedWitness.hs" >RetainedWitness.hs
+    "${g[@]}" -fomit-interface-pragmas -c RetainedWitness.hs
+    cp RetainedWitness.hi "$out/projection/"
+)
+(
+    cd "$out/projection"
+    if "${g[@]}" -fforce-recomp -c RetainedProjection.hs >wrong-worker.log 2>&1 ||
+       ! grep -Fq '[GHC-05617]' wrong-worker.log ||
+       ! grep -Fq 'project (Retain _ value) = value' wrong-worker.log; then
+        cat wrong-worker.log >&2
+        exit 1
+    fi
+)

@@ -795,13 +795,20 @@ couldExportRetainedCase iface usages = anyM candidate (mi_decls iface)
       , not (ifConWrapper con), null (ifConExTCvs con), null (ifConEqSpec con)
       , null (ifConCtxt con)
       , [Just witness, Nothing] <- ifConArgBinders con
-      , [(mult, witness_kind), (_, IfaceTyConApp _ payload_args)] <- ifConArgTys con
+      , [(mult, witness_kind), (_, payload)] <- ifConArgTys con
       , witness_kind == result
       , nullaryName mult == Just manyDataConName
-      , IfaceTermVar use : _ <- reverse (appArgsIfaceTypes payload_args)
-      = witness == use && (owner == mi_semantic_module iface ||
-                           any (usesConstructor owner (ifConName con)) usages)
+      , payloadUsesWitness con witness payload
+      = owner == mi_semantic_module iface ||
+        any (usesConstructor owner (ifConName con)) usages
     package _ _ _ _ _ = False
+
+    payloadUsesWitness _ witness (IfaceTyConApp _ args)
+      | IfaceTermVar use : _ <- reverse (appArgsIfaceTypes args) = witness == use
+    payloadUsesWitness con witness (IfaceAppTy (IfaceTyVar family) args)
+      | [IfaceTermVar use] <- appArgsIfaceTypes args
+      = witness == use && any ((== family) . ifaceBndrName) (ifConUnivTvs con)
+    payloadUsesWitness _ _ _ = False
 
     fromModule owner UsageHomeModule{usg_mod_name = mod_name, usg_unit_id = unit}
       = owner == mkModule (RealUnit (Definite unit)) mod_name
