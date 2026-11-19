@@ -157,14 +157,43 @@ and [Showcase library](../examples/open-evaluation/LocalOpen.hs).
 
 A deriving clause may itself need the unfinished function. GHC reports
 which declaration needs that function at the type-level call. A local
-explicit instance still blocks this scheduling path. Using a derived
+explicit instance still blocked this scheduling path at M138. Using a derived
 instance to typecheck ordinary code also leaves a separate evaluator
 question. An open observation that actually calls the class selector
 needs a definition the evaluator can follow.
 
-For the next explicit-instance case, the instance head must be available
-when the ordinary producer solves its constraints. The method bodies can
-refer to other value declarations in the module. GHC's `tcTyClsInstDecls`
-prepares the instance environment. Its `tcInstDecls2` checks the methods
-after the ordinary bindings. A split
-must preserve both sets of dependencies.
+## M147. Separate an instance head from its methods
+
+In the [source example](../examples/open-evaluation/LocalInstance.hs),
+`keep x = const x (enabled IdentityPass)` needs the local `Pass IdentityPass`
+instance to typecheck. Evaluating `keep` on an unknown type returns that
+type without calling `enabled`. This lets the module define
+`type Input a = LocalInstance.keep a` before it checks either method.
+
+The scheduler obtains the dependencies of the instance head from its
+renamed type and modifiers. It checks the prerequisite type declarations,
+then adds the instance head to GHC's ordinary instance environment. The
+instance methods can now follow the remaining value bindings. One method
+in the example uses `LocalInstance.later a` directly in a type. The type
+of `later` in turn uses `Input`, so the compiler checks the two
+producers in different groups. The compiler keeps both checked
+definitions in scope for the deferred method pass. Each method is
+checked once within the same splice group.
+
+A caller with the extension off can import `passValue` and use it at
+`Int` and `Bool`. Making `keep` inspect `enabled IdentityPass` forces a
+dictionary whose method still needs `Input`. The compiler rejects this
+cycle at the local call in `Input`. It also checks an unused method body
+and finishes the methods before a following top-level splice.
+
+An associated type equation can also supply a prerequisite for the
+producer. In the regression, `not (enabled Token)` needs
+`Flag Token ~ Bool`. The instance gives `type Flag Token = Answer`
+and a local synonym gives `type Answer = Bool`. GHC checks the synonym
+and installs the equation before checking the producer. If the equation
+instead calls the unfinished `keep`, GHC names that dependency at the
+source call. Associated data instances and standalone family instances
+still need scheduling.
+[Associated equation](../examples/open-evaluation/LocalAssociated.hs).
+[Scheduler](../../../compiler/GHC/Tc/Module.hs)
+and [consumer and strict cycle](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).

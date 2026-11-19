@@ -1858,8 +1858,14 @@ rnTopSrcDecls group
    }
 
 tcTopSrcDecls :: [(Name, SrcSpan)] -> HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
-tcTopSrcDecls [] group = tcTopSrcTables group
-tcTopSrcDecls demands group = do
+tcTopSrcDecls demands group = tcTopSrcDeclsThen demands group pure
+
+-- | Finish inside the scopes of all local definitions checked for this group.
+tcTopSrcDeclsThen :: [(Name, SrcSpan)] -> HsGroup GhcRn
+                  -> ((TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv))
+                  -> TcM (TcGblEnv, TcLclEnv)
+tcTopSrcDeclsThen [] group finish = tcTopSrcTables group >>= finish
+tcTopSrcDeclsThen demands group finish = do
     defer <- goptM Opt_DeferTypeErrors
     holes <- goptM Opt_DeferTypedHoles
     not_in_scope <- goptM Opt_DeferOutOfScopeVariables
@@ -1871,8 +1877,8 @@ tcTopSrcDecls demands group = do
                          , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
         (previous, current) = partition ((`elemNameSet` checked) . fst) demands
         check_current
-          | null current = tcTopSrcTables group
-          | otherwise = tcLocalOpenGroup current group
+          | null current = tcTopSrcTables group >>= finish
+          | otherwise = tcLocalOpenGroup current group finish
     if null previous then check_current else do
       -- tc_rn_src_decls has solved these bindings before running each splice.
       failIfErrsM
@@ -1933,11 +1939,21 @@ and derives the instances before checking the selected functions.
 Later groups inherit both environments. If an instance or default
 needs a type that depends on an unfinished local value, report the edge.
 Keep INLINE pragmas with their bindings. Split a shared
-signature between the groups at its original location. Explicit instance
-declarations can require local method bodies or family equations. Leave
-those groups outside this split. The ordinary late source
-RULE check validates the owners the observer actually uses. An unrelated
-RULE does not stop the split. A producer after a splice cannot be renamed
+signature between the groups at its original location. Check the ordinary
+instance heads with the early group. Their original instance groups can
+depend on method bodies. Build dependencies from the heads, modifiers
+and associated type equations before moving them. The first pass checks
+these equations with the instance heads and saves the InstInfo for each
+instance. Check the methods after the remaining value bindings and before
+returning to the enclosing splice group. Run that pass inside the
+continuations of all scheduled batches. A method can then use a producer
+whose checked Core becomes available in a later batch. Associated data
+family instances introduce declarations that need separate scheduling.
+Explicit family instances also need their own scheduling rules.
+
+The ordinary late source RULE check validates the owners the observer
+actually uses. An unrelated RULE does not stop the split. A producer
+after a splice cannot be renamed
 from the group's prefix. For a producer in an earlier group, use the binds
 and evidence solved before the splice. Build the Core map on demand.
 
@@ -1957,17 +1973,24 @@ ABExport identifies the source owner. Record that owner for RULE checks.
 -}
 
 -- | Check the independently schedulable local definitions first.
-tcLocalOpenGroup :: [(Name, SrcSpan)] -> HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
+tcLocalOpenGroup :: [(Name, SrcSpan)] -> HsGroup GhcRn
+                 -> ((TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv))
+                 -> TcM (TcGblEnv, TcLclEnv)
 tcLocalOpenGroup demands group@HsGroup
   { hs_valds = XValBindsLR (HsVBG binds sigs)
   , hs_tyclds = tycls
-  , hs_derivds = standalone, hs_defds = defaults }
-  | all (null . group_instds) tycls
+  , hs_derivds = standalone, hs_defds = defaults } finish
   = do
+      instances <- traverse instance_head [inst | tg <- tycls, inst <- group_instds tg]
       when (hasSplice (standalone, defaults)) $
         rejectLocalOpen demands "A splice prevents checking a standalone deriving or default declaration early."
-      prerequisites <- case closeLocalNames (typeDeps "the deriving and default declarations" needsTerm)
-                                            emptyNameSet instance_default_roots of
+      let heads = concatMap (nameSetElemsStable . group_ext) instances
+          prerequisite_types = do
+            with_heads <- closeLocalNames (typeDeps "the instance heads and associated type equations" instanceNeedsTerm)
+                                          emptyNameSet heads
+            closeLocalNames (typeDeps "the deriving and default declarations" needsTerm)
+                            with_heads instance_default_roots
+      prerequisites <- case prerequisite_types of
         Left reason -> rejectLocalOpen demands reason
         Right names -> pure names
       let (selected, ready, blocked) = foldl' tryDemand (prerequisites, [], []) demands
@@ -1976,25 +1999,62 @@ tcLocalOpenGroup demands group@HsGroup
         _ -> pure ()
       let (early_binds, rest_binds) = partition (any (selectedBind selected) . snd) binds
           (early_sigs, rest_sigs) = splitSignatures selected sigs
+          type_groups = [tg { group_instds = [] } | tg <- tycls, not (null (group_tyclds tg))]
           (early_tys, rest_tys) = partition (any ((`elemNameSet` selected) . tcdName . unLoc)
-                                                 . group_tyclds) tycls
+                                                 . group_tyclds) type_groups
           early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs)
-                               , hs_tyclds = early_tys, hs_derivds = standalone, hs_defds = defaults }
+                               , hs_tyclds = early_tys ++ instances
+                               , hs_derivds = standalone, hs_defds = defaults }
           rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs)
                        , hs_tyclds = rest_tys, hs_derivds = [], hs_defds = [] }
-      (envs@(early_env, _), wanted) <- captureTopConstraints (tcTopSrcDeclGroup early)
+      ((envs@(early_env, _), methods), wanted) <- captureTopConstraints $
+        tcTopSrcDeclGroupWithMethods (not (null instances)) early
       restoreEnvs envs $ do
         evs <- checkNoErrs (simplifyTop wanted)
         definitions <- localOpenDefinitions (reverse ready)
                          (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
-        addTopEvBinds evs $ withLocalOpenDefinitions definitions
-          (tcTopSrcDecls (map fst (reverse blocked)) rest)
+        addTopEvBinds evs $ withLocalOpenDefinitions definitions $
+          tcTopSrcDeclsThen (map fst (reverse blocked)) rest $ \rest_envs ->
+            case methods of
+              Nothing -> finish rest_envs
+              Just (classes, infos) -> restoreEnvs rest_envs $ do
+                bindings <- tcInstDecls2 classes infos
+                (env, lcl) <- getEnvs
+                finish (env { tcg_binds = tcg_binds env ++ bindings }, lcl)
   where
     group_names = mkNameSet (hsGroupBinders group)
     value_names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds group))
+    instance_head inst@(L _ ClsInstD{cid_inst = ClsInstDecl
+      { cid_poly_ty = head_ty, cid_modifiers = modifiers
+      , cid_ext = (_, HsNestedGroup { ng_tyfam_insts = equations
+                                   , ng_datafam_insts = data_instances }) }})
+      | not (null data_instances) =
+          rejectLocalOpen demands "Early instance checking does not support associated data family instances."
+      | hasSplice (head_ty, modifiers) =
+          rejectLocalOpen demands "A splice prevents checking this instance head early."
+      | term : _ <- localUses value_names (head_ty, modifiers) =
+          rejectLocalOpen demands ("This instance head requires the unfinished local function "
+                                   ++ getOccString term ++ ".")
+      | hasSplice equations =
+          rejectLocalOpen demands "A splice prevents checking an associated type equation early."
+      | term : _ <- localUses value_names equations =
+          rejectLocalOpen demands ("An associated type equation requires the unfinished local function "
+                                   ++ getOccString term ++ ".")
+      | otherwise = do
+          let names = localUses group_names (head_ty, modifiers, equations)
+              deps = [leader | name <- names, Just (leader, _) <- [lookupNameEnv types name]]
+          pure TyClGroup { group_ext = mkNameSet deps, group_tyclds = []
+                         , group_kisigs = [], group_roles = [], group_instds = [inst] }
+    instance_head _ =
+      rejectLocalOpen demands "Early instance checking does not support explicit family instances."
+
     instance_default_roots =
       [tcdName (unLoc decl) | decl <- tyClGroupTyClDecls tycls, not (no_deriving decl)]
       ++ localUses group_names (standalone, defaults)
+    instanceNeedsTerm dep term = "Checking an instance head or associated type equation requires "
+                              ++ getOccString dep
+                              ++ ", whose declaration uses the local function "
+                              ++ getOccString term ++ "."
     needsTerm dep term = "Checking the deriving and default declarations requires "
                       ++ getOccString dep ++ ", whose declaration uses the local function "
                       ++ getOccString term ++ "."
@@ -2082,9 +2142,9 @@ tcLocalOpenGroup demands group@HsGroup
     no_deriving _ = True
     empty_deriving (L _ HsDerivingClause{deriv_clause_tys = L _ (DctMulti _ [])}) = True
     empty_deriving _ = False
-tcLocalOpenGroup demands _ =
+tcLocalOpenGroup demands _ _ =
     rejectLocalOpen demands
-      "Early checking of local definitions does not support same-group explicit instances."
+      "Early checking of local definitions requires renamed value bindings."
 
 -- | Return the owners of signatures and pragmas relevant to scheduling.
 signatureOwners :: Sig GhcRn -> [Name]
@@ -2238,7 +2298,12 @@ tcSourceValueBinds group = do
     check_group _ = panic "tcSourceValueBinds: expected renamed value bindings"
 
 tcTopSrcDeclGroup :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
-tcTopSrcDeclGroup group@(HsGroup { hs_tyclds = tycl_decls,
+tcTopSrcDeclGroup group = fst <$> tcTopSrcDeclGroupWithMethods False group
+
+-- | Check a source batch, optionally saving the instance method pass.
+tcTopSrcDeclGroupWithMethods :: Bool -> HsGroup GhcRn
+  -> TcM ((TcGblEnv, TcLclEnv), Maybe ([LTyClDecl GhcRn], [InstInfo GhcRn]))
+tcTopSrcDeclGroupWithMethods defer_methods group@(HsGroup { hs_tyclds = tycl_decls,
                          hs_derivds = deriv_decls,
                          hs_fords  = foreign_decls,
                          hs_defds  = default_decls,
@@ -2284,7 +2349,10 @@ tcTopSrcDeclGroup group@(HsGroup { hs_tyclds = tycl_decls,
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls) inst_infos ;
+        let { method_classes = tyClGroupTyClDecls tycl_decls } ;
+        (inst_binds, pending_methods) <- if defer_methods
+          then pure ([], Just (method_classes, inst_infos))
+          else (, Nothing) <$> tcInstDecls2 method_classes inst_infos ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -2322,10 +2390,10 @@ tcTopSrcDeclGroup group@(HsGroup { hs_tyclds = tycl_decls,
         -- See Note [Newtype constructor usage in foreign declarations]
         addUsedGREs NoDeprecationWarnings (bagToList fo_gres) ;
 
-        return (tcg_env', tcl_env)
+        return ((tcg_env', tcl_env), pending_methods)
     }}}}}
 
-tcTopSrcDeclGroup _ = panic "tcTopSrcDeclGroup: ValBindsIn"
+tcTopSrcDeclGroupWithMethods _ _ = panic "tcTopSrcDeclGroup: ValBindsIn"
 
 ---------------------------
 tcTyClsInstDecls :: [TyClGroup GhcRn]

@@ -138,6 +138,54 @@ SOURCE
     test "$(./derived)" = '(True,"Ticket Dusk","Dusk","1.0","2.0")'
 )
 
+# The instance head is needed while checking keep. Its methods see both
+# the first type synonym and the producer checked in the next source group.
+cp "$src/LocalInstance.hs" "$src/LocalAssociated.hs" .
+"${ghc[@]}" -c LocalInstance.hs LocalAssociated.hs
+cp LocalInstance.hi LocalAssociated.hi ../client/
+(
+    cd ../client
+    cat > InstanceConsumer.hs <<'SOURCE'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main where
+import LocalInstance (passValue)
+import LocalAssociated (result)
+main :: IO ()
+main = print (passValue (7 :: Int), passValue True, result)
+SOURCE
+    "${ghc[@]}" -c InstanceConsumer.hs
+    "${ghc[@]}" InstanceConsumer.o ../producer/LocalInstance.o ../producer/LocalAssociated.o -o instance-consumer
+    test "$(./instance-consumer)" = '(7,True,True)'
+)
+
+sed -e 's/LocalInstance/StrictInstance/g' \
+    -e 's/const x (enabled IdentityPass)/if enabled IdentityPass then x else x/' \
+    "$src/LocalInstance.hs" > StrictInstance.hs
+line=$(awk '/^type Input a =/ {print NR}' StrictInstance.hs)
+expect_rejection StrictInstance "$line" '\[GHC-70566\]' 'local class method whose definition is unavailable'
+
+# An ignored method still has to typecheck. A later splice closes its group.
+sed -e 's/LocalInstance/BadInstance/g' \
+    -e "s/(True :: Input Bool)/'x'/" "$src/LocalInstance.hs" > BadInstance.hs
+line=$(awk '/^    enabled _ =/ {print NR}' BadInstance.hs)
+expect_rejection BadInstance "$line" '\[GHC-(83865|18872)\]' "Couldn't match"
+sed -e 's/LocalInstance/SplicedInstance/g' \
+    -e '/^passValue ::/i $(pure [])' "$src/LocalInstance.hs" > SplicedInstance.hs
+"${ghc[@]}" -XTemplateHaskell -c SplicedInstance.hs
+
+sed -e 's/LocalAssociated/EquationCycle/g' \
+    -e 's/type Flag Token = Answer/type Flag Token = EquationCycle.keep Bool/' \
+    "$src/LocalAssociated.hs" >EquationCycle.hs
+line=$(awk '/^type Kept a =/ {print NR}' EquationCycle.hs)
+expect_rejection EquationCycle "$line" '\[GHC-70566\]' 'unfinished local function keep'
+
+sed -e 's/LocalAssociated/DataFamily/g' \
+    -e '/^class Gate a where/a\    data Stamp a' \
+    -e '/^instance Gate Token where/a\    data Stamp Token = StampToken' \
+    "$src/LocalAssociated.hs" >DataFamily.hs
+line=$(awk '/^type Kept a =/ {print NR}' DataFamily.hs)
+expect_rejection DataFamily "$line" '\[GHC-70566\]' 'associated data family instances'
+
 cat > DerivingCycle.hs <<'SOURCE'
 {-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures #-}
 module DerivingCycle where

@@ -36,7 +36,7 @@ import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcR
                            tcg_rdr_env, tcg_semantic_mod, tcg_local_open_defs, tcg_local_open_owners, updTcRef)
 import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), tcEqType)
 import GHC.Types.Basic (Boxity(Boxed))
-import GHC.Types.Id (Id, idName, idType, mkSysLocal)
+import GHC.Types.Id (Id, idName, idType, isClassOpId_maybe, mkSysLocal)
 import GHC.Types.Name (Name, getOccString, nameModule_maybe, stableNameCmp)
 import GHC.Types.Name.Env (emptyNameEnv, extendNameEnv_C, lookupNameEnv, nonDetNameEnvElts)
 import GHC.Types.Name.Reader (gre_imp, isLocalGRE, is_decl, is_isboot, lookupGRE_Name)
@@ -196,6 +196,7 @@ observeOpenType _ _ _ = pure (Left InvalidInput)
 -- | A demanded external definition was unavailable to the observer.
 data DefinitionFailure
   = UnavailableModule
+  | UnavailableLocalMethod
   | CannotReadInterface
   | MissingTemplate
   | WrongTemplateType
@@ -257,6 +258,9 @@ readOpenDefinition identifier = do
       reason = text "open term definition"
   case nameModule_maybe requested of
     Just mod
+      | mod == tcg_semantic_mod tcgEnv, Just _ <- isClassOpId_maybe identifier
+      -> pure (Left UnavailableLocalMethod)
+    Just mod
       | mod /= tcg_semantic_mod tcgEnv
       , not (isHoleModule mod)
       , (installed, Nothing) <- getModuleInstantiation mod
@@ -311,6 +315,7 @@ openTypeFailureReason InvalidInput =
 openTypeFailureReason (UnavailableDefinition name failure) =
   (Just name, case failure of
     UnavailableModule -> "A referenced definition does not come from an ordinary imported module."
+    UnavailableLocalMethod -> "Evaluation needs a local class method whose definition is unavailable at this call."
     CannotReadInterface -> "The interface for a referenced definition could not be read."
     MissingTemplate -> "The interface for a referenced definition contains no usable Core unfolding."
     WrongTemplateType -> "The type of a referenced unfolding disagrees with its declared type.")
