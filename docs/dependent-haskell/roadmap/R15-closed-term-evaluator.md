@@ -908,3 +908,45 @@ use the different workers. The ordinary client writes only
 `consume value`. Both M155 and M158 accept this client with the matching
 rule and without either worker's object. A design that delays readback
 must preserve this use after the provider has finished compiling.
+
+## M161. Observe a field decision from the loaded executable
+
+The ordinary worker returns `(n + 1, errorWithoutStackTrace "unread")`.
+A second version has a rewrite rule that changes the second field to
+`'x'`. The rule fires before code generation. With the original
+`.hi` and the replacement object, M160 can read the full pair. It can
+also check `same x = x` against a different worker that returns the
+same pair under a matching projection rule. A decision made solely
+from that first interface would miss the change.
+
+The executable experiment adds an explicit observer to the fixture.
+A plugin reads the pair constructor after the ordinary Core optimizer.
+It follows floated local bindings and checks the demand signature of
+the function called by the second field. A saturated call whose
+signature excludes returning can supply a partial observation. In the
+measured `-O1` build, the original field qualified. The rewritten
+character did not. At `-O0`, and with `-fignore-interface-pragmas`,
+the imported error function's demand signature was unavailable to the
+pass, even though its installed interface included that signature.
+
+The observer returns its decision and the worker's result together.
+One ordinary client printed `Partial 8` with the first object and
+`Whole 8 'x'` with the second. The type checker proved each observation
+with `Refl`. Keeping `Worker.hi` fixed and replacing only `Worker.o`
+invalidated the first proof. Run the experiment with the fork's
+self-hosted compiler on the Linux dynamic build:
+
+```sh
+bash docs/dependent-haskell/examples/closed-evaluation/check-readback-entry.sh \
+  "$PWD/_build/stage1/bin/ghc" "$PWD/_build/stage1/lib"
+```
+
+The fixture calls its observer explicitly. Direct `fst (bump 7)`
+still needs a compiler representation that preserves the original
+projection and its proof-time rewrite checks. A compiler-generated
+observer must refer to the same worker implementation at the call
+site, including the implementations of any helpers used to classify
+a field. The probe exercises one native object change. It does not
+establish that correspondence for all linkables and compiler hooks.
+[Core plugin](../examples/closed-evaluation/PairReadbackProbe.hs)
+and [source proofs](../examples/closed-evaluation/check-readback-entry.sh).

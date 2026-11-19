@@ -9016,3 +9016,25 @@ dependent directory passed 240 of 275 cases. The remaining 35 failures
 matched M158 individually. Both compilers accepted the same 115 of
 124 ordinary polykinds programs. The boundary checks and the interface
 upgrade from M158 passed.
+
+## M161 experiment: return the readback decision with the executable result
+
+Run two ordinary implementations against the same interface. The original
+returns a pair with an exceptional second field. The second implementation
+has a rewrite rule that returns `'x'` for that field. Check which fields
+the final Core pass can classify. Have the executable return its readback
+decision and its pair together. Check the resulting type and invalidate
+the previous proof after changing only the worker object.
+
+## M162: carry an argument through structural recursion
+
+Check the original carried binder and type arguments at a recursive call
+on a proper field. Prove the output equation of `fill` for a rigid tag
+and tail. Reject a changed tag, an extra demand or a nondecreasing call.
+
+## M163: check constructor applications in an early family producer
+
+Check the full type of an imported function that uses a boxed datatype.
+Verify the resolved constructor and its application in Core. Exercise an
+ordinary `Maybe` elimination, a local strictness control and an imported
+signature with a type family inside `Maybe`.

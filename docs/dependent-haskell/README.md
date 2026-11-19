@@ -30,6 +30,10 @@ also prove `erase (More x xs) = More True (erase xs)` through its
 interface while `xs` is unknown. [Current source examples](Showcase.hs)
 and [next cases](ROADMAP.md#current-work-queue).
 
+The [closed-pair experiment](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable)
+keeps the same interface and changes the linked worker object. It checks when
+the caller can read just the number and when it can read the complete pair.
+
 An ordinary Haskell library can hide its parcel constructor and export
 `make` and `first`. The dependent client proves `first (make 7) :~: 7`
 even though evaluating the second field would raise an exception. GHC

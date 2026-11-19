@@ -5688,3 +5688,14 @@ GHC must additionally account for dictionary selection and rewrite
 rules. Changing only the body of an imported projection changes the
 family equation in the example. [Agda mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
 and [imported function test](../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
+M161 uses GHC's `isDeadEndAppSig` to examine a call after rewriting.
+The number of supplied arguments matters. A function that cannot
+return on full application can still return a function when partially applied.
+GHC also simplifies the expression it sends to the interpreter and
+selects its linkables before execution. The experiment varies the
+actual linked implementation while preserving the source interface.
+[Demand signatures](../../compiler/GHC/Types/Demand.hs),
+[interactive Core compilation](../../compiler/GHC/Driver/Main/Passes.hs),
+[linkable selection](../../compiler/GHC/Linker/Deps.hs) and
+[field readback experiment](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable).
