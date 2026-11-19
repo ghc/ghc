@@ -8870,3 +8870,62 @@ nominal proof still forces that field. A stripped interface for an open
 case with a helper inside `Just` and a standalone type instance calling
 an independent local identity function each produced GHC-70566 at the
 source call. These examples define the next three checks.
+
+## M151: check a helper inside an open constructor result
+
+- [x] Check the helper's saturated call and retain its nominal family
+      application in the enclosing branch. Obtain a local polymorphic
+      identity equation from the solved Core when a public case needs it.
+- [x] Keep private helper identities through stripped interfaces. Change
+      an imported body, add a matching rule, and check the ordinary proof.
+
+[Checks and provenance](roadmap/R16-open-term-evaluator.md#m151-checked-helper-calls-inside-constructor-results).
+
+## M152: schedule a local producer before a family equation
+
+- [x] Defer the equations of a fresh same-group open family when its
+      declarations are outside the early dependency closure. Preserve
+      their original group dependencies and check sibling equations together.
+- [x] Let the local observer return an opaque, checked ground type of kind
+      `Type`. Keep strict demand and wrong kinds visible at the source call.
+
+[Source and limits](roadmap/R21-dependency-analysis.md#m152-independent-local-producers-for-type-instances).
+
+## M153: retain the unobserved field of a partial pair
+
+- [x] Check a saturated boxed pair in the solved producer. Publish its
+      copied input and a private, irreducible family for the other field.
+- [x] Retain both ordinary function identities in the nominal projection.
+      Exercise both orientations and preserve executable demand when another
+      operand would otherwise be forced or the projected field must run.
+- [x] Exercise a bare alias, rules for either owner, ordinary consumers
+      without objects, and recompilation after changing the producer.
+
+[Direct projection and interface checks](roadmap/R15-closed-term-evaluator.md#m153-export-a-direct-projection-of-a-partial-pair).
+
+## M154: check a private helper that constructs a result
+
+- [x] Check the referenced local helper in solved Core. Admit input
+      variables and saturated public lazy constructors in its result.
+- [x] Check an ordinary proof through stripped interfaces. Force the input
+      or introduce a recursive call and check that the old proof fails.
+
+[Helper example and controls](roadmap/R16-open-term-evaluator.md#m154-a-helper-can-construct-its-result).
+
+The M151–M154 compiler checkpoint is `97d88df9ca`. Both stages built.
+Both native Showcase runs and the self-hosted GHCi run produced the
+same 230 lines. The normal-way dependent directory passed 239 of 274
+exercised cases. All 35 failures matched M150 individually. The two
+new registered tests passed. The interface migration checks covered
+an old binary-only import, eligible producer recompilation and warm
+reuse.
+
+The wrong argument in `ident Maybe` reports its kind mismatch at
+`Maybe`. A synonym that applies a helper at `Bool` can use its
+checked equation when a rewrite rule applies only at `Char`. A
+matching rule still prevents the proof. The strict-field rejection
+still explains which constructor inputs the evaluator supports.
+
+M150 and this compiler accepted the same 115 of 124 ordinary
+polykinds programs. The boundary plugin and splice checks passed,
+including invalidation after a producer or candidate file changed.

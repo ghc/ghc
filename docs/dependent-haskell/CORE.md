@@ -3015,9 +3015,30 @@ The resulting nominal equation can keep the original case stuck on a
 rigid input while a separate client supplies the missing constructor.
 [Case result equations](roadmap/R16-open-term-evaluator.md#m148-constructor-results-from-a-checked-case).
 
+A case branch can retain a saturated helper call in a lazy field.
+The resulting family equation refers to the helper's own checked
+family. GHC can check a private polymorphic helper whose body returns
+an input or builds a public lazy constructor from its inputs. A rule
+or body change at the helper can invalidate a downstream proof.
+[Helper equations](roadmap/R16-open-term-evaluator.md#m154-a-helper-can-construct-its-result).
+
 When an outer ordinary call needs an interface-only pair projection,
 the compiler can emit an ordinary Core case. The nominal equation
 applied to a pair of distinct rigid variables determines the selected
 field. Only the result of the outer call needs readback. A bare nominal
 application still needs an operand that can be written to an interface.
 [Closed pair projection](roadmap/R15-closed-term-evaluator.md#m149-demand-only-the-selected-field-of-a-computed-pair).
+
+A solved binding `make n = (n, e)` can publish a nominal equation
+whose right-hand side contains an irreducible family for `e`. The
+field family belongs to `make` and takes all the original arguments.
+The outer constructor and the copied field are the only new facts.
+An ordinary executable call can still evaluate `e` when needed.
+A direct projection can retain both checked source applications in an
+interface. The solver checks each owner's rewrite rules when using
+its equation. [Checked partial pairs](roadmap/R15-closed-term-evaluator.md#m153-export-a-direct-projection-of-a-partial-pair).
+
+For an evaluated local function, an ordinary ground type such as
+`Maybe Bool` can be a symbolic operand of kind `Type`. Readback can
+return its original type. A strict case cannot ask for a runtime
+inhabitant of that type. [Local family equations](roadmap/R21-dependency-analysis.md#m152-independent-local-producers-for-type-instances).

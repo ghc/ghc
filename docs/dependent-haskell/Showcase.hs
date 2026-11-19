@@ -66,6 +66,7 @@ import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
 import qualified LocalInstance
 import qualified LocalAssociated
+import qualified IndependentFamily
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -946,6 +947,23 @@ main = do
         (Refl :: Prelude.odd (Prelude.fst (Build.partialPair 7)) :~: 'True)
     observe "run associated and standalone data instances from a dependent module"
         LocalDataFamily.result
+    observe "reduce an optional head through a private helper"
+        (Refl :: ViaHelper ('Spine.More 'x' 'Spine.Empty) :~: 'Just 'x')
+    observe "use a local identity in a family equation needed by a later producer"
+        IndependentFamily.result
+    -- NativeClosedPartialPair checks the same proof with only the two interfaces.
+    observe "prove a direct projection of a pair with an exceptional field"
+        (Refl :: Prelude.fst (Build.partialPair 7) :~: 7)
+    observe "build a public constructor through a private helper"
+        (Refl :: MarkedHead ('Spine.More 'x' 'Spine.Empty) :~: 'Just ('Spine.Marked 'x'))
+
+-- | Keep the helper equation in the ordinary worker's case.
+type ViaHelper :: Spine.Spine a -> Maybe a
+type ViaHelper xs = Spine.firstViaHelper xs
+
+-- | Preserve the helper that wraps a field in the worker's public constructor.
+type MarkedHead :: Spine.Spine a -> Maybe (Spine.Marked a)
+type MarkedHead xs = Spine.firstViaMark xs
 
 -- | Keep the ordinary case until the client supplies the outer constructor.
 type FirstMaybe :: Spine.Spine a -> Maybe a

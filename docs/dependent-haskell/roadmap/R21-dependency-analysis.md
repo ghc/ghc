@@ -248,3 +248,24 @@ When the family comes from an import, the same independent identity
 still gets GHC-70566 at the source call. Checking such an equation
 early requires knowing which other declarations can use that imported
 family.
+
+An explicit declaration-group boundary already works for the independent
+case. Put `keep x = x` before `$(pure [])` and the equation
+`type instance Payload Int = M.keep Bool` after it. A separate ordinary
+client checks the Boolean result using the interfaces alone. Moving such
+a boundary changes which instances are visible to earlier declarations.
+[GHC's declaration-group rules](../../users_guide/exts/template_haskell.rst).
+
+An ordinary example shows why the dependency can be invisible in the
+producer source. An imported `hidden` needs `Branch (Payload Int)`.
+The producer writes `choose x y = if hidden Proxy then x else y`.
+The provider has an incoherent blanket instance that returns `False`
+and a `Branch Bool` instance that returns `True`. Before the equation
+`type instance Payload Int = Bool`, the ordinary program returns
+`False` for `choose True False`. Adding that equation gives `True`
+with the same producer body. Checking whether `Payload` occurs in the
+source of `choose` misses the dependency. An imported-family scheduler
+must preserve the dictionary selected under the complete instance
+environment. A second producer that calls `const x (hidden Proxy)`
+returns `x` in both runs. Observing that result alone cannot detect
+the difference in dictionary selection.

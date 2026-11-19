@@ -8,19 +8,20 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. Native execution and GHCi agree on all 226 Showcase lines.
-The normal-way dependent directory passed 237 of 272 exercised cases.
-The 35 remaining failures produced the same output as at M147 (`f8261da064`).
+Updated 2026-11-19. Native execution and GHCi agree on all 230 Showcase lines.
+The normal-way dependent directory passed 239 of 274 exercised cases.
+The 35 remaining failures produced the same output as at M150 (`7d8cd2b0a4`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
-An ordinary `firstMaybe` can now appear in an exported type with its
-input still unknown. A caller that supplies a nonempty spine proves
-the result is `Just x` without inspecting the tail. Local producers
-can also use the constructors and derived instances of a data family.
-For a closed computation, `odd (pick (make 7))` can check through a
-projection interface even when the other pair field throws.
-[Current roadmap checks](ROADMAP.md#current-work-queue).
+A separate ordinary client can prove `pick (make 7) :~: 7` when
+`make n = (n, error "unused")`, using only the two interfaces and an
+exported alias. An ordinary `firstViaHelper` can also build an optional
+head by calling a private identity inside `Just`. A second helper can
+wrap the head in a public lazy constructor. A family equation can
+use an independent local function before another producer needs that
+equation. [Current source examples](Showcase.hs)
+and [next cases](ROADMAP.md#current-work-queue).
 
 An ordinary Haskell library can hide its parcel constructor and export
 `make` and `first`. The dependent client proves `first (make 7) :~: 7`

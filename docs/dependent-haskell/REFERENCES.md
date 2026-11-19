@@ -5596,3 +5596,51 @@ the local producer. A method may refer to the producer later in the
 group. [Agda interleaved mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
 [GHC family instances](../users_guide/exts/type_families.rst)
 and [the local source example](examples/open-evaluation/LocalDataFamily.hs).
+
+### Private field families and checked helper calls
+
+An Agda abstract function has a stable identity even where its body
+cannot reduce. M153 uses the same distinction for a suspended pair
+field. The representation is specific to GHC. An empty closed type
+family has no reduction equations, and the outside of the pair follows
+from checking the Haskell constructor worker. Haskell's lazy pair fields
+explain why that check can describe the constructor without inspecting
+the other field. [Agda 2.8 abstract definitions](https://agda.readthedocs.io/en/v2.8.0/language/abstract-definitions.html),
+[GHC closed type families](../users_guide/exts/type_families.rst),
+[Haskell 2010 pattern semantics, §3.17](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-610003.17)
+and [R15's separate-module check](roadmap/R15-closed-term-evaluator.md#m153-export-a-direct-projection-of-a-partial-pair).
+
+Agda also permits an opaque name in a type and controls which proofs
+can unfold it. This distinction matters for the next R15 example.
+GHC can run the projection of a computed field, but an exported
+synonym can carry the projection into another module before a proof
+uses it. The Haskell design must also record interpreted object
+dependencies and applicable rewrite rules.
+[Agda opaque definitions](https://agda.readthedocs.io/en/v2.8.0/language/opaque-definitions.html)
+and [Gratzer et al., Controlling unfolding in type theory](https://www.cambridge.org/core/journals/mathematical-structures-in-computer-science/article/controlling-unfolding-in-type-theory/A2865261D18E29153AB7B0F2E89BA8C8).
+
+GHC already uses distinct applications of an empty closed family
+when two unknown types must remain distinct. Its pattern-match checker
+can otherwise conclude that a reachable branch is inaccessible. For
+R15 an unread field also has an owner and an observation context. A
+single placeholder of the field's kind would lose that distinction.
+See Note [The types Any and UnusedType], especially (Any6), in
+[GHC.Builtin.WiredIn.Types](../../compiler/GHC/Builtin/WiredIn/Types.hs).
+
+Agda's case trees preserve the order in which pattern matching inspects
+inputs. M151 checks that order in GHC Core. A helper call in a result
+constructor also needs its own equation. GHC retains the checked family
+in the branch and verifies its owner and rewrite rules during reduction.
+M154 reuses the constructor check for the helper's own body. A variable
+pattern can return its input beneath a lazy constructor without forcing it.
+[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [helper rules and recompilation](roadmap/R16-open-term-evaluator.md#m151-checked-helper-calls-inside-constructor-results).
+
+Agda can place declarations before mutually dependent definitions. GHC
+also has to decide which family equations were available while checking
+an earlier value. M152 can delay all the equations of a fresh local
+family whose declaration is outside the earlier dependency closure.
+GHC's normal instance checker then checks the equations together.
+[Agda interleaved mutual blocks](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
+[GHC family instances](../users_guide/exts/type_families.rst) and
+[the two local producers](examples/open-evaluation/IndependentFamily.hs).
