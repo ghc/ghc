@@ -2172,10 +2172,10 @@ lintType (ExistsTy b body)
   = do { lintL (isTyVar b)
            (text "Existential binder is not a type variable:" <+> ppr b)
        ; lintBinder LambdaBind b $
-         do { lintL (isLiftedTypeKind (varType b))
+         do { lintL (varType b `eqType` liftedTypeKind)
                 (text "Existential binder must have kind Type:" <+> ppr b)
             ; lintType body
-            ; lintL (isLiftedTypeKind (typeKind body))
+            ; lintL (typeKind body `eqType` liftedTypeKind)
                 (text "Existential payload must have kind Type:" <+> ppr body) } }
 
 lintType (DepFunTy vis b body)
