@@ -2254,7 +2254,8 @@ inferredMatchabilityIndex b =
 tcCheckSynonymMetadata :: (Name -> Int -> TcM [Type])
                        -> LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckSynonymMetadata get_indices rhs kind =
-  tc_check_lhs_type (typeLevelMode {mode_synonym_metadata = Just get_indices}) rhs kind
+  addTypeCtxt rhs $
+    tc_check_lhs_type (typeLevelMode {mode_synonym_metadata = Just get_indices}) rhs kind
 
 hasInferredMatchability :: TyCon -> Bool
 hasInferredMatchability tc
