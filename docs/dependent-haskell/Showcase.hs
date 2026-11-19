@@ -58,6 +58,7 @@ import qualified Language.Haskell.TH as TH
 import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
 import qualified OpenSource
+import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
 import qualified OrdinaryVecClient as Ordinary
 import qualified ParameterizedIndexLibrary as Parameterized
@@ -835,6 +836,9 @@ main = do
         (map fromEnum [UnicodeExport.p3 (Proxy @'é'), UnicodeExport.p3 (Proxy @'\x1e943')])
     observe "greatest common divisor checked in a type"
         (TypeNats.natVal (Proxy @(Prelude.gcd 18 24)))
+    observe "first and second fields proved through an imported pair equality"
+        ( PreludePairExport.first (Proxy @'( 'True, 'x')) (Proxy @'True)
+        , PreludePairExport.second (Proxy @'( 'True, 'x')) (Proxy @'x') )
     observe "first and second projections from a pair of unknown types"
         (OpenSource.tupleFirst False (42 :: Int), OpenSource.tupleSecond False (42 :: Int))
     observe "quotient and remainder returned during type checking"

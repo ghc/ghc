@@ -13,9 +13,21 @@ test('NativeOpenCharFamily',
       extra_files([open_eval_dir + f for f in ['CharacterCase.hs', 'CharacterExport.hs']])],
      run_command, ['bash NativeOpenCharFamily.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledUpper',
-     [only_ways(['normal']), extra_files([open_eval_dir + 'UnicodeExport.hs'])],
+     [only_ways(['normal']), extra_files([open_eval_dir + 'UnicodeExport.hs',
+                                        'NativeOpenInstalledInterfaces.sh'])],
      run_command,
      ['bash NativeOpenInstalledUpper.sh "{compiler}" "{libdir}" "{ghc_pkg}"'])
+test('NativeOpenInstalledPair',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([open_eval_dir + 'PreludePairExport.hs',
+                   'NativeOpenInstalledInterfaces.sh', 'InstalledStagedPair.hs',
+                   'WrongRigidPair.hs', 'WrongGroundPair.hs', 'WrongPairNamespace.hs'])],
+     run_command, ['bash NativeOpenInstalledPair.sh "{compiler}" "{libdir}" "{ghc_pkg}" '
+                   + config.ghc_th_way_flags])
+test('NativeOpenPairLinkable',
+     [req_interp, req_rts_linker, only_ways(['normal'])],
+     run_command, ['bash NativeOpenPairLinkable.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeOpenCharGhci',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs', 'OpenSource.hs']]),
      ghci_script, ['NativeOpenCharGhci.script'])

@@ -123,14 +123,16 @@ module OpenRigidPair where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
+import qualified OpenProducer
 
-stuck :: forall (p :: (Type, Type)). Proxy p -> Proxy (Prelude.fst p)
+stuck :: forall (p :: (Type, Type)). Proxy p -> Proxy (OpenProducer.pairFirst p)
 stuck _ = undefined
 HS
 cp negative/OpenRigidPair.hs manager/
+rigid_pair_site=$(awk '/^stuck ::/ {print NR ":" index($0, "OpenProducer.pairFirst")}' negative/OpenRigidPair.hs)
 expect_rigid_pair() {
     if "${ghc[@]}" "$@" > rigid-pair.log 2>&1 ||
-       ! grep -Fxq 'OpenRigidPair.hs:7:56: error: [GHC-70566]' rigid-pair.log ||
+       ! grep -Fxq "OpenRigidPair.hs:$rigid_pair_site: error: [GHC-70566]" rigid-pair.log ||
        ! grep -Fq 'Reduction stopped at a case on the rigid argument p.' rigid-pair.log; then
         cat rigid-pair.log >&2
         exit 1
