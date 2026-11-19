@@ -8,10 +8,10 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 212 lines.
-The normal-way dependent directory passed 227 of 263 exercised cases. All 36 failures
-produced the same output as at M135 (`b692c7c298`). Fifteen reject existing
-programs that should compile.
+Updated 2026-11-19. Native execution and GHCi agree on all 216 Showcase lines.
+The normal-way dependent directory passed 235 of 270 exercised cases.
+The 35 remaining failures produced the same output as at M139 (`085a34e5a7`).
+Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
 An ordinary Haskell library can hide its parcel constructor and export
@@ -144,6 +144,15 @@ GHC's `Nat` can use
 `Vec (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) Bool`.
 GHC gets the conversion's result type from the index and checks that
 the vector has three cells. [Vector example](roadmap/R15-closed-term-evaluator.md#m139-using-the-installed-prelude-length-in-a-vector-index).
+
+An enclosing call can supply the kind too. In
+`Prelude.max (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) 2`,
+the literal `2` fixes the conversion target to `Natural`.
+The Showcase also supplies a pair to an exported `Swap` and uses an
+ordinary GADT indexed by the type constructor `Maybe`.
+[Nested conversions](roadmap/R15-closed-term-evaluator.md#m140-checking-a-nested-conversion),
+[pair equations](roadmap/R16-open-term-evaluator.md#m142-exporting-a-swap-from-an-ordinary-module)
+and [ordinary GADT](examples/open-evaluation/LegacyKindArgument.hs).
 
 The Showcase uses `Refl` to prove
 `Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2]`. A list returned by one

@@ -8,7 +8,11 @@ that fact in this fork.
    definition of `fst` once. An exporter can then mention `fst p ~ x` for
    an unknown pair. A client that supplies `'(Int, Bool)` can establish
    that the first field is `Int`. It needs the interfaces during type
-   checking. [Installed projection example](examples/open-evaluation/PreludePairExport.hs).
+   checking. An ordinary module can now also export a checked equation
+   for `swapPair (x,y) = (y,x)`. A dependent module publishes `Swap p`
+   for an unknown pair, and a later ordinary client supplies the
+   constructor to reduce it. [Installed projection example](examples/open-evaluation/PreludePairExport.hs)
+   and [ordinary producer and separate client](roadmap/R16-open-term-evaluator.md#m142-exporting-a-swap-from-an-ordinary-module).
 2. **Run a computation for this obligation.** The compiler can run an
    ordinary function at a closed input. A checker can inspect the result
    and construct evidence with a type that states exactly what it found.

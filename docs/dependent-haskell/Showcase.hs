@@ -65,6 +65,7 @@ import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
 import qualified LazyParcel
+import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenConstructorSource
 import qualified NativeMultiPackage as Packages
@@ -912,6 +913,12 @@ main = do
         (OpenBuildSource.exact (Proxy @Char) (Proxy @Bool))
     observe "use a derived instance beside a dependent type"
         LocalOpen.routeLabel
+    observe "a literal sibling fixes a nested numeric conversion"
+        (Refl :: Prelude.max (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) 2 :~: 3)
+    observe "an ordinary datatype infers the arrow required by Maybe"
+        (LegacyKindArgument.maybeField (Just True))
+    observe "supply the pair to an exported swap after typechecking its definition"
+        (Refl :: OpenBuildSource.Swap '( 'True, 'x') :~: '( 'x', 'True))
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

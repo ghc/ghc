@@ -2980,3 +2980,11 @@ contributes its declaration fingerprint. Only demanded function bodies
 contribute term rewrite-rule dependencies.
 [Core readback](../../compiler/GHC/Core/OpenWhnf.hs)
 and [source examples](examples/open-evaluation/OpenBuildSource.hs).
+
+When the ordinary producer supplies a checked boxed pair equation, an
+exported type can retain the family application at a neutral pair.
+The closed-family axiom matches the actual pair constructor. A later
+client that supplies the constructor uses that axiom for its nominal
+equality. A stricter worker loses the equation. A rewrite rule that can
+change the worker at the instantiated types prevents use of its axiom.
+[Interface and rule checks](roadmap/R16-open-term-evaluator.md#m142-exporting-a-swap-from-an-ordinary-module).

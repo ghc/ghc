@@ -70,6 +70,30 @@ failures before reconsidering those goldens.
 [RAE_T32a](../../../testsuite/tests/dependent/should_fail/RAE_T32a.hs)
 and [T13135](../../../testsuite/tests/dependent/should_fail/T13135.hs).
 
+### M141. Inferring an omitted arrow in a dependent argument
+
+In `D (Type -> Type) Maybe`, the declared kind of `D` says that its
+second argument has the kind supplied by its first. The kind of
+`Maybe` determines M for the written arrow. If the second argument
+has an explicitly U kind, the same source arrow gets U. If it only
+requires an arbitrary kind, an unresolved omitted arrow keeps the
+legacy U default. A user-written `FUN @M` or `FUN @U` stays fixed.
+
+In type declarations and complete value signatures, GHC solves the
+equalities before defaulting local matchability variables. The test
+compiles the same source with the dependent extension off and on.
+It reads the binder from another module's interface and checks a
+locally quantified matchability in a GADT constructor field. A
+judgment with registered retained indices keeps its existing rules
+for immutable kind arguments.
+`RAE_T32b` now compiles. Fourteen of the earlier fifteen positive
+programs remain rejected. The other 21 diagnostic or output mismatches
+are unchanged. A family equation used as both a runtime
+arrow and the kind of `Maybe` still presents the dual-use problem above.
+[Original test](../../../testsuite/tests/dependent/should_compile/RAE_T32b.hs),
+[inference and nominal equality controls](../../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.sh)
+and [ordinary source example](../examples/open-evaluation/LegacyKindArgument.hs).
+
 Run the directory tests with a built in-tree compiler.
 
 ```sh

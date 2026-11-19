@@ -587,5 +587,62 @@ no coercion for a neutral computation.
 
 The same readback accepts an ordinary boxed pair from two rigid fields,
 or from a swap applied to a known promoted pair. Pair syntax uses the
-wired-in constructor. The observer still stops at the case when the
-swap receives an unknown pair.
+wired-in constructor. Without an exported equation, the observer stops
+at a case on an unknown pair.
+
+## M142. Exporting a swap from an ordinary module
+
+```haskell
+type Swap :: (k, l) -> (l, k)
+type Swap p = B.swapPair p
+```
+
+The ordinary producer defines `swapPair (x, y) = (y, x)`. GHC inspects
+the desugared definition at the end of typechecking. It can publish the
+existing boxed-pair equation even with the dependent extension off in
+the producer. The dependent exporter needs no constructor for `p`.
+Its ordinary client checks `Swap '( 'True, 'x') :~: '( 'x', 'True)`
+from interfaces alone. The exporter cannot prove `Swap p :~: p`
+for an arbitrary homogeneous pair.
+
+Changing the producer body to force the first field before constructing
+the result removes the equation. GHC rejects the unchanged export after
+reading the new interface. Arbitrary open cases still need an account
+of the scrutinee, branch selection and demand.
+[Ordinary producer](../examples/open-evaluation/OpenBuildWorker.hs),
+[exporter](../examples/open-evaluation/OpenBuildSource.hs)
+and [separate compilation and strictness controls](../../../testsuite/tests/dependent/should_run/NativeOpenBuild.sh).
+
+The equation also works when the producer has no `INLINE` pragmas and
+omits its executable unfolding. For a pair of two unknown Booleans,
+the client rejects a local rule that changes the Boolean swap. A
+specialization for pairs of characters cannot match those inputs. GHC
+checks the ordinary function's type arguments and reads the solved type
+of a rule binder before final zonking to distinguish those cases.
+
+An ordinary interface built by M139 has no pair equation. An unchanged
+home producer must therefore run through the new compiler once. The
+self-recompilation fingerprint records this change for ordinary home
+modules, including modules that publish no equations. A second build
+can reuse their interfaces. The change preserves the binary interface
+format, so an ordinary client can still read a prebuilt M139 interface.
+Obtaining a new equation from a binary-only package requires rebuilding
+its producer. The two-compiler check accepts paths to the M139 compiler,
+the current compiler and the compatible library directory. It checks
+ordinary binary-only use, source upgrade and reuse without a file edit.
+[Recompilation key](../../../compiler/GHC/Iface/Recomp/Flags.hs)
+and [upgrade check](../examples/open-evaluation/check-pair-upgrade.sh).
+
+The next case is `pick :: Choice a b -> b`. The ordinary function
+selects a different field in each of two constructors. A known
+constructor already reduces. Exporting `type Field p = W.pick p` for
+an unknown `p :: Choice Type Type` stops at the case on `p`. A
+certificate must check every alternative before it can publish equations
+for this datatype. [Ordinary sum and selector](../examples/open-evaluation/OpenConstructorWorker.hs).
+
+Start with a local datatype whose constructors are all exported. Require
+one ordinary case alternative per constructor and a result that returns
+one of its lazy fields. Check the selected field in each alternative,
+privacy of a hidden constructor, and rejection of a stricter worker.
+The new equation must preserve existing calls that ignore an exceptional
+field in a computed argument.

@@ -8690,3 +8690,50 @@ execution in both stages and GHCi produced the same 213 Showcase lines.
 The normal-way dependent directory passed 229 of 265 exercised cases.
 All 36 failures matched M138 individually. The full GHC testsuite was
 not run.
+
+## M140: check a nested conversion
+
+- [x] Use a declared argument type, a known enclosing result or literal
+      siblings to specialize a nested call. Collect literal information
+      before planning either child of a saturated call.
+- [x] Run the computation with ordinary demand. Keep rejection of an
+      ambiguous nested result, a missing dictionary and an implicit cast.
+
+[Source checks](roadmap/R15-closed-term-evaluator.md#m140-checking-a-nested-conversion).
+
+## M141: infer arrow matchability in a dependent argument
+
+- [x] Let the next visible argument determine an omitted arrow when the
+      preceding argument supplies its whole kind. Solve the declaration
+      equalities before choosing the legacy U default.
+- [x] Check a complete signature, a separately imported binder, H98 and GADT fields and a
+      locally quantified matchability. Preserve the nominal requirement
+      for inferring equality of inputs from equality of applications.
+
+[Compatibility controls](roadmap/R23-unsaturated-type-families.md#m141-inferring-an-omitted-arrow-in-a-dependent-argument).
+
+## M142: export a stuck pair swap from an ordinary producer
+
+- [x] Check the ordinary boxed pair case while finalizing the producer.
+      Use the existing family equation for the exact observed field order.
+- [x] Export the stuck application and reduce it when a separate ordinary
+      client supplies the constructor. Recheck the exporter when a
+      stricter producer can no longer supply the equation.
+- [x] Admit a rewrite rule specialized to `Char` at a pair of unknown
+      Booleans. Reject the same rule specialized to `Bool`. Check both
+      the type argument inferred from a local rule binder and the kind
+      arguments of the family application.
+- [x] Read an older ordinary interface. When `--make` has the source,
+      recompile an unchanged pre-certificate producer once, check the
+      new export, and reuse the resulting interfaces on the next build.
+
+[Separate-module example](roadmap/R16-open-term-evaluator.md#m142-exporting-a-swap-from-an-ordinary-module).
+
+Both stages built and passed the M139 interface upgrade check. Native
+execution in both stages and GHCi produced the same 216 Showcase lines.
+The existing Showcase output directory also rebuilt without manual cleanup.
+The dependent directory passed 235 of 270 normal-way cases. The 35
+remaining failures matched M139 individually. Fourteen reject existing
+programs that should compile. In a separate comparison of 124 ordinary
+polykinded source programs, the same 115 compiled on M139 and M142.
+The full GHC testsuite was not run.

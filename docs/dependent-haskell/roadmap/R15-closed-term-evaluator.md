@@ -672,9 +672,42 @@ A written result annotation can also supply the kind. A bare
 `Proxy (Prelude.fromIntegral 5)` leaves it unknown. Asking for
 `Bool` requires a `Num Bool` instance, even with deferred type errors.
 Using `Prelude.length` directly as a `Nat` still produces a kind
-mismatch at the call. The expected kind currently reaches the outer
-call. An enclosing ordinary function cannot yet pass its known input
-kind down to an overloaded nested call.
+mismatch at the call. M139 handled the expected kind at the outer call.
 [Ambiguous result](../../../testsuite/tests/dependent/should_fail/NativeClosedSourceAmbiguous.hs),
 [missing instance](../../../testsuite/tests/dependent/should_fail/NativeClosedResultDictionary.hs)
 and [missing conversion](../../../testsuite/tests/dependent/should_fail/NativeClosedLengthNoCast.hs).
+
+## M140. Checking a nested conversion
+
+```haskell
+proof :: Prelude.max (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) 2 :~: 3
+proof = Refl
+```
+
+The second argument of `max` fixes its operand type to `Natural`.
+The first argument uses that type to select the result of `fromIntegral`.
+Swapping the two source arguments gives the same result. A declared
+monomorphic input or a known enclosing result can also supply the kind.
+A constructor literal such as `'Just 6` can constrain a different argument.
+
+GHC checks the literal siblings before planning the nested ordinary calls.
+It still executes their combined Core expression on demand. A test passes
+a conversion of an exceptional `Int` to a function that ignores its
+argument. The result is `'True`. A requested `Num Bool` instance still
+fails at the conversion even when the outer function ignores the value.
+Two computed siblings can still leave an overloaded result ambiguous
+when neither has an enclosing kind and their common type must be inferred.
+For example, `Prelude.max (Prelude.sum '[1, 2])
+(Prelude.fromIntegral (Prelude.length '[1, 2, 3]))` reports the unresolved
+result parameter at `fromIntegral`. The first call determines a
+`Natural`, but the planner has not shared that information with the
+second call.
+[Positive and demand checks](../../../testsuite/tests/dependent/should_run/NativeClosedNestedExpected.hs)
+and [unsatisfied dictionary](../../../testsuite/tests/dependent/should_fail/NativeClosedNestedResultDictionary.hs).
+
+For the next increment, instantiate each ordinary function once and
+collect the argument and result equalities for the whole application.
+Check both argument orders before preparing any dictionaries. The
+acceptance cases include a genuinely ambiguous result, incompatible
+operands and an ignored exception. Constructor literals and empty lists
+must keep their existing checks as the planner takes over those cases.

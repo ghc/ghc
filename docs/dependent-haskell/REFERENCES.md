@@ -5475,3 +5475,44 @@ an error. [Serokell closed evaluator](https://ghc.serokell.io/dh#closed-term-eva
 [Foldable.length](../../libraries/ghc-internal/src/GHC/Internal/Data/Foldable.hs),
 [fromIntegral](../../libraries/ghc-internal/src/GHC/Internal/Real.hs)
 and [Nat](../../libraries/ghc-internal/src/GHC/Internal/TypeNats.hs).
+
+### Inferring nested applications and exporting pair equations
+
+Agda inserts implicit arguments during elaboration. A type or another
+argument can determine them. M140 uses the same source of information
+for the type parameters of a nested ordinary Haskell function. The
+enclosing declaration, an expected result or a literal sibling can
+determine the target of `fromIntegral`. Haskell's ordinary instance
+solver must then discharge the constraints.
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [closed source checks](roadmap/R15-closed-term-evaluator.md#m140-checking-a-nested-conversion).
+
+GHC proposal 242 distinguishes the matchability required for inverse
+decomposition from the matchability of an ordinary function. It lets the
+solver determine matchability before defaulting and distinguishes defaults
+for type-level and term-level arrows. M141 recognizes one case in which
+an argument supplies the kind of a later argument. That later argument
+can determine the written arrow. If it leaves the choice open, the fork
+keeps its previous U default for this source position. A regression
+compares the result with explicit U using `Refl`.
+[Proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html)
+and [checked declarations](roadmap/R23-unsaturated-type-families.md#m141-inferring-an-omitted-arrow-in-a-dependent-argument).
+
+Agda compiles pattern matching to case trees. A clause can reduce when
+the relevant constructor is known. In Haskell a pair pattern forces
+the pair constructor, and either field can still be bottom. M142
+exports a constructor equation from a strict pair case that returns
+the selected lazy fields. The checker inspects the actual worker before
+publishing the equation. [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
+[Haskell pattern semantics, section 3.17](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html)
+and [ordinary pair exporter](roadmap/R16-open-term-evaluator.md#m142-exporting-a-swap-from-an-ordinary-module).
+
+GHC stores a fingerprint of the settings that affect each home module.
+M142 uses that mechanism to recheck ordinary home source when upgrading
+from a compiler that could not publish pair equations there. A binary
+reader can still load the older interface. Reusing the old fingerprint
+in an incremental build left the unchanged worker without its equation
+even though the same source compiled in a fresh directory.
+[Interface recompilation](../../compiler/GHC/Iface/Recomp.hs),
+[fingerprints](../../compiler/GHC/Iface/Recomp/Flags.hs)
+and [two-compiler reproduction](examples/open-evaluation/check-pair-upgrade.sh).
