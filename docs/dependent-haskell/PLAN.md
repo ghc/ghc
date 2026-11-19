@@ -9283,3 +9283,33 @@ A client with only the public interface can reduce a known constructor.
 For a rigid unknown scrutinee, keep the case stuck. Diagnose a bad
 pattern or branch at its source location. Show the checked case in a
 client error. [Roadmap example](https://ghc.serokell.io/dh#type-level-case-expressions).
+
+## Combined R15–R19 and R23 source checkpoint
+
+Compiler `46715de12b` runs the 252-line [Showcase](Showcase.hs) as
+native code from both stages and as self-hosted GHCi bytecode. The
+outputs match byte for byte. The self-host also passes all 23 focused
+tests, including four exact-print round trips and the previously
+regressed `SDecide (Rep k)` constraints in `T14720` and `T15346`.
+
+The normal-way dependent suite passes 265 of 297 exercised cases. M174
+passed 249 of 284. The 13 additional cases pass. Three old failures now
+pass unchanged: `T14038`, `T14749` and `T20875`. Of the 32 remaining
+failures, 30 have the same diagnostic or golden diff. In `T13910` and
+`T13938`, checking advances to a later declaration that uses the
+`singletons` arrow synonym. The [R23 card](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell)
+records the explicit matchability annotation that accepts those sources.
+
+The ordinary polykinds comparison checks 124 programs. Both M174 and
+this compiler accept the same 115. An intermediate compiler also
+accepted `T14174a`. The current compiler rejects that program at
+`App Bool arr Type p False` because two inferred matchability
+arguments to `Fun` remain ambiguous. Recovering that inference while
+preserving independent indices remains open.
+
+Both shared compilers also upgrade cached producers written by
+`00ba1e8d92`. A new client can use independent parameter and result
+indices without changing the producer's source. The second build reuses
+all outputs. The native object readback and earlier family-kind upgrade
+checks pass with the self-hosted compiler.
+[Compiler-upgrade driver](examples/closed-evaluation/check-readback-upgrade.sh).

@@ -169,9 +169,12 @@ General opaque proof projection stays open.
 Both native stages verified the R15 pair projections. Self-hosted
 GHCi can now print a kind with R23 arrow modifiers that checks when
 copied back into source. The shared bootstrap compiler passes 19 focused
-tests. These include the two ordinary programs where a hidden matchability
-choice previously split the same source constraint. The combined self-host
-and the full dependent directory are the next release checks.
+tests. The self-host passes 23, including the two ordinary programs where
+a hidden matchability choice previously split the same source constraint.
+The dependent directory passes 265 of 297 exercised cases. Each of its
+32 failures also occurred at M174. Three previously rejected programs now
+compile unchanged. Two others, `T13910` and `T13938`, reach a later
+declaration before failing.
 [R15](roadmap/R15-closed-term-evaluator.md) and
 [R16](roadmap/R16-open-term-evaluator.md) are separate subtasks of function promotion. The upstream graph has
 no dependency from one evaluator to the other. Work on them in parallel.
@@ -189,7 +192,7 @@ when some of its operands are unknown.
 | [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Support more type contexts and compose lambdas with local lets and cases. | M174 checks the unannotated `Map` example. An ordinary interface-only client now partially applies a two-argument lambda and distinguishes shadowed kind binders across nested lambdas. |
 | [R18, type-level lets](roadmap/R18-type-level-lets.md) | Compose a local binding with a constructor case while preserving the inferred kind at both uses. | The shared bootstrap passes the source and interface tests for `type F a = let b = G a in H b b`. An unused ill-kinded RHS is rejected. |
 | [R19, type-level cases](roadmap/R19-type-level-cases.md) | Preserve lexical scope when cases occur inside lets or lambdas. | An ordinary client can reduce a known constructor through an interface. A case on an unknown scrutinee stays stuck. A separate experiment preserves `let k = Bool` inside branches for a closed RHS of monomorphic kind. |
-| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Check cached family interfaces with the self-hosted compiler. Improve the diagnostic for a data declaration whose kind uses an unmatchable arrow synonym. | The shared bootstrap passes unchanged `T14720`, `T15346`, `T14749`, `T14038` and `T20875`. Using `%M` in the `singletons` arrow synonym restores `T12442`, `T13910` and `T13938` in a separate compiler. [Proposal and source evidence](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell). |
+| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Recover kind inference in `T14174a`. Improve the diagnostic for a data declaration whose kind uses an unmatchable arrow synonym. | Both stages upgrade cached family interfaces. The self-host passes unchanged `T14720`, `T15346`, `T14749`, `T14038` and `T20875`. Using `%M` in the `singletons` arrow synonym restores `T12442`, `T13910` and `T13938` in a separate compiler. [Proposal and source evidence](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell). |
 
 The previous source controls now pass for a private parcel with an
 exceptional second field, a constructor containing two unknown types,
