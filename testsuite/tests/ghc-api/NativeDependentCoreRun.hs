@@ -4722,6 +4722,16 @@ runSourceRejectChecks = do
                 ++ local [] selection
                      ["keep True 0 = 42", "keep True x = x", "keep False x = x"]
                      "keep True 0 + keep True 7"
+    -- The installed Boolean negation has checked equations. Its result
+    -- selects Int before the literal is passed to the retained function.
+    void $ sourceEntry "NativeSourceCheckedBooleanProducer" $
+        unlines $
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}"
+            , "module NativeSourceCheckedBooleanProducer where"
+            , "type family Select (b :: Bool) where"
+            , "  Select True = Int"
+            , "  Select False = Bool"
+            ] ++ local [] selection identity "keep (not False) (42 :: Int)"
     mapM_
         check
         [ ("unsupported algebraic domain", 83605, "supported structural algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
@@ -4731,7 +4741,9 @@ runSourceRejectChecks = do
         , ("inner erased forall", 83605, "within the scope of a retained binder", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
         , ("strict retained pattern", 83605, "bare variable pattern", ["BangPatterns"], local [] selection ["keep !_ x = x"] "42")
         , ("multiple variable equations", 83605, "one unguarded clause for each constructor", [], local [] selection (identity ++ identity) "42")
-        , ("producer expression argument", 83605, "No checked source equations are available for", [], local [] consumer identity "keep (not False) 42")
+        , ("uncertified producer expression", 83605, "No checked source equations are available for", [],
+           ["partial :: Bool -> Bool", "partial flag = if flag then False else error \"undefined index\""]
+           ++ local [] selection identity "keep (partial False) (42 :: Int)")
         , ("nonreflexive indexed constraint", 18872, "True", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
         , ("general indexed constraint", 39999, "Show", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
         , ("Quick Look through ($)", 83605, "Quick Look inference", [], local [] consumer ["keep b x = 42"] "(keep $ True) 42")
