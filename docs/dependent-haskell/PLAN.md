@@ -9304,8 +9304,7 @@ The ordinary polykinds comparison checks 124 programs. Both M174 and
 this compiler accept the same 115. An intermediate compiler also
 accepted `T14174a`. The current compiler rejects that program at
 `App Bool arr Type p False` because two inferred matchability
-arguments to `Fun` remain ambiguous. Recovering that inference while
-preserving independent indices remains open.
+arguments to `Fun` remain ambiguous. The following checkpoint recovers that inference.
 
 Both shared compilers also upgrade cached producers written by
 `00ba1e8d92`. A new client can use independent parameter and result
@@ -9313,3 +9312,23 @@ indices without changing the producer's source. The second build reuses
 all outputs. The native object readback and earlier family-kind upgrade
 checks pass with the self-hosted compiler.
 [Compiler-upgrade driver](examples/closed-evaluation/check-readback-upgrade.sh).
+
+## R17–R19, R21 and R23 source and compatibility checkpoint
+
+Compiler `88cef2bf98` produces the same 256 Showcase lines with the
+bootstrap compiler, the self-hosted compiler and self-hosted GHCi.
+The additions exercise a constructor case under `Map`, the original
+kind of a matched `Nothing`, a case as the value of a local type binding,
+and two uses of a closed family in local function signatures.
+The self-host passes all 25 focused tests. It also upgrades the
+intermediate open-family interfaces and reuses them on a second build.
+
+The normal-way dependent directory passes 265 of 297 exercised cases.
+The 32 failures match the previous checkpoint. The new arrow-synonym
+diagnostic accounts for all changes in `GADTSingletons`,
+`LopezJuan`, `RaeBlogPost`, `T12088sg3`, `T12442`, `T13135`, `T13910`
+and `T13938`. The other 24 diagnostics or golden diffs agree.
+The separate 124-program polykinds comparison accepts 116. Only
+`T14174a` changed result. The self-host also passes its registered test.
+[Source examples](Showcase.hs) and
+[matchability inference](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).

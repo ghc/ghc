@@ -8,16 +8,20 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-At compiler checkpoint `46715de12b`, both native stages and self-hosted
-GHCi agree on all 252 Showcase output lines. Source types can partially
-apply a two-argument lambda, bind a local type with `let`, and select a
-result by constructor with `case`. For example, `grow` names the successor
-of an IO-sourced vector length in its result type. The focused compiler
-suite passed 23 of 23 tests. The normal-way dependent directory passed
-265 of 297 exercised cases, up from 249 of 284 at M174. All 32 remaining
-failures also occurred at M174. [Source examples](Showcase.hs),
-[users' guide](../users_guide/exts/experimental_dependent_types.rst)
-and [compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+At compiler checkpoint `88cef2bf98`, both native stages and self-hosted
+GHCi agree on all 256 lines of the [Showcase](Showcase.hs). A type lambda
+can match its argument under `Map`. A type-level `let` can bind the
+result of a constructor case and use it twice. A closed family in a
+local function's signature can determine the result of an equation
+for an imported type family.
+
+The self-host passed all 25 focused tests. The normal-way dependent
+directory passed 265 of 297 exercised cases. The same 32 cases failed
+at the previous checkpoint. Eight now identify the kind synonym that
+supplies an unmatchable arrow. The ordinary polykinds comparison gained
+one pass, `T14174a`, bringing it to 116 of 124.
+[Users' guide](../users_guide/exts/experimental_dependent_types.rst) and
+[compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
 A source type synonym can apply the anonymous function `\f -> f Int`
 to each of `Maybe`, `Either String` and `IO` with `Map`. An ordinary

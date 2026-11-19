@@ -166,15 +166,15 @@ General opaque proof projection stays open.
 
 ## Current work queue
 
-Both native stages verified the R15 pair projections. Self-hosted
-GHCi can now print a kind with R23 arrow modifiers that checks when
-copied back into source. The shared bootstrap compiler passes 19 focused
-tests. The self-host passes 23, including the two ordinary programs where
-a hidden matchability choice previously split the same source constraint.
-The dependent directory passes 265 of 297 exercised cases. Each of its
-32 failures also occurred at M174. Three previously rejected programs now
-compile unchanged. Two others, `T13910` and `T13938`, reach a later
-declaration before failing.
+At `88cef2bf98`, both native stages and self-hosted GHCi produce the
+same 256 Showcase lines. The self-host passes all 25 focused tests.
+These cover type lambdas, lets, constructor cases, matchability syntax,
+exact printing and ordinary programs that use families in kinds.
+The dependent directory passes 265 of 297 exercised cases. Its 32
+failures match the previous checkpoint. Eight diagnostics now identify
+the arrow synonym involved. The separate polykinds comparison accepts
+116 of 124 programs. It recovers `T14174a` with its original source.
+
 [R15](roadmap/R15-closed-term-evaluator.md) and
 [R16](roadmap/R16-open-term-evaluator.md) are separate subtasks of function promotion. The upstream graph has
 no dependency from one evaluator to the other. Work on them in parallel.
@@ -186,13 +186,14 @@ when some of its operands are unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
+| [R05, dependent Core](roadmap/R05-dependent-core.md#occurrence-analysis) | Run an ordinary simplifier iteration on retained data and preserve proof scope and lazy demand. | An isolated occurrence pass keeps a runtime binding whose only use is a vector index. The ordinary optimized pipeline still needs changes for retained applications and case proofs. |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Extend scalar readback to more result shapes while preserving demand. | Both projections and the native object-upgrade check pass with the self-hosted compiler. The unselected exceptional sibling stays lazy. [Readback design](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field). |
 | [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check which mapper equations remain valid when the consumer enables rewrite rules. | An optimized client infers the index from an [imported witness](examples/boundary-evidence/UseMapWitness.hs), including inside `Maybe` and lists. Constructing a fresh `Refl` still needs the mapper's equation. |
-| [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Check a producer whose input type reduces through a local closed family. Preserve real cycles through constructor fields. | In a separate compiler, a helper signature can depend on an earlier closed family. An ordinary interface client passes. A cycle through a constructor field still fails. |
-| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Support more type contexts and compose lambdas with local lets and cases. | M174 checks the unannotated `Map` example. An ordinary interface-only client now partially applies a two-argument lambda and distinguishes shadowed kind binders across nested lambdas. |
-| [R18, type-level lets](roadmap/R18-type-level-lets.md) | Compose a local binding with a constructor case while preserving the inferred kind at both uses. | The shared bootstrap passes the source and interface tests for `type F a = let b = G a in H b b`. An unused ill-kinded RHS is rejected. |
-| [R19, type-level cases](roadmap/R19-type-level-cases.md) | Preserve lexical scope when cases occur inside lets or lambdas. | An ordinary client can reduce a known constructor through an interface. A case on an unknown scrutinee stays stuck. A separate experiment preserves `let k = Bool` inside branches for a closed RHS of monomorphic kind. |
-| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Recover kind inference in `T14174a`. Improve the diagnostic for a data declaration whose kind uses an unmatchable arrow synonym. | Both stages upgrade cached family interfaces. The self-host passes unchanged `T14720`, `T15346`, `T14749`, `T14038` and `T20875`. Using `%M` in the `singletons` arrow synonym restores `T12442`, `T13910` and `T13938` in a separate compiler. [Proposal and source evidence](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell). |
+| [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Extend the dependency check to more signed producers while retaining cycle, strictness and rewrite-rule diagnostics. | A producer can call through a closed family in its own signature. A separate client checks the resulting `Payload Word` using only compiled interfaces. [Provider](examples/open-evaluation/FamilySignature.hs). |
+| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Preserve index refinement when a case inside a lambda matches two different GADT indices. | A constructor case on a lambda argument works under `Map`. Its branches can use the whole matched value with its original kind. [Source and client](roadmap/R17-type-level-lambdas.md#matching-a-lambda-argument). |
+| [R18, type-level lets](roadmap/R18-type-level-lets.md) | Preserve the checked local definition when branches in the body of a let refer to it. | A case in the RHS of a let sees the outer scope. Both uses of its result share a type. An ill-kinded branch still fails if the let-bound name is unused. [Source](examples/open-evaluation/TypeLet.hs). |
+| [R19, type-level cases](roadmap/R19-type-level-cases.md) | Check nested cases with lexical captures and different constructor result indices. | An interface client reduces a known constructor. Matching stays stuck on an unknown input, including when both alternatives return the same type. |
+| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Recheck ordinary GHC compatibility as more type-level functions use inferred and explicit kinds. | Both the private compatibility run and the self-hosted test accept `T14174a` unchanged. The other 123 polykinds results agree in the private comparison. The compiler identifies the unmatchable synonym when a data declaration requires M. [Compatibility examples](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell). |
 
 The previous source controls now pass for a private parcel with an
 exceptional second field, a constructor containing two unknown types,
