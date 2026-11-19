@@ -103,6 +103,12 @@ test('NativeClosedLazyParcel',
 test('NativeClosedPartialPair',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedFamilyProjection.hs'])],
      run_command, ['bash NativeClosedPartialPair.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+test('NativeClosedComputedPair',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([closed_eval_dir + f for f in
+                   ['ComputedPair.hs', 'ComputedPairProof.hs', 'PairProjection.hs']])],
+     run_command, ['bash NativeClosedComputedPair.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeClosedReturnedPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['NativeClosedReturnedPairLib.hs', 'NativeClosedReturnedPairRejects.hs',

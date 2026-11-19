@@ -75,6 +75,7 @@ module GHC.Tc.Gen.HsType (
 
    ) where
 
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -92,8 +93,9 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, isMonomorphicEnumCaseType, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField)
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
+                              sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, isMonomorphicEnumCaseType, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
+                              lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -132,7 +134,7 @@ import GHC.Types.Error
 import GHC.Types.Id ( mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Set (mkNameSet, unionNameSet)
+import GHC.Types.Name.Set (NameSet, mkNameSet, unionNameSet, emptyNameSet, elemNameSet, extendNameSet)
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -141,6 +143,8 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
+
+import GHC.Unit.Module (mkModule, mkModuleName, moduleName, moduleNameString, moduleUnit, stringToUnit, unitString)
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -165,6 +169,7 @@ import Data.List ( intercalate, mapAccumL )
 import Control.Monad
 import Data.Data (Data, cast, gmapQ)
 import Data.Tuple( swap )
+import Text.Read (readMaybe)
 
 {-
         ----------------------------
@@ -2922,17 +2927,21 @@ tcPlanClosedTree mode ordinary hint root arguments = do
           -- Forming a type needs the argument, but does not use the case axiom.
           -- See Note [Source family evidence uses] in GHC.Tc.Gen.SourceTable.
           run <- case child of
-            ClosedApplication _ fun vars _ domains _ args
-              | Just builder <- sourceTableId_maybe fun
-              , Just (copied, copied_arg) <- sourcePairBuilderField builder
-              , and [i == copied_arg || literal child_arg | (i, child_arg) <- zip [0..] args] -> do
-                  selected <- closedPairProjectionField table kinds input result
-                  if selected == Just copied then do
-                    operands <- zipWithM prepare_family_operand domains args
-                    pure $ do
-                      values <- zipWithM (checkClosedFamilyOperand (getName fun)) domains operands
-                      pure (mkTyConApp builder (map snd vars ++ values))
-                  else prepare_family_operand input child
+            ClosedApplication call_loc fun vars _ domains _ args -> do
+              selected <- closedPairProjectionField table kinds input result
+              case (selected, sourceTableId_maybe fun >>= sourcePairBuilderField) of
+                (Just side, Just (copied, copied_arg))
+                  | side == copied
+                  , Just builder <- sourceTableId_maybe fun
+                  , and [i == copied_arg || literal child_arg | (i, child_arg) <- zip [0..] args] -> do
+                      operands <- zipWithM prepare_family_operand domains args
+                      pure $ do
+                        values <- zipWithM (checkClosedFamilyOperand (getName fun)) domains operands
+                        pure (mkTyConApp builder (map snd vars ++ values))
+                (Just side, _) -> do
+                  observed <- prepareObservedPair side call_loc fun (map snd vars) domains args input result
+                  maybe (prepare_family_operand input child) pure observed
+                _ -> prepare_family_operand input child
             _ -> prepare_family_operand input child
           let application = do
                 arg <- checkClosedFamilyOperand owner input run
@@ -3148,6 +3157,41 @@ tcPlanClosedTree mode ordinary hint root arguments = do
       ClosedFamilyValue loc <$> prepareClosedFamilyResult owner table kinds inputs result operands
     prepare ClosedBoundary{} = panic "tcPlanClosedTree: unprepared boundary"
 
+    -- The companion certifies the field that this projection leaves unread.
+    prepareObservedPair side loc fun params domains args input result = runMaybeT $ do
+      (tc, [left, right]) <- MaybeT (pure (splitTyConApp_maybe input))
+      guard (tc == pairTyCon)
+      field <- MaybeT (lookupObservedPairField side fun params (pickLR side (right, left)))
+      observer <- MaybeT (lookupPairObserver side fun (length domains))
+      let owner = getName fun
+      available <- lift (tcHasClosedCallExecutable owner)
+      permitted <- lift (canObservePairSource fun)
+      guard (available && permitted)
+      lift $ setSrcSpan loc $ do
+        apply <- tcPrepareClosedApplication fun domains input
+        operands <- mapM (fmap (closedCallRuntimeOperand owner) . prepare) args
+        select <- closedPairProjectionExpression side input left right result
+        reify <- tcPrepareClosedResult owner input
+        reify_selected <- tcPrepareClosedResult owner result
+        env <- getGblEnv
+        pure $ do
+          partial <- readPairRecipe owner emptyNameSet observer
+          expression <- sequence operands >>= apply
+          if partial then do
+            selected <- reify_selected (select expression)
+            recordSourceUses [(fun, Nothing)]
+            let site = tcg_zany_n env
+                mod = tcg_semantic_mod env
+            ordinal <- readTcRef site
+            updTcRef site (+ 1)
+            updTcRef (tcg_evaluated_term_uses env) (`extendNameSet` tyConName field)
+            let key = mkStrLitTy (fsLit (show (unitString (moduleUnit mod),
+                                             moduleNameString (moduleName mod), ordinal)))
+                unread = mkTyConApp field (params ++ [key])
+            let (x, y) = pickLR side ((selected, unread), (unread, selected))
+            pure (mkPromotedPairTy left right x y)
+          else reify expression
+
     prepare_family_operand _ (ClosedLiteral _ _ literal) = return (return literal)
     prepare_family_operand kind child = prepare child >>= prepareClosedCallResult kind
 
@@ -3157,6 +3201,32 @@ tcPlanClosedTree mode ordinary hint root arguments = do
     bare_empty arg = case ignoreParens arg of
       L _ (HsExplicitListTy _ _ []) -> True
       _ -> False
+
+-- | Resolve a chain of optional proof recipes without entering the producer.
+readPairRecipe :: Name -> NameSet -> Id -> TcM Bool
+readPairRecipe owner seen entry
+  | name `elemNameSet` seen = pure False
+  | otherwise = do
+      reify <- tcPrepareClosedObservation owner stringTy name
+      quoted <- reify (Core.Var entry)
+      case quoted >>= readbackString of
+        Just "!" -> pure True
+        Just reference
+          | Just (unit, mod, occurrence, arity) <- readMaybe reference -> do
+              let defining = mkModule (stringToUnit unit) (mkModuleName mod)
+              target <- lookupPairRecipe defining (mkVarOcc occurrence) arity
+              maybe (pure False) (readPairRecipe owner (extendNameSet seen name)) target
+        _ -> pure False
+  where
+    name = getName entry
+
+-- | Read the promoted list produced by the closed Char list codec.
+readbackString :: Type -> Maybe String
+readbackString ty = case splitTyConApp_maybe ty of
+    Just (con, [_]) | con == promoteDataCon nilDataCon -> Just []
+    Just (con, [_, char, tail_ty]) | con == promoteDataCon consDataCon ->
+      (:) <$> isCharLitTy char <*> readbackString tail_ty
+    _ -> Nothing
 
 -- | Read a certified projection without first observing the whole pair.
 -- See Note [Demand of an interface-only pair projection].
@@ -3169,14 +3239,20 @@ prepareClosedPairProjection owner table kinds input result (OrdinaryClosedCall _
         Just side -> do
           loc <- getSrcSpanM
           sourceCaseKindUse table kinds
-          binder <- mkSysLocalM (fsLit "closed_pair") ManyTy input
-          a <- mkSysLocalM (fsLit "closed_first") ManyTy left_kind
-          b <- mkSysLocalM (fsLit "closed_second") ManyTy right_kind
-          let observe scrutinee = Core.Case scrutinee binder result
-                [Core.Alt (Core.DataAlt (tupleDataCon Boxed 2)) [a, b] (Core.Var (pickLR side (a, b)))]
+          observe <- closedPairProjectionExpression side input left_kind right_kind result
           return (Just (OrdinaryClosedCall loc owner (observe <$> expression)))
         Nothing -> return Nothing
 prepareClosedPairProjection _ _ _ _ _ _ = return Nothing
+
+-- | Force the actual pair and return only its selected field.
+closedPairProjectionExpression :: LeftOrRight -> Kind -> Kind -> Kind -> Kind
+                               -> TcM (Core.CoreExpr -> Core.CoreExpr)
+closedPairProjectionExpression side input left right result = do
+    binder <- mkSysLocalM (fsLit "closed_pair") ManyTy input
+    a <- mkSysLocalM (fsLit "closed_first") ManyTy left
+    b <- mkSysLocalM (fsLit "closed_second") ManyTy right
+    pure $ \scrutinee -> Core.Case scrutinee binder result
+      [Core.Alt (Core.DataAlt (tupleDataCon Boxed 2)) [a, b] (Core.Var (pickLR side (a, b)))]
 
 -- | Read the selected field without recording a use of the projection's equation.
 closedPairProjectionField :: TyCon -> [Kind] -> Kind -> Kind -> TcM (Maybe LeftOrRight)

@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr ) where
+module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr, pairObservationOcc, pairObservationType ) where
 
 import GHC.Prelude
 
@@ -21,13 +21,32 @@ import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
+import GHC.Builtin.Modules (gHC_INTERNAL_ERR)
+import GHC.Builtin.PrimOps (PrimOp(RaiseOp))
+import GHC.Builtin.WiredIn.Types
+  (boolTy, charTy, naturalTy, pairTyCon, stringTy, tupleDataCon)
 import GHC.Core
+import GHC.Core.Make (mkCharExpr, mkListExpr)
+import GHC.Core.TyCo.Rep (scaledThing)
+import GHC.Core.TyCo.Compare (eqType)
+import GHC.Core.Type
+  (Type, getTyVar_maybe, mkVisFunTyManyU, splitForAllForAllTyBinders,
+   splitFunTys, splitTyConApp_maybe)
+import GHC.Iface.Env (allocateGlobalBinder, lookupNameCache)
+import GHC.Types.Basic (Boxity(Boxed), LeftOrRight(..))
+import GHC.Types.Id (idName, idType, isExportedId, isGlobalId, isPrimOpId_maybe,
+                     isDataConWorkId_maybe, mkExportedVanillaId, setInlinePragma)
+import GHC.Types.Name (getOccName, nameModule_maybe, nameSrcSpan)
+import GHC.Types.Name.Occurrence (OccName, mkVarOcc, occNameString)
+import GHC.Types.TyThing (TyThing(AnId))
+import GHC.Types.Var (Var, VarBndr(Bndr), isId)
+import GHC.Types.Var.Set (emptyVarSet, elemVarSet, extendVarSet)
 import GHC.Core.Dependent
 import GHC.Core.SimpleOpt (simpleOptPgm)
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
-import GHC.Core.Utils   ( dumpIdInfoOfProgram, diffBinds, stripTicksE )
+import GHC.Core.Utils   ( dumpIdInfoOfProgram, diffBinds, stripTicksE, exprType )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Simplify ( SimplifyExprOpts, simplifyPgm )
 import qualified GHC.Core.Opt.Simplify as Simplify
@@ -60,11 +79,10 @@ import GHC.Unit.External ( ExternalUnitCache )
 
 import GHC.Types.Id.Info
 import GHC.Types.Tickish ( tickishIsCode )
-import GHC.Types.Var.Env ( mkRnEnv2, emptyInScopeSet )
-import GHC.Types.InlinePragma ( CompilerPhase(..) )
+import GHC.Types.Var.Env ( mkRnEnv2, emptyInScopeSet, mkVarEnv, lookupVarEnv )
+import GHC.Types.InlinePragma ( CompilerPhase(..), neverInlinePragma )
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Name.Ppr
-import GHC.Types.Var ( Var )
 import GHC.Types.Unique.Supply ( UniqueTag(..) )
 
 import Control.Monad
@@ -98,7 +116,9 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                               ; all_passes <- withPlugins (hsc_plugins hsc_env')
                                                 installCoreToDos
                                                 builtin_passes
-                              ; runCorePasses all_passes guts }
+                              ; optimized <- runCorePasses all_passes guts
+                              ; withTiming logger (text "Pair field observations" <+> brackets (ppr mod))
+                                  (const ()) (addPairObservations optimized) }
 
        ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
@@ -120,6 +140,133 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
+
+{- Note [Executable pair field observations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Choose the ABI from the exported ordinary signature. A replacement body
+must supply the same symbol even when its proof becomes false. The
+pair ABI covers unrestricted arrows from a scalar codec to a pair of
+scalar codecs. Relay entries support unrestricted arrows between the
+same codecs. In the library error module, entries are also available
+for functions with a universally quantified result. Their value arity
+comes from their checked type. These restrictions bound code growth.
+
+Read final Core after the user's RULES and plugins. Use the exact raise#
+primitive as a proof of nonreturn. Serialize an imported call's exact
+owner and value arity as a recipe. An older object can lack its hidden
+entry without losing an ordinary symbol. The type checker resolves
+the recipe in the interpreter, where each link is optional. The object
+never refers to an imported proof closure from native code.
+
+The first-field observer keeps its original name. The second-field
+observer has a distinct name. A first-field-only object can still
+supply the first observer after recompilation of its interface.
+-}
+
+-- | Hidden executable entry for a projection or a scalar relay.
+pairObservationOcc :: Maybe LeftOrRight -> Int -> OccName -> OccName
+pairObservationOcc side arity owner =
+    mkVarOcc ("$readback2:" ++ side_tag ++ show arity ++ ":" ++ occNameString owner)
+  where
+    side_tag = case side of
+      Just CRight -> "right:"
+      _ -> ""
+
+-- | Recognize an ordinary producer supported by the first observation ABI.
+pairObservationType :: Type -> Maybe (Type, Type)
+pairObservationType ty = do
+    (input, result) <- observationArrow ty
+    (constructor, [left, right]) <- splitTyConApp_maybe result
+    guard (constructor == pairTyCon && scalarCodec left && scalarCodec right)
+    pure (input, result)
+
+-- | One unrestricted argument with an existing scalar readback codec.
+observationArrow :: Type -> Maybe (Type, Type)
+observationArrow ty = do
+    let (_, args, result) = splitFunTys ty
+    [arg] <- pure args
+    let input = scaledThing arg
+    guard (scalarCodec input && ty `eqType` mkVisFunTyManyU input result)
+    pure (input, result)
+
+-- | Scalar codecs for the bounded native ABI.
+scalarCodec :: Type -> Bool
+scalarCodec ty = any (eqType ty) [boolTy, charTy, naturalTy]
+
+-- | Publish hidden native entries for checked pair observations.
+addPairObservations :: ModGuts -> CoreM ModGuts
+addPairObservations guts = do
+    env <- getHscEnv
+    let emit side owner arity rhs = do
+          let occ = pairObservationOcc side arity (getOccName owner)
+          name <- liftIO $ allocateGlobalBinder (hsc_NC env) this_mod occ
+                    Nothing (nameSrcSpan (idName owner))
+          let entry = mkExportedVanillaId name (exprType rhs)
+          pure (NonRec (setInlinePragma entry neverInlinePragma) rhs)
+
+        importedProof owner arity
+          | Just mod <- nameModule_maybe (idName owner)
+          , RealUnit _ <- moduleUnit mod
+          , mod /= this_mod = liftIO $ do
+              name <- lookupNameCache (hsc_NC env) mod (pairObservationOcc Nothing arity (getOccName owner))
+              thing <- lookupType env name
+              pure $ case thing of
+                Just (AnId entry) | idType entry `eqType` stringTy ->
+                  recipe (show (unitString (moduleUnit mod), moduleNameString (moduleName mod),
+                                occNameString (getOccName owner), arity))
+                _ -> no
+          | otherwise = pure no
+
+        proof seen expr = case collectArgs expr of
+          (Var fn, args)
+            | isPrimOpId_maybe fn == Just RaiseOp
+            , valArgCount args == 1 -> pure yes
+            | null args
+            , Just body <- lookupVarEnv bodies fn
+            , not (fn `elemVarSet` seen) -> proof (extendVarSet seen fn) body
+            | isGlobalId fn
+            , all (not . isCoArg) args -> importedProof fn (valArgCount args)
+          (Case _ _ _ [Alt _ _ body], []) -> proof seen body
+          (Tick _ body, []) -> proof seen body
+          _ -> pure no
+
+        add (owner, rhs)
+          | isExportedId owner
+          , Just _ <- pairObservationType (idType owner) = do
+              (left, right) <- case collectBinders rhs of
+                ([_], body)
+                  | (Var con, [Type _, Type _, x, y]) <- collectArgs body
+                  , isDataConWorkId_maybe con == Just (tupleDataCon Boxed 2) ->
+                      (,) <$> proof emptyVarSet x <*> proof emptyVarSet y
+                _ -> pure (no, no)
+              sequence [emit (Just CLeft) owner 1 right, emit (Just CRight) owner 1 left]
+          | isExportedId owner
+          , Just arity <- relayArity owner = do
+              let (params, body) = collectBinders rhs
+              flag <- if length (filter isId params) == arity
+                        then proof emptyVarSet body
+                        else pure no
+              (:[]) <$> emit Nothing owner arity flag
+          | otherwise = pure []
+    entries <- concat <$> mapM add bindings
+    pure guts{mg_binds = mg_binds guts ++ entries}
+  where
+    this_mod = mg_module guts
+    bindings = flattenBinds (mg_binds guts)
+    bodies = mkVarEnv bindings
+    recipe = mkListExpr charTy . map mkCharExpr
+    yes = recipe "!"
+    no = recipe ""
+
+    relayArity owner
+      | Just (_, result) <- observationArrow (idType owner)
+      , scalarCodec result = Just 1
+      | this_mod == gHC_INTERNAL_ERR
+      , let (parameters, body) = splitForAllForAllTyBinders (idType owner)
+            (_, args, result) = splitFunTys body
+      , Just variable <- getTyVar_maybe result
+      , variable `elem` [v | (_, Bndr v _) <- parameters] = Just (length args)
+      | otherwise = Nothing
 
 {-
 ************************************************************************

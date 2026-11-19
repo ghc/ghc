@@ -964,13 +964,13 @@ printLoadedObjects(void) {
    }
 }
 
-SymbolAddr* lookupSymbol( SymbolName* lbl )
+static SymbolAddr* lookupSymbolWithDiagnostics(SymbolName* lbl, bool required)
 {
     ACQUIRE_LOCK(&linker_mutex);
     // NULL for "don't add dependent". When adding a dependency we call
     // lookupDependentSymbol directly.
     SymbolAddr* r = lookupDependentSymbol(lbl, NULL, NULL);
-    if (!r) {
+    if (!r && required) {
         if (!RtsFlags.MiscFlags.linkerOptimistic) {
           errorBelch("^^ Could not load '%s', dependency unresolved. "
                      "See top entry above. You might consider using --optimistic-linking\n",
@@ -992,6 +992,16 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
     }
     RELEASE_LOCK(&linker_mutex);
     return r;
+}
+
+SymbolAddr* lookupSymbol(SymbolName* lbl)
+{
+    return lookupSymbolWithDiagnostics(lbl, true);
+}
+
+bool hasSymbol(SymbolName* lbl)
+{
+    return lookupSymbolWithDiagnostics(lbl, false) != NULL;
 }
 
 /* -----------------------------------------------------------------------------

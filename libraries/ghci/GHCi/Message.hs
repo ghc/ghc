@@ -253,6 +253,8 @@ data Message a where
   -- their own interpreter which understands additional commands.
   CustomMessage :: Word8 -> ByteString -> Message ByteString
 
+  HasSymbol :: !BS.ShortByteString -> Message Bool
+
 deriving instance Show (Message a)
 
 -- | Used to dynamically create a data constructor's info table at
@@ -611,6 +613,7 @@ getMessage = do
       40 -> Msg <$> (WhereFrom <$> get)
       41 -> Msg <$> (AddHpcModule <$> get <*> get <*> get <*> get)
       42 -> Msg <$> (CustomMessage <$> get <*> get)
+      43 -> Msg <$> HasSymbol <$> get
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -659,6 +662,7 @@ putMessage m = case m of
   WhereFrom a                 -> putWord8 40 >> put a
   AddHpcModule m n h ticks    -> putWord8 41 >> put m >> put n >> put h >> put ticks
   CustomMessage tag payload   -> putWord8 42 >> put tag >> put payload
+  HasSymbol str               -> putWord8 43 >> put str
 
 {-
 Note [Parallelize CreateBCOs serialization]

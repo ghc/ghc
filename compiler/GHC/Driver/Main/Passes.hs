@@ -15,6 +15,7 @@ module GHC.Driver.Main.Passes
 
       hscCompileCoreExpr'
     , hscCompileCoreExpr
+    , hscCompileCoreExprWithOptionalName
 
     -- * Running passes separately
     , hscRecompStatus
@@ -152,6 +153,7 @@ import GHC.Types.Name.Set (mkNameSet, elemNameSet)
 import GHC.Types.IPE
 import GHC.Types.Name
 import GHC.Types.Name.Ppr
+import GHC.Types.Unique.DFM (emptyUDFM)
 import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
 import GHC.Types.SourceFile
@@ -1632,6 +1634,23 @@ hscCompileCoreExpr hsc_env loc expr =
 
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr' hsc_env srcspan ds_expr = do
+  (value, links, packages) <- compileCoreExpr hsc_env srcspan Nothing ds_expr
+  pure (expectJust value, links, packages)
+
+-- | Compile an optional observation in the native interpreter.
+-- A custom hook cannot make the optional link decision.
+hscCompileCoreExprWithOptionalName
+  :: HscEnv -> SrcSpan -> Name -> CoreExpr
+  -> IO (Maybe ForeignHValue, [LinkableUsage], PkgsLoaded)
+hscCompileCoreExprWithOptionalName hsc_env loc name expr =
+  case (hscCompileCoreExprHook (hsc_hooks hsc_env), interpInstance (hscInterp hsc_env)) of
+    (Just _, _) -> pure (Nothing, [], emptyUDFM)
+    (_, ExternalInterp (ExtJS _)) -> pure (Nothing, [], emptyUDFM)
+    _ -> compileCoreExpr hsc_env loc (Just name) expr
+
+compileCoreExpr :: HscEnv -> SrcSpan -> Maybe Name -> CoreExpr
+                -> IO (Maybe ForeignHValue, [LinkableUsage], PkgsLoaded)
+compileCoreExpr hsc_env srcspan optional ds_expr = do
   {- Simplify it -}
   -- See Note [Compiling native dependent Core].
   let native = hasNativeDependentExpr ds_expr
@@ -1714,7 +1733,8 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   case interp of
     -- always generate JS code for the JS interpreter (no bytecode!)
     Interp { interpInstance = ExternalInterp (ExtJS i) } ->
-      jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id
+      do (value, links, packages) <- jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id
+         pure (Just value, links, packages)
 
     _ -> do
       {- Convert to BCOs -}
@@ -1729,12 +1749,12 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
       {- load it -}
       bco_time <- getCurrentTime
       mbc <- ByteCode.mkModuleByteCode this_mod bcos []
-      (mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
+      (available, links, packages) <- loadDeclsWithOptionalName interp hsc_env srcspan optional $
         Linkable bco_time this_mod $ NE.singleton (DotGBC mbc)
-      -- Get the foreign reference to the name we should have just loaded.
-      mhvs <- lookupFromLoadedEnv interp (idName binding_id)
-      {- Get the HValue for the root -}
-      return (expectJust mhvs, mods_needed, units_needed)
+      if available then do
+        value <- lookupFromLoadedEnv interp (idName binding_id)
+        pure (Just (expectJust value), links, packages)
+      else pure (Nothing, links, packages)
 
 
 

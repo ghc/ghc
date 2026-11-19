@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, sourcePairBuilderField, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, isMonomorphicEnumCaseType, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
@@ -11,7 +11,7 @@ import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
-import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, charTy, charTyCon, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, charTy, charTyCon, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import qualified GHC.Core as Core
 import GHC.Core.CharCase (certOwner, certRows, certify)
@@ -52,20 +52,21 @@ import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), isEmptyEvBindsMap)
 import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
-import GHC.Tc.Utils.Env (tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
+import GHC.Tc.Utils.Env (tcLookupGlobal, tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
 import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobalRdrEnv, getTcEvBindsMap, getTcEvBindsState,
                            checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
-import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..))
+import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(SourceTableId))
-import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, idUnfolding, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
-import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc,
-                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
+import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
+                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
+import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType)
 import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
 import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv, mkNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
@@ -77,7 +78,7 @@ import GHC.Unit.External (eps_rule_base)
 import GHC.Unit.Home (homeUnitId)
 import GHC.Unit.Home.Graph (lookupHugByModule)
 import GHC.Unit.Home.ModInfo (hm_details)
-import GHC.Unit.Module (getModuleInstantiation, isHoleModule)
+import GHC.Unit.Module (Module, getModuleInstantiation, isHoleModule)
 import GHC.Unit.Module.Deps (imp_boot_mods)
 import GHC.Unit.Module.Env (lookupInstalledModuleEnv, moduleSetElts)
 import GHC.Unit.Module.ModDetails (md_rules)
@@ -894,13 +895,14 @@ sourceCaseTables binds = do
       helper_cores <- collectHelpers helperCore references emptyNameSet reachable
       helpers <- foldM (buildHelper env imported public) []
                    (stronglyConnCompFromEdgedVerticesUniq helper_cores)
-      certified <- fmap catMaybes $ forM root_cores $ \(owner, rhs) ->
+      certified <- forM root_cores $ \(owner, rhs) ->
         certifyBinding env exported enum_enabled rdr_env helpers owner rhs
-      let (roots, fields) = unzip certified
+      let (root_entries, fields) = unzip certified
+          roots = catMaybes root_entries
           helper_tables = mkNameEnv [(tyConName table, table) | (_, table) <- helpers]
           used = helperClosure helper_tables emptyNameSet (calleeNames roots)
           referenced (_, table) = tyConName table `elemNameSet` used
-      pure (final_tables ++ roots ++ filter referenced helpers, catMaybes fields)
+      pure (final_tables ++ roots ++ filter referenced helpers, concat fields)
   where
     charArrow = mkVisFunTyManyU charTy charTy
 
@@ -974,10 +976,8 @@ sourceCaseTables binds = do
         _ -> Nothing
 
     certifyBinding env exported enum_enabled rdr_env helpers owner rhs
-      | Just build <- checkedPairBuilder owner rhs = do
-          (table, field) <- build
-          pure (Just ((owner, table), Just field))
-      | otherwise = fmap (fmap (, Nothing)) $
+      | Just build <- checkedPairBuilder owner rhs = build
+      | otherwise = (, []) <$>
           case rhs of
             Core.Var target | varType owner `eqType` charArrow -> forwarding env owner target
             _ | Just projection <- checkedPairCase owner rhs ->
@@ -1692,7 +1692,7 @@ pairBuilderType ty = do
 
 -- | Certify the constructor spine and allocate the suspended field's private family.
 -- See Note [A partial pair in a nominal operand].
-checkedPairBuilder :: Id -> Core.CoreExpr -> Maybe (TcM (TyCon, TyCon))
+checkedPairBuilder :: Id -> Core.CoreExpr -> Maybe (TcM (Maybe (Id, TyCon), [TyCon]))
 checkedPairBuilder owner rhs = do
   guard (exprType rhs `eqType` varType owner)
   (tvs, domains, result, left, right) <- pairBuilderType (exprType rhs)
@@ -1706,30 +1706,122 @@ checkedPairBuilder owner rhs = do
          eqTypes [l, r, exprType x, exprType y] [left, right, left, right])
   let input (Core.Var v) | v `elem` terms = Just v
       input _ = Nothing
-  (known, side, opaque_kind, name_field) <- case (input x, input y) of
-    (Just v, Nothing) -> Just (v, CLeft, right, mkSourceSndOcc)
-    (Nothing, Just v) -> Just (v, CRight, left, mkSourceFstOcc)
-    _ -> Nothing
   pure $ do
-    args <- forM domains $ \ty -> flip mkTyVar ty <$> newSysName (mkTyVarOcc "arg")
     let parameters = zipWith (\v (Bndr _ vis) -> Bndr v (NamedTCB vis)) types signature
-        binders = parameters ++ mkAnonTyConBinders args
-        vars = types ++ args
-        lhs = mkTyVarTys vars
         name = idName owner
-    field_name <- newImplicitBinder name name_field
-    let field_kind = mkTyConKindWithMatchability unmatchableDataConTy binders opaque_kind
-        field_tc = mkFamilyTyCon field_name field_kind binders 0 opaque_kind Nothing
-                     (ClosedTypeFamilyTyCon (CTF Nothing)) Nothing NotInjective
-        suspended = mkTyConApp field_tc lhs
-        selected = case lookup known (zip terms args) of
-          Just v -> mkTyVarTy v
-          Nothing -> panic "checkedPairBuilder: unbound pair field"
-        fields = case side of CLeft -> [selected, suspended]; CRight -> [suspended, selected]
-        pair = mkTyConApp (promotedTupleDataCon Boxed 2) ([left, right] ++ fields)
-        branch _ = mkCoAxBranch vars [] [] lhs pair (map (const Nominal) vars) (nameSrcSpan name)
-    table <- makeSourceFamily name binders result [branch]
-    pure (table, field_tc)
+        copiedPair known side opaque_kind occ = do
+          args <- forM domains $ \ty -> flip mkTyVar ty <$> newSysName (mkTyVarOcc "arg")
+          let binders = parameters ++ mkAnonTyConBinders args
+              vars = types ++ args
+              lhs = mkTyVarTys vars
+              selected = case lookup known (zip terms args) of
+                Just v -> mkTyVarTy v
+                Nothing -> panic "checkedPairBuilder: unbound pair field"
+          field <- emptyPairField name occ binders opaque_kind
+          let suspended = mkTyConApp field lhs
+              pair_fields = pickLR side ([selected, suspended], [suspended, selected])
+              pair = mkTyConApp (promotedTupleDataCon Boxed 2) ([left, right] ++ pair_fields)
+              branch _ = mkCoAxBranch vars [] [] lhs pair (map (const Nominal) vars) (nameSrcSpan name)
+          table <- makeSourceFamily name binders result [branch]
+          pure (Just (owner, table), [field])
+    case (input x, input y) of
+      (Just v, Nothing) -> copiedPair v CLeft right mkSourceSndOcc
+      (Nothing, Just v) -> copiedPair v CRight left mkSourceFstOcc
+      _ | Just _ <- pairObservationType (varType owner) -> do
+            key <- flip mkTyVar typeSymbolKind <$> newSysName (mkTyVarOcc "observation")
+            let binders = mkAnonTyConBinders [key]
+            first <- emptyPairField name (mkObservedFieldOcc CRight) binders left
+            second <- emptyPairField name (mkObservedFieldOcc CLeft) binders right
+            pure (Nothing, [first, second])
+        | otherwise -> pure (Nothing, [])
+
+-- | Reserve the unread field occurrence for the given projection.
+mkObservedFieldOcc :: LeftOrRight -> OccName -> OccName
+mkObservedFieldOcc side = mkTcOcc . (prefix ++) . occNameString
+  where
+    prefix = pickLR side ("Q2:", "Q1:")
+
+-- | Allocate an opaque field family in the ordinary producer's interface.
+emptyPairField :: Name -> (OccName -> OccName) -> [TyConBinder] -> Kind -> TcM TyCon
+emptyPairField owner occ binders result = do
+    name <- newImplicitBinder owner occ
+    let kind = mkTyConKindWithMatchability unmatchableDataConTy binders result
+    pure (mkFamilyTyCon name kind binders 0 result Nothing
+            (ClosedTypeFamilyTyCon (CTF Nothing)) Nothing NotInjective)
+
+-- | Find the exact private field of an ordinary imported pair producer.
+lookupObservedPairField :: LeftOrRight -> Id -> [Type] -> Kind -> TcM (Maybe TyCon)
+lookupObservedPairField side producer params expected
+  | Just mod <- nameModule_maybe owner
+  , not (isHoleModule mod)
+  , (installed, Nothing) <- getModuleInstantiation mod = do
+      env <- getGblEnv
+      let ordinary = case lookupGRE_Name (tcg_rdr_env env) owner of
+            Just gre -> any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
+            Nothing -> False
+          boot = gwib_isBoot <$> lookupInstalledModuleEnv
+                   (imp_boot_mods (tcg_imports env)) installed
+      if mod /= tcg_semantic_mod env && ordinary && boot /= Just IsBoot
+        then loadField mod
+        else pure Nothing
+  | otherwise = pure Nothing
+  where
+    owner = idName producer
+
+    loadField mod = do
+      iface <- loadInterfaceForName (text "staged pair producer") owner
+      let occ = mkObservedFieldOcc side (nameOccName owner)
+      case mi_hash_fn iface occ of
+        Nothing -> pure Nothing
+        Just _ -> do
+          name <- lookupOrig mod occ
+          thing <- tcLookupGlobal name
+          pure $ do
+            ATyCon field <- Just thing
+            guard (tyConName field == name)
+            ClosedTypeFamilyTyCon (CTF Nothing) <- famTyConFlav_maybe field
+            let (invisible, visible) = span isInvisibleTyConBinder (tyConBinders field)
+                parameters = [v | Bndr v _ <- invisible]
+                inst = substTyWith parameters params
+            [Bndr key AnonTCB] <- pure visible
+            guard (varType key `eqType` typeSymbolKind &&
+                   lengthIs params (length parameters) &&
+                   eqTypes (map typeKind params) (map (inst . varType) parameters) &&
+                   inst (tyConResKind field) `eqType` expected)
+            pure field
+
+-- | Keep ordinary staging if simplification can change the producer call.
+canObservePairSource :: Id -> TcM Bool
+canObservePairSource owner
+  | Core.hasCoreUnfolding (idUnfolding owner) = pure False
+  | otherwise = isNothing <$> changedSourceUse [(owner, Nothing)]
+
+-- | Find the exact hidden observer emitted by the final Core pass.
+lookupPairObserver :: LeftOrRight -> Id -> Int -> TcM (Maybe Id)
+lookupPairObserver side producer arity
+  | Just mod <- nameModule_maybe owner =
+      lookupObservationEntry (Just side) mod (nameOccName owner) arity
+  | otherwise = pure Nothing
+  where
+    owner = idName producer
+
+-- | Load an optional hidden recipe at its exact module, owner and arity.
+lookupPairRecipe :: Module -> OccName -> Int -> TcM (Maybe Id)
+lookupPairRecipe = lookupObservationEntry Nothing
+
+-- | Load the entry for the selected projection or a scalar relay.
+lookupObservationEntry :: Maybe LeftOrRight -> Module -> OccName -> Int -> TcM (Maybe Id)
+lookupObservationEntry side mod owner arity = do
+    let occ = pairObservationOcc side arity owner
+    name <- lookupOrig mod occ
+    iface <- loadInterfaceForName (text "staged pair recipe") name
+    case mi_hash_fn iface occ of
+      Nothing -> pure Nothing
+      Just _ -> do
+        thing <- tcLookupGlobal name
+        pure $ case thing of
+          AnId entry | idName entry == name, varType entry `eqType` stringTy -> Just entry
+          _ -> Nothing
 
 -- | Identify the copied field and its zero-based position among the value inputs.
 sourcePairBuilderField :: TyCon -> Maybe (LeftOrRight, Int)
@@ -1767,6 +1859,17 @@ The module and position are part of the field's Name. Nothing reduces
 P2:make and no equality about e follows from its creation. Checking the
 constructor spine needs no unfolding from e. The symmetric equation uses
 P1:make. A case or a cast outside the pair does not have this shape.
+
+A direct producer with the executable observer ABI exports a private
+Q2 family when it has no copied field. The observer fills the demanded
+field using actual executable code. The unread field uses the exact
+producer declaration and an observation key.
+The key records the full semantic unit and module and an ordinal from that
+module's successful observations. Allocate after readback succeeds.
+Unlike compiler Uniques or source locations, this numbering is independent
+of the Unique supply and distinguishes multiple checks of a single span. Do not add a T equation merely to expose these private fields.
+This preserves ordinary name resolution when neither field is copied.
+See Note [The types Any and UnusedType] in GHC.Builtin.WiredIn.Types.
 
 The renamer keeps the ordinary producer in scope. A direct nominal
 projection can store both checked applications in an interface when

@@ -142,6 +142,9 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
          conf = IServConfig
            { iservConfProgram  = prog
            , iservConfOpts     = interpOpts opts
+           , iservConfHasSymbol = case interpCreateProcess opts of
+               Nothing -> null (interpProg opts)
+               Just _  -> False
            , iservConfProfiled = profiled
            , iservConfDynamic  = dynamic
            , iservConfHook     = interpCreateProcess opts

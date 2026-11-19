@@ -38,6 +38,7 @@ module GHC.Runtime.Interpreter
   , lookupSymbol
   , lookupSymbolInDLL
   , lookupClosure
+  , interpHasSymbol
   , loadDLLs
   , loadArchive
   , loadObj
@@ -531,6 +532,19 @@ interpSymbolToCLabel s = eliminateInterpSymbol s interpretedInterpSymbol $ \is -
 lookupClosure :: Interp -> InterpSymbol s -> IO (Maybe HValueRef)
 lookupClosure interp str =
   interpCmd interp (LookupClosure (fastStringToShortByteString (interpSymbolToCLabel str)))
+
+-- | Look up an optional native symbol. Use the normal readback path when
+-- a custom server can use a different message protocol.
+interpHasSymbol :: Interp -> InterpSymbol s -> IO Bool
+interpHasSymbol interp sym = case interpInstance interp of
+#if defined(HAVE_INTERNAL_INTERPRETER)
+  InternalInterp -> query
+#endif
+  ExternalInterp (ExtIServ iserv)
+    | iservConfHasSymbol (interpConfig iserv) -> query
+  _ -> pure False
+  where
+    query = interpCmd interp (HasSymbol (fastStringToShortByteString (interpSymbolToCLabel sym)))
 
 -- | 'withSymbolCache' tries to find a symbol in the 'interpLookupSymbolCache'
 -- which maps symbols to the address where they are loaded.

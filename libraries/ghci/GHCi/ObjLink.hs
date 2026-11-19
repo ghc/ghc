@@ -18,6 +18,7 @@ module GHCi.ObjLink
   , unloadObj
   , purgeObj
   , lookupSymbol
+  , hasSymbol
   , lookupSymbolInDLL
   , lookupClosure
   , resolveObjs
@@ -117,6 +118,9 @@ foreign import javascript unsafe "__ghc_wasm_jsffi_dyld.lookupSymbolPtr($1,$2)"
 lookupSymbolInDLL :: Ptr LoadedDLL -> BS.ShortByteString -> IO (Maybe (Ptr a))
 lookupSymbolInDLL _ _ = pure Nothing
 
+hasSymbol :: BS.ShortByteString -> IO Bool
+hasSymbol _ = pure False
+
 resolveObjs :: IO Bool
 resolveObjs = pure True
 
@@ -168,6 +172,15 @@ lookupSymbolInDLL dll str_in = do
      if addr == nullPtr
        then return Nothing
        else return (Just addr)
+
+-- | Check an optional native symbol without constructing a closure reference.
+hasSymbol :: BS.ShortByteString -> IO Bool
+#if !defined(BOOTSTRAP_GHCI)
+hasSymbol str = (/= 0) <$> BS.useAsCString (prefixUnderscore str) c_hasSymbol
+#else
+-- The bootstrap compiler links against its installed RTS.
+hasSymbol _ = pure False
+#endif
 
 prefixUnderscore :: BS.ShortByteString -> BS.ShortByteString
 prefixUnderscore
@@ -269,6 +282,9 @@ loadDLLs = foldrM load_one $ Right []
 foreign import ccall unsafe "loadNativeObj"           c_loadNativeObj           :: CFilePath -> Ptr CString -> IO (Ptr LoadedDLL)
 foreign import ccall unsafe "lookupSymbolInNativeObj" c_lookupSymbolInNativeObj :: Ptr LoadedDLL -> CString -> IO (Ptr a)
 foreign import ccall unsafe "initLinker_"             c_initLinker_             :: CInt -> IO ()
+#if !defined(BOOTSTRAP_GHCI)
+foreign import ccall unsafe "hasSymbol" c_hasSymbol :: CString -> IO CBool
+#endif
 foreign import ccall unsafe "lookupSymbol"            c_lookupSymbol            :: CString -> IO (Ptr a)
 foreign import ccall unsafe "loadArchive"             c_loadArchive             :: CFilePath -> IO Int
 foreign import ccall unsafe "loadObj"                 c_loadObj                 :: CFilePath -> IO Int

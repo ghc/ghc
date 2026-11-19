@@ -19,6 +19,7 @@ module GHC.Linker.Loader
    , getLoaderState
    -- * Load & Unload
    , loadDecls
+   , loadDeclsWithOptionalName
    , loadPackages
    , loadModule
    , loadCmdLineLibs
@@ -43,6 +44,7 @@ module GHC.Linker.Loader
 where
 
 import GHC.Prelude
+import Data.Maybe (isJust)
 
 import GHC.Settings
 import GHC.Utils.Misc
@@ -769,20 +771,30 @@ get_reachable_nodes hsc_env mods
 -- | Load the dependencies of a linkable, and then load the linkable itself.
 loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([LinkableUsage], PkgsLoaded)
 loadDecls interp hsc_env span linkable = do
-    -- Initialise the linker (if it's not been done already)
-    initLoaderState interp hsc_env
+    (_, links, packages) <- loadDeclsWithOptionalName interp hsc_env span Nothing linkable
+    pure (links, packages)
 
-    -- Take lock for the actual work.
+-- | Load the dependencies first. If an optional closure is absent, retain
+-- those dependencies and leave the bytecode unlinked.
+loadDeclsWithOptionalName :: Interp -> HscEnv -> SrcSpan -> Maybe Name -> Linkable
+                          -> IO (Bool, [LinkableUsage], PkgsLoaded)
+loadDeclsWithOptionalName interp hsc_env span optional linkable = do
+    initLoaderState interp hsc_env
     modifyLoaderState interp $ \pls0 -> do
-      -- Link the packages and modules required
-      (pls, ok, links_needed, units_needed) <- loadDependencies interp hsc_env pls0 span needed_mods
-      if failed ok
-        then throwGhcExceptionIO (ProgramError "could not load dependencies for decls")
-        else do
-          (pls2, ok2) <- loadInternalModuleLinkables interp hsc_env pls [linkable]
-          when (failed ok2) $
-            throwGhcExceptionIO (ProgramError "could not load linkable for decls")
-          return (pls2, (links_needed, units_needed))
+      (pls, ok, links, packages) <- loadDependencies interp hsc_env pls0 span needed_mods
+      when (failed ok) $
+        throwGhcExceptionIO (ProgramError "could not load dependencies for decls")
+      available <- case optional of
+        Nothing -> pure True
+        Just name | Just _ <- lookupNameBytecodeState (bco_loader_state pls) name ->
+          pure True
+        Just name -> interpHasSymbol interp (IClosureSymbol name)
+      if available then do
+        (pls2, ok2) <- loadInternalModuleLinkables interp hsc_env pls [linkable]
+        when (failed ok2) $
+          throwGhcExceptionIO (ProgramError "could not load linkable for decls")
+        pure (pls2, (True, links, packages))
+      else pure (pls, (False, links, packages))
   where
     cbcs = linkableBCOs linkable
 

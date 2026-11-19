@@ -28,7 +28,8 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult
+     finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedApplication, tcPrepareClosedFunctionValue,
+     tcPrepareClosedResult, tcPrepareClosedObservation
      , tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable
       ) where
 
@@ -38,6 +39,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Plugins
 import GHC.Driver.Session (safeInferOn, safeLanguageOn)
 import GHC.Driver.Main
+import GHC.Driver.Main.Passes (hscCompileCoreExprWithOptionalName)
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.Driver.Ppr (showPpr, showSDocForUser)
@@ -149,7 +151,7 @@ import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
 import GHC.Data.Bag (Bag)
 import GHC.Data.FastString
-import GHC.Data.Maybe( MaybeErr(..) )
+import GHC.Data.Maybe( MaybeErr(..), expectJust )
 import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
@@ -1909,6 +1911,17 @@ tcPrepareClosedFunctionValue fun expected = do
 -- | Render and interpret a complete runtime expression at a type boundary.
 tcPrepareClosedResult :: Name -> Kind -> TcM (Core.CoreExpr -> TcM Type)
 tcPrepareClosedResult name result_kind = do
+  reify <- tcPrepareClosedResultWithOptionalName name result_kind Nothing
+  pure (fmap expectJust . reify)
+
+-- | Observe an executable entry when the interpreter can load its symbol.
+tcPrepareClosedObservation :: Name -> Kind -> Name -> TcM (Core.CoreExpr -> TcM (Maybe Type))
+tcPrepareClosedObservation name result_kind entry =
+  tcPrepareClosedResultWithOptionalName name result_kind (Just entry)
+
+tcPrepareClosedResultWithOptionalName
+  :: Name -> Kind -> Maybe Name -> TcM (Core.CoreExpr -> TcM (Maybe Type))
+tcPrepareClosedResultWithOptionalName name result_kind optional = do
   hsc_env <- getTopEnv
   checked_shape <- tcClosedCallValueShape name result_kind
   shape <- case checked_shape of
@@ -1933,18 +1946,23 @@ tcPrepareClosedResult name result_kind = do
     let response = render call
     unless (exprType response `tcEqType` stringTy) $
       bad "Unexpected type for the interpreter response."
-    compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc (mkCoreApp ret response)
+    compiled <- tryMostM $ liftIO $ case optional of
+      Nothing -> do
+        (value, links, packages) <- hscCompileCoreExpr hsc_env loc (mkCoreApp ret response)
+        pure (Just value, links, packages)
+      Just entry -> hscCompileCoreExprWithOptionalName hsc_env loc entry (mkCoreApp ret response)
     (value, links, packages) <- either (bad . displayException) pure compiled
     recordThNeededRuntimeDeps links packages
-    outcome <- tryAllM $ liftIO $ evalString interp value
-    rendered <- case outcome of
-      Left exn | Just async <- (fromException exn :: Maybe SomeAsyncException) ->
-        liftIO $ throwIO async
-      Left exn -> bad (displayException exn)
-      Right rendered -> pure rendered
-    case decodeClosedCallResult shape rendered of
-      Just ty | typeKind ty `tcEqType` result_kind -> return ty
-      _ -> bad "The value returned by the interpreter does not match the checked result type."
+    forM value $ \value -> do
+      outcome <- tryAllM $ liftIO $ evalString interp value
+      rendered <- case outcome of
+        Left exn | Just async <- (fromException exn :: Maybe SomeAsyncException) ->
+          liftIO $ throwIO async
+        Left exn -> bad (displayException exn)
+        Right rendered -> pure rendered
+      case decodeClosedCallResult shape rendered of
+        Just ty | typeKind ty `tcEqType` result_kind -> return ty
+        _ -> bad "The value returned by the interpreter does not match the checked result type."
   where
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name

@@ -71,6 +71,7 @@ run m = case m of
   FindSystemLibrary {}        -> notSupportedJS m
   CreateBCOs {}               -> notSupportedJS m
   LookupClosure str           -> lookupJSClosure str
+  HasSymbol {}                -> pure False
 #else
   InitLinker -> initObjLinker RetainCAFs
   LoadDLLs strs -> fmap (map toRemotePtr) <$> loadDLLs strs
@@ -85,6 +86,7 @@ run m = case m of
   FindSystemLibrary str -> findSystemLibrary str
   CreateBCOs bcos -> createBCOs bcos
   LookupClosure str -> lookupClosure str
+  HasSymbol str -> hasSymbol str
 #endif
   RtsRevertCAFs -> rts_revertCAFs
   LookupSymbol str -> fmap toRemotePtr <$> lookupSymbol str

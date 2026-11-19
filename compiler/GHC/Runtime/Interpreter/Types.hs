@@ -127,6 +127,7 @@ data IServConfig = IServConfig
   , iservConfDynamic  :: !Bool     -- ^ Use Dynamic way
   , iservConfHook     :: !(Maybe (CreateProcess -> IO ProcessHandle)) -- ^ Hook
   , iservConfTrace    :: IO ()     -- ^ Trace action executed after spawn
+  , iservConfHasSymbol :: !Bool    -- ^ On-demand server with the same protocol
   }
 
 -- | Common field between native external interpreter and the JS one

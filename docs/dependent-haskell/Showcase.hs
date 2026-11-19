@@ -36,6 +36,7 @@ import qualified BetaCallClient as Beta
 import qualified CharacterExport
 import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
+import qualified ComputedPair as Computed
 import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
@@ -89,6 +90,7 @@ import qualified OpenSource
 import qualified Signal
 import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
+import qualified PairProjection as ComputedProjection
 import qualified OrdinaryVecClient as Ordinary
 import qualified ParameterizedIndexLibrary as Parameterized
 import PackedVecLibrary
@@ -962,6 +964,9 @@ main = do
     -- NativeClosedPartialPair checks the same proof with only the two interfaces.
     observe "prove a direct projection of a pair with an exceptional field"
         (Refl :: Prelude.fst (Build.partialPair 7) :~: 7)
+    observe "prove each computed field without evaluating its exceptional sibling"
+        ( Refl :: ComputedProjection.pick (Computed.bump 7) :~: 8
+        , Refl :: ComputedProjection.pickRight (Computed.bumpRight 7) :~: 8 )
     observe "build a public constructor through three private helpers"
         (Refl :: MarkedHead ('Spine.More 'x' 'Spine.Empty) :~: 'Just ('Spine.Marked 'x'))
     observe "infer a local function used in an imported family equation"

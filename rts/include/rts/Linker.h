@@ -47,6 +47,9 @@ HsInt insertSymbol(pathchar* obj_name, char* key, void* data);
 /* lookup a symbol in the hash table */
 void *lookupSymbol( char *lbl );
 
+/* Check for an optional symbol. Report a miss even in optimistic mode. */
+bool hasSymbol(char *lbl);
+
 /* See Linker.c Note [runtime-linker-phases] */
 typedef enum {
     OBJECT_LOADED,

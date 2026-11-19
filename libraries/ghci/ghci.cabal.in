@@ -98,6 +98,7 @@ library
         transformers     >= 0.5 && < 0.7
 
     if flag(bootstrap)
+      cpp-options: -DBOOTSTRAP_GHCI
       build-depends:
             ghc-boot-th-next  == @ProjectVersionMunged@
     else
