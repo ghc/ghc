@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
 Read on 2026-11-14 through 2026-11-19. The [manifest](manifest.json) records
-twenty-seven works and thirty-three downloaded PDF versions. It contains source URLs,
+twenty-eight works and thirty-four downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -15,8 +15,7 @@ The JFP 2022 ANF paper and selected-page records are in
 The OutsideIn(X) author draft and selected-page records are in
 `native-let-conversion/`. The POPL 2004 `seq` paper and selected-page
 records are in `serokell-evaluators/`. This directory also holds the
-QuickSpec paper and its verification record, and the LMCS 2015 call-by-need
-paper and its selected-page extraction.
+QuickSpec, call-by-need, and HERMIT papers with their reading records.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -56,6 +55,7 @@ versions and several selective readings.
 | [Free Theorems in the Presence of seq](https://janis-voigtlaender.eu/JV04.html) | Johann and Voigtländer, POPL 2004 | R16 | A polymorphic type does not determine whether a function demands an argument. |
 | [QuickSpec: Guessing Formal Specifications using Testing](https://smallbone.se/papers/quickspec.pdf) | Claessen, Smallbone and Hughes, TAP 2010 | R15, R16 | Candidate equations for an optional boundary checker. |
 | [Simulation in the Call-by-Need Lambda-Calculus with Letrec, Case, Constructors, and Seq](https://lmcs.episciences.org/930) | Schmidt-Schauß, Sabel and Machkasova, LMCS 2015 | R05, R16 | Contextual equivalence, convergence and the observations available through `seq`. |
+| [Reasoning with the HERMIT](https://ku-fpg.github.io/software/hermit/) | Farmer, Sculthorpe and Gill, Haskell 2015 | R16 | Checking a scripted proof of a GHC rewrite equation against the Core being compiled. |
 
 ## Singletons, Haskell 2012
 
@@ -756,3 +756,20 @@ The reading covers the abstract, selected introduction passages,
 Definition 2.2 and the theorem statements on pages 45–46.
 [Theorem 7.6, page 46](https://lmcs.episciences.org/930/pdf#page=46)
 and [journal record](https://lmcs.episciences.org/930).
+
+## Checking GHC rewrite equations with HERMIT, Haskell 2015
+
+HERMIT converts a typechecked but inactive `RULES` pragma into a lemma.
+The plugin runs user-directed proof steps on the Core being compiled.
+Scripts can replay the steps during compilation. The worked `map-fusion`
+example uses a local definition of `map` and proves composition of two maps.
+It splits the list input into undefined, empty, and constructor cases.
+[Author PDF, sections 2.2–2.5 and 3](https://ku-fpg.github.io/files/Farmer-15-HERMIT-reasoning.pdf#page=2).
+
+Some HERMIT transformations can change definedness when their preconditions
+are unchecked. The replay example informs R16 proof checking against current
+Core. Certifying the installed Prelude `map` rule and its interaction with
+other active rules requires separate evidence. The
+[call-by-need entry above](#contextual-equivalence-in-a-call-by-need-calculus-lmcs-2015)
+provides semantic prior art for the definedness requirement.
+[Author PDF, sections 2.5 and 5.3](https://ku-fpg.github.io/files/Farmer-15-HERMIT-reasoning.pdf#page=4).

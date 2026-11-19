@@ -208,6 +208,18 @@ Agreement on a parser’s result tag can justify substitution in a type
 indexed by that tag. Other callers can also inspect the payload or force
 the input.
 
+The compiler environment can change a proposed equation too. With the
+usual list fusion rules, the first element of `map not (True : xs)`
+is `False`. In the tested optimized client an additional rule on
+`build` changes that element to `True`. The rule fires after `map`
+has rewritten to its list producer. An exported proof about the head
+must therefore account for the rules visible to the client that uses
+the equation. HERMIT provides an example of replaying a proof against
+the Core in the current compilation. A boundary plugin could supply
+such a proof for a particular rewrite.
+[Source and rule firings](examples/open-evaluation/check-map-fusion.sh)
+and [HERMIT reading notes](papers/README.md#checking-ghc-rewrite-equations-with-hermit-haskell-2015).
+
 | Check | What the client can use |
 | --- | --- |
 | Run an ordinary producer at a closed input and reconstruct a witness. | The proposition in the type of that witness, at that input. |
