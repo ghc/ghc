@@ -20,6 +20,13 @@ compiler. [Map source](../examples/open-evaluation/TypeLambda.hs) and
 
 ## Compatibility with existing Haskell
 
+If a provider gains an inferred matchability parameter, an older client
+can still refer to the same family by name. For a bare alias such as
+`type Saved = K`, the interface records the kind at which the alias
+was checked. The reader uses that kind to distinguish a valid
+polymorphic alias from one that needs rebuilding. The diagnostic names
+the referring module. [Compiler-upgrade test](../examples/closed-evaluation/check-readback-upgrade.sh).
+
 The normal-way run of `testsuite/tests/dependent` after M112 found 36
 unexpected results. Of 213 cases run, 177 passed. The compiler and
 `base` rebuilt from the previous fork tip, `496701ecc8`, reproduced all

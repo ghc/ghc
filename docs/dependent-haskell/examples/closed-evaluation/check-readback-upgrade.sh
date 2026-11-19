@@ -19,7 +19,7 @@ boot_dir=
 if (( $# == 5 )); then boot_dir=$(realpath "$5"); fi
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
-mkdir "$work"/{home,binary,err}
+mkdir "$work"/{home,binary,err,bare}
 lib="$new_lib"
 if [[ -n $boot_dir ]]; then
     cp -al "$new_lib" "$work/lib"
@@ -68,6 +68,14 @@ if [[ -n $boot_dir ]]; then
         sha256sum -c warm.sha --quiet
     )
 fi
+
+# Exercise the SOURCE cycle in Note [Synonym kind loop] on the new reader.
+(
+    mkdir "$work/synonym-loop"
+    cd "$work/synonym-loop"
+    cp "$repo"/testsuite/tests/typecheck/should_compile/T2412{.hs,.hs-boot,A.hs} .
+    "${new[@]}" "${sanity[@]}" -c T2412.hs-boot T2412A.hs T2412.hs
+)
 
 cd "$work/home"
 cp "$src/PairProjection.hs" .
@@ -159,6 +167,28 @@ cp ./*.hi ./*.o Proof.hs "$work/binary/"
         exit 1
     fi
 )
+# Keep an old interface whose synonym RHS is just the family head.
+(
+    cd "$work/bare"
+    cp ../home/ClosedProvider.hi .
+    cat >Saved.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}
+module Saved (Saved) where
+import ClosedProvider (K)
+type Saved = K
+HS
+    cat >UseSaved.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module UseSaved where
+import Saved (Saved)
+identity :: Saved 'True
+identity x = x
+HS
+    "${old[@]}" "${opts[@]}" -c Saved.hs UseSaved.hs
+    rm Saved.hs
+    "${new[@]}" "${opts[@]}" -fforce-recomp -c UseSaved.hs
+)
+
 if [[ -n $boot_dir ]]; then
     replace "$work/err/GHC/Internal/Err.hi" "$new_internal/GHC/Internal/Err.hi"
     cp "$archive" "$archive.new"
@@ -179,6 +209,16 @@ for provider in ClosedProvider OpenProvider Both; do
     "${new[@]}" --show-iface "$provider.hi" >"$provider.new"
     grep -F 'matchability-schemes-v' "$provider.new"
 done
+(
+    cd "$work/bare"
+    cp ../home/ClosedProvider.hi .
+    if "${new[@]}" "${opts[@]}" -fforce-recomp -c UseSaved.hs >bare.log 2>&1 ||
+       ! grep -Fq 'Incompatible interface dependency:' bare.log ||
+       ! grep -Fq 'Rebuild the module that refers to it: Saved' bare.log; then
+        cat bare.log >&2
+        exit 1
+    fi
+)
 nm -g --defined-only Scalar.o Worker.o Certified.o | grep -E "$new_companions"
 grep -E "type K :: forall.*Matchability" Both.new
 grep -E "type Associated :: forall.*Matchability" Both.new

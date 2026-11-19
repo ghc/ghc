@@ -784,8 +784,15 @@ tc_iface_decl _ _
    = do { kind' <- tcIfaceType kind
         ; bindIfaceTyConBinders_AT binders $ \ binders' ->
      do { res_kind' <- tcIfaceType res_kind     -- Note [Synonym kind loop]
-        ; rhs      <- forkM (mk_doc tc_name) $
-                      tcIfaceType rhs_ty
+        ; rhs      <- forkM (mk_doc tc_name) $ do
+            { rhs <- tcIfaceType rhs_ty
+            ; case rhs of
+                TyConApp target [] ->
+                  -- See Note [Imported matchability prefixes].
+                  checkImportedMatchabilityPrefix target
+                    (tyConKind target `eqType` res_kind')
+                _ -> return ()
+            ; return rhs }
         ; shape <- if null binders
                    then NativeSynonymDomain <$> tcIfaceDomainShape rhs_ty
                    else return NativeUnknownDomain
@@ -2059,8 +2066,22 @@ Note [Native Boolean evidence in interfaces]. Module unfolding generation
 remains separately gated.
 -}
 
--- | A stale caller can refer to the same family Name with the old visible
--- first argument. Preserve valid partial applications, which omit a suffix.
+{- Note [Imported matchability prefixes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An upgraded provider can add a leading inferred Matchability parameter
+to a type family. An old client still refers to the same family Name.
+For an applied family, check the first recorded argument. A partial
+application can omit trailing arguments.
+
+A bare alias such as @type Saved = K@ has no argument to inspect.
+Its interface records the result kind at the time Saved was compiled.
+Compare that kind with the current kind of K. A polymorphic bare alias
+already has the new telescope. An old monomorphic alias needs a rebuild.
+Keep this comparison in the deferred RHS action. Loading the kind of
+Saved can participate in the import cycle in Note [Synonym kind loop].
+-}
+
+-- | Check a client's view of an imported type constructor's prefix.
 checkImportedMatchabilityPrefix :: TyCon -> Bool -> IfL ()
 checkImportedMatchabilityPrefix tc valid_prefix
   | not (isWiredInName name) = do
