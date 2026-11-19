@@ -51,13 +51,13 @@ import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.WiredIn.Types (matchableDataConTy, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (matchabilityTy, matchableDataConTy, unmatchableDataConTy)
 import GHC.Core.Predicate
 import GHC.Core.Reduction ( Reduction )
 import GHC.Core.Type
 import GHC.Core.Ppr
 import GHC.Driver.Ppr (showPpr)
-import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon, tyConArity )
+import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon, isInferredTyConBinder, tyConArity, tyConBinders )
 
 import GHC.Types.Name
 import GHC.Types.Id
@@ -252,14 +252,18 @@ solveEqualitiesSelectingMetadata infer_arrows default_unresolved callsite thing_
        ; (tclvl, (wanted, res))
             <- pushTcLevelM $
                do { owner <- TcM.getTcLevel
-                  ; defaults <- if infer_arrows then Just <$> TcM.newTcRef [] else pure Nothing
+                  ; defaults <- if infer_arrows
+                                then Just <$> ((,) <$> TcM.newTcRef [] <*> TcM.newTcRef [])
+                                else pure Nothing
                   ; (res, wanted) <- captureConstraints $
                       TcM.updLclEnv (setDefaults defaults) thing_inside
                   ; wanted <- runTcSEqualities (simplifyTopWanteds wanted)
                   ; wanted <- case defaults of
                       Nothing -> return wanted
-                      Just ref -> do { arrows <- TcM.readTcRef ref
-                                     ; settleArrows owner arrows wanted }
+                      Just (ref, indices_ref) -> do
+                        arrows <- TcM.readTcRef ref
+                        indices <- TcM.readTcRef indices_ref
+                        settleArrows owner arrows indices wanted
                   ; return (wanted,res) }
        ; traceTc "pushLevelAndSolveEqualities }" (vcat [ text "Residual:" <+> ppr wanted
                                                        , text "Level:" <+> ppr tclvl ])
@@ -269,12 +273,14 @@ solveEqualitiesSelectingMetadata infer_arrows default_unresolved callsite thing_
     setDefaults Nothing env | Nothing <- tcl_kind_arrow_defaults env = env
     setDefaults defaults env = env { tcl_kind_arrow_defaults = defaults }
 
-    settleArrows _ [] wanted = return wanted
-    settleArrows owner arrows wanted = do
+    settleArrows _ [] [] wanted = return wanted
+    settleArrows owner arrows indices wanted = do
       residual <- TcM.liftZonkM $ mapM TcM.zonkTcType (residualPredicates wanted)
-      chosen <- or <$> mapM (chooseArrow False owner residual) arrows
-      if chosen
-        then solveAgain wanted >>= settleArrows owner arrows
+      owned <- familyIndexRoots owner indices
+      chosen <- or <$> mapM (chooseArrow False owner residual) (arrows ++ owned)
+      linked <- if chosen then pure False else linkFamilyIndices (mkVarSet owned) residual
+      if chosen || linked
+        then solveAgain wanted >>= settleArrows owner arrows indices
         else if default_unresolved
           then do
             defaulted <- or <$> mapM (chooseArrow True owner []) arrows
@@ -309,20 +315,51 @@ residualPredicates wanted =
   map ctPred (bagToList (wc_simple wanted)) ++
   concatMap (residualPredicates . ic_wanted) (bagToList (wc_impl wanted))
 
+-- | Keep only representatives allocated by this declaration.
+familyIndexRoots :: TcLevel -> [TcTyVar] -> TcM [TcTyVar]
+familyIndexRoots owner indices = do
+  roots <- TcM.liftZonkM $ mapM (TcM.zonkTcType . mkTyVarTy) indices
+  let registered = mkVarSet indices
+  pure [tv | Just tv <- map getTyVar_maybe roots
+           , tv `elemVarSet` registered
+           , isPromotableMetaTyVar tv, not (isTyVarTyVar tv)
+           , tcTyVarLevel tv `sameDepthAs` owner]
+
+-- | Share a choice only when both fresh indices belong to this declaration.
+linkFamilyIndices :: TyVarSet -> [PredType] -> TcM Bool
+linkFamilyIndices owned residual =
+  case [(a, b) | pred_ty <- residual
+               , Just (lhs, rhs) <- [familyArrowPair pred_ty]
+               , Just a <- [getTyVar_maybe lhs]
+               , Just b <- [getTyVar_maybe rhs]
+               , a `elemVarSet` owned, b `elemVarSet` owned] of
+    (a, b) : _ -> TcM.liftZonkM (TcM.writeMetaTyVar a (mkTyVarTy b)) >> pure True
+    [] -> pure False
+
 -- | Find a default that makes a residual nominal family equality reflexive.
--- Every other argument already agrees. The ordinary solver must still check
--- the whole wanted after defaulting.
+-- The ordinary solver must still check the whole wanted after defaulting.
 familyArrowChoices :: TcTyVar -> PredType -> [Type]
 familyArrowChoices tv pred_ty
-  | Just (Nominal, lhs, rhs) <- getEqPredTys_maybe pred_ty
-  , Just (f, a : as) <- tcSplitTyConApp_maybe lhs
-  , Just (g, b : bs) <- tcSplitTyConApp_maybe rhs
-  , f == g, isTypeFamilyTyCon f, length as + 1 == tyConArity f
-  , length as == length bs, and (zipWith tcEqType as bs)
+  | Just (a, b) <- familyArrowPair pred_ty
   = [concrete | (var, concrete) <- [(a,b), (b,a)]
               , getTyVar_maybe var == Just tv
               , tcEqType concrete matchableDataConTy || tcEqType concrete unmatchableDataConTy]
   | otherwise = []
+
+-- | Compare saturated applications with exactly one differing inferred index.
+familyArrowPair :: PredType -> Maybe (Type, Type)
+familyArrowPair pred_ty
+  | Just (Nominal, lhs, rhs) <- getEqPredTys_maybe pred_ty
+  , Just (f, as) <- tcSplitTyConApp_maybe lhs
+  , Just (g, bs) <- tcSplitTyConApp_maybe rhs
+  , f == g, isTypeFamilyTyCon f
+  , length as == tyConArity f, length as == length bs
+  , [(binder, a, b)] <- filter (\(_, a, b) -> not (tcEqType a b))
+                                (zip3 (tyConBinders f) as bs)
+  , isInferredTyConBinder binder
+  , varType (binderVar binder) `tcEqType` matchabilityTy
+  = Just (a, b)
+  | otherwise = Nothing
 
 {- Note [Owning omitted arrows in kind-valued arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -337,9 +374,19 @@ can float constraints to it. An application spine has neither the expected
 kind of its enclosing context nor the rest of the declaration's constraints.
 It must not default on its own.
 
-Repeat constrained choices before applying the fallback. One choice can
-make another residual comparison concrete. Each successful pass fills
-at least one metavariable owned by this check.
+Family telescope kinds record a separate set of choices. An occurrence
+of a dependent family may leave a wanted such as K ?m b ~ K ?n b.
+When the saturated heads and all other arguments already agree, and
+both representatives are still registered at this level, we can give
+the two fresh choices one representative. Recheck the entire wanted.
+Do not identify specified or rigid indices. In particular, zonking a
+registered metavariable to an unregistered one does not transfer
+ownership. Do not apply the U fallback to a telescope index. A remaining
+index may become an inferred binder.
+
+Repeat constrained choices and identifications before the fallback.
+Each successful pass either fills an owned metavariable with concrete
+metadata or reduces the number of distinct owned representatives.
 
 A stuck wanted can still select an owned default. For K ?m b ~ K M b,
 choosing M makes the application reflexive when its other arguments

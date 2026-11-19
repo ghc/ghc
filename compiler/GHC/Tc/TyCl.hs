@@ -2311,7 +2311,7 @@ kcLTyClDecl collect_metadata (L loc decl)
              let choose name n = do
                    indices <- replicateM n (newFlexiTyVar matchabilityTy)
                    owner <- tcl_kind_arrow_defaults <$> getLclEnv
-                   forM_ owner $ \defaults -> updTcRef defaults (indices ++)
+                   forM_ owner $ \(defaults, _) -> updTcRef defaults (indices ++)
                    let vars = mkTyVarTys indices
                    updTcRef ref ((name, vars) :)
                    pure vars
@@ -4071,7 +4071,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
        ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_ty)))
-               <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
+               <- pushLevelAndSolveKindArrowsX "tcTyFamInstEqnGuts" $
                   bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
                   do { (lhs_ty, rhs_kind, index) <- case tyConBinders fam_tc of
                            b : _ | inferredMatchabilityIndex b -> do

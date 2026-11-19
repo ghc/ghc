@@ -88,7 +88,8 @@ data TcLclEnv           -- Changes as we move inside an expression
 
         tcl_usage :: TcRef UsageEnv, -- Required multiplicity of bindings is accumulated here.
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_kind_arrow_defaults :: Maybe (TcRef [TcTyVar]),
+        -- Omitted arrows can default. Family kind indices can generalize.
+        tcl_kind_arrow_defaults :: Maybe (TcRef [TcTyVar], TcRef [TcTyVar]),
         tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 

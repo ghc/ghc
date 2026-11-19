@@ -4006,7 +4006,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
              , any (familyKindUsesMatchability tc) indices -> do
                  defaults <- tcl_kind_arrow_defaults <$> getLclEnv
                  case defaults of
-                   Just owner -> mkTyConApp tc <$>
+                   Just (owner, _) -> mkTyConApp tc <$>
                      traverse (\b -> if familyKindUsesMatchability tc b
                                       then fresh_kind_arrow owner
                                       else pure unmatchableDataConTy) indices
@@ -4195,7 +4195,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
       = do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
            ; case owner of
                Nothing -> tc_check_lhs_type mode arg expected
-               Just defaults -> check_arrows defaults arg expected }
+               Just (defaults, _) -> check_arrows defaults arg expected }
       | otherwise = tc_check_lhs_type mode arg expected
 
     is_par HsArgPar{} = True
@@ -7492,7 +7492,11 @@ tcLHsFamilyResultKindSig = tc_lhs_kind_sig
 
 -- | Give each checked kind application its own metadata variables.
 familyKindMetadata :: Maybe (Name -> Int -> TcM [Type])
-familyKindMetadata = Just (\_ n -> replicateM n (newFlexiTyVarTy matchabilityTy))
+familyKindMetadata = Just $ \_ n -> do
+  vars <- replicateM n (newFlexiTyVar matchabilityTy)
+  owner <- tcl_kind_arrow_defaults <$> getLclEnv
+  forM_ owner $ \(_, indices) -> updTcRef indices (vars ++)
+  pure (mkTyVarTys vars)
 
 tc_lhs_kind_sig :: TcTyMode -> UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
 tc_lhs_kind_sig mode ctxt hs_kind

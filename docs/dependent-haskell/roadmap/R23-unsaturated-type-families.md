@@ -39,6 +39,17 @@ with an explicit kind can have the same interface shape. Its ABI stays
 the same when the new compiler infers the same kind. A second build
 reuses the new interfaces.
 
+In `T14174a`, the kind of `p` and its use as an argument to `App`
+introduce two omitted indices of the same family application. All its
+other arguments agree. GHC can choose the same index for these two
+uses when it created both metavariables for this declaration. It then
+rechecks the original equality. No equality between arbitrary inputs of
+a noninjective family follows from equality of its results. Explicit
+distinct indices and two unrelated implicit parameters retain their
+separate meanings.
+[Original program](../../../testsuite/tests/polykinds/T14174a.hs)
+and [ordinary client and rigid-index controls](../../../testsuite/tests/dependent/should_run/NativeOpenMatchability.sh).
+
 If a provider gains an inferred matchability parameter, an older client
 can still refer to the same family by name. For a bare alias such as
 `type Saved = K`, the interface records the kind at which the alias
