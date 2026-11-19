@@ -2969,6 +2969,11 @@ The retained-witness discussion, elimination and Core passages were read.
 Its existential witness is erased. Retained dependent pairs are future work
 in that proposal. The current retained-field packages do not discharge the
 first-class `exists` or `some` roadmap tasks.
+The [R22 acceptance examples](roadmap/R22-existential-quantification.md)
+use the draft's explicit bar binder and its alternative lexical `Unpack`
+rule. The recursive filter tests demand when the package comes from an
+unknown computation. [Agda's erased vector argument](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html)
+provides the comparison for erasing the witness.
 
 The [additional paper reading record](papers/README.md#roadmap-review-2026-11-15)
 covers matchability, existential laziness, constrained families, and the
