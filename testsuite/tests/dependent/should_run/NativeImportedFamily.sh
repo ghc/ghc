@@ -11,8 +11,8 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 mkdir "$out"/{producer,client}
 cd "$out/producer"
-cp "$src"/{ImportedFamilyProvider,ImportedFamily,MixedFamily}.hs .
-"${ghc[@]}" -c ImportedFamilyProvider.hs ImportedFamily.hs MixedFamily.hs
+cp "$src"/{ImportedFamilyProvider,ImportedFamily,MixedFamily,FamilySignature}.hs .
+"${ghc[@]}" -c ImportedFamilyProvider.hs ImportedFamily.hs MixedFamily.hs FamilySignature.hs
 
 "${ghc[@]}" --show-iface MixedFamily.hi >mixed.iface
 grep -Fq 'type role Envelope nominal' mixed.iface
@@ -24,14 +24,16 @@ cat >Client.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
 import ImportedFamily (importedFamilyResults)
+import FamilySignature (observed)
 import MixedFamily (Stored(..), mixedResult)
 main :: IO ()
 main = case mixedResult of
-    Stored True -> print (importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
+    Stored True | observed -> print (importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
+    Stored True -> fail "expected a True payload from the signed producer"
     Stored False -> fail "expected a True payload"
 HS
 "${ghc[@]}" -c Client.hs
-"${ghc[@]}" Client.o ../producer/{ImportedFamily,ImportedFamilyProvider,MixedFamily}.o -o client
+"${ghc[@]}" Client.o ../producer/{ImportedFamily,ImportedFamilyProvider,MixedFamily,FamilySignature}.o -o client
 ./client
 
 expect_cycle() {
@@ -80,6 +82,12 @@ sed -e 's/MixedFamily/TransitiveFieldCycle/g' \
     -e 's/data Wrap a = Wrap a/data Wrap a = Wrap (Payload Double) a/' \
     ../producer/MixedFamily.hs >TransitiveFieldCycle.hs
 expect_cycle TransitiveFieldCycle
+
+# The only route to Wrap is through the helper signature's closed family.
+sed -e 's/FamilySignature/SignatureFieldCycle/g' \
+    -e 's/data Wrap a = Wrap a/data Wrap a = Wrap (Payload Float)/' \
+    ../producer/FamilySignature.hs >SignatureFieldCycle.hs
+expect_cycle SignatureFieldCycle
 
 cat >RecursiveProducer.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}

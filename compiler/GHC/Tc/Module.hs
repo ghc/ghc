@@ -130,13 +130,14 @@ import GHC.Core.OpenWhnf (openDataConFieldTypes)
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Core.Class
+import GHC.Core.Coercion (coercionLKind, coercionRKind)
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Core.TyCo.Tidy( tidyTopType )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons, orphNamesOfFamInst
-   , famInstEnvElts, extendFamInstEnvList, normaliseType )
+   , famInstEnvElts, extendFamInstEnvList, emptyFamInstEnvs, normaliseType )
 
 import GHC.Parser.Header       ( mkImplicitImports, mkUnresolvedImport )
 
@@ -1923,19 +1924,33 @@ tcIndependentFamilyProducers demands group@HsGroup
           [(con, tcdName (unLoc decl))
           | tg <- groups, decl@(L _ DataDecl{tcdDataDefn = defn}) <- group_tyclds tg
           , DataTypeCons False cons <- [dd_cons defn], con_decl <- cons, L _ con <- getConNames (unLoc con_decl)]
-        data_dependencies name
+        value_names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds group))
+        closed_family_uses decl@(L _ FamDecl{tcdFam = FamilyDecl
+          {fdLName = L _ family, fdInfo = ClosedTypeFamily _ (Just equations)}})
+          | null (localUses value_names decl)
+          , all (not . elemNameSet family . externalDeclUses . feqn_rhs . unLoc) equations =
+              Just (delFromNameSet (externalDeclUses decl) family)
+        closed_family_uses _ = Nothing
+        early_type_dependencies name
           | not (nameIsLocalOrFrom this_mod name) = Right emptyNameSet
           | otherwise = case lookupNameEnv data_groups name of
               Just tg
-                | Just fv_sets <- traverse independentDataDecl (group_tyclds tg)
+                | Just fv_sets <- traverse early_decl_uses (group_tyclds tg)
                 , null (group_kisigs tg), null (group_instds tg)
-                , not (hasSplice (group_tyclds tg)) ->
+                , let decls = group_tyclds tg
+                , isSingleton decls || all (not . isFamilyDecl . unLoc) decls
+                , not (hasSplice decls) ->
                     Right (unionNameSets (group_ext tg : fv_sets))
-              _ -> Left "a datatype dependency"
-        data_prerequisites constructors =
+              _ -> Left "a type declaration dependency"
+        early_decl_uses decl =
+          case closed_family_uses decl of
+            Just refs -> Just refs
+            Nothing -> independentDataDecl decl
+        type_prerequisites constructors signature_types =
           either (const Nothing) Just $
-            closeLocalNames data_dependencies emptyNameSet
-              (mapMaybe (lookupNameEnv constructor_owners) (nameSetElemsStable constructors))
+            closeLocalNames early_type_dependencies emptyNameSet
+              (nameSetElemsStable signature_types ++
+               mapMaybe (lookupNameEnv constructor_owners) (nameSetElemsStable constructors))
         check_data_import name
           | isTyConName name = do
               thing <- tcLookupGlobal name
@@ -1944,9 +1959,9 @@ tcIndependentFamilyProducers demands group@HsGroup
                 _ -> False
           | otherwise = pure False
     candidate <- case independentClosure this_mod constructor_owners binds sigs (map fst selected) of
-      Just (names, constructors, imported)
+      Just (names, constructors, imported, signature_types)
         | not (null selected), ordinary_solver
-        , Just prerequisites <- data_prerequisites constructors -> do
+        , Just prerequisites <- type_prerequisites constructors signature_types -> do
             let local_data = filterNameSet (nameIsLocalOrFrom this_mod) prerequisites
                 imported_data = prerequisites `minusNameSet` local_data
             checked_data <- and <$> traverse check_data_import (nameSetElemsStable imported_data)
@@ -1972,8 +1987,11 @@ tcIndependentFamilyProducers demands group@HsGroup
             (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
           workers <- traverse independentImport (nameSetElemsStable constructors)
           let allowed = unionNameSets [names, imported, mkNameSet (catMaybes workers)]
+              families = mkNameSet [tcdName decl | tg <- early_groups, L _ decl <- group_tyclds tg,
+                                                   isFamilyDecl decl]
           unless (all isJust workers && isEmptyBag evs &&
-                    all (independentCore allowed . snd) (nonDetNameEnvElts definitions)) $
+                    all (independentCore families allowed . snd)
+                        (nonDetNameEnvElts definitions)) $
             rejectLocalOpen selected "The checked producer requires evidence outside the independent fragment."
           addTopEvBinds evs $ withLocalOpenDefinitions checked $
             tcTopSrcDeclsThen (filter (not . (`elemNameSet` names) . fst) demands) rest finish
@@ -2000,13 +2018,14 @@ independentDataDecl _ = Nothing
 
 -- | Close a producer over independent signatures and lexical applications.
 independentClosure :: Module -> NameEnv Name -> [(RecFlag, [LHsBind GhcRn])] -> [LSig GhcRn]
-                   -> [Name] -> Maybe (NameSet, NameSet, NameSet)
+                   -> [Name] -> Maybe (NameSet, NameSet, NameSet, NameSet)
 independentClosure this_mod constructors binds sigs roots = do
     names <- foldM (visit emptyNameSet) emptyNameSet roots
     let local = filterNameSet (nameIsLocalOrFrom this_mod) names
     let local_cons = filterNameSet (`elemNameEnv` constructors) local
         local_binds = local `minusNameSet` local_cons
-    pure (local_binds, local_cons, names `minusNameSet` local)
+    signature_types <- traverse (fmap snd . signature) (nameSetElemsStable local_binds)
+    pure (local_binds, local_cons, names `minusNameSet` local, unionNameSets signature_types)
   where
     signatures = signaturesByOwner sigs
     functions = mkNameEnv
@@ -2026,11 +2045,14 @@ independentClosure this_mod constructors binds sigs roots = do
       | name `elemNameEnv` constructors = Just emptyNameSet
       | isExternalName name, not (nameIsLocalOrFrom this_mod name) = Just emptyNameSet
       | Just matches <- lookupNameEnv functions name
-      , let pragmas = fromMaybe [] (lookupNameEnv signatures name)
-      , all ordinary_pragma pragmas
-      , Just tyvars <- independent_signature (filter is_type_sig pragmas)
+      , Just (tyvars, _) <- signature name
       , Just refs <- match_refs tyvars emptyNameSet matches
       = Just refs
+      | otherwise = Nothing
+
+    signature name
+      | let pragmas = fromMaybe [] (lookupNameEnv signatures name)
+      , all ordinary_pragma pragmas = independent_signature (filter is_type_sig pragmas)
       | otherwise = Nothing
 
     is_type_sig TypeSig{} = True
@@ -2039,12 +2061,12 @@ independentClosure this_mod constructors binds sigs roots = do
     ordinary_pragma InlineSig{} = True
     ordinary_pragma _ = False
 
-    independent_signature [] = Just emptyNameSet
+    independent_signature [] = Just (emptyNameSet, emptyNameSet)
     independent_signature [TypeSig _ [] _ (HsWC _ (L _ HsSig
       { sig_bndrs = outer, sig_body = body }))]
-      | Just params <- signature_binders outer, not (null params)
+      | Just params <- signature_binders outer
       , let bound = mkNameSet params
-      , arrow_type bound body = Just bound
+      , Just refs <- signature_type bound body = Just (bound, refs)
     independent_signature _ = Nothing
     signature_binders HsOuterImplicit{hso_ximplicit = quantified} = Just quantified
     signature_binders HsOuterExplicit{hso_matchability = Nothing, hso_bndrs = quantified} =
@@ -2052,6 +2074,14 @@ independentClosure this_mod constructors binds sigs roots = do
     signature_binders _ = Nothing
     bare_binder (L _ b@HsTvb {tvb_kind = HsBndrNoKind _}) = hsTyVarName b
     bare_binder _ = Nothing
+    signature_type params ty = case unLoc (ignoreParens ty) of
+      HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) input result ->
+        unionNameSet <$> signature_type params input <*> signature_type params result
+      HsAppTy _ fun arg -> unionNameSet <$> signature_type params fun <*> signature_type params arg
+      HsTyVar _ NotPromoted (L _ (WithUserRdr _ n))
+        | n `elemNameSet` params -> Just emptyNameSet
+        | isTyConName n, isExternalName n -> Just (unitNameSet n)
+      _ -> Nothing
     arrow_type params ty = case unLoc (ignoreParens ty) of
       HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) input result ->
         arrow_type params input && arrow_type params result
@@ -2109,9 +2139,11 @@ independentDataFields con parameters
   | otherwise = Nothing
 
 -- | Recheck pre-optimisation Core emitted by the source fragment.
-independentCore :: NameSet -> CoreExpr -> Bool
-independentCore producers = go emptyNameSet emptyNameSet
+independentCore :: NameSet -> NameSet -> CoreExpr -> Bool
+independentCore families producers = go emptyNameSet emptyNameSet
   where
+    valid_type = independentTypeWith families
+
     go tyvars locals expression
       | (Core.Var worker, args) <- Core.collectArgs expression
       , Just con <- isDataConWorkId_maybe worker =
@@ -2122,14 +2154,14 @@ independentCore producers = go emptyNameSet emptyNameSet
               | Just field_types <- independentDataFields con parameters ->
                   equalLength fields field_types &&
                   and (zipWith (\expr kind -> exprType expr `eqType` kind) fields field_types) &&
-                  all (independentType tyvars) parameters &&
+                  all (valid_type tyvars) parameters &&
                   all (go tyvars locals) fields
             _ -> False
     go tyvars locals (Core.Var v)
       | getName v `elemNameSet` locals =
-          independentType tyvars (varType v)
+          valid_type tyvars (varType v)
       | getName v `elemNameSet` producers =
-          independentType emptyNameSet (varType v)
+          valid_type emptyNameSet (varType v)
       | otherwise = False
     go tyvars locals (Core.Lam v body)
       | isTyVar v, independentConstant liftedTypeKind (varType v) =
@@ -2143,7 +2175,17 @@ independentCore producers = go emptyNameSet emptyNameSet
     -- Check its RHS without the monomorphic binder in scope.
     go tyvars locals (Core.Let (Core.Rec [(v, rhs)]) body) =
       independent_let tyvars locals v rhs body
-    go tyvars _ (Core.Type ty) = independentType tyvars ty
+    go tyvars locals (Core.Cast body co)
+      | not (isEmptyNameSet families)
+      , let lhs = coercionLKind co
+            rhs = coercionRKind co
+            normalize = reductionReducedType . normaliseType
+                          emptyFamInstEnvs Nominal
+      , valid_type tyvars lhs
+      , valid_type tyvars rhs
+      , normalize lhs `eqType` normalize rhs =
+          go tyvars locals body
+    go tyvars _ (Core.Type ty) = valid_type tyvars ty
     go _ _ _ = False
 
     independent_let tyvars locals v rhs body =
@@ -2153,26 +2195,32 @@ independentCore producers = go emptyNameSet emptyNameSet
 
     term_binder tyvars v =
       isId v && not (isCoVar v) && independentConstant manyDataConTy (idMult v) &&
-      independentType tyvars (varType v)
+      valid_type tyvars (varType v)
 
     core_type (Core.Type ty) = Just ty
     core_type _ = Nothing
 
 -- | Check variables, ordinary arrows and generative boxed data types.
 independentType :: NameSet -> Type -> Bool
-independentType tyvars (TyVarTy var) = getName var `elemNameSet` tyvars
-independentType tyvars FunTy{ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult,
-                             ft_arg = input, ft_res = result} =
-  independentConstant unmatchableDataConTy ma && independentConstant manyDataConTy mult &&
-  independentType tyvars input && independentType tyvars result
-independentType tyvars (ForAllTy ma (Bndr var (Invisible _)) body) =
-  independentConstant unmatchableDataConTy ma && isTyVar var &&
-  independentConstant liftedTypeKind (varType var) &&
-  independentType (extendNameSet tyvars (getName var)) body
-independentType tyvars (TyConApp tc args)
-  | independentDataKind tc, lengthIs args (tyConArity tc) =
-      all (independentType tyvars) args
-independentType _ ty = independentConstant liftedTypeKind ty
+independentType = independentTypeWith emptyNameSet
+
+independentTypeWith :: NameSet -> NameSet -> Type -> Bool
+independentTypeWith families = check
+  where
+    check tyvars (TyVarTy var) = getName var `elemNameSet` tyvars
+    check tyvars FunTy{ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult,
+                                 ft_arg = input, ft_res = result} =
+      independentConstant unmatchableDataConTy ma && independentConstant manyDataConTy mult &&
+      check tyvars input && check tyvars result
+    check tyvars (ForAllTy ma (Bndr var (Invisible _)) body) =
+      independentConstant unmatchableDataConTy ma && isTyVar var &&
+      independentConstant liftedTypeKind (varType var) &&
+      check (extendNameSet tyvars (getName var)) body
+    check tyvars (TyConApp tc args)
+      | lengthIs args (tyConArity tc)
+      , independentDataKind tc || tyConName tc `elemNameSet` families =
+          all (check tyvars) args
+    check _ ty = independentConstant liftedTypeKind ty
 
 -- | Match a wired-in type constant without ignoring casts in its arguments.
 independentConstant :: Type -> Type -> Bool
@@ -2223,6 +2271,21 @@ group_ext. An imported family in a field can depend on the pending
 equation. Reject it before moving any group. The regular source checker
 then receives the remaining type groups and all instances, methods,
 defaults and deriving declarations.
+A signed producer can name a closed type family in an input or result.
+Use those resolved names as additional roots of the same type SCC
+closure. Check the family's declaration and its external references.
+A recursive family or a cycle through another family blocks the split.
+An imported open family in the transitive closure blocks the split,
+even when it occurs only in a field of an unused constructor.
+
+The checked Core may contain a cast from a planned closed family to
+its reduced type. Validate the endpoints by nominal normalization with
+empty open family instance environments. This check cannot use the
+postponed equation or an unrelated instance. Restrict the planned
+closed families to nonrecursive declarations before normalizing.
+The source annotation and imported Id checks still use the original
+family-free fragment.
+
 With a typechecker plugin, the early batch could have effects or solve
 constraints differently. Use the ordinary declaration order in that case.
 -}
@@ -2684,6 +2747,14 @@ withLocalOpenDefinitions (definitions, owners) check = do
            , tcg_local_open_owners = old_owners `plusNameEnv` owners }) check
     pure (checked_env { tcg_local_open_defs = old_defs
                       , tcg_local_open_owners = old_owners }, checked_lcl)
+
+-- | Retain resolved external references that the local SCC graph omits.
+externalDeclUses :: Data a => a -> NameSet
+externalDeclUses node
+  | Just name <- cast node =
+      if isExternalName name && (isTyConName name || isDataConName name || isVarName name)
+      then unitNameSet name else emptyNameSet
+  | otherwise = unionNameSets (gmapQ externalDeclUses node)
 
 -- | Find resolved local names in a renamed declaration or signature.
 localUses :: Data a => NameSet -> a -> [Name]

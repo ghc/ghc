@@ -24,7 +24,7 @@ test('NativeLocalOpen',
 test('NativeImportedFamily',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'ImportedFamilyProvider.hs', open_eval_dir + 'ImportedFamily.hs',
-                   open_eval_dir + 'MixedFamily.hs'])],
+                   open_eval_dir + 'MixedFamily.hs', open_eval_dir + 'FamilySignature.hs'])],
      run_command, ['bash NativeImportedFamily.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
 test('NativeOpenConstructor',
