@@ -257,6 +257,12 @@ test('NativeTypeCaseReify',
       extra_files([open_eval_dir + 'NativeCase.hs'])],
      multimod_compile, ['NativeTypeCaseReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
 
+test('NativeSimplifier',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeSimplifierProvider.hs', 'NativeSimplifierClient.hs',
+                   '../../../../docs/dependent-haskell/examples/qualified-pi/FunctionFieldLibrary.hs'])],
+     run_command, ['bash NativeSimplifier.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedPackage',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativePackageOperand.hs',

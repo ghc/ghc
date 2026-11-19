@@ -52,6 +52,7 @@ module GHC.Core.Opt.Simplify.Env (
         wrapJoinFloats, wrapJoinFloatsX, unitJoinFloat, addJoinFlts
     ) where
 
+import GHC.Core.Opt.OccurAnal (SimplCoreMode)
 import GHC.Prelude
 
 import GHC.Core.Coercion.Opt ( OptCoercionOpts )
@@ -272,7 +273,8 @@ seUnfoldingOpts env = sm_uf_opts (seMode env)
 
 -- See Note [The environments of the Simplify pass]
 data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
-  { sm_phase        :: !SimplPhase    -- ^ The phase of the simplifier
+  { sm_core_mode    :: !SimplCoreMode -- ^ Core forms the pass may encounter
+  , sm_phase        :: !SimplPhase    -- ^ The phase of the simplifier
   , sm_names        :: ![String]      -- ^ Name(s) of the phase
   , sm_rules        :: !Bool          -- ^ Whether RULES are enabled
   , sm_inline       :: !Bool          -- ^ Whether inlining is enabled

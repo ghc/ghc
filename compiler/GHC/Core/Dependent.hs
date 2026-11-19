@@ -1,6 +1,7 @@
 -- | Detect native dependent types in Core and its metadata.
 module GHC.Core.Dependent (
     hasNativeDependentProgram,
+    supportsNativeGentle,
     hasNativeDependentExpr,
     hasNativeDependentExprRhs,
     hasNativeDependentUnfolding,
@@ -11,6 +12,7 @@ module GHC.Core.Dependent (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Type (isNativeIndexType)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
@@ -33,7 +35,11 @@ data ScanState = ScanState
     , scannedKinds :: VarSet
     , scannedSynonyms :: TyConSet
     , scanMetadata :: MetadataScan
+    , scanPurpose :: !ScanPurpose
     }
+
+-- | Choose whether a scan detects native forms or checks the Gentle subset.
+data ScanPurpose = DetectNative | CheckGentle
 
 -- | Select which bound-Id metadata a boundary can demand.
 data MetadataScan = AllMetadata | StableMetadata | NoMetadata
@@ -56,6 +62,12 @@ Do not follow unfoldings attached to variable occurrences.
 hasNativeDependentProgram :: CoreProgram -> [CoreRule] -> Bool
 hasNativeDependentProgram binds rules =
     runScan AllMetadata (foldMap scanBind binds <> foldMap scanRule rules)
+
+-- | Admit algebraic retained binders and constructor proofs.
+-- Reject function-valued index binders, alias proofs and retained casts.
+supportsNativeGentle :: CoreProgram -> Bool
+supportsNativeGentle binds =
+    not (runScanFor CheckGentle AllMetadata (foldMap scanBind binds))
 
 -- | Inspect an expression and metadata on its bound identifiers.
 hasNativeDependentExpr :: CoreExpr -> Bool
@@ -86,7 +98,20 @@ rejectNativeDependentExpr context expr =
 
 -- | Run a scan with empty metadata, kind, and synonym caches.
 runScan :: MetadataScan -> NativeScan -> Bool
-runScan metadata scan = evalState (runNativeScan scan) (ScanState emptyVarSet emptyVarSet emptyTyConSet metadata)
+runScan = runScanFor DetectNative
+
+runScanFor :: ScanPurpose -> MetadataScan -> NativeScan -> Bool
+runScanFor purpose metadata scan =
+    evalState (runNativeScan scan)
+        (ScanState emptyVarSet emptyVarSet emptyTyConSet metadata purpose)
+
+-- | A native form qualifies for Gentle only if its children and type qualify.
+gentleForm :: NativeScan -> NativeScan
+gentleForm scan = NativeScan $ do
+    purpose <- gets scanPurpose
+    case purpose of
+        CheckGentle -> runNativeScan scan
+        DetectNative -> pure True
 
 -- | Report an unsupported compiler operation when a scan finds a native type.
 rejectNative :: String -> Bool -> IO ()
@@ -121,10 +146,12 @@ scanBind (Rec pairs) = foldMap (\(b, rhs) -> scanBinder b <> scanExpr rhs) pairs
 
 -- | Inspect a case alternative and its binders.
 scanAlt :: CoreAlt -> NativeScan
-scanAlt alt
-    | isNativeIndexAlt alt || isNativeIndexAliasAlt alt = NativeScan (pure True)
-scanAlt (Alt con bs rhs) =
-    scanAltCon con <> foldMap scanBinder bs <> scanExpr rhs
+scanAlt alt@(Alt con bs rhs)
+    | isNativeIndexAliasAlt alt = NativeScan (pure True)
+    | isNativeIndexAlt alt = gentleForm children
+    | otherwise = children
+  where
+    children = scanAltCon con <> foldMap scanBinder bs <> scanExpr rhs
 
 -- | Inspect the type of a case alternative constructor.
 scanAltCon :: AltCon -> NativeScan
@@ -153,7 +180,11 @@ scanBinder v =
                     then pure False
                     else do
                         modify' (\s -> s{scannedMetadata = extendVarSet seen v})
-                        runNativeScan (foldMap scanRule (idCoreRules v) <> scanUnfolding (realIdUnfolding v))
+                        purpose <- gets scanPurpose
+                        let rules = idCoreRules v
+                        case purpose of
+                            CheckGentle | not (null rules) -> pure True
+                            _ -> runNativeScan (foldMap scanRule rules <> scanUnfolding (realIdUnfolding v))
             )
 
 -- | Inspect the declarative part of a rule.
@@ -202,9 +233,10 @@ scanSynonym tc
 -- | Inspect syntax and synonym bodies, including unused synonym arguments.
 scanType :: Type -> NativeScan
 scanType (TyVarTy tv) = scanVarKind tv
-scanType (TermVarTy _) = NativeScan (pure True)
+scanType (TermVarTy v) = gentleForm (scanAlgebraicIndex v)
 scanType (TermAppTy _ _) = NativeScan (pure True)
-scanType DepFunTy{} = NativeScan (pure True)
+scanType (DepFunTy _ b body) =
+    gentleForm (scanAlgebraicIndex b <> scanType body)
 scanType (LitTy _) = mempty
 scanType (TyConApp tc args) = foldMap scanType args <> scanSynonym tc
 scanType (AppTy fun arg) = scanType fun <> scanType arg
@@ -214,6 +246,10 @@ scanType (ForAllTy ma (Bndr var _) body) =
   scanType ma <> scanType (varType var) <> scanType body
 scanType (CastTy ty co) = scanType ty <> scanCo co
 scanType (CoercionTy co) = scanCo co
+
+-- | Check the existing native algebraic index contract.
+scanAlgebraicIndex :: Var -> NativeScan
+scanAlgebraicIndex v = NativeScan (pure (not (isNativeIndexType (varType v))))
 
 -- | Inspect coercion annotations and dependencies.
 scanCo :: Coercion -> NativeScan

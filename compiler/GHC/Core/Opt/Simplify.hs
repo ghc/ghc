@@ -255,7 +255,8 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                      occurAnalysePgm
                        this_mod
                        OccurAnalOpts
-                         { oa_active_unf = active_unf
+                         { oa_core_mode = sm_core_mode mode
+                         , oa_active_unf = active_unf
                          , oa_active_rule = active_rule
                          , oa_can_drop = const True
                          }

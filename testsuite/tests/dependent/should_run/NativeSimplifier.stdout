@@ -1,0 +1,11 @@
+([7],[])
+[7]
+choose bottom: forced
+(19,19)
+([3,3],[5])
+[([],[]),([],[5,5]),([3,3],[]),([3,3],[5])]
+("unused lengths",True)
+("partial application",True)
+nested second length: forced
+37
+(20,20)

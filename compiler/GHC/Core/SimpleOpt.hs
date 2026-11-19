@@ -30,7 +30,7 @@ import GHC.Core.FVs
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Make
-import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalyseNativeExpr,
+import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), SimplCoreMode(..), occurAnalyseExpr, occurAnalyseNativeExpr,
                              canDropNativeLocalBinding,
                              occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
@@ -435,7 +435,8 @@ simpleOptPgm opts this_mod binds rules =
     occ_anald_binds  = occurAnalysePgm
                          this_mod
                          OccurAnalOpts
-                           { oa_active_unf = \_ -> True  {- All unfoldings active -}
+                           { oa_core_mode = OrdinaryCore
+                           , oa_active_unf = \_ -> True  {- All unfoldings active -}
                            , oa_active_rule = \_ -> False {- No rules active -}
                            , oa_can_drop = so_can_drop opts
                            }

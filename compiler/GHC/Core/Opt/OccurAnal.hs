@@ -26,7 +26,7 @@ core expression with (hopefully) improved usage information.
 -}
 
 module GHC.Core.Opt.OccurAnal (
-    OccurAnalOpts(..),
+    OccurAnalOpts(..), SimplCoreMode(..),
     occurAnalysePgm,
     occurAnalyseExpr, occurAnalyseBndrsAndExpr,
     occurAnalyseNativeExpr, canDropNativeLocalBinding,
@@ -70,7 +70,7 @@ import GHC.Utils.Misc
 import GHC.Builtin.KnownKeys( runRWKey )
 import GHC.Unit.Module( Module )
 
-import Data.List (mapAccumL)
+import Data.List (mapAccumL, mapAccumR)
 
 {-
 ************************************************************************
@@ -172,9 +172,15 @@ occurAnalyseExpr_Prep expr = expr'
   where
     WUD _ expr' = occAnal (initOccEnv { occ_allow_weak_joins = True }) expr
 
+-- | Select the scope and substitution invariants of the Core simplifier.
+-- See Note [Retained Core in the Gentle simplifier] in GHC.Driver.Main.Passes.
+data SimplCoreMode = OrdinaryCore | RetainedCore
+  deriving Eq
+
 -- | Options for occurrence analysis of a program
 data OccurAnalOpts = OccurAnalOpts
-  { oa_active_unf     :: Id -> Bool              -- ^ Active unfoldings
+  { oa_core_mode      :: !SimplCoreMode
+  , oa_active_unf     :: Id -> Bool              -- ^ Active unfoldings
   , oa_active_rule    :: ActivationGhc -> Bool   -- ^ Active rules
   , oa_can_drop       :: Id -> Bool
       -- ^ Can we drop this Id if it is dead?
@@ -1161,7 +1167,10 @@ occAnalBind env lvl ire (Rec pairs) thing_inside combine
 occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   | isTyVar bndr      -- A type let; we don't gather usage info
   = let !(WUD body_uds res) = addInScopeOne env bndr thing_inside
-    in WUD body_uds (combine [NonRec bndr rhs] res)
+        refs | RetainedCore <- oa_core_mode (occ_opts env)
+             , Type ty <- rhs = occTypeUses env ty `unionVarSet` occBinderAnnUses env bndr
+             | otherwise = emptyVarSet
+    in WUD (addManyOccs body_uds refs) (combine [NonRec bndr rhs] res)
 
   -- /Existing/ non-recursive join points
   -- See Note [Occurrence analysis for join points]
@@ -1216,16 +1225,19 @@ occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
   | null rules, null imp_rule_infos
   =  -- Fast path for common case of no rules. This is only worth
      -- 0.1% perf on average, but it's also only a line or two of code
-    ( adj_rhs_uds `orUDs` adj_unf_uds
+    ( scope_uds
     , final_bndr_no_rules, final_rhs )
 
   | otherwise
-  = ( foldl' orUDs (adj_rhs_uds `orUDs` adj_unf_uds) adj_rule_uds
+  = ( foldl' orUDs scope_uds adj_rule_uds
     , final_bndr_with_rules, final_rhs )
 
     -- orUDs: Combine the RHS, (stable) unfolding, and RULES with orUDs
     --        See Note [Unfoldings and RULES]
   where
+    scope_uds = addManyOccs (adj_rhs_uds `orUDs` adj_unf_uds)
+                           (occBinderAnnUses env bndr)
+
     --------- Right hand side ---------
     -- For join points, set occ_encl to OccVanilla, via setTailCtxt.  If we have
     --    join j = Just (f x) in ...
@@ -1908,7 +1920,8 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
     -- NB: Both adj_unf_uds and adj_rule_uds have been adjusted to match the
     --     JoinArity rhs_ja of unadj_rhs_uds.
     unadj_inl_uds   = unadj_rhs_uds `andUDs` adj_unf_uds
-    unadj_scope_uds = unadj_inl_uds `andUDs` adj_rule_uds
+    unadj_scope_uds = addManyOccs (unadj_inl_uds `andUDs` adj_rule_uds)
+                                  (occBinderAnnUses env bndr)
                    -- Note [Rules are extra RHSs]
                    -- Note [Rule dependency info]
     scope_fvs = udFreeVars bndr_set unadj_scope_uds
@@ -2401,15 +2414,23 @@ occ_anal_lam_tail env expr@(Lam {})
             -- See Note [Strictness in the occurrence analyser]
             wrap_lam !body !bndr = let !bndr' = tagLamBinder usage bndr
                                    in Lam bndr' body
-        in WUD (usage `addLamCoVarOccs` rev_bndrs)
-               (foldl' wrap_lam body' rev_bndrs)
+            -- Inner binder types can mention an outer runtime binder. Add
+            -- those uses before assigning occurrence info to the outer binder.
+            wrap_indexed (!uses, !body) !bndr =
+              let (uses', !bndr') = tagRetainedBinder env uses bndr
+              in (uses', Lam bndr' body)
+        in if oa_core_mode (occ_opts env) == RetainedCore
+           then case foldl' wrap_indexed (usage, body') rev_bndrs of
+                  (uses, expr') -> WUD uses expr'
+           else WUD (usage `addLamCoVarOccs` rev_bndrs)
+                    (foldl' wrap_lam body' rev_bndrs)
 
 -- For casts, keep going in the same lambda-group
 -- See Note [Occurrence analysis for lambda binders]
 occ_anal_lam_tail env (Cast expr co)
   = let  WUD usage expr' = occ_anal_lam_tail env expr
          -- usage1: see Note [Gather occurrences of coercion variables]
-         usage1 = addManyOccs usage (coVarsOfCo co)
+         usage1 = addManyOccs usage (occCoercionUses env co)
 
          -- usage2: see Note [Occ-anal and cast worker/wrapper]
          usage2 = case expr of
@@ -2648,10 +2669,10 @@ occAnal env expr@(Var _) = occAnalApp env (expr, [], [])
     -- rules in them, so the *specialised* versions looked as if they
     -- weren't used at all.
 
-occAnal _ expr@(Type ty)
-  = WUD (addManyOccs emptyDetails (coVarsOfType ty)) expr
-occAnal _ expr@(Coercion co)
-  = WUD (addManyOccs emptyDetails (coVarsOfCo co)) expr
+occAnal env expr@(Type ty)
+  = WUD (addManyOccs emptyDetails (occTypeUses env ty)) expr
+occAnal env expr@(Coercion co)
+  = WUD (addManyOccs emptyDetails (occCoercionUses env co)) expr
         -- See Note [Gather occurrences of coercion variables]
 
 {- Note [Gather occurrences of coercion variables]
@@ -2727,7 +2748,7 @@ occAnal env (Cast expr co)
   = let
       WUD usage expr' = occAnal env expr
       -- usage1: see Note [Gather occurrences of coercion variables]
-      usage1 = addManyOccs usage (coVarsOfCo co)
+      usage1 = addManyOccs usage (occCoercionUses env co)
       -- usage2: see (JCT1) in Note [Join points, casts, and ticks] in GHC.Core.
       usage2 = markAllNonTail_CastOrTick env usage1
     in
@@ -2753,8 +2774,11 @@ occAnal env (Case scrut bndr ty alts)
                -- See Note [Strictness in the occurrence analyser]
            in WUD alts_usage (tagged_bndr, alts')
 
-      total_usage = markAllNonTail scrut_usage `andUDs` alts_usage
+      total_usage = addManyOccs (markAllNonTail scrut_usage `andUDs` alts_usage) refs
                     -- Alts can have tail calls, but the scrutinee can't
+      refs | RetainedCore <- oa_core_mode (occ_opts env)
+           = occTypeUses env ty `unionVarSet` occBinderAnnUses env bndr
+           | otherwise = emptyVarSet
 
     in WUD total_usage (Case scrut' tagged_bndr ty alts')
   where
@@ -2768,15 +2792,44 @@ occAnal env (Case scrut bndr ty alts)
     do_alt !env (Alt con bndrs rhs)
       = addInScopeList env bndrs $ \ env ->
         let WUD rhs_usage rhs' = occAnal env rhs
-            !tagged_bndrs = tagLamBinders rhs_usage bndrs
-                           -- See Note [Strictness in the occurrence analyser]
+            (uses, !tagged_bndrs)
+              | RetainedCore <- oa_core_mode (occ_opts env)
+              = mapAccumR (tagRetainedBinder env) rhs_usage bndrs
+              | otherwise = (rhs_usage, tagLamBinders rhs_usage bndrs)
+                            -- See Note [Strictness in the occurrence analyser]
         in                 -- See Note [Binders in case alternatives]
-        WUD rhs_usage (Alt con tagged_bndrs rhs')
+        WUD uses (Alt con tagged_bndrs rhs')
 
 occAnal env (Let bind body)
   -- TODO: Would be nice to use a strict version of mkLets here
   = occAnalBind env NotTopLevel noImpRuleEdges bind
                 (\env -> occAnal env body) mkLets
+
+-- | Collect scope uses in a binder annotation in retained mode.
+occBinderAnnUses :: OccEnv -> Var -> VarSet
+occBinderAnnUses env bndr
+  | RetainedCore <- oa_core_mode (occ_opts env)
+  = occTypeUses env (varType bndr) `unionVarSet`
+    maybe emptyVarSet (occTypeUses env) (varMultMaybe bndr)
+  | otherwise = emptyVarSet
+
+-- | Tag one binder before adding its annotation's uses to the outer scope.
+-- Process a telescope from right to left.
+tagRetainedBinder :: OccEnv -> UsageDetails -> Var -> (UsageDetails, Var)
+tagRetainedBinder env usage bndr =
+    (addManyOccs usage (occBinderAnnUses env bndr), tagLamBinder usage bndr)
+
+-- | Count runtime indices in a type as scope uses.
+occTypeUses :: OccEnv -> Type -> VarSet
+occTypeUses env ty
+  | oa_core_mode (occ_opts env) == RetainedCore = filterVarSet isLocalId (tyCoVarsOfType ty)
+  | otherwise = coVarsOfType ty
+
+-- | Count runtime indices in a coercion as scope uses.
+occCoercionUses :: OccEnv -> Coercion -> VarSet
+occCoercionUses env co
+  | oa_core_mode (occ_opts env) == RetainedCore = filterVarSet isLocalId (tyCoVarsOfCo co)
+  | otherwise = coVarsOfCo co
 
 occAnalArgs :: OccEnv -> CoreExpr -> [CoreExpr]
             -> [OneShots]  -- Very commonly empty, notably prior to dmd anal
@@ -3160,7 +3213,8 @@ initOccEnv
              -- To be conservative, we say that all
              -- inlines and rules are active
            , occ_opts = OccurAnalOpts
-              { oa_active_rule  = \_ -> True
+              { oa_core_mode = OrdinaryCore
+              , oa_active_rule  = \_ -> True
               , oa_active_unf  = \_ -> True
               , oa_can_drop = \_ -> True
               }

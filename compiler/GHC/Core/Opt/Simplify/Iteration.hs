@@ -15,6 +15,8 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Core
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
+import GHC.Core.TyCo.Rep (Type(DepFunTy))
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.ConstantFold
 import GHC.Core.Opt.Stats ( Tick(..) )
@@ -1856,7 +1858,10 @@ simplArg _ _ _ (Simplified {}) arg mco
        MCo co -> return (mkCast arg co)
 simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
   = do { let arg_env' = arg_se `setInScopeFromE` env
-             arg_ty   = funArgTy fun_ty
+             arg_ty
+               | sm_core_mode (seMode env) == RetainedCore
+               , DepFunTy _ b _ <- coreFullView fun_ty = varType b
+               | otherwise = funArgTy fun_ty
              stop     = case mb_arg_info of
                            Nothing -> mkBoringStop arg_ty
                            Just ai -> mkLazyArgStop arg_ty ai
@@ -1893,6 +1898,15 @@ simpl_lam :: HasDebugCallStack
 simpl_lam env bndr body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = do { tick (BetaReduction bndr)
        ; simplLam (extendTvSubst env bndr arg_ty) body cont }
+
+-- See Note [Retained Core in the Gentle simplifier] in GHC.Driver.Main.Passes.
+simpl_lam env bndr body cont@ApplyToVal{sc_hole_ty = fun_ty}
+  | sm_core_mode (seMode env) == RetainedCore
+  , DepFunTy{} <- coreFullView fun_ty
+  = do { let (inner_bndrs, inner_body) = collectBinders body
+       ; (env', bndrs') <- simplLamBndrs env (bndr:inner_bndrs)
+       ; body' <- simplExpr env' inner_body
+       ; rebuild env (mkLams bndrs' body') cont }
 
 -- Value beta-reduction
 -- This works for /coercion/ lambdas too
@@ -3223,6 +3237,11 @@ rebuildCase, reallyRebuildCase
 --      1. Eliminate the case if there's a known constructor
 --------------------------------------------------
 
+rebuildCase ctxt@(_,env) scrut case_bndr alts cont
+  | sm_core_mode (seMode env) == RetainedCore
+  , any (\alt -> isNativeIndexAlt alt || isNativeIndexAliasAlt alt) alts
+  = reallyRebuildCase ctxt scrut case_bndr alts cont
+
 rebuildCase (saf,env) scrut case_bndr alts cont
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
@@ -3562,6 +3581,13 @@ simplAlt :: (SimplAltFlag, SimplEnv)
          -> SimplCont
          -> InAlt
          -> SimplM OutAlt
+
+simplAlt (saf,env) _ _ _ _ cont' (Alt con bndrs rhs)
+  -- See Note [Retained Core in the Gentle simplifier] in GHC.Driver.Main.Passes.
+  | sm_core_mode (seMode env) == RetainedCore
+  = do { (env', bndrs') <- simplAltBinders (saf,env) bndrs
+       ; rhs' <- simplAltExprC (saf,env') rhs cont'
+       ; return (Alt con bndrs' rhs') }
 
 simplAlt (saf,env) _scrut' imposs_deflt_cons case_bndr' bndr_swap' cont' (Alt DEFAULT bndrs rhs)
   = assert (null bndrs) $

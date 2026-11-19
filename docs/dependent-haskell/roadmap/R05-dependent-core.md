@@ -56,9 +56,19 @@ A private compiler counts those uses and visits the types of lambda
 binders from the innermost to the outermost. Its standalone occurrence
 pass then preserves the two bindings. Core and STG Lint pass. An
 ordinary interface client observes that `choose` forces its Boolean and
-`keep` can return the vector without forcing it. The next check is an
-ordinary simplifier iteration. Dependent source modules still require
-the restricted optimization pipeline.
+`keep` can return the vector without forcing it. For modules with algebraic indices such as `Bool` and `Nat`, the compiler
+can now run one Gentle simplifier iteration at `-O0`. Occurrence analysis
+keeps an index that occurs only in a let signature, a recursive binding,
+a case result or a later alternative field. Preserving its scope keeps
+the original lazy demand. A client can call a function with an
+exceptional index and obtain `20` from the unused branch.
+
+Modules with a function-valued index, a retained cast or local rewrite
+rules still use the restricted pipeline. The next step is to preserve
+the equality binder when an ordinary case transformation processes a
+retained function field. General `-O1` remains open.
+[Source controls](../../../testsuite/tests/dependent/should_run/NativeSimplifierProvider.hs)
+and [interface client](../../../testsuite/tests/dependent/should_run/NativeSimplifierClient.hs).
 
 ## Next increments
 

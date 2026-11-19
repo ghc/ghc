@@ -102,12 +102,16 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
-import GHC.Core.Dependent ( hasNativeDependentExpr, rejectNativeDependentExpr )
+import GHC.Core.Dependent ( hasNativeDependentExpr, rejectNativeDependentExpr, supportsNativeGentle )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon (tyConName)
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.Opt.Pipeline
+import GHC.Core.Opt.Simplify (simplifyPgm)
+import GHC.Core.Opt.Simplify.Env (SimplMode(..))
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
+import GHC.Driver.Config.Core.Opt.Simplify (initSimplifyOpts, initGentleSimplMode)
 import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
 import GHC.Core.InstEnv
 import GHC.Core.Rules
@@ -1497,8 +1501,47 @@ hscSimplify' plugins ds_result = do
           endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt binds rules
           let simplified = simpleOptNativeProgram binds
           endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt simplified rules
-          return (ds_result { mg_binds = simplified })
+          let result = ds_result { mg_binds = simplified }
+          if null rules && supportsNativeGentle simplified
+            then do
+              let df = hsc_dflags lint_env
+                  opts = initSimplifyOpts df [] 1
+                           ((initGentleSimplMode df) { sm_core_mode = RetainedCore }) emptyRuleBase
+              (_, optimized) <- simplifyPgm (hsc_logger lint_env)
+                (hsc_unit_env lint_env) name_ppr_ctx opts result
+              let final = simpleOptNativeProgram (mg_binds optimized)
+              endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt final rules
+              return (optimized { mg_binds = final })
+            else return result
         else {-# SCC "Core2Core" #-} core2core hsc_env_with_plugins ds_result
+
+{- Note [Retained Core in the Gentle simplifier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Run one Gentle iteration only after the native module check and restricted
+SimpleOpt. The eligibility scan admits algebraic retained binders and
+constructor proofs. It excludes function-valued index applications, alias
+proofs, retained casts, and local rules. The restricted native pipeline
+handles the other inputs. This check does not admit native modules to -O1.
+
+A local Id can occur only in a type or coercion. Occurrence analysis must
+keep this Id in scope without adding runtime demand. A type or multiplicity
+on a later lambda binder can refer to an earlier retained binder.
+The same rule applies to let signatures, case result types and alternative
+fields. Process alternative binder annotations from right to left so a
+later field can keep an earlier binder in scope.
+
+The simplifier's ordinary beta substitution can replace a value occurrence
+without updating the corresponding index in a type. Keep a retained
+lambda applied and simplify the binders from left to right. Rebuild its
+application outside the lambda scope.
+
+The ordinary alternative path installs facts about the scrutinee. A fact
+can replace a scrutinee with a constructor while a nested nominal proof
+still names the retained Id. A virtual proof binder is also not a constructor
+argument. In retained mode preserve virtual-proof alternatives and skip the
+ordinary alternative facts throughout the pass. One module check suffices.
+The ordinary mode does not inspect each alternative RHS for native forms.
+-}
 
 {- Note [Compiling native dependent modules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

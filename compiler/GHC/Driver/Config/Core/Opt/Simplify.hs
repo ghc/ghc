@@ -5,6 +5,7 @@ module GHC.Driver.Config.Core.Opt.Simplify
   , initGentleSimplMode
   ) where
 
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
 import GHC.Prelude
 
 import GHC.Core.Rules ( RuleBase )
@@ -58,7 +59,8 @@ initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let
 
 initSimplMode :: DynFlags -> CompilerPhase -> String -> SimplMode
 initSimplMode dflags phase name = SimplMode
-  { sm_names = [name]
+  { sm_core_mode = OrdinaryCore
+  , sm_names = [name]
   , sm_phase = SimplPhase phase
   , sm_rules = gopt Opt_EnableRewriteRules dflags
   , sm_eta_expand = gopt Opt_DoLambdaEtaExpansion dflags
