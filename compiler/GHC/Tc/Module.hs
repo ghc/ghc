@@ -78,6 +78,7 @@ import GHC.Tc.Gen.Sig( isCompleteHsSig, tcRules )
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsTopLHsBinds)
 import GHC.HsToCore.Monad (initDsTc)
 import GHC.Core (CoreExpr)
+import qualified GHC.Core as Core
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
 import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
@@ -153,8 +154,9 @@ import GHC.Types.DefaultEnv
 import GHC.Types.Fixity.Env
 import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
-import GHC.Types.Var (setIdDetails)
+import GHC.Types.Var (VarBndr(Bndr), isCoVar, setIdDetails)
 import GHC.Types.Var.Env
+import GHC.Types.Unique.FM (isNullUFM)
 import GHC.Types.TypeEnv
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -1879,12 +1881,159 @@ tcTopSrcDeclsThen demands group finish = do
         (previous, current) = partition ((`elemNameSet` checked) . fst) demands
         check_current
           | null current = tcTopSrcTables group >>= finish
-          | otherwise = tcLocalOpenGroup current group finish
+          | otherwise = tcIndependentFamilyProducers current group finish
     if null previous then check_current else do
       -- tc_rn_src_decls has solved these bindings before running each splice.
       failIfErrsM
       definitions <- localOpenDefinitions previous (tcg_ev_binds env) (tcg_binds env)
       withLocalOpenDefinitions definitions check_current
+
+-- | Check only a closed producer fragment before imported family equations.
+-- See Note [Independent imported-family producers].
+tcIndependentFamilyProducers :: [(Name, SrcSpan)] -> HsGroup GhcRn
+                             -> ((TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv))
+                             -> TcM (TcGblEnv, TcLclEnv)
+tcIndependentFamilyProducers demands group@HsGroup
+  { hs_valds = XValBindsLR (HsVBG binds sigs), hs_tyclds = groups } finish = do
+    env <- getGblEnv
+    plugins <- readTcRef (tcg_plugins env)
+    let roots = mkNameSet (map fst demands)
+        pending = [(getLocA inst, localUses roots equation)
+                  | tg <- groups, inst <- group_instds tg,
+                    TyFamInstD {tfid_inst = equation@TyFamInstDecl
+                      {tfid_eqn = FamEqn {feqn_tycon = L _ family}}} <- [unLoc inst],
+                    not (nameIsLocalOrFrom (tcg_semantic_mod env) family)]
+        in_equation (name, loc) (inst_loc, uses) = loc `isSubspanOf` inst_loc && name `elem` uses
+        selected = [d | d <- demands, any (in_equation d) pending]
+        ordinary_solver = null (solverTcMPlugins plugins) && null (defaultingTcMPlugins plugins) &&
+                          isNullUFM (rewriterTcMPlugins plugins)
+    case independentClosure binds sigs (map fst selected) of
+      Just names | not (null selected), ordinary_solver -> do
+        let (early_binds, rest_binds) = partition (any (selectedBind names) . snd) binds
+            (early_sigs, rest_sigs) = splitSignatures names sigs
+            early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs) }
+            rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs) }
+        (envs@(early_env, _), wanted) <- captureTopConstraints (tcTopSrcDeclGroup early)
+        restoreEnvs envs $ do
+          evs <- checkNoErrs (simplifyTop wanted)
+          checked@(definitions, _) <- localOpenDefinitions selected
+            (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
+          unless (isEmptyBag evs && all (independentCore names . snd)
+                                             (nonDetNameEnvElts definitions)) $
+            rejectLocalOpen selected "The checked producer requires evidence outside the independent fragment."
+          addTopEvBinds evs $ withLocalOpenDefinitions checked $
+            tcTopSrcDeclsThen (filter (not . (`elemNameSet` names) . fst) demands) rest finish
+      _ -> tcLocalOpenGroup demands group finish
+tcIndependentFamilyProducers demands group finish = tcLocalOpenGroup demands group finish
+
+-- | Close a producer over complete signatures and lexical variable applications.
+independentClosure :: [(RecFlag, [LHsBind GhcRn])] -> [LSig GhcRn] -> [Name] -> Maybe NameSet
+independentClosure binds sigs roots =
+    either (const Nothing) Just (closeLocalNames deps emptyNameSet roots)
+  where
+    signatures = signaturesByOwner sigs
+    functions = mkNameEnv
+      [(name, matches) | (NonRecursive, [L _ FunBind{fun_id = L _ name, fun_matches = matches}]) <- binds]
+
+    deps name
+      | Just matches <- lookupNameEnv functions name
+      , Just pragmas <- lookupNameEnv signatures name
+      , [sig] <- filter is_type_sig pragmas
+      , valid_sig sig, all ordinary_pragma pragmas
+      , Just refs <- match_refs emptyNameSet matches
+      = Right refs
+      | otherwise = Left "A producer has a dependency outside the independent fragment."
+
+    is_type_sig TypeSig{} = True
+    is_type_sig _ = False
+    ordinary_pragma TypeSig{} = True
+    ordinary_pragma InlineSig{} = True
+    ordinary_pragma _ = False
+
+    valid_sig (TypeSig _ [] _ (HsWC _ (L _ HsSig
+      { sig_bndrs = HsOuterExplicit{hso_matchability = Nothing, hso_bndrs = quantified}
+      , sig_body = body })))
+      | Just params <- traverse bare_binder quantified, not (null params) =
+          arrow_type (mkNameSet params) body
+    valid_sig _ = False
+    bare_binder (L _ b@HsTvb {tvb_kind = HsBndrNoKind _}) = hsTyVarName b
+    bare_binder _ = Nothing
+    arrow_type params ty = case unLoc (ignoreParens ty) of
+      HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) input result ->
+        arrow_type params input && arrow_type params result
+      HsTyVar _ NotPromoted (L _ (WithUserRdr _ n)) -> n `elemNameSet` params
+      _ -> False
+
+    match_refs locals (MG {mg_alts = L _ [L _ Match
+      { m_pats = L _ pats
+      , m_grhss = GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) }]}) = do
+      binders <- traverse pat_binders pats
+      expr_refs (locals `unionNameSet` mkNameSet (catMaybes binders)) rhs
+    match_refs _ _ = Nothing
+    pat_binders (L _ (VarPat _ (L _ n))) = Just (Just n)
+    pat_binders (L _ WildPat{}) = Just Nothing
+    pat_binders (L _ (ParPat _ p)) = pat_binders p
+    pat_binders _ = Nothing
+    expr_refs locals (L _ expr) = case expr of
+      HsVar _ (L _ (WithUserRdr _ n)) ->
+        Just (if n `elemNameSet` locals then emptyNameSet else unitNameSet n)
+      HsPar _ e -> expr_refs locals e
+      HsApp _ fun arg -> unionNameSet <$> expr_refs locals fun <*> expr_refs locals arg
+      HsLam _ LamSingle matches -> match_refs locals matches
+      _ -> Nothing
+
+-- | Recheck pre-optimisation Core emitted by the source fragment.
+independentCore :: NameSet -> CoreExpr -> Bool
+independentCore producers = go emptyNameSet emptyNameSet
+  where
+    go tyvars locals (Core.Var v)
+      | getName v `elemNameSet` locals =
+          independent_type tyvars (varType v)
+      | getName v `elemNameSet` producers =
+          independent_type emptyNameSet (varType v)
+      | otherwise = False
+    go tyvars locals (Core.Lam v body)
+      | isTyVar v, isLiftedTypeKind (varType v) =
+          go (extendNameSet tyvars (getName v)) locals body
+      | isId v, not (isCoVar v), isManyTy (idMult v), independent_type tyvars (varType v) =
+          go tyvars (extendNameSet locals (getName v)) body
+      | otherwise = False
+    go tyvars locals (Core.App fun operand) = go tyvars locals fun && go tyvars locals operand
+    go tyvars _ (Core.Type ty) = independent_type tyvars ty
+    go _ _ _ = False
+
+    independent_type tyvars (TyVarTy var) = getName var `elemNameSet` tyvars
+    independent_type tyvars (FunTy {ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult,
+                                    ft_arg = input, ft_res = result}) =
+      ma `eqType` unmatchableDataConTy && isManyTy mult &&
+      independent_type tyvars input && independent_type tyvars result
+    independent_type tyvars (ForAllTy ma (Bndr var (Invisible _)) body) =
+      ma `eqType` unmatchableDataConTy && isTyVar var && isLiftedTypeKind (varType var) &&
+      independent_type (extendNameSet tyvars (getName var)) body
+    independent_type _ ty = isLiftedTypeKind ty
+
+{- Note [Independent imported-family producers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An imported family can be named by an imported signature or a class
+instance. A renamed name closure alone cannot justify moving an ordinary
+producer ahead of that family's equation. Check a separate early batch
+with only signed lexical lambda/application bindings. Reject imported
+values, annotations and syntax with overloaded operations. Allow named
+dependencies only inside the same closed family-free fragment.
+
+For example, in "keep x = const x (hidden Proxy)", the dictionary for
+hidden may change when the family equation comes into scope. Observing
+that keep returns x cannot establish which dictionary GHC selected.
+Even an ignored type annotation may use the very equation we are
+checking. Inspect the renamed syntax before desugaring can erase it.
+
+Check the ordinary bindings and solve them without the candidate
+equation. Verify the resulting Core before observing the actual
+producer bodies. The regular source checker then receives its original
+type groups, instances, methods, defaults and deriving declarations.
+With a typechecker plugin, the early batch could have effects or solve
+constraints differently. Use the ordinary declaration order in that case.
+-}
 
 tcTopSrcTables :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcTables group = do
@@ -2123,9 +2272,7 @@ tcLocalOpenGroup demands group@HsGroup
     functionBinding bind@(L _ FunBind{fun_id = L _ name, fun_ext = fvs}) =
       Just (name, bind, fvs)
     functionBinding _ = Nothing
-    signatures = foldr addSignature emptyNameEnv sigs
-    addSignature (L _ sig) env =
-      foldr (\owner acc -> extendNameEnv_C (++) acc owner [sig]) env (signatureOwners sig)
+    signatures = signaturesByOwner sigs
 
     tryDemand (selected, ready, blocked) demand@(name, _) =
       case visit name selected name of
@@ -2195,8 +2342,6 @@ tcLocalOpenGroup demands group@HsGroup
     ordinaryType ClassDecl{} = True
     ordinaryType _ = False
 
-    selectedBind names (L _ FunBind{fun_id = L _ b}) = b `elemNameSet` names
-    selectedBind _ _ = False
     no_deriving (L _ DataDecl{tcdDataDefn = HsDataDefn{dd_derivs = ds}}) =
       all empty_deriving ds
     no_deriving _ = True
@@ -2233,6 +2378,18 @@ signatureOwners (SCCFunSig _ (L _ n) _) = [n]
 signatureOwners (SpecSig _ (L _ n) _ _) = [n]
 signatureOwners (SpecSigE n _ _ _) = [n]
 signatureOwners _ = []
+
+-- | Collect the signatures and pragmas that move with each producer.
+signaturesByOwner :: [LSig GhcRn] -> NameEnv [Sig GhcRn]
+signaturesByOwner = foldr add emptyNameEnv
+  where
+    add (L _ sig) env =
+      foldr (\owner acc -> extendNameEnv_C (++) acc owner [sig]) env (signatureOwners sig)
+
+-- | Select the function bindings that belong to an early group.
+selectedBind :: NameSet -> LHsBind GhcRn -> Bool
+selectedBind names (L _ FunBind{fun_id = L _ b}) = b `elemNameSet` names
+selectedBind _ _ = False
 
 -- | Keep each shared signature with its corresponding set of owners.
 splitSignatures :: NameSet -> [LSig GhcRn] -> ([LSig GhcRn], [LSig GhcRn])

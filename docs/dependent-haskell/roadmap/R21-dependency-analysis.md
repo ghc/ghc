@@ -237,17 +237,38 @@ observation.
 This split requires the family to be absent from the early dependency
 closure, which includes the instance, deriving and default declarations
 checked early. If an earlier declaration depends on that family, GHC
-rejects the postponement at the original dependent call. Imported
-families, associated equations and data-family instances retain their
-existing scheduling bounds. [Source and cycle
+rejects the postponement at the original dependent call. This split
+covers standalone type equations for a local family. [Source and cycle
 checks](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
 
 In the [shared example](../examples/open-evaluation/IndependentFamily.hs)
 the second producer uses the family after its equations are installed.
-When the family comes from an import, the same independent identity
-still gets GHC-70566 at the source call. Checking such an equation
-early requires knowing which other declarations can use that imported
-family.
+
+## M156. Independent producers for imported type families
+
+An imported open family can have a local equation that calls an
+independent producer. GHC checks an early batch containing only
+functions with complete, family-free variable-and-arrow signatures
+and bodies made of named variables, applications, and ordinary lambdas.
+The checker verifies the solved Core, including binder types and
+absence of evidence casts, before open evaluation uses it. The
+remaining group keeps its class instances, deriving, defaults and
+family instances in their ordinary order.
+
+The example assigns three equations to an imported family. It computes
+their right-hand sides with a reordered projection through a local
+helper, a lambda application and an identity. Its ordinary class
+method needs the Boolean equation. An ordinary client typechecks
+using only the interfaces and then prints `(True,EQ,'x')`.
+[Imported family example](../examples/open-evaluation/ImportedFamily.hs)
+and [separate compilation checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
+A producer that uses an imported operation or an explicit annotation
+can have a dependency on the postponed family. The early fragment
+rejects both the hidden-dictionary example below and a producer that
+ignores a term annotated at `Payload Int`. Optimization could remove
+the annotation's evidence after checking it. The scheduler therefore
+checks source syntax and evidence before optimization.
 
 An explicit declaration-group boundary already works for the independent
 case. Put `keep x = x` before `$(pure [])` and the equation

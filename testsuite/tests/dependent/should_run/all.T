@@ -15,6 +15,11 @@ test('NativeLocalOpen',
                    open_eval_dir + 'LocalDataFamily.hs', open_eval_dir + 'IndependentFamily.hs'])],
      run_command, ['bash NativeLocalOpen.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
+test('NativeImportedFamily',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + 'ImportedFamilyProvider.hs', open_eval_dir + 'ImportedFamily.hs'])],
+     run_command, ['bash NativeImportedFamily.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeOpenConstructor',
      [only_ways(['normal']), extra_files([open_eval_dir + 'OpenConstructorWorker.hs',
                                          open_eval_dir + 'OpenConstructorSource.hs',
