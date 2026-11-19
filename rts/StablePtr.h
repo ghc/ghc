@@ -16,8 +16,6 @@
 
 #include "sm/GC.h" // for evac_fn below
 
-#include "BeginPrivate.h"
-
 void    freeStablePtr         ( StgStablePtr sp );
 
 /* Use the "Unsafe" one after only when manually locking and
@@ -42,5 +40,3 @@ void    stablePtrUnlock       ( void );
 // needed by Schedule.c:forkProcess()
 extern Mutex stable_ptr_mutex;
 #endif
-
-#include "EndPrivate.h"

@@ -12,8 +12,6 @@
 
 #include "IOManager.h"
 
-#include "BeginPrivate.h"
-
 #if defined(IOMGR_ENABLED_POLL)
 
 void initCapabilityIOManagerPoll(CapIOManager *iomgr);
@@ -36,6 +34,3 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
 void interruptIOManagerPoll(CapIOManager *iomgr);
 
 #endif /* IOMGR_ENABLED_POLL */
-
-#include "EndPrivate.h"
-

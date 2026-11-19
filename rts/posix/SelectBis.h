@@ -32,8 +32,6 @@
 
 #include "IOManager.h"
 
-#include "BeginPrivate.h"
-
 #if defined(IOMGR_ENABLED_SELECTBIS)
 
 void initCapabilityIOManagerSelectBis(CapIOManager *iomgr);
@@ -57,6 +55,3 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr);
 void interruptIOManagerSelectBis(CapIOManager *iomgr);
 
 #endif /* IOMGR_ENABLED_SELECTBIS */
-
-#include "EndPrivate.h"
-

@@ -13,8 +13,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 extern char *ghc_rts_opts;
 
 extern void OnExitHook (void);
@@ -24,5 +22,3 @@ extern void MallocFailHook (W_ request_size /* in bytes */, const char *msg);
 extern void FlagDefaultsHook (void);
 extern void LongGCSync (uint32_t capno, Time t);
 extern void LongGCSyncEnd (Time t);
-
-#include "EndPrivate.h"

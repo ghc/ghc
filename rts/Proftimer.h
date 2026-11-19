@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void initProfTimer      ( void );
 void handleProfTick     ( void );
 void pauseHeapProfTimer  ( void );
@@ -17,5 +15,3 @@ void resumeHeapProfTimer ( void );
 
 extern bool performHeapProfile;
 extern bool performTickySample;
-
-#include "EndPrivate.h"

@@ -10,8 +10,6 @@
 
 #include "Capability.h"
 
-#include "BeginPrivate.h"
-
 extern bool running_finalizers;
 extern StgWeak * dead_weak_ptr_list;
 
@@ -20,5 +18,3 @@ void runAllCFinalizers(StgWeak *w);
 void scheduleFinalizers(Capability *cap, StgWeak *w);
 void markWeakList(void);
 bool runSomeFinalizers(bool all);
-
-#include "EndPrivate.h"

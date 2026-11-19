@@ -35,11 +35,7 @@
 #define pathcopy strcpy
 #endif
 
-#include "BeginPrivate.h"
-
 pathchar* pathdup(const pathchar *path);
 pathchar* pathdir(const pathchar *path);
 pathchar* mkPath(const char* path);
 HsBool endsWithPath(const pathchar* base, const pathchar* str);
-
-#include "EndPrivate.h"

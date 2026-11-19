@@ -13,8 +13,6 @@
 #include "Capability.h"
 #include "sm/NonMovingCensus.h"
 
-#include "BeginPrivate.h"
-
 #if defined(TRACING)
 
 extern bool eventlog_enabled;
@@ -253,5 +251,3 @@ INLINE_HEADER void postThreadLabel(Capability    *cap   STG_UNUSED,
 { /* nothing */ }
 
 #endif
-
-#include "EndPrivate.h"

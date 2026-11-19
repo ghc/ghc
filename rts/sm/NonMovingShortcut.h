@@ -9,9 +9,5 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void
 nonmoving_eval_thunk_selector(MarkQueue *queue, StgSelector *p, StgClosure **origin);
-
-#include "EndPrivate.h"

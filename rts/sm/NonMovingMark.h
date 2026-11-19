@@ -11,8 +11,6 @@
 #include "Task.h"
 #include "NonMoving.h"
 
-#include "BeginPrivate.h"
-
 enum EntryType {
     NULL_ENTRY = 0,
     MARK_CLOSURE = 1,
@@ -205,5 +203,3 @@ void printMarkQueueEntry(MarkQueueEnt *ent);
 void printMarkQueue(MarkQueue *q);
 
 #endif
-
-#include "EndPrivate.h"

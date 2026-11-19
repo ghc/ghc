@@ -1,7 +1,5 @@
 #pragma once
 
-#include "BeginPrivate.h"
-
 struct AdjustorPool;
 
 /* N.B. the adjustor assembler snippets rely on the layout of this structure
@@ -25,5 +23,3 @@ struct AdjustorTemplate {
 };
 
 struct AdjustorPool *new_adjustor_pool_from_template(const struct AdjustorTemplate *tmpl);
-
-#include "EndPrivate.h"

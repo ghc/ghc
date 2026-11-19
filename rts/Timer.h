@@ -8,12 +8,8 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void initTimer(void);
 void exitTimer(void);
 
 void pauseTimer(void);
 void unpauseTimer(void);
-
-#include "EndPrivate.h"

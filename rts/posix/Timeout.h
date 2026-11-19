@@ -10,8 +10,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay);
 
 void syncDelayCancelTimeout(CapIOManager *iomgr, StgTSO *tso);
@@ -55,6 +53,3 @@ struct timeval *timeoutInMicroseconds(CapIOManager *iomgr, bool wait,
                                       Time now, struct timeval *tv);
 
 #endif
-
-#include "EndPrivate.h"
-

@@ -13,8 +13,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 StgCompactNFData *compactNew   (Capability      *cap,
                                 StgWord          size);
 void              compactResize(Capability       *cap,
@@ -75,5 +73,3 @@ extern void insertCompactHash (Capability *cap,
                                StgClosure *p, StgClosure *to);
 
 extern void verifyCompact (StgCompactNFData *str);
-
-#include "EndPrivate.h"

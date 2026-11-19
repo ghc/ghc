@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 extern void        printPtr        ( StgPtr p );
 extern void        printObj        ( StgClosure *obj );
 
@@ -36,5 +34,3 @@ extern const char *lookupGHCName( void *addr );
 
 extern const char *what_next_strs[];
 #endif
-
-#include "EndPrivate.h"

@@ -14,8 +14,6 @@
 #include "rts/storage/HeapAlloc.h"
 #include "NonMovingMark.h"
 
-#include "BeginPrivate.h"
-
 // Segments
 #if defined(wasm32_HOST_ARCH)
 #define NONMOVING_SEGMENT_BITS 14ULL   // 2^14 = 16kByte
@@ -414,7 +412,4 @@ void print_thread_list(StgTSO* tso);
 RTS_PRIVATE void nonmovingClearSegment(struct NonmovingSegment*);
 
 RTS_PRIVATE void nonmovingClearSegmentFreeBlocks(struct NonmovingSegment*);
-
-#include "EndPrivate.h"
-
 #endif // CMINUSMINUS

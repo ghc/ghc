@@ -13,13 +13,9 @@
 #include "Rts.h"
 #include "Profiling.h"
 
-#include "BeginPrivate.h"
-
 #if defined(PROFILING)
 
 void writeCCSReport( FILE *prof_file, CostCentreStack const *ccs,
                      ProfilerTotals totals );
 
 #endif
-
-#include "EndPrivate.h"

@@ -25,8 +25,6 @@
 #include "Sparks.h"
 #include "sm/NonMovingMark.h" // for MarkQueue
 
-#include "BeginPrivate.h"
-
 // We never want a Capability to overlap a cache line with
 // anything else, so round it up to a cache line size:
 #define CAPABILITY_ALIGNMENT CACHELINE_SIZE
@@ -525,5 +523,3 @@ INLINE_HEADER bool emptyInbox(Capability *cap)
 }
 
 #endif
-
-#include "EndPrivate.h"

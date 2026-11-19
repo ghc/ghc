@@ -10,8 +10,6 @@
 
 #include "WSDeque.h"
 
-#include "BeginPrivate.h"
-
 /* typedef for SparkPool in RtsTypes.h */
 
 /* Stats on spark creation/conversion */
@@ -101,5 +99,3 @@ INLINE_HEADER bool fizzledSpark (StgClosure *spark)
 }
 
 #endif // THREADED_RTS
-
-#include "EndPrivate.h"

@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void initializeTimer       (void);
 
 Time getProcessCPUTime     (void);
@@ -23,5 +21,3 @@ void  getUnixEpochTime      (StgWord64 *sec, StgWord32 *nsec);
 
 // Not strictly timing, but related
 W_    getPageFaults         (void);
-
-#include "EndPrivate.h"

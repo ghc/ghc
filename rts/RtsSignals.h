@@ -24,8 +24,6 @@
 
 #if defined(RTS_USER_SIGNALS)
 
-#include "BeginPrivate.h"
-
 /*
  * Function: initUserSignals()
  *
@@ -78,7 +76,4 @@ INLINE_HEADER bool startPendingSignalHandlers(Capability *cap STG_UNUSED)
     return false;
 }
 #endif
-
-#include "EndPrivate.h"
-
 #endif /* RTS_USER_SIGNALS */

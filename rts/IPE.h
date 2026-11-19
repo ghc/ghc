@@ -11,10 +11,6 @@
 #include "Rts.h"
 #include <stdio.h>
 
-#include "BeginPrivate.h"
-
 void dumpIPEToEventLog(void);
 void initIpe(void);
 void exitIpe(void);
-
-#include "EndPrivate.h"

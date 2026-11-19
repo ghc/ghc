@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #define END_BLOCKED_EXCEPTIONS_QUEUE ((MessageThrowTo*)END_TSO_QUEUE)
 
 StgTSO * unblockOne (Capability *cap, StgTSO *tso);
@@ -55,5 +53,3 @@ void printAllThreads (void);
 void printGlobalThreads(void);
 void printThreadQueue (StgTSO *t);
 #endif
-
-#include "EndPrivate.h"

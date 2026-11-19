@@ -13,8 +13,6 @@
 #include "Capability.h"
 #include "Trace.h"
 
-#include "BeginPrivate.h"
-
 /* initScheduler(), exitScheduler()
  * Called from STG :  no
  * Locks assumed   :  none
@@ -181,5 +179,3 @@ emptyRunQueue(Capability *cap)
 }
 
 #endif /* !IN_STG_CODE */
-
-#include "EndPrivate.h"

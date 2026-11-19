@@ -14,10 +14,6 @@ RTS_PUBLIC StgStack* cloneStack(Capability* capability, const StgStack* stack);
 
 RTS_PUBLIC void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
 
-#include "BeginPrivate.h"
-
 #if defined(THREADED_RTS)
 void handleCloneStackMessage(Capability *cap, MessageCloneStack *msg);
 #endif
-
-#include "EndPrivate.h"

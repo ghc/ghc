@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 // An absolute time value in units of 10ms.
 typedef StgWord LowResTime;
 
@@ -21,6 +19,3 @@ void wakeupIOManagerSelect(CapIOManager *iomgr);
 
 bool awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait);
 void interruptIOManagerSelect(CapIOManager *iomgr);
-
-#include "EndPrivate.h"
-

@@ -16,8 +16,6 @@
 #include "RtsProbes.h"
 #endif /* defined(DTRACE) */
 
-#include "BeginPrivate.h"
-
 // -----------------------------------------------------------------------------
 // EventLog API
 // -----------------------------------------------------------------------------
@@ -1026,5 +1024,3 @@ INLINE_HEADER void traceTaskDelete(Task *task STG_UNUSED)
     }
     dtraceTaskDelete(serialisableTaskId(task));
 }
-
-#include "EndPrivate.h"

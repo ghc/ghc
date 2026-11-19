@@ -10,8 +10,6 @@
 
 #include "Capability.h"
 
-#include "BeginPrivate.h"
-
 /* -----------------------------------------------------------------------------
    Initialisation / De-initialisation
    -------------------------------------------------------------------------- */
@@ -216,5 +214,3 @@ INLINE_HEADER void clear_blocks(bdescr *bd) {
   memset(bd->start, RtsFlags.DebugFlags.zero_on_gc ? 0xaa : 0,
          BLOCK_SIZE * bd->blocks);
 }
-
-#include "EndPrivate.h"

@@ -11,8 +11,6 @@
 #include "Rts.h"
 #include "Libdw.h"
 
-#include "BeginPrivate.h"
-
 #if USE_LIBDW
 
 /* Initialize the pool */
@@ -23,5 +21,3 @@ void libdwPoolInit(void);
 INLINE_HEADER void libdwPoolInit(void) {}
 
 #endif /* USE_LIBDW */
-
-#include "EndPrivate.h"

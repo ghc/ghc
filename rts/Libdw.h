@@ -13,8 +13,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #if USE_LIBDW
 
 /* Begin a libdw session. A session is tied to a particular capability */
@@ -38,5 +36,3 @@ int libdwForEachFrameOutwards(Backtrace *bt,
                               void *user_data);
 
 #endif /* USE_LIBDW */
-
-#include "EndPrivate.h"

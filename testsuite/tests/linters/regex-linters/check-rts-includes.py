@@ -66,38 +66,8 @@ class RtsHIncludeOrderLinter(Linter):
                     line_content=lines[line_no-1],
                     message="PosixSource.h must be first header included in each file"))
 
-class PrivateIncludeLinter(Linter):
-    """
-    Verify that system headers are not #include'd in <BeginPrivate.h> blocks as this
-    can result in very hard-to-diagnose linking errors due to hidden library functions.
-    """
-    def __init__(self):
-        Linter.__init__(self)
-        self.add_path_filter(in_rts_dir)
-        self.add_path_filter(lambda path: path.suffix == '.h')
-
-    def lint(self, path: Path):
-        private = False
-        try:
-            lines = path.read_text(encoding="utf-8").split('\n')
-            for line_no, include in get_includes(path):
-                if include == '"BeginPrivate.h"':
-                    private = True
-                elif include == '"EndPrivate.h"':
-                    private = False
-                elif private:
-                    self.add_warning(Warning(
-                        path=path,
-                        line_no=line_no,
-                        line_content=lines[line_no-1],
-                        message='System header %s found inside of <BeginPrivate.h> block' % include))
-        except Exception as e:
-            e.add_note(f"While handling {path}")
-            raise e
-
 linters = [
     RtsHIncludeOrderLinter(),
-    PrivateIncludeLinter(),
 ]
 
 if __name__ == '__main__':

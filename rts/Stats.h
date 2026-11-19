@@ -12,8 +12,6 @@
 #include "sm/GC.h"
 #include "Sparks.h"
 
-#include "BeginPrivate.h"
-
 struct gc_thread_;
 
 void      stat_startInit(void);
@@ -104,5 +102,3 @@ typedef struct RTSSummaryStats_ {
     // one for each generation, 0 first
     GenerationSummaryStats* gc_summary_stats;
 } RTSSummaryStats;
-
-#include "EndPrivate.h"

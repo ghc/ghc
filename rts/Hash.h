@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 typedef struct hashtable HashTable; /* abstract */
 typedef struct strhashtable StrHashTable;
 
@@ -115,5 +113,3 @@ INLINE_HEADER void insertHashSet ( HashSet *set, StgWord key )
 {
     insertHashTable((HashTable*)set, key, NULL);
 }
-
-#include "EndPrivate.h"

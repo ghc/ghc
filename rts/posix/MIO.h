@@ -14,8 +14,6 @@
 # include <signal.h>
 #endif
 
-#include "BeginPrivate.h"
-
 /* Communicating with the IO manager thread (see GHC.Conc).
  */
 #if defined(THREADED_RTS)
@@ -25,5 +23,3 @@ void ioManagerStartCap (/* inout */ Capability **cap);
 
 void timerManagerNotifySignal(int sig, siginfo_t *info);
 #endif
-
-#include "EndPrivate.h"

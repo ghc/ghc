@@ -37,8 +37,6 @@
 #include "RtsPublic.h"
 #include "Capability.h"
 
-#include "BeginPrivate.h"
-
 
 /* The ClosureTable can be used in two different modes:
  *
@@ -279,6 +277,3 @@ void *indexClosureTable(ClosureTable *t, int ix)
 
     return t->arr->payload[ix];
 }
-
-#include "EndPrivate.h"
-

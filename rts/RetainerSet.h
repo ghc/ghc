@@ -13,8 +13,6 @@
 
 #if defined(PROFILING)
 
-#include "BeginPrivate.h"
-
 /*
   Type 'retainer' defines the retainer identity.
 
@@ -143,7 +141,4 @@ void outputAllRetainerSet(FILE *);
 */
 #define hashKeySingleton(r)       ((StgWord)(r))
 #define hashKeyAddElement(r, s)   (hashKeySingleton((r)) + (s)->hashKey)
-
-#include "EndPrivate.h"
-
 #endif /* PROFILING */

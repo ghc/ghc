@@ -7,8 +7,4 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 void initBuiltinClosures(void);
-
-#include "EndPrivate.h"

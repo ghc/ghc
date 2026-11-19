@@ -28,8 +28,6 @@
 #include <poll.h> /* for struct pollfd */
 #endif
 
-#include "BeginPrivate.h"
-
 /* The per-capability data structures belonging to the I/O manager.
  *
  * It can be accessed as cap->iomgr. Or given just the iomgr, you can access
@@ -115,6 +113,3 @@ INLINE_HEADER void setTsoIOOpOutcome (StgTSO *tso,
     tso->stackobj->sp[1] = (W_)outcome;
     tso->stackobj->sp[2] = (W_)result;
 }
-
-#include "EndPrivate.h"
-

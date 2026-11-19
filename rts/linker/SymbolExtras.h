@@ -3,8 +3,6 @@
 #include "Rts.h"
 #include "LinkerInternals.h"
 
-#include "BeginPrivate.h"
-
 #if defined(NEED_SYMBOL_EXTRAS)
 
 int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize);
@@ -23,5 +21,3 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
 
 #endif /* powerpc_HOST_ARCH || x86_64_HOST_ARCH */
 #endif /* NEED_SYMBOL_EXTRAS */
-
-#include "EndPrivate.h"
