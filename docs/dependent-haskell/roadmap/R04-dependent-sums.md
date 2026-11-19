@@ -73,3 +73,20 @@ that changes the returned length also prevents its use.
 - [x] Check the projection through a compiled interface. Check a
   mismatched index and the two independent field-demand examples.
 - [x] Use the ordinary imported first projection in the result signature.
+
+## Abstract over the payload family
+
+The family parameter `p` may itself be a variable. The promoted kind
+binds the witness before applying `p` to it. The same `project`
+implementation works at `Vec Char` and at `Const Int`.
+
+```haskell
+project :: foreach (q :: Retained p) -> p (Witness q)
+project (Retain _ value) = value
+```
+
+The checker compares the actual kind of the supplied family with its
+declared kind. It requires a lifted payload type. This check preserves
+the matchability of the family argument. The result still depends on the
+caller’s package when the family is unknown.
+[Generic implementation](../examples/packed-vector/RetainedNat.hs).

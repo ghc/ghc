@@ -104,6 +104,7 @@ import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
 import PackedVecLibrary
 import RetainedNat (Retained(..), constantPackage, withRetained)
+import qualified RetainedNat
 import qualified QualifiedPiLibrary as Qualified
 import qualified ReadNatural
 import qualified Type.Reflection as Reflection
@@ -1290,6 +1291,9 @@ listBoundaries = do
     observe "project the length of a known dependent package in a type"
         (Refl :: PackedProjection.Length PackedProjection.One :~: 'S 'Z)
     let vector = Retain n (replicateNative n 'x') :: Retained (Vec Char)
+    let seven = constantPackage (error "unused projected witness") (7 :: Int)
+    observe "project from two payload families with the same dependent function"
+        (toList (RetainedNat.project vector), getConst (RetainedNat.project seven))
     observe "use the stored length and vector in a generic dependent eliminator"
         (withRetained vector (\k v -> (natToInt k, toList v)))
     observe "read either package field without demanding its sibling"

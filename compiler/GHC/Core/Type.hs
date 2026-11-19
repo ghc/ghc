@@ -2392,12 +2392,13 @@ nativeIndexType structural_fields = go []
       | TyConApp tc args <- coreFullView ty
       , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
       , not (isTypeDataTyCon tc), tyConArity tc == length args
-      , all (tcIsLiftedTypeKind . tyVarKind) (tyConTyVars tc)
       , tcIsLiftedTypeKind (typeKind ty)
-      , all argument args
       , null (tyConStupidTheta tc)
       , let cons = tyConDataCons tc
             package_root = structural_fields && null path && isSingleton cons
+      , (all (tcIsLiftedTypeKind . tyVarKind) (tyConTyVars tc) && all argument args)
+         || (package_root && any dataConHasPromotedRetained cons
+             && and (zipWith package_argument (tyConTyVars tc) args))
       , Just fields <- concat <$> traverse (con_fields package_root ty args) cons
       = all (field ((tc, args) : path)) fields
       | otherwise = False
@@ -2416,6 +2417,16 @@ nativeIndexType structural_fields = go []
       | structural_fields = isNativeOpaqueValueType arg
       | otherwise = noFreeVarsOfType arg && isTauTy arg
                     && isNativeOpaqueValueType arg
+
+    -- A checked root package alone can use an ordinary higher-kinded
+    -- parameter. Its kind must accept a closed lifted witness and return Type.
+    package_argument tv arg
+      | tcIsLiftedTypeKind (tyVarKind tv) = argument arg
+      | Just (_, _, _, domain, range) <- splitFunTy_maybe (tyVarKind tv)
+      , range `eqType` liftedTypeKind
+      , isNativeClosedIndexType domain
+      = typeKind arg `eqType` tyVarKind tv
+      | otherwise = False
 
     con_fields package_root domain args con
       | package_root

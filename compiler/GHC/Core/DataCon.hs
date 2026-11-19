@@ -1302,8 +1302,11 @@ second argument kind.
 
 The source and interface readers use the same shape check. This
 subset admits one direct occurrence of the witness in the final
-argument of the payload type. Other arguments and the result contain
-no runtime Ids. The supported payload multiplicities affect the
+argument of the payload type. The head can be a type constructor, as
+in `Vec a n`, or a universal parameter, as in `p n`. In the latter
+case, the domain of `p` must match the witness type and its result
+must be lifted. Other arguments and the result contain no runtime Ids.
+The supported payload multiplicities affect the
 runtime constructor only. Promotion does not supply any evidence
 that a runtime scrutinee equals this promoted constructor.
 -}
@@ -1324,13 +1327,25 @@ promotedRetainedFields con
   , isNativeClosedIndexType witness_ty
   , witness_ty `eqType` varType witness
   , not (anyFreeVarsOfType isId result)
-  , Just (head_tc, args) <- splitTyConAppNoView_maybe body
-  , TermVarTy v : reverse_prefix <- reverse args
-  , witness == v
-  , let prefix = reverse reverse_prefix
-  , all (not . anyFreeVarsOfType isId) prefix
-  = Just (witness, \index -> mkTyConApp head_tc (prefix ++ [index]))
+  , Just payload <- abstract_payload univs witness body
+  = Just (witness, payload)
   | otherwise = Nothing
+  where
+    abstract_payload univs witness (AppTy head_ty@(TyVarTy family) (TermVarTy v))
+      | family `elem` univs
+      , witness == v
+      , Just (_, _, _, domain, range) <- splitFunTy_maybe (tyVarKind family)
+      , domain `eqType` varType witness
+      , range `eqType` liftedTypeKind
+      = Just (mkAppTy head_ty)
+    abstract_payload _ witness body
+      | Just (head_tc, args) <- splitTyConAppNoView_maybe body
+      , TermVarTy v : reverse_prefix <- reverse args
+      , witness == v
+      , let prefix = reverse reverse_prefix
+      , all (not . anyFreeVarsOfType isId) prefix
+      = Just (\index -> mkTyConApp head_tc (prefix ++ [index]))
+      | otherwise = Nothing
 
 freshNames :: [Name] -> [Name]
 -- Make an infinite list of Names whose Uniques and OccNames

@@ -35,10 +35,13 @@ import PackedVecLibrary
 import RetainedNat
 
 main :: IO ()
-main = print (withRetained (constantPackage (error "unused witness") (7 :: Int))
+main = do
+  print (withRetained (constantPackage (error "unused witness") (7 :: Int))
                   (\_ box -> getConst box),
               withRetained (constantPackage Z (error "unused payload" :: Int))
                   (\n _ -> natToInt n))
+  let q = constantPackage (error "unused projected witness") (7 :: Int)
+  print (getConst (project q))
 HS
 "${g[@]}" -c Main.hs
 "${g[@]}" Main.o ../provider/{PackedVecLibrary,RetainedNat}.o -o run
@@ -157,3 +160,18 @@ if "${g[@]}" -fforce-recomp -DWRONG_WITNESS -c NativePackageOperand.hs >bad.log 
     cat bad.log >&2
     exit 1
 fi
+
+reject_family() {
+    local flag=$1 anchor=$2 expected=$3
+    local line
+    line=$(awk -v anchor="$anchor" 'index($0,anchor) == 1 {print NR}' NativePackageOperand.hs)
+    if "${g[@]}" -fforce-recomp "-D$flag" -c NativePackageOperand.hs >bad.log 2>&1 ||
+       ! grep -Fq "NativePackageOperand.hs:$line:" bad.log ||
+       ! grep -Fq "$expected" bad.log; then
+        cat bad.log >&2
+        exit 1
+    fi
+}
+reject_family WRONG_FAMILY_RESULT 'wrongFamilyResult (Retain' '[GHC-83865]'
+reject_family WRONG_FAMILY_KIND 'type WrongFamily =' '[GHC-83865]'
+reject_family SHIFTED_WITNESS "    ShiftWitness ('Shift" '[GHC-83605]'
