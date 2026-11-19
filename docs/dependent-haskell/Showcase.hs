@@ -48,6 +48,7 @@ import qualified Data.Char
 import qualified Data.Either
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.Functor.Const (getConst)
 import Data.Kind (Type)
 import Data.List (isInfixOf)
 import qualified Data.List
@@ -101,6 +102,7 @@ import qualified PairProjection as ComputedProjection
 import qualified OrdinaryVecClient as Ordinary
 import qualified ParameterizedIndexLibrary as Parameterized
 import PackedVecLibrary
+import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified QualifiedPiLibrary as Qualified
 import qualified ReadNatural
 import qualified Type.Reflection as Reflection
@@ -1281,6 +1283,14 @@ listBoundaries = do
     observe "ordinary zip with a short input" (Ordinary.ordinaryZipExact n xs [1 :: Int])
     observe "safeHead after checking for exactly one cell" (first "x", first "", first "xy")
     observe "first cell of a packaged list" (headPacked (packList ('p' : undefined)))
+    let vector = Retain n (replicateNative n 'x') :: Retained (Vec Char)
+    observe "use the stored length and vector in a generic dependent eliminator"
+        (withRetained vector (\k v -> (natToInt k, toList v)))
+    observe "read either package field without demanding its sibling"
+        ( withRetained (constantPackage (error "unused witness") (7 :: Int))
+              (\_ box -> getConst box)
+        , withRetained (constantPackage n (error "unused payload" :: Int))
+              (\k _ -> natToInt k) )
     observe "checked row prefix with a runtime length"
         (toList <$> prefixRowExact n 'x' xs, toList <$> prefixRowExact n 'x' "a")
   where

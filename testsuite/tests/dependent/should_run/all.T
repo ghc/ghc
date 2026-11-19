@@ -253,3 +253,9 @@ test('NativeTypeCaseReify',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'NativeCase.hs'])],
      multimod_compile, ['NativeTypeCaseReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
+
+test('NativeRetainedPackage',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/RetainedNat.hs'])],
+     run_command, ['bash NativeRetainedPackage.sh "{compiler}" "{libdir}"'])

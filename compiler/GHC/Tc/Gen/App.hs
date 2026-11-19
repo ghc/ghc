@@ -2837,11 +2837,18 @@ could bypass the representation checks in ordinary instantiation. Keep the
 unconstrained routes unchanged. Constructor candidates remain unconstrained.
 See Note [Immutable retained result instantiation] and
 Note [Generic retained argument inference].
+
+A record selector also carries a checked Id. For example, applying
+getConst to a known Const Int n can instantiate its erased index with the
+local runtime n. Inspect the selector Id's concreteness requirements in
+the same way as for a variable head.
 -}
 
 -- | Check that a known application head has no concreteness requirements.
 hasNoConcreteTyVars :: HsExpr GhcTc -> Bool
 hasNoConcreteTyVars (HsVar _ (L _ var)) = isEmptyNameEnv (idConcreteTvs var)
+hasNoConcreteTyVars (XExpr (HsRecSelTc (FieldOcc _ (L _ sel))))
+  = isEmptyNameEnv (idConcreteTvs sel)
 hasNoConcreteTyVars (XExpr (ConLikeTc (RealDataCon dc)))
   = isEmptyNameEnv (dataConConcreteTyVars dc)
 hasNoConcreteTyVars _ = False

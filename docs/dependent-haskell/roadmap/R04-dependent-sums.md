@@ -24,7 +24,17 @@ The consumer chooses a single result type `r`. Inside the match it can
 use the payload at the stored index. Stage1 compiled the polymorphic
 consumer with Core and STG lint. The program read a constant payload
 with an exceptional witness. It also read a zero witness with an
-exceptional payload. [Existing vector package](../examples/packed-vector/PackedVecLibrary.hs).
+exceptional payload. [Generic package](../examples/packed-vector/RetainedNat.hs).
+The [Showcase](../Showcase.hs) uses the same
+eliminator with both `Vec Char` and `Const Int`. [Existing vector package](../examples/packed-vector/PackedVecLibrary.hs).
+
+The imported selector `getConst` can infer the erased index from its
+argument. An ordinary client can use `withRetained p (\_ c -> getConst c)`
+without writing a type application. A selector whose result still depends
+on the private index cannot export that index as a caller-chosen type.
+A direct constructor pattern on this polymorphic `Const` still needs
+separate inference work.
+[Interface and escape controls](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
 ## Missing projection
 
