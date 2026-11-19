@@ -880,3 +880,31 @@ interfaces.
 [Producer](../examples/open-evaluation/SpineWorker.hs),
 [stripped-interface tests](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh),
 and [interface upgrade](../examples/open-evaluation/check-case-upgrade.sh).
+
+### Passing a function as the carried operand
+
+`Prelude.map Prelude.not` needs the function value of `not` before it
+has a Boolean argument. There are two source tests. For a closed list,
+the ordinary evaluator can in principle pass the function to `map`
+inside one Core expression and read the resulting list. For an open
+list, an exported `NegateAll xs` must keep the function application in
+the interface until a client supplies a constructor. The second test
+also needs the rules for unapplied functions and their equality.
+The R23 card owns the distinction between matchable and unmatchable
+arrows. [R23 implementation and compatibility](R23-unsaturated-type-families.md)
+and [the function promotion roadmap](https://ghc.serokell.io/dh#function-promotion).
+
+`map` also scrutinizes its second argument. Its first argument is the
+function carried into the recursive call. The M162 check scrutinizes the
+first argument and carries the second. A separately defined worker can
+exercise the general argument order without Prelude's fusion rules.
+The Prelude case must also account for the rules attached to the
+installed definition.
+
+M163 reports GHC-37479 at `P.not` for both the closed list and the
+open alias. A rule-free ordinary worker with either of two different
+callbacks reports the same error at the callback. An explicit
+unmatchable arrow also leaves the separate family-saturation test
+blocked: GHC-27346 requires the Boolean family `Flip` to receive its
+argument. The companion negative test correctly rejects deriving
+`a :~: b` from `f a :~: f b` for an unmatchable `f`.

@@ -9038,3 +9038,16 @@ Check the full type of an imported function that uses a boxed datatype.
 Verify the resolved constructor and its application in Core. Exercise an
 ordinary `Maybe` elimination, a local strictness control and an imported
 signature with a type family inside `Maybe`.
+
+Both compiler stages built at `7a77369c05`. Native execution at both
+stages and self-hosted GHCi agreed on 234 Showcase lines. The normal
+dependent directory passed 240 of 275 exercised cases. All 35 failures
+matched M160 individually. Both compilers accepted the same 115 of
+124 ordinary polykinds programs. The interface upgrades and the boundary
+plugin and splice checks passed.
+
+The next R21 examples omit the explicit `forall` and then omit the
+signature for the same local `keep`. Both report GHC-70566 at the
+family equation. For R16, closed and open calls to `Prelude.map`
+both report GHC-37479 at `Prelude.not`. See the
+[higher-order source cases](roadmap/R16-open-term-evaluator.md#passing-a-function-as-the-carried-operand).

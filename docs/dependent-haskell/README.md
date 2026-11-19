@@ -8,9 +8,9 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. Native execution and GHCi agree on all 233 Showcase lines.
+Updated 2026-11-19. Native execution and GHCi agree on all 234 Showcase lines.
 The normal-way dependent directory passed 240 of 275 exercised cases.
-The 35 remaining failures produced the same output as at M158 (`549380d318`).
+The 35 remaining failures produced the same output as at M160 (`8ce7c7370e`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
@@ -23,11 +23,12 @@ Changing the last helper to produce `Unmarked` rejects the unchanged
 client's proof. An ordinary module can also export `secondOrFirst`.
 A client can prove that this function selects the second element of a
 spine even when the remaining tail is unknown. An imported open family
-can use a signed local function that calls `Prelude.id` or an imported
-projection. Changing that projection's body can change the result of the
-family equation. For a recursive ordinary worker, the type checker can
-also prove `erase (More x xs) = More True (erase xs)` through its
-interface while `xs` is unknown. [Current source examples](Showcase.hs)
+can use a signed local function that calls `Prelude.id`, an imported
+projection, or `maybe x id (Just x)`. Changing the projection's body
+can change the result of the family equation. For a recursive
+ordinary worker, a client can prove `fill (More x xs) tag = More tag (fill xs tag)`
+through its interface while both `xs` and `tag` are unknown.
+[Current source examples](Showcase.hs)
 and [next cases](ROADMAP.md#current-work-queue).
 
 The [closed-pair experiment](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable)

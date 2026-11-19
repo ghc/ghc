@@ -169,12 +169,33 @@ HS
     echo 'The compiler upgraded the reachable helper chain and reused the ordinary module and warm build.'
 fi
 
-if [[ $# -ge 8 ]]; then
-    mkdir "$out/private-case"
-    cd "$out/private-case"
+# All three upgrades use the same public spine and two unrelated modules.
+compile_old_spine() {
+    local dir=$1 compiler=$2
+    mkdir "$out/$dir"
+    cd "$out/$dir"
     cp "$src/SpineWorker.hs" "$out/latest/IdentityOnly.hs" "$out/Abstract.hs" .
-    "$8" "${flags[@]}" -v0 -c SpineWorker.hs IdentityOnly.hs Abstract.hs
+    "$compiler" "${flags[@]}" -v0 -c SpineWorker.hs IdentityOnly.hs Abstract.hs
     "$current" "${flags[@]}" --show-iface SpineWorker.hi >old.worker
+}
+
+check_spine_upgrade() {
+    local reason=$1 table
+    shift
+    local targets=(Proof.hs IdentityOnly.hs Abstract.hs)
+    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >upgrade.log 2>&1 ||
+        { cat upgrade.log; exit 1; }
+    grep -Eq "Compiling SpineWorker[[:space:]].*\[$reason\]" upgrade.log ||
+        { cat upgrade.log; exit 1; }
+    if grep -Eq 'Compiling (IdentityOnly|Abstract)[[:space:]]' upgrade.log; then cat upgrade.log; exit 1; fi
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >new.worker
+    for table in "$@"; do grep -Fq "T:$table " new.worker; done
+    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >warm.log 2>&1
+    if grep -Fq 'Compiling ' warm.log; then cat warm.log; exit 1; fi
+}
+
+if [[ $# -ge 8 ]]; then
+    compile_old_spine private-case "$8"
     grep -Fq 'T:markField ' old.worker
     if grep -Eq 'T:(headOr|secondOrFirst) ' old.worker; then exit 1; fi
 
@@ -196,24 +217,12 @@ singleton = Refl
 second :: Second ('W.More 'True ('W.More 'False xs)) :~: 'Just 'False
 second = Refl
 HS
-    targets=(Proof.hs IdentityOnly.hs Abstract.hs)
-    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >upgrade.log 2>&1 ||
-        { cat upgrade.log; exit 1; }
-    grep -Eq 'Compiling SpineWorker[[:space:]].*\[Compiler now checks private constructor cases\]' upgrade.log
-    if grep -Eq 'Compiling (IdentityOnly|Abstract)[[:space:]]' upgrade.log; then cat upgrade.log; exit 1; fi
-    "$current" "${flags[@]}" --show-iface SpineWorker.hi >new.worker
-    for helper in headOr secondOrFirst; do grep -Fq "T:$helper " new.worker; done
-    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >warm.log 2>&1
-    if grep -Fq 'Compiling ' warm.log; then cat warm.log; exit 1; fi
+    check_spine_upgrade "Compiler now checks private constructor cases" headOr secondOrFirst
     echo 'The compiler upgraded the private case producer and reused the unrelated modules and warm build.'
 fi
 
 if [[ $# -ge 9 ]]; then
-    mkdir "$out/recursive-case"
-    cd "$out/recursive-case"
-    cp "$src/SpineWorker.hs" "$out/latest/IdentityOnly.hs" "$out/Abstract.hs" .
-    "$9" "${flags[@]}" -v0 -c SpineWorker.hs IdentityOnly.hs Abstract.hs
-    "$current" "${flags[@]}" --show-iface SpineWorker.hi >old.worker
+    compile_old_spine recursive-case "$9"
     grep -Fq 'T:headOr ' old.worker
     if grep -Fq 'T:erase ' old.worker; then exit 1; fi
 
@@ -234,24 +243,12 @@ import Residual (Erase)
 proof :: Proxy xs -> Erase ('W.More 'False xs) :~: 'W.More 'True (Erase xs)
 proof _ = Refl
 HS
-    targets=(Proof.hs IdentityOnly.hs Abstract.hs)
-    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >upgrade.log 2>&1 ||
-        { cat upgrade.log; exit 1; }
-    grep -Eq 'Compiling SpineWorker[[:space:]].*\[Compiler now checks recursive constructor cases\]' upgrade.log
-    if grep -Eq 'Compiling (IdentityOnly|Abstract)[[:space:]]' upgrade.log; then cat upgrade.log; exit 1; fi
-    "$current" "${flags[@]}" --show-iface SpineWorker.hi >new.worker
-    grep -Fq 'T:erase ' new.worker
-    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >warm.log 2>&1
-    if grep -Fq 'Compiling ' warm.log; then cat warm.log; exit 1; fi
+    check_spine_upgrade "Compiler now checks recursive constructor cases" erase
     echo 'The compiler upgraded the recursive case producer and reused the unrelated modules and warm build.'
 fi
 
 if [[ $# -eq 10 ]]; then
-    mkdir "$out/carried-case"
-    cd "$out/carried-case"
-    cp "$src/SpineWorker.hs" "$out/latest/IdentityOnly.hs" "$out/Abstract.hs" .
-    "${10}" "${flags[@]}" -v0 -c SpineWorker.hs IdentityOnly.hs Abstract.hs
-    "$current" "${flags[@]}" --show-iface SpineWorker.hi >old.worker
+    compile_old_spine carried-case "${10}"
     grep -Fq 'T:erase ' old.worker
     if grep -Fq 'T:fill ' old.worker; then exit 1; fi
 
@@ -273,14 +270,6 @@ proof :: forall (xs :: W.Spine Bool) (tag :: Maybe Bool).
          Proxy xs -> Proxy tag -> Fill ('W.More 'False xs) tag :~: 'W.More tag (Fill xs tag)
 proof _ _ = Refl
 HS
-    targets=(Proof.hs IdentityOnly.hs Abstract.hs)
-    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >upgrade.log 2>&1 ||
-        { cat upgrade.log; exit 1; }
-    grep -Eq 'Compiling SpineWorker[[:space:]].*\[Compiler now checks recursive cases with carried arguments\]' upgrade.log
-    if grep -Eq 'Compiling (IdentityOnly|Abstract)[[:space:]]' upgrade.log; then cat upgrade.log; exit 1; fi
-    "$current" "${flags[@]}" --show-iface SpineWorker.hi >new.worker
-    grep -Fq 'T:fill ' new.worker
-    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >warm.log 2>&1
-    if grep -Fq 'Compiling ' warm.log; then cat warm.log; exit 1; fi
+    check_spine_upgrade "Compiler now checks recursive cases with carried arguments" fill
     echo 'The compiler upgraded the carried case producer and reused the unrelated modules and warm build.'
 fi

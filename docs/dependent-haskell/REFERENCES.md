@@ -5699,3 +5699,25 @@ actual linked implementation while preserving the source interface.
 [interactive Core compilation](../../compiler/GHC/Driver/Main/Passes.hs),
 [linkable selection](../../compiler/GHC/Linker/Deps.hs) and
 [field readback experiment](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable).
+
+Weirich, Voizard, de Amorim and Eisenberg give separate rules for
+evaluation and equality evidence in the presence of nontermination.
+This distinction also applies to the probe. The type checker can verify
+which tagged result a particular executable returned. A new equality
+between arbitrary applications would need its own justification.
+[A Specification for Dependent Types in Haskell](https://doi.org/10.1145/3110275)
+and [the boundary example](BOUNDARY-EVIDENCE.md#what-does-an-observation-establish).
+
+Agda's list `replicate` recurses on the predecessor and passes the
+element unchanged. M162 checks the same relationship between the two
+arguments of `fill` in ordinary Core. The recursive tail can remain
+unknown because the input cell determines the outer output constructor.
+[Agda list operations](https://agda.github.io/agda-stdlib/master/Data.List.Base.html)
+and [the checked spine equation](roadmap/R16-open-term-evaluator.md#m162-structural-recursion-with-an-unchanged-argument).
+
+Agda's `maybe′` applies the selected function to the field of a
+known `just`. M163 uses the ordinary Haskell `maybe` with its own
+argument order. The scheduler checks the imported signature and the
+actual constructor worker. The evaluator can then select the `Just`
+branch without inspecting its field. [Agda Maybe eliminators](https://agda.github.io/agda-stdlib/master/Data.Maybe.Base.html)
+and [the family producer](examples/open-evaluation/ImportedFamily.hs).
