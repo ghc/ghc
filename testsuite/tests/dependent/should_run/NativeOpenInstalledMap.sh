@@ -24,7 +24,7 @@ line=$(awk '/^preludeNil =/ { print NR }' PreludeMapProof.hs)
 if "${ghc[@]}" -O0 -fenable-rewrite-rules -fforce-recomp -c PreludeMapProof.hs >rules.log 2>&1 ||
    ! grep -Fq "PreludeMapProof.hs:$line:" rules.log ||
    ! grep -Fq '[GHC-83605]' rules.log ||
-   ! grep -Fq 'only when rewrite rules are disabled' rules.log ||
+   ! grep -Fq 'with the current rewrite rules' rules.log ||
    ! grep -Fq 'Use -fno-enable-rewrite-rules in the module that needs this equation.' rules.log; then
     cat rules.log >&2
     exit 1
@@ -109,5 +109,26 @@ if "${ghc[@]}" -O1 -fenable-rewrite-rules -DCHECK_PROOF -fforce-recomp -c Main.h
    ! grep -Fq "Main.hs:$line:" orphan.log ||
    ! grep -Fq '[GHC-83605]' orphan.log; then
     cat orphan.log >&2
+    exit 1
+fi
+
+# A checked identity rule admits an optimized proof. Adding an orphan
+# to a previously imported module invalidates the unchanged proof.
+mkdir "$out/identity"
+cd "$out/identity"
+cp "$out/rewrite/"*.hs .
+printf 'module Orphan () where\n' >Orphan.hs
+identity=("${ghc[@]}" -O1 -fenable-rewrite-rules -DCHECK_PROOF)
+"${identity[@]}" --make Main.hs -o run
+[[ $(./run) == '(False,False)' ]]
+"${identity[@]}" -v1 --make Main.hs -o run >warm.log 2>&1
+if grep -Fq 'Compiling ' warm.log; then cat warm.log >&2; exit 1; fi
+cp "$out/rewrite/Orphan.hs" Orphan.hs
+if "${identity[@]}" -v1 --make Main.hs -o run >changed.log 2>&1 ||
+   ! grep -Fq 'Compiling Main' changed.log ||
+   ! grep -Fq '[Orphan changed]' changed.log ||
+   ! grep -Fq "Main.hs:$line:" changed.log ||
+   ! grep -Fq '[GHC-83605]' changed.log; then
+    cat changed.log >&2
     exit 1
 fi

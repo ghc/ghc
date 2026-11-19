@@ -3720,8 +3720,8 @@ pprRetainedQuantificationError reason = case reason of
   RetainedResultWrapper ->
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedFinalCoreRulesEnabled fun ->
-    vcat [ text "GHC can use the checked equation for" <+> quotes (ppr fun)
-            <+> text "only when rewrite rules are disabled."
+    vcat [ text "GHC cannot use the checked equation for" <+> quotes (ppr fun)
+            <+> text "with the current rewrite rules."
          , text "Use -fno-enable-rewrite-rules in the module that needs this equation." ]
   RetainedSourceRule fun ->
     text "A rewrite rule can change the result of" <+> quotes (ppr fun)

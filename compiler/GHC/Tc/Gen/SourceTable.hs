@@ -361,6 +361,35 @@ hasSourceMethodRuleAt rules first fun = any user_rule (getRules rules (globalise
       , tyConName tc == other, isGenerativeTyCon tc Nominal = False
     user_rule rule = not (isAutoRule rule || isNeverActive (ruleActivation rule))
 
+-- | Check that every visible rule of a certified mapper preserves its two list equations.
+-- See Note [Identity traversal rules].
+checkedMapperRules :: RuleEnv -> Id -> Bool
+checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation)
+                                         (getRules env (globaliseId owner)) of
+    [] -> False
+    rules -> all identityTraversal rules
+  where
+    identityTraversal Rule{ru_fn = fn, ru_bndrs = [a, xs],
+                           ru_args = [Core.Type input, Core.Type output,
+                                      Core.Lam x (Core.Var y), Core.Var arg],
+                           ru_rhs = Core.Var result}
+      = fn == idName owner && getTyVar_maybe input == Just a && eqType input output
+        && isId x && x == y && eqType (varType x) input
+        && isId xs && xs == arg && arg == result && eqType (varType xs) (mkListTy input)
+    identityTraversal _ = False
+
+{- Note [Identity traversal rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For the checked list mapper, mapping the identity lambda over an empty
+list gives the empty list. On a cons it returns the original head and
+maps the same lambda over the tail. Neither side forces the head or
+the tail. These equations also preserve a divergent spine.
+
+Check the binders and both sides of every visible rule. An unverified
+rule can change the result even when another rule is the identity
+traversal. Recheck after processing declarations and splices.
+-}
+
 -- | Check the selected method at the occurrence, and record its semantic dependencies.
 recordSourceMethodUse :: Id -> Id -> Id -> TcM ()
 recordSourceMethodUse dfun selector target =
@@ -476,8 +505,10 @@ changedSourceUse ops = do
     rewriting <- goptM Opt_EnableRewriteRules
     let check [] = pure Nothing
         check (op@(v, arg) : rest)
-          | finalCoreMapperOwner v =
-              if rewriting then pure (Just op) else check rest
+          | finalCoreMapperOwner v = do
+              let local = sourceRuleOwners (tcg_rules env)
+              if rewriting && (idName v `elemNameSet` local || not (checkedMapperRules visible v))
+                then pure (Just op) else check rest
           | otherwise = do
               local <- sourceRuleOwnersAtTc arg (tcg_rules env)
               if idName v `elemNameSet` local || hasSourceMethodRuleAt visible arg v
@@ -580,7 +611,9 @@ checkSourceMethodUsesWithPending env = do
         visible <- visibleSourceMethodRules env
         forM_ (nameSetElemsStable imported) $ \name -> do
           v <- tcLookupId name
-          when (any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name)) (report name)
+          let changed | finalCoreMapperOwner v = not (checkedMapperRules visible v)
+                      | otherwise = any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name)
+          when changed (report name)
 
 -- | Find source functions that a user rule can rewrite.
 sourceRuleOwners :: [LRuleDecl GhcTc] -> NameSet
@@ -1316,10 +1349,14 @@ continues. See keepValidatedSourceMappers in GHC.Driver.Main.Passes.
 
 The final worker check says what the produced binding does. It does not
 prove the rules that another module can use to rewrite a call. The distinct
-interface origin therefore limits use of an equation to a consumer with
-rewrite rules disabled. Forming a type records the interface dependency
-without using the equation. The solver checks the current flag when it
-uses an equation, including through an imported alias.
+interface origin requires the consumer to disable rewriting or check
+every visible rule. The identity traversal rule can pass this check
+because its RHS exposes no new call. A fusion rule can expose other
+rule heads and requires a separate proof.
+
+Forming a type records the interface dependency without using the
+equation. The solver checks the rules when it uses an equation,
+including through an imported alias.
 -}
 
 -- | The two equations for a lazy constructor-to-constructor list map.

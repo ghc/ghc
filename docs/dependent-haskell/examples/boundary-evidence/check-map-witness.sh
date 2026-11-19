@@ -24,7 +24,7 @@ cd client
 line=$(awk '/^fresh = Refl$/ {print NR}' UseMapWitness.hs)
 if "${ghc[@]}" -O1 -fenable-rewrite-rules -DFRESH -c UseMapWitness.hs >fresh.log 2>&1 ||
    ! grep -Eq "^UseMapWitness[.]hs:$line:.*error: \[GHC-83605\]" fresh.log ||
-   ! grep -Fq 'only when rewrite rules are disabled' fresh.log; then
+   ! grep -Fq 'with the current rewrite rules' fresh.log; then
     cat fresh.log >&2
     exit 1
 fi

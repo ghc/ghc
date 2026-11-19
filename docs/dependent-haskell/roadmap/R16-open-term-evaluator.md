@@ -1054,8 +1054,9 @@ a partial combiner. Rule-enabled conversion remains open.
 
 ### Checking an identity traversal with rules enabled
 
-A private compiler accepted an ordinary `-O1` client of a ruled
-mapper. The producer's only active rule replaces
+An ordinary `-O1` client can use a checked equation from an ordinary
+list mapper. The interface must expose its active rules. The maintained
+test uses a producer whose only active rule replaces
 `mapper (\x -> x) xs` with `xs`. On an empty spine each side
 returns the empty list. On a cons each side returns the original head
 and leaves the tail lazy. This check depends on the compiled rule's
@@ -1065,6 +1066,8 @@ The same client failed when the rule returned the input list for Boolean
 negation, or evaluated the head before returning a cons. An imported
 orphan rule and a rule declared after a splice also blocked the proof.
 Changing the producer's rule invalidated the cached ordinary client.
+Adding an orphan rule to an already imported module also recompiles the
+client. [Maintained mapper test](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
 The check covers the identity traversal. The fusion rules on the
 installed `Prelude.map` introduce other functions and need separate checks.
 
