@@ -69,7 +69,8 @@ test('NativeClosedReturnedPair',
                    + config.ghc_th_way_flags])
 test('NativeClosedEnums',
      [req_interp, req_rts_linker, only_ways(['normal']),
-      extra_files(['NativeClosedEnumA.hs', 'NativeClosedEnumB.hs', 'NativeClosedEnumReexport.hs'])],
+      extra_files(['NativeClosedEnumA.hs', 'NativeClosedEnumB.hs', 'NativeClosedEnumReexport.hs',
+                   closed_eval_dir + 'FiniteTree.hs'])],
      multimod_compile_and_run,
      ['NativeClosedEnums', '-dcore-lint -dstg-lint -Werror=unused-imports ' + config.ghc_th_way_flags])
 test('NativeClosedCompoundLists',

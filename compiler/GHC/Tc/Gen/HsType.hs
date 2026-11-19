@@ -2678,31 +2678,36 @@ tcPlanOrdinaryCall mode ordinary fun args
   | ordinary
   , or (zipWith needs_constructor_plan args domains)
   = plan_joint_literals
-  | [arg] <- args = tcPlanClosedCall mode ordinary fun arg
-  | otherwise = do
-      loc <- getSrcSpanM
-      checkCompleteClosedCall mode name
-      tcPreflightClosedCall name
-      operands <- traverse prepare args
-      let (known, empty) = partitionWith split_operand (zip3 args domains operands)
-          in_scope = mkInScopeSet (tyCoVarsOfTypes (rho : predicates))
-      known_subst <- foldM match_known (Subst.mkEmptySubst in_scope) known
-      subst <- choose_empty known_subst empty
-      let inputs = map (Subst.substTy subst) domains
-          result = Subst.substTy subst codomain
-          unresolved = filter (maybe True (not . noFreeVarsOfType) . Subst.lookupTyVar subst) tvs
-          ground_class p = let pred_ty = Subst.substTy subst p
-                           in noFreeVarsOfType pred_ty && isJust (getClassPredTys_maybe pred_ty)
-      unless (null unresolved) $
-        bad ("The operands do not determine the following type parameters: "
-             ++ unwords (map getOccString unresolved) ++ ".")
-      unless (all ground_class predicates && noFreeVarsOfType result &&
-              Subst.substTy subst rho `tcEqType` foldr mkVisFunTyManyU result inputs) $
-        bad "The call must have a fully instantiated ordinary function type."
-      actions <- zipWithM prepare_runtime inputs (zip args operands)
-      run <- tcPrepareClosedCall fun inputs result
-      return (result, setSrcSpan loc (sequence actions >>= run))
+  | ordinary = do
+      aliases <- traverse closedConstructorAlias args
+      if or aliases then plan_joint_literals else plan_default
+  | otherwise = plan_default
   where
+    plan_default
+      | [arg] <- args = tcPlanClosedCall mode ordinary fun arg
+      | otherwise = do
+          loc <- getSrcSpanM
+          checkCompleteClosedCall mode name
+          tcPreflightClosedCall name
+          operands <- traverse prepare args
+          let (known, empty) = partitionWith split_operand (zip3 args domains operands)
+              in_scope = mkInScopeSet (tyCoVarsOfTypes (rho : predicates))
+          known_subst <- foldM match_known (Subst.mkEmptySubst in_scope) known
+          subst <- choose_empty known_subst empty
+          let inputs = map (Subst.substTy subst) domains
+              result = Subst.substTy subst codomain
+              unresolved = filter (maybe True (not . noFreeVarsOfType) . Subst.lookupTyVar subst) tvs
+              ground_class p = let pred_ty = Subst.substTy subst p
+                               in noFreeVarsOfType pred_ty && isJust (getClassPredTys_maybe pred_ty)
+          unless (null unresolved) $
+            bad ("The operands do not determine the following type parameters: "
+                 ++ unwords (map getOccString unresolved) ++ ".")
+          unless (all ground_class predicates && noFreeVarsOfType result &&
+                  Subst.substTy subst rho `tcEqType` foldr mkVisFunTyManyU result inputs) $
+            bad "The call must have a fully instantiated ordinary function type."
+          actions <- zipWithM prepare_runtime inputs (zip args operands)
+          run <- tcPrepareClosedCall fun inputs result
+          return (result, setSrcSpan loc (sequence actions >>= run))
     name = getName fun
     (_, binders, rho) = splitInvisPiTys (varType fun)
     tvs = mapMaybe namedPiTyBinder_maybe binders
@@ -2781,8 +2786,10 @@ tcPlanOrdinaryCall mode ordinary fun args
       | Just (child_loc, child_rdr, child_name, child_args) <- nestedClosedCall arg =
           Left <$> setSrcSpan child_loc (tcPlanClosedHead mode ordinary child_rdr child_name child_args)
       | closedConstructorLiteral arg = return (Right arg)
-      | otherwise = setSrcSpanA (getLoc arg) $
-          bad "Each constructor field must be a closed literal. This operand contains an open or unsupported field."
+      | otherwise = do
+          alias <- closedConstructorAlias arg
+          if alias then return (Right arg) else setSrcSpanA (getLoc arg) $
+            bad "Each constructor field must be a closed literal. This operand contains an open or unsupported field."
 
     check_joint domain (arg, plan) = setSrcSpanA (getLoc arg) $ case plan of
       Left computed@(kind, _) -> do
@@ -3041,6 +3048,20 @@ closedConstructorLiteral arg = case unLoc (ignoreParens arg) of
     closed_argument HsArgPar{} = True
     closed_argument (HsValArg _ operand) = closedConstructorLiteral operand
     closed_argument _ = False
+
+-- | A bare imported nullary synonym can name a constructor operand.
+-- Its checked expansion still has to pass runtime operand admission.
+closedConstructorAlias :: LHsType GhcRn -> TcM Bool
+closedConstructorAlias arg
+  | L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- ignoreParens arg
+  , isExternalName name, isTyConName name = do
+      this_mod <- tcg_semantic_mod <$> getGblEnv
+      if nameIsLocalOrFrom this_mod name then return False else do
+        thing <- tcLookupGlobal name
+        case thing of
+          ATyCon tc -> return (isTypeSynonymTyCon tc && tyConArity tc == 0)
+          _ -> return False
+  | otherwise = return False
 
 -- | Check the literal at the declared input kind and build its runtime value.
 tcClosedTypeCallArgument :: TcTyMode -> Name -> Type -> LHsType GhcRn -> TcM Core.CoreExpr

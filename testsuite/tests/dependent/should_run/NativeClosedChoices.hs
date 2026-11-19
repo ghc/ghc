@@ -32,6 +32,9 @@ alternatives :: ( P.classify 0 :~: 'Left '[ 'a', '\n', '"', 'λ']
                 , Data.Either.isLeft (P.classify 0) :~: 'True )
 alternatives = (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)
 
+ownEither :: P.ownEither 8 :~: 'P.First 8
+ownEither = Refl
+
 main :: IO ()
 main = case (optional, alternatives) of
     ((Refl, Refl, Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)) ->

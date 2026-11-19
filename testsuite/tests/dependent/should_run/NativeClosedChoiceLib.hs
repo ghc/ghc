@@ -28,6 +28,10 @@ unsupported _ = errorWithoutStackTrace "ran an unsupported result"
 -- | An ordinary datatype with the same type name as the library datatype.
 data Either a b = First a | Second b
 
--- | This result must not use the library Either codec.
+-- | Construct the ordinary datatype for the closed evaluator.
+ownEither :: Natural -> Either Natural Bool
+ownEither = First
+
+-- | Fail if result evaluation starts with incomplete constructor imports.
 otherEither :: Natural -> Either Natural Bool
 otherEither _ = errorWithoutStackTrace "ran an unrelated Either"

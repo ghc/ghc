@@ -1,0 +1,5 @@
+NativeClosedExpanding.hs:7:15: error: [GHC-70565]
+    • Cannot evaluate ‘A.expanding’ in a type.
+        Cannot plan the recursive constructor fields of A.Growth [GHC.Internal.Bignum.Natural.Natural]. The recursive type must repeat an earlier type or be a proper subterm of A.Growth GHC.Internal.Bignum.Natural.Natural.
+    • In the first argument of ‘Proxy’, namely ‘(A.expanding 0)’
+      In the type signature: bad :: Proxy (A.expanding 0)

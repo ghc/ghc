@@ -1,5 +1,5 @@
 NativeClosedCharResult.hs:7:23: error: [GHC-70565]
     • Cannot evaluate ‘Data.Char.ord’ in a type.
-        The function returns Int. Closed calls in types currently support results of type Natural, Char, Bool, lists, boxed pairs, Maybe, and Either of supported results, or ordinary nullary enumerations with imported constructors.
+        The function returns Int. Closed calls in types currently support results of type Natural, Char, Bool, lists, boxed pairs, Maybe, and Either of supported results, or ordinary boxed datatypes with supported fields and imported constructors.
     • In the first argument of ‘Proxy’, namely ‘(Data.Char.ord 'x')’
       In the type signature: unsupported :: Proxy (Data.Char.ord 'x')

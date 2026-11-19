@@ -292,9 +292,10 @@ for the result datatype cannot supply either the constructor or its fields.
 and [failure in a present field](../../../testsuite/tests/dependent/should_fail/NativeClosedPresentBottom.hs).
 
 The native checks pass a `Natural` greater than 2^64 through a nested
-`Right (Just (...))` and read back the result. Rebinding the known name
-`Either` in the consumer still rejects an unrelated datatype before
-the interpreter runs the producer. Changing only the recorded producer
+`Right (Just (...))` and read back the result. The installed `Either`
+codec uses the defining module and type name. A user datatype with the
+same type name uses the ordinary algebraic datatype rules described
+below. Changing only the recorded producer
 object from `Right (Just (3, True))` to `Right (Just (4, True))`
 invalidates the old proof. In that check, the producer interfaces are
 byte-for-byte identical. [Lookalike datatype diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedOtherEither.stderr).
@@ -315,7 +316,7 @@ explicit default.
 ## Compound list results and constructor literals
 
 Closed results can contain lists at any supported element kind.
-Supported types are `Natural`, `Char`, `Bool`, and lists, boxed pairs,
+The built-in cases are `Natural`, `Char`, `Bool`, and lists, boxed pairs,
 `Maybe` and `Either` whose element or field types are all supported.
 For example, `Data.List.tails '[1, 2, 3]` returns a list of Natural lists.
 `Prelude.concat` can consume that computed result. The source test also
@@ -389,21 +390,73 @@ works if all its constructors are ordinary nullary constructors.
 [Ordinary producer](../examples/closed-evaluation/Signal.hs)
 and [source controls](../../../testsuite/tests/dependent/should_run/NativeClosedEnums.hs).
 
-The caller must bring every constructor into scope with a non-SOURCE
-import. A qualified import or a re-export suffices. An optimized
+To evaluate a producer result, the caller must bring every constructor
+into scope with a non-SOURCE import. A qualified import or a re-export suffices. An optimized
 interface can contain the representation of an abstract type. Access to
 that metadata alone does not authorize inspection. GHC-70565 identifies
 the type and the import requirement, without printing its private
-constructors. GHC also checks a direct constructor operand at its own
-source span. It records implicit constructor uses for unused-import
-checks and recompilation.
+constructors. GHC records the constructor uses for unused-import checks
+and recompilation.
 [Abstract result](../../../testsuite/tests/dependent/should_fail/NativeClosedEnumAbstract.hs)
-and [partially imported operand](../../../testsuite/tests/dependent/should_fail/NativeClosedEnumOperand.hs).
+and [partially imported result](../../../testsuite/tests/dependent/should_fail/NativeClosedEnumPartial.hs).
 
 A one-shot client was reusable with unchanged inputs. Changing the
 recorded producer object while preserving all interface bytes
 invalidated its old equality. Removing constructor access from the
 re-export interface also invalidated the client with the original
-objects still installed. A general user-defined datatype with fields
-needs a representation for its field kinds, constructor evidence and
-possible recursive occurrences.
+objects still installed.
+
+## M127. Returning finite values of ordinary algebraic datatypes
+
+An ordinary producer can return a value of a parameterized recursive
+datatype. A later ordinary call can consume that value. In this example
+the same source module also defines a polymorphic `leaves` function.
+
+```haskell
+tree :: T.sample 3 :~: 'T.Fork ('T.Leaf 3) ('T.Fork ('T.Leaf 4) ('T.Leaf 5))
+tree = Refl
+
+leaves :: T.leaves (T.sample 3) :~: '[3, 4, 5]
+leaves = Refl
+```
+
+Before execution, GHC checks all constructors of the result type and
+builds a finite graph of their ground field types. A repeated exact type
+uses an existing node. A fresh instantiation of a datatype already on
+the current path must be a proper subterm of the earlier type. This
+admits ordinary and mutual recursion and rejects expanding recursion
+such as `Grow a` containing `Grow [a]`. It can also reject a finite
+cycle where a datatype permutes two different parameter types. The
+diagnostic identifies the two instantiations that failed the check.
+GHC admits boxed strict fields
+with matching source and worker field types. Constructors that require
+evidence, unboxed or unpacked representations, or retained field binders
+are outside this implementation.
+[Ordinary tree](../examples/closed-evaluation/FiniteTree.hs),
+[source tests](../../../testsuite/tests/dependent/should_run/NativeClosedEnums.hs)
+and [expanding recursion](../../../testsuite/tests/dependent/should_fail/NativeClosedExpanding.hs).
+
+The interpreter uses the checked constructors to inspect the actual
+result. It runs the producer once and encodes only the returned
+constructor and its present fields. A user `Show` instance cannot
+choose the constructor or its fields. Full reification forces every
+present field. An infinite value can diverge.
+
+Operand construction follows the constructors in the checked value.
+For a user datatype, each selected constructor must be in scope from a
+non-SOURCE import. For example, a client that imports only `Ready` can
+pass `'Ready` to `score`. The unused alternatives require no codec. The
+constructor wrapper enforces demand when packing strict boxed fields.
+A bare imported nullary type synonym can name an operand. After
+expansion, a private constructor still fails at the operand span
+without printing its name.
+[Private constructor alias](../../../testsuite/tests/dependent/should_fail/NativeClosedEnumOperand.hs)
+and [partially imported unrelated `Either`](../../../testsuite/tests/dependent/should_fail/NativeClosedOtherEither.hs).
+
+The self-hosted compiler passed the recursive-result and selected-operand
+checks with the internal and external interpreter. The checks used Core
+and STG lint. They covered tree reconstruction, mutual recursion, boxed
+strict fields and failure at bottom in a selected field. They rebuilt the provider
+with an additional constructor, leaving the client source, producer
+signature and returned `Leaf` fixed. The unchanged client failed
+because its explicit constructor import became partial.

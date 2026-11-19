@@ -1,5 +1,5 @@
 NativeClosedEnumField.hs:7:15: error: [GHC-70565]
-    • Cannot evaluate ‘A.strictValue’ in a type.
-        The function returns Strict. Closed calls in types currently support results of type Natural, Char, Bool, lists, boxed pairs, Maybe, and Either of supported results, or ordinary nullary enumerations with imported constructors.
-    • In the first argument of ‘Proxy’, namely ‘(A.strictValue 0)’
-      In the type signature: bad :: Proxy (A.strictValue 0)
+    • Cannot evaluate ‘A.unboxedValue’ in a type.
+        The function returns Unboxed. Closed calls in types currently support results of type Natural, Char, Bool, lists, boxed pairs, Maybe, and Either of supported results, or ordinary boxed datatypes with supported fields and imported constructors.
+    • In the first argument of ‘Proxy’, namely ‘(A.unboxedValue 0)’
+      In the type signature: bad :: Proxy (A.unboxedValue 0)

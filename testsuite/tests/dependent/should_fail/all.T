@@ -146,7 +146,7 @@ for name in ['NativeClosedCompoundListBottom', 'NativeClosedCompoundListUnsuppor
                 extra_files(['../should_run/NativeClosedCompoundListsLib.hs'])],
          multimod_compile_fail, [name, '-v0 ' + config.ghc_th_way_flags])
 for name in ['NativeClosedEnumAbstract', 'NativeClosedEnumPartial', 'NativeClosedEnumField',
-             'NativeClosedEnumOperand']:
+             'NativeClosedEnumOperand', 'NativeClosedExpanding']:
     test(name, [req_interp, req_rts_linker, only_ways(['normal']),
                 extra_files(['../should_run/NativeClosedEnumA.hs'])],
          multimod_compile_fail, [name, '-O1 -v0 ' + config.ghc_th_way_flags])
