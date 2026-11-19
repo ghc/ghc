@@ -9332,3 +9332,22 @@ The separate 124-program polykinds comparison accepts 116. Only
 `T14174a` changed result. The self-host also passes its registered test.
 [Source examples](Showcase.hs) and
 [matchability inference](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+## R03, R04 and R16–R19 source checkpoint
+
+At `e04f9add03`, the bootstrap compiler, self-hosted compiler and
+self-hosted GHCi produce the same 261 Showcase lines. A type lambda
+matches GADT constructors at two different indices. Type cases can
+share the kind inferred for one local definition. An ordinary client
+can infer the erased index of `getConst` while the package's retained
+witness stays lazy. The mapper test checks an identity traversal rule
+and rejects a new orphan rule that changes a list head.
+
+All 30 focused normal-way tests pass. The dependent directory passes
+266 of 298 exercised cases, including the new package test. Its 32
+other cases match the diagnostics from `88cef2bf98`. The family-result
+upgrade rebuilds the two old family owners and their affected clients.
+A second build reuses the outputs. This checkpoint uses the restricted
+optimizer for modules with native dependent Core.
+[Package](examples/packed-vector/RetainedNat.hs), [mapper](roadmap/R16-open-term-evaluator.md#checking-an-identity-traversal-with-rules-enabled)
+and [indexed type lambda](examples/open-evaluation/TypeLambda.hs).

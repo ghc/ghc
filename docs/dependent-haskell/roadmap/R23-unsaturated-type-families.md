@@ -102,6 +102,35 @@ the matchabilities independent and preserves the distinct binder rules in
 [Original source](../../../testsuite/tests/polykinds/T15874.hs) and
 [diagnostic and compatibility controls](../../../testsuite/tests/dependent/should_run/NativeOpenMatchability.sh).
 
+The remaining seven polykinds failures in the 116/124 normal-way
+comparison also compile after explicit source changes. The unmodified
+files all report GHC-83865. Proposal #242 assigns U to arrows on a synonym
+RHS. It generalizes matchabilities only in inferred kinds and never in
+types. A later use cannot select a new index for a fixed synonym.
+[Proposal #242 inference rules](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference).
+
+| Source | Checked spelling |
+| --- | --- |
+| [T11523](../../../testsuite/tests/polykinds/T11523.hs), [T12055](../../../testsuite/tests/polykinds/T12055.hs) | `type Cat k = k %M -> k %M -> Type` |
+| [T14515](../../../testsuite/tests/polykinds/T14515.hs) | In either synonym, `forall k. @M k %M -> ty` |
+| [T14873](../../../testsuite/tests/polykinds/T14873.hs) | `type a ~> b = TyFun a b %M -> Type` |
+| [T19093](../../../testsuite/tests/polykinds/T19093.hs) | `type PolyKinded res = forall (k :: Type). @M k %M -> res` |
+| [T19094](../../../testsuite/tests/polykinds/T19094.hs) | `type PolyKinded (q :: Matchability) (a :: Matchability) res = forall (k :: Type). @q k %a -> res` |
+| [T19250](../../../testsuite/tests/polykinds/T19250.hs) | `type Exp a = a %M -> Type` |
+
+In `T19094`, use `PolyKinded U U (PolyKinded U U Bool)` for the
+family and `PolyKinded M M (PolyKinded M M Constraint)` after the
+class's initial `Bool ->`. Changing only the family's first visible arrow
+to M still rejects, so the forall and arrow indices can be checked
+separately. In `T12055`, `Cat Type` accepts `((->) @U)`: the two M
+arrows classify the type constructor's arguments, while U describes
+the runtime arrow it constructs.
+
+A separate negative control used `type family Erase a :: Bool where
+Erase a = 'True`. GHC-25897 rejected `Refl` at type
+`(Erase a ~ Erase b) => a :~: b`. The source changes above preserve
+that distinction between a type constructor and a family.
+
 In `T20875`, the equation `ToKind TRUE = Type -> Type` checks its right
 side as an ordinary type. Its arrow gets U. The type constructor `Maybe`
 has an M arrow in its kind. Writing `FUN @M 'Many Type Type` in the

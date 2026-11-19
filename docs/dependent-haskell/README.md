@@ -8,18 +8,19 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-At compiler checkpoint `88cef2bf98`, both native stages and self-hosted
-GHCi agree on all 256 lines of the [Showcase](Showcase.hs). A type lambda
-can match its argument under `Map`. A type-level `let` can bind the
-result of a constructor case and use it twice. A closed family in a
-local function's signature can determine the result of an equation
-for an imported type family.
+At compiler checkpoint `e04f9add03`, both native stages and self-hosted
+GHCi agree on all 261 lines of the [Showcase](Showcase.hs). A type lambda
+can match two GADT constructors that give its field different kinds.
+A type-level `let` can share one inferred kind across case branches.
+An ordinary module can use `getConst` to extract a packaged value while
+leaving its runtime index unevaluated. [Package and eliminator](examples/packed-vector/RetainedNat.hs).
 
-The self-host passed all 25 focused tests. The normal-way dependent
-directory passed 265 of 297 exercised cases. The same 32 cases failed
-at the previous checkpoint. Eight now identify the kind synonym that
-supplies an unmatchable arrow. The ordinary polykinds comparison gained
-one pass, `T14174a`, bringing it to 116 of 124.
+The self-host passed all 30 focused tests. The normal-way dependent
+directory passed 266 of 298 exercised cases. The same 32 cases failed
+with the same diagnostics as at `88cef2bf98`. The separate polykinds
+comparison at `88cef2bf98` accepted 116 of 124 unmodified programs.
+The eight remaining programs compile with explicit matchability on
+their kind synonyms.
 [Users' guide](../users_guide/exts/experimental_dependent_types.rst) and
 [compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 

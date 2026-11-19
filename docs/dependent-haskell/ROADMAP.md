@@ -180,11 +180,19 @@ fresh proof about a negated list head agrees with the runtime call.
 Both compiler stages rebuilt. All five focused self-hosted tests passed.
 [Regression and flags](roadmap/R16-open-term-evaluator.md#keep-a-checked-mapper-equation-consistent-with-specialization).
 
-The next integration has 259 matching native Showcase lines on the
-bootstrap compiler. The additional cases read fields from constructors
-with different GADT indices and share local type definitions across
-case branches. The source tests also pass one Gentle simplifier
-iteration with algebraic indices and function fields.
+At `e04f9add03`, both native stages and self-hosted GHCi agree on 261
+Showcase lines. The 30 focused self-hosted tests pass. The five new
+observations read fields at two GADT indices, use a local type in two
+case expressions, and unpack two choices of payload family. The package
+tests check that reading one field leaves the other unevaluated.
+The normal-way dependent directory passes 266 of 298 exercised cases.
+Its 32 remaining failures match the previous diagnostics.
+[Package tests](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
+
+The source checkpoint uses the restricted native optimizer. A separate
+R05 compiler runs a Gentle iteration on algebraic indices, function
+fields and a result coercion. The next integration check must preserve
+an index when a top-level binding also has an unfolding.
 
 [R15](roadmap/R15-closed-term-evaluator.md) and
 [R16](roadmap/R16-open-term-evaluator.md) are separate subtasks of function promotion. The upstream graph has
@@ -200,7 +208,7 @@ when some of its operands are unknown.
 | [R04/R22, dependent sums and existentials](roadmap/R04-dependent-sums.md) | Project a payload whose type refers to the same package's runtime length. | A retained GADT and a rank-2 consumer already express local unpacking. A first-class projection needs the type checker to refer to the package itself. |
 | [R05, dependent Core](roadmap/R05-dependent-core.md#occurrence-analysis) | Preserve the coercion in `transportElement` through an ordinary simplifier iteration. | Algebraic indices and function fields pass the Gentle tests. A module with a retained function coercion still takes the restricted path. |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Extend scalar readback to more result shapes while preserving demand. | Both projections and the native object-upgrade check pass with the self-hosted compiler. The unselected exceptional sibling stays lazy. [Readback design](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field). |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check whether a consumer may prove a mapper equation with an identity traversal rule in scope. | The specialization regression covers both flag settings. An applicable orphan rule that changes the head must invalidate a cached proof. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check more rules used by the installed `Prelude.map`. | The compiler checks an identity traversal rule on an ordinary mapper. An imported orphan rule that changes the head invalidates a cached proof. |
 | [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Extend the dependency check to more signed producers while retaining cycle, strictness and rewrite-rule diagnostics. | A producer can call through a closed family in its own signature. A separate client checks the resulting `Payload Word` using only compiled interfaces. [Provider](examples/open-evaluation/FamilySignature.hs). |
 | [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Check additional lambdas whose arguments have indexed constructor patterns. | An explicit polymorphic kind lets a stripped-interface client prove both GADT branches. A splice in a capture kind executes once. |
 | [R18, type-level lets](roadmap/R18-type-level-lets.md) | Extend the local RHS forms that can be checked once and used under a case. | Two case branches constrain one local `'Nothing`. Separate let bindings can choose different kinds. |
