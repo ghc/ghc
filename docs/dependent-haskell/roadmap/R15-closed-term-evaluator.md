@@ -193,8 +193,7 @@ The client records the objects for both functions. With their interfaces
 held fixed, changing either implementation can invalidate the client's
 type. [Recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedNestedDependencies.sh).
 
-Same-module definitions require further work on R21. A nested list result, a `Maybe` result and a list of a newtype over
-`Natural` are outside the supported result shapes. General closed expressions
+Same-module definitions require further work on R21. Nested lists and lists of a newtype over `Natural` remain outside the supported result shapes. General closed expressions
 and user-defined representations remain open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).
 The [implementation references](../REFERENCES.md#executing-closed-calls-and-reducing-open-calls)
 give the earlier prototype and the current GHC entry points.
@@ -269,3 +268,31 @@ installed interface bytes and the client source. The old equality fails
 when the compiler checks the client again.
 [Returned-pair tests](../../../testsuite/tests/dependent/should_run/NativeClosedReturnedPair.sh)
 and [the result representation](../../../compiler/GHC/Tc/Gen/Splice.hs).
+
+## Returning a constructor with alternatives
+
+`Data.List.uncons '[2,3,5] :~: 'Just '(2, '[3,5])` checks with `Refl`.
+`Data.Maybe.fromMaybe 9 (Data.Maybe.listToMaybe '[])` computes `9`.
+An ordinary parser with type `String -> Either String Natural` can return
+either a value or a diagnostic string to another closed call. The
+[Showcase](../Showcase.hs) parses the character lists for `23` and `x`
+and uses `fromRight` to select a default for the second.
+
+GHC checks the field kinds of all alternatives before running the producer.
+It evaluates the producer once. A Core case records which constructor
+the producer actually returned and encodes only that constructor's fields.
+The compiler reconstructs the promoted value with the corresponding
+DataKinds constructor. A later ordinary call can receive it as an operand.
+For example, forcing `Just undefined` fails at the producer even when the
+later call only tests for `Nothing`. A client-defined `Show` instance
+cannot supply either the constructor or its fields.
+[Source proofs](../../../testsuite/tests/dependent/should_run/NativeClosedChoices.hs)
+and [failure in a present field](../../../testsuite/tests/dependent/should_fail/NativeClosedPresentBottom.hs).
+
+The native checks pass a `Natural` greater than 2^64 through a nested
+`Right (Just (...))` and read back the result. Rebinding the known name
+`Either` in the consumer still rejects an unrelated datatype before
+the interpreter runs the producer. Changing only the recorded producer
+object from `Right (Just (3, True))` to `Right (Just (4, True))`
+invalidates the old proof. In that check, the producer interfaces are
+byte-for-byte identical. [Lookalike datatype diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedOtherEither.stderr).

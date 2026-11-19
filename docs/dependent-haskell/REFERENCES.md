@@ -5220,3 +5220,17 @@ value. The compiler therefore uses only the trusted leaf dictionaries.
 [Supported results and evaluation order in draft #509](https://github.com/Haskell-mouse/ghc-proposals/blob/f0b6af30a6e15545606195eb72c2981ea91aa326/proposals/0000-type-functions.rst#L109-L142),
 [GHC's promoted pair constructors](../../compiler/GHC/Builtin/WiredIn/Types.hs)
 and [the interpreter check](roadmap/R15-closed-term-evaluator.md#returning-a-pair).
+
+### Maybe and Either in the closed evaluator
+
+Draft #509 includes `Maybe a` and `Either a b` when their parameters
+are promotable. Agda's `Maybe` and its standard library sum distinguish
+the constructor from its arguments. The nullary case of `Maybe` has
+no payload. R15 uses the corresponding GHC data constructors for each
+case alternative. It checks their instantiated field types and calls
+`promoteDataCon` when decoding the selected alternative. Its tagged
+string representation is local to the compiler and interpreter.
+[Type-functions draft](https://github.com/Haskell-mouse/ghc-proposals/blob/f0b6af30a6e15545606195eb72c2981ea91aa326/proposals/0000-type-functions.rst#L122-L141),
+[Agda 2.8.0 Maybe](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Maybe.agda),
+[Agda standard library 2.3 sum](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Sum/Base.agda#L25-L38)
+and [GHC's result decoder](../../compiler/GHC/Tc/Gen/Splice.hs).

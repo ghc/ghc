@@ -8303,3 +8303,29 @@ compiler passed them with its internal and external interpreters. Each
 compiled Showcase and the GHCi run matched the same 190 lines. The
 normal-way dependent directory passed 185 of 221 cases. All 36 remaining
 failures had the same per-test output as at M115.
+
+## M118: check Maybe and Either results
+
+Accept both alternatives of the standard datatypes and reconstruct a
+computed result as an argument to another ordinary call. Preserve the
+existing string representation for scalars, scalar lists, and pairs.
+
+- [x] Check `listToMaybe` at empty and nonempty inputs and `uncons` at a
+      list of naturals. Check a function returning `Either String (Maybe
+      (Natural, Bool))` at three inputs.
+- [x] Use the actual promoted constructor and check its arity and field
+      kinds. Identify the standard `Either` by its defining unit, module, and
+      occurrence, including when the client rebinds known names. Share the string suffix across alternatives in the generated Core.
+- [x] Check rejection of a wrong constructor equality, a present bottom,
+      an unsupported result field, and an unrelated datatype named `Either`.
+- [x] Check both compiler stages, both interpreter paths and the Showcase.
+- [x] Change only the producer object without changing its interfaces.
+      Require GHC to recheck the client and reject the old nested sum proof.
+
+[Source and constructor checks](roadmap/R15-closed-term-evaluator.md#returning-a-constructor-with-alternatives).
+
+Both compiler stages checked the sum examples with Core and STG lint.
+The self-hosted compiler passed with the internal and external
+interpreters. The two compiled Showcases and the GHCi run produced
+the same 192 lines. The normal-way dependent directory passed 190 of
+226 cases. All 36 failures had the same individual output as at M116.

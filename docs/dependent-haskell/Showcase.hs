@@ -37,9 +37,11 @@ import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
 import qualified Data.Char
+import qualified Data.Either
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Kind (Type)
 import Data.List (isInfixOf)
+import qualified Data.Maybe
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:) (Refl))
 import qualified FunctionFieldClient
@@ -61,6 +63,7 @@ import qualified OrdinaryVecClient as Ordinary
 import qualified ParameterizedIndexLibrary as Parameterized
 import PackedVecLibrary
 import qualified QualifiedPiLibrary as Qualified
+import qualified ReadNatural
 import qualified Type.Reflection as Reflection
 import qualified UnicodeExport
 
@@ -836,6 +839,12 @@ main = do
         (OpenSource.tupleFirst False (42 :: Int), OpenSource.tupleSecond False (42 :: Int))
     observe "quotient and remainder returned during type checking"
         (reflectPair (Proxy @(Prelude.quotRem 17 5)))
+    observe "listToMaybe at a nonempty list and at an empty list"
+        ( TypeNats.natVal (Proxy @(Data.Maybe.fromMaybe 99 (Data.Maybe.listToMaybe '[2,3])))
+        , TypeNats.natVal (Proxy @(Data.Maybe.fromMaybe 99 (Data.Maybe.listToMaybe '[]))) )
+    observe "readEither at valid and invalid input with a default of 99"
+        ( TypeNats.natVal (Proxy @(Data.Either.fromRight 99 (ReadNatural.readNatural '[ '2','3'])))
+        , TypeNats.natVal (Proxy @(Data.Either.fromRight 99 (ReadNatural.readNatural '[ 'x']))) )
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

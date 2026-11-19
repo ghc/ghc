@@ -357,21 +357,31 @@ head at nominal reductions also preserved the proof for both the later
 written and splice-generated `Bool` rules. Rules that could change a
 nominal `Bool` proof still caused that proof to be rejected.
 
-One compatibility case remains. Add this semantics-preserving rule
-after the proof in the same module:
+A rule can also match the ground application. This rule preserves the
+result of the projection. It appears after the proof in the same module.
 
 ```haskell
 {-# RULES "choose/first" [~1] forall x y. Worker.choose @Natural (x,y) = x #-}
 ```
 
 The published compiler evaluates the ground call and accepts the module.
-The candidate commits to nominal family evidence, then rejects the module
-at `Refl`, even though the rule returns the same first field. Choosing
-ordinary evaluation for a previously supported closed call must happen
-before its type uses nominal evidence. The separate interface-only route
-must continue to work when the projection has no loadable object. These
-are gates for publishing equations for installed `Prelude.fst` and
-`Prelude.snd`. The published compiler can already select a field from
-a written pair of rigid type variables.
+The first candidate used nominal evidence and rejected it at `Refl`.
+The next candidate ran the ordinary projection when its home-module object
+was available. Both compilers then accepted the rule and recorded it in
+the client interface. Without the object, the candidate continued to check
+an open equality from the producer and exporter interfaces alone.
+
+One-shot compilation exposed a further distinction. A worker object can
+remain on disk after an object that it imports has been removed. With
+only the interfaces present, the client accepted the nominal proof.
+Restoring just the worker object made the candidate try to execute it.
+GHC-70565 then named the missing transitive object. Restoring both objects
+made the same proof pass. The experiment must consult the executable
+dependencies of the worker before choosing ordinary evaluation.
+
+Publishing equations for installed `Prelude.fst` and `Prelude.snd` also
+requires checks against the real package database and a separate copy
+containing only interfaces. The published compiler can already select
+a field from a written pair of rigid type variables.
 [Source-family rule checks](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
 and [the closed evaluator](R15-closed-term-evaluator.md#returning-a-pair).

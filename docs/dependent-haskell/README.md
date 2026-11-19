@@ -8,9 +8,10 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 190 lines.
-The full dependent-directory check still has 36 failures that reproduce on
-the previous fork tip. Fifteen reject existing programs that should compile.
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 192 lines.
+The normal-way dependent directory passed 190 of 226 cases. All 36 failures
+produced the same output as on the previous fork tip. Fifteen reject existing
+programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
 An imported `length :: [Natural] -> Natural` can now compute a vector
@@ -37,6 +38,12 @@ call such as `Prelude.fst '(a,b)`, the result is the caller's original
 reports that it needs the constructor of `p`.
 [Closed calls](roadmap/R15-closed-term-evaluator.md#functions-with-several-arguments)
 and [pair projections](roadmap/R16-open-term-evaluator.md#projecting-a-pair-of-unknown-types).
+
+A closed call can also return a constructor. GHC checks
+`Data.List.uncons '[2,3,5] :~: 'Just '(2, '[3,5])` with `Refl`. The
+Showcase parses `"23"` and `"x"` with the ordinary `Text.Read.readEither`
+specialized to `Natural`. A second call takes the parsed value or the
+default `99`, giving `(23,99)`. [Maybe and Either results](roadmap/R15-closed-term-evaluator.md#returning-a-constructor-with-alternatives).
 
 An ordinary character case can also select the type. The two projections
 in the Showcase receive the same arguments, `False` and `42 :: Int`.
