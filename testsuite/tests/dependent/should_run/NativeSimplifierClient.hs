@@ -3,7 +3,8 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
-import NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, sample, observePacked, driveSame, scopeLet, scopeKnown)
+import qualified NativeSimplifierLocalRec as LocalRec
+import NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, sample, observePacked, driveSame, scopeLet, scopeTop, scopeKnown)
 
 main :: IO ()
 main = do
@@ -36,4 +37,5 @@ main = do
     print (scopeAnnotations yes, scopeAnnotations exceptional)
     print (observePacked sample)
     driveSame exceptional >>= print
-    print (scopeLet, scopeKnown exceptional)
+    print (scopeLet, scopeTop, scopeKnown exceptional)
+    print (LocalRec.observe yes, LocalRec.observeInGroup exceptional, LocalRec.ordinary yes)

@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, BangPatterns, TypeOperators #-}
-module NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, Packed, sample, observePacked, driveSame, scopeLet, scopeKnown) where
+module NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, Packed, sample, observePacked, driveSame, scopeLet, scopeTop, scopeKnown) where
 
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
@@ -130,6 +130,12 @@ scopeLet =
   let source :: Bool
       source = True
   in observeIndexed (choose source)
+
+sharedIndex :: Bool
+sharedIndex = True
+
+scopeTop :: [Int]
+scopeTop = observeIndexed (choose sharedIndex)
 
 {-# NOINLINE observeProof #-}
 observeProof :: ((p :: Bool) :~: (q :: Bool)) -> Int

@@ -2767,7 +2767,7 @@ occAnal env (Case scrut bndr ty alts)
 
       WUD alts_usage (tagged_bndr, alts')
          = addInScopeOne env bndr $ \env ->
-           let alt_env = addBndrSwap scrut' bndr $
+           let alt_env = addBndrSwap scrut' bndr alts $
                          setTailCtxt env  -- Kill off OccRhs
                WUD alts_usage alts' = do_alts alt_env alts
                !tagged_bndr = tagLamBinder alts_usage bndr
@@ -3761,13 +3761,15 @@ doesn't use it. So this is only to satisfy the perhaps-over-picky Lint.
 
 -}
 
-addBndrSwap :: OutExpr -> Id -> OccEnv -> OccEnv
+addBndrSwap :: OutExpr -> Id -> [CoreAlt] -> OccEnv -> OccEnv
 -- See Note [Binder swap]
 -- See Note [The binder-swap substitution]
-addBndrSwap scrut case_bndr
+addBndrSwap scrut case_bndr alts
             env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars })
   | DoBinderSwap scrut_var mco <- scrutOkForBinderSwap scrut
   , scrut_var /= case_bndr
+  , oa_core_mode (occ_opts env) /= RetainedCore
+      || not (any (usesIndex scrut_var) alts)
       -- Consider: case x of x { ... }
       -- Do not add [x :-> x] to occ_bs_env, else lookupBndrSwap will loop
   = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mkSymMCo mco)
@@ -3777,6 +3779,9 @@ addBndrSwap scrut case_bndr
   | otherwise
   = env
   where
+    usesIndex v (Alt _ bs rhs) =
+      any (hasFreeVarInCoreAnnotations v . Var) bs
+        || hasFreeVarInCoreAnnotations v rhs
     case_bndr' = zapIdOccInfo case_bndr
                  -- See Note [Zap case binders in proxy bindings]
 

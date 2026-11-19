@@ -7,9 +7,12 @@ trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 flags=(-fomit-interface-pragmas -fno-write-if-simplified-core)
-cp "$area/NativeSimplifierProvider.hs" .
+cp "$area"/{NativeSimplifierProvider,NativeSimplifierLocalRec}.hs .
 "${g[@]}" -O0 "${flags[@]}" -ddump-simpl-iterations -c NativeSimplifierProvider.hs >retained.log 2>&1 || { cat retained.log; exit 1; }
 grep -Fq 'Simplifier iteration=1' retained.log || { cat retained.log; exit 1; }
+"${g[@]}" -O0 "${flags[@]}" -ddump-simpl-iterations -c NativeSimplifierLocalRec.hs >local-rec.log 2>&1 ||
+  { cat local-rec.log; exit 1; }
+grep -Fq 'Simplifier iteration=1' local-rec.log || { cat local-rec.log; exit 1; }
 status=0
 "${g[@]}" -O1 "${flags[@]}" -fforce-recomp -c NativeSimplifierProvider.hs >optimized.log 2>&1 || status=$?
 if [[ $status != 1 ]] || ! grep -Fq 'Native dependent Core cannot enter optimized module compilation' optimized.log; then
@@ -17,8 +20,8 @@ if [[ $status != 1 ]] || ! grep -Fq 'Native dependent Core cannot enter optimize
   exit 1
 fi
 mkdir client
-cp "$area/NativeSimplifierClient.hs" NativeSimplifierProvider.hi client/
+cp "$area/NativeSimplifierClient.hs" NativeSimplifierProvider.hi NativeSimplifierLocalRec.hi client/
 cd client
 "${g[@]}" -O0 "${flags[@]}" -c NativeSimplifierClient.hs
-"${g[@]}" NativeSimplifierClient.o ../NativeSimplifierProvider.o -o run
+"${g[@]}" NativeSimplifierClient.o ../NativeSimplifierProvider.o ../NativeSimplifierLocalRec.o -o run
 ./run

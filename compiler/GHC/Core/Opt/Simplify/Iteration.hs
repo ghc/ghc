@@ -43,7 +43,8 @@ import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
-import GHC.Core.FVs     ( mkRuleInfo, hasFreeVarInCoreAnnotations )
+import GHC.Core.FVs     ( mkRuleInfo, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars
+                        , bindsAnnotationFreeVars )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Core.Multiplicity
 
@@ -60,6 +61,7 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
+import GHC.Types.Var.Set (VarSet, emptyVarSet, elemVarSet, unionVarSet)
 
 import GHC.Builtin.WiredIn.Prim( realWorldStatePrimTy )
 import GHC.Builtin.KnownKeys( runRWKey, seqHashKey )
@@ -232,11 +234,18 @@ simplTopBinds env0 binds0
                                       ; return (floats1, env2) }
 
     simpl_bind env (Rec pairs)
-      = simplRecBind env (BC_Let TopLevel Recursive) pairs
+      = simplRecBind top_annotation_refs env (BC_Let TopLevel Recursive) pairs
     simpl_bind env (NonRec b r)
       = do { let bind_cxt = BC_Let TopLevel NonRecursive
            ; (env', b') <- addBndrRules env b (lookupRecBndr env b) bind_cxt
-           ; simplRecOrTopPair env' bind_cxt b b' r }
+           ; simplRecOrTopPair (b `elemVarSet` top_annotation_refs) env' bind_cxt b b' r }
+
+    -- A previous iteration can float a pinned local binder to the top
+    -- level. Collect its annotation uses before reintroducing unfoldings.
+    top_annotation_refs
+      | sm_core_mode (seMode env0) == RetainedCore
+      = bindsAnnotationFreeVars binds0
+      | otherwise = emptyVarSet
 
 {-
 ************************************************************************
@@ -249,10 +258,10 @@ simplRecBind is used for
         * recursive bindings only
 -}
 
-simplRecBind :: SimplEnv -> BindContext
+simplRecBind :: VarSet -> SimplEnv -> BindContext
              -> [(InId, InExpr)]
              -> SimplM (SimplFloats, SimplEnv)
-simplRecBind env0 bind_cxt pairs0
+simplRecBind annotation_refs env0 bind_cxt pairs0
   = do  { (env1, triples) <- mapAccumLM add_rules env0 pairs0
         ; let new_bndrs = map sndOf3 triples
         ; (rec_floats, env2) <- enterRecGroupRHSs env1 new_bndrs $ \env ->
@@ -268,7 +277,7 @@ simplRecBind env0 bind_cxt pairs0
     go env [] = return (emptyFloats env, env)
 
     go env ((old_bndr, new_bndr, rhs) : pairs)
-        = do { (float, env1) <- simplRecOrTopPair env bind_cxt
+        = do { (float, env1) <- simplRecOrTopPair (old_bndr `elemVarSet` annotation_refs) env bind_cxt
                                                   old_bndr new_bndr rhs
              ; (floats, env2) <- go env1 pairs
              ; return (float `addFloats` floats, env2) }
@@ -281,13 +290,14 @@ simplOrTopPair is used for
 It assumes the binder has already been simplified, but not its IdInfo.
 -}
 
-simplRecOrTopPair :: SimplEnv
+simplRecOrTopPair :: Bool -> SimplEnv
                   -> BindContext
                   -> InId -> OutBndr -> InExpr  -- Binder and rhs
                   -> SimplM (SimplFloats, SimplEnv)
 
-simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
-  | Just env' <- preInlineUnconditionally env (bindContextLevel bind_cxt)
+simplRecOrTopPair keep_index env bind_cxt old_bndr new_bndr rhs
+  | not keep_index
+  , Just env' <- preInlineUnconditionally env (bindContextLevel bind_cxt)
                                           old_bndr (UnSimplified env) rhs MRefl
   = {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
     simplTrace "SimplBindr:inline-uncond1" (ppr old_bndr) $
@@ -301,7 +311,7 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
                                            (old_bndr,env) (new_bndr,env) (rhs,env)
 
       BC_Let top_lvl is_rec -> simplTrace "SimplBind:normal" (ppr old_bndr) $
-                               simplLazyBind False top_lvl is_rec
+                               simplLazyBind keep_index top_lvl is_rec
                                              (old_bndr,env) (new_bndr,env) (rhs,env)
 
 simplTrace :: String -> SDoc -> SimplM a -> SimplM a
@@ -2105,9 +2115,14 @@ simplRecE env pairs body cont
         ; env1 <- simplRecBndrs env bndrs
                 -- NB: bndrs' don't have unfoldings or rules
                 -- We add them as we go down
-        ; (floats1, env2)  <- simplRecBind env1 (BC_Let NotTopLevel Recursive) pairs
+        ; (floats1, env2)  <- simplRecBind annotation_refs env1 (BC_Let NotTopLevel Recursive) pairs
         ; (floats2, expr') <- simplExprF env2 body cont
         ; return (floats1 `addFloats` floats2, expr') }
+  where
+    annotation_refs
+      | sm_core_mode (seMode env) == RetainedCore
+      = bindsAnnotationFreeVars [Rec pairs] `unionVarSet` exprAnnotationFreeVars body
+      | otherwise = emptyVarSet
 
 {- Note [Dark corner with representation polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2185,7 +2200,7 @@ simplRecJoinPoint env pairs body cont
        ; env1 <- simplRecJoinBndrs env bndrs mult res_ty
                -- NB: bndrs' don't have unfoldings or rules
                -- We add them as we go down
-       ; (floats1, env2)  <- simplRecBind env1 (BC_Join Recursive cont) pairs
+       ; (floats1, env2)  <- simplRecBind emptyVarSet env1 (BC_Join Recursive cont) pairs
        ; (floats2, body') <- simplExprF env2 body cont
        ; return (floats1 `addFloats` floats2, body') }
 

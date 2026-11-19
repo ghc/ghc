@@ -260,7 +260,7 @@ test('NativeTypeCaseReify',
 test('NativeSimplifier',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeSimplifierProvider.hs', 'NativeSimplifierClient.hs',
-                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
+                   'NativeSimplifierLocalRec.hs'])],
      run_command, ['bash NativeSimplifier.sh "{compiler}" "{libdir}"'])
 
 test('NativeFunctionIndex',

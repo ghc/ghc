@@ -16,7 +16,7 @@ module GHC.Core.FVs (
         exprFreeIds,      exprsFreeIds,
         exprFreeIdsDSet,  exprsFreeIdsDSet,
         exprFreeIdsList,  exprsFreeIdsList,
-        bindFreeVars, hasFreeVarInCoreAnnotations,
+        bindFreeVars, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars, bindsAnnotationFreeVars,
 
         -- * Selective free variables of expressions
         InterestingVarFun,
@@ -74,6 +74,7 @@ import GHC.Data.Maybe( orElse )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic.Plain
+import Data.Monoid (Any(..), (<>))
 
 {-
 ************************************************************************
@@ -277,39 +278,62 @@ exprFVs (Let (Rec pairs) body)
 -- A term occurrence contributes its type and multiplicity, but not its Id.
 -- Inspect stable unfolding templates and skip ordinary duplicates of RHSs.
 hasFreeVarInCoreAnnotations :: Var -> CoreExpr -> Bool
-hasFreeVarInCoreAnnotations target = expr
+hasFreeVarInCoreAnnotations target = getAny . expr
   where
-    ty = anyFreeVarsOfType (== target)
-    co = anyFreeVarsOfCo (== target)
+    (expr, _) = coreAnnotationFVs (Any . anyFreeVarsOfType (== target))
+                                  (Any . anyFreeVarsOfCo (== target))
+                                  (\b uses -> if b == target then mempty else uses)
 
-    annotation b = ty (varType b) || maybe False ty (varMultMaybe b)
+-- | Collect the free variables of an expression's Core annotations.
+exprAnnotationFreeVars :: CoreExpr -> VarSet
+exprAnnotationFreeVars = fst coreAnnotationVarSets
+
+-- | Collect references from binder annotations, RHSs and stable unfoldings.
+-- Include references between the supplied bindings.
+bindsAnnotationFreeVars :: CoreProgram -> VarSet
+bindsAnnotationFreeVars = foldMap (snd coreAnnotationVarSets)
+
+coreAnnotationVarSets :: (CoreExpr -> VarSet, CoreBind -> VarSet)
+coreAnnotationVarSets =
+    coreAnnotationFVs tyCoVarsOfType tyCoVarsOfCo (flip delVarSet)
+
+coreAnnotationFVs
+    :: Monoid refs
+    => (Type -> refs) -> (Coercion -> refs) -> (Var -> refs -> refs)
+    -> (CoreExpr -> refs, CoreBind -> refs)
+coreAnnotationFVs ty co hide = (expr, bind)
+  where
+    annotation b = ty (varType b) <> foldMap ty (varMultMaybe b)
 
     under [] body = body
-    under (b : bs) body = annotation b || (b /= target && under bs body)
+    under (b : bs) body = annotation b <> hide b (under bs body)
 
     expr (Type t) = ty t
     expr (Coercion c) = co c
     expr (Var v) = annotation v
-    expr Lit{} = False
-    expr (Tick tick body) = tickAnn tick || expr body
-    expr (App fun arg) = expr fun || expr arg
+    expr Lit{} = mempty
+    expr (Tick tick body) = tickAnn tick <> expr body
+    expr (App fun arg) = expr fun <> expr arg
     expr (Lam b body) = under [b] (expr body)
-    expr (Cast body c) = expr body || co c
-    expr (Case scrut b t alts) = expr scrut || ty t || under [b] (any alt alts)
-    expr (Let (NonRec b rhs) body) = expr rhs || unfolding b || under [b] (expr body)
+    expr (Cast body c) = expr body <> co c
+    expr (Case scrut b t alts) = expr scrut <> ty t <> under [b] (foldMap alt alts)
+    expr (Let (NonRec b rhs) body) = expr rhs <> unfolding b <> under [b] (expr body)
     expr (Let (Rec pairs) body) =
-        under (map fst pairs) (expr body || any (\(b, rhs) -> expr rhs || unfolding b) pairs)
+        under (map fst pairs) (expr body <> foldMap (\(b, rhs) -> expr rhs <> unfolding b) pairs)
 
     alt (Alt _ bs rhs) = under bs (expr rhs)
 
-    tickAnn (Breakpoint _ _ ids) = any annotation ids
-    tickAnn _ = False
+    bind (NonRec b rhs) = annotation b <> unfolding b <> expr rhs
+    bind (Rec pairs) = foldMap (\(b, rhs) -> bind (NonRec b rhs)) pairs
+
+    tickAnn (Breakpoint _ _ ids) = foldMap annotation ids
+    tickAnn _ = mempty
 
     unfolding b
       | isId b
       , CoreUnfolding { uf_src = src, uf_tmpl = rhs } <- realIdUnfolding b
       , isStableSource src = expr rhs
-      | otherwise = False
+      | otherwise = mempty
 
 ---------
 rhs_fvs :: (Id, CoreExpr) -> SelectiveDFV
