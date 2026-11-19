@@ -1,0 +1,5 @@
+NativeClosedEnumAbstract.hs:7:15: error: [GHC-70565]
+    • Cannot evaluate ‘A.abstractValue’ in a type.
+        Cannot inspect the constructors of A.Abstract. To evaluate an enumeration in a type, bring every constructor into scope from a non-SOURCE import.
+    • In the first argument of ‘Proxy’, namely ‘(A.abstractValue 0)’
+      In the type signature: bad :: Proxy (A.abstractValue 0)

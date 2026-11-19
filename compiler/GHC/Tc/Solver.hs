@@ -1128,9 +1128,9 @@ retryTypeCalls lvl binds calls wanteds = TcM.setTcLevel lvl (go calls wanteds)
           go rest residual'
 
     findReady _ [] = pure Nothing
-    findReady skipped (call@(TcPendingTypeCall _ _ input _) : rest) = do
+    findReady skipped (call@(TcPendingTypeCall location fun input _) : rest) = do
       checked <- TcM.liftZonkM (TcM.zonkTcType input)
-      argument <- tcDecodeClosedCallOperand checked
+      argument <- TcM.setSrcSpan location (tcDecodeClosedCallOperand (idName fun) checked)
       case argument of
         Just value -> pure (Just (call, value, reverse skipped ++ rest))
         Nothing -> findReady (call : skipped) rest

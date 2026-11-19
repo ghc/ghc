@@ -48,7 +48,7 @@ lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 runQinTcM :: TH.Q a -> TcM a
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 finishTH :: TcM ()
-tcDecodeClosedCallOperand :: Type -> TcM (Maybe CoreExpr)
+tcDecodeClosedCallOperand :: Name -> Type -> TcM (Maybe CoreExpr)
 
 tcHasClosedCallExecutable :: Name -> TcM Bool
 tcCheckClosedCallContext :: Name -> TcM ()

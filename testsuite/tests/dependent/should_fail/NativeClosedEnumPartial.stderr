@@ -1,0 +1,5 @@
+NativeClosedEnumPartial.hs:7:15: error: [GHC-70565]
+    • Cannot evaluate ‘A.choose’ in a type.
+        Cannot inspect the constructors of A.Token. To evaluate an enumeration in a type, bring every constructor into scope from a non-SOURCE import.
+    • In the first argument of ‘Proxy’, namely ‘(A.choose 0)’
+      In the type signature: bad :: Proxy (A.choose 0)

@@ -1,0 +1,5 @@
+NativeClosedEnumKind.hs:8:23: error: [GHC-70565]
+    • Cannot evaluate ‘A.score’ in a type.
+        The operand has kind B.Token, which does not match the declared input type A.Token.
+    • In the first argument of ‘Proxy’, namely ‘(A.score (B.choose 0))’
+      In the type signature: bad :: Proxy (A.score (B.choose 0))

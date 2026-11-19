@@ -1,5 +1,5 @@
 NativeClosedCompoundListUnsupported.hs:8:15: error: [GHC-70565]
     • Cannot evaluate ‘P.unsupported’ in a type.
-        The function returns [Maybe Int]. Closed calls in types currently support results of type Natural, Char, Bool, or lists, boxed pairs, Maybe, and Either of supported results.
+        The function returns [Maybe Int]. Closed calls in types currently support results of type Natural, Char, Bool, lists, boxed pairs, Maybe, and Either of supported results, or ordinary nullary enumerations with imported constructors.
     • In the first argument of ‘Proxy’, namely ‘(P.unsupported 1)’
       In the type signature: bad :: Proxy (P.unsupported 1)

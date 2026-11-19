@@ -144,7 +144,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Driver.DynFlags
-import GHC.Driver.Ppr (showPpr)
+import GHC.Driver.Env (hsc_units)
+import GHC.Driver.Ppr (showPpr, showSDocForUser)
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString
@@ -2520,6 +2521,21 @@ data ClosedCallOperand
   | SourceClosedOperand (Maybe Kind)
   | ComputedClosedOperand Kind
 
+-- | Distinguish equally spelled input types in the caller's import context.
+closedOperandMismatch :: Name -> Kind -> Type -> TcM a
+closedOperandMismatch owner actual expected = do
+  flags <- getDynFlags
+  let short_actual = showPpr flags actual
+      short_expected = showPpr flags expected
+  (a, e) <- if short_actual /= short_expected
+            then return (short_actual, short_expected)
+            else do ctx <- getNamePprCtx
+                    units <- hsc_units <$> getTopEnv
+                    let qualify = showSDocForUser flags units ctx . ppr
+                    return (qualify actual, qualify expected)
+  failWithTc (TcRnClosedTypeEval owner
+    ("The operand has kind " ++ a ++ ", which does not match the declared input type " ++ e ++ "."))
+
 -- | Specialize the declared arrow using only its argument. Keep the
 -- result independent of defaulting and of the surrounding expected kind.
 tcClosedCallKinds :: Name -> Type -> LHsType GhcRn -> ClosedCallOperand -> TcM (Type, Type)
@@ -2531,10 +2547,7 @@ tcClosedCallKinds name fun_ty arg operand
          Just subst -> return subst
          Nothing -> case operand of
            RetryClosedOperand -> unsupported
-           _ -> at_operand $ do
-             dflags <- getDynFlags
-             bad ("The operand has kind " ++ showPpr dflags input ++
-                  ", which does not match the declared input type " ++ showPpr dflags domain ++ ".")
+           _ -> at_operand (closedOperandMismatch name input domain)
        let undetermined tv = maybe True (not . noFreeVarsOfType) (Subst.lookupTyVar subst tv)
            unresolved = filter undetermined tvs
            result = Subst.substTy subst codomain
@@ -2615,7 +2628,7 @@ tcPlanClosedCall mode ordinary_call fun arg = do
       (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg (ComputedClosedOperand child_kind)
       let get_operand = do
             checked <- run_child
-            value <- tcDecodeClosedCallOperand checked
+            value <- setSrcSpanA (getLoc arg) (tcDecodeClosedCallOperand name checked)
             case value of
               Just argument -> return argument
               Nothing -> setSrcSpanA (getLoc arg) $
@@ -2694,11 +2707,8 @@ tcPlanOrdinaryCall mode ordinary fun args
 
     match_known subst (arg, domain, actual)
       | Just next <- tcMatchTyX subst domain actual = return next
-      | otherwise = setSrcSpanA (getLoc arg) $ do
-          dflags <- getDynFlags
-          bad ("The operand has kind " ++ showPpr dflags actual ++
-               ", which does not match the declared input type " ++
-               showPpr dflags (Subst.substTy subst domain) ++ ".")
+      | otherwise = setSrcSpanA (getLoc arg) $
+          closedOperandMismatch name actual (Subst.substTy subst domain)
 
     needs_constructor_plan arg domain
       | L _ (HsExplicitListTy _ _ []) <- ignoreParens arg
@@ -2784,7 +2794,7 @@ tcPlanOrdinaryCall mode ordinary fun args
         return (run >>= setSrcSpanA (getLoc arg) . decode_joint)
       where
         decode_joint checked = do
-          value <- tcDecodeClosedCallOperand checked
+          value <- tcDecodeClosedCallOperand name checked
           maybe (bad "The checked argument does not represent a supported closed value.") return value
 
     -- Solve a forced empty-list kind before defaulting an ambiguous one.
@@ -2812,7 +2822,7 @@ tcPlanOrdinaryCall mode ordinary fun args
 
     prepare_runtime _ (arg, Right (_, Just run)) = return $ do
       checked <- run
-      value <- tcDecodeClosedCallOperand checked
+      value <- setSrcSpanA (getLoc arg) (tcDecodeClosedCallOperand name checked)
       case value of
         Just argument -> return argument
         Nothing -> setSrcSpanA (getLoc arg) $
@@ -2928,10 +2938,8 @@ tcPlanSourceFamilyCall mode ordinary_call name arg = do
   unless (null ty_params || isSourcePairCase table) unsupported
   let specialize actual
         | null ty_params = do
-            unless (actual `tcEqType` domain) $ at_operand $ do
-              dflags <- getDynFlags
-              bad ("The operand has kind " ++ showPpr dflags actual ++
-                   ", which does not match the declared input type " ++ showPpr dflags domain ++ ".")
+            unless (actual `tcEqType` domain) $
+              at_operand (closedOperandMismatch owner actual domain)
             return ([], domain, result)
         | otherwise = do
             unless (ground actual) $
@@ -3020,7 +3028,8 @@ tcClosedTypeCallArgument mode name domain arg = do
   checkCompleteClosedCall mode name
   checked <- solveEqualities "tcClosedTypeCallArgument" $
     tc_check_lhs_type mode arg domain
-  value <- tcDecodeClosedCallOperand =<< liftZonkM (zonkTcType checked)
+  value <- setSrcSpanA (getLoc arg) $
+    tcDecodeClosedCallOperand name =<< liftZonkM (zonkTcType checked)
   maybe (bad "The checked argument does not have the expected literal representation.") return value
   where
     bad :: String -> TcM a
