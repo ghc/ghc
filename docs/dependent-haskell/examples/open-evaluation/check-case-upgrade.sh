@@ -2,8 +2,8 @@
 set -euo pipefail
 export LC_ALL=C
 
-if [[ $# -lt 4 || $# -gt 6 || $1 != /* || $2 != /* || $3 != /* || $4 != /* || ${5:-/} != /* || ${6:-/} != /* ]]; then
-    printf 'usage: %s ABS_M142_GHC ABS_M144_GHC ABS_CURRENT_GHC ABS_LIBDIR [ABS_M147_GHC [ABS_M150_GHC]]\n' "$0" >&2
+if [[ $# -lt 4 || $# -gt 7 || $1 != /* || $2 != /* || $3 != /* || $4 != /* || ${5:-/} != /* || ${6:-/} != /* || ${7:-/} != /* ]]; then
+    printf 'usage: %s ABS_M142_GHC ABS_M144_GHC ABS_CURRENT_GHC ABS_LIBDIR [ABS_M147_GHC [ABS_M150_GHC [ABS_M154_GHC]]]\n' "$0" >&2
     exit 2
 fi
 m142=$1
@@ -92,7 +92,7 @@ HS
     echo 'The projection-only compiler upgraded to constructor results. The next build reused both modules.'
 fi
 
-if [[ $# -eq 6 ]]; then
+if [[ $# -ge 6 ]]; then
     mkdir latest
     cd latest
     cp "$src/SpineWorker.hs" .
@@ -138,4 +138,33 @@ HS
         "$6" "${flags[@]}" -v0 -i -i. -c Client.hs
     )
     echo 'M150 builders and case helpers upgraded. The unrelated module and warm build were reused.'
+fi
+
+if [[ $# -eq 7 ]]; then
+    mkdir "$out/chain"
+    cd "$out/chain"
+    cp "$src/SpineWorker.hs" .
+    cp "$out/latest/IdentityOnly.hs" .
+    "$7" "${flags[@]}" -v0 -c SpineWorker.hs IdentityOnly.hs
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >old.worker
+    grep -Fq 'T:firstViaWrap ' old.worker
+    if grep -Fq 'T:firstViaMark ' old.worker; then exit 1; fi
+    cat >Proof.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, StandaloneKindSignatures, TypeOperators #-}
+module Proof where
+import qualified SpineWorker as W
+import Data.Type.Equality ((:~:)(Refl))
+type Result :: W.Spine a -> Maybe (W.Marked a)
+type Result xs = W.firstViaMark xs
+proof :: Result ('W.More 'True xs) :~: 'Just ('W.Marked 'True)
+proof = Refl
+HS
+    "$current" "${flags[@]}" -v1 --make -no-link Proof.hs IdentityOnly.hs >upgrade.log 2>&1 || { cat upgrade.log; exit 1; }
+    grep -Eq 'Compiling SpineWorker[[:space:]].*\[Compiler now checks reachable constructor helpers\]' upgrade.log
+    if grep -Eq 'Compiling IdentityOnly[[:space:]]' upgrade.log; then cat upgrade.log; exit 1; fi
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >new.worker
+    for helper in firstViaMark mark markResult markField; do grep -Fq "T:$helper " new.worker; done
+    "$current" "${flags[@]}" -v1 --make -no-link Proof.hs IdentityOnly.hs >warm.log 2>&1
+    if grep -q 'Compiling ' warm.log; then cat warm.log; exit 1; fi
+    echo 'The compiler upgraded the reachable helper chain and reused the ordinary module and warm build.'
 fi

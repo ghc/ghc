@@ -786,3 +786,28 @@ proof finite and excludes cycles. Existing rules and interface
 dependencies still apply to the helper's exact Id.
 [Producer](../examples/open-evaluation/SpineWorker.hs)
 and [source gate](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh).
+
+## M155. Reachable helper chains
+
+A checked case can now use a helper that calls another helper. The
+ordinary `firstViaMark` retains the three private equations for
+`mark`, `markResult` and `markField`. A separate alias and ordinary
+consumer check the result from stripped interfaces. A changed leaf
+result invalidates the unchanged proof. A rule on a distant helper
+or a cyclic call blocks publication.
+
+GHC starts from the actual free local Ids in the desugared case.
+It checks the reachable helpers in dependency order and rejects cyclic
+groups. The existing result checker still requires saturated calls,
+public lazy constructors and scoped arguments. Only the dependencies
+of emitted equations enter the interface. Agda also checks its
+reduction dependencies, with a separate termination check that can
+prove certain recursive cycles. This subset requires an acyclic graph.
+[Agda termination checking](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html)
+and [stripped-interface test](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh).
+
+The next case is a private helper with clauses `choose No = Nothing`
+and `choose (Some x) = Just x`. An exported `first (Box v) = Just (choose v)`
+needs its case equations. On the M155 bootstrap compiler, an alias for
+`first b` still reports GHC-68947 at the call when the worker has only
+a stripped interface.

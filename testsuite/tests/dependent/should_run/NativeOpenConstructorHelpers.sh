@@ -20,7 +20,9 @@ grep -Fq 'T:firstViaWrap ' worker.iface
 grep -Fq 'T:wrap ' worker.iface
 grep -Fq 'T:firstViaMark ' worker.iface
 grep -Fq 'T:mark ' worker.iface
-if sed -n '/^exports:/,/^defaults:/p' worker.iface | grep -Eq '^[[:space:]]+(helper|wrap|mark)$'; then
+grep -Fq 'T:markResult ' worker.iface
+grep -Fq 'T:markField ' worker.iface
+if sed -n '/^exports:/,/^defaults:/p' worker.iface | grep -Eq '^[[:space:]]+(helper|wrap|mark|markResult|markField)$'; then
     echo 'The private helper escaped into source exports.' >&2
     exit 1
 fi
@@ -57,6 +59,50 @@ marked _ _ = Refl
 HS
 "${ghc[@]}" -c Residual.hs
 "${ghc[@]}" -c Consumer.hs
+
+# On a warm build both aliases and the consumer reuse their object files.
+for mod in Residual Consumer; do
+    "${ghc[@]}" -v1 -c "$mod.hs" >warm.log 2>&1
+    grep -Fxq 'compilation IS NOT required' warm.log || { cat warm.log >&2; exit 1; }
+done
+
+# The leaf equation can change the value without changing the helper type.
+# Keep the original alias interface and consumer source.
+sed 's/^markField x = Marked x$/markField _ = Unmarked/' Worker.source > SpineWorker.hs
+compile_worker
+grep -Fq 'T:firstViaMark ' worker.iface
+line=$(awk '/^marked _ _ = Refl$/ { print NR }' Consumer.hs)
+if "${ghc[@]}" -c Consumer.hs >reject.log 2>&1 ||
+   ! grep -Eq "^Consumer\.hs:$line:[0-9]+.*error: \[GHC-(25897|83865)\]" reject.log ||
+   ! grep -Fq "Couldn't match" reject.log; then
+    cat reject.log >&2
+    exit 1
+fi
+
+reject_old_mark() {
+    if grep -Eq 'T:(firstViaMark|mark|markResult|markField) ' worker.iface; then
+        cat worker.iface >&2
+        return 1
+    fi
+    if "${ghc[@]}" -c Residual.hs >reject.log 2>&1 ||
+       ! grep -Eq '^Residual\.hs:9:[0-9]+(-[0-9]+)?: error: \[GHC-(70565|70566|68947)\]' reject.log ||
+       ! grep -Fq 'firstViaMark' reject.log; then
+        cat reject.log >&2
+        return 1
+    fi
+}
+
+# The exact distant Id must be free of rules. A mutual component cannot
+# supply an equation or leave otherwise unused helper equations behind.
+cp Worker.source SpineWorker.hs
+cat >> SpineWorker.hs <<'HS'
+{-# RULES "markField/replacement" forall x. markField x = undefined #-}
+HS
+compile_worker
+reject_old_mark
+sed 's/^markResult x = markField x$/markResult x = mark x/' Worker.source > SpineWorker.hs
+compile_worker
+reject_old_mark
 
 reject_old_residual() {
     if grep -Eq 'T:(firstViaHelper|helper) ' worker.iface; then

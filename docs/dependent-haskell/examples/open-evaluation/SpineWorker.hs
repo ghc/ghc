@@ -31,7 +31,7 @@ wrap :: a -> Maybe a
 wrap x = Just x
 
 -- | A public result constructor distinct from the built-in types.
-data Marked a = Marked a
+data Marked a = Unmarked | Marked a
 
 -- | Construct a public user-defined result through a private helper.
 firstViaMark :: Spine a -> Maybe (Marked a)
@@ -40,7 +40,15 @@ firstViaMark (More x _) = Just (mark x)
 
 {-# NOINLINE mark #-}
 mark :: a -> Marked a
-mark x = Marked x
+mark x = markResult x
+
+{-# NOINLINE markResult #-}
+markResult :: a -> Marked a
+markResult x = markField x
+
+{-# NOINLINE markField #-}
+markField :: a -> Marked a
+markField x = Marked x
 
 -- | Force the tail before returning the first field.
 strictFirst :: Spine a -> Maybe a

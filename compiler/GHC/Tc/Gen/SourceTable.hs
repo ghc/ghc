@@ -33,6 +33,7 @@ import GHC.Core.TyCo.Rep (Type(TyConApp))
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Utils (exprType)
+import GHC.Data.Graph.Directed (Node(..), SCC(..), stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
 import GHC.Data.OrdList (fromOL)
@@ -63,7 +64,7 @@ import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
 import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
-import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv)
+import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv, mkNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
                            unionNameSet, unionNameSets, unitNameSet)
@@ -808,33 +809,65 @@ sourceCaseTables binds = do
         if hasSourceMethodRule visible owner
           then pure Nothing
           else fmap (owner,) <$> bindingCore bind owner
-      let local v = isId v && nameModule_maybe (idName v) == Just (tcg_semantic_mod env)
-          referenced_names = mkNameSet
-            [ idName v | (owner, rhs) <- root_cores, eligibleCase env exported owner
-                       , v <- exprSomeFreeVarsList local rhs ]
-          referenced_owners = filter (\(_, owner) -> idName owner `elemNameSet` referenced_names) owners
-      helpers <- fmap catMaybes $ forM referenced_owners $ \(bind, owner) ->
-        case constructorHelperType (varType owner) of
-          Just _
-            | isExternalName (idName owner)
+      let localCall v = isId v && nameModule_maybe (idName v) == Just (tcg_semantic_mod env)
+          references = map idName . exprSomeFreeVarsList localCall
+          reachable = concatMap (references . snd)
+                        (filter (eligibleCase env exported . fst) root_cores)
+          local_owners = mkNameEnv [(idName owner, (bind, owner)) | (bind, owner) <- owners]
+          helperCore name
+            | Just (bind, owner) <- lookupNameEnv local_owners name
+            , isExternalName name
             , not (eligible owner)
-            , not (idName owner `elemNameSet` ruled)
-            , not (hasSourceMethodRule visible owner) -> do
-                rhs <- bindingCore bind owner
-                case rhs >>= checkedConstructorHelper
-                              (publicCaseType env exported (ordinaryImport rdr_env)) owner of
-                  Just (telescope, domains, result, row) ->
-                    Just . (owner,) <$> publishConstructorRows owner telescope domains result [row]
-                  Nothing -> pure Nothing
-          _ -> pure Nothing
+            , not (name `elemNameSet` ruled)
+            , not (hasSourceMethodRule visible owner)
+            , Just _ <- constructorHelperType (varType owner)
+            = fmap (owner,) <$> bindingCore bind owner
+            | otherwise = pure Nothing
+          imported = ordinaryImport rdr_env
+          public = publicCaseType env exported imported
+      helper_cores <- collectHelpers helperCore references emptyNameSet reachable
+      helpers <- foldM (buildHelper env imported public) []
+                   (stronglyConnCompFromEdgedVerticesUniq helper_cores)
       certified <- fmap catMaybes $ forM root_cores $ \(owner, rhs) ->
         certifyBinding env exported rdr_env helpers owner rhs
       let (roots, fields) = unzip certified
-          used = concatMap (maybe [] id . sourceTableCallees . snd) roots
-          referenced (_, table) = any ((== tyConName table) . tyConName) used
+          helper_tables = mkNameEnv [(tyConName table, table) | (_, table) <- helpers]
+          used = helperClosure helper_tables emptyNameSet (calleeNames roots)
+          referenced (_, table) = tyConName table `elemNameSet` used
       pure (roots ++ filter referenced helpers, catMaybes fields)
   where
     charArrow = mkVisFunTyManyU charTy charTy
+
+    collectHelpers _ _ _ [] = pure []
+    collectHelpers helperCore references seen (name : rest)
+      | name `elemNameSet` seen = collectHelpers helperCore references seen rest
+      | otherwise = do
+          let next = collectHelpers helperCore references (extendNameSet seen name)
+          core <- helperCore name
+          case core of
+            Just (owner, rhs) -> do
+              let direct = references rhs
+              others <- next (direct ++ rest)
+              pure (DigraphNode (owner, rhs) name direct : others)
+            Nothing -> next rest
+
+    buildHelper env imported public done (AcyclicSCC (owner, rhs))
+      | Just (telescope, domains, result, row) <- checkedConstructorHelper
+             public (lookupHelper env imported done) owner rhs = do
+          table <- publishConstructorRows owner telescope domains result [row]
+          pure ((owner, table) : done)
+    buildHelper _ _ _ done _ = pure done
+
+    calleeNames = concatMap (callees . snd)
+    callees = map tyConName . maybe [] id . sourceTableCallees
+
+    helperClosure _ seen [] = seen
+    helperClosure tables seen (name : rest)
+      | name `elemNameSet` seen = helperClosure tables seen rest
+      | Just table <- lookupNameEnv tables name =
+          let children = callees table
+          in helperClosure tables (extendNameSet seen name) (children ++ rest)
+      | otherwise = helperClosure tables seen rest
 
     eligibleCase env exported owner
       | Just (ConstructorCaseType _ tc _ _ _) <- constructorCaseType (varType owner)
@@ -969,10 +1002,10 @@ constructorHelperType ty = do
       = let (inputs, result) = splitArrows output in (input : inputs, result)
       | otherwise = ([], tau)
 
--- | Check a construction without calling other helpers or inspecting inputs.
-checkedConstructorHelper :: (TyCon -> Bool) -> Id -> Core.CoreExpr
+-- | Check a construction using earlier checked helpers and scoped inputs.
+checkedConstructorHelper :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr
                          -> Maybe ([ForAllTyBinder], [Type], Type, ConstructorCaseRow)
-checkedConstructorHelper public owner rhs = do
+checkedConstructorHelper public helper owner rhs = do
     let rhs_type = exprType rhs
     guard (rhs_type `eqType` varType owner)
     (telescope, domains, result) <- constructorHelperType rhs_type
@@ -984,7 +1017,7 @@ checkedConstructorHelper public owner rhs = do
     guard (parameters == [v | Bndr v _ <- telescope] &&
            all isId terms && eqTypes (map varType terms) domains)
     guard (all publicKind (result : domains))
-    value <- checkCaseResult public publicKind (const Nothing)
+    value <- checkCaseResult public publicKind helper
                              (\v -> v <$ guard (v `elem` terms)) result body
     pure (declared, domains, result, ConstructorCaseRow (map CaseField terms) value)
 
@@ -1338,6 +1371,25 @@ publishConstructorRows owner telescope domains result rows = do
     publishResult instantiate fields (CaseCall table args children) =
       mkTyConApp table (map instantiate args ++ map (publishResult instantiate fields) children)
 
+{- Note [Reachable constructor helpers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Start from the free local Ids of the desugared case roots. Desugar a
+candidate helper only the first time an exact resolved Id reaches it.
+Sort the reachable graph with the existing SCC utility. Check callees
+before callers. Skip a recursive component, including a self edge.
+The result checker can only reference already checked local helpers or
+exact imported source tables. A caller of a rejected helper cannot
+publish an equation that calls it.
+
+Free Core Ids find candidates. The checked RHS family applications
+determine which helpers actually leave the module. Traverse those
+applications from published roots, including under constructors.
+The ordinary source-table dependency walk checks the exact retained
+owners and their rules. In particular, a private helper has no source
+export, but it needs an interface Id and an axiom when a dependent
+consumer can reach it through a public family.
+-}
+
 {- Note [Checked sum projections]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Start with a case on the first argument of the ordinary function. Each
@@ -1351,11 +1403,10 @@ Keep a saturated helper as a reference to its exact checked family,
 including inside a constructor field. An imported helper must already
 have a source table. Within this producer, a private helper can supply
 an equation if its solved Core returns a scoped input variable or
-a checked lazy constructor tree over the inputs. Such helpers do not
-inspect their inputs or call other helpers. This check cannot introduce
-a cycle of local helper equations.
-Only consider local helpers that occur free in an eligible case's Core.
-Publish a helper only if a checked case equation refers to it. The same
+a checked lazy constructor tree over the inputs. A helper cannot inspect
+its inputs. It can call another helper using public, checked kinds.
+See Note [Reachable constructor helpers].
+Publish only the transitive helper dependencies of checked case equations. The same
 dependency closure retains the helper Id in stripped interfaces and
 checks rules even when a client mentions only an exported alias.
 A case removes its scrutinee from the scope of leaves. Pattern matching
