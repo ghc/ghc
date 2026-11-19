@@ -22,13 +22,15 @@ grep -Fq 'T:firstViaMark ' worker.iface
 grep -Fq 'T:mark ' worker.iface
 grep -Fq 'T:markResult ' worker.iface
 grep -Fq 'T:markField ' worker.iface
-if sed -n '/^exports:/,/^defaults:/p' worker.iface | grep -Eq '^[[:space:]]+(helper|wrap|mark|markResult|markField)$'; then
+grep -Fq 'T:secondOrFirst ' worker.iface
+grep -Fq 'T:headOr ' worker.iface
+if sed -n '/^exports:/,/^defaults:/p' worker.iface | grep -Eq '^[[:space:]]+(helper|wrap|mark|markResult|markField|headOr)$'; then
     echo 'The private helper escaped into source exports.' >&2
     exit 1
 fi
 cat > Residual.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, StandaloneKindSignatures #-}
-module Residual (First, Wrapped, Marked) where
+module Residual (First, Wrapped, Marked, Second) where
 import qualified SpineWorker as W
 type First :: W.Spine Bool -> Maybe Bool
 type First xs = W.firstViaHelper xs
@@ -36,13 +38,15 @@ type Wrapped :: W.Spine Bool -> Maybe (Maybe Bool)
 type Wrapped xs = W.firstViaWrap xs
 type Marked :: W.Spine Bool -> Maybe (W.Marked Bool)
 type Marked xs = W.firstViaMark xs
+type Second :: W.Spine Bool -> Maybe Bool
+type Second xs = W.secondOrFirst xs
 HS
 cat > Consumer.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
 module Consumer where
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import Residual (First, Wrapped, Marked)
+import Residual (First, Wrapped, Marked, Second)
 import qualified SpineWorker as W
 
 empty :: First 'W.Empty :~: 'Nothing
@@ -56,6 +60,11 @@ wrapped _ _ = Refl
 marked :: forall (a :: Bool) (xs :: W.Spine Bool).
           Proxy a -> Proxy xs -> Marked ('W.More a xs) :~: 'Just ('W.Marked a)
 marked _ _ = Refl
+singleton :: forall (a :: Bool). Proxy a -> Second ('W.More a 'W.Empty) :~: 'Just a
+singleton _ = Refl
+second :: forall (a :: Bool) (b :: Bool) (xs :: W.Spine Bool).
+          Proxy a -> Proxy b -> Proxy xs -> Second ('W.More a ('W.More b xs)) :~: 'Just b
+second _ _ _ = Refl
 HS
 "${ghc[@]}" -c Residual.hs
 "${ghc[@]}" -c Consumer.hs
@@ -65,6 +74,47 @@ for mod in Residual Consumer; do
     "${ghc[@]}" -v1 -c "$mod.hs" >warm.log 2>&1
     grep -Fxq 'compilation IS NOT required' warm.log || { cat warm.log >&2; exit 1; }
 done
+
+cat > UnknownTail.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+module UnknownTail where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import Residual (Second)
+import qualified SpineWorker as W
+
+proof :: forall (a :: Bool) (xs :: W.Spine Bool).
+         Proxy a -> Proxy xs -> Second ('W.More a xs) :~: 'Just a
+proof _ _ = Refl
+HS
+if "${ghc[@]}" -c UnknownTail.hs >reject.log 2>&1 ||
+   ! grep -Eq '^UnknownTail\.hs:10:[0-9]+.*error: \[GHC-(25897|83865)\]' reject.log ||
+   ! grep -Fq "Couldn't match" reject.log; then cat reject.log >&2; exit 1; fi
+
+reject_old_second() {
+    if grep -Eq 'T:(headOr|secondOrFirst) ' worker.iface; then cat worker.iface >&2; exit 1; fi
+    local line
+    line=$(awk '/^type Second xs =/ {print NR}' Residual.hs)
+    if "${ghc[@]}" -c Residual.hs >reject.log 2>&1 ||
+       ! grep -Eq "^Residual\.hs:$line:[0-9]+.*error: \[GHC-(68947|70566)\]" reject.log ||
+       ! grep -Fq 'secondOrFirst' reject.log; then cat reject.log >&2; exit 1; fi
+}
+
+# Force the tail in the More branch, then try a separate incomplete match.
+sed 's/^headOr (More y _) _ = y$/headOr (More y !_) _ = y/' Worker.source > SpineWorker.hs
+compile_worker
+reject_old_second
+sed '/^headOr Empty fallback = fallback$/d' Worker.source > SpineWorker.hs
+compile_worker
+reject_old_second
+
+# A rule on the private case can replace even a well-typed complete match.
+cp Worker.source SpineWorker.hs
+cat >> SpineWorker.hs <<'HS'
+{-# RULES "headOr/replacement" forall xs fallback. headOr xs fallback = fallback #-}
+HS
+compile_worker
+reject_old_second
 
 # The leaf equation can change the value without changing the helper type.
 # Keep the original alias interface and consumer source.

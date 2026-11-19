@@ -811,3 +811,28 @@ and `choose (Some x) = Just x`. An exported `first (Box v) = Just (choose v)`
 needs its case equations. On the M155 bootstrap compiler, an alias for
 `first b` still reports GHC-68947 at the call when the worker has only
 a stripped interface.
+
+## M158. A private helper can match a constructor
+
+`secondOrFirst` returns `Nothing` for an empty spine. For a nonempty
+spine, it constructs `Just (headOr xs x)`. The private helper inspects
+`xs` to choose the second element or the fallback `x`. The public
+equation keeps this helper call inside the lazy `Just` field. A client
+can choose either helper branch using only the stripped interfaces.
+With a rigid `xs`, GHC cannot conclude that the result contains the
+fallback.
+
+GHC checks private case helpers in dependency order with the same
+Core case checker as public workers. The helper needs complete
+alternatives and a checked lazy representation. An extra demand on
+a field, a missing alternative or a rewrite rule on the helper
+prevents its caller from publishing checked equations. The helper's
+equation survives in the interface without a source export.
+
+When upgrading from M155, GHC rechecks an older home producer with a
+local exported datatype eligible for case equations. Plain and
+abstract modules can reuse their interfaces, and a warm build reuses
+the updated producer.
+[Producer](../examples/open-evaluation/SpineWorker.hs),
+[stripped-interface tests](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh),
+and [interface upgrade](../examples/open-evaluation/check-case-upgrade.sh).

@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, NoExperimentalDependentTypes #-}
 module SpineWorker
-    ( Spine(..), firstMaybe, firstViaHelper, firstViaWrap, Marked(..), firstViaMark
+    ( Spine(..), firstMaybe, firstViaHelper, firstViaWrap, Marked(..), firstViaMark, secondOrFirst
     , boxedFirst, strictFirst, Secret, privateFirst, StrictResult(..), strictResult
     ) where
 
@@ -49,6 +49,17 @@ markResult x = markField x
 {-# NOINLINE markField #-}
 markField :: a -> Marked a
 markField x = Marked x
+
+-- | Return the second element of a nonempty spine, or its only element.
+secondOrFirst :: Spine a -> Maybe a
+secondOrFirst Empty = Nothing
+secondOrFirst (More x xs) = Just (headOr xs x)
+
+-- | Select a head without inspecting the fallback or the remaining tail.
+{-# NOINLINE headOr #-}
+headOr :: Spine a -> a -> a
+headOr Empty fallback = fallback
+headOr (More y _) _ = y
 
 -- | Force the tail before returning the first field.
 strictFirst :: Spine a -> Maybe a

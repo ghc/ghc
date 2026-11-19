@@ -852,9 +852,14 @@ sourceCaseTables binds = do
             Nothing -> next rest
 
     buildHelper env imported public done (AcyclicSCC (owner, rhs))
-      | Just (telescope, domains, result, row) <- checkedConstructorHelper
-             public (lookupHelper env imported done) owner rhs = do
-          table <- publishConstructorRows owner telescope domains result [row]
+      | Just (telescope, domains, result, row) <- checkedConstructorHelper public helper owner rhs
+      = publish (publishConstructorRows owner telescope domains result [row])
+      | Just (signature, rows) <- checkedConstructorCase public helper owner rhs
+      = publish (publishConstructorCase owner signature rows)
+      where
+        helper = lookupHelper env imported done
+        publish make = do
+          table <- make
           pure ((owner, table) : done)
     buildHelper _ _ _ done _ = pure done
 
@@ -1380,6 +1385,12 @@ before callers. Skip a recursive component, including a self edge.
 The result checker can only reference already checked local helpers or
 exact imported source tables. A caller of a rejected helper cannot
 publish an equation that calls it.
+
+A private helper may also scrutinize an argument. Use the same case
+checker as for an exported function. The caller keeps the helper
+application under its constructor. Its family can select a branch
+when a later client supplies the scrutinee. The checks for public
+constructors, strict fields and exhaustive branches still apply.
 
 Free Core Ids find candidates. The checked RHS family applications
 determine which helpers actually leave the module. Traverse those
