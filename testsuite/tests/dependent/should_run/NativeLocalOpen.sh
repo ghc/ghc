@@ -140,9 +140,9 @@ SOURCE
 
 # The instance head is needed while checking keep. Its methods see both
 # the first type synonym and the producer checked in the next source group.
-cp "$src/LocalInstance.hs" "$src/LocalAssociated.hs" .
-"${ghc[@]}" -c LocalInstance.hs LocalAssociated.hs
-cp LocalInstance.hi LocalAssociated.hi ../client/
+cp "$src/LocalInstance.hs" "$src/LocalAssociated.hs" "$src/LocalDataFamily.hs" .
+"${ghc[@]}" -c LocalInstance.hs LocalAssociated.hs LocalDataFamily.hs
+cp LocalInstance.hi LocalAssociated.hi LocalDataFamily.hi ../client/
 (
     cd ../client
     cat > InstanceConsumer.hs <<'SOURCE'
@@ -150,12 +150,14 @@ cp LocalInstance.hi LocalAssociated.hi ../client/
 module Main where
 import LocalInstance (passValue)
 import LocalAssociated (result)
+import qualified LocalDataFamily
 main :: IO ()
-main = print (passValue (7 :: Int), passValue True, result)
+main = print (passValue (7 :: Int), passValue True, result, LocalDataFamily.result)
 SOURCE
     "${ghc[@]}" -c InstanceConsumer.hs
-    "${ghc[@]}" InstanceConsumer.o ../producer/LocalInstance.o ../producer/LocalAssociated.o -o instance-consumer
-    test "$(./instance-consumer)" = '(7,True,True)'
+    "${ghc[@]}" InstanceConsumer.o ../producer/LocalInstance.o ../producer/LocalAssociated.o \
+        ../producer/LocalDataFamily.o -o instance-consumer
+    test "$(./instance-consumer)" = '(7,True,True,(True,False,"StampToken {marked = False}"))'
 )
 
 sed -e 's/LocalInstance/StrictInstance/g' \
@@ -176,15 +178,24 @@ sed -e 's/LocalInstance/SplicedInstance/g' \
 sed -e 's/LocalAssociated/EquationCycle/g' \
     -e 's/type Flag Token = Answer/type Flag Token = EquationCycle.keep Bool/' \
     "$src/LocalAssociated.hs" >EquationCycle.hs
-line=$(awk '/^type Kept a =/ {print NR}' EquationCycle.hs)
+line=$(awk '/^    type Flag Token =/ {print NR}' EquationCycle.hs)
 expect_rejection EquationCycle "$line" '\[GHC-70566\]' 'unfinished local function keep'
 
-sed -e 's/LocalAssociated/DataFamily/g' \
-    -e '/^class Gate a where/a\    data Stamp a' \
-    -e '/^instance Gate Token where/a\    data Stamp Token = StampToken' \
-    "$src/LocalAssociated.hs" >DataFamily.hs
-line=$(awk '/^type Kept a =/ {print NR}' DataFamily.hs)
-expect_rejection DataFamily "$line" '\[GHC-70566\]' 'associated data family instances'
+# A family instance may need the very producer that uses its constructors.
+for family in AssociatedData StandaloneData StandaloneType; do
+    case "$family" in
+        AssociatedData) pattern='marked :: Payload'; replacement='marked :: AssociatedData.keep Bool'
+                        reason='An associated data instance' ;;
+        StandaloneData) pattern='contents :: Flag Token'; replacement='contents :: StandaloneData.keep Bool'
+                        reason='This data instance' ;;
+        StandaloneType) pattern='type instance Flag Token = Payload'; replacement='type instance Flag Token = StandaloneType.keep Bool'
+                        reason='This type instance' ;;
+    esac
+    sed -e "s/LocalDataFamily/$family/g" -e "s/$pattern/$replacement/" "$src/LocalDataFamily.hs" >"$family.hs"
+    line=$(awk -v term="$family.keep Bool" 'index($0,term) {print NR}' "$family.hs")
+    expect_rejection "$family" "$line" '\[GHC-70566\]' "$reason requires the unfinished local function keep"
+    [[ $(grep -c 'error: \[GHC-70566\]' reject.log) == 1 ]]
+done
 
 cat > DerivingCycle.hs <<'SOURCE'
 {-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures #-}

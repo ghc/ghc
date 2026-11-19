@@ -192,8 +192,33 @@ producer. In the regression, `not (enabled Token)` needs
 and a local synonym gives `type Answer = Bool`. GHC checks the synonym
 and installs the equation before checking the producer. If the equation
 instead calls the unfinished `keep`, GHC names that dependency at the
-source call. Associated data instances and standalone family instances
-still need scheduling.
+source call. M150 extends scheduling to associated data instances and
+standalone family instances.
 [Associated equation](../examples/open-evaluation/LocalAssociated.hs).
 [Scheduler](../../../compiler/GHC/Tc/Module.hs)
 and [consumer and strict cycle](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
+## M150. Constructors and selectors of family instances
+
+The ordinary term `StampToken True == StampToken False` needs the data
+constructor of an associated data instance and its derived `Eq` instance.
+A standalone data instance defines the record selector `contents`. Its
+field type reduces through a standalone type instance. GHC checks all
+three declarations before the local producer `keep`. The instance
+method can then use `keep` in a type. An ordinary module imports the
+result and runs the method, equality, and derived `Show` code.
+[Source example](../examples/open-evaluation/LocalDataFamily.hs).
+
+The scheduler reads constructor field types and deriving clauses with
+their instance. GHC's ordinary instance pass installs the constructors
+and selectors. A field type that calls the unfinished producer creates
+a cycle. The diagnostic names the producer and identifies the kind of
+instance at the source call. Data-family constructor promotion is a
+separate upstream feature, R14. The example uses the constructors in
+ordinary terms. [Registration and cycle checks](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
+A family equation can also mention a local function that needs no
+instances. For example, `type instance Payload Int = M.ident Bool`
+needs only `ident x = x`. The current scheduler requires instance
+prerequisites before the first value group. Distinguishing this acyclic
+case from a real cycle is the next source check.

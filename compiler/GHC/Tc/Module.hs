@@ -1947,9 +1947,15 @@ these equations with the instance heads and saves the InstInfo for each
 instance. Check the methods after the remaining value bindings and before
 returning to the enclosing splice group. Run that pass inside the
 continuations of all scheduled batches. A method can then use a producer
-whose checked Core becomes available in a later batch. Associated data
-family instances introduce declarations that need separate scheduling.
-Explicit family instances also need their own scheduling rules.
+whose checked Core becomes available in a later batch.
+
+Schedule family instances with the types in their equations, constructor
+fields and deriving clauses. The ordinary instance pass introduces data
+constructors, record selectors and derived instances before checking
+the early value bindings. These constructors and selectors belong to
+the instance. They do not need a separate type declaration group.
+This order concerns term uses of constructors. See Note [No dependencies
+on data instances] in GHC.Rename.Module for the limits on promotion.
 
 The ordinary late source RULE check validates the owners the observer
 actually uses. An unrelated RULE does not stop the split. A producer
@@ -1981,12 +1987,12 @@ tcLocalOpenGroup demands group@HsGroup
   , hs_tyclds = tycls
   , hs_derivds = standalone, hs_defds = defaults } finish
   = do
-      instances <- traverse instance_head [inst | tg <- tycls, inst <- group_instds tg]
+      instances <- traverse instance_group [inst | tg <- tycls, inst <- group_instds tg]
       when (hasSplice (standalone, defaults)) $
         rejectLocalOpen demands "A splice prevents checking a standalone deriving or default declaration early."
       let heads = concatMap (nameSetElemsStable . group_ext) instances
           prerequisite_types = do
-            with_heads <- closeLocalNames (typeDeps "the instance heads and associated type equations" instanceNeedsTerm)
+            with_heads <- closeLocalNames (typeDeps "the instance declarations" instanceNeedsTerm)
                                           emptyNameSet heads
             closeLocalNames (typeDeps "the deriving and default declarations" needsTerm)
                             with_heads instance_default_roots
@@ -2024,34 +2030,35 @@ tcLocalOpenGroup demands group@HsGroup
   where
     group_names = mkNameSet (hsGroupBinders group)
     value_names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds group))
-    instance_head inst@(L _ ClsInstD{cid_inst = ClsInstDecl
-      { cid_poly_ty = head_ty, cid_modifiers = modifiers
-      , cid_ext = (_, HsNestedGroup { ng_tyfam_insts = equations
-                                   , ng_datafam_insts = data_instances }) }})
-      | not (null data_instances) =
-          rejectLocalOpen demands "Early instance checking does not support associated data family instances."
-      | hasSplice (head_ty, modifiers) =
-          rejectLocalOpen demands "A splice prevents checking this instance head early."
-      | term : _ <- localUses value_names (head_ty, modifiers) =
-          rejectLocalOpen demands ("This instance head requires the unfinished local function "
-                                   ++ getOccString term ++ ".")
-      | hasSplice equations =
-          rejectLocalOpen demands "A splice prevents checking an associated type equation early."
-      | term : _ <- localUses value_names equations =
-          rejectLocalOpen demands ("An associated type equation requires the unfinished local function "
-                                   ++ getOccString term ++ ".")
-      | otherwise = do
-          let names = localUses group_names (head_ty, modifiers, equations)
-              deps = [leader | name <- names, Just (leader, _) <- [lookupNameEnv types name]]
-          pure TyClGroup { group_ext = mkNameSet deps, group_tyclds = []
-                         , group_kisigs = [], group_roles = [], group_instds = [inst] }
-    instance_head _ =
-      rejectLocalOpen demands "Early instance checking does not support explicit family instances."
+    instance_group inst = do
+      names <- case unLoc inst of
+        ClsInstD{cid_inst = ClsInstDecl
+          { cid_poly_ty = head_ty, cid_modifiers = modifiers
+          , cid_ext = (_, HsNestedGroup { ng_tyfam_insts = equations
+                                       , ng_datafam_insts = data_instances }) }} ->
+          concat <$> sequence [ instance_part "This instance head"
+                                  (getLocA head_ty : map getLocA modifiers) (head_ty, modifiers)
+                              , instance_part "An associated type equation" (map getLocA equations) equations
+                              , instance_part "An associated data instance" (map getLocA data_instances) data_instances ]
+        TyFamInstD{tfid_inst = equation} -> instance_part "This type instance" [getLocA inst] equation
+        DataFamInstD{dfid_inst = data_inst} -> instance_part "This data instance" [getLocA inst] data_inst
+      let deps = [leader | name <- names, Just (leader, _) <- [lookupNameEnv types name]]
+      pure TyClGroup { group_ext = mkNameSet deps, group_tyclds = []
+                     , group_kisigs = [], group_roles = [], group_instds = [inst] }
+    instance_part :: Data a => String -> [SrcSpan] -> a -> TcM [Name]
+    instance_part what locations part
+      | hasSplice part = rejectLocalOpen demands (what ++ " contains a splice.")
+      | term : _ <- localUses value_names part = do
+          let calls = [d | d@(n, loc) <- demands, n == term, any (loc `isSubspanOf`) locations]
+              reason = what ++ " requires the unfinished local function " ++ getOccString term ++ "."
+          -- A generated declaration can have no real source span.
+          rejectLocalOpen (if null calls then demands else calls) reason
+      | otherwise = pure (localUses group_names part)
 
     instance_default_roots =
       [tcdName (unLoc decl) | decl <- tyClGroupTyClDecls tycls, not (no_deriving decl)]
       ++ localUses group_names (standalone, defaults)
-    instanceNeedsTerm dep term = "Checking an instance head or associated type equation requires "
+    instanceNeedsTerm dep term = "Checking an instance declaration requires "
                               ++ getOccString dep
                               ++ ", whose declaration uses the local function "
                               ++ getOccString term ++ "."
@@ -2060,7 +2067,8 @@ tcLocalOpenGroup demands group@HsGroup
                       ++ getOccString term ++ "."
     types = mkNameEnv [(binder, (leader, tg)) | tg <- tycls, first : _ <- [group_tyclds tg]
                                              , let leader = tcdName (unLoc first)
-                                             , binder <- hsTyClForeignBinders [tg] []]
+                                             , binder <- hsTyClForeignBinders [tg { group_instds = [] }] []]
+    instance_binders = mkNameSet (hsTyClForeignBinders [tg { group_tyclds = [] } | tg <- tycls] [])
     graph = mkNameEnv
       [ (owner, (bind, fvs, group_edge))
       | (_, scc_binds) <- binds
@@ -2117,6 +2125,7 @@ tcLocalOpenGroup demands group@HsGroup
       | otherwise = "The declaration of " ++ getOccString dep ++ " requires the local function "
                     ++ getOccString term ++ " before it can be observed."
 
+    typeDeps _ _ dep | dep `elemNameSet` instance_binders = Right emptyNameSet
     typeDeps owner needs_term dep = case lookupNameEnv types dep of
       Just (leader, tg)
         | dep /= leader -> Right (unitNameSet leader)
@@ -2131,6 +2140,7 @@ tcLocalOpenGroup demands group@HsGroup
       _ -> Left ("Cannot check " ++ owner ++ " before the same-group declaration "
                  ++ getOccString dep ++ ".")
     ordinaryType SynDecl{} = True
+    ordinaryType FamDecl{} = True
     ordinaryType DataDecl{} = True
     ordinaryType ClassDecl{} = True
     ordinaryType _ = False
