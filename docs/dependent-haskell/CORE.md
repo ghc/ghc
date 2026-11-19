@@ -2947,3 +2947,36 @@ dependencies before evaluating the producer. A written package already
 contains its erased arguments in the kind-checked promoted application.
 [Planning, rendering and decoding](../../compiler/GHC/Tc/Gen/Splice.hs)
 and [witnessed source results](roadmap/R15-closed-term-evaluator.md#m135-reading-a-runtime-existential-package).
+
+### Composing closed ordinary calls
+
+The planner keeps a checked ordinary application in Core when the next
+operation is another ordinary Haskell function. It compiles the combined
+expression and renders the observed result. For `first (make 7)`, the
+callee's ordinary Core determines whether either field of the intermediate
+parcel is demanded. A checked family still needs an argument in the type
+language, so its input is a separate observation. Runtime exceptions
+belong to the observing call. A static input-kind error belongs to the
+offending operand.
+[Source planning](../../compiler/GHC/Tc/Gen/HsType.hs)
+and [interpreter boundary](../../compiler/GHC/Tc/Gen/Splice.hs).
+
+Keep an interface dependency on each checked ordinary function before
+simplification. Record the object dependencies that remain after linking.
+An optimizer rule can replace the whole expression and remove the last
+object reference. Changing the rule in just the provider interface must
+then invalidate the client. [Rule replay](../../testsuite/tests/dependent/should_run/NativeClosedFusedRule.sh).
+
+### Returning a constructor with symbolic fields
+
+The ordinary producer's instantiated result arrow determines the result
+kind. The observer saves each field and its lexical environment. To
+construct a promoted result, it reads each field at its declared kind
+and checks the result of the promoted application. A neutral variable
+must refer to one of the supplied symbols. The weak-head reduction and
+all field reads share one reduction budget. An unknown scrutinee
+blocks a case even when other fields are known. The visible constructor
+contributes its declaration fingerprint. Only demanded function bodies
+contribute term rewrite-rule dependencies.
+[Core readback](../../compiler/GHC/Core/OpenWhnf.hs)
+and [source examples](examples/open-evaluation/OpenBuildSource.hs).

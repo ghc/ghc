@@ -5433,3 +5433,28 @@ after GHC checks a function it mentions. The source needs no new block
 syntax. [Serokell's dependency analysis](https://serokell.io/blog/dependency-analysis-haskell),
 [Agda's interleaved declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
 and [GHC's declaration scheduler](../../compiler/GHC/Tc/Module.hs).
+
+### Observing a composition and returning an open constructor
+
+In Haskell a constructor pattern inspects the outer value. A field
+matched by a wildcard can stay unevaluated. M136 passes an ordinary
+nested application directly to its ordinary consumer so these rules
+also determine demand during compilation. Agda's reflection API
+distinguishes reducing a term to weak head normal form from normalizing
+it. M137 makes the corresponding distinction in the open observer:
+a case only needs the constructor tag, while returning a complete
+promoted value requires observing its fields. The fork bounds that
+second operation because ordinary Haskell fields can diverge.
+[Haskell Report, section 3.17](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html),
+[Agda reflection](https://agda.readthedocs.io/en/v2.8.0/language/reflection.html)
+and [Serokell open evaluator](https://ghc.serokell.io/dh#open-term-evaluator).
+
+Stock deriving generates instances from datatype declarations. Derived
+contexts can depend on each other. Haskell module defaults determine
+how eligible ambiguous constraints are resolved. M138 uses GHC's own
+deriving and defaulting passes before checking the local function that
+a type mentions. GHC's deriving strategies also support a local class
+with a default method in this example.
+[Haskell derived instances](https://www.haskell.org/onlinereport/haskell2010/haskellch11.html),
+[Haskell default declarations, section 4.3.4](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html)
+and [GHC deriving strategies](../../docs/users_guide/exts/deriving_strategies.rst).

@@ -8621,3 +8621,50 @@ client. The open constructor, mixed dependency, boundary plugin and
 splice regressions passed. The normal-way dependent directory passed
 221 of 257 exercised cases. All 36 failures matched M131 individually.
 The full GHC testsuite was not run.
+
+## M136: preserve demand in nested ordinary calls
+
+- [x] Check each function's application and keep ordinary intermediate
+      values in typed Core. Reify the value at the enclosing observation
+      or when a type family needs a type argument.
+- [x] Read the first field of an abstract parcel. Keep static kind errors
+      at the offending operand and report a demanded exception at the
+      observing call. Preserve direct unsupported-result controls.
+- [x] Recheck after either independently linked object changes. Check
+      an optimized rule whose change invalidates a client even when no
+      provider object is an interpreter dependency.
+
+[Composition and source checks](roadmap/R15-closed-term-evaluator.md#m136-composing-ordinary-calls-before-observation).
+
+## M137: read back open constructor results
+
+- [x] Check the result kind from the ordinary producer type. Recover a
+      supplied rigid argument or read the fields of a supported constructor.
+- [x] Accept nested user constructors and boxed pairs. Share one reduction
+      budget across all demanded fields. Preserve a blocked case on an
+      unknown scrutinee.
+- [x] Track the actual visible constructors and their interface use.
+      Recheck an unchanged exporter after the producer changes its
+      returned constructor. Reject a hidden result at the call.
+
+[Open result proofs](roadmap/R16-open-term-evaluator.md#reading-back-an-ordinary-constructor-result).
+
+## M138: check derived instances and defaults before local functions
+
+- [x] Schedule attached and standalone deriving declarations and module
+      defaults with the type groups they need. Use GHC's ordinary instance
+      and default checking.
+- [x] Compile a local producer and a separate ordinary consumer using
+      derived instances, a local class default method and numeric defaults
+      across declaration passes.
+- [x] Report the dependency at the type-level call when deriving needs
+      a type that refers back to the unfinished function.
+
+[Declaration ordering and ordinary consumer](roadmap/R21-dependency-analysis.md#m138-deriving-clauses-and-module-defaults).
+
+Both compiler stages built. Native execution in both stages and GHCi
+produced the same 212 Showcase lines. Both interpreters passed the parcel,
+object replay and optimized-rule replay checks. The open constructor,
+derived-instance and defaulting checks passed. The normal-way dependent
+directory passed 227 of 263 exercised cases. All 36 failures matched
+M135 individually. The full GHC testsuite was not run.

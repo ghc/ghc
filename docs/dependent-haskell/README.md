@@ -8,17 +8,32 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 209 lines.
-The normal-way dependent directory passed 221 of 257 exercised cases. All 36 failures
-produced the same output as at M131 (`71e63770eb`). Fifteen reject existing
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 212 lines.
+The normal-way dependent directory passed 227 of 263 exercised cases. All 36 failures
+produced the same output as at M135 (`b692c7c298`). Fifteen reject existing
 programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
-An ordinary library function now returns `SomeVec Natural` and chooses
-the length from its input. At `4`, the dependent client proves
-`E.readSomeVec (E.someVec 4) :~: '[4, 5]`. GHC recovers the erased
-length from the singleton inside the package and checks its vector at
-that length. The producer and consumer both have ordinary Haskell types.
+An ordinary Haskell library can hide its parcel constructor and export
+`make` and `first`. The dependent client proves `first (make 7) :~: 7`
+even though evaluating the second field would raise an exception. GHC
+compiles the two ordinary applications together and observes the
+number. [Parcel library](examples/closed-evaluation/LazyParcel.hs) and
+[source proof](../../testsuite/tests/dependent/should_run/NativeClosedLazyParcel.hs).
+
+A polymorphic ordinary function can also build a constructor from
+unknown inputs. The client proves `Make a b :~: 'Shell a b` and can
+export the result to users of ordinary Haskell. Local functions used
+in types can now share a module with deriving clauses, standalone
+deriving declarations, and module defaults when their prerequisites
+can be checked first. [Open constructor proofs](examples/open-evaluation/OpenBuildSource.hs)
+and [deriving and defaulting](roadmap/R21-dependency-analysis.md#m138-deriving-clauses-and-module-defaults).
+
+For the ordinary library function returning `SomeVec Natural`, the
+Showcase now checks the returned package itself at input `4`. GHC
+recovers the erased length from its singleton and checks both cells,
+`4` and `5`. A second proof applies the ordinary consumer and checks
+that it returns `'[4, 5]`.
 [Runnable proof](Showcase.hs) and [ordinary library](examples/closed-evaluation/ExistentialVec.hs).
 
 An imported case can select a symbolic field from a known constructor.

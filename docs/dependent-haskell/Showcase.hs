@@ -62,6 +62,8 @@ import qualified IndexedVec
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
+import qualified LazyParcel
+import qualified OpenBuildSource
 import qualified OpenConstructorSource
 import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
@@ -898,7 +900,15 @@ main = do
     observe "select unknown fields from known constructors"
         (OpenConstructorSource.left True 'x', OpenConstructorSource.nested (7 :: Int) 'z')
     observe "read a length witness returned by an ordinary function"
-        (Refl :: E.readSomeVec (E.someVec 4) :~: '[4, 5], E.readSomeVec (E.someVec 4))
+        ( Refl :: E.someVec 4 :~: 'E.SomeVec ('E.SS ('E.SS 'E.SZ))
+                      ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))
+        , E.readSomeVec (E.someVec 4) )
+    observe "read one field of a private parcel without forcing the other"
+        (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
+    observe "construct a result from two symbolic fields"
+        (OpenBuildSource.exact (Proxy @Char) (Proxy @Bool))
+    observe "use a derived instance beside a dependent type"
+        LocalOpen.routeLabel
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)
