@@ -512,3 +512,10 @@ each definition it unfolds. An undemanded argument can refer to another
 checked helper without adding that helper to the proof's rule dependencies.
 [Two local selections](../examples/open-evaluation/LocalOpen.hs)
 and [helper and rewrite-rule controls](R21-dependency-analysis.md#m128-following-a-local-dependency-chain).
+
+M131 applies the existing open reduction limit to recursive value groups.
+A terminating observation can use a mutually recursive function even
+when a different call to that group would diverge. A demanded
+monomorphic recursion binder contributes its source function to the
+late rewrite-rule check.
+[Recursive source examples](R21-dependency-analysis.md#m131-mutually-recursive-value-bindings).

@@ -4,7 +4,7 @@ module GHC.Core.OpenWhnf
   , Neutral(..)
   , Suspension
   , CaseContinuation(..)
-  , openWhnfM, openWhnfTraceM, CaseStep(..)
+  , openWhnfM, openWhnfWithLocalM, openWhnfTraceM, CaseStep(..)
   ) where
 
 import GHC.Prelude
@@ -72,23 +72,35 @@ data CaseStep
 -- See Note [Observing open Core].
 openWhnfM :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> VarSet -> CoreExpr
           -> m (Either EvalFailure Whnf)
-openWhnfM limit obtain = openWhnfTraceM limit obtain (const (pure ()))
+openWhnfM limit obtain = openWhnfWithLocalM limit obtain (const (pure ()))
+
+-- | Report a lexical variable when its suspended binding is demanded.
+openWhnfWithLocalM :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> (Var -> m ())
+                  -> VarSet -> CoreExpr -> m (Either EvalFailure Whnf)
+openWhnfWithLocalM limit obtain local =
+  openWhnfTraceWithLocalM limit obtain local (const (pure ()))
 
 -- | Observe an expression and report case selections and the unboxed unit
 -- continuation step in the order in which the observer performs them.
 openWhnfTraceM :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr))
               -> (CaseStep -> m ()) -> VarSet -> CoreExpr -> m (Either EvalFailure Whnf)
-openWhnfTraceM limit obtain record unsolved expr =
-  runExceptT $ evalStateT (evaluate limit obtain record unsolved (Suspension emptyVarEnv expr)) 1
+openWhnfTraceM limit obtain = openWhnfTraceWithLocalM limit obtain (const (pure ()))
 
-evaluate :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> (CaseStep -> m ()) ->
-            VarSet -> Suspension -> StateT Int (ExceptT EvalFailure m) Whnf
-evaluate limit obtain record unsolved (Suspension env expr) = do
+openWhnfTraceWithLocalM :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> (Var -> m ())
+                       -> (CaseStep -> m ()) -> VarSet -> CoreExpr -> m (Either EvalFailure Whnf)
+openWhnfTraceWithLocalM limit obtain local record unsolved expr =
+  runExceptT $ evalStateT (evaluate limit obtain local record unsolved (Suspension emptyVarEnv expr)) 1
+
+evaluate :: Monad m => IntWithInf -> (Var -> m (Maybe CoreExpr)) -> (Var -> m ())
+         -> (CaseStep -> m ()) -> VarSet -> Suspension -> StateT Int (ExceptT EvalFailure m) Whnf
+evaluate limit obtain local record unsolved (Suspension env expr) = do
   steps <- get
   if intGtLimit steps limit then lift (throwE Exhausted) else put (steps + 1)
   case expr of
     Var v
-      | Just binding <- lookupVarEnv env v -> recur binding
+      | Just binding <- lookupVarEnv env v -> do
+          lift (lift (local v))
+          recur binding
       | otherwise -> do
           definition <- lift (lift (obtain v))
           case definition of
@@ -174,7 +186,7 @@ evaluate limit obtain record unsolved (Suspension env expr) = do
         _ -> lift (throwE UnsupportedCore)
     _ -> lift (throwE UnsupportedCore)
   where
-    recur = evaluate limit obtain record unsolved
+    recur = evaluate limit obtain local record unsolved
     pairCon = tupleDataCon Boxed 2
     pairWorker = dataConWorkId pairCon
     pairFields (DataAlt con) [x,y] first second

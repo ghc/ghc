@@ -1910,7 +1910,11 @@ needs a checked body. Its ordinary forall
 is erased and does not bind a retained term in the caller's type.
 
 Follow the producer's resolved RHS dependencies in renamed SCC order.
-The producer and any unsigned helper use ordinary inference. Check
+The producer and any unsigned helper use ordinary inference. Include
+every member of a recursive value SCC. Ordinary checking handles the
+recursive term bindings. A type dependency on an unavailable declaration
+still prevents early checking. Observation uses the existing reduction
+limit when it demands a divergent member. Check
 selected signatures for dependencies on declarations that have not
 been checked. Keep INLINE pragmas with their bindings. Split a shared
 signature between the groups at its original location. A same-group instance or
@@ -1927,6 +1931,13 @@ Follow the checked bindings' resolved term references to find helpers
 from earlier groups. Inspect only the resulting closure for pending
 typed splices. Pass only its checked Core to the observer. The type
 checker cannot execute an object for the current module.
+
+For observation, desugar each AbsBinds export separately. Keep the full
+monomorphic binding group, evidence and export wrapper. This uses the
+single-export desugaring path instead of building a synthetic tuple
+and selecting its field. Ordinary Core generation still receives the
+original AbsBinds. When observation demands a monomorphic binder, its
+ABExport identifies the source owner. Record that owner for RULE checks.
 -}
 
 -- | Check the independently schedulable local definitions first.
@@ -1954,10 +1965,16 @@ tcLocalOpenGroup demands group@HsGroup
     value_names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds group))
     types = mkNameEnv [(tcdName (unLoc decl), decl) | decl <- tyClGroupTyClDecls tycls]
     graph = mkNameEnv
-      [ (owner, scc)
-      | scc@(_, scc_binds) <- binds
-      , bind <- scc_binds
-      , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
+      [ (owner, (bind, fvs, group_edge))
+      | (_, scc_binds) <- binds
+      , Just definitions <- [traverse functionBinding scc_binds]
+      , (representative, _, _) : _ <- [definitions]
+      , let members = mkNameSet [name | (name, _, _) <- definitions]
+      , (owner, bind, fvs) <- definitions
+      , let group_edge = if owner == representative then members else unitNameSet representative ]
+    functionBinding bind@(L _ FunBind{fun_id = L _ name, fun_ext = fvs}) =
+      Just (name, bind, fvs)
+    functionBinding _ = Nothing
     signatures = foldr addSignature emptyNameEnv sigs
     addSignature (L _ sig) env =
       foldr (\owner acc -> extendNameEnv_C (++) acc owner [sig]) env (signatureOwners sig)
@@ -1968,18 +1985,15 @@ tcLocalOpenGroup demands group@HsGroup
         Left reason -> rejectLocalOpen [demand] reason
 
     dependencies root name = case lookupNameEnv graph name of
-      Just (Recursive, _) ->
-        Left ("The local term dependency forms a cycle through " ++ getOccString name ++ ".")
-      Just (NonRecursive, [bind@(L _ FunBind{fun_ext = fvs})])
+      Just (bind, fvs, members)
         | hasSplice bind -> Left ("A pending splice prevents observing " ++ getOccString name ++ ".")
         | otherwise -> do
             mapM_ (checkSignature root name) (fromMaybe [] (lookupNameEnv signatures name))
             case nameSetElemsStable ((fvs `intersectNameSet` group_names) `minusNameSet` value_names) of
               dep : _ -> Left (typeDependency root name dep)
-              [] -> Right (fvs `intersectNameSet` value_names)
+              [] -> Right (members `unionNameSet` (fvs `intersectNameSet` value_names))
       _ -> Left ("The local dependency " ++ getOccString name
-                 ++ " is not an independent function binding.")
-
+                 ++ " is not an ordinary function binding.")
     checkSignature root name sig = case sig of
       TypeSig _ [] _ tau
         | not (isCompleteHsSig tau) ->
@@ -2037,7 +2051,7 @@ splitSignatures selected = foldr split ([], [])
 
 -- | Desugar only demanded bindings after their owning group has solved.
 localOpenDefinitions :: [(Name, SrcSpan)] -> Bag EvBind -> LHsBinds GhcTc
-                     -> TcM (NameEnv (Id, CoreExpr))
+                     -> TcM (NameEnv (Id, CoreExpr), NameEnv Id)
 localOpenDefinitions demands evidence binds = do
     let requested = mkNameSet (map fst demands)
         named_binds =
@@ -2055,22 +2069,36 @@ localOpenDefinitions demands evidence binds = do
     selected <- case closeLocalNames dependencies emptyNameSet (nameSetElemsStable requested) of
       Right names -> pure names
       Left reason -> rejectLocalOpen demands reason
-    let relevant = [bind | (owners, bind) <- named_binds, intersectsNameSet owners selected]
+    let relevant_binds = [(owners, bind) | (owners, bind) <- named_binds
+                                       , intersectsNameSet owners selected]
+        relevant = map snd relevant_binds
+        definition_names = unionNameSets (map fst relevant_binds)
     when (any hasPendingTypedSplice relevant) $
       rejectLocalOpen demands "This earlier definition contains a pending typed splice."
     (_, _, zonked, _, _, _, _) <- zonkTopDecls evidence relevant [] [] [] []
-    (messages, proposal) <- initDsTc (dsTopLHsBinds zonked)
-    let definitions = mkNameEnv
+    (messages, proposal) <- initDsTc (dsTopLHsBinds (concatMap singleExport zonked))
+    let owners = mkNameEnv (concatMap monoOwners zonked)
+        definitions = mkNameEnv
           [ (idName owner, (owner, rhs))
           | core <- maybeToList proposal, not (errorsFound messages)
           , (owner, rhs) <- fromOL core
-          , idName owner `elemNameSet` selected
+          , idName owner `elemNameSet` definition_names
           , exprType rhs `eqType` idType owner ]
         missing = filter (not . (`elemNameEnv` definitions) . fst) demands
     unless (null missing) $
       rejectLocalOpen missing "No checked Core definition is available for this call."
-    pure definitions
+    pure (definitions, owners)
   where
+    singleExport :: LHsBind GhcTc -> LHsBinds GhcTc
+    singleExport (L loc (XHsBindsLR (abs_binds@AbsBinds{abs_exports = exports@(_ : _ : _)}))) =
+      [L loc (XHsBindsLR (abs_binds { abs_exports = [owner] })) | owner <- exports]
+    singleExport bind = [bind]
+
+    monoOwners :: LHsBind GhcTc -> [(Name, Id)]
+    monoOwners (L _ (XHsBindsLR AbsBinds{abs_exports = exports})) =
+      [(idName mono, poly) | ABE{abe_mono = mono, abe_poly = poly} <- exports]
+    monoOwners _ = []
+
     -- zonkExpr executes a pending typed splice. The ordinary module
     -- zonk still owns this operation. Observation must not execute it.
     hasPendingTypedSplice :: Data a => a -> Bool
@@ -2080,16 +2108,13 @@ localOpenDefinitions demands evidence binds = do
 
 -- | Close the requested names over the eligible bindings in the graph.
 closeLocalNames :: (Name -> Either String NameSet) -> NameSet -> [Name] -> Either String NameSet
-closeLocalNames dependencies = foldM (visit emptyNameSet)
+closeLocalNames dependencies = foldM visit
   where
-    visit visiting done name
-      | name `elemNameSet` done = Right done
-      | name `elemNameSet` visiting =
-          Left ("The local term dependency contains a cycle through " ++ getOccString name ++ ".")
+    visit checked name
+      | name `elemNameSet` checked = Right checked
       | otherwise = do
           uses <- dependencies name
-          checked <- foldM (visit (extendNameSet visiting name)) done (nameSetElemsStable uses)
-          pure (extendNameSet checked name)
+          foldM visit (extendNameSet checked name) (nameSetElemsStable uses)
 
 -- | Collect resolved term references from one checked binding.
 localOpenReferences :: Data a => a -> [Name]
@@ -2099,14 +2124,17 @@ localOpenReferences node = case cast node :: Maybe (HsExpr GhcTc) of
     _ -> concat (gmapQ localOpenReferences node)
 
 -- | Confine the checked definitions to the current typechecking continuation.
-withLocalOpenDefinitions :: NameEnv (Id, CoreExpr)
+withLocalOpenDefinitions :: (NameEnv (Id, CoreExpr), NameEnv Id)
                          -> TcM (TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv)
-withLocalOpenDefinitions definitions check = do
+withLocalOpenDefinitions (definitions, owners) check = do
     env <- getGblEnv
     let old_defs = tcg_local_open_defs env
+        old_owners = tcg_local_open_owners env
     (checked_env, checked_lcl) <- setGblEnv
-      (env { tcg_local_open_defs = old_defs `plusNameEnv` definitions }) check
-    pure (checked_env { tcg_local_open_defs = old_defs }, checked_lcl)
+      (env { tcg_local_open_defs = old_defs `plusNameEnv` definitions
+           , tcg_local_open_owners = old_owners `plusNameEnv` owners }) check
+    pure (checked_env { tcg_local_open_defs = old_defs
+                      , tcg_local_open_owners = old_owners }, checked_lcl)
 
 usesNames :: Data a => NameSet -> a -> Bool
 usesNames names = isJust . firstLocalUse names

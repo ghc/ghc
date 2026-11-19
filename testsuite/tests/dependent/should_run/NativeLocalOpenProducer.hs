@@ -35,7 +35,11 @@ type Apply :: (Type -> Type) -> Type -> Type
 type Apply backward a = backward a
 
 prior :: a -> a
-prior x = forward x
+prior x = left x
+
+left, right :: a -> a
+left x = right x
+right x = const (forward x) (left x)
 
 $(pure [])
 

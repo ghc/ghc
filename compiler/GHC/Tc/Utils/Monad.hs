@@ -429,6 +429,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_source_table_uses    = source_table_uses
           , tcg_local_open_demands  = Nothing
           , tcg_local_open_defs     = emptyNameEnv
+          , tcg_local_open_owners   = emptyNameEnv
           , tcg_evaluated_term_uses  = evaluated_term_uses
           , tcg_source_rule_types    = source_rule_types
           , tcg_optional_source_uses = optional_source_uses

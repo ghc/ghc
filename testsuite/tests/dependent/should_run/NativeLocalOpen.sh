@@ -75,7 +75,7 @@ type Result a = NativeLocalOpenTermCycle.choose a
 choose x = loop x
 loop x = loop x
 SOURCE
-expect_rejection NativeLocalOpenTermCycle 5 '\[GHC-70566\]' 'loop'
+expect_rejection NativeLocalOpenTermCycle 5 '\[GHC-70566\]' 'Reduction exceeded the open evaluation step limit'
 
 cat > NativeLocalOpenHelperType.hs <<'SOURCE'
 {-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures #-}
@@ -116,7 +116,7 @@ choose x y = select x (unused y)
 select :: a -> a -> a
 select x _ = x
 unused :: a -> a
-unused x = x
+unused x = unused x
 {-# RULES "unused/strict" forall x. unused x = x `seq` x #-}
 SOURCE
 "${ghc[@]}" -c NativeLocalOpenRules.hs
@@ -124,6 +124,13 @@ cat >>NativeLocalOpenRules.hs <<'SOURCE'
 {-# RULES "select/second" forall x y. select x y = y #-}
 SOURCE
 expect_rejection NativeLocalOpenRules 14 '\[GHC-83605\]' 'select'
+
+cp "$src/NativeLocalOpenSibling.hs" .
+"${ghc[@]}" -c NativeLocalOpenSibling.hs
+sed -e 's/^left x = keep x (right x)$/left x = right x/' \
+    -e 's/^right x = left x$/right x = keep x (left x)/' NativeLocalOpenSibling.hs >changed
+mv changed NativeLocalOpenSibling.hs
+expect_rejection NativeLocalOpenSibling 10 '\[GHC-83605\]' 'right'
 
 cat > NativeLocalOpenPriorHelper.hs <<'SOURCE'
 {-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures, TemplateHaskell #-}

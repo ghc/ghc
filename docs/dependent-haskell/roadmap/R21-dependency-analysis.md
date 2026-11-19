@@ -82,6 +82,26 @@ a type declaration separately. Mixed dependencies on same-group type
 declarations, local instances, nonempty deriving, defaults and deferred
 errors remain open.
 
+## M131. Mutually recursive value bindings
+
+GHC can typecheck a recursive group of ordinary functions before
+observing a call. It keeps every member of the renamer's group together.
+In `select x (loop y)`, the selector returns `x` without evaluating the
+recursive argument. A call that does demand the loop spends the open
+evaluator's reduction budget and reports GHC-70566 at the call. This
+checks the particular observation. A declaration cycle in which a type
+requires its own unfinished producer still fails before observation.
+[Runnable selection](../examples/open-evaluation/LocalOpen.hs)
+and [cycle and demand controls](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
+Signed and inferred mutually recursive functions both work. For an
+inferred group, the typechecker already records the monomorphic binder
+that implements each polymorphic source function. The observer uses
+that correspondence when it demands a recursive reference. A rule on
+the other function therefore fails if its body is read and succeeds
+if the argument containing that call is ignored.
+[Inferred group with a source rule](../../../testsuite/tests/dependent/should_run/NativeLocalOpenSibling.hs).
+
 ## Closed calls
 
 An ordinary qualified call on a known closed literal still requires an

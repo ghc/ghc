@@ -636,6 +636,9 @@ data TcGblEnv
         tcg_local_open_defs :: NameEnv (Id, CoreExpr),
           -- ^ Solved local producers. Scope this map to the rest of their group.
 
+        tcg_local_open_owners :: NameEnv Id,
+          -- ^ Source owners of demanded monomorphic binders inside checked Core.
+
         tcg_evaluated_term_uses :: TcRef NameSet,
           -- ^ Imported definitions used in type evaluation, including instance dictionaries.
 

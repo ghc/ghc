@@ -27,7 +27,7 @@ import GHC.Iface.Syntax (IfaceDecl(..), IfaceInfoItem(..), IfaceUnfolding(..))
 import GHC.IfaceToCore (tcIfaceExpr)
 import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcRn,
                            liftIO, newTcRef, newUnique, readTcRef, tcg_imports,
-                           tcg_semantic_mod, tcg_local_open_defs, updTcRef)
+                           tcg_semantic_mod, tcg_local_open_defs, tcg_local_open_owners, updTcRef)
 import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), tcEqType)
 import GHC.Types.Basic (Boxity(Boxed))
 import GHC.Types.Id (Id, idName, idType, mkSysLocal)
@@ -71,8 +71,13 @@ observeOpenType instantiated operands
          && exprType application `tcEqType` liftedTypeKind
         then do
           readDefinitions <- lift (newTcRef (emptyVarEnv, emptyNameSet))
-          locals <- lift (tcg_local_open_defs <$> getGblEnv)
-          let remember v rhs = do
+          env <- lift getGblEnv
+          let locals = tcg_local_open_defs env
+              local v = case lookupNameEnv (tcg_local_open_owners env) (idName v) of
+                Nothing -> pure ()
+                Just owner -> lift (updTcRef readDefinitions $ \(cache, used) ->
+                  (cache, extendNameSet used (idName owner)))
+              remember v rhs = do
                 lift (updTcRef readDefinitions $ \(cache, used) ->
                   (extendVarEnv cache v rhs, extendNameSet used (idName v)))
                 pure (Just rhs)
@@ -91,7 +96,7 @@ observeOpenType instantiated operands
                         case definition of
                           Left failure -> throwE (UnavailableDefinition (idName v) failure)
                           Right rhs -> remember v rhs
-          outcome <- openWhnfM limit obtain emptyVarSet application
+          outcome <- openWhnfWithLocalM limit obtain local emptyVarSet application
           case outcome of
             Left failure -> throwE (CannotReduce failure)
             Right (Neutral (Rigid actual))

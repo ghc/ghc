@@ -2,7 +2,7 @@
 {-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 
-module LocalOpen (Selected, keepFirst, LastOf, lastOf) where
+module LocalOpen (Selected, keepFirst, LastOf, lastOf, LazyFirst, lazyFirst) where
 
 import Data.Kind (Type)
 
@@ -25,3 +25,15 @@ type LastOf a b = lastOf a b
 -- | Reverse the inputs to the local first-argument selector.
 lastOf :: a -> a -> a
 lastOf x y = select y x
+
+-- | The type chosen by the ordinary selector below.
+type LazyFirst :: Type -> Type -> Type
+type LazyFirst a b = lazyFirst a b
+
+-- | Return the first argument. The recursive second argument stays unevaluated.
+lazyFirst :: a -> a -> a
+lazyFirst x y = select x (loopAgain y)
+
+-- | Diverge if a caller demands this argument.
+loopAgain :: a -> a
+loopAgain x = loopAgain x
