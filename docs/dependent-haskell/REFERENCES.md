@@ -47,6 +47,14 @@ kind of a nullary constructor such as `'Nothing`.
 [Agda as-patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#as-patterns)
 and [type-lambda example](roadmap/R17-type-level-lambdas.md#matching-a-lambda-argument).
 
+A closed written lambda kind supplies the lifted family's standalone kind
+signature. GHC checks it before the equations, so each constructor pattern
+can refine the index independently. This preserves specified and inferred
+binder visibility across interfaces. Agda's with-abstraction likewise
+checks clauses under a telescope that permits refinement from the matched
+constructor. [GHC proposal #54](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0054-kind-signatures.rst)
+and [Agda with-abstraction](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#generalisation).
+
 ### Matchability and multiplicity on arrows
 
 Proposal #242 writes `a -> @m b` and defines it as `(->) @m a b`.

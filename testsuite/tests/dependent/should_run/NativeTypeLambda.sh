@@ -18,12 +18,13 @@ if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -F '$lambda:'; then 
 cp TypeLambda.hi NativeTypeLambdaScope.hi "$out/client/"
 cd "$out/client"
 cat >Ordinary.hs <<'HS'
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
 module Ordinary where
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import NativeTypeLambdaScope
-import TypeLambda (L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild)
+import TypeLambda (L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild,
+                   IndexedTag(..), IndexedCase, IndexedCaseInferred)
 import Data.Proxy (Proxy)
 result :: L :~: '[Maybe Int, Either String Int, IO Int]
 result = Refl
@@ -56,6 +57,12 @@ rebuildNothing :: Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Ma
 rebuildNothing = Refl
 rebuildJust :: Rebuild ('Just 'LT) :~: Proxy ('Just 'LT)
 rebuildJust = Refl
+indexedBool :: IndexedCase @Bool ('BooleanTag 'False) :~: Proxy 'False
+indexedBool = Refl
+indexedOrdering :: IndexedCase @Ordering ('OrderingTag 'GT) :~: Proxy 'GT
+indexedOrdering = Refl
+indexedInferred :: IndexedCaseInferred ('OrderingTag 'LT) :~: Proxy 'LT
+indexedInferred = Refl
 ordinaryLambda :: a -> b -> a
 ordinaryLambda x = (\_ -> x)
 HS
@@ -107,6 +114,36 @@ if "${g[@]}" -c Quoted.hs >quote.log 2>&1 ||
    ! grep -Fq 'Quoted.hs:7:30: error: [GHC-65904]' quote.log ||
    ! grep -Fq 'Type case syntax' quote.log || grep -Fq '$lambda' quote.log; then
     cat quote.log >&2
+    exit 1
+fi
+
+cat >WrongIndex.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
+module WrongIndex where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import TypeLambda (IndexedCase, IndexedTag(..))
+wrong :: IndexedCase @Bool ('OrderingTag 'LT) :~: Proxy 'LT
+wrong = Refl
+HS
+if "${g[@]}" -c WrongIndex.hs >index.log 2>&1 ||
+   ! grep -Fq 'WrongIndex.hs:6:29: error: [GHC-83865]' index.log; then
+    cat index.log >&2
+    exit 1
+fi
+
+cat >WrongVisibility.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
+module WrongVisibility where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import TypeLambda (IndexedCaseInferred, IndexedTag(..))
+wrong :: IndexedCaseInferred @Bool ('BooleanTag 'True) :~: Proxy 'True
+wrong = Refl
+HS
+if "${g[@]}" -c WrongVisibility.hs >visibility.log 2>&1 ||
+   ! grep -Fq 'WrongVisibility.hs:6:10: error: [GHC-20967]' visibility.log; then
+    cat visibility.log >&2
     exit 1
 fi
 

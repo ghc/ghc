@@ -1907,13 +1907,19 @@ coAxNthLHS ax ind =
 -- See Note [Partial type family applications].
 isUnsaturatedUserFamily :: TyCon -> [Type] -> Bool
 isUnsaturatedUserFamily tc args
-  | isTypeFamilyTyCon tc
+  | user_family (tyConFlavour tc)
   , Nothing <- builtInClosedTyFamTyCon_maybe tc
   , let missing = tyConArity tc - length args
   , missing > 0 =
       unmatchable missing (piResultTys (tyConKind tc) args)
   | otherwise = False
   where
+    -- Include checked TcTyCon headers in the initial kind-checking pass.
+    -- Their real family TyCons only exist after this mutually recursive group.
+    user_family ClosedTypeFamilyFlavour = True
+    user_family (OpenFamilyFlavour IAmType _) = True
+    user_family _ = False
+
     unmatchable 0 _ = True
     unmatchable n kind
       | ForAllTy ma (Bndr tv (Invisible _)) result <- coreFullView kind

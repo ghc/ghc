@@ -22,7 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet), HsTypeCaseAlt(..))
+import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -81,7 +81,7 @@ import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
 import Data.List ( partition )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
-import Data.Maybe ( isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
+import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {- Note [Lifting type lambdas]
@@ -118,6 +118,13 @@ family equation per constructor alternative. This leaves the case
 stuck on an unknown argument, even when the alternatives agree.
 A branch may use the whole matched value. See Note [Type case aliases]
 in GHC.Tc.TyCl.
+
+A closed written polymorphic kind on a tail-case lambda also provides
+a standalone signature for the family. Check the kind before its
+equations, so a constructor pattern cannot fix a kind variable for
+every branch. Preserve the written forall binders. Give closed captures
+parameters before that telescope. Keep the normal inference path when
+a capture's kind depends on the enclosing context.
 -}
 -- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
 liftTypeLambdas :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
@@ -127,8 +134,9 @@ liftTypeLambdas group =
   where
     liftGroup decls =
       let (defs, lifted) = unzip (map liftDecl (group_tyclds decls))
-          (families, hidden) = unzip (concat lifted)
-      in (decls { group_tyclds = defs ++ families }, hidden)
+          (families, hidden, signatures) = unzip3 (concat lifted)
+      in (decls { group_tyclds = defs ++ families
+                , group_kisigs = group_kisigs decls ++ catMaybes signatures }, hidden)
 
     liftDecl (L loc syn@SynDecl{tcdLName = owner, tcdRhs = rhs,
                                 tcdTyVars = HsQTvs{hsq_explicit = captures}})
@@ -140,10 +148,39 @@ liftTypeLambdas group =
         in (L loc syn{tcdRhs = rhs'}, families)
     liftDecl decl = (decl, [])
 
+    liftRhs owner captures (L loc (HsKindSig ann body kind)) salt
+      | L _ HsForAllTy{} <- stripParens kind
+      , null (extractHsTyRdrTyVars kind)
+      , Just capture_kinds <- traverse (closedCaptureKind . fst) captures
+      , L lam_loc (XHsType (HsTypeLambda _ vars rhs)) <- stripParens body
+      , (_, result) <- collectLambdas salt vars rhs
+      , L _ (XHsType HsTypeCase{}) <- stripParens result
+      = let (body', families, next) =
+                liftLambdaRhs owner captures lam_loc vars rhs salt
+                  (Just (foldr nlHsFunTy kind capture_kinds))
+        in (L loc (HsKindSig ann body' kind), families, next)
     liftRhs owner captures (L loc (HsKindSig ann body kind)) salt =
       let (body', families, next) = liftRhs owner captures body salt
       in (L loc (HsKindSig ann body' kind), families, next)
     liftRhs owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
+      liftLambdaRhs owner captures loc vars body salt Nothing
+    liftRhs owner captures (L loc (HsAppTy ann f x)) salt =
+      let (f', fs, next) = liftRhs owner captures f salt
+          (x', xs, last_salt) = liftRhs owner captures x next
+      in (L loc (HsAppTy ann f' x'), fs ++ xs, last_salt)
+    liftRhs owner captures (L loc (HsParTy ann body)) salt =
+      let (body', ds, next) = liftRhs owner captures body salt
+      in (L loc (HsParTy ann body'), ds, next)
+    liftRhs _ _ ty salt = (ty, [], salt)
+
+    -- A standalone kind signature quantifies the invisible prefix before
+    -- checking any equation. If the first row could fix that prefix, GADT
+    -- matches with different result indices would become monomorphic.
+    closedCaptureKind (L _ (HsTvb _ _ _ (HsBndrKind _ kind)))
+      | null (extractHsTyRdrTyVars kind) = Just kind
+    closedCaptureKind _ = Nothing
+
+    liftLambdaRhs owner captures loc vars body salt signature =
       let (binders, result) = collectLambdas salt vars body
           -- Keep source spellings in a malformed list so the normal family
           -- binder check diagnoses a duplicate at the written binder.
@@ -155,18 +192,9 @@ liftTypeLambdas group =
           equation_scope = equation_captures ++ locals
           (body', families, next) =
             liftRhs owner equation_scope result (salt + 1)
-          (applied, lifted) = liftLambda owner loc captures equation_scope body' salt
+          (applied, lifted) = liftLambda owner loc captures equation_scope body' salt signature
       in (applied, lifted : families, next)
-    liftRhs owner captures (L loc (HsAppTy ann f x)) salt =
-      let (f', fs, next) = liftRhs owner captures f salt
-          (x', xs, last_salt) = liftRhs owner captures x next
-      in (L loc (HsAppTy ann f' x'), fs ++ xs, last_salt)
-    liftRhs owner captures (L loc (HsParTy ann body)) salt =
-      let (body', ds, next) = liftRhs owner captures body salt
-      in (L loc (HsParTy ann body'), ds, next)
-    liftRhs _ _ ty salt = (ty, [], salt)
-
-    liftLambda owner loc captures equation_scope body salt =
+    liftLambda owner loc captures equation_scope body salt signature =
       let owner_occ = rdrNameOcc (unLoc owner)
           occ = mkTcOcc ("$lambda:" ++ occNameString owner_occ ++ ":" ++ show salt)
           name = L (getLoc owner) (mkRdrUnqual occ)
@@ -186,7 +214,9 @@ liftTypeLambdas group =
                        (L (l2l loc) (NoSig noExtField)) Nothing))
           applied = foldl' (\f (_, n) -> L loc (HsAppTy noExtField f (typeName n)))
                            (typeName name) captures
-      in (applied, (family, (occ, owner_occ)))
+          sig kind = L loc (StandaloneKindSig noAnn name
+                       (L (getLoc kind) (mkHsImplicitSigType kind)))
+      in (applied, (family, (occ, owner_occ), sig <$> signature))
 
     -- A tail case on a lambda argument can be represented directly by
     -- the lambda's equations. Matching remains deferred until application.
@@ -2138,7 +2168,7 @@ rnTyClDecls hidden tycl_ds
        ; traceRn "rnTyClDecls" $
            vcat [ text "tyClGroupTyClDecls:" <+> ppr tycls_w_fvs
                 , text "tc_names:" <+> ppr tc_names ]
-       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)
+       ; kisigs_w_fvs <- rnStandaloneKindSignatures hidden tc_names (tyClGroupKindSigs tycl_ds)
        ; instds_w_fvs <- mapM (wrapLocFstMA rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
 
@@ -2206,23 +2236,24 @@ getKindSigs :: [Name] -> KindSigEnv -> [LStandaloneKindSig GhcRn]
 getKindSigs bndrs kisig_env = mapMaybe (lookupNameEnv kisig_env) bndrs
 
 rnStandaloneKindSignatures
-  :: NameSet  -- names of types and classes in the current TyClGroup
+  :: [(OccName, OccName)] -> NameSet  -- names of types and classes in the current TyClGroup
   -> [LStandaloneKindSig GhcPs]
   -> RnM [(LStandaloneKindSig GhcRn, FreeNames)]
-rnStandaloneKindSignatures tc_names kisigs
+rnStandaloneKindSignatures hidden tc_names kisigs
   = do { let (no_dups, dup_kisigs) = removeDupsOn get_name kisigs
              get_name = standaloneKindSigName . unLoc
        ; mapM_ dupKindSig_Err dup_kisigs
-       ; mapM (wrapLocFstMA (rnStandaloneKindSignature tc_names)) no_dups
+       ; mapM (wrapLocFstMA (rnStandaloneKindSignature hidden tc_names)) no_dups
        }
 
 rnStandaloneKindSignature
-  :: NameSet  -- names of types and classes in the current TyClGroup
+  :: [(OccName, OccName)] -> NameSet  -- names of types and classes in the current TyClGroup
   -> StandaloneKindSig GhcPs
   -> RnM (StandaloneKindSig GhcRn, FreeNames)
-rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
+rnStandaloneKindSignature hidden tc_names (StandaloneKindSig _ v ki)
   = do  { standalone_ki_sig_ok <- xoptM LangExt.StandaloneKindSignatures
-        ; unless standalone_ki_sig_ok $ addErr TcRnUnexpectedStandaloneKindSig
+        ; unless (standalone_ki_sig_ok || rdrNameOcc (unLoc v) `elem` map fst hidden) $
+            addErr TcRnUnexpectedStandaloneKindSig
         ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) SigLikeStandaloneKindSig v
         ; (new_ki, fvs) <- rnHsSigType (StandaloneKindSigCtx v) KindLevel ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)

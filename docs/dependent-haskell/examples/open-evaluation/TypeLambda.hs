@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures,
-             TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, StandaloneKindSignatures,
+             TypeApplications, TypeFamilies, TypeOperators #-}
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild
-  , roadmap, partial, mixed
+  , IndexedTag(..), IndexedCase, IndexedCaseInferred
+  , roadmap, partial, mixed, indexedFields
   ) where
 
 import Data.Kind (Type)
@@ -56,3 +57,23 @@ mixed = Refl
 -- | Preserve the entire scrutinee after matching its constructor.
 type Rebuild :: forall k. Maybe k -> Type
 type Rebuild m = (\tag -> case tag of { Nothing -> Proxy tag; Just _ -> Proxy tag }) m
+
+-- | Each constructor fixes the index and the type of its field.
+data IndexedTag k where
+  BooleanTag :: Bool -> IndexedTag Bool
+  OrderingTag :: Ordering -> IndexedTag Ordering
+
+-- | Check both branches under the written polymorphic kind.
+type IndexedCase =
+  ((\tag -> case tag of { BooleanTag field -> Proxy field; OrderingTag field -> Proxy field })
+    :: forall k. @U IndexedTag k %U -> Type)
+
+-- | Keep the inferred visibility of the written kind binder.
+type IndexedCaseInferred =
+  ((\tag -> case tag of { BooleanTag field -> Proxy field; OrderingTag field -> Proxy field })
+    :: forall {k}. @U IndexedTag k %U -> Type)
+
+-- | Observe the actual field in each indexed branch.
+indexedFields :: ( IndexedCase @Bool ('BooleanTag 'False) :~: Proxy 'False
+                 , IndexedCase @Ordering ('OrderingTag 'GT) :~: Proxy 'GT )
+indexedFields = (Refl, Refl)
