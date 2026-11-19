@@ -32,8 +32,11 @@ The imported selector `getConst` can infer the erased index from its
 argument. An ordinary client can use `withRetained p (\_ c -> getConst c)`
 without writing a type application. A selector whose result still depends
 on the private index cannot export that index as a caller-chosen type.
-A direct constructor pattern on this polymorphic `Const` still needs
-separate inference work.
+The callback can also use `case c of Const x -> x`. Checking the first
+argument of `withRetained` fixes the payload family to `Const Int`.
+The pattern checker reads the actual index from the scrutinee. A
+constructor pattern that returns a vector at a caller-chosen index
+still fails.
 [Interface and escape controls](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
 ## Project a payload at the length of its input package

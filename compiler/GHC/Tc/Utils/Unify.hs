@@ -1144,14 +1144,23 @@ matchExpectedTyConApp tc orig_ty
                 _ -> defer }
          -- See Note [Matching native family result shapes].
 
+    go ty@AppTy{}
+       | (TyVarTy tv, args) <- splitAppTysNoView ty
+       , isMetaTyVar tv
+       = follow_head tv args
+         -- See Note [Matching a constructor at a retained index].
+
     go (TyVarTy tv)
        | isMetaTyVar tv
-       = do { cts <- readMetaTyVar tv
-            ; case cts of
-                Indirect ty -> go ty
-                Flexi       -> defer }
+       = follow_head tv []
 
     go _ = defer
+
+    follow_head tv args = do
+      contents <- readMetaTyVar tv
+      case contents of
+        Indirect head_ty -> go (mkAppTys head_ty args)
+        Flexi            -> defer
 
     -- If the common case does not occur, instantiate a template
     -- T k1 .. kn t1 .. tm, and unify with the original type
@@ -1170,6 +1179,19 @@ matchExpectedTyConApp tc orig_ty
                  tc_template = mkTyConApp tc args
            ; co <- unifyType Nothing tc_template orig_ty
            ; return (co, args) }
+
+{- Note [Matching a constructor at a retained index]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a callback with a retained binder n, the scrutinee of a constructor
+pattern can have type p n. An earlier argument can already have fixed
+the metavariable p to Const Int. The type still has an AppTy node.
+Reading p and reapplying its arguments exposes Const Int n.
+
+Match that application with the existing TyConApp path. The constructor
+gets the actual n from the scrutinee. The fallback would instead allocate
+a fresh metavariable for the last argument and require it to contain n,
+which is local to the callback. An unknown head uses the usual fallback.
+-}
 
 {- Note [Matching native family result shapes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

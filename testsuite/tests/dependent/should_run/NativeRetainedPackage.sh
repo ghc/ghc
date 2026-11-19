@@ -30,7 +30,7 @@ cd "$out/client"
 cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
 module Main where
-import Data.Functor.Const (getConst)
+import Data.Functor.Const (Const(..))
 import PackedVecLibrary
 import RetainedNat
 import RetainedProjection (project)
@@ -43,6 +43,7 @@ main = do
                   (\n _ -> natToInt n))
   let q = constantPackage (error "unused projected witness") (7 :: Int)
   print (getConst (project q))
+  print (withRetained q (\_ box -> case box of Const x -> x))
 HS
 "${g[@]}" -c Main.hs
 "${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
@@ -59,6 +60,13 @@ escape p = withRetained p (\_ box -> contents box)
 HS
 if "${g[@]}" -c Escape.hs >bad.log 2>&1 || ! grep -Fq 'Escape.hs:8:' bad.log ||
    ! grep -Fq 'Vec Int' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
+
+sed 's/contents box/case box of Box xs -> xs/' Escape.hs >EscapePattern.hs
+if "${g[@]}" -c EscapePattern.hs >bad.log 2>&1 ||
+   ! grep -Fq 'EscapePattern.hs:8:' bad.log || ! grep -Fq 'Vec Int' bad.log; then
     cat bad.log >&2
     exit 1
 fi
