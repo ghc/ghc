@@ -796,10 +796,9 @@ The use still checks the projection's source owner and rewrite rules.
 The ordinary pair builder still needs its executable, and its object
 remains a recompilation dependency. The tests cover projections of both
 fields at the same type. An exceptional unused field stays unevaluated.
-Selecting the exceptional field reports the exception. A top-level nominal application still needs a closed
-operand to persist in an interface. Forming that application leaves its
-equation unused, including when a visible rule prevents a later reduction. This case
-still observes both fields of a computed pair.
+Selecting the exceptional field reports the exception. At M149, a
+top-level nominal application needed a fully observed operand to persist
+in an interface. M153 adds an equation that preserves the copied field.
 
 For a user datatype, a bridge can replay certified constructor
 patterns using Core cases and carry unused fields as ordinary Core
@@ -813,19 +812,58 @@ checks](../../../testsuite/tests/dependent/should_run/NativeClosedReturnedPair.s
 The direct example is `pick (make 7) :~: 7`, where `make n` returns
 `(n, error "unused")`. Forming `type Alias = pick (make 7)` also needs
 a type for the operand. A local compiler thunk cannot travel through an
-interface. One possible representation gives each suspended field a private
-family owned by the actual producer and indexed by its captured arguments.
-A checker would have to verify the constructor spine and preserve the
-producer's identity through recompilation. A client could then reduce the
-first projection while a claim about the second field remained stuck.
-The fork has no such representation yet. The test for a bare application
-also covers a matching rewrite rule. Forming it can succeed even when
-using the equation later would fail.
+interface. The M149 design gave each suspended field a private family
+owned by its producer and indexed by its arguments. M153 implements
+that design for a pair with a copied input. Forming the projection in
+an alias leaves its equation unused. Using the equation later checks
+the applicable rewrite rules.
 
 A separate model checks the proposed equation shape using ordinary
 closed families with `UndecidableInstances`. Given an empty family
 `Deferred (n :: Nat) :: Char` and `Make n = '(n, Deferred n)`, an
 interface-only client proves `Pick (Make 7) :~: 7` with `Refl`. GHC
-rejects the claim that the second field is `'x'`. This model supplies
-`Make` by hand. Generating it from an ordinary Haskell definition
-still requires the producer and field identity checks above.
+rejects the claim that the second field is `'x'`. This model supplied `Make` by hand.
+
+## M153. Export a direct projection of a partial pair
+
+An ordinary definition `make n = (n, e)` returns a pair before it
+inspects `e`. A dependent module can export
+`type Selected = pick (make 7)`. An ordinary client can prove
+`Selected :~: 7` with `Refl`. Both modules can compile with only
+the producer and projection interfaces. A matching rewrite rule for
+either function is checked at the proof. The source alias can still
+be formed when a matching rule is visible.
+
+The checker reads the actual saturated pair constructor in solved Core.
+Exactly one field must be an unchanged input binder. The other field may
+throw, diverge or compute a useful value. GHC publishes the ordinary
+producer's checked equation and a private empty family for that field.
+The name identifies the producer and field position. Its inputs include
+all the producer's type and value arguments. No equation establishes a
+particular value for the suspended field.
+
+With only the projection interface available, GHC can keep both nominal
+applications when their equations select the copied field. Selecting a
+computed field can still use the producer's object and normal closed
+readback. Extra computed arguments also stay on the executable path if
+forming the nominal operand could force an ignored argument. A top-level
+case demanding an input before constructing the pair cannot receive this
+equation. [Source example](../examples/open-evaluation/OpenBuildWorker.hs)
+and [separate compilation, dependency and rule checks](../../../testsuite/tests/dependent/should_run/NativeClosedPartialPair.sh).
+
+For `bump n = (n + 1, error "unused")`, neither field is an input
+binder. With only the projection interface, the direct proof at `7`
+still forces the other field. Supplying the projection executable lets
+the same proof check at `8`. A certificate for the computed field would
+also need to justify the addition at its actual specialization.
+
+A separate control moves the projection into an ordinary module.
+Its `number n = case bump n of (x, _) -> x` lets the client prove
+`number 7 :~: 8`. Its other projection reports the exception in the
+unobserved field when that field is selected. The proof interface
+records the object for `bump`. Replacing that object alone with the
+version that adds two rejects the unchanged proof at `Refl` with
+actual `9` and expected `8`. The interpreter can already compute
+the demanded field. The open question is how to represent the
+partially observed operand of a projection in an exported type
+while retaining the guards on both source functions.

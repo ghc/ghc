@@ -544,6 +544,7 @@ checkFlagHash hsc_env iface self_recomp = do
         sum_fp = computeFingerprint putNameLiterally (base_fp, "sum-projections-v1" :: String)
         projection_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v1" :: String)
         result_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v2" :: String)
+        helper_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v3" :: String)
         new_fp = caseTreeFingerprint base_fp
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
@@ -551,18 +552,16 @@ checkFlagHash hsc_env iface self_recomp = do
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
        | old_fp == base_fp, any couldHaveSumProjection candidates
          -> recheck "Compiler now checks sum projections"
-       | old_fp == result_fp
-         -> if null candidates
-              then up_to_date logger (text "Module cannot export a constructor case")
-              else recheck "Compiler now checks constructor case helpers"
-       | old_fp == projection_fp
-         -> if null candidates
-              then up_to_date logger (text "Module cannot export a constructor case")
-              else recheck "Compiler now checks constructor case results"
-       | old_fp == base_fp || old_fp == sum_fp
-         -> if null candidates
-              then up_to_date logger (text "Module cannot export a constructor case")
-              else recheck "Compiler now checks constructor case trees"
+       | old_fp == result_fp, not (null candidates)
+         -> recheck "Compiler now checks constructor case helpers"
+       | old_fp == projection_fp, not (null candidates)
+         -> recheck "Compiler now checks constructor case results"
+       | (old_fp == base_fp || old_fp == sum_fp), not (null candidates)
+         -> recheck "Compiler now checks constructor case trees"
+       | old_fp `elem` [base_fp, sum_fp, projection_fp, result_fp, helper_fp]
+         -> if couldExportPairBuilder iface
+              then recheck "Compiler now checks lazy pair builders"
+              else up_to_date logger (text "Module cannot export a new constructor equation")
        | old_fp == computeFingerprint putNameLiterally new_flags
          -> recheck "Compiler now checks ordinary pair equations"
        | otherwise -> do
@@ -574,7 +573,7 @@ checkFlagHash hsc_env iface self_recomp = do
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
-caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v3" :: String)
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v4" :: String)
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
 -- See Note [Recompiling constructor case producers].
@@ -586,6 +585,27 @@ exportedCaseDatatypes iface =
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     exported name = name `elemNameSet` exports
+
+-- | An exported function can hide its result pair behind a type synonym.
+couldExportPairBuilder :: ModIface -> Bool
+couldExportPairBuilder iface =
+    any candidate (mi_decls iface)
+  where
+    exports = mkNameSet (concatMap availNames (mi_exports iface))
+    local_data = mkNameSet [n | (_, IfaceData{ifName = n}) <- mi_decls iface]
+    candidate (_, IfaceId{ifName = n, ifType = ty}) = n `elemNameSet` exports && possiblyPair False ty
+    candidate _ = False
+    possiblyPair arrow ty = case ty of
+      IfaceForAllTy _ _ body -> possiblyPair arrow body
+      IfaceFunTy _ _ _ _ result -> possiblyPair True result
+      IfaceTupleTy{} -> arrow
+      -- A synonym can hide the arrows as well as the result.
+      IfaceTyConApp tc _ ->
+        let n = ifaceTyConName tc
+        in isTupleTyConName n || not (isWiredInName n || n `elemNameSet` local_data)
+      IfaceCastTy{} -> True
+      IfaceAppTy{} -> True
+      _ -> False
 
 -- | M144 checked direct projections from two or more constructors with fields.
 couldHaveSumProjection :: [IfaceConDecl] -> Bool
@@ -609,7 +629,12 @@ the intervening compiler reused it. Record the new key on every write,
 including when the Core checks find no equation. M146 only returned
 fields and arguments. Reuse the same necessary candidate test when
 upgrading to constructor results and to checked helper calls in those
-results. An older binary-only interface still supports ordinary imports.
+results. A lazy pair builder can return a boxed pair without declaring
+any datatype. Check the ordinary types of exported functions as well.
+An unexpanded synonym can hide its arrows or its result. Recheck that
+module once. A rigid result variable and a known non-pair datatype
+cannot hide the pair constructor. See Note [A partial pair in a nominal
+operand] in GHC.Tc.Gen.SourceTable.
 -}
 
 

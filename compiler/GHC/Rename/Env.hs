@@ -1275,7 +1275,11 @@ lookupSourceTables (gbl, lcl) term_rdr
             else do
               iface <- loadInterfaceForName (text "finite source function") term
               name <- lookupOrig mod occ
-              if isJust (mi_hash_fn iface occ)
+              let present occurrence = isJust (mi_hash_fn iface occurrence)
+                  term_occ = nameOccName term
+              -- Keep the ordinary function available for executable calls.
+              -- See Note [A partial pair in a nominal operand] in GHC.Tc.Gen.SourceTable.
+              if present occ && not (present (mkSourceFstOcc term_occ) || present (mkSourceSndOcc term_occ))
                 then return (Just name)
                 else do
                   updTcRef (tcg_source_table_uses env) (`extendNameSet` name)

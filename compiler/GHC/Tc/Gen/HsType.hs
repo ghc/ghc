@@ -91,7 +91,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, isSourceConstructorCase, sourceCaseVisibleArity, sourceTableOwner)
+                              sourceCaseKindUse, isSourceConstructorCase, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -128,7 +128,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
-import GHC.Types.Id ( mkLocalId, mkSysLocalM )
+import GHC.Types.Id ( mkLocalId, mkSysLocalM, sourceTableId_maybe )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (mkNameSet, unionNameSet)
@@ -2819,7 +2819,19 @@ tcPlanClosedTree mode ordinary hint root arguments = do
       | CheckClosedCase{} <- root -> setSrcSpan loc $ do
           -- Forming a type needs the argument, but does not use the case axiom.
           -- See Note [Source family evidence uses] in GHC.Tc.Gen.SourceTable.
-          run <- prepare_family_operand input child
+          run <- case child of
+            ClosedApplication _ fun vars _ domains _ args
+              | Just builder <- sourceTableId_maybe fun
+              , Just (copied, copied_arg) <- sourcePairBuilderField builder
+              , and [i == copied_arg || literal child_arg | (i, child_arg) <- zip [0..] args] -> do
+                  selected <- closedPairProjectionField table kinds input result
+                  if selected == Just copied then do
+                    operands <- zipWithM prepare_family_operand domains args
+                    pure $ do
+                      values <- zipWithM (checkClosedFamilyOperand (getName fun)) domains operands
+                      pure (mkTyConApp builder (map snd vars ++ values))
+                  else prepare_family_operand input child
+            _ -> prepare_family_operand input child
           let application = do
                 arg <- checkClosedFamilyOperand owner input run
                 return (mkTyConApp table (kinds ++ [arg]))
@@ -2827,6 +2839,10 @@ tcPlanClosedTree mode ordinary hint root arguments = do
     ClosedFamilyApplication _ _ _ _ _ result _ -> (result,) <$> prepare ground
     _ -> panic "tcPlanClosedTree: missing call root"
   where
+    -- Quoting another computed input could force it even if the builder ignores it.
+    literal ClosedLiteral{} = True
+    literal _ = False
+
     collect outer_call fun expected args = do
       loc <- getSrcSpanM
       let name = getName fun
@@ -2963,7 +2979,7 @@ tcPlanClosedTree mode ordinary hint root arguments = do
       unless (all ground (result : inputs) &&
               all (\p -> ground p && isJust (getClassPredTys_maybe p)) constraints) $
         unsupported name
-      ClosedApplication loc fun [] [] inputs result <$> traverse verify children
+      ClosedApplication loc fun (zip (map fst vars) values) [] inputs result <$> traverse verify children
 
     verify (ClosedFamilyApplication loc owner table kinds inputs result children) = setSrcSpan loc $ do
       kinds <- liftZonkM (zonkTcTypes kinds)
@@ -3021,6 +3037,24 @@ tcPlanClosedTree mode ordinary hint root arguments = do
 prepareClosedPairProjection :: Name -> TyCon -> [Kind] -> Kind -> Kind
                             -> ClosedCallValue -> TcM (Maybe ClosedCallValue)
 prepareClosedPairProjection owner table kinds input result (OrdinaryClosedCall _ _ expression)
+  | Just (_, [left_kind, right_kind]) <- splitTyConApp_maybe input = do
+      field <- closedPairProjectionField table kinds input result
+      case field of
+        Just side -> do
+          loc <- getSrcSpanM
+          sourceCaseKindUse table kinds
+          binder <- mkSysLocalM (fsLit "closed_pair") ManyTy input
+          a <- mkSysLocalM (fsLit "closed_first") ManyTy left_kind
+          b <- mkSysLocalM (fsLit "closed_second") ManyTy right_kind
+          let observe scrutinee = Core.Case scrutinee binder result
+                [Core.Alt (Core.DataAlt (tupleDataCon Boxed 2)) [a, b] (Core.Var (pickLR side (a, b)))]
+          return (Just (OrdinaryClosedCall loc owner (observe <$> expression)))
+        Nothing -> return Nothing
+prepareClosedPairProjection _ _ _ _ _ _ = return Nothing
+
+-- | Read the selected field without recording a use of the projection's equation.
+closedPairProjectionField :: TyCon -> [Kind] -> Kind -> Kind -> TcM (Maybe LeftOrRight)
+closedPairProjectionField table kinds input result
   | sourceCaseVisibleArity table == Just 1
   , Just (tc, [left_kind, right_kind]) <- splitTyConApp_maybe input
   , tc == tupleTyCon Boxed 2 = do
@@ -3032,23 +3066,13 @@ prepareClosedPairProjection owner table kinds input result (OrdinaryClosedCall _
       right <- fresh_field right_kind
       envs <- tcGetFamInstEnvs
       let pair = mkPromotedPairTy left_kind right_kind left right
-          selected = reductionReducedType <$>
-            reduceTyFamApp_maybe envs Nominal table (kinds ++ [pair])
-          project ty
-            | ty `tcEqType` left && result `tcEqType` left_kind = Just fst
-            | ty `tcEqType` right && result `tcEqType` right_kind = Just snd
-            | otherwise = Nothing
-      case selected >>= project of
-        Just field -> do
-          sourceCaseKindUse table kinds
-          binder <- mkSysLocalM (fsLit "closed_pair") ManyTy input
-          a <- mkSysLocalM (fsLit "closed_first") ManyTy left_kind
-          b <- mkSysLocalM (fsLit "closed_second") ManyTy right_kind
-          let observe scrutinee = Core.Case scrutinee binder result
-                [Core.Alt (Core.DataAlt (tupleDataCon Boxed 2)) [a, b] (Core.Var (field (a, b)))]
-          return (Just (OrdinaryClosedCall loc owner (observe <$> expression)))
-        Nothing -> return Nothing
-prepareClosedPairProjection _ _ _ _ _ _ = return Nothing
+      return $ do
+        reduction <- reduceTyFamApp_maybe envs Nominal table (kinds ++ [pair])
+        let field = reductionReducedType reduction
+        if field `tcEqType` left && result `tcEqType` left_kind then Just CLeft
+        else if field `tcEqType` right && result `tcEqType` right_kind then Just CRight
+        else Nothing
+closedPairProjectionField _ _ _ _ = return Nothing
 
 {- Note [Demand of an interface-only pair projection]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

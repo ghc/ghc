@@ -2,8 +2,8 @@
 set -euo pipefail
 export LC_ALL=C
 
-if [[ ( $# -ne 4 && $# -ne 5 ) || $1 != /* || $2 != /* || $3 != /* || $4 != /* || ${5:-/} != /* ]]; then
-    printf 'usage: %s ABS_M142_GHC ABS_M144_GHC ABS_CURRENT_GHC ABS_LIBDIR [ABS_M147_GHC]\n' "$0" >&2
+if [[ $# -lt 4 || $# -gt 6 || $1 != /* || $2 != /* || $3 != /* || $4 != /* || ${5:-/} != /* || ${6:-/} != /* ]]; then
+    printf 'usage: %s ABS_M142_GHC ABS_M144_GHC ABS_CURRENT_GHC ABS_LIBDIR [ABS_M147_GHC [ABS_M150_GHC]]\n' "$0" >&2
     exit 2
 fi
 m142=$1
@@ -68,7 +68,7 @@ if grep -Eq 'Compiling Abstract[[:space:]]' upgrade.log; then exit 1; fi
 if grep -q 'Compiling ' warm.log; then cat warm.log; exit 1; fi
 echo 'Both generations of interface were upgraded. The next build reused the checked modules.'
 
-if [[ $# -eq 5 ]]; then
+if [[ $# -ge 5 ]]; then
     cp "$src/SpineWorker.hs" .
     "$5" "${flags[@]}" -v0 -c SpineWorker.hs
     "$current" "${flags[@]}" --show-iface SpineWorker.hi >old.iface
@@ -90,4 +90,52 @@ HS
     "$current" "${flags[@]}" -v1 --make -no-link First.hs >warm.log 2>&1
     if grep -q 'Compiling ' warm.log; then cat warm.log; exit 1; fi
     echo 'The projection-only compiler upgraded to constructor results. The next build reused both modules.'
+fi
+
+if [[ $# -eq 6 ]]; then
+    mkdir latest
+    cd latest
+    cp "$src/SpineWorker.hs" .
+    cat >Builder.hs <<'HS'
+module Builder (make) where
+import Numeric.Natural
+type Result a = (a, Char)
+make :: Natural -> Result Natural
+make n = (n, errorWithoutStackTrace "unused field")
+HS
+    cat >IdentityOnly.hs <<'HS'
+module IdentityOnly (ident) where
+ident :: a -> a
+ident x = x
+HS
+    "$6" "${flags[@]}" -v0 -c SpineWorker.hs Builder.hs IdentityOnly.hs
+    "$current" "${flags[@]}" --show-iface Builder.hi >old.builder
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >old.worker
+    if grep -Fq 'P2:make' old.builder || grep -Eq 'T:(firstViaHelper|firstViaWrap) ' old.worker; then exit 1; fi
+    "$current" "${flags[@]}" -v1 --make -no-link SpineWorker.hs Builder.hs IdentityOnly.hs >upgrade.log 2>&1 || { cat upgrade.log; exit 1; }
+    grep -Eq 'Compiling SpineWorker[[:space:]].*\[Compiler now checks constructor case helpers\]' upgrade.log
+    grep -Eq 'Compiling Builder[[:space:]].*\[Compiler now checks lazy pair builders\]' upgrade.log
+    if grep -Eq 'Compiling IdentityOnly[[:space:]]' upgrade.log; then cat upgrade.log; exit 1; fi
+    "$current" "${flags[@]}" --show-iface Builder.hi >new.builder
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >new.worker
+    grep -Fq 'P2:make' new.builder
+    grep -Fq 'T:firstViaHelper ' new.worker
+    grep -Fq 'T:firstViaWrap ' new.worker
+    "$current" "${flags[@]}" -v1 --make -no-link SpineWorker.hs Builder.hs IdentityOnly.hs >warm.log 2>&1
+    if grep -q 'Compiling ' warm.log; then cat warm.log; exit 1; fi
+    mkdir ordinary
+    cp Builder.hi ordinary/
+    (
+        cd ordinary
+        cat >Client.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Client where
+import Builder (make)
+import Numeric.Natural (Natural)
+value :: Natural
+value = fst (make 7)
+HS
+        "$6" "${flags[@]}" -v0 -i -i. -c Client.hs
+    )
+    echo 'M150 builders and case helpers upgraded. The unrelated module and warm build were reused.'
 fi

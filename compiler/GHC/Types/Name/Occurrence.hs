@@ -68,6 +68,7 @@ module GHC.Types.Name.Occurrence (
         mkSuperDictSelOcc, mkSuperDictAuxOcc,
         mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkSourceTableOcc, sourceTableTermOcc,
+        mkSourceFstOcc, mkSourceSndOcc,
         mkTyConRepOcc,
 
         -- ** Deconstruction
@@ -1070,6 +1071,12 @@ mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ
 -- | Name of the closed family for a finite source function.
 mkSourceTableOcc :: OccName -> OccName
 mkSourceTableOcc = mk_simple_deriv tcName "T:"
+
+-- | Private families for the unevaluated fields of an ordinary pair builder.
+-- See Note [A partial pair in a nominal operand] in GHC.Tc.Gen.SourceTable.
+mkSourceFstOcc, mkSourceSndOcc :: OccName -> OccName
+mkSourceFstOcc = mk_simple_deriv tcName "P1:"
+mkSourceSndOcc = mk_simple_deriv tcName "P2:"
 
 -- | Recover the source function's spelling from its family occurrence.
 sourceTableTermOcc :: OccName -> Maybe OccName

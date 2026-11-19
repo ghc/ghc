@@ -697,8 +697,9 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       ; setGblEnv tcg_env' $ do
           let binds = tcg_binds tcg_env'
           tables <- if tables_enabled then sourceTableTyCons binds else pure []
-          cases <- sourceCaseTables binds
-          env <- installSourceTables (tables ++ cases)
+          (cases, fields) <- sourceCaseTables binds
+          with_fields <- if null fields then getGblEnv else fst <$> addTyConsToGblEnv fields
+          env <- setGblEnv with_fields (installSourceTables (tables ++ cases))
           if tables_enabled then installSourceMethods env else pure env }
 
 -- | Publish only checked method aliases that user rules cannot replace.
