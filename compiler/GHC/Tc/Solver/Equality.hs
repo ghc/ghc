@@ -12,7 +12,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Builtin.CoercionRules
-  ( boxedPairCompositionRule, matchBoxedPairComposition )
+  ( proveBoxedPairProjection )
 import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
 import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
 
@@ -700,13 +700,8 @@ can_eq_nc ces rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
 -- See Note [Strict boxed pair composition] in GHC.Builtin.CoercionRules.
 can_eq_nc ces _ _ ev NomEq lhs _ rhs _
   | bothRewritten ces, isWanted ev
-  , Just apps <- matchBoxedPairComposition lhs rhs
-  = solveBoxedPairComposition ev apps $
-      AxiomCo boxedPairCompositionRule [mkNomReflCo lhs, mkNomReflCo rhs]
-  | bothRewritten ces, isWanted ev
-  , Just apps <- matchBoxedPairComposition rhs lhs
-  = solveBoxedPairComposition ev apps $
-      mkSymCo (AxiomCo boxedPairCompositionRule [mkNomReflCo rhs, mkNomReflCo lhs])
+  , Just (co, apps) <- proveBoxedPairProjection lhs rhs
+  = solveBoxedPairComposition ev apps co
 
 -- (EQNC6): use canEqCanLHS
 --

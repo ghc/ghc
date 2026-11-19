@@ -27,7 +27,7 @@ test('NativeOpenInstalledPair',
                    + config.ghc_th_way_flags])
 test('NativeOpenPairCoercion',
      [req_process, req_host_target_ghc, only_ways(['normal']),
-      extra_files(['NativeOpenPairCoercionWorker.hs']),
+      extra_files(['NativeOpenPairCoercionUsage.hs', 'NativeOpenPairCoercionWorker.hs']),
       extra_run_opts(f'"{config.libdir}"')],
      compile_and_run, ['-package ghc -package transformers'])
 test('NativeOpenPairLinkable',

@@ -1,15 +1,18 @@
 -- | Built-in nominal rules that can occur in an interface coercion.
 module GHC.Builtin.CoercionRules
   ( builtInCoAxiomRules
-  , boxedPairCompositionRule
-  , matchBoxedPairComposition
+  , boxedPairCompositionRule, matchBoxedPairComposition
+  , boxedPairReconstructionRule
+  , proveBoxedPairProjection
   ) where
 
 import GHC.Prelude
 
 import GHC.Builtin.WiredIn.TypeLits (typeNatCoAxiomRules)
 import GHC.Builtin.WiredIn.Types (promotedTupleDataCon, tupleTyCon)
+import GHC.Core.Coercion (mkNomReflCo, mkSymCo)
 import GHC.Core.Coercion.Axiom
+import GHC.Core.TyCo.Rep (Coercion(AxiomCo))
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -24,56 +27,143 @@ import Control.Monad (guard)
 
 -- | Resolve the stable names written to the interface by CoreToIface.
 builtInCoAxiomRules :: UniqFM FastString CoAxiomRule
-builtInCoAxiomRules = addToUFM typeNatCoAxiomRules
-                            boxedPairCompositionName boxedPairCompositionRule
+builtInCoAxiomRules =
+    addToUFM (addToUFM typeNatCoAxiomRules boxedPairCompositionName boxedPairCompositionRule)
+             boxedPairReconstructionName boxedPairReconstructionRule
 
 {- Note [Strict boxed pair composition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The certified case for swapping a boxed pair forces the shell but neither
-field. Both certified projections force the shell and return one field.
-Composing a projection with the swap therefore observes the same shell
-and field as projecting the opposite field directly. There is no pair
+A certified reconstruction of a boxed pair forces the shell but neither
+field. Each output field is one of the two input binders. A certified
+projection of the reconstruction therefore observes the same shell and
+field as a direct projection of the selected input binder. There is no pair
 eta law here. In particular a bottom shell is different from a pair
 whose two fields are bottom.
 
-Check all three nominal single-branch axioms. The branch verifier uses
-binder identity and exact constructors. The source solver additionally
-checks and records all three term owners before it introduces evidence.
+Follow each projected field back through strict constructor cases. Its
+path ends at a scrutinee which has no such case. Compare the two paths
+from that end and use the outermost common scrutinee with the same field.
+For example, fst (duplicate q) and snd (duplicate q) can agree on the
+first field of q. They need no equation for q itself. The source solver
+records the owners of the cases crossed on either side. All steps check
+nominal single-branch axioms, binder identity and exact constructors.
 Use the same pure check for Lint and for coercion endpoints. Substitution
 can make the operand a constructor; the rule remains valid in that case.
+
+Keep the original rule key for exchange-only proofs in existing interfaces.
+Write the more general key for other reconstructions. A compiler that
+reads the same binary format but lacks the new rule rejects the new key
+through tcIfaceAxiomRule.
 -}
+
+boxedPairReconstructionName :: FastString
+boxedPairReconstructionName = fsLit "BoxedPairReconstruction"
 
 boxedPairCompositionName :: FastString
 boxedPairCompositionName = fsLit "BoxedPairComposition"
 
--- | Nominal evidence for composing a certified projection with a certified swap.
+-- | The original nominal law for a projection through an exchange.
 boxedPairCompositionRule :: CoAxiomRule
-boxedPairCompositionRule =
-    BuiltInEqRule boxedPairCompositionName proves
+boxedPairCompositionRule = pairCompositionRule boxedPairCompositionName matchExchange
+
+-- | Nominal evidence for two projections that observe the same field.
+boxedPairReconstructionRule :: CoAxiomRule
+boxedPairReconstructionRule = pairCompositionRule boxedPairReconstructionName commonField
+
+type PairCaseUse = (TyCon, [Type])
+
+pairCompositionRule :: FastString -> (Projection -> Projection -> Maybe [PairCaseUse])
+                    -> CoAxiomRule
+pairCompositionRule name match = BuiltInEqRule name proves
   where
     proves [Pair lhs lhs', Pair rhs rhs'] = do
       guard (lhs `eqType` lhs' && rhs `eqType` rhs')
-      _ <- matchBoxedPairComposition lhs rhs
+      (l, r) <- projections lhs rhs
+      _ <- match l r
       pure (Pair lhs rhs)
     proves _ = Nothing
 
--- | The branch bodies used by the strict composition law.
-data PairCaseBranch = PickLeft | PickRight | ExchangeFields
+-- | A position in the input pair.
+data PairField = FirstField | SecondField
   deriving Eq
 
--- | Check the rule endpoints and return all source family uses.
+-- | The branch bodies used by the strict composition law.
+data PairCaseBranch = Project PairField | Reconstruct PairField PairField
+
+selectField :: PairField -> (a, a) -> a
+selectField FirstField = fst
+selectField SecondField = snd
+
+-- | The current field and scrutinee, its two field kinds, and the equations used.
+data Projection = Projection PairField Type (Kind, Kind) [PairCaseUse]
+
+-- | Check the original oriented exchange law and return its source dependencies.
 matchBoxedPairComposition :: Type -> Type -> Maybe [(TyCon, [Type])]
 matchBoxedPairComposition lhs rhs = do
-    (outer, outer_args, outer_case, inner_ty, outer_a, outer_b) <- appliedPairCase lhs
-    (inner, inner_args, inner_case, p, inner_a, inner_b) <- appliedPairCase inner_ty
-    (other, other_args, other_case, q, other_a, other_b) <- appliedPairCase rhs
-    guard (inner_case == ExchangeFields)
-    guard ((outer_case == PickLeft && other_case == PickRight)
-           || (outer_case == PickRight && other_case == PickLeft))
-    guard (and [p `eqType` q, inner_a `eqType` other_a, inner_b `eqType` other_b,
-                outer_a `eqType` inner_b, outer_b `eqType` inner_a,
-                typeKind lhs `eqType` typeKind rhs])
-    pure [(outer, outer_args), (inner, inner_args), (other, other_args)]
+    (l, r) <- projections lhs rhs
+    matchExchange l r
+
+-- | Preserve the published exchange proof in either orientation.
+proveBoxedPairProjection :: Type -> Type -> Maybe (Coercion, [PairCaseUse])
+proveBoxedPairProjection lhs rhs = do
+    (l, r) <- projections lhs rhs
+    choose l r
+  where
+    evidence rule a b = AxiomCo rule [mkNomReflCo a, mkNomReflCo b]
+    choose l r
+      | Just uses <- matchExchange l r
+      = pure (evidence boxedPairCompositionRule lhs rhs, uses)
+      | Just uses <- matchExchange r l
+      = pure (mkSymCo (evidence boxedPairCompositionRule rhs lhs), uses)
+      | otherwise = do
+          uses <- commonField l r
+          pure (evidence boxedPairReconstructionRule lhs rhs, uses)
+
+projections :: Type -> Type -> Maybe (Projection, Projection)
+projections lhs rhs = do
+    l <- project lhs
+    r <- project rhs
+    guard (typeKind lhs `eqType` typeKind rhs)
+    pure (l, r)
+  where
+    project ty = do
+      (fun, args, Project field, p, a, b) <- appliedPairCase ty
+      pure (Projection field p (a,b) [(fun, args)])
+
+-- | Cross one certified reconstruction and retain its input field identities.
+throughReconstruction :: Projection -> Maybe (Bool, Projection)
+throughReconstruction (Projection field p (a,b) uses) = do
+    (fun, args, Reconstruct left right, q, x, y) <- appliedPairCase p
+    guard (a `eqType` selectField left (x,y) && b `eqType` selectField right (x,y))
+    let next = Projection (selectField field (left,right)) q (x,y) ((fun,args):uses)
+    pure (left == SecondField && right == FirstField, next)
+
+matchExchange :: Projection -> Projection -> Maybe [PairCaseUse]
+matchExchange l r = do
+    (True, inner) <- throughReconstruction l
+    matchingField inner r
+
+matchingField :: Projection -> Projection -> Maybe [PairCaseUse]
+matchingField (Projection f p (a,b) uses) (Projection g q (x,y) other) = do
+    guard (f == g && a `eqType` x && b `eqType` y && p `eqType` q)
+    pure (reverse uses ++ reverse other)
+
+-- | Stop at the outermost common projection. Its scrutinee can remain opaque.
+commonField :: Projection -> Projection -> Maybe [PairCaseUse]
+commonField l r
+  | Just uses <- matchingField l r = Just uses
+  | otherwise = commonPrefix (path l []) (path r [])
+  where
+    path current outer = case throughReconstruction current of
+      Just (_, inner) -> path inner (current:outer)
+      Nothing         -> current:outer
+
+    commonPrefix (x:xs) (y:ys) = do
+      uses <- matchingField x y
+      case commonPrefix xs ys of
+        Just shorter -> Just shorter
+        Nothing      -> Just uses
+    commonPrefix _ _ = Nothing
 
 -- | Read the single branch at a saturated application and check its kinds.
 appliedPairCase :: Type -> Maybe (TyCon, [Type], PairCaseBranch, Type, Kind, Kind)
@@ -109,16 +199,23 @@ appliedPairCase ty = do
     b <- lookup kb_var (zip kind_vars kinds)
     guard (typeKind p `eqType` mkTyConApp (tupleTyCon Boxed 2) [a,b])
     let rhs = coAxBranchRHS branch
-    choice <- if repGetTyVar_maybe rhs == Just x then pure PickLeft
-              else if repGetTyVar_maybe rhs == Just y then pure PickRight
-              else do
-                (rc, rhs_args) <- splitTyConAppNoView_maybe rhs
-                guard (rc == pc
-                       && map repGetTyVar_maybe rhs_args == map Just [kb_var, ka_var, y, x])
-                pure ExchangeFields
-    let result = case choice of
-          PickLeft -> a
-          PickRight -> b
-          ExchangeFields -> mkTyConApp (tupleTyCon Boxed 2) [b,a]
+        field ty
+          | repGetTyVar_maybe ty == Just x = Just FirstField
+          | repGetTyVar_maybe ty == Just y = Just SecondField
+          | otherwise = Nothing
+        input_kinds = (a, b)
+    (choice, result) <- case field rhs of
+      Just f -> pure (Project f, selectField f input_kinds)
+      Nothing -> do
+        (rc, [left_kind, right_kind, left, right]) <- splitTyConAppNoView_maybe rhs
+        guard (rc == pc)
+        left_field <- field left
+        right_field <- field right
+        let kind_vars_by_field = (ka_var, kb_var)
+        guard (repGetTyVar_maybe left_kind == Just (selectField left_field kind_vars_by_field))
+        guard (repGetTyVar_maybe right_kind == Just (selectField right_field kind_vars_by_field))
+        let result_kind f = selectField f input_kinds
+        pure (Reconstruct left_field right_field,
+              mkTyConApp (tupleTyCon Boxed 2) [result_kind left_field, result_kind right_field])
     guard (typeKind ty `eqType` result)
     pure (family, args, choice, p, a, b)
