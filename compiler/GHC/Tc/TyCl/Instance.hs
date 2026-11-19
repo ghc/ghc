@@ -2562,7 +2562,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
        -- See Note [Default methods in instances]
 
     type_to_hs_type :: Type -> LHsType GhcRn
-    type_to_hs_type = parenthesizeHsType appPrec . noLocA . XHsType
+    type_to_hs_type = parenthesizeHsType appPrec . noLocA . XHsType . HsCoreTyRn
 
 ----------------------
 

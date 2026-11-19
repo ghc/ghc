@@ -169,6 +169,8 @@ instance Diagnostic DsMessage where
                -> mkMsg "SCC pragmas" empty
              ThNoUserInline
                -> mkMsg "NOUSERINLINE" empty
+             ThTypeLet
+               -> mkMsg "Type let syntax" empty
              ThExoticFormOfType ty
                -> mkMsg "Exotic form of type" (ppr ty)
              ThAmbiguousRecordSelectors e

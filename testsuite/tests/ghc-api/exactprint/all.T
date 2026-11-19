@@ -44,4 +44,6 @@ test('ZeroWidthSemi',  normal, compile, ['-dsuppress-uniques -ddump-parsed-ast -
 test('T22919',  normal, compile, ['-dsuppress-uniques -ddump-parsed-ast -dkeep-comments'])
 
 test('TypeLambdaPrint', ignore_stderr, makefile_test, ['TypeLambdaPrint'])
+
+test('TypeLetPrint', ignore_stderr, makefile_test, ['TypeLetPrint'])
 test('PercentPrint', ignore_stderr, makefile_test, ['PercentPrint'])

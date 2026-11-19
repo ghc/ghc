@@ -43,7 +43,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Driver.Backpack.Syntax
@@ -2344,6 +2344,10 @@ is connected to the first type too.
 type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
+        | 'let' vocurly tyvar '=' ctype close 'in' ctype
+                                       {% amsA' (sLL $1 $> $
+                                          XHsType (HsTypeLet (epTok $1, epTok $4, epTok $7)
+                                            $3 $5 $8)) }
         | btype '->' ctype             {% let arr = HsModifiedFunArr noExtField
                                                                      []
                                                                      (HsStandardArr $ EpArrow $ epUniTok $2)

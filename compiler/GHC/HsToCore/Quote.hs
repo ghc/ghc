@@ -37,6 +37,7 @@ import GHC.HsToCore.Binds
 import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
+import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Tc.Utils.TcType
@@ -1487,6 +1488,8 @@ repLTy tyki = repLTyAt (Just tyki)
 -- | Quote a type with a selected default, or defer declaration-kind omissions.
 -- See Note [Quoting forall matchability].
 repLTyAt :: Maybe TypeOrKind -> LHsType GhcRn -> MetaM (Core (M TH.Type))
+repLTyAt _ (L loc (XHsType HsTypeLetRn{})) =
+  notHandledL (locA loc) ThTypeLet
 repLTyAt tyki ty = repTy tyki (unLoc ty)
 
 -- | Quote a type without merging its source forall groups.

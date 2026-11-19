@@ -649,6 +649,7 @@ deriving instance Data (HsType GhcRn)
 deriving instance Data (HsType GhcTc)
 
 deriving instance Data HsTypeGhcPsExt
+deriving instance Data HsTypeGhcRnExt
 
 -- deriving instance (DataIdLR p p) => Data (HsFunArr p)
 deriving instance Data (HsFunArr GhcPs)

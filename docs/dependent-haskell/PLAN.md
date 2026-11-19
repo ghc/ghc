@@ -9250,3 +9250,17 @@ and a witness in a list. Verify that the caller's rule fires on an
 ordinary runtime call. Reject a fresh `Refl`, a discarded equality,
 a reassignment to a rigid index and an attempt to invert an ordinary
 type family. [Boundary example](examples/boundary-evidence/UseMapWitness.hs).
+
+## R18. Bind a local type in source
+
+Accept `type F a = let b = G a in H b b` with
+`ExperimentalDependentTypes`. Check the RHS in its enclosing scope
+and bind its checked type in the body. All occurrences of the local
+name share that type. Check an unused RHS and preserve lexical
+shadowing. The public synonym and its compiled interface expose
+the result of the substitution.
+
+Exercise the source example, an ordinary interface-only client,
+exact printing, and a raw Template Haskell quote. For disabled syntax,
+report the extension at the `let`. Recursive bindings and binding
+groups remain separate work. [Design sources](REFERENCES.md#references-by-roadmap-feature).

@@ -566,6 +566,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalDerivingItem"                       = 11913
   GhcDiagnosticCode "TcRnUnexpectedAnnotation"                      = 18932
   GhcDiagnosticCode "TcRnTypeLambdaDisabled"                        = 27184
+  GhcDiagnosticCode "TcRnTypeLetDisabled"                           = 29822
   GhcDiagnosticCode "TcRnTypeLambdaContext"                         = 27185
   GhcDiagnosticCode "TcRnIllegalRecordSyntax"                       = 89246
   GhcDiagnosticCode "TcRnInvalidVisibleKindArgument"                = 20967

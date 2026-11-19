@@ -206,6 +206,7 @@ data ThRejectionReason
   | ThUnclassifiedArrowModifier (LHsModifier GhcRn)
   | ThUnexpectedModifier [LHsModifier GhcRn]
   | ThUnexpectedModifierExpr [LHsModifierOf (LocatedA (HsExpr GhcRn)) GhcRn]
+  | ThTypeLet
 
 -- | Why is a @SPECIALISE@ pragmas useless?
 data UselessSpecialisePragmaReason

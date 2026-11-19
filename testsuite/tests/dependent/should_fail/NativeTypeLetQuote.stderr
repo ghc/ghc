@@ -1,0 +1,2 @@
+NativeTypeLetQuote.hs:7:13: error: [GHC-65904]
+    Type let syntax not (yet) handled by Template Haskell

@@ -20,7 +20,7 @@ module GHC.Hs.Type (
         pprHsModifiedFunArr, pprHsModifier, pprLHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsTypeGhcPsExt(..),
+        HsTypeGhcPsExt(..), HsTypeGhcRnExt(..),
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -530,10 +530,15 @@ type instance XWildCardTy      GhcRn = HoleKind
 type instance XWildCardTy      GhcTc = NoExtField
 
 type instance XXType           GhcPs = HsTypeGhcPsExt
-type instance XXType           GhcRn = HsCoreTy
+type instance XXType           GhcRn = HsTypeGhcRnExt
 type instance XXType           GhcTc = DataConCantHappen
 
 type HsCoreTy = Type
+
+-- | Renamed type extensions that need kind checking.
+data HsTypeGhcRnExt
+  = HsCoreTyRn HsCoreTy
+  | HsTypeLetRn (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
 
 -- Extension of HsType during parsing.
 -- see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -553,6 +558,9 @@ data HsTypeGhcPsExt
 
   | HsTypeLambda (EpToken "(", EpToken "\\", EpUniToken "->" "→", EpToken ")")
                  (LocatedN RdrName) (LHsType GhcPs)
+
+  | HsTypeLet (EpToken "let", EpToken "=", EpToken "in") (LocatedN RdrName)
+              (LHsType GhcPs) (LHsType GhcPs)
 
   | HsRecTy     (EpToken "{", EpToken "}")
                 (Located [LHsConDeclRecField GhcPs])
@@ -1652,7 +1660,14 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
     HsRecTy _ flds  -> pprHsConDeclRecFields (unLoc flds)
     HsTypeLambda _ v body -> parens (char '\\' <> ppr v <+> arrow <+> ppr_mono_lty body)
-  GhcRn -> ppr t
+    HsTypeLet _ v rhs body ->
+      text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
+        <+> text "in" <+> ppr_mono_lty body
+  GhcRn -> case t of
+    HsCoreTyRn ty -> ppr ty
+    HsTypeLetRn v rhs body ->
+      text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
+        <+> text "in" <+> ppr_mono_lty body
 
 ppr_infix_ty :: (OutputableBndrId p) => LHsType (GhcPass p) -> Maybe SDoc
 ppr_infix_ty (L _ (HsTyVar _ prom (L _ op))) = Just (pprOccWithTick Infix prom op)
@@ -1718,7 +1733,10 @@ hsTypeNeedsParens p = go_hs_ty
         HsBangTy{}  -> p > topPrec
         HsRecTy{}   -> False
         HsTypeLambda{} -> False
-      GhcRn -> go_core_ty t
+        HsTypeLet{} -> p >= topPrec
+      GhcRn -> case t of
+        HsCoreTyRn ty -> go_core_ty ty
+        HsTypeLetRn{} -> p >= topPrec
 
     go_core_ty (TyVarTy{})    = False
     go_core_ty (TermVarTy{})  = False

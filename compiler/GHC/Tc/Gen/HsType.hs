@@ -80,10 +80,12 @@ import Control.Monad.Trans.Maybe (MaybeT(..))
 
 import GHC.Prelude hiding ( head, init, last, tail )
 
+import GHC.Hs.Type (HsTypeGhcRnExt(..))
 import GHC.Hs
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Types.BasicTypes (TcTyThing(ATcTypeLet))
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.ErrCtxt
@@ -1873,8 +1875,23 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
                 tc_check_lhs_type mode ty sig'
        ; checkExpKind mode rn_ty ty' sig' exp_kind }
 
+-- See Note [Typechecking type lets].
+tcHsType mode (XHsType (HsTypeLetRn (L _ binder) rhs body)) exp_kind = do
+  (rhs_ty, rhs_kind) <- tc_infer_lhs_type mode rhs
+  updLclCtxt (tcExtendLocalTypeEnv [(binder, ATcTypeLet binder rhs_ty rhs_kind)]) $
+    tcLHsType mode body exp_kind
+
+{- Note [Typechecking type lets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Kind check the RHS once per pass in the enclosing scope. Check it even
+when the body does not use the name. Every use shares the checked Type and its kind
+metavariables. The binder can shadow an outer type name. The renamer
+gives each binder its own Name and keeps the new name out of its RHS.
+Read the Type at each occurrence. The let itself never enters Core.
+-}
+
 -- See Note [Typechecking HsCoreTys]
-tcHsType mode rn_ty@(XHsType ty) exp_kind
+tcHsType mode rn_ty@(XHsType (HsCoreTyRn ty)) exp_kind
   = do env <- getLclEnv
        -- Raw uniques since we go from NameEnv to TvSubstEnv.
        let subst_prs :: [(Unique, TcType)]
@@ -4586,6 +4603,7 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
        ; thing <- tcLookup name
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
+           ATcTypeLet _ ty kind -> return (ty, kind)
 
            -- An ordinary module can import a synonym for a checked computation.
            -- See Note [Source table dependency closure] in GHC.Tc.Module.

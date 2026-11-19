@@ -52,6 +52,7 @@ import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
 import GHC.Driver.Flags
 
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet), HsTypeGhcRnExt(..))
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -960,7 +961,7 @@ rnHsTyKi env (HsDocTy x ty haddock_doc)
 -- See Note [Renaming HsCoreTys]
 rnHsTyKi env (XHsType (HsCoreTy ty))
   = do mapM_ (check_in_scope . nameRdrName) fvs_list
-       return (XHsType ty, fvs)
+       return (XHsType (HsCoreTyRn ty), fvs)
   where
     fvs_list = map getName $ tyCoVarsOfTypeList ty
     fvs = mkFNs fvs_list
@@ -985,6 +986,16 @@ rnHsTyKi env ty@(XHsType (HsBangTy _ bang (L _ inner))) = do
 rnHsTyKi _ (XHsType HsTypeLambda{}) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   failWithTc (if enabled then TcRnTypeLambdaContext else TcRnTypeLambdaDisabled)
+
+rnHsTyKi env (XHsType (HsTypeLet (let_kw, _, _) binder rhs body)) = do
+  enabled <- xoptM LangExt.ExperimentalDependentTypes
+  unless enabled $
+    setSrcSpan (getEpTokenSrcSpan let_kw) $ failWithTc TcRnTypeLetDisabled
+  (rhs', rhs_fvs) <- rnLHsTyKi env rhs
+  name <- newLocalBndrRn binder
+  (body', body_fvs) <- bindLocalNamesFV [name] (rnLHsTyKi env body)
+  return (XHsType (HsTypeLetRn (fmap (const name) binder) rhs' body'),
+          rhs_fvs `plusFN` body_fvs)
 
 rnHsTyKi env ty@(XHsType (HsRecTy {})) = do
   -- Record types (which only show up temporarily in constructor
@@ -2593,6 +2604,9 @@ extract_lty (L _ ty) acc
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }
                                   -> extract_lctxt ctxt $
                                      extract_lty ty acc
+      XHsType (HsTypeLet _ binder rhs body)
+                                  -> extract_lty rhs
+                                       (filter ((/= unLoc binder) . unLoc) (extract_lty body []) ++ acc)
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc

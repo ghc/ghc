@@ -77,6 +77,7 @@ import qualified MixedFamily
 import qualified InterpretedKind
 import qualified InvisibleFamily
 import qualified TypeLambda
+import qualified TypeLet
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -991,6 +992,7 @@ main = do
         (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
+    observe "name and reuse a type-level intermediate result" TypeLet.roadmap
     observe "pass a constructor to uncurry with two unknown fields"
         (OpenBuildSource.uncurried (Proxy @Int) (Proxy @Char))
     observe "prove one map step for an arbitrary callback and tail"
@@ -1183,6 +1185,8 @@ sourceAddition = do
     observe "replicate at a computed runtime length" (toList filled)
 
     bottom <- newIORef (bottomValue @Nat "showcase-sum-tail") >>= readIORef
+    observe "grow at a locally named runtime index"
+        (toList (grow m 'x'), safeHead (grow bottom 'x'))
     let tag :: Proxy (bottom + m)
         tag = tagLength (bottom + m)
         partial :: Vec Bool (n + bottom)
@@ -1192,6 +1196,9 @@ sourceAddition = do
         VCons x _ -> observe "first cell at a partial runtime length" x
         VNil -> fail "Expected one cell before the unknown tail"
   where
+    grow :: foreach (n :: Nat) -> a -> (let k = 1 + n in Vec a k)
+    grow n x = replicateNative (1 + n) x
+
     tagLength :: foreach (k :: Nat) -> Proxy k
     tagLength _k = Proxy
 

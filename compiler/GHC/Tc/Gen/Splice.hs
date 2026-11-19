@@ -55,6 +55,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
+import GHC.Tc.Types.BasicTypes (TcTyThing(ATcTypeLet))
 import GHC.Tc.Types.Origin
 import GHC.Tc.Gen.SourceTable (checkOptionalSourceUses)
 import GHC.Tc.Types.LclEnv
@@ -3422,6 +3423,10 @@ reifyThing (ATyVar tv tv1)
        ; ty2 <- reifyType ty1
        ; return (TH.TyVarI (reifyName tv) ty2) }
 
+reifyThing (ATcTypeLet name ty _) = do
+  rhs <- liftZonkM (zonkTcType ty) >>= reifyType
+  pure (TH.TyConI (TH.TySynD (reifyName name) [] rhs))
+
 reifyThing thing = pprPanic "reifyThing" (pprTcTyThingCategory thing)
 
 -------------------------------------------
@@ -4204,6 +4209,7 @@ reifyTypeOfThing th_name = do
       reifyPatSynType (patSynSigBndr ps)
     ATcId{tct_id = id} -> liftZonkM (zonkTcType (idType id)) >>= reifyType
     ATyVar _ tctv -> liftZonkM (zonkTcTyVar tctv) >>= reifyType
+    ATcTypeLet _ _ kind -> liftZonkM (zonkTcType kind) >>= reifyKind
     -- Impossible cases, supposedly:
     AGlobal (ACoAxiom _) -> panic "reifyTypeOfThing: ACoAxiom"
     ATcTyCon _ -> panic "reifyTypeOfThing: ATcTyCon"

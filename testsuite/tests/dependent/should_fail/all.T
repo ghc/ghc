@@ -255,5 +255,7 @@ test('NativeClosedCallbackKinds',
       extra_files(['../should_run/NativeClosedCallbackLib.hs'])],
      multimod_compile_fail, ['NativeClosedCallbackKinds', '-v0 ' + config.ghc_th_way_flags])
 
+test('NativeTypeLetQuote', [req_th, only_ways(['normal'])], compile_fail, [''])
+
 test('NativePercentArrowQuoteUnknown', [req_th, only_ways(['normal'])],
      compile_fail, ['-fdiagnostics-show-caret'])

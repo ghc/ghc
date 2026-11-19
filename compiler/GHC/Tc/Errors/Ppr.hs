@@ -1103,6 +1103,9 @@ instance Diagnostic TcRnMessage where
 
     TcRnTypeLambdaDisabled
       -> mkSimpleDecorated $ text "Type lambdas require -XExperimentalDependentTypes."
+    TcRnTypeLetDisabled
+      -> mkSimpleDecorated $ text "A type-level" <+> quotes (text "let")
+                              <+> text "requires -XExperimentalDependentTypes."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
            text "This type lambda needs a top-level synonym with explicitly kinded captures."
@@ -2454,6 +2457,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTypeLambdaDisabled{}
       -> ErrorWithoutFlag
+    TcRnTypeLetDisabled{}
+      -> ErrorWithoutFlag
     TcRnTypeLambdaContext{}
       -> ErrorWithoutFlag
     TcRnInvalidVisibleKindArgument{}
@@ -3159,6 +3164,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalRecordSyntax{}
       -> noHints
     TcRnTypeLambdaDisabled{}
+      -> noHints
+    TcRnTypeLetDisabled{}
       -> noHints
     TcRnTypeLambdaContext{}
       -> noHints

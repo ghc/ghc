@@ -4575,6 +4575,9 @@ data TcRnMessage where
   -- | A type lambda appears with ExperimentalDependentTypes disabled.
   TcRnTypeLambdaDisabled :: TcRnMessage
 
+  -- | A type-level let appears with ExperimentalDependentTypes disabled.
+  TcRnTypeLetDisabled :: TcRnMessage
+
   -- | A type lambda appears outside the supported declaration context.
   TcRnTypeLambdaContext :: TcRnMessage
   deriving Generic
