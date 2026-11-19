@@ -162,6 +162,11 @@ test('NativeClosedIndexedContext',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['NativeClosedIndexedContextLib.hs'])],
      multimod_compile_fail, ['NativeClosedIndexedContext', '-v0 ' + config.ghc_th_way_flags])
+for name in ['NativeClosedIndexedVecEmpty', 'NativeClosedIndexHidden', 'NativeClosedIndexFamily']:
+    test(name, [req_interp, req_rts_linker, only_ways(['normal']),
+                extra_files(['NativeClosedIndexFailures.hs',
+                             '../../../../docs/dependent-haskell/examples/closed-evaluation/IndexedVec.hs'])],
+         multimod_compile_fail, [name, '-v0 ' + config.ghc_th_way_flags])
 for name in ['NativeClosedIndexedWrongKind', 'NativeClosedIndexedWrongValue', 'NativeClosedIndexedPartial']:
     test(name, [req_interp, req_rts_linker, only_ways(['normal']),
                 extra_files(['../../../../docs/dependent-haskell/examples/closed-evaluation/IndexedMark.hs'])],

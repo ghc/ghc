@@ -1,0 +1,5 @@
+NativeClosedIndexFamily.hs:7:15: error: [GHC-70565]
+    • Cannot evaluate ‘P.blocked’ in a type.
+        Cannot recover a constructor-local type argument from the checked result type.
+    • In the first argument of ‘Proxy’, namely ‘(P.blocked 1)’
+      In the type signature: bad :: Proxy (P.blocked 1)

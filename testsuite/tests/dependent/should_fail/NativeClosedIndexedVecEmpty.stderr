@@ -1,0 +1,5 @@
+NativeClosedIndexedVecEmpty.hs:8:19: error: [GHC-70565]
+    • Cannot evaluate ‘V.safeHead’ in a type.
+        The operand has kind Vec 'Z Natural, which does not match the declared input type Vec ('S n) a.
+    • In the first argument of ‘(:~:)’, namely ‘V.safeHead (P.empty 0)’
+      In the type signature: bad :: V.safeHead (P.empty 0) :~: 3

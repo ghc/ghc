@@ -492,8 +492,53 @@ Missing any reachable constructor blocks inspection before execution.
 The client records the parent datatype declaration as a dependency.
 Changing just its interface to make a hidden constructor reachable
 invalidated the unchanged client with all original objects still in place.
-A reachable constructor with an existential binder or an explicit
-dictionary remains outside the codec. A branch GHC can rule out at the
+M129 excludes reachable constructors with existential binders or explicit
+dictionaries. A branch GHC can rule out at the
 requested index needs neither a representation nor a constructor import.
 [Missing constructor](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexedPartial.hs)
 and [dictionary control](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexedContext.hs).
+
+## M130. Recovering the predecessor of a vector length
+
+An ordinary source module defines a length-indexed vector. Its `two`
+function constructs two consecutive numbers. Its `safeHead` accepts a
+vector with any nonzero length. Both functions can also be used in a
+dependent client's type.
+
+```haskell
+first :: V.safeHead (V.two 3) :~: 3
+first = Refl
+```
+
+GHC also checks the entire result against
+`'V.VCons 3 ('V.VCons 4 'V.VNil)`. Reading both cells with an ordinary
+consumer gives `34`. At a call on an empty vector, GHC-70565 reports
+that the operand's kind is `Vec 'Z Natural` while the function expects
+`Vec ('S n) a`. The mismatch is known from the producer's signature.
+The error fixture uses a throwing producer so that premature execution
+would be visible.
+[Ordinary vector](../examples/closed-evaluation/IndexedVec.hs),
+[successful checks](../../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs)
+and [empty-vector diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexedVecEmpty.stderr).
+
+The predecessor is an erased type argument of `VCons`. In the first
+case branch GHC has nominal evidence that `'S ('S 'Z)` equals `'S m`.
+Projecting the constructor argument relates `'S 'Z` and `m`. The
+renderer uses that proof to view the tail at its known length. The
+decoder uses the recovered argument in DataKinds constructor order.
+The interpreter transmits just the constructor tags and data fields.
+
+This works through saturated, nominally injective ordinary or promoted
+constructors. For example, `PairOf a '(n, m)` determines the lengths of
+two vector fields independently. The compiler checks repeated occurrences
+of the same index for agreement. A recursive field may shorten one
+non-`Type` index to a strict structural subterm while the other arguments
+stay fixed. [Two indexed fields](../../../testsuite/tests/dependent/should_run/NativeClosedVectorPair.hs).
+
+If an erased argument is absent from the result or appears only under
+a noninjective family, the compiler reports the unrecoverable argument
+before executing the producer. Recovering an existential from a runtime
+singleton field remains open.
+[Core evidence](../CORE.md#nominal-evidence-for-constructor-local-indices),
+[hidden-index diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexHidden.stderr)
+and [noninjective family diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexFamily.stderr).
