@@ -30,6 +30,10 @@ defined :: Natural -> Natural -> (Natural, Natural)
 defined n _ = (n, n + 1)
 bad :: Natural -> Natural
 bad _ = errorWithoutStackTrace "ignored argument was forced"
+
+firstWorker, secondWorker :: Natural -> (Natural, Char)
+firstWorker n = (n + 1, 'x')
+secondWorker n = (n + 1, 'x')
 HS
 "${ghc[@]}" "${ways[@]}" -c Builder.hs NativeClosedFamilyProjection.hs
 "${ghc[@]}" --show-iface Builder.hi >producer.iface
@@ -107,6 +111,52 @@ ignored :: F.pick (W.defined 7 (W.bad 1)) :~: 7
 ignored = Refl
 HS
 "${ghc[@]}" -i -i. -c Executable.hs
+
+# Identical operands allow reflexivity without using the projection equation.
+cat >Reflexive.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, RoleAnnotations, ScopedTypeVariables #-}
+module Reflexive where
+import qualified Builder as W
+import qualified NativeClosedFamilyProjection as F
+import Numeric.Natural (Natural)
+data N (n :: Natural) = N
+type role N nominal
+{-# RULES "pick/changed" forall (p :: (Natural, Char)). F.pick p = 17 #-}
+same :: N (F.pick (W.firstWorker 7)) -> N (F.pick (W.secondWorker 7))
+same x = x
+HS
+"${ghc[@]}" -i -i. -fenable-rewrite-rules -Wno-inline-rule-shadowing -c Reflexive.hs
+
+# Both projected types can also arrive through ordinary exported values.
+cat >Values.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, RoleAnnotations #-}
+module Values (value, consume) where
+import qualified Builder as W
+import qualified NativeClosedFamilyProjection as F
+import Numeric.Natural (Natural)
+data N (n :: Natural) = N
+type role N nominal
+type A = F.pick (W.firstWorker 7)
+type B = F.pick (W.secondWorker 7)
+value :: N A
+value = N
+consume :: N B -> Bool
+consume _ = True
+HS
+"${ghc[@]}" -i -i. -c Values.hs
+cp Values.hi ../client/
+cd ../client
+cat >UseValues.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, ScopedTypeVariables #-}
+module UseValues where
+import qualified Values
+import qualified NativeClosedFamilyProjection as F
+import Numeric.Natural (Natural)
+{-# RULES "pick/changed" forall (p :: (Natural, Char)). F.pick p = 17 #-}
+result :: Bool
+result = Values.consume Values.value
+HS
+"${ghc[@]}" -i -i. -fenable-rewrite-rules -Wno-inline-rule-shadowing -c UseValues.hs
 
 # The hidden field has the same family declaration after its implementation changes.
 # The object used to compute that field must still invalidate the old proof.

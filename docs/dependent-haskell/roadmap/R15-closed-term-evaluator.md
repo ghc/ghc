@@ -876,3 +876,35 @@ and keep the rule check at proof use. Treating an apparent error call
 as proof that a field cannot return would be incorrect. An ordinary
 producer rule that rewrites `errorWithoutStackTrace` at `Char` to
 `'x'` actually fired in the control.
+
+### When equality needs the whole operand
+
+The M157 prototype computed the number in `pick (bump 7) :~: 8`
+without evaluating the unused field. It gave that field a private
+name for each observation. An exported alias retained the projection.
+A subsequent proof checked its rewrite rules. Changing only the object
+for the imported addition invalidated the old result.
+
+A nominal parameter exposes a compatibility problem. Let two ordinary
+workers return `(n + 1, 'x')` and put a rewrite rule on `pick`. This
+program compiles on M155:
+
+```haskell
+same :: N (F.pick (W.firstWorker 7)) -> N (F.pick (W.secondWorker 7))
+same x = x
+```
+
+Full readback gives GHC the same pair on both sides. It can check
+`same` by reflexivity without reducing `pick`. The prototype gave the
+two occurrences different unread fields. GHC then tried the projection
+equation and rejected the program with GHC-83605. The implementation
+stays open. The next design must let a projection leave the sibling
+unevaluated and preserve an equality that requires the whole operand.
+[Registered compatibility test](../../../testsuite/tests/dependent/should_run/NativeClosedPartialPair.sh).
+
+The same obligation can cross an interface. One module exports
+`value :: N A` and `consume :: N B -> Bool`, where the two synonyms
+use the different workers. The ordinary client writes only
+`consume value`. Both M155 and M158 accept this client with the matching
+rule and without either worker's object. A design that delays readback
+must preserve this use after the provider has finished compiling.
