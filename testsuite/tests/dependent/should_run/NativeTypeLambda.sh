@@ -63,6 +63,16 @@ indexedOrdering :: IndexedCase @Ordering ('OrderingTag 'GT) :~: Proxy 'GT
 indexedOrdering = Refl
 indexedInferred :: IndexedCaseInferred ('OrderingTag 'LT) :~: Proxy 'LT
 indexedInferred = Refl
+selected :: Selected 'False :~: '[Ordering]
+selected = Refl
+siblingsTrue :: Siblings 'True :~: '(Bool, Char)
+siblingsTrue = Refl
+siblingsFalse :: Siblings 'False :~: '(Ordering, Int)
+siblingsFalse = Refl
+ordinaryCases :: OrdinaryCases 'True :~: ([Bool], Maybe Char)
+ordinaryCases = Refl
+consed :: Consed 'False :~: '[Ordering, Int]
+consed = Refl
 ordinaryLambda :: a -> b -> a
 ordinaryLambda x = (\_ -> x)
 HS
@@ -144,6 +154,21 @@ HS
 if "${g[@]}" -c WrongVisibility.hs >visibility.log 2>&1 ||
    ! grep -Fq 'WrongVisibility.hs:6:10: error: [GHC-20967]' visibility.log; then
     cat visibility.log >&2
+    exit 1
+fi
+
+cat >SiblingScope.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, DataKinds, TypeFamilies #-}
+module SiblingScope where
+import Data.Proxy
+type Bad (xs :: Maybe Bool) =
+  '( (\x -> case x of { Just field -> Proxy field; Nothing -> Proxy 'False }) xs
+   , (\y -> Proxy field) Ordering )
+HS
+if "${g[@]}" -c SiblingScope.hs >sibling.log 2>&1 ||
+   ! grep -Fq 'SiblingScope.hs:6:19: error: [GHC-76037]' sibling.log ||
+   ! grep -Fq 'Not in scope: type variable' sibling.log; then
+    cat sibling.log >&2
     exit 1
 fi
 

@@ -79,7 +79,7 @@ import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 import Control.Monad
 import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
-import Data.List ( partition )
+import Data.List ( mapAccumL, partition )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
@@ -165,20 +165,15 @@ liftTypeLambdas group =
       in (L loc (HsKindSig ann body' kind), families, next)
     liftRhs owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
       liftLambdaRhs owner captures loc vars body salt Nothing
-    liftRhs owner captures (L loc (HsAppTy ann f x)) salt =
-      let (f', fs, next) = liftRhs owner captures f salt
-          (x', xs, last_salt) = liftRhs owner captures x next
-      in (L loc (HsAppTy ann f' x'), fs ++ xs, last_salt)
-    liftRhs owner captures (L loc (HsParTy ann body)) salt =
-      let (body', ds, next) = liftRhs owner captures body salt
-      in (L loc (HsParTy ann body'), ds, next)
-    liftRhs _ _ ty salt = (ty, [], salt)
+    liftRhs owner captures ty salt =
+      liftTypeChildren (liftRhs owner captures) ty salt
 
     -- A standalone kind signature quantifies the invisible prefix before
     -- checking any equation. If the first row could fix that prefix, GADT
     -- matches with different result indices would become monomorphic.
+    -- 'capture' has already removed kinds that contain a splice.
     closedCaptureKind (L _ (HsTvb _ _ _ (HsBndrKind _ kind)))
-      | closedSpliceFreeKind kind = Just kind
+      | null (extractHsTyRdrTyVars kind) = Just kind
     closedCaptureKind _ = Nothing
 
     -- The written annotation and capture binders remain in the synonym.
@@ -351,14 +346,8 @@ liftTypeCases group =
     liftRhs owner captures (L loc (XHsType (HsTypeLet ann v rhs body))) salt =
       let (rhs', cases, next) = liftRhs owner captures rhs salt
       in (L loc (XHsType (HsTypeLet ann v rhs' body)), cases, next)
-    liftRhs owner captures (L loc (HsParTy ann ty)) salt =
-      let (ty', cases, next) = liftRhs owner captures ty salt
-      in (L loc (HsParTy ann ty'), cases, next)
-    liftRhs owner captures (L loc (HsAppTy ann f x)) salt =
-      let (f', left, next) = liftRhs owner captures f salt
-          (x', right, end) = liftRhs owner captures x next
-      in (L loc (HsAppTy ann f' x'), left ++ right, end)
-    liftRhs _ _ ty salt = (ty, [], salt)
+    liftRhs owner captures ty salt =
+      liftTypeChildren (liftRhs owner captures) ty salt
 
     capture b@(L _ (HsTvb _ (HsBndrRequired _) (HsBndrVar _ n) _)) = Just (b, n)
     capture _ = Nothing
@@ -377,6 +366,38 @@ liftTypeCases group =
           pats = zipWith pat_capture [0 :: Int ..] captures ++ [pat]
       in L loc (FamEqn ([], [], noAnn) name mkHsOuterImplicit
                        (map (HsValArg noExtField) pats) Prefix rhs)
+
+-- | Visit type expression children that share their enclosing lexical scope.
+-- The caller handles binders and kind annotations. Thread the next private
+-- family index through the children in source order.
+liftTypeChildren :: (LHsType GhcPs -> Int -> (LHsType GhcPs, [a], Int))
+                 -> LHsType GhcPs -> Int -> (LHsType GhcPs, [a], Int)
+liftTypeChildren visit ty@(L loc node) salt = case node of
+  HsParTy ann body -> one (HsParTy ann) body
+  HsAppTy ann f x -> two (HsAppTy ann) f x
+  HsAppKindTy ann f kind -> one (\f' -> HsAppKindTy ann f' kind) f
+  HsOpTy ann l op r -> two (\l' r' -> HsOpTy ann l' op r') l r
+  HsListTy ann t -> one (HsListTy ann) t
+  HsTupleTy ann sort ts -> many (HsTupleTy ann sort) ts
+  HsExplicitListTy ann promoted ts -> many (HsExplicitListTy ann promoted) ts
+  HsExplicitTupleTy ann promoted ts -> many (HsExplicitTupleTy ann promoted) ts
+  _ -> (ty, [], salt)
+  where
+    one rebuild t =
+      let (t', lifted, next) = visit t salt
+      in (L loc (rebuild t'), lifted, next)
+
+    two rebuild l r =
+      let (l', left, next) = visit l salt
+          (r', right, end) = visit r next
+      in (L loc (rebuild l' r'), left ++ right, end)
+
+    many rebuild ts =
+      let step next t = case visit t next of
+            (t', lifted, end) -> (end, (t', lifted))
+          (end, results) = mapAccumL step salt ts
+          (ts', lifted) = unzip results
+      in (L loc (rebuild ts'), concat lifted, end)
 
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.

@@ -1,6 +1,9 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures #-}
-{-# LANGUAGE TypeFamilies, UndecidableInstances #-}
-module NativeTypeLambdaScope (Levels, Adjacent, InferredLevels, UsesKind) where
+{-# LANGUAGE TypeFamilies, TypeOperators, UndecidableInstances #-}
+module NativeTypeLambdaScope
+  ( Levels, Adjacent, InferredLevels, UsesKind
+  , Selected, Siblings, OrdinaryCases, Consed
+  ) where
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import GHC.Exts (U)
@@ -23,3 +26,16 @@ type InferredLevels (a :: q) =
 
 type UsesKind (a :: k) =
   (\b c -> (Proxy (a :: k), Proxy k, b, c)) Bool Char
+
+type Selected xs = '[ (\b -> case b of { True -> Bool; False -> Ordering }) xs ]
+
+type Siblings b =
+  '( (\x -> case x of { True -> Bool; False -> Ordering }) b
+   , (\x -> case x of { True -> Char; False -> Int }) b )
+
+type OrdinaryCases (b :: Bool) =
+  ( [case b of { True -> Bool; False -> Ordering }]
+  , Maybe (case b of { True -> Char; False -> Int }) )
+
+type Consed (b :: Bool) =
+  (case b of { True -> Char; False -> Ordering }) ': '[Int]
