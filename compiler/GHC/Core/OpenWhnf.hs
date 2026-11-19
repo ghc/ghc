@@ -23,6 +23,7 @@ import GHC.Core.DataCon
   , isBanged, isTypeDataCon )
 import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreAlt, CoreExpr, Expr(..), collectArgs, isTyCoArg)
 import GHC.Core.FVs (exprFreeVars)
+import GHC.Core.Opt.Arity (etaExpand)
 import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCon (isBoxedDataTyCon)
@@ -156,8 +157,11 @@ evaluate limit obtain local record unsolved first_type (Suspension env expr) = d
   steps <- get
   if intGtLimit steps limit then lift (throwE Exhausted) else put (steps + 1)
   case expr of
-    _ | Just (con, arguments, fields) <- constructorApplication expr, con /= pairCon ->
-          pure (BoxedData con arguments (map (Suspension env) fields))
+    _ | Just (con, arguments, fields, missing) <- constructorApplication expr
+      , missing > 0 || con /= pairCon ->
+          if missing > 0
+          then recur (Suspension env (etaExpand missing expr))
+          else pure (BoxedData con arguments (map (Suspension env) fields))
     Var v
       | Just binding <- lookupVarEnv env v -> do
           lift (lift (local v))
@@ -272,17 +276,18 @@ evaluate limit obtain local record unsolved first_type (Suspension env expr) = d
       liftedBinder field && varType field `eqType` exprType body
 
 -- | Read a fully applied ordinary constructor worker and its suspended fields.
-constructorApplication :: CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
+constructorApplication :: CoreExpr -> Maybe (DataCon, [Type], [CoreExpr], Int)
 constructorApplication expr
   | (Var worker, args) <- collectArgs expr
   , Just con <- isDataConWorkId_maybe worker
   , let (types, fields) = span isTyCoArg args
   , Just parameters <- traverse typeArgument types
   , Just expected <- openDataConFieldTypes con parameters
-  , length expected == length fields
+  , let missing = length expected - length fields
+  , missing >= 0
   , all (not . isTyCoArg) fields
   , and (zipWith eqType expected (map exprType fields))
-  = Just (con, parameters, fields)
+  = Just (con, parameters, fields, missing)
   | otherwise = Nothing
   where
     typeArgument (Type ty) = Just ty
@@ -331,6 +336,13 @@ the actual DataCon and typed alternative binders to select and bind its
 fields. A neutral scrutinee still blocks case selection. The ordinary
 source operand decoder also checks this worker shape. It does not
 bypass a strict field or a representation-changing wrapper.
+
+An ordinary function can also receive the worker as a callback. For
+example, build passes (:) to the list producer before either field is
+available. Once all type arguments are present, eta-expand the missing
+value arguments. The resulting lambda keeps the supplied fields in their
+original environment. Its body reaches the same saturated constructor
+check when the caller supplies the remaining fields.
 
 Keep the dedicated boxed pair and Char trace steps for existing clients.
 

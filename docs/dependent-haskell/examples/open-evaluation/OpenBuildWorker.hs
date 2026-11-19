@@ -1,7 +1,7 @@
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-unoptimized-core-for-interpreter -fno-omit-interface-pragmas #-}
 
-module OpenBuildWorker (Shell (..), Nested (..), build, wrap, echo, buildPair, partialPair, swapPair) where
+module OpenBuildWorker (Shell (..), Nested (..), build, buildWithUncurry, wrap, echo, buildPair, partialPair, swapPair) where
 
 import Numeric.Natural (Natural)
 
@@ -15,6 +15,11 @@ data Nested a b = Nested (Shell a b)
 {-# INLINE build #-}
 build :: a -> b -> Shell a b
 build x y = Shell x y
+
+-- | Pass the constructor to the ordinary pair eliminator.
+{-# INLINE buildWithUncurry #-}
+buildWithUncurry :: a -> b -> Shell a b
+buildWithUncurry x y = uncurry Shell (x, y)
 
 -- | Construct an inner value and wrap it.
 {-# INLINE wrap #-}

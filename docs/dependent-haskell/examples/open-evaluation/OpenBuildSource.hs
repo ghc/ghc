@@ -3,7 +3,7 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeOperators #-}
 
-module OpenBuildSource (Make, exact, nested, rigid, pair, swapped, Swap) where
+module OpenBuildSource (Make, exact, uncurried, nested, rigid, pair, swapped, Swap) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -17,6 +17,10 @@ type Make a b = B.build a b
 -- | Check the constructor and both fields.
 exact :: forall a b. Proxy a -> Proxy b -> Make a b :~: 'B.Shell a b
 exact _ _ = Refl
+
+-- | Check the constructor callback with both input fields unknown.
+uncurried :: forall a b. Proxy a -> Proxy b -> B.buildWithUncurry a b :~: 'B.Shell a b
+uncurried _ _ = Refl
 
 -- | Check both layers of the constructed result.
 nested :: forall a b. Proxy a -> Proxy b -> B.wrap a b :~: 'B.Nested ('B.Shell a b)
