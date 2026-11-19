@@ -16,7 +16,7 @@ module GHC.Core.FVs (
         exprFreeIds,      exprsFreeIds,
         exprFreeIdsDSet,  exprsFreeIdsDSet,
         exprFreeIdsList,  exprsFreeIdsList,
-        bindFreeVars,
+        bindFreeVars, hasFreeVarInCoreAnnotations,
 
         -- * Selective free variables of expressions
         InterestingVarFun,
@@ -272,6 +272,44 @@ exprFVs (Let (NonRec bndr rhs) body)
 exprFVs (Let (Rec pairs) body)
   = addCoreBndrsFV (map fst pairs) $
     mapUnionFV rhs_fvs pairs `mappend` exprFVs body
+
+-- | Check for a free occurrence in a type, coercion or binder annotation.
+-- A term occurrence contributes its type and multiplicity, but not its Id.
+-- Inspect stable unfolding templates and skip ordinary duplicates of RHSs.
+hasFreeVarInCoreAnnotations :: Var -> CoreExpr -> Bool
+hasFreeVarInCoreAnnotations target = expr
+  where
+    ty = anyFreeVarsOfType (== target)
+    co = anyFreeVarsOfCo (== target)
+
+    annotation b = ty (varType b) || maybe False ty (varMultMaybe b)
+
+    under [] body = body
+    under (b : bs) body = annotation b || (b /= target && under bs body)
+
+    expr (Type t) = ty t
+    expr (Coercion c) = co c
+    expr (Var v) = annotation v
+    expr Lit{} = False
+    expr (Tick tick body) = tickAnn tick || expr body
+    expr (App fun arg) = expr fun || expr arg
+    expr (Lam b body) = under [b] (expr body)
+    expr (Cast body c) = expr body || co c
+    expr (Case scrut b t alts) = expr scrut || ty t || under [b] (any alt alts)
+    expr (Let (NonRec b rhs) body) = expr rhs || unfolding b || under [b] (expr body)
+    expr (Let (Rec pairs) body) =
+        under (map fst pairs) (expr body || any (\(b, rhs) -> expr rhs || unfolding b) pairs)
+
+    alt (Alt _ bs rhs) = under bs (expr rhs)
+
+    tickAnn (Breakpoint _ _ ids) = any annotation ids
+    tickAnn _ = False
+
+    unfolding b
+      | isId b
+      , CoreUnfolding { uf_src = src, uf_tmpl = rhs } <- realIdUnfolding b
+      , isStableSource src = expr rhs
+      | otherwise = False
 
 ---------
 rhs_fvs :: (Id, CoreExpr) -> SelectiveDFV

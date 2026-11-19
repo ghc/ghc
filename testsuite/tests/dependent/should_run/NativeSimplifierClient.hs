@@ -3,7 +3,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
-import NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, sample, observePacked)
+import NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, sample, observePacked, driveSame)
 
 main :: IO ()
 main = do
@@ -35,3 +35,4 @@ main = do
     print (impossible (choose False))
     print (scopeAnnotations yes, scopeAnnotations exceptional)
     print (observePacked sample)
+    driveSame exceptional >>= print

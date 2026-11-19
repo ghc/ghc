@@ -1,6 +1,9 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
-{-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, BangPatterns #-}
-module NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, Packed, sample, observePacked) where
+{-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, BangPatterns, TypeOperators #-}
+module NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, Packed, sample, observePacked, driveSame) where
+
+import Data.IORef (newIORef, readIORef)
+import Data.Type.Equality ((:~:)(Refl))
 
 data Nat = Z | S Nat
 data Vec a (n :: Nat) where
@@ -100,3 +103,20 @@ sample = Pack (S (S Z)) (Cons 7 (Cons 8 Nil))
 
 observePacked :: Packed -> [Int]
 observePacked (Pack _ xs) = toList xs
+
+data Same where
+  Same :: foreach (x :: Bool) -> foreach (y :: Bool) -> (x :~: y) -> Same
+
+buildSame :: Bool -> Same
+buildSame x = Same x x Refl
+
+{-# NOINLINE consumeSame #-}
+consumeSame :: Same -> Bool
+consumeSame (Same _ _ Refl) = True
+
+{-# NOINLINE driveSame #-}
+driveSame :: Bool -> IO Bool
+driveSame input = do
+  cell <- newIORef input
+  x <- readIORef cell
+  pure (consumeSame (buildSame x))

@@ -43,7 +43,7 @@ import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
-import GHC.Core.FVs     ( mkRuleInfo {- exprsFreeIds -} )
+import GHC.Core.FVs     ( mkRuleInfo, hasFreeVarInCoreAnnotations )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Core.Multiplicity
 
@@ -1914,10 +1914,16 @@ simpl_lam env bndr body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = do { tick (BetaReduction bndr)
        ; simplLam (extendTvSubst env bndr arg_ty) body cont }
 
+-- An ordinary result type can hide uses of this binder in the body's types
+-- and coercions. Value beta substitution does not rewrite those occurrences.
 -- See Note [Retained Core in the Gentle simplifier] in GHC.Driver.Main.Passes.
 simpl_lam env bndr body cont@ApplyToVal{sc_hole_ty = fun_ty}
   | sm_core_mode (seMode env) == RetainedCore
-  , DepFunTy{} <- coreFullView fun_ty
+  , let retained_arrow = case coreFullView fun_ty of
+          DepFunTy{} -> True
+          _ -> False
+  , retained_arrow || (isNativeOpaqueValueId bndr
+                       && hasFreeVarInCoreAnnotations bndr body)
   = do { let (inner_bndrs, inner_body) = collectBinders body
        ; (env', bndrs') <- simplLamBndrs env (bndr:inner_bndrs)
        ; body' <- simplExpr env' inner_body
