@@ -166,9 +166,10 @@ total = Refl
 The inner result supplies the input kind for `sum`. In another check, the
 outer function reads the first element and its result must be `5`.
 This distinguishes a genuinely reversed argument from the original list.
-The compiler checks staging before entering a nested argument. A failure
-while forcing an inner result reports the inner function's source span.
-Draft proposal #509 specifies this argument-first order for closed calls.
+The compiler checks staging before preparing a nested argument.
+The original implementation followed draft proposal #509 and
+reified each argument. The current staged path composes ordinary
+calls before observing their result.
 [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [source tests](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs).
 
@@ -181,18 +182,17 @@ types of the functions. The enclosing type still has its own checks.
 [Kind error](../../../testsuite/tests/dependent/should_fail/NativeClosedNestedKind.hs)
 and [missing instance](../../../testsuite/tests/dependent/should_fail/NativeClosedNestedMissing.hs).
 
-Every supported result kind can also serve as an intermediate operand.
-For example, `Prelude.odd (Prelude.sum '[2, 3, 5])` returns `'False`.
-For a Boolean, the compiler recovers the data constructor that DataKinds
-promoted and uses its ordinary Core worker. For a list, it uses the
-element kind from the checked result. A computed empty list of naturals
-therefore cannot supply the Boolean list required by `and`.
+The checked kind of each intermediate guides the enclosing ordinary
+call. For example, `Prelude.odd (Prelude.sum '[2, 3, 5])` returns
+`'False`. A computed empty list of naturals cannot supply the Boolean
+list required by `and`. When a checked family supplies an operand,
+GHC packs its promoted value with the matching ordinary constructor.
 [Positive examples](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs)
 and [wrong empty-list kind](../../../testsuite/tests/dependent/should_fail/NativeClosedComputedEmpty.hs).
 
-The client records the objects for both functions. With their interfaces
-held fixed, changing either implementation can invalidate the client's
-type. [Recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedNestedDependencies.sh).
+The client records both objects when the interpreter links code for
+both functions. With their interfaces held fixed, changing either object
+can invalidate the client's type. [Recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedNestedDependencies.sh).
 
 Same-module definitions require further work on R21. General closed
 expressions and user-defined representations, including newtypes, remain
@@ -248,23 +248,24 @@ A helper with type `(Foldable f, Eq a) => f a -> f a -> Bool` can take
 
 GHC checks arity, kinds, staging and instances before executing any
 operand. It reports a conflicting kind at the first inconsistent operand.
-It then normalizes the operands in source order. An ignored nested call
-can therefore fail during type checking. Runtime Haskell keeps its usual
-lazy evaluation. The current interpreter accepts leading invisible parameters.
+The interpreter evaluates the composed ordinary applications with
+Haskell's usual demand behavior. A checked family still normalizes
+its operand at the type boundary. The staged call checker accepts
+leading invisible parameters.
 [Source of the evaluation rule](../REFERENCES.md#saturated-closed-calls-and-open-pair-projections).
 
 ## Returning a pair
 
 `Prelude.quotRem 17 5 :~: '(3,2)` checks with `Refl`. The compiler
 evaluates the ordinary function once and inspects its actual pair.
-The same checked representation lets a nested call receive that pair
-as an argument.
+An ordinary nested call can also receive a pair directly.
 
-The interpreter encodes both fields before returning to the type checker.
-An overlapping `Show (Natural, Natural)` instance in the client cannot
-change the result. A bottom in the second field is reported at the
-producer even if the outer closed call ignores the pair. GHC rejects an
-unsupported result such as `(Natural, Int)` before running its producer.
+When the pair is the observed result, the interpreter encodes both
+fields before returning to the type checker. An overlapping
+`Show (Natural, Natural)` instance in the client cannot change the result.
+Observing a pair forces a bottom in its second field. An ordinary
+consumer may leave that field undemanded. GHC rejects an unsupported
+observed result such as `(Natural, Int)` before running its producer.
 The one-shot test also changes a producer object while retaining the
 installed interface bytes and the client source. The old equality fails
 when the compiler checks the client again.
@@ -280,14 +281,13 @@ either a value or a diagnostic string to another closed call. The
 [Showcase](../Showcase.hs) parses the character lists for `23` and `x`
 and uses `fromRight` to select a default for the second.
 
-GHC checks the field kinds of all alternatives before running the producer.
-It evaluates the producer once. A Core case records which constructor
-the producer actually returned and encodes only that constructor's fields.
-The compiler reconstructs the promoted value with the corresponding
-DataKinds constructor. A later ordinary call can receive it as an operand.
-For example, forcing `Just undefined` fails at the producer even when the
-later call only tests for `Nothing`. A client-defined `Show` instance
-for the result datatype cannot supply either the constructor or its fields.
+To observe a result, GHC checks the field kinds of all alternatives
+before running the producer. A Core case records its actual constructor
+and encodes its present fields. The compiler reconstructs the value
+with the corresponding DataKinds constructor. Observing
+`Just undefined` fails when the encoder demands its field.
+`isNothing (Just undefined)` only needs the constructor tag. A
+client-defined `Show` instance cannot supply the constructor or fields.
 [Source proofs](../../../testsuite/tests/dependent/should_run/NativeClosedChoices.hs)
 and [failure in a present field](../../../testsuite/tests/dependent/should_fail/NativeClosedPresentBottom.hs).
 
@@ -331,9 +331,10 @@ canonical `showList` representation. The compiler consumes the complete
 response and reconstructs the promoted constructors. Forcing the
 response forces the list spine and every present element. It also forces
 the present fields of a nested pair or sum. An absent alternative has no
-fields to force. A later producer that ignores an operand still requires
-the inner computation to finish. An infinite result cannot finish this
-encoding, and large results require space for a complete response.
+fields to force. An ordinary consumer can ignore an element or the
+entire list before the final result is observed. An observed infinite
+list cannot finish this encoding, and large results require space
+for a complete response.
 [Result codec](../../../compiler/GHC/Tc/Gen/Splice.hs)
 and [bottom control](../../../testsuite/tests/dependent/should_fail/NativeClosedCompoundListBottom.hs).
 
@@ -572,8 +573,9 @@ The type stays the same in all three cases. GHC observes the stored
 witness to recover the length chosen on that call.
 
 ```haskell
-computed :: E.readSomeVec (E.someVec 4) :~: '[4, 5]
-computed = Refl
+two :: E.someVec 4 :~: 'E.SomeVec ('E.SS ('E.SS 'E.SZ))
+                                ('V.VCons 4 ('V.VCons 5 'V.VNil))
+two = Refl
 ```
 
 The supported package has one constructor, one erased index, and two
@@ -600,8 +602,53 @@ witness. A divergent witness can still make closed checking diverge.
 [missing witness](../../../testsuite/tests/dependent/should_fail/NativeClosedWitnessMissing.hs)
 and [inconsistent result](../../../testsuite/tests/dependent/should_fail/NativeClosedWitnessMismatch.hs).
 
-A separate-module check compiled `computed` twice. GHC reused the
-unchanged client. Changing only the producer from `n + 1` to `n + 2`
+A separate-module M135 check compiled a proof of
+`E.readSomeVec (E.someVec 4) :~: '[4, 5]` twice. GHC reused the unchanged
+client. Changing only the producer from `n + 1` to `n + 2`
 changed its object and preserved its interface ABI hash. GHC rechecked
 the original proof and reported that the returned second cell was
 `6` where the client required `5`.
+
+## M136. Composing ordinary calls before observation
+
+`LazyParcel` exports an abstract datatype and ordinary functions.
+Its constructor is private. The second field of `make 7` throws if
+demanded. The first field can still appear in a type.
+
+```haskell
+firstField :: P.first (P.make 7) :~: 7
+firstField = Refl
+```
+
+GHC checks the stage, kind and instance requirements of each ordinary
+call. It then compiles their typed Core application together. Only the
+observed result needs a codec. The intermediate type may stay abstract
+or have a representation that the codec cannot reify. For example,
+an ordinary consumer can ignore an intermediate `Either Natural Int`.
+Trying to observe the parcel itself still fails because the caller
+cannot inspect its constructor.
+[Ordinary parcel](../examples/closed-evaluation/LazyParcel.hs),
+[abstract intermediate](../../../testsuite/tests/dependent/should_run/NativeClosedLazyParcel.hs)
+and [observing an abstract result](../../../testsuite/tests/dependent/should_fail/NativeClosedLazyParcelEscape.hs).
+
+A kind mismatch still points to the operand and prevents execution.
+When a demanded field throws, the interpreter reports the exception
+at the call whose result is observed. For example,
+`P.second (P.make 7)` reports the exception at `P.second`. An ordinary
+fused computation has no separate observation of `P.make`. A checked
+source family remains a boundary that can require its own observation.
+[Kind mismatch](../../../testsuite/tests/dependent/should_fail/NativeClosedLazyParcelKind.hs)
+and [demanded field](../../../testsuite/tests/dependent/should_fail/NativeClosedLazyParcelDemand.hs).
+
+GHC records the ordinary heads and dictionary names before interactive
+simplification. It records the objects actually linked by the
+interpreter. The existing separate-module test replaces each linked
+object in turn while keeping its ABI and client source fixed.
+[Object replay](../../../testsuite/tests/dependent/should_run/NativeClosedNestedDependencies.sh).
+
+Another test gives an ordinary provider an optimization rule for
+`first (make n)`. Both the ordinary executable and the staged call use
+the rule. It eliminates both calls, so the provider object cannot
+invalidate the proof. Replacing only its interface changes the rule's
+result from `7` to `8`. GHC rejects the unchanged client's proof at
+`Refl`. [Optimized interface replay](../../../testsuite/tests/dependent/should_run/NativeClosedFusedRule.sh).

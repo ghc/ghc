@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedCall
+     finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedApplication, tcPrepareClosedResult
      , tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable
       ) where
 
@@ -1872,12 +1872,35 @@ closedImportedGRE rdr_env con = do
 -- See Note [Closed literal type evaluation].
 tcRunClosedCall :: Id -> Core.CoreExpr -> Type -> TcM Type
 tcRunClosedCall fun argument result_kind = do
-  run <- tcPrepareClosedCall fun [exprType argument] result_kind
-  run [argument]
+  apply <- tcPrepareClosedApplication fun [exprType argument] result_kind
+  reify <- tcPrepareClosedResult (idName fun) result_kind
+  apply [argument] >>= reify
 
--- | Check the call and build an action for its runtime operands.
-tcPrepareClosedCall :: Id -> [Type] -> Kind -> TcM ([Core.CoreExpr] -> TcM Type)
-tcPrepareClosedCall fun domains result_kind = do
+-- | Typecheck the ordinary runtime application without observing its value.
+tcPrepareClosedApplication :: Id -> [Type] -> Kind -> TcM ([Core.CoreExpr] -> TcM Core.CoreExpr)
+tcPrepareClosedApplication fun domains result_kind = do
+  let name = idName fun
+      bad = failWithTc . TcRnClosedTypeEval name
+      expected = foldr mkVisFunTyManyU result_kind domains
+  tcPreflightClosedCall name
+  function <- if idType fun `tcEqType` expected
+                then pure (Core.Var fun)
+                else specializeClosedFunction name expected
+  unless (exprType function `tcEqType` expected) $
+    bad "The closed call does not have the expected ordinary function type."
+  -- Even a fused call can be simplified using an imported unfolding.
+  env <- getGblEnv
+  updTcRef (tcg_evaluated_term_uses env) (`extendNameSet` name)
+  loc <- getSrcSpanM
+  return $ \arguments -> setSrcSpan loc $ do
+    unless (length arguments == length domains &&
+            and (zipWith tcEqType (map exprType arguments) domains)) $
+      bad "The runtime operands do not have the expected types."
+    return (mkCoreApps function arguments)
+
+-- | Render and interpret a complete runtime expression at a type boundary.
+tcPrepareClosedResult :: Name -> Kind -> TcM (Core.CoreExpr -> TcM Type)
+tcPrepareClosedResult name result_kind = do
   hsc_env <- getTopEnv
   checked_shape <- tcClosedCallValueShape name result_kind
   shape <- case checked_shape of
@@ -1887,13 +1910,6 @@ tcPrepareClosedCall fun domains result_kind = do
                     "lists, boxed pairs, Maybe, and Either of supported results, " ++
                     "or ordinary boxed datatypes with supported fields and imported constructors.")
   interp <- checkClosedTypeEvalStage hsc_env name
-  let expected = foldr mkVisFunTyManyU result_kind domains
-  function <- if idType fun `tcEqType` expected
-                then pure (Core.Var fun)
-                else specializeClosedFunction name expected
-  unless (exprType function `tcEqType` expected) $
-    bad "The closed call does not have the expected ordinary function type."
-
   render <- closedCallRenderer name shape
   ret_id <- lookupOrig gHC_INTERNAL_BASE returnIOIdOcc >>= tcLookupId
   io_tc <- lookupOrig gHC_TYPES ioTyConOcc >>= tcLookupTyCon
@@ -1902,13 +1918,11 @@ tcPrepareClosedCall fun domains result_kind = do
   unless (exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
     bad "Unexpected type for the interpreter response."
   loc <- getSrcSpanM
-  return $ \arguments -> setSrcSpan loc $ do
+  return $ \call -> setSrcSpan loc $ do
     failIfErrsM
-    unless (length arguments == length domains &&
-            and (zipWith tcEqType (map exprType arguments) domains)) $
-      bad "The runtime operands do not have the expected types."
-    let call = mkCoreApps function arguments
-        response = render call
+    unless (exprType call `tcEqType` result_kind) $
+      bad "The runtime expression does not have the checked result type."
+    let response = render call
     unless (exprType response `tcEqType` stringTy) $
       bad "Unexpected type for the interpreter response."
     compiled <- tryMostM $ liftIO $ hscCompileCoreExpr hsc_env loc (mkCoreApp ret response)
@@ -1924,7 +1938,6 @@ tcPrepareClosedCall fun domains result_kind = do
       Just ty | typeKind ty `tcEqType` result_kind -> return ty
       _ -> bad "The value returned by the interpreter does not match the checked result type."
   where
-    name = idName fun
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name
 

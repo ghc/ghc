@@ -1,9 +1,8 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
-
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
 module NativeClosedCompoundListBottom where
 
-import Data.Type.Equality ((:~:)(Refl))
+import Data.Proxy (Proxy(..))
 import qualified NativeClosedCompoundListsLib as P
 
-bad :: P.ignoreCompound (P.bottomElement 1) :~: 7
-bad = Refl
+bad :: Proxy (P.bottomElement 1)
+bad = Proxy

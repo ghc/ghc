@@ -1,7 +1,5 @@
-NativeClosedCompoundListBottom.hs:8:26: error: [GHC-70565]
+NativeClosedCompoundListBottom.hs:7:15: error: [GHC-70565]
     • Cannot evaluate ‘P.bottomElement’ in a type.
         compound list element forced
-    • In the first argument of ‘(:~:)’, namely
-        ‘P.ignoreCompound (P.bottomElement 1)’
-      In the type signature:
-        bad :: P.ignoreCompound (P.bottomElement 1) :~: 7
+    • In the first argument of ‘Proxy’, namely ‘(P.bottomElement 1)’
+      In the type signature: bad :: Proxy (P.bottomElement 1)

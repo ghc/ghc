@@ -1,6 +1,4 @@
-NativeClosedPresentBottom.hs:7:30: error: [GHC-70565]
+NativeClosedPresentBottom.hs:7:15: error: [GHC-70565]
     • Cannot evaluate ‘P.badJust’ in a type. forced the present field
-    • In the first argument of ‘(:~:)’, namely
-        ‘Data.Maybe.isNothing (P.badJust 0)’
-      In the type signature:
-        bad :: Data.Maybe.isNothing (P.badJust 0) :~: 'False
+    • In the first argument of ‘Proxy’, namely ‘(P.badJust 0)’
+      In the type signature: bad :: Proxy (P.badJust 0)

@@ -48,5 +48,8 @@ literals :: ( Prelude.concat '[ '[], '[ 'x'], '[]] :~: '[ 'x']
             , P.ignoreCompound '[] :~: 7 )
 literals = (Refl, Refl, Refl, Refl, Refl, Refl, Refl)
 
+ignoredElements :: P.ignoreCompound (P.bottomElement 1) :~: 7
+ignoredElements = Refl
+
 main :: IO ()
 main = print (show ([[1, 2], []] :: [[Natural]]), show (P.alternatives 2))

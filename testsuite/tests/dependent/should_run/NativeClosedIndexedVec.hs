@@ -29,6 +29,9 @@ empty = Refl
 one :: E.someVec 3 :~: 'E.SomeVec ('E.SS 'E.SZ) ('V.VCons 3 'V.VNil)
 one = Refl
 
+two :: E.someVec 4 :~: 'E.SomeVec ('E.SS ('E.SS 'E.SZ)) ('V.VCons 4 ('V.VCons 5 'V.VNil))
+two = Refl
+
 computed :: E.readSomeVec (E.someVec 4) :~: '[4, 5]
 computed = Refl
 
@@ -37,6 +40,6 @@ fare :: R.ticket 4 :~: 'R.Ticket ('R.OnWay 'R.AtHome) ('R.Change ('R.Paid 4) 5)
 fare = Refl
 
 main :: IO ()
-main = case (cells, first, both, pair, writtenExistential, empty, one, computed, fare) of
-  (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl) ->
+main = case (cells, first, both, pair, writtenExistential, empty, one, two, computed, fare) of
+  (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl) ->
     print (V.safeHead (V.two 3), V.readTwo (V.two 3))

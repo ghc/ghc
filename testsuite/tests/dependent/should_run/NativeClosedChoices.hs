@@ -35,6 +35,12 @@ alternatives = (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)
 ownEither :: P.ownEither 8 :~: 'P.First 8
 ownEither = Refl
 
+ignoredField :: Data.Maybe.isNothing (P.badJust 0) :~: 'False
+ignoredField = Refl
+
+ignoredUnsupported :: P.ignoreUnsupported (P.unsupported 0) :~: 19
+ignoredUnsupported = Refl
+
 main :: IO ()
 main = case (optional, alternatives) of
     ((Refl, Refl, Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)) ->

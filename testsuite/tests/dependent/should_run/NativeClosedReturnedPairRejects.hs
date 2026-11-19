@@ -19,8 +19,10 @@ instance {-# OVERLAPPING #-} Show (Natural, Natural) where
 bad :: Prelude.quotRem 17 5 :~: '(2, 3)
 bad = Refl
 #elif defined(BOTTOM_FIELD)
-bad :: P.ignorePair (P.bottomField 1) :~: 7
-bad = Refl
+import Data.Proxy (Proxy(..))
+
+bad :: Proxy (P.bottomField 1)
+bad = Proxy
 #elif defined(WRONG_KIND)
 bad :: P.ignorePair (P.wrongKind 1) :~: 7
 bad = Refl

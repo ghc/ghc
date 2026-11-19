@@ -154,6 +154,10 @@ test('NativeClosedEnumKind',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedEnumA.hs', '../should_run/NativeClosedEnumB.hs'])],
      multimod_compile_fail, ['NativeClosedEnumKind', '-v0 ' + config.ghc_th_way_flags])
+for name in ['NativeClosedLazyParcelDemand', 'NativeClosedLazyParcelEscape', 'NativeClosedLazyParcelKind']:
+    test(name, [req_interp, req_rts_linker, only_ways(['normal']),
+                extra_files(['../../../../docs/dependent-haskell/examples/closed-evaluation/LazyParcel.hs'])],
+         multimod_compile_fail, [name, '-v0 ' + config.ghc_th_way_flags])
 for name in ['NativeClosedPresentBottom', 'NativeClosedUnsupportedAlternative', 'NativeClosedOtherEither']:
     test(name, [req_interp, req_rts_linker, only_ways(['normal']),
                 extra_files(['../should_run/NativeClosedChoiceLib.hs'])],

@@ -90,7 +90,7 @@ import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourcePairCaseKindUse, isSourcePairCase, sourceTableOwner)
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Iface.Env (lookupOrig)
@@ -2419,8 +2419,9 @@ tc_app_ty mode rn_ty exp_kind
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
-                         -> do { (result_kind, run) <- tcPlanOrdinaryCall mode ordinary_call fun args
+                         -> do { (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call fun args
                                ; checkClosedCallExpectedKind rn_ty exp_kind result_kind
+                               ; run <- prepareClosedCallResult result_kind plan
                                ; result <- run
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
@@ -2446,8 +2447,9 @@ tc_app_ty mode rn_ty exp_kind
        ; case executable of
            Nothing -> tc_app_ty_generic mode rn_ty exp_kind
            Just owner -> setSrcSpanA loc $
-             do { (kind, run) <- tcPlanOrdinaryCall mode ordinary_call owner [arg]
+             do { (kind, plan) <- tcPlanOrdinaryCall mode ordinary_call owner [arg]
                 ; checkClosedCallExpectedKind rn_ty exp_kind kind
+                ; run <- prepareClosedCallResult kind plan
                 ; result <- run
                 ; checkExpKind mode rn_ty result kind exp_kind } }
   where
@@ -2627,9 +2629,34 @@ tcClosedCallKinds name fun_ty arg operand
     unsupported :: TcM a
     unsupported = failWithTc (TcRnNoSourceTable name)
 
+-- | An ordinary application can remain Core until its result is observed.
+-- See Note [Closed source calls].
+data ClosedCallValue
+  = OrdinaryClosedCall SrcSpan Name (TcM Core.CoreExpr)
+  | ClosedFamilyValue (TcM Type)
+
+-- | Prepare the outer observation before running any checked-family operand.
+prepareClosedCallResult :: Kind -> ClosedCallValue -> TcM (TcM Type)
+prepareClosedCallResult kind (OrdinaryClosedCall loc name expression) = setSrcSpan loc $ do
+  reify <- tcPrepareClosedResult name kind
+  return (expression >>= reify)
+prepareClosedCallResult _ (ClosedFamilyValue action) = return action
+
+-- | Keep an ordinary operand in Core. Demote a family result at its source span.
+closedCallRuntimeOperand :: Name -> LHsType GhcRn -> ClosedCallValue -> TcM Core.CoreExpr
+closedCallRuntimeOperand _ _ (OrdinaryClosedCall _ _ expression) = expression
+closedCallRuntimeOperand name arg (ClosedFamilyValue action) = do
+  checked <- action
+  setSrcSpanA (getLoc arg) $ do
+    value <- tcDecodeClosedCallOperand name checked
+    case value of
+      Just argument -> return argument
+      Nothing -> failWithTc (TcRnClosedTypeEval name
+        "The checked operand does not represent a supported closed value.")
+
 -- | Check the kind and evidence before running a unary chain.
 -- See Note [Closed source calls].
-tcPlanClosedCall :: TcTyMode -> Bool -> Id -> LHsType GhcRn -> TcM (Kind, TcM Type)
+tcPlanClosedCall :: TcTyMode -> Bool -> Id -> LHsType GhcRn -> TcM (Kind, ClosedCallValue)
 tcPlanClosedCall mode ordinary_call fun arg = do
   loc <- getSrcSpanM
   let name = getName fun
@@ -2640,15 +2667,7 @@ tcPlanClosedCall mode ordinary_call fun arg = do
       (child_kind, run_child) <-
         setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call child_rdr child_name child_arg)
       (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg (ComputedClosedOperand child_kind)
-      let get_operand = do
-            checked <- run_child
-            value <- setSrcSpanA (getLoc arg) (tcDecodeClosedCallOperand name checked)
-            case value of
-              Just argument -> return argument
-              Nothing -> setSrcSpanA (getLoc arg) $
-                failWithTc (TcRnClosedTypeEval name
-                  "The checked operand does not represent a supported closed value.")
-      return (domain, result_kind, get_operand)
+      return (domain, result_kind, closedCallRuntimeOperand name arg run_child)
     Nothing -> do
       let literal_kind = closedCallLiteralKind arg
       unless (ordinary_call || isJust literal_kind) $
@@ -2657,11 +2676,11 @@ tcPlanClosedCall mode ordinary_call fun arg = do
                                (SourceClosedOperand literal_kind)
       argument <- tcClosedTypeCallArgument mode name domain arg
       return (domain, result_kind, return argument)
-  run <- tcPrepareClosedCall fun [domain] result_kind
-  return (result_kind, setSrcSpan loc (operand >>= run . (:[])))
+  apply <- tcPrepareClosedApplication fun [domain] result_kind
+  return (result_kind, OrdinaryClosedCall loc name (operand >>= apply . (:[])))
 
 -- | Prepare a source call without evaluating its operands.
-tcPlanOrdinaryCall :: TcTyMode -> Bool -> Id -> [LHsType GhcRn] -> TcM (Kind, TcM Type)
+tcPlanOrdinaryCall :: TcTyMode -> Bool -> Id -> [LHsType GhcRn] -> TcM (Kind, ClosedCallValue)
 tcPlanOrdinaryCall mode ordinary fun args
   | not (equalLength domains args) = do
       checkCompleteClosedCall mode name
@@ -2700,8 +2719,8 @@ tcPlanOrdinaryCall mode ordinary fun args
                   Subst.substTy subst rho `tcEqType` foldr mkVisFunTyManyU result inputs) $
             bad "The call must have a fully instantiated ordinary function type."
           actions <- zipWithM prepare_runtime inputs (zip args operands)
-          run <- tcPrepareClosedCall fun inputs result
-          return (result, setSrcSpan loc (sequence actions >>= run))
+          apply <- tcPrepareClosedApplication fun inputs result
+          return (result, OrdinaryClosedCall loc name (sequence actions >>= apply))
     name = getName fun
     (_, binders, rho) = splitInvisPiTys (varType fun)
     tvs = mapMaybe namedPiTyBinder_maybe binders
@@ -2773,8 +2792,8 @@ tcPlanOrdinaryCall mode ordinary fun args
               all (\ty -> ground ty && isJust (getClassPredTys_maybe ty)) constraints) $
         bad "The call must have a fully instantiated ordinary function type."
       actions <- zipWithM prepare_joint_runtime inputs (zip args checked)
-      run <- tcPrepareClosedCall fun inputs result
-      return (result, setSrcSpan loc (sequence actions >>= run))
+      apply <- tcPrepareClosedApplication fun inputs result
+      return (result, OrdinaryClosedCall loc name (sequence actions >>= apply))
 
     prepare_joint arg
       | Just (child_loc, child_rdr, child_name, child_args) <- nestedClosedCall arg =
@@ -2812,7 +2831,7 @@ tcPlanOrdinaryCall mode ordinary fun args
         checked_kind <- liftZonkM (zonkTcType kind)
         unless (checked_kind `tcEqType` domain) $
           bad "The checked operand does not have the declared closed kind."
-        return (run >>= setSrcSpanA (getLoc arg) . decode_joint)
+        return (closedCallRuntimeOperand name arg run)
       where
         decode_joint checked = do
           value <- tcDecodeClosedCallOperand name checked
@@ -2841,13 +2860,8 @@ tcPlanOrdinaryCall mode ordinary fun args
         priority candidates | isJust (lookupNatural candidates) = 2
                             | otherwise = 3
 
-    prepare_runtime _ (arg, Right (_, Just run)) = return $ do
-      checked <- run
-      value <- setSrcSpanA (getLoc arg) (tcDecodeClosedCallOperand name checked)
-      case value of
-        Just argument -> return argument
-        Nothing -> setSrcSpanA (getLoc arg) $
-          bad "The checked operand does not represent a supported closed value."
+    prepare_runtime _ (arg, Right (_, Just run)) =
+      return (closedCallRuntimeOperand name arg run)
     prepare_runtime kind (arg, _) = return <$> tcClosedTypeCallArgument mode name kind arg
 
 -- | Check a known enclosing kind before executing a staged call.
@@ -2861,14 +2875,16 @@ checkClosedCallExpectedKind rn_ty (Check expected) actual = do
 checkClosedCallExpectedKind _ (Infer _) _ = return ()
 
 -- | Prepare an already resolved nested occurrence.
-tcPlanClosedHead :: TcTyMode -> Bool -> RdrName -> Name -> [LHsType GhcRn] -> TcM (Kind, TcM Type)
+tcPlanClosedHead :: TcTyMode -> Bool -> RdrName -> Name -> [LHsType GhcRn] -> TcM (Kind, ClosedCallValue)
 tcPlanClosedHead mode ordinary_call rdr name args
   | [arg] <- args
   , isSourceFamilyName name = do
       executable <- tcClosedPairExecutableOwner rdr name arg
       case executable of
         Just owner -> tcPlanOrdinaryCall mode ordinary_call owner [arg]
-        Nothing -> tcPlanSourceFamilyCall mode ordinary_call name arg
+        Nothing -> do
+          (kind, run) <- tcPlanSourceFamilyCall mode ordinary_call name arg
+          return (kind, ClosedFamilyValue run)
   | otherwise = do
       env <- getGblEnv
       when (nameIsLocalOrFrom (tcg_semantic_mod env) name) $
@@ -2983,8 +2999,9 @@ tcPlanSourceFamilyCall mode ordinary_call name arg = do
                      ++ showPpr dflags domain ++ " and " ++ showPpr dflags result ++ ".")
   (kind_args, input_kind, result_kind, run_arg) <- case nestedClosedCall arg of
     Just (child_loc, child_rdr, child_name, child_args) -> do
-      (kind, run) <- setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call child_rdr child_name child_args)
+      (kind, plan) <- setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call child_rdr child_name child_args)
       (kinds, checked_domain, checked_result) <- specialize kind
+      run <- prepareClosedCallResult kind plan
       return (kinds, checked_domain, checked_result, run)
     Nothing -> do
       let literal_kind = if null ty_params then closedCallLiteralKind else familyLiteralKind
@@ -3136,11 +3153,18 @@ If that family expects a ground kind for an ordinary call, check that kind
 before running the call. This leaves pure and rigid family applications
 on the normal checking path.
 
-Each prepared call returns its result kind and an action. The action runs
-the operand calls once in source order and uses their promoted results to
-build the outer runtime operands. Then apply the prepared function once. Save each function's
-source span so errors during execution point to the call that failed. The expected result kind of the
-outer call does not affect either specialization.
+Compose adjacent ordinary applications as one typed Core expression. For
+example, first (make 7) can select one field of a private datatype while
+the other field contains bottom. Rendering the complete intermediate
+value would force that unused field. A checked family needs a Type
+argument, so its boundary still requires readback. Check constructor
+visibility wherever a value must be returned to the typechecker.
+
+Check each application's inputs at their own spans. Run the composed
+expression at the span of its outer observation. An exception raised by
+a thunk need not come from the function that returned that thunk.
+The expected result kind of the outer call does not select an operand's
+specialization.
 
 A partial signature can use this path when the chain ends in a literal.
 A call on a signature wildcard continues to use the inference retry path.

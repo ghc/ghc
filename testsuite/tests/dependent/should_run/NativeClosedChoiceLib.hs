@@ -25,6 +25,10 @@ badJust _ = Just (errorWithoutStackTrace "forced the present field")
 unsupported :: Natural -> E.Either Natural Int
 unsupported _ = errorWithoutStackTrace "ran an unsupported result"
 
+-- | Return a value without observing the argument.
+ignoreUnsupported :: E.Either Natural Int -> Natural
+ignoreUnsupported _ = 19
+
 -- | An ordinary datatype with the same type name as the library datatype.
 data Either a b = First a | Second b
 

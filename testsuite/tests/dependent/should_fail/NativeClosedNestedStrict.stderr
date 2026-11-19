@@ -1,8 +1,8 @@
-NativeClosedNestedStrict.hs:8:57: error: [GHC-70565]
-    • Cannot evaluate ‘Lib.badElement’ in a type.
+NativeClosedNestedStrict.hs:8:8: error: [GHC-70565]
+    • Cannot evaluate ‘sum’ in a type.
         list codec forced the second element
     • In the first argument of ‘(:~:)’, namely
-        ‘Lib.empty (Prelude.const (Prelude.reverse '[1]) (Lib.badElement '[1]))’
+        ‘Prelude.sum (Prelude.const (Lib.badElement '[1]) (Prelude.reverse '[1]))’
       In the type signature:
-        bad :: Lib.empty (Prelude.const (Prelude.reverse '[1]) (Lib.badElement '[1]))
-               :~: '[]
+        bad :: Prelude.sum (Prelude.const (Lib.badElement '[1]) (Prelude.reverse '[1]))
+               :~: 0

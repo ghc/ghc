@@ -1,0 +1,5 @@
+NativeClosedLazyParcelEscape.hs:6:15: error: [GHC-70565]
+    • Cannot evaluate ‘P.make’ in a type.
+        Cannot inspect the constructors of P.Parcel. To evaluate an algebraic datatype in a type, bring every constructor into scope from a non-SOURCE import.
+    • In the first argument of ‘Proxy’, namely ‘(P.make 7)’
+      In the type signature: bad :: Proxy (P.make 7)

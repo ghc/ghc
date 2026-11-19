@@ -68,6 +68,9 @@ saturated :: ( Prelude.gcd 18 24 :~: 6
              , Lib.sameList '[] '[ 'True] :~: 'False )
 saturated = (Refl, Refl, Refl)
 
+ignoredNested :: Lib.empty (Prelude.const (Prelude.reverse '[1]) (Lib.badElement '[1])) :~: '[]
+ignoredNested = Refl
+
 main :: IO ()
 main = case (reversed, emptyInput, emptyResult, bools, emptyBools, chars) of
     (Refl, Refl, Refl, Refl, Refl, Refl)

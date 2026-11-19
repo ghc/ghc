@@ -1,0 +1,4 @@
+NativeClosedLazyParcelDemand.hs:6:15: error: [GHC-70565]
+    • Cannot evaluate ‘P.second’ in a type. unused second parcel field
+    • In the first argument of ‘Proxy’, namely ‘(P.second (P.make 7))’
+      In the type signature: bad :: Proxy (P.second (P.make 7))

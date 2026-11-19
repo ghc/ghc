@@ -28,5 +28,8 @@ joint = Refl
 dependency :: P.pair 3 :~: '(4, 3)
 dependency = Refl
 
+ignoredPair :: P.ignorePair (P.bottomField 1) :~: 7
+ignoredPair = Refl
+
 main :: IO ()
 main = putStrLn (show ((3, 2) :: (Natural, Natural)))
