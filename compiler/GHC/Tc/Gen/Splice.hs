@@ -79,7 +79,7 @@ import GHC.Core.InstEnv as InstEnv
 import GHC.Core.Utils (exprType)
 
 import GHC.Builtin.TH
-import GHC.Builtin.Modules (mkGhcInternalModule)
+import GHC.Builtin.Modules (gHC_INTERNAL_BASE, gHC_TYPES, mkGhcInternalModule)
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs (eitherTyConOcc, returnIOIdOcc, toAnnotationWrapperIdOcc)
 import GHC.Builtin.WiredIn.Types
@@ -89,6 +89,7 @@ import GHC.HsToCore.Docs
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
 import GHC.Iface.Load
+import GHC.Iface.Env (lookupOrig)
 
 import GHCi.Message
 import GHCi.RemoteTypes
@@ -1437,8 +1438,8 @@ tcPrepareClosedCall fun domains result_kind = do
     bad "The closed call does not have the expected ordinary function type."
 
   render <- closedCallRenderer name shape
-  ret_id <- tcLookupKnownOccId returnIOIdOcc
-  io_tc <- tcLookupKnownKeyTyCon ioTyConKey
+  ret_id <- lookupOrig gHC_INTERNAL_BASE returnIOIdOcc >>= tcLookupId
+  io_tc <- lookupOrig gHC_TYPES ioTyConOcc >>= tcLookupTyCon
   let ret = mkCoreApp (Core.Var ret_id) (Core.Type stringTy)
       io_string = mkTyConApp io_tc [stringTy]
   unless (exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
@@ -1473,7 +1474,8 @@ tcPrepareClosedCall fun domains result_kind = do
 -- | Build the renderer before any nested operand executes.
 closedCallRenderer :: Name -> ClosedCallShape -> TcM (Core.CoreExpr -> Core.CoreExpr)
 closedCallRenderer name shape = do
-  show_class <- tcLookupKnownKeyClass showClassKey
+  show_class <- lookupOrig (mkGhcInternalModule (fsLit "GHC.Internal.Show"))
+                           (mkTcOcc "Show") >>= tcLookupClass
   inst_env <- tcGetInstEnvs
   let empty_string = mkListExpr charTy []
       show_s = mkVisFunTyManyU stringTy stringTy
@@ -1628,6 +1630,11 @@ built-in Show instance for the scalar type and returnIO to construct an
 IO String for evalString. If the result is a list, use the showList method
 of the element dictionary. Do not select a Show instance for the list.
 A user-defined overlapping list instance could encode a different value.
+The interpreter expects the target library's IO String. Resolve its IO,
+returnIO and Show by their defining modules. A client can rebind the
+names used for its own code. Those names do not determine this response.
+Resolve the producer's own constraints in the client as usual.
+
 The interpreter forces the string before it returns it. The compiler
 checks the canonical form before it constructs a literal or promoted
 constructor. A checked result can also be the operand of a nested call.
