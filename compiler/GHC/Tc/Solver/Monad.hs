@@ -128,7 +128,7 @@ import GHC.Driver.Env
 import qualified GHC.Tc.Utils.Instantiate as TcM
 import GHC.Core.InstEnv
 import GHC.Tc.Instance.Family as FamInst
-import GHC.Tc.Gen.SourceTable (sourceTableFamilyUse)
+import GHC.Tc.Gen.SourceTable (sourceTableFamilyAppUse)
 import GHC.Core.FamInstEnv
 
 import qualified GHC.Tc.Utils.Monad    as TcM
@@ -2334,7 +2334,7 @@ matchFamTcM tycon args
        ; let match_fam_result
               = reduceTyFamApp_maybe fam_envs Nominal tycon args
        ; case match_fam_result of
-           Just _ -> sourceTableFamilyUse tycon
+           Just _ -> sourceTableFamilyAppUse tycon args
            Nothing -> return ()
        ; TcM.traceTc "matchFamTcM" $
          vcat [ text "Matching:" <+> ppr (mkTyConApp tycon args)

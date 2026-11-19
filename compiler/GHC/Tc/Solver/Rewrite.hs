@@ -43,7 +43,7 @@ import GHC.Driver.Config.Core.Lint( initLintConfig )
 import GHC.Driver.DynFlags
 import GHC.Tc.Utils.Monad (rewriterTcMPlugins)
 import qualified GHC.Tc.Utils.Monad as TcM
-import GHC.Tc.Gen.SourceTable (sourceTableFamilyUse)
+import GHC.Tc.Gen.SourceTable (sourceTableFamilyAppUse)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
@@ -1905,7 +1905,7 @@ try_to_reduce tc tys tc_rewriters
              record_deps mb_redn
                | Just redn <- mb_redn
                = do { wrapTcS $ TcM.setCtLocM (re_loc rewrite_env) $
-                        sourceTableFamilyUse tc
+                        sourceTableFamilyAppUse tc tys
                     ; updTcRef (re_used_cos rewrite_env)
                         ( `addUnivCoDep` reductionCoercion redn )
                     ; return mb_redn }

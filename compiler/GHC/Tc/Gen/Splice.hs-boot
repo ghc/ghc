@@ -50,6 +50,7 @@ runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 finishTH :: TcM ()
 tcDecodeClosedCallOperand :: Type -> TcM (Maybe CoreExpr)
 
+tcHasClosedCallExecutable :: Name -> TcM Bool
 tcCheckClosedCallContext :: Name -> TcM ()
 tcPreflightClosedCall :: Name -> TcM ()
 

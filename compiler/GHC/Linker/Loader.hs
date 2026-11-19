@@ -34,6 +34,7 @@ module GHC.Linker.Loader
    , rmDupLinkables
    , modifyLoaderState
    , initLinkDepsOpts
+   , executableDependenciesAvailable
    , getGccSearchDirectory
    , mkDynLoadLib
    , loadMoreUnits
@@ -205,6 +206,38 @@ emptyLoaderState unit_env = LoaderState
                      in foldr addToUDFM' emptyUDFM $ [
                        pkg_to_dfm rtsUnitId
                      ] ++ fmap pkg_to_dfm deps
+
+-- | Plan the same dependencies as the interpreter, without loading code.
+-- Check for concrete libraries. A system DLL with no resolved path cannot
+-- establish that this staged type call has an executable dependency.
+executableDependenciesAvailable :: Interp -> HscEnv -> SrcSpan -> Module -> IO Bool
+executableDependenciesAvailable interp hsc_env span mod = do
+  pls <- fromMaybe (emptyLoaderState (hsc_unit_env hsc_env)) <$> getLoaderState interp
+  plan <- getLinkDepsIfAvailable (initLinkDepsOpts hsc_env) interp pls span [mod]
+  case plan of
+    Nothing -> pure False
+    Just units -> do
+      (packages, _) <- loadMoreUnits hsc_env units (pkgs_loaded pls)
+      registered <- allM (concreteLibraries []) packages
+      if registered
+        then pure True
+        else do
+          let dflags = hsc_dflags hsc_env
+          paths <- getGCCPaths (hsc_logger hsc_env) (targetPlatform dflags) (configureLd dflags)
+          allM (concreteLibraries paths) packages
+  where
+    concreteLibraries gcc_paths pkg
+      | [] <- libraries = pure (unitId pkg /= moduleUnitId mod)
+      | otherwise = do
+          dirs <- addEnvPaths "LIBRARY_PATH" (libraryDirsForWay' (interpreterDynamic interp) pkg)
+          let bytecode_dirs = map ST.unpack (Packages.unitLibraryBytecodeDirs pkg)
+              find_lib = locateLibWithWarning False interp hsc_env True bytecode_dirs dirs gcc_paths
+          allM (fmap concrete . find_lib) libraries
+      where
+        libraries = map ST.unpack (Packages.unitLibraries pkg)
+
+    concrete DLL{} = False
+    concrete _ = True
 
 extendLoadedEnv :: Interp -> BytecodeLoaderStateModifier -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp modify_bytecode_loader_state new_bindings =
@@ -652,26 +685,26 @@ initLinkDepsOpts hsc_env = opts
             , ldMsgOpts     = initIfaceMessageOpts dflags
             , ldWays        = ways dflags
             , ldGetDependencies = get_reachable_nodes hsc_env
-            , ldLoadByteCode
+            , ldFindByteCode
             }
     dflags = hsc_dflags hsc_env
 
-    ldLoadByteCode mod locn = do
-      bytecode_linkable <-  findBytecodeLinkableMaybe hsc_env locn
+    ldFindByteCode mod locn = do
+      bytecode_linkable <- findBytecodeLinkableMaybe hsc_env locn
       case bytecode_linkable of
         Nothing -> findWholeCoreBindings hsc_env mod
         Just bco -> return (Just bco)
 
-findWholeCoreBindings :: HscEnv -> Module -> IO (Maybe Linkable)
+findWholeCoreBindings :: HscEnv -> Module -> IO (Maybe (IO Linkable))
 findWholeCoreBindings hsc_env mod = do
       _ <- initIfaceLoad hsc_env $
              loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
                  mod ImportBySystem
       EPS {eps_iface_bytecode} <- hscEPS hsc_env
-      sequence (lookupModuleEnv eps_iface_bytecode mod)
+      pure (lookupModuleEnv eps_iface_bytecode mod)
 
 
-findBytecodeLinkableMaybe :: HscEnv -> ModLocation -> IO (Maybe Linkable)
+findBytecodeLinkableMaybe :: HscEnv -> ModLocation -> IO (Maybe (IO Linkable))
 findBytecodeLinkableMaybe hsc_env locn = do
   let bytecode_fn    = ml_bytecode_file locn
       bytecode_fn_os = ml_bytecode_file_ospath locn
@@ -679,8 +712,12 @@ findBytecodeLinkableMaybe hsc_env locn = do
   case maybe_bytecode_time of
     Nothing -> return Nothing
     Just bytecode_time -> do
-      bco <- readBinByteCode hsc_env bytecode_fn
-      return $ Just $ mkModuleByteCodeLinkable bytecode_time bco
+      on_disk <- readOnDiskModuleByteCode hsc_env bytecode_fn
+      -- The serialized foreign object bytes travel with the .gbc.
+      -- Leave unpacking them to the actual load, along with bytecode.
+      return $ Just $ do
+        bco <- decodeOnDiskModuleByteCode hsc_env on_disk
+        pure (mkModuleByteCodeLinkable bytecode_time bco)
 
 get_reachable_nodes :: HscEnv -> [Module] -> IO ([Module], UniqDSet UnitId)
 get_reachable_nodes hsc_env mods
@@ -1508,7 +1545,12 @@ locateLib
   -> [FilePath]
   -> String
   -> IO LibrarySpec
-locateLib interp hsc_env is_hs bc_dirs lib_dirs gcc_dirs lib0
+locateLib = locateLibWithWarning True
+
+locateLibWithWarning
+  :: Bool -> Interp -> HscEnv -> Bool -> [FilePath] -> [FilePath] -> [FilePath]
+  -> String -> IO LibrarySpec
+locateLibWithWarning warn_missing interp hsc_env is_hs bc_dirs lib_dirs gcc_dirs lib0
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
     --   first look in library-dirs for a dynamic library (on User paths only)
@@ -1675,7 +1717,8 @@ locateLib interp hsc_env is_hs bc_dirs lib_dirs gcc_dirs lib0
      -- But only for haskell libraries, as C libraries don't have a
      -- profiling/non-profiling distinction to begin with.
      assumeDll
-      | is_hs
+      | warn_missing
+      , is_hs
       , not loading_dynamic_hs_libs
       , interpreterProfiled interp
       = do

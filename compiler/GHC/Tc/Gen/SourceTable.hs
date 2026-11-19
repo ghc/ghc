@@ -1,6 +1,7 @@
 -- | Closed type families for checked functions that match one constructor.
 module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
+                              sourceTableFamilyAppUse, sourcePairProjectionKindUse, isSourcePairProjection, sourceTableOwner,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
@@ -10,7 +11,7 @@ import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
-import GHC.Builtin.WiredIn.Types (charTy, charTyCon, integerTy, integerTyConName, listTyCon, mkListTy, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (charTy, charTyCon, integerTy, integerTyConName, listTyCon, liftedTypeKind, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import qualified GHC.Core as Core
 import GHC.Core.CharCase (certOwner, certRows, certify)
@@ -26,6 +27,7 @@ import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCo.FVs (tyConsOfTypes)
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.Utils (exprType)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
 import GHC.Data.OrdList (fromOL)
@@ -48,7 +50,7 @@ import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBi
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
-import GHC.Types.Basic (Origin(..))
+import GHC.Types.Basic (Boxity(Boxed), Origin(..))
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
@@ -75,8 +77,9 @@ import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet)
-import GHC.Types.Var (Id, CoVar, VarBndr(..), mkTyVar, varName)
+import GHC.Types.Var (Id, CoVar, ForAllTyBinder, ForAllTyFlag(Invisible), VarBndr(..), isId, isTyVar, mkTyVar, varName, varType)
 import GHC.Types.Var.Set (elemVarSet)
+import GHC.Utils.Misc (lengthIs)
 import GHC.Utils.Monad (allM)
 import GHC.Utils.Outputable (text)
 
@@ -103,7 +106,11 @@ sourceTableOccurrence env actual
 -- | Resolve a checked source call through the defining term's identity.
 -- See Note [Source table Ids].
 tcLookupSourceTableId :: Id -> TcM (Maybe Id)
-tcLookupSourceTableId actual = do
+tcLookupSourceTableId = tcLookupSourceTableIdAt Nothing
+
+-- | Filter only the exact root owner at a checked specialization.
+tcLookupSourceTableIdAt :: Maybe Name -> Id -> TcM (Maybe Id)
+tcLookupSourceTableIdAt first actual = do
     env <- getGblEnv
     case sourceTableOccurrence env actual of
       Just fun | Just table <- sourceTableId_maybe fun -> do
@@ -111,7 +118,7 @@ tcLookupSourceTableId actual = do
         case dependencies of
           Nothing -> return Nothing
           Just callees -> do
-            recordSourceUses [(v, Nothing) | v <- fun : callees]
+            recordSourceUses ((fun, first) : [(v, Nothing) | v <- callees])
             forM_ (fun : callees) $ \owner ->
               when (nameModule_maybe (idName owner) == Just (tcg_semantic_mod env)) $
                 keepAlive (idName owner)
@@ -187,11 +194,39 @@ sourceTableTypeUses ty = mapM_ sourceTableFamilyUse (sourceFamilyTyCons [ty])
 -- | Check a source family when its axiom supplies type equality evidence.
 -- See Note [Source family evidence uses].
 sourceTableFamilyUse :: TyCon -> TcM ()
-sourceTableFamilyUse table
+sourceTableFamilyUse table = sourceTableFamilyUseAt table Nothing
+
+-- | Record evidence use at an application, including cache and plugin reductions.
+sourceTableFamilyAppUse :: TyCon -> [Type] -> TcM ()
+sourceTableFamilyAppUse table args
+  | isSourcePairProjection table, lengthIs args (tyConArity table) = do
+      checked <- liftZonkM (zonkTcTypes args)
+      sourceTableFamilyUseAt table (groundFirstHead checked)
+  | otherwise = sourceTableFamilyUse table
+
+-- | Check the specialized kinds in a closed pair plan before running its operand.
+sourcePairProjectionKindUse :: TyCon -> [Kind] -> TcM ()
+sourcePairProjectionKindUse table kinds
+  | isSourcePairProjection table, lengthIs kinds (tyConArity table - 1)
+  = sourceTableFamilyUseAt table (groundFirstHead kinds)
+  | otherwise = sourceTableFamilyUse table
+
+-- | A ground, family-free first type argument can disprove a rough rule match.
+groundFirstHead :: [Type] -> Maybe Name
+groundFirstHead args@(first : _)
+  | all noFreeVarsOfType args, all isTyFamFree args
+  , Just (tc, _) <- tcSplitTyConApp_maybe first
+  , isGenerativeTyCon tc Nominal
+  = Just (tyConName tc)
+groundFirstHead _ = Nothing
+
+-- | Check the exact owner and record its dependency with the available precision.
+sourceTableFamilyUseAt :: TyCon -> Maybe Name -> TcM ()
+sourceTableFamilyUseAt table first
   | isNothing (sourceTableTermOcc (nameOccName (tyConName table))) = pure ()
   | otherwise = do
       owner <- sourceTableOwner table
-      checked <- maybe (pure Nothing) tcLookupSourceTableId owner
+      checked <- maybe (pure Nothing) (tcLookupSourceTableIdAt first) owner
       when (isNothing checked) $ do
         -- See Note [Legacy private source leaves].
         absent <- importedSourceOwnerAbsent table
@@ -258,7 +293,10 @@ hasSourceMethodRuleAt :: RuleEnv -> Maybe Name -> Id -> Bool
 hasSourceMethodRuleAt rules first fun = any user_rule (getRules rules (globaliseId fun))
   where
     user_rule BuiltinRule{} = False
-    user_rule Rule{ru_rough = Just other : _} | Just actual <- first, actual /= other = False
+    user_rule Rule{ru_rough = Just other : _, ru_args = Core.Type ty : _}
+      | Just actual <- first, actual /= other
+      , Just (tc, _) <- tcSplitTyConApp_maybe ty
+      , tyConName tc == other, isGenerativeTyCon tc Nominal = False
     user_rule rule = not (isAutoRule rule || isNeverActive (ruleActivation rule))
 
 -- | Check the selected method at the occurrence, and record its semantic dependencies.
@@ -695,7 +733,7 @@ sourceTableTyCons binds = do
       else pure Nothing
 
 -- | Publish a checked Char worker or imported forwarding alias only after its final bindings are zonked.
--- See Note [Checked Char cases].
+-- See Note [Checked Char cases] and Note [Checked pair projections].
 sourceCharTables :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
 sourceCharTables binds = do
   env <- getGblEnv
@@ -704,7 +742,7 @@ sourceCharTables binds = do
       eligible owner =
         idName owner `elemNameSet` exported &&
         not (idName owner `elemNameSet` ruled) &&
-        varType owner `eqType` charArrow
+        (varType owner `eqType` charArrow || not (isNothing (pairProjectionType (varType owner))))
       candidates = [ (bind, owner) | bind <- binds
                    , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
                    , eligible owner ]
@@ -725,8 +763,10 @@ sourceCharTables binds = do
         Just core | not (errorsFound messages)
           , [rhs] <- [expr | (ident, expr) <- fromOL core, idName ident == idName owner] ->
             case rhs of
-              Core.Var target -> forwarding env owner target
-              _ | Right certificate <- certify owner rhs
+              Core.Var target | varType owner `eqType` charArrow -> forwarding env owner target
+              _ | Just projection <- checkedPairProjection owner rhs ->
+                    Just . (owner,) <$> publishPairProjection owner projection
+                | Right certificate <- certify owner rhs
                 , certOwner certificate == idName owner ->
                     publish owner (certRows certificate) id
                 | otherwise -> pure Nothing
@@ -790,6 +830,107 @@ before publishing. The default equation references the target family, so
 the usual dependency walk checks the same chain where the solver uses it.
 The new table belongs to the alias. Re-exporting the target keeps its
 original name and requires no forwarding table.
+-}
+
+-- | Identify the private telescope that only the direct pair certificate emits.
+isSourcePairProjection :: TyCon -> Bool
+isSourcePairProjection table =
+    not (isNothing (sourceTableTermOcc (nameOccName (tyConName table)))) &&
+    not (isNothing (pairProjectionType (tyConKind table)))
+
+-- | Identify the two field parameters and result parameter of a boxed projection.
+pairProjectionType :: Type -> Maybe ([ForAllTyBinder], TyVar, TyVar, TyVar)
+pairProjectionType tau = do
+    let (telescope, body) = splitForAllForAllTyBinders tau
+    binders <- traverse liftedBinder telescope
+    (FTF_T_T, ma, mult, domain, result) <- splitFunTy_maybe body
+    guard (ma `eqType` unmatchableDataConTy && isManyTy mult)
+    (tuple, [first, second]) <- splitTyConApp_maybe domain
+    guard (tuple == tupleTyCon Boxed 2)
+    x <- getTyVar_maybe first
+    y <- getTyVar_maybe second
+    r <- getTyVar_maybe result
+    guard (r == x || r == y)
+    let parameters = [v | Bndr v _ <- binders]
+    guard (x `elem` parameters && y `elem` parameters)
+    guard (all (\v -> v == x || v == y) parameters)
+    pure (binders, x, y, r)
+  where
+    liftedBinder (_, binder@(Bndr v (Invisible _)))
+      | isTyVar v, varType v `eqType` liftedTypeKind = Just binder
+    liftedBinder _ = Nothing
+
+-- | The original kind-parameter order and which pair field the body returns.
+data PairProjection = PairProjection [ForAllTyBinder] TyVar TyVar PairField
+
+-- | The field selected by the checked alternative body.
+data PairField = FirstField | SecondField
+
+-- | Certify a strict pair case whose sole branch returns one lazy field.
+checkedPairProjection :: Id -> Core.CoreExpr -> Maybe PairProjection
+checkedPairProjection owner rhs = do
+    let rhs_type = exprType rhs
+    guard (rhs_type `eqType` varType owner)
+    (binders, x, y, r) <- pairProjectionType rhs_type
+    (owner_binders, x_owner, y_owner, _) <- pairProjectionType (varType owner)
+    let (parameters, rest) = Core.collectBinders rhs
+        (type_args, term_args) = splitAt (length binders) parameters
+    guard (type_args == [v | Bndr v _ <- binders])
+    [pair] <- pure term_args
+    guard (isId pair && varType pair `eqType` mkTyConApp (tupleTyCon Boxed 2) (mkTyVarTys [x,y]))
+    Core.Case (Core.Var scrutinee) case_binder result
+      [Core.Alt (Core.DataAlt con) [first, second] (Core.Var chosen)] <- pure rest
+    guard (scrutinee == pair && varType case_binder `eqType` varType pair)
+    guard (con == tupleDataCon Boxed 2 && first /= second)
+    guard (isId first && isId second)
+    guard (varType first `eqType` mkTyVarTy x && varType second `eqType` mkTyVarTy y)
+    guard (result `eqType` mkTyVarTy r && varType chosen `eqType` result)
+    selected <- if chosen == first then Just FirstField
+                else if chosen == second then Just SecondField
+                else Nothing
+    pure (PairProjection owner_binders x_owner y_owner selected)
+
+-- | Publish the single constructor equation certified by the ordinary pair case.
+publishPairProjection :: Id -> PairProjection -> TcM TyCon
+publishPairProjection owner (PairProjection telescope first second selected) = do
+    kind_binders <- forM telescope $ \(Bndr variable visibility) -> do
+      name <- newSysName (nameOccName (varName variable))
+      pure (mkNamedTyConBinder visibility (mkTyVar name liftedTypeKind))
+    let quantifiers = [v | Bndr v _ <- kind_binders]
+        source_variables = [v | Bndr v _ <- telescope]
+        instantiate = substTyWith source_variables (mkTyVarTys quantifiers)
+        first_kind = instantiate (mkTyVarTy first)
+        second_kind = instantiate (mkTyVarTy second)
+        select x y = case selected of
+          FirstField -> x
+          SecondField -> y
+    pair <- fresh_var "p" (mkTyConApp (tupleTyCon Boxed 2) [first_kind, second_kind])
+    x <- fresh_var "a" first_kind
+    y <- fresh_var "b" second_kind
+    let binders = kind_binders ++ mkAnonTyConBinders [pair]
+        result = select first_kind second_kind
+        pat = mkTyConApp (promotedTupleDataCon Boxed 2) [first_kind, second_kind, mkTyVarTy x, mkTyVarTy y]
+        args = mkTyVarTys quantifiers ++ [pat]
+        clause_binders = quantifiers ++ [x,y]
+        branch _ = mkCoAxBranch clause_binders [] [] args (select (mkTyVarTy x) (mkTyVarTy y))
+                       (map (const Nominal) clause_binders) (nameSrcSpan (idName owner))
+    makeSourceFamily (idName owner) binders result [branch]
+  where
+    fresh_var occ kind = flip mkTyVar kind <$> newSysName (mkTyVarOcc occ)
+
+{- Note [Checked pair projections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked boxed case can publish one nominal constructor equation.
+The two bound field types become kind parameters in that equation.
+A homogeneous term type shares one kind parameter but still introduces
+two independent fields. Inspect the actual case, not the function name
+or a sample result. Returning the exact alternative binder requires no
+demand of the other field. With a neutral pair the family does not
+choose an alternative and the equality can survive an interface.
+
+The new family domain includes every promoted pair operand that this
+ordinary projection can use in the symbolic open observer. Functions
+whose bodies fail certification retain the ordinary term entry.
 -}
 
 -- | The first constructor pattern, any carried variable, and the checked RHS.
@@ -1029,17 +1170,21 @@ sourceBranch lookup_call input carried_types result (SourceRow loc con pat_args 
 -- | Give the table the representation of a closed, non-injective family.
 makeFamily :: Name -> SourceInput -> [Type] -> TyCon -> [TyCon -> CoAxBranch] -> TcM TyCon
 makeFamily fun input carried_types result branches = do
-    name <- newImplicitBinder fun mkSourceTableOcc
-    ax_name <- newImplicitBinder name mkInstTyCoOcc
     (quantified, domain, _) <- freshInput input
     args <- zipWithM argVar ["x", "y"] (domain : carried_types)
     let binders = mkNamedTyConBinders (Invisible SpecifiedSpec) quantified ++
                   mkAnonTyConBinders args
-        res_kind = mkTyConTy result
-        kind = mkTyConKindWithMatchability unmatchableDataConTy binders res_kind
+    makeSourceFamily fun binders (mkTyConTy result) branches
+  where
+    argVar occ ty = do { n <- newSysName (mkTyVarOcc occ); pure (mkTyVar n ty) }
+
+-- | Build a nominal closed family from an explicit telescope and result kind.
+makeSourceFamily :: Name -> [TyConBinder] -> Kind -> [TyCon -> CoAxBranch] -> TcM TyCon
+makeSourceFamily fun binders res_kind branches = do
+    name <- newImplicitBinder fun mkSourceTableOcc
+    ax_name <- newImplicitBinder name mkInstTyCoOcc
+    let kind = mkTyConKindWithMatchability unmatchableDataConTy binders res_kind
         fam_tc = mkFamilyTyCon name kind binders 0 res_kind Nothing
                    (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
         axiom = mkBranchedCoAxiom Nominal ax_name fam_tc (map ($ fam_tc) branches)
     pure fam_tc
-  where
-    argVar occ ty = do { n <- newSysName (mkTyVarOcc occ); pure (mkTyVar n ty) }

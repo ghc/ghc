@@ -29,7 +29,7 @@ module GHC.Tc.Gen.Splice(
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
      finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedCall
-     , tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand
+     , tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable
       ) where
 
 import GHC.Prelude
@@ -128,6 +128,7 @@ import GHC.Types.Name
 import GHC.Types.Unique.Map
 import GHC.Serialized
 
+import GHC.Linker.Loader (executableDependenciesAvailable)
 import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
@@ -1688,6 +1689,21 @@ checkClosedTypeEvalStage hsc_env name = do
   case hsc_interp hsc_env of
     Just interp -> return interp
     Nothing -> reject "Compile-time evaluation requires a GHC interpreter for the target."
+
+-- | Test the execution route without preflighting, linking, or running code.
+tcHasClosedCallExecutable :: Name -> TcM Bool
+tcHasClosedCallExecutable name = do
+  env <- getTopEnv
+  dflags <- getDynFlags
+  level <- getThLevel
+  boot <- tcIsHsBootOrSig
+  explicit <- xoptM LangExt.ExplicitLevelImports
+  case (nameModule_maybe name, hsc_interp env, level) of
+    (Just mod, Just interp, Comp)
+      | not boot, not explicit, not (safeLanguageOn dflags) -> do
+          loc <- getSrcSpanM
+          liftIO $ executableDependenciesAvailable interp env loc mod
+    _ -> pure False
 
 -- | Check policy at the location where the call occurs.
 tcCheckClosedCallContext :: Name -> TcM ()

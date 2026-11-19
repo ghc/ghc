@@ -10,6 +10,7 @@ module GHC.Linker.Deps
   ( LinkDepsOpts (..)
   , LinkDeps (..)
   , getLinkDeps
+  , getLinkDepsIfAvailable
   )
 where
 
@@ -41,6 +42,9 @@ import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Data.Maybe
 
 import Control.Applicative
+import Control.Monad (unless)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Except (runExceptT, throwE)
 
 import Data.List (isSuffixOf)
 
@@ -57,7 +61,7 @@ data LinkDepsOpts = LinkDepsOpts
   , ldWays        :: !Ways                          -- ^ Enabled ways
   , ldFinderCache :: !FinderCache
   , ldFinderOpts  :: !FinderOpts
-  , ldLoadByteCode :: !(Module -> ModLocation -> IO (Maybe Linkable))
+  , ldFindByteCode :: !(Module -> ModLocation -> IO (Maybe (IO Linkable)))
   , ldGetDependencies :: !([Module] -> IO ([Module], UniqDSet UnitId))
   }
 
@@ -83,28 +87,51 @@ getLinkDeps
   -> [Module]     -- If you need these
   -> IO LinkDeps  -- ... then link these first
 getLinkDeps opts interp pls span mods = do
-      -- The interpreter and dynamic linker can only handle object code built
-      -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
-      -- So here we check the build tag: if we're building a non-standard way
-      -- then we need to find & link object files built the "normal" way.
-      maybe_normal_osuf <- checkNonStdWay opts interp span
+      result <- planLinkDeps False opts interp pls span mods
+      LinkDepsPlan loadable loaded units all_units <- either (dieWith opts span) pure result
+      lnks <- sequence loadable
+      let usages = mkLinkablesUsage lnks
+      -- Do not retain 'Linkable' through lazy usage records.
+      pure $! seqList usages (LinkDeps
+        { ldNeededLinkables = lnks
+        , ldAllLinkables = loaded ++ usages
+        , ldUnits = units
+        , ldNeededUnits = all_units
+        })
 
-      get_link_deps opts pls maybe_normal_osuf span mods
+-- | Find the required packages if all home artifacts are available.
+-- Invalid interfaces and invalid ways still report errors.
+getLinkDepsIfAvailable :: LinkDepsOpts -> Interp -> LoaderState -> SrcSpan
+                       -> [Module] -> IO (Maybe [UnitId])
+getLinkDepsIfAvailable opts interp pls span mods = do
+  result <- planLinkDeps True opts interp pls span mods
+  pure $ case result of
+    Right (LinkDepsPlan _ _ units _) -> Just units
+    Left _ -> Nothing
+
+-- | Newly needed linkables may still need bytecode materialization.
+data LinkDepsPlan = LinkDepsPlan [IO Linkable] [LinkableUsage] [UnitId] (UniqDSet UnitId)
+
+planLinkDeps :: Bool -> LinkDepsOpts -> Interp -> LoaderState -> SrcSpan
+             -> [Module] -> IO (Either SDoc LinkDepsPlan)
+planLinkDeps check_artifacts opts interp pls span mods = do
+  suffix <- checkNonStdWay opts interp span
+  get_link_deps check_artifacts opts pls suffix mods
 
 get_link_deps
-  :: LinkDepsOpts
+  :: Bool
+  -> LinkDepsOpts
   -> LoaderState
   -> Maybe FilePath  -- replace object suffixes?
-  -> SrcSpan
   -> [Module]
-  -> IO LinkDeps
-get_link_deps opts pls maybe_normal_osuf span mods = do
+  -> IO (Either SDoc LinkDepsPlan)
+get_link_deps check_artifacts opts pls maybe_normal_osuf mods = runExceptT $ do
 
       -- Three step process:
 
         -- 1. Find the dependent home-pkg-modules/packages from each iface
         -- (omitting modules from the interactive package, which is already linked)
-      (mods_s, pkgs_s) <- ldGetDependencies opts relevant_mods
+      (mods_s, pkgs_s) <- lift (ldGetDependencies opts relevant_mods)
 
       let
         -- 2.  Exclude ones already linked
@@ -122,96 +149,67 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
-      lnks_needed <- mapM (get_linkable (ldObjSuffix opts)) mods_needed
-      let
-        lnks_needed_usages = mkLinkablesUsage lnks_needed
-        new_link_deps lnks = LinkDeps
-          { ldNeededLinkables = lnks_needed
-          , ldAllLinkables    = lnks
-          , ldUnits           = pkgs_needed
-          , ldNeededUnits     = pkgs_s
-          }
-        -- Make sure we do not retain 'Linkable' by evaluating '[LinkableUsage]'
-        link_deps =
-          seqList lnks_needed_usages (new_link_deps (links_got ++ lnks_needed_usages))
-
-      return link_deps
+      loadable <- mapM (get_linkable (ldObjSuffix opts)) mods_needed
+      pure (LinkDepsPlan loadable links_got pkgs_needed pkgs_s)
   where
     unit_env = ldUnitEnv opts
     relevant_mods = filterOut isInteractiveModule mods
 
-    no_obj :: Outputable a => a -> IO b
-    no_obj mod = dieWith opts span $
-                     text "cannot find object file for module " <>
-                        quotes (ppr mod) $$
-                     while_linking_expr
+    no_obj mod = missing (text "cannot find object file for module" <+> quotes (ppr mod))
+    missing reason = throwE (reason $$ text "while linking an interpreted expression")
 
-    while_linking_expr = text "while linking an interpreted expression"
-
-
-    -- See Note [Using Byte Code rather than Object Code for Template Haskell]
-    homeModLinkable :: HomeModInfo -> Maybe Linkable
-    homeModLinkable hmi =
-      if ldUseByteCode opts
-        then homeModInfoByteCode hmi <|> homeModInfoObject hmi
-        else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
-
-    get_linkable osuf mod      -- A home-package module
-      = HUG.lookupHugByModule mod (ue_home_unit_graph unit_env) >>= \case
-          Just mod_info -> adjust_linkable (expectJust (homeModLinkable mod_info))
-          Nothing -> do
-           -- It's not in the HPT because we are in one shot mode,
-           -- so use the Finder to get a ModLocation...
-           case ue_homeUnit unit_env of
-            Nothing -> no_obj mod
-            Just home_unit -> do
-
-              let fc = ldFinderCache opts
-              let fopts = ldFinderOpts opts
-              mb_stuff <- runFinderM $ findHomeModule fc fopts home_unit (moduleName mod)
-              case mb_stuff of
+    get_linkable osuf mod = do
+      info <- lift $ HUG.lookupHugByModule mod (ue_home_unit_graph unit_env)
+      case info of
+        Just hmi
+          | Just lnk <- preferredHomeLinkable opts hmi -> checked_linkable osuf lnk
+          | otherwise -> no_obj mod
+        Nothing
+          | Just home_unit <- ue_homeUnit unit_env -> do
+              -- In one-shot mode, prefer bytecode. Discovery returns an
+              -- action so a probe never compiles Core or writes foreign stubs.
+              found <- lift $ runFinderM $ findHomeModule
+                         (ldFinderCache opts) (ldFinderOpts opts) home_unit (moduleName mod)
+              case found of
                 Found loc _ -> do
-                  from_bc <- ldLoadByteCode opts mod loc
-                  maybe (fallback_no_bytecode home_unit mod) pure from_bc
-                _ -> fallback_no_bytecode home_unit mod
-        where
+                  bytecode <- lift $ ldFindByteCode opts mod loc
+                  case bytecode of
+                    Just load -> pure load
+                    Nothing -> do
+                      object <- lift $ findObjectLinkableMaybe mod loc
+                      maybe (no_obj mod) (checked_linkable osuf) object
+                _ -> no_obj mod
+        Nothing -> no_obj mod
 
-            fallback_no_bytecode home_unit mod = do
-              let fc = ldFinderCache opts
-              let fopts = ldFinderOpts opts
-              mb_stuff <- runFinderM $ findHomeModule fc fopts home_unit (moduleName mod)
-              case mb_stuff of
-                Found loc _ -> do
-                  mb_lnk <- findObjectLinkableMaybe mod loc
-                  case mb_lnk of
-                    Nothing  -> no_obj mod
-                    Just lnk -> adjust_linkable lnk
-                _ -> no_obj (moduleName mod)
+    checked_linkable osuf lnk = do
+      parts <- traverse (adjust_part osuf) (linkableParts lnk)
+      pure (pure (lnk {linkableParts = parts}))
 
-            adjust_linkable lnk
-                | Just new_osuf <- maybe_normal_osuf = do
-                        new_parts <- mapM (adjust_part new_osuf)
-                                        (linkableParts lnk)
-                        return lnk{ linkableParts=new_parts }
-                | otherwise =
-                        return lnk
+    adjust_part osuf part = case (maybe_normal_osuf, part) of
+      (Just new_osuf, DotO file ModuleObject) -> do
+        massert (osuf `isSuffixOf` file)
+        let file_base = fromJust (stripExtension osuf file)
+            new_file = file_base <.> new_osuf
+        requireFile new_file
+        pure (DotO new_file ModuleObject)
+      (Just _, DotA fp) -> panic ("adjust_ul DotA " ++ show fp)
+      (Just _, DotDLL fp) -> panic ("adjust_ul DotDLL " ++ show fp)
+      (_, DotO file _) | check_artifacts -> requireFile file >> pure part
+      (_, DotA file) | check_artifacts -> requireFile file >> pure part
+      (_, DotDLL file) | check_artifacts -> requireFile file >> pure part
+      -- Inspecting DotGBC payloads here can force lazy code generation from
+      -- the home table. Serialized bytecode carries its foreign object bytes.
+      _ -> pure part
 
-            adjust_part new_osuf part = case part of
-              DotO file ModuleObject -> do
-                massert (osuf `isSuffixOf` file)
-                let file_base = fromJust (stripExtension osuf file)
-                    new_file = file_base <.> new_osuf
-                ok <- doesFileExist new_file
-                if (not ok)
-                   then dieWith opts span $
-                          text "cannot find object file "
-                                <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file ModuleObject)
-              DotO file ForeignObject -> pure (DotO file ForeignObject)
-              DotA fp    -> panic ("adjust_ul DotA " ++ show fp)
-              DotDLL fp  -> panic ("adjust_ul DotDLL " ++ show fp)
-              DotGBC {}  -> pure part
+    requireFile file = do
+      exists <- lift (doesFileExist file)
+      unless exists (missing (text "cannot find object file" <+> quotes (text file)))
 
+-- | Select the same in-memory linkable for planning and linking.
+preferredHomeLinkable :: LinkDepsOpts -> HomeModInfo -> Maybe Linkable
+preferredHomeLinkable opts hmi
+  | ldUseByteCode opts = homeModInfoByteCode hmi <|> homeModInfoObject hmi
+  | otherwise = homeModInfoObject hmi <|> homeModInfoByteCode hmi
 
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]
