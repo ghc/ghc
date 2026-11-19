@@ -5,4 +5,4 @@ import qualified Data.Char
 import Data.Proxy
 
 p :: forall (c :: Char). Proxy '( 'X', c)
-p = Proxy @'(Data.Char.toUpper 'x', _)
+p = Proxy @'(Data.Char.toTitle 'x', _)

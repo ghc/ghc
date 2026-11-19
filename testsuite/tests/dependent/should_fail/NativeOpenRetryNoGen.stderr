@@ -1,10 +1,10 @@
 NativeOpenRetryNoGen.hs:10:19: error: [GHC-70565]
-    • Cannot evaluate ‘Data.Char.toUpper’ in a type.
+    • Cannot evaluate ‘Data.Char.toTitle’ in a type.
         This binding group has a pattern binding with an explicit multiplicity. Give the binding that uses this call a complete type signature.
-    • In the first argument of ‘Proxy’, namely ‘(Data.Char.toUpper _c)’
-      In the type signature: x :: Proxy (Data.Char.toUpper _c)
+    • In the first argument of ‘Proxy’, namely ‘(Data.Char.toTitle _c)’
+      In the type signature: x :: Proxy (Data.Char.toTitle _c)
       In the expression:
         let
-          x :: Proxy (Data.Char.toUpper _c)
+          x :: Proxy (Data.Char.toTitle _c)
           %Many !(x, y) = (Proxy @'A', True)
         in (x, y)

@@ -1,6 +1,6 @@
 NativeClosedCharRigid.hs:7:48: error: [GHC-70565]
-    • Cannot evaluate ‘Data.Char.toUpper’ in a type.
+    • Cannot evaluate ‘Data.Char.toTitle’ in a type.
         The argument must be a closed Char literal, such as 'x'.
-    • In the first argument of ‘Proxy’, namely ‘(Data.Char.toUpper c)’
+    • In the first argument of ‘Proxy’, namely ‘(Data.Char.toTitle c)’
       In the type signature:
-        rigid :: forall (c :: Char). Proxy c -> Proxy (Data.Char.toUpper c)
+        rigid :: forall (c :: Char). Proxy c -> Proxy (Data.Char.toTitle c)

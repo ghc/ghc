@@ -7,6 +7,6 @@ import Data.Proxy (Proxy(..))
 
 pair :: (Proxy 'A', Bool)
 pair =
-  let x :: Proxy (Data.Char.toUpper _c)
+  let x :: Proxy (Data.Char.toTitle _c)
       %Many !(x, y) = (Proxy @'A', True)
   in (x, y)

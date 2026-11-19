@@ -12,6 +12,10 @@ test('NativeOpenCharFamily',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['CharacterCase.hs', 'CharacterExport.hs']])],
      run_command, ['bash NativeOpenCharFamily.sh "{compiler}" "{libdir}"'])
+test('NativeOpenInstalledUpper',
+     [only_ways(['normal']), extra_files([open_eval_dir + 'UnicodeExport.hs'])],
+     run_command,
+     ['bash NativeOpenInstalledUpper.sh "{compiler}" "{libdir}" "{ghc_pkg}"'])
 test('NativeOpenCharGhci',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs', 'OpenSource.hs']]),
      ghci_script, ['NativeOpenCharGhci.script'])

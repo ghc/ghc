@@ -5,5 +5,5 @@ module NativeOpenRetryInterfaceProducer (upper) where
 import qualified Data.Char
 import Data.Proxy (Proxy(..))
 
-upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+upper :: Proxy _c -> Proxy (Data.Char.toTitle _c)
 upper (_ :: Proxy 'a') = Proxy @'A'

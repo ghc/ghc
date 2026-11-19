@@ -9,29 +9,29 @@ import GHC.TypeLits (charVal, natVal)
 import GHC.Types (Multiplicity(Many))
 import qualified NativeOpenRetryLib
 
-upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+upper :: Proxy _c -> Proxy (Data.Char.toTitle _c)
 upper (_ :: Proxy 'a') = Proxy @'A'
 
-mixed :: Proxy _c -> ( Proxy (Data.Char.toUpper 'x'), Proxy (Data.Char.toUpper _c)
+mixed :: Proxy _c -> ( Proxy (Data.Char.toTitle 'x'), Proxy (Data.Char.toTitle _c)
                      , Proxy (Prelude.sum (Prelude.reverse '[2, 3, 5])) )
 mixed (_ :: Proxy 'a') = (Proxy @'X', Proxy @'A', Proxy @10)
 
 nested :: Char
 nested = charVal (local (Proxy @'a'))
   where
-    local :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+    local :: Proxy _c -> Proxy (Data.Char.toTitle _c)
     local (_ :: Proxy 'a') = Proxy @'A'
 
 expression :: Char
 expression = charVal (local (Proxy @'a'))
   where
-    local = ((\(_ :: Proxy 'a') -> Proxy @'A') :: Proxy _c -> Proxy (Data.Char.toUpper _c))
+    local = ((\(_ :: Proxy 'a') -> Proxy @'A') :: Proxy _c -> Proxy (Data.Char.toTitle _c))
 
 data Same (x :: Char) (y :: Char) where
   Same :: Same c c
 
--- The toLower operand becomes known only after replay evaluates toUpper.
-chain :: Proxy _c -> (Proxy (Data.Char.toLower _upper), Same (Data.Char.toUpper _c) _upper)
+-- The toLower operand becomes known only after replay evaluates toTitle.
+chain :: Proxy _c -> (Proxy (Data.Char.toLower _upper), Same (Data.Char.toTitle _c) _upper)
 chain (_ :: Proxy 'a') = (Proxy @'a', Same)
 
 empty :: Proxy _xs -> Proxy (NativeOpenRetryLib.total _xs)

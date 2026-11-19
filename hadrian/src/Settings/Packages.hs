@@ -263,6 +263,14 @@ ghcInternalArgs = package ghcInternal ? do
                   ]
                _ -> mempty
 
+            -- Publish the character equations and the public forwarding binding
+            -- with the in-tree compiler. See Note [Checked Char cases] in
+            -- GHC.Tc.Gen.SourceTable.
+          , notStage0 ? builder (Ghc CompileHs) ?
+            inputs [ "**/GHC/Internal/Unicode.hs"
+                   , "**/GHC/Internal/Unicode/Char/UnicodeData/SimpleUpperCaseMapping.hs"
+                   ] ? arg "-XExperimentalDependentTypes"
+
           , builder (Cabal Flags) ? staged (buildFlag NeedLibatomic) `cabalFlag` "need-atomic"
 
           ]

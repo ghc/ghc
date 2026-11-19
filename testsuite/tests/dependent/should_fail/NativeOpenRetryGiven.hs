@@ -9,6 +9,6 @@ data Tag (c :: Char) where
   OnlyA :: Tag 'a'
   Other :: Tag c
 
-upper :: Tag _c -> Proxy (Data.Char.toUpper _c)
+upper :: Tag _c -> Proxy (Data.Char.toTitle _c)
 upper OnlyA = Proxy @'A'
 upper Other = Proxy @'A'

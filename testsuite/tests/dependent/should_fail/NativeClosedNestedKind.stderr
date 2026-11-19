@@ -1,7 +1,7 @@
 NativeClosedNestedKind.hs:8:33: error: [GHC-70565]
-    • Cannot evaluate ‘Data.Char.toUpper’ in a type.
+    • Cannot evaluate ‘Data.Char.toTitle’ in a type.
         The operand has kind [Natural], which does not match the declared input type Char.
     • In the first argument of ‘Proxy’, namely
-        ‘(Data.Char.toUpper (Prelude.reverse (Lib.badElement '[1])))’
+        ‘(Data.Char.toTitle (Prelude.reverse (Lib.badElement '[1])))’
       In the type signature:
-        bad :: Proxy (Data.Char.toUpper (Prelude.reverse (Lib.badElement '[1])))
+        bad :: Proxy (Data.Char.toTitle (Prelude.reverse (Lib.badElement '[1])))
