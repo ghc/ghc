@@ -548,6 +548,7 @@ checkFlagHash hsc_env iface self_recomp = do
         pair_builder_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v4" :: String)
         reachable_helper_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v5" :: String)
         private_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v6" :: String)
+        recursive_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v7" :: String)
         new_fp = caseTreeFingerprint base_fp
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
@@ -555,6 +556,10 @@ checkFlagHash hsc_env iface self_recomp = do
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
        | old_fp == base_fp, any couldHaveSumProjection candidates
          -> recheck "Compiler now checks sum projections"
+       | old_fp == recursive_case_fp, not (null candidates)
+         -> recheck "Compiler now checks recursive cases with carried arguments"
+       | old_fp == recursive_case_fp
+         -> up_to_date logger (text "Module cannot export a constructor case")
        | old_fp == private_case_fp, not (null candidates)
          -> recheck "Compiler now checks recursive constructor cases"
        | old_fp == private_case_fp
@@ -588,7 +593,7 @@ checkFlagHash hsc_env iface self_recomp = do
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
-caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v7" :: String)
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v8" :: String)
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
 -- See Note [Recompiling constructor case producers].

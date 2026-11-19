@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, NoExperimentalDependentTypes #-}
 module SpineWorker
-    ( Spine(..), firstMaybe, firstViaHelper, firstViaWrap, Marked(..), firstViaMark, secondOrFirst, erase
+    ( Spine(..), firstMaybe, firstViaHelper, firstViaWrap, Marked(..), firstViaMark, secondOrFirst, erase, fill
     , boxedFirst, strictFirst, Secret, privateFirst, StrictResult(..), strictResult
     ) where
 
@@ -65,6 +65,11 @@ headOr (More y _) _ = y
 erase :: Spine a -> Spine Bool
 erase Empty = Empty
 erase (More _ xs) = More True (erase xs)
+
+-- | Replace each element with the supplied value.
+fill :: Spine a -> b -> Spine b
+fill Empty _ = Empty
+fill (More _ xs) tag = More tag (fill xs tag)
 
 -- | Force the tail before returning the first field.
 strictFirst :: Spine a -> Maybe a

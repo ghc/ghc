@@ -25,13 +25,14 @@ grep -Fq 'T:markField ' worker.iface
 grep -Fq 'T:secondOrFirst ' worker.iface
 grep -Fq 'T:headOr ' worker.iface
 grep -Fq 'T:erase ' worker.iface
+grep -Fq 'T:fill ' worker.iface
 if sed -n '/^exports:/,/^defaults:/p' worker.iface | grep -Eq '^[[:space:]]+(helper|wrap|mark|markResult|markField|headOr)$'; then
     echo 'The private helper escaped into source exports.' >&2
     exit 1
 fi
 cat > Residual.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, StandaloneKindSignatures #-}
-module Residual (First, Wrapped, Marked, Second, Erase) where
+module Residual (First, Wrapped, Marked, Second, Erase, Fill) where
 import qualified SpineWorker as W
 type First :: W.Spine Bool -> Maybe Bool
 type First xs = W.firstViaHelper xs
@@ -43,13 +44,15 @@ type Second :: W.Spine Bool -> Maybe Bool
 type Second xs = W.secondOrFirst xs
 type Erase :: W.Spine Bool -> W.Spine Bool
 type Erase xs = W.erase xs
+type Fill :: W.Spine Bool -> Maybe Bool -> W.Spine (Maybe Bool)
+type Fill xs tag = W.fill xs tag
 HS
 cat > Consumer.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
 module Consumer where
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import Residual (First, Wrapped, Marked, Second, Erase)
+import Residual (First, Wrapped, Marked, Second, Erase, Fill)
 import qualified SpineWorker as W
 
 empty :: First 'W.Empty :~: 'Nothing
@@ -73,6 +76,11 @@ erasedEmpty = Refl
 erasedMore :: forall (x :: Bool) (xs :: W.Spine Bool).
               Proxy x -> Proxy xs -> Erase ('W.More x xs) :~: 'W.More 'True (Erase xs)
 erasedMore _ _ = Refl
+filledEmpty :: forall (tag :: Maybe Bool). Proxy tag -> Fill 'W.Empty tag :~: 'W.Empty
+filledEmpty _ = Refl
+filledMore :: forall (x :: Bool) (xs :: W.Spine Bool) (tag :: Maybe Bool).
+              Proxy x -> Proxy xs -> Proxy tag -> Fill ('W.More x xs) tag :~: 'W.More tag (Fill xs tag)
+filledMore _ _ _ = Refl
 HS
 "${ghc[@]}" -c Residual.hs
 "${ghc[@]}" -c Consumer.hs
@@ -124,6 +132,15 @@ if "${ghc[@]}" -fenable-rewrite-rules -Wno-orphans -Wno-inline-rule-shadowing \
    ! grep -Eq '^RecursiveRule\.hs:[0-9]+:[0-9]+.*error: \[GHC-83605\]' reject.log ||
    ! grep -Fq 'erase' reject.log; then cat reject.log >&2; exit 1; fi
 
+sed 's/^module Consumer where/module CarriedRule where/' Consumer.hs > CarriedRule.hs
+cat >> CarriedRule.hs <<'HS'
+{-# RULES "fill/replacement" forall (xs :: W.Spine Bool) (tag :: Maybe Bool). W.fill xs tag = W.Empty #-}
+HS
+if "${ghc[@]}" -fenable-rewrite-rules -Wno-orphans -Wno-inline-rule-shadowing \
+       -c CarriedRule.hs >reject.log 2>&1 ||
+   ! grep -Eq '^CarriedRule\.hs:[0-9]+:[0-9]+.*error: \[GHC-83605\]' reject.log ||
+   ! grep -Fq 'fill' reject.log; then cat reject.log >&2; exit 1; fi
+
 reject_old_erase() {
     if grep -Fq 'T:erase ' worker.iface; then cat worker.iface >&2; exit 1; fi
     local line
@@ -145,6 +162,22 @@ sed 's/^erase (More _ xs) = More True (erase xs)$/erase (More x xs) = More True 
     Worker.source > SpineWorker.hs
 compile_worker
 reject_old_erase
+
+# Field identity, decrease and demand are independent of the result type.
+reject_fill() {
+    compile_worker
+    if grep -Fq 'T:fill ' worker.iface; then cat worker.iface >&2; exit 1; fi
+}
+sed -e 's/^fill ::.*/fill :: Spine a -> a -> Spine a/' \
+    -e 's/^fill (More _ xs) tag =.*/fill (More x xs) tag = More tag (fill xs x)/' \
+    Worker.source > SpineWorker.hs
+reject_fill
+sed 's/^fill (More _ xs) tag =.*/fill (More x xs) tag = More tag (fill (More x xs) tag)/' \
+    Worker.source > SpineWorker.hs
+reject_fill
+sed 's/^fill (More _ xs) tag =.*/fill (More _ xs) !tag = More tag (fill xs tag)/' \
+    Worker.source > SpineWorker.hs
+reject_fill
 
 reject_old_second() {
     if grep -Eq 'T:(headOr|secondOrFirst) ' worker.iface; then cat worker.iface >&2; exit 1; fi

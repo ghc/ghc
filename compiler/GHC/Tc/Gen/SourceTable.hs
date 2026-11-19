@@ -83,7 +83,7 @@ import GHC.Unit.Types (GenWithIsBoot(..), isInteractiveModule, moduleName, modul
 import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
-import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet)
+import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
 import GHC.Types.Var (Id, CoVar, VarBndr(..), isId, mkTyVar, varName)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (lengthIs)
@@ -1139,13 +1139,14 @@ constructorCaseType tau = do
     (domain, rest) <- visibleArrow body
     (tc, args) <- caseDatatype domain
     parameters <- catMaybes <$> traverse domainParameter args
-    guard (length parameters == length quantified &&
-           mkUniqSet parameters == mkUniqSet quantified)
     let (carried, result) = case visibleArrow rest of
           Just (fallback, output) -> ([fallback], output)
           Nothing -> ([], rest)
-    guard (not (null parameters) && caseKind (mkTyVarTys parameters) result &&
-           all (caseKind (mkTyVarTys parameters)) carried)
+        kinds = mkTyVarTys quantified
+    guard (not (null parameters) &&
+           sizeUniqSet (mkUniqSet parameters) == length parameters &&
+           tyCoVarsOfTypes (domain : carried) == mkUniqSet quantified &&
+           caseKind kinds result && all (caseKind kinds) carried)
     -- Preserve the separate pair and list certificates.
     guard (tc /= listTyCon && tc /= tupleTyCon Boxed 2)
     pure (ConstructorCaseType binders tc args carried result)
@@ -1183,7 +1184,7 @@ data ConstructorCaseTree
   = CaseField Id
   | CaseConstructor DataCon [Type] [ConstructorCaseTree]
   | CaseCall TyCon [Type] [ConstructorCaseTree]
-  | CaseSelf [Type] Id
+  | CaseSelf [Type] [Id]
 
 -- | A complete path through the Core cases and its checked result.
 data ConstructorCaseRow = ConstructorCaseRow [ConstructorCaseTree] ConstructorCaseTree
@@ -1200,8 +1201,9 @@ checkedConstructorCase public helper owner rhs = do
     guard (parameters == [v | Bndr v _ <- telescope])
     guard (all isId terms && eqTypes (map varType terms) (mkTyConApp tc args : carried))
     first : _ <- pure terms
-    guard (all (casePublicKind public args) (result : carried))
-    rows <- checkCase args result (map CaseField terms) [] first body
+    let kinds = [mkTyVarTy v | Bndr v _ <- telescope]
+    guard (all (casePublicKind public kinds) (result : carried))
+    rows <- checkCase kinds result (map CaseField terms) [] first body
     -- The patterns use types from the Core binders. Use the same telescope
     -- for substitution. Keep the owner's declared visibility in the interface.
     ConstructorCaseType signature _ _ _ _ <- constructorCaseType (varType owner)
@@ -1257,18 +1259,21 @@ checkedConstructorCase public helper owner rhs = do
         scoped v = any (contains v) patterns
 
     checkedSelfCall patterns aliases expr = do
-      ConstructorCaseType telescope tc args [] _ <- constructorCaseType (exprType rhs)
-      CaseConstructor _ _ children : _ <- pure patterns
+      ConstructorCaseType telescope tc args _ _ <- constructorCaseType (exprType rhs)
+      CaseConstructor _ _ children : carried <- pure patterns
       (Core.Var callee, arguments) <- pure (Core.collectArgs expr)
       guard (callee == owner)
       let (kind_args, operands) = splitAt (length telescope) arguments
           expected = [mkTyVarTy v | Bndr v _ <- telescope]
       types <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) kind_args
       guard (eqTypes types expected)
-      [Core.Var operand] <- pure operands
+      Core.Var operand : extra <- pure operands
       let field = resolve aliases operand
       guard (varType field `eqType` mkTyConApp tc args && any (contains field) children)
-      pure (CaseSelf types field)
+      original <- traverse (\case CaseField v -> Just v; _ -> Nothing) carried
+      actual <- traverse (\case Core.Var v -> Just (resolve aliases v); _ -> Nothing) extra
+      guard (actual == original)
+      pure (CaseSelf types (field : original))
 
     -- Each entry already names a leaf. Core Id identities keep the alias
     -- lexical, and each alternative receives its own immutable environment.
@@ -1391,8 +1396,8 @@ publishConstructorRows owner telescope domains result rows = do
     publishResult family instantiate fields (CaseCall table args children) =
       mkTyConApp table (map instantiate args ++ map publish children)
       where publish = publishResult family instantiate fields
-    publishResult family instantiate fields (CaseSelf args field) =
-      mkTyConApp family (map instantiate args ++ [fieldType fields field])
+    publishResult family instantiate fields (CaseSelf args operands) =
+      mkTyConApp family (map instantiate args ++ map (fieldType fields) operands)
 
     fieldType fields selected = case lookup selected fields of
       Just v -> mkTyVarTy v
@@ -1432,11 +1437,13 @@ that each leaf returns an in-scope field, the carried argument, or a
 saturated ordinary constructor applied to checked results. Check each
 result's kind against the actual worker and check the parameter order.
 Building a lazy constructor introduces no new tests on its fields.
-A unary worker can call itself beneath such a constructor. As in
-Note [Closed source tables], the operand must be a proper field
+A worker can call itself beneath such a constructor. As in
+Note [Closed source tables], the first operand must be a proper field
 of the matched input. Require the original kind instantiation and
-the exact recursive Id. Each reduction then passes a strict
-subpattern as the next operand, and a rigid tail remains stuck.
+the exact recursive Id. If the worker has a second operand, it must
+remain a pattern variable and the call must pass that same Core Id.
+Each reduction passes a strict subpattern as the first operand. A
+rigid tail remains stuck.
 Keep a saturated helper as a reference to its exact checked family,
 including inside a constructor field. An imported helper must already
 have a source table. Within this producer, a private helper can supply

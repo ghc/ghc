@@ -860,3 +860,23 @@ reuses the updated producer.
 [Producer](../examples/open-evaluation/SpineWorker.hs),
 [stripped-interface tests](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh),
 and [interface upgrade](../examples/open-evaluation/check-case-upgrade.sh).
+
+
+## M162. Structural recursion with an unchanged argument
+
+The ordinary `fill :: Spine a -> b -> Spine b` replaces each element
+with a supplied value. Its checked equation for `More x xs` and `tag`
+returns `More tag (fill xs tag)`. The interface-only proof leaves both
+the tail and the tag rigid.
+
+The recursive call must use the original type arguments and pass the
+same second Core binder. The first operand must still be a proper field
+of the matched input. A replacement tag, a rebuilt first operand, or a
+test that forces the tag cannot supply this equation.
+
+The compiler rechecks v7 home interfaces with an eligible exported
+datatype. Unrelated modules and subsequent warm builds can reuse their
+interfaces.
+[Producer](../examples/open-evaluation/SpineWorker.hs),
+[stripped-interface tests](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh),
+and [interface upgrade](../examples/open-evaluation/check-case-upgrade.sh).
