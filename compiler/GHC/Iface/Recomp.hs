@@ -18,6 +18,7 @@ where
 
 import GHC.Prelude
 import GHC.Data.FastString
+import GHC.Builtin.WiredIn.Types (listTyConName)
 
 import GHC.Driver.Backend
 import GHC.Driver.Env
@@ -549,6 +550,7 @@ checkFlagHash hsc_env iface self_recomp = do
         reachable_helper_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v5" :: String)
         private_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v6" :: String)
         recursive_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v7" :: String)
+        carried_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v8" :: String)
         new_fp = caseTreeFingerprint base_fp
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
@@ -556,6 +558,14 @@ checkFlagHash hsc_env iface self_recomp = do
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
        | old_fp == base_fp, any couldHaveSumProjection candidates
          -> recheck "Compiler now checks sum projections"
+       | old_fp == carried_case_fp, not (null candidates) || couldExportCallbackCase iface
+         -> recheck "Compiler now checks constructor cases with callbacks"
+       | old_fp == carried_case_fp
+         -> up_to_date logger (text "Module cannot export a constructor case")
+       | old_fp `elem` [base_fp, sum_fp, projection_fp, result_fp, helper_fp, pair_builder_fp,
+                        reachable_helper_fp, private_case_fp, recursive_case_fp]
+       , null candidates, couldExportCallbackCase iface
+         -> recheck "Compiler now checks constructor cases with callbacks"
        | old_fp == recursive_case_fp, not (null candidates)
          -> recheck "Compiler now checks recursive cases with carried arguments"
        | old_fp == recursive_case_fp
@@ -593,7 +603,7 @@ checkFlagHash hsc_env iface self_recomp = do
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
-caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v8" :: String)
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v9" :: String)
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
 -- See Note [Recompiling constructor case producers].
@@ -605,6 +615,35 @@ exportedCaseDatatypes iface =
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     exported name = name `elemNameSet` exports
+
+-- | Check whether a wired list case could take a callback as its first operand.
+-- An interface type synonym can hide an arrow or a list.
+couldExportCallbackCase :: ModIface -> Bool
+couldExportCallbackCase iface = any candidate (mi_decls iface)
+  where
+    exports = mkNameSet (concatMap availNames (mi_exports iface))
+    local_data = mkNameSet [n | (_, IfaceData{ifName = n}) <- mi_decls iface]
+    candidate (_, IfaceId{ifName = n, ifType = ty}) = n `elemNameSet` exports && outer ty
+    candidate _ = False
+
+    outer (IfaceForAllTy _ _ body) = outer body
+    outer (IfaceFunTy FTF_T_T _ _ callback rest) = arrow callback && tail_arrow rest
+    outer ty = opaque ty
+
+    arrow (IfaceFunTy FTF_T_T _ _ _ _) = True
+    arrow ty = opaque ty
+
+    tail_arrow (IfaceFunTy FTF_T_T _ _ domain _) = list domain
+    tail_arrow ty = opaque ty
+
+    list ty@(IfaceTyConApp tc _) = ifaceTyConName tc == listTyConName || opaque ty
+    list ty = opaque ty
+
+    opaque (IfaceTyConApp tc _) =
+      let n = ifaceTyConName tc in not (isWiredInName n || n `elemNameSet` local_data)
+    opaque IfaceCastTy{} = True
+    opaque IfaceAppTy{} = True
+    opaque _ = False
 
 -- | An exported function can hide its result pair behind a type synonym.
 couldExportPairBuilder :: ModIface -> Bool
