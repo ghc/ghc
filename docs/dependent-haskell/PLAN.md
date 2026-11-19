@@ -8771,3 +8771,57 @@ accepted the same 115 of 124 programs on M142 and the candidate.
 The boundary harness also checked the plugin, splice, external candidate
 and the two Boolean observations. The full GHC testsuite was outside
 this verification run.
+
+## M145: infer a computed operand through a checked case
+
+- [x] Share the case's invisible kind parameters with the enclosing
+      ordinary call. Infer the numeric conversion in a pair from the
+      result of its first projection. Use the same source judgment when
+      the ordinary producer is executable.
+- [x] Apply a known kind before the legacy empty-list default. Check
+      both an ignored exception and an unsatisfied dictionary.
+- [x] Prepare a checked binary case's fallback before evaluation.
+      Observe its value when the nominal branch selects it.
+
+[Closed source controls](roadmap/R15-closed-term-evaluator.md#m145-sharing-kinds-across-a-checked-family).
+
+## M146: export an ordinary nested constructor case
+
+- [x] Derive one equation for each path in a complete Core case tree
+      over visible boxed constructors. Preserve typed variable aliases,
+      the order of kind arguments, and the selected field or fallback.
+- [x] Check the result from stripped interfaces. Exercise an unknown
+      inner constructor, a rigid outer input, a phantom input parameter,
+      a nested datatype argument, and matching or disjoint rewrite rules.
+- [x] Detect older interfaces from two generations of the compiler,
+      including a product skipped by the earlier sum upgrade.
+
+[Open source controls](roadmap/R16-open-term-evaluator.md#m146-nested-constructor-cases-with-a-fallback).
+
+## M147: check a local instance head before its methods
+
+- [x] Check the prerequisites of an explicit class instance head and
+      its associated type equations. Install them before typechecking
+      a producer that uses its dictionary or needs a family reduction.
+- [x] Check the methods after all their local values and types are
+      in scope, including definitions from later scheduled groups.
+- [x] Run an ordinary client through an imported interface. Reject a
+      local type-level call that demands a method before it is checked.
+
+[Instance example and cycle check](roadmap/R21-dependency-analysis.md#m147-separate-an-instance-head-from-its-methods).
+
+The bootstrap and self-hosted compilers built. Both native Showcase
+runs and GHCi agreed on all 223 output lines. The normal-way dependent
+directory passed 237 of 272 cases. All 35 failures matched M144
+individually. M144 and M147 compiled the same 115 of 124 ordinary
+polykinds programs. The
+[boundary harness](examples/boundary-evidence/check.sh) also verified that
+changing only the external field position invalidates the witness and that
+a partial Boolean input distinguishes the two functions. This run covered
+a subset of the GHC testsuite.
+
+The next three source cases come from the active cards. An interface-only
+projection can demand an unused field when it reads back an ordinary
+pair builder. An open case that constructs `Just x` cannot yet publish
+its result for an unknown scrutinee. The local declaration scheduler
+still rejects associated data instances.

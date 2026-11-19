@@ -651,7 +651,7 @@ can prove both `Pick ('W.LeftFields 'True 'x') :~: 'x'` and
 Each equation matches one constructor. With only the variable `p`,
 the application stays in the exported type.
 
-GHC checks one direct Core case on the function's argument. Every
+At M144, GHC checked one direct Core case on the function's argument. Every
 constructor must have an alternative that returns one of its bound
 fields. The datatype must be local and exported with every constructor.
 Its fields must be lazy boxed values at its type parameters. A hidden

@@ -729,12 +729,12 @@ Incompatible computed kinds fail before execution.
 [ambiguous computed siblings](../../../testsuite/tests/dependent/should_fail/NativeClosedComputedSiblingsAmbiguous.hs)
 and [incompatible computed siblings](../../../testsuite/tests/dependent/should_fail/NativeClosedComputedSiblingsMismatch.hs).
 
-An interface-only projection still checks its argument separately. In
+At M143 an interface-only projection still checked its argument separately. In
 `(P.pick (W.pair (Prelude.fromIntegral (Prelude.length '[1,2,3])) 'x') :: Nat)`,
 `P.pick` selects the first field. Its expected result fixes that field's
-kind to `Nat`. The current checker asks the ordinary pair builder to
-infer the whole pair first and reports GHC-70565 at `W.pair`. Passing
-this constraint through the projection is the next source check.
+kind to `Nat`. M143 asked the ordinary pair builder to infer the whole pair first
+and reported GHC-70565 at `W.pair`. M145 below uses that program as
+its source check.
 
 ## M145. Sharing kinds across a checked family
 
@@ -759,6 +759,10 @@ same type, a computed `Char` operand can fix the result of an earlier
 `firstOf '[]`. A consumer that ignores that earlier operand leaves the
 empty-list exception unevaluated. If the enclosing kind does not
 determine an empty list's type, the existing default still applies.
+
+An empty list can also take a compound element kind such as `Maybe Char`.
+The checker uses the enclosing result constraint before it applies the
+legacy default.
 
 The tests compile the projection from ordinary source and use its
 interface without its object. They check the inferred `Nat` result,

@@ -2995,3 +2995,15 @@ selected field. Leaving the scrutinee unknown preserves the case as a
 family application. Matching the promoted constructor later supplies
 the nominal coercion. Adding demand on another field invalidates that
 derivation. [Sum projection and its source controls](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum).
+
+A nested case contributes the full sequence of demanded constructor
+patterns to each branch. For `pickNested`, the outer constructor
+exposes a field of type `Maybe a`. Only a known `Just` or `Nothing`
+can select the result. A checked binary case may also return its second
+argument. During closed evaluation from interfaces, rewrite the case on
+the computed scrutinee and a fresh variable for the fallback. If the
+family selects the variable, evaluate the fallback. If it selects a
+closed result, that result is available immediately. GHC checks the
+fallback's kind and dictionaries in both cases. The fresh variable
+must never appear in a returned type. [Case tree](roadmap/R16-open-term-evaluator.md#m146-nested-constructor-cases-with-a-fallback)
+and [closed operand checks](roadmap/R15-closed-term-evaluator.md#m145-sharing-kinds-across-a-checked-family).

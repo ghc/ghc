@@ -8,9 +8,9 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. Native execution and GHCi agree on all 218 Showcase lines.
+Updated 2026-11-19. Native execution and GHCi agree on all 223 Showcase lines.
 The normal-way dependent directory passed 237 of 272 exercised cases.
-The 35 remaining failures produced the same output as at M142 (`94908818ba`).
+The 35 remaining failures produced the same output as at M144 (`5e8e165827`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
@@ -26,7 +26,8 @@ unknown inputs. The client proves `Make a b :~: 'Shell a b` and can
 export the result to users of ordinary Haskell. Local functions used
 in types can now share a module with deriving clauses, standalone
 deriving declarations, and module defaults when their prerequisites
-can be checked first. [Open constructor proofs](examples/open-evaluation/OpenBuildSource.hs)
+can be checked first. A local instance head can also solve a producer's
+constraint before its methods use that producer in a type. [Open constructor proofs](examples/open-evaluation/OpenBuildSource.hs)
 and [deriving and defaulting](roadmap/R21-dependency-analysis.md#m138-deriving-clauses-and-module-defaults).
 
 For the ordinary library function returning `SomeVec Natural`, the
@@ -40,15 +41,20 @@ The ordinary function `pick` returns the second field of `LeftFields`
 and the first field of `RightFields`. A dependent exporter can write
 `type Pick p = W.pick p` while the input is unknown. A separate
 ordinary client that supplies either constructor can prove which field
-it gets from the stripped interfaces. Within one module a similar function
-can now depend on a locally declared datatype or a synonym that calls
-another function. [Sum projection](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum)
+it gets from the stripped interfaces. A producer can also export a
+nested match. For `pickNested (Nested (Just x)) fallback = x`, the
+client's proof needs both constructors. It can leave the fallback
+unknown. Within one module a similar function can depend on a locally
+declared datatype or a synonym that calls another function. [Sum projection](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum)
 and [local declaration ordering](roadmap/R21-dependency-analysis.md#m134-local-type-and-value-dependencies).
 
 In a closed call, `Prelude.max (Prelude.sum '[1, 2])
 (Prelude.fromIntegral (Prelude.length '[1, 2, 3]))` checks at `3`. The
 result of `sum` determines the conversion type in either argument order.
-[Computed operands](roadmap/R15-closed-term-evaluator.md#m143-sharing-the-kinds-of-computed-operands).
+The result of `fst` can also fix the type of a conversion inside a
+computed pair while the second field is inferred from its argument.
+[Computed operands](roadmap/R15-closed-term-evaluator.md#m143-sharing-the-kinds-of-computed-operands)
+and [projection inference](roadmap/R15-closed-term-evaluator.md#m145-sharing-kinds-across-a-checked-family).
 
 The ordinary vector library defines `safeHead :: Vec ('S n) a -> a`.
 In the Showcase, `IndexedVec.safeHead (IndexedVec.two 3) :~: 3` checks

@@ -64,9 +64,12 @@ import qualified IndexedVec
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
+import qualified LocalInstance
+import qualified LocalAssociated
 import qualified LazyParcel
 import qualified LegacyKindArgument
 import qualified OpenBuildSource
+import qualified OpenBuildWorker as Build
 import qualified OpenConstructorSource
 import qualified OpenConstructorWorker as W
 import qualified NativeMultiPackage as Packages
@@ -924,10 +927,24 @@ main = do
         (Refl :: Prelude.max (Prelude.sum '[1, 2]) (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) :~: 3)
     observe "supply either constructor to a projection checked at an unknown input"
         (Refl :: Pick ('W.LeftFields 'True 'x') :~: 'x', Refl :: Pick ('W.RightFields 'y' 'False) :~: 'y')
+    observe "infer a conversion from the selected field of a computed pair"
+        (Refl :: (Prelude.fst (Build.buildPair (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) 'x') :: TypeNats.Nat) :~: 3)
+    observe "infer the element type of a nested empty list from its sibling"
+        (Refl :: Prelude.max (Prelude.reverse '[]) (Prelude.reverse '[ 'Just 'x']) :~: '[ 'Just 'x'])
+    observe "supply the inner constructor to a deferred nested match"
+        (Refl :: PickNested ('W.Nested ('Just 'x')) 'y' :~: 'x', Refl :: PickNested ('W.Nested 'Nothing) 'y' :~: 'y')
+    observe "use a local instance whose method checks a dependent input type"
+        (LocalInstance.passValue 'x', LocalInstance.passValue True)
+    observe "check an associated type equation before a dependent producer"
+        LocalAssociated.result
 
 -- | Keep the ordinary projection in the type until a client supplies a constructor.
 type Pick :: W.Choice Bool Char -> Char
 type Pick p = W.pick p
+
+-- | Retain the nested match and its fallback until a constructor selects a branch.
+type PickNested :: W.Nested k -> k -> k
+type PickNested p fallback = W.pickNested p fallback
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

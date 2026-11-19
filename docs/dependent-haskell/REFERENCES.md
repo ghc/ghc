@@ -5541,3 +5541,36 @@ forced. The producer checks that each branch returns a lazy field.
 [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
 [Haskell 2010 pattern matching](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-610003.17)
 and [sum projection controls](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum).
+
+### Inferring a checked case and preserving its demand
+
+Agda's implicit arguments can be determined by checking the other
+arguments or the expected type. M145 uses this relationship for a
+certified projection. Its result type fixes one component of an
+ordinary pair builder even while the other component is unknown.
+Whether the linker can load the projection changes how the compiler
+executes the call. Both paths use the same argument and result kinds.
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [source and interface checks](roadmap/R15-closed-term-evaluator.md#m145-sharing-kinds-across-a-checked-family).
+
+Agda's case trees split a selected variable and retain the choice of
+which argument to inspect next. Haskell pattern matching distinguishes
+a defined outer constructor from an undefined field. M146 inspects the
+ordinary Core case tree and repeats its demanded constructor patterns
+in each nominal equation. This permits a fallback to remain unevaluated
+and a case on an unknown inner constructor to remain stuck.
+[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
+[Haskell 2010 pattern semantics, §3.17](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-610003.17)
+and [the checked branch examples](roadmap/R16-open-term-evaluator.md#m146-nested-constructor-cases-with-a-fallback).
+
+For R21, Agda distinguishes declaring a type from checking the clauses
+that define its value. Its interleaved mutual blocks make this ordering
+explicit. In GHC the corresponding implementation already splits instance
+heads from method checking. M147 reuses those two passes when a local
+ordinary producer is needed in a type. Its head supplies dictionary
+resolution before the methods can refer to later types or values. GHC
+stores the renamed associated equations separately from the methods,
+so their actual type dependencies can be scheduled with the head.
+[Agda interleaved mutual blocks](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
+[GHC's instance passes](../../compiler/GHC/Tc/TyCl/Instance.hs)
+and [scheduler and acceptance example](roadmap/R21-dependency-analysis.md#m147-separate-an-instance-head-from-its-methods).
