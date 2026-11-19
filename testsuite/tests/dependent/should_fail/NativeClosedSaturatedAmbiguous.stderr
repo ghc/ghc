@@ -1,0 +1,7 @@
+NativeClosedSaturatedAmbiguous.hs:8:15: error: [GHC-70565]
+    • Cannot evaluate ‘Lib.ambiguousPair’ in a type.
+        The operands do not determine the following type parameters: b.
+    • In the first argument of ‘Proxy’, namely
+        ‘(Lib.ambiguousPair 18 24 :: Natural)’
+      In the type signature:
+        bad :: Proxy (Lib.ambiguousPair 18 24 :: Natural)

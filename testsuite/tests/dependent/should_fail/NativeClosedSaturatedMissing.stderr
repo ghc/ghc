@@ -1,0 +1,8 @@
+NativeClosedSaturatedMissing.hs:9:11: error: [GHC-39999]
+    • No instance for ‘NativeClosedSumLib.Missing Char’
+        arising from a use of ‘Outer.unavailablePair’
+    • In the expression: Outer.unavailablePair
+      In the first argument of ‘(:~:)’, namely
+        ‘Outer.unavailablePair 'x' (Inner.badElement '[1])’
+      In the type signature:
+        answer :: Outer.unavailablePair 'x' (Inner.badElement '[1]) :~: 0

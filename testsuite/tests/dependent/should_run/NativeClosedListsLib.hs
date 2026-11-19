@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances, NoExperimentalDependentTypes #-}
-module NativeClosedListsLib (characters, flags, empty, badElement, reverseNaturals, first) where
+module NativeClosedListsLib (characters, flags, empty, badElement, reverseNaturals, first, sameList) where
 
+import Data.Foldable (toList)
 import Numeric.Natural (Natural)
 
 -- Ordinary Show may choose this instance. The type evaluator must not.
@@ -25,3 +26,6 @@ reverseNaturals = reverse
 first :: [Natural] -> Natural
 first [] = 0
 first (n:_) = n
+
+sameList :: (Foldable f, Eq a) => f a -> f a -> Bool
+sameList lhs rhs = toList lhs == toList rhs

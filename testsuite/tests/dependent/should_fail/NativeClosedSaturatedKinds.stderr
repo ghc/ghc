@@ -1,0 +1,6 @@
+NativeClosedSaturatedKinds.hs:7:40: error: [GHC-70565]
+    • Cannot evaluate ‘Lib.sameList’ in a type.
+        The operand has kind [Natural], which does not match the declared input type [Bool].
+    • In the first argument of ‘Proxy’, namely
+        ‘(Lib.sameList '[ 'True] '[1])’
+      In the type signature: mixed :: Proxy (Lib.sameList '[ 'True] '[1])

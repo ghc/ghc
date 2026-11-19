@@ -1,0 +1,5 @@
+NativeClosedSaturatedUnder.hs:6:15: error: [GHC-70565]
+    • Cannot evaluate ‘gcd’ in a type.
+        Expected 2 value arguments, but got 1. Closed calls must be fully applied.
+    • In the first argument of ‘Proxy’, namely ‘(Prelude.gcd 18)’
+      In the type signature: bad :: Proxy (Prelude.gcd 18)

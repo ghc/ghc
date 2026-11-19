@@ -55,4 +55,4 @@ tcPreflightClosedCall :: Name -> TcM ()
 
 tcRunClosedCall :: Id -> CoreExpr -> Type -> TcM Type
 
-tcPrepareClosedCall :: Id -> Type -> Kind -> TcM (CoreExpr -> TcM Type)
+tcPrepareClosedCall :: Id -> [Type] -> Kind -> TcM ([CoreExpr] -> TcM Type)

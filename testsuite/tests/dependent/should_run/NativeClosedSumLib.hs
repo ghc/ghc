@@ -2,6 +2,7 @@
 module NativeClosedSumLib
     ( weighted, containsAny, identity
     , unavailable, Local (..), local, ambiguous, hiddenRequirement
+    , unavailablePair, ambiguousPair
     ) where
 
 import Numeric.Natural (Natural)
@@ -37,3 +38,9 @@ instance Num b => Hidden Natural where
 
 hiddenRequirement :: (Num a, Hidden a) => [a] -> a
 hiddenRequirement _ = hidden 0
+
+unavailablePair :: Missing a => a -> [Natural] -> Natural
+unavailablePair _ _ = 0
+
+ambiguousPair :: (Num a, Num b) => a -> a -> b
+ambiguousPair _ _ = 0

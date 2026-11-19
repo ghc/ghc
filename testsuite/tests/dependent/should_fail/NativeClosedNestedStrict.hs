@@ -4,5 +4,6 @@ module NativeClosedNestedStrict where
 import Data.Type.Equality ((:~:)(Refl))
 import qualified NativeClosedListsLib as Lib
 
-bad :: Lib.empty (Prelude.reverse (Lib.badElement '[1])) :~: '[]
+-- Both const and empty ignore a value. The nested call still checks its result.
+bad :: Lib.empty (Prelude.const (Prelude.reverse '[1]) (Lib.badElement '[1])) :~: '[]
 bad = Refl

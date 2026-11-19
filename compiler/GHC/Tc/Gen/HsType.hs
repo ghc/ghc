@@ -116,7 +116,7 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.TyCo.Subst as Subst
-import GHC.Core.Unify ( BindFlag(..), tcMatchTy, tcMatchTyX_BM )
+import GHC.Core.Unify ( BindFlag(..), tcMatchTy, tcMatchTyX, tcMatchTyX_BM )
 
 import GHC.Builtin( allNameStrings )
 import GHC.Builtin.Modules (gHC_INTERNAL_TYPENATS)
@@ -156,7 +156,7 @@ import GHC.Data.Bag( unitBag, mapBagM_ )
 import Data.Function ( on )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.List ( intercalate, mapAccumL )
+import Data.List ( intercalate, mapAccumL, sortOn )
 import Control.Monad
 import Data.Data (Data, cast, gmapQ)
 import Data.Tuple( swap )
@@ -2390,9 +2390,9 @@ tc_app_ty mode rn_ty exp_kind
                          , all isTypeVariableArg args
                          -> do { result <- tcOpenTypeCall mode name instantiated args
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
-                         | [arg] <- args
-                         , ordinary_call || (isQual rdr && ready_partial_call)
-                         -> do { (result_kind, run) <- tcPlanClosedCall mode ordinary_call fun arg
+                         | not (null args)
+                         , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
+                         -> do { (result_kind, run) <- tcPlanOrdinaryCall mode ordinary_call fun args
                                ; checkClosedCallExpectedKind rn_ty exp_kind result_kind
                                ; result <- run
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
@@ -2455,19 +2455,22 @@ isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
   isTyVarName name
 isTypeVariableArg _ = False
 
--- | Find the resolved head and operand of a unary term or checked family call.
-nestedClosedCall :: LHsType GhcRn -> Maybe (SrcSpan, Name, LHsType GhcRn)
+-- | Find a resolved term call or a unary checked family call.
+nestedClosedCall :: LHsType GhcRn -> Maybe (SrcSpan, Name, [LHsType GhcRn])
 nestedClosedCall arg
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr _ name))) <- head_ty
   , isExternalName name
-  , isVarName name || isSourceFamilyName name
-  , [HsValArg _ operand] <- filterOut is_par args
-  = Just (locA loc, name, operand)
+  , Just operands <- traverse val_arg (filterOut is_par args)
+  , not (null operands)
+  , isVarName name || (isSourceFamilyName name && length operands == 1)
+  = Just (locA loc, name, operands)
   | otherwise = Nothing
   where
     (head_ty, args) = splitHsAppTys (unLoc (ignoreParens arg))
     is_par HsArgPar{} = True
     is_par _ = False
+    val_arg (HsValArg _ operand) = Just operand
+    val_arg _ = Nothing
 
 -- | Recognize the internal Name selected for a checked source family.
 isSourceFamilyName :: Name -> Bool
@@ -2589,8 +2592,104 @@ tcPlanClosedCall mode ordinary_call fun arg = do
                                (SourceClosedOperand literal_kind)
       argument <- tcClosedTypeCallArgument mode name domain arg
       return (domain, result_kind, return argument)
-  run <- tcPrepareClosedCall fun domain result_kind
-  return (result_kind, setSrcSpan loc (operand >>= run))
+  run <- tcPrepareClosedCall fun [domain] result_kind
+  return (result_kind, setSrcSpan loc (operand >>= run . (:[])))
+
+-- | Prepare a source call without evaluating its operands.
+tcPlanOrdinaryCall :: TcTyMode -> Bool -> Id -> [LHsType GhcRn] -> TcM (Kind, TcM Type)
+tcPlanOrdinaryCall mode ordinary fun args
+  | not (equalLength domains args) = do
+      checkCompleteClosedCall mode name
+      tcPreflightClosedCall name
+      bad ("Expected " ++ show (length domains) ++
+           (if lengthIs domains 1 then " value argument, but got " else " value arguments, but got ") ++
+           show (length args) ++ ". Closed calls must be fully applied.")
+  | [arg] <- args = tcPlanClosedCall mode ordinary fun arg
+  | otherwise = do
+      loc <- getSrcSpanM
+      checkCompleteClosedCall mode name
+      tcPreflightClosedCall name
+      operands <- traverse prepare args
+      let (known, empty) = partitionWith split_operand (zip3 args domains operands)
+          in_scope = mkInScopeSet (tyCoVarsOfTypes (rho : predicates))
+      known_subst <- foldM match_known (Subst.mkEmptySubst in_scope) known
+      subst <- choose_empty known_subst empty
+      let inputs = map (Subst.substTy subst) domains
+          result = Subst.substTy subst codomain
+          unresolved = filter (maybe True (not . noFreeVarsOfType) . Subst.lookupTyVar subst) tvs
+          ground_class p = let pred_ty = Subst.substTy subst p
+                           in noFreeVarsOfType pred_ty && isJust (getClassPredTys_maybe pred_ty)
+      unless (null unresolved) $
+        bad ("The operands do not determine the following type parameters: "
+             ++ unwords (map getOccString unresolved) ++ ".")
+      unless (all ground_class predicates && noFreeVarsOfType result &&
+              Subst.substTy subst rho `tcEqType` foldr mkVisFunTyManyU result inputs) $
+        bad "The call must have a fully instantiated ordinary function type."
+      actions <- zipWithM prepare_runtime inputs (zip args operands)
+      run <- tcPrepareClosedCall fun inputs result
+      return (result, setSrcSpan loc (sequence actions >>= run))
+  where
+    name = getName fun
+    (_, binders, rho) = splitInvisPiTys (varType fun)
+    tvs = mapMaybe namedPiTyBinder_maybe binders
+    predicates = mapMaybe anonPiTyBinderType_maybe binders
+    (_, arrows, codomain) = splitFunTys rho
+    domains = map scaledThing arrows
+
+    bad :: String -> TcM a
+    bad = failWithTc . TcRnClosedTypeEval name
+
+    prepare arg
+      | Just (child_loc, child_name, child_args) <- nestedClosedCall arg = do
+          (kind, run) <- setSrcSpan child_loc (tcPlanClosedHead mode ordinary child_name child_args)
+          return (Right (kind, Just run))
+      | L _ (HsExplicitListTy _ _ []) <- ignoreParens arg = return (Left ())
+      | Just kind <- closedCallLiteralKind arg = return (Right (kind, Nothing))
+      | otherwise = setSrcSpanA (getLoc arg) $
+          bad "The argument must be a closed literal or a closed call."
+
+    split_operand (arg, domain, Left ()) = Right (arg, domain)
+    split_operand (arg, domain, Right (kind, _)) = Left (arg, domain, kind)
+
+    match_known subst (arg, domain, actual)
+      | Just next <- tcMatchTyX subst domain actual = return next
+      | otherwise = setSrcSpanA (getLoc arg) $ do
+          dflags <- getDynFlags
+          bad ("The operand has kind " ++ showPpr dflags actual ++
+               ", which does not match the declared input type " ++
+               showPpr dflags (Subst.substTy subst domain) ++ ".")
+
+    -- Solve a forced empty-list kind before defaulting an ambiguous one.
+    -- Match the whole domain to retain higher-kinded parameters such as f in f a.
+    choose_empty subst pending =
+      case sortOn (priority . snd) choices of
+        [] -> return subst
+        ((arg, _), []) : _ -> setSrcSpanA (getLoc arg) $
+          bad "The declared input type does not accept an empty list of the supported element kinds."
+        (_, [(_, next)]) : rest -> choose_empty next (map fst rest)
+        ((arg, _), candidates) : rest
+          | Just next <- lookupNatural candidates -> choose_empty next (map fst rest)
+          | otherwise -> setSrcSpanA (getLoc arg) $
+              bad "The declared input type does not determine the element kind of the empty list."
+      where
+        choices = [(item, [(kind, next) | kind <- map mkListTy closedCallScalarKinds
+                                        , Just next <- [tcMatchTyX subst domain kind]])
+                  | item@(_, domain) <- pending]
+        lookupNatural candidates = listToMaybe
+          [next | (kind, next) <- candidates, kind `tcEqType` mkListTy naturalTy]
+        priority [] = 0 :: Int
+        priority [_] = 1
+        priority candidates | isJust (lookupNatural candidates) = 2
+                            | otherwise = 3
+
+    prepare_runtime _ (arg, Right (_, Just run)) = return $ do
+      checked <- run
+      value <- tcDecodeClosedCallOperand checked
+      case value of
+        Just argument -> return argument
+        Nothing -> setSrcSpanA (getLoc arg) $
+          bad "The checked operand does not represent a supported closed value."
+    prepare_runtime kind (arg, _) = return <$> tcClosedTypeCallArgument mode name kind arg
 
 -- | Check a known enclosing kind before executing a staged call.
 -- Inference and non-ground expected kinds still use checkExpKind.
@@ -2603,16 +2702,17 @@ checkClosedCallExpectedKind rn_ty (Check expected) actual = do
 checkClosedCallExpectedKind _ (Infer _) _ = return ()
 
 -- | Prepare an already resolved nested occurrence.
-tcPlanClosedHead :: TcTyMode -> Bool -> Name -> LHsType GhcRn -> TcM (Kind, TcM Type)
-tcPlanClosedHead mode ordinary_call name arg
-  | isSourceFamilyName name = tcPlanSourceFamilyCall mode ordinary_call name arg
+tcPlanClosedHead :: TcTyMode -> Bool -> Name -> [LHsType GhcRn] -> TcM (Kind, TcM Type)
+tcPlanClosedHead mode ordinary_call name args
+  | [arg] <- args
+  , isSourceFamilyName name = tcPlanSourceFamilyCall mode ordinary_call name arg
   | otherwise = do
       env <- getGblEnv
       when (nameIsLocalOrFrom (tcg_semantic_mod env) name) $
         failWithTc (TcRnNoSourceTable name)
       thing <- tcLookupGlobal name
       case thing of
-        AnId fun -> tcPlanClosedCall mode ordinary_call fun arg
+        AnId fun -> tcPlanOrdinaryCall mode ordinary_call fun args
         _ -> failWithTc (TcRnNoSourceTable name)
 
 -- | Scalar kinds admitted by the source operand grammar.
@@ -2713,9 +2813,11 @@ without a tick. Under ListTuplePuns, an unticked singleton list is a list
 type and an unticked empty list is a type constructor. Neither is an
 explicit promoted list in the parsed syntax.
 
-A literal argument supplies the kind that specializes a polymorphic
-function. Check the literal with the ordinary kind checker before decoding
-its runtime value. For an empty list, match the declared input against the
+Literal arguments supply the kinds that specialize a polymorphic
+function. In a saturated call, match all known operand kinds together
+before selecting kinds for empty lists. A later operand can determine
+the earlier empty list's element kind. Check each literal with the ordinary
+kind checker before decoding its runtime value. For an empty list, match the declared input against the
 supported list kinds. If more than one kind matches, prefer [Natural] to
 preserve the existing meaning of calls such as Prelude.reverse '[]. The
 expected result kind does not choose the element kind.
@@ -2736,9 +2838,9 @@ before running the call. This leaves pure and rigid family applications
 on the normal checking path.
 
 Each prepared call returns its result kind and an action. The action runs
-the inner call once and uses its promoted result to build the outer
-runtime operand. Save the function's source span so errors during
-execution point to the call that failed. The expected result kind of the
+the operand calls once in source order and uses their promoted results to
+build the outer runtime operands. Then apply the prepared function once. Save each function's
+source span so errors during execution point to the call that failed. The expected result kind of the
 outer call does not affect either specialization.
 
 A partial signature can use this path when the chain ends in a literal.

@@ -63,14 +63,20 @@ source :: ( Prelude.odd 5 :~: 'True
           , Prelude.reverse '[ 'λ', '\n'] :~: '[ '\n', 'λ'] )
 source = (Refl, Refl, Refl, Refl, Refl)
 
+saturated :: ( Prelude.gcd 18 24 :~: 6
+             , Prelude.subtract (Prelude.sum '[1, 1]) 7 :~: 5
+             , Lib.sameList '[] '[ 'True] :~: 'False )
+saturated = (Refl, Refl, Refl)
+
 main :: IO ()
 main = case (reversed, emptyInput, emptyResult, bools, emptyBools, chars) of
     (Refl, Refl, Refl, Refl, Refl, Refl)
         | show [5, 3, 2 :: Natural] == "[2,3,5]" ->
-            case (nested, computed, source, twiceUpper (Proxy @'x') :: Proxy 'X') of
+            case (nested, computed, source, saturated, twiceUpper (Proxy @'x') :: Proxy 'X') of
                 ( (Refl, Refl, Refl, Refl)
                   , (Refl, Refl, Refl, Refl, Refl, Refl)
                   , (Refl, Refl, Refl, Refl, Refl)
+                  , (Refl, Refl, Refl)
                   , Proxy ) ->
                     print (natVal (fst (chain (Proxy @'[2, 3, 5]))))
         | otherwise -> fail "ordinary Show did not select the overlapping list instance"

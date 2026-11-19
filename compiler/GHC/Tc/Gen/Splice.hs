@@ -1347,19 +1347,19 @@ closedCallValueShape kind
 -- See Note [Closed literal type evaluation].
 tcRunClosedCall :: Id -> Core.CoreExpr -> Type -> TcM Type
 tcRunClosedCall fun argument result_kind = do
-  run <- tcPrepareClosedCall fun (exprType argument) result_kind
-  run argument
+  run <- tcPrepareClosedCall fun [exprType argument] result_kind
+  run [argument]
 
--- | Check the call and build an action for its runtime operand.
-tcPrepareClosedCall :: Id -> Type -> Kind -> TcM (Core.CoreExpr -> TcM Type)
-tcPrepareClosedCall fun domain result_kind = do
+-- | Check the call and build an action for its runtime operands.
+tcPrepareClosedCall :: Id -> [Type] -> Kind -> TcM ([Core.CoreExpr] -> TcM Type)
+tcPrepareClosedCall fun domains result_kind = do
   hsc_env <- getTopEnv
   (dictionary_kind, list_result, decode) <- case closedTypeResultCodec result_kind of
     Just codec -> return codec
     Nothing -> bad ("The function returns " ++ showPpr (hsc_dflags hsc_env) result_kind ++
                     ". Closed calls in types currently support results of type Natural, Char, Bool, or lists of these types.")
   interp <- checkClosedTypeEvalStage hsc_env name
-  let expected = mkVisFunTyManyU domain result_kind
+  let expected = foldr mkVisFunTyManyU result_kind domains
   function <- if idType fun `tcEqType` expected
                 then pure (Core.Var fun)
                 else specializeClosedFunction name expected
@@ -1387,11 +1387,12 @@ tcPrepareClosedCall fun domain result_kind = do
                   && exprType ret `tcEqType` mkVisFunTyManyU stringTy io_string) $
             bad "Unexpected type for the interpreter response."
           loc <- getSrcSpanM
-          return $ \argument -> setSrcSpan loc $ do
+          return $ \arguments -> setSrcSpan loc $ do
             failIfErrsM
-            unless (exprType argument `tcEqType` domain) $
-              bad "The runtime operand does not have the expected type."
-            let call = mkCoreApp function argument
+            unless (length arguments == length domains &&
+                    and (zipWith tcEqType (map exprType arguments) domains)) $
+              bad "The runtime operands do not have the expected types."
+            let call = mkCoreApps function arguments
                 rendered_call = mkCoreApp render call
                 response = if list_result
                              then mkCoreApp rendered_call (mkListExpr charTy [])
