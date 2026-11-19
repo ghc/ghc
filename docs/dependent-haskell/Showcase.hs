@@ -30,6 +30,7 @@
 module Main (main) where
 
 import qualified BetaCallClient as Beta
+import qualified CharacterExport
 import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
 import qualified ConstructorCallClient as Constructor
@@ -60,6 +61,7 @@ import qualified ParameterizedIndexLibrary as Parameterized
 import PackedVecLibrary
 import qualified QualifiedPiLibrary as Qualified
 import qualified Type.Reflection as Reflection
+import qualified UnicodeExport
 
 {- Note [Maintaining the Dependent Haskell showcase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -812,8 +814,8 @@ main = do
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
     observe "Prelude.sum in a type" (TypeNats.natVal (Proxy @(Prelude.sum '[2, 3, 5])))
-    observe "uppercase after the pattern determines the character"
-        (charVal (upperFromPattern (Proxy @'a')))
+    observe "title case after the pattern determines the character"
+        (charVal (titleFromPattern (Proxy @'a')))
     observe "Prelude.reverse '[2, 3, 5] equals '[5, 3, 2]"
         (Refl :: Prelude.reverse '[2, 3, 5] :~: '[5, 3, 2])
     observe "sum of a list reversed during type checking"
@@ -822,9 +824,14 @@ main = do
         (OpenSource.routedFirst False (42 :: Int), OpenSource.routedSecond False (42 :: Int))
     observe "odd accepts the Natural computed by sum"
         (Refl :: Prelude.odd (Prelude.sum '[2, 3, 5]) :~: 'False)
+    observe "odd applied directly to the literal 5" (Refl :: odd 5 :~: 'True)
+    observe "an exported character equality at a mapped and a default input"
+        [CharacterExport.p3 (Proxy @'x'), CharacterExport.p3 (Proxy @'!')]
+    observe "Unicode code points from an exported Data.Char.toUpper equality"
+        (map fromEnum [UnicodeExport.p3 (Proxy @'é'), UnicodeExport.p3 (Proxy @'\x1e943')])
 
 -- | The producer exports only an ordinary Haskell function.
-closedLength :: Proxy (Length.length '[1, 2, 3])
+closedLength :: Proxy (Length.length [1, 2, 3])
 closedLength = Proxy
 
 -- | The ordinary polymorphic identity returns the caller's type variable.
@@ -840,8 +847,8 @@ openLeft :: forall a b. a -> b -> const a b
 openLeft x _ = x
 
 -- | The argument pattern fixes the wildcard before GHC checks the result.
-upperFromPattern :: Proxy _c -> Proxy (Data.Char.toUpper _c)
-upperFromPattern (_ :: Proxy 'a') = Proxy @'A'
+titleFromPattern :: Proxy _c -> Proxy (Data.Char.toTitle _c)
+titleFromPattern (_ :: Proxy 'a') = Proxy @'A'
 
 -- | Use the same imported function at runtime and in a result type.
 closedSourceFunctions :: IO ()

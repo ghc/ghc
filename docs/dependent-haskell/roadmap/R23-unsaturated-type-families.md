@@ -3,9 +3,43 @@
 Upstream: [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families).
 Upstream status: accepted, awaiting implementation. Local status: M63 has
 selected ordinary-arrow build/check evidence. M64 implements explicit forall
-metadata. Its selected builds and checks pass; publication remains pending.
-The generic native client and family source unsaturation remain open.
+metadata. The generic native client, unsaturated family applications in
+source, and compatibility with existing Haskell programs remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
+
+## Compatibility with existing Haskell
+
+The normal-way run of `testsuite/tests/dependent` after M112 found 36
+unexpected results. Of 213 cases run, 177 passed. The compiler and
+`base` rebuilt from the previous fork tip, `496701ecc8`, reproduced all
+36 failures. Each test produced the same diagnostic text or golden diff
+after removing temporary paths and diff-header timestamps.
+
+Fifteen tests that should compile were rejected.
+All fifteen report a mismatch involving arrow matchability. For example,
+`T20875` expects the saturated type family `ToKind TRUE` to supply
+the arrow kind of `Maybe`. `T12442` checks defunctionalization symbols.
+These programs use existing Haskell syntax. Restore their acceptance and
+keep rejecting actual incompatible matchability annotations.
+[Family returning an arrow kind](../../../testsuite/tests/dependent/should_compile/T20875.hs),
+[defunctionalization](../../../testsuite/tests/dependent/should_compile/T12442.hs)
+and [reflection](../../../testsuite/tests/dependent/should_compile/RaeJobTalk.hs).
+
+Of the 21 output mismatches, three successful compilations printed
+different kinds. In sixteen compile-fail tests the substantive rejection
+was preserved. Two other negative tests now fail in an earlier declaration.
+`RAE_T32a` fails at the application of `MkStar`. `T13135` rejects `AST`
+before it reaches the intended missing `Constr` instance. Fix the earlier
+failures before reconsidering those goldens.
+[RAE_T32a](../../../testsuite/tests/dependent/should_fail/RAE_T32a.hs)
+and [T13135](../../../testsuite/tests/dependent/should_fail/T13135.hs).
+
+Run the directory tests with a built in-tree compiler.
+
+```sh
+hadrian/build --flavour=default --test-compiler=stage2 --test-speed=normal \
+    --test-way=normal --test-root-dirs=testsuite/tests/dependent test
+```
 
 ## Goal and dependencies
 

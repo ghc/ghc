@@ -8,7 +8,8 @@ temporary directory.
 
 `GenerateUpper.hs` uses the GHC API to resolve, typecheck, and
 desugar a fresh home-module copy of the Unicode worker source. It
-lints the selected binding in its module scope and certifies
+lints the selected binding in its module scope. The [structural
+checker](../../../../compiler/GHC/Core/CharCase.hs) certifies
 all 1,505 literal arms and the strict identity default. It writes the
 ordinary closed family `Upper` directly from the certified Core
 rows. The harness also rejects recursive and partial functions and a
@@ -31,8 +32,7 @@ source stay unchanged, and the result for `'x'` changes from `'X'`
 to `'Y'`.
 
 This example uses a generated module to carry the equations across
-the interface. To check `Data.Char.toUpper c` directly, GHC still
-needs to certify the package producer when it compiles the library,
-associate the public function with its worker, and record the
-dependency in its interface.
+the interface. The [compiler implementation](../../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+stores the equations in the producer's interface. An exported forwarding
+function can refer to its worker's family.
 [Draft proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).

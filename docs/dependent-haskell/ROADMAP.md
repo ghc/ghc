@@ -157,14 +157,15 @@ argument is still unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Accept source operands through GHC's normal literal and constructor checking at the supported kinds. Preserve the existing interpretation of an unannotated empty list. | [M108](PLAN.md#m108-accept-a-computed-value-at-each-supported-result-kind) accepts all six result shapes as computed operands. The innermost call still requires a character literal or a list of natural literals. |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check proposal #509’s exported equality `Data.Char.toUpper c ~ uc` when the client instantiates `c`. [M109](PLAN.md#m109-carry-an-open-call-in-an-exported-equality) specifies what Core Lint and a separate client must check. | M107 selects a rigid result operand across an imported character case. A [separate experiment](examples/certified-character-case/README.md) derives a closed family from the Unicode worker and checks its nominal equality across interfaces. The public term name still needs a link to that evidence. R17–R19 also depend on R05 and R16. |
+| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Check a fully applied binary library function such as `Prelude.gcd 18 24`. | [M110](PLAN.md#m110-check-ground-source-operands-at-their-declared-kinds) admits all six scalar/list kinds as source inputs. [M111](PLAN.md#m111-use-the-closed-evaluator-with-the-roadmaps-source-spelling) checks `Vec (length [1,2,3]) Bool` under the existing scoping rules. [M112](PLAN.md#m112-pass-a-checked-family-result-to-the-closed-evaluator) composes a checked family with an interpreted call. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Project a component of a pair containing rigid variables, as in `Prelude.fst '(a,b)`. | [M109](PLAN.md#m109-carry-an-open-call-in-an-exported-equality) discharges [proposal #509's](https://github.com/ghc-proposals/ghc-proposals/pull/509) exported `Data.Char.toUpper c ~ uc` through the installed library. More general open terms still need a representation and nominal evidence. R17–R19 also depend on R05 and R16. |
 | R21, dependency analysis | Allow the producer to be defined in the consumer module, respecting declaration order and cycles. | A separately compiled producer lets R15 proceed while R21 remains open. |
 
 [R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
 and [R23](roadmap/R23-unsaturated-type-families.md) retain their own completion
-criteria. Revisit a dependency when it blocks an active card's executable
-example. Treat the arrows as prerequisites or subtasks, as on Serokell's
+criteria. The [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell)
+include ordinary programs rejected because of arrow matchability. Revisit
+a dependency when it blocks an active card's executable example. Treat the arrows as prerequisites or subtasks, as on Serokell's
 graph. A workaround in an example library does not close a dependency.
 
 ### Local checkpoints
@@ -226,6 +227,10 @@ evaluator work has priority.
 | 47 | R15: nested closed calls | [M106](PLAN.md#m106-check-a-closed-call-inside-another-closed-call) | A reversed list supplies the argument to an ordinary `sum`. The client records dependencies on both producers. |
 | 48 | R16: observe a character case | [M107](PLAN.md#m107-observe-a-character-case-with-rigid-result-operands) | An imported worker selects between two rigid types. The API regression records and checks the selected branches against its typed Core. |
 | 49 | R15: use computed operands | [M108](PLAN.md#m108-accept-a-computed-value-at-each-supported-result-kind) | The result kind determines the next operand's representation, including an arbitrary-precision natural and lists of Boolean or character values. |
+| 50 | R16: export a character case | [M109](PLAN.md#m109-carry-an-open-call-in-an-exported-equality) | A client solves an exported worker equality at a literal from two interfaces. A visible conflicting rewrite rule prevents that use. |
+| 51 | R15: accept source literals | [M110](PLAN.md#m110-check-ground-source-operands-at-their-declared-kinds) | The argument kind selects how to check the literal. A mixed list fails at the element with the wrong kind. |
+| 52 | R15: accept the upstream spelling | [M111](PLAN.md#m111-use-the-closed-evaluator-with-the-roadmaps-source-spelling) | The existing name lookup rules admit an unqualified imported length function on `[1,2,3]`. |
+| 53 | R15/R16: compose a family result with an ordinary call | [M112](PLAN.md#m112-pass-a-checked-family-result-to-the-closed-evaluator) | The solver supplies the inner character and the interpreter runs the outer function. Each records its own dependency. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
@@ -386,8 +391,8 @@ still require substantial research.
 - [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24. M82 connects a concrete instance method to a checked source function in a retained argument. M83 checks the selected ground `Num` instance’s conversion of a nonnegative literal. General classes and abstract dictionary arguments remain open.
 - [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23.
 - [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge.
-- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M99, M101 and M103 support qualified closed calls on a character or a list of natural number literals. The argument can determine a polymorphic function's specialization. M105 reads back one list layer of a supported scalar type. M106 composes qualified unary calls. M108 passes all supported result shapes between calls. General closed evaluation remains open. See the [active card](roadmap/R15-closed-term-evaluator.md).
-- [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M100 and M102 handle rigid projections. M104 retries a call before generalization when a pattern fixes a signature wildcard. M107 selects a branch with a known character and a rigid result operand. The exported equality in M109 remains open. See the [open-term examples and checks](roadmap/R16-open-term-evaluator.md).
+- [ ] **R15 [Closed term evaluator](https://ghc.serokell.io/dh#closed-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M99, M101 and M103 support qualified closed calls on a character or a list of natural number literals. The argument can determine a polymorphic function's specialization. M105 reads back one list layer of a supported scalar type. M106 composes qualified unary calls. M108 passes all supported result shapes between calls. M110 accepts written literals at those kinds. M111 checks the roadmap's length signature. General closed evaluation remains open. See the [active card](roadmap/R15-closed-term-evaluator.md).
+- [ ] **R16 [Open term evaluator](https://ghc.serokell.io/dh#open-term-evaluator)** — Unmarked. Needs/includes: no outgoing graph edge. M100 and M102 handle rigid projections. M104 retries a call before generalization when a pattern fixes a signature wildcard. M107 selects a branch with a known character and a rigid result operand. M109 publishes a closed family for finite character mappings and follows a checked alias across an interface. See the [open-term examples and checks](roadmap/R16-open-term-evaluator.md).
 - [ ] **R17 [Type-level lambdas](https://ghc.serokell.io/dh#type-level-lambdas)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R18 [Type-level let-bindings](https://ghc.serokell.io/dh#type-level-let-bindings)** — Unmarked. Needs/includes: R05, R16.
 - [ ] **R19 [Type-level case-expressions](https://ghc.serokell.io/dh#type-level-case-expressions)** — Unmarked. Needs/includes: R05, R16.

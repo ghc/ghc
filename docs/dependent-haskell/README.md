@@ -8,11 +8,14 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19.
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 187 lines.
+The full dependent-directory check still has 36 failures that reproduce on
+the previous fork tip. Fifteen reject existing programs that should compile.
+[R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
 An imported `length :: [Natural] -> Natural` can now compute a vector
 index during compilation. The producer uses ordinary Haskell `foldr`.
-The declaration `v :: Vec (Length.length '[1, 2, 3]) Bool` accepts three
+With `RequiredTypeArguments`, the declaration `v :: Vec (length [1,2,3]) Bool` accepts three
 cells. If the producer changes to return four, GHC checks the unchanged
 client again and rejects it. [Source example and compiler checks](roadmap/R15-closed-term-evaluator.md).
 
@@ -49,7 +52,7 @@ The Showcase uses `Refl` to prove
 call can determine the input of another call during inference. [List evidence](roadmap/R15-closed-term-evaluator.md#list-results).
 
 The input can also come from a pattern. In
-`upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)`, matching
+`upper :: Proxy _c -> Proxy (Data.Char.toTitle _c)`, matching
 `(_ :: Proxy 'a')` fixes the wildcard. The body must return `Proxy 'A'`.
 A module that imports `upper` can use that concrete type with the
 extension switched off. [Inference example](roadmap/R16-open-term-evaluator.md#inferring-a-character-from-a-pattern).
@@ -57,8 +60,23 @@ extension switched off. [Inference example](roadmap/R16-open-term-evaluator.md#i
 One closed call can supply another's argument directly.
 `Prelude.sum (Prelude.reverse '[2, 3, 5])` computes the index `10`.
 The Showcase proves that passing this sum to `Prelude.odd` yields
-`'False`.
+`'False`. A natural literal also works directly. GHC proves
+`odd 5 :~: 'True` using the ordinary `Integral Natural` instance.
 [Nested calls](roadmap/R15-closed-term-evaluator.md#nested-closed-calls).
+
+A character function can appear in an exported equality before the
+caller selects a character. The runnable example exports
+`(CharacterCase.upper c ~ uc, KnownChar uc) => Proxy c -> Char`.
+An ordinary client gets `'X'` at `'x'` and `'!'` at the default.
+Both results follow from the producer's interface.
+[Character function](examples/open-evaluation/CharacterCase.hs)
+and [exported signature](examples/open-evaluation/CharacterExport.hs).
+
+The same signature works for the installed `Data.Char.toUpper`. Its public
+definition forwards to the generated Unicode worker. The worker publishes
+the literal equations and the default. A caller with the extension off can
+use `p3 (Proxy @'é')` to obtain `'É'`.
+[Proposal #509 example](examples/open-evaluation/UnicodeExport.hs).
 
 An ordinary recursive length function now gives the return type of a
 vector constructor. For a list of `Int` read from an `IORef`, the caller can

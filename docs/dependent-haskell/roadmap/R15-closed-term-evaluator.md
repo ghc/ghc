@@ -222,3 +222,25 @@ syntax `[x]` under `ListTuplePuns`. Use `'[x]` or `'[]` to request a
 singleton or empty promoted list when that extension is active.
 [Consumer](../examples/closed-evaluation/Client.hs)
 and [proposal #378 on term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types).
+
+## Checked family results inside closed calls
+
+In `Data.Char.toLower (Data.Char.toUpper 'x')`, the installed
+`toUpper` supplies a checked family equation and `toLower` executes
+in the interpreter. The solver reduces the inner application to
+`'X'` using the producer interface. The outer function returns `'x'`.
+A change in the checked equations can invalidate the consumer even
+when the interpreter never loads the certified worker object.
+A purely symbolic `toUpper (toUpper c)` can remain in an exported
+type while `c` is unknown.
+[Mixed source proofs](../../../testsuite/tests/dependent/should_run/NativeClosedLists.hs)
+and [nominal family reduction](../../../compiler/GHC/Tc/Solver.hs).
+
+## Next source test
+
+`Prelude.gcd 18 24 :~: 6` currently fails with GHC-68947. Its two
+operands determine the same `Natural` parameter. The compiler must
+check the complete arrow and its `Integral` dictionary before it
+evaluates either operand. Use a noncommutative function to check
+argument order. Use a function on two lists to check that a later
+Boolean element can determine the kind of an earlier empty list.

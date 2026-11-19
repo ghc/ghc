@@ -198,9 +198,14 @@ and fully applied. Its operands can be local values, supported constructors,
 or further checked calls. A user-defined operator can supply equations in
 the same way as a named function.
 
-GHC can execute a qualified call to an imported ordinary function while
-checking a type. For example, both witnesses check with an ordinary import
-of ``Data.Char``::
+GHC can execute a call to an imported ordinary function while checking
+a type. An unqualified name uses the existing scope rules. For example,
+with :extension:`RequiredTypeArguments`, ``Vec (length [1,2,3]) Bool``
+can refer to an imported ``length :: [Natural] -> Natural``. An explicit
+type binder named ``length`` takes precedence.
+
+GHC uses a published character equation for ``toUpper`` and executes
+``isDigit``, ``sum``, ``reverse`` and ``odd`` in the following examples::
 
     {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
     import qualified Data.Char
@@ -233,11 +238,16 @@ once. If that call fails, the error
 points to the inner function, even when the outer function would ignore
 its argument at runtime.
 
-At the innermost call, write a character literal or a promoted list of
-natural number literals. Each function takes one unrestricted argument.
-An intermediate result can be ``Natural``, ``Char``, ``Bool`` or a list of
-one of these types. The next function's argument type must match it.
-An empty list carries its element type across that boundary. GHC forces
+At the innermost call, write a natural or character literal, a Boolean
+constructor, or a promoted list of those values. For example,
+``Prelude.odd 5 :~: 'True`` and ``Prelude.and '[ 'True, 'False] :~: 'False``
+both admit ``Refl``. GHC uses the declared function argument to select
+``[Bool]`` for ``Prelude.and '[]``. A polymorphic ``Prelude.reverse '[]``
+uses ``[Natural]`` as before.
+
+Each function takes one unrestricted argument. An intermediate result
+can have any of the same six kinds. An empty result list carries its
+element kind to the next call. GHC forces
 every result element before constructing the promoted list. The producer may use
 ordinary Haskell. The compiler needs its compiled code and a target
 interpreter. Safe Haskell rejects execution of these calls. If an imported
@@ -262,7 +272,7 @@ For example, with :extension:`NamedWildCards`, :extension:`PartialTypeSignatures
     import Data.Proxy (Proxy(..))
     import qualified Data.Char
 
-    upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+    upper :: Proxy _c -> Proxy (Data.Char.toTitle _c)
     upper (_ :: Proxy 'a') = Proxy @'A'
 
 GHC learns that ``_c`` is ``'a'`` from the pattern. Before it generalizes
@@ -315,6 +325,32 @@ The consumer records the worker definition it used. A producer loaded
 as bytecode in GHCi can supply its unfoldings with
 :ghc-flag:`-fno-unoptimized-core-for-interpreter` and
 :ghc-flag:`-fno-omit-interface-pragmas`.
+
+An exported equality can also mention a checked character function.
+For example, module ``CharacterCase`` can define::
+
+    upper :: Char -> Char
+    upper 'x' = 'X'
+    upper 'é' = 'É'
+    upper c   = c
+
+A second module can use that function in a signature::
+
+    p3 :: forall c uc. (CharacterCase.upper c ~ uc, KnownChar uc)
+       => Proxy c -> Char
+    p3 _ = charVal (Proxy @uc)
+
+Enable :extension:`ExperimentalDependentTypes` in those two modules.
+A client with the extension switched off can call ``p3 (Proxy @'x')``
+and get ``'X'``. Calling it at ``'!'`` returns ``'!'``. The producer's
+interface carries the checked equations even with
+:ghc-flag:`-fomit-interface-pragmas`. GHC can use the default equation
+when it can rule out every earlier incompatible literal. This form
+supports a finite set of character literals and an identity default.
+An exported function can also forward to an imported function with checked
+equations. The fork's in-tree build uses this for ``Data.Char.toUpper``.
+Replacing ``CharacterCase.upper c`` with ``Data.Char.toUpper c`` in the
+signature above lets an ordinary client reflect the Unicode mapping.
 
 For a class method, the current implementation accepts a concrete
 instance of a one-parameter class. The method must return its class

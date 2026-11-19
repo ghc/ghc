@@ -8130,21 +8130,95 @@ returns its input in the default branch.
       worker and regenerating the family changes the unchanged client's
       result under `--make`.
       [Reproduce the experiment](examples/certified-character-case/README.md).
-- [ ] Associate the checked case with the worker's resolved name in the
+- [x] Associate the checked case with the worker's resolved name in the
       producer's own interface. Record its declaration dependency. Check
       which producer data remain available when ordinary optimization
       unfoldings are omitted.
-- [ ] Represent the saturated call in the producer interface. Keep it
+- [x] Represent the saturated call in the producer interface. Keep it
       opaque when its operand is a skolem. The result of this function
       does not determine its input.
-- [ ] At a known operand, produce a nominal equality whose endpoints
+- [x] At a known operand, produce a nominal equality whose endpoints
       Core Lint can reconstruct from checked information. Reject an
       altered definition or branch. Check the interface in a fresh process.
-- [ ] Compile an ordinary client using only interfaces, then link it.
-      Test mapped and default characters, preserve demand on a rigid
-      operand, and invalidate the client after an unchanged-signature edit.
-      Run the exact `Data.Char.toUpper` example once its producer can
-      publish the required information.
+- [x] Compile an ordinary client of a direct worker using only
+      interfaces, then link it. Test mapped and default characters.
+      Recheck the unchanged client after a worker body edit. Check a
+      visible orphan rule against both the ordinary runtime function
+      and the exported equality.
+      [Three-module regression](../../testsuite/tests/dependent/should_run/NativeOpenCharFamily.sh).
+- [x] Forward the checked equations through a second term binding.
+      Retain the worker dependency and check rewrite rules on both names.
+- [x] Compile the exact `Data.Char.toUpper` example in proposal #509
+      using the installed library producer and an ordinary client. Both
+      compiler stages accepted the exporter with the `ghc-internal`
+      registration exposing only interfaces. After linking, the client reported
+      code points `[88,201,33,125217]`.
+      [Exporter](examples/open-evaluation/UnicodeExport.hs) and
+      [package regression](../../testsuite/tests/dependent/should_run/NativeOpenInstalledUpper.sh).
 
 [Exported signature and evidence](roadmap/R16-open-term-evaluator.md#an-equality-that-crosses-a-module-boundary)
 and [proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).
+
+## M110: check ground source operands at their declared kinds
+
+M108 let the result of `Prelude.sum` supply a `Natural` to another
+function. At that checkpoint, writing `Prelude.odd 5 :~: 'True`
+failed with GHC-70565. M110 checks the written literal through GHC's
+type checker and uses the same conversion as for a nested call.
+
+- [x] Accept natural and character literals, the Boolean constructors and
+      promoted lists of those elements. Check mixed lists at the bad element.
+- [x] Use the declared input of `Prelude.and` to check `'[]` at `[Bool]`.
+      Preserve the existing `[Natural]` choice for `Prelude.reverse '[]`.
+- [x] Require the operand to determine a polymorphic function's parameters.
+      Check staging before execution and preserve diagnostics on open terms.
+- [x] Compile the source proofs and run the Showcase with both stages and GHCi.
+      All three runs produced the same 187 lines.
+
+[Closed evaluator card](roadmap/R15-closed-term-evaluator.md).
+
+## M111: use the closed evaluator with the roadmap's source spelling
+
+The [Serokell example](https://ghc.serokell.io/dh#closed-term-evaluator)
+uses `Vec (length [1,2,3]) Bool`. Compile that signature using the
+existing `RequiredTypeArguments` name lookup rule and an imported
+`length :: [Natural] -> Natural`.
+
+- [x] Preserve unqualified type binders and names in the type namespace.
+      Check an explicit empty `forall.` and the implicit-quantification
+      behaviour with `RequiredTypeArguments` disabled.
+- [x] Admit a list that the parser already recognizes as an explicit
+      list. Preserve the interpretation of singleton and empty brackets
+      under `ListTuplePuns`. Check unqualified nested calls.
+- [x] Reject a source-only import at the function name. Run the short
+      vector and producer recompilation checks using the roadmap spelling.
+
+## M112: pass a checked family result to the closed evaluator
+
+Publishing a function's equations changes how a type application is
+resolved. For example, in `Data.Char.toLower (Data.Char.toUpper 'x')`,
+the inner name now refers to a checked family. The outer function
+still needs the interpreter. Preserve this source program when the
+producer gains a family.
+
+- [x] Check the whole call before executing an ordinary child. Convert
+      a ground family result through its nominal reduction and the
+      existing value representation for its kind.
+- [x] Keep purely symbolic family applications on the ordinary path.
+      `toUpper (toUpper c)` must remain well-kinded for a rigid `c`.
+- [x] Check the stage, required instances and known input kind before
+      entering user code. Diagnose an unknown operand at its source.
+- [x] Confirm that a body-only change to the certified worker can
+      invalidate a mixed call. The worker supplies an interface
+      dependency. The ordinary function supplies executable code.
+
+[Closed evaluator card](roadmap/R15-closed-term-evaluator.md)
+and [nominal family reducer](../../compiler/GHC/Tc/Solver.hs).
+
+Both compiler stages passed the mixed-call checks. The self-hosted compiler
+also passed with each interpreter. The integrated check passed 36 selected
+normal-way tests and the dedicated GHCi test. Both compiled Showcase runs
+and GHCi produced the same 187 lines. The wider dependent-directory run
+passed 177 cases and failed 36. Rebuilding the compiler and base library
+from `496701ecc8` reproduced all 36 failures with the same diagnostics.
+[R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).

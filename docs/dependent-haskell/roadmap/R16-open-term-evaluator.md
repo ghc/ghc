@@ -74,13 +74,13 @@ and [separate-compilation test](../examples/open-evaluation/check-source.sh).
 ## Inferring a character from a pattern
 
 ```haskell
-upper :: Proxy _c -> Proxy (Data.Char.toUpper _c)
+upper :: Proxy _c -> Proxy (Data.Char.toTitle _c)
 upper (_ :: Proxy 'a') = Proxy @'A'
 ```
 
 The pattern determines `_c`. GHC runs the imported function on `'a'`
 and checks the body against the resulting `Proxy 'A'`. If the body
-claims `'Z'`, the error at `Data.Char.toUpper` reports both characters.
+claims `'Z'`, the error at `Data.Char.toTitle` reports both characters.
 If the pattern leaves `_c` unknown, GHC reports the blocked input there.
 An ordinary client sees `upper :: Proxy 'a' -> Proxy 'A'` in the
 interface. [Source tests](../../../testsuite/tests/dependent/should_run/NativeOpenRetry.hs)
@@ -185,7 +185,7 @@ p3 _ = charVal (Proxy @uc)
 The producer checks the body with the equality and dictionary supplied
 by its caller. The caller must establish the equality after it chooses
 `c`. The application must therefore survive in the producer's interface.
-M104 rejects this signature at `Data.Char.toUpper`.
+M104 rejected this signature at `Data.Char.toUpper`.
 [Proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).
 
 Start with an ordinary imported `Char -> Char` that changes one literal
@@ -208,7 +208,7 @@ and returned its input in the default branch. The observer selects all three res
 The test records a proposed ground reduction and replays its selected
 alternatives against the linted definition. It rejects a changed
 producer, a missing step and a wrong result. The trace lives in memory.
-An exported equality still needs a representation and nominal evidence.
+M109 uses an ordinary closed-family axiom to supply nominal evidence for this finite case.
 
 The default branch exposed a demand requirement. GHC shares the default
 code in a local function that takes an unboxed unit. The observer could
@@ -218,7 +218,7 @@ not be discarded. Inspect the producer with `-ddump-ds-preopt` to see the
 continuation before optimization.
 [Desugaring shared pattern-match failure](../../../compiler/GHC/HsToCore/Utils.hs).
 
-The design question is how to represent and check this reduction in
+General open case reduction still needs a checked representation in
 Core. The current `TermAppCo` proves congruence under one local head.
 GHC's built-in literal rules give an example of checking proof endpoints.
 A checked step for a case must also identify the imported definition and
@@ -234,30 +234,14 @@ when the producer omitted its optional unfolding. Persistent evidence
 therefore needs a producer declaration that supplies the checked
 information under the supported compilation flags.
 
-The next proposed interface test has three modules. An ordinary worker
-changes one character and returns the default input unchanged. A second
-module exports a `p3`-style signature over that worker. The third imports
-the signature and discharges it at a literal with only interfaces
-available. Inspect the produced nominal coercion with Core Lint, then
-change the worker and require the unchanged third module to recheck.
-GHC's built-in family prover is pure. A design that reuses it must load
-and validate its input before checking the coercion endpoints. A private
-certificate tied to the resolved producer declaration is one candidate.
-The certificate representation and the coercion remain open.
+For finite character mappings, R16 reuses the closed-family machinery
+from R13. The producer derives one literal equation per branch and a final
+identity equation. Core Lint can check the resulting nominal coercion
+against that axiom. General open cases can have expressions outside this
+fragment. [Source tables](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+and [closed-family branch selection](../../../compiler/GHC/Core/FamInstEnv.hs).
 
-A finite total character mapping also admits a smaller experiment.
-The fork already binds some ordinary functions to compiler-generated
-closed families using `SourceTableId` on R13. If the compiler derives
-every literal equation and its identity fallback from the checked worker,
-the existing closed-family axiom supplies nominal evidence for this
-fragment. A forwarding equation could refer to the worker from an alias.
-Test blocked and ground inputs, interface fingerprints and client
-invalidation before selecting that design. General R16 cases can have
-expressions that such a family does not represent.
-[Source tables](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
-and [GHC's closed-family branch selection](../../../compiler/GHC/Core/FamInstEnv.hs).
-
-The built library illustrates why the producer matters.
+The original package interfaces showed why producer publication matters.
 `GHC.Internal.Unicode.toUpper` exports an unfolding that refers to
 `toSimpleUpperCase`. That function exports a wrapper that calls
 `$wtoSimpleUpperCase`. The worker's interface has its type and
@@ -273,5 +257,55 @@ typechecks with only interfaces available. It gets the mapped result for
 input back for `'!'`. GHC rejects both a wrong ground equality and a
 default proof for an unknown `c`. Editing the original worker and
 regenerating the family changes the unchanged client's result from
-`'X'` to `'Y'`. The remaining compiler step is to associate the public
-`Data.Char.toUpper` name with this checked family in the producer interface.
+`'X'` to `'Y'`. This experiment established the finite case rule before
+GHC could publish the family itself.
+
+## Direct character cases in producer interfaces
+
+An extension-enabled producer can now export `upper :: Char -> Char` with
+a finite set of literal mappings and an identity default. GHC derives the
+closed family from the desugared function and records it in the term's
+`SourceTableId`. An exporter can write `CharacterCase.upper c ~ uc` in a
+signature. A separate client can solve that constraint at a known character
+with the extension switched off and optional unfoldings omitted. It still
+cannot assume the identity equation for an unknown input.
+
+The ordinary client reads only the interfaces during checking. Changing
+`'x'` from `'X'` to `'Y'` in the worker changes the unchanged client's
+output. A visible orphan rule can also change the worker. In that control
+the ordinary runtime call returned `'Z'`, and GHC reported GHC-83605 at
+the call that requested the equality. The producer, exporter and client also
+passed a separate `-fno-code -fwrite-interface` check.
+[Producer](../examples/open-evaluation/CharacterCase.hs),
+[exporter](../examples/open-evaluation/CharacterExport.hs)
+and [three-module regression](../../../testsuite/tests/dependent/should_run/NativeOpenCharFamily.sh).
+
+## The installed Unicode function
+
+The fork's Hadrian build enables equation publication in the two
+`ghc-internal` modules that implement `Data.Char.toUpper`. The Unicode
+module's `toUpper` is an exact alias of `toSimpleUpperCase` in another
+module. It publishes a forwarding equation. The public `Data.Char`
+module re-exports the same binding.
+
+The exporter can now use the signature from proposal #509 verbatim.
+The package regression makes a temporary registration with the installed
+unit IDs. It supplies only `ghc-internal` interfaces to the exporter and
+client during compilation. The exporter interface contains the equality
+under the Unicode module's family name. The link then uses the ordinary
+libraries. The client checks `'x'`, `'é'`, the default at `'!'`, and the
+last mapping at U+1E943. Their result code points are 88, 201, 33
+and 125217. At `p3 @'x' @'Y'`, GHC reports the actual and required
+characters at the call.
+[Exported signature](../examples/open-evaluation/UnicodeExport.hs),
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledUpper.hs)
+and [separate-package test](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledUpper.sh).
+
+## Next source test
+
+`first :: forall a b. a -> b -> Prelude.fst '(a,b)` currently fails at
+`Prelude.fst` with GHC-68947. The result must be the caller's original
+`a`. The ordinary function demands the outer pair. Selecting its first
+field leaves the second field unevaluated. Cover the analogous `snd`,
+a rigid pair with no known constructor, and a changed imported definition
+that selects the other field. [The ordinary projections](../../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs).

@@ -5125,5 +5125,55 @@ and [interface decoding](../../compiler/GHC/IfaceToCore.hs).
 The [Unicode experiment](examples/certified-character-case/README.md)
 derives the ordinary family from pre-optimization Core. The client can
 reduce its exported equality with only the producer interfaces available.
-[Structural check](examples/certified-character-case/CharCertificate.hs)
+[Structural check](../../compiler/GHC/Core/CharCase.hs)
 and [exported signature](examples/certified-character-case/P3.hs).
+
+### Literals as inputs to ordinary functions in types
+
+Agda gives a natural literal its built-in natural-number type by default.
+A program can select `fromNat` through instance arguments. GHC already
+has a type-level natural literal and can use its kind to select the
+ordinary `Integral Natural` instance for `Prelude.odd 5`. R15 checks
+promoted lists and Boolean constructors through the same type checker as
+other Haskell type syntax. For a bare promoted empty list, the function
+domain can supply the missing element kind.
+[Agda 2.8.0 literal overloading](https://agda.readthedocs.io/en/v2.8.0/language/literal-overloading.html#natural-numbers),
+[GHC's type-level literals](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/type_literals.html)
+and [GHC's source type checker](../../compiler/GHC/Tc/Gen/HsType.hs).
+
+### Publishing the character worker's equality
+
+Agda compiles ordered clauses to a case tree. A rigid scrutinee can
+prevent the tree from selecting a branch. For a finite strict character
+case with an identity default, a GHC closed family can express the same
+condition through its apartness check. The generated equations must use
+the worker's checked binding and preserve its literal alternatives. The
+declaration's identity matters when a client reads the equation through
+a second module's signature.
+[Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
+[GHC's closed-family axioms](../../compiler/GHC/Core/FamInstEnv.hs)
+and [the exported equality in proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).
+
+The public `Data.Char` module re-exports `GHC.Internal.Unicode.toUpper`.
+That definition names the imported `toSimpleUpperCase` worker. An exact
+term alias can therefore publish a forwarding equation. The alias's
+equation refers to the worker's family by name. The checked declaration
+supplies its identity and tracks edits to the worker. In this fork,
+Hadrian enables publication when its in-tree compiler builds those two
+modules. A standalone Cabal build with this compiler can opt in by setting
+`ghc-options: -XExperimentalDependentTypes` for `ghc-internal` in the
+project file. That Cabal setting applies to the library component.
+[Public export](../../libraries/base/src/Data/Char.hs),
+[Unicode forwarding definition](../../libraries/ghc-internal/src/GHC/Internal/Unicode.hs),
+[generated worker](../../libraries/ghc-internal/src/GHC/Internal/Unicode/Char/UnicodeData/SimpleUpperCaseMapping.hs)
+and [Hadrian package settings](../../hadrian/src/Settings/Packages.hs).
+
+For a mixed call such as `toLower (toUpper 'x')`, GHC's bounded
+family-only rewriter uses checked nominal axioms to determine the
+ground operand. Agda's case-tree account explains why an unknown
+scrutinee can still leave nested applications blocked. GHC's closed
+interpreter needs a concrete value at that boundary. Each side
+records the dependency that supplied its result.
+[Solver's family-only reduction](../../compiler/GHC/Tc/Solver.hs),
+[source owner and evidence checks](../../compiler/GHC/Tc/Gen/SourceTable.hs)
+and [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
