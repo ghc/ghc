@@ -2794,3 +2794,32 @@ Core constructor, wire tag, proof primitive, term evaluator or totality rule.
 Preserve lazy values and bottom functions. Ordinary optimization, unrestricted
 expression indices and general normalization guarantees remain outside this
 contract.
+
+## Nominal evidence for a composition of strict pair cases
+
+Consider `fst (swap p) ~ snd p` for an unknown boxed pair. The checked
+producer equations have a pair constructor on the left. Neither
+constructor equation can reduce at this input. The solver uses a
+built-in nominal rule to connect these endpoints, including when an
+imported signature exposes the composition only after substitution.
+
+For example, the outer projection in `fst (swap p)` selects the first
+output of the exchange. Its defining branch puts the second input there.
+The opposite projection on the right selects that same second input.
+Forcing either result inspects the same shell and then the same field.
+The proof does not require an equation between a pair and a fresh pair
+of its projections. Such an equation would change strictness at bottom.
+
+The two arguments of the `BoxedPairComposition` axiom identify the
+endpoints with nominal reflexive coercions. The checker reads the
+single closed branch of each family. It checks saturation, binder
+identity, field order, kinds, and the common scrutinee. Core Lint uses
+the same checker. The solver also records the three source owners so
+a conflicting ordinary rewrite rule can invalidate the source judgment.
+The interface records the built-in rule name and its arguments. The fork
+changed the format suffix from `68` to `69`. Both readers rejected the
+other format at the header. Changing only the rule name inside a new
+proof produced a diagnostic naming the unknown rule.
+[Rule and branch checker](../../compiler/GHC/Builtin/CoercionRules.hs),
+[solver](../../compiler/GHC/Tc/Solver/Equality.hs)
+and [Core Lint controls](../../testsuite/tests/dependent/should_run/NativeOpenPairCoercion.hs).

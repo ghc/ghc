@@ -8395,3 +8395,28 @@ Both compiler stages built. The native Showcase and GHCi agreed on all
 tests with the internal and external interpreters. The normal-way
 dependent directory passed 198 of 234 cases. All 36 failures had the
 same individual diagnostics as at M119. The full GHC testsuite was not run.
+
+## M123: prove strict pair composition after substitution
+
+- [x] From the checked projections and exchange, establish both
+      `fst (swap p) ~ snd p` and `snd (swap p) ~ fst p` for a rigid pair.
+      Require nominal premises and exact branch binders. Check source
+      owner dependencies for both projections and the exchange.
+- [x] Check the proof after instantiation through an interface. Reject the
+      wrong field with homogeneous kinds, a conflicting rule in the
+      client, and a conflicting orphan rule added after compilation.
+- [x] Change the interface version. Check rejection of an incompatible
+      header and an unknown built-in rule in a serialized proof.
+- [x] Build both stages. Check the installed equations, the Core Lint
+      controls, the Showcase and the normal-way dependent tests.
+
+[Core rule](CORE.md#nominal-evidence-for-a-composition-of-strict-pair-cases)
+and [source examples](roadmap/R16-open-term-evaluator.md#composing-a-projection-with-a-swap).
+
+The two compiled Showcases and GHCi produced the same 197 lines. Both
+interpreter paths passed the interface-only package test. The ordinary
+consumer rejected a local `fst` rule at its inferred composition. The
+self-hosted compiler also passed the ordinary splice and plugin examples.
+The normal-way dependent directory passed 199 of 235 cases, including
+the Core Lint test. Each of the 36 failures had the same diagnostics as
+at M122. The full GHC testsuite was not run.

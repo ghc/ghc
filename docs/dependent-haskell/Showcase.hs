@@ -858,6 +858,9 @@ main = do
     observe "project rigid fields after swapping a known pair"
         ( PreludePairExport.nestedFirst (Proxy @'True)
         , PreludePairExport.nestedSecond (Proxy @'x') )
+    observe "project through a swap proved for an unknown pair"
+        ( PreludePairExport.abstractFirst (Proxy @'( 'True, 'x'))
+        , PreludePairExport.abstractSecond (Proxy @'( 'True, 'x')) )
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

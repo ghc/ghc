@@ -362,3 +362,19 @@ tests. A separate, bounded check returned and consumed 32, 256, and 1,024
 optional elements with Core and STG lint enabled. The normal-way
 dependent directory passed 198 of 234 cases. The 36 failures had the
 same individual output as at M119.
+
+## Next source case for a user-defined result
+
+An ordinary module can export `data Signal = Stop | Go` and
+`signal :: Natural -> Signal`. Check `P.signal 0 :~: 'P.Stop` and pass
+the computed signal to a second ordinary function. Require an import
+of both constructors. A module that exports only the abstract type
+must retain control over its representation.
+
+The proposed first case uses the existing DataKinds constructor
+identities for a monomorphic boxed enumeration. Two modules can both
+define `Stop`. The consumer must get the constructor of the actual
+result type. Change the producer, or remove a constructor from the
+module export list, and check that GHC rechecks the unchanged consumer.
+These are acceptance cases for the next R15 increment.
+[GHC's DataKinds rules](../../users_guide/exts/data_kinds.rst).

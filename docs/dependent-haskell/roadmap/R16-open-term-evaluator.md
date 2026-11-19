@@ -447,14 +447,25 @@ also needs the equality when a later client instantiates `q` with
 `Data.Tuple.swap p`. Rewriting the original source expression would miss
 that use.
 
-An isolated compiler checks a nominal Core coercion for this law and its
-dual. It checks the actual field order in the three family equations.
-It recorded the coercion in an optimized interface and a second module
-read it with Core Lint enabled. The compiler with the constructor
-equations alone rejected both proofs at `Refl` with GHC-83865.
-Before integration, check malformed coercions, local and imported rewrite
-rules, stale evidence, and interface format compatibility. The law
-requires both sides to force the same pair shell and select the same
-field. An arbitrary boxed pair can diverge when forced.
-[Source correspondence](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+The proof uses a nominal Core coercion for the law and its dual.
+The checker reads the actual field order in the three family equations.
+The compiler with only the constructor equations rejected both proofs
+at `Refl` with GHC-83865. The experimental rule passed both, including
+a client that obtained the composition by substituting into an imported
+signature. A matching local rule and an orphan rule introduced later
+both invalidated the corresponding source proof. The structural checker
+also rejected the wrong field of a homogeneous pair and a forged
+representational premise.
+
+The ordinary test client has the extension off. It imports `get`,
+`swapIndex`, and `secondIndex` from the dependent exporter. The type
+of `get (swapIndex p)` contains the composition, even though the client
+only manipulates proxies. The test asks GHC to give it the same index
+as `secondIndex p`. Adding a local rule that makes `fst` select the
+second field causes GHC-83605 at the use in the ordinary client.
+Both sides of the checked equality force the same pair shell
+and select the same field. An arbitrary boxed pair can diverge when
+forced.
+[Core law](../CORE.md#nominal-evidence-for-a-composition-of-strict-pair-cases),
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledPair.hs)
 and [Agda's projection and eta rules](../REFERENCES.md#closed-constructor-arguments-and-composition-of-strict-pair-cases).

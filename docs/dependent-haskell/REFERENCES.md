@@ -5299,3 +5299,16 @@ which field two successive strict cases select.
 [Agda 2.8.0 internal syntax](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs),
 [Agda record eta](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#eta-expansion)
 and [GHC’s pair definitions](../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs).
+
+### A nominal law for two strict pair cases
+
+System FC uses explicit coercions to witness equal types. The closed
+type families calculus specifies when a branch can supply such a
+coercion. For an unknown `p`, the constructor branch for `swap` cannot
+match. The separate law that two strict cases select the same field is
+a design choice in this fork. Its executable checks cover the branch
+shapes, nominal roles, interface substitution, and source rule
+dependencies. A metatheoretic account of this addition remains open.
+[System F with type equality coercions, TLDI 2007](https://www.microsoft.com/en-us/research/publication/system-f-with-type-equality-coercions/),
+[Closed Type Families with Overlapping Equations, POPL 2014](https://simon.peytonjones.org/assets/pdfs/closed-type-families.pdf)
+and [local Core contract](CORE.md#nominal-evidence-for-a-composition-of-strict-pair-cases).
