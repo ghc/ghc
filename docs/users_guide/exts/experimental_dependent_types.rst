@@ -27,7 +27,7 @@ type by matching a constructor, or partially apply a type lambda::
 
     {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers #-}
     {-# LANGUAGE StandaloneKindSignatures, TypeFamilies #-}
-    module SurfaceGuide (PairUp, Payload, WithError, Result) where
+    module SurfaceGuide (PairUp, Payload, ByType, WithError, Result) where
     import Data.Kind (Type)
     import GHC.Exts (U)
 
@@ -36,6 +36,10 @@ type by matching a constructor, or partially apply a type lambda::
     type Payload b = case b of
       True  -> Int
       False -> Bool
+
+    type ByType a = case a of
+      Bool     -> Int
+      Ordering -> Char
 
     type WithError :: Type %U -> Type
     type WithError = (\err result -> Either err result) String
@@ -51,6 +55,12 @@ right-hand side in the enclosing scope, even if the body ignores it.
 The lambda and case forms currently require a top-level synonym on the
 outside. A case alternative can bind distinct fields of a constructor.
 The case stays stuck while the outer constructor of the scrutinee is unknown.
+
+``ByType Bool`` selects ``Int`` directly at compile time. A bare branch
+head names a data constructor if one is in scope. Otherwise GHC looks
+it up in the type namespace. A promotion tick always selects a data
+constructor. A synonym used as a pattern must still have a constructor
+head after expansion.
 
 Natural numerals in vector indices
 ----------------------------------

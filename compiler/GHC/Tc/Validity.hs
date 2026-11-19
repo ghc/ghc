@@ -2605,9 +2605,27 @@ checkTyFamEqnValidityInfo fam_tc = \ case
      , vi_qtvs         = qtvs
      , vi_non_user_tvs = non_user_tvs
      , vi_pats         = pats
-     , vi_rhs          = rhs } ->
+     , vi_case_pattern = case_pattern
+     , vi_rhs          = rhs } -> do
+    forM_ case_pattern $ \(span, pat) ->
+      setSrcSpan span $
+        checkTc (isJust (tcSplitTyConApp_maybe pat)) (TcRnTypeCasePattern (Just pat))
     setSrcSpan loc $
-    checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
+      checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
+
+{- Note [Constructor heads in type cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A case row must demand a constructor in its scrutinee. A source synonym
+such as Identity x expands to a variable. A family axiom for that row would
+reduce even when its scrutinee is an unknown variable. Keep the checked
+pattern and source location in TyFamEqnValidityInfo. Inspect it after the
+recursive group is complete and the synonym cycle check has run. Expanding
+synonyms during the family equation check can force the unfinished knot.
+
+Use the normal constructor view, including the visible function-arrow
+constructor. Ordinary family LHS validity still rejects a type family
+application. Other family equations do not carry a case pattern.
+-}
 
 -- | Check binders for a type or data family declaration.
 --

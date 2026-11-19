@@ -1110,8 +1110,11 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCaseDisabled
       -> mkSimpleDecorated $ text "A type-level" <+> quotes (text "case")
                               <+> text "requires -XExperimentalDependentTypes."
-    TcRnTypeCasePattern
-      -> mkSimpleDecorated $ text "A type case pattern needs a data constructor with distinct variable or wildcard fields."
+    TcRnTypeCasePattern Nothing
+      -> mkSimpleDecorated $ text "A type case pattern needs a constructor head with distinct variable or wildcard arguments."
+    TcRnTypeCasePattern (Just pat)
+      -> mkSimpleDecorated $ hang (text "After expanding type synonyms, the pattern has no constructor head:")
+                                2 (ppr (coreFullView pat))
     TcRnTypeCaseContext
       -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext

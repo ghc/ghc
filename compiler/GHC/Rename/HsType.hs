@@ -54,7 +54,6 @@ import GHC.Driver.Flags
 import GHC.Data.List.SetOps (findDupsEq)
 import GHC.Parser.PostProcess (setRdrNameSpace)
 
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias), HsTypeGhcRnExt(..), HsTypeCaseAlt(..))
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -989,6 +988,17 @@ rnHsTyKi _ (XHsType HsTypeLambda{}) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   failWithTc (if enabled then TcRnTypeLambdaContext else TcRnTypeLambdaDisabled)
 
+-- A bare case pattern prefers a data constructor, as before. Resolve it
+-- after the declaration group is in scope. If the data name is absent,
+-- use the ordinary type namespace and the ordinary family-pattern checks.
+rnHsTyKi env (XHsType (HsTypeCaseHead name))
+  = do { let data_name = fmap (`setRdrNameSpace` srcDataName) name
+       ; found <- lookupOccRn_maybe (unLoc data_name)
+       ; case found of
+           Just gre -> rnHsTyVar (const (pure gre)) env (HsTyVar noAnn IsPromoted data_name) IsPromoted data_name
+           Nothing -> rnHsTyVar lookupTypeOccRn env (HsTyVar noAnn NotPromoted name) NotPromoted
+                        (fmap (`setRdrNameSpace` tcName) name) }
+
 rnHsTyKi env (XHsType (HsTypeCaseAlias generated alias body)) = do
   -- Compiler-generated family arguments are absent from the source pattern.
   -- Keep the normal unused binder check for written constructor fields.
@@ -1016,7 +1026,7 @@ rnHsTyKi _ (XHsType (HsTypeCase (case_kw, _) _ _ alts)) = do
     else case [ pat | L _ (HsTypeCaseAlt pat _ _) <- alts
                     , isNothing (classifyTypeCasePattern pat) ] of
       pat : _ -> setSrcSpanA (getLoc pat) $
-        failWithTc TcRnTypeCasePattern
+        failWithTc (TcRnTypeCasePattern Nothing)
       [] -> setSrcSpan (getEpTokenSrcSpan case_kw) $ failWithTc TcRnTypeCaseContext
 
 rnHsTyKi env ty@(XHsType (HsRecTy {})) = do
@@ -1063,9 +1073,9 @@ classifyTypeCasePattern pat = do
           pure (L loc (HsAppTy ann con' field), name : bound)
         HsWildCardTy{} -> pure (L loc (HsAppTy ann con' field), bound)
         _ -> Nothing
-    constructorPattern (L loc (HsTyVar ann _ name))
+    constructorPattern (L loc pat@(HsTyVar _ promotion name))
       | isRdrTc (unLoc name) || isRdrDataCon (unLoc name)
-      = Just (L loc (HsTyVar ann IsPromoted (fmap (`setRdrNameSpace` srcDataName) name)), [])
+      = Just (L loc (if isPromoted promotion then pat else XHsType (HsTypeCaseHead name)), [])
     constructorPattern _ = Nothing
 
 {-

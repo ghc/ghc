@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, TypeFamilies #-}
 -- | Select a type from the constructor of a type-level scrutinee.
 module NativeCase
-  ( F, Field, Same, Capture, Braces, roadmap
+  ( F, ByType, Field, Same, Capture, Braces, roadmap
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
   ) where
@@ -13,6 +13,11 @@ import Data.Proxy (Proxy)
 type F a = case a of
   True -> Int
   False -> Bool
+
+-- | Select a result from the input type itself.
+type ByType (a :: Type) = case a of
+  Bool     -> Int
+  Ordering -> Char
 
 -- | Bind the field of Just in its alternative.
 type Field x = case x of

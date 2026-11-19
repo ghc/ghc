@@ -4584,8 +4584,8 @@ data TcRnMessage where
   -- | A type-level case needs ExperimentalDependentTypes.
   TcRnTypeCaseDisabled :: TcRnMessage
 
-  -- | A type case alternative cannot be represented by a constructor pattern.
-  TcRnTypeCasePattern :: TcRnMessage
+  -- | The pattern is malformed, or its expansion has no constructor head.
+  TcRnTypeCasePattern :: Maybe Type -> TcRnMessage
 
   -- | A type case occurs outside the supported synonym RHS.
   TcRnTypeCaseContext :: TcRnMessage

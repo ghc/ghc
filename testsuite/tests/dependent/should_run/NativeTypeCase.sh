@@ -22,11 +22,21 @@ cp NativeCase.hi NativeTypeCase{Client,Rigid,LetWrong}.hs interfaces/
    reject NativeTypeCaseRigid 8:13 'case a of {True -> Int; False -> Int}' &&
    grep -Fq "Just x1 -> '(x, x1)" bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
+"${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
+cp NativeTypeCaseHeadProvider.hi NativeTypeCaseHeads.hs NativeTypeCaseSynonymCatchAll.hs interfaces/
+(cd interfaces && "${g[@]}" -Werror=unused-imports -c NativeTypeCaseHeads.hs)
+reject NativeTypeCaseFamilyHead 4:24 'GHC-73138'
+grep -Fq 'Illegal type synonym family application' bad.log
+(cd interfaces && reject NativeTypeCaseSynonymCatchAll 8:39 'GHC-55789'
+grep -Fq 'After expanding type synonyms, the pattern has no constructor head' bad.log
+grep -Fq 'NativeTypeCaseSynonymCatchAll.hs:9:39: error: [GHC-55789]' bad.log
+grep -Fq 'NativeTypeCaseSynonymCatchAll.hs:10:35: error: [GHC-55789]' bad.log
+grep -Fq 'NativeTypeCaseSynonymCatchAll.hs:11:41: error: [GHC-55789]' bad.log)
 reject NativeTypeCaseInvalid 6:3 'Not in scope: data constructor'
 reject NativeTypeCaseEscape 6:14 'Not in scope: type variable'
-reject NativeTypeCaseBadPattern 5:3 'A type case pattern needs a data constructor'
+reject NativeTypeCaseBadPattern 5:3 'A type case pattern needs a constructor head'
 grep -Fq '[GHC-55789]' bad.log
-reject NativeTypeCaseFallback 5:3 'A type case pattern needs a data constructor'
+reject NativeTypeCaseFallback 5:3 'A type case pattern needs a constructor head'
 reject NativeTypeCaseDisabled 4:12 'GHC-98931'
 reject NativeTypeCaseBranchKind 6:12 "In the type case in"
 reject NativeTypeCaseScrutinee 4:15 'Not in scope: type constructor or class'

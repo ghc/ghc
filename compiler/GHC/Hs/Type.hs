@@ -573,6 +573,9 @@ data HsTypeGhcPsExt
 
   | HsTypeCaseAlias [RdrName] (Maybe (Int, LocatedN RdrName)) (LHsType GhcPs)
 
+  -- An unquoted constructor head in a lifted type-case equation.
+  | HsTypeCaseHead (LocatedN RdrName)
+
 -- | A parsed constructor alternative in a type case.
 data HsTypeCaseAlt
   = HsTypeCaseAlt (LHsType GhcPs) (EpUniToken "->" "→") (LHsType GhcPs)
@@ -1675,6 +1678,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
       text "case" <+> ppr_mono_lty scrutinee <+> text "of"
         $$ nest 2 (vcat [ppr_mono_lty pat <+> arrow <+> ppr_mono_lty rhs
                        | L _ (HsTypeCaseAlt pat _ rhs) <- alts])
+    HsTypeCaseHead name -> ppr name
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
     HsTypeLet _ v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
@@ -1750,6 +1754,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsBangTy{}  -> p > topPrec
         HsRecTy{}   -> False
         HsTypeLambda{} -> False
+        HsTypeCaseHead{} -> False
         HsTypeCaseAlias{} -> p >= topPrec
         HsTypeLet{} -> p >= topPrec
         HsTypeCase{} -> p >= topPrec

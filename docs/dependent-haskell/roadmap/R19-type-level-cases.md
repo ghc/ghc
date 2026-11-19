@@ -33,6 +33,27 @@ The supported patterns have a constructor head and distinct variables or
 wildcards for fields. General nested cases, catch-all alternatives and
 case expressions inside arbitrary types remain open.
 
+## Type constructors in case patterns
+
+An unquoted head first resolves as a data constructor. If no data
+constructor is in scope, GHC looks in the ordinary type namespace.
+A promotion tick selects the data namespace. Thus both `Choose Bool
+:~: Int` and `Choose Ordering :~: Char` hold for this synonym:
+
+```haskell
+type Choose a = case a of { Bool -> Int; Ordering -> Char }
+```
+
+In `data T = T`, bare `T` in a type case still selects the data
+constructor. A type-only qualified import can select the type constructor
+or class. Synonyms can expand to constructor patterns. A synonym that expands to a
+variable cannot turn a constructor branch into a catch-all. The ordinary checks for
+closed families reject applications of type families in patterns.
+Term-level cases keep their existing name lookup. Type cases on promoted
+GADT constructors still refine the scrutinee kind.
+[Closed-family translation, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf)
+and [namespace and interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
+
 ## A case in a let body
 
 A case branch can use a let-bound type or kind. For example,

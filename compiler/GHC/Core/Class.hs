@@ -130,6 +130,8 @@ data TyFamEqnValidityInfo
       -- introduces the kind variable @k@ for the kind of @a@. See #23734.
     , vi_pats :: [Type]
       -- ^ LHS patterns
+    , vi_case_pattern :: Maybe (SrcSpan, Type)
+      -- ^ Written constructor pattern and its checked type for a lifted case
     , vi_rhs :: Type
       -- ^ RHS of the equation
       --

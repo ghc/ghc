@@ -22,7 +22,6 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -432,7 +431,8 @@ liftTypeCases group =
             | otherwise = typeName n
           captured = zipWith pat_capture [0 :: Int ..] captures
           pats = captured ++ [pat]
-          body = foldr restore rhs aliases
+          branch_rhs = foldr restore rhs aliases
+          body = L (getLoc branch_rhs) (XHsType (HsTypeCaseAlias [] Nothing branch_rhs))
           restore (ann, binder, helper, indices) rest
             | unLoc binder `notElem` bound =
                 letTy (getLoc rhs) ann binder

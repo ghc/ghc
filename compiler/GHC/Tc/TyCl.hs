@@ -33,9 +33,7 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Config.HsToCore
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeCaseAliasRn))
 
-import GHC.Tc.Types.BasicTypes (TcTyThing(ATcCaseLet))
 import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
@@ -3559,6 +3557,7 @@ tcDefaultAssocDecl fam_tc
                           , vi_qtvs         = qtvs
                           , vi_non_user_tvs = non_user_tvs
                           , vi_pats         = pats
+                          , vi_case_pattern = Nothing
                           , vi_rhs          = rhs_ty } )
            -- We perform checks for well-formedness and validity later, in
            -- GHC.Tc.Validity.checkValidAssocTyFamDeflt.
@@ -4043,9 +4042,30 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                      , vi_qtvs         = qtvs
                      , vi_non_user_tvs = non_user_tvs
                      , vi_pats         = pats
+                     , vi_case_pattern = typeCasePattern fam_tc hs_pats hs_rhs_ty pats
                      , vi_rhs          = rhs_ty }
 
        ; return (ax, vi) }
+
+-- | Keep the source location of the scrutinee pattern until validity checking.
+-- See Note [Constructor heads in type cases] in GHC.Tc.Validity.
+typeCasePattern :: TyCon -> [LHsTypeArg GhcRn] -> LHsType GhcRn -> [Type]
+                -> Maybe (SrcSpan, Type)
+typeCasePattern tc source_args rhs checked_args
+  | L _ (XHsType HsTypeCaseAliasRn{}) <- rhs
+  = case [(getLocA pat, arg)
+         | (pat, arg) <- zip [p | HsValArg _ p <- source_args]
+                             [a | (b, a) <- zip (tyConBinders tc) checked_args
+                                , isVisibleTyConBinder b]
+         , not (capture pat)] of
+      [pattern_info] -> Just pattern_info
+      _ -> pprPanic "typeCasePattern: expected one constructor pattern" (ppr (tyConName tc))
+  | otherwise = Nothing
+  where
+    capture (L _ (HsParTy _ pat)) = capture pat
+    capture (L _ (HsTyVar _ _ (L _ (WithUserRdr _ name)))) =
+      isTvOcc (nameOccName name)
+    capture _ = False
 
 checkTyFamInstEqn :: TcTyCon -> Name -> [HsArg p tm ty] -> TcM ()
 checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats =

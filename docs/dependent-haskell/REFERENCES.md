@@ -48,6 +48,17 @@ kind of a nullary constructor such as `'Nothing`.
 [Agda as-patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#as-patterns)
 and [type-lambda example](roadmap/R17-type-level-lambdas.md#matching-a-lambda-argument).
 
+Matching `BooleanTag field` refines the kind of the field in that branch.
+Agda checks the corresponding index equation when matching an indexed
+constructor. Matching `Bool` itself selects a type with no value field.
+Use GHC's closed-family pattern rules for that operation. The fork keeps
+its existing data-constructor priority for bare case patterns, including
+when a data constructor shares its name with a type constructor. An
+explicit promotion tick always selects the data namespace.
+[Agda indexed patterns](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes),
+[GHC closed-family equations](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#closed-type-families)
+and [fork lookup rule](roadmap/R19-type-level-cases.md#type-constructors-in-case-patterns).
+
 A closed written lambda kind supplies the lifted family's standalone kind
 signature. GHC checks it before the equations, so each constructor pattern
 can refine the index independently. This preserves specified and inferred
