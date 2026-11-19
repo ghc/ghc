@@ -68,3 +68,26 @@ cmp normal.out plain.out
 grep -F 'replace Bool list builder' helper.rules
 printf '%s\n' '[True]' True '[True]' 'Just False' False >helper.expected
 diff -u helper.expected helper.out
+
+# The stock fold/build rule also needs a condition on its producer.
+cat >FoldBuild.hs <<'HS'
+module Main where
+import Control.Exception (ErrorCall, evaluate, try)
+import GHC.Exts (build)
+
+{-# NOINLINE expose #-}
+expose :: (Bool -> Char -> Char) -> Char
+expose k = foldr k 'z' (build (\c n -> c `seq` n))
+
+main :: IO ()
+main = do
+    result <- try (evaluate (expose (error "undefined combiner"))) :: IO (Either ErrorCall Char)
+    putStrLn (either (const "demanded combiner") show result)
+HS
+for level in 0 1; do
+    "${g[@]}" "-O$level" -fforce-recomp -ddump-rule-firings FoldBuild.hs -o fold-build >"fold-$level.rules"
+    ./fold-build >"fold-$level.out"
+done
+grep -Fxq "'z'" fold-0.out
+grep -Fq 'Rule fired: fold/build' fold-1.rules
+grep -Fxq 'demanded combiner' fold-1.out

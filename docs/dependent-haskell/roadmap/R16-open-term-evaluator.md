@@ -994,3 +994,26 @@ The remaining part of the roadmap example is the mapper. The installed
 `Prelude.map` has fusion rules. Its interface can omit the recursive
 unfolding. Evidence for the mapper must survive compilation of its
 defining module and account for rules visible where a proof uses it.
+
+The ordinary optimizer supplies a concrete limit on such evidence.
+For ``g c n = c `seq` n``, evaluating `foldr k 'z' (build g)` with an
+undefined `k` returns `'z'` at `-O0`. At `-O1`, the stock `fold/build`
+rule fires and the same observation raises an exception. A conversion
+rule for the mapper must justify each use of fusion at the producer
+it reaches. The type of `g` alone cannot establish that condition.
+[Reproduce both observations](../examples/open-evaluation/check-map-fusion.sh)
+and [research on polymorphism with seq](../papers/README.md#free-theorems-and-seq-popl-2004).
+
+A private instrumented build compared the original `GHC.Internal.Base.map`
+with its own final Core at both `-O1` and `-O2`. Both inspect the input
+spine, apply the same callback to the cons head and recurse on its
+original tail. The checker also rejected changes to the callback, the
+demand or the tail. This gives the producer a place to check the
+ordinary mapper before its unfolding can disappear from the interface.
+A private compiler used that evidence to check the exact
+`Prelude.map Prelude.not` proof with rewriting disabled. An optimized
+module could export the alias. A consumer with rewriting enabled
+received GHC-83605 when it tried to use the mapper equation at `Refl`.
+A fresh no-code producer supplied no final-Core evidence. Integration
+and the conditions for using the equation with rewriting enabled remain
+open.

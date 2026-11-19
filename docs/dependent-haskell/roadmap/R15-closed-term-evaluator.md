@@ -985,3 +985,24 @@ interpreter runs. The checked callback enters the same runtime Core
 expression as the other operands. The compiler records its interface and
 linker dependencies and reifies the final result. Function-valued results
 and open higher-order aliases remain outside this path.
+
+## Native prototype for a computed pair field
+
+A private compiler has checked the direct source proof
+`pick (bump 7) :~: 8` for `bump n = (n + 1, error "unread")`.
+An ordinary client checked the exported alias without the projection's
+object file. Demanding the other field raised the expected exception.
+
+The producer emitted a private entry from its final Core. The entry
+returns either the selected field or the complete pair. The first
+choice requires evidence from the executable that the other field
+cannot return. Replacing only a transitive helper object changed that
+decision. GHC rechecked the client and compared the complete operand
+when both fields became available. This preserves reflexivity under a
+projection rule. A visible producer rule kept the existing execution path.
+
+The experiment used a private native build of `GHC.Internal.Err`.
+Integration still needs an ordinary package build and a representation
+that covers other supported field types. The shared branch continues
+to use the existing direct-projection case. [Previous object and equality
+controls](#m161-observe-a-field-decision-from-the-loaded-executable).
