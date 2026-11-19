@@ -9221,3 +9221,18 @@ lines. Exact printing reproduced the source byte for byte. The dependent
 directory passed 249 of 284 exercised normal-way cases. Its 35 failures
 and their diagnostics matched M173. Both compilers accepted the same
 115 of 124 ordinary polykinds sources.
+
+## R23. Write matchability before the arrow
+
+Use `a %U -> b` for an unmatchable arrow and `a %M -> b` for a
+matchable arrow. With `Modifiers`, GHC identifies each annotation by its
+kind. With `LinearTypes` as well, allow one multiplicity and one
+matchability in either order. Keep the existing `FUN` representation
+and the multiplicity rules for `NoModifiers`.
+[Proposal decisions](REFERENCES.md#matchability-and-multiplicity-on-arrows).
+
+Check the R17 `Map` example with an unmatchable callback. Require the
+matchable variant to fail. Check a polymorphic annotation, a duplicate
+annotation, an interface-only client, exact printing and a Template
+Haskell round trip. Report a source error when GHC cannot classify an
+arrow modifier in a raw quotation.

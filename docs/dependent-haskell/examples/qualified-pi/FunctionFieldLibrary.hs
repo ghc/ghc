@@ -1,12 +1,10 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
-{-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
 
 -- | Store a local function inside a closed algebraic index.
 module FunctionFieldLibrary where
 
-import GHC.Exts (FUN, U, Multiplicity (Many))
-
-type BoolEndo = FUN @U 'Many Bool Bool
+type BoolEndo = Bool -> Bool
 
 data Flag (b :: Bool) where
     IsFalse :: Flag 'False

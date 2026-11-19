@@ -1,15 +1,15 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, StandaloneKindSignatures,
-             TypeApplications, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures,
+             TypeFamilies, TypeOperators #-}
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda (L, Captured, Shadowed, roadmap) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import GHC.Exts (FUN, U, Multiplicity(Many))
+import GHC.Exts (U)
 
 -- | Apply a type function to each list element.
-type Map :: FUN @U 'Many a b -> [a] -> [b]
+type Map :: (a %U -> b) -> [a] -> [b]
 type family Map f xs where
   Map f '[] = '[]
   Map f (x ': xs) = f x ': Map f xs

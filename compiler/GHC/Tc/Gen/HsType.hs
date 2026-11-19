@@ -64,7 +64,7 @@ module GHC.Tc.Gen.HsType (
         checkClassKindSig,
 
         -- Modifiers
-        tcModifiersAndWarn, tcMult, tcMultDefault, tcModifiersMult,
+        tcModifiersAndWarn, tcMult, tcConArrowMult, tcModifiersMult,
 
         -- Pattern type signatures
         tcHsPatSigType, tcHsTyPat, tcRuleBndrSig,
@@ -1470,11 +1470,16 @@ concern things that the renamer can't handle.
 
 -}
 
+-- | Check the multiplicity and the matchability of a constructor field arrow.
+tcConArrowMult :: HsModifiedFunArr GhcRn -> TcM (Maybe Mult)
+tcConArrowMult ann = do
+  (mult, ma) <- tc_arrow_modifiers typeLevelMode ann
+  forM_ ma $ \actual -> void (unifyType Nothing actual matchableDataConTy)
+  pure mult
+
+-- | Check multiplicity annotations in a field declaration.
 tcMult :: HsModifiedFunArr GhcRn -> TcM (Maybe Mult)
 tcMult = tc_mult typeLevelMode
-
-tcMultDefault :: Mult -> HsModifiedFunArr GhcRn -> TcM Mult
-tcMultDefault def ann = fromMaybe def <$> tcMult ann
 
 tcModifiersAndWarn :: [LHsModifier GhcRn] -> TcM [TcType]
 tcModifiersAndWarn mods =
@@ -2056,6 +2061,55 @@ tc_mult mode (HsModifiedFunArr _ mods arr) = do
     (HsLinearArr _, Nothing) -> pure $ Just oneDataConTy
     (HsLinearArr _, Just _) -> failWithTc TcRnTooManyMultiplicities
 
+-- | The two modifier kinds that can annotate a function arrow.
+data ArrowModifier = ArrowMultiplicity | ArrowMatchability
+
+-- | Check the arrow annotations. See Note [Arrow matchability modifiers].
+tc_arrow_modifiers :: TcTyMode -> HsModifiedFunArr GhcRn
+                   -> TcM (Maybe Mult, Maybe Matchability)
+tc_arrow_modifiers _ (HsModifiedFunArr _ [] arr) =
+  case arr of
+    HsStandardArr _ -> pure (Nothing, Nothing)
+    HsLinearArr _   -> pure (Just oneDataConTy, Nothing)
+tc_arrow_modifiers mode ann@(HsModifiedFunArr _ mods arr) = do
+  modifiers <- xoptM LangExt.Modifiers
+  if not modifiers then (, Nothing) <$> tc_mult mode ann else do
+    linear_types <- xoptM LangExt.LinearTypes
+    let classify k
+          | tcEqType k matchabilityTy = Right ArrowMatchability
+          | isMultiplicityTy k && linear_types = Right ArrowMultiplicity
+          | isMultiplicityTy k = Left SuggestLinear
+          | otherwise = Left DontSuggestLinear
+    (mult, ma) <- foldM (addModifier classify) (Nothing, Nothing) mods
+    case (arr, mult) of
+      (HsLinearArr _, Nothing) -> pure (Just oneDataConTy, ma)
+      (HsLinearArr _, Just _) -> failWithTc TcRnTooManyMultiplicities
+      (HsStandardArr _, _) -> pure (mult, ma)
+  where
+    addModifier classify (mult, ma) modifier = setSrcSpanA (getLoc modifier) $ do
+      found <- tc_modifier_with mode modifier Nothing classify
+      case found of
+        Nothing -> pure (mult, ma)
+        Just (ArrowMultiplicity, m)
+          | isNothing mult -> pure (Just m, ma)
+          | otherwise -> failWithTc TcRnTooManyMultiplicities
+        Just (ArrowMatchability, m)
+          | isNothing ma -> pure (mult, Just m)
+          | otherwise -> failWithTc TcRnTooManyMatchabilities
+
+{- Note [Arrow matchability modifiers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With Modifiers, an arrow can have one annotation of kind Matchability.
+With LinearTypes, it can also have one of kind Multiplicity. Infer each
+modifier's kind once so the order of these annotations is immaterial.
+An explicit matchability takes precedence over the context's default.
+For example, Map can specify an unmatchable callback as (a %U -> b).
+A constructor field arrow must still be matchable.
+
+With NoModifiers, keep checking the multiplicity against the expected
+kind. Older linear signatures can use %p without a separate kind for p.
+-}
+
 -- | Extract the optional Multiplicity modifier from a list. Nothing if none of
 -- them are Multiplicities, error if more than one is. Non-Multiplicity
 -- modifiers generate warnings but are otherwise ignored.
@@ -2115,7 +2169,12 @@ tc_modifier :: TcTyMode
             -> (TcKind -> Either SuggestLinear ())
                -- ^ Given the Kind of a modifier, is the modifier expected?
             -> TcM (Maybe TcType)
-tc_modifier mode (L _ mod@(HsModifier modPrintsAs ty)) mSuggestKind check_expected_kind = do
+tc_modifier mode modifier mSuggestKind check_expected_kind =
+  fmap (fmap snd) $ tc_modifier_with mode modifier mSuggestKind check_expected_kind
+
+tc_modifier_with :: TcTyMode -> LHsModifier GhcRn -> Maybe Name
+                 -> (TcKind -> Either SuggestLinear a) -> TcM (Maybe (a, TcType))
+tc_modifier_with mode (L _ mod@(HsModifier modPrintsAs ty)) mSuggestKind check_expected_kind = do
   (inf_ty, inf_kind) <- tc_infer_lhs_type mode ty
   -- bug: zonking here means that (1) is rejected, but (2) is accepted.
   --     (1): Int %(m :: Multiplicity) -> Int %m -> Int
@@ -2127,7 +2186,7 @@ tc_modifier mode (L _ mod@(HsModifier modPrintsAs ty)) mSuggestKind check_expect
     -- should.
     TyVarTy _ -> failWithTc $ TcRnUnknownModifierKind mod mSuggestKind
     _ -> case check_expected_kind inf_kind' of
-      Right () -> return $ Just inf_ty
+      Right tag -> return $ Just (tag, inf_ty)
       Left suggestLinear -> do
         linearTypes <- xoptM LangExt.LinearTypes
         warn_unrecognised <- woptM Opt_WarnUnrecognisedModifiers
@@ -2260,20 +2319,21 @@ tc_fun_type_x check type_level_ma mode mult ty1 ty2 exp_kind = case mode_tyki mo
        ; res_k <- newOpenTypeKind
        ; ty1'  <- check ty1 arg_k
        ; ty2'  <- check ty2 res_k
-       ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
-       ; ma <- type_level_ma
+       ; (mult', explicit_ma) <- tc_arrow_modifiers mode mult
+       ; ma <- maybe type_level_ma pure explicit_ma
        ; checkExpKind mode (HsFunTy noExtField mult ty1 ty2)
-                      (tcMkVisFunTy ma mult' ty1' ty2')
+                      (tcMkVisFunTy ma (fromMaybe manyDataConTy mult') ty1' ty2')
                       liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1'  <- check ty1 liftedTypeKind
        ; ty2'  <- check ty2 liftedTypeKind
-       ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
-       ; ma <- if mode_declaration mode
-               then newFlexiTyVarTy matchabilityTy
-               else return matchableDataConTy
+       ; (mult', explicit_ma) <- tc_arrow_modifiers mode mult
+       ; ma <- case explicit_ma of
+                 Just ma -> pure ma
+                 Nothing | mode_declaration mode -> newFlexiTyVarTy matchabilityTy
+                         | otherwise -> pure matchableDataConTy
        ; checkExpKind mode (HsFunTy noExtField mult ty1 ty2)
-                      (tcMkVisFunTy ma mult' ty1' ty2')
+                      (tcMkVisFunTy ma (fromMaybe manyDataConTy mult') ty1' ty2')
                       liftedTypeKind exp_kind }
 
 {- Note [Skolem escape and forall-types]

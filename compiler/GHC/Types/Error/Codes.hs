@@ -716,6 +716,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnpromotableLit"                           = 51819
   GhcDiagnosticCode "TcRnUnrecognisedModifier"                      = 49969
   GhcDiagnosticCode "TcRnUnknownModifierKind"                       = 38026
+  GhcDiagnosticCode "TcRnTooManyMatchabilities"                     = 64627
   GhcDiagnosticCode "TcRnTooManyMultiplicities"                     = 65505
 
   -- TcRnIllegalInvisibleTypePattern

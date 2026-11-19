@@ -342,16 +342,14 @@ In more detail, the moving parts are:
 
 Warnings are controlled by @-Wunrecognised-modifiers@ (on by default).
 
-The only current use of modifiers is multiplicity annotations for linear types.
-These modifiers are recognized in pattern bindings, @let %1 x = ...@;
-constructor arguments (both record style, @data A = B { %1 x :: Int }@; and GADT
-style, @data A where B :: Int %1 -> A@); and function arrows, @Int %1 -> Int@.
+LinearTypes recognises multiplicities on pattern bindings (@let %1 x = ...@),
+record fields (@data A = B { x %1 :: Int }@), and function arrows
+(@Int %1 -> Int@), including arrows in GADT constructor signatures.
+See Note [Typechecking Multiplicity modifiers] in GHC.Tc.Gen.HsType.
 
-Modifiers in these positions are typechecked with 'tcModifiersMult' (pattern
-bindings) or 'tcMult' (when we have an 'HsModifiedFunArr'), and modifiers of
-kind 'Multiplicity' affect typechecking. Non-'Multiplicity' modifiers in these
-positions are treated the same as any other modifiers. See
-Note [Typechecking Multiplicity modifiers] in GHC.Tc.Gen.HsType.
+Modifiers recognises matchability on function arrows. The checker
+distinguishes the two annotations in @a %U %1 -> b@ by their kinds.
+See Note [Arrow matchability modifiers] in GHC.Tc.Gen.HsType.
 
 The modifier @%1@ is a special case, interpreted differently depending on linear
 types. With @-XLinearTypes@, @%1@ means the same as @%'One'@. (Specifically

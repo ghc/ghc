@@ -2135,6 +2135,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnknownModifierKind mod _ -> mkSimpleDecorated $
       text "Modifier" <+> pprHsModifier mod <+> "has unknown kind"
 
+    TcRnTooManyMatchabilities -> mkSimpleDecorated $
+      text "An arrow can have only one matchability modifier."
     TcRnTooManyMultiplicities -> mkSimpleDecorated $
       text "Too many Multiplicity modifiers"
 
@@ -2814,6 +2816,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnknownModifierKind{}
       -> ErrorWithoutFlag
     TcRnTooManyMultiplicities{}
+      -> ErrorWithoutFlag
+    TcRnTooManyMatchabilities{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3589,6 +3593,8 @@ instance Diagnostic TcRnMessage where
            (Just name, Nothing) -> [SuggestModifierSignature mod name]
            _ -> noHints
     TcRnTooManyMultiplicities{}
+      -> noHints
+    TcRnTooManyMatchabilities{}
       -> noHints
 
   diagnosticCode = constructorCode @GHC

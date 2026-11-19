@@ -7,6 +7,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE Modifiers #-}
 {-# LANGUAGE NamedWildCards #-}
 {-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -436,7 +437,7 @@ leadingContext Z xs right ys = show (toList xs, toList ys)
 leadingContext (S predecessor) xs later ys = show (toList xs, toList ys)
 
 -- | Use equality evidence between retained argument positions.
-keepWithLaterEvidence :: foreach (n :: Nat) -> foreach (m :: Nat) -> (n ~ m) => foreach (k :: Nat) -> Vec Int m -> Vec Int k -> (Vec Int n, Vec Int k)
+keepWithLaterEvidence :: foreach (n :: Nat) (m :: Nat) -> (n ~ m) => foreach (k :: Nat) -> Vec Int m -> Vec Int k -> (Vec Int n, Vec Int k)
 keepWithLaterEvidence Z _ _ xs ys = (xs, ys)
 keepWithLaterEvidence (S _) _ _ xs ys = (xs, ys)
 
@@ -1008,7 +1009,7 @@ type family FlipFlag (b :: Bool) :: Bool where
     FlipFlag 'True = 'False
 
 -- | Apply an unmatchable Boolean function to each list element.
-type MapFlags :: FUN @U 'Many Bool Bool -> [Bool] -> [Bool]
+type MapFlags :: (Bool %U -> Bool) -> [Bool] -> [Bool]
 type family MapFlags f xs where
     MapFlags f '[] = '[]
     MapFlags f (x ': xs) = f x ': MapFlags f xs

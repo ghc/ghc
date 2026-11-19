@@ -4569,6 +4569,9 @@ data TcRnMessage where
   -}
   TcRnTooManyMultiplicities :: TcRnMessage
 
+  -- | More than one matchability modifier on the same arrow.
+  TcRnTooManyMatchabilities :: TcRnMessage
+
   -- | A type lambda appears with ExperimentalDependentTypes disabled.
   TcRnTypeLambdaDisabled :: TcRnMessage
 

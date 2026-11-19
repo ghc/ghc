@@ -21,6 +21,11 @@ a comparison implementation. External solvers remain later work.
 
 ## References by roadmap feature
 
+For a new source spelling, record the proposal section, its status, and
+the example that checks the spelling. Use the proposal's surface form
+in the Showcase when the fork accepts it. Keep an explicit constructor
+application when the example tests the representation itself.
+
 The [program roadmap](ROADMAP.md) owns the work queue and the upstream task
 index. The 2026-11-16 review adds feature pages that connect research to the
 next implementation obligations:
@@ -33,6 +38,26 @@ next implementation obligations:
 | [R18: type-level lets](https://ghc.serokell.io/dh#type-level-let-bindings) | Check each RHS in its enclosing scope and substitute its checked type at uses. Compare [Agda's nonrecursive let](https://agda.readthedocs.io/en/stable/language/let-and-where.html) with [Eisenberg and Stolarek's lifting translation, §4.7](https://richarde.dev/papers/2014/promotion/promotion.pdf). |
 | [R19: type-level cases](https://ghc.serokell.io/dh#type-level-case-expressions) | The prototype passes the scrutinee and lexical captures to a private closed family. Check when its branches may reduce on unknown inputs. [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf). |
 | [R23: unsaturated type families](roadmap/R23-unsaturated-type-families.md#prior-art-and-current-boundary) | Proposal #242, the higher-order type-level paper and the pinned 2024 implementation. Read the native integration correction with the draft. |
+
+### Matchability and multiplicity on arrows
+
+Proposal #242 writes `a -> @m b` and defines it as `(->) @m a b`.
+The committee accepted the proposal experimentally and singled out its
+syntax for reconsideration in light of #370. [#242 syntax](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#syntax-changes),
+[#242 definition of FUN](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#fun),
+and [committee decision](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#committee-decision).
+
+Accepted proposal #370 gives modifiers a common position before the
+arrow and identifies each modifier by its kind. It anticipates
+`%Matchable` and allows matchability and multiplicity in either order.
+It leaves the detailed integration of matchability to #242. With the
+fork's aliases `U` and `M`, the corresponding source forms are
+`a %U -> b` and `a %M -> b`. The fork accepts these forms with
+`Modifiers` alone. Adding `LinearTypes` permits `a %1 %U -> b`.
+The type-level `Map` example uses `(a %U -> b) -> [a] -> [b]`.
+[#370 modifier specification](https://ghc-proposals.readthedocs.io/en/latest/proposals/0370-modifiers.html)
+and [acceptance](https://github.com/ghc-proposals/ghc-proposals/pull/370).
+[Map example](examples/open-evaluation/TypeLambda.hs).
 
 These pages record the selected implementation sources, open questions and
 unexecuted controls. The paper ledger records additional versions and selective

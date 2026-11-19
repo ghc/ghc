@@ -8,6 +8,16 @@ with remaining invisible binders, and ordinary-program compatibility
 remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
+## Matchability on a source arrow
+
+Import `U` from `GHC.Exts` and enable `Modifiers` to write the
+callback kind as `(a %U -> b) -> [a] -> [b]`. The R17 example supplies
+a type lambda at that position. A separate module checks its result
+from the interface. Changing the callback to `a %M -> b` rejects the
+lambda because it is unmatchable. Both checks pass in the isolated
+compiler. [Map source](../examples/open-evaluation/TypeLambda.hs) and
+[proposal decisions](../REFERENCES.md#matchability-and-multiplicity-on-arrows).
+
 ## Compatibility with existing Haskell
 
 The normal-way run of `testsuite/tests/dependent` after M112 found 36

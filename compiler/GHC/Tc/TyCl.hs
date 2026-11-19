@@ -2359,12 +2359,13 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
 kcConArgTys :: ConArgKind                      -- Expected kind of the argument(s)
+            -> IsPrefixConGADT
             -> [HsConDeclField GhcRn]          -- User-written argument types
             -> TcM ()
-kcConArgTys exp_kind arg_tys
+kcConArgTys exp_kind con_form arg_tys
   = forM_ arg_tys $ \(CDF { cdf_multiplicity, cdf_type }) ->
     do { _ <- tcCheckLHsTypeInContext cdf_type exp_kind
-       ; void $ tcMult cdf_multiplicity }
+       ; void $ tcFieldModifiers con_form cdf_multiplicity }
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
 
 -- Kind-check the types of arguments to a Haskell98 data constructor.
@@ -2372,9 +2373,9 @@ kcConH98Args :: ConArgKind                       -- Expected kind of the argumen
              -> HsConDeclH98Details GhcRn
              -> TcM ()
 kcConH98Args exp_kind con_args = case con_args of
-  PrefixCon _ tys     -> kcConArgTys exp_kind tys
-  InfixCon _ ty1 ty2  -> kcConArgTys exp_kind [ty1, ty2]
-  RecCon _ (L _ flds) -> kcConArgTys exp_kind $
+  PrefixCon _ tys     -> kcConArgTys exp_kind IsNotPrefixConGADT tys
+  InfixCon _ ty1 ty2  -> kcConArgTys exp_kind IsNotPrefixConGADT [ty1, ty2]
+  RecCon _ (L _ flds) -> kcConArgTys exp_kind IsNotPrefixConGADT $
                          map (cdrf_spec . unLoc) flds
 
 -- Kind-check the types of arguments to a GADT data constructor.
@@ -2382,8 +2383,8 @@ kcConGADTArgs :: ConArgKind                       -- Expected kind of the argume
               -> HsConDeclGADTDetails GhcRn
               -> TcM ()
 kcConGADTArgs exp_kind con_args = case con_args of
-  PrefixConGADT _ tys     -> kcConArgTys exp_kind tys
-  RecConGADT _ (L _ flds) -> kcConArgTys exp_kind $
+  PrefixConGADT _ tys     -> kcConArgTys exp_kind IsPrefixConGADT tys
+  RecConGADT _ (L _ flds) -> kcConArgTys exp_kind IsNotPrefixConGADT $
                              map (cdrf_spec . unLoc) flds
 
 kcConDecls :: TcKind  -- Result kind of tycon
@@ -4763,7 +4764,14 @@ unannotatedMultIsLinear isPrefixConGADT = do
 tcDataConMult :: IsPrefixConGADT -> HsModifiedFunArr GhcRn -> TcM Mult
 tcDataConMult isPrefixConGADT mult = do
   isLinear <- unannotatedMultIsLinear isPrefixConGADT
-  tcMultDefault (if isLinear then oneDataConTy else manyDataConTy) mult
+  annotation <- tcFieldModifiers isPrefixConGADT mult
+  pure (fromMaybe (if isLinear then oneDataConTy else manyDataConTy) annotation)
+
+-- | A prefix GADT declaration attaches its modifiers to an arrow.
+-- Record declarations attach theirs to the field name.
+tcFieldModifiers :: IsPrefixConGADT -> HsModifiedFunArr GhcRn -> TcM (Maybe Mult)
+tcFieldModifiers IsPrefixConGADT    = tcConArrowMult
+tcFieldModifiers IsNotPrefixConGADT = tcMult
 
 {-
 Note [Function arrows in GADT constructors]

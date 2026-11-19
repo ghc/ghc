@@ -1,13 +1,13 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, StandaloneKindSignatures, TypeApplications #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures #-}
 module OpenMapSource (Each, NegateAll, Signals, OrdinarySignals, Heads) where
 
 import qualified ClosedTableLibrary as C
-import GHC.Exts (FUN, U, Multiplicity(Many))
+import GHC.Exts (U)
 import qualified OpenMapWorker as W
 import qualified SpineWorker as S
 
 -- | Use the ordinary mapper with an unmatchable Boolean callback.
-type Each :: FUN @U 'Many Bool Bool -> [Bool] -> [Bool]
+type Each :: (Bool %U -> Bool) -> [Bool] -> [Bool]
 type Each f xs = W.each f xs
 
 -- | Use the checked Boolean callback from the vector examples.

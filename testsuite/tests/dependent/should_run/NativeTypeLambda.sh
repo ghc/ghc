@@ -58,11 +58,11 @@ if "${g[@]}" -c Signature.hs >context.log 2>&1 ||
 fi
 
 cat >Matchable.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeApplications #-}
+{-# LANGUAGE ExperimentalDependentTypes, Modifiers #-}
 module Matchable where
 import Data.Kind (Type)
-import GHC.Exts (FUN, M, Multiplicity(Many))
-type Bad = ((\x -> x) :: FUN @M 'Many Type Type)
+import GHC.Exts (M)
+type Bad = ((\x -> x) :: Type %M -> Type)
 HS
 if "${g[@]}" -c Matchable.hs >matchable.log 2>&1 ||
    ! grep -Eq '^Matchable[.]hs:5:6: error: \[GHC-83865\]' matchable.log ||
