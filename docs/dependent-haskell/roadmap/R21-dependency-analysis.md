@@ -255,11 +255,11 @@ absence of evidence casts, before open evaluation uses it. The
 remaining group keeps its class instances, deriving, defaults and
 family instances in their ordinary order.
 
-The example assigns three equations to an imported family. It computes
-their right-hand sides with a reordered projection through a local
-helper, a lambda application and an identity. Its ordinary class
-method needs the Boolean equation. An ordinary client typechecks
-using only the interfaces and then prints `(True,EQ,'x')`.
+The first three equations in the example use a reordered projection
+through a local helper, a lambda application and an identity. Its
+ordinary class method needs the Boolean equation. The first three
+results have types `Bool`, `Ordering`, and `Char` in an ordinary
+client that sees only the interfaces.
 [Imported family example](../examples/open-evaluation/ImportedFamily.hs)
 and [separate compilation checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
 
@@ -314,3 +314,20 @@ observed helper rejects the proof. Changing the imported projection
 to choose the other operand changes the family equation to `Char`.
 The original Boolean method then fails to typecheck. [Separate
 compilation, demand and RULE checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
+## M163. Ordinary data in an independent producer
+
+The early check now admits saturated boxed data types such as `Maybe a`
+when their kind telescopes and arguments are independent. For a source
+constructor use, it resolves the constructor to its exact worker and
+checks the saturated application in solved Core. The constructor must
+have an ordinary boxed representation and lazy fields.
+
+The fourth equation uses `Prelude.maybe x Prelude.id (Just x)` to
+return the supplied type `Maybe Bool`. The ordinary interface-only
+client checks the fourth component at that type and prints
+`(True,EQ,'x',Just False)`. The negative calls an imported function
+whose declared type contains `Maybe (Payload Int)`. Although the
+producer never writes the family name, its early check rejects the
+dependency at the equation's call.
+[Source checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).

@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns, FlexibleContexts, FlexibleInstances, NoExperimentalDependentTypes, TypeFamilies #-}
 {-# OPTIONS_GHC -fno-unoptimized-core-for-interpreter -fno-omit-interface-pragmas #-}
-module ImportedFamilyProvider (Payload, hidden, Branch(..), importedFirst, importedStrict) where
+module ImportedFamilyProvider
+  (Payload, hidden, hiddenNested, Branch(..), importedFirst, importedStrict) where
 
 -- | Select the payload type of an ordinary argument.
 type family Payload a
@@ -17,6 +18,10 @@ instance Branch Bool where
 -- | Read the dictionary selected for the integer payload.
 hidden :: Branch (Payload Int) => proxy (Payload Int) -> Bool
 hidden = branch
+
+-- | Hide the family inside an otherwise ordinary boxed type.
+hiddenNested :: Maybe (Payload Int) -> Bool
+hiddenNested _ = True
 
 -- | Return the first input without inspecting either input.
 {-# INLINE importedFirst #-}

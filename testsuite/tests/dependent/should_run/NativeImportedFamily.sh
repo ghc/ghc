@@ -22,7 +22,7 @@ cat >Client.hs <<'HS'
 module Main where
 import ImportedFamily (importedFamilyResults)
 main :: IO ()
-main = print (importedFamilyResults :: (Bool, Ordering, Char))
+main = print (importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool))
 HS
 "${ghc[@]}" -c Client.hs
 "${ghc[@]}" Client.o ../producer/{ImportedFamily,ImportedFamilyProvider}.o -o client
@@ -54,6 +54,11 @@ sed -e 's/BlindCycle/ErasedCycle/g' \
     -e '/^import Data.Proxy/d' -e 's/(Payload, hidden)/(Payload)/' \
     -e 's/(hidden Proxy)/(True :: Payload Int)/' BlindCycle.hs >ErasedCycle.hs
 expect_cycle ErasedCycle
+
+sed -e 's/BlindCycle/NestedTypeCycle/g' -e '/^import Data.Proxy/d' \
+    -e 's/(Payload, hidden)/(Payload, hiddenNested)/' \
+    -e 's/(hidden Proxy)/(hiddenNested Nothing)/' BlindCycle.hs >NestedTypeCycle.hs
+expect_cycle NestedTypeCycle
 
 cat >StrictImport.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}

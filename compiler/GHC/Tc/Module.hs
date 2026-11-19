@@ -125,6 +125,8 @@ import GHC.Core.Predicate ( classMethodTy )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.DataCon
+import GHC.Core.ConLike (ConLike(RealDataCon))
+import GHC.Core.OpenWhnf (openDataConFieldTypes)
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Core.Class
@@ -1909,8 +1911,8 @@ tcIndependentFamilyProducers demands group@HsGroup
                           isNullUFM (rewriterTcMPlugins plugins)
     candidate <- case independentClosure (tcg_semantic_mod env) binds sigs (map fst selected) of
       Just (names, imported) | not (null selected), ordinary_solver -> do
-        safe <- allM independentImport (nameSetElemsStable imported)
-        pure (if safe then Just (names, imported) else Nothing)
+        verified <- traverse independentImport (nameSetElemsStable imported)
+        pure ((names,) . mkNameSet <$> sequence verified)
       _ -> pure Nothing
     case candidate of
       Just (names, imported) -> do
@@ -1991,16 +1993,50 @@ independentClosure this_mod binds sigs roots = do
       HsLam _ LamSingle matches -> match_refs locals matches
       _ -> Nothing
 
--- | Verify an imported occurrence from its interface, without using its body.
-independentImport :: Name -> TcM Bool
+-- | Verify an imported occurrence and return the name found in checked Core.
+independentImport :: Name -> TcM (Maybe Name)
 independentImport name = do
-    ident <- tcLookupIdMaybe name
-    pure (maybe False (independentType emptyNameSet . idType) ident)
+    thing <- tcLookupGlobal name
+    pure $ case thing of
+      AnId ident
+        | independentType emptyNameSet (idType ident) -> Just (idName ident)
+      AConLike (RealDataCon con)
+        | isJust (independentDataFields con (mkTyVarTys (dataConUnivTyVars con))) ->
+            Just (idName (dataConWorkId con))
+      _ -> Nothing
+
+-- | Admit only boxed ordinary datatypes with a telescope of Type binders.
+independentDataKind :: TyCon -> Bool
+independentDataKind tc =
+  isVanillaAlgTyCon tc && isBoxedDataTyCon tc && isGenerativeTyCon tc Nominal &&
+  independentConstant liftedTypeKind (tyConResKind tc) &&
+  all (\v -> isTyVar v && independentConstant liftedTypeKind (varType v)) (tyConTyVars tc)
+
+-- | Match a constructor whose user arguments and worker arguments agree.
+independentDataFields :: DataCon -> [Type] -> Maybe [Type]
+independentDataFields con parameters
+  | independentDataKind (dataConTyCon con)
+  , dataConUserTyVars con == dataConUnivTyVars con =
+      openDataConFieldTypes con parameters
+  | otherwise = Nothing
 
 -- | Recheck pre-optimisation Core emitted by the source fragment.
 independentCore :: NameSet -> CoreExpr -> Bool
 independentCore producers = go emptyNameSet emptyNameSet
   where
+    go tyvars locals expression
+      | (Core.Var worker, args) <- Core.collectArgs expression
+      , Just con <- isDataConWorkId_maybe worker =
+          getName worker `elemNameSet` producers &&
+          let (types, fields) = span Core.isTyCoArg args
+          in case traverse core_type types of
+            Just parameters
+              | Just field_types <- independentDataFields con parameters ->
+                  equalLength fields field_types &&
+                  and (zipWith (\expr kind -> exprType expr `eqType` kind) fields field_types) &&
+                  all (independentType tyvars) parameters &&
+                  all (go tyvars locals) fields
+            _ -> False
     go tyvars locals (Core.Var v)
       | getName v `elemNameSet` locals =
           independentType tyvars (varType v)
@@ -2017,7 +2053,10 @@ independentCore producers = go emptyNameSet emptyNameSet
     go tyvars _ (Core.Type ty) = independentType tyvars ty
     go _ _ _ = False
 
--- | Types in the independent fragment contain only lifted variables and arrows.
+    core_type (Core.Type ty) = Just ty
+    core_type _ = Nothing
+
+-- | Check variables, ordinary arrows and generative boxed data types.
 independentType :: NameSet -> Type -> Bool
 independentType tyvars (TyVarTy var) = getName var `elemNameSet` tyvars
 independentType tyvars FunTy{ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult,
@@ -2028,6 +2067,9 @@ independentType tyvars (ForAllTy ma (Bndr var (Invisible _)) body) =
   independentConstant unmatchableDataConTy ma && isTyVar var &&
   independentConstant liftedTypeKind (varType var) &&
   independentType (extendNameSet tyvars (getName var)) body
+independentType tyvars (TyConApp tc args)
+  | independentDataKind tc, lengthIs args (tyConArity tc) =
+      all (independentType tyvars) args
 independentType _ ty = independentConstant liftedTypeKind ty
 
 -- | Match a wired-in type constant without ignoring casts in its arguments.
@@ -2048,8 +2090,12 @@ annotations and syntax with overloaded operations. An imported Id
 can enter this batch if its entire declared type is independent.
 Check all binder kinds, argument types and arrow metadata. This
 check uses its interface, without evaluating or certifying its body.
-The observer checks the body and source RULE dependencies only if
-the checked producer needs the imported Id.
+Imported data constructors have a source DataCon Name and a distinct
+Core worker Name. Match that worker at its exact saturated application,
+and check the representation and lazy field types. A generative boxed
+datatype can appear in an imported type when the constructor kind
+telescope is independent too. The observer checks the body and source
+RULE dependencies only if the checked producer needs the imported Id.
 
 For example, in "keep x = const x (hidden Proxy)", the dictionary for
 hidden may change when the family equation comes into scope. Observing
