@@ -773,7 +773,16 @@ We also want to deal well cases like this
         v = (f e1 `cast` co) e2
 Here we want to make e1,e2 trivial and get
         x1 = e1; x2 = e2; v = (f x1 `cast` co) v2
-That's what the 'go' loop in prepareRhs does
+That's what the 'go' loop in prepareRhs does.
+
+Note [Keep retained arguments in prepareRhs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The type of a later argument can depend on the expression supplied to a
+retained binder. For example, PackVec (S Z) xs requires xs :: Vec a ('S 'Z).
+Floating S Z into a fresh binding n changes the expected type to Vec a n.
+The new runtime Id is opaque, so the original vector type cannot use that
+Id in place of its constructor index. Keep the retained argument in place.
+Ordinary arguments in the same application can still be made trivial.
 -}
 
 prepareRhs :: HasDebugCallStack
@@ -813,6 +822,12 @@ prepareRhs env top_lvl occ rhs0
         = do { (floats, rhs') <- anfise fun
              ; return (floats, App rhs' (Type ty)) }
     anfise (App fun arg)
+        | sm_core_mode (seMode env) == RetainedCore
+        , DepFunTy{} <- coreFullView (exprType fun)
+        -- See Note [Keep retained arguments in prepareRhs].
+        = do { (floats, fun') <- anfise fun
+             ; return (floats, App fun' arg) }
+        | otherwise
         = do { (floats1, fun') <- anfise fun
              ; (floats2, arg') <- makeTrivial env top_lvl topDmd occ arg
              ; return (floats1 `addLetFlts` floats2, App fun' arg') }

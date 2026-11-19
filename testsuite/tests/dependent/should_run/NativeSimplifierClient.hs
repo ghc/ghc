@@ -3,7 +3,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
-import NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations)
+import NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, sample, observePacked)
 
 main :: IO ()
 main = do
@@ -34,3 +34,4 @@ main = do
       _ -> fail "Unexpected demand of nested second length"
     print (impossible (choose False))
     print (scopeAnnotations yes, scopeAnnotations exceptional)
+    print (observePacked sample)

@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, BangPatterns #-}
-module NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations) where
+module NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, Packed, sample, observePacked) where
 
 data Nat = Z | S Nat
 data Vec a (n :: Nat) where
@@ -91,3 +91,12 @@ scopeAnnotations source =
   in case (if keep then False else True :: Ignored b) of
        False -> recurse False
        True -> 21
+
+data Packed where
+  Pack :: foreach (n :: Nat) -> Vec Int n -> Packed
+
+sample :: Packed
+sample = Pack (S (S Z)) (Cons 7 (Cons 8 Nil))
+
+observePacked :: Packed -> [Int]
+observePacked (Pack _ xs) = toList xs
