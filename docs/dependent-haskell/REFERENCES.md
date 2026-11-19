@@ -59,6 +59,15 @@ The type-level `Map` example uses `(a %U -> b) -> [a] -> [b]`.
 and [acceptance](https://github.com/ghc-proposals/ghc-proposals/pull/370).
 [Map example](examples/open-evaluation/TypeLambda.hs).
 
+The inference rules in #242 default a bare arrow on a type synonym's
+right-hand side to U. The proposal identifies the `singletons` arrow
+`type a ~> b = TyFun a b -> Type` as an exception to the common use of
+synonyms for runtime function types. A data declaration that uses
+`a ~> b` as its result kind needs M. With the #370 notation the library
+can write `type a ~> b = TyFun a b %M -> Type` once.
+[#242 on synonym right-hand sides](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms)
+and [normative inference rules](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference).
+
 Proposal #242 also specifies `-fprint-explicit-matchabilities`.
 The flag matters when copying a callback kind from GHCi. Omitting an
 unmatchable index can make a standalone kind signature require a

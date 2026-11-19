@@ -62,6 +62,17 @@ keep rejecting actual incompatible matchability annotations.
 [defunctionalization](../../../testsuite/tests/dependent/should_compile/T12442.hs)
 and [reflection](../../../testsuite/tests/dependent/should_compile/RaeJobTalk.hs).
 
+Three of those tests define the `singletons` arrow synonym
+`type a ~> b = TyFun a b -> Type`. With the unmodified synonym, the
+compiler reports GHC-83865 at the data declarations in `T12442`,
+`T13910` and `T13938`. Changing the synonym's arrow to `%M ->`
+in its defining module makes all three programs compile with Core
+and STG Lint. The two-module `T13938` client needs no edits.
+The unchanged sources remain compatibility failures. Proposal #242
+predicts this break and gives U as the default for a synonym RHS.
+[Source test](../../../testsuite/tests/dependent/should_run/NativePercentArrowOnlyModifiers.hs)
+and [proposal rationale](../REFERENCES.md#matchability-and-multiplicity-on-arrows).
+
 In `T20875`, the equation `ToKind TRUE = Type -> Type` checks its right
 side as an ordinary type. Its arrow gets U. The type constructor `Maybe`
 has an M arrow in its kind. Writing `FUN @M 'Many Type Type` in the
