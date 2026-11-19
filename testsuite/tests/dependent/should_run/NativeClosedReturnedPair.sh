@@ -60,6 +60,40 @@ reject BOTTOM_FIELD P.bottomField 70565 'pair second field forced'
 reject WRONG_KIND '(P.wrongKind' 70565 'declared input type (Natural, Natural)' 'wrong-kind pair ran'
 reject UNSUPPORTED_FIELD P.unsupported 70565 'The function returns (Natural, Int).' 'unsupported pair shape ran'
 
+# Keep the projection's interfaces available without its executable.
+mkdir projection interfaces
+cp "$src/NativeClosedFamilyProjection.hs" projection/
+(cd projection && "${ghc[@]}" "${ways[@]}" -c NativeClosedFamilyProjection.hs)
+cp projection/*.hi interfaces/
+if [[ -f projection/NativeClosedFamilyProjection.dyn_hi ]]; then
+    cp projection/*.dyn_hi interfaces/
+fi
+ordinary_compile=("${compile[@]}")
+compile+=("-i$PWD/interfaces")
+cp "$src/NativeClosedFamilyExpected.hs" .
+"${compile[@]}" NativeClosedFamilyExpected.hs
+projection_object='addDependentFile "[^"]*/NativeClosedFamilyProjection\.(dyn_o|o)"'
+"${ghc[@]}" --show-iface NativeClosedFamilyExpected.hi >nominal.iface
+if grep -Eq "$projection_object" nominal.iface; then
+    echo 'The interface-only proof recorded a projection object dependency.' >&2
+    exit 1
+fi
+rejects=NativeClosedFamilyExpected
+reject AMBIGUOUS F.pick 70565 "do not determine the checked family's input and result kinds"
+reject DICTIONARY Prelude.fromIntegral 39999 'Num Bool'
+reject DEMANDED_FALLBACK P.firstOf 70565 'forced an empty sibling'
+
+# Make the ordinary projection executable and check the same source again.
+cp projection/*.o interfaces/
+if [[ -f projection/NativeClosedFamilyProjection.dyn_o ]]; then
+    cp projection/*.dyn_o interfaces/
+fi
+"${compile[@]}" -fforce-recomp -DEXECUTABLE_PACKET NativeClosedFamilyExpected.hs
+"${ghc[@]}" --show-iface NativeClosedFamilyExpected.hi >executable.iface
+grep -Eq "$projection_object" executable.iface
+compile=("${ordinary_compile[@]}")
+
+
 "${compile[@]}" "$client.hs" -v1 >unchanged.log 2>&1
 grep -Fxq 'compilation IS NOT required' unchanged.log
 "${ghc[@]}" --show-iface "$client.hi" >client.iface

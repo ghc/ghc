@@ -31,5 +31,12 @@ dependency = Refl
 ignoredPair :: P.ignorePair (P.bottomField 1) :~: 7
 ignoredPair = Refl
 
+emptySibling :: P.keepSecond (P.firstOf '[]) (P.firstOf '[ 'x']) :~: 'x'
+emptySibling = Refl
+
+-- | Infer a compound element kind from the other computed operand.
+compoundEmpty :: Prelude.max (Prelude.reverse '[]) (Prelude.reverse '[ 'Just 'x']) :~: '[ 'Just 'x']
+compoundEmpty = Refl
+
 main :: IO ()
 main = putStrLn (show ((3, 2) :: (Natural, Natural)))

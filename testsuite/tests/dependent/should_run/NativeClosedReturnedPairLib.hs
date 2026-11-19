@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 module NativeClosedReturnedPairLib where
 
 import Numeric.Natural (Natural)
@@ -30,3 +31,20 @@ wrongKind _ = error "wrong-kind pair ran"
 
 unsupported :: Natural -> (Natural, Int)
 unsupported _ = error "unsupported pair shape ran"
+
+
+-- | Build a pair with independently inferred field types.
+makePair :: a -> b -> (a, b)
+makePair x y = (x, y)
+
+-- | Read the first element of the list.
+firstOf :: [a] -> a
+firstOf (x : _) = x
+firstOf [] = errorWithoutStackTrace "forced an empty sibling"
+
+-- | Return the second operand without demanding the first.
+keepSecond :: a -> a -> a
+keepSecond _ y = y
+
+type Zero = 0
+type Ordinary = Int

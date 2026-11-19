@@ -75,7 +75,8 @@ test('NativeClosedLazyParcel',
      multimod_compile_and_run, ['NativeClosedLazyParcel', '-dcore-lint -dstg-lint ' + config.ghc_th_way_flags])
 test('NativeClosedReturnedPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
-      extra_files(['NativeClosedReturnedPairLib.hs', 'NativeClosedReturnedPairRejects.hs'])],
+      extra_files(['NativeClosedReturnedPairLib.hs', 'NativeClosedReturnedPairRejects.hs',
+                   'NativeClosedFamilyProjection.hs', 'NativeClosedFamilyExpected.hs'])],
      run_command, ['bash NativeClosedReturnedPair.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
 test('NativeClosedEnums',

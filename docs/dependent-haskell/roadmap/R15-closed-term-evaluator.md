@@ -735,3 +735,43 @@ An interface-only projection still checks its argument separately. In
 kind to `Nat`. The current checker asks the ordinary pair builder to
 infer the whole pair first and reports GHC-70565 at `W.pair`. Passing
 this constraint through the projection is the next source check.
+
+## M145. Sharing kinds across a checked family
+
+    proof :: (Projection.pick
+                (Worker.makePair
+                  (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) 'x') :: Nat)
+             :~: 3
+    proof = Refl
+
+The checked projection relates its result kind to the first kind of
+its pair input. The enclosing `Nat` fixes that first kind before
+`Char` is known. The second literal supplies `Char`. The shared tree
+uses both constraints to specialize the ordinary pair builder and
+`fromIntegral`. The projection can use its checked interface family
+when the linker cannot load the ordinary projection. The kind solver
+finishes specialization before the compiler prepares ordinary evidence
+and the checked family application. The same rule checks still apply.
+
+An empty list can use a known result kind before selecting its legacy
+`Natural` default. If an ordinary consumer requires two results of the
+same type, a computed `Char` operand can fix the result of an earlier
+`firstOf '[]`. A consumer that ignores that earlier operand leaves the
+empty-list exception unevaluated. If the enclosing kind does not
+determine an empty list's type, the existing default still applies.
+
+The tests compile the projection from ordinary source and use its
+interface without its object. They check the inferred `Nat` result,
+an unresolved result kind, a missing `Num Bool` instance, and the
+ignored empty sibling. [Projection checks](../../../testsuite/tests/dependent/should_run/NativeClosedFamilyExpected.hs)
+and [empty sibling check](../../../testsuite/tests/dependent/should_run/NativeClosedReturnedPair.hs).
+
+The same proof checks after the projection's object becomes available.
+The tests inspect the consumer interface to distinguish the object
+dependency from the earlier interface-only use. For a binary checked
+case, the compiler checks the fallback's kind and dictionaries before
+reducing the case. It evaluates the fallback only if the equation
+selects that argument. The interface-only test puts an exceptional
+empty-list selection there. The `Just` branch succeeds and the
+`Nothing` branch reports the exception. [Separate compilation, demand
+and dependencies](../../../testsuite/tests/dependent/should_run/NativeClosedReturnedPair.sh).
