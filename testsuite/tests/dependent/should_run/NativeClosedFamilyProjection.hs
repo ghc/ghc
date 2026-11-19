@@ -1,10 +1,14 @@
 {-# LANGUAGE NoExperimentalDependentTypes #-}
-module NativeClosedFamilyProjection (pick, Optional(..), choose, Packet(..), choosePacket, makePacket) where
+module NativeClosedFamilyProjection (pick, pickRight, Optional(..), choose, Packet(..), choosePacket, makePacket) where
 
 import Numeric.Natural (Natural)
 
 pick :: (a, b) -> a
 pick (x, _) = x
+
+-- | Select the other field when both have the same type.
+pickRight :: (a, a) -> a
+pickRight (_, y) = y
 
 -- | Keep the inner constructor as a separate demand.
 data Optional a = Optional (Maybe a)

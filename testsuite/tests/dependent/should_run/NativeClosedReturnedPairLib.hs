@@ -48,3 +48,6 @@ keepSecond _ y = y
 
 type Zero = 0
 type Ordinary = Int
+
+bottomFirst :: Natural -> (Natural, Natural)
+bottomFirst n = (errorWithoutStackTrace "selected pair field forced", n)

@@ -111,7 +111,7 @@ import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Class
-import GHC.Core.FamInstEnv (familyNameInstances, famInstTyCon, lookupFamInstEnv, fim_instance)
+import GHC.Core.FamInstEnv (familyNameInstances, famInstTyCon, lookupFamInstEnv, fim_instance, reduceTyFamApp_maybe)
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Predicate ( getClassPredTys_maybe, isCTupleClass )
@@ -128,7 +128,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
-import GHC.Types.Id ( mkLocalId )
+import GHC.Types.Id ( mkLocalId, mkSysLocalM )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (mkNameSet, unionNameSet)
@@ -2977,6 +2977,18 @@ tcPlanClosedTree mode ordinary hint root arguments = do
       apply <- tcPrepareClosedApplication fun inputs result
       operands <- mapM (fmap (closedCallRuntimeOperand owner) . prepare) children
       return (OrdinaryClosedCall loc owner (sequence operands >>= apply))
+    prepare (ClosedFamilyApplication loc owner table kinds [input] result [child]) =
+      setSrcSpan loc $ case child of
+        ClosedLiteral _ _ literal -> nominal (pure literal)
+        _ -> do
+          value <- prepare child
+          projection <- prepareClosedPairProjection owner table kinds input result value
+          case projection of
+            Just projected -> pure projected
+            Nothing -> prepareClosedCallResult input value >>= nominal
+      where
+        nominal operand =
+          ClosedFamilyValue loc <$> prepareClosedFamilyResult owner table kinds [input] result [operand]
     prepare (ClosedFamilyApplication loc owner table kinds inputs result children) = setSrcSpan loc $ do
       operands <- zipWithM prepare_family_operand inputs children
       ClosedFamilyValue loc <$> prepareClosedFamilyResult owner table kinds inputs result operands
@@ -2991,6 +3003,58 @@ tcPlanClosedTree mode ordinary hint root arguments = do
     bare_empty arg = case ignoreParens arg of
       L _ (HsExplicitListTy _ _ []) -> True
       _ -> False
+
+-- | Read a certified projection without first observing the whole pair.
+-- See Note [Demand of an interface-only pair projection].
+prepareClosedPairProjection :: Name -> TyCon -> [Kind] -> Kind -> Kind
+                            -> ClosedCallValue -> TcM (Maybe ClosedCallValue)
+prepareClosedPairProjection owner table kinds input result (OrdinaryClosedCall _ _ expression)
+  | sourceCaseVisibleArity table == Just 1
+  , Just (tc, [left_kind, right_kind]) <- splitTyConApp_maybe input
+  , tc == tupleTyCon Boxed 2 = do
+      loc <- getSrcSpanM
+      let fresh_field kind = do
+            name <- mkInternalName <$> newUnique <*> pure (mkTyVarOcc "field") <*> pure loc
+            return (mkTyVarTy (mkTyVar name kind))
+      left <- fresh_field left_kind
+      right <- fresh_field right_kind
+      envs <- tcGetFamInstEnvs
+      let pair = mkPromotedPairTy left_kind right_kind left right
+          selected = reductionReducedType <$>
+            reduceTyFamApp_maybe envs Nominal table (kinds ++ [pair])
+          project ty
+            | ty `tcEqType` left && result `tcEqType` left_kind = Just fst
+            | ty `tcEqType` right && result `tcEqType` right_kind = Just snd
+            | otherwise = Nothing
+      case selected >>= project of
+        Just field -> do
+          sourceCaseKindUse table kinds
+          binder <- mkSysLocalM (fsLit "closed_pair") ManyTy input
+          a <- mkSysLocalM (fsLit "closed_first") ManyTy left_kind
+          b <- mkSysLocalM (fsLit "closed_second") ManyTy right_kind
+          let observe scrutinee = Core.Case scrutinee binder result
+                [Core.Alt (Core.DataAlt (tupleDataCon Boxed 2)) [a, b] (Core.Var (field (a, b)))]
+          return (Just (OrdinaryClosedCall loc owner (observe <$> expression)))
+        Nothing -> return Nothing
+prepareClosedPairProjection _ _ _ _ _ _ = return Nothing
+
+{- Note [Demand of an interface-only pair projection]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ordinary executable route can project a pair before encoding the
+result. When only the projection interface is available, encoding the
+whole intermediate pair would force both fields. The checked source
+family describes which field to return. Match its nominal equation on
+a promoted pair of distinct fresh variables. If it returns exactly one
+variable, build a Core case on the runtime pair and pass only that field
+to the next application or result renderer. This forces the pair
+constructor and preserves the other field's laziness.
+
+The tentative reduction does not emit equality evidence or record a
+source-family use. After choosing this route, record the same RULE and
+interface dependencies as for a checked family reduction. The ordinary
+operand retains its interpreter and object dependencies. No fresh type
+variable enters the runtime Core or the result type.
+-}
 
 -- | Check a known enclosing kind before executing a staged call.
 -- Inference and non-ground expected kinds still use checkExpKind.

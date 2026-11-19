@@ -78,9 +78,12 @@ if grep -Eq "$projection_object" nominal.iface; then
     echo 'The interface-only proof recorded a projection object dependency.' >&2
     exit 1
 fi
+"${compile[@]}" -fenable-rewrite-rules -Wno-inline-rule-shadowing \
+    -DUNUSED_PROJECTION NativeClosedFamilyExpected.hs
 rejects=NativeClosedFamilyExpected
 reject AMBIGUOUS F.pick 70565 "do not determine the checked family's input and result kinds"
 reject DICTIONARY Prelude.fromIntegral 39999 'Num Bool'
+reject DEMANDED_PAIR_FIELD Prelude.odd 70565 'selected pair field forced'
 reject DEMANDED_FALLBACK P.firstOf 70565 'forced an empty sibling'
 
 # Make the ordinary projection executable and check the same source again.

@@ -779,3 +779,53 @@ selects that argument. The interface-only test puts an exceptional
 empty-list selection there. The `Just` branch succeeds and the
 `Nothing` branch reports the exception. [Separate compilation, demand
 and dependencies](../../../testsuite/tests/dependent/should_run/NativeClosedReturnedPair.sh).
+
+## M149. Demand only the selected field of a computed pair
+
+A closed ordinary call can use a projection of a computed boxed pair
+as an operand when the projection is available through a checked
+interface alone. The compiler matches the certified equation against a
+promoted pair of distinct variables. When the equation returns one variable, GHC builds
+a typed Core case that demands the pair constructor and returns that
+field. The interpreter renders the final result. This preserves
+Haskell's strictness for boxed constructor patterns and laziness for
+their variable and wildcard subpatterns. [Haskell 2010 Report, section
+3.17](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-610003.17).
+
+The use still checks the projection's source owner and rewrite rules.
+The ordinary pair builder still needs its executable, and its object
+remains a recompilation dependency. The tests cover projections of both
+fields at the same type. An exceptional unused field stays unevaluated.
+Selecting the exceptional field reports the exception. A top-level nominal application still needs a closed
+operand to persist in an interface. Forming that application leaves its
+equation unused, including when a visible rule prevents a later reduction. This case
+still observes both fields of a computed pair.
+
+For a user datatype, a bridge can replay certified constructor
+patterns using Core cases and carry unused fields as ordinary Core
+binders. It must check the constructor identities, strictness,
+exhaustiveness and field kinds while keeping the original interpreter
+dependencies. Retaining an unevaluated operand in a nominal type also
+needs a representation that survives interface serialization and delays
+the rule check until equality uses the equation. [Separate compilation and demand
+checks](../../../testsuite/tests/dependent/should_run/NativeClosedReturnedPair.sh).
+
+The direct example is `pick (make 7) :~: 7`, where `make n` returns
+`(n, error "unused")`. Forming `type Alias = pick (make 7)` also needs
+a type for the operand. A local compiler thunk cannot travel through an
+interface. One possible representation gives each suspended field a private
+family owned by the actual producer and indexed by its captured arguments.
+A checker would have to verify the constructor spine and preserve the
+producer's identity through recompilation. A client could then reduce the
+first projection while a claim about the second field remained stuck.
+The fork has no such representation yet. The test for a bare application
+also covers a matching rewrite rule. Forming it can succeed even when
+using the equation later would fail.
+
+A separate model checks the proposed equation shape using ordinary
+closed families with `UndecidableInstances`. Given an empty family
+`Deferred (n :: Nat) :: Char` and `Make n = '(n, Deferred n)`, an
+interface-only client proves `Pick (Make 7) :~: 7` with `Refl`. GHC
+rejects the claim that the second field is `'x'`. This model supplies
+`Make` by hand. Generating it from an ordinary Haskell definition
+still requires the producer and field identity checks above.
