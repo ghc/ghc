@@ -68,8 +68,8 @@ import GHC.Tc.Utils.Instantiate
 
 import qualified GHC.Core as Core
 import GHC.Core.FVs (exprSomeFreeVarsList)
-import GHC.Core.Make (mkCoreApp, mkCoreApps, mkCharExpr, mkListExpr, mkNaturalExpr
-                     , mkCoreBoxedTuple, mkSingleAltCase)
+import GHC.Core.Make (mkCoreApp, mkCoreApps, mkCoreConApps, mkCharExpr, mkListExpr
+                     , mkConsExpr, mkNaturalExpr)
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion( etaExpandCoAxBranch )
 import GHC.Core.Type as Type
@@ -79,8 +79,9 @@ import GHC.Core.InstEnv as InstEnv
 import GHC.Core.Utils (exprType)
 
 import GHC.Builtin.TH
+import GHC.Builtin.Modules (mkGhcInternalModule)
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.KnownOccs (returnIOIdOcc, toAnnotationWrapperIdOcc)
+import GHC.Builtin.KnownOccs (eitherTyConOcc, returnIOIdOcc, toAnnotationWrapperIdOcc)
 import GHC.Builtin.WiredIn.Types
 
 import GHC.ThToHs
@@ -1317,13 +1318,19 @@ tcDecodeClosedCallOperand operand = do
     decode platform (ClosedList scalar) ty = do
       elements <- extractPromotedList_maybe ty
       mkListExpr (closedScalarKind scalar) <$> traverse (decodeScalar platform scalar) elements
-    decode platform (ClosedPair left right) ty = do
-      (x, y) <- isPromotedPairType ty
-      guard (typeKind x `tcEqType` closedShapeKind left &&
-             typeKind y `tcEqType` closedShapeKind right)
-      a <- decode platform left x
-      b <- decode platform right y
-      return (mkCoreBoxedTuple [a, b])
+    decode platform (ClosedData _ kinds alternatives) ty = do
+      (promoted, args) <- splitTyConApp_maybe ty
+      con <- isPromotedDataCon_maybe promoted
+      ClosedConstructor _ _ fields <- find (hasConstructor con) alternatives
+      let (type_args, values) = splitAt (length kinds) args
+      guard (equalLength type_args kinds && and (zipWith tcEqType type_args kinds))
+      guard (equalLength values fields &&
+             and (zipWith (\value field -> typeKind value `tcEqType` closedShapeKind field)
+                          values fields))
+      operands <- zipWithM (decode platform) fields values
+      return (mkCoreConApps con (map Core.Type kinds ++ operands))
+
+    hasConstructor con (ClosedConstructor _ expected _) = con == expected
 
     decodeScalar platform ClosedNatural ty = do
       number <- isNumLitTy ty
@@ -1343,7 +1350,10 @@ data ClosedCallScalar = ClosedNatural | ClosedChar | ClosedBool
 data ClosedCallShape
   = ClosedScalar ClosedCallScalar
   | ClosedList ClosedCallScalar
-  | ClosedPair ClosedCallShape ClosedCallShape
+  | ClosedData TyCon [Kind] [ClosedConstructor]
+
+-- | The wire tag (absent for a product), constructor and field codecs.
+data ClosedConstructor = ClosedConstructor (Maybe Char) DataCon [ClosedCallShape]
 
 -- | Recover the kind at a leaf of the result.
 closedScalarKind :: ClosedCallScalar -> Kind
@@ -1355,21 +1365,51 @@ closedScalarKind ClosedBool = boolTy
 closedShapeKind :: ClosedCallShape -> Kind
 closedShapeKind (ClosedScalar scalar) = closedScalarKind scalar
 closedShapeKind (ClosedList scalar) = mkListTy (closedScalarKind scalar)
-closedShapeKind (ClosedPair left right) = mkBoxedTupleTy [closedShapeKind left, closedShapeKind right]
+closedShapeKind (ClosedData tc kinds _) = mkTyConApp tc kinds
 
 -- | Classify a checked result or computed operand by its kind.
 closedCallValueShape :: Kind -> Maybe ClosedCallShape
-closedCallValueShape kind = case splitTyConApp_maybe kind of
-  Just (tc, [arg]) | tc == listTyCon -> ClosedList <$> scalar arg
-  Just (tc, [a, b]) | tc == pairTyCon ->
-    ClosedPair <$> closedCallValueShape a <*> closedCallValueShape b
-  _ -> ClosedScalar <$> scalar kind
+closedCallValueShape = shape
   where
+    shape kind = case splitTyConApp_maybe kind of
+      Just (tc, [arg]) | tc == listTyCon -> ClosedList <$> scalar arg
+      Just (tc, [arg]) | tc == maybeTyCon -> do
+        field <- shape arg
+        boxed tc [arg] [ClosedConstructor (Just '0') nothingDataCon [],
+                        ClosedConstructor (Just '1') justDataCon [field]]
+      Just (tc, [a, b]) | tc == pairTyCon -> do
+        left <- shape a
+        right <- shape b
+        boxed tc [a, b] [ClosedConstructor Nothing (tupleDataCon Boxed 2) [left, right]]
+      Just (tc, [a, b])
+        | let name = tyConName tc
+        , nameOccName name == eitherTyConOcc
+        , nameModule_maybe name == Just (mkGhcInternalModule (fsLit "GHC.Internal.Data.Either")) -> do
+          [left_con, right_con] <- pure (tyConDataCons tc)
+          left <- shape a
+          right <- shape b
+          boxed tc [a, b] [ClosedConstructor (Just '0') left_con [left],
+                           ClosedConstructor (Just '1') right_con [right]]
+      _ -> ClosedScalar <$> scalar kind
+
+    -- These constructor alternatives have no evidence or representation fields.
+    boxed tc kinds alternatives = do
+      forM_ alternatives $ \(ClosedConstructor _ con fields) -> do
+        guard (dataConTyCon con == tc && isVanillaDataCon con &&
+               null (dataConRepArgBinders con) &&
+               equalLength (dataConUnivTyVars con) kinds &&
+               dataConRepArity con == length fields)
+        let args = dataConInstArgTys con kinds
+        guard (equalLength args fields &&
+               and (zipWith (\arg field -> scaledThing arg `tcEqType` closedShapeKind field)
+                            args fields))
+      return (ClosedData tc kinds alternatives)
+
     scalar ty
-      | ty `tcEqType` naturalTy = Just ClosedNatural
-      | ty `tcEqType` charTy = Just ClosedChar
-      | ty `tcEqType` boolTy = Just ClosedBool
-      | otherwise = Nothing
+      | ty `tcEqType` naturalTy = pure ClosedNatural
+      | ty `tcEqType` charTy = pure ClosedChar
+      | ty `tcEqType` boolTy = pure ClosedBool
+      | otherwise = mzero
 
 -- | Execute a checked closed call through the target interpreter.
 -- See Note [Closed literal type evaluation].
@@ -1386,7 +1426,7 @@ tcPrepareClosedCall fun domains result_kind = do
     Just shape -> return shape
     Nothing -> bad ("The function returns " ++ showPpr (hsc_dflags hsc_env) result_kind ++
                     ". Closed calls in types currently support results of type Natural, Char, Bool, " ++
-                    "lists of these types, or boxed pairs of supported results.")
+                    "lists of these types, or boxed pairs, Maybe, and Either of supported results.")
   interp <- checkClosedTypeEvalStage hsc_env name
   let expected = foldr mkVisFunTyManyU result_kind domains
   function <- if idType fun `tcEqType` expected
@@ -1462,21 +1502,28 @@ closedCallRenderer name shape = do
       renderFields quote current = case current of
         ClosedScalar scalar -> renderToken quote <$> renderScalar scalar
         ClosedList scalar -> renderToken quote <$> renderList scalar
-        ClosedPair left right -> do
-          let left_kind = closedShapeKind left
-              right_kind = closedShapeKind right
-          pair <- mkSysLocalM (fsLit "closed_pair") ManyTy (closedShapeKind current)
-          a <- mkSysLocalM (fsLit "closed_left") ManyTy left_kind
-          b <- mkSysLocalM (fsLit "closed_right") ManyTy right_kind
-          render_left <- renderFields quote left
-          render_right <- renderFields quote right
-          return $ \value suffix ->
-            mkSingleAltCase value pair (Core.DataAlt (tupleDataCon Boxed 2)) [a, b]
-              (render_left (Core.Var a) (render_right (Core.Var b) suffix))
+        ClosedData _ _ alternatives -> do
+          binder <- mkSysLocalM (fsLit "closed_data") ManyTy (closedShapeKind current)
+          render_alts <- forM alternatives $ \(ClosedConstructor tag con fields) -> do
+            binders <- mapM (mkSysLocalM (fsLit "closed_field") ManyTy . closedShapeKind) fields
+            renderers <- mapM (renderFields quote) fields
+            let alt suffix =
+                  let body = foldr (\(render, field) rest -> render (Core.Var field) rest)
+                                   suffix (zip renderers binders)
+                      tagged = maybe body (\c -> mkConsExpr charTy (mkCharExpr c) body) tag
+                  in Core.Alt (Core.DataAlt con) binders tagged
+            return alt
+          let select value suffix = Core.Case value binder stringTy (map ($ suffix) render_alts)
+          case render_alts of
+            [_] -> return select
+            _ -> do
+              rest <- mkSysLocalM (fsLit "closed_suffix") ManyTy stringTy
+              return $ \value suffix -> Core.Let (Core.NonRec rest suffix)
+                                           (select value (Core.Var rest))
   case shape of
     ClosedScalar scalar -> renderScalar scalar
     ClosedList scalar -> renderList scalar
-    ClosedPair{} -> do
+    ClosedData{} -> do
       quote <- builtinShow ClosedChar True
       render <- renderFields quote shape
       return $ \value -> render value empty_string
@@ -1519,7 +1566,7 @@ decodeClosedCallResult :: ClosedCallShape -> String -> Maybe Type
 decodeClosedCallResult shape rendered = case shape of
   ClosedScalar scalar -> decodeScalar scalar False rendered
   ClosedList scalar -> decodeScalar scalar True rendered
-  ClosedPair{} -> do
+  ClosedData{} -> do
     (value, rest) <- decodeFields shape rendered
     guard (null rest)
     return value
@@ -1527,10 +1574,25 @@ decodeClosedCallResult shape rendered = case shape of
     decodeFields current input = case current of
       ClosedScalar scalar -> decodeToken scalar False input
       ClosedList scalar -> decodeToken scalar True input
-      ClosedPair left right -> do
-        (a, after_left) <- decodeFields left input
-        (b, after_right) <- decodeFields right after_left
-        return (mkPromotedPairTy (closedShapeKind left) (closedShapeKind right) a b, after_right)
+      ClosedData _ kinds alternatives -> do
+        (ClosedConstructor _ con fields, payload) <- selectConstructor alternatives input
+        (values, rest) <- decodeArguments fields payload
+        return (mkTyConApp (promoteDataCon con) (kinds ++ values), rest)
+
+    selectConstructor [constructor@(ClosedConstructor Nothing _ _)] input =
+      Just (constructor, input)
+    selectConstructor alternatives (tag : input) = do
+      constructor <- find (hasTag tag) alternatives
+      return (constructor, input)
+    selectConstructor _ [] = Nothing
+
+    hasTag tag (ClosedConstructor expected _ _) = expected == Just tag
+
+    decodeArguments [] input = Just ([], input)
+    decodeArguments (field : fields) input = do
+      (value, rest) <- decodeFields field input
+      (values, residual) <- decodeArguments fields rest
+      return (value : values, residual)
 
     decodeToken scalar is_list input = do
       [(token, _)] <- pure (reads @String input)
@@ -1572,12 +1634,18 @@ Use the same kind classifier to rebuild the corresponding Core literals
 and constructors. The checked kind supplies the element type of an
 empty list.
 
-For a boxed pair, use one Core case on the producer application. Render each
-leaf with its scalar or list renderer. Quote each leaf as a separate string
-token with the built-in Char showList. Its suffix concatenates the tokens.
-The compiler decodes the tokens in shape order and rebuilds the promoted
-pair. No Show instance for the pair takes part in reification. Forcing the
-complete response forces every field, even if a later caller ignores it.
+For a boxed constructor, use one Core case on the producer application.
+Render each field with its checked codec. Quote scalar and list fields as
+separate string tokens with the built-in Char showList. Its suffix
+concatenates the tokens. Maybe and Either emit a tag before the fields of
+the selected constructor. A pair has one constructor and needs no tag.
+The compiler checks the tag and fields against the planned datatype and
+rebuilds the promoted constructor. Identify Either by its defining module
+and occurrence. The client can rebind its in-scope known names.
+The interpreter forces each field of the selected constructor when it
+forces the response, even if a later caller ignores that field.
+Bind the string suffix once for a sum. Copying it into each alternative
+would duplicate the generated cases for every later field.
 
 For an overloaded producer, check the resolved occurrence against the
 specialized ordinary arrow. Use the same type and dictionary elaboration as

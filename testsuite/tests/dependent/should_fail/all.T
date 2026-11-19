@@ -140,6 +140,12 @@ test('NativeClosedNestedMissing',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs', '../should_run/NativeClosedSumLib.hs'])],
      multimod_compile_fail, ['NativeClosedNestedMissing', '-v0 ' + config.ghc_th_way_flags])
+for name in ['NativeClosedPresentBottom', 'NativeClosedUnsupportedAlternative', 'NativeClosedOtherEither']:
+    test(name, [req_interp, req_rts_linker, only_ways(['normal']),
+                extra_files(['../should_run/NativeClosedChoiceLib.hs'])],
+         multimod_compile_fail, [name, '-v0 ' + config.ghc_th_way_flags])
+test('NativeClosedWrongAlternative', [req_interp, req_rts_linker, only_ways(['normal'])],
+     compile_fail, [config.ghc_th_way_flags])
 test('NativeClosedSaturatedKinds',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs'])],

@@ -1,0 +1,7 @@
+NativeClosedWrongAlternative.hs:12:7: error: [GHC-83865]
+    • Couldn't match type: Just 5
+                     with: Nothing
+      Expected: Just 5 :~: Nothing
+        Actual: Just 5 :~: Just 5
+    • In the expression: Refl
+      In an equation for ‘bad’: bad = Refl
