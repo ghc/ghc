@@ -93,6 +93,16 @@ different indices still fails there. A splice on a captured synonym binder
 runs on the written binder once. The generated capture parameter gets its
 kind from the checked application.
 
+When the typechecker expands a lambda in an equality error, it can recover
+the public name from the client's signature. For example, if a client
+writes `type Named t = Rebuild t`, its failed proof can show
+`Named (Opaque t)` on both sides of the actual equality. GHC restores a
+synonym only when its expansion has the same family and arguments.
+If the mismatch exposes a case inside a larger synonym, GHC can show the
+checked alternatives, with the other lambda arguments substituted. A type
+lambda does not in general determine its arguments from its result.
+[Diagnostic and scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
+
 ## Prior art
 
 Agda uses ordinary lambda syntax and accepts unannotated binders when

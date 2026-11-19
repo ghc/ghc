@@ -93,6 +93,50 @@ if "${g[@]}" -c RigidCase.hs >rigid-case.log 2>&1 ||
     exit 1
 fi
 
+cat >ClientAlias.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+module ClientAlias where
+import Data.Proxy
+import Data.Type.Equality
+import TypeLambda (Rebuild)
+type family Opaque (t :: Bool) :: Maybe Ordering
+type instance Opaque 'True = 'Just 'GT
+type Named t = Rebuild t
+named :: forall t. Proxy t -> Named (Opaque t) :~: Proxy (Opaque t)
+named _ = Refl
+distinct :: forall (p :: Maybe Ordering) (q :: Maybe Ordering).
+            Proxy p -> Proxy q -> Rebuild p :~: Rebuild q
+distinct _ _ = Refl
+HS
+if "${g[@]}" -c ClientAlias.hs >alias.log 2>&1 ||
+   ! grep -Fq 'ClientAlias.hs:10:11: error: [GHC-83865]' alias.log ||
+   ! grep -Fq 'Actual: Named (Opaque t) :~: Named (Opaque t)' alias.log ||
+   ! grep -Fq 'ClientAlias.hs:13:16: error: [GHC-83865]' alias.log ||
+   ! grep -Fq 'Expected: Rebuild p :~: Rebuild q' alias.log ||
+   ! grep -Fq 'GHC cannot determine the arguments of the type lambda' alias.log ||
+   grep -Fq '$lambda:' alias.log; then
+    cat alias.log >&2
+    exit 1
+fi
+
+cat >NestedMismatch.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module NestedMismatch where
+import Data.Proxy
+import Data.Type.Equality
+import NativeTypeLambdaScope (SelectedFirst)
+wrong :: forall b. Proxy b -> SelectedFirst b Char :~: Maybe (Either Int Bool)
+wrong _ = Refl
+HS
+if "${g[@]}" -c NestedMismatch.hs >nested.log 2>&1 ||
+   ! grep -Fq 'NestedMismatch.hs:7:11: error: [GHC-83865]' nested.log ||
+   ! grep -Fq 'case b of {True -> Either Char Bool;' nested.log ||
+   ! grep -Fq 'False -> Either Bool Char}' nested.log ||
+   grep -Fq '$lambda:' nested.log; then
+    cat nested.log >&2
+    exit 1
+fi
+
 cat >CaseFields.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, TypeFamilies #-}
 module CaseFields where

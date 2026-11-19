@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies, TypeOperators, UndecidableInstances #-}
 module NativeTypeLambdaScope
   ( Levels, Adjacent, InferredLevels, UsesKind
-  , Selected, Siblings, OrdinaryCases, Consed
+  , Selected, Siblings, OrdinaryCases, Consed, SelectedFirst
   ) where
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -39,3 +39,7 @@ type OrdinaryCases (b :: Bool) =
 
 type Consed (b :: Bool) =
   (case b of { True -> Char; False -> Ordering }) ': '[Int]
+
+
+type SelectedFirst b t = Maybe ((\tag x ->
+  case tag of { True -> Either x Bool; False -> Either Bool x }) b t)

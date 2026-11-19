@@ -137,7 +137,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Foldable ( fold )
 import Data.Function (on)
-import Data.List ( groupBy, sortBy, sortOn, tails, partition, unfoldr, stripPrefix )
+import Data.List ( find, groupBy, sortBy, sortOn, tails, partition, unfoldr, stripPrefix )
 import Data.Ord ( comparing )
 import Data.Bifunctor
 
@@ -4837,45 +4837,98 @@ mismatchInvisibleBits (CouldNotDeduce { cnd_ea = mb_ea })
       Just (CND_ExpectedActual _ ty1 ty2) ->
         mayLookIdentical ty1 ty2
 
--- | Recognize the private Name emitted by liftTypeCases in GHC.Rename.Module.
-typeCaseOwner :: Name -> Maybe SDoc
-typeCaseOwner name = do
-  key <- stripPrefix "$case:" (occNameString (getOccName name))
+-- | Recover the source declaration that owns a private lifted family.
+liftedTypeOwner :: String -> Name -> Maybe String
+liftedTypeOwner prefix name = do
+  key <- stripPrefix prefix (occNameString (getOccName name))
   case break (== ':') (reverse key) of
-    (_ : _, ':' : owner) | not (null owner) -> Just (text (reverse owner))
+    (_ : _, ':' : owner) | not (null owner) -> Just (reverse owner)
     _ -> Nothing
 
+-- | Describe the lifted expression in terms of its source declaration.
+liftedTypeContext :: Name -> Maybe SDoc
+liftedTypeContext name
+  | Just owner <- liftedTypeOwner "$case:" name = Just (text "type case in" <+> quotes (text owner))
+  | Just owner <- liftedTypeOwner "$lambda:" name = Just (text "type lambda in" <+> quotes (text owner))
+  | otherwise = Nothing
+
 -- | Find the generated head in an application context.
-typeCaseHeadOwner :: LHsType GhcRn -> Maybe SDoc
-typeCaseHeadOwner (L _ ty) = case ty of
-  HsTyVar _ _ (L _ (WithUserRdr _ name)) -> typeCaseOwner name
-  HsAppTy _ f _ -> typeCaseHeadOwner f
-  HsAppKindTy _ f _ -> typeCaseHeadOwner f
-  HsParTy _ f -> typeCaseHeadOwner f
+liftedTypeHeadContext :: LHsType GhcRn -> Maybe SDoc
+liftedTypeHeadContext (L _ ty) = case ty of
+  HsTyVar _ _ (L _ (WithUserRdr _ name)) -> liftedTypeContext name
+  HsAppTy _ f _ -> liftedTypeHeadContext f
+  HsAppKindTy _ f _ -> liftedTypeHeadContext f
+  HsParTy _ f -> liftedTypeHeadContext f
   _ -> Nothing
 
--- | Display a lowered case in an equality diagnostic. Read its existing
--- closed-family equations without reducing the scrutinee.
+-- | Restore the public synonym at an occurrence of its exact expansion.
+-- See Note [Printing lifted type lambdas in a client].
+restoreTypeLambdas :: [Type] -> Type -> Type
+restoreTypeLambdas sources = restore
+  where
+    written = concatMap synonyms sources
+    synonyms ty@(TyConApp tc args) = [ty | isTypeSynonymTyCon tc] ++ concatMap synonyms args
+    synonyms (AppTy f a) = synonyms f ++ synonyms a
+    synonyms FunTy{ft_arg = a, ft_res = b} = synonyms a ++ synonyms b
+    synonyms _ = []
+
+    restore ty@(TyConApp tc args)
+      | Just _ <- liftedTypeOwner "$lambda:" (tyConName tc)
+      , Just original <- find ((`pickyEqType` ty) . coreFullView) written
+      = original
+      | otherwise = TyConApp tc (map restore args)
+    restore (AppTy f a) = AppTy (restore f) (restore a)
+    restore ty@FunTy{ft_arg = a, ft_res = b} = ty{ft_arg = restore a, ft_res = restore b}
+    restore ty = ty
+
+{- Note [Printing lifted type lambdas in a client]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A client can write Rebuild x in the expected type of Refl. The equality
+solver can expose its private family when it reports a mismatch. Use the
+source synonym again if expanding it gives the same private family
+and arguments. This also works for a client alias of Rebuild. Two uses
+of one lambda can have different captures or inputs. Only the diagnostic uses this
+view. The expanded-types diagnostic can still show the family.
+-}
+
+-- | Show the constructor case checked by a private family, without reducing it.
 pprTypeCaseMismatch :: Type -> SDoc
 pprTypeCaseMismatch ty
   | Just (tc, args) <- splitTyConAppNoView_maybe ty
-  , Just owner <- typeCaseOwner (tyConName tc)
-  = case (reverse (filterOutInvisibleTypes tc args), closedFamilyTyConCoAxiom_maybe tc) of
-      (scrutinee : captures, Just ax)
-        | length args == tyConArity tc
-        , let (tidy_env, _) = tidyOpenTypesX emptyTidyEnv (scrutinee : captures)
-        , Just rows <- traverse (row tidy_env tc (reverse captures)) (fromBranches (coAxiomBranches ax))
-        -> text "case" <+> ppr scrutinee <+> text "of"
-             <+> braces (sep (punctuate semi rows))
-      _ -> text "the type case in" <+> quotes owner
+  , Just source <- liftedTypeContext (tyConName tc)
+  = let fallback | isJust (liftedTypeOwner "$case:" (tyConName tc)) = text "the" <+> source
+                 | otherwise = ppr ty
+    in fromMaybe fallback $ do
+      guard (length args == tyConArity tc)
+      ax <- closedFamilyTyConCoAxiom_maybe tc
+      let branches = fromBranches (coAxiomBranches ax)
+          visible = filterOutInvisibleTypes tc args
+      column <- case liftedTypeOwner "$case:" (tyConName tc) of
+        Just _ -> Just (length visible - 1)
+        Nothing -> do
+          -- In a lifted lambda the matched argument can precede another
+          -- lambda argument. All other visible patterns are variables.
+          first : _ <- pure branches
+          [index] <- pure [ i | (i, pat) <- zip [0..] (filterOutInvisibleTypes tc (coAxBranchLHS first))
+                              , Just (con, _) <- [splitTyConAppNoView_maybe pat]
+                              , isJust (isPromotedDataCon_maybe con) ]
+          pure index
+      (scrutinee, actuals) <- select column visible
+      let (env, _) = tidyOpenTypesX emptyTidyEnv (scrutinee : actuals)
+      rows <- traverse (row env column tc actuals) branches
+      pure (text "case" <+> ppr scrutinee <+> text "of"
+              <+> braces (sep (punctuate semi rows)))
   | otherwise = ppr ty
   where
-    row tidy_env tc captures branch = do
-      pat : formals <- pure (reverse (filterOutInvisibleTypes tc (coAxBranchLHS branch)))
-      vars <- traverse getTyVar_maybe (reverse formals)
-      guard (length vars == length captures)
-      let body = substTyWith vars captures (coAxBranchRHS branch)
-      [pat', body'] <- pure (tidyOpenTypes tidy_env [pat, body])
+    select index xs
+      | index >= 0, (front, x : back) <- splitAt index xs = Just (x, front ++ back)
+      | otherwise = Nothing
+    row env column tc actuals branch = do
+      (pat, others) <- select column (filterOutInvisibleTypes tc (coAxBranchLHS branch))
+      vars <- traverse getTyVar_maybe others
+      guard (length vars == length actuals)
+      let body = substTyWith vars actuals (coAxBranchRHS branch)
+      [pat', body'] <- pure (tidyOpenTypes env [pat, body])
       pure (pprTidiedType pat' <+> text "->" <+> pprTidiedType body')
 
 -- | Turn a 'MismatchMsg' into an 'SDoc'.
@@ -4901,6 +4954,11 @@ pprMismatchMsg ctxt
           , maybe empty pprSameOccInfo same_occ_info
           ]
   where
+    pprMismatchType = case errorItemOrigin item of
+      TypeEqOrigin{uo_expected = exp, uo_actual = act} ->
+        pprTypeCaseMismatch . restoreTypeLambdas [exp, act]
+      _ -> pprTypeCaseMismatch
+
     msg
       | (isLiftedRuntimeRep ty1 && isUnliftedRuntimeRep ty2) ||
         (isLiftedRuntimeRep ty2 && isUnliftedRuntimeRep ty1) ||
@@ -4910,15 +4968,15 @@ pprMismatchMsg ctxt
 
       | isAtomicTy ty1 || isAtomicTy ty2
       = -- Print with quotes
-        sep [ text herald1 <+> quotes (pprTypeCaseMismatch ty1)
+        sep [ text herald1 <+> quotes (pprMismatchType ty1)
             , nest padding $
-              text herald2 <+> quotes (pprTypeCaseMismatch ty2) ]
+              text herald2 <+> quotes (pprMismatchType ty2) ]
 
       | otherwise
       = -- Print with vertical layout
-        vcat [ text herald1 <> colon <+> pprTypeCaseMismatch ty1
+        vcat [ text herald1 <> colon <+> pprMismatchType ty1
              , nest padding $
-               text herald2 <> colon <+> pprTypeCaseMismatch ty2 ]
+               text herald2 <> colon <+> pprMismatchType ty2 ]
 
     herald1 = conc [ "Couldn't match"
                    , if is_repr then "representation of" else ""
@@ -5480,8 +5538,10 @@ we want to give it a bit of structure.  Here's the plan
 pprExpectedActualInfo :: SolverReportErrCtxt -> ExpectedActualInfo -> SDoc
 pprExpectedActualInfo _ (ExpectedActual { ea_expected = exp, ea_actual = act }) =
   vcat
-    [ text "Expected:" <+> ppr exp
-    , text "  Actual:" <+> ppr act ]
+    [ text "Expected:" <+> ppr (restore exp)
+    , text "  Actual:" <+> ppr (restore act) ]
+  where
+    restore = restoreTypeLambdas [exp, act]
 pprExpectedActualInfo _
   (ExpectedActualAfterTySynExpansion
     { ea_expanded_expected = exp
@@ -5716,8 +5776,11 @@ pprAmbiguityInfo (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
       | otherwise -- "The type variable 't0' is ambiguous"
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
-pprAmbiguityInfo (NonInjectiveTyFam tc) =
-  note $ quotes (ppr tc) <+> text "is a non-injective type family"
+pprAmbiguityInfo (NonInjectiveTyFam tc)
+  | Just source <- liftedTypeContext (tyConName tc)
+  = note $ text "GHC cannot determine the arguments of the" <+> source <+> text "from its result"
+  | otherwise
+  = note $ quotes (ppr tc) <+> text "is a non-injective type family"
 
 pprSameOccInfo :: SameOccInfo -> SDoc
 pprSameOccInfo (SameOcc same_pkg n1 n2) =
@@ -8213,8 +8276,8 @@ pprHsCtxt = \case
            | otherwise                 = pprUserTypeCtxt ctxt
 
   FunAppCtxt (FunAppCtxtTy fn arg) _
-    | Just owner <- typeCaseHeadOwner fn ->
-        hang (text "When checking the type case in" <+> quotes owner <> comma)
+    | Just source <- liftedTypeHeadContext fn ->
+        hang (text "When checking the" <+> source <> comma)
           2 (text "at" <+> quotes (ppr arg))
   FunAppCtxt fun_arg arg_no ->
     hang (hsep [ text "In the", speakNth arg_no, text "argument of"
@@ -8279,8 +8342,8 @@ pprHsCtxt = \case
             Just (tc, _) -> isAlgTyCon tc
             Nothing      -> False
 
-  TyConDeclCtxt name _ | Just owner <- typeCaseOwner name ->
-    text "In the type case in" <+> quotes owner
+  TyConDeclCtxt name _ | Just source <- liftedTypeContext name ->
+    text "In the" <+> source
   TyConDeclCtxt name flav ->
     hsep [ text "In the", ppr flav
          , text "declaration for", quotes (ppr name) ]
@@ -8301,8 +8364,8 @@ pprHsCtxt = \case
       ppr_cons :: [LocatedN Name] -> SDoc
       ppr_cons [con] = quotes (ppr con)
       ppr_cons cons  = interpp'SP cons
-  ClosedFamEqnCtxt tc | Just owner <- typeCaseOwner (tyConName tc) ->
-    text "In a branch of the type case in" <+> quotes owner
+  ClosedFamEqnCtxt tc | Just source <- liftedTypeContext (tyConName tc) ->
+    text "In a branch of the" <+> source
   ClosedFamEqnCtxt tc ->
     text "In the equations for closed type family" <+>
            quotes (ppr tc)
