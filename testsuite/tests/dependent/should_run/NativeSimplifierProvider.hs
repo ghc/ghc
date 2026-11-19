@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, BangPatterns, TypeOperators #-}
-module NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, Packed, sample, observePacked, driveSame) where
+module NativeSimplifierProvider (choose, keep, Tagged(..), keepTagged, one, toList, typeOnly, Nat(..), observeLengths, observeDemand, lazyLengths, lazyPartial, impossible, scopeAnnotations, Packed, sample, observePacked, driveSame, scopeLet, scopeKnown) where
 
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
@@ -120,3 +120,21 @@ driveSame input = do
   cell <- newIORef input
   x <- readIORef cell
   pure (consumeSame (buildSame x))
+
+{-# NOINLINE observeIndexed #-}
+observeIndexed :: Vec Int n -> [Int]
+observeIndexed = toList
+
+scopeLet :: [Int]
+scopeLet =
+  let source :: Bool
+      source = True
+  in observeIndexed (choose source)
+
+{-# NOINLINE observeProof #-}
+observeProof :: ((p :: Bool) :~: (q :: Bool)) -> Int
+observeProof Refl = 8
+
+scopeKnown :: Bool -> Int
+scopeKnown b = case buildSame b of
+  Same p q proof -> observeProof proof

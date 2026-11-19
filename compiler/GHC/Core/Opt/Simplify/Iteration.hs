@@ -301,7 +301,7 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
                                            (old_bndr,env) (new_bndr,env) (rhs,env)
 
       BC_Let top_lvl is_rec -> simplTrace "SimplBind:normal" (ppr old_bndr) $
-                               simplLazyBind top_lvl is_rec
+                               simplLazyBind False top_lvl is_rec
                                              (old_bndr,env) (new_bndr,env) (rhs,env)
 
 simplTrace :: String -> SDoc -> SimplM a -> SimplM a
@@ -312,7 +312,8 @@ simplTrace herald doc thing_inside = do
     else thing_inside
 
 --------------------------
-simplLazyBind :: TopLevelFlag -> RecFlag
+simplLazyBind :: Bool                     -- Keep a binder used in annotations.
+              -> TopLevelFlag -> RecFlag
               -> (InId, SimplEnv)       -- InBinder, and static env for its unfolding (if any)
               -> (OutId, SimplEnv)      -- OutBinder, and SimplEnv after simplifying that binder
                                         -- The OutId has IdInfo (notably RULES),
@@ -321,7 +322,7 @@ simplLazyBind :: TopLevelFlag -> RecFlag
               -> SimplM (SimplFloats, SimplEnv)
 -- Precondition: Ids only, no TyVars; not a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
-simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
+simplLazyBind keep_index top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
   = assert (isId bndr )
     assertPpr (not (isJoinId bndr)) (ppr bndr) $
     -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
@@ -374,7 +375,7 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
 
         ; let env1 = env `setInScopeFromF` rhs_floats
         ; rhs' <- rebuildLam env1 tvs' body3 rhs_cont
-        ; (bind_float, env2) <- completeBind (BC_Let top_lvl is_rec) (bndr,unf_se) (bndr1,rhs',env1)
+        ; (bind_float, env2) <- completeBind keep_index (BC_Let top_lvl is_rec) (bndr,unf_se) (bndr1,rhs',env1)
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
@@ -388,7 +389,7 @@ simplJoinBind :: RecFlag
 simplJoinBind is_rec cont (old_bndr, unf_se) (new_bndr, env) (rhs, rhs_se)
   = do  { let rhs_env = rhs_se `setInScopeFromE` env
         ; rhs' <- simplJoinRhs rhs_env old_bndr rhs cont
-        ; completeBind (BC_Join is_rec cont) (old_bndr, unf_se) (new_bndr, rhs', env) }
+        ; completeBind False (BC_Join is_rec cont) (old_bndr, unf_se) (new_bndr, rhs', env) }
 
 --------------------------
 simplAuxBind :: (SimplAltFlag, SimplEnv)
@@ -433,7 +434,7 @@ simplAuxBind (saf,env) bndr new_rhs
 
           -- Simplify the binder and complete the binding
         ; (env1, new_bndr) <- simplAltIdBinder (saf, env `setInScopeFromF` rhs_floats) bndr
-        ; (bind_float, env2) <- completeBind (BC_Let NotTopLevel NonRecursive)
+        ; (bind_float, env2) <- completeBind False (BC_Let NotTopLevel NonRecursive)
                                              (bndr, env) (new_bndr, rhs1, env1)
 
         ; return (rhs_floats `addFloats` bind_float, env2) }
@@ -961,7 +962,8 @@ It does *not* attempt to do let-to-case.  Why?  Because it is used for
 Nor does it do the atomic-argument thing
 -}
 
-completeBind :: BindContext
+completeBind :: Bool                     -- Keep a binder used in annotations.
+             -> BindContext
              -> (InId, SimplEnv)           -- Old binder, and the static envt in which to simplify
                                            --   its stable unfolding (if any)
              -> (OutId, OutExpr, SimplEnv) -- New binder and rhs; can be a JoinId.
@@ -973,7 +975,7 @@ completeBind :: BindContext
 --
 -- Binder /can/ be a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
-completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
+completeBind keep_index bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
  | isCoVar old_bndr
  = case new_rhs of
      Coercion co -> return (emptyFloats env, extendCvSubst env old_bndr co)
@@ -989,14 +991,19 @@ completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
       ; (new_arity, eta_rhs) <- tryEtaExpandRhs env bind_cxt new_bndr new_rhs
 
         -- Simplify the unfolding; see Note [Environment for simplLetUnfolding]
-      ; new_unfolding <- simplLetUnfolding (unf_se `setInScopeFromE` env)
-                            bind_cxt old_bndr
-                            eta_rhs (idType new_bndr) new_arity old_unf
+      ; new_unfolding <-
+          -- See Note [Preserving retained annotation uses].
+          if keep_index
+          then return NoUnfolding
+          else simplLetUnfolding (unf_se `setInScopeFromE` env)
+                 bind_cxt old_bndr eta_rhs (idType new_bndr) new_arity old_unf
 
       ; let new_bndr_w_info = addLetBndrInfo new_bndr new_arity new_unfolding
         -- See Note [In-scope set as a substitution]
 
-      ; if postInlineUnconditionally env bind_cxt old_bndr new_bndr_w_info eta_rhs
+      ; if keep_index
+        then return (mkFloatBind env (NonRec new_bndr_w_info eta_rhs))
+        else if postInlineUnconditionally env bind_cxt old_bndr new_bndr_w_info eta_rhs
 
         then -- Inline and discard the binding
              do  { tick (PostInlineUnconditionally old_bndr)
@@ -1318,7 +1325,8 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
     do { ty' <- simplType env ty
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
-  | Just env' <- preInlineUnconditionally env NotTopLevel bndr (UnSimplified env) rhs MRefl
+  | not keep_index
+  , Just env' <- preInlineUnconditionally env NotTopLevel bndr (UnSimplified env) rhs MRefl
     -- Because of the let-can-float invariant, it's ok to
     -- inline freely, or to drop the binding if it is dead.
   = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr) $
@@ -1329,13 +1337,16 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
   -- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
   -- binding like { j = j2 |> co } would first be eta-expanded and then inlined
   -- Better to test preInlineUnconditionally first.
-  | Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
+  | not keep_index
+  , Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
   = {-#SCC "simplNonRecJoinPoint" #-}
     simplNonRecJoinPoint env bndr' rhs' body cont
 
   | otherwise
   = {-#SCC "simplNonRecE" #-}
-    simplNonRecE env FromLet bndr (rhs, env) body cont
+    simplNonRecE env keep_index FromLet bndr (rhs, env) body cont
+  where
+    keep_index = retainedAnnotationUse env bndr body
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1692,7 +1703,7 @@ completeBindX env from_what bndr rhs body cont
               -- because this is completeBindX, so bndr is not in scope in the RHS.
 
         ; let env3 = env2 `setInScopeFromF` rhs_floats
-        ; (bind_float, env4) <- completeBind (BC_Let NotTopLevel NonRecursive)
+        ; (bind_float, env4) <- completeBind False (BC_Let NotTopLevel NonRecursive)
                                              (bndr,env) (bndr2, rhs1, env3)
               -- Must pass env1 to completeBind in case simplBinder had to clone,
               -- and extended the substitution with [bndr :-> new_bndr]
@@ -1922,8 +1933,7 @@ simpl_lam env bndr body cont@ApplyToVal{sc_hole_ty = fun_ty}
   , let retained_arrow = case coreFullView fun_ty of
           DepFunTy{} -> True
           _ -> False
-  , retained_arrow || (isNativeOpaqueValueId bndr
-                       && hasFreeVarInCoreAnnotations bndr body)
+  , retained_arrow || retainedAnnotationUse env bndr body
   = do { let (inner_bndrs, inner_body) = collectBinders body
        ; (env', bndrs') <- simplLamBndrs env (bndr:inner_bndrs)
        ; body' <- simplExpr env' inner_body
@@ -1953,7 +1963,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
              -- Optimisation: when there is no wrapping coercion use simplNonRecE
              -- so that the clever floating out of let-bindings can take place
              -- in this round of the Simplifier
-             -> simplNonRecE env from_what bndr (arg, arg_env) body cont
+             -> simplNonRecE env False from_what bndr (arg, arg_env) body cont
 
            _ -> do { arg' <- simplArg env Nothing fun_ty arg_se arg arg_mco
                    ; completeBindX env from_what bndr arg' body cont }
@@ -2001,8 +2011,33 @@ simplLamBndrs :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
 
 ------------------
+{- Note [Preserving retained annotation uses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ordinary value substitution changes term occurrences without replacing
+their runtime Ids in types. Keeping a binding alone is insufficient.
+If its unfolding replaced a retained operand, the term could use a
+different index while the type still refers to the original binder.
+Leave the binding in scope and do not install an unfolding for it.
+
+The same restriction applies to known constructor elimination. It creates
+auxiliary bindings for the case binder and payload fields. Do not enter
+that path if the selected RHS has annotations that refer to one of those
+binders. Other alternatives and ordinary Core still use the existing
+known-constructor optimisation. A future substitution can remove these
+guards when it updates term and annotation occurrences together.
+-}
+
+-- | Check whether value substitution would leave an old runtime index.
+-- See Note [Preserving retained annotation uses].
+retainedAnnotationUse :: SimplEnv -> InId -> InExpr -> Bool
+retainedAnnotationUse env bndr body =
+  sm_core_mode (seMode env) == RetainedCore
+  && isNativeOpaqueValueId bndr
+  && hasFreeVarInCoreAnnotations bndr body
+
 simplNonRecE :: HasDebugCallStack
              => SimplEnv
+             -> Bool              -- Keep a binder used in annotations.
              -> FromWhat
              -> InId               -- The binder, always an Id
                                    -- Never a join point
@@ -2026,9 +2061,10 @@ simplNonRecE :: HasDebugCallStack
 -- from_what=FromLet => the RHS satisfies the let-can-float invariant
 -- Otherwise it may or may not satisfy it.
 
-simplNonRecE env from_what bndr (rhs, rhs_se) body cont
+simplNonRecE env keep_index from_what bndr (rhs, rhs_se) body cont
   | assert (isId bndr && not (isJoinId bndr) ) $
     is_strict_bind
+  , not keep_index
   = -- Evaluate RHS strictly
     simplExprF (rhs_se `setInScopeFromE` env) rhs
                (StrictBind { sc_bndr = bndr, sc_body = body, sc_from = from_what
@@ -2037,7 +2073,7 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
   | otherwise  -- Evaluate RHS lazily
   = do { (env1, bndr1)    <- simplNonRecBndr env bndr
        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Let NotTopLevel NonRecursive)
-       ; (floats1, env3)  <- simplLazyBind NotTopLevel NonRecursive
+       ; (floats1, env3)  <- simplLazyBind keep_index NotTopLevel NonRecursive
                                            (bndr,env) (bndr2,env2) (rhs,rhs_se)
        ; (floats2, expr') <- simplNonRecBody env3 from_what body cont
        ; return (floats1 `addFloats` floats2, expr') }
@@ -3276,21 +3312,28 @@ rebuildCase (saf,env) scrut case_bndr alts cont
       <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
         -- Works when the scrutinee is a variable with a known unfolding
         -- as well as when it's an explicit constructor application
-  , let env0 = setInScopeSet env in_scope'
-  = do  { tick (KnownBranch case_bndr)
+  , let selected = findAlt (DataAlt con) alts
+  = if sm_core_mode (seMode env) == RetainedCore
+       && maybe False keeps_index selected
+    then reallyRebuildCase (saf,env) scrut case_bndr alts cont
+    else do { let env0 = setInScopeSet env in_scope'
+            ; tick (KnownBranch case_bndr)
         ; let -- case_bndr_unf: see Note [Do not duplicate constructor applications]
               case_bndr_rhs | exprIsTrivial scrut = scrut
                             | otherwise           = con_app
               con_app = Var (dataConWorkId con) `mkTyApps` ty_args
                                                 `mkApps`   other_args
         ; wrapDataConFloats env wfloats case_bndr cont $
-          case findAlt (DataAlt con) alts of
+          case selected of
             Nothing                   -> missingAlt env0 case_bndr alts cont
             Just (Alt DEFAULT bs rhs) -> simpl_rhs env0 case_bndr_rhs bs rhs
             Just (Alt _       bs rhs) -> knownCon env0 scrut con other_args
                                                   case_bndr bs rhs cont
         }
   where
+    keeps_index (Alt _ bs rhs) =
+      any (\b -> retainedAnnotationUse env b rhs) (case_bndr : bs)
+
     simpl_rhs env case_bndr_rhs bs rhs
       = assert (null bs) $
         do { (floats1, env') <- simplAuxBind (saf,env) case_bndr case_bndr_rhs
@@ -3326,6 +3369,7 @@ rebuildCase (saf,env) scrut case_bndr alts@[Alt _ bndrs rhs] cont
   -- See Note [Case to let transformation]
   | all_dead_bndrs
   , doCaseToLet scrut case_bndr
+  , not (retainedAnnotationUse env case_bndr rhs)
   = do { tick (CaseElim case_bndr)
        ; (floats1, env')  <- simplAuxBind (saf,env) case_bndr scrut
          -- simplAuxBind can create a substitution for case_bndr,
@@ -4042,7 +4086,7 @@ knownCon env scrut dc dc_args case_bndr alt_bndrs rhs cont
 
       | otherwise
       = do { (env1, case_bndr1) <- simplAltIdBinder (SAF_In,env) case_bndr
-           ; simplLazyBind NotTopLevel NonRecursive
+           ; simplLazyBind False NotTopLevel NonRecursive
                            (case_bndr,env) (case_bndr1,env1) (con_app,env) }
 
 -------------------
