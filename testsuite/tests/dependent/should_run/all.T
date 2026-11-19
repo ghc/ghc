@@ -16,7 +16,8 @@ test('NativeLocalOpen',
                    + config.ghc_th_way_flags])
 test('NativeOpenConstructor',
      [only_ways(['normal']), extra_files([open_eval_dir + 'OpenConstructorWorker.hs',
-                                         open_eval_dir + 'OpenConstructorSource.hs'])],
+                                         open_eval_dir + 'OpenConstructorSource.hs',
+                                         open_eval_dir + 'SpineWorker.hs'])],
      run_command, ['bash NativeOpenConstructor.sh "{compiler}" "{libdir}"'])
 test('NativeOpenBuild',
      [only_ways(['normal']), extra_files([open_eval_dir + 'OpenBuildWorker.hs',

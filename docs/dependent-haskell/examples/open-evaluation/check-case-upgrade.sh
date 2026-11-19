@@ -2,13 +2,14 @@
 set -euo pipefail
 export LC_ALL=C
 
-if [[ $# -ne 4 || $1 != /* || $2 != /* || $3 != /* || $4 != /* ]]; then
-    printf 'usage: %s ABS_M142_GHC ABS_M144_GHC ABS_CURRENT_GHC ABS_LIBDIR\n' "$0" >&2
+if [[ ( $# -ne 4 && $# -ne 5 ) || $1 != /* || $2 != /* || $3 != /* || $4 != /* || ${5:-/} != /* ]]; then
+    printf 'usage: %s ABS_M142_GHC ABS_M144_GHC ABS_CURRENT_GHC ABS_LIBDIR [ABS_M147_GHC]\n' "$0" >&2
     exit 2
 fi
 m142=$1
 m144=$2
 current=$3
+src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 flags=("-B$4" -package-env - -O0 -fomit-interface-pragmas -fno-write-if-simplified-core
        -dcore-lint -dstg-lint -fdiagnostics-color=never)
 out=$(mktemp -d)
@@ -66,3 +67,27 @@ if grep -Eq 'Compiling Abstract[[:space:]]' upgrade.log; then exit 1; fi
 "$current" "${flags[@]}" -v1 --make -no-link Client.hs >warm.log 2>&1
 if grep -q 'Compiling ' warm.log; then cat warm.log; exit 1; fi
 echo 'Both generations of interface were upgraded. The next build reused the checked modules.'
+
+if [[ $# -eq 5 ]]; then
+    cp "$src/SpineWorker.hs" .
+    "$5" "${flags[@]}" -v0 -c SpineWorker.hs
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >old.iface
+    if grep -Fq 'T:firstMaybe ' old.iface; then exit 1; fi
+    cat >First.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, StandaloneKindSignatures, TypeOperators #-}
+module First where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified SpineWorker as W
+type Head :: W.Spine a -> Maybe a
+type Head xs = W.firstMaybe xs
+proof :: Head ('W.More 'x' xs) :~: 'Just 'x'
+proof = Refl
+HS
+    "$current" "${flags[@]}" -v1 --make -no-link First.hs >upgrade.log 2>&1 || { cat upgrade.log; exit 1; }
+    grep -Eq 'Compiling SpineWorker[[:space:]].*\[Compiler now checks constructor case results\]' upgrade.log
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >new.iface
+    grep -Fq 'T:firstMaybe ' new.iface
+    "$current" "${flags[@]}" -v1 --make -no-link First.hs >warm.log 2>&1
+    if grep -q 'Compiling ' warm.log; then cat warm.log; exit 1; fi
+    echo 'The projection-only compiler upgraded to constructor results. The next build reused both modules.'
+fi

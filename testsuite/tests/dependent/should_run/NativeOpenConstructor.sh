@@ -307,6 +307,63 @@ fi
 expect_rejection Residual 7 '\[GHC-70566\]' 'Cannot reduce the open call'
 expect_rejection NestedResidual 8 '\[GHC-(68947|70565|70566|83865)\]' 'pickNested'
 
+# Check constructed results from a stripped ordinary worker interface.
+cp "$src/SpineWorker.hs" .
+"${ghc[@]}" -fomit-interface-pragmas -c SpineWorker.hs
+rm SpineWorker.hs SpineWorker.o
+"${ghc[@]}" --show-iface SpineWorker.hi > spine.iface
+for owner in firstMaybe boxedFirst; do
+    grep -Fq "T:$owner " spine.iface
+done
+if grep -Eq 'T:(strictFirst|privateFirst|strictResult) ' spine.iface; then
+    printf '%s\n' 'An unsupported strict or private result equation escaped.' >&2
+    exit 1
+fi
+
+cat > SpineResidual.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, ExplicitForAll, ExperimentalDependentTypes, PolyKinds, StandaloneKindSignatures #-}
+module SpineResidual (FirstMaybe, BoxedFirst) where
+
+import qualified SpineWorker as W
+
+type FirstMaybe :: forall a. W.Spine a -> Maybe a
+type FirstMaybe p = W.firstMaybe p
+
+type BoxedFirst :: forall a. W.Spine a -> Maybe (Maybe a)
+type BoxedFirst p = W.boxedFirst p
+SOURCE
+"${ghc[@]}" -c SpineResidual.hs
+cat > SpineClient.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, KindSignatures, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+module SpineClient where
+
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import SpineResidual (FirstMaybe, BoxedFirst)
+import qualified SpineWorker as W
+
+empty :: FirstMaybe ('W.Empty :: W.Spine Char) :~: 'Nothing
+empty = Refl
+
+more :: forall (x :: Bool) (rest :: W.Spine Bool).
+        Proxy x -> Proxy rest -> FirstMaybe ('W.More x rest) :~: 'Just x
+more _ _ = Refl
+
+boxed :: forall (x :: Bool) (rest :: W.Spine Bool).
+         Proxy x -> Proxy rest -> BoxedFirst ('W.More x rest) :~: 'Just ('Just x)
+boxed _ _ = Refl
+SOURCE
+"${ghc[@]}" -c SpineClient.hs
+
+# Only the value returned for More changed. Its old equality must fail.
+sed 's/^boxedFirst (More x _) = Just (Just x)$/boxedFirst (More _ _) = Just Nothing/' \
+    "$src/SpineWorker.hs" >SpineWorker.hs
+"${ghc[@]}" -fomit-interface-pragmas -c SpineWorker.hs
+rm SpineWorker.hs SpineWorker.o
+"${ghc[@]}" -c SpineResidual.hs
+line=$(awk '/^boxed _ _ = Refl/ {print NR}' SpineClient.hs)
+expect_rejection SpineClient "$line" '\[GHC-83865\]' 'Refl'
+
 cd ../client
 cp "$src/NativeOpenConstructor.hs" .
 "${ghc[@]}" -c NativeOpenConstructor.hs

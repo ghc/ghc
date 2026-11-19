@@ -703,6 +703,38 @@ The next invocation reuses the rebuilt modules. [Three-compiler upgrade](../exam
 
 A branch that constructs a result, such as `firstMaybe (More x _) =
 Just x`, needs to represent that constructor and its symbolic fields on
-the right-hand side of the equation. The current case checker accepts a
-bound field or fallback there. General normalization of a case on an
-unknown term remains open.
+the right-hand side of the equation. M146 accepted a bound field or
+fallback there. M148 adds constructed results. General normalization
+of a case on an unknown term remains open.
+
+## M148. Constructor results from a checked case
+
+An ordinary `firstMaybe :: Spine a -> Maybe a` builds `Nothing`
+after `Empty` and `Just x` after `More x rest`. A dependent module
+can export the residual with a rigid input. An ordinary consumer can then
+prove both equations from stripped interfaces, including the second
+equation with a rigid tail. Building `Just x` adds no demand on either
+field. The same check covers nested results such as `Just (Just x)`.
+
+GHC checks a saturated application of the actual DataCon worker. It
+checks the constructor's type arguments, field kinds, result kind,
+ordinary lazy representation and visibility. Result expressions can use
+scoped fields and build further checked constructors. A strict result
+constructor or a private constructor cannot enter the published
+equations. A strict match on the input tail still blocks the certificate.
+
+GHC rechecks potentially eligible local producers once when upgrading
+from the previous constructor case format. The migration uses the same
+necessary local datatype check. Binary-only producers still need a
+rebuild to publish the new equations.
+[Stripped-interface tests](../../../testsuite/tests/dependent/should_run/NativeOpenConstructor.sh).
+
+Changing only the constructed result from `Just (Just x)` to
+`Just Nothing` invalidates the client's previous equality at `Refl`.
+A result such as `Just (helper x)` needs evidence for the helper as
+well as the constructors. With only a stripped worker interface, GHC
+reports GHC-70566 at the call on a rigid spine. Its current suggestion
+to use a rigid variable does not identify the missing equation. The
+next case needs both helper evidence and a diagnostic for its absence.
+[Ordinary worker](../examples/open-evaluation/SpineWorker.hs)
+and [compiler upgrade](../examples/open-evaluation/check-case-upgrade.sh).
