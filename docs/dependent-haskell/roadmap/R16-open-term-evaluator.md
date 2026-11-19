@@ -633,16 +633,46 @@ ordinary binary-only use, source upgrade and reuse without a file edit.
 [Recompilation key](../../../compiler/GHC/Iface/Recomp/Flags.hs)
 and [upgrade check](../examples/open-evaluation/check-pair-upgrade.sh).
 
-The next case is `pick :: Choice a b -> b`. The ordinary function
-selects a different field in each of two constructors. A known
-constructor already reduces. Exporting `type Field p = W.pick p` for
-an unknown `p :: Choice Type Type` stops at the case on `p`. A
-certificate must check every alternative before it can publish equations
-for this datatype. [Ordinary sum and selector](../examples/open-evaluation/OpenConstructorWorker.hs).
+## M144. Deferring a projection over an ordinary sum
 
-Start with a local datatype whose constructors are all exported. Require
-one ordinary case alternative per constructor and a result that returns
-one of its lazy fields. Check the selected field in each alternative,
-privacy of a hidden constructor, and rejection of a stricter worker.
-The new equation must preserve existing calls that ignore an exceptional
-field in a computed argument.
+```haskell
+data Choice a b = LeftFields a b | RightFields b a
+
+pick :: Choice a b -> b
+pick (LeftFields _ y) = y
+pick (RightFields y _) = y
+```
+
+The ordinary producer exports the datatype, its constructors and the
+function. A dependent module can now define `type Pick p = W.pick p`
+with an unknown `p :: W.Choice Bool Char`. A later ordinary client
+can prove both `Pick ('W.LeftFields 'True 'x') :~: 'x'` and
+`Pick ('W.RightFields 'y' 'False) :~: 'y'` from stripped interfaces.
+Each equation matches one constructor. With only the variable `p`,
+the application stays in the exported type.
+
+GHC checks one direct Core case on the function's argument. Every
+constructor must have an alternative that returns one of its bound
+fields. The datatype must be local and exported with every constructor.
+Its fields must be lazy boxed values at its type parameters. A hidden
+constructor, extra demand, nested match or rewritable producer can
+block publication. A consumer also checks applicable rewrite rules
+before using the equation. The order of explicit type arguments follows
+the function signature. [Producer](../examples/open-evaluation/OpenConstructorWorker.hs)
+and [separate clients, rule checks and strictness controls](../../../testsuite/tests/dependent/should_run/NativeOpenConstructor.sh).
+
+When upgrading from M142, GHC checks an old home interface for a local
+exported parameterized sum with a field in each constructor. A possible
+producer recompiles once, including when the Core check yields no
+equation. An abstract or unrelated module can reuse its old interface.
+Binary-only packages need a producer rebuild to gain the new equation.
+[Two-compiler upgrade check](../examples/open-evaluation/check-sum-upgrade.sh).
+
+A function such as `pickNested (Nested (Just x)) _ = x` tests a field
+before choosing its result. The current observer handles an exposed
+constructor at the call site. Publishing the nested pattern for a
+future client requires recording that second demand. At `Nested Type`,
+the current compiler reports GHC-70566 at the unknown scrutinee.
+A client should eventually recover `x` for `Nested (Just x)` and the
+fallback for `Nested Nothing`. The `Just` branch must leave the
+fallback unevaluated.

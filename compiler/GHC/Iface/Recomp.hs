@@ -405,7 +405,7 @@ checkVersions hsc_env mod_summary iface self_recomp
             then return $ outOfDateItemBecause SourceFileChanged Nothing else do {
        ; if not (isHomeModule home_unit (mi_module iface))
             then return $ outOfDateItemBecause ThisUnitIdChanged Nothing else do {
-       ; recomp <- liftIO $ checkFlagHash hsc_env (mi_module iface) self_recomp
+       ; recomp <- liftIO $ checkFlagHash hsc_env iface self_recomp
                              `recompThen` checkOptimHash hsc_env self_recomp
                              `recompThen` checkHpcHash hsc_env self_recomp
                              `recompThen` checkMergedSignatures hsc_env mod_summary self_recomp
@@ -536,13 +536,19 @@ checkHie dflags mod_summary =
              _ -> UpToDate
 
 -- | Check the flags haven't changed
-checkFlagHash :: HscEnv -> Module -> IfaceSelfRecomp -> IO RecompileRequired
-checkFlagHash hsc_env iface_mod self_recomp = do
+checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp -> IO RecompileRequired
+checkFlagHash hsc_env iface self_recomp = do
     let logger   = hsc_logger hsc_env
     let FingerprintWithValue old_fp old_flags = mi_sr_flag_hash self_recomp
-    let (new_fp, new_flags) = fingerprintDynFlags hsc_env iface_mod putNameLiterally
+    let (previous_fp, new_flags) = fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
+        new_fp = sumProjectionFingerprint previous_fp
     if old_fp == new_fp
       then up_to_date logger (text "Module flags unchanged")
+      else if old_fp == previous_fp
+      then if mayExportSumProjection iface
+           then out_of_date_hash logger (CustomReason "Compiler now checks sum projections")
+                  (text "Sum projection publication changed") old_fp new_fp
+           else up_to_date logger (text "Module cannot export a sum projection")
       else if old_fp == computeFingerprint putNameLiterally new_flags
       then out_of_date_hash logger (CustomReason "Compiler now checks ordinary pair equations")
              (text "Ordinary pair-equation publication changed") old_fp new_fp
@@ -553,6 +559,36 @@ checkFlagHash hsc_env iface_mod self_recomp = do
                       Just old_flags -> checkIfaceFlags old_flags new_flags
         out_of_date logger FlagsChanged (fmap vcat diffs)
 
+-- | Record that the compiler checked this source for sum projections.
+-- See Note [Recompiling sum projection producers].
+sumProjectionFingerprint :: Fingerprint -> Fingerprint
+sumProjectionFingerprint fp = computeFingerprint putNameLiterally (fp, "sum-projections-v1" :: String)
+
+-- | Test a necessary property of the local input datatype in an older interface.
+mayExportSumProjection :: ModIface -> Bool
+mayExportSumProjection iface = any (candidate . snd) (mi_decls iface)
+  where
+    exports = mkNameSet (concatMap availNames (mi_exports iface))
+    exported name = name `elemNameSet` exports
+    candidate IfaceData{ ifName = name, ifBinders = _ : _
+                       , ifCons = IfDataTyCon False cons@(_ : _ : _) }
+      = exported name && all (\con -> exported (ifConName con) && not (null (ifConArgTys con))) cons
+    candidate _ = False
+
+{- Note [Recompiling sum projection producers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A sum projection needs a local parameterized datatype with at least two
+constructors. The producer exports the type and every constructor. Each
+alternative returns a field, so every constructor must have a field.
+These are necessary conditions even when a synonym hides the datatype
+in the function signature. The full Core check belongs in
+GHC.Tc.Gen.SourceTable. See Note [Checked sum projections] there.
+
+When the flags match the preceding compiler, use the old interface to
+skip modules that could never have supplied such an equation. Record the
+new fingerprint when writing the interface, including when no function
+qualifies. Ordinary use of binary-only packages keeps the old interface.
+-}
 
 checkIfaceFlags :: IfaceDynFlags -> IfaceDynFlags -> IO [SDoc]
 checkIfaceFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)
@@ -1207,7 +1243,7 @@ mkSelfRecomp :: HscEnv -> Module -> Fingerprint -> [Usage] -> IO IfaceSelfRecomp
 mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
-      let dyn_flags_info = fingerprintDynFlags hsc_env this_mod putNameLiterally
+      let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
 
       let opt_hash = fingerprintOptFlags dflags putNameLiterally
 
@@ -1221,7 +1257,7 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
               else FingerprintWithValue flag_hash Nothing
 
       return (IfaceSelfRecomp
-                { mi_sr_flag_hash = include_detailed_flags dyn_flags_info
+                { mi_sr_flag_hash = include_detailed_flags (sumProjectionFingerprint flag_hash, flags)
                 , mi_sr_hpc_hash = hpc_hash
                 , mi_sr_opt_hash = opt_hash
                 , mi_sr_plugin_hash = plugin_hash
