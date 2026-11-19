@@ -1279,6 +1279,26 @@ messages and in GHCi:
     exposed to the programmer, but it is nevertheless displayed when
     :ghc-flag:`-fprint-explicit-kinds` is enabled.
 
+.. ghc-flag:: -fprint-explicit-matchabilities
+    :shortdesc: Print matchability on function arrows and forall binders.
+    :type: dynamic
+    :reverse: -fno-print-explicit-matchabilities
+    :category: verbosity
+
+    This flag displays matchabilities that GHC normally omits, including an
+    unmatchable arrow that would appear as a bare arrow. For example, use it
+    with :extension:`Modifiers` when copying the kind of a higher-order type
+    family from GHCi into a standalone kind signature::
+
+        ghci> :set -XModifiers -fprint-explicit-matchabilities
+
+    With :extension:`Modifiers`, GHC renders a function arrow's matchability
+    before the arrow as a percent modifier, such as ``a %U -> b``.
+    Use the same extensions and imports when you copy that syntax into source
+    code. In particular, a printed matchability constructor needs to be in
+    scope. The flag is off by default. It does not enable source syntax or
+    affect the interface file or its dump.
+
 .. ghc-flag:: -fprint-explicit-coercions
     :shortdesc: Print coercions in types
     :type: dynamic

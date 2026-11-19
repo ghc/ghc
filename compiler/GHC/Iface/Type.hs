@@ -1303,11 +1303,16 @@ pprIfaceDepFunArrow DepFunVisible = arrow
 pprIfaceDepFunArrow DepFunInvisible = dot
 
 pprTypeArrow :: FunTyFlag -> IfaceMatchability -> IfaceMult -> SDoc
-pprTypeArrow af ma mult = pprArrowWithModifiers mods af arr <+> ppr_matchability
+pprTypeArrow af ma mult =
+  getPprStyle $ \style ->
+  sdocOption sdocModifiers $ \modifiers ->
+  sdocOption sdocPrintExplicitMatchabilities $ \explicit ->
+    let show_ma = ma /= ifaceUnmatchable || (userStyle style && explicit && isFUNArg af)
+    in if userStyle style && modifiers && isFUNArg af
+      then pprArrowWithModifiers ([pprPrecIfaceType appPrec ma | show_ma] ++ mods) af arr
+      else pprArrowWithModifiers mods af arr
+             <+> ppWhen show_ma (char '@' <> parens (pprPrecIfaceType appPrec ma))
   where
-    ppr_matchability
-      | ma == ifaceUnmatchable = empty
-      | otherwise = char '@' <> parens (pprPrecIfaceType appPrec ma)
     (arr, mods) = case mult of
       IfaceTyConApp tc IA_Nil
         | tc `ifaceTyConHasKey` manyDataConKey
@@ -1710,8 +1715,12 @@ pprIfaceForAllWithMatchability bndrs
 -- | Apply user-facing quantifier rules without hiding non-default metadata.
 pprUserIfaceForAllWithMatchability :: [(IfaceMatchability, IfaceForAllBndr)] -> SDoc
 pprUserIfaceForAllWithMatchability bndrs
-  = pprDefaultUserForAll bndrs (pprUserIfaceForAll (map snd bndrs)) $
-      pprIfaceForAllWithDefault ((== ifaceMatchable) . fst) bndrs
+  = getPprStyle $ \style ->
+    sdocOption sdocPrintExplicitMatchabilities $ \explicit ->
+      if userStyle style && explicit
+      then pprIfaceForAllWithMatchability bndrs
+      else pprDefaultUserForAll bndrs (pprUserIfaceForAll (map snd bndrs)) $
+             pprIfaceForAllWithDefault ((== ifaceMatchable) . fst) bndrs
 
 -- | Use ordinary forall syntax for a default source-type telescope.
 -- See Note [Default forall matchability in diagnostics].
@@ -1720,7 +1729,8 @@ pprDefaultUserForAll bndrs ordinary annotated
   = getPprStyle $ \style ->
     getPprDebug $ \debug ->
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
-      if userStyle style && not debug && not print_kinds
+    sdocOption sdocPrintExplicitMatchabilities $ \explicit ->
+      if userStyle style && not debug && not print_kinds && not explicit
          && all ((== ifaceUnmatchable) . fst) bndrs
       then ordinary else annotated
 

@@ -2586,6 +2586,7 @@ fFlagsDeps = [
   flagSpec "print-explicit-kinds"             Opt_PrintExplicitKinds,
   flagSpec "print-explicit-coercions"         Opt_PrintExplicitCoercions,
   flagSpec "print-explicit-runtime-reps"      Opt_PrintExplicitRuntimeReps,
+  flagSpec "print-explicit-matchabilities"   Opt_PrintExplicitMatchabilities,
   flagSpec "print-equality-relations"         Opt_PrintEqualityRelations,
   flagSpec "print-axiom-incomps"              Opt_PrintAxiomIncomps,
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,

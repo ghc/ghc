@@ -59,6 +59,11 @@ The type-level `Map` example uses `(a %U -> b) -> [a] -> [b]`.
 and [acceptance](https://github.com/ghc-proposals/ghc-proposals/pull/370).
 [Map example](examples/open-evaluation/TypeLambda.hs).
 
+Proposal #242 also specifies `-fprint-explicit-matchabilities`.
+The flag matters when copying a callback kind from GHCi. Omitting an
+unmatchable index can make a standalone kind signature require a
+matchable callback. [Showing matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
+
 These pages record the selected implementation sources, open questions and
 unexecuted controls. The paper ledger records additional versions and selective
 readings. It preserves the older version records and their reading scopes.

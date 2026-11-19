@@ -415,6 +415,7 @@ data SDocContext = SDC
   , sdocPrintExplicitKinds          :: !Bool
   , sdocPrintExplicitCoercions      :: !Bool
   , sdocPrintExplicitRuntimeReps    :: !Bool
+  , sdocPrintExplicitMatchabilities :: !Bool
   , sdocPrintExplicitForalls        :: !Bool
   , sdocPrintPotentialInstances     :: !Bool
   , sdocPrintEqualityRelations      :: !Bool
@@ -434,6 +435,7 @@ data SDocContext = SDC
   , sdocErrorSpans                  :: !Bool
   , sdocStarIsType                  :: !Bool
   , sdocLinearTypes                 :: !Bool
+  , sdocModifiers                   :: !Bool
   , sdocListTuplePuns               :: !Bool
   , sdocPrintTypeAbbreviations      :: !Bool
   , sdocUnitIdForUser               :: !(FastString -> SDoc)
@@ -485,6 +487,7 @@ defaultSDocContext = SDC
   , sdocPrintExplicitKinds          = False
   , sdocPrintExplicitCoercions      = False
   , sdocPrintExplicitRuntimeReps    = False
+  , sdocPrintExplicitMatchabilities = False
   , sdocPrintExplicitForalls        = False
   , sdocPrintPotentialInstances     = False
   , sdocPrintEqualityRelations      = False
@@ -504,6 +507,7 @@ defaultSDocContext = SDC
   , sdocErrorSpans                  = False
   , sdocStarIsType                  = False
   , sdocLinearTypes                 = False
+  , sdocModifiers                   = False
   , sdocListTuplePuns               = True
   , sdocPrintTypeAbbreviations      = True
   , sdocUnitIdForUser               = ftext

@@ -920,6 +920,7 @@ data GeneralFlag
    -- Known names; see Note [Overview of known entities] in GHC.Builtin.
    | Opt_DefinesKnownKeyNames
    | Opt_RebindableKnownNames
+   | Opt_PrintExplicitMatchabilities
    deriving (Eq, Show, Enum)
 
 -- | The set of flags which affect optimisation for the purposes of
