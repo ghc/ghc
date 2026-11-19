@@ -62,7 +62,7 @@ module GHC.Core.DataCon (
         specialPromotedDc,
 
         -- ** Promotion related functions
-        promoteDataCon
+        promoteDataCon, dataConHasPromotedRetained
     ) where
 
 import GHC.Prelude
@@ -74,6 +74,7 @@ import GHC.Core.Type as Type
 import GHC.Core.Coercion
 import GHC.Core.Unify
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Multiplicity
@@ -110,6 +111,7 @@ import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
 import Data.List( find )
+import Data.Maybe ( isJust )
 
 {-
 Note [Data constructor representation]
@@ -1272,15 +1274,62 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
     prom_bndrs       = prom_tv_bndrs ++ prom_arg_bndrs
     prom_res_kind    = orig_res_ty
     promoted
-      | not (null arg_binders)
-      = pprPanic "promoteDataCon: retained field telescope" (ppr name)
-      | otherwise
+      | null arg_binders
       = mkPromotedDataCon con name prom_info prom_bndrs
-                         prom_res_kind roles rep_info
+                         prom_res_kind (roles Representational) rep_info
+      | Just (witness, payload) <- promotedRetainedFields con
+      , witness_name : payload_name : _ <- fresh_names
+      = let index = mkTyVar witness_name (varType witness)
+            payload_binder = mkTyVar payload_name (payload (mkTyVarTy index))
+            binders = prom_tv_bndrs ++ [ mkNamedTyConBinder Required index
+                                      , mkAnonTyConBinder payload_binder ]
+        in mkPromotedDataCon con name prom_info binders
+                             prom_res_kind (roles Nominal) rep_info
+      | otherwise
+      = pprPanic "promoteDataCon: retained field telescope" (ppr name)
 
-    roles = map (\tv -> if isTyVar tv then Nominal else Phantom)
-                (univ_tvs ++ ex_tvs)
-            ++ map (const Representational) (theta ++ map scaledThing orig_arg_tys)
+    roles field_role = map (\tv -> if isTyVar tv then Nominal else Phantom)
+                           (univ_tvs ++ ex_tvs)
+                       ++ map (const field_role) (theta ++ map scaledThing orig_arg_tys)
+
+{- Note [Promoting one retained witness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Keep the runtime witness as an Id in the worker and in patterns. The
+promoted constructor instead binds a fresh required type variable of
+the witness's domain. The payload argument kind uses this variable.
+Ordinary kind application substitutes the first argument into the
+second argument kind.
+
+The source and interface readers use the same shape check. This
+subset admits one direct occurrence of the witness in the final
+argument of the payload type. Other arguments and the result contain
+no runtime Ids. The supported payload multiplicities affect the
+runtime constructor only. Promotion does not supply any evidence
+that a runtime scrutinee equals this promoted constructor.
+-}
+
+-- | Can this retained constructor use a checked promoted telescope?
+-- See Note [Promoting one retained witness].
+dataConHasPromotedRetained :: DataCon -> Bool
+dataConHasPromotedRetained = isJust . promotedRetainedFields
+
+-- | Keep the runtime Id separate from the required binder in the promoted kind.
+-- This prototype handles one final index argument in an ordinary payload type.
+promotedRetainedFields :: DataCon -> Maybe (Id, Type -> Type)
+promotedRetainedFields con
+  | [Just witness, Nothing] <- dataConRepArgBinders con
+  , (_, [], [], [], [Scaled witness_mult witness_ty, Scaled payload_mult body], result) <- dataConFullSig con
+  , isManyTy witness_mult, isOneTy payload_mult || isManyTy payload_mult
+  , isNativeIndexType witness_ty
+  , witness_ty `eqType` varType witness
+  , not (anyFreeVarsOfType isId result)
+  , Just (head_tc, args) <- splitTyConAppNoView_maybe body
+  , TermVarTy v : reverse_prefix <- reverse args
+  , witness == v
+  , let prefix = reverse reverse_prefix
+  , all (not . anyFreeVarsOfType isId) prefix
+  = Just (witness, \index -> mkTyConApp head_tc (prefix ++ [index]))
+  | otherwise = Nothing
 
 freshNames :: [Name] -> [Name]
 -- Make an infinite list of Names whose Uniques and OccNames
@@ -1667,9 +1716,10 @@ implies function or argument equality. See Note [Function-valued retained
 binders] in GHC.Core.Type and
 docs/dependent-haskell/REFERENCES.md#function-valued-retained-package-fields-prior-art.
 
-These constructors are not promotable. The promoted TyCon cache must fail
-explicitly if requested; an anonymous promoted telescope would leave runtime
-Ids out of scope. Callers must reject source promotion before requesting it.
+The promoted kind must bind each index used in a later field. See
+Note [Promoting one retained witness]. Reject other retained telescopes
+before requesting their promoted TyCon. Anonymous promoted binders would
+leave the original runtime Id out of scope.
 
 The flat instantiated-field APIs cannot return fresh runtime field binders.
 Reject retained constructors in dataConInstSig, dataConInstArgTys and

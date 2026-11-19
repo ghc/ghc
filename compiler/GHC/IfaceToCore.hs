@@ -2785,9 +2785,9 @@ tcIfaceTyCon (IfaceTyCon name _info)
        ; case thing of
               ATyCon tc -> return tc
               AConLike (RealDataCon dc)
-                -> do { unless (null (dataConRepArgBinders dc)) $
+                -> do { unless (null (dataConRepArgBinders dc) || dataConHasPromotedRetained dc) $
                           failIfM (text "Invalid retained constructor fields in interface:"
-                                    <+> ppr name $$ text "Retained constructors cannot be promoted.")
+                                    <+> ppr name $$ text "This retained constructor has no supported promoted field telescope.")
                       ; return (promoteDataCon dc) }
               _ -> pprPanic "tcIfaceTyCon" (ppr thing) }
 

@@ -3778,7 +3778,8 @@ pprRetainedQuantificationError reason = case reason of
          , text "Records, contexts, existential binders, equality specifications, and StrictData are not supported."
          , text "Its erased quantifiers must name exactly the datatype parameters." ]
   RetainedPackagePromotion ->
-    text "Promotion of constructors with retained fields is not supported yet."
+    vcat [ text "This retained constructor has no supported promoted field telescope."
+         , text "Promotion requires one witness followed by a field whose final type argument is that witness." ]
   RetainedPackagePattern ->
     vcat [ text "A retained package pattern requires prefix constructor syntax and unrestricted multiplicity."
          , text "Retained fields require bare variables, wildcards, or constructor patterns for their index domain. Constructor fields must be variables or wildcards."

@@ -9,9 +9,9 @@ g=("$1" "-B$2" -v0 -package-env - -O0 -i -i. -dcore-lint -dstg-lint -fdiagnostic
 shift 2
 g+=("$@")
 cd "$out/provider"
-cp "$src"/{RetainedNat,PackedVecLibrary}.hs .
-"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs
-cp PackedVecLibrary.hi RetainedNat.hi "$out/client/"
+cp "$src"/{PackedVecLibrary,RetainedNat,PackedProjection}.hs .
+"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedProjection.hs
+cp PackedVecLibrary.hi RetainedNat.hi PackedProjection.hi "$out/client/"
 cd "$out/client"
 cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
@@ -41,6 +41,31 @@ escape p = withRetained p (\_ box -> contents box)
 HS
 if "${g[@]}" -c Escape.hs >bad.log 2>&1 || ! grep -Fq 'Escape.hs:8:' bad.log ||
    ! grep -Fq 'Vec Int' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
+
+cat >Projection.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
+module Projection where
+import Data.Type.Equality
+import PackedProjection
+import PackedVecLibrary
+
+one :: Length One :~: 'S 'Z
+one = Refl
+zero :: Length ('PackVec 'Z ('VNil :: Vec Bool 'Z)) :~: 'Z
+zero = Refl
+HS
+"${g[@]}" -c Projection.hs
+cat >WrongIndex.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
+module WrongIndex where
+import PackedVecLibrary
+type Bad = 'PackVec 'Z ('VCons 'True 'VNil)
+HS
+if "${g[@]}" -c WrongIndex.hs >bad.log 2>&1 || ! grep -Fq 'WrongIndex.hs:4:' bad.log ||
+   ! grep -Fq '[GHC-83865]' bad.log; then
     cat bad.log >&2
     exit 1
 fi

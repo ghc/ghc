@@ -4706,7 +4706,7 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
              -> return (mkTyConTy tc, tyConKind tc)
 
            AGlobal (AConLike (RealDataCon dc))
-             -> do { unless (null (dataConRepArgBinders dc)) $
+             -> do { unless (null (dataConRepArgBinders dc) || dataConHasPromotedRetained dc) $
                        failWithTc $ TcRnRetainedQuantificationError RetainedPackagePromotion
                    ; when (isDataFamInstTyCon (dataConTyCon dc)) $
                        -- see #15245

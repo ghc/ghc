@@ -2303,7 +2303,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             Left _ -> do
                 diagnostics <- unlines <$> readIORef promotionMessages
                 check ("imported retained constructor rejects promotion; diagnostic: " ++ diagnostics) $
-                    "Retained constructors cannot be promoted." `isInfixOf` diagnostics
+                    "This retained constructor has no supported promoted field telescope." `isInfixOf` diagnostics
             Right _ -> fail "FAIL: imported retained constructor was promoted"
         ordinary <- restorePackage env =<< roundtrip NormalCompression (tyThingToIfaceDecl (ATyCon boolTyCon))
         forcePackage ordinary

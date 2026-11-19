@@ -50,14 +50,16 @@ payload (PackVec _ xs) = xs
 ```
 
 The current compiler rejects the retained domain `PackedVec a` at the
-signature (GHC-83605). An alternative test that defines the length as a
-type family reaches a second restriction. The compiler rejects the
-promoted `PackVec` pattern because the constructor has a retained field.
+signature (GHC-83605). A closed type family can project the witness from a known promoted
+`PackVec`. A client with only the interface can prove the lengths of an
+empty and a one-element package. Supplying a zero witness and a
+one-element vector is a kind error at the payload. [Known package
+projection](../examples/packed-vector/PackedProjection.hs).
 A signature such as `PackedVec a -> Vec a n` correctly fails with
 GHC-25897. Its caller could choose a different `n` from the stored length.
 
-- [ ] Represent the constructor's fields in order so the witness binds
-  occurrences in the payload type.
+- [x] Represent a single retained witness before a payload whose final
+  type argument is that witness in the promoted constructor kind.
 - [ ] Relate the length of the input package to the field bound by the
   match. Only the input package remains in scope in the exported type.
 - [ ] Check the projection through a compiled interface. Check a

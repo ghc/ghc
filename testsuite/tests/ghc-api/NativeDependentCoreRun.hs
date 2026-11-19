@@ -4005,7 +4005,8 @@ runPackageSourceRejectChecks = do
         , ("Existential", 83605, "existential binders", [], [], declaration "forall a hidden. foreach (n :: Nat) -> Vec a n -> hidden -> PackedVec a")
         , ("Equality", 83605, "contexts", [], [], declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a")
         , ("RefinedUniversal", 83605, "equality specifications", [], [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
-        , ("Promotion", 83605, "Promotion of constructors with retained fields", [], [], package ++ ["type Bad = 'PackVec"])
+        , ("Promotion", 83605, "no supported promoted field telescope", [], [],
+            declaration "foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a m -> PackedVec a" ++ ["type Bad = 'PackVec"])
         , ("PatternWrongPredecessor", 5617, "rest", [], [], package ++ ["bad :: PackedVec Int -> PackedVec Int", "bad (PackVec (S k) (VCons x rest)) = PackVec (S k) rest"])
         , ("IndependentWildcards", 83865, "bad _ _ xs = xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m", "bad _ _ xs = xs"])
         , ("PatternIndependent", 5617, "rest", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> PackedVec Int", "bad m (PackVec (S k) (VCons x rest)) = PackVec m rest"])

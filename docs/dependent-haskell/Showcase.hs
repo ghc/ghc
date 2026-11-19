@@ -101,6 +101,7 @@ import qualified OpaqueCallClient as Opaque
 import qualified PairProjection as ComputedProjection
 import qualified OrdinaryVecClient as Ordinary
 import qualified ParameterizedIndexLibrary as Parameterized
+import qualified PackedProjection
 import PackedVecLibrary
 import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified QualifiedPiLibrary as Qualified
@@ -1283,6 +1284,8 @@ listBoundaries = do
     observe "ordinary zip with a short input" (Ordinary.ordinaryZipExact n xs [1 :: Int])
     observe "safeHead after checking for exactly one cell" (first "x", first "", first "xy")
     observe "first cell of a packaged list" (headPacked (packList ('p' : undefined)))
+    observe "project the length of a known dependent package in a type"
+        (Refl :: PackedProjection.Length PackedProjection.One :~: 'S 'Z)
     let vector = Retain n (replicateNative n 'x') :: Retained (Vec Char)
     observe "use the stored length and vector in a generic dependent eliminator"
         (withRetained vector (\k v -> (natToInt k, toList v)))
