@@ -176,7 +176,7 @@ sed "s/error \"relay sibling\"/'x'/" RelayLeaf.hs >../replacement/RelayLeaf.hs
 (cd ../replacement && producer RelayLeaf.hs)
 for obj in ../replacement/RelayLeaf.o ../replacement/RelayLeaf.dyn_o; do
     if [[ ! -f $obj ]]; then continue; fi
-    symbol=$(nm -g --defined-only "$obj" | awk '$NF ~ /readback2.*field_closure$/ {print $NF}')
+    symbol=$(nm -g --defined-only "$obj" | awk '$NF ~ /readback2ZCscalarzmtable_closure$/ {print $NF}')
     [[ -n $symbol && $symbol != *$'\n'* ]]
     if nm -u RelayWorker.o | grep -F "$symbol"; then exit 1; fi
     objcopy --localize-symbol "$symbol" "$obj"

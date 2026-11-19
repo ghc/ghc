@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr, pairObservationOcc, pairObservationType ) where
+module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr, pairObservationOcc, pairObservationType, scalarRecipeTableOcc ) where
 
 import GHC.Prelude
 
@@ -21,22 +21,25 @@ import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
-import GHC.Builtin.Modules (gHC_INTERNAL_ERR)
+import GHC.Builtin.KnownKeys (knownKeyOccName)
+import GHC.Builtin.Modules (gHC_INTERNAL_ERR, gHC_TYPES)
 import GHC.Builtin.PrimOps (PrimOp(RaiseOp))
 import GHC.Builtin.WiredIn.Types
   (boolTy, charTy, naturalTy, pairTyCon, stringTy, tupleDataCon)
 import GHC.Core
-import GHC.Core.Make (mkCharExpr, mkListExpr)
+import GHC.Core.Make (getMkStringIds, mkCharExpr, mkListExpr, mkStringExprWith)
 import GHC.Core.TyCo.Rep (scaledThing)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.Type
   (Type, getTyVar_maybe, mkVisFunTyManyU, splitForAllForAllTyBinders,
    splitFunTys, splitTyConApp_maybe)
 import GHC.Iface.Env (allocateGlobalBinder, lookupNameCache)
+import GHC.Tc.Utils.Env (lookupGlobal_maybe)
+import GHC.Data.Maybe (MaybeErr(..))
 import GHC.Types.Basic (Boxity(Boxed), LeftOrRight(..))
 import GHC.Types.Id (idName, idType, isExportedId, isGlobalId, isPrimOpId_maybe,
                      isDataConWorkId_maybe, mkExportedVanillaId, setInlinePragma)
-import GHC.Types.Name (getOccName, nameModule_maybe, nameSrcSpan)
+import GHC.Types.Name (getOccName, nameModule_maybe, nameOccName, nameSrcSpan)
 import GHC.Types.Name.Occurrence (OccName, mkVarOcc, occNameString)
 import GHC.Types.TyThing (TyThing(AnId))
 import GHC.Types.Var (Var, VarBndr(Bndr), isId)
@@ -86,6 +89,8 @@ import GHC.Types.Name.Ppr
 import GHC.Types.Unique.Supply ( UniqueTag(..) )
 
 import Control.Monad
+import Control.Monad.Trans.Maybe (MaybeT(..))
+import Data.Maybe (catMaybes, isJust)
 import GHC.Unit.Module
 
 {-
@@ -161,9 +166,14 @@ never refers to an imported proof closure from native code.
 The first-field observer keeps its original name. The second-field
 observer has a distinct name. A first-field-only object can still
 supply the first observer after recompilation of its interface.
+
+Publish one String table when the module can emit a scalar recipe.
+An empty table keeps the same entry after an object-only replacement.
+Only the interpreter looks up the table. Older objects can still provide
+per-owner scalar entries.
 -}
 
--- | Hidden executable entry for a projection or a scalar relay.
+-- | Hidden executable entry with the ordinary owner's stable ABI arity.
 pairObservationOcc :: Maybe LeftOrRight -> Int -> OccName -> OccName
 pairObservationOcc side arity owner =
     mkVarOcc ("$readback2:" ++ side_tag ++ show arity ++ ":" ++ occNameString owner)
@@ -171,6 +181,11 @@ pairObservationOcc side arity owner =
     side_tag = case side of
       Just CRight -> "right:"
       _ -> ""
+
+-- | Stable module entry for the scalar recipes. An empty table keeps the
+-- publication marker across a later object-only replacement.
+scalarRecipeTableOcc :: OccName
+scalarRecipeTableOcc = mkVarOcc "$readback2:scalar-table"
 
 -- | Recognize an ordinary producer supported by the first observation ABI.
 pairObservationType :: Type -> Maybe (Type, Type)
@@ -197,30 +212,37 @@ scalarCodec ty = any (eqType ty) [boolTy, charTy, naturalTy]
 addPairObservations :: ModGuts -> CoreM ModGuts
 addPairObservations guts = do
     env <- getHscEnv
-    let emit side owner arity rhs = do
-          let occ = pairObservationOcc side arity (getOccName owner)
+    let emit occ owner rhs = do
           name <- liftIO $ allocateGlobalBinder (hsc_NC env) this_mod occ
                     Nothing (nameSrcSpan (idName owner))
           let entry = mkExportedVanillaId name (exprType rhs)
           pure (NonRec (setInlinePragma entry neverInlinePragma) rhs)
 
+        typedEntry mod occ = do
+          name <- lookupNameCache (hsc_NC env) mod occ
+          thing <- lookupType env name
+          pure $ case thing of
+            Just (AnId entry) -> idType entry `eqType` stringTy
+            _ -> False
+
         importedProof owner arity
           | Just mod <- nameModule_maybe (idName owner)
           , RealUnit _ <- moduleUnit mod
           , mod /= this_mod = liftIO $ do
-              name <- lookupNameCache (hsc_NC env) mod (pairObservationOcc Nothing arity (getOccName owner))
-              thing <- lookupType env name
-              pure $ case thing of
-                Just (AnId entry) | idType entry `eqType` stringTy ->
-                  recipe (show (unitString (moduleUnit mod), moduleNameString (moduleName mod),
-                                occNameString (getOccName owner), arity))
-                _ -> no
-          | otherwise = pure no
+              let occ = nameOccName (idName owner)
+              legacy <- typedEntry mod (pairObservationOcc Nothing arity occ)
+              table <- if relayArity mod owner == Just arity
+                         then typedEntry mod scalarRecipeTableOcc else pure False
+              pure $ if legacy || table
+                then show (unitString (moduleUnit mod), moduleNameString (moduleName mod),
+                           occNameString occ, arity)
+                else ""
+          | otherwise = pure ""
 
         proof seen expr = case collectArgs expr of
           (Var fn, args)
             | isPrimOpId_maybe fn == Just RaiseOp
-            , valArgCount args == 1 -> pure yes
+            , valArgCount args == 1 -> pure "!"
             | null args
             , Just body <- lookupVarEnv bodies fn
             , not (fn `elemVarSet` seen) -> proof (extendVarSet seen fn) body
@@ -228,40 +250,64 @@ addPairObservations guts = do
             , all (not . isCoArg) args -> importedProof fn (valArgCount args)
           (Case _ _ _ [Alt _ _ body], []) -> proof seen body
           (Tick _ body, []) -> proof seen body
-          _ -> pure no
+          _ -> pure ""
 
-        add (owner, rhs)
+        addPair (owner, rhs)
           | isExportedId owner
-          , Just _ <- pairObservationType (idType owner) = do
+          , isJust (pairObservationType (idType owner)) = do
               (left, right) <- case collectBinders rhs of
                 ([_], body)
                   | (Var con, [Type _, Type _, x, y]) <- collectArgs body
                   , isDataConWorkId_maybe con == Just (tupleDataCon Boxed 2) ->
                       (,) <$> proof emptyVarSet x <*> proof emptyVarSet y
-                _ -> pure (no, no)
-              sequence [emit (Just CLeft) owner 1 right, emit (Just CRight) owner 1 left]
+                _ -> pure ("", "")
+              let entry side flag = emit (pairObservationOcc (Just side) 1 (getOccName owner))
+                                         owner (recipe flag)
+              sequence [entry CLeft right, entry CRight left]
+          | otherwise = pure []
+
+        addRelay (owner, rhs)
           | isExportedId owner
-          , Just arity <- relayArity owner = do
+          , Just arity <- relayArity this_mod owner = do
               let (params, body) = collectBinders rhs
               flag <- if length (filter isId params) == arity
                         then proof emptyVarSet body
-                        else pure no
-              (:[]) <$> emit Nothing owner arity flag
-          | otherwise = pure []
-    entries <- concat <$> mapM add bindings
-    pure guts{mg_binds = mg_binds guts ++ entries}
+                        else pure ""
+              pure (Just (owner, arity, flag))
+          | otherwise = pure Nothing
+    pair_entries <- concat <$> mapM addPair bindings
+    relay_rows <- catMaybes <$> mapM addRelay bindings
+    table_entry <- case relay_rows of
+      [] -> pure []
+      (owner, _, _):_ -> do
+        let rows = [(occNameString (getOccName fn), arity, flag)
+                   | (fn, arity, flag) <- relay_rows, not (null flag)]
+        packed <- liftIO $ packTable env (show rows)
+        (:[]) <$> emit scalarRecipeTableOcc owner packed
+    pure guts{mg_binds = mg_binds guts ++ pair_entries ++ table_entry}
   where
     this_mod = mg_module guts
     bindings = flattenBinds (mg_binds guts)
     bodies = mkVarEnv bindings
     recipe = mkListExpr charTy . map mkCharExpr
-    yes = recipe "!"
-    no = recipe ""
 
-    relayArity owner
+    -- Use the standard String codec for compiler metadata.
+    -- Early library builds can use the literal list when the codec is absent.
+    packTable env text = do
+      ids <- runMaybeT (getMkStringIds findUnpacker)
+      pure (maybe (recipe text) (`mkStringExprWith` text) ids)
+      where
+        findUnpacker key = MaybeT $ do
+          name <- lookupNameCache (hsc_NC env) gHC_TYPES (knownKeyOccName key)
+          thing <- lookupGlobal_maybe env name
+          pure $ case thing of
+            Succeeded (AnId unpacker) -> Just unpacker
+            _ -> Nothing
+
+    relayArity mod owner
       | Just (_, result) <- observationArrow (idType owner)
       , scalarCodec result = Just 1
-      | this_mod == gHC_INTERNAL_ERR
+      | mod == gHC_INTERNAL_ERR
       , let (parameters, body) = splitForAllForAllTyBinders (idType owner)
             (_, args, result) = splitFunTys body
       , Just variable <- getTyVar_maybe result

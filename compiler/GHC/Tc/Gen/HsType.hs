@@ -3202,23 +3202,42 @@ tcPlanClosedTree mode ordinary hint root arguments = do
       L _ (HsExplicitListTy _ _ []) -> True
       _ -> False
 
--- | Resolve a chain of optional proof recipes without entering the producer.
+-- | Resolve optional scalar entries without entering the pair producer.
 readPairRecipe :: Name -> NameSet -> Id -> TcM Bool
 readPairRecipe owner seen entry
   | name `elemNameSet` seen = pure False
   | otherwise = do
-      reify <- tcPrepareClosedObservation owner stringTy name
-      quoted <- reify (Core.Var entry)
-      case quoted >>= readbackString of
-        Just "!" -> pure True
-        Just reference
-          | Just (unit, mod, occurrence, arity) <- readMaybe reference -> do
-              let defining = mkModule (stringToUnit unit) (mkModuleName mod)
-              target <- lookupPairRecipe defining (mkVarOcc occurrence) arity
-              maybe (pure False) (readPairRecipe owner (extendNameSet seen name)) target
-        _ -> pure False
+      recipe <- readRecipeEntry owner entry
+      maybe (pure False) (readRecipeValue owner (extendNameSet seen name)) recipe
   where
     name = getName entry
+
+-- | Read a recipe through the optional native symbol check.
+readRecipeEntry :: Name -> Id -> TcM (Maybe String)
+readRecipeEntry owner entry = do
+    observe <- tcPrepareClosedObservation owner stringTy (getName entry)
+    quoted <- observe (Core.Var entry)
+    pure (quoted >>= readbackString)
+
+-- | Decode a versioned terminal proof or a reference to another owner.
+readRecipeValue :: Name -> NameSet -> String -> TcM Bool
+readRecipeValue _ _ "!" = pure True
+readRecipeValue owner seen reference
+  | Just (unit, mod, occurrence, arity) <- readMaybe reference = do
+      let defining = mkModule (stringToUnit unit) (mkModuleName mod)
+      (table, legacy) <- lookupPairRecipe defining (mkVarOcc occurrence) arity
+      rows <- maybe (pure Nothing) (readRecipeEntry owner) table
+      case rows of
+        Nothing -> maybe (pure False) (readPairRecipe owner seen) legacy
+        Just contents -> case legacy of
+          Just key
+            | let name = getName key
+            , not (name `elemNameSet` seen)
+            , Just entries <- readMaybe contents
+            , [recipe] <- [row | (occ, n, row) <- entries, occ == occurrence, n == arity]
+            -> readRecipeValue owner (extendNameSet seen name) recipe
+          _ -> pure False
+  | otherwise = pure False
 
 -- | Read the promoted list produced by the closed Char list codec.
 readbackString :: Type -> Maybe String

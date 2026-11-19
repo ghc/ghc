@@ -61,12 +61,12 @@ import GHC.Types.Avail (availNames)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(SourceTableId))
-import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, idUnfolding, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
-import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType)
+import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
 import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
 import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv, mkNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
@@ -1800,23 +1800,29 @@ canObservePairSource owner
 lookupPairObserver :: LeftOrRight -> Id -> Int -> TcM (Maybe Id)
 lookupPairObserver side producer arity
   | Just mod <- nameModule_maybe owner =
-      lookupObservationEntry (Just side) mod (nameOccName owner) arity
+      lookupRecipeEntry False mod (pairObservationOcc (Just side) arity (nameOccName owner))
   | otherwise = pure Nothing
   where
     owner = idName producer
 
--- | Load an optional hidden recipe at its exact module, owner and arity.
-lookupPairRecipe :: Module -> OccName -> Int -> TcM (Maybe Id)
-lookupPairRecipe = lookupObservationEntry Nothing
+-- | Check both artifact forms of a scalar relay. An object-only replacement
+-- can add the table or replace it with the old per-owner closure.
+lookupPairRecipe :: Module -> OccName -> Int -> TcM (Maybe Id, Maybe Id)
+lookupPairRecipe mod owner arity =
+    (,) <$> lookupRecipeEntry True mod scalarRecipeTableOcc
+        <*> lookupRecipeEntry True mod (pairObservationOcc Nothing arity owner)
 
--- | Load the entry for the selected projection or a scalar relay.
-lookupObservationEntry :: Maybe LeftOrRight -> Module -> OccName -> Int -> TcM (Maybe Id)
-lookupObservationEntry side mod owner arity = do
-    let occ = pairObservationOcc side arity owner
+-- | An optional artifact probe can use the reserved entry type when an old
+-- interface has no declaration. This ID is used only in temporary bytecode
+-- guarded by the loader's optional symbol check.
+lookupRecipeEntry :: Bool -> Module -> OccName -> TcM (Maybe Id)
+lookupRecipeEntry allow_missing mod occ = do
     name <- lookupOrig mod occ
     iface <- loadInterfaceForName (text "staged pair recipe") name
     case mi_hash_fn iface occ of
-      Nothing -> pure Nothing
+      Nothing
+        | allow_missing -> pure (Just (mkVanillaGlobal name stringTy))
+        | otherwise -> pure Nothing
       Just _ -> do
         thing <- tcLookupGlobal name
         pure $ case thing of
