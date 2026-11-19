@@ -84,7 +84,7 @@ test('NativeClosedIndexed',
 test('NativeClosedIndexedVec',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([closed_eval_dir + 'IndexedVec.hs', closed_eval_dir + 'ExistentialVec.hs',
-                   'NativeClosedVectorPair.hs'])],
+                   'NativeClosedVectorPair.hs', 'NativeClosedIndexedRoute.hs'])],
      multimod_compile_and_run,
      ['NativeClosedIndexedVec', '-dcore-lint -dstg-lint ' + config.ghc_th_way_flags])
 test('NativeClosedCompoundLists',

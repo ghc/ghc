@@ -168,6 +168,13 @@ for name in ['NativeClosedIndexedVecEmpty', 'NativeClosedIndexHidden', 'NativeCl
                 extra_files(['NativeClosedIndexFailures.hs',
                              '../../../../docs/dependent-haskell/examples/closed-evaluation/IndexedVec.hs'])],
          multimod_compile_fail, [name, '-v0 ' + config.ghc_th_way_flags])
+for name in ['NativeClosedSomeVecIndexVisibility', 'NativeClosedWitnessMismatch',
+             'NativeClosedWitnessMissing']:
+    test(name, [req_interp, req_rts_linker, only_ways(['normal']),
+                extra_files(['NativeClosedWitnessFailures.hs'] +
+                            ['../../../../docs/dependent-haskell/examples/closed-evaluation/' + f
+                             for f in ['IndexedVec.hs', 'ExistentialVec.hs']])],
+         multimod_compile_fail, [name, '-v0 ' + config.ghc_th_way_flags])
 for name in ['NativeClosedIndexedWrongKind', 'NativeClosedIndexedWrongValue', 'NativeClosedIndexedPartial']:
     test(name, [req_interp, req_rts_linker, only_ways(['normal']),
                 extra_files(['../../../../docs/dependent-haskell/examples/closed-evaluation/IndexedMark.hs'])],

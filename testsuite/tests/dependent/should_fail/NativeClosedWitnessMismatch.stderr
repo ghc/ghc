@@ -1,0 +1,5 @@
+NativeClosedWitnessMismatch.hs:9:15: error: [GHC-70565]
+    • Cannot evaluate ‘P.misaligned’ in a type.
+        The value returned by the interpreter does not match the checked result type.
+    • In the first argument of ‘Proxy’, namely ‘(P.misaligned 4)’
+      In the type signature: bad :: Proxy (P.misaligned 4)

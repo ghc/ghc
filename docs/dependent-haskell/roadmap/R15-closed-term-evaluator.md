@@ -537,8 +537,71 @@ stay fixed. [Two indexed fields](../../../testsuite/tests/dependent/should_run/N
 
 If an erased argument is absent from the result or appears only under
 a noninjective family, the compiler reports the unrecoverable argument
-before executing the producer. Recovering an existential from a runtime
-singleton field remains open.
+before executing the producer. M135 below handles an index carried by
+a runtime singleton field.
 [Core evidence](../CORE.md#nominal-evidence-for-constructor-local-indices),
 [hidden-index diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexHidden.stderr)
 and [noninjective family diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexFamily.stderr).
+
+## M132. Written existential operands
+
+An ordinary consumer can read a written promoted package that contains
+a singleton and a vector. The kind checker supplies the erased length
+argument in the checked constructor application.
+
+```haskell
+cells :: E.readSomeVec ('E.SomeVec ('E.SS ('E.SS 'E.SZ))
+                                 ('V.VCons 4 ('V.VCons 5 'V.VNil))) :~: '[4, 5]
+cells = Refl
+```
+
+Operand construction checks the actual source type arguments, the
+constructor's result index and its field kinds. It applies the ordinary
+constructor wrapper. An ambiguous erased argument cannot be packed as
+a concrete operand. For a computed package, the result type alone leaves
+the length existential. M135 recovers it by observing the first field.
+[Ordinary singleton and package](../examples/closed-evaluation/ExistentialVec.hs),
+[written operand proof](../../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs)
+and [ambiguous operand](../../../testsuite/tests/dependent/should_fail/NativeClosedSomeVecAmbiguous.hs).
+
+## M135. Reading a runtime existential package
+
+`someVec :: Natural -> SomeVec Natural` returns an empty vector at
+zero, one cell at an odd input, and two cells at a positive even input.
+The type stays the same in all three cases. GHC observes the stored
+witness to recover the length chosen on that call.
+
+```haskell
+computed :: E.readSomeVec (E.someVec 4) :~: '[4, 5]
+computed = Refl
+```
+
+The supported package has one constructor, one erased index, and two
+fields. The first field carries a witness whose constructors specify
+a nullary base or a unary successor of another witness. The second
+field has its own indexed datatype. Its recursive field may appear
+anywhere among the ordinary data fields. Each renderer uses the actual
+type variables and equalities bound by its own Core case. The decoder
+recovers the index from the first field and checks the second against it.
+The fare regression has two base indices and puts the recursive field
+first. GHC obtains the constructors for all these examples from their
+datatype declarations.
+[Vector proofs](../../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs)
+and [fare datatype](../../../testsuite/tests/dependent/should_run/NativeClosedIndexedRoute.hs).
+
+Ordinary imports must expose the constructors used by both renderers
+and the promoted index constructors. GHC checks the imports before
+executing the producer. A pair of vectors with an erased shared length
+lacks the explicit witness this procedure requires. A test uses
+`unsafeCoerce` to give a two-cell vector the wrong length. Its runtime
+constructor sequence fails the decoder's check against a one-cell
+witness. A divergent witness can still make closed checking diverge.
+[Import check](../../../testsuite/tests/dependent/should_fail/NativeClosedSomeVecIndexVisibility.hs),
+[missing witness](../../../testsuite/tests/dependent/should_fail/NativeClosedWitnessMissing.hs)
+and [inconsistent result](../../../testsuite/tests/dependent/should_fail/NativeClosedWitnessMismatch.hs).
+
+A separate-module check compiled `computed` twice. GHC reused the
+unchanged client. Changing only the producer from `n + 1` to `n + 2`
+changed its object and preserved its interface ABI hash. GHC rechecked
+the original proof and reported that the returned second cell was
+`6` where the client required `5`.
