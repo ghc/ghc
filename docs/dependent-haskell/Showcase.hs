@@ -57,6 +57,7 @@ import qualified GHC.TypeNats as TypeNats
 import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
 import qualified IndexedMark
+import qualified IndexedVec
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
@@ -883,6 +884,10 @@ main = do
         (Refl :: LocalOpen.LastOf Char Bool :~: Bool, LocalOpen.lastOf 'x' 'y')
     observe "read the fields of a result indexed by True"
         (Refl :: IndexedMark.readMark (IndexedMark.sample 6) :~: 67)
+    observe "read the head of an ordinary length-indexed vector"
+        (Refl :: IndexedVec.safeHead (IndexedVec.two 3) :~: 3)
+    observe "ignore a recursive helper in a type and at runtime"
+        (Refl :: LocalOpen.LazyFirst Char Bool :~: Char, LocalOpen.lazyFirst 'x' 'y')
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

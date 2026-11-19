@@ -8,11 +8,20 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 203 lines.
-The normal-way dependent directory passed 212 of 248 cases. All 36 failures
-produced the same output as on the previous fork tip. Fifteen reject existing
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 205 lines.
+The normal-way dependent directory passed 216 of 252 exercised cases. All 36 failures
+produced the same output as at M129 (`236f02cd1c`). Fifteen reject existing
 programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+The ordinary vector library defines `safeHead :: Vec ('S n) a -> a`.
+In the Showcase, `IndexedVec.safeHead (IndexedVec.two 3) :~: 3` checks
+from source. GHC rejects a producer of an empty vector before running it.
+A local selector can also use a recursive helper in an ignored argument.
+The same selection works in a type and at runtime.
+[Ordinary vector](examples/closed-evaluation/IndexedVec.hs),
+[empty-vector error](../../testsuite/tests/dependent/should_fail/NativeClosedIndexedVecEmpty.stderr)
+and [local selector](examples/open-evaluation/LocalOpen.hs).
 
 The Showcase checks `IndexedMark.readMark (IndexedMark.sample 6) :~: 67`.
 The ordinary producer returns `Pair 6 7 :: Mark Natural 'True`. A

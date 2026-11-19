@@ -2874,3 +2874,36 @@ then checks the resulting kind. The ordinary constructor wrapper
 supplies equality evidence when constructing an operand for a later call.
 [Renderer and decoder](../../compiler/GHC/Tc/Gen/Splice.hs)
 and [source checks](roadmap/R15-closed-term-evaluator.md#m129-constructors-at-a-known-gadt-index).
+
+### Nominal evidence for constructor-local indices
+
+At `Vec ('S ('S 'Z)) a`, a `VCons` alternative introduces a fresh
+predecessor `m` and a nominal coercion from `'S ('S 'Z)` to `'S m`.
+GHC projects through the promoted `'S` and reverses the coercion. Lifting
+that equality through `Vec` relates the tail field's actual type
+`Vec m a` to its planned type `Vec ('S 'Z) a`. GHC checks both
+endpoints before using the representational cast on the field.
+
+Planning records how to project each erased argument from the result
+equalities. The renderer follows those paths using the actual branch
+binders. Readback reuses the checked argument types. A constructor-local
+argument hidden from the result needs another source of evidence.
+[Constructor and renderer checks](../../compiler/GHC/Tc/Gen/Splice.hs)
+and [ordinary vector producer](examples/closed-evaluation/IndexedVec.hs).
+
+### Source owners of inferred recursive functions
+
+For a group of inferred polymorphic functions, normal desugaring can bind
+a tuple of implementations and select each export from it. To observe one
+export, use the desugarer's single-export path with that export's original
+wrapper, evidence and complete monomorphic binding group. This yields
+the checked body directly. Normal module compilation still uses the
+original export list.
+
+The typechecked export maps each monomorphic binder to its source
+function. Record that owner when weak-head evaluation follows the
+binder's suspended expression. This keeps rewrite-rule checks precise
+even when the two functions share the same inferred type.
+[Declaration scheduler](../../compiler/GHC/Tc/Module.hs),
+[weak-head evaluator](../../compiler/GHC/Core/OpenWhnf.hs)
+and [sibling-rule test](../../testsuite/tests/dependent/should_run/NativeLocalOpenSibling.hs).

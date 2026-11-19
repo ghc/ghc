@@ -5378,3 +5378,29 @@ recovering such an index is a further step in GHC.
 [Agda indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes),
 [GHC constructor representation](../../compiler/GHC/Core/DataCon.hs)
 and [source GADT](examples/closed-evaluation/IndexedMark.hs).
+
+### Recovering a vector index and observing a recursive group
+
+Agda's vector cons binds the predecessor locally. Its result has
+successor length. M130 uses the same relationship for an ordinary
+Haskell GADT after type erasure. The worker's Core case already has the
+nominal equality from the result to the constructor's index. GHC's
+coercion selector projects it and its lifting operation relates the
+field types. The GADT's public constructor still determines which
+DataKinds value the client receives.
+[Agda indexed vector](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes),
+[GHC coercions](../../compiler/GHC/Core/Coercion.hs)
+and [the local coercion endpoints](CORE.md#nominal-evidence-for-constructor-local-indices).
+
+The Haskell Report infers types for mutually dependent value bindings
+as a group. Agda also groups mutual definitions and separately checks
+termination. M131 uses GHC's own group, including its checked type
+inference. Haskell's lazy evaluation can finish one observation of a
+group containing a divergent binding. The open evaluator's step limit
+handles calls that continue to demand it. Weirich, Voizard, de Amorim and
+Eisenberg study equality and nontermination in their specification for
+Dependent Haskell.
+[Haskell Report, section 4.5.1](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html),
+[Agda's mutual definitions](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html),
+[Agda's termination checker](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html)
+and [A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf).

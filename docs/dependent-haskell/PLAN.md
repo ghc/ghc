@@ -8529,3 +8529,39 @@ reordered constructor parameters and two simultaneous index equalities
 with Core and STG lint. The dependent directory passed 212 of 248
 normal cases. All 36 prior failures produced the same diagnostics as at
 M127. The full GHC testsuite was not run.
+
+## M130: recover constructor-local vector indices
+
+- [x] Recover each erased index from a nominally injective constructor
+      path in the known result type. Check the role and endpoints of
+      the actual branch evidence before casting a field. Save the
+      constructor's checked type arguments and paths in its result plan.
+- [x] Reify two ordinary vector cells, pass them to polymorphic
+      `safeHead`, and check the result. Reject an empty operand from
+      its type before executing its producer.
+- [x] Check two independent existential indices in tuple components.
+      Reject a hidden phantom or a noninjective family. Permit recursive
+      planning when one index strictly decreases and all other arguments
+      stay fixed.
+
+[Vector source, evidence and diagnostics](roadmap/R15-closed-term-evaluator.md#m130-recovering-the-predecessor-of-a-vector-length).
+
+## M131: observe recursive local value groups
+
+- [x] Stage an ordinary recursive value group together. Accept a lazy
+      selection that ignores a loop. Diagnose a demanded loop at the
+      configured open evaluation limit.
+- [x] Observe terminating calls to signed and inferred mutually recursive
+      functions. Reject a mixed cycle through the consumer's type.
+- [x] Map a demanded monomorphic binder to its polymorphic source
+      function. Accept a rule on an ignored sibling. Reject the same
+      rule when the observation uses that sibling.
+
+[Mutual recursion and rule ownership](roadmap/R21-dependency-analysis.md#m131-mutually-recursive-value-bindings).
+
+Both compiler stages built. Each ran the native Showcase with Core and
+STG lint. GHCi produced the same 205 lines. Both interpreters checked
+the vector, its two independently indexed fields, and the three rejection
+cases. The boundary plugin and splice checks also passed. The normal-way
+dependent directory passed 216 of 252 exercised cases. All 36 failures
+matched the M129 diagnostics individually. The full GHC testsuite was not run.
