@@ -1217,6 +1217,9 @@ lookupTypeOcc app_head rdr_name
           | app_head
           , isVarOcc (greOccName gre)
           -> do { this_mod <- tcg_semantic_mod <$> getGblEnv
+                ; level <- getThLevel
+                ; explicit_levels <- xoptM LangExt.ExplicitLevelImports
+                ; demands <- tcg_local_open_demands <$> getGblEnv
                 ; let name = greName gre
                 ; if isLexVarId (occNameFS (greOccName gre))
                      && isImportedGRE gre && not (nameIsLocalOrFrom this_mod name)
@@ -1228,7 +1231,15 @@ lookupTypeOcc app_head rdr_name
                                     "The selected SOURCE import does not provide a definition for type evaluation.")
                             ; addUsedGRE AllDeprecationWarnings gre
                             ; return gre }
-                    else failWithTc (TcRnNoSourceTable name) }
+                    else case level of
+                      Comp | isQual term_rdr, isLocalGRE gre, not explicit_levels
+                           , isLexVarId (occNameFS (greOccName gre))
+                           , nameModule_maybe name == Just this_mod
+                           , Just ref <- demands ->
+                        do { loc <- getSrcSpanM
+                           ; updTcRef ref ((name, loc) :)
+                           ; return gre }
+                      _ -> failWithTc (TcRnNoSourceTable name) }
         (gre, _) : rest
           | any (isJust . snd) candidates -> do
               addNameClashErrRn term_rdr (gre NE.:| map fst rest)

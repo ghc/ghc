@@ -141,6 +141,7 @@ import GHC.Tc.Errors.Types
 
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Coercion (LiftingContext)
+import GHC.Core (CoreExpr)
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep ( UnivCoDeps )
 import GHC.Core.TyCon  ( TyCon )
@@ -628,6 +629,12 @@ data TcGblEnv
           -- calls. A local table Name records an actual use. Term Names record the
           -- DFun, selector and source target of a retained method application.
           -- See Note [Source table usage fingerprints] in GHC.Unit.Module.ModIface.
+
+        tcg_local_open_demands :: Maybe (TcRef [(Name, SrcSpan)]),
+          -- ^ Record only the local term heads admitted by the source group renamer.
+
+        tcg_local_open_defs :: NameEnv (Id, CoreExpr),
+          -- ^ Solved local producers. Scope this map to the rest of their group.
 
         tcg_evaluated_term_uses :: TcRef NameSet,
           -- ^ Imported definitions used in type evaluation, including instance dictionaries.

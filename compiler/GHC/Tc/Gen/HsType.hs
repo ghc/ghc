@@ -88,7 +88,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
-import GHC.Tc.Gen.SourceTable (sourceTableFamilyUse, sourceTableTypeUses,
+import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourcePairCaseKindUse, isSourcePairCase, sourceTableOwner)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
@@ -129,7 +129,7 @@ import GHC.Types.Error
 import GHC.Types.Id ( mkLocalId )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Set (unionNameSet)
+import GHC.Types.Name.Set (nameSetElemsStable, unionNameSet)
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -2369,7 +2369,24 @@ tc_app_ty mode rn_ty exp_kind
   , isExternalName name
   = setSrcSpanA loc $
     do { env <- getGblEnv
-       ; case traverse value_arg (filterOut is_par hs_args) of
+       ; if isQual rdr && nameIsLocalOrFrom (tcg_semantic_mod env) name
+           then case (lookupNameEnv (tcg_local_open_defs env) name, value_args) of
+             (Just (fun, _), Just args)
+               | isTypeLevel (mode_tyki mode), ordinary_call
+               , Just (instantiated, domains) <- instantiateOpenTypeFunction fun
+               , equalLength domains args, all isOpenTypeOperand args
+               -> do { result <- tcOpenTypeCall mode name instantiated (zip args domains)
+                     ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
+             (Just _, Just [arg])
+               | isTypeLevel (mode_tyki mode), ordinary_call
+               , isJust (closedCallLiteralKind arg)
+               -> failWithTc (TcRnClosedTypeEval name
+                    "Closed type evaluation requires an imported definition. This function belongs to the module being compiled.")
+             _ -> unsupported name
+           else imported_call env rdr name }
+  where
+    imported_call env rdr name =
+      case value_args of
            Just args
              | isTypeLevel (mode_tyki mode)
              , ordinary_call || isJust (mode_pending_calls mode)
@@ -2407,9 +2424,9 @@ tc_app_ty mode rn_ty exp_kind
                                ; result <- run
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
-           _ -> unsupported name }
-  where
+           _ -> unsupported name
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
+    value_args = traverse value_arg (filterOut is_par hs_args)
     is_par HsArgPar{} = True
     is_par _ = False
     value_arg (HsValArg _ arg) = Just arg
@@ -2470,6 +2487,9 @@ tcOpenTypeCall mode name instantiated args = do
                    in failWithTc (TcRnOpenTypeEval name definition message)
     Right (result, used) -> do
       env <- getGblEnv
+      forM_ (lookupNameEnv (tcg_local_open_defs env) name) $ \(owner, _) -> do
+        dependencies <- traverse tcLookupId (nameSetElemsStable used)
+        recordSourceUses [(definition, Nothing) | definition <- owner : dependencies]
       updTcRef (tcg_evaluated_term_uses env) (`unionNameSet` used)
       pure result
   where

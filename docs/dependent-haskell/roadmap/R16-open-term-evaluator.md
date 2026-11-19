@@ -494,3 +494,15 @@ built before this change can still read newly compiled proofs of the old
 exchange law. It reports an unknown rule when it encounters a new
 reconstruction proof. The new reader also accepts existing exchange
 proofs. [Core contract](../CORE.md#nominal-evidence-for-a-composition-of-strict-pair-cases).
+
+### Observing an independent local definition
+
+The observer can also use a body supplied by R21. In the same source
+module, `type Selected a b = LocalOpen.select a b` reduces to `a` when
+the ordinary definition is `select x _ = x`. The two symbolic operands
+each have kind `Type`. This lets the caller supply two different types
+to the ordinary homogeneous function `select :: a -> a -> a`. If the definition
+instead demands its unknown argument, observation reports that demand
+at the call. The compiled synonym can be used from an ordinary module.
+[Source example](../examples/open-evaluation/LocalOpen.hs)
+and [declaration and splice boundaries](R21-dependency-analysis.md).

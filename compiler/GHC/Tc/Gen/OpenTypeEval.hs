@@ -27,11 +27,12 @@ import GHC.Iface.Syntax (IfaceDecl(..), IfaceInfoItem(..), IfaceUnfolding(..))
 import GHC.IfaceToCore (tcIfaceExpr)
 import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcRn,
                            liftIO, newTcRef, newUnique, readTcRef, tcg_imports,
-                           tcg_semantic_mod, updTcRef)
+                           tcg_semantic_mod, tcg_local_open_defs, updTcRef)
 import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), tcEqType)
 import GHC.Types.Basic (Boxity(Boxed))
 import GHC.Types.Id (Id, idName, idType, mkSysLocal)
 import GHC.Types.Name (Name, getOccString, nameModule_maybe)
+import GHC.Types.Name.Env (lookupNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, extendNameSet)
 import GHC.Types.SourceFile (isHsBootOrSig)
 import GHC.Types.Var (ForAllTyFlag(Invisible), VarBndr(..), isGlobalId, isTcTyVar, isTyVar,
@@ -70,7 +71,12 @@ observeOpenType instantiated operands
          && exprType application `tcEqType` liftedTypeKind
         then do
           readDefinitions <- lift (newTcRef (emptyVarEnv, emptyNameSet))
+          locals <- lift (tcg_local_open_defs <$> getGblEnv)
           let obtain v
+                | Just (_, rhs) <- lookupNameEnv locals (idName v)
+                = if tcEqType (exprType rhs) (idType v)
+                    then pure (Just rhs)
+                    else throwE (UnavailableDefinition (idName v) WrongTemplateType)
                 | not (isGlobalId v) = pure Nothing
                 | otherwise = do
                     (known, _) <- lift (readTcRef readDefinitions)

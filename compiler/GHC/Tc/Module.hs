@@ -74,7 +74,12 @@ import GHC.Tc.Gen.Annotation
 import GHC.Tc.Gen.Bind
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
-import GHC.Tc.Gen.Sig( tcRules )
+import GHC.Tc.Gen.Sig( isCompleteHsSig, tcRules )
+import {-# SOURCE #-} GHC.HsToCore.Binds (dsTopLHsBinds)
+import GHC.HsToCore.Monad (initDsTc)
+import GHC.Core (CoreExpr)
+import GHC.Core.Utils (exprType)
+import GHC.Data.OrdList (fromOL)
 import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses,
@@ -186,10 +191,10 @@ import Control.Arrow ( second )
 import Control.DeepSeq
 import Control.Monad
 import Control.Monad.Trans.Writer.CPS
-import Data.Data ( Data )
+import Data.Data (Data, cast, gmapQ)
 import Data.Function (on)
 import Data.Functor.Classes ( liftEq )
-import Data.List ( find, sort, sortBy )
+import Data.List (find, partition, sort, sortBy)
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord
@@ -848,7 +853,10 @@ tc_rn_src_decls ds
                 -- If ds is [] we get ([], Nothing)
 
         -- Deal with decls up to, but not including, the first splice
-      ; (tcg_env, rn_decls) <- rnTopSrcDecls first_group
+      ; experimental <- xoptM LangExt.ExperimentalDependentTypes
+      ; local_demands <- if experimental then Just <$> newTcRef [] else pure Nothing
+      ; (tcg_env, rn_decls) <- updGblEnv (\env -> env { tcg_local_open_demands = local_demands }) $
+                              rnTopSrcDecls first_group
                 -- rnTopSrcDecls fails if there are any errors
 
       ; traceRn "tc_rn_src_decls 77" empty
@@ -890,9 +898,10 @@ tc_rn_src_decls ds
       -- get reported w.r.t. the right GlobalRdrEnv. It is for this reason that
       -- the captureTopConstraints must go here, not in tcRnSrcDecls.
       ; traceRn "about to typechecke decls" (ppr rn_decls)
-      ; ((tcg_env, tcl_env), lie1) <- setGblEnv tcg_env $
+      ; demands <- maybe (pure []) (fmap reverse . readTcRef) local_demands
+      ; ((tcg_env, tcl_env), lie1) <- setGblEnv (tcg_env { tcg_local_open_demands = Nothing }) $
                                       captureTopConstraints $
-                                      tcTopSrcDecls rn_decls
+                                      tcTopSrcDecls demands rn_decls
 
         -- If there is no splice, we're nearly done
       ; restoreEnvs (tcg_env, tcl_env) $
@@ -1848,8 +1857,30 @@ rnTopSrcDecls group
         return (tcg_env', rn_decls)
    }
 
-tcTopSrcDecls :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
-tcTopSrcDecls group = do
+tcTopSrcDecls :: [(Name, SrcSpan)] -> HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
+tcTopSrcDecls [] group = tcTopSrcTables group
+tcTopSrcDecls demands group = do
+    defer <- goptM Opt_DeferTypeErrors
+    holes <- goptM Opt_DeferTypedHoles
+    not_in_scope <- goptM Opt_DeferOutOfScopeVariables
+    when (defer || holes || not_in_scope) $
+      rejectLocalOpen demands "Disable deferred errors before observing a local definition."
+    env <- getGblEnv
+    let checked = mkNameSet
+          [ idName owner | bind <- tcg_binds env
+                         , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
+        (previous, current) = partition ((`elemNameSet` checked) . fst) demands
+        check_current
+          | null current = tcTopSrcTables group
+          | otherwise = tcLocalOpenGroup current group
+    if null previous then check_current else do
+      -- tc_rn_src_decls has solved these bindings before running each splice.
+      failIfErrsM
+      definitions <- localOpenDefinitions previous (tcg_ev_binds env) (tcg_binds env)
+      withLocalOpenDefinitions definitions check_current
+
+tcTopSrcTables :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
+tcTopSrcTables group = do
     enabled <- xoptM LangExt.ExperimentalDependentTypes
     env <- getGblEnv
     case if enabled then splitLocalSourceTables TableInType (tcg_dus env) group else Nothing of
@@ -1868,6 +1899,147 @@ tcTopSrcDecls group = do
           addTopEvBinds evs $ do
             tables_env <- installSourceTables tables
             setGblEnv tables_env (tcTopSrcDeclGroup rest)
+
+{- Note [Scheduling local open definitions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Only the new application-head fallback records a demand. It keeps the
+resolved local term Name and the call's source span. Pass the group's
+demands to the scheduler before checking its type declarations. A standalone
+kind signature can make a synonym's binder rigid. The term producer still
+needs a checked body. Its ordinary forall
+is erased and does not bind a retained term in the caller's type.
+
+Move only independent signed value SCCs. Use resolved signature Names
+and the existing RHS dependency information. A same-group instance or
+default can affect solver choices without a reference in the producer.
+Leave those groups outside this first split. The ordinary late source
+RULE check validates the owners the observer actually uses. An unrelated
+RULE does not stop the split. A producer after a splice cannot be renamed
+from the group's prefix. For a producer in an earlier group, use the binds
+and evidence solved before the splice. Build the Core map on demand.
+
+Solve and zonk the early binds before desugaring. Drop duplicate
+desugaring messages and keep ordinary runtime compilation unchanged.
+Pass only the checked Core to the existing observer. The type checker
+cannot execute an object for the current module.
+-}
+
+-- | Check the independently schedulable local definitions first.
+tcLocalOpenGroup :: [(Name, SrcSpan)] -> HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
+tcLocalOpenGroup demands group@HsGroup
+  { hs_valds = XValBindsLR (HsVBG binds sigs)
+  , hs_tyclds = tycls
+  , hs_derivds = [], hs_defds = [] }
+  | all (null . group_instds) tycls
+  , all no_deriving (tyClGroupTyClDecls tycls)
+  , let (early_binds, rest_binds) = partition (any requestedBind . snd) binds
+        (early_sigs, rest_sigs) = partition (mentionsRequested . unLoc) sigs
+  , Just signed <- traverse completeSignature early_sigs
+  , mkNameSet signed == requested
+  , Just bodies <- traverse independentBind early_binds
+  , mkNameSet bodies == requested
+  = do
+      let early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs) }
+          rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs) }
+      (envs@(early_env, _), wanted) <- captureTopConstraints (tcTopSrcDeclGroup early)
+      restoreEnvs envs $ do
+        evs <- checkNoErrs (simplifyTop wanted)
+        definitions <- localOpenDefinitions demands
+                         (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
+        addTopEvBinds evs $ withLocalOpenDefinitions definitions (tcTopSrcTables rest)
+  where
+    requested = mkNameSet (map fst demands)
+    group_names = mkNameSet (hsGroupBinders group)
+    requestedBind (L _ FunBind{fun_id = L _ b}) = b `elemNameSet` requested
+    requestedBind _ = False
+    independentBind (NonRecursive, [bind@(L _ FunBind{fun_id = L _ b, fun_ext = fvs})])
+      | isEmptyNameSet (fvs `intersectNameSet` group_names), not (hasSplice bind) = Just b
+    independentBind _ = Nothing
+    completeSignature (L _ (TypeSig _ [] [L _ n] sig))
+      | isCompleteHsSig sig, not (usesNames group_names sig), not (hasSplice sig) = Just n
+    completeSignature _ = Nothing
+    mentionsRequested (TypeSig _ _ ns _) = any ((`elemNameSet` requested) . unLoc) ns
+    mentionsRequested (InlineSig _ (L _ n) _) = n `elemNameSet` requested
+    mentionsRequested (SCCFunSig _ (L _ n) _) = n `elemNameSet` requested
+    mentionsRequested (SpecSig _ (L _ n) _ _) = n `elemNameSet` requested
+    mentionsRequested (SpecSigE n _ _ _) = n `elemNameSet` requested
+    mentionsRequested _ = False
+    no_deriving (L _ DataDecl{tcdDataDefn = HsDataDefn{dd_derivs = ds}}) =
+      all empty_deriving ds
+    no_deriving _ = True
+    empty_deriving (L _ HsDerivingClause{deriv_clause_tys = L _ (DctMulti _ [])}) = True
+    empty_deriving _ = False
+tcLocalOpenGroup demands group = do
+    let sigs = case hs_valds group of
+          XValBindsLR (HsVBG _ lsigs) -> lsigs
+          _ -> []
+        cycles (owner, _) = or
+          [ usesNames (unitNameSet (tcdName (unLoc decl))) sig
+          | L _ (TypeSig _ _ owners sig) <- sigs
+          , any ((== owner) . unLoc) owners
+          , decl <- tyClGroupTyClDecls (hs_tyclds group)
+          , usesNames (unitNameSet owner) decl ]
+        message
+          | any cycles demands = "This type use and the producer's type signature form a dependency cycle."
+          | otherwise = "This call needs an independent local definition with a complete signature in the same declaration group."
+    rejectLocalOpen demands message
+
+-- | Desugar only demanded bindings after their owning group has solved.
+localOpenDefinitions :: [(Name, SrcSpan)] -> Bag EvBind -> LHsBinds GhcTc
+                     -> TcM (NameEnv (Id, CoreExpr))
+localOpenDefinitions demands evidence binds = do
+    let requested = mkNameSet (map fst demands)
+        selected bind = any ((`elemNameSet` requested) . idName)
+                          (collectHsBindBinders CollNoDictBinders (unLoc bind))
+        relevant = filter selected binds
+    when (any hasPendingTypedSplice relevant) $
+      rejectLocalOpen demands "This earlier definition contains a pending typed splice."
+    (_, _, zonked, _, _, _, _) <- zonkTopDecls evidence relevant [] [] [] []
+    (messages, proposal) <- initDsTc (dsTopLHsBinds zonked)
+    let definitions = mkNameEnv
+          [ (idName owner, (owner, rhs))
+          | core <- maybeToList proposal, not (errorsFound messages)
+          , (owner, rhs) <- fromOL core
+          , idName owner `elemNameSet` requested
+          , exprType rhs `eqType` idType owner ]
+        missing = filter (not . (`elemNameEnv` definitions) . fst) demands
+    unless (null missing) $
+      rejectLocalOpen missing "No checked Core definition is available for this call."
+    pure definitions
+  where
+    -- zonkExpr executes a pending typed splice. The ordinary module
+    -- zonk still owns this operation. Observation must not execute it.
+    hasPendingTypedSplice :: Data a => a -> Bool
+    hasPendingTypedSplice node = case cast node :: Maybe (HsExpr GhcTc) of
+      Just HsTypedSplice{} -> True
+      _ -> or (gmapQ hasPendingTypedSplice node)
+
+-- | Confine the checked definitions to the current typechecking continuation.
+withLocalOpenDefinitions :: NameEnv (Id, CoreExpr)
+                         -> TcM (TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv)
+withLocalOpenDefinitions definitions check = do
+    env <- getGblEnv
+    let old_defs = tcg_local_open_defs env
+    (checked_env, checked_lcl) <- setGblEnv
+      (env { tcg_local_open_defs = old_defs `plusNameEnv` definitions }) check
+    pure (checked_env { tcg_local_open_defs = old_defs }, checked_lcl)
+
+usesNames :: Data a => NameSet -> a -> Bool
+usesNames names node
+  | Just name <- cast node = name `elemNameSet` names
+  | otherwise = or (gmapQ (usesNames names) node)
+
+hasSplice :: Data a => a -> Bool
+hasSplice node =
+    isJust (cast node :: Maybe (HsTypedSplice GhcRn))
+    || isJust (cast node :: Maybe (HsUntypedSplice GhcRn))
+    || or (gmapQ hasSplice node)
+
+rejectLocalOpen :: [(Name, SrcSpan)] -> String -> TcM a
+rejectLocalOpen demands reason = do
+    for_ demands $ \(name, loc) ->
+      setSrcSpan loc (addErr (TcRnOpenTypeEval name Nothing reason))
+    failM
 
 -- | Solve independent source functions before retained calls in the same value group.
 -- See Note [Ordering local source tables] in GHC.Rename.Module.

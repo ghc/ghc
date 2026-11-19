@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourcePairCaseKindUse, isSourcePairCase, sourceTableOwner,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,

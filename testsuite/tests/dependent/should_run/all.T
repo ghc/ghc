@@ -8,6 +8,11 @@ test('NativeOpenIdentity',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs',
                  'OpenSource.hs', 'RunOpenSource.hs', 'RunOpenSource.stdout', 'check-source.sh']]),
      run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
+test('NativeLocalOpen',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['NativeLocalOpenProducer.hs'])],
+     run_command, ['bash NativeLocalOpen.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeOpenCharFamily',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['CharacterCase.hs', 'CharacterExport.hs']])],

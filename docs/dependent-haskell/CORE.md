@@ -2844,3 +2844,15 @@ interfaces. It reports the new rule by name when it needs a proof it
 cannot check. Both behaviors were checked with the prior binary.
 [Structural verifier](../../compiler/GHC/Builtin/CoercionRules.hs)
 and [ordinary source cases](../../testsuite/tests/dependent/should_run/NativeOpenPairCoercionUsage.hs).
+
+### Obtaining Core for a same-module call
+
+The renamer records a qualified local term used in a type application.
+For an independent, signed producer, the module typechecker solves its
+binding before checking that application. The open evaluator reads the
+binding's typed Core with the caller's unknown arguments. It records the
+definitions it used for the existing source-rule checks. An exported
+type synonym contains the result of the observation. A client can use
+that synonym with only the interface.
+[Declaration scheduler](../../compiler/GHC/Tc/Module.hs)
+and [interface client](../../testsuite/tests/dependent/should_run/NativeLocalOpen.hs).
