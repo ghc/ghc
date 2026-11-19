@@ -22,6 +22,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 -- | Runnable examples of the completed Dependent Haskell source features.
+-- See BOUNDARY-EVIDENCE.md for the optional plugin and observation examples.
 -- In GHCi, load PackedVecLibrary with the options in the adjacent README.
 -- Enter these as separate commands to keep a retained function at the prompt.
 --
