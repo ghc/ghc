@@ -5,14 +5,14 @@ export LC_ALL=C
 # Run with two matching native toolchains. The old compiler predates the
 # readback recipes and the matchability inference. The optional build directory
 # supplies the old boot interfaces for the original GHC.Internal.Err source.
-family_kinds=false
-if [[ ${1:-} == --family-kinds ]]; then
-    family_kinds=true
-    shift
-fi
-if (( $# < 4 || $# > 5 )) || { "$family_kinds" && (( $# != 4 )); }; then
+family_upgrade=
+case ${1:-} in
+    --family-kinds|--family-results) family_upgrade=$1; shift ;;
+esac
+if (( $# < 4 || $# > 5 )) || { [[ -n $family_upgrade ]] && (( $# != 4 )); }; then
     echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB [OLD_GHC_INTERNAL_BUILD]" >&2
     echo "       $0 --family-kinds M177_GHC M177_LIB NEW_GHC NEW_LIB" >&2
+    echo "       $0 --family-results INTERMEDIATE_GHC INTERMEDIATE_LIB NEW_GHC NEW_LIB" >&2
     exit 2
 fi
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -41,8 +41,28 @@ replace() {
     mv -f "$2.new" "$2"
 }
 
-if "$family_kinds"; then
+if [[ -n $family_upgrade ]]; then
     cd "$work/home"
+    cat >IndependentIndices.hs <<'HS'
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
+module IndependentIndices where
+import Data.Kind (Type)
+type family Rep (b :: Bool) :: Type
+type instance Rep 'True = Type -> Type
+type family Arrow (f :: Rep 'True) :: Type
+type family Use (f :: Rep 'True) (g :: Arrow f) :: Type
+type instance Arrow Maybe = Type -> Type
+identity :: Arrow Maybe
+identity x = x
+HS
+    cat >Unrelated.hs <<'HS'
+module Unrelated where
+answer :: Int
+answer = 42
+HS
+fi
+
+if [[ $family_upgrade == --family-kinds ]]; then
     cat >FamilyKinds.hs <<'HS'
 {-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
 module FamilyKinds (PFrom) where
@@ -59,25 +79,10 @@ import FamilyKinds (PFrom)
 observation :: Proxy (PFrom '())
 observation = Proxy
 HS
-    cat >IndependentIndices.hs <<'HS'
-{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
-module IndependentIndices where
-import Data.Kind (Type)
-type family Rep (b :: Bool) :: Type
-type instance Rep 'True = Type -> Type
-type family Arrow (f :: Rep 'True) :: Type
-type family Use (f :: Rep 'True) (g :: Arrow f) :: Type
-type instance Arrow Maybe = Type -> Type
+    cat >>IndependentIndices.hs <<'HS'
 type instance Use Maybe Maybe = Bool
-identity :: Arrow Maybe
-identity x = x
 observation :: Use Maybe Maybe
 observation = True
-HS
-    cat >Unrelated.hs <<'HS'
-module Unrelated where
-answer :: Int
-answer = 42
 HS
     args=(--make -no-link -v1 "${sanity[@]}" FamilyKindsClient.hs IndependentIndices.hs Unrelated.hs)
     "${old[@]}" "${args[@]}"
@@ -90,6 +95,85 @@ HS
     if grep -F 'Compiling Unrelated' upgrade.log; then exit 1; fi
     "${new[@]}" "${args[@]}" >warm.log 2>&1
     if grep -F 'Compiling ' warm.log; then exit 1; fi
+    exit 0
+fi
+
+if [[ $family_upgrade == --family-results ]]; then
+    cat >TwoFamilyResults.hs <<'HS'
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
+module TwoFamilyResults where
+import Data.Kind (Type)
+type family Rep (b :: Bool) :: Type
+type instance Rep 'True = Type -> Type
+type instance Rep 'False = Type -> Type
+type family Arrow (f :: Rep 'True) (g :: Rep 'False) :: Type
+type instance Arrow Maybe Maybe = Type -> Type
+type family Use (f :: Rep 'True) (g :: Rep 'False) (h :: Arrow f g) :: Type
+HS
+    cat >ExplicitKind.hs <<'HS'
+{-# LANGUAGE DataKinds, Modifiers, PolyKinds, StandaloneKindSignatures, TypeFamilies #-}
+module ExplicitKind where
+import Data.Kind (Type)
+import GHC.Exts (Matchability)
+type Fixed :: forall {m :: Matchability}. (Type %m -> Type) -> Type
+type family Fixed f
+type instance Fixed Maybe = Bool
+type family Receiving (b :: Fixed Maybe) :: Type
+type instance Receiving 'True = Int
+HS
+    args=(--make -no-link -v1 "${sanity[@]}" ExplicitKind.hs Unrelated.hs)
+    "${old[@]}" "${args[@]}" IndependentIndices.hs TwoFamilyResults.hs
+    "${old[@]}" --show-iface ExplicitKind.hi >explicit.old
+    grep -F '  ABI hash:' explicit.old >explicit.old.abi
+    sha256sum Unrelated.{hi,o} >unrelated.sha
+    stat -c '%y %n' Unrelated.{hi,o} >unrelated.time
+
+    # Add the clients after the intermediate compiler writes the owner interfaces.
+    cat >IndependentIndicesClient.hs <<'HS'
+{-# LANGUAGE TypeFamilies #-}
+module IndependentIndicesClient where
+import IndependentIndices
+type instance Use Maybe Maybe = Bool
+observation :: Use Maybe Maybe
+observation = True
+HS
+    cat >TwoFamilyResultsClient.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, StandaloneKindSignatures, TypeFamilies #-}
+module TwoFamilyResultsClient where
+import Data.Kind (Type)
+import Data.Proxy (Proxy(..))
+import GHC.Exts (U)
+import TwoFamilyResults
+type instance Use Maybe Maybe Maybe = Bool
+observation :: Use Maybe Maybe Maybe
+observation = True
+
+type Callback :: Type %U -> Type
+type family Callback a where
+  Callback Int = Bool
+-- A shared parameter index would reject each mixed application.
+independent :: Proxy (Arrow Maybe Callback, Arrow Callback Maybe)
+independent = Proxy
+HS
+    args+=(IndependentIndicesClient.hs TwoFamilyResultsClient.hs)
+    "${new[@]}" "${args[@]}" >upgrade.log 2>&1 || { cat upgrade.log >&2; exit 1; }
+    for owner in IndependentIndices TwoFamilyResults; do
+        grep -E "Compiling $owner .*\[Compiler now separates family result and parameter matchability\]" upgrade.log
+        grep -E "Compiling ${owner}Client([[:space:]]|$)" upgrade.log
+    done
+    "${new[@]}" --show-iface ExplicitKind.hi >explicit.new
+    grep -F '  ABI hash:' explicit.new >explicit.new.abi
+    cmp explicit.old.abi explicit.new.abi
+    sha256sum -c unrelated.sha --quiet
+    stat -c '%y %n' Unrelated.{hi,o} >unrelated.current
+    cmp unrelated.time unrelated.current
+    if grep -F 'Compiling Unrelated' upgrade.log; then exit 1; fi
+
+    sha256sum ./*.hi ./*.o >warm.sha
+    "${new[@]}" "${args[@]}" >warm.log 2>&1 || { cat warm.log >&2; exit 1; }
+    sha256sum -c warm.sha --quiet
+    if grep -F 'Compiling ' warm.log; then exit 1; fi
+    echo 'The owner interfaces were upgraded, the clients passed, and the second build reused all outputs.'
     exit 0
 fi
 

@@ -30,6 +30,15 @@ matchability selector for an arrow in its result.
 [Original regression](../../../testsuite/tests/dependent/should_compile/T15346.hs)
 and [upgrade and independent-index tests](../examples/closed-evaluation/check-readback-upgrade.sh).
 
+An intermediate compiler (`00ba1e8d92`) could write an interface with
+one selector for the parameter and none for the result. The producer
+itself compiled. A later module that supplied a new open-family instance
+then failed with GHC-83865. On upgrade, GHC rechecks open families used
+as kinds whose old telescope can refer to an inferred selector. A family
+with an explicit kind can have the same interface shape. Its ABI stays
+the same when the new compiler infers the same kind. A second build
+reuses the new interfaces.
+
 If a provider gains an inferred matchability parameter, an older client
 can still refer to the same family by name. For a bare alias such as
 `type Saved = K`, the interface records the kind at which the alias
@@ -62,7 +71,8 @@ side can also describe a runtime function, where `keep x = x` needs U.
 Changing the default for every family equation would break that program.
 
 Both uses can occur in one module. GHC 9.14.1 accepts the following
-declarations together. The fork rejects `Maybe` at the second equation.
+declarations together. The fork previously rejected `Maybe` at the
+second equation.
 
 ```haskell
 type family K (b :: Bool) :: Type
@@ -78,13 +88,12 @@ identity x = x
 The kind of `Maybe` needs M. The term `identity` needs U.
 Both refer to the same `K 'True`. An explicit extra parameter on `K`
 can distinguish these uses in the fork. That solution changes the
-source interface. Compatibility requires checking the original module.
+source interface. The fork now infers the selector and checks both uses.
 
 For the U case, GHC-83865 now reports the disagreement between
 `Matchable` and `Unmatchable` at `Maybe`. The original expected family
 can hide the arrow from the diagnostic's argument count. A family that
 reduces to `Type` can still produce the advice to supply another argument.
-Restoring the unannotated program remains open.
 [Matchability control](../../../testsuite/tests/dependent/diagnostics/FamilyArrowMatchability.hs),
 [arity control](../../../testsuite/tests/dependent/diagnostics/FamilyArrowArity.hs)
 and [proposal #242 on annotation-free arrows](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html).

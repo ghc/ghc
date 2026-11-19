@@ -21,7 +21,7 @@ import GHC.Data.FastString
 import GHC.Builtin.Modules (gHC_INTERNAL_ERR)
 import GHC.Builtin.WiredIn.Types
   (boolTyConName, charTyConName, listTyConName, manyDataConName, naturalTyConName, pairTyCon
-  , matchableDataConName, unmatchableDataConName)
+  , matchabilityTyConName, matchableDataConName, unmatchableDataConName)
 
 import GHC.Driver.Backend
 import GHC.Driver.Env
@@ -41,7 +41,7 @@ import GHC.Iface.Env
 
 import GHC.Core
 import GHC.Core.DataCon (isNullarySrcDataCon)
-import GHC.Core.TyCon (Injectivity(..), isBoxedDataTyCon, isVanillaAlgTyCon, tyConArity, tyConDataCons, isVisibleTyConBinder, tyConName)
+import GHC.Core.TyCon (TyConBndrVis(NamedTCB), Injectivity(..), isBoxedDataTyCon, isVanillaAlgTyCon, tyConArity, tyConDataCons, isVisibleTyConBinder, tyConName)
 import GHC.Tc.Utils.Monad
 import GHC.Hs
 
@@ -569,13 +569,19 @@ checkFlagHash hsc_env iface self_recomp = do
         closed_matchability_fp = closedMatchabilityFingerprint base_fp
         open_matchability_fp = caseTreeFingerprint base_fp
         old_readback_fp = readbackRecipeFingerprint open_matchability_fp
-        new_fp = familyKindMatchabilityFingerprint old_readback_fp
+        intermediate_kind_fp = familyKindMatchabilityFingerprint old_readback_fp
+        new_fp = familyResultMatchabilityFingerprint intermediate_kind_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
+       | old_fp == intermediate_kind_fp
+       , couldSeparateFamilyResultMatchability iface
+         -> recheck "Compiler now separates family result and parameter matchability"
+       | old_fp == intermediate_kind_fp
+         -> up_to_date logger (text "Module has no independent family result index to check")
        | old_fp `elem` (old_readback_fp : open_matchability_fp : closed_matchability_fp : archived)
        , couldGeneralizeFamilyKindMatchability iface
          -> recheck "Compiler now infers matchability in family kinds"
@@ -708,6 +714,40 @@ familyKindMatchabilityFingerprint :: Fingerprint -> Fingerprint
 familyKindMatchabilityFingerprint fp =
     computeFingerprint putNameLiterally (fp, "family-kind-matchability-v1" :: String)
 
+-- | Record that an inferred telescope index no longer reserves the result index.
+familyResultMatchabilityFingerprint :: Fingerprint -> Fingerprint
+familyResultMatchabilityFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "family-result-matchability-v1" :: String)
+
+-- | Check old family headers that may need an independent result selector.
+-- See Note [Recompiling families with independent matchability indices].
+couldSeparateFamilyResultMatchability :: ModIface -> Bool
+couldSeparateFamilyResultMatchability = couldInferOpenMatchabilityWith candidate
+  where
+    candidate bs = any inferredIndex bs && any possibleReceiver bs
+
+    inferredIndex (Bndr (IfaceTvBndr (_, IfaceTyConApp tc IA_Nil)) (NamedTCB Inferred)) =
+      ifaceTyConName tc == matchabilityTyConName
+    inferredIndex _ = False
+
+    possibleReceiver (Bndr (IfaceTvBndr (_, IfaceTyConApp _ IA_Nil)) _) = False
+    possibleReceiver _ = True
+
+{- Note [Recompiling families with independent matchability indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An older compiler used a single index for two purposes. For example,
+in Arrow (f :: Rep 'True) :: Type, an inferred Matchability argument
+selected the kind of f and prevented a separate result selector.
+A client may first need that selector after upgrading its compiler.
+
+Reconsider an open family used as a kind if it has an inferred
+matchability index and a binder kind that could use the index. A nullary
+type constructor used as a binder kind contains no local variables.
+The result kind is already known to be Type. For other binder kinds
+the check is conservative. An explicit standalone signature can give the
+same interface shape. A new fingerprint makes the recheck occur once.
+-}
+
 -- | An older declaration can have an omitted metadata argument fixed in
 -- a family kind. Its interface still identifies the inferred argument.
 couldGeneralizeFamilyKindMatchability :: ModIface -> Bool
@@ -741,7 +781,12 @@ ifaceFamilyDecls = concatMap (familyDecls . snd) . mi_decls
 -- | An old interface preserves the resolved heads of its declared family
 -- kinds. Include associated families because they are nested in IfaceClass.
 couldInferOpenMatchability :: ModIface -> Bool
-couldInferOpenMatchability iface =
+couldInferOpenMatchability = couldInferOpenMatchabilityWith (const True)
+
+-- | Restrict the upgrade check to families with the specified telescope.
+couldInferOpenMatchabilityWith :: ([IfaceTyConBinder] -> Bool)
+                               -> ModIface -> Bool
+couldInferOpenMatchabilityWith eligible iface =
     any candidate families
   where
     families = ifaceFamilyDecls iface
@@ -752,7 +797,8 @@ couldInferOpenMatchability iface =
     candidate IfaceFamily{ifName = n, ifBinders = bs, ifResKind = res, ifFamInj = NotInjective,
                           ifFamFlav = IfaceOpenTypeFamilyTyCon} =
       any isVisibleTyConBinder bs && isIfaceLiftedTypeKind res &&
-      n `elemNameSet` heads
+      n `elemNameSet` heads &&
+      eligible bs
     candidate _ = False
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
@@ -1561,6 +1607,10 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
+          current_flag_hash = familyResultMatchabilityFingerprint
+                            $ familyKindMatchabilityFingerprint
+                            $ readbackRecipeFingerprint
+                            $ caseTreeFingerprint flag_hash
 
       let opt_hash = fingerprintOptFlags dflags putNameLiterally
 
@@ -1574,7 +1624,7 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
               else FingerprintWithValue flag_hash Nothing
 
       return (IfaceSelfRecomp
-                { mi_sr_flag_hash = include_detailed_flags (familyKindMatchabilityFingerprint (readbackRecipeFingerprint (caseTreeFingerprint flag_hash)), flags)
+                { mi_sr_flag_hash = include_detailed_flags (current_flag_hash, flags)
                 , mi_sr_hpc_hash = hpc_hash
                 , mi_sr_opt_hash = opt_hash
                 , mi_sr_plugin_hash = plugin_hash
