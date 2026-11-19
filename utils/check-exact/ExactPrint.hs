@@ -48,7 +48,7 @@ import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
-import GHC.Hs.Type () -- Required for HsConDetails type-family instances
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda)) -- Required for HsConDetails type-family instances
 import GHC.TypeLits
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
@@ -4120,6 +4120,14 @@ instance ExactPrint (HsType GhcPs) where
   exact (HsDocTy an ty doc) = do
     ty' <- markAnnotated ty
     return (HsDocTy an ty' doc)
+  exact (XHsType (HsTypeLambda (open, lam, arr, close) binder body)) = do
+    open' <- markEpToken open
+    lam' <- markEpToken lam
+    binder' <- markAnnotated binder
+    arr' <- markEpUniToken arr
+    body' <- markAnnotated body
+    close' <- markEpToken close
+    return (XHsType (HsTypeLambda (open', lam', arr', close') binder' body'))
   exact (XHsType (HsBangTy ann (HsSrcBang mt up str) ty)) = do
     (ann', mt') <- exactBang (ann, mt) str
     ty' <- markAnnotated ty

@@ -112,6 +112,7 @@ import GHC.Utils.Misc
 import Control.Monad
 import Data.Foldable ( toList, traverse_ )
 import GHC.Utils.Monad.StrictIdentity
+import qualified Data.List as List
 import Data.List ( partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
@@ -5723,7 +5724,11 @@ checkFamFlag :: Name -> TcM ()
 -- client might have a go!
 checkFamFlag tc_name
   = do { idx_tys <- xoptM LangExt.TypeFamilies
-       ; unless idx_tys $ addErrTc (TcRnTyFamsDisabled (TyFamsDisabledFamily tc_name)) }
+       ; lifted_lambda <- if "$lambda:" `List.isPrefixOf` occNameString (nameOccName tc_name)
+                          then xoptM LangExt.ExperimentalDependentTypes
+                          else pure False
+       ; unless (idx_tys || lifted_lambda) $
+           addErrTc (TcRnTyFamsDisabled (TyFamsDisabledFamily tc_name)) }
 
 checkResultSigFlag :: Name -> FamilyResultSig GhcRn -> TcM ()
 checkResultSigFlag tc_name (TyVarSig _ tvb)

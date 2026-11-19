@@ -57,6 +57,7 @@ import qualified Data.ByteString as BS
 import Control.Monad( unless )
 import Data.Bifunctor (first)
 import Data.Foldable (for_)
+import Data.List (isPrefixOf)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe( catMaybes, isNothing )
@@ -1761,7 +1762,7 @@ cvtTypeKind typeOrKind ty
 
            VarT nm -> do { nm' <- tNameN nm
                          ; mk_apps (HsTyVar noAnn NotPromoted nm') tys' }
-           ConT nm -> do { nm' <- tconName nm
+           ConT nm -> do { nm' <- cvtNameWith True OccName.tcClsName nm
                          ; let prom = name_promotedness nm'
                          ; lnm' <- returnLA nm'
                          ; mk_apps (HsTyVar noAnn prom lnm') tys'}
@@ -2226,8 +2227,12 @@ ipName n
        ; return (HsIPName (packHText n)) }
 
 cvtName :: OccName.NameSpace -> TH.Name -> CvtM RdrName
-cvtName ctxt_ns (TH.Name occ flavour)
-  | not (okOcc ctxt_ns occ_str) = failWith (IllegalOccName ctxt_ns occ_str)
+cvtName = cvtNameWith False
+
+cvtNameWith :: Bool -> OccName.NameSpace -> TH.Name -> CvtM RdrName
+cvtNameWith allow_lifted ctxt_ns (TH.Name occ flavour)
+  | not (okOcc ctxt_ns occ_str || (allow_lifted && liftedLambdaName)) =
+      failWith (IllegalOccName ctxt_ns occ_str)
   | otherwise
   = do { loc <- getL
        ; listTuplePuns <- getListTuplePuns
@@ -2236,6 +2241,13 @@ cvtName ctxt_ns (TH.Name occ flavour)
        ; return rdr_name }
   where
     occ_str = TH.occString occ
+
+    -- Reifying a synonym can return a reference to a private lifted family.
+    -- Only an exact original type occurrence can round-trip the internal spelling.
+    liftedLambdaName
+      | TH.NameG TH.TcClsName _ _ <- flavour
+      , ctxt_ns == OccName.tcClsName = "$lambda:" `isPrefixOf` occ_str
+      | otherwise = False
 
 okOcc :: OccName.NameSpace -> String -> Bool
 okOcc ns str

@@ -4568,6 +4568,12 @@ data TcRnMessage where
          bar :: a %1 ⊸ b
   -}
   TcRnTooManyMultiplicities :: TcRnMessage
+
+  -- | A type lambda appears with ExperimentalDependentTypes disabled.
+  TcRnTypeLambdaDisabled :: TcRnMessage
+
+  -- | A type lambda appears outside the supported declaration context.
+  TcRnTypeLambdaContext :: TcRnMessage
   deriving Generic
 
 ----

@@ -1101,6 +1101,12 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            text "Record syntax is illegal here:" <+> ppr ty
 
+    TcRnTypeLambdaDisabled
+      -> mkSimpleDecorated $ text "Type lambdas require -XExperimentalDependentTypes."
+    TcRnTypeLambdaContext
+      -> mkSimpleDecorated $
+           text "This type lambda needs a top-level synonym with explicitly kinded captures."
+
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $
            text "Cannot apply function of kind" <+> quotes (ppr ty)
@@ -2444,6 +2450,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalRecordSyntax{}
       -> ErrorWithoutFlag
+    TcRnTypeLambdaDisabled{}
+      -> ErrorWithoutFlag
+    TcRnTypeLambdaContext{}
+      -> ErrorWithoutFlag
     TcRnInvalidVisibleKindArgument{}
       -> ErrorWithoutFlag
     TcRnTooManyBinders{}
@@ -3143,6 +3153,10 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedAnnotation{}
       -> noHints
     TcRnIllegalRecordSyntax{}
+      -> noHints
+    TcRnTypeLambdaDisabled{}
+      -> noHints
+    TcRnTypeLambdaContext{}
       -> noHints
     TcRnInvalidVisibleKindArgument{}
       -> noHints

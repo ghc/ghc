@@ -982,6 +982,10 @@ rnHsTyKi env ty@(XHsType (HsBangTy _ bang (L _ inner))) = do
       TcRnUnexpectedAnnotation ty bang
   rnHsTyKi env inner
 
+rnHsTyKi _ (XHsType HsTypeLambda{}) = do
+  enabled <- xoptM LangExt.ExperimentalDependentTypes
+  failWithTc (if enabled then TcRnTypeLambdaContext else TcRnTypeLambdaDisabled)
+
 rnHsTyKi env ty@(XHsType (HsRecTy {})) = do
   -- Record types (which only show up temporarily in constructor
   -- signatures) should have been removed by now

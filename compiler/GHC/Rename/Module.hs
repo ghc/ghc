@@ -83,6 +83,84 @@ import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Maybe ( isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
+{- Note [Lifting type lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lower a type lambda to a closed family before declaration dependency
+analysis. Keep the original kind annotation so the typechecker checks
+the generated application against the source kind. Prefix lexical captures
+and give the generated family one more argument for the lambda binder.
+Give the lifted family and the synonym the same kind-checking SCC.
+Constraints from later arguments can fix the kind of the lambda binder
+before kind generalization. The existing family checker checks the
+scope, kind and beta equation.
+
+The family header and its equation bind different variables. For
+`S (q :: Type) (a :: q) = Map (\q -> Proxy a) xs`, preserve the
+outer q in the header because it scopes over a's kind. Give the last
+header binder a fresh spelling. In the equation bind the outer
+argument under that spelling and use q for the lambda parameter.
+The partial application in S still passes the outer q and a.
+-}
+-- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
+liftTypeLambdas :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
+liftTypeLambdas group =
+  let (groups, hidden) = unzip (map liftGroup (hs_tyclds group))
+  in (group { hs_tyclds = groups }, concat hidden)
+  where
+    liftGroup decls =
+      let (defs, lifted) = unzip (map liftDecl (group_tyclds decls))
+          (families, hidden) = unzip (concat lifted)
+      in (decls { group_tyclds = defs ++ families }, hidden)
+
+    liftDecl (L loc syn@SynDecl{tcdLName = owner, tcdRhs = rhs,
+                                tcdTyVars = HsQTvs{hsq_explicit = captures}}) =
+      let (rhs', families, _) = liftRhs owner captures rhs (0 :: Int)
+      in (L loc syn{tcdRhs = rhs'}, families)
+    liftDecl decl = (decl, [])
+
+    liftRhs owner captures (L loc (HsKindSig ann body kind)) salt =
+      let (body', families, next) = liftRhs owner captures body salt
+      in (L loc (HsKindSig ann body' kind), families, next)
+    liftRhs owner captures (L loc (XHsType (HsTypeLambda _ v body))) salt
+      | Just scoped <- traverse capture captures
+      = let (applied, lifted) = liftLambda owner loc scoped v body salt
+        in (applied, [lifted], salt + 1)
+    liftRhs owner captures (L loc (HsAppTy ann f x)) salt =
+      let (f', fs, next) = liftRhs owner captures f salt
+          (x', xs, last_salt) = liftRhs owner captures x next
+      in (L loc (HsAppTy ann f' x'), fs ++ xs, last_salt)
+    liftRhs owner captures (L loc (HsParTy ann body)) salt =
+      let (body', ds, next) = liftRhs owner captures body salt
+      in (L loc (HsParTy ann body'), ds, next)
+    liftRhs _ _ ty salt = (ty, [], salt)
+
+    liftLambda owner loc scoped v body salt =
+      let owner_occ = rdrNameOcc (unLoc owner)
+          occ = mkTcOcc ("$lambda:" ++ occNameString owner_occ ++ ":" ++ show salt)
+          name = L (getLoc owner) (mkRdrUnqual occ)
+          variable = L (getLoc v) (mkRdrUnqual (setOccNameSpace tvName (rdrNameOcc (unLoc v))))
+          shadowed n = unLoc n == unLoc variable
+          fresh = L (getLoc v) (mkRdrUnqual (mkTyVarOcc "$lambdaArg"))
+          header_var = if any (shadowed . snd) scoped then fresh else variable
+          binder = L loc (HsTvb noAnn (HsBndrRequired noExtField)
+                       (HsBndrVar noExtField header_var) (HsBndrNoKind noExtField))
+          pats = [typeName (if shadowed n then fresh else n) | (_, n) <- scoped]
+          eqn = L loc (FamEqn ([], [], noAnn) name mkHsOuterImplicit
+                      (map (HsValArg noExtField) (pats ++ [typeName variable]))
+                      Prefix body)
+          family = L loc (FamDecl noExtField
+                   (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just [eqn])) TopLevel
+                       name (HsQTvs noExtField (map fst scoped ++ [binder])) Prefix
+                       (L (l2l loc) (NoSig noExtField)) Nothing))
+          applied = foldl' (\f (_, n) -> L loc (HsAppTy noExtField f (typeName n)))
+                           (typeName name) scoped
+      in (applied, (family, (occ, owner_occ)))
+
+    capture b@(L _ (HsTvb _ (HsBndrRequired _) (HsBndrVar _ n) HsBndrKind{})) = Just (b, n)
+    capture _ = Nothing
+
+    typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
+
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
 It also does the following error checks:
@@ -101,7 +179,14 @@ does NOT assume that anything is in scope already
 -}
 rnSrcDecls :: HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 -- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
-rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
+rnSrcDecls group = do
+  enabled <- xoptM LangExt.ExperimentalDependentTypes
+  let (expanded, hidden) = if enabled then liftTypeLambdas group else (group, [])
+  rnSrcDeclsWithLambdas hidden expanded
+
+-- | Rename the declarations and keep each lifted family in its owner's group.
+rnSrcDeclsWithLambdas :: [(OccName, OccName)] -> HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
+rnSrcDeclsWithLambdas hidden group@(HsGroup { hs_valds   = val_decls,
                             hs_splcds  = splice_decls,
                             hs_tyclds  = tycl_decls,
                             hs_derivds = deriv_decls,
@@ -180,7 +265,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn "Start rnTyClDecls" (ppr tycl_decls) ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls tycl_decls ;
+   (rn_tycl_decls, src_fvs1) <- rnTyClDecls hidden tycl_decls ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
@@ -262,7 +347,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                         in -- we return the deprecs in the env, not in the HsGroup above
                         tcg_env' { tcg_warns = insertWarnDecls (tcg_warns tcg_env') rn_decl_warns
                                  , tcg_rdr_env = delListFromOccEnv (tcg_rdr_env tcg_env')
-                                                   (map nameOccName table_names) };
+                                                   (map fst hidden ++ map nameOccName table_names) };
        } ;
    traceRn "finish rnSrc" (ppr rn_group) ;
    traceRn "finish Dus" (ppr src_dus ) ;
@@ -1874,10 +1959,10 @@ another instance, so we better add them to the environment one by one.
 -}
 
 
-rnTyClDecls :: [TyClGroup GhcPs]
+rnTyClDecls :: [(OccName, OccName)] -> [TyClGroup GhcPs]
             -> RnM ([TyClGroup GhcRn], FreeNames)
 -- Rename the declarations and do dependency analysis on them
-rnTyClDecls tycl_ds
+rnTyClDecls hidden tycl_ds
   = do { -- Flatten TyClGroups and rename each declaration individually.
          -- Steps (TCDEP1) and (TCDEP2) of Note [Dependency analysis of type and class decls]
        ; tycls_w_fvs <- mapM (wrapLocFstMA rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
@@ -1894,7 +1979,7 @@ rnTyClDecls tycl_ds
        ; rdr_env <- getGlobalRdrEnv
        ; traceRn "rnTyClDecls SCC analysis" $
            vcat [ text "rdr_env:" <+> ppr rdr_env ]
-       ; let tycl_sccs = depAnalTyClDecls rdr_env tc_names kisig_fv_env tycls_w_fvs
+       ; let tycl_sccs = depAnalTyClDecls hidden rdr_env tc_names kisig_fv_env tycls_w_fvs
              (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
              role_annot_env = mkRoleAnnotEnv role_annots
 
@@ -1976,14 +2061,21 @@ rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
         }
 
 -- See Note [Dependency analysis of type and class decls]
-depAnalTyClDecls :: GlobalRdrEnv
+depAnalTyClDecls :: [(OccName, OccName)] -> GlobalRdrEnv
                  -> NameSet                         -- Names in the current HsGroup
                  -> KindSig_FV_Env                  -- FVs of standalone kind signatures
                  -> [(LTyClDecl GhcRn, FreeNames)]
                  -> [SCC (LTyClDecl GhcRn, NameSet)]
-depAnalTyClDecls rdr_env tc_names kisig_fv_env ds_w_fvs
+depAnalTyClDecls hidden rdr_env tc_names kisig_fv_env ds_w_fvs
   = stronglyConnCompFromEdgedVerticesUniq edges
   where
+    lifted_owners = mkOccEnv hidden
+    names_by_occ = mkOccEnv [(nameOccName name, name) | name <- nonDetEltsUniqSet tc_names]
+    -- Give the lifted family and its owning synonym one kind-checking SCC.
+    -- The partial application supplies the edge in the other direction.
+    owner_edge name = mkNameSet
+      [owner | occ <- maybeToList (lookupOccEnv lifted_owners (nameOccName name))
+             , owner <- maybeToList (lookupOccEnv names_by_occ occ)]
     -- Build a graph where each node is a `TyClDecl` keyed by its name, and
     -- its `FreeNames` give rise to edges.
     -- Step (TCDEP3) of Note [Dependency analysis of type and class decls]
@@ -1996,7 +2088,7 @@ depAnalTyClDecls rdr_env tc_names kisig_fv_env ds_w_fvs
             | (d, fvs) <- ds_w_fvs,
               let { name = tcdName (unLoc d)
                   ; kisig_fvs = lookupKindSig_FV_Env kisig_fv_env name
-                  ; node_fvs = fvs `plusFN` kisig_fvs -- (TCDEP3.fvs_kisig)
+                  ; node_fvs = fvs `plusFN` kisig_fvs `plusFN` owner_edge name -- (TCDEP3.fvs_kisig)
                   ; deps = toParents rdr_env node_fvs `intersectFNs` tc_names
                       -- (toParents rdr_env) maps datacons to parent tycons (TCDEP3.fvs_parent),
                       -- (`intersectFNs` tc_names) filters out imported names (TCDEP3.fvs_nogbl).

@@ -551,6 +551,9 @@ data HsTypeGhcPsExt
                 (LHsType GhcPs)
     -- See Note [Parsing data type declarations]
 
+  | HsTypeLambda (EpToken "(", EpToken "\\", EpUniToken "->" "→", EpToken ")")
+                 (LocatedN RdrName) (LHsType GhcPs)
+
   | HsRecTy     (EpToken "{", EpToken "}")
                 (Located [LHsConDeclRecField GhcPs])
     -- See Note [Parsing data type declarations]
@@ -1648,6 +1651,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsCoreTy ty     -> ppr ty
     HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
     HsRecTy _ flds  -> pprHsConDeclRecFields (unLoc flds)
+    HsTypeLambda _ v body -> parens (char '\\' <> ppr v <+> arrow <+> ppr_mono_lty body)
   GhcRn -> ppr t
 
 ppr_infix_ty :: (OutputableBndrId p) => LHsType (GhcPass p) -> Maybe SDoc
@@ -1713,6 +1717,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsCoreTy ty -> go_core_ty ty
         HsBangTy{}  -> p > topPrec
         HsRecTy{}   -> False
+        HsTypeLambda{} -> False
       GhcRn -> go_core_ty t
 
     go_core_ty (TyVarTy{})    = False

@@ -162,3 +162,7 @@ AddHiding2:
 .PHONY: AddClassMethod
 AddClassMethod:
 	$(CHECK_EXACT) $(LIBDIR) AddClassMethod.hs addClassMethod
+
+.PHONY: TypeLambdaPrint
+TypeLambdaPrint:
+	$(CHECK_EXACT) $(LIBDIR) TypeLambdaPrint.hs

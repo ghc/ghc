@@ -42,3 +42,5 @@ test('AddClassMethod',ignore_stderr, makefile_test, ['AddClassMethod'])
 test('Test20239',  normal, compile_fail, ['-dsuppress-uniques -ddump-parsed-ast -dkeep-comments'])
 test('ZeroWidthSemi',  normal, compile, ['-dsuppress-uniques -ddump-parsed-ast -dkeep-comments'])
 test('T22919',  normal, compile, ['-dsuppress-uniques -ddump-parsed-ast -dkeep-comments'])
+
+test('TypeLambdaPrint', ignore_stderr, makefile_test, ['TypeLambdaPrint'])

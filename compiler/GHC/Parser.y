@@ -43,6 +43,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
 import GHC.Hs
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Driver.Backpack.Syntax
@@ -2420,6 +2421,8 @@ atype :: { LHsType GhcPs }
         | '(#' bar_types2 '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
                                       ; amsA' (sLL $1 $> $ HsSumTy (AnnParensHash (epTok $1) (epTok $3)) $2) } }
         | '[' ktype ']'               {% amsA' . sLL $1 $> =<< (mkListSyntaxTy1 (epTok $1) $2 (epTok $3)) }
+        | '(' '\\' tyvar '->' ctype ')' {% amsA' (sLL $1 $> $
+                            XHsType (HsTypeLambda (epTok $1, epTok $2, epUniTok $4, epTok $6) $3 $5)) }
         | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy (epTok $1, epTok $3) $2) }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE '(' ')'         {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
