@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, isSourceConstructorCase, sourceTableOwner)
+                              sourceCaseKindUse, isSourceConstructorCase, sourceCaseVisibleArity, sourceTableOwner)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -2331,14 +2331,14 @@ tcInferTyAppHead :: TcTyMode -> LHsType GhcRn -> [LHsTypeArg GhcRn] -> TcM (TcTy
 -- constructors, it does not zoom off into tcInferTyApps and family
 -- saturation
 tcInferTyAppHead mode (L _ (HsTyVar _ _ (L _ (WithUserRdr _ tv)))) args
-  -- A bare head supplies no rule-use information when this application
-  -- immediately supplies the one visible argument of a constructor certificate.
+  -- A saturated case records its rule use with the instantiated kinds.
+  -- See Note [Source family evidence uses] in GHC.Tc.Gen.SourceTable.
   | isSourceFamilyName tv
-  , [_] <- [() | HsValArg{} <- args]
   = do table <- tcLookupTyCon tv
-       if isSourceConstructorCase table
-         then return (mkTyConTy table, tyConKind table)
-         else tcTyVar mode tv
+       case sourceCaseVisibleArity table of
+         Just arity | lengthIs [() | HsValArg{} <- args] arity
+           -> return (mkTyConTy table, tyConKind table)
+         _ -> tcTyVar mode tv
   | otherwise = tcTyVar mode tv
 tcInferTyAppHead mode ty _
   = tc_infer_lhs_type mode ty

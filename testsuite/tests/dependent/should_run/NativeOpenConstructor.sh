@@ -113,6 +113,7 @@ sed '/^{-# OPTIONS_GHC/d' "$src/OpenConstructorWorker.hs" > OpenConstructorWorke
 rm OpenConstructorWorker.hs OpenConstructorWorker.o
 "${ghc[@]}" --show-iface OpenConstructorWorker.hi > stripped.iface
 grep -Fq 'T:pick ' stripped.iface
+grep -Fq 'T:pickNested ' stripped.iface
 if grep -Fq 'T:unwrap ' stripped.iface; then
     echo 'The interface published a projection for a datatype with hidden constructors.' >&2
     exit 1
@@ -157,19 +158,154 @@ type Bad (p :: W.Envelope Type) = W.unwrap p
 SOURCE
 expect_rejection Abstract 5 '\[GHC-70566\]' 'Cannot reduce the open call'
 
+cat > NestedResidual.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll #-}
+{-# LANGUAGE PolyKinds, StandaloneKindSignatures #-}
+module NestedResidual (PickNested) where
+
+import qualified OpenConstructorWorker as W
+
+type PickNested :: forall a. W.Nested a -> a -> a
+type PickNested p fallback = W.pickNested p fallback
+SOURCE
+"${ghc[@]}" -c NestedResidual.hs
+
+cat > NestedClient.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+module NestedClient where
+
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import NestedResidual (PickNested)
+import qualified OpenConstructorWorker as W
+
+just :: forall (x :: Bool) (fallback :: Bool).
+        Proxy x -> Proxy fallback -> PickNested ('W.Nested ('Just x)) fallback :~: x
+just _ _ = Refl
+
+nothing :: forall (fallback :: Char).
+           Proxy fallback -> PickNested ('W.Nested 'Nothing) fallback :~: fallback
+nothing _ = Refl
+SOURCE
+"${ghc[@]}" -c NestedClient.hs
+
+cat > NestedDemand.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+module NestedDemand where
+
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import NestedResidual (PickNested)
+import qualified OpenConstructorWorker as W
+
+-- Both defined Maybe () constructors yield '(). The worker still demands m.
+bad :: forall (m :: Maybe ()). Proxy m -> PickNested ('W.Nested m) '() :~: '()
+bad _ = Refl
+SOURCE
+expect_rejection NestedDemand 11 '\[GHC-(25897|83865|18872)\]' "Couldn't match"
+
+cat > OuterDemand.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+module OuterDemand where
+
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import NestedResidual (PickNested)
+import qualified OpenConstructorWorker as W
+
+-- A rigid outer constructor cannot be assumed either.
+bad :: forall (p :: W.Nested ()). Proxy p -> PickNested p '() :~: '()
+bad _ = Refl
+SOURCE
+expect_rejection OuterDemand 11 '\[GHC-(25897|83865|18872)\]' "Couldn't match"
+
+cat > LargerWorker.hs <<'SOURCE'
+module LargerWorker (Larger(..), choose, Product(..), project, Marker(..), retain, Deep(..), innermost) where
+data Larger a = Larger (Maybe a) a | Empty
+choose :: Larger a -> a -> a
+choose (Larger (Just x) _) _ = x
+choose (Larger Nothing _) x = x
+choose Empty x = x
+
+data Product a = Product a
+project :: Product a -> a
+project (Product x) = x
+
+data Marker a = Marker
+retain :: Marker a -> a -> a
+retain Marker x = x
+
+data Deep a = Deep (Maybe (Maybe a))
+innermost :: Deep a -> a -> a
+innermost (Deep outer) fallback = case outer of
+    Nothing -> fallback
+    Just inner -> case inner of
+        Nothing -> fallback
+        Just x -> x
+SOURCE
+"${ghc[@]}" -fomit-interface-pragmas -c LargerWorker.hs
+rm LargerWorker.hs LargerWorker.o
+cat > LargerClient.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
+module LargerClient where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified LargerWorker as L
+proof :: L.choose ('L.Larger ('Just 'True) 'False) 'False :~: 'True
+proof = Refl
+empty :: L.choose 'L.Empty 'False :~: 'False
+empty = Refl
+productField :: L.project ('L.Product 'True) :~: 'True
+productField = Refl
+phantomFallback :: L.retain 'L.Marker 'False :~: 'False
+phantomFallback = Refl
+deep :: L.innermost ('L.Deep ('Just ('Just 'x'))) 'y' :~: 'x'
+deep = Refl
+innerEmpty :: L.innermost ('L.Deep ('Just 'Nothing)) 'y' :~: 'y'
+innerEmpty = Refl
+SOURCE
+"${ghc[@]}" -c LargerClient.hs
+
+cat > WrongMarkerKind.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
+module WrongMarkerKind where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified LargerWorker as L
+bad :: L.retain ('L.Marker :: L.Marker 'True) 'False :~: 'False
+bad = Refl
+SOURCE
+expect_rejection WrongMarkerKind 5 '\[GHC-(83865|18872)\]' 'kind'
+
+cat > NestedRule.hs <<'SOURCE'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+{-# OPTIONS_GHC -fenable-rewrite-rules -Wno-inline-rule-shadowing #-}
+module NestedRule where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified OpenConstructorWorker as W
+proof :: W.pickNested ('W.Nested ('Just 'True)) 'False :~: 'True
+proof = Refl
+{-# RULES "nested/specialized" forall (p :: W.Nested Char) x.
+    W.pickNested p x = x #-}
+SOURCE
+"${ghc[@]}" -c NestedRule.hs
+sed 's/W.Nested Char/W.Nested Bool/' NestedRule.hs > NestedRule.next
+mv NestedRule.next NestedRule.hs
+expect_rejection NestedRule 7 '\[GHC-83605\]' 'rewrite rule can change the result'
+
 # Force the previously ignored field in the ordinary body. The datatype,
 # signature and unchanged interface-only exporter stay the same.
 sed -e '/^{-# OPTIONS_GHC/d' \
     -e 's/^pick (LeftFields _ y) = y$/pick (LeftFields x y) = x `seq` y/' \
+    -e 's/^pickNested (Nested (Just x)) _ = x$/pickNested (Nested (Just x)) fallback = fallback `seq` x/' \
     "$src/OpenConstructorWorker.hs" > OpenConstructorWorker.hs
 "${ghc[@]}" -fomit-interface-pragmas -c OpenConstructorWorker.hs
 rm OpenConstructorWorker.hs OpenConstructorWorker.o
 "${ghc[@]}" --show-iface OpenConstructorWorker.hi > strict.iface
-if grep -Fq 'T:pick ' strict.iface; then
+if grep -Eq 'T:pick(Nested)? ' strict.iface; then
     echo 'The interface kept the projection after the worker began forcing a field.' >&2
     exit 1
 fi
 expect_rejection Residual 7 '\[GHC-70566\]' 'Cannot reduce the open call'
+expect_rejection NestedResidual 8 '\[GHC-(68947|70565|70566|83865)\]' 'pickNested'
 
 cd ../client
 cp "$src/NativeOpenConstructor.hs" .

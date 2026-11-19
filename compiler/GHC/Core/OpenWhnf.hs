@@ -298,10 +298,11 @@ openDataConFieldTypes con parameters
   , all (not . isBanged) (dataConImplBangs con)
   , (vars, [], [], [], fields, result) <- dataConFullSig con
   , length vars == length parameters
-  , and (zipWith eqType (map varType vars) (map typeKind parameters))
   , length fields == dataConRepArity con
   , let instantiate = substTyWith vars parameters
         field_types = map (instantiate . scaledThing) fields
+  -- The kind of a parameter may refer to earlier constructor parameters.
+  , and (zipWith eqType (map (instantiate . varType) vars) (map typeKind parameters))
   , isLiftedTypeKind (typeKind (instantiate result))
   , all (isLiftedTypeKind . typeKind) field_types
   = Just field_types

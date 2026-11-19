@@ -1,7 +1,7 @@
 -- | Closed type families for checked functions that match one constructor.
 module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
-                              sourceTableFamilyAppUse, sourceCaseKindUse, isSourceConstructorCase, sourceTableOwner, groundFirstHead,
+                              sourceTableFamilyAppUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
@@ -48,7 +48,7 @@ import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), isEmptyEvBindsMap)
 import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
-import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBindsMap, getTcEvBindsState,
+import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobalRdrEnv, getTcEvBindsMap, getTcEvBindsState,
                            checkNoErrs, getTopEnv, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
@@ -60,6 +60,7 @@ import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, setIdType, sourceTa
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, isExternalName, mkSourceTableOcc, mkInstTyCoOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
+import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
 import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
@@ -85,6 +86,7 @@ import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (lengthIs)
 import GHC.Utils.Monad (allM, anyM)
 import GHC.Utils.Outputable (text)
+import GHC.Utils.Panic (panic)
 
 import Control.Monad (filterM, foldM, forM, forM_, guard, unless, when, zipWithM)
 import Control.Monad.IO.Class (liftIO)
@@ -203,15 +205,17 @@ sourceTableFamilyUse table = sourceTableFamilyUseAt table Nothing
 -- | Record evidence use at an application, including cache and plugin reductions.
 sourceTableFamilyAppUse :: TyCon -> [Type] -> TcM ()
 sourceTableFamilyAppUse table args
-  | isSourceConstructorCase table, lengthIs args (tyConArity table) = do
-      kinds <- liftZonkM (zonkTcTypes (take (tyConArity table - 1) args))
+  | Just visible <- sourceCaseVisibleArity table
+  , lengthIs args (tyConArity table) = do
+      kinds <- liftZonkM (zonkTcTypes (take (tyConArity table - visible) args))
       sourceTableFamilyUseAt table (groundFirstHead kinds)
   | otherwise = sourceTableFamilyUse table
 
 -- | Check specialized kinds before running a constructor case operand.
 sourceCaseKindUse :: TyCon -> [Kind] -> TcM ()
 sourceCaseKindUse table kinds
-  | isSourceConstructorCase table, lengthIs kinds (tyConArity table - 1)
+  | Just visible <- sourceCaseVisibleArity table
+  , lengthIs kinds (tyConArity table - visible)
   = sourceTableFamilyUseAt table (groundFirstHead kinds)
   | otherwise = sourceTableFamilyUse table
 
@@ -769,6 +773,7 @@ sourceCaseTables :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
 sourceCaseTables binds = do
   env <- getGblEnv
   char_tables <- xoptM LangExt.ExperimentalDependentTypes
+  rdr_env <- getGlobalRdrEnv
   let exported = mkNameSet (concatMap availNames (tcg_exports env))
       ruled = sourceRuleOwners (tcg_rules env)
       eligible owner =
@@ -776,7 +781,7 @@ sourceCaseTables binds = do
         not (idName owner `elemNameSet` ruled) &&
         ((char_tables && varType owner `eqType` charArrow) ||
          not (isNothing (pairCaseType (varType owner))) ||
-         eligibleSum env exported owner)
+         eligibleCase env exported owner)
       candidates = [ (bind, owner) | bind <- binds
                    , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
                    , eligible owner ]
@@ -787,18 +792,25 @@ sourceCaseTables binds = do
       fmap catMaybes $ forM candidates $ \(bind, owner) ->
         if hasSourceMethodRule visible owner
           then pure Nothing
-          else certifyBinding env exported bind owner
+          else certifyBinding env exported rdr_env bind owner
   where
     charArrow = mkVisFunTyManyU charTy charTy
 
-    eligibleSum env exported owner
-      | Just (SumCaseType _ tc _ _) <- sumCaseType (varType owner)
+    eligibleCase env exported owner
+      | Just (ConstructorCaseType _ tc _ _ _) <- constructorCaseType (varType owner)
       = nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
-        tyConName tc `elemNameSet` exported &&
-        all (\dc -> dataConName dc `elemNameSet` exported) (tyConDataCons tc)
+        publicCaseType env exported (const False) tc
       | otherwise = False
 
-    certifyBinding env exported bind owner = do
+    publicCaseType env exported imported tc =
+      all available (tyConName tc : map dataConName (tyConDataCons tc))
+      where
+        available name
+          | nameModule_maybe name == Just (tcg_semantic_mod env)
+          = name `elemNameSet` exported
+          | otherwise = imported name
+
+    certifyBinding env exported rdr_env bind owner = do
       (messages, bindings) <- initDsTc (dsTopLHsBinds [bind])
       case bindings of
         Just core | not (errorsFound messages)
@@ -807,9 +819,13 @@ sourceCaseTables binds = do
               Core.Var target | varType owner `eqType` charArrow -> forwarding env owner target
               _ | Just projection <- checkedPairCase owner rhs ->
                     Just . (owner,) <$> publishPairCase owner projection
-                | eligibleSum env exported owner
-                , Just (signature, rows) <- checkedSumCase owner rhs ->
-                    Just . (owner,) <$> publishSumCase owner signature rows
+                | eligibleCase env exported owner
+                , let imported name = case lookupGRE_Name rdr_env name of
+                        Just gre -> any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
+                        Nothing -> False
+                , Just (signature, rows) <- checkedConstructorCase
+                    (publicCaseType env exported imported) owner rhs ->
+                    Just . (owner,) <$> publishConstructorCase owner signature rows
                 | Right certificate <- certify owner rhs
                 , certOwner certificate == idName owner ->
                     publish owner (certRows certificate) id
@@ -878,8 +894,12 @@ original name and requires no forwarding table.
 
 -- | Recognize a private constructor-case family and its nominal equations.
 isSourceConstructorCase :: TyCon -> Bool
-isSourceConstructorCase table
-  | Nothing <- sourceTableTermOcc (nameOccName (tyConName table)) = False
+isSourceConstructorCase table = not (isNothing (sourceCaseVisibleArity table))
+
+-- | Return the number of value operands of a certified constructor case.
+sourceCaseVisibleArity :: TyCon -> Maybe Int
+sourceCaseVisibleArity table
+  | Nothing <- sourceTableTermOcc (nameOccName (tyConName table)) = Nothing
   | Just axiom <- closedFamilyTyConCoAxiom_maybe table
   , coAxiomRole axiom == Nominal
   = let branches = fromBranches (coAxiomBranches axiom)
@@ -887,34 +907,52 @@ isSourceConstructorCase table
     in case pairCaseType kind of
         Just (telescope, _, _, _) ->
           case traverse (caseBranchConstructor telescope) branches of
-            Just [con] -> con == tupleDataCon Boxed 2
-            _ -> False
-        Nothing -> case sumCaseType kind of
-          Just (SumCaseType telescope tc _ _) ->
-            case traverse (sumCaseBranch telescope) branches of
-              Just cons -> lengthIs cons (length (tyConDataCons tc)) &&
-                           mkUniqSet cons == mkUniqSet (tyConDataCons tc)
-              Nothing -> False
-          Nothing -> False
-  | otherwise = False
+            Just [con] | con == tupleDataCon Boxed 2 -> Just 1
+            _ -> Nothing
+        Nothing -> case constructorCaseType kind of
+          Just (ConstructorCaseType telescope tc _ carried _)
+            | let visible = 1 + length carried
+            , Just roots <- traverse (projectionBranch telescope tc visible) branches
+            , mkUniqSet roots == mkUniqSet (tyConDataCons tc) -> Just visible
+          _ -> Nothing
+  | otherwise = Nothing
   where
-    caseBranchConstructor telescope branch = fst <$> caseBranch telescope branch
-    sumCaseBranch telescope branch = do
-      (con, fields) <- caseBranch telescope branch
-      guard (any (eqType (coAxBranchRHS branch)) fields)
-      pure con
+    projectionBranch telescope tc visible branch = do
+      (patterns, vars) <- branchPatterns telescope branch
+      root_pat : carried <- pure patterns
+      guard (lengthIs patterns visible)
+      (root_con, fields) <- constructorPattern root_pat
+      guard (dataConTyCon root_con == tc)
+      leaves <- concat <$> traverse patternLeaves (fields ++ carried)
+      guard (eqTypes leaves vars && any (eqType (coAxBranchRHS branch)) vars)
+      pure root_con
 
+    patternLeaves ty
+      | Just _ <- getTyVar_maybe ty = Just [ty]
+      | otherwise = do
+          (_, fields) <- constructorPattern ty
+          concat <$> traverse patternLeaves fields
+
+    caseBranchConstructor telescope branch = fst <$> caseBranch telescope branch
     caseBranch telescope branch = do
+      (patterns, vars) <- branchPatterns telescope branch
+      [pattern_ty] <- pure patterns
+      (con, fields) <- constructorPattern pattern_ty
+      guard (eqTypes fields vars)
+      pure (con, fields)
+
+    branchPatterns telescope branch = do
       let (params, patterns) = splitAt (length telescope) (coAxBranchLHS branch)
           (qvars, fields) = splitAt (length telescope) (coAxBranchTyVars branch)
       guard (null (coAxBranchCoVars branch) && eqTypes params (mkTyVarTys qvars))
-      [pattern_ty] <- pure patterns
+      pure (patterns, mkTyVarTys fields)
+
+    constructorPattern pattern_ty = do
       (promoted, args) <- splitTyConApp_maybe pattern_ty
       con <- isPromotedDataCon_maybe promoted
-      let (con_args, field_args) = splitAt (length (dataConUserTyVars con)) args
-      guard (lengthIs con_args (length (dataConUserTyVars con)) &&
-             eqTypes field_args (mkTyVarTys fields))
-      pure (con, field_args)
+      let (parameters, fields) = splitAt (length (dataConUserTyVars con)) args
+      guard (lengthIs parameters (length (dataConUserTyVars con)))
+      pure (con, fields)
 
 -- | Identify the lifted parameter telescope and result of a boxed pair case.
 pairCaseType :: Type -> Maybe ([ForAllTyBinder], TyVar, TyVar, Type)
@@ -940,111 +978,197 @@ pairCaseType tau = do
       | isTyVar v, varType v `eqType` liftedTypeKind = Just binder
     liftedBinder _ = Nothing
 
--- | The telescope, input datatype and arguments, and selected field kind.
-data SumCaseType = SumCaseType [ForAllTyBinder] TyCon [Type] Type
+-- | The kind telescope, input datatype and parameters, optional fallback, and result.
+data ConstructorCaseType = ConstructorCaseType [ForAllTyBinder] TyCon [Type] [Type] Type
 
--- | Recognize the restricted parameterized sum signature.
-sumCaseType :: Type -> Maybe SumCaseType
-sumCaseType tau = do
+-- | Check the ordinary unary or binary signature for a constructor case.
+constructorCaseType :: Type -> Maybe ConstructorCaseType
+constructorCaseType tau = do
     let (telescope, body) = splitForAllForAllTyBinders tau
     binders <- traverse liftedBinder telescope
-    (FTF_T_T, ma, mult, domain, result) <- splitFunTy_maybe body
-    guard (ma `eqType` unmatchableDataConTy && isManyTy mult)
-    (tc, args) <- splitTyConApp_maybe domain
-    guard (isVanillaAlgTyCon tc && isBoxedDataTyCon tc && isLiftedAlgTyCon tc)
-    -- A list can have the same shape, but belongs to a separate certificate.
-    guard (tc /= listTyCon && lengthIs args (tyConArity tc))
-    _ : _ : _ <- pure (tyConDataCons tc)
-    parameters <- traverse getTyVar_maybe args
-    selected <- getTyVar_maybe result
     let quantified = [v | Bndr v _ <- binders]
-    guard (selected `elem` parameters && length args == length quantified &&
+    (domain, rest) <- visibleArrow body
+    (tc, args) <- caseDatatype domain
+    parameters <- catMaybes <$> traverse domainParameter args
+    guard (length parameters == length quantified &&
            mkUniqSet parameters == mkUniqSet quantified)
-    pure (SumCaseType binders tc args result)
+    let (carried, result) = case visibleArrow rest of
+          Just (fallback, output) -> ([fallback], output)
+          Nothing -> ([], rest)
+    selected <- getTyVar_maybe result
+    guard (selected `elem` parameters && all (eqType result) carried)
+    -- Preserve the separate pair and list certificates.
+    guard (tc /= listTyCon && tc /= tupleTyCon Boxed 2)
+    pure (ConstructorCaseType binders tc args carried result)
   where
+    domainParameter ty
+      | ty `eqType` liftedTypeKind = Just Nothing
+      | otherwise = Just <$> getTyVar_maybe ty
+    visibleArrow ty = do
+      (FTF_T_T, ma, mult, arg, res) <- splitFunTy_maybe ty
+      guard (ma `eqType` unmatchableDataConTy && isManyTy mult)
+      pure (arg, res)
     liftedBinder (ma, binder@(Bndr v (Invisible _)))
       | ma `eqType` unmatchableDataConTy
       , isTyVar v, varType v `eqType` liftedTypeKind = Just binder
     liftedBinder _ = Nothing
 
--- | Checked constructor and its original field types around the selected field.
-data SumCaseRow = SumCaseRow DataCon [Type] Type [Type]
+-- | Read a saturated ordinary boxed datatype with constructors.
+caseDatatype :: Type -> Maybe (TyCon, [Type])
+caseDatatype ty = do
+    (tc, args) <- splitTyConApp_maybe ty
+    guard (isVanillaAlgTyCon tc && isBoxedDataTyCon tc && isLiftedAlgTyCon tc &&
+           lengthIs args (tyConArity tc) && not (null (tyConDataCons tc)))
+    pure (tc, args)
 
--- | Accept exactly one branch per constructor, returning an exact bound field.
-checkedSumCase :: Id -> Core.CoreExpr -> Maybe (SumCaseType, [SumCaseRow])
-checkedSumCase owner rhs = do
+-- | A constructor demanded by Core, or an undemanded scoped variable.
+data ConstructorCasePattern = CaseField Id | CaseConstructor DataCon [Type] [ConstructorCasePattern]
+
+-- | A complete path through the Core cases and its selected variable.
+data ConstructorCaseRow = ConstructorCaseRow [ConstructorCasePattern] Id
+
+-- | Read exhaustive cases on exact bound operands, ending in a scoped field.
+checkedConstructorCase :: (TyCon -> Bool) -> Id -> Core.CoreExpr
+                       -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
+checkedConstructorCase public owner rhs = do
     let rhs_type = exprType rhs
     guard (rhs_type `eqType` varType owner)
-    SumCaseType telescope tc args result <- sumCaseType rhs_type
-    signature <- sumCaseType (varType owner)
+    ConstructorCaseType telescope tc args carried result <- constructorCaseType rhs_type
     let (bindings, body) = Core.collectBinders rhs
         (parameters, terms) = splitAt (length telescope) bindings
-        input = mkTyConApp tc args
     guard (parameters == [v | Bndr v _ <- telescope])
-    [term] <- pure terms
-    guard (isId term && varType term `eqType` input)
-    Core.Case (Core.Var scrutinee) case_binder case_result alternatives <- pure body
-    guard (scrutinee == term && varType case_binder `eqType` input &&
-           case_result `eqType` result)
-    rows <- traverse (checkRow tc args result) alternatives
-    let expected = tyConDataCons tc
-    guard (lengthIs rows (length expected) &&
-           mkUniqSet [dc | SumCaseRow dc _ _ _ <- rows] == mkUniqSet expected)
-    pure (signature, rows)
+    guard (all isId terms && eqTypes (map varType terms) (mkTyConApp tc args : carried))
+    first : _ <- pure terms
+    rows <- checkCase args result (map CaseField terms) [] first body
+    -- The patterns use types from the Core binders. Use the same telescope
+    -- for substitution. Keep the owner's declared visibility in the interface.
+    ConstructorCaseType signature _ _ _ _ <- constructorCaseType (varType owner)
+    let binders = zipWith (\(Bndr v _) (Bndr _ vis) -> Bndr v vis) telescope signature
+    pure (ConstructorCaseType binders tc args carried result, rows)
   where
-    checkRow tc args result (Core.Alt (Core.DataAlt dc) fields (Core.Var chosen)) = do
+    checkCase parameters result patterns aliases scrutinee
+              (Core.Case (Core.Var actual) binder case_result alternatives) = do
+      guard (resolve aliases actual == scrutinee &&
+             varType binder `eqType` varType actual && case_result `eqType` result)
+      (tc, args) <- caseDatatype (varType actual)
+      guard (public tc && all (publicField parameters) args)
+      branches <- traverse (checkAlt parameters result patterns aliases scrutinee tc args) alternatives
+      guard (completeCase tc (map fst branches))
+      pure (concatMap snd branches)
+    checkCase _ _ _ _ _ _ = Nothing
+
+    checkAlt parameters result patterns aliases scrutinee tc args (Core.Alt (Core.DataAlt dc) fields body) = do
       guard (dataConTyCon dc == tc && dataConUserTyVars dc == dataConUnivTyVars dc)
       kinds <- openDataConFieldTypes dc args
-      guard (all (\k -> any (eqType k) args) kinds)
       guard (all isId fields && eqTypes (map varType fields) kinds)
-      guard (varType chosen `eqType` result)
-      let original_fields = map scaledThing (dataConOrigArgTys dc)
-      (before, (_, selected) : after) <- pure (break ((== chosen) . fst) (zip fields original_fields))
-      pure (SumCaseRow dc (map snd before) selected (map snd after))
-    checkRow _ _ _ _ = Nothing
+      guard (all (publicField parameters) kinds)
+      let replace (CaseField v)
+            | v == scrutinee = (True, CaseConstructor dc args (map CaseField fields))
+          replace field@CaseField{} = (False, field)
+          replace (CaseConstructor con types children) =
+            let (flags, children') = unzip (map replace children)
+            in (or flags, CaseConstructor con types children')
+          (replaced, patterns') = unzip (map replace patterns)
+      guard (or replaced)
+      rows <- checkBody parameters result patterns' aliases body
+      pure (dc, rows)
+    checkAlt _ _ _ _ _ _ _ _ = Nothing
 
--- | Publish equations which demand only the sum constructor.
-publishSumCase :: Id -> SumCaseType -> [SumCaseRow] -> TcM TyCon
-publishSumCase owner (SumCaseType telescope tc args result) rows = do
+    checkBody parameters result patterns aliases body = case body of
+      Core.Var output
+        | let selected = resolve aliases output
+        , varType selected `eqType` result, scoped selected ->
+            pure [ConstructorCaseRow patterns selected]
+      Core.Case (Core.Var next) _ _ _ ->
+        checkCase parameters result patterns aliases (resolve aliases next) body
+      Core.Let (Core.NonRec binder (Core.Var target)) rest
+        | isId binder, binder /= target, not (scoped binder)
+        , isNothing (lookup binder aliases)
+        , varType binder `eqType` varType target
+        , let selected = resolve aliases target
+        , scoped selected ->
+            checkBody parameters result patterns ((binder, selected) : aliases) rest
+      _ -> Nothing
+      where
+        scoped v = any (contains v) patterns
+
+    -- Each entry already names a leaf. Core Id identities keep the alias
+    -- lexical, and each alternative receives its own immutable environment.
+    resolve aliases v = case lookup v aliases of
+      Just target -> target
+      Nothing -> v
+
+    publicField parameters kind
+      | kind `eqType` liftedTypeKind || any (eqType kind) parameters = True
+      | Just (tc, args) <- caseDatatype kind = public tc && all (publicField parameters) args
+      | otherwise = False
+    contains selected (CaseField v) = selected == v
+    contains selected (CaseConstructor _ _ children) = any (contains selected) children
+
+-- | Check distinct and complete constructor coverage without a default.
+completeCase :: TyCon -> [DataCon] -> Bool
+completeCase tc actual =
+    lengthIs actual (length expected) && mkUniqSet actual == mkUniqSet expected
+  where
+    expected = tyConDataCons tc
+
+-- | Publish one nominal equation per complete path through the checked cases.
+publishConstructorCase :: Id -> ConstructorCaseType -> [ConstructorCaseRow] -> TcM TyCon
+publishConstructorCase owner (ConstructorCaseType telescope tc args carried result) rows = do
     kind_binders <- forM telescope $ \(Bndr variable visibility) -> do
       name <- newSysName (nameOccName (varName variable))
       pure (mkNamedTyConBinder visibility (mkTyVar name liftedTypeKind))
     let quantifiers = [v | Bndr v _ <- kind_binders]
         instantiate = substTyWith [v | Bndr v _ <- telescope] (mkTyVarTys quantifiers)
-        tc_args = map instantiate args
-        input = mkTyConApp tc tc_args
-    arg <- fresh "scrutinee" input
-    branches <- forM rows $ \(SumCaseRow dc before selected after) -> do
-      let fresh_field = fresh "field" . substTyWith (dataConUnivTyVars dc) tc_args
-      prefix <- mapM fresh_field before
-      chosen <- fresh_field selected
-      suffix <- mapM fresh_field after
-      let fields = prefix ++ chosen : suffix
-          pat = mkTyConApp (promoteDataCon dc) (tc_args ++ mkTyVarTys fields)
-          binders = quantifiers ++ fields
-          branch _ = mkCoAxBranch binders [] [] (mkTyVarTys quantifiers ++ [pat])
-                       (mkTyVarTy chosen) (map (const Nominal) binders)
-                       (nameSrcSpan (idName owner))
+                      . expandTypeSynonyms
+        input = mkTyConApp tc args
+    operands <- mapM (fresh "arg" . instantiate) (input : carried)
+    branches <- forM rows $ \(ConstructorCaseRow patterns selected) -> do
+      (lhs, leaves) <- unzip <$> traverse (publishPattern instantiate) patterns
+      let fields = concat leaves
+          vars = quantifiers ++ map snd fields
+          rhs = case lookup selected fields of
+            Just v -> mkTyVarTy v
+            Nothing -> panic "publishConstructorCase: unbound selected field"
+          branch _ = mkCoAxBranch vars [] [] (mkTyVarTys quantifiers ++ lhs) rhs
+                      (map (const Nominal) vars) (nameSrcSpan (idName owner))
       pure branch
-    makeSourceFamily (idName owner) (kind_binders ++ mkAnonTyConBinders [arg])
+    makeSourceFamily (idName owner) (kind_binders ++ mkAnonTyConBinders operands)
                      (instantiate result) branches
   where
     fresh occ kind = flip mkTyVar kind <$> newSysName (mkTyVarOcc occ)
 
+    publishPattern instantiate (CaseField ident) = do
+      field <- fresh "field" (instantiate (varType ident))
+      pure (mkTyVarTy field, [(ident, field)])
+    publishPattern instantiate (CaseConstructor dc parameters children) = do
+      (fields, leaves) <- unzip <$> traverse (publishPattern instantiate) children
+      pure (mkTyConApp (promoteDataCon dc) (map instantiate parameters ++ fields), concat leaves)
+
 {- Note [Checked sum projections]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A solved Core case on its exact argument supplies one nominal equation
-per constructor. The input datatype and every constructor must be exported
-by the module defining them. Each field has the kind of an input parameter.
-The promoted pattern therefore contains no private names and introduces
-no equations about a neutral scrutinee or about pairs or other constructors.
-Use only the selected Core Id as the result. The unused fields remain lazy.
+Start with a case on the first argument of the ordinary function. Each
+subsequent case must scrutinize one of the still-visible variables. Check
+all alternatives against the lazy boxed constructor representation. Check
+that each leaf returns exactly an in-scope field or the carried argument.
+A case removes its scrutinee from the scope of leaves. Pattern matching
+can bind a selected variable through a nonrecursive let. Follow a
+same-typed alias to an existing leaf without introducing a new field.
+Reject casts, contexts, strict fields, defaults and unrelated scrutinees.
 
-Like the pair certificate, the family has an invisible prefix that
-instantiates the ordinary function and a single visible value argument.
-They share rule checking and selection of the ordinary executable route.
-A sum projection does not acquire any pair-specific equations or operand
-grammar.
+Each path contributes one nominal equation, with a constructor at every
+point demanded by Core. A branch for Nested (Just x) requires both the
+outer Nested and the inner Just. These equations do not match a neutral
+scrutinee even when all of its possible branches would agree. The
+unselected fields and any unused fallback are not demanded.
+
+Require an exported local input datatype. Any other datatype mentioned
+by an emitted pattern or a field kind must also be public. Its exact
+constructor names must be exported locally or visible through ordinary
+imports. A poly-kinded datatype may have a kind argument fixed at Type
+in the ordinary worker. This fixed argument belongs to the datatype
+pattern, not to the worker's invisible telescope. The original
+invisible telescope precedes one or two visible arguments. Recognize that prefix when checking applicable rules.
 -}
 
 -- | The original kind-parameter order and result of the alternative.
