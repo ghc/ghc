@@ -9236,3 +9236,17 @@ matchable variant to fail. Check a polymorphic annotation, a duplicate
 annotation, an interface-only client, exact printing and a Template
 Haskell round trip. Report a source error when GHC cannot classify an
 arrow modifier in a raw quotation.
+
+## R16. Infer the index of an imported witness
+
+An ordinary client can consume `Checked xs` while rewrite rules are
+enabled. Infer `xs` from the producer's checked family application.
+Reuse the nominal unifier's scope, kind and occurs checks. The client
+must still supply the producer's equality to use its hidden head.
+
+Compile the producer without interface pragmas. Give the client only
+the compiled interfaces. Check a direct result, a witness in a `Maybe`
+and a witness in a list. Verify that the caller's rule fires on an
+ordinary runtime call. Reject a fresh `Refl`, a discarded equality,
+a reassignment to a rigid index and an attempt to invert an ordinary
+type family. [Boundary example](examples/boundary-evidence/UseMapWitness.hs).

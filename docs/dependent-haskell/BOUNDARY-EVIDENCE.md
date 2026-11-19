@@ -307,12 +307,14 @@ The provider exports a `Checked (NegateAll '[ 'True])`. It contains a
 head indexed by a hidden list and an equality with the public list.
 The caller matches the imported `Refl` to return the head at the public
 index. Discarding the equality gives a type error at the returned head.
-The caller supplies the public index as a visible type argument. Leaving
-it to inference currently requires a fresh family reduction. A fresh
-`Refl` at the concrete equation also gives GHC-83605 with rules enabled.
+The caller infers the public index from the stripped interface. It can
+return the head at that index or use the witness inside a `Maybe` or
+list. Inference keeps the existing family application as the index.
+A fresh `Refl` at the concrete equation gives GHC-83605 with rules enabled.
 
 The caller uses a rule that replaces the builder introduced by the
-ordinary runtime `map` call. The executable prints `(False,True)`.
-The first value comes from the head carried by the imported witness.
-The second comes from the caller's rewritten runtime call.
+ordinary runtime `map` call. The executable prints
+`(False,Just False,Just False,True)`. The first three results read the
+head carried by the imported witness. The final result comes from the
+caller's rewritten runtime call.
 [Run the example](examples/boundary-evidence/check-map-witness.sh).

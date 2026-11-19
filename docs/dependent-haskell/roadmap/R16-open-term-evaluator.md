@@ -1038,6 +1038,12 @@ module. A caller's rule on `build` can change the runtime result in
 that same client. [Compiler Note](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
 and [witness and rewrite control](../examples/boundary-evidence/check-map-witness.sh).
 
+The consumer can infer the public list index in `checkedFirst checked`
+from the producer's interface. The same inference works inside `Maybe`
+and a list. A fresh proof at the concrete result still requires the
+mapper's equation. A check with rewrite rules enabled rejects it at the
+source `Refl`. [Optimized consumer](../examples/boundary-evidence/UseMapWitness.hs).
+
 The GHC Core replay for the concrete map builder checks both endpoints
 of `foldr/build` with an unknown combiner and seed. It rejects a changed
 combiner, a changed seed, and a new demand on the combiner. Other rules

@@ -49,6 +49,7 @@ import GHC.Core
 
 import GHC.Types.Var
 import GHC.Types.Basic
+import GHC.Types.Name (nameOccName, sourceTableTermOcc)
 import GHC.Types.Name.Reader
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -474,6 +475,12 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | Just ty1' <- coreView ty1 = can_eq_nc ces rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
   | Just ty2' <- coreView ty2 = can_eq_nc ces rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
+-- An imported synonym and a filled metavariable can now name the same
+-- source application. Reflexivity does not need the family's equation.
+can_eq_nc _ _ _ ev NomEq lhs@(TyConApp tc args) _ rhs@(TyConApp tc' _) _
+  | tc == tc', saturatedSourceHead tc args
+  , lhs `tcEqType` rhs = canEqReflexive ev NomEq lhs
+
 -- See Note [Reflexivity after retained normalization].
 can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(TermVarTy v1) _ (TermVarTy v2) _
   | bothRewritten ces, v1 == v2
@@ -655,7 +662,7 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1 _ ty2 _
 
 -- (EQNC5) Rewrite
 -- No similarity in type structure detected. Rewrite and try again.
-can_eq_nc ces rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
+can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | not $ bothRewritten ces
   = -- Rewrite the two types and try again
     do { preferred <- trySourceLetEquality ev eq_rel ps_ty1 ps_ty2
@@ -664,8 +671,30 @@ can_eq_nc ces rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
                                         (univCoDepsHoles (mkUnivCoDeps [co]))
                          ; setEqIfWanted ev (CPH co holes)
                          ; stopWith ev "Solved by direct source-let equality" }
-           Nothing -> rewrite_both }
+           Nothing -> infer_source_index }
   where
+    -- See Note [Inferring a source index without reduction].
+    infer_source_index =
+      case (ty1, ty2) of
+        (TyVarTy tv, rhs@(TyConApp family args)) -> try_index NotSwapped tv family args rhs
+        (rhs@(TyConApp family args), TyVarTy tv) -> try_index IsSwapped tv family args rhs
+        _ -> rewrite_both
+    try_index swapped tv family args rhs
+      | mightPossiblyUnify ev eq_rel tv, saturatedSourceHead family args = do
+          owner <- wrapTcS (sourceTableOwner family)
+          case owner of
+            Nothing -> rewrite_both
+            Just _ -> do
+              unfilled <- isUnfilledMetaTyVar tv
+              given_lvl <- getInnermostGivenEqLevel
+              rhs' <- zonkTcType rhs
+              kind <- zonkTcType (varType tv)
+              if unfilled && kind `eqType` typeKind rhs'
+                 && simpleUnifyCheck UC_Solver given_lvl tv rhs' == SUC_CanUnify
+                then canEqCanLHSFinish ev NomEq swapped (TyVarLHS tv) rhs'
+                else rewrite_both
+      | otherwise = rewrite_both
+
     rewrite_both
       = do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite_if_unrewritten (ces_rwL ces) ps_ty1
            ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite_if_unrewritten (ces_rwR ces) ps_ty2
@@ -756,6 +785,20 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
     call_domain f ty = case nativeIndexFunctionTys_maybe f of
       Just (_, result) -> typeKind ty `eqType` result
       Nothing -> False
+
+{- Note [Inferring a source index without reduction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose a module exports w :: Checked (Map f xs), and a caller applies
+consume :: forall ys. Checked ys -> Bool to w. The wanted for ys can
+be solved by choosing Map f xs itself. This does not use a mapper axiom.
+Rewriting the wanted first can demand an equation the caller cannot use.
+
+Only try the ordinary solver unification path for a wanted at nominal
+role with an unfilled metavariable opposite a saturated source family.
+Use the synonym-expanded operands from EQNC1. Zonk before checking
+scope, occurrence and kind. Other equalities follow the normal rewriting
+order. See Note [Prevent unification with type families] in GHC.Tc.Utils.Unify.
+-}
 
 {- Note [Opaque runtime index equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2749,6 +2792,14 @@ finishCanWithIrred reason ev
        ; continueWith $ Left $ IrredCt { ir_ev = ev, ir_reason = reason } }
 
 -----------------------
+-- | Recognize the shape of a saturated source-table application.
+-- Unification additionally verifies its owner. Reflexivity needs only
+-- definitional equality of the complete types.
+saturatedSourceHead :: TyCon -> [Type] -> Bool
+saturatedSourceHead tc args =
+  isTypeFamilyTyCon tc && length args == tyConArity tc
+    && isJust (sourceTableTermOcc (nameOccName (tyConName tc)))
+
 -- | Solve a reflexive equality constraint
 canEqReflexive :: CtEvidence    -- ty ~ ty
                -> EqRel

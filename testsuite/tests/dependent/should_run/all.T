@@ -4,6 +4,12 @@
 test('T11964', normal, multimod_compile, ['T11964', '-v0'])
 closed_eval_dir = '../../../../docs/dependent-haskell/examples/closed-evaluation/'
 open_eval_dir = '../../../../docs/dependent-haskell/examples/open-evaluation/'
+boundary_dir = '../../../../docs/dependent-haskell/examples/boundary-evidence/'
+test('NativeMapWitnessInference',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files([boundary_dir + f for f in ['MapWitness.hs', 'MapRuleReplacement.hs',
+                                              'UseMapWitness.hs', 'check-map-witness.sh']])],
+     run_command, ['bash check-map-witness.sh "{compiler}" "{libdir}"'])
 test('NativeOpenIdentity',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs',
                  'OpenSource.hs', 'RunOpenSource.hs', 'RunOpenSource.stdout', 'check-source.sh']]),

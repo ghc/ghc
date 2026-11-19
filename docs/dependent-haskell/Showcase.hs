@@ -24,6 +24,9 @@
 
 -- | Runnable examples of the completed Dependent Haskell source features.
 -- See BOUNDARY-EVIDENCE.md for the optional plugin, splice, and observation examples.
+-- The companion UseMapWitness.hs runs an ordinary optimized client. It checks
+-- @firstFromProvider = checkedFirst checked@ with the producer's interface
+-- and prints the head inferred through both a Maybe and a list.
 -- In FileOffer.hs, an external search supplies a position for
 -- @Member 8 (OrdinaryOffer.offered 7)@. GHC checks the generated path.
 -- In GHCi, load PackedVecLibrary with the options in the adjacent README.

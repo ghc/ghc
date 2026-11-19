@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, DataKinds, GADTs, NoExperimentalDependentTypes, RankNTypes,
-             ScopedTypeVariables, TypeApplications, TypeOperators #-}
+             ScopedTypeVariables, TypeOperators #-}
 module Main (main) where
 
 import Data.Type.Equality ((:~:)(Refl))
@@ -10,6 +10,10 @@ import MapRuleReplacement (replacement)
 fresh :: NegateAll '[ 'True] :~: '[ 'False]
 fresh = Refl
 #endif
+
+-- | Recover the head at the public index supplied by the producer.
+firstFromProvider :: First (NegateAll '[ 'True])
+firstFromProvider = checkedFirst checked
 
 -- | Use the imported equality to recover the head at the public index.
 checkedFirst :: Checked xs -> First xs
@@ -24,6 +28,11 @@ headValue TrueHead  = True
 readChecked :: forall xs. Checked xs -> Bool
 readChecked witness = headValue (checkedFirst witness)
 
+-- | Read a witness from a list without invoking the caller's fusion rule.
+firstChecked :: [Checked xs] -> Maybe Bool
+firstChecked [] = Nothing
+firstChecked (w : _) = Just (readChecked w)
+
 {-# RULES "replace introduced Bool builder" [~1]
     forall (g :: forall r. (Bool -> r -> r) -> r -> r). build g = replacement #-}
 
@@ -34,4 +43,5 @@ runtimeHead xs = case map not (True : xs) of
   [] -> error "expected the replacement list"
 
 main :: IO ()
-main = print (readChecked @(NegateAll '[ 'True]) checked, runtimeHead [])
+main = print (headValue firstFromProvider, fmap readChecked (Just checked),
+              firstChecked [checked], runtimeHead [])

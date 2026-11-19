@@ -5813,6 +5813,15 @@ The extra dependency on an imported type family comes from Haskell's
 open family instances. [Agda interleaved mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
 and [mixed Haskell declarations](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations).
 
+Agda's `subst` example infers the two implicit indices from the supplied
+equality and the indexed value. Agda's `rewrite` eliminates the equality
+by matching on `refl`. The R16 client similarly infers the public index
+of `checked`. Matching its `Refl` then transports the head from the
+hidden index. The caller's GHC rewrite rules apply to its ordinary
+runtime code. [Agda implicit arguments](https://agda.readthedocs.io/en/stable/language/implicit-arguments.html),
+[rewriting with an equality](https://agda.readthedocs.io/en/stable/language/with-abstraction.html#rewrite)
+and [Haskell client](examples/boundary-evidence/UseMapWitness.hs).
+
 Agda inserts trailing implicit arguments when the expected type requires
 them. R23 uses an expected kind to distinguish two uses of a Haskell
 family. A receiver can ask for the entire polymorphic family, or it can
