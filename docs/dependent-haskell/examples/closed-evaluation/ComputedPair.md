@@ -33,3 +33,16 @@ For a dynamic native compiler, use the configured interpreter way
 and add `-dynamic` to both compilation commands if required. The
 registered test uses the configured Template Haskell way. Its
 mixed-interface object check uses `nm` and `objcopy` on Linux ELF.
+
+The upgrade driver takes the old compiler and library directory, then the
+new compiler and library directory. Use an old build that predates R15
+and R23. The new package directory must supply the matching native
+interpreter and the error recipe. To rebuild the original error module
+inside a private copy of the package directory, give the driver the old
+`ghc-internal` build directory as its fifth argument. The build directory
+must include the boot interfaces.
+
+```sh
+bash docs/dependent-haskell/examples/closed-evaluation/check-readback-upgrade.sh \
+  "$old_ghc" "$old_lib" "$new_ghc" "$new_lib" "$old_ghc_internal_build"
+```

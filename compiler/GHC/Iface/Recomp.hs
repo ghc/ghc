@@ -18,7 +18,9 @@ where
 
 import GHC.Prelude
 import GHC.Data.FastString
-import GHC.Builtin.WiredIn.Types (listTyConName)
+import GHC.Builtin.Modules (gHC_INTERNAL_ERR)
+import GHC.Builtin.WiredIn.Types
+  (boolTyConName, charTyConName, listTyConName, manyDataConName, naturalTyConName, pairTyCon)
 
 import GHC.Driver.Backend
 import GHC.Driver.Env
@@ -38,7 +40,7 @@ import GHC.Iface.Env
 
 import GHC.Core
 import GHC.Core.DataCon (isNullarySrcDataCon)
-import GHC.Core.TyCon (Injectivity(..), isBoxedDataTyCon, isVanillaAlgTyCon, tyConArity, tyConDataCons, isVisibleTyConBinder)
+import GHC.Core.TyCon (Injectivity(..), isBoxedDataTyCon, isVanillaAlgTyCon, tyConArity, tyConDataCons, isVisibleTyConBinder, tyConName)
 import GHC.Tc.Utils.Monad
 import GHC.Hs
 
@@ -65,6 +67,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
+import GHC.Types.SourceFile (HscSource(HsSrcFile))
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
 import GHC.Types.Unique.Map
@@ -563,7 +566,8 @@ checkFlagHash hsc_env iface self_recomp = do
                     reachable_helper_fp, private_case_fp, recursive_case_fp, carried_case_fp,
                     callback_case_fp, enum_case_fp, final_mapper_fp]
         closed_matchability_fp = closedMatchabilityFingerprint base_fp
-        new_fp = caseTreeFingerprint base_fp
+        open_matchability_fp = caseTreeFingerprint base_fp
+        new_fp = readbackRecipeFingerprint open_matchability_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
@@ -572,10 +576,17 @@ checkFlagHash hsc_env iface self_recomp = do
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
        | old_fp `elem` (closed_matchability_fp : archived), couldInferOpenMatchability iface
          -> recheck "Compiler now infers open-family matchability"
-       | old_fp == closed_matchability_fp
-         -> up_to_date logger (text "Module has no open family used as a kind")
        | old_fp `elem` archived, couldInferClosedMatchability iface
          -> recheck "Compiler now infers closed-family matchability"
+       | old_fp `elem` (open_matchability_fp : closed_matchability_fp : archived)
+       , backendGeneratesCode (backend dflags)
+       , mi_hsc_src iface == HsSrcFile
+       , couldExportReadbackRecipe iface
+         -> recheck "Compiler now emits native pair readback recipes"
+       | old_fp == open_matchability_fp
+         -> up_to_date logger (text "Module cannot emit a native pair readback recipe")
+       | old_fp == closed_matchability_fp
+         -> up_to_date logger (text "Module has no open family used as a kind")
        | old_fp == final_mapper_fp
          -> up_to_date logger (text "Module has no closed arrow family")
        | old_fp == enum_case_fp, final_possible
@@ -641,6 +652,49 @@ caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "open-family-m
 
 closedMatchabilityFingerprint :: Fingerprint -> Fingerprint
 closedMatchabilityFingerprint fp = computeFingerprint putNameLiterally (fp, "closed-family-matchability-v1" :: String)
+
+-- | Record that the compiler checked final Core for native readback recipes.
+readbackRecipeFingerprint :: Fingerprint -> Fingerprint
+readbackRecipeFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "pair-readback-recipes-v2" :: String)
+
+-- | Check whether unchanged source can emit a native entry. An old interface
+-- can hide an eligible type behind a synonym. The final Core pass checks
+-- the full type after recompilation.
+couldExportReadbackRecipe :: ModIface -> Bool
+couldExportReadbackRecipe iface =
+    mi_module iface == gHC_INTERNAL_ERR || any candidate (mi_decls iface)
+  where
+    exports = mkNameSet (concatMap availNames (mi_exports iface))
+    local_data = mkNameSet [n | (_, IfaceData{ifName = n}) <- mi_decls iface]
+
+    candidate (_, IfaceId{ifName = n, ifType = ty}) = n `elemNameSet` exports && outer ty
+    candidate _ = False
+
+    outer (IfaceFunTy FTF_T_T _ mult domain result) =
+      unrestricted mult && scalar domain && (scalar result || pair result)
+    outer ty = opaque ty
+
+    unrestricted (IfaceTyConApp tc IA_Nil) = ifaceTyConName tc == manyDataConName
+    unrestricted ty = opaque ty
+
+    scalar ty@(IfaceTyConApp tc IA_Nil) =
+      ifaceTyConName tc `elem` [boolTyConName, charTyConName, naturalTyConName] || opaque ty
+    scalar ty = opaque ty
+
+    pair (IfaceTupleTy BoxedTuple NotPromoted args) = pairArgs args
+    pair (IfaceTyConApp tc args)
+      | ifaceTyConName tc == tyConName pairTyCon = pairArgs args
+    pair _ = False
+
+    pairArgs (IA_Arg a _ (IA_Arg b _ IA_Nil)) = scalar a && scalar b
+    pairArgs _ = False
+
+    opaque (IfaceTyConApp tc _) =
+      let n = ifaceTyConName tc in not (isWiredInName n || n `elemNameSet` local_data)
+    opaque IfaceCastTy{} = True
+    opaque IfaceAppTy{} = True
+    opaque _ = False
 
 -- | An old interface preserves the resolved heads of its declared family
 -- kinds. Include associated families because they are nested in IfaceClass.
@@ -1483,7 +1537,7 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
               else FingerprintWithValue flag_hash Nothing
 
       return (IfaceSelfRecomp
-                { mi_sr_flag_hash = include_detailed_flags (caseTreeFingerprint flag_hash, flags)
+                { mi_sr_flag_hash = include_detailed_flags (readbackRecipeFingerprint (caseTreeFingerprint flag_hash), flags)
                 , mi_sr_hpc_hash = hpc_hash
                 , mi_sr_opt_hash = opt_hash
                 , mi_sr_plugin_hash = plugin_hash
