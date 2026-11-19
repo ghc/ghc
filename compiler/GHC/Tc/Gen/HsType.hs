@@ -91,7 +91,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, isSourceConstructorCase, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField)
+                              sourceCaseKindUse, isSourceConstructorCase, isMonomorphicEnumCaseType, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -128,7 +128,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
-import GHC.Types.Id ( mkLocalId, mkSysLocalM, sourceTableId_maybe )
+import GHC.Types.Id ( mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (mkNameSet, unionNameSet)
@@ -2466,6 +2466,11 @@ tc_app_ty mode rn_ty exp_kind
        ; case executable of
            Just owner -> run loc (\hint -> tcPlanExecutableCase mode ordinary_call hint owner args)
            Nothing
+             | ordinary_call, isNothing staging, any (isJust . bareClosedCallback) args
+             -> do { table <- tcLookupTyCon name
+                   ; checkOpenCallbackInterfaces table args
+                   ; mapM_ checkNominalCallback args
+                   ; tc_app_ty_generic mode rn_ty exp_kind }
              | ordinary_call, any nominalCallback args
              -> do { mapM_ checkNominalCallback args
                    ; tc_app_ty_generic mode rn_ty exp_kind }
@@ -3176,23 +3181,24 @@ tcPlanExecutableCase mode False hint owner = tcPlanOrdinaryCall mode False hint 
 -- See Note [Selecting the closed constructor case route].
 tcClosedCaseExecutableOwner :: RdrName -> Name -> [LHsType GhcRn] -> Maybe Bool -> TcM (Maybe Id)
 tcClosedCaseExecutableOwner rdr name args staging
-  | staging == Just True
-  , isQual rdr || isUnqual rdr
+  | isQual rdr || isUnqual rdr
+  , Just needs_execution <- staging
   = do
       table <- tcLookupTyCon name
-      owner <- if sourceCaseVisibleArity table == Just (length args) ||
-                  any (isJust . bareClosedCallback) args
-                 then sourceTableOwner table
-                 else pure Nothing
+      let expect_eager = lengthIs args 1 && isMonomorphicEnumCaseType (tyConKind table)
+          staged = needs_execution &&
+                   (sourceCaseVisibleArity table == Just (length args) ||
+                    any (isJust . bareClosedCallback) args)
+      owner <- if expect_eager || staged then sourceTableOwner table else pure Nothing
       case owner of
-        Just fun -> do
+        Just fun | staged || sourceTableKeepsExecutable fun -> do
           imported <- isClosedOrdinaryImport rdr (getName fun)
           if imported
             then do
               executable <- tcHasClosedCallExecutable (getName fun)
               pure (fun <$ guard executable)
             else pure Nothing
-        Nothing -> pure Nothing
+        _ -> pure Nothing
   | otherwise = pure Nothing
 
 -- | Recover a bare imported callback without interpreting it as a type.
@@ -3208,6 +3214,21 @@ nominalCallback :: LHsType GhcRn -> Bool
 nominalCallback arg
   | Just (_, _, name) <- bareClosedCallback arg = isSourceFamilyName name
   | otherwise = False
+
+-- | Report an unavailable imported callback at its written operand.
+checkOpenCallbackInterfaces :: TyCon -> [LHsType GhcRn] -> TcM ()
+checkOpenCallbackInterfaces table args
+  | lengthIs visible (length args) = zipWithM_ check visible args
+  | otherwise = pure ()
+  where
+    visible = dropWhile isInvisibleTyConBinder (tyConBinders table)
+    check (Bndr binder AnonTCB) operand
+      | Just (loc, rdr, name) <- bareClosedCallback operand
+      , isVarName name
+      , Just (FTF_T_T, ma, mult, _, _) <- splitFunTy_maybe (varType binder)
+      , ma `tcEqType` unmatchableDataConTy, isManyTy mult
+      = setSrcSpan loc (failWithTc (TcRnNoSourceCallback rdr))
+    check _ _ = pure ()
 
 -- | Verify provenance of a named callback without using its equation.
 checkNominalCallback :: LHsType GhcRn -> TcM ()

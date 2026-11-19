@@ -17,6 +17,7 @@ types that
 {-# LANGUAGE DerivingVia #-}
 
 module GHC.Types.Basic (
+        SourceTableOrigin(..),
         LeftOrRight(..),
         pickLR,
 
@@ -1476,3 +1477,6 @@ convImportLevel NotLevelled = NormalLevel
 convImportLevelSpec :: ImportDeclLevel -> ImportLevel
 convImportLevelSpec ImportDeclQuote = QuoteLevel
 convImportLevelSpec ImportDeclSplice = SpliceLevel
+
+-- | Select the source route for a closed call with available object code.
+data SourceTableOrigin = NominalSourceTable | ExecutableSourceTable

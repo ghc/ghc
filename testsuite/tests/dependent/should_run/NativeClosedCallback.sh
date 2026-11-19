@@ -15,7 +15,7 @@ cp "$src"/NativeClosedCallback{,Lib}.hs .
 cat > Callback.hs <<'HS'
 module Callback (step) where
 step :: Bool -> Bool
-step x = if x then False else True
+step = not
 HS
 mkdir callback replacement
 mv Callback.hs callback/
@@ -37,9 +37,9 @@ grep -Eq '^ *addDependentFile "([^"]*/)?callback/Callback\.o" [[:xdigit:]]{32}' 
 "${ghc[@]}" -icallback -v1 -c Client.hs >warm.log 2>&1
 grep -Fq 'compilation IS NOT required' warm.log
 
-# The rebuilt interface can differ in its own source fingerprint. Compare the
-# ABI, then replace only the object used by the unchanged client.
-sed 's/then False else True/then True else False/' callback/Callback.hs > replacement/Callback.hs
+# Forwarding definitions have no constructor equations in the interface.
+# Change only the executable used by the unchanged client.
+sed 's/^step = not$/step = id/' callback/Callback.hs > replacement/Callback.hs
 (cd replacement && "${ghc[@]}" -c Callback.hs)
 abi() { "${ghc[@]}" --show-iface "$1" | awk '$1 == "ABI" && $2 == "hash:" {print $3}'; }
 original=$(abi callback/Callback.hi)

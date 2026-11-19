@@ -930,10 +930,15 @@ instance Diagnostic TcRnMessage where
     TcRnNoSourceTable name
       -> mkSimpleDecorated $ vcat
            [ text "No checked equations are available for" <+> quotes (ppr name) <+> text "in a type."
-           , text "Match the first argument with one clause per constructor, using variables or wildcards for its fields."
+           , text "Match a constructor-valued argument with one clause per constructor, using variables or wildcards for its fields."
            , text "Build the result from constructors, bound variables, or fully applied functions with checked equations."
-           , text "In a recursive call, pass a field of the first argument directly."
-           , text "If there is a second argument, bind it with a variable and pass it unchanged in recursive calls." ]
+           , text "In a recursive call, pass a field of the matched argument directly."
+           , text "Bind any other arguments with variables and pass them unchanged in recursive calls." ]
+    TcRnNoSourceCallback callback
+      -> mkSimpleDecorated $ vcat
+           [ text "The imported interface supplies no checked equations for the callback" <+>
+             quotes (ppr callback) <> dot
+           , text "An open type-level call needs a checked callback from its defining module." ]
     TcRnOpenTypeEval name definition reason
       -> mkSimpleDecorated $ hang
            (text "Cannot reduce the open call to" <+> quotes (ppr name) <+> text "in a type.")
@@ -2391,6 +2396,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnNoSourceTable {}
       -> ErrorWithoutFlag
+    TcRnNoSourceCallback {}
+      -> ErrorWithoutFlag
     TcRnClosedTypeEval {}
       -> ErrorWithoutFlag
     TcRnOpenTypeEval {}
@@ -3081,6 +3088,8 @@ instance Diagnostic TcRnMessage where
     TcRnTermNameInType {}
       -> noHints
     TcRnNoSourceTable {}
+      -> noHints
+    TcRnNoSourceCallback {}
       -> noHints
     TcRnClosedTypeEval {}
       -> noHints

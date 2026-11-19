@@ -36,6 +36,8 @@ import GHC.Iface.Recomp.Flags
 import GHC.Iface.Env
 
 import GHC.Core
+import GHC.Core.DataCon (isNullarySrcDataCon)
+import GHC.Core.TyCon (isBoxedDataTyCon, isVanillaAlgTyCon, tyConArity, tyConDataCons)
 import GHC.Tc.Utils.Monad
 import GHC.Hs
 
@@ -54,7 +56,8 @@ import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Annotations
 import GHC.Types.Avail
-import GHC.Types.Basic ( ImportLevel(..) )
+import GHC.Types.Basic ( ImportLevel(..), TupleSort(BoxedTuple) )
+import GHC.Types.TyThing (TyThing(ATyCon))
 import GHC.Types.UnresolvedImport
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -551,6 +554,7 @@ checkFlagHash hsc_env iface self_recomp = do
         private_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v6" :: String)
         recursive_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v7" :: String)
         carried_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v8" :: String)
+        callback_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v9" :: String)
         new_fp = caseTreeFingerprint base_fp
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
@@ -558,6 +562,12 @@ checkFlagHash hsc_env iface self_recomp = do
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
        | old_fp == base_fp, any couldHaveSumProjection candidates
          -> recheck "Compiler now checks sum projections"
+       | old_fp `elem` [base_fp, sum_fp, projection_fp, result_fp, helper_fp, pair_builder_fp,
+                        reachable_helper_fp, private_case_fp, recursive_case_fp, carried_case_fp, callback_case_fp]
+       , couldExportEnumCallback iface
+         -> recheck "Compiler now checks ordinary enumeration callbacks"
+       | old_fp == callback_case_fp
+         -> up_to_date logger (text "Module cannot export an enumeration callback")
        | old_fp == carried_case_fp, not (null candidates) || couldExportCallbackCase iface
          -> recheck "Compiler now checks constructor cases with callbacks"
        | old_fp == carried_case_fp
@@ -603,7 +613,7 @@ checkFlagHash hsc_env iface self_recomp = do
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
-caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v9" :: String)
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v10" :: String)
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
 -- See Note [Recompiling constructor case producers].
@@ -615,6 +625,43 @@ exportedCaseDatatypes iface =
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     exported name = name `elemNameSet` exports
+
+-- | Find exported ordinary signatures that can hide an enumeration arrow.
+couldExportEnumCallback :: ModIface -> Bool
+couldExportEnumCallback iface = any candidate (mi_decls iface)
+  where
+    exports = mkNameSet (concatMap availNames (mi_exports iface))
+    exported n = n `elemNameSet` exports
+    declarations = [(n, (bndrs, cons)) | (_, IfaceData{ifName = n, ifBinders = bndrs, ifCons = cons}) <- mi_decls iface]
+    candidate (_, IfaceId{ifName = n, ifType = ty, ifIdDetails = details}) =
+      exported n && case details of
+        IfSourceTableId{} -> False
+        _ -> arrow ty
+    candidate _ = False
+
+    arrow (IfaceFunTy FTF_T_T _ _ domain result) = enum domain && enum result
+    arrow ty = opaque ty
+
+    enum (IfaceTupleTy BoxedTuple NotPromoted IA_Nil) = True
+    enum ty@(IfaceTyConApp tc _) =
+      let n = ifaceTyConName tc in
+        case lookup n declarations of
+          Just ([], IfDataTyCon False cons@(_:_)) ->
+            exported n && all (\dc -> exported (ifConName dc) && null (ifConArgTys dc)) cons
+          Just _ -> False
+          Nothing | Just (ATyCon wired) <- wiredInNameTyThing_maybe n ->
+            isVanillaAlgTyCon wired && isBoxedDataTyCon wired && tyConArity wired == 0 &&
+            case tyConDataCons wired of
+              [] -> False
+              cons -> all isNullarySrcDataCon cons
+          Nothing -> opaque ty
+    enum ty = opaque ty
+
+    opaque (IfaceTyConApp tc _) =
+      let n = ifaceTyConName tc in not (isWiredInName n || n `elem` map fst declarations)
+    opaque IfaceCastTy{} = True
+    opaque IfaceAppTy{} = True
+    opaque _ = False
 
 -- | Check whether a wired list case could take a callback as its first operand.
 -- An interface type synonym can hide an arrow or a list.
@@ -694,6 +741,11 @@ An unexpanded synonym can hide its arrows or its result. Recheck that
 module once. A rigid result variable and a known non-pair datatype
 cannot hide the pair constructor. See Note [A partial pair in a nominal
 operand] in GHC.Tc.Gen.SourceTable.
+
+A module can export a function between two enumerations defined elsewhere.
+For a wired-in datatype, inspect its constructors. For another imported
+datatype or an unexpanded synonym, recheck the producer when its source is
+available. The previous interface alone cannot supply the missing equations.
 -}
 
 

@@ -2082,6 +2082,9 @@ data TcRnMessage where
   -- | A term used in a type has no checked constructor table.
   TcRnNoSourceTable :: !Name -> TcRnMessage
 
+  -- | An interface supplies no checked equations for an open callback.
+  TcRnNoSourceCallback :: !RdrName -> TcRnMessage
+
   -- | GHC could not execute an imported function during type elaboration.
   TcRnClosedTypeEval :: !Name -> !String -> TcRnMessage
   -- | The second name identifies a definition demanded by an open call.

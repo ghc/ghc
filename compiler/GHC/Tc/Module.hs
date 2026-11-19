@@ -763,13 +763,18 @@ installSourceTables tables = do
               ordinary = case idDetails owner of
                            SourceTableId {} -> setIdDetails owner VanillaId
                            _ -> owner
-          in (ordinary, table)
+              origin = case idDetails owner of
+                         SourceTableId _ _ prior -> prior
+                         _ -> case idDetails fun of
+                                SourceTableId _ _ proposed -> proposed
+                                _ -> NominalSourceTable
+          in (ordinary, table, origin)
         prepared = map prepare tables
-        candidates = [setIdDetails fun (SourceTableId (idName fun) table)
-                     | (fun, table) <- prepared]
+        candidates = [setIdDetails fun (SourceTableId (idName fun) table origin)
+                     | (fun, table, origin) <- prepared]
     -- Make all checked owners available while recovering the dependency closure.
     tcExtendGlobalValEnv candidates $ do
-      dependencies <- mapM (sourceTableDependencies . snd) prepared
+      dependencies <- mapM (\(_, table, _) -> sourceTableDependencies table) prepared
       -- Dependency lookup can load interfaces that contain rules.
       rewriting <- goptM Opt_EnableRewriteRules
       visible <- if rewriting then Just <$> visibleSourceMethodRules env else pure Nothing
@@ -777,7 +782,7 @@ installSourceTables tables = do
       let ruled = sourceRuleOwners (tcg_rules env)
           changed fun = idName fun `elemNameSet` ruled
                         || maybe False (`hasSourceMethodRule` fun) visible
-      ids <- forM (zip prepared dependencies) $ \((fun, table), callees) -> do
+      ids <- forM (zip prepared dependencies) $ \((fun, table, origin), callees) -> do
         let name = idName fun
             reject diagnostic = do
               when (tyConName table `elemNameSet` used) $
@@ -792,7 +797,7 @@ installSourceTables tables = do
               when (nameIsLocalOrFrom (tcg_semantic_mod env) (idName callee)) $
                 keepAlive (idName callee)
             pure $ case idDetails fun of
-              VanillaId -> setIdDetails fun (SourceTableId name table)
+              VanillaId -> setIdDetails fun (SourceTableId name table origin)
               _ -> fun
       tcExtendGlobalValEnv ids $
         if null new_tables then getGblEnv else fst <$> addTyConsToGblEnv new_tables

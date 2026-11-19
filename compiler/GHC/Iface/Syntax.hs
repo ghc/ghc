@@ -557,7 +557,7 @@ data IfGuidance
 
 data IfaceIdDetails
   = IfVanillaId
-  | IfSourceTableId IfExtName
+  | IfSourceTableId IfExtName SourceTableOrigin
   | IfWorkerLikeId [CbvMark]
   | IfRecSelId
     { ifRecSelIdParent     :: Either IfaceTyCon IfaceDecl
@@ -1956,7 +1956,10 @@ instance Outputable IfaceConAlt where
 ------------------
 instance Outputable IfaceIdDetails where
   ppr IfVanillaId       = Outputable.empty
-  ppr (IfSourceTableId table) = text "SourceTable" <+> ppr table
+  ppr (IfSourceTableId table origin) = text label <+> ppr table
+    where label = case origin of
+            NominalSourceTable -> "SourceTable"
+            ExecutableSourceTable -> "ExecutableSourceTable"
   ppr (IfWorkerLikeId dmd) = text "StrWork" <> parens (ppr dmd)
   ppr (IfRecSelId tc _c b _fl) = text "RecSel" <+> ppr tc
                             <+> if b
@@ -2085,7 +2088,7 @@ freeNamesIfIdDetails (IfRecSelId tc first_con _ fl) =
   unitFN first_con &&&
   unitFN (flSelector fl)
 freeNamesIfIdDetails IfVanillaId         = emptyNameSet
-freeNamesIfIdDetails (IfSourceTableId table) = unitFN table
+freeNamesIfIdDetails (IfSourceTableId table _) = unitFN table
 freeNamesIfIdDetails (IfWorkerLikeId {}) = emptyNameSet
 freeNamesIfIdDetails IfDFunId            = emptyNameSet
 freeNamesIfIdDetails (IfSourceDFunId methods literal) =
@@ -2834,7 +2837,8 @@ instance Binary IfaceIdDetails where
                                        ; put_ bh d }
     put_ bh (IfWorkerLikeId dmds) = putByte bh 2 >> put_ bh dmds
     put_ bh IfDFunId              = putByte bh 3
-    put_ bh (IfSourceTableId table) = putByte bh 4 >> put_ bh table
+    put_ bh (IfSourceTableId table NominalSourceTable) = putByte bh 4 >> put_ bh table
+    put_ bh (IfSourceTableId table ExecutableSourceTable) = putByte bh 7 >> put_ bh table
     put_ bh (IfSourceDFunId methods Nothing) = putByte bh 5 >> put_ bh methods
     put_ bh (IfSourceDFunId methods (Just literal)) =
       putByte bh 6 >> put_ bh methods >> put_ bh literal
@@ -2850,9 +2854,10 @@ instance Binary IfaceIdDetails where
             2 -> do { dmds <- get bh
                     ; return (IfWorkerLikeId dmds) }
             3 -> return IfDFunId
-            4 -> IfSourceTableId <$> get bh
+            4 -> flip IfSourceTableId NominalSourceTable <$> get bh
             5 -> IfSourceDFunId <$> get bh <*> pure Nothing
             6 -> IfSourceDFunId <$> get bh <*> (Just <$> get bh)
+            7 -> flip IfSourceTableId ExecutableSourceTable <$> get bh
             _ -> panic "Binary IfaceIdDetails: unknown tag"
 
 instance Binary IfaceInfoItem where
@@ -3289,7 +3294,7 @@ instance NFData IfaceBang where
 instance NFData IfaceIdDetails where
   rnf = \case
     IfVanillaId -> ()
-    IfSourceTableId table -> rnf table
+    IfSourceTableId table origin -> rnf table `seq` origin `seq` ()
     IfWorkerLikeId dmds -> rnf dmds `seq` ()
     IfRecSelId (Left tycon) b c d -> rnf tycon `seq` rnf b `seq` rnf c `seq` rnf d
     IfRecSelId (Right decl) b c d -> rnf decl `seq` rnf b `seq` rnf c `seq` rnf d

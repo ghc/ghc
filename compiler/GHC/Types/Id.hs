@@ -47,7 +47,7 @@ module GHC.Types.Id (
         idName, idType, idMult, idScaledType, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
         recordSelectorTyCon_maybe,
-        sourceTableId_maybe, sourceMethodAliases, sourceMethodTarget_maybe,
+        sourceTableId_maybe, sourceTableKeepsExecutable, sourceMethodAliases, sourceMethodTarget_maybe,
         setSourceMethodIds, setSourceLiteralCons, sourceLiteralCons_maybe, sourceDFunDetails_maybe,
 
         -- ** Modifying an Id
@@ -214,7 +214,7 @@ idName    = Var.varName
 -- See Note [Source table Ids] in GHC.Tc.Gen.SourceTable.
 sourceTableId_maybe :: Id -> Maybe TyCon
 sourceTableId_maybe fun
-  | SourceTableId owner table <- idDetails fun
+  | SourceTableId owner table _ <- idDetails fun
   , idName fun == owner
   , Just mod <- nameModule_maybe owner
   , nameModule_maybe (tyConName table) == Just mod
@@ -222,6 +222,12 @@ sourceTableId_maybe fun
   , Just _ <- closedFamilyTyConCoAxiom_maybe table
   = Just table
   | otherwise = Nothing
+
+-- | Test the origin of an already validated source table owner.
+sourceTableKeepsExecutable :: Id -> Bool
+sourceTableKeepsExecutable fun = case idDetails fun of
+  SourceTableId _ _ ExecutableSourceTable -> True
+  _ -> False
 
 -- | Record methods whose checked bodies select a certified source function.
 -- See Note [Checked dictionary methods].

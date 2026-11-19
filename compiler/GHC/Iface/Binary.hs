@@ -53,7 +53,8 @@ import GHC.Platform.Profile
 import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Iface.Ext.Fields (readFieldWith, writeFieldWith, deleteField)
-import GHC.Iface.Syntax (IfaceDecl(..))
+import GHC.Iface.Syntax (IfaceDecl(..), IfaceIdDetails(..))
+import GHC.Types.Basic (SourceTableOrigin(ExecutableSourceTable))
 import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)
 
 import GHC.Data.FastMutInt
@@ -156,7 +157,8 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
-    errorOnMismatch "mismatched interface file versions" our_ver check_ver
+    unless (check_ver == enumCallbackIfaceVersion) $
+      errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
     check_tag <- get bh
     let tag = profileBuildTag profile
@@ -272,7 +274,9 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
     put_ bh (binaryInterfaceMagic platform)
 
     -- The version, profile tag, and source hash go next
-    put_ bh (show hiVersion)
+    let version | any hasEnumCallback (mi_decls mod_iface) = enumCallbackIfaceVersion
+                | otherwise = show hiVersion
+    put_ bh version
     let tag = profileBuildTag profile
     put_  bh tag
 
@@ -280,6 +284,17 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
 
     -- And send the result to the file
     writeBinMem bh hi_path
+
+-- Executable-origin declarations use a new IdDetails tag. Keep ordinary
+-- interfaces readable by the older compiler. Its version check rejects
+-- these producer interfaces before it reaches the new tag.
+enumCallbackIfaceVersion :: String
+enumCallbackIfaceVersion = show hiVersion ++ "-enum-callbacks-v1"
+
+-- | Test whether the declaration requires the executable-source tag.
+hasEnumCallback :: (a, IfaceDecl) -> Bool
+hasEnumCallback (_, IfaceId{ifIdDetails = IfSourceTableId _ ExecutableSourceTable}) = True
+hasEnumCallback _ = False
 
 -- | Puts the 'ModIface' to the 'WriteBinHandle'.
 --

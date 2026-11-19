@@ -1,7 +1,7 @@
 -- | Closed type families for checked functions that match one constructor.
 module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, sourcePairBuilderField, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
-                              sourceTableFamilyAppUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, groundFirstHead,
+                              sourceTableFamilyAppUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, isMonomorphicEnumCaseType, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
@@ -56,8 +56,9 @@ import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobal
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
-import GHC.Types.Basic (Origin(..), LeftOrRight(..))
+import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..))
 import GHC.Types.Error (errorsFound)
+import GHC.Types.Id.Info (IdDetails(SourceTableId))
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
@@ -84,7 +85,7 @@ import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
-import GHC.Types.Var (Id, CoVar, VarBndr(..), isId, mkTyVar, varName)
+import GHC.Types.Var (Id, CoVar, VarBndr(..), isId, mkTyVar, setIdDetails, varName)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (lengthAtLeast, lengthIs)
 import GHC.Utils.Monad (allM, anyM)
@@ -673,6 +674,13 @@ no checked body and therefore supplies no certificate. Keep a private owner
 alive when a type uses its table. Imported type aliases need this owner to
 check its rewrite dependencies.
 
+An ordinary function between two enumerations can supply equations for an
+open callback. A closed call to the same function can already execute its
+object code. Mark the certificate ExecutableSourceTable so that a direct
+closed call still uses the executable when it is available. An interface
+with this mark needs a new file version. An older compiler can read the
+original nominal certificates but cannot choose how to use the new ones.
+
 Constructor workers have no rewrite rules. See getRules in GHC.Core.Rules.
 Exclude a source rule that can rewrite the owner or a checked callee.
 An import cycle through an hs-boot
@@ -805,13 +813,16 @@ sourceCaseTables binds = do
   rdr_env <- getGlobalRdrEnv
   let exported = mkNameSet (concatMap availNames (tcg_exports env))
       ruled = sourceRuleOwners (tcg_rules env)
+      enum_enabled = not char_tables
+      imported = ordinaryImport rdr_env
+      eligible_case = eligibleCase env exported enum_enabled imported
       eligible owner =
         idName owner `elemNameSet` exported &&
         not (idName owner `elemNameSet` ruled) &&
         ((char_tables && varType owner `eqType` charArrow) ||
          not (isNothing (pairCaseType (varType owner))) ||
          not (isNothing (pairBuilderType (varType owner))) ||
-         eligibleCase env exported owner)
+         eligible_case owner)
       owners = [ (bind, owner) | bind <- binds
                , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
       candidates = filter (eligible . snd) owners
@@ -826,7 +837,7 @@ sourceCaseTables binds = do
       let localCall v = isId v && nameModule_maybe (idName v) == Just (tcg_semantic_mod env)
           references = map idName . exprSomeFreeVarsList localCall
           reachable = concatMap (references . snd)
-                        (filter (eligibleCase env exported . fst) root_cores)
+                        (filter (eligible_case . fst) root_cores)
           local_owners = mkNameEnv [(idName owner, (bind, owner)) | (bind, owner) <- owners]
           helperCore name
             | Just (bind, owner) <- lookupNameEnv local_owners name
@@ -837,13 +848,12 @@ sourceCaseTables binds = do
             , Just _ <- constructorHelperType (varType owner)
             = fmap (owner,) <$> bindingCore bind owner
             | otherwise = pure Nothing
-          imported = ordinaryImport rdr_env
           public = publicCaseType env exported imported
       helper_cores <- collectHelpers helperCore references emptyNameSet reachable
       helpers <- foldM (buildHelper env imported public) []
                    (stronglyConnCompFromEdgedVerticesUniq helper_cores)
       certified <- fmap catMaybes $ forM root_cores $ \(owner, rhs) ->
-        certifyBinding env exported rdr_env helpers owner rhs
+        certifyBinding env exported enum_enabled rdr_env helpers owner rhs
       let (roots, fields) = unzip certified
           helper_tables = mkNameEnv [(tyConName table, table) | (_, table) <- helpers]
           used = helperClosure helper_tables emptyNameSet (calleeNames roots)
@@ -888,12 +898,18 @@ sourceCaseTables binds = do
           in helperClosure tables (extendNameSet seen name) (children ++ rest)
       | otherwise = helperClosure tables seen rest
 
-    eligibleCase env exported owner
+    eligibleCase env exported enum_enabled imported owner
+      | isMonomorphicEnumCaseType (varType owner)
+      = enum_enabled && maybe False enumVisible (caseArrow (varType owner))
       | Just (ConstructorCaseType _ tc _ _ position _) <- constructorCaseType (varType owner)
       = (position == 1 && tc == listTyCon) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
          publicCaseType env exported (const False) tc)
       | otherwise = False
+      where
+        enumVisible (input, output) =
+          all (maybe False (publicCaseType env exported imported . fst) . caseDatatype)
+              [input, output]
 
     publicCaseType env exported imported tc =
       all available (tyConName tc : map dataConName (tyConDataCons tc))
@@ -915,7 +931,7 @@ sourceCaseTables binds = do
             Just rhs
         _ -> Nothing
 
-    certifyBinding env exported rdr_env helpers owner rhs
+    certifyBinding env exported enum_enabled rdr_env helpers owner rhs
       | Just build <- checkedPairBuilder owner rhs = do
           (table, field) <- build
           pure (Just ((owner, table), Just field))
@@ -924,12 +940,17 @@ sourceCaseTables binds = do
             Core.Var target | varType owner `eqType` charArrow -> forwarding env owner target
             _ | Just projection <- checkedPairCase owner rhs ->
                   Just . (owner,) <$> publishPairCase owner projection
-              | eligibleCase env exported owner
-              , let imported = ordinaryImport rdr_env
+              | let imported = ordinaryImport rdr_env
+              , eligibleCase env exported enum_enabled imported owner
               , Just (signature, rows) <- checkedConstructorCase
                   (publicCaseType env exported imported)
-                  (lookupHelper env imported helpers) owner rhs ->
-                  Just . (owner,) <$> publishConstructorCase owner signature rows
+                  (lookupHelper env imported helpers) owner rhs -> do
+                  table <- publishConstructorCase owner signature rows
+                  let certified
+                        | isMonomorphicEnumCaseType (varType owner) = setIdDetails owner
+                            (SourceTableId (idName owner) table ExecutableSourceTable)
+                        | otherwise = owner
+                  pure (Just (certified, table))
               | Right certificate <- certify owner rhs
               , certOwner certificate == idName owner ->
                   publish owner (certRows certificate) id
@@ -1060,7 +1081,8 @@ sourceCaseVisibleArity table
             _ -> Nothing
         Nothing -> case constructorCaseType kind of
           Just (ConstructorCaseType telescope tc _ domains position _)
-            | let visible = length domains
+            | not (isMonomorphicEnumCaseType kind)
+            , let visible = length domains
             , Just roots <- traverse (projectionBranch telescope tc visible position) branches
             , mkUniqSet roots == mkUniqSet (tyConDataCons tc) -> Just visible
           _ -> Nothing
@@ -1166,7 +1188,7 @@ constructorCaseType tau = do
       _ -> Nothing
     (tc, args) <- caseDatatype domain
     parameters <- catMaybes <$> traverse domainParameter args
-    guard (not (null parameters) &&
+    guard ((isMonomorphicEnumCaseType tau || not (null parameters)) &&
            sizeUniqSet (mkUniqSet parameters) == length parameters &&
            tyCoVarsOfTypes domains == mkUniqSet quantified &&
            caseKind kinds result && all (caseKind kinds) carried)
@@ -1195,6 +1217,20 @@ splitCaseOperand :: Int -> [a] -> Maybe ([a], a, [a])
 splitCaseOperand i xs = case splitAt i xs of
     (before, x : after) -> Just (before, x, after)
     _ -> Nothing
+
+-- | A non-polymorphic arrow between ordinary nullary enumerations.
+isMonomorphicEnumCaseType :: Type -> Bool
+isMonomorphicEnumCaseType ty = case caseArrow ty of
+  Just (domain, result) -> all enumeration [domain, result]
+  Nothing -> False
+  where
+    enumeration t = case caseDatatype t of
+      Just (tc, []) -> all nullary (tyConDataCons tc)
+      _ -> False
+    nullary dc =
+      case openDataConFieldTypes dc [] of
+        Just [] -> True
+        _ -> False
 
 -- | Read a saturated ordinary boxed datatype with constructors.
 caseDatatype :: Type -> Maybe (TyCon, [Type])

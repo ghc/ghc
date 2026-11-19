@@ -142,7 +142,7 @@ data IdDetails
 
   -- | The checked source definition and its closed family of equations.
   -- See Note [Source table Ids] in GHC.Tc.Gen.SourceTable.
-  | SourceTableId Name TyCon
+  | SourceTableId Name TyCon SourceTableOrigin
 
   -- | The 'Id' for a record selector
   | RecSelId
@@ -453,7 +453,10 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId               = panic "pprIdDetails"
-   pp (SourceTableId _ table) = text "SourceTable" <+> ppr table
+   pp (SourceTableId _ table origin) = text label <+> ppr table
+     where label = case origin of
+             NominalSourceTable -> "SourceTable"
+             ExecutableSourceTable -> "ExecutableSourceTable"
    pp (WorkerLikeId dmds)     = text "StrictWorker" <> parens (ppr dmds)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"

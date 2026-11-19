@@ -542,6 +542,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalTupleSection"                       = 59155
   GhcDiagnosticCode "TcRnTermNameInType"                            = 37479
   GhcDiagnosticCode "TcRnNoSourceTable"                             = 68947
+  GhcDiagnosticCode "TcRnNoSourceCallback"                          = 64152
   GhcDiagnosticCode "TcRnClosedTypeEval"                            = 70565
   GhcDiagnosticCode "TcRnOpenTypeEval"                              = 70566
   GhcDiagnosticCode "TcRnUnexpectedKindVar"                         = 12875
