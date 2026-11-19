@@ -2,7 +2,7 @@
 {-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 
-module LocalOpen (Selected, keepFirst, LastOf, lastOf, LazyFirst, lazyFirst) where
+module LocalOpen (Selected, keepFirst, LastOf, lastOf, LazyFirst, lazyFirst, Routed, route) where
 
 import Data.Kind (Type)
 
@@ -37,3 +37,22 @@ lazyFirst x y = select x (loopAgain y)
 -- | Diverge if a caller demands this argument.
 loopAgain :: a -> a
 loopAgain x = loopAgain x
+
+-- | Select a type using a constructor from this module.
+type Routed :: Type -> Type -> Type
+type Routed a b = LocalOpen.route a b
+
+-- | Use the same routing function on ordinary values.
+route :: a -> a -> a
+route x y = follow Second x y
+
+-- | Select which argument to return.
+data Route = First | Second
+
+-- | An ordinary result synonym used by the helper's signature.
+type ResultOf a = a
+
+-- | Return the field selected by the route.
+follow :: Route -> a -> a -> ResultOf a
+follow First x _ = x
+follow Second _ y = y

@@ -91,7 +91,32 @@ SOURCE
 expect_rejection NativeLocalOpenHelperType 5 '\[GHC-70566\]' 'dependency cycle through helper and Result'
 sed 's/^helper :: a -> Result a$/helper :: a -> Payload a/' NativeLocalOpenHelperType.hs >changed
 mv changed NativeLocalOpenHelperType.hs
-expect_rejection NativeLocalOpenHelperType 5 '\[GHC-70566\]' 'same-group declaration Payload'
+"${ghc[@]}" -c NativeLocalOpenHelperType.hs
+sed 's/^type Payload a = a$/type Payload a = Result a/' NativeLocalOpenHelperType.hs >changed
+mv changed NativeLocalOpenHelperType.hs
+expect_rejection NativeLocalOpenHelperType 5 '\[GHC-70566\]' 'dependency cycle through helper and Result'
+
+cat > NativeLocalOpenChain.hs <<'SOURCE'
+{-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures, TypeOperators #-}
+module NativeLocalOpenChain where
+import Data.Kind (Type)
+import Data.Type.Equality
+type Final :: Type -> Type
+type Final a = NativeLocalOpenChain.outer a
+outer :: a -> Middle a
+outer x = x
+type Middle :: Type -> Type
+type Middle a = NativeLocalOpenChain.inner a
+inner :: a -> a
+inner x = via End x
+data Stamp = End | More Side
+data Side = Side Stamp
+via :: Stamp -> a -> a
+via _ x = x
+proof :: Final Char :~: Char
+proof = Refl
+SOURCE
+"${ghc[@]}" -c NativeLocalOpenChain.hs
 
 cat > NativeLocalOpenStrict.hs <<'SOURCE'
 {-# LANGUAGE BangPatterns, ExperimentalDependentTypes, StandaloneKindSignatures #-}

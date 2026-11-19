@@ -1916,7 +1916,16 @@ recursive term bindings. A type dependency on an unavailable declaration
 still prevents early checking. Observation uses the existing reduction
 limit when it demands a divergent member. Check
 selected signatures for dependencies on declarations that have not
-been checked. Keep INLINE pragmas with their bindings. Split a shared
+been checked. If a signature or RHS needs a local datatype or synonym,
+include its whole renamed TyClGroup and lexical prerequisites. A reference
+to a constructor or field selects its parent group. group_ext omits term
+names: inspect the declarations and standalone kind signatures before
+moving them ahead of the value group. A dependency back to the requested
+function is a mixed cycle. If a type needs a different local function,
+stage the ready functions first, then retry the remaining calls with their
+checked definitions in scope. Each pass removes at least one demand.
+See Note [Prepare TyClGroup FVs] in GHC.Rename.Module.
+Keep INLINE pragmas with their bindings. Split a shared
 signature between the groups at its original location. A same-group instance or
 default can affect solver choices without a reference in the producer.
 Leave those groups outside this first split. The ordinary late source
@@ -1949,21 +1958,30 @@ tcLocalOpenGroup demands group@HsGroup
   | all (null . group_instds) tycls
   , all no_deriving (tyClGroupTyClDecls tycls)
   = do
-      selected <- foldM closeDemand emptyNameSet demands
+      let (selected, ready, blocked) = foldl' tryDemand (emptyNameSet, [], []) demands
+      case (ready, reverse blocked) of
+        ([], (demand, reason) : _) -> rejectLocalOpen [demand] reason
+        _ -> pure ()
       let (early_binds, rest_binds) = partition (any (selectedBind selected) . snd) binds
           (early_sigs, rest_sigs) = splitSignatures selected sigs
-          early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs) }
-          rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs) }
+          (early_tys, rest_tys) = partition (any ((`elemNameSet` selected) . tcdName . unLoc)
+                                                 . group_tyclds) tycls
+          early = emptyRnGroup { hs_valds = XValBindsLR (HsVBG early_binds early_sigs)
+                               , hs_tyclds = early_tys }
+          rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs), hs_tyclds = rest_tys }
       (envs@(early_env, _), wanted) <- captureTopConstraints (tcTopSrcDeclGroup early)
       restoreEnvs envs $ do
         evs <- checkNoErrs (simplifyTop wanted)
-        definitions <- localOpenDefinitions demands
+        definitions <- localOpenDefinitions (reverse ready)
                          (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
-        addTopEvBinds evs $ withLocalOpenDefinitions definitions (tcTopSrcTables rest)
+        addTopEvBinds evs $ withLocalOpenDefinitions definitions
+          (tcTopSrcDecls (map fst (reverse blocked)) rest)
   where
     group_names = mkNameSet (hsGroupBinders group)
     value_names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds group))
-    types = mkNameEnv [(tcdName (unLoc decl), decl) | decl <- tyClGroupTyClDecls tycls]
+    types = mkNameEnv [(binder, (leader, tg)) | tg <- tycls, first : _ <- [group_tyclds tg]
+                                             , let leader = tcdName (unLoc first)
+                                             , binder <- hsTyClForeignBinders [tg] []]
     graph = mkNameEnv
       [ (owner, (bind, fvs, group_edge))
       | (_, scc_binds) <- binds
@@ -1979,40 +1997,58 @@ tcLocalOpenGroup demands group@HsGroup
     addSignature (L _ sig) env =
       foldr (\owner acc -> extendNameEnv_C (++) acc owner [sig]) env (signatureOwners sig)
 
-    closeDemand selected demand@(name, _) =
-      case closeLocalNames (dependencies name) selected [name] of
-        Right result -> pure result
-        Left reason -> rejectLocalOpen [demand] reason
+    tryDemand (selected, ready, blocked) demand@(name, _) =
+      case visit name selected name of
+        Right result -> (result, demand : ready, blocked)
+        Left reason -> (selected, ready, (demand, reason) : blocked)
 
-    dependencies root name = case lookupNameEnv graph name of
-      Just (bind, fvs, members)
-        | hasSplice bind -> Left ("A pending splice prevents observing " ++ getOccString name ++ ".")
-        | otherwise -> do
-            mapM_ (checkSignature root name) (fromMaybe [] (lookupNameEnv signatures name))
-            case nameSetElemsStable ((fvs `intersectNameSet` group_names) `minusNameSet` value_names) of
-              dep : _ -> Left (typeDependency root name dep)
-              [] -> Right (members `unionNameSet` (fvs `intersectNameSet` value_names))
-      _ -> Left ("The local dependency " ++ getOccString name
-                 ++ " is not an ordinary function binding.")
-    checkSignature root name sig = case sig of
+    visit root selected name
+      | name `elemNameSet` selected = Right selected
+      | otherwise = case lookupNameEnv graph name of
+          Just (bind, fvs, members)
+            | hasSplice bind -> Left ("A pending splice prevents observing " ++ getOccString name ++ ".")
+            | otherwise -> do
+                sig_deps <- mapM (signatureDeps name) (fromMaybe [] (lookupNameEnv signatures name))
+                let rhs_deps = (fvs `intersectNameSet` group_names) `minusNameSet` value_names
+                    required = unionNameSets (rhs_deps : sig_deps)
+                    values = members `unionNameSet` (fvs `intersectNameSet` value_names)
+                checked <- closeLocalNames (typeDeps root name) (extendNameSet selected name)
+                                           (nameSetElemsStable required)
+                foldM (visit root) checked (nameSetElemsStable values)
+          _ -> Left ("The local dependency " ++ getOccString name
+                     ++ " is not an ordinary function binding.")
+    signatureDeps name sig = case sig of
       TypeSig _ [] _ tau
         | not (isCompleteHsSig tau) ->
             Left ("The signature of " ++ getOccString name ++ " contains a wildcard.")
         | hasSplice tau ->
             Left ("The signature of " ++ getOccString name ++ " contains a splice.")
-        | Just dep <- firstLocalUse group_names tau -> Left (typeDependency root name dep)
-        | otherwise -> Right ()
-      InlineSig{} -> Right ()
+        | dep : _ <- localUses value_names tau ->
+            Left ("The signature of " ++ getOccString name ++ " requires the local function "
+                  ++ getOccString dep ++ " before it can be observed.")
+        | otherwise -> Right (mkNameSet (localUses group_names tau))
+      InlineSig{} -> Right emptyNameSet
       _ -> Left ("The local dependency " ++ getOccString name
                  ++ " has a signature or pragma that cannot be checked early.")
 
-    typeDependency root name dep
-      | Just decl <- lookupNameEnv types dep, usesNames (unitNameSet root) decl =
-          "This call forms a type dependency cycle through " ++ getOccString name
-          ++ " and " ++ getOccString dep ++ "."
-      | otherwise =
-          "The local dependency " ++ getOccString name
-          ++ " refers to the same-group declaration " ++ getOccString dep ++ "."
+    typeDeps root owner dep = case lookupNameEnv types dep of
+      Just (leader, tg)
+        | dep /= leader -> Right (unitNameSet leader)
+        | let decls = (group_tyclds tg, group_kisigs tg)
+        , term : _ <- localUses value_names decls ->
+            if term == root
+            then Left ("This call forms a type dependency cycle through " ++ getOccString owner
+                       ++ " and " ++ getOccString dep ++ ".")
+            else Left ("The declaration of " ++ getOccString dep ++ " requires the local function "
+                       ++ getOccString term ++ " before it can be observed.")
+        | all (ordinaryType . unLoc) (group_tyclds tg)
+        , not (hasSplice (group_tyclds tg, group_kisigs tg)) -> Right (group_ext tg)
+      _ -> Left ("The local dependency " ++ getOccString owner
+                 ++ " refers to the same-group declaration " ++ getOccString dep
+                 ++ ", which cannot be checked early.")
+    ordinaryType SynDecl{} = True
+    ordinaryType DataDecl{} = True
+    ordinaryType _ = False
 
     selectedBind names (L _ FunBind{fun_id = L _ b}) = b `elemNameSet` names
     selectedBind _ _ = False
@@ -2136,13 +2172,11 @@ withLocalOpenDefinitions (definitions, owners) check = do
     pure (checked_env { tcg_local_open_defs = old_defs
                       , tcg_local_open_owners = old_owners }, checked_lcl)
 
-usesNames :: Data a => NameSet -> a -> Bool
-usesNames names = isJust . firstLocalUse names
-
-firstLocalUse :: Data a => NameSet -> a -> Maybe Name
-firstLocalUse names node
-  | Just name <- cast node = if name `elemNameSet` names then Just name else Nothing
-  | otherwise = listToMaybe (catMaybes (gmapQ (firstLocalUse names) node))
+-- | Find resolved local names in a renamed declaration or signature.
+localUses :: Data a => NameSet -> a -> [Name]
+localUses names node
+  | Just name <- cast node = [name | name `elemNameSet` names]
+  | otherwise = concat (gmapQ (localUses names) node)
 
 hasSplice :: Data a => a -> Bool
 hasSplice node =

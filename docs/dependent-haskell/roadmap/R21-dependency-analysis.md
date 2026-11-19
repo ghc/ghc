@@ -102,6 +102,27 @@ the other function therefore fails if its body is read and succeeds
 if the argument containing that call is ignored.
 [Inferred group with a source rule](../../../testsuite/tests/dependent/should_run/NativeLocalOpenSibling.hs).
 
+## M134. Local type and value dependencies
+
+A function used in a type can use constructors and type synonyms from the
+same module. In the source example, `route` passes the constructor
+`Second` to a helper. The helper's signature mentions the local datatype
+`Route` and the local synonym `ResultOf`. The renamer has already put each
+type declaration with its standalone kind signature, role annotations,
+and mutually recursive peers. The scheduler moves the required groups
+into scope before checking the helper and observing `route`.
+[Local routing example](../examples/open-evaluation/LocalOpen.hs).
+
+Sometimes a prerequisite type itself calls another local function.
+For example, `type Final a = outer a`, `outer :: a -> Middle a`,
+and `type Middle a = inner a` require two passes. First GHC checks
+`inner`. With its definition available, GHC can check `Middle`, then
+`outer`, then `Final`. The declarations can appear in reverse order.
+If a helper's result synonym refers back to the consumer itself, GHC
+reports the type dependency cycle at the original call. Local instances
+and nonempty deriving clauses still require more declaration analysis.
+[Acyclic and cyclic source checks](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
 ## Closed calls
 
 An ordinary qualified call on a known closed literal still requires an
