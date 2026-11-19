@@ -54,6 +54,7 @@ import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified NativeMultiPackage as Packages
+import Numeric.Natural (Natural)
 import qualified OpenSource
 import qualified OpaqueCallClient as Opaque
 import qualified OrdinaryVecClient as Ordinary
@@ -833,6 +834,13 @@ main = do
         (TypeNats.natVal (Proxy @(Prelude.gcd 18 24)))
     observe "first and second projections from a pair of unknown types"
         (OpenSource.tupleFirst False (42 :: Int), OpenSource.tupleSecond False (42 :: Int))
+    observe "quotient and remainder returned during type checking"
+        (reflectPair (Proxy @(Prelude.quotRem 17 5)))
+
+-- | Read the two natural-number indices inferred from a computed pair.
+reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)
+            => Proxy '(q, r) -> (Natural, Natural)
+reflectPair _ = (TypeNats.natVal (Proxy @q), TypeNats.natVal (Proxy @r))
 
 -- | The producer exports only an ordinary Haskell function.
 closedLength :: Proxy (Length.length [1, 2, 3])

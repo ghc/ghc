@@ -5207,3 +5207,16 @@ function come from another module. [Serokell's declaration analysis](https://ser
 [R21](https://ghc.serokell.io/dh#dependency-analysis),
 [type-functions draft](https://github.com/ghc-proposals/ghc-proposals/pull/509)
 and [the fork's two-order source check](roadmap/R21-dependency-analysis.md).
+
+### Returning a pair from a closed call
+
+The type-functions draft lists a pair of promotable fields among its
+supported types. It also specifies that the compiler force the result
+before promoting it. In this fork, an ordinary typed Core case observes
+the result once and uses its two field binders. Each leaf uses the
+existing scalar or list representation. A client-defined method for
+showing the whole pair would allow the client to change its type-level
+value. The compiler therefore uses only the trusted leaf dictionaries.
+[Supported results and evaluation order in draft #509](https://github.com/Haskell-mouse/ghc-proposals/blob/f0b6af30a6e15545606195eb72c2981ea91aa326/proposals/0000-type-functions.rst#L109-L142),
+[GHC's promoted pair constructors](../../compiler/GHC/Builtin/WiredIn/Types.hs)
+and [the interpreter check](roadmap/R15-closed-term-evaluator.md#returning-a-pair).

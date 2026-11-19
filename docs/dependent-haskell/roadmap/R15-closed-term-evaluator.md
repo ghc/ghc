@@ -249,8 +249,23 @@ GHC checks arity, kinds, staging and instances before executing any
 operand. It reports a conflicting kind at the first inconsistent operand.
 It then normalizes the operands in source order. An ignored nested call
 can therefore fail during type checking. Runtime Haskell keeps its usual
-lazy evaluation. The current interpreter accepts leading invisible
-parameters and returns scalars or lists of the supported scalar types.
-Closed calls returning a pair, such as `Prelude.quotRem 17 5`, still need a
-way to represent both result fields.
+lazy evaluation. The current interpreter accepts leading invisible parameters.
 [Source of the evaluation rule](../REFERENCES.md#saturated-closed-calls-and-open-pair-projections).
+
+## Returning a pair
+
+`Prelude.quotRem 17 5 :~: '(3,2)` checks with `Refl`. The compiler
+evaluates the ordinary function once and inspects its actual pair. Each
+field can be a supported scalar, a list of supported scalars, or another
+such pair. A nested call can receive that pair as an argument.
+
+The interpreter encodes both fields before returning to the type checker.
+An overlapping `Show (Natural, Natural)` instance in the client cannot
+change the result. A bottom in the second field is reported at the
+producer even if the outer closed call ignores the pair. GHC rejects an
+unsupported result such as `(Natural, Int)` before running its producer.
+The one-shot test also changes a producer object while retaining the
+installed interface bytes and the client source. The old equality fails
+when the compiler checks the client again.
+[Returned-pair tests](../../../testsuite/tests/dependent/should_run/NativeClosedReturnedPair.sh)
+and [the result representation](../../../compiler/GHC/Tc/Gen/Splice.hs).

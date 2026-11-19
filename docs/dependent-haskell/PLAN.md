@@ -8279,3 +8279,27 @@ Both compilers passed the M, U and runtime-function controls. Of 220
 normal-way dependent-directory cases, 184 passed and 36 failed. The
 set of failures is identical to M114. Six now report the conflicting
 matchabilities where they previously suggested another argument.
+
+## M116: return a boxed pair from a closed call
+
+Check `Prelude.quotRem 17 5 :~: '(3,2)`. Extend the interpreter's
+result representation to boxed pairs of supported fields. Use a Core
+case on the actual result and keep the existing string transport.
+
+- [x] Reconstruct the promoted pair and use it as an operand of a later
+      closed call. Check nested pairs, escaped characters and empty-list
+      kind inference.
+- [x] Reject a false equality when an overlapping tuple `Show` instance
+      prints the claimed value. Ignore this instance in the evaluator.
+- [x] Force all result fields. Check an unsupported result kind before
+      evaluating it.
+- [x] Retain the runtime dependency. Change only the recorded producer
+      object and require an unchanged client to reject its old proof.
+
+[R15 source tests and evaluation order](roadmap/R15-closed-term-evaluator.md#returning-a-pair).
+
+Both compiler stages passed the returned-pair tests. The self-hosted
+compiler passed them with its internal and external interpreters. Each
+compiled Showcase and the GHCi run matched the same 190 lines. The
+normal-way dependent directory passed 185 of 221 cases. All 36 remaining
+failures had the same per-test output as at M115.
