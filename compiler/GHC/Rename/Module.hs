@@ -81,6 +81,7 @@ import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
 import Data.List ( partition )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
+import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
@@ -150,7 +151,7 @@ liftTypeLambdas group =
 
     liftRhs owner captures (L loc (HsKindSig ann body kind)) salt
       | L _ HsForAllTy{} <- stripParens kind
-      , null (extractHsTyRdrTyVars kind)
+      , closedSpliceFreeKind kind
       , Just capture_kinds <- traverse (closedCaptureKind . fst) captures
       , L lam_loc (XHsType (HsTypeLambda _ vars rhs)) <- stripParens body
       , (_, result) <- collectLambdas salt vars rhs
@@ -177,8 +178,18 @@ liftTypeLambdas group =
     -- checking any equation. If the first row could fix that prefix, GADT
     -- matches with different result indices would become monomorphic.
     closedCaptureKind (L _ (HsTvb _ _ _ (HsBndrKind _ kind)))
-      | null (extractHsTyRdrTyVars kind) = Just kind
+      | closedSpliceFreeKind kind = Just kind
     closedCaptureKind _ = Nothing
+
+    -- The written annotation and capture binders remain in the synonym.
+    -- A copied kind must not cause another execution of a source splice.
+    closedSpliceFreeKind kind =
+      null (extractHsTyRdrTyVars kind) && spliceFree kind
+
+    spliceFree :: Data a => a -> Bool
+    spliceFree node
+      | Just (L _ HsSpliceTy{}) <- (cast node :: Maybe (LHsType GhcPs)) = False
+      | otherwise = and (gmapQ spliceFree node)
 
     liftLambdaRhs owner captures loc vars body salt signature =
       let (binders, result) = collectLambdas salt vars body
@@ -279,7 +290,16 @@ liftTypeLambdas group =
       L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
         (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
 
-    capture b@(L _ (HsTvb _ (HsBndrRequired _) (HsBndrVar _ n) _)) = Just (b, n)
+    capture original@(L loc (HsTvb ann vis@(HsBndrRequired _) var@(HsBndrVar _ n) kind)) =
+      Just (capture_binder, n)
+      where
+        capture_binder
+          | HsBndrKind _ written_kind <- kind
+          , not (spliceFree written_kind)
+          -- The synonym checks the written splice. Infer this generated
+          -- parameter from the capture passed by the synonym in the same SCC.
+          = L loc (HsTvb ann vis var (HsBndrNoKind noExtField))
+          | otherwise = original
     capture _ = Nothing
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)

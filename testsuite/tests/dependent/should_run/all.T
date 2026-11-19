@@ -207,8 +207,8 @@ test('NativeTypeLambda',
      run_command, ['bash NativeTypeLambda.sh "{compiler}" "{libdir}"'])
 test('NativeTypeLambdaReify',
      [req_interp, req_rts_linker, only_ways(['normal']),
-      extra_files([open_eval_dir + 'TypeLambda.hs'])],
-     multimod_compile, ['NativeTypeLambdaReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
+      extra_files([open_eval_dir + 'TypeLambda.hs', 'NativeTypeLambdaReifyClient.hs'])],
+     multimod_compile, ['NativeTypeLambdaReifyClient', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
 
 test('NativeTypeLet',
      [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs'])],

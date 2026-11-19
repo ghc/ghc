@@ -82,6 +82,17 @@ The [provider](../examples/open-evaluation/TypeLambda.hs) and its
 [interface-only consumer](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh)
 check the mapped result, lexical shadowing and both `Maybe` cases.
 
+A closed written polymorphic kind can supply the lifted family's standalone
+signature for a tail case. The invisible forall and value arrows must be
+unmatchable. GHC checks each indexed constructor against that signature and
+preserves written specified and inferred binders. The forwarding path
+requires splice-free annotations and captures whose declared kinds are
+closed and splice-free. An annotation or capture kind containing a type splice
+stays on the ordinary inference path, so a case requiring refinements at
+different indices still fails there. A splice on a captured synonym binder
+runs on the written binder once. The generated capture parameter gets its
+kind from the checked application.
+
 ## Prior art
 
 Agda uses ordinary lambda syntax and accepts unannotated binders when
