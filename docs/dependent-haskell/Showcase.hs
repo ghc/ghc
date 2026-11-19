@@ -957,14 +957,16 @@ main = do
         (Refl :: Prelude.fst (Build.partialPair 7) :~: 7)
     observe "build a public constructor through three private helpers"
         (Refl :: MarkedHead ('Spine.More 'x' 'Spine.Empty) :~: 'Just ('Spine.Marked 'x'))
-    observe "use imported functions and Maybe in equations for an imported type family"
-        (ImportedFamily.importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool))
+    observe "infer a local function used in an imported family equation"
+        (ImportedFamily.importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
     observe "select the second element through a private case"
         (Refl :: Spine.secondOrFirst ('Spine.More 'x' ('Spine.More 'y' 'Spine.Empty)) :~: 'Just 'y')
     observe "rebuild one spine cell while its tail remains unknown"
         (erasedCell (Proxy :: Proxy ('Spine.Empty :: Spine.Spine Bool)))
     observe "carry the same tag through a recursive spine"
         (filledCell (Proxy :: Proxy ('Spine.Empty :: Spine.Spine Bool)) (Proxy :: Proxy ('Just 'True)))
+    observe "apply Prelude.map to Prelude.not at a known list"
+        (Refl :: Prelude.map Prelude.not '[ 'True, 'False] :~: '[ 'False, 'True])
 
 -- | Prove the first output cell without supplying the input tail.
 erasedCell :: forall (xs :: Spine.Spine Bool). Proxy xs

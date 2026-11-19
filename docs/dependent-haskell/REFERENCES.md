@@ -5721,3 +5721,19 @@ argument order. The scheduler checks the imported signature and the
 actual constructor worker. The evaluator can then select the `Just`
 branch without inspecting its field. [Agda Maybe eliminators](https://agda.github.io/agda-stdlib/master/Data.Maybe.Base.html)
 and [the family producer](examples/open-evaluation/ImportedFamily.hs).
+
+The Haskell Report uses dependency groups to infer and generalize
+binding types. A reference to a binding with a signature can break a
+typing cycle. M164 uses GHC's ordinary inference for a local producer.
+It also checks the dependencies in the producer bodies before evaluating
+a family equation. Those bodies can still call each other.
+[Haskell 2010, sections 4.5.1–2](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html#x10-880004.5.1)
+and [M164 source and interface checks](roadmap/R21-dependency-analysis.md#m164-inferred-independent-producer-types).
+
+Agda's list `map` takes an ordinary function. Its cons equation applies
+that function to the head and recurses on the tail. The same expression
+serves two separate GHC checks. M165 runs the application on a known
+list. R16 also needs to preserve the application in an exported equation
+when the tail is unknown. Haskell's executable dependency tracking and
+rewrite rules affect each check. [Agda standard library 2.3, Data.List.Base](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html)
+and [the two evaluator cards](ROADMAP.md#current-work-queue).

@@ -908,3 +908,19 @@ unmatchable arrow also leaves the separate family-saturation test
 blocked: GHC-27346 requires the Boolean family `Flip` to receive its
 argument. The companion negative test correctly rejects deriving
 `a :~: b` from `f a :~: f b` for an unmatchable `f`.
+
+M165 checks the closed list. The open alias now resolves the callback
+and stops at the unknown list. Two checks remain. First, certify the
+ordinary rule-free worker. Its cons equation applies the original
+callback to the head and recurses on the tail. Second, account for the
+rewrites available to the installed `Prelude.map`.
+
+The `map` fusion rule introduces `build`, `foldr`, and `mapFB`.
+In the native test, plain and optimized calls both return `False` at
+the head of `map not (True : error "tail")`. A client adds a rule for
+`build` at `Bool`. Both the fusion rule and the client rule fire.
+The same expression returns `True`. Even an undefined input spine now
+produces a cons. A proof about this call must account for the visible
+rules on the functions introduced by the first rewrite.
+[Reproduce the three builds](../examples/open-evaluation/check-map-fusion.sh)
+and [installed rule definitions](../../../libraries/ghc-internal/src/GHC/Internal/Base.hs).

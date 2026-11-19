@@ -9051,3 +9051,29 @@ signature for the same local `keep`. Both report GHC-70566 at the
 family equation. For R16, closed and open calls to `Prelude.map`
 both report GHC-37479 at `Prelude.not`. See the
 [higher-order source cases](roadmap/R16-open-term-evaluator.md#passing-a-function-as-the-carried-operand).
+
+## M164. Infer a local function before an imported family equation
+
+Use the ordinary source binding groups to infer the type of
+`keep x = maybe x id (Just x)`. Check its solved Core before using it
+in an imported family equation. Test implicit and omitted signatures
+with `MonoLocalBinds`. Reject a hidden family in an imported type and
+a cycle through a signed function.
+[R21 implementation and example](roadmap/R21-dependency-analysis.md#m164-inferred-independent-producer-types).
+
+## M165. Pass an imported function to a closed call
+
+Check `Prelude.map Prelude.not '[ 'True, 'False]` at its written source
+type. Instantiate the callback using the types of the other operands.
+Check a separate worker, two callbacks with different results, and
+polymorphic `id`. An incompatible callback must report its own source
+span. Changing an object used by a proof must cause GHC to check the
+proof again. [R15 implementation and example](roadmap/R15-closed-term-evaluator.md#m165-named-functions-as-closed-operands).
+
+Both compiler stages built. Native execution at both stages and
+self-hosted GHCi agreed on all 235 Showcase lines. The normal dependent
+test directory passed 242 of 277 exercised cases. The 35 failures
+matched M163 individually. The compilers accepted the same 115 of 124
+ordinary polykinds programs. The interface upgrades and boundary checks
+passed. Replacing only the callback object kept the installed interface
+byte-identical and caused the unchanged proof to fail.

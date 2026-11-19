@@ -31,6 +31,14 @@ computations whose inputs are still unknown (R16). Dependency analysis
 same module. The [work queue](#current-work-queue) gives a source
 example and the next acceptance test for each card.
 
+At M164 the compiler infers
+the type of a local `keep` used by an imported family equation (R21).
+At M165 the compiler checks
+`Prelude.map Prelude.not '[ 'True, 'False] :~: '[ 'False, 'True]` (R15).
+It still rejects `type NegateAll xs = Prelude.map Prelude.not xs` (R16).
+The open case needs to preserve the callback and the unknown tail across
+a module interface.
+
 The [Showcase](Showcase.hs) reads lengths from IO and uses them to
 replicate, append, index, and flatten vectors. [M95](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary)
 accepts an ordinary list at a requested length or packages it with its
@@ -166,7 +174,7 @@ when some of its operands are unknown.
 | --- | --- | --- |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Prove `pick (bump 7) :~: 8` without forcing the other field. Preserve reflexivity when two different functions return equal, fully defined pairs. | [M157](roadmap/R15-closed-term-evaluator.md#when-equality-needs-the-whole-operand) exposed a compatibility regression. [M161](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable) proves which fields an explicit observer returned across an object-only change. Automatic projection still uses the M153 path. |
 | [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Export `NegateAll xs = Prelude.map Prelude.not xs`. Prove that supplying a `True` head produces a `False` head without supplying the tail. | [M162](roadmap/R16-open-term-evaluator.md#m162-structural-recursion-with-an-unchanged-argument) can carry the same tag through recursion. A function operand also needs a representation for its unapplied value. This connects R16 with R13 and R23. |
-| [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Infer the local producer in an imported family equation. Compare an implicitly quantified signature with no signature for the same `keep x = maybe x id (Just x)`. | [M163](roadmap/R21-dependency-analysis.md#m163-ordinary-data-in-an-independent-producer) admits the constructor and the imported eliminator for an explicitly quantified signature. |
+| [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | An ordinary client can now use the family result of the unsigned `keep x = maybe x id (Just x)`. Mixed declaration cycles and family-dependent signatures remain open. | [M164](roadmap/R21-dependency-analysis.md#m164-inferred-independent-producer-types) checks the producer before admitting the family equation. |
 
 The previous source controls now pass for a private parcel with an
 exceptional second field, a constructor containing two unknown types,
@@ -302,6 +310,8 @@ evaluator work has priority.
 | 99 | R21: check independent imported function types | [M160](roadmap/R21-dependency-analysis.md#m160-independent-imported-function-types) | An ordinary imported projection determines a family result. Changing the projection's body invalidates the method that consumes it. |
 | 100 | R16: preserve an argument through a recursive call | [M162](roadmap/R16-open-term-evaluator.md#m162-structural-recursion-with-an-unchanged-argument) | A client checks one output cell and its recursive tail with the tag still unknown. |
 | 101 | R21: use ordinary constructors in an imported family equation | [M163](roadmap/R21-dependency-analysis.md#m163-ordinary-data-in-an-independent-producer) | A local function uses the installed `Prelude.maybe` on `Just x`. A hidden family inside an imported `Maybe` type still prevents premature checking. |
+| 102 | R21: infer an independent local producer | [M164](PLAN.md#m164-infer-a-local-function-before-an-imported-family-equation) | The ordinary client reads the family result from the interface when the producer has no signature. |
+| 103 | R15: pass an imported function to a closed call | [M165](PLAN.md#m165-pass-an-imported-function-to-a-closed-call) | `map not` reduces at a known list. Changing only a callback object invalidates the unchanged client proof. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
