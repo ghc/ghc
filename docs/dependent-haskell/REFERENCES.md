@@ -5574,3 +5574,25 @@ so their actual type dependencies can be scheduled with the head.
 [Agda interleaved mutual blocks](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
 [GHC's instance passes](../../compiler/GHC/Tc/TyCl/Instance.hs)
 and [scheduler and acceptance example](roadmap/R21-dependency-analysis.md#m147-separate-an-instance-head-from-its-methods).
+
+### Constructor results, field demand and family instances
+
+Agda's case trees explain when a function can choose a clause. Once the
+required constructor is known, the right-hand side can build a value
+from its bound variables. M148 checks the ordinary Core case and its
+result constructors. Haskell's rules for a boxed pair pattern determine
+M149's strictness. A constructor match inspects the pair, while the
+variable pattern for an unused field requires no evaluation.
+[Agda 2.8 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
+[Haskell 2010 pattern semantics, §3.17](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-610003.17)
+and [closed evaluation controls](roadmap/R15-closed-term-evaluator.md#m149-demand-only-the-selected-field-of-a-computed-pair).
+
+Agda permits a datatype declaration and its constructors to appear at
+different points in a mutually dependent group. GHC's family instances
+have additional requirements. Their constructors, selectors and derived
+instances must be available when GHC checks ordinary term uses. M150
+reuses GHC's existing instance pass and checks the field types before
+the local producer. A method may refer to the producer later in the
+group. [Agda interleaved mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
+[GHC family instances](../users_guide/exts/type_families.rst)
+and [the local source example](examples/open-evaluation/LocalDataFamily.hs).

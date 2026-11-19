@@ -66,10 +66,12 @@ import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
 import qualified LocalInstance
 import qualified LocalAssociated
+import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenBuildWorker as Build
+import qualified SpineWorker as Spine
 import qualified OpenConstructorSource
 import qualified OpenConstructorWorker as W
 import qualified NativeMultiPackage as Packages
@@ -937,6 +939,17 @@ main = do
         (LocalInstance.passValue 'x', LocalInstance.passValue True)
     observe "check an associated type equation before a dependent producer"
         LocalAssociated.result
+    observe "build an optional head when a client supplies the spine constructor"
+        (Refl :: FirstMaybe ('Spine.Empty :: Spine.Spine Bool) :~: 'Nothing,
+         Refl :: FirstMaybe ('Spine.More 'x' 'Spine.Empty) :~: 'Just 'x')
+    observe "test the selected field of a pair whose other field throws"
+        (Refl :: Prelude.odd (Prelude.fst (Build.partialPair 7)) :~: 'True)
+    observe "run associated and standalone data instances from a dependent module"
+        LocalDataFamily.result
+
+-- | Keep the ordinary case until the client supplies the outer constructor.
+type FirstMaybe :: Spine.Spine a -> Maybe a
+type FirstMaybe xs = Spine.firstMaybe xs
 
 -- | Keep the ordinary projection in the type until a client supplies a constructor.
 type Pick :: W.Choice Bool Char -> Char

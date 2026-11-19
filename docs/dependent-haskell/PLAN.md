@@ -8825,3 +8825,48 @@ projection can demand an unused field when it reads back an ordinary
 pair builder. An open case that constructs `Just x` cannot yet publish
 its result for an unknown scrutinee. The local declaration scheduler
 still rejects associated data instances.
+
+## M148: construct the result of a deferred case
+
+- [x] Check each ordinary Core result against the expected kind. Publish
+      constructor trees built from in-scope fields and public lazy constructors.
+- [x] Use the resulting type in an ordinary client with stripped interfaces.
+      Exercise a nested result, private constructors and strict fields.
+- [x] Identify earlier home interfaces eligible for the new equations.
+
+[Open evaluator](roadmap/R16-open-term-evaluator.md#m148-constructor-results-from-a-checked-case).
+
+## M149: preserve demand inside a closed call
+
+- [x] For an interface-only unary pair projection, check the nominal equation
+      at two fresh field variables. Use the selected variable to construct
+      a typed Core case inside the surrounding ordinary application.
+- [x] Keep the operand's executable dependency and the projection's rule
+      checks. Exercise an unused field and a demanded field that throws.
+
+[Closed evaluator and the direct projection still to solve](roadmap/R15-closed-term-evaluator.md#m149-demand-only-the-selected-field-of-a-computed-pair).
+
+## M150: schedule family instances before dependent producers
+
+- [x] Follow type dependencies of associated data and standalone family
+      instances. Include constructor fields and deriving clauses.
+- [x] Check local uses of the constructors and selectors with the ordinary
+      instance environment. Complete the class methods after the producers.
+- [x] Exercise an ordinary client and report a family field or equation
+      that requires an unfinished local function at its source use.
+
+[Local family instances](roadmap/R21-dependency-analysis.md#m150-constructors-and-selectors-of-family-instances).
+
+Both compiler stages built. Both native executables and GHCi produced
+the same 226 Showcase lines. The normal-way dependent directory passed
+237 of 272 cases. Each of the 35 failures had the same output as at
+M147. M147 and M150 accepted the same 115 of 124 ordinary polykinds
+sources. The boundary evidence harness also passed. The verification
+covered the dependent directory and selected ordinary programs.
+
+The M147 compiler forced the unused pair field in the nested R15 example.
+M149 left it unevaluated through an interface-only projection. The direct
+nominal proof still forces that field. A stripped interface for an open
+case with a helper inside `Just` and a standalone type instance calling
+an independent local identity function each produced GHC-70566 at the
+source call. These examples define the next three checks.

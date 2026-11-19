@@ -8,11 +8,19 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. Native execution and GHCi agree on all 223 Showcase lines.
+Updated 2026-11-19. Native execution and GHCi agree on all 226 Showcase lines.
 The normal-way dependent directory passed 237 of 272 exercised cases.
-The 35 remaining failures produced the same output as at M144 (`5e8e165827`).
+The 35 remaining failures produced the same output as at M147 (`f8261da064`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+An ordinary `firstMaybe` can now appear in an exported type with its
+input still unknown. A caller that supplies a nonempty spine proves
+the result is `Just x` without inspecting the tail. Local producers
+can also use the constructors and derived instances of a data family.
+For a closed computation, `odd (pick (make 7))` can check through a
+projection interface even when the other pair field throws.
+[Current roadmap checks](ROADMAP.md#current-work-queue).
 
 An ordinary Haskell library can hide its parcel constructor and export
 `make` and `first`. The dependent client proves `first (make 7) :~: 7`

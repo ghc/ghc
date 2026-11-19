@@ -3007,3 +3007,17 @@ closed result, that result is available immediately. GHC checks the
 fallback's kind and dictionaries in both cases. The fresh variable
 must never appear in a returned type. [Case tree](roadmap/R16-open-term-evaluator.md#m146-nested-constructor-cases-with-a-fallback)
 and [closed operand checks](roadmap/R15-closed-term-evaluator.md#m145-sharing-kinds-across-a-checked-family).
+
+A checked case can build a result constructor from scoped variables.
+The checker follows the alternatives in the producer's desugared Core.
+Each field must have the kind required by the constructor's worker.
+The resulting nominal equation can keep the original case stuck on a
+rigid input while a separate client supplies the missing constructor.
+[Case result equations](roadmap/R16-open-term-evaluator.md#m148-constructor-results-from-a-checked-case).
+
+When an outer ordinary call needs an interface-only pair projection,
+the compiler can emit an ordinary Core case. The nominal equation
+applied to a pair of distinct rigid variables determines the selected
+field. Only the result of the outer call needs readback. A bare nominal
+application still needs an operand that can be written to an interface.
+[Closed pair projection](roadmap/R15-closed-term-evaluator.md#m149-demand-only-the-selected-field-of-a-computed-pair).

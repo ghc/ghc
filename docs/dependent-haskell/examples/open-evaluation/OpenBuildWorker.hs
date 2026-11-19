@@ -1,7 +1,9 @@
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-unoptimized-core-for-interpreter -fno-omit-interface-pragmas #-}
 
-module OpenBuildWorker (Shell (..), Nested (..), build, wrap, echo, buildPair, swapPair) where
+module OpenBuildWorker (Shell (..), Nested (..), build, wrap, echo, buildPair, partialPair, swapPair) where
+
+import Numeric.Natural (Natural)
 
 -- | A two-field datatype with two constructors.
 data Shell a b = Shell a b | OtherShell a b
@@ -28,6 +30,10 @@ echo x = x
 {-# INLINE buildPair #-}
 buildPair :: a -> b -> (a, b)
 buildPair x y = (x, y)
+
+-- | Return a number without evaluating the second field.
+partialPair :: Natural -> (Natural, Char)
+partialPair n = (n, errorWithoutStackTrace "unused second pair field")
 
 -- | Read a pair and return its fields in reverse order.
 {-# INLINE swapPair #-}
