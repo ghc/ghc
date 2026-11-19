@@ -88,7 +88,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
-import GHC.Tc.Gen.SourceTable (sourceTableTypeUses)
+import GHC.Tc.Gen.SourceTable (sourceTableFamilyUse, sourceTableTypeUses)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -103,6 +103,7 @@ import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBin
                                   tcRuntimeForAllBndrs )
 import GHC.Tc.Zonk.TcType
 
+import GHC.Core.Reduction (reductionReducedType)
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -2392,6 +2393,7 @@ tc_app_ty mode rn_ty exp_kind
                          | [arg] <- args
                          , ordinary_call || (isQual rdr && ready_partial_call)
                          -> do { (result_kind, run) <- tcPlanClosedCall mode ordinary_call fun arg
+                               ; checkClosedCallExpectedKind rn_ty exp_kind result_kind
                                ; result <- run
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
@@ -2453,11 +2455,12 @@ isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
   isTyVarName name
 isTypeVariableArg _ = False
 
--- | Find the already resolved head and operand of a unary term call.
+-- | Find the resolved head and operand of a unary term or checked family call.
 nestedClosedCall :: LHsType GhcRn -> Maybe (SrcSpan, Name, LHsType GhcRn)
 nestedClosedCall arg
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr _ name))) <- head_ty
-  , isVarName name, isExternalName name
+  , isExternalName name
+  , isVarName name || isSourceFamilyName name
   , [HsValArg _ operand] <- filterOut is_par args
   = Just (locA loc, name, operand)
   | otherwise = Nothing
@@ -2465,6 +2468,10 @@ nestedClosedCall arg
     (head_ty, args) = splitHsAppTys (unLoc (ignoreParens arg))
     is_par HsArgPar{} = True
     is_par _ = False
+
+-- | Recognize the internal Name selected for a checked source family.
+isSourceFamilyName :: Name -> Bool
+isSourceFamilyName = isJust . sourceTableTermOcc . nameOccName
 
 -- | The information available about the operand before specialization.
 data ClosedCallOperand
@@ -2505,8 +2512,7 @@ tcClosedCallKinds name fun_ty arg operand
     predicates = mapMaybe anonPiTyBinderType_maybe binders
     natural_list = mkListTy naturalTy
     retry_inputs = [charTy, natural_list]
-    scalars = [naturalTy, charTy, boolTy]
-    list_inputs = map mkListTy scalars
+    list_inputs = map mkListTy closedCallScalarKinds
     operand_description = case operand of
       ComputedClosedOperand{} -> "The checked operand"
       _ -> "The literal argument"
@@ -2531,7 +2537,7 @@ tcClosedCallKinds name fun_ty arg operand
               _ -> at_operand $
                 bad "The declared input type does not determine the element kind of the empty list."
         | otherwise -> return actual
-      SourceClosedOperand Nothing -> case matching (scalars ++ list_inputs) of
+      SourceClosedOperand Nothing -> case matching (closedCallScalarKinds ++ list_inputs) of
         [input]
           | input `tcEqType` charTy ->
               bad "The argument must be a closed Char literal, such as 'x'."
@@ -2563,14 +2569,8 @@ tcPlanClosedCall mode ordinary_call fun arg = do
     Just (child_loc, child_name, child_arg) -> do
       checkCompleteClosedCall mode name
       tcPreflightClosedCall name
-      (child_kind, run_child) <- setSrcSpan child_loc $ do
-        env <- getGblEnv
-        when (nameIsLocalOrFrom (tcg_semantic_mod env) child_name) $
-          failWithTc (TcRnNoSourceTable child_name)
-        child <- tcLookupGlobal child_name
-        case child of
-          AnId child_fun -> tcPlanClosedCall mode ordinary_call child_fun child_arg
-          _ -> failWithTc (TcRnNoSourceTable child_name)
+      (child_kind, run_child) <-
+        setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call child_name child_arg)
       (domain, result_kind) <- tcClosedCallKinds name (varType fun) arg (ComputedClosedOperand child_kind)
       let get_operand = do
             checked <- run_child
@@ -2591,6 +2591,75 @@ tcPlanClosedCall mode ordinary_call fun arg = do
       return (domain, result_kind, return argument)
   run <- tcPrepareClosedCall fun domain result_kind
   return (result_kind, setSrcSpan loc (operand >>= run))
+
+-- | Check a known enclosing kind before executing a staged call.
+-- Inference and non-ground expected kinds still use checkExpKind.
+checkClosedCallExpectedKind :: HsType GhcRn -> ExpKind -> Kind -> TcM ()
+checkClosedCallExpectedKind rn_ty (Check expected) actual = do
+  expected' <- liftZonkM (zonkTcType expected)
+  when (noFreeVarsOfType expected' && isTyFamFree expected' && not (actual `tcEqType` expected')) $
+    solveEqualities "checkClosedCallExpectedKind" $
+      discardResult (unifyKind (Just (HsTypeRnThing rn_ty)) actual expected')
+checkClosedCallExpectedKind _ (Infer _) _ = return ()
+
+-- | Prepare an already resolved nested occurrence.
+tcPlanClosedHead :: TcTyMode -> Bool -> Name -> LHsType GhcRn -> TcM (Kind, TcM Type)
+tcPlanClosedHead mode ordinary_call name arg
+  | isSourceFamilyName name = tcPlanSourceFamilyCall mode ordinary_call name arg
+  | otherwise = do
+      env <- getGblEnv
+      when (nameIsLocalOrFrom (tcg_semantic_mod env) name) $
+        failWithTc (TcRnNoSourceTable name)
+      thing <- tcLookupGlobal name
+      case thing of
+        AnId fun -> tcPlanClosedCall mode ordinary_call fun arg
+        _ -> failWithTc (TcRnNoSourceTable name)
+
+-- | Scalar kinds admitted by the source operand grammar.
+closedCallScalarKinds :: [Kind]
+closedCallScalarKinds = [naturalTy, charTy, boolTy]
+
+-- | Prepare a unary checked family in a chain of closed calls.
+tcPlanSourceFamilyCall :: TcTyMode -> Bool -> Name -> LHsType GhcRn -> TcM (Kind, TcM Type)
+tcPlanSourceFamilyCall mode ordinary_call name arg = do
+  loc <- getSrcSpanM
+  table <- tcLookupTyCon name
+  sourceTableFamilyUse table
+  owner <- case sourceTableTermOcc (nameOccName name) of
+    Just occ -> lookupOrig (nameModule name) occ
+    Nothing -> return name
+  let bad :: String -> TcM a
+      bad = failWithTc . TcRnClosedTypeEval owner
+      at_operand :: TcM a -> TcM a
+      at_operand = setSrcSpanA (getLoc arg)
+  let supported kind =
+        any (tcEqType kind) (closedCallScalarKinds ++ map mkListTy closedCallScalarKinds)
+      result_kind = tyConResKind table
+  domain <- case tyConTyVars table of
+    [tv] | tyConArity table == 1
+         , supported (tyVarKind tv)
+         , supported result_kind -> return (tyVarKind tv)
+    _ -> bad "The checked family does not have a supported unary input and result."
+  run_arg <- case nestedClosedCall arg of
+    Just (child_loc, child_name, child_arg) -> do
+      (kind, run) <- setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call child_name child_arg)
+      unless (kind `tcEqType` domain) $ at_operand $ do
+        dflags <- getDynFlags
+        bad ("The operand has kind " ++ showPpr dflags kind ++
+             ", which does not match the declared input type " ++ showPpr dflags domain ++ ".")
+      return run
+    Nothing -> do
+      unless (isJust (closedCallLiteralKind arg)) $
+        at_operand (bad "The checked family operand must be a closed literal or a closed call.")
+      checked <- solveEqualities "tcPlanSourceFamilyCall" $
+        tc_check_lhs_type mode arg domain
+      zonked <- liftZonkM (zonkTcType checked)
+      return (return zonked)
+  let run = setSrcSpan loc $ do
+        input <- run_arg
+        norm_loc <- getCtLocM AnnOrigin Nothing
+        reductionReducedType <$> tcRewriteFamilyAxioms norm_loc (mkTyConApp table [input])
+  return (result_kind, run)
 
 -- | Reject a closed call in an incomplete visible type argument.
 checkCompleteClosedCall :: TcTyMode -> Name -> TcM ()
@@ -2655,6 +2724,16 @@ For a nested call, check the outer call's staging
 first. Prepare the inner call and use its inferred result kind to
 specialize the outer call. No function runs until the whole chain has
 checked kinds, staging, and evidence.
+
+Prepare a unary checked source family in an ordinary call's operand.
+Reduce its checked type with the nominal family rewriter. The rewriter
+checks the owner's rule and interface dependencies. This path does not
+load the family's runtime object.
+
+The normal checker still checks a family at the head of an application.
+If that family expects a ground kind for an ordinary call, check that kind
+before running the call. This leaves pure and rigid family applications
+on the normal checking path.
 
 Each prepared call returns its result kind and an action. The action runs
 the inner call once and uses its promoted result to build the outer

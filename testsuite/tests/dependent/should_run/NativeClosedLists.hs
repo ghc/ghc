@@ -39,8 +39,13 @@ chain (_ :: Proxy '[2, 3, 5]) = (Proxy @5, Same)
 -- The inner result determines the specialization of the outer call.
 nested :: forall. ( sum (reverse [2, 3, 5]) :~: 10
           , Lib.first (Prelude.reverse '[2, 3, 5]) :~: 5
-          , Data.Char.toUpper (Data.Char.toLower 'Z') :~: 'Z' )
-nested = (Refl, Refl, Refl)
+          , Data.Char.toUpper (Data.Char.toLower 'Z') :~: 'Z'
+          , Data.Char.toLower (Data.Char.toUpper 'x') :~: 'x' )
+nested = (Refl, Refl, Refl, Refl)
+
+-- A nested certified application can stay stuck until its caller supplies c.
+twiceUpper :: forall (c :: Char). Proxy c -> Proxy (Data.Char.toUpper (Data.Char.toUpper c))
+twiceUpper _ = Proxy
 
 -- The kind of a checked result determines its runtime representation.
 computed :: ( Prelude.odd (Prelude.sum '[2, 3, 5]) :~: 'False
@@ -62,7 +67,10 @@ main :: IO ()
 main = case (reversed, emptyInput, emptyResult, bools, emptyBools, chars) of
     (Refl, Refl, Refl, Refl, Refl, Refl)
         | show [5, 3, 2 :: Natural] == "[2,3,5]" ->
-            case (nested, computed, source) of
-                ((Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl)) ->
+            case (nested, computed, source, twiceUpper (Proxy @'x') :: Proxy 'X') of
+                ( (Refl, Refl, Refl, Refl)
+                  , (Refl, Refl, Refl, Refl, Refl, Refl)
+                  , (Refl, Refl, Refl, Refl, Refl)
+                  , Proxy ) ->
                     print (natVal (fst (chain (Proxy @'[2, 3, 5]))))
         | otherwise -> fail "ordinary Show did not select the overlapping list instance"
