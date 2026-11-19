@@ -1067,3 +1067,20 @@ orphan rule and a rule declared after a splice also blocked the proof.
 Changing the producer's rule invalidated the cached ordinary client.
 The check covers the identity traversal. The fusion rules on the
 installed `Prelude.map` introduce other functions and need separate checks.
+
+### Keep a checked mapper equation consistent with specialization
+
+An orphan rule can replace `mapper not xs` with `xs`. The input
+`[True]` distinguishes the results. At `ac2753c565`, an ordinary
+client compiled at `-O1 -fno-enable-rewrite-rules` could construct
+`Refl` for a `False` head and return `True` from the same runtime call.
+The specializer applied the user rule while the simplifier had rules
+disabled.
+
+The specializer now checks the rewrite flag before applying a user
+rule. Built-in rules can still select dictionary fields. With rewriting
+disabled, the bootstrap compiler accepts the proof and the program
+returns `False`. With rewriting enabled, the type checker rejects
+the fresh proof. An ordinary call in that configuration still returns
+`True` when the orphan rule fires.
+[Provider, proof and runtime check](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).

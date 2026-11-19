@@ -50,3 +50,64 @@ grep -Fq 'Rule fired: drop mapper traversal' producer.rules
 if grep -Eq 'FinalCoreSourceTable|T:mapper' producer.iface; then
     exit 1
 fi
+
+# A user rule may also fire during specialisation. Disabling rules must
+# protect both the ordinary runtime call and a fresh source equality.
+mkdir "$out"/{specialise,rewrite}
+cd "$out/specialise"
+cp "$src/NativeOpenInstalledMapProducer.hs" .
+cat >PreludeMapSource.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, StandaloneKindSignatures #-}
+module PreludeMapSource (PreludeNegateAll) where
+import qualified NativeOpenInstalledMapProducer as W
+import qualified Prelude as P
+type PreludeNegateAll :: [P.Bool] -> [P.Bool]
+type PreludeNegateAll xs = W.mapper P.not xs
+HS
+cat >Orphan.hs <<'HS'
+{-# OPTIONS_GHC -Wno-orphans -Wno-inline-rule-shadowing #-}
+module Orphan () where
+import qualified NativeOpenInstalledMapProducer as W
+{-# RULES "override demanded negation" [~1] forall xs. W.mapper not xs = xs #-}
+HS
+cat >Main.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
+module Main where
+import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
+import qualified NativeOpenInstalledMapProducer as W
+import Orphan ()
+import PreludeMapSource
+
+#ifdef CHECK_PROOF
+proof :: Proxy xs -> PreludeNegateAll ('True ': xs) :~: ('False ': PreludeNegateAll xs)
+proof _ = Refl
+#endif
+
+{-# NOINLINE demanded #-}
+demanded :: [Bool] -> Bool
+demanded xs = case W.mapper not xs of
+    x : _ -> x
+    [] -> error "empty"
+
+main :: IO ()
+#ifdef CHECK_PROOF
+main = case proof (Proxy :: Proxy '[]) of Refl -> print (False, demanded [True])
+#else
+main = print (demanded [True])
+#endif
+HS
+cp ./*.hs "$out/rewrite/"
+"${ghc[@]}" -O1 -fno-enable-rewrite-rules -DCHECK_PROOF --make Main.hs -o run
+[[ $(./run) == '(False,False)' ]]
+cd "$out/rewrite"
+"${ghc[@]}" -O1 -fenable-rewrite-rules -ddump-rule-firings --make Main.hs -o run >fired.log
+grep -Fq 'Rule fired: override demanded negation' fired.log
+[[ $(./run) == True ]]
+line=$(awk '/^proof _ = Refl/ { print NR }' Main.hs)
+if "${ghc[@]}" -O1 -fenable-rewrite-rules -DCHECK_PROOF -fforce-recomp -c Main.hs >orphan.log 2>&1 ||
+   ! grep -Fq "Main.hs:$line:" orphan.log ||
+   ! grep -Fq '[GHC-83605]' orphan.log; then
+    cat orphan.log >&2
+    exit 1
+fi

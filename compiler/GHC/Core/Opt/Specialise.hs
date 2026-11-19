@@ -1266,7 +1266,9 @@ specExpr env (Let bind body)
 fireRewriteRules :: SpecEnv   -- Substitution is already zapped
                  -> OutExpr -> [OutExpr] -> (OutExpr, [OutExpr])
 fireRewriteRules env (Var f) args
-  | let rules = getRules (se_rules env) f
+  | let visible = getRules (se_rules env) f
+        rules | gopt Opt_EnableRewriteRules (se_dflags env) = visible
+              | otherwise = filter isBuiltinRule visible
   , Just (rule, expr) <- specLookupRule env f args activeInInitialPhase rules
   , let rest_args    = drop (ruleArity rule) args -- See Note [Extra args in the target]
         zapped_subst = se_subst env   -- Just needed for the InScopeSet
@@ -1371,6 +1373,10 @@ It's not hard to achieve: see `fireRewriteRules`. The only tricky bit is
 making sure that we have a reasonably up to date EPS rule base. Currently
 we load it up just once, in `initRuleEnv`, called at the beginning of
 `specProgram`.
+
+Respect -fno-enable-rewrite-rules here as in the simplifier. Keep
+built-in rules for operations such as dictionary selection. They are
+part of ordinary specialisation even when user rules are disabled.
 
 NB: you might wonder if running rules in the specialiser (this Note) renders
 Note [tryRules: plan (BEFORE)] in the Simplifier (partly) redundant.  That is,
