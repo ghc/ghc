@@ -4120,14 +4120,14 @@ instance ExactPrint (HsType GhcPs) where
   exact (HsDocTy an ty doc) = do
     ty' <- markAnnotated ty
     return (HsDocTy an ty' doc)
-  exact (XHsType (HsTypeLambda (open, lam, arr, close) binder body)) = do
+  exact (XHsType (HsTypeLambda (open, lam, arr, close) binders body)) = do
     open' <- markEpToken open
     lam' <- markEpToken lam
-    binder' <- markAnnotated binder
+    binders' <- mapM markAnnotated binders
     arr' <- markEpUniToken arr
     body' <- markAnnotated body
     close' <- markEpToken close
-    return (XHsType (HsTypeLambda (open', lam', arr', close') binder' body'))
+    return (XHsType (HsTypeLambda (open', lam', arr', close') binders' body'))
   exact (XHsType (HsTypeLet (let_tok, eq, in_tok) var rhs body)) = do
     let' <- markEpToken let_tok
     var' <- markAnnotated var

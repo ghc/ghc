@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures,
              TypeFamilies, TypeOperators #-}
 -- | Apply a type lambda to a list of type constructors.
-module TypeLambda (L, Captured, Shadowed, roadmap) where
+module TypeLambda (L, Captured, Shadowed, WithError, roadmap, partial) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -17,6 +17,10 @@ type family Map f xs where
 -- | Apply each type constructor to Int.
 type L = Map (\f -> f Int) [Maybe, Either String, IO]
 
+-- | Supply the error type now and the result type at the use site.
+type WithError :: Type %U -> Type
+type WithError = (\err result -> Either err result) String
+
 -- | Capture the first argument of Either from the enclosing synonym.
 type Captured (a :: Type) = Map (\b -> Either a b) '[Bool, Char]
 
@@ -26,3 +30,7 @@ type Shadowed (q :: Type) (a :: q) = Map (\q -> Either q (Proxy a)) '[Char]
 -- | Check the full result of the roadmap example.
 roadmap :: L :~: '[Maybe Int, Either String Int, IO Int]
 roadmap = Refl
+
+-- | Apply the partially applied lambda to Bool.
+partial :: WithError Bool :~: Either String Bool
+partial = Refl

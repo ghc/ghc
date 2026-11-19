@@ -557,7 +557,7 @@ data HsTypeGhcPsExt
     -- See Note [Parsing data type declarations]
 
   | HsTypeLambda (EpToken "(", EpToken "\\", EpUniToken "->" "→", EpToken ")")
-                 (LocatedN RdrName) (LHsType GhcPs)
+                 [LocatedN RdrName] (LHsType GhcPs)
 
   | HsTypeLet (EpToken "let", EpToken "=", EpToken "in") (LocatedN RdrName)
               (LHsType GhcPs) (LHsType GhcPs)
@@ -1659,7 +1659,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsCoreTy ty     -> ppr ty
     HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
     HsRecTy _ flds  -> pprHsConDeclRecFields (unLoc flds)
-    HsTypeLambda _ v body -> parens (char '\\' <> ppr v <+> arrow <+> ppr_mono_lty body)
+    HsTypeLambda _ vars body -> parens (char '\\' <> hsep (map ppr vars) <+> arrow <+> ppr_mono_lty body)
     HsTypeLet _ v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
         <+> text "in" <+> ppr_mono_lty body

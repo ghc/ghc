@@ -9264,3 +9264,13 @@ Exercise the source example, an ordinary interface-only client,
 exact printing, and a raw Template Haskell quote. For disabled syntax,
 report the extension at the `let`. Recursive bindings and binding
 groups remain separate work. [Design sources](REFERENCES.md#references-by-roadmap-feature).
+
+## R17. Partially apply a source type lambda
+
+Allow several variable binders in a parenthesized type lambda on a
+top-level synonym RHS. For `WithError = (\err result -> Either err result) String`,
+an interface-only client can apply `WithError` to its own result type.
+When a nested binder shadows a captured kind, preserve the outer kind
+for earlier parameters and use the inner binder in the body. Check
+both explicitly and implicitly scoped kind variables.
+[Source and scope controls](roadmap/R17-type-level-lambdas.md).

@@ -94,12 +94,23 @@ Constraints from later arguments can fix the kind of the lambda binder
 before kind generalization. The existing family checker checks the
 scope, kind and beta equation.
 
-The family header and its equation bind different variables. For
-`S (q :: Type) (a :: q) = Map (\q -> Proxy a) xs`, preserve the
-outer q in the header because it scopes over a's kind. Give the last
-header binder a fresh spelling. In the equation bind the outer
-argument under that spelling and use q for the lambda parameter.
-The partial application in S still passes the outer q and a.
+Keep the capture's original header binder and kind. Earlier header
+variables scope over later kinds. An equation can give a shadowed
+capture a private name while retaining the original name for the new
+lambda binder. Pass all captures to a nested family, including private
+equation names: their values can still occur in the kind of another
+capture.
+
+For example, if a synonym binds (q :: Type) (a :: q), a lambda that
+binds q must still carry the original q so its header can bind a.
+A nested lambda then passes that original q using the parent
+equation's private name, while source occurrences of q still refer
+to the nearest lambda.
+
+The ordinary declaration renamer brings implicit kind variables
+from the synonym header and its outer kind annotation into scope.
+Make those variables explicit parameters of each lifted family.
+Keep the original synonym's implicit binders and their order.
 -}
 -- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
 liftTypeLambdas :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
@@ -113,18 +124,32 @@ liftTypeLambdas group =
       in (decls { group_tyclds = defs ++ families }, hidden)
 
     liftDecl (L loc syn@SynDecl{tcdLName = owner, tcdRhs = rhs,
-                                tcdTyVars = HsQTvs{hsq_explicit = captures}}) =
-      let (rhs', families, _) = liftRhs owner captures rhs (0 :: Int)
-      in (L loc syn{tcdRhs = rhs'}, families)
+                                tcdTyVars = HsQTvs{hsq_explicit = captures}})
+      | Just scoped <- traverse capture captures
+      = let (kind_occs, _) = hsQTyVarKindOccs captures (extractHsTyRdrTyVarsKindVars rhs)
+            kinds = nubN kind_occs
+            implicit = [(lambdaBinder k, k) | k <- kinds]
+            (rhs', families, _) = liftRhs owner (implicit ++ scoped) rhs (0 :: Int)
+        in (L loc syn{tcdRhs = rhs'}, families)
     liftDecl decl = (decl, [])
 
     liftRhs owner captures (L loc (HsKindSig ann body kind)) salt =
       let (body', families, next) = liftRhs owner captures body salt
       in (L loc (HsKindSig ann body' kind), families, next)
-    liftRhs owner captures (L loc (XHsType (HsTypeLambda _ v body))) salt
-      | Just scoped <- traverse capture captures
-      = let (applied, lifted) = liftLambda owner loc scoped v body salt
-        in (applied, [lifted], salt + 1)
+    liftRhs owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
+      let (binders, result) = collectLambdas salt vars body
+          -- Keep source spellings in a malformed list so the normal family
+          -- binder check diagnoses a duplicate at the written binder.
+          header_names
+            | hasDuplicates binders = binders
+            | otherwise = zipWith (privateName "header" salt) [0..] binders
+          locals = zip (map lambdaBinder header_names) binders
+          equation_captures = zipWith (hideCapture binders salt) [0..] captures
+          equation_scope = equation_captures ++ locals
+          (body', families, next) =
+            liftRhs owner equation_scope result (salt + 1)
+          (applied, lifted) = liftLambda owner loc captures equation_scope body' salt
+      in (applied, lifted : families, next)
     liftRhs owner captures (L loc (HsAppTy ann f x)) salt =
       let (f', fs, next) = liftRhs owner captures f salt
           (x', xs, last_salt) = liftRhs owner captures x next
@@ -134,29 +159,52 @@ liftTypeLambdas group =
       in (L loc (HsParTy ann body'), ds, next)
     liftRhs _ _ ty salt = (ty, [], salt)
 
-    liftLambda owner loc scoped v body salt =
+    liftLambda owner loc captures equation_scope body salt =
       let owner_occ = rdrNameOcc (unLoc owner)
           occ = mkTcOcc ("$lambda:" ++ occNameString owner_occ ++ ":" ++ show salt)
           name = L (getLoc owner) (mkRdrUnqual occ)
-          variable = L (getLoc v) (mkRdrUnqual (setOccNameSpace tvName (rdrNameOcc (unLoc v))))
-          shadowed n = unLoc n == unLoc variable
-          fresh = L (getLoc v) (mkRdrUnqual (mkTyVarOcc "$lambdaArg"))
-          header_var = if any (shadowed . snd) scoped then fresh else variable
-          binder = L loc (HsTvb noAnn (HsBndrRequired noExtField)
-                       (HsBndrVar noExtField header_var) (HsBndrNoKind noExtField))
-          pats = [typeName (if shadowed n then fresh else n) | (_, n) <- scoped]
-          eqn = L loc (FamEqn ([], [], noAnn) name mkHsOuterImplicit
-                      (map (HsValArg noExtField) (pats ++ [typeName variable]))
-                      Prefix body)
+          params = map (HsValArg noExtField . typeName . snd) equation_scope
+          eqn = L loc (FamEqn ([], [], noAnn) name mkHsOuterImplicit params Prefix body)
           family = L loc (FamDecl noExtField
                    (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just [eqn])) TopLevel
-                       name (HsQTvs noExtField (map fst scoped ++ [binder])) Prefix
+                       name (HsQTvs noExtField (map fst equation_scope)) Prefix
                        (L (l2l loc) (NoSig noExtField)) Nothing))
           applied = foldl' (\f (_, n) -> L loc (HsAppTy noExtField f (typeName n)))
-                           (typeName name) scoped
+                           (typeName name) captures
       in (applied, (family, (occ, owner_occ)))
 
-    capture b@(L _ (HsTvb _ (HsBndrRequired _) (HsBndrVar _ n) HsBndrKind{})) = Just (b, n)
+    -- An adjacent lambda shares the current telescope, so the inner
+    -- closure is just a partial application of the same family.
+    collectLambdas salt vars body
+      | not (hasDuplicates vars)
+      , L _ (XHsType (HsTypeLambda _ more inner)) <- stripParens body
+      , not (hasDuplicates more)
+      = collectLambdas salt (zipWith (hideEarlier more salt) [0..] vars ++ more) inner
+      | otherwise = (vars, body)
+
+    stripParens (L _ (HsParTy _ body)) = stripParens body
+    stripParens ty = ty
+
+    sameBinder a b = unLoc a == unLoc b
+    hasDuplicates = not . null . findDupsEq sameBinder
+
+    hideEarlier binders salt index var
+      | any (sameBinder var) binders = privateName "argument" salt index var
+      | otherwise = var
+
+    hideCapture binders salt index (header, var)
+      | any (sameBinder var) binders = (header, privateName "capture" salt index var)
+      | otherwise = (header, var)
+
+    privateName role salt index (L loc _) = L loc (mkRdrUnqual
+      (mkTyVarOcc ("$lambda-" ++ role ++ ":" ++ show (salt :: Int)
+                              ++ ":" ++ show (index :: Int))))
+
+    lambdaBinder v =
+      L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
+        (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
+
+    capture b@(L _ (HsTvb _ (HsBndrRequired _) (HsBndrVar _ n) _)) = Just (b, n)
     capture _ = Nothing
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)

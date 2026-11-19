@@ -10,17 +10,20 @@ g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
    -fdiagnostics-color=never)
 
 cd "$out/provider"
-cp "$src/TypeLambda.hs" .
+cp "$src"/{TypeLambda,NativeTypeLambdaScope}.hs .
 "${g[@]}" -c TypeLambda.hs
 "${g[@]}" --show-iface TypeLambda.hi >provider.iface
 if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -F '$lambda:'; then exit 1; fi
-cp TypeLambda.hi "$out/client/"
+"${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaScope.hs
+cp TypeLambda.hi NativeTypeLambdaScope.hi "$out/client/"
 cd "$out/client"
 cat >Ordinary.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module Ordinary where
+import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
-import TypeLambda (L, Captured, Shadowed)
+import NativeTypeLambdaScope
+import TypeLambda (L, Captured, Shadowed, WithError)
 import Data.Proxy (Proxy)
 result :: L :~: '[Maybe Int, Either String Int, IO Int]
 result = Refl
@@ -28,8 +31,50 @@ capture :: Captured Ordering :~: '[Either Ordering Bool, Either Ordering Char]
 capture = Refl
 shadowed :: Shadowed Bool 'True :~: '[Either Char (Proxy 'True)]
 shadowed = Refl
+partial :: WithError Char :~: Either String Char
+partial = Refl
+nested :: Levels Bool 'True :~:
+    ((Proxy 'True, Bool), (Proxy 'True, Int, Ordering))
+nested = Refl
+lifted :: Levels Type Ordering :~:
+    ((Proxy Ordering, Bool), (Proxy Ordering, Int, Ordering))
+lifted = Refl
+adjacent :: Adjacent Bool 'False :~: (Proxy 'False, Ordering)
+adjacent = Refl
+inferred :: InferredLevels 'True :~:
+    ((Proxy 'True, Bool), (Proxy 'True, Int, Ordering))
+inferred = Refl
+usesKind :: UsesKind 'True :~: (Proxy 'True, Proxy Bool, Bool, Char)
+usesKind = Refl
 HS
 "${g[@]}" -c Ordinary.hs
+
+cat >WrongScope.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module WrongScope where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import NativeTypeLambdaScope
+wrong :: Levels Bool 'True :~:
+    ((Proxy 'True, Int), (Proxy 'True, Bool, Ordering))
+wrong = Refl
+HS
+if "${g[@]}" -c WrongScope.hs >scope.log 2>&1 ||
+   ! grep -Fq 'WrongScope.hs:8:9: error: [GHC-83865]' scope.log; then
+    cat scope.log >&2
+    exit 1
+fi
+
+cat >Duplicate.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module Duplicate where
+type Duplicate = (\a a -> a) Int Bool
+HS
+if "${g[@]}" -c Duplicate.hs >duplicate.log 2>&1 ||
+   ! grep -Fq 'Duplicate.hs:3:20: error: [GHC-10498]' duplicate.log; then
+    cat duplicate.log >&2
+    exit 1
+fi
 
 cat >Disabled.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}

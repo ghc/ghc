@@ -25,11 +25,19 @@ Booleans and a callback whose result has kind `Bool`. Other checks
 cover a captured variable, a shadowed binder, a rejected matchable
 arrow, and the module's implicit export list.
 
-The first supported binder is a single type variable. Enclosing synonym
-parameters have explicit kinds. The renamer accepts this lambda at the
+A lambda can bind one or more ordinary type variables. An enclosing
+synonym can infer its parameter kinds. The renamer accepts lambdas at the
 root of the synonym body or under application, parentheses, and kind
 ascription. Other positions report GHC-27185. With the extension
 disabled, the diagnostic is GHC-27184 at the lambda.
+
+Adjacent lambdas share one family telescope. A lambda nested in an
+application gets its own family and captures the enclosing equation's
+binders. Both preserve lexical shadowing. An inner `q` can shadow an
+outer `q` while a captured `a :: q` keeps its original kind. A formerly
+implicit synonym kind variable can also appear explicitly in the lifted
+body. An ordinary interface-only client checks these cases. Nested
+family applications remain subject to the usual termination checks.
 
 The compiler lifts each lambda to a private closed family. The
 declaration group checks the synonym and generated family together.

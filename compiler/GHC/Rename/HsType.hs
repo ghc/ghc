@@ -31,7 +31,7 @@ module GHC.Rename.HsType (
         -- Binding related stuff
         bindHsOuterTyVarBndrs, bindHsForAllTelescope, bindHsGadtTelescopes,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
-        rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
+        rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars, hsQTyVarKindOccs,
         FreeKiTyVars, filterInScopeM,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars,
@@ -1289,6 +1289,17 @@ bindSigTyVarsFV tvs thing_inside
                 bindLocalNamesFV tvs thing_inside }
 
 ---------------
+-- | Find potential implicit kind binders before filtering the ambient scope.
+-- Return all occurrences and the subset from the result alone.
+hsQTyVarKindOccs :: [LHsTyVarBndr flag GhcPs] -> FreeKiTyVars
+                 -> (FreeKiTyVars, FreeKiTyVars)
+hsQTyVarKindOccs tv_bndrs rhs_kvs =
+  (filterFreeNamesToBind explicit (binder_kvs ++ rhs_kvs),
+   filterFreeNamesToBind binder_kvs (filterFreeNamesToBind explicit rhs_kvs))
+  where
+    explicit = mapMaybe hsLTyVarLocName tv_bndrs
+    binder_kvs = extractHsTyVarBndrsKVs tv_bndrs
+
 bindHsQTyVars :: forall a b.
                  HsDocContext
               -> Maybe (a, [Name])  -- Just _  => an associated type decl
@@ -1308,16 +1319,7 @@ bindHsQTyVars :: forall a b.
 -- (b) Bring type variables into scope
 --
 bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
-  = do { let bndr_kv_occs = extractHsTyVarBndrsKVs hs_tv_bndrs
-
-       ; let -- See Note [bindHsQTyVars examples] for what
-             -- all these various things are doing
-             bndrs, all_implicit_kvs :: [LocatedN RdrName]
-             bndrs        = mapMaybe hsLTyVarLocName hs_tv_bndrs
-             all_implicit_kvs = filterFreeNamesToBind bndrs $
-               bndr_kv_occs ++ body_kv_occs
-             body_remaining = filterFreeNamesToBind bndr_kv_occs $
-              filterFreeNamesToBind bndrs body_kv_occs
+  = do { let (all_implicit_kvs, body_remaining) = hsQTyVarKindOccs hs_tv_bndrs body_kv_occs
 
        ; implicit_kvs <-
            case mb_assoc of
@@ -1327,7 +1329,6 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
 
        ; traceRn "checkMixedVars3" $
            vcat [ text "bndrs"   <+> ppr hs_tv_bndrs
-                , text "bndr_kv_occs"   <+> ppr bndr_kv_occs
                 , text "body_kv_occs"   <+> ppr body_kv_occs
                 , text "implicit_kvs"   <+> ppr implicit_kvs
                 , text "body_remaining" <+> ppr body_remaining

@@ -2425,7 +2425,7 @@ atype :: { LHsType GhcPs }
         | '(#' bar_types2 '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
                                       ; amsA' (sLL $1 $> $ HsSumTy (AnnParensHash (epTok $1) (epTok $3)) $2) } }
         | '[' ktype ']'               {% amsA' . sLL $1 $> =<< (mkListSyntaxTy1 (epTok $1) $2 (epTok $3)) }
-        | '(' '\\' tyvar '->' ctype ')' {% amsA' (sLL $1 $> $
+        | '(' '\\' type_lambda_binders '->' ctype ')' {% amsA' (sLL $1 $> $
                             XHsType (HsTypeLambda (epTok $1, epTok $2, epUniTok $4, epTok $6) $3 $5)) }
         | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy (epTok $1, epTok $3) $2) }
                                       -- see Note [Promotion] for the followings
@@ -4080,6 +4080,10 @@ qvaropm :: { LocatedN RdrName }
 
 -----------------------------------------------------------------------------
 -- Type variables
+
+type_lambda_binders :: { [LocatedN RdrName] }
+        : tyvar                       { [$1] }
+        | tyvar type_lambda_binders    { $1 : $2 }
 
 tyvar   :: { LocatedN RdrName }
 tyvar   : tyvarid               { $1 }

@@ -1108,7 +1108,7 @@ instance Diagnostic TcRnMessage where
                               <+> text "requires -XExperimentalDependentTypes."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
-           text "This type lambda needs a top-level synonym with explicitly kinded captures."
+           text "This type lambda needs the right-hand side of a top-level synonym with ordinary parameters."
 
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $

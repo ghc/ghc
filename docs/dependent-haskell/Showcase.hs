@@ -992,6 +992,7 @@ main = do
         (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
+    observe "partially apply a two-argument type lambda" TypeLambda.partial
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
     observe "pass a constructor to uncurry with two unknown fields"
         (OpenBuildSource.uncurried (Proxy @Int) (Proxy @Char))
