@@ -20,6 +20,16 @@ compiler. [Map source](../examples/open-evaluation/TypeLambda.hs) and
 
 ## Compatibility with existing Haskell
 
+In `type family PFrom (x :: a) :: Rep a`, the result kind can depend
+on an inferred matchability argument to `Rep`. Fixing that argument
+prematurely gives `SDecide (Rep k)` two different meanings in the
+same program. Preserve the argument in the receiving family's
+telescope. First solve the constraints that can determine its value.
+An open family with such a parameter can independently need a
+matchability selector for an arrow in its result.
+[Original regression](../../../testsuite/tests/dependent/should_compile/T15346.hs)
+and [upgrade and independent-index tests](../examples/closed-evaluation/check-readback-upgrade.sh).
+
 If a provider gains an inferred matchability parameter, an older client
 can still refer to the same family by name. For a bare alias such as
 `type Saved = K`, the interface records the kind at which the alias

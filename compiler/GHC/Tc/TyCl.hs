@@ -1426,7 +1426,7 @@ inferOpenMatchability candidates signatures tc
   , OpenFamilyFlavour IAmType _ <- tyConFlavour tc
   , tyConResKind tc `eqType` liftedTypeKind
   , not (null (tyConVisibleTyVars tc))
-  , not (any ((`eqType` matchabilityTy) . tyVarKind . binderVar) (tyConBinders tc)) = do
+  , not (any reserves_matchability (tyConBinders tc)) = do
       ma <- newFlexiTyVar matchabilityTy
       let index = mkTyVar (getName ma) matchabilityTy
       pure (mkTcTyCon (tyConName tc)
@@ -1434,6 +1434,12 @@ inferOpenMatchability candidates signatures tc
               (mkNamedTyConBinders Inferred [index] ++ tyConBinders tc)
               0 (tyConResKind tc) (tcTyConScopedTyVars tc) True (tyConFlavour tc))
   | otherwise = pure tc
+  where
+    -- A receiver index used in its telescope is independent of the selector
+    -- for the result arrow. Explicit metadata takes precedence.
+    reserves_matchability b =
+      tyVarKind (binderVar b) `eqType` matchabilityTy &&
+      not (inferredMatchabilityIndex b && familyKindUsesMatchability tc b)
 
 type ScopedPairs = [(Name, TcTyVar)]
   -- The ScopedPairs for a TcTyCon are precisely

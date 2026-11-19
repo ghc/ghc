@@ -3969,11 +3969,14 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
              | TypeLevel <- mode_tyki mode
              , isTypeFamilyTyCon tc
              , hasInferredMatchability tc
-             , b : _ <- tyConBinders tc
-             , familyKindUsesMatchability tc b -> do
+             , let indices = takeWhile inferredMatchabilityIndex (tyConBinders tc)
+             , any (familyKindUsesMatchability tc) indices -> do
                  defaults <- tcl_kind_arrow_defaults <$> getLclEnv
                  case defaults of
-                   Just owner -> mkTyConApp tc . (:[]) <$> fresh_kind_arrow owner
+                   Just owner -> mkTyConApp tc <$>
+                     traverse (\b -> if familyKindUsesMatchability tc b
+                                      then fresh_kind_arrow owner
+                                      else pure unmatchableDataConTy) indices
                    Nothing -> pure fun
            _ -> pure fun
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args Nothing

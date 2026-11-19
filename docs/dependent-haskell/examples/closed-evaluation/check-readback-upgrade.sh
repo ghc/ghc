@@ -5,8 +5,14 @@ export LC_ALL=C
 # Run with two matching native toolchains. The old compiler predates the
 # readback recipes and the matchability inference. The optional build directory
 # supplies the old boot interfaces for the original GHC.Internal.Err source.
-if (( $# < 4 || $# > 5 )); then
+family_kinds=false
+if [[ ${1:-} == --family-kinds ]]; then
+    family_kinds=true
+    shift
+fi
+if (( $# < 4 || $# > 5 )) || { "$family_kinds" && (( $# != 4 )); }; then
     echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB [OLD_GHC_INTERNAL_BUILD]" >&2
+    echo "       $0 --family-kinds M177_GHC M177_LIB NEW_GHC NEW_LIB" >&2
     exit 2
 fi
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -34,6 +40,58 @@ replace() {
     cp "$1" "$2.new"
     mv -f "$2.new" "$2"
 }
+
+if "$family_kinds"; then
+    cd "$work/home"
+    cat >FamilyKinds.hs <<'HS'
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
+module FamilyKinds (PFrom) where
+import Data.Kind (Type)
+type family Rep (k :: Type) :: Type
+type instance Rep () = ()
+type family PFrom (a :: k) :: Rep k
+HS
+    cat >FamilyKindsClient.hs <<'HS'
+{-# LANGUAGE DataKinds, TypeFamilies #-}
+module FamilyKindsClient where
+import Data.Proxy (Proxy(..))
+import FamilyKinds (PFrom)
+observation :: Proxy (PFrom '())
+observation = Proxy
+HS
+    cat >IndependentIndices.hs <<'HS'
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
+module IndependentIndices where
+import Data.Kind (Type)
+type family Rep (b :: Bool) :: Type
+type instance Rep 'True = Type -> Type
+type family Arrow (f :: Rep 'True) :: Type
+type family Use (f :: Rep 'True) (g :: Arrow f) :: Type
+type instance Arrow Maybe = Type -> Type
+type instance Use Maybe Maybe = Bool
+identity :: Arrow Maybe
+identity x = x
+observation :: Use Maybe Maybe
+observation = True
+HS
+    cat >Unrelated.hs <<'HS'
+module Unrelated where
+answer :: Int
+answer = 42
+HS
+    args=(--make -no-link -v1 "${sanity[@]}" FamilyKindsClient.hs IndependentIndices.hs Unrelated.hs)
+    "${old[@]}" "${args[@]}"
+    sha256sum Unrelated.{hi,o} >unrelated.sha
+    "${new[@]}" "${args[@]}" >upgrade.log 2>&1 || { cat upgrade.log >&2; exit 1; }
+    grep -F 'Compiling FamilyKinds [Compiler now infers matchability in family kinds]' upgrade.log
+    grep -F 'Compiling FamilyKindsClient [FamilyKinds changed]' upgrade.log
+    grep -F 'Compiling IndependentIndices [Compiler now infers matchability in family kinds]' upgrade.log
+    sha256sum -c unrelated.sha --quiet
+    if grep -F 'Compiling Unrelated' upgrade.log; then exit 1; fi
+    "${new[@]}" "${args[@]}" >warm.log 2>&1
+    if grep -F 'Compiling ' warm.log; then exit 1; fi
+    exit 0
+fi
 
 if [[ -n $boot_dir ]]; then
     old_internal=$(find "$old_lib" -type d -name 'ghc-internal-*-inplace' -print -quit)
@@ -218,6 +276,39 @@ done
         cat bare.log >&2
         exit 1
     fi
+)
+(
+    mkdir "$work/remote"
+    cd "$work/remote"
+    cp ../home/OpenProvider.hi .
+    cat >RemoteInstance.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeFamilies #-}
+module RemoteInstance where
+import Data.Kind (Type)
+import OpenProvider
+
+instance Owner 'True where
+  type Associated 'True a = a -> a
+
+instance Observer 'True where
+  type Observe 'True Type Maybe = Bool
+
+identity :: Associated 'True Type
+identity x = x
+HS
+    "${new[@]}" "${opts[@]}" -c RemoteInstance.hs
+    rm RemoteInstance.hs
+    cat >RemoteClient.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeFamilies #-}
+module RemoteClient where
+import Data.Kind (Type)
+import OpenProvider
+import RemoteInstance ()
+
+observation :: Observe 'True Type Maybe
+observation = True
+HS
+    "${new[@]}" "${opts[@]}" -c RemoteClient.hs
 )
 nm -g --defined-only Scalar.o Worker.o Certified.o | grep -E "$new_companions"
 grep -E "type K :: forall.*Matchability" Both.new
