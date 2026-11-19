@@ -66,6 +66,13 @@ or an SMT solver's exit code cannot by itself construct a membership path.
 [GHC's plugin evidence interface](../users_guide/extending_ghc.rst#typechecker-plugins)
 and [Agda's decidable propositions and witnesses](https://agda.github.io/agda-stdlib/v2.3/Relation.Nullary.Decidable.Core.html).
 
+A QuickCheck generator could also propose a field position. The checker
+would compare the label at that position with the requested label and
+construct the membership path. One successful candidate proves membership
+because the claim asks for one position. If every attempt misses, the
+search has established only that those positions failed. To establish
+absence in this finite list, a checker must account for every position.
+
 ## Running a search in a splice
 
 The same obligation has a plugin-free spelling. The ordinary
@@ -136,6 +143,13 @@ rules. The runnable example asks GHC for two separate `Refl` witnesses.
 It then demands the results on an exceptional input at runtime.
 [Ordinary functions](examples/boundary-evidence/BoolObservation.hs)
 and [the two-input observation](examples/boundary-evidence/ObserveBoth.hs). [Observational equality and partial Haskell](REFERENCES.md#observational-equality-and-partial-haskell).
+
+The distinction determines where a client can use an equality. A proof
+that two parsers return the same tag on a particular input lets a client
+replace one tag with the other in a type indexed by that tag. Replacing
+the parser itself would also affect callers that inspect its payload or
+force its input. Arbitrary Haskell can search for evidence at either
+scope. The obligation states which substitutions the evidence justifies.
 
 ## Where totality matters
 
