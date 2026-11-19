@@ -751,7 +751,8 @@ tcRetainedConstructorArgType = collect []
           { thing <- tcLookupGlobal name
           ; case thing of
               AConLike (RealDataCon dc)
-                | (tvs, [], [], [], fields, result) <- dataConFullSig dc
+                | null (dataConRepArgBinders dc)
+                , (tvs, [], [], [], fields, result) <- dataConFullSig dc
                 , fields `equalLength` args
                 , isJust (nativeIndexDataConTyArgs result dc)
                 -> do { subst <- foldM (tcMatchDeclaredField tvs) Subst.emptySubst (zip fields args)
@@ -2459,7 +2460,18 @@ tcRetainedArg domain arg
              else unsupported }
       | otherwise = unsupported
 
-    apply env fun arg = case splitFunTy_maybe (exprType fun) of
+    -- Resolve the witness before checking the dependent payload. The next
+    -- application reads its domain from the type of this partial Core call.
+    apply env fun arg
+      | DepFunTy DepFunVisible binder _ <- coreFullView (exprType fun)
+      = do { (core_arg, arg') <- resolve env (varType binder) arg
+           ; case Core.retainedArgIndex core_arg of
+               Just index | typeKind index `tcEqType` varType binder ->
+                 return (Core.App fun core_arg, arg')
+               _ -> setSrcSpanA (getLoc arg) unsupported }
+      | otherwise = apply_ordinary env fun arg
+
+    apply_ordinary env fun arg = case splitFunTy_maybe (exprType fun) of
       Just (_, _, _, arg_ty, _) -> do
         (core_arg, arg') <- resolve env arg_ty arg
         let app = Core.App fun core_arg

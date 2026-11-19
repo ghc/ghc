@@ -257,7 +257,8 @@ test('NativeTypeCaseReify',
 
 test('NativeRetainedPackage',
      [req_host_target_ghc, only_ways(['normal']),
-      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
+      extra_files(['NativePackageOperand.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/RetainedNat.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedProjection.hs'])],
      run_command, ['bash NativeRetainedPackage.sh "{compiler}" "{libdir}"'])

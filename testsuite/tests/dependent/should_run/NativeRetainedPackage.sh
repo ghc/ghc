@@ -134,3 +134,13 @@ if "${g[@]}" -c WrongProjection.hs >bad.log 2>&1 ||
     cat bad.log >&2
     exit 1
 fi
+
+cp "$src/NativePackageOperand.hs" .
+"${g[@]}" -c NativePackageOperand.hs
+line=$(awk '/^wrong n _ xs/ {print NR}' NativePackageOperand.hs)
+if "${g[@]}" -fforce-recomp -DWRONG_WITNESS -c NativePackageOperand.hs >bad.log 2>&1 ||
+   ! grep -Fq "NativePackageOperand.hs:$line:" bad.log ||
+   ! grep -Fq '[GHC-83865]' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi

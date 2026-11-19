@@ -68,15 +68,16 @@ import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
-                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId, nativeIndexDataConTyArgs )
+                     , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
+                     , nativeIndexDataConTyArgs, splitFunTy_maybe )
 import GHC.Core.Coercion ( MCoercion(MRefl), mkCoVarCo, mkCoCast
                          , mkSymCo, mkSubCo, coercionKind, coercionLKind
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
-import GHC.Core.DataCon ( DataCon, dataConName, dataConInstOrigArgTys, dataConUnivTyVars, dataConWorkId )
+import GHC.Core.DataCon ( DataCon, dataConName, dataConSourceArity, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Reduction ( Reduction(..) )
-import GHC.Core.Utils ( applyTypeToArgs )
+import GHC.Core.Utils ( applyTypeToArgs, exprType )
 -- Create chunkified tuple types for monad comprehensions
 import GHC.Core.Make.BigTuple
 
@@ -588,8 +589,8 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
             -> do { con_like <- tcLookupConLike name
                   ; return $ case con_like of
                       RealDataCon con
-                        | Just args <- nativeIndexDataConTyArgs domain con
-                        , fields `equalLength` dataConInstOrigArgTys con args -> Just con
+                        | Just _ <- nativeIndexDataConTyArgs domain con
+                        , fields `lengthIs` dataConSourceArity con -> Just con
                       _ -> Nothing }
           _ -> return Nothing
 
@@ -664,15 +665,9 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                ; case con_like of
                    RealDataCon con
                      | Just type_args <- nativeIndexDataConTyArgs expected con
-                     , let fields = dataConInstOrigArgTys con type_args
-                     , fields `equalLength` args ->
-                       do { values <- zipWithM
-                              (\(Scaled _ ty) arg -> scalar_argument ty (unLoc arg)) fields args
-                          ; return $ do
-                              actuals <- sequence values
-                              let value = foldl' App (Var (dataConWorkId con)) (map Type type_args ++ actuals)
-                              _ <- exprToNativeIndex value
-                              return value }
+                     , args `lengthIs` dataConSourceArity con
+                     -> scalar_fields expected
+                          (foldl' App (Var (dataConWorkId con)) (map Type type_args)) args
                    _ -> return Nothing }
           | HsVar{} <- expr
           = do { actual <- local_variable expr
@@ -680,6 +675,25 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                    Just var | isNativeOpaqueValueId var
                             , varType var `eqType` expected -> Just (Var var)
                    _ -> Nothing }
+          | otherwise = return Nothing
+
+        -- | Open the worker telescope in order. Applying a checked witness
+        -- substitutes it into the domain of the next field.
+        scalar_fields expected worker [] = return $ do
+          index <- exprToNativeIndex worker
+          guard (typeKind index `eqType` expected)
+          return worker
+        scalar_fields expected worker (arg : args)
+          | let sigma = exprType worker
+          , Just domain <- case coreFullView sigma of
+              DepFunTy DepFunVisible binder _ -> Just (varType binder)
+              _ -> case splitFunTy_maybe sigma of
+                Just (_, _, _, input, _) -> Just input
+                Nothing -> Nothing
+          = do { actual <- scalar_argument domain (unLoc arg)
+               ; case actual of
+                   Just value -> scalar_fields expected (App worker value) args
+                   Nothing -> return Nothing }
           | otherwise = return Nothing
 
         -- | Use resolved lexical identities and decline unknown source locals.
