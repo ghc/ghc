@@ -24,13 +24,14 @@ grep -Fq 'T:markResult ' worker.iface
 grep -Fq 'T:markField ' worker.iface
 grep -Fq 'T:secondOrFirst ' worker.iface
 grep -Fq 'T:headOr ' worker.iface
+grep -Fq 'T:erase ' worker.iface
 if sed -n '/^exports:/,/^defaults:/p' worker.iface | grep -Eq '^[[:space:]]+(helper|wrap|mark|markResult|markField|headOr)$'; then
     echo 'The private helper escaped into source exports.' >&2
     exit 1
 fi
 cat > Residual.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, StandaloneKindSignatures #-}
-module Residual (First, Wrapped, Marked, Second) where
+module Residual (First, Wrapped, Marked, Second, Erase) where
 import qualified SpineWorker as W
 type First :: W.Spine Bool -> Maybe Bool
 type First xs = W.firstViaHelper xs
@@ -40,13 +41,15 @@ type Marked :: W.Spine Bool -> Maybe (W.Marked Bool)
 type Marked xs = W.firstViaMark xs
 type Second :: W.Spine Bool -> Maybe Bool
 type Second xs = W.secondOrFirst xs
+type Erase :: W.Spine Bool -> W.Spine Bool
+type Erase xs = W.erase xs
 HS
 cat > Consumer.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
 module Consumer where
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import Residual (First, Wrapped, Marked, Second)
+import Residual (First, Wrapped, Marked, Second, Erase)
 import qualified SpineWorker as W
 
 empty :: First 'W.Empty :~: 'Nothing
@@ -65,6 +68,11 @@ singleton _ = Refl
 second :: forall (a :: Bool) (b :: Bool) (xs :: W.Spine Bool).
           Proxy a -> Proxy b -> Proxy xs -> Second ('W.More a ('W.More b xs)) :~: 'Just b
 second _ _ _ = Refl
+erasedEmpty :: Erase 'W.Empty :~: 'W.Empty
+erasedEmpty = Refl
+erasedMore :: forall (x :: Bool) (xs :: W.Spine Bool).
+              Proxy x -> Proxy xs -> Erase ('W.More x xs) :~: 'W.More 'True (Erase xs)
+erasedMore _ _ = Refl
 HS
 "${ghc[@]}" -c Residual.hs
 "${ghc[@]}" -c Consumer.hs
@@ -90,6 +98,53 @@ HS
 if "${ghc[@]}" -c UnknownTail.hs >reject.log 2>&1 ||
    ! grep -Eq '^UnknownTail\.hs:10:[0-9]+.*error: \[GHC-(25897|83865)\]' reject.log ||
    ! grep -Fq "Couldn't match" reject.log; then cat reject.log >&2; exit 1; fi
+
+cat > ErasedTail.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
+module ErasedTail where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import Residual (Erase)
+import qualified SpineWorker as W
+
+proof :: forall (x :: Bool) (xs :: W.Spine Bool).
+         Proxy x -> Proxy xs -> Erase ('W.More x xs) :~: 'W.More 'True 'W.Empty
+proof _ _ = Refl
+HS
+if "${ghc[@]}" -c ErasedTail.hs >reject.log 2>&1 ||
+   ! grep -Eq '^ErasedTail\.hs:10:[0-9]+.*error: \[GHC-(25897|83865)\]' reject.log ||
+   ! grep -Fq "Couldn't match" reject.log; then cat reject.log >&2; exit 1; fi
+
+sed 's/^module Consumer where/module RecursiveRule where/' Consumer.hs > RecursiveRule.hs
+cat >> RecursiveRule.hs <<'HS'
+{-# RULES "erase/replacement" forall (xs :: W.Spine Bool). W.erase xs = W.Empty #-}
+HS
+if "${ghc[@]}" -fenable-rewrite-rules -Wno-orphans -Wno-inline-rule-shadowing \
+       -c RecursiveRule.hs >reject.log 2>&1 ||
+   ! grep -Eq '^RecursiveRule\.hs:[0-9]+:[0-9]+.*error: \[GHC-83605\]' reject.log ||
+   ! grep -Fq 'erase' reject.log; then cat reject.log >&2; exit 1; fi
+
+reject_old_erase() {
+    if grep -Fq 'T:erase ' worker.iface; then cat worker.iface >&2; exit 1; fi
+    local line
+    line=$(awk '/^type Erase xs =/ {print NR}' Residual.hs)
+    if "${ghc[@]}" -c Residual.hs >reject.log 2>&1 ||
+       ! grep -Eq "^Residual\.hs:$line:[0-9]+.*error: \[GHC-(68947|70566)\]" reject.log ||
+       ! grep -Fq 'erase' reject.log; then cat reject.log >&2; exit 1; fi
+}
+
+# Neither a strict field match nor an incomplete or nondecreasing
+# recursive clause can supply an equation.
+sed 's/^erase (More _ xs) =/erase (More _ !xs) =/' Worker.source > SpineWorker.hs
+compile_worker
+reject_old_erase
+sed '/^erase Empty = Empty$/d' Worker.source > SpineWorker.hs
+compile_worker
+reject_old_erase
+sed 's/^erase (More _ xs) = More True (erase xs)$/erase (More x xs) = More True (erase (More x xs))/' \
+    Worker.source > SpineWorker.hs
+compile_worker
+reject_old_erase
 
 reject_old_second() {
     if grep -Eq 'T:(headOr|secondOrFirst) ' worker.iface; then cat worker.iface >&2; exit 1; fi

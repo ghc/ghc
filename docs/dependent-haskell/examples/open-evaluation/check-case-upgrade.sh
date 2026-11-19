@@ -2,8 +2,8 @@
 set -euo pipefail
 export LC_ALL=C
 
-if [[ $# -lt 4 || $# -gt 8 || $1 != /* || $2 != /* || $3 != /* || $4 != /* || ${5:-/} != /* || ${6:-/} != /* || ${7:-/} != /* || ${8:-/} != /* ]]; then
-    printf 'usage: %s ABS_M142_GHC ABS_M144_GHC ABS_CURRENT_GHC ABS_LIBDIR [ABS_M147_GHC [ABS_M150_GHC [ABS_M154_GHC [ABS_M155_GHC]]]]\n' "$0" >&2
+if [[ $# -lt 4 || $# -gt 9 || $1 != /* || $2 != /* || $3 != /* || $4 != /* || ${5:-/} != /* || ${6:-/} != /* || ${7:-/} != /* || ${8:-/} != /* || ${9:-/} != /* ]]; then
+    printf 'usage: %s ABS_M142_GHC ABS_M144_GHC ABS_CURRENT_GHC ABS_LIBDIR [ABS_M147_GHC [ABS_M150_GHC [ABS_M154_GHC [ABS_M155_GHC [ABS_M158_GHC]]]]]\n' "$0" >&2
     exit 2
 fi
 m142=$1
@@ -169,7 +169,7 @@ HS
     echo 'The compiler upgraded the reachable helper chain and reused the ordinary module and warm build.'
 fi
 
-if [[ $# -eq 8 ]]; then
+if [[ $# -ge 8 ]]; then
     mkdir "$out/private-case"
     cd "$out/private-case"
     cp "$src/SpineWorker.hs" "$out/latest/IdentityOnly.hs" "$out/Abstract.hs" .
@@ -206,4 +206,42 @@ HS
     "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >warm.log 2>&1
     if grep -Fq 'Compiling ' warm.log; then cat warm.log; exit 1; fi
     echo 'The compiler upgraded the private case producer and reused the unrelated modules and warm build.'
+fi
+
+if [[ $# -eq 9 ]]; then
+    mkdir "$out/recursive-case"
+    cd "$out/recursive-case"
+    cp "$src/SpineWorker.hs" "$out/latest/IdentityOnly.hs" "$out/Abstract.hs" .
+    "$9" "${flags[@]}" -v0 -c SpineWorker.hs IdentityOnly.hs Abstract.hs
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >old.worker
+    grep -Fq 'T:headOr ' old.worker
+    if grep -Fq 'T:erase ' old.worker; then exit 1; fi
+
+    cat >Residual.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, StandaloneKindSignatures #-}
+module Residual (Erase) where
+import qualified SpineWorker as W
+type Erase :: W.Spine Bool -> W.Spine Bool
+type Erase xs = W.erase xs
+HS
+    cat >Proof.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module Proof where
+import qualified SpineWorker as W
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import Residual (Erase)
+proof :: Proxy xs -> Erase ('W.More 'False xs) :~: 'W.More 'True (Erase xs)
+proof _ = Refl
+HS
+    targets=(Proof.hs IdentityOnly.hs Abstract.hs)
+    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >upgrade.log 2>&1 ||
+        { cat upgrade.log; exit 1; }
+    grep -Eq 'Compiling SpineWorker[[:space:]].*\[Compiler now checks recursive constructor cases\]' upgrade.log
+    if grep -Eq 'Compiling (IdentityOnly|Abstract)[[:space:]]' upgrade.log; then cat upgrade.log; exit 1; fi
+    "$current" "${flags[@]}" --show-iface SpineWorker.hi >new.worker
+    grep -Fq 'T:erase ' new.worker
+    "$current" "${flags[@]}" -v1 --make -no-link "${targets[@]}" >warm.log 2>&1
+    if grep -Fq 'Compiling ' warm.log; then cat warm.log; exit 1; fi
+    echo 'The compiler upgraded the recursive case producer and reused the unrelated modules and warm build.'
 fi

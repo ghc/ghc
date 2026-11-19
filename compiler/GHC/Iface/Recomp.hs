@@ -547,6 +547,7 @@ checkFlagHash hsc_env iface self_recomp = do
         helper_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v3" :: String)
         pair_builder_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v4" :: String)
         reachable_helper_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v5" :: String)
+        private_case_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v6" :: String)
         new_fp = caseTreeFingerprint base_fp
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
@@ -554,6 +555,10 @@ checkFlagHash hsc_env iface self_recomp = do
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
        | old_fp == base_fp, any couldHaveSumProjection candidates
          -> recheck "Compiler now checks sum projections"
+       | old_fp == private_case_fp, not (null candidates)
+         -> recheck "Compiler now checks recursive constructor cases"
+       | old_fp == private_case_fp
+         -> up_to_date logger (text "Module cannot export a constructor case")
        | old_fp == reachable_helper_fp, not (null candidates)
          -> recheck "Compiler now checks private constructor cases"
        | old_fp == reachable_helper_fp
@@ -583,7 +588,7 @@ checkFlagHash hsc_env iface self_recomp = do
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
-caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v6" :: String)
+caseTreeFingerprint fp = computeFingerprint putNameLiterally (fp, "constructor-case-trees-v7" :: String)
 
 -- | Local datatypes that a producer could scrutinize in a published equation.
 -- See Note [Recompiling constructor case producers].
@@ -639,7 +644,7 @@ the intervening compiler reused it. Record the new key on every write,
 including when the Core checks find no equation. M146 only returned
 fields and arguments. Reuse the same necessary candidate test when
 upgrading to constructor results, reachable helper calls and private
-constructor cases. A lazy pair builder can return a boxed pair without declaring
+or structurally recursive constructor cases. A lazy pair builder can return a boxed pair without declaring
 any datatype. Check the ordinary types of exported functions as well.
 An unexpanded synonym can hide its arrows or its result. Recheck that
 module once. A rigid result variable and a known non-pair datatype

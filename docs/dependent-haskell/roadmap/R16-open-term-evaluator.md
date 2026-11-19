@@ -836,3 +836,27 @@ the updated producer.
 [Producer](../examples/open-evaluation/SpineWorker.hs),
 [stripped-interface tests](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh),
 and [interface upgrade](../examples/open-evaluation/check-case-upgrade.sh).
+
+## M159. Structural recursion under a result constructor
+
+The ordinary `erase :: Spine a -> Spine Bool` replaces every element
+with `True`. A checked equation for `More x xs` returns
+`More True (erase xs)`. An ordinary interface-only consumer can prove
+that equation with a rigid tail. The recursive family application
+stays in the result. It needs the tail constructor before choosing a
+branch.
+
+The checker recognizes the exact unary Core self-call at its original
+type arguments. The operand must be a proper bound field of the
+matched first argument with the original input type. The self-call
+must occur under a checked lazy constructor. A rebuilt argument
+cannot establish the decrease, and an incomplete case or a case that
+forces the recursive field cannot publish the equation. The existing
+rule check still guards the recursive function.
+
+An eligible M158 producer recompiles once on upgrade. Plain and
+abstract modules can reuse their old interfaces, and a warm build
+reuses the updated producer.
+[Producer](../examples/open-evaluation/SpineWorker.hs),
+[stripped-interface tests](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh),
+and [interface upgrade](../examples/open-evaluation/check-case-upgrade.sh).

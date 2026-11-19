@@ -1023,7 +1023,7 @@ checkedConstructorHelper public helper owner rhs = do
            all isId terms && eqTypes (map varType terms) domains)
     guard (all publicKind (result : domains))
     value <- checkCaseResult public publicKind helper
-                             (\v -> v <$ guard (v `elem` terms)) result body
+                             (\v -> v <$ guard (v `elem` terms)) (const Nothing) result body
     pure (declared, domains, result, ConstructorCaseRow (map CaseField terms) value)
 
 -- | Recognize a private constructor-case family and its nominal equations.
@@ -1183,6 +1183,7 @@ data ConstructorCaseTree
   = CaseField Id
   | CaseConstructor DataCon [Type] [ConstructorCaseTree]
   | CaseCall TyCon [Type] [ConstructorCaseTree]
+  | CaseSelf [Type] Id
 
 -- | A complete path through the Core cases and its checked result.
 data ConstructorCaseRow = ConstructorCaseRow [ConstructorCaseTree] ConstructorCaseTree
@@ -1229,7 +1230,7 @@ checkedConstructorCase public helper owner rhs = do
           replace (CaseConstructor con types children) =
             let (flags, children') = unzip (map replace children)
             in (or flags, CaseConstructor con types children')
-          replace call@CaseCall{} = (False, call)
+          replace call = (False, call)
           (replaced, patterns') = unzip (map replace patterns)
       guard (or replaced)
       rows <- checkBody parameters result patterns' aliases body
@@ -1249,10 +1250,25 @@ checkedConstructorCase public helper owner rhs = do
       _ -> do
         value <- checkCaseResult public (casePublicKind public parameters) helper
                     (\v -> let selected = resolve aliases v
-                           in selected <$ guard (scoped selected)) result body
+                           in selected <$ guard (scoped selected))
+                    (checkedSelfCall patterns aliases) result body
         pure [ConstructorCaseRow patterns value]
       where
         scoped v = any (contains v) patterns
+
+    checkedSelfCall patterns aliases expr = do
+      ConstructorCaseType telescope tc args [] _ <- constructorCaseType (exprType rhs)
+      CaseConstructor _ _ children : _ <- pure patterns
+      (Core.Var callee, arguments) <- pure (Core.collectArgs expr)
+      guard (callee == owner)
+      let (kind_args, operands) = splitAt (length telescope) arguments
+          expected = [mkTyVarTy v | Bndr v _ <- telescope]
+      types <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) kind_args
+      guard (eqTypes types expected)
+      [Core.Var operand] <- pure operands
+      let field = resolve aliases operand
+      guard (varType field `eqType` mkTyConApp tc args && any (contains field) children)
+      pure (CaseSelf types field)
 
     -- Each entry already names a leaf. Core Id identities keep the alias
     -- lexical, and each alternative receives its own immutable environment.
@@ -1262,7 +1278,7 @@ checkedConstructorCase public helper owner rhs = do
 
     contains selected (CaseField v) = selected == v
     contains selected (CaseConstructor _ _ children) = any (contains selected) children
-    contains _ CaseCall{} = False
+    contains _ _ = False
 
 -- | Account for the visibility of every datatype in a checked kind.
 casePublicKind :: (TyCon -> Bool) -> [Type] -> Type -> Bool
@@ -1274,39 +1290,42 @@ casePublicKind public parameters kind
 
 -- | Check a scoped variable, lazy constructor, or an available helper call.
 checkCaseResult :: (TyCon -> Bool) -> (Type -> Bool) -> (Id -> Maybe TyCon)
-                -> (Id -> Maybe Id) -> Type -> Core.CoreExpr -> Maybe ConstructorCaseTree
-checkCaseResult public publicKind helper scoped expected expr = do
-  guard (exprType expr `eqType` expected)
-  case Core.collectArgs expr of
-    (Core.Var output, [])
-      | Just selected <- scoped output
-      , varType selected `eqType` expected ->
-          pure (CaseField selected)
-    (Core.Var worker, arguments)
-      | Just dc <- isDataConWorkId_maybe worker -> do
-          let tc = dataConTyCon dc
-              universals = dataConUnivTyVars dc
-              (type_args, fields) = splitAt (length universals) arguments
-          guard (public tc && dataConUserTyVars dc == universals)
-          args <- traverse coreType type_args
-          guard (all publicKind args &&
-                 mkTyConApp tc args `eqType` expected)
-          kinds <- openDataConFieldTypes dc args
-          guard (lengthIs fields (length kinds))
-          children <- zipWithM (checkCaseResult public publicKind helper scoped) kinds fields
-          pure (CaseConstructor dc args children)
-    (Core.Var callee, arguments)
-      | Just table <- helper callee -> do
-          let (type_args, fields) = splitAt (helperInvisibleArity table) arguments
-          args <- traverse coreType type_args
-          guard (all publicKind args)
-          (input_kinds, result_kind) <- helperKinds table args
-          guard (result_kind `eqType` expected && lengthIs fields (length input_kinds))
-          children <- zipWithM (checkCaseResult public publicKind helper scoped) input_kinds fields
-          pure (CaseCall table args children)
-    _ -> Nothing
-
+                -> (Id -> Maybe Id) -> (Core.CoreExpr -> Maybe ConstructorCaseTree)
+                -> Type -> Core.CoreExpr -> Maybe ConstructorCaseTree
+checkCaseResult public publicKind helper scoped self = check False
   where
+    check under_constructor expected expr = do
+      guard (exprType expr `eqType` expected)
+      case Core.collectArgs expr of
+        (Core.Var output, [])
+          | Just selected <- scoped output
+          , varType selected `eqType` expected ->
+              pure (CaseField selected)
+        (Core.Var worker, arguments)
+          | Just dc <- isDataConWorkId_maybe worker -> do
+              let tc = dataConTyCon dc
+                  universals = dataConUnivTyVars dc
+                  (type_args, fields) = splitAt (length universals) arguments
+              guard (public tc && dataConUserTyVars dc == universals)
+              args <- traverse coreType type_args
+              guard (all publicKind args &&
+                     mkTyConApp tc args `eqType` expected)
+              kinds <- openDataConFieldTypes dc args
+              guard (lengthIs fields (length kinds))
+              children <- zipWithM (check True) kinds fields
+              pure (CaseConstructor dc args children)
+        (Core.Var callee, arguments)
+          | Just table <- helper callee -> do
+              let (type_args, fields) = splitAt (helperInvisibleArity table) arguments
+              args <- traverse coreType type_args
+              guard (all publicKind args)
+              (input_kinds, result_kind) <- helperKinds table args
+              guard (result_kind `eqType` expected && lengthIs fields (length input_kinds))
+              children <- zipWithM (check under_constructor) input_kinds fields
+              pure (CaseCall table args children)
+        _ | under_constructor -> self expr
+          | otherwise -> Nothing
+
     helperKinds table args = do
       let (invisible, visible) = span isInvisibleTyConBinder (tyConBinders table)
           vars = [v | Bndr v _ <- invisible]
@@ -1348,8 +1367,8 @@ publishConstructorRows owner telescope domains result rows = do
       (lhs, leaves) <- unzip <$> traverse (publishPattern instantiate) patterns
       let fields = concat leaves
           vars = quantifiers ++ map snd fields
-          rhs = publishResult instantiate fields result_value
-          branch _ = mkCoAxBranch vars [] [] (mkTyVarTys quantifiers ++ lhs) rhs
+          branch family = mkCoAxBranch vars [] [] (mkTyVarTys quantifiers ++ lhs)
+                      (publishResult family instantiate fields result_value)
                       (map (const Nominal) vars) (nameSrcSpan (idName owner))
       pure branch
     makeSourceFamily (idName owner) (kind_binders ++ mkAnonTyConBinders operands)
@@ -1363,18 +1382,21 @@ publishConstructorRows owner telescope domains result rows = do
     publishPattern instantiate (CaseConstructor dc parameters children) = do
       (fields, leaves) <- unzip <$> traverse (publishPattern instantiate) children
       pure (mkTyConApp (promoteDataCon dc) (map instantiate parameters ++ fields), concat leaves)
-    publishPattern _ CaseCall{} = panic "publishConstructorCase: call in pattern"
+    publishPattern _ _ = panic "publishConstructorCase: call in pattern"
 
-    publishResult _ fields (CaseField selected) =
-      case lookup selected fields of
-        Just v -> mkTyVarTy v
-        Nothing -> panic "publishConstructorCase: unbound selected field"
-    publishResult instantiate fields (CaseConstructor dc args children) =
-      mkTyConApp (promoteDataCon dc) (map instantiate args ++
-        map (publishResult instantiate fields) children)
+    publishResult _ _ fields (CaseField selected) = fieldType fields selected
+    publishResult family instantiate fields (CaseConstructor dc args children) =
+      mkTyConApp (promoteDataCon dc) (map instantiate args ++ map publish children)
+      where publish = publishResult family instantiate fields
+    publishResult family instantiate fields (CaseCall table args children) =
+      mkTyConApp table (map instantiate args ++ map publish children)
+      where publish = publishResult family instantiate fields
+    publishResult family instantiate fields (CaseSelf args field) =
+      mkTyConApp family (map instantiate args ++ [fieldType fields field])
 
-    publishResult instantiate fields (CaseCall table args children) =
-      mkTyConApp table (map instantiate args ++ map (publishResult instantiate fields) children)
+    fieldType fields selected = case lookup selected fields of
+      Just v -> mkTyVarTy v
+      Nothing -> panic "publishConstructorCase: unbound selected field"
 
 {- Note [Reachable constructor helpers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1410,6 +1432,11 @@ that each leaf returns an in-scope field, the carried argument, or a
 saturated ordinary constructor applied to checked results. Check each
 result's kind against the actual worker and check the parameter order.
 Building a lazy constructor introduces no new tests on its fields.
+A unary worker can call itself beneath such a constructor. As in
+Note [Closed source tables], the operand must be a proper field
+of the matched input. Require the original kind instantiation and
+the exact recursive Id. Each reduction then passes a strict
+subpattern as the next operand, and a rigid tail remains stuck.
 Keep a saturated helper as a reference to its exact checked family,
 including inside a constructor field. An imported helper must already
 have a source table. Within this producer, a private helper can supply
