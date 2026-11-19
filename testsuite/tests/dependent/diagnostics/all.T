@@ -1,3 +1,5 @@
+test('FamilyArrowArity', normal, compile_fail, [''])
+test('FamilyArrowMatchability', normal, compile_fail, [''])
 test('ForallMatchabilityEmpty', normal, compile_fail, [''])
 test('ForallMatchabilityTHWrapper', req_th, compile_fail, [''])
 test('PatSynMatchableArrow', normal, compile_fail, [''])

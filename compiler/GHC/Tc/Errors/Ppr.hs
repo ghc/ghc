@@ -41,7 +41,7 @@ import qualified GHC.Boot.TH.Syntax as TH
 --            import "ghc-internal"     qualified GHC.Internal.TH.Syntax as TH
 import qualified GHC.Boot.TH.Ppr as TH
 
-import GHC.Builtin.WiredIn.Types( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )
+import GHC.Builtin.WiredIn.Types( boxedRepDataConTyCon, matchabilityTy, tYPETyCon, pretendNameIsInScope )
 import GHC.Builtin.KnownKeys -- A bunch of keys
 
 import GHC.Types.Name.Reader
@@ -4936,6 +4936,9 @@ pprMismatchMsg ctxt
              n | n > 0   -- we don't know how many args there are, so don't
                          -- recommend removing args that aren't
                , Just thing <- mb_thing
+               , not (typeKind ty1 `tcEqType` matchabilityTy &&
+                      typeKind ty2 `tcEqType` matchabilityTy)
+                 -- See Note [Argument counts in kind errors].
                -> Just $ pprTcSolverReportMsg ctxt (ExpectingMoreArguments n thing)
              _ -> Nothing
 
@@ -5014,6 +5017,16 @@ pprMismatchMsg ctxt
       case wanteds of
         [wanted] -> text "Could not deduce" <+> quotes (ppr wanted)
         _        -> text "Could not deduce:" <+> pprTheta wanteds
+
+{- Note [Argument counts in kind errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The arity hint counts visible binders in the original kinds. A type
+family can hide an arrow in the expected kind. For example, if F True
+reduces to Type -> @U Type, then Maybe :: F True has one arrow on each
+side. Decomposition leaves M ~ U. Report that mismatch even though
+counting the visible binders of F True gives zero. Keep the arity hint
+when a family reduces to Type and the caller really omitted an argument.
+-}
 
 pprQCOriginExtra :: ErrorItem -> SDoc
 -- When we were originally trying to solve a quantified constraint like
