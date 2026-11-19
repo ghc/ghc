@@ -133,6 +133,10 @@ test('NativeClosedSum',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedSumLib.hs'])],
      multimod_compile_and_run,
      ['NativeClosedSum', '-Werror=unused-imports ' + config.ghc_th_way_flags])
+test('NativeClosedNestedExpected',
+     [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedSumLib.hs'])],
+     multimod_compile_and_run,
+     ['NativeClosedNestedExpected', '-dcore-lint -dstg-lint ' + config.ghc_th_way_flags])
 test('NativeClosedSumDependencies',
      [req_interp, req_rts_linker, only_ways(['normal'])],
      run_command, ['bash NativeClosedSumDependencies.sh "{compiler}" "{libdir}" '

@@ -3,6 +3,7 @@ module NativeClosedSumLib
     ( weighted, containsAny, identity
     , unavailable, Local (..), local, ambiguous, hiddenRequirement
     , unavailablePair, ambiguousPair, countOptional
+    , keepNatural, chooseLeft, chooseRight, ignoreNatural, bottomSigned, ignoreBool
     ) where
 
 import Numeric.Natural (Natural)
@@ -49,3 +50,27 @@ ambiguousPair _ _ = 0
 countOptional :: Num n => Maybe a -> Bool -> n
 countOptional (Just _) True = 1
 countOptional _ _ = 0
+
+-- | Fix the argument type of a staged conversion.
+keepNatural :: Natural -> Natural
+keepNatural = id
+
+-- | Return the optional value or the supplied default.
+chooseLeft :: Maybe a -> a -> a
+chooseLeft = maybe id const
+
+-- | Put the optional argument after its default.
+chooseRight :: a -> Maybe a -> a
+chooseRight = flip chooseLeft
+
+-- | Ignore a natural-number computation.
+ignoreNatural :: Natural -> Bool
+ignoreNatural _ = True
+
+-- | Raise an exception if the staged operand is demanded.
+bottomSigned :: Natural -> Int
+bottomSigned _ = errorWithoutStackTrace "ran a closed operand ignored by its consumer"
+
+-- | Fix an argument to Bool without forcing its value.
+ignoreBool :: Bool -> Natural
+ignoreBool _ = 0

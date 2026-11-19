@@ -2637,8 +2637,13 @@ tcClosedCallKinds hint name fun_ty arg operand
 closedCallResultHint :: Bool -> ExpKind -> TcM (Maybe Kind)
 closedCallResultHint True (Check expected) = do
   kind <- liftZonkM (zonkTcType expected)
-  return (kind <$ guard (noFreeVarsOfType kind && isTyFamFree kind))
+  return (nestedClosedResultHint True kind)
 closedCallResultHint _ _ = return Nothing
+
+-- | A nested application can only specialize against a known closed kind.
+nestedClosedResultHint :: Bool -> Kind -> Maybe Kind
+nestedClosedResultHint ordinary kind =
+  kind <$ guard (ordinary && noFreeVarsOfType kind && isTyFamFree kind)
 
 -- | Extend the operand substitution when the result still contains a parameter.
 refineClosedCallResult :: Maybe Kind -> Kind -> Subst.Subst -> Subst.Subst
@@ -2658,8 +2663,13 @@ parameter absent from both input and result stays an error.
 Take the hint only from a ground, family-free Check context. Do not
 guess from an inference variable, default a dictionary, or change
 the pending partial-signature path. A result determined by operands
-keeps its existing expected-kind check. Nested calls can use a hint
-only at a separately checked type boundary.
+keeps its existing expected-kind check. For nested ordinary calls,
+use the declared operand kind after the enclosing result and all
+literal siblings have supplied their information. Compute these hints
+before planning any computed sibling. This keeps hints independent of
+argument order and leaves unresolved computed-to-computed inference
+out of this path. Choose legacy empty-list defaults after planning
+computed operands.
 -}
 
 -- | An ordinary application can remain Core until its result is observed.
@@ -2697,8 +2707,14 @@ tcPlanClosedCall mode ordinary_call hint fun arg = do
     Just (child_loc, child_rdr, child_name, child_arg) -> do
       checkCompleteClosedCall mode name
       tcPreflightClosedCall name
+      let (_, _, rho) = splitInvisPiTys (varType fun)
+          operand_hint = do
+            (_, _, _, domain, codomain) <- splitFunTy_maybe rho
+            let initial = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfType rho))
+                subst = refineClosedCallResult hint codomain initial
+            nestedClosedResultHint ordinary_call (Subst.substTy subst domain)
       (child_kind, run_child) <-
-        setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call child_rdr child_name child_arg)
+        setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call operand_hint child_rdr child_name child_arg)
       (domain, result_kind) <- tcClosedCallKinds hint name (varType fun) arg (ComputedClosedOperand child_kind)
       return (domain, result_kind, closedCallRuntimeOperand name arg run_child)
     Nothing -> do
@@ -2735,10 +2751,14 @@ tcPlanOrdinaryCall mode ordinary hint fun args
           loc <- getSrcSpanM
           checkCompleteClosedCall mode name
           tcPreflightClosedCall name
-          operands <- traverse prepare args
+          let in_scope = mkInScopeSet (tyCoVarsOfTypes (rho : predicates))
+              initial = Subst.mkEmptySubst in_scope
+          literals <- foldM match_known initial (mapMaybe known_literal (zip args domains))
+          let hint_subst = refineClosedCallResult hint codomain literals
+              operand_hints = map (nestedClosedResultHint ordinary . Subst.substTy hint_subst) domains
+          operands <- zipWithM prepare operand_hints args
           let (known, empty) = partitionWith split_operand (zip3 args domains operands)
-              in_scope = mkInScopeSet (tyCoVarsOfTypes (rho : predicates))
-          known_subst <- foldM match_known (Subst.mkEmptySubst in_scope) known
+          known_subst <- foldM match_known initial known
           operand_subst <- choose_empty known_subst empty
           let subst = refineClosedCallResult hint codomain operand_subst
               inputs = map (Subst.substTy subst) domains
@@ -2765,9 +2785,15 @@ tcPlanOrdinaryCall mode ordinary hint fun args
     bad :: String -> TcM a
     bad = failWithTc . TcRnClosedTypeEval name
 
-    prepare arg
+    known_literal (arg, domain)
+      | L _ (HsExplicitListTy _ _ []) <- ignoreParens arg = Nothing
+      | Just kind <- closedCallLiteralKind arg = Just (arg, domain, kind)
+      | otherwise = Nothing
+
+    prepare operand_hint arg
       | Just (child_loc, child_rdr, child_name, child_args) <- nestedClosedCall arg = do
-          (kind, run) <- setSrcSpan child_loc (tcPlanClosedHead mode ordinary child_rdr child_name child_args)
+          (kind, run) <- setSrcSpan child_loc
+            (tcPlanClosedHead mode ordinary operand_hint child_rdr child_name child_args)
           return (Right (kind, Just run))
       | L _ (HsExplicitListTy _ _ []) <- ignoreParens arg = return (Left ())
       | Just kind <- closedCallLiteralKind arg = return (Right (kind, Nothing))
@@ -2801,14 +2827,27 @@ tcPlanOrdinaryCall mode ordinary hint fun args
       unless (all isTyVar tvs && rho `tcEqType` foldr mkVisFunTyManyU codomain domains) $
         bad "The call must have a fully instantiated ordinary function type."
       plans <- traverse prepare_joint args
-      ((variables, input_types, result_type, predicate_types), checked) <-
-        solveEqualities "tcPlanClosedConstructorCall" $ do
+      ((variables, input_types, result_type, predicate_types), literals) <-
+        solveEqualities "tcPlanClosedConstructorCall: literals" $ do
           (subst, variables) <- newMetaTyVars tvs
           let input_types = map (Subst.substTy subst) domains
               result_type = Subst.substTy subst codomain
               predicate_types = map (Subst.substTy subst) predicates
-          values <- zipWithM check_joint input_types (zip args plans)
+          values <- zipWithM check_joint_literal input_types plans
           return ((mkTyVarTys variables, input_types, result_type, predicate_types), values)
+
+      -- Compute all hints from the same snapshot of the literal constraints.
+      hint_inputs <- liftZonkM (zonkTcTypes input_types)
+      hint_result <- liftZonkM (zonkTcType result_type)
+      let hint_scope = mkInScopeSet (tyCoVarsOfTypes (hint_result : hint_inputs))
+          hint_start = Subst.mkEmptySubst hint_scope
+          hint_subst
+            | anyFreeVarsOfType (\var -> not (isTyVar var && isMetaTyVar var)) hint_result = hint_start
+            | otherwise = refineClosedCallResult hint hint_result hint_start
+          operand_hints = map (nestedClosedResultHint ordinary . Subst.substTy hint_subst) hint_inputs
+      planned <- zipWithM prepare_joint_child operand_hints literals
+      checked <- solveEqualities "tcPlanClosedConstructorCall: computed operands" $
+        zipWithM check_joint_computed input_types (zip args planned)
 
       -- The old bare empty-list case defaults to Natural only when the
       -- other inputs and the declared domain leave its element unknown.
@@ -2837,19 +2876,25 @@ tcPlanOrdinaryCall mode ordinary hint fun args
       return (result, OrdinaryClosedCall loc name (sequence actions >>= apply))
 
     prepare_joint arg
-      | Just (child_loc, child_rdr, child_name, child_args) <- nestedClosedCall arg =
-          Left <$> setSrcSpan child_loc (tcPlanClosedHead mode ordinary child_rdr child_name child_args)
+      | Just child <- nestedClosedCall arg = return (Left child)
       | closedConstructorLiteral arg = return (Right arg)
       | otherwise = do
           alias <- closedConstructorAlias arg
           if alias then return (Right arg) else setSrcSpanA (getLoc arg) $
             bad "Each constructor field must be a closed literal. This operand contains an open or unsupported field."
 
-    check_joint domain (arg, plan) = setSrcSpanA (getLoc arg) $ case plan of
-      Left computed@(kind, _) -> do
+    check_joint_literal _ (Left child) = return (Left child)
+    check_joint_literal domain (Right literal) = Right <$> tc_check_lhs_type mode literal domain
+
+    prepare_joint_child operand_hint (Left (loc, rdr, child, operands)) =
+      Left <$> setSrcSpan loc (tcPlanClosedHead mode ordinary operand_hint rdr child operands)
+    prepare_joint_child _ (Right literal) = return (Right literal)
+
+    check_joint_computed domain (arg, plan) = case plan of
+      Left computed@(kind, _) -> setSrcSpanA (getLoc arg) $ do
         discardResult (unifyKind (Just (HsTypeRnThing (unLoc arg))) kind domain)
         return (Left computed)
-      Right literal -> Right <$> tc_check_lhs_type mode literal domain
+      Right literal -> return (Right literal)
 
     default_joint_empty arg domain
       | L _ (HsExplicitListTy _ _ []) <- ignoreParens arg = do
@@ -2916,13 +2961,14 @@ checkClosedCallExpectedKind rn_ty (Check expected) actual = do
 checkClosedCallExpectedKind _ (Infer _) _ = return ()
 
 -- | Prepare an already resolved nested occurrence.
-tcPlanClosedHead :: TcTyMode -> Bool -> RdrName -> Name -> [LHsType GhcRn] -> TcM (Kind, ClosedCallValue)
-tcPlanClosedHead mode ordinary_call rdr name args
+tcPlanClosedHead :: TcTyMode -> Bool -> Maybe Kind -> RdrName -> Name
+                 -> [LHsType GhcRn] -> TcM (Kind, ClosedCallValue)
+tcPlanClosedHead mode ordinary_call hint rdr name args
   | [arg] <- args
   , isSourceFamilyName name = do
       executable <- tcClosedPairExecutableOwner rdr name arg
       case executable of
-        Just owner -> tcPlanOrdinaryCall mode ordinary_call Nothing owner [arg]
+        Just owner -> tcPlanOrdinaryCall mode ordinary_call hint owner [arg]
         Nothing -> do
           (kind, run) <- tcPlanSourceFamilyCall mode ordinary_call name arg
           return (kind, ClosedFamilyValue run)
@@ -2932,7 +2978,7 @@ tcPlanClosedHead mode ordinary_call rdr name args
         failWithTc (TcRnNoSourceTable name)
       thing <- tcLookupGlobal name
       case thing of
-        AnId fun -> tcPlanOrdinaryCall mode ordinary_call Nothing fun args
+        AnId fun -> tcPlanOrdinaryCall mode ordinary_call hint fun args
         _ -> failWithTc (TcRnNoSourceTable name)
 
 -- | Preserve the ordinary execution route for an existing staged pair call.
@@ -3040,7 +3086,7 @@ tcPlanSourceFamilyCall mode ordinary_call name arg = do
                      ++ showPpr dflags domain ++ " and " ++ showPpr dflags result ++ ".")
   (kind_args, input_kind, result_kind, run_arg) <- case nestedClosedCall arg of
     Just (child_loc, child_rdr, child_name, child_args) -> do
-      (kind, plan) <- setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call child_rdr child_name child_args)
+      (kind, plan) <- setSrcSpan child_loc (tcPlanClosedHead mode ordinary_call Nothing child_rdr child_name child_args)
       (kinds, checked_domain, checked_result) <- specialize kind
       run <- prepareClosedCallResult kind plan
       return (kinds, checked_domain, checked_result, run)

@@ -1,0 +1,7 @@
+NativeClosedNestedResultNoCast.hs:7:29: error: [GHC-70565]
+    • Cannot evaluate ‘P.keepNatural’ in a type.
+        The operand has kind Int, which does not match the declared input type Natural.
+    • In the first argument of ‘Proxy’, namely
+        ‘(P.keepNatural (Prelude.length '[1, 2, 3]))’
+      In the type signature:
+        bad :: Proxy (P.keepNatural (Prelude.length '[1, 2, 3]))
