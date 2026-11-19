@@ -11,6 +11,11 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
+import GHC.Builtin.CoercionRules
+  ( boxedPairCompositionRule, matchBoxedPairComposition )
+import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
+import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
+
 import GHC.Tc.Solver.Irred( solveIrred )
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.Rewrite
@@ -691,6 +696,18 @@ can_eq_nc ces rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
 -- Only rewritten types end up below here.
 ----------------------------
 
+-- Try a certified strict pair composition before choosing a canonical LHS.
+-- See Note [Strict boxed pair composition] in GHC.Builtin.CoercionRules.
+can_eq_nc ces _ _ ev NomEq lhs _ rhs _
+  | bothRewritten ces, isWanted ev
+  , Just apps <- matchBoxedPairComposition lhs rhs
+  = solveBoxedPairComposition ev apps $
+      AxiomCo boxedPairCompositionRule [mkNomReflCo lhs, mkNomReflCo rhs]
+  | bothRewritten ces, isWanted ev
+  , Just apps <- matchBoxedPairComposition rhs lhs
+  = solveBoxedPairComposition ev apps $
+      mkSymCo (AxiomCo boxedPairCompositionRule [mkNomReflCo rhs, mkNomReflCo lhs])
+
 -- (EQNC6): use canEqCanLHS
 --
 -- NB: pattern match on bothRewritten: we want only rewritten types sent to canEqCanLHS
@@ -777,6 +794,22 @@ Missing this point is what caused #15431
 -}
 
 ---------------------------------
+-- | Check owner correspondence before writing nominal evidence.
+solveBoxedPairComposition :: CtEvidence -> [(TyCon, [Type])] -> Coercion
+                          -> TcS (StopOrContinue (Either IrredCt EqCt))
+solveBoxedPairComposition ev apps co = do
+    wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $
+      forM_ apps $ \(family, args) -> do
+        owner <- sourceTableOwner family
+        when (isNothing owner) $
+          TcM.failWithTc (TcRnRetainedQuantificationError
+                          (RetainedUncheckedSourceCall (tyConName family)))
+        sourceTableFamilyAppUse family args
+    let holes = foldr (flip addRewriter) emptyCoHoleSet
+                      (univCoDepsHoles (mkUnivCoDeps [co]))
+    setEqIfWanted ev (CPH co holes)
+    stopWith ev "Solved by strict boxed pair composition"
+
 -- | Compare retained bodies in a private runtime-binder scope.
 -- See Note [Solving retained function equalities].
 can_eq_nc_depfun :: CtEvidence -> EqRel -> Type -> Type -> MCoercionN

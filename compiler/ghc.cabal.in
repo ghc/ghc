@@ -198,6 +198,7 @@ Library
     Exposed-Modules:
         GHC
         GHC.Builtin
+        GHC.Builtin.CoercionRules
         GHC.Builtin.KnownKeys
         GHC.Builtin.KnownOccs
         GHC.Builtin.Modules

@@ -1,9 +1,20 @@
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
+{-# LANGUAGE DataKinds, GADTs, KindSignatures, NoExperimentalDependentTypes, TypeApplications #-}
 module Main where
 
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import PreludePairExport (first, second, swapped, nestedFirst, nestedSecond)
+import Numeric.Natural (Natural)
+import PreludePairExport
+  (first, second, swapped, nestedFirst, nestedSecond,
+   abstractFirst, abstractSecond, get, swapIndex, secondIndex)
+
+-- This composition is exposed by instantiation in this module. The exporter
+-- elaborates get, swapIndex and secondIndex separately.
+viaImport :: forall (p :: (Natural, Natural)). Proxy p -> ()
+viaImport p = sameIndex (get (swapIndex p)) (secondIndex p)
+  where
+    sameIndex :: Proxy (n :: Natural) -> Proxy n -> ()
+    sameIndex _ _ = ()
 
 main :: IO ()
 main =
@@ -14,5 +25,9 @@ main =
        , swapped (Proxy @'( 'True, 'x')) (Proxy @'( 'x', 'True))
        , nestedFirst (Proxy @'False)
        , nestedSecond (Proxy @'y')
+       , abstractFirst (Proxy @'( 'True, 'x'))
+       , abstractSecond (Proxy @'( 'True, 'x'))
+       , viaImport (Proxy @'(17, 5))
        ) of
-    (Refl, Refl, Refl, Refl, Refl, Refl, Refl) -> putStrLn "Type, Bool, and Char operands"
+    (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, ()) ->
+      putStrLn "Type, Bool, Char, and Natural operands"

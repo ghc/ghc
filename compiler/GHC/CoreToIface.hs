@@ -396,6 +396,7 @@ toIfaceCoercionX fr co
 
 toIfaceAxiomRule :: CoAxiomRule -> IfaceAxiomRule
 toIfaceAxiomRule (BuiltInFamRew  bif) = IfaceAR_X (mkIfLclName (bifrw_name bif))
+toIfaceAxiomRule (BuiltInEqRule name _) = IfaceAR_X (mkIfLclName name)
 toIfaceAxiomRule (BuiltInFamInj bif)  = IfaceAR_X (mkIfLclName (bifinj_name bif))
 toIfaceAxiomRule (BranchedAxiom ax i) = IfaceAR_B (coAxiomName ax) i
 toIfaceAxiomRule (UnbranchedAxiom ax) = IfaceAR_U (coAxiomName ax)

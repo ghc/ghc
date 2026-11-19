@@ -37,11 +37,12 @@ expect_rejection() {
 
 cd "$out/exporter"
 cp "$src"/{PreludePairExport,WrongRigidPair}.hs .
-"${ghc[@]}" "${db[@]}" -fomit-interface-pragmas -c PreludePairExport.hs
+"${ghc[@]}" "${db[@]}" -fno-omit-interface-pragmas -c PreludePairExport.hs
 "${ghc[@]}" --show-iface PreludePairExport.hi >exported.iface
 grep -Fq 'GHC.Internal.Data.Tuple.T:fst' exported.iface
 grep -Fq 'GHC.Internal.Data.Tuple.T:snd' exported.iface
 grep -Fq 'GHC.Internal.Data.Tuple.T:swap' exported.iface
+grep -Fq 'BoxedPairComposition' exported.iface
 cp PreludePairExport.hi "$out/interfaces/"
 expect_rejection WrongRigidPair.hs '^wrong _ _ = Refl' '\[GHC-25897\]' 'x :~: fst p'
 
@@ -62,3 +63,15 @@ cp "$src/InstalledStagedPair.hs" .
 "${ghc[@]}" --show-iface InstalledStagedPair.hi >staged.iface
 grep -Fq 'installed/fst/natural' staged.iface
 grep -Fq 'installed/snd/natural' staged.iface
+
+# Instantiating imported proxies exposes the composition in an ordinary client.
+# A local rule for fst selects the wrong field in this client.
+cp "$src/WrongPairRule.hs" .
+line=$(awk '/^bad p =/ {print NR}' WrongPairRule.hs)
+if "${ghc[@]}" -i. -i"$out/interfaces" -fno-ignore-interface-pragmas \
+    -fenable-rewrite-rules -c WrongPairRule.hs >reject.log 2>&1 ||
+   ! grep -Eq "^WrongPairRule.hs:$line:[0-9]+(-[0-9]+)?: error: " reject.log ||
+   ! grep -Fq '[GHC-83605]' reject.log; then
+    cat reject.log >&2
+    exit 1
+fi

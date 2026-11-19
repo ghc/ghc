@@ -35,7 +35,7 @@ import GHC.ByteCode.Types
 import GHC.Driver.Session
 import GHC.Driver.Config.Core.Lint ( initLintConfig )
 
-import GHC.Builtin.WiredIn.TypeLits(typeNatCoAxiomRules)
+import GHC.Builtin.CoercionRules (builtInCoAxiomRules)
 import GHC.Builtin.WiredIn.Types
 
 import GHC.Iface.Syntax
@@ -2735,14 +2735,12 @@ tcIfaceTyCon (IfaceTyCon name _info)
 
 tcIfaceAxiomRule :: IfaceAxiomRule -> IfL CoAxiomRule
 -- Unlike CoAxioms, which arise from user 'type instance' declarations,
--- there are a fixed set of CoAxiomRules:
---   - axioms for type-level literals (Nat and Symbol),
---     enumerated in typeNatCoAxiomRules
+-- built-in rules have stable names in builtInCoAxiomRules.
 tcIfaceAxiomRule (IfaceAR_X n)
-  | Just axr <- lookupUFM typeNatCoAxiomRules (ifLclNameFS n)
+  | Just axr <- lookupUFM builtInCoAxiomRules (ifLclNameFS n)
   = return axr
   | otherwise
-  = pprPanic "tcIfaceAxiomRule" (ppr n)
+  = failIfM (text "Unknown built-in coercion rule in interface:" <+> ppr n)
 tcIfaceAxiomRule (IfaceAR_U name)   = do { ax <- tcIfaceUnbranchedAxiom name; return (UnbranchedAxiom ax) }
 tcIfaceAxiomRule (IfaceAR_B name i) = do { ax <- tcIfaceBranchedAxiom name;   return (BranchedAxiom ax i) }
 

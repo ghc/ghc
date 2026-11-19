@@ -21,9 +21,15 @@ test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludePairExport.hs',
                    'NativeOpenInstalledInterfaces.sh', 'InstalledStagedPair.hs',
-                   'WrongRigidPair.hs', 'WrongGroundPair.hs', 'WrongPairNamespace.hs'])],
+                   'WrongRigidPair.hs', 'WrongGroundPair.hs', 'WrongPairNamespace.hs',
+                   'WrongPairRule.hs'])],
      run_command, ['bash NativeOpenInstalledPair.sh "{compiler}" "{libdir}" "{ghc_pkg}" '
                    + config.ghc_th_way_flags])
+test('NativeOpenPairCoercion',
+     [req_process, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeOpenPairCoercionWorker.hs']),
+      extra_run_opts(f'"{config.libdir}"')],
+     compile_and_run, ['-package ghc -package transformers'])
 test('NativeOpenPairLinkable',
      [req_interp, req_rts_linker, only_ways(['normal'])],
      run_command, ['bash NativeOpenPairLinkable.sh "{compiler}" "{libdir}" '

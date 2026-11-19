@@ -7,8 +7,8 @@ import GHC.Settings.Config
 
 hiVersion :: Integer
 -- The suffix changes when the fork changes a common interface payload.
--- Reject older retained-binder payloads before decoding their fields.
-hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "68") :: Integer
+-- Reject interfaces before decoding unknown coercion rule names.
+hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "69") :: Integer
 
 -- All pretty arbitrary:
 

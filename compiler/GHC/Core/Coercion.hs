@@ -2468,6 +2468,8 @@ coercion_lr_kind which orig_co
     go_ax axr@(BuiltInFamRew  bif) cos  = check_bif_res axr (bifrw_proves  bif (map coercionKind cos))
     go_ax axr@(BuiltInFamInj bif) [co]  = check_bif_res axr (bifinj_proves bif (coercionKind co))
     go_ax axr@(BuiltInFamInj {})  _     = crash axr
+    go_ax axr@(BuiltInEqRule _ proves) cos =
+      check_bif_res axr (proves (map coercionKind cos))
     go_ax     (UnbranchedAxiom ax) cos  = go_branch ax (coAxiomSingleBranch ax) cos
     go_ax     (BranchedAxiom ax i) cos  = go_branch ax (coAxiomNthBranch ax i)  cos
 

@@ -1,8 +1,10 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, KindSignatures #-}
 {-# LANGUAGE PolyKinds, TypeFamilies, TypeOperators #-}
-module PreludePairExport (first, second, swapped, nestedFirst, nestedSecond) where
+module PreludePairExport
+  (first, second, swapped, nestedFirst, nestedSecond,
+   abstractFirst, abstractSecond, get, swapIndex, secondIndex) where
 
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import qualified Data.Tuple
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -30,3 +32,26 @@ nestedFirst _ = Refl
 nestedSecond :: forall (c :: Char). Proxy c
              -> Prelude.snd (Data.Tuple.swap '( 'True, c)) :~: 'True
 nestedSecond _ = Refl
+
+-- | Project the second input field of a rigid pair.
+{-# INLINE abstractFirst #-}
+abstractFirst :: forall (p :: (Bool, Char)). Proxy p
+              -> Prelude.fst (Data.Tuple.swap p) :~: Prelude.snd p
+abstractFirst _ = Refl
+
+-- | Project the first input field of a rigid pair.
+abstractSecond :: forall (p :: (Bool, Char)). Proxy p
+               -> Prelude.snd (Data.Tuple.swap p) :~: Prelude.fst p
+abstractSecond _ = Refl
+
+-- | Expose an application of the first projection for later substitution.
+get :: forall k l (p :: (k, l)). Proxy p -> Proxy (Prelude.fst p)
+get _ = Proxy
+
+-- | Carry the swapped index through an ordinary proxy.
+swapIndex :: forall k l (p :: (k, l)). Proxy p -> Proxy (Data.Tuple.swap p)
+swapIndex _ = Proxy
+
+-- | Carry the second field through an ordinary proxy.
+secondIndex :: forall k l (p :: (k, l)). Proxy p -> Proxy (Prelude.snd p)
+secondIndex _ = Proxy

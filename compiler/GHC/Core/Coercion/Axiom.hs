@@ -627,6 +627,9 @@ data CoAxiomRule
                                                        --    e.g.  a+b~0 ==>  a~0
                                                        -- Always unary
 
+  | BuiltInEqRule FastString ([TypeEqn] -> Maybe TypeEqn)
+    -- Free-floating checked nominal equality with two nominal premises.
+
   | BranchedAxiom      (CoAxiom Branched) BranchIndex  -- Closed type family
 
   | UnbranchedAxiom    (CoAxiom Unbranched)            -- Open type family instance,
@@ -638,17 +641,20 @@ instance Eq CoAxiomRule where
   (BuiltInFamInj bif1)   == (BuiltInFamInj bif2)   = bifinj_name bif1 == bifinj_name bif2
   (UnbranchedAxiom ax1)  == (UnbranchedAxiom ax2)  = getUnique ax1 == getUnique ax2
   (BranchedAxiom ax1 i1) == (BranchedAxiom ax2 i2) = getUnique ax1 == getUnique ax2 && i1 == i2
+  (BuiltInEqRule n1 _) == (BuiltInEqRule n2 _) = n1 == n2
   _ == _ = False
 
 coAxiomRuleRole :: CoAxiomRule -> Role
 coAxiomRuleRole (BuiltInFamRew  {})  = Nominal
 coAxiomRuleRole (BuiltInFamInj {})   = Nominal
+coAxiomRuleRole (BuiltInEqRule {})  = Nominal
 coAxiomRuleRole (UnbranchedAxiom ax) = coAxiomRole ax
 coAxiomRuleRole (BranchedAxiom ax _) = coAxiomRole ax
 
 coAxiomRuleArgRoles :: CoAxiomRule -> [Role]
 coAxiomRuleArgRoles (BuiltInFamRew  bif) = replicate (bifrw_arity bif) Nominal
 coAxiomRuleArgRoles (BuiltInFamInj {})   = [Nominal]
+coAxiomRuleArgRoles (BuiltInEqRule {})   = [Nominal, Nominal]
 coAxiomRuleArgRoles (UnbranchedAxiom ax) = coAxBranchRoles (coAxiomSingleBranch ax)
 coAxiomRuleArgRoles (BranchedAxiom ax i) = coAxBranchRoles (coAxiomNthBranch ax i)
 
@@ -671,6 +677,7 @@ instance Data.Data CoAxiomRule where
 instance Outputable CoAxiomRule where
   ppr (BuiltInFamRew  bif) = ppr (bifrw_name bif)
   ppr (BuiltInFamInj bif)  = ppr (bifinj_name bif)
+  ppr (BuiltInEqRule name _) = ppr name
   ppr (UnbranchedAxiom ax) = ppr (coAxiomName ax)
   ppr (BranchedAxiom ax i) = ppr (coAxiomName ax) <> brackets (int i)
 

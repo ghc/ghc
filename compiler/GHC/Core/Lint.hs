@@ -2981,6 +2981,8 @@ lintCoercion this_co@(AxiomCo ax cos)
                   [pr] -> isJust (bifinj_proves bif pr)
                   _    -> False)
                bad_bif
+    lint_ax (BuiltInEqRule _ proves) prs
+      = checkL (isJust (proves prs)) bad_bif
     lint_ax (UnbranchedAxiom ax) prs
       = lintBranch this_co (coAxiomTyCon ax) (coAxiomSingleBranch ax) prs
     lint_ax (BranchedAxiom ax ind) prs
