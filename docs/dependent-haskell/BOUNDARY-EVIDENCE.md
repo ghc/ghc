@@ -66,9 +66,9 @@ or an SMT solver's exit code cannot by itself construct a membership path.
 [GHC's plugin evidence interface](../users_guide/extending_ghc.rst#typechecker-plugins)
 and [Agda's decidable propositions and witnesses](https://agda.github.io/agda-stdlib/v2.3/Relation.Nullary.Decidable.Core.html).
 
-A QuickCheck generator could also propose a field position. The checker
-would compare the label at that position with the requested label and
-construct the membership path. One successful candidate proves membership
+A QuickCheck generator can also propose a field position. The file-backed
+example below turns that position into a path. GHC checks whether the
+path selects the requested label. One successful candidate proves membership
 because the claim asks for one position. If every attempt misses, the
 search has established only that those positions failed. To establish
 absence in this finite list, a checker must account for every position.
@@ -99,15 +99,40 @@ raises an exception. A general-purpose checker can return an ordinary
 description of a candidate path. A small evidence builder can admit only
 the finite sequence of constructors, as this example does.
 
-The example uses a pure producer. A search that reads an external file
-observes that file at build time. Reuse across builds requires a declared
-dependency on the file. Runtime IO can produce a different value.
-
 The search stops at its first match. The signature currently requires
 R15 to read back the whole finite list. A successful search alone gives
 no termination guarantee for that second step.
 [Compile-time search](examples/boundary-evidence/EmitMembership.hs)
 and [dependent client](examples/boundary-evidence/SplicedOffer.hs).
+
+## Checking a position from an external program
+
+An external search can write one zero-based field position to
+`offer.position` beside the checked module. The offset `1` selects
+the second field. The file format is a decimal integer
+without a sign or leading zeroes, with an optional final line feed.
+
+```haskell
+labelEight :: Member 8 (OrdinaryOffer.offered 7)
+labelEight = $(emitFilePosition "offer.position" (OrdinaryOffer.offered 7))
+```
+
+The splice obtains the length of this finite offer. It reads at most
+the decimal width of that length plus two bytes, enough to recognize a
+line feed and detect trailing data. It checks the range before emitting
+constructors. With `[7,8]`, offset `1` produces `There Here`.
+Offset `0` produces `Here`, which GHC rejects at the binding for label
+eight. A malformed or out-of-range position fails in the splice. The
+producer and the external search can still be partial.
+
+The splice registers the absolute file path with `addDependentFile`
+before it reads the candidate. GHC tracks the file's contents in the
+interface. The example harness checks reuse, changes only the position
+file, and checks that GHC rejects the unchanged binding. The checked
+fact refers to the producer's result at build time.
+[Checked module](examples/boundary-evidence/FileOffer.hs),
+[evidence builder](examples/boundary-evidence/EmitMembership.hs)
+and [TH file dependencies](../../libraries/ghc-internal/src/GHC/Internal/TH/Monad.hs).
 
 ## What does an observation establish?
 
@@ -193,6 +218,8 @@ The self-hosted compiler verified these results with Core and STG lint.
 | Search `offered 7` with a splice for label `8`. | The generated path selects the second field. |
 | Change only the search input to `8`. | GHC rejects the generated `Here` at the binding for input `7`. |
 | Change the producer to return `[8,7]` at input `7`. | The unchanged splice recompiles and selects the first field. |
+| Keep `offer.position` at `1`, then change only that file to `0`. | GHC reuses the first build. The edit makes it recheck the unchanged binding and reject `Here`. |
+| Supply a negative, malformed or out-of-range position, then restore `1`. | The splice rejects each invalid file. The restored program selects the second field. |
 | Compare `lazyTrue` and `strictTrue`. | Both closed proofs check. At an exceptional input, the first returns `True` and the second raises. |
 | Change `strictTrue x` to return `x`. | GHC rejects the unchanged proof at `False`. |
 
@@ -211,7 +238,8 @@ The self-hosted compiler verified these results with Core and STG lint.
   and exact inputs. R15 already tracks the executable dependencies of
   a closed call. A checker that reads other files or changes its rules
   needs its own recompilation dependencies before an exported fact can
-  be reused reliably.
+  be reused reliably. The file-backed example tracks one candidate file
+  with `addDependentFile`.
 
 [Liquid Haskell refinement reflection](https://arxiv.org/abs/1711.03842),
 [the Thoralf plugin](https://richarde.dev/papers/2018/thoralf/thoralf.pdf),

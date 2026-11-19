@@ -129,3 +129,49 @@ sed -i.bak 's/\[start, start + 1\]/[start + 1, start]/' OrdinaryOffer.hs
 "${splice[@]}" -main-is SplicedOffer SplicedOffer.hs -o spliced-offer
 [[ $(./spliced-offer) == first ]]
 printf '%s\n' 'Changing the producer regenerated a path to the first field.'
+
+mkdir "$out/file-offer"
+cd "$out/file-offer"
+mkdir source
+cp -- "$src"/{BoundaryEvidence,OrdinaryOffer,EmitMembership,FileOffer}.hs "$src/offer.position" source/
+file_offer=("${splice[@]}" -i -isource -ddump-splices -main-is FileOffer source/FileOffer.hs -o file-offer)
+"${file_offer[@]}" >first.log 2>&1 || { cat first.log >&2; exit 1; }
+grep -Fq 'Splicing expression' first.log
+[[ $(./file-offer) == second ]]
+"${ghc[@]}" --show-iface source/FileOffer.hi >file.iface
+grep -Eq 'addDependentFile "[^"]*/offer[.]position"' file.iface
+"${file_offer[@]}" >reuse.log 2>&1 || { cat reuse.log >&2; exit 1; }
+if grep -Fq 'Splicing expression' reuse.log; then
+    cat reuse.log >&2
+    exit 1
+fi
+printf '%s\n' 'The file supplied the position of the second field.'
+
+file_line=$(awk '/^labelEight = / {print NR}' source/FileOffer.hs)
+expect_file_failure() {
+    local message=$1
+    if "${file_offer[@]}" >file.log 2>&1 ||
+       ! grep -Eq "^source/FileOffer[.]hs:$file_line:[0-9]+(-[0-9]+)?: error:" file.log ||
+       ! grep -Fq "$message" file.log; then
+        cat file.log >&2
+        exit 1
+    fi
+}
+
+# Only the candidate file changes. Position zero is in range but has label seven.
+printf '0\n' >source/offer.position
+expect_file_failure "Couldn't match type"
+grep -Fq 'Here' file.log
+printf '%s\n' 'Changing only the candidate rechecked and rejected the wrong label.'
+
+bad_position='Expected a zero-based field position in offer.position'
+for value in -1 2 '01' '1x' $'1\n0'; do
+    printf '%s\n' "$value" >source/offer.position
+    expect_file_failure "$bad_position"
+done
+printf '1%010000d\n' 0 >source/offer.position
+expect_file_failure "$bad_position"
+printf '1' >source/offer.position
+"${file_offer[@]}" >restored.log 2>&1 || { cat restored.log >&2; exit 1; }
+[[ $(./file-offer) == second ]]
+printf '%s\n' 'Invalid candidate files failed. Restoring position one compiled again.'
