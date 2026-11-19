@@ -121,3 +121,9 @@ test('T4162', [ extra_run_opts(f'"{config.libdir}"')
               # no subprocesses or signals
               , when(arch('wasm32') or arch('javascript'), skip)
               ], compile_and_run, ['-package ghc'])
+
+test('NativeRetainedPromotedIface',
+     [only_ways(['normal']),
+      extra_files(['../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+      extra_run_opts(f'"{config.libdir}" PackedVecLibrary.hs')],
+     compile_and_run, ['-package ghc'])

@@ -1,0 +1,10 @@
+bare: accepted
+universal: accepted
+witness: accepted
+valid: accepted
+valid suffix: accepted
+bad erased argument: rejected
+bad witness: rejected
+wrong payload index: rejected
+wrong payload suffix: rejected
+oversaturated: rejected

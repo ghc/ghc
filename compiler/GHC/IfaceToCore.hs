@@ -1952,6 +1952,8 @@ tcIfaceType = go
                _ -> return ()
            ; case isPromotedDataCon_maybe tc' of
                Just con
+                 | not (null (dataConRepArgBinders con)) ->
+                   check_iface_retained_args (ppr tc) (tyConKind tc') tks'
                  | let (tys, fields) = splitAt (length (dataConUnivTyVars con)) tks'
                  , any (anyFreeVarsOfType isId) fields ->
                  do { valid <- evaluateIfaceNativeDomain (ppr tc) $
@@ -1996,7 +1998,28 @@ tcIfaceType = go
                              <+> ppr f) }
     app TermAppTy{} _
       = failIfM (text "A retained call result cannot be applied in an interface.")
+    app fun@(TyConApp tc _) arg
+      | Just con <- isPromotedDataCon_maybe tc
+      , not (null (dataConRepArgBinders con))
+      = do { check_iface_retained_args (ppr tc) (typeKind fun) [arg]
+           ; return (mkAppTy fun arg) }
     app fun arg = return (mkAppTy fun arg)
+
+    -- An interface can encode the same application in one TyConApp or
+    -- append arguments using AppTy. Both forms use the promoted telescope.
+    -- Stop at the end of the supplied arguments, so valid prefixes remain
+    -- valid. Each preceding argument determines the next dependent kind.
+    check_iface_retained_args name kind args
+      = do { valid <- evaluateIfaceNativeDomain name (check kind args)
+           ; unless valid $
+               failIfM (text "Invalid retained constructor fields in interface:" <+> name) }
+      where
+        check _ [] = True
+        check kind (arg : rest)
+          | Just (_, binder, _) <- splitPiTy_maybe kind
+          , typeKind arg `eqType` piTyBinderType binder
+          = check (piResultTy kind arg) rest
+          | otherwise = False
 
 -- | Check a forall annotation before its binder enters scope.
 -- See Note [Forall interface metadata] in GHC.Iface.Type.
