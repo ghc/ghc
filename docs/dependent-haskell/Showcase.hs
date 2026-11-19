@@ -22,7 +22,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 -- | Runnable examples of the completed Dependent Haskell source features.
--- See BOUNDARY-EVIDENCE.md for the optional plugin and observation examples.
+-- See BOUNDARY-EVIDENCE.md for the optional plugin, splice, and observation examples.
 -- In GHCi, load PackedVecLibrary with the options in the adjacent README.
 -- Enter these as separate commands to keep a retained function at the prompt.
 --
@@ -42,6 +42,7 @@ import qualified Data.Either
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Kind (Type)
 import Data.List (isInfixOf)
+import qualified Data.List
 import qualified Data.Maybe
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:) (Refl))
@@ -850,6 +851,13 @@ main = do
     observe "readEither at valid and invalid input with a default of 99"
         ( TypeNats.natVal (Proxy @(Data.Either.fromRight 99 (ReadNatural.readNatural '[ '2','3'])))
         , TypeNats.natVal (Proxy @(Data.Either.fromRight 99 (ReadNatural.readNatural '[ 'x']))) )
+    observe "concatenate all suffixes of [1,2,3] during type checking"
+        (Refl :: Prelude.concat (Data.List.tails '[1,2,3]) :~: '[1,2,3,2,3,3])
+    observe "collect the present values from an optional list literal"
+        (Refl :: Data.Maybe.catMaybes '[ 'Nothing, 'Just 3] :~: '[3])
+    observe "project rigid fields after swapping a known pair"
+        ( PreludePairExport.nestedFirst (Proxy @'True)
+        , PreludePairExport.nestedSecond (Proxy @'x') )
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

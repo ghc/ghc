@@ -5277,3 +5277,25 @@ account of partial conversions between ordinary and indexed values.
 This provides prior art for the failure branch of `fromListExact` and
 for a boundary that makes the checked invariant visible in its result.
 [Foundations of dependent interoperability, JFP 2018](https://doi.org/10.1017/S0956796818000011).
+
+### Closed constructor arguments and composition of strict pair cases
+
+Agda's standard library defines `concat` on lists of lists and
+`catMaybes` on lists of optional values. R15 uses those two examples
+with the corresponding ordinary Haskell functions. GHC's existing
+promoted list, tuple, and data constructors check the source arguments.
+The fork also needs to reconstruct a finite result at its checked kind
+after the interpreter runs.
+[Agda standard library 2.3, lists](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html)
+and [GHC's list and sum checks](../../testsuite/tests/dependent/should_run/NativeClosedCompoundLists.hs).
+
+Agda represents a projection of a neutral term as an elimination. Its
+record rules also permit eta equality for eligible records. The latter
+rule cannot transfer to lazy boxed pairs in Haskell. Forcing an unknown
+pair can diverge. Building a pair of its two unevaluated projections
+always produces a constructor. R16 certifies each strict case from the
+Haskell worker's typed Core. The separate composition experiment asks
+which field two successive strict cases select.
+[Agda 2.8.0 internal syntax](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs),
+[Agda record eta](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#eta-expansion)
+and [GHC’s pair definitions](../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs).

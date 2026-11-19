@@ -8,11 +8,24 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 193 lines.
-The normal-way dependent directory passed 192 of 228 cases. All 36 failures
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 196 lines.
+The normal-way dependent directory passed 198 of 234 cases. All 36 failures
 produced the same output as on the previous fork tip. Fifteen reject existing
 programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+The [boundary example](BOUNDARY-EVIDENCE.md#running-a-search-in-a-splice)
+runs an ordinary Haskell search during compilation. Its result is a
+membership path at `Member 8 (OrdinaryOffer.offered 7)`. The same
+obligation can also select a GHC typechecker plugin through a class
+constraint. An ordinary consumer can use the checked path.
+
+Ordinary `concat` can consume the list of suffixes returned by `tails`.
+The Showcase also checks `catMaybes '[ 'Nothing, 'Just 3] :~: '[3]` and
+uses an installed `swap` equation to project fields from a pair that
+contains an unknown index.
+[Closed list examples](roadmap/R15-closed-term-evaluator.md#compound-list-results-and-constructor-literals)
+and [open pair examples](roadmap/R16-open-term-evaluator.md#composing-a-projection-with-a-swap).
 
 An imported `length :: [Natural] -> Natural` can now compute a vector
 index during compilation. The producer uses ordinary Haskell `foldr`.

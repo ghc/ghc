@@ -8356,3 +8356,42 @@ The normal-way dependent directory passed 192 of 228 cases. The 36 failures
 had the same individual output as at M118.
 Seven existing linker, serialized bytecode, and Template Haskell tests
 also passed in the normal way. The full GHC testsuite was not run.
+
+## M120: check lists of compound closed results
+
+- [x] Read and write a finite list with any supported element shape.
+      Preserve the kind of an empty list. Check the actual list constructors.
+- [x] Pass the suffixes of a list to ordinary `concat`. Check optional and
+      sum elements in the presence of a conflicting client `Show` instance.
+- [x] Locate an exception in a present element. Reject an unsupported
+      element type before calling the producer.
+
+## M121: export a checked pair constructor case
+
+- [x] Inspect the typed Core of a strict boxed pair case. Record the exact
+      input field for a projection and both input fields for a pair result.
+      A function that also forces the unused field needs another rule.
+- [x] Check a user-defined swap on two unknown fields of a known pair
+      constructor, using only the producer interface in the client.
+- [x] Check the installed `Data.Tuple.swap` and the ordinary package client.
+
+## M122: check closed constructor arguments together
+
+- [x] Use one instantiation of the producer type to check a constructor
+      literal, other literals, and computed operands. Infer missing
+      constructor arguments from the available inputs. Keep the existing
+      `Natural` default for an otherwise ambiguous bare empty list.
+- [x] Check operand kinds and producer dictionaries before running a nested
+      computation. Locate a kind mismatch at the bad argument. Report a
+      missing instance at the application.
+- [x] Check both compiler stages, run the Showcase, and compare all
+      normal-way dependent tests with M119.
+
+[R15 examples](roadmap/R15-closed-term-evaluator.md)
+and [R16 pair examples](roadmap/R16-open-term-evaluator.md#exporting-a-projection-of-an-unknown-pair).
+
+Both compiler stages built. The native Showcase and GHCi agreed on all
+196 output lines. The self-hosted compiler passed the compound result
+tests with the internal and external interpreters. The normal-way
+dependent directory passed 198 of 234 cases. All 36 failures had the
+same individual diagnostics as at M119. The full GHC testsuite was not run.
