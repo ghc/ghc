@@ -1,0 +1,7 @@
+NativeClosedIndexedWrongKind.hs:6:25: error: [GHC-83865]
+    • Couldn't match kind ‘False’ with ‘True’
+      Expected kind ‘P.Mark GHC.Internal.Bignum.Natural.Natural True’,
+        but ‘'P.Off’ has kind ‘P.Mark
+                                 GHC.Internal.Bignum.Natural.Natural False’
+    • In the second argument of ‘(:~:)’, namely ‘'P.Off’
+      In the type signature: wrong :: P.sample 0 :~: 'P.Off

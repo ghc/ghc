@@ -1,0 +1,5 @@
+NativeClosedIndexedContext.hs:6:23: error: [GHC-70565]
+    • Cannot evaluate ‘P.unsupported’ in a type.
+        The function returns Context 'True. Closed calls in types currently support results of type Natural, Char, Bool, lists, boxed pairs, Maybe, and Either of supported results, or ordinary boxed datatypes with supported fields and imported constructors.
+    • In the first argument of ‘Proxy’, namely ‘(P.unsupported 1)’
+      In the type signature: unsupported :: Proxy (P.unsupported 1)

@@ -158,6 +158,14 @@ for name in ['NativeClosedPresentBottom', 'NativeClosedUnsupportedAlternative', 
     test(name, [req_interp, req_rts_linker, only_ways(['normal']),
                 extra_files(['../should_run/NativeClosedChoiceLib.hs'])],
          multimod_compile_fail, [name, '-v0 ' + config.ghc_th_way_flags])
+test('NativeClosedIndexedContext',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['NativeClosedIndexedContextLib.hs'])],
+     multimod_compile_fail, ['NativeClosedIndexedContext', '-v0 ' + config.ghc_th_way_flags])
+for name in ['NativeClosedIndexedWrongKind', 'NativeClosedIndexedWrongValue', 'NativeClosedIndexedPartial']:
+    test(name, [req_interp, req_rts_linker, only_ways(['normal']),
+                extra_files(['../../../../docs/dependent-haskell/examples/closed-evaluation/IndexedMark.hs'])],
+         multimod_compile_fail, [name, '-v0 ' + config.ghc_th_way_flags])
 test('NativeClosedWrongAlternative', [req_interp, req_rts_linker, only_ways(['normal'])],
      compile_fail, [config.ghc_th_way_flags])
 test('NativeClosedSaturatedKinds',

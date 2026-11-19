@@ -68,7 +68,7 @@ import GHC.Tc.Utils.Instantiate
 
 import qualified GHC.Core as Core
 import GHC.Core.FVs (exprSomeFreeVarsList)
-import GHC.Core.Make (mkCoreApp, mkCoreApps, mkCoreConApps, mkCoreConWrapApps, mkCharExpr, mkListExpr
+import GHC.Core.Make (mkCoreApp, mkCoreApps, mkCoreConWrapApps, mkCharExpr, mkListExpr
                      , mkConsExpr, mkNaturalExpr)
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion( etaExpandCoAxBranch )
@@ -76,7 +76,7 @@ import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep as TyCoRep
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv as InstEnv
-import GHC.Core.Utils (exprType)
+import GHC.Core.Utils (dataConRepInstPat, exprType)
 
 import GHC.Builtin.TH
 import GHC.Builtin.Modules (gHC_INTERNAL_BASE, gHC_TYPES, mkGhcInternalModule)
@@ -119,6 +119,7 @@ import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Unique
+import GHC.Types.Unique.Supply (getUniquesM)
 import GHC.Types.Var.Set
 import GHC.Types.Meta
 import GHC.Types.Basic hiding( SuccessFlag(..) )
@@ -1334,9 +1335,11 @@ tcDecodeClosedCallOperand owner operand = do
           (tc, kinds) <- maybe (Left UnsupportedClosedShape) Right (splitTyConApp_maybe kind)
           (promoted, args) <- maybe (Left UnsupportedClosedShape) Right (splitTyConApp_maybe ty)
           con <- maybe (Left UnsupportedClosedShape) Right (isPromotedDataCon_maybe promoted)
-          let (type_args, values) = splitAt (length kinds) args
-          ensure (dataConTyCon con == tc && equalLength type_args kinds &&
-                  and (zipWith tcEqType type_args kinds))
+          ensure (dataConTyCon con == tc)
+          source_args <- closedConstructorTypeArgs con kinds
+          let (type_args, values) = splitAt (length source_args) args
+          ensure (equalLength type_args source_args &&
+                  and (zipWith tcEqType type_args source_args))
           own_gres <- if closedBuiltinData tc
             then return emptyNameEnv
             else do
@@ -1344,13 +1347,11 @@ tcDecodeClosedCallOperand owner operand = do
               case closedImportedGRE rdr_env con of
                 Just gre -> return (unitNameEnv (dataConName con) gre)
                 Nothing -> Left (InaccessibleClosedOperand tc)
-          fields <- ordinaryClosedFields kind kinds con
+          fields <- closedConstructorFields kind kinds con
           ensure (equalLength fields values &&
                   and (zipWith (\field value -> field `tcEqType` typeKind value) fields values))
           found <- traverse (decode platform rdr_env) values
-          let pack | any isBanged (dataConImplBangs con) = mkCoreConWrapApps
-                   | otherwise = mkCoreConApps
-          return (pack con (map Core.Type kinds ++ map fst found),
+          return (mkCoreConWrapApps con (map Core.Type source_args ++ map fst found),
                   plusNameEnvList (own_gres : map snd found))
 
     decodeList platform rdr_env element acc used ty = case splitTyConApp_maybe ty of
@@ -1411,7 +1412,7 @@ closedShapeKind (ClosedRef kind) = kind
 -- | A shape can be unsupported, inaccessible, or recursively expanding.
 data ClosedShapeError
   = UnsupportedClosedShape
-  | InaccessibleClosedData TyCon
+  | InaccessibleClosedData TyCon Bool
   | InaccessibleClosedOperand TyCon
   | NonDecreasingClosedShape Kind Kind
 
@@ -1422,7 +1423,16 @@ tcClosedCallValueShape owner kind = do
   env <- getGblEnv
   case closedCallValueShape (tcg_rdr_env env) kind of
     Right codec@(ClosedCodec _ nodes) -> do
-      forM_ [tc | (_, ClosedData tc _ _) <- nodes] (addUsedDataCons (tcg_rdr_env env))
+      let datatypes = [(tc, [con | ClosedConstructor _ con _ <- alternatives])
+                     | (_, ClosedData tc _ alternatives) <- nodes]
+          used = [name | (tc, constructors) <- datatypes
+                       , name <- tyConName tc : map dataConName constructors]
+      addUsedGREs NoDeprecationWarnings
+        [gre | (_, constructors) <- datatypes, con <- constructors
+             , Just gre <- [closedImportedGRE (tcg_rdr_env env) con]]
+      -- The parent declaration fingerprint also covers constructors that
+      -- were impossible at the index, and constructors added later.
+      updTcRef (tcg_evaluated_term_uses env) (`extendNameSetList` used)
       return (Just codec)
     Left err -> reportClosedShapeError owner err
 
@@ -1430,14 +1440,17 @@ tcClosedCallValueShape owner kind = do
 reportClosedShapeError :: Name -> ClosedShapeError -> TcM (Maybe a)
 reportClosedShapeError owner err = case err of
   UnsupportedClosedShape -> return Nothing
-  InaccessibleClosedData tc -> do
+  InaccessibleClosedData tc indexed -> do
       flags <- getDynFlags
       ctx <- getNamePprCtx
       units <- hsc_units <$> getTopEnv
       let shape = if isEnumerationTyCon tc then "an enumeration" else "an algebraic datatype"
+          constructors | indexed = "constructor that can produce the result index"
+                       | otherwise = "constructor"
       failWithTc (TcRnClosedTypeEval owner
         ("Cannot inspect the constructors of " ++ showSDocForUser flags units ctx (ppr tc) ++
-         ". To evaluate " ++ shape ++ " in a type, bring every constructor into scope from a non-SOURCE import."))
+         ". To evaluate " ++ shape ++ " in a type, bring every " ++ constructors ++
+         " into scope from a non-SOURCE import."))
   InaccessibleClosedOperand tc -> do
       flags <- getDynFlags
       ctx <- getNamePprCtx
@@ -1492,18 +1505,20 @@ closedCallValueShape rdr_env kind = do
             else do
               forM_ (find (\(head_tc, old) -> head_tc == tc && not (proper_subterm here old)) active) $
                 \(_, old) -> Trans.lift (Left (NonDecreasingClosedShape old here))
-              field_types <- Trans.lift (traverse (ordinaryClosedFields here args) constructors)
-              unless (all (isJust . closedImportedGRE rdr_env) constructors) $
-                Trans.lift (Left (InaccessibleClosedData tc))
-              alternatives <- forM (zip constructors field_types) $ \(con, fields) -> do
+              let possible = filter (not . dataConCannotMatch args) constructors
+              when (null possible) $ Trans.lift (Left UnsupportedClosedShape)
+              field_types <- Trans.lift (traverse (closedConstructorFields here args) possible)
+              unless (all (isJust . closedImportedGRE rdr_env) possible) $
+                Trans.lift (Left (InaccessibleClosedData tc (not (equalLength possible constructors))))
+              alternatives <- forM (zip possible field_types) $ \(con, fields) -> do
                 codecs <- traverse (shape ((tc, here) : active)) fields
                 return (ClosedConstructor (Just (show (dataConTagZ con) ++ ";")) con codecs)
-              node <- Trans.lift (boxed tc args alternatives)
+              let node = ClosedData tc args alternatives
               State.modify' ((here, node) :)
               return (ClosedRef here)
       Just (tc, _)
         | isVanillaAlgTyCon tc, isLiftedAlgTyCon tc, isAbstractTyCon tc
-        -> Trans.lift (Left (InaccessibleClosedData tc))
+        -> Trans.lift (Left (InaccessibleClosedData tc False))
       _ -> Trans.lift (Left UnsupportedClosedShape)
 
     -- A repeated datatype may also be a strictly smaller type argument.
@@ -1552,28 +1567,51 @@ ordinaryClosedTyCon :: TyCon -> [Type] -> Bool
 ordinaryClosedTyCon tc args =
   isVanillaAlgTyCon tc && isBoxedDataTyCon tc && isLiftedAlgTyCon tc &&
   lengthIs args (tyConArity tc) && null (tyConStupidTheta tc) &&
-  all (tcIsLiftedTypeKind . tyVarKind) (tyConTyVars tc) && all closedGroundField args
+  all (closedGroundField . tyVarKind) (tyConTyVars tc) && all closedGroundType args
+
+-- | Check that a kind or type has no unresolved information.
+closedGroundType :: Type -> Bool
+closedGroundType ty = noFreeVarsOfType ty && isTyFamFree ty && isTauTy ty
 
 closedGroundField :: Type -> Bool
-closedGroundField ty =
-  tcIsLiftedTypeKind (typeKind ty) && noFreeVarsOfType ty && isTyFamFree ty && isTauTy ty
+closedGroundField ty = tcIsLiftedTypeKind (typeKind ty) && closedGroundType ty
 
--- | Check that the worker representation uses the original boxed fields.
-ordinaryClosedFields :: Kind -> [Type] -> DataCon -> Either ClosedShapeError [Type]
-ordinaryClosedFields here args con
-  | isVanillaDataCon con, null (dataConTheta con)
+-- | Recover the wrapper and promoted constructor's erased source arguments.
+closedConstructorTypeArgs :: DataCon -> [Type] -> Either ClosedShapeError [Type]
+closedConstructorTypeArgs con args
+  | (universals, [], specs, [], _, _) <- dataConFullSig con
+  , equalLength universals args
+  , all (closedGroundType . substTyWith universals args . snd . eqSpecPair) specs
+  , let refined = map (fst . eqSpecPair) specs
+        unrefined = filter (`notElem` refined) universals
+  , let user_vars = dataConUserTyVars con
+  , equalLength user_vars unrefined, all (`elem` unrefined) user_vars
+  , Just source_args <- traverse (`lookup` zip universals args) user_vars
+  = return source_args
+  | otherwise = Left UnsupportedClosedShape
+
+-- | Check the selected source fields and the worker's evidence prefix.
+-- See Note [Fixed-index constructors in closed calls].
+closedConstructorFields :: Kind -> [Type] -> DataCon -> Either ClosedShapeError [Type]
+closedConstructorFields here args con
+  | (universals, [], specs, [], _, _) <- dataConFullSig con
   , null (dataConRepArgBinders con)
-  , let universals = dataConUnivTyVars con
-  , equalLength universals args, dataConUserTyVars con == universals
+  , equalLength universals args
   , let bangs = dataConImplBangs con
   , not (any isUnpacked bangs)
-  , isNothing (dataConWrapId_maybe con) || any isBanged bangs
-  , substTyWith universals args (dataConOrigResTy con) `tcEqType` here
+  , not (null specs) || isVanillaDataCon con
+  , not (null specs) || isNothing (dataConWrapId_maybe con) ||
+      any isBanged bangs || dataConUserTyVars con /= universals
+  , let instantiate = substTyWith universals args
+  , instantiate (dataConOrigResTy con) `tcEqType` here
   , let fields = map scaledThing (dataConInstOrigArgTys con args)
-        rep_fields = map scaledThing (dataConInstArgTys con args)
-  , all closedGroundField fields && dataConRepArity con == length fields
+        rep = map (instantiate . scaledThing) (dataConRepArgTys con)
+        (evidence, rep_fields) = splitAt (length specs) rep
+        expected_evidence = map instantiate (eqSpecPreds specs)
+  , all closedGroundField fields && dataConRepArity con == length rep
+  , equalLength evidence expected_evidence && and (zipWith tcEqType evidence expected_evidence)
   , equalLength fields rep_fields && and (zipWith tcEqType fields rep_fields)
-  = Right fields
+  = fields <$ closedConstructorTypeArgs con args
   | otherwise = Left UnsupportedClosedShape
 
 -- | Find an ordinary import for this exact constructor.
@@ -1702,14 +1740,21 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
               binding = Core.Rec [(loop, Core.Lam spine (Core.Lam suffix encode))]
           return $ \value tail_string ->
             Core.Let binding (mkCoreApps (Core.Var loop) [value, tail_string])
-        ClosedData _ _ alternatives -> do
+        ClosedData _ kinds alternatives -> do
           binder <- mkSysLocalM (fsLit "closed_data") ManyTy (closedShapeKind current)
           render_alts <- forM alternatives $ \(ClosedConstructor tag con fields) -> do
-            binders <- mapM (mkSysLocalM (fsLit "closed_field") ManyTy . closedShapeKind) fields
+            uniques <- getUniquesM
+            let (existentials, binders) = dataConRepInstPat uniques ManyTy con kinds
+                (evidence, value_binders) = splitAt (length (dataConTheta con)) binders
+            unless (null existentials && all isCoVar evidence &&
+                    equalLength fields value_binders &&
+                    and (zipWith (\field var -> closedShapeKind field `tcEqType` varType var)
+                                 fields value_binders)) $
+              failWithTc (TcRnClosedTypeEval name "Unexpected constructor representation.")
             renderers <- mapM (renderFields refs quote) fields
             let alt suffix =
                   let body = foldr (\(render, field) rest -> render (Core.Var field) rest)
-                                   suffix (zip renderers binders)
+                                   suffix (zip renderers value_binders)
                       emit c = mkConsExpr charTy (mkCharExpr c)
                       tagged = maybe body (foldr emit body) tag
                   in Core.Alt (Core.DataAlt con) binders tagged
@@ -1789,7 +1834,10 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
       ClosedData _ kinds alternatives -> do
         (ClosedConstructor _ con fields, payload) <- selectConstructor alternatives input
         (values, rest) <- decodeArguments fields payload
-        return (mkTyConApp (promoteDataCon con) (kinds ++ values), rest)
+        source_args <- either (const Nothing) Just (closedConstructorTypeArgs con kinds)
+        let value = mkTyConApp (promoteDataCon con) (source_args ++ values)
+        guard (typeKind value `tcEqType` closedShapeKind current)
+        return (value, rest)
 
     decodeList element acc ('0' : rest) =
       Just (mkPromotedListTy (closedShapeKind element) (reverse acc), rest)
@@ -1835,13 +1883,33 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
       guard (show value == input)
       return (promote value)
 
+{- Note [Fixed-index constructors in closed calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source constructor such as Count :: Natural -> Mark 'True promotes at
+that user type. Its worker takes an erased equality before the Natural
+field. The renderer binds the worker arguments with dataConRepInstPat
+and encodes only source fields. The decoder applies the promoted
+constructor with source arguments. The ordinary wrapper supplies the
+equality when a checked value becomes a runtime operand.
+
+For a reachable constructor, instantiate its EqSpec with the ground
+scrutinee arguments. Require ground right-hand sides, no existential
+binders or explicit context, and exact source and representation field
+types. This permits an index that refers to another parameter. Omit
+only alternatives that
+dataConCannotMatch proves incompatible. Require visibility of the
+remaining constructors. Record the parent datatype too, because changes
+to the declaration can make a different set of constructors reachable.
+No equality evidence comes from the interpreter response.
+-}
+
 {- Note [Constructor visibility in closed calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Use ordinary DataKinds constructor identities in both directions. An
 interface can contain constructors hidden from the client. To inspect an
-unknown result, require non-SOURCE imports for every constructor of each
-user datatype that the renderer may inspect. Record those imports with
-addUsedDataCons. For a known operand, inspect its promoted constructors
+unknown result, require and record non-SOURCE imports for every
+constructor that the renderer may inspect. Record the parent datatype
+declaration as an interface usage. For a known operand, inspect its promoted constructors
 directly. Require and record just the selected constructors. Check again
 after expanding a type synonym. Use the constructor wrapper when building a
 value with a strict boxed field.

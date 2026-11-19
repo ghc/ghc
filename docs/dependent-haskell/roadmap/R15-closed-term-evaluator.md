@@ -428,10 +428,9 @@ admits ordinary and mutual recursion and rejects expanding recursion
 such as `Grow a` containing `Grow [a]`. It can also reject a finite
 cycle where a datatype permutes two different parameter types. The
 diagnostic identifies the two instantiations that failed the check.
-GHC admits boxed strict fields
-with matching source and worker field types. Constructors that require
-evidence, unboxed or unpacked representations, or retained field binders
-are outside this implementation.
+GHC admits boxed strict fields with matching source and worker field
+types. M129 adds support for constructor result equalities. Unboxed and
+unpacked representations and retained field binders remain open.
 [Ordinary tree](../examples/closed-evaluation/FiniteTree.hs),
 [source tests](../../../testsuite/tests/dependent/should_run/NativeClosedEnums.hs)
 and [expanding recursion](../../../testsuite/tests/dependent/should_fail/NativeClosedExpanding.hs).
@@ -460,3 +459,41 @@ strict fields and failure at bottom in a selected field. They rebuilt the provid
 with an additional constructor, leaving the client source, producer
 signature and returned `Leaf` fixed. The unchanged client failed
 because its explicit constructor import became partial.
+
+## M129. Constructors at a known GADT index
+
+An ordinary GADT can return different constructors at different indices.
+In `Mark a flag`, `Off` returns `Mark a 'False`. Both `Count` and
+`Pair` return `Mark a 'True`. GHC therefore accepts this proof in a client
+that imports only `Count` and `Pair` from the datatype.
+
+```haskell
+nested :: P.readMark (P.sample 6) :~: 67
+nested = Refl
+```
+
+The ordinary producer returns `Pair 6 7`. The second ordinary function
+computes `10 * 6 + 7`. GHC also rejects `P.sample 6 :~: 'P.Pair 7 6`
+at `Refl`. Trying to compare `P.sample 0` with `'P.Off` fails earlier,
+at kind checking. The two sides have different Boolean indices.
+[Ordinary producer](../examples/closed-evaluation/IndexedMark.hs),
+[dependent client](../../../testsuite/tests/dependent/should_run/NativeClosedIndexed.hs)
+and [wrong-index diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexedWrongKind.stderr).
+
+The compiler checks reachability with GHC's existing constructor
+matcher. For each possible constructor, it binds the worker's equality
+evidence in a Core case. It reads back the constructor tag and data
+fields. DataKinds supplies the promoted constructor and the ordinary
+constructor wrapper supplies the equality during operand reconstruction.
+An index may refer to another ground parameter. User-written parameter
+order is respected when applying the promoted constructor.
+
+Missing any reachable constructor blocks inspection before execution.
+The client records the parent datatype declaration as a dependency.
+Changing just its interface to make a hidden constructor reachable
+invalidated the unchanged client with all original objects still in place.
+A reachable constructor with an existential binder or an explicit
+dictionary remains outside the codec. A branch GHC can rule out at the
+requested index needs neither a representation nor a constructor import.
+[Missing constructor](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexedPartial.hs)
+and [dictionary control](../../../testsuite/tests/dependent/should_fail/NativeClosedIndexedContext.hs).

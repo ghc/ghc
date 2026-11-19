@@ -1,0 +1,6 @@
+NativeClosedIndexedWrongValue.hs:7:9: error: [GHC-83865]
+    • Couldn't match type ‘6’ with ‘7’
+      Expected: P.Pair 6 7 :~: P.Pair 7 6
+        Actual: P.Pair 6 7 :~: P.Pair 6 7
+    • In the expression: Refl
+      In an equation for ‘wrong’: wrong = Refl
