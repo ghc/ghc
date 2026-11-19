@@ -2506,17 +2506,7 @@ tcOpenTypeCall mode name instantiated args = do
 
 -- | Admit a rigid type variable or a promoted pair of rigid variables.
 isOpenTypeOperand :: LHsType GhcRn -> Bool
-isOpenTypeOperand arg
-  | L _ (HsExplicitTupleTy _ _ [x, y]) <- ignoreParens arg =
-      isTypeVariableArg x && isTypeVariableArg y
-  | otherwise = isTypeVariableArg arg
-
--- | Let the open evaluator kind-check only named operands.
-isTypeVariableArg :: LHsType GhcRn -> Bool
-isTypeVariableArg (L _ (HsParTy _ arg)) = isTypeVariableArg arg
-isTypeVariableArg (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)))) =
-  isTyVarName name
-isTypeVariableArg _ = False
+isOpenTypeOperand = isOpenTypeOperandWith (\(WithUserRdr _ name) -> isTyVarName name)
 
 -- | Find a resolved term call or a unary checked family call.
 nestedClosedCall :: LHsType GhcRn -> Maybe (SrcSpan, RdrName, Name, [LHsType GhcRn])

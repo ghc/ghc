@@ -57,8 +57,14 @@ that belongs to its own bindings.
 For example, `type LastOf a b = lastOf a b` observes the ordinary
 definition `lastOf x y = select y x`. When `select x _ = x`, the
 result type is `b`. This unqualified use follows the usual term lookup
-with `RequiredTypeArguments`. An explicitly bound type variable with
-the same name still takes precedence.
+with `RequiredTypeArguments`. An explicit `forall a.` also lets `pick a`
+refer to the local function. In an ordinary implicitly quantified
+signature, `pick` can still bind a type variable. The regression supplies
+`@Maybe` for that variable with visible type application. An explicitly
+bound type variable takes precedence too. The fallback for an unqualified
+ordinary function applies to a spine of named variables or pairs of
+named variables. Closed constructor inputs retain the checked-equation
+lookup and its diagnostics for incomplete clauses or invalid recursion.
 [Source example](../examples/open-evaluation/LocalOpen.hs).
 
 Scheduling a helper makes its checked body available. Its rewrite rules

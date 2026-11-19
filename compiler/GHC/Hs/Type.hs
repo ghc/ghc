@@ -81,7 +81,7 @@ module GHC.Hs.Type (
         splitLHsSigmaTyInvis, splitLHsGadtTy,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
-        ignoreParens, hsHasForEachTy, hsForEachVisibility, hsSigWcType, hsPatSigType,
+        ignoreParens, isOpenTypeOperandWith, hsHasForEachTy, hsForEachVisibility, hsSigWcType, hsPatSigType,
         hsTypeHasNoAnonWildcards, hsTyVarBndrHasNoAnonWildcards,
         hsTyKindSig,
         setHsTyVarBndrFlag, hsTyVarBndrFlag, updateHsTyVarBndrFlag,
@@ -715,6 +715,17 @@ hsTyKindSig lty =
     _                 -> Nothing
 
 ---------------------
+-- | An operand for open evaluation is a named variable or a pair of them.
+-- The renamer tests the spelling and the typechecker tests the resolved Name.
+isOpenTypeOperandWith :: (IdOccP (GhcPass p) -> Bool) -> LHsType (GhcPass p) -> Bool
+isOpenTypeOperandWith variable operand = case unLoc (ignoreParens operand) of
+  HsExplicitTupleTy _ _ [x, y] -> is_variable x && is_variable y
+  _ -> is_variable operand
+  where
+    is_variable ty = case unLoc (ignoreParens ty) of
+      HsTyVar _ NotPromoted (L _ name) -> variable name
+      _ -> False
+
 ignoreParens :: LHsType (GhcPass p) -> LHsType (GhcPass p)
 ignoreParens (L _ (HsParTy _ ty)) = ignoreParens ty
 ignoreParens ty                   = ty

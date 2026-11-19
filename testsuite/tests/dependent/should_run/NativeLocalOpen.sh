@@ -42,6 +42,19 @@ expect_rejection() {
     fi
 }
 
+cat > NativeLocalOpenNames.hs <<'SOURCE'
+{-# LANGUAGE ExperimentalDependentTypes, ExplicitForAll, TypeApplications #-}
+module NativeLocalOpenNames where
+pick x = x
+explicit :: forall a. a -> pick a
+explicit x = x
+implicit :: pick a -> pick a
+implicit x = x
+twoBinders :: Maybe Bool
+twoBinders = implicit @Maybe @Bool (Just True)
+SOURCE
+"${ghc[@]}" -c NativeLocalOpenNames.hs
+
 cat > NativeLocalOpenCycle.hs <<'SOURCE'
 {-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures #-}
 module NativeLocalOpenCycle where

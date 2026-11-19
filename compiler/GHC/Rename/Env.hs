@@ -1173,15 +1173,19 @@ lookupLocalOccRn rdr_name
 -- lookupTypeOccRn looks up an optionally promoted RdrName.
 -- Used for looking up type variables.
 lookupTypeOccRn :: RdrName -> RnM GlobalRdrElt
-lookupTypeOccRn = lookupTypeOcc False
+lookupTypeOccRn = lookupTypeOcc BareTypeOccurrence
 
 -- | Look up a name used as the head of a type application.
-lookupTypeAppHeadRn :: RdrName -> RnM GlobalRdrElt
-lookupTypeAppHeadRn = lookupTypeOcc True
+-- The flag says whether its operands have the syntax of open inputs.
+lookupTypeAppHeadRn :: Bool -> RdrName -> RnM GlobalRdrElt
+lookupTypeAppHeadRn = lookupTypeOcc . TypeApplicationHead
+
+-- | Only an application head can fall back to an ordinary function.
+data TypeOccurrence = BareTypeOccurrence | TypeApplicationHead Bool
 
 -- See Note [Demotion] and Note [Names of finite source functions].
-lookupTypeOcc :: Bool -> RdrName -> RnM GlobalRdrElt
-lookupTypeOcc app_head rdr_name
+lookupTypeOcc :: TypeOccurrence -> RdrName -> RnM GlobalRdrElt
+lookupTypeOcc position rdr_name
   = do { mb_gre <- lookupOccRn_maybe rdr_name
        ; case mb_gre of
              Just gre -> return gre
@@ -1214,7 +1218,7 @@ lookupTypeOcc app_head rdr_name
           return gre { gre_name = table, gre_par = NoParent
                      , gre_info = IAmTyCon ClosedTypeFamilyFlavour }
         [(gre, Nothing)]
-          | app_head
+          | TypeApplicationHead open_operands <- position
           , isVarOcc (greOccName gre)
           -> do { this_mod <- tcg_semantic_mod <$> getGblEnv
                 ; level <- getThLevel
@@ -1232,7 +1236,8 @@ lookupTypeOcc app_head rdr_name
                             ; addUsedGRE AllDeprecationWarnings gre
                             ; return gre }
                     else case level of
-                      Comp | isLocalGRE gre, not explicit_levels
+                      Comp | isQual term_rdr || open_operands
+                           , isLocalGRE gre, not explicit_levels
                            , isLexVarId (occNameFS (greOccName gre))
                            , nameModule_maybe name == Just this_mod
                            , Just ref <- demands ->
@@ -1303,6 +1308,13 @@ application head. With an implicit outer quantifier, an unqualified name
 can already have a type binder. The ordinary type lookup still wins.
 See Note [Closed source calls] in GHC.Tc.Gen.HsType and Note [Open source
 calls] in GHC.Tc.Gen.OpenTypeEval.
+
+For a local unqualified head, request a checked Core body only when all
+the operands have open-input syntax. A closed use such as loop '[ 'True]
+can request a structural source equation. If its recursive clause is
+invalid, report the missing equation at that use. A qualified local
+head can also request the staging diagnostic for a closed literal call.
+See Note [Scheduling local open definitions] in GHC.Tc.Module.
 -}
 
 {- Note [eqTyCon (~) compatibility fallback]

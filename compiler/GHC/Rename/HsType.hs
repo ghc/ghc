@@ -932,14 +932,12 @@ rnHsTyKi env tyLit@(HsTyLit src lit)
        ; return (HsTyLit src (convertLit lit), emptyFNs) }
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)
-  = do { (ty1', fvs1) <- rnLHsAppHead env ty1
-       ; (ty2', fvs2) <- rnLHsTyKi env ty2
-       ; return (HsAppTy noExtField ty1' ty2', fvs1 `plusFN` fvs2) }
+  = rnHsAppTy env True ty1 ty2
 
 rnHsTyKi env (HsAppKindTy _ ty k)
   = do { kind_app <- xoptM LangExt.TypeApplications
        ; unless kind_app (addErr (typeAppErr KindLevel k))
-       ; (ty', fvs1) <- rnLHsAppHead env ty
+       ; (ty', fvs1) <- rnLHsAppHead env False ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
        ; return (HsAppKindTy noExtField ty' k', fvs1 `plusFN` fvs2) }
 
@@ -1084,16 +1082,26 @@ throw an error accordingly.
 -}
 
 --------------
--- | Use the same function-head lookup for an ordinary argument and a
--- visible kind argument. Parentheses preserve the function-head context.
-rnLHsAppHead :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
-rnLHsAppHead env (L l tv@(HsTyVar _ ip name)) = setSrcSpanA l $ do
-  (tv', fvs) <- rnHsTyVar lookupTypeAppHeadRn env tv ip name
+-- | Preserve ordinary lookup for closed unqualified source equations.
+-- Only a spine of symbolic operands can request local open evaluation.
+rnHsAppTy :: RnTyKiEnv -> Bool -> LHsType GhcPs -> LHsType GhcPs -> RnM (HsType GhcRn, FreeNames)
+rnHsAppTy env open fun arg = do
+  (fun', fun_fvs) <- rnLHsAppHead env (open && isOpenTypeOperandWith isRdrTyVar arg) fun
+  (arg', arg_fvs) <- rnLHsTyKi env arg
+  return (HsAppTy noExtField fun' arg', fun_fvs `plusFN` arg_fvs)
+
+-- | Carry the operand test to the head of a parenthesized application.
+rnLHsAppHead :: RnTyKiEnv -> Bool -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
+rnLHsAppHead env open (L l tv@(HsTyVar _ ip name)) = setSrcSpanA l $ do
+  (tv', fvs) <- rnHsTyVar (lookupTypeAppHeadRn open) env tv ip name
   return (L l tv', fvs)
-rnLHsAppHead env (L l (HsParTy _ ty)) = do
-  (ty', fvs) <- rnLHsAppHead env ty
+rnLHsAppHead env open (L l (HsAppTy _ fun arg)) = setSrcSpanA l $ do
+  (ty', fvs) <- rnHsAppTy env open fun arg
+  return (L l ty', fvs)
+rnLHsAppHead env open (L l (HsParTy _ ty)) = do
+  (ty', fvs) <- rnLHsAppHead env open ty
   return (L l (HsParTy noAnn ty'), fvs)
-rnLHsAppHead env ty = rnLHsTyKi env ty
+rnLHsAppHead env _ ty = rnLHsTyKi env ty
 
 rnHsTyVar :: (RdrName -> RnM GlobalRdrElt) -> RnTyKiEnv -> HsType GhcPs
           -> PromotionFlag -> LocatedN RdrName -> RnM (HsType GhcRn, FreeNames)
@@ -1132,7 +1140,7 @@ rnHsTyOp :: RnTyKiEnv -> HsType GhcPs -> LHsType GhcPs
          -> RnM (LHsType GhcRn, FreeNames)
 rnHsTyOp env overall_ty tyop
   | L l (HsTyVar ann prom (L loc op)) <- tyop
-  = do { opgre <- lookupTypeAppHeadRn op
+  = do { opgre <- lookupTypeAppHeadRn False op
        ; checkNamedWildCard env (greName opgre)
        ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $
