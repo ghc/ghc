@@ -855,6 +855,7 @@ tcExpr (HsStatic free_names expr) res_ty
 
                Just (ATyVar {}) -> return ()  -- Free type variables are allowed
                Just ATcTypeLet{} -> return ()
+               Just ATcCaseLet{} -> return ()
 
                    -- Not really expecting these, but we'll get an error from
                    -- elsewhere, so don't produce an error here

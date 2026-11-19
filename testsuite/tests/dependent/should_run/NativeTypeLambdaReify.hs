@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, TemplateHaskell, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, TemplateHaskell, TypeFamilies, TypeOperators #-}
 module NativeTypeLambdaReify where
 
 import qualified Data.Kind as K
@@ -6,7 +6,7 @@ import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax (addModFinalizer)
+import Language.Haskell.TH.Syntax (addModFinalizer, mkNameG_tc)
 import System.Directory (doesFileExist, removeFile)
 import TypeLambda (L)
 
@@ -30,3 +30,22 @@ type CheckedOnce
              [t| K.Type |]))
   (a :: q) =
     ((\b -> (Proxy a, b)) :: K.Type %U -> K.Type)
+
+type CapturedCaseLet a b =
+  let captured = '(a, a) in case b of
+    'True -> Proxy captured
+    'False -> Maybe (Proxy captured)
+
+$(do loc <- location
+     let occ = "$case-let-rhs:CapturedCaseLet:0"
+         helper = mkNameG_tc (loc_package loc) (loc_module loc) occ
+     visible <- lookupTypeName occ
+     canReify <- recover (pure False) (True <$ reify helper)
+     canReifyType <- recover (pure False) (True <$ reifyType helper)
+     case (visible, canReify, canReifyType) of
+       (Nothing, False, False) -> pure ()
+       _ -> fail "the generated case-let helper escaped through Template Haskell"
+     public <- reify ''CapturedCaseLet
+     case public of
+       TyConI (TySynD name [_, _] _) | name == ''CapturedCaseLet -> pure []
+       _ -> fail "expected the public case-let synonym")

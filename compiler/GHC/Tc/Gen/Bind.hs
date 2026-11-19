@@ -1971,6 +1971,7 @@ isClosedBndrGroup type_env binds
           AGlobal {} -> True
           ATyVar {}  -> False  -- In-scope type variables are not closed!
           ATcTypeLet{} -> False
+          ATcCaseLet{} -> False
           ATcId { tct_info = info}
             -> case info of
                    LetBound closed -> closed

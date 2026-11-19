@@ -55,7 +55,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
-import GHC.Tc.Types.BasicTypes (TcTyThing(ATcTypeLet))
+import GHC.Tc.Types.BasicTypes (TcTyThing(ATcTypeLet, ATcCaseLet))
 import GHC.Tc.Types.Origin
 import GHC.Tc.Gen.SourceTable (checkOptionalSourceUses)
 import GHC.Tc.Types.LclEnv
@@ -3306,7 +3306,11 @@ getThing :: TH.Name -> TcM TcTyThing
 getThing th_name
   = do  { name <- lookupThName th_name
         ; traceIf (text "reify" <+> text (show th_name) <+> brackets (ppr_ns th_name) <+> ppr name)
-        ; tcLookupTh name }
+        ; thing <- tcLookupTh name
+        ; case thing of
+            -- Generated RHS helpers are scoped to checked type-case lifting.
+            ATcCaseLet{} -> failWithTc (notInScope th_name)
+            _ -> return thing }
         -- ToDo: this tcLookup could fail, which would give a
         --       rather unhelpful error message
   where
@@ -4210,6 +4214,7 @@ reifyTypeOfThing th_name = do
     ATcId{tct_id = id} -> liftZonkM (zonkTcType (idType id)) >>= reifyType
     ATyVar _ tctv -> liftZonkM (zonkTcTyVar tctv) >>= reifyType
     ATcTypeLet _ _ kind -> liftZonkM (zonkTcType kind) >>= reifyKind
+    ATcCaseLet{} -> failWithTc (notInScope th_name)
     -- Impossible cases, supposedly:
     AGlobal (ACoAxiom _) -> panic "reifyTypeOfThing: ACoAxiom"
     ATcTyCon _ -> panic "reifyTypeOfThing: ATcTyCon"
