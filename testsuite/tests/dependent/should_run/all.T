@@ -17,6 +17,10 @@ test('NativeOpenConstructor',
      [only_ways(['normal']), extra_files([open_eval_dir + 'OpenConstructorWorker.hs',
                                          open_eval_dir + 'OpenConstructorSource.hs'])],
      run_command, ['bash NativeOpenConstructor.sh "{compiler}" "{libdir}"'])
+test('NativeOpenBuild',
+     [only_ways(['normal']), extra_files([open_eval_dir + 'OpenBuildWorker.hs',
+                                         open_eval_dir + 'OpenBuildSource.hs', 'NativeOpenBuildControls.hs'])],
+     run_command, ['bash NativeOpenBuild.sh "{compiler}" "{libdir}"'])
 test('NativeOpenCharFamily',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['CharacterCase.hs', 'CharacterExport.hs']])],

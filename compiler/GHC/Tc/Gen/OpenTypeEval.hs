@@ -15,10 +15,10 @@ import Control.Monad.Trans.Except (runExceptT, throwE)
 import GHC.Builtin.WiredIn.Types (liftedTypeKind, manyDataConTy, mkBoxedTupleTy,
                                   promotedTupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreExpr, Expr(..))
-import GHC.Core.DataCon (DataCon, dataConTyCon, dataConWorkId)
-import GHC.Core.TyCon (isBoxedDataTyCon, isPromotedDataCon_maybe)
+import GHC.Core.DataCon (DataCon, dataConName, dataConTyCon, dataConWorkId)
+import GHC.Core.TyCon (isBoxedDataTyCon, isPromotedDataCon_maybe, isTupleTyCon, tyConName)
 import GHC.Core.Make (mkCoreBoxedTuple)
-import GHC.Core.Type (Type, FunTyFlag(FTF_T_T), getTyVar_maybe, isLiftedTypeKind, isManyTy,
+import GHC.Core.Type (Kind, Type, FunTyFlag(FTF_T_T), getTyVar_maybe, isLiftedTypeKind, isManyTy,
                       mkTyConApp, mkTyVarTy, mkVisFunTyManyU, splitForAllForAllTyBinders,
                       splitFunTy_maybe, splitTyConApp_maybe, typeKind)
 import GHC.Core.Utils (exprType)
@@ -29,22 +29,23 @@ import GHC.Driver.Env (HscEnv, hsc_HUG, hsc_all_home_unit_ids, hsc_dflags)
 import GHC.Iface.Load (findAndReadIface)
 import GHC.Iface.Syntax (IfaceDecl(..), IfaceInfoItem(..), IfaceUnfolding(..))
 import GHC.IfaceToCore (tcIfaceExpr)
+import GHC.Rename.Env (DeprecationWarnings(NoDeprecationWarnings), addUsedGREs)
 import GHC.Tc.Gen.SourceTable (groundFirstHead)
 import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcRn,
                            liftIO, newTcRef, newUnique, readTcRef, tcg_imports,
-                           tcg_semantic_mod, tcg_local_open_defs, tcg_local_open_owners, updTcRef)
+                           tcg_rdr_env, tcg_semantic_mod, tcg_local_open_defs, tcg_local_open_owners, updTcRef)
 import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), tcEqType)
 import GHC.Types.Basic (Boxity(Boxed))
 import GHC.Types.Id (Id, idName, idType, mkSysLocal)
 import GHC.Types.Name (Name, getOccString, nameModule_maybe, stableNameCmp)
 import GHC.Types.Name.Env (emptyNameEnv, extendNameEnv_C, lookupNameEnv, nonDetNameEnvElts)
-import GHC.Types.Name.Set (emptyNameSet, isEmptyNameSet, nameSetElemsStable,
+import GHC.Types.Name.Reader (gre_imp, isLocalGRE, is_decl, is_isboot, lookupGRE_Name)
+import GHC.Types.Name.Set (NameSet, emptyNameSet, isEmptyNameSet, mkNameSet, nameSetElemsStable,
                            unionNameSet, unitNameSet)
 import GHC.Types.SourceFile (isHsBootOrSig)
 import GHC.Types.Var (TyVar, ForAllTyFlag(Invisible), VarBndr(..), isGlobalId, isTcTyVar, isTyVar,
                       tcTyVarDetails, tyVarKind, varName)
 import GHC.Types.Var.Env (emptyVarEnv, extendVarEnv, lookupVarEnv)
-import GHC.Types.Var.Set (emptyVarSet)
 import GHC.Core.OpenWhnf
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.ModInfo (hm_iface)
@@ -55,13 +56,14 @@ import GHC.Unit.Module.Deps (imp_boot_mods)
 import GHC.Unit.Module.ModIface (ModIface, mi_decls, mi_hsc_src, mi_semantic_module)
 import GHC.Utils.Outputable (text)
 
--- | An open application did not produce a checked rigid type.
+-- | An open application did not produce a checked source type.
 data OpenTypeFailure
   = InvalidInput
   | UnavailableDefinition Name DefinitionFailure
   | CannotReduce EvalFailure
   | RigidCase Name
   | UnexpectedNeutral
+  | HiddenConstructor Name
 
 -- | A checked source argument and its lazy constructor fields.
 data OpenArgument
@@ -70,17 +72,18 @@ data OpenArgument
   | OpenConstructor DataCon [Type] [OpenArgument]
 
 -- | Apply the instantiated function to symbolic operands of the checked kind.
-observeOpenType :: CoreExpr -> [Type] -> TcM (Either OpenTypeFailure (Type, [(Name, Maybe Name)]))
-observeOpenType instantiated operands
+observeOpenType :: CoreExpr -> Kind -> [Type]
+                -> TcM (Either OpenTypeFailure (Type, [(Name, Maybe Name)], NameSet))
+observeOpenType instantiated result_kind operands
   | Just args <- traverse checkedOperand operands = runExceptT $ do
       limit <- reductionDepth <$> lift getDynFlags
       ((_, origins), revArgs) <- lift $
         foldM buildArgument ((emptyVarEnv, emptyVarEnv), []) args
       let coreArgs = reverse revArgs
-          expected = foldr (mkVisFunTyManyU . exprType) liftedTypeKind coreArgs
+          expected = foldr (mkVisFunTyManyU . exprType) result_kind coreArgs
           application = foldl App instantiated coreArgs
       if exprType instantiated `tcEqType` expected
-         && exprType application `tcEqType` liftedTypeKind
+         && exprType application `tcEqType` result_kind
         then do
           definitions <- lift (newTcRef emptyVarEnv)
           uses <- lift (newTcRef emptyNameEnv)
@@ -116,22 +119,29 @@ observeOpenType instantiated operands
                   Just _ -> record (idName v) (first_type >>= groundFirstHead . (:[]))
                   Nothing -> pure ()
                 pure result
-          outcome <- openWhnfWithLocalM limit obtain local emptyVarSet application
+          let origin v = mkTyVarTy <$> lookupVarEnv origins v
+              constructorGRE con = lookupGRE_Name (tcg_rdr_env env) (dataConName con)
+              visible con = pure $ case constructorGRE con of
+                Just gre -> isLocalGRE gre || any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
+                Nothing -> False
+          outcome <- openReadbackM limit obtain local origin visible result_kind application
           case outcome of
-            Left failure -> throwE (CannotReduce failure)
-            Right (Neutral (Rigid actual))
-              | Just skolem <- lookupVarEnv origins actual
-              , idType actual `tcEqType` liftedTypeKind -> do
-                  dependencies <- lift (readTcRef uses)
-                  let ordered = sortBy (\(n, _) (m, _) -> stableNameCmp n m) (nonDetNameEnvElts dependencies)
-                      flatten (n, kinds)
-                        | isEmptyNameSet kinds = [(n, Nothing)]
-                        | otherwise = [(n, Just k) | k <- nameSetElemsStable kinds]
-                  pure (mkTyVarTy skolem, concatMap flatten ordered)
-            Right (Neutral (CaseBlocked (Rigid actual) _))
-              | Just skolem <- lookupVarEnv origins actual ->
-                  throwE (RigidCase (varName skolem))
-            _ -> throwE UnexpectedNeutral
+            Left (ReadbackEvaluation failure) -> throwE (CannotReduce failure)
+            Left (ReadbackHidden con) -> throwE (HiddenConstructor (tyConName (dataConTyCon con)))
+            Left (ReadbackOpaque (Neutral (CaseBlocked (Rigid actual) _)))
+              | Just skolem <- lookupVarEnv origins actual -> throwE (RigidCase (varName skolem))
+            Left (ReadbackOpaque _) -> throwE UnexpectedNeutral
+            Right (result, constructors) -> do
+              dependencies <- lift (readTcRef uses)
+              let ordered = sortBy (\(n, _) (m, _) -> stableNameCmp n m) (nonDetNameEnvElts dependencies)
+                  flatten (n, kinds)
+                    | isEmptyNameSet kinds = [(n, Nothing)]
+                    | otherwise = [(n, Just k) | k <- nameSetElemsStable kinds]
+                  declarations = mkNameSet
+                    [ name | con <- constructors, name <- [dataConName con, tyConName (dataConTyCon con)] ]
+              lift (addUsedGREs NoDeprecationWarnings
+                [gre | con <- constructors, Just gre <- [constructorGRE con]])
+              pure (result, concatMap flatten ordered, declarations)
         else throwE InvalidInput
   where
     rigid skolem
@@ -181,7 +191,7 @@ observeOpenType instantiated operands
           let symbol = mkSysLocal (fsLit "open-type-operand") unique manyDataConTy (tyVarKind skolem)
           pure ((extendVarEnv symbols skolem symbol, extendVarEnv origins symbol skolem),
                 Var symbol)
-observeOpenType _ _ = pure (Left InvalidInput)
+observeOpenType _ _ _ = pure (Left InvalidInput)
 
 -- | A demanded external definition was unavailable to the observer.
 data DefinitionFailure
@@ -195,13 +205,14 @@ data DefinitionFailure
 openPairKind :: Type
 openPairKind = mkBoxedTupleTy [liftedTypeKind, liftedTypeKind]
 
--- | Instantiate the type binders and recover the input kinds of the term arrows.
-instantiateOpenTypeFunction :: Id -> Maybe (CoreExpr, [Type])
+-- | Instantiate the type binders and recover the checked input and result kinds.
+instantiateOpenTypeFunction :: Id -> Maybe (CoreExpr, [Kind], Kind)
 instantiateOpenTypeFunction function
   | not (null binders), all liftedUniversal binders
-  = do domains <- termDomains body
+  = do (domains, result) <- termKinds body
        guard (not (null domains))
-       pure (foldl (\expr _ -> App expr (Type liftedTypeKind)) (Var function) binders, domains)
+       let instantiated = foldl (\expr _ -> App expr (Type liftedTypeKind)) (Var function) binders
+       pure (instantiated, domains, result)
   | otherwise = Nothing
   where
     (binders, body) = splitForAllForAllTyBinders (idType function)
@@ -219,11 +230,20 @@ instantiateOpenTypeFunction function
       , all bound parameters
       = Just (mkTyConApp con (map (const liftedTypeKind) parameters))
       | otherwise = Nothing
-    termDomains ty
+    termKinds ty
       | Just (FTF_T_T, matchability, multiplicity, domain, result) <- splitFunTy_maybe ty
       , matchability `tcEqType` unmatchableDataConTy
-      , isManyTy multiplicity = (:) <$> domainKind domain <*> termDomains result
-      | bound ty = Just []
+      , isManyTy multiplicity = do
+          input <- domainKind domain
+          (inputs, output) <- termKinds result
+          pure (input : inputs, output)
+      | bound ty = Just ([], liftedTypeKind)
+      | Just (tuple, [a,b]) <- splitTyConApp_maybe ty
+      , tuple == tupleTyCon Boxed 2
+      , bound a, bound b = Just ([], openPairKind)
+      | Just (con, parameters) <- splitTyConApp_maybe ty
+      , isBoxedDataTyCon con, not (isTupleTyCon con), all bound parameters
+      = Just ([], mkTyConApp con (map (const liftedTypeKind) parameters))
       | otherwise = Nothing
 
 -- | Read the checked expression for one demanded ordinary import.
@@ -301,8 +321,10 @@ openTypeFailureReason (CannotReduce failure) =
     MissingAlternative -> "Reduction reached a case without a matching alternative.")
 openTypeFailureReason (RigidCase scrutinee) =
   (Nothing, "Reduction stopped at a case on the rigid argument " ++ getOccString scrutinee ++ ".")
+openTypeFailureReason (HiddenConstructor name) =
+  (Nothing, "A result constructor of " ++ getOccString name ++ " is not in scope through an ordinary import.")
 openTypeFailureReason UnexpectedNeutral =
-  (Nothing, "Reduction did not return any of the supplied rigid arguments.")
+  (Nothing, "Reduction did not produce a supplied rigid argument or a finite constructor value built from supported fields.")
 
 {- Note [Open source calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

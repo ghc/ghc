@@ -2373,10 +2373,10 @@ tc_app_ty mode rn_ty exp_kind
            then case (lookupNameEnv (tcg_local_open_defs env) name, value_args) of
              (Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
-               , Just (instantiated, domains) <- instantiateOpenTypeFunction fun
+               , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction fun
                , equalLength domains args, all isOpenTypeOperand args
-               -> do { result <- tcOpenTypeCall mode name instantiated (zip args domains)
-                     ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
+               -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
+                     ; checkExpKind mode rn_ty result result_kind exp_kind }
              (Just _, Just [arg])
                | isTypeLevel (mode_tyki mode), ordinary_call
                , isJust (closedCallLiteralKind arg)
@@ -2412,11 +2412,11 @@ tc_app_ty mode rn_ty exp_kind
                                ; updTcRef pending (TcPendingTypeCall call_span fun checked result :)
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | ordinary_call
-                         , Just (instantiated, domains) <- instantiateOpenTypeFunction fun
+                         , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction fun
                          , equalLength domains args
                          , all isOpenTypeOperand args
-                         -> do { result <- tcOpenTypeCall mode name instantiated (zip args domains)
-                               ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
+                         -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
+                               ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
                          -> do { (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call fun args
@@ -2472,8 +2472,8 @@ tc_app_ty_generic mode rn_ty exp_kind
 
 -- | Check named rigid operands and record definitions used to reduce the call.
 -- See Note [Open source calls] in GHC.Tc.Gen.OpenTypeEval.
-tcOpenTypeCall :: TcTyMode -> Name -> Core.CoreExpr -> [(LHsType GhcRn, Kind)] -> TcM Type
-tcOpenTypeCall mode name instantiated args = do
+tcOpenTypeCall :: TcTyMode -> Name -> Core.CoreExpr -> Kind -> [(LHsType GhcRn, Kind)] -> TcM Type
+tcOpenTypeCall mode name instantiated result_kind args = do
   when (mode_complete_type_arg mode == Just False) $
     reject "A visible type argument containing an open call must be complete. Replace its wildcards with types."
   level <- getThLevel
@@ -2483,11 +2483,11 @@ tcOpenTypeCall mode name instantiated args = do
     Comp | not bootOrSig && not explicitLevels -> pure ()
     _ -> reject "This call requires an ordinary module outside quotes and splices, without ExplicitLevelImports."
   operands <- mapM checkOperand args
-  outcome <- observeOpenType instantiated operands
+  outcome <- observeOpenType instantiated result_kind operands
   case outcome of
     Left reason -> let (definition, message) = openTypeFailureReason reason
                    in failWithTc (TcRnOpenTypeEval name definition message)
-    Right (result, used) -> do
+    Right (result, used, constructors) -> do
       env <- getGblEnv
       let locals = tcg_local_open_defs env
           lookup_owner n = case lookupNameEnv locals n of
@@ -2495,7 +2495,7 @@ tcOpenTypeCall mode name instantiated args = do
             Nothing -> tcLookupId n
       dependencies <- forM used $ \(n, first) -> (, first) <$> lookup_owner n
       recordSourceUses dependencies
-      updTcRef (tcg_evaluated_term_uses env) (`unionNameSet` mkNameSet (map fst used))
+      updTcRef (tcg_evaluated_term_uses env) (\seen -> seen `unionNameSet` constructors `unionNameSet` mkNameSet (map fst used))
       pure result
   where
     checkOperand (arg, kind) = do

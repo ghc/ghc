@@ -5,26 +5,29 @@ module GHC.Core.OpenWhnf
   , Suspension
   , CaseContinuation(..)
   , openWhnfM, openWhnfWithLocalM, openWhnfTraceM, CaseStep(..)
-  , openDataConFieldTypes
+  , openDataConFieldTypes, openReadbackM, OpenReadbackFailure(..)
   ) where
 
 import GHC.Prelude
 
+import Control.Monad (foldM)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
-import Control.Monad.Trans.State.Strict (StateT, evalStateT, get, put)
-import GHC.Builtin.WiredIn.Types (charDataCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy)
+import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE, withExceptT)
+import Control.Monad.Trans.State.Strict (StateT, evalStateT, get, mapStateT, put)
+import GHC.Builtin.WiredIn.Types
+  (charDataCon, mkPromotedPairTy, pairTyCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy)
 import GHC.Core.DataCon
   ( DataCon, dataConWorkId, dataConTyCon, dataConFullSig, dataConRepArity
   , dataConRepArgBinders, dataConStupidTheta, dataConImplBangs
-  , dataConWrapId_maybe, isBanged, isTypeDataCon )
+  , dataConWrapId_maybe, dataConUserTyVars, dataConUnivTyVars, promoteDataCon
+  , isBanged, isTypeDataCon )
 import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreAlt, CoreExpr, Expr(..), collectArgs, isTyCoArg)
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCon (isBoxedDataTyCon)
 import GHC.Core.TyCo.Rep (scaledThing)
-import GHC.Core.Type (Type, isLiftedTypeKind, substTyWith, tyCoVarsOfType, typeKind)
+import GHC.Core.Type (Kind, Type, isLiftedTypeKind, mkTyConApp, splitTyConApp_maybe, substTyWith, tyCoVarsOfType, typeKind)
 import GHC.Core.Utils (exprType, findAlt)
 import GHC.Types.Basic (Boxity(Boxed), IntWithInf, intGtLimit)
 import GHC.Types.Id (isDataConWorkId_maybe)
@@ -33,7 +36,7 @@ import GHC.Types.Tickish (GenTickish(Breakpoint))
 import GHC.Types.Var (Var, isId, isTyVar, varType)
 import GHC.Types.Var.Env (VarEnv, emptyVarEnv, extendVarEnv, extendVarEnvList, lookupVarEnv,
                           mkInScopeSet)
-import GHC.Types.Var.Set (VarSet, elemVarSet, unionVarSet)
+import GHC.Types.Var.Set (VarSet, emptyVarSet, elemVarSet, unionVarSet)
 
 -- | A bounded observation could not produce weak head form.
 data EvalFailure
@@ -56,8 +59,14 @@ data Whnf
   | Literal Literal
   | BoxedChar Char
   | BoxedPair Suspension Suspension
-  | BoxedData DataCon [Suspension]
+  | BoxedData DataCon [Type] [Suspension]
   | Neutral Neutral
+
+-- | A weak head result cannot be returned as a checked source type.
+data OpenReadbackFailure
+  = ReadbackEvaluation EvalFailure
+  | ReadbackOpaque Whnf
+  | ReadbackHidden DataCon
 
 -- | An unknown head and its suspended eliminations.
 data Neutral
@@ -101,6 +110,45 @@ openWhnfTraceWithLocalM :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (May
 openWhnfTraceWithLocalM limit obtain local record unsolved expr =
   runExceptT $ evalStateT (evaluate limit obtain local record unsolved Nothing (Suspension emptyVarEnv expr)) 1
 
+-- | Reflect a finite ordinary constructor value or a supplied rigid symbol.
+-- The first observation and every demanded field share one reduction budget.
+openReadbackM :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr))
+              -> (Var -> m ()) -> (Var -> Maybe Type) -> (DataCon -> m Bool)
+              -> Kind -> CoreExpr
+              -> m (Either OpenReadbackFailure (Type, [DataCon]))
+openReadbackM limit obtain local origin visible expected expr =
+  runExceptT $ evalStateT (readback [] expected (Suspension emptyVarEnv expr)) 1
+  where
+    observe = mapStateT (withExceptT ReadbackEvaluation)
+            . evaluate limit obtain local (const (pure ())) emptyVarSet Nothing
+    readback used kind suspension = do
+      whnf <- observe suspension
+      case whnf of
+        Neutral (Rigid v)
+          | Just ty <- origin v, typeKind ty `eqType` kind -> pure (ty, used)
+        BoxedPair first@(Suspension _ x) second@(Suspension _ y)
+          | Just (con, [ka, kb]) <- splitTyConApp_maybe kind, con == pairTyCon
+          , exprType x `eqType` ka, exprType y `eqType` kb -> do
+              (a, used') <- readback used ka first
+              (b, used'') <- readback used' kb second
+              pure (mkPromotedPairTy ka kb a b, used'')
+        BoxedData con arguments fields
+          | mkTyConApp (dataConTyCon con) arguments `eqType` kind
+          , dataConUserTyVars con == dataConUnivTyVars con
+          , Just field_kinds <- openDataConFieldTypes con arguments
+          , length fields == length field_kinds -> do
+              in_scope <- lift (lift (visible con))
+              if not in_scope then lift (throwE (ReadbackHidden con)) else do
+                (rev_tys, used') <- foldM readField ([], con : used) (zip field_kinds fields)
+                let result = mkTyConApp (promoteDataCon con) (arguments ++ reverse rev_tys)
+                if typeKind result `eqType` kind
+                  then pure (result, used')
+                  else lift (throwE (ReadbackOpaque whnf))
+        _ -> lift (throwE (ReadbackOpaque whnf))
+    readField (rev_tys, used) (kind, field) = do
+      (ty, used') <- readback used kind field
+      pure (ty : rev_tys, used')
+
 evaluate :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
          -> (CaseStep -> m ()) -> VarSet -> Maybe Type -> Suspension
          -> StateT Int (ExceptT EvalFailure m) Whnf
@@ -108,8 +156,8 @@ evaluate limit obtain local record unsolved first_type (Suspension env expr) = d
   steps <- get
   if intGtLimit steps limit then lift (throwE Exhausted) else put (steps + 1)
   case expr of
-    _ | Just (con, fields) <- constructorApplication expr, con /= pairCon ->
-          pure (BoxedData con (map (Suspension env) fields))
+    _ | Just (con, arguments, fields) <- constructorApplication expr, con /= pairCon ->
+          pure (BoxedData con arguments (map (Suspension env) fields))
     Var v
       | Just binding <- lookupVarEnv env v -> do
           lift (lift (local v))
@@ -188,7 +236,7 @@ evaluate limit obtain local record unsolved first_type (Suspension env expr) = d
           | otherwise -> lift (throwE MissingAlternative)
         BoxedPair first second ->
           selectData SelectBoxedPair pairCon [first, second] binder suspended alts
-        BoxedData con fields ->
+        BoxedData con _ fields ->
           selectData (SelectBoxedData con) con fields binder suspended alts
         Literal lit
           | Just (Alt key [] body) <- findAlt (LitAlt lit) alts -> do
@@ -224,7 +272,7 @@ evaluate limit obtain local record unsolved first_type (Suspension env expr) = d
       liftedBinder field && varType field `eqType` exprType body
 
 -- | Read a fully applied ordinary constructor worker and its suspended fields.
-constructorApplication :: CoreExpr -> Maybe (DataCon, [CoreExpr])
+constructorApplication :: CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 constructorApplication expr
   | (Var worker, args) <- collectArgs expr
   , Just con <- isDataConWorkId_maybe worker
@@ -234,7 +282,7 @@ constructorApplication expr
   , length expected == length fields
   , all (not . isTyCoArg) fields
   , and (zipWith eqType expected (map exprType fields))
-  = Just (con, fields)
+  = Just (con, parameters, fields)
   | otherwise = Nothing
   where
     typeArgument (Type ty) = Just ty
@@ -284,6 +332,11 @@ source operand decoder also checks this worker shape. It does not
 bypass a strict field or a representation-changing wrapper.
 
 Keep the dedicated boxed pair and Char trace steps for existing clients.
+
+Readback needs a finite type. It asks for each suspended field at its
+original kind. Only original rigid symbols and checked constructors can
+be read back. All of these field observations share the existing budget.
+Ordinary case observation continues to leave unselected fields suspended.
 
 A case must inspect its scrutinee even when it has only a DEFAULT branch.
 If the scrutinee is neutral, retain the alternatives, the binder and their

@@ -560,3 +560,32 @@ the imported eliminator, including two demands at different types.
 Changing one field's strictness makes the unchanged exporter recompile
 from the new interface.
 [Regression](../../../testsuite/tests/dependent/should_run/NativeOpenConstructor.sh).
+
+### Reading back an ordinary constructor result
+
+An imported ordinary builder can return a boxed constructor with
+symbolic fields. In [OpenBuildSource.hs](../examples/open-evaluation/OpenBuildSource.hs),
+`Make a b` reduces to `'Shell a b`. The example also returns a nested
+constructor and returns an existing rigid operand of kind `Shell Type Type`.
+An ordinary client can import the elaborated type synonym and proof.
+
+The observer suspends each lazy field in its own lexical environment.
+When the result must become a type, readback observes those fields as
+needed to reconstruct the promoted constructor. The initial observation
+and all field observations share the same reduction budget. A field
+which demands an unknown value or exceeds that budget stops readback.
+A hidden constructor stops readback before the observer demands its fields.
+
+Readback checks the result kind, constructor identity, field types,
+and ordinary constructor visibility. The typechecker records actual
+unfolding uses and the declarations of the constructors it returns.
+That records rewrite-rule dependencies on the demanded term definitions
+and interface dependencies on the returned data declarations. This slice
+covers lazy boxed constructors with ordinary representations. It adds
+no coercion for a neutral computation.
+
+
+The same readback accepts an ordinary boxed pair from two rigid fields,
+or from a swap applied to a known promoted pair. Pair syntax uses the
+wired-in constructor. The observer still stops at the case when the
+swap receives an unknown pair.
