@@ -1004,8 +1004,12 @@ caused GHC to recheck the proof. When both fields returned, comparing
 the complete operand preserved reflexivity under a projection rule.
 
 The experiment used a private native build of `GHC.Internal.Err`.
-Integration still needs verification of a quiet optional symbol lookup
-across the compiler and its interpreter. A genuinely missing ordinary
-symbol must keep the source diagnostic. The prototype covers the first
-field for supported scalar pairs. [Previous object and equality
+The paired compiler and interpreter check either projection of a
+supported scalar pair. They fall back quietly when an older object lacks
+the optional symbol. If an ordinary symbol is missing, GHC reports
+GHC-70565 at the source call. A per-module table records scalar relays.
+In one eight-function module the object and interface measured 9,992 and
+1,925 bytes, compared with 9,768 and 1,852 before the change. Giving each
+function its own entry used 15,376 and 2,279 bytes in that module.
+Shared compiler integration remains open. [Previous object and equality
 controls](#m161-observe-a-field-decision-from-the-loaded-executable).

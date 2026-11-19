@@ -168,19 +168,21 @@ General opaque proof projection stays open.
 [R16, open term evaluator](roadmap/R16-open-term-evaluator.md) are active.**
 They are separate subtasks of function promotion. The upstream graph has
 no dependency from one evaluator to the other. Work on them in parallel.
-R17 exercises the open evaluator from source. R23 checks compatibility
-with programs that use functions in kinds.
+R17, R18 and R19 cover lambdas, local bindings and cases in source
+types. R23 checks compatibility with programs that use functions in kinds.
 Use a source test on each card. R15 checks the result of running an
 ordinary closed call. R16 checks what the ordinary function demands
 when some of its operands are unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Integrate `pick (bump 7) :~: 8` without forcing the other field. Preserve ordinary linking and staged fallback with older helper objects. | The [native prototype](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field) now links against an older transitive object and checks the direct proof. An optional symbol lookup still emits a warning on successful fallback. |
+| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Integrate both computed pair projections without forcing the other field. Rebuild eligible producers on upgrade. | The [native prototype](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field) now checks a missing optional symbol quietly with a matching interpreter. A genuine missing object still reports the source call. |
 | [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check a mapper equation when rewrite rules are enabled in the consumer. Account for rules on the mapper and the helpers its rewrites introduce. | [M173](roadmap/R16-open-term-evaluator.md#m173-check-the-installed-prelude-mapper-before-publishing-its-equations) proves the exact `Prelude.map Prelude.not` source example with rewriting disabled at the proof. |
 | [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Check a family equation whose local producer needs a local datatype. Preserve real cycles through constructor fields. | The [mixed declaration example](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations) checks ordinary constructor prerequisites and a scoped expression signature. Families in producer signatures and more general declaration groups remain open. |
-| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Integrate the source callback in `Map (\f -> f Int) [Maybe, Either String, IO]`. | A private compiler checks the unannotated source and its interface-only client. Quotation, source printing and diagnostics still need review. The card depends on R05 and R16. |
-| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Restore existing family-as-kind programs and preserve ordinary runtime arrows. | [M172](roadmap/R23-unsaturated-type-families.md#passing-a-family-with-an-invisible-argument) retains an invisible binder. A private compiler now checks unchanged `T14749` and preserves the 124-program polykinds comparison. Interface migration and the open associated family in `T14038` remain open. |
+| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Extend the source example to several binders, nested lambdas and additional type contexts. | M174 checks the unannotated `Map` example, kind-dependent capture, and ordinary interface clients. The first source form is a parenthesized lambda in a top-level synonym. The card depends on R05 and R16. |
+| [R18, type-level lets](https://ghc.serokell.io/dh#type-level-let-bindings) | Integrate `type F a = let b = G a in H b b`. | An independent bootstrap checks the RHS once per checking pass. An ordinary client can reduce the exported synonym. An unused ill-kinded RHS gets a source error. |
+| [R19, type-level cases](https://ghc.serokell.io/dh#type-level-case-expressions) | Integrate constructor alternatives and report a source case when reduction is stuck. | A private compiler reduces the selected branch from an interface. An unknown scrutinee stays stuck even when both result branches have the same type. |
+| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Restore existing family-as-kind programs and preserve ordinary runtime arrows. | [M172](roadmap/R23-unsaturated-type-families.md#passing-a-family-with-an-invisible-argument) retains an invisible binder. A combined private compiler checks unchanged `T14749`, `T14038`, `T13938a` and `T20875`. The broader synonym inference needed by `T13910` still breaks previously accepted callback signatures. |
 
 The previous source controls now pass for a private parcel with an
 exceptional second field, a constructor containing two unknown types,

@@ -9198,3 +9198,26 @@ GHCi agreed on 245 Showcase lines. The dependent directory passed 247 of
 282 normal-way cases. The same 35 cases failed with the same diagnostics
 as at M172. Both compilers accepted the same 115 of 124 ordinary polykinds
 sources. The boundary examples passed against the self-hosted compiler.
+
+## M174. Pass an anonymous type function to Map
+
+Accept the source expression `Map (\f -> f Int) [Maybe, Either String, IO]`
+on the right-hand side of a type synonym. Lift its lambda to a private
+closed family. Check the family and its owner in the same declaration
+group so the later list fixes the argument kind. Keep captured variables
+in telescope order when a lambda shadows the kind of another capture.
+[Source program](examples/open-evaluation/TypeLambda.hs) and
+[roadmap and design provenance](roadmap/R17-type-level-lambdas.md).
+
+Check the complete result and a captured result in an ordinary module
+with only the provider interface. Change the lambda body and check that
+the previously successful client recompiles and rejects its old `Refl`.
+Check the disabled extension at the lambda, reject a matchable arrow,
+and reify and splice the public synonym. The exact-print test checks the
+source comments around the binders.
+
+Both compiler stages and self-hosted GHCi agreed on all 246 Showcase
+lines. Exact printing reproduced the source byte for byte. The dependent
+directory passed 249 of 284 exercised normal-way cases. Its 35 failures
+and their diagnostics matched M173. Both compilers accepted the same
+115 of 124 ordinary polykinds sources.

@@ -8,12 +8,19 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-At M173, native execution at both compiler stages and self-hosted GHCi
-agreed on all 245 Showcase lines. The normal-way dependent directory
-passed 247 of 282 exercised cases. The 35 remaining failures produced
-the same output as at M172 (`f1c0681898`).
+At M174, native execution at both compiler stages and self-hosted GHCi
+agreed on all 246 Showcase lines. The normal-way dependent directory
+passed 249 of 284 exercised cases. The 35 remaining failures produced
+the same output as at M173 (`41f68fc904`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+A source type synonym can apply the anonymous function `\f -> f Int`
+to each of `Maybe`, `Either String` and `IO` with `Map`. An ordinary
+client checks the complete result from the interface. The pre-lambda
+M173 compiler can check the same result from that interface.
+[Source example](examples/open-evaluation/TypeLambda.hs) and
+[supported syntax](roadmap/R17-type-level-lambdas.md).
 
 An ordinary source function can now map a checked callback over a list
 whose tail is unknown. An importing module proves that a list starting
