@@ -1,0 +1,5 @@
+NativeClosedConstructorAmbiguous.hs:7:15: error: [GHC-70565]
+    • Cannot evaluate ‘P.ambiguous’ in a type.
+        The operands do not determine the following type parameters: a.
+    • In the first argument of ‘Proxy’, namely ‘(P.ambiguous 'Nothing)’
+      In the type signature: bad :: Proxy (P.ambiguous 'Nothing)

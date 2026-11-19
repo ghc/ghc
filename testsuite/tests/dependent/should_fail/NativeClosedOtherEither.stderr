@@ -1,5 +1,5 @@
 NativeClosedOtherEither.hs:9:15: error: [GHC-70565]
     • Cannot evaluate ‘P.otherEither’ in a type.
-        The function returns Either Natural Bool. Closed calls in types currently support results of type Natural, Char, Bool, lists of these types, or boxed pairs, Maybe, and Either of supported results.
+        The function returns Either Natural Bool. Closed calls in types currently support results of type Natural, Char, Bool, or lists, boxed pairs, Maybe, and Either of supported results.
     • In the first argument of ‘Proxy’, namely ‘(P.otherEither 0)’
       In the type signature: bad :: Proxy (P.otherEither 0)

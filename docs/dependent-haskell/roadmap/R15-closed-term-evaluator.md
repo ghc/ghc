@@ -143,8 +143,9 @@ reversed = Refl
 ```
 
 The imported definition determines the order. The function's checked result
-type supplies the element kind, including for an empty list. R15 can return
-a list of `Natural`, `Char` or `Bool`. A function that throws an exception
+type supplies the element kind, including for an empty list. The initial
+list representation supports `Natural`, `Char` and `Bool` elements.
+A function that throws an exception
 in a later element fails at the source call. The interpreter must finish
 reading the result before GHC accepts the proof.
 
@@ -193,8 +194,9 @@ The client records the objects for both functions. With their interfaces
 held fixed, changing either implementation can invalidate the client's
 type. [Recompilation test](../../../testsuite/tests/dependent/should_run/NativeClosedNestedDependencies.sh).
 
-Same-module definitions require further work on R21. Nested lists and lists of a newtype over `Natural` remain outside the supported result shapes. General closed expressions
-and user-defined representations remain open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).
+Same-module definitions require further work on R21. General closed
+expressions and user-defined representations, including newtypes, remain
+open. Inputs with unknowns belong to [R16](R16-open-term-evaluator.md).
 The [implementation references](../REFERENCES.md#executing-closed-calls-and-reducing-open-calls)
 give the earlier prototype and the current GHC entry points.
 
@@ -254,9 +256,9 @@ lazy evaluation. The current interpreter accepts leading invisible parameters.
 ## Returning a pair
 
 `Prelude.quotRem 17 5 :~: '(3,2)` checks with `Refl`. The compiler
-evaluates the ordinary function once and inspects its actual pair. Each
-field can be a supported scalar, a list of supported scalars, or another
-such pair. A nested call can receive that pair as an argument.
+evaluates the ordinary function once and inspects its actual pair.
+The same checked representation lets a nested call receive that pair
+as an argument.
 
 The interpreter encodes both fields before returning to the type checker.
 An overlapping `Show (Natural, Natural)` instance in the client cannot
@@ -297,12 +299,66 @@ object from `Right (Just (3, True))` to `Right (Just (4, True))`
 invalidates the old proof. In that check, the producer interfaces are
 byte-for-byte identical. [Lookalike datatype diagnostic](../../../testsuite/tests/dependent/should_fail/NativeClosedOtherEither.stderr).
 
-The known-name rebinding test covers recognition of the result datatype.
-The renderer still obtains the `Show` class and `returnIO` through GHC's
-known-name lookup. The tests above use the standard definitions of those
-response primitives. The effect of replacing them is a separate R15 check.
+The response uses the installed definitions of `Show`, `IO` and
+`returnIO` by their defining module and name. The renderer checks that
+the scalar dictionary comes from the module that defines the canonical
+`Show` class. It checks the representation of the complete response as
+`IO String` before passing it to the interpreter. Producer specialization
+still uses ordinary instance resolution.
+[Response construction](../../../compiler/GHC/Tc/Gen/Splice.hs).
 
 An attempted closed call to `Data.Maybe.fromJust` requires an implicit
 `HasCallStack` argument. The current staged call checker reports
 GHC-91416 at that use. The integration test uses `fromMaybe` with an
 explicit default.
+
+## Compound list results and constructor literals
+
+Closed results can contain lists at any supported element kind.
+Supported types are `Natural`, `Char`, `Bool`, and lists, boxed pairs,
+`Maybe` and `Either` whose element or field types are all supported.
+For example, `Data.List.tails '[1, 2, 3]` returns a list of Natural lists.
+`Prelude.concat` can consume that computed result. The source test also
+passes a list of lists of `Either` through `concat` and selects the left
+fields with `Data.Either.lefts`.
+[Compound list proofs](../../../testsuite/tests/dependent/should_run/NativeClosedCompoundLists.hs).
+
+The target interpreter uses a recursive Core case to inspect a compound
+list. Each cons records its element and continues with its tail. Nil
+terminates that list's encoding. Scalar lists keep the element's
+canonical `showList` representation. The compiler consumes the complete
+response and reconstructs the promoted constructors. Forcing the
+response forces the list spine and every present element. It also forces
+the present fields of a nested pair or sum. An absent alternative has no
+fields to force. A later producer that ignores an operand still requires
+the inner computation to finish. An infinite result cannot finish this
+encoding, and large results require space for a complete response.
+[Result codec](../../../compiler/GHC/Tc/Gen/Splice.hs)
+and [bottom control](../../../testsuite/tests/dependent/should_fail/NativeClosedCompoundListBottom.hs).
+
+Complete ordinary calls can also take direct promoted constructor
+literals. For example, `Prelude.concat '[ '[], '[ 'x'], '[]]` returns
+`'[ 'x']`, and `Data.Maybe.catMaybes '[ 'Nothing, 'Just 3]` returns
+`'[3]`. GHC uses the ordinary kind checker and the producer's input
+types. A later Boolean operand can fix the missing side of an earlier
+`Either`. The same inference can fix a bare empty list to `[Char]`.
+A fully known domain can select an empty list of compound elements.
+The legacy unconstrained bare empty list still defaults to
+`[Natural]`. Missing constructor kinds remain ambiguous when the inputs
+supply no information to fix them.
+
+GHC plans staged child calls before execution, checks the operand kinds
+together, and checks the producer's required dictionaries before running
+the children. It admits constructor literal syntax with closed fields.
+Explicit kind applications and expressions inside those fields remain
+outside this source grammar. The response decoder still validates the
+actual constructor and its fields against the checked type.
+[Ambiguous constructor](../../../testsuite/tests/dependent/should_fail/NativeClosedConstructorAmbiguous.hs)
+and [missing evidence before a throwing child](../../../testsuite/tests/dependent/should_fail/NativeClosedConstructorEvidence.hs).
+
+Both compiler stages built. The self-hosted compiler checked the compound
+examples with both interpreter modes and passed the registered source
+tests. A separate, bounded check returned and consumed 32, 256, and 1,024
+optional elements with Core and STG lint enabled. The normal-way
+dependent directory passed 198 of 234 cases. The 36 failures had the
+same individual output as at M119.

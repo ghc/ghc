@@ -1317,9 +1317,7 @@ tcDecodeClosedCallOperand operand = do
     return value
   where
     decode platform (ClosedScalar scalar) ty = decodeScalar platform scalar ty
-    decode platform (ClosedList scalar) ty = do
-      elements <- extractPromotedList_maybe ty
-      mkListExpr (closedScalarKind scalar) <$> traverse (decodeScalar platform scalar) elements
+    decode platform (ClosedList element) ty = decodeList platform element ty
     decode platform (ClosedData _ kinds alternatives) ty = do
       (promoted, args) <- splitTyConApp_maybe ty
       con <- isPromotedDataCon_maybe promoted
@@ -1331,6 +1329,20 @@ tcDecodeClosedCallOperand operand = do
                           values fields))
       operands <- zipWithM (decode platform) fields values
       return (mkCoreConApps con (map Core.Type kinds ++ operands))
+
+    -- Use a tail traversal for a potentially long compound list.
+    decodeList platform element = go []
+      where
+        kind = closedShapeKind element
+        go acc ty = case splitTyConApp_maybe ty of
+          Just (con, [k]) | con == promotedNilDataCon, k `tcEqType` kind ->
+            return (mkListExpr kind (reverse acc))
+          Just (con, [k, value, rest])
+            | con == promotedConsDataCon, k `tcEqType` kind
+            , typeKind value `tcEqType` kind -> do
+                operand <- decode platform element value
+                go (operand : acc) rest
+          _ -> Nothing
 
     hasConstructor con (ClosedConstructor _ expected _) = con == expected
 
@@ -1351,7 +1363,7 @@ data ClosedCallScalar = ClosedNatural | ClosedChar | ClosedBool
 -- | Value shapes supported in both directions by the closed-call evaluator.
 data ClosedCallShape
   = ClosedScalar ClosedCallScalar
-  | ClosedList ClosedCallScalar
+  | ClosedList ClosedCallShape
   | ClosedData TyCon [Kind] [ClosedConstructor]
 
 -- | The wire tag (absent for a product), constructor and field codecs.
@@ -1366,7 +1378,7 @@ closedScalarKind ClosedBool = boolTy
 -- | Build the kind used for a case binder or a promoted constructor.
 closedShapeKind :: ClosedCallShape -> Kind
 closedShapeKind (ClosedScalar scalar) = closedScalarKind scalar
-closedShapeKind (ClosedList scalar) = mkListTy (closedScalarKind scalar)
+closedShapeKind (ClosedList element) = mkListTy (closedShapeKind element)
 closedShapeKind (ClosedData tc kinds _) = mkTyConApp tc kinds
 
 -- | Classify a checked result or computed operand by its kind.
@@ -1374,7 +1386,7 @@ closedCallValueShape :: Kind -> Maybe ClosedCallShape
 closedCallValueShape = shape
   where
     shape kind = case splitTyConApp_maybe kind of
-      Just (tc, [arg]) | tc == listTyCon -> ClosedList <$> scalar arg
+      Just (tc, [arg]) | tc == listTyCon -> ClosedList <$> shape arg
       Just (tc, [arg]) | tc == maybeTyCon -> do
         field <- shape arg
         boxed tc [arg] [ClosedConstructor (Just '0') nothingDataCon [],
@@ -1428,7 +1440,7 @@ tcPrepareClosedCall fun domains result_kind = do
     Just shape -> return shape
     Nothing -> bad ("The function returns " ++ showPpr (hsc_dflags hsc_env) result_kind ++
                     ". Closed calls in types currently support results of type Natural, Char, Bool, " ++
-                    "lists of these types, or boxed pairs, Maybe, and Either of supported results.")
+                    "or lists, boxed pairs, Maybe, and Either of supported results.")
   interp <- checkClosedTypeEvalStage hsc_env name
   let expected = foldr mkVisFunTyManyU result_kind domains
   function <- if idType fun `tcEqType` expected
@@ -1504,7 +1516,28 @@ closedCallRenderer name shape = do
       renderToken quote render value suffix = mkCoreApps quote [render value, suffix]
       renderFields quote current = case current of
         ClosedScalar scalar -> renderToken quote <$> renderScalar scalar
-        ClosedList scalar -> renderToken quote <$> renderList scalar
+        ClosedList (ClosedScalar scalar) -> renderToken quote <$> renderList scalar
+        ClosedList element -> do
+          let kind = closedShapeKind current
+              field_kind = closedShapeKind element
+          loop <- mkSysLocalM (fsLit "closed_list") ManyTy (mkVisFunTyManyU kind show_s)
+          spine <- mkSysLocalM (fsLit "closed_spine") ManyTy kind
+          suffix <- mkSysLocalM (fsLit "closed_suffix") ManyTy stringTy
+          binder <- mkSysLocalM (fsLit "closed_cell") ManyTy kind
+          element_id <- mkSysLocalM (fsLit "closed_element") ManyTy field_kind
+          rest <- mkSysLocalM (fsLit "closed_tail") ManyTy kind
+          render <- renderFields quote element
+          let continue = mkCoreApps (Core.Var loop) [Core.Var rest, Core.Var suffix]
+              encode = Core.Case (Core.Var spine) binder stringTy
+                [ Core.Alt (Core.DataAlt nilDataCon) []
+                    (tag '0' (Core.Var suffix))
+                , Core.Alt (Core.DataAlt consDataCon) [element_id, rest]
+                    (tag '1' (render (Core.Var element_id) continue))
+                ]
+              tag c = mkConsExpr charTy (mkCharExpr c)
+              binding = Core.Rec [(loop, Core.Lam spine (Core.Lam suffix encode))]
+          return $ \value tail_string ->
+            Core.Let binding (mkCoreApps (Core.Var loop) [value, tail_string])
         ClosedData _ _ alternatives -> do
           binder <- mkSysLocalM (fsLit "closed_data") ManyTy (closedShapeKind current)
           render_alts <- forM alternatives $ \(ClosedConstructor tag con fields) -> do
@@ -1525,8 +1558,8 @@ closedCallRenderer name shape = do
                                            (select value (Core.Var rest))
   case shape of
     ClosedScalar scalar -> renderScalar scalar
-    ClosedList scalar -> renderList scalar
-    ClosedData{} -> do
+    ClosedList (ClosedScalar scalar) -> renderList scalar
+    _ -> do
       quote <- builtinShow ClosedChar True
       render <- renderFields quote shape
       return $ \value -> render value empty_string
@@ -1568,19 +1601,27 @@ desugarStagedExpr expr = do
 decodeClosedCallResult :: ClosedCallShape -> String -> Maybe Type
 decodeClosedCallResult shape rendered = case shape of
   ClosedScalar scalar -> decodeScalar scalar False rendered
-  ClosedList scalar -> decodeScalar scalar True rendered
-  ClosedData{} -> do
+  ClosedList (ClosedScalar scalar) -> decodeScalar scalar True rendered
+  _ -> do
     (value, rest) <- decodeFields shape rendered
     guard (null rest)
     return value
   where
     decodeFields current input = case current of
       ClosedScalar scalar -> decodeToken scalar False input
-      ClosedList scalar -> decodeToken scalar True input
+      ClosedList (ClosedScalar scalar) -> decodeToken scalar True input
+      ClosedList element -> decodeList element [] input
       ClosedData _ kinds alternatives -> do
         (ClosedConstructor _ con fields, payload) <- selectConstructor alternatives input
         (values, rest) <- decodeArguments fields payload
         return (mkTyConApp (promoteDataCon con) (kinds ++ values), rest)
+
+    decodeList element acc ('0' : rest) =
+      Just (mkPromotedListTy (closedShapeKind element) (reverse acc), rest)
+    decodeList element acc ('1' : input) = do
+      (value, rest) <- decodeFields element input
+      decodeList element (value : acc) rest
+    decodeList _ _ _ = Nothing
 
     selectConstructor [constructor@(ClosedConstructor Nothing _ _)] input =
       Just (constructor, input)
@@ -1652,6 +1693,13 @@ rebuilds the promoted constructor. Identify Either by its defining module
 and occurrence. The client can rebind its in-scope known names.
 The interpreter forces each field of the selected constructor when it
 forces the response, even if a later caller ignores that field.
+Use one recursive Core binding to walk the spine of a list of compound
+elements. Each cons emits a tag, then the element, then the remaining
+cells. Nil emits a distinct tag. These tags delimit an empty list inside
+another value without first computing its length. The scalar-list fast
+path retains its existing encoding, including the String representation.
+In both directions, the checked list kind fixes the element kind.
+
 Bind the string suffix once for a sum. Copying it into each alternative
 would duplicate the generated cases for every later field.
 

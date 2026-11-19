@@ -2642,6 +2642,9 @@ tcPlanOrdinaryCall mode ordinary fun args
       bad ("Expected " ++ show (length domains) ++
            (if lengthIs domains 1 then " value argument, but got " else " value arguments, but got ") ++
            show (length args) ++ ". Closed calls must be fully applied.")
+  | ordinary
+  , or (zipWith needs_constructor_plan args domains)
+  = plan_joint_literals
   | [arg] <- args = tcPlanClosedCall mode ordinary fun arg
   | otherwise = do
       loc <- getSrcSpanM
@@ -2696,6 +2699,93 @@ tcPlanOrdinaryCall mode ordinary fun args
           bad ("The operand has kind " ++ showPpr dflags actual ++
                ", which does not match the declared input type " ++
                showPpr dflags (Subst.substTy subst domain) ++ ".")
+
+    needs_constructor_plan arg domain
+      | L _ (HsExplicitListTy _ _ []) <- ignoreParens arg
+      , Just (tc, [element]) <- splitTyConApp_maybe domain
+      , tc == listTyCon, noFreeVarsOfType domain
+      = not (any (tcEqType element) closedCallScalarKinds)
+      | isJust (closedCallLiteralKind arg) = False
+      | (L _ (HsTyVar _ _ (L _ (WithUserRdr _ con))), _) <- splitHsAppTys (unLoc (ignoreParens arg))
+      , isDataConName con = True
+      | otherwise = closedConstructorLiteral arg
+
+    -- Check all the arguments against one instantiation of the declared
+    -- telescope. No child action or producer dictionary runs in this solve.
+    plan_joint_literals = do
+      loc <- getSrcSpanM
+      checkCompleteClosedCall mode name
+      tcPreflightClosedCall name
+      unless (all isTyVar tvs && rho `tcEqType` foldr mkVisFunTyManyU codomain domains) $
+        bad "The call must have a fully instantiated ordinary function type."
+      plans <- traverse prepare_joint args
+      ((variables, input_types, result_type, predicate_types), checked) <-
+        solveEqualities "tcPlanClosedConstructorCall" $ do
+          (subst, variables) <- newMetaTyVars tvs
+          let input_types = map (Subst.substTy subst) domains
+              result_type = Subst.substTy subst codomain
+              predicate_types = map (Subst.substTy subst) predicates
+          values <- zipWithM check_joint input_types (zip args plans)
+          return ((mkTyVarTys variables, input_types, result_type, predicate_types), values)
+
+      -- The old bare empty-list case defaults to Natural only when the
+      -- other inputs and the declared domain leave its element unknown.
+      solveEqualities "tcPlanClosedConstructorCall: empty lists" $
+        zipWithM_ default_joint_empty args input_types
+      inst_variables <- liftZonkM (zonkTcTypes variables)
+      inputs <- liftZonkM (zonkTcTypes input_types)
+      result <- liftZonkM (zonkTcType result_type)
+      constraints <- liftZonkM (zonkTcTypes predicate_types)
+      let ground ty = noFreeVarsOfType ty && isTyFamFree ty
+          unresolved = [getOccString tv | (tv, ty) <- zip tvs inst_variables, not (ground ty)]
+      unless (null unresolved) $
+        bad ("The operands do not determine the following type parameters: " ++ unwords unresolved ++ ".")
+      unless (all ground (result : inputs) &&
+              all (\ty -> ground ty && isJust (getClassPredTys_maybe ty)) constraints) $
+        bad "The call must have a fully instantiated ordinary function type."
+      actions <- zipWithM prepare_joint_runtime inputs (zip args checked)
+      run <- tcPrepareClosedCall fun inputs result
+      return (result, setSrcSpan loc (sequence actions >>= run))
+
+    prepare_joint arg
+      | Just (child_loc, child_rdr, child_name, child_args) <- nestedClosedCall arg =
+          Left <$> setSrcSpan child_loc (tcPlanClosedHead mode ordinary child_rdr child_name child_args)
+      | closedConstructorLiteral arg = return (Right arg)
+      | otherwise = setSrcSpanA (getLoc arg) $
+          bad "Each constructor field must be a closed literal. This operand contains an open or unsupported field."
+
+    check_joint domain (arg, plan) = setSrcSpanA (getLoc arg) $ case plan of
+      Left computed@(kind, _) -> do
+        discardResult (unifyKind (Just (HsTypeRnThing (unLoc arg))) kind domain)
+        return (Left computed)
+      Right literal -> Right <$> tc_check_lhs_type mode literal domain
+
+    default_joint_empty arg domain
+      | L _ (HsExplicitListTy _ _ []) <- ignoreParens arg = do
+          checked_domain <- liftZonkM (zonkTcType domain)
+          case splitTyConApp_maybe checked_domain of
+            Just (tc, [element]) | tc == listTyCon
+                                 , Just tv <- getTyVar_maybe element
+                                 , isMetaTyVar tv ->
+                setSrcSpanA (getLoc arg) (discardResult (unifyKind Nothing element naturalTy))
+            _ -> return ()
+      | otherwise = return ()
+
+    prepare_joint_runtime domain (arg, planned) = setSrcSpanA (getLoc arg) $ case planned of
+      Right literal -> do
+        checked <- liftZonkM (zonkTcType literal)
+        unless (noFreeVarsOfType checked && typeKind checked `tcEqType` domain) $
+          bad "The constructor literal does not determine a closed operand kind."
+        return <$> decode_joint checked
+      Left (kind, run) -> do
+        checked_kind <- liftZonkM (zonkTcType kind)
+        unless (checked_kind `tcEqType` domain) $
+          bad "The checked operand does not have the declared closed kind."
+        return (run >>= setSrcSpanA (getLoc arg) . decode_joint)
+      where
+        decode_joint checked = do
+          value <- tcDecodeClosedCallOperand checked
+          maybe (bad "The checked argument does not represent a supported closed value.") return value
 
     -- Solve a forced empty-list kind before defaulting an ambiguous one.
     -- Match the whole domain to retain higher-kinded parameters such as f in f a.
@@ -2907,6 +2997,23 @@ checkCompleteClosedCall mode name =
     failWithTc (TcRnClosedTypeEval name
       "A visible type argument containing a closed call must be complete. Replace its wildcards with types.")
 
+-- | Admit only syntax that cannot run an ordinary call during kind checking.
+-- The value decoder checks the actual DataCon identity.
+closedConstructorLiteral :: LHsType GhcRn -> Bool
+closedConstructorLiteral arg = case unLoc (ignoreParens arg) of
+  HsExplicitListTy _ _ elements -> all closedConstructorLiteral elements
+  HsExplicitTupleTy _ _ fields -> lengthIs fields 2 && all closedConstructorLiteral fields
+  HsTyLit _ HsNatural{} -> True
+  HsTyLit _ HsChar{} -> True
+  syntax -> case splitHsAppTys syntax of
+    (L _ (HsTyVar _ _ (L _ (WithUserRdr _ con))), args)
+      | isDataConName con -> all closed_argument args
+    _ -> False
+  where
+    closed_argument HsArgPar{} = True
+    closed_argument (HsValArg _ operand) = closedConstructorLiteral operand
+    closed_argument _ = False
+
 -- | Check the literal at the declared input kind and build its runtime value.
 tcClosedTypeCallArgument :: TcTyMode -> Name -> Type -> LHsType GhcRn -> TcM Core.CoreExpr
 tcClosedTypeCallArgument mode name domain arg = do
@@ -2946,6 +3053,13 @@ promoted list of those literals. The renamer keeps the resolved term Name
 after trying the ordinary type and checked source-table paths. An existing
 type binder still wins. An explicit forall or the RequiredTypeArguments
 capture rule can leave an unqualified term name available.
+
+For a constructor operand, instantiate the producer telescope once and
+check all operands together. A later input can determine a kind omitted
+by an earlier constructor. Collect the kinds of nested calls without
+running their actions. Complete the source kind and dictionary checks
+before executing any child. A bare empty list keeps the existing Natural
+default when other operands leave its element kind undetermined.
 
 Accept the explicit promoted-list syntax chosen by the parser, with or
 without a tick. Under ListTuplePuns, an unticked singleton list is a list

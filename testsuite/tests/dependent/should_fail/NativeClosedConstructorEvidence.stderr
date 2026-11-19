@@ -1,0 +1,8 @@
+NativeClosedConstructorEvidence.hs:7:15: error: [GHC-39999]
+    • No instance for ‘P.Missing Bool’
+        arising from a use of ‘P.needsEvidence’
+    • In the expression: P.needsEvidence
+      In the first argument of ‘Proxy’, namely
+        ‘(P.needsEvidence (P.explode 0) ('Right 'x') 'True)’
+      In the type signature:
+        bad :: Proxy (P.needsEvidence (P.explode 0) ('Right 'x') 'True)

@@ -56,6 +56,10 @@ test('NativeClosedReturnedPair',
       extra_files(['NativeClosedReturnedPairLib.hs', 'NativeClosedReturnedPairRejects.hs'])],
      run_command, ['bash NativeClosedReturnedPair.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
+test('NativeClosedCompoundLists',
+     [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedCompoundListsLib.hs'])],
+     multimod_compile_and_run,
+     ['NativeClosedCompoundLists', '-dcore-lint -dstg-lint ' + config.ghc_th_way_flags])
 test('NativeClosedResponseNames', [req_interp, req_rts_linker, only_ways(['normal'])],
      compile, [config.ghc_th_way_flags])
 test('NativeClosedChoices',
