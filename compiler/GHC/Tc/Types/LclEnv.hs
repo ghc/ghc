@@ -35,7 +35,7 @@ module GHC.Tc.Types.LclEnv (
 
 import GHC.Prelude
 
-import GHC.Tc.Utils.TcType ( TcLevel, TcType )
+import GHC.Tc.Utils.TcType ( TcLevel, TcType, TcTyVar )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
 import GHC.Core.UsageEnv ( UsageEnv )
@@ -88,6 +88,7 @@ data TcLclEnv           -- Changes as we move inside an expression
 
         tcl_usage :: TcRef UsageEnv, -- Required multiplicity of bindings is accumulated here.
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
+        tcl_kind_arrow_defaults :: Maybe (TcRef [TcTyVar]),
         tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 

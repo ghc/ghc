@@ -37,6 +37,7 @@ import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
+                    , pushLevelAndSolveKindArrows, pushLevelAndSolveKindArrowsX
                     , reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -1260,7 +1261,7 @@ kcTyClGroup kisig_env decls
 
         ; inferred_tcs
             <- tcExtendKindEnvWithTyCons checked_tcs  $
-               pushLevelAndSolveEqualities unkSkolAnon [] $
+               pushLevelAndSolveKindArrows unkSkolAnon [] $
                      -- We are going to kind-generalise, so unification
                      -- variables in here must be one level in
                do {  -- Step 1: Bind kind variables for all decls
@@ -3574,7 +3575,7 @@ tcTySynRhs roles_info tc_name hs_ty
   = bindTyClTyVars tc_name $ \ kind tc_bndrs _nb_eta res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (getLclEnvRdrEnv env))
-       ; rhs_ty <- pushLevelAndSolveEqualities skol_info tc_bndrs $
+       ; rhs_ty <- pushLevelAndSolveKindArrows skol_info tc_bndrs $
                    tcCheckLHsTypeInContext hs_ty (TheKind res_kind)
 
          -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
@@ -4143,7 +4144,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
        ; skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> explicit_tkv_nms)))
 
        ; (tclvl, wanted, (exp_tvbs, ctxt, (arg_tys, field_lbls, stricts)))
-           <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
+           <- pushLevelAndSolveKindArrowsX "tcConDecl:H98"  $
               tcConDeclTelescope skol_info explicit_teles $
               do { let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConH98Args exp_kind hs_args
@@ -4285,7 +4286,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; let L _ name :| _ = names
        ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (tvbs, ctxt, (arg_tys, res_ty, field_lbls, stricts)))
-           <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
+           <- pushLevelAndSolveKindArrowsX "tcConDecl:GADT" $
               tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
               do { (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]

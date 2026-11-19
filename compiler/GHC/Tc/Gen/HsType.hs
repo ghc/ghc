@@ -499,7 +499,7 @@ tc_lhs_sig_type retained_sig skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs
                                                    , sig_body = hs_ty })) ctxt_kind
   = setSrcSpanA loc $
     do { (tc_lvl, wanted, (exp_kind, outer_ma, (outer_bndrs, ty)))
-              <- pushLevelAndSolveEqualitiesX "tc_lhs_sig_type" $
+              <- pushLevelAndSolveKindArrowsX "tc_lhs_sig_type" $
                  -- See Note [Failure in local type signatures]
                  do { exp_kind <- newExpectedKind ctxt_kind
                           -- See Note [Escaping kind in type signatures]
@@ -597,7 +597,7 @@ tcCheckRetainedType allow_function = go
            ; checkExpKind mode ty (tcMkPhiTy theta body_ty) liftedTypeKind (Check kind) }
     go mode (L loc (HsFunTy _ mult arg res)) kind
       = setSrcSpanA loc $
-        tc_fun_type_x (go mode) mode mult arg res (Check kind)
+        tc_fun_type_x (go mode) (pure unmatchableDataConTy) mode mult arg res (Check kind)
     go mode (L loc ty@(HsForEachTy ann bndrs body)) kind
       = setSrcSpanA loc $
         do { level <- getThLevel
@@ -2162,14 +2162,14 @@ combinations of extensions.
 ------------------------------------------
 tc_fun_type :: TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType
-tc_fun_type mode = tc_fun_type_x (tc_check_lhs_type mode) mode
+tc_fun_type mode = tc_fun_type_x (tc_check_lhs_type mode) (pure unmatchableDataConTy) mode
 
 -- | Check an ordinary arrow with the supplied checker for its child types.
 -- See Note [Higher-order retained signatures].
 tc_fun_type_x :: (LHsType GhcRn -> TcKind -> TcM TcType)
-              -> TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn
+              -> TcM Type -> TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn
               -> ExpKind -> TcM TcType
-tc_fun_type_x check mode mult ty1 ty2 exp_kind = case mode_tyki mode of
+tc_fun_type_x check type_level_ma mode mult ty1 ty2 exp_kind = case mode_tyki mode of
   TypeLevel ->
     do { traceTc "tc_fun_type" (ppr ty1 $$ ppr ty2)
        ; arg_k <- newOpenTypeKind
@@ -2177,8 +2177,9 @@ tc_fun_type_x check mode mult ty1 ty2 exp_kind = case mode_tyki mode of
        ; ty1'  <- check ty1 arg_k
        ; ty2'  <- check ty2 res_k
        ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
+       ; ma <- type_level_ma
        ; checkExpKind mode (HsFunTy noExtField mult ty1 ty2)
-                      (tcMkVisFunTy unmatchableDataConTy mult' ty1' ty2')
+                      (tcMkVisFunTy ma mult' ty1' ty2')
                       liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1'  <- check ty1 liftedTypeKind
@@ -3467,7 +3468,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                 ; let exp_kind = substTy subst $ piTyBinderType ki_binder
                 ; arg' <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty arg) n) $
                           case checked_arg of
-                            Nothing -> tc_check_lhs_type mode arg exp_kind
+                            Nothing -> check_kind_value ki_binder inner_ki args arg exp_kind
                             Just (arg_ty, arg_kind) ->
                               checkExpectedKind mode (unLoc arg) arg_ty arg_kind exp_kind
                 ; traceTc "tcInferTyApps (vis normal app) 2" (ppr exp_kind)
@@ -3514,6 +3515,39 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
         zapped_subst   = zapSubst subst
         substed_fun_ki = substTy subst fun_ki
         hs_ty          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
+
+    -- A visible argument is used as a kind when it supplies the whole kind
+    -- of the next visible argument. Keep this limited to the checked telescope.
+    check_kind_value binder inner args arg expected
+      | L _ HsFunTy{} <- ignoreParens arg
+      , TypeLevel <- mode_tyki mode
+      , isEmptyNameEnv (mode_indices mode)
+      , Named (Bndr tv _) <- binder
+      , isLiftedTypeKind expected
+      , HsValArg{} : _ <- dropWhile is_par args
+      , Just (_, next, _) <- tcSplitPiTy_maybe inner
+      , not (isInvisiblePiTyBinder next)
+      , Just kind_var <- getTyVar_maybe (piTyBinderType next)
+      , kind_var == tv
+      = do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
+           ; case owner of
+               Nothing -> tc_check_lhs_type mode arg expected
+               Just defaults -> check_arrows defaults arg expected }
+      | otherwise = tc_check_lhs_type mode arg expected
+
+    is_par HsArgPar{} = True
+    is_par _ = False
+
+    check_arrows defaults (L _ (HsParTy _ arg)) expected =
+      check_arrows defaults arg expected
+    check_arrows defaults (L loc (HsFunTy _ mult domain range)) expected =
+      setSrcSpanA loc $
+      tc_fun_type_x (check_arrows defaults) fresh mode mult domain range (Check expected)
+      where
+        fresh = do { ma <- newFlexiTyVar matchabilityTy
+                   ; updTcRef defaults (ma :)
+                   ; return (mkTyVarTy ma) }
+    check_arrows _ arg expected = tc_check_lhs_type mode arg expected
 
     -- Detect a registered runtime Name in a source argument.
     -- See Note [Immutable native kind arguments].

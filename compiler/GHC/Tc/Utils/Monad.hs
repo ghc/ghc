@@ -502,6 +502,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 },
                 tcl_usage      = usage_var,
                 tcl_lie        = lie_var,
+                tcl_kind_arrow_defaults = Nothing,
                 tcl_errs       = errs_var
                 }
 
@@ -642,6 +643,7 @@ restoreLclEnv new_lcl_env = updLclEnv upd
   where
     upd old_lcl_env =  new_lcl_env { tcl_errs  = tcl_errs  old_lcl_env
                                    , tcl_lie   = tcl_lie   old_lcl_env
+                                   , tcl_kind_arrow_defaults = tcl_kind_arrow_defaults old_lcl_env
                                    , tcl_usage = tcl_usage old_lcl_env }
 
 getEnvs :: TcRnIf gbl lcl (gbl, lcl)
@@ -689,7 +691,7 @@ This led to #19470 and #20981.
 
 Solution: instead of setLclEnv use restoreLclEnv, which preserves from
 the /parent/ context these mutable collection IORefs:
-      tcl_errs, tcl_lie, tcl_usage
+      tcl_errs, tcl_lie, tcl_usage and tcl_kind_arrow_defaults
 -}
 
 -- Command-line flags

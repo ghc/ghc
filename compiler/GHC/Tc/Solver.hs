@@ -8,6 +8,7 @@ module GHC.Tc.Solver(
        simplifyInteractive,
        solveEqualities,
        pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX,
+       pushLevelAndSolveKindArrows, pushLevelAndSolveKindArrowsX,
        reportUnsolvedEqualities,
        simplifyWantedsTcM,
        tcCheckGivens,
@@ -42,12 +43,14 @@ import GHC.Tc.Utils.Monad   as TcM
 import GHC.Tc.Zonk.TcType     as TcM
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad  as TcS
+import GHC.Tc.Types.LclEnv (tcl_kind_arrow_defaults)
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc( CtLoc, mkGivenLoc )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
+import GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 import GHC.Core.Predicate
 import GHC.Core.Reduction ( Reduction )
 import GHC.Core.Type
@@ -218,16 +221,67 @@ pushLevelAndSolveEqualitiesX :: String -> TcM a
 --
 -- Panics if we solve any non-equality constraints.  (In runTCSEqualities
 -- we use an error thunk for the evidence bindings.)
-pushLevelAndSolveEqualitiesX callsite thing_inside
+pushLevelAndSolveEqualitiesX = solveEqualitiesAtLevel False
+
+-- | Own omitted matchability in kind-valued arguments in a complete declaration.
+pushLevelAndSolveKindArrows :: SkolemInfoAnon -> [TyConBinder] -> TcM a -> TcM a
+pushLevelAndSolveKindArrows skol_info tcbs action =
+  do { (level, wanted, result) <- pushLevelAndSolveKindArrowsX "kind-valued arguments" action
+     ; report_unsolved_equalities skol_info (binderVars tcbs) level wanted
+     ; return result }
+
+-- | Leave residual equalities to the declaration's normal reporting path.
+pushLevelAndSolveKindArrowsX :: String -> TcM a -> TcM (TcLevel, WantedConstraints, a)
+pushLevelAndSolveKindArrowsX = solveEqualitiesAtLevel True
+
+solveEqualitiesAtLevel :: Bool -> String -> TcM a -> TcM (TcLevel, WantedConstraints, a)
+solveEqualitiesAtLevel infer_arrows callsite thing_inside
   = do { traceTc "pushLevelAndSolveEqualitiesX {" (text "Called from" <+> text callsite)
        ; (tclvl, (wanted, res))
             <- pushTcLevelM $
-               do { (res, wanted) <- captureConstraints thing_inside
+               do { owner <- TcM.getTcLevel
+                  ; defaults <- if infer_arrows then Just <$> TcM.newTcRef [] else pure Nothing
+                  ; (res, wanted) <- captureConstraints $
+                      TcM.updLclEnv (setDefaults defaults) thing_inside
                   ; wanted <- runTcSEqualities (simplifyTopWanteds wanted)
+                  ; defaulted <- case defaults of
+                      Nothing -> return False
+                      Just ref -> do { arrows <- TcM.readTcRef ref
+                                     ; or <$> mapM (defaultArrow owner) arrows }
+                  ; wanted <- if defaulted && not (isSolvedWC wanted)
+                                then runTcSEqualities (simplifyTopWanteds wanted)
+                                else return wanted
                   ; return (wanted,res) }
        ; traceTc "pushLevelAndSolveEqualities }" (vcat [ text "Residual:" <+> ppr wanted
                                                        , text "Level:" <+> ppr tclvl ])
        ; return (tclvl, wanted, res) }
+
+  where
+    setDefaults Nothing env | Nothing <- tcl_kind_arrow_defaults env = env
+    setDefaults defaults env = env { tcl_kind_arrow_defaults = defaults }
+
+    defaultArrow owner original = do
+      current <- TcM.liftZonkM (TcM.zonkTcType (mkTyVarTy original))
+      case getTyVar_maybe current of
+        Just tv | isPromotableMetaTyVar tv, not (isTyVarTyVar tv)
+                , not (owner `strictlyDeeperThan` tcTyVarLevel tv) -> do
+          TcM.liftZonkM (TcM.writeMetaTyVar tv unmatchableDataConTy)
+          return True
+        _ -> return False
+
+{- Note [Owning omitted arrows in kind-valued arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete kind check of a declaration owns the arrows recorded in its local
+environment. First solve the whole declaration, including later arguments,
+so that an equality can choose M or U. Keep the previous U default for an
+occurrence without enough information to infer M. Default variables owned by
+this scope, then re-solve any residual obligations. A metavariable already
+promoted out to an outer scope belongs to that scope. Do not fix its value
+here. Nested complete checks replace the owner. Nested solveEqualities calls
+can float constraints to it. An application spine has neither the expected
+kind of its enclosing context nor the rest of the declaration's constraints.
+It must not default on its own.
+-}
 
 -- | Type-check a thing that emits only equality constraints, solving any
 -- constraints we can and re-emitting constraints that we can't.
