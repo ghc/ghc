@@ -8,11 +8,14 @@ cd "$tmp"
 g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 flags=(-fomit-interface-pragmas -fno-write-if-simplified-core)
 mkdir provider client
-cp "$area/PackedVecLibrary.hs" provider/
+cp "$area"/{PackedVecLibrary,ParameterizedIndexLibrary}.hs provider/
 cd provider
 "${g[@]}" -O0 "${flags[@]}" -ddump-simpl-iterations -c PackedVecLibrary.hs >retained.log 2>&1 || { cat retained.log; exit 1; }
 grep -Fq 'Simplifier iteration=1' retained.log || { cat retained.log; exit 1; }
-cp PackedVecLibrary.hi "$area"/NativeRetainedCast*.hs "$area/NativeLetIndependentRule.hs" ../client/
+"${g[@]}" -O0 "${flags[@]}" -ddump-simpl-iterations -c ParameterizedIndexLibrary.hs >domain.log 2>&1 ||
+    { cat domain.log; exit 1; }
+grep -Fq 'Simplifier iteration=1' domain.log || { cat domain.log; exit 1; }
+cp PackedVecLibrary.hi ParameterizedIndexLibrary.hi "$area"/NativeRetainedCast*.hs "$area/NativeLetIndependentRule.hs" ../client/
 cd ../client
 "${g[@]}" -O0 "${flags[@]}" -ddump-simpl-iterations -c NativeLetIndependentRule.hs >fallback.log 2>&1 || { cat fallback.log; exit 1; }
 if grep -Fq 'Simplifier iteration=' fallback.log; then cat fallback.log; exit 1; fi
@@ -30,3 +33,16 @@ reject NativeRetainedCastLength GHC-18872 'has nominal role in its second argume
 "${g[@]}" -O0 "${flags[@]}" -c NativeRetainedCastClient.hs
 "${g[@]}" NativeRetainedCastClient.o ../provider/PackedVecLibrary.o -o run
 ./run
+
+reject NativeRetainedCastDomainReject GHC-83865 'DomainToken Char'
+sed '/^bad ::/,$d; s/^module NativeRetainedCastDomainReject where/module OrdinaryRoleWitness where/' \
+    NativeRetainedCastDomainReject.hs >OrdinaryRoleWitness.hs
+"${g[@]}" -O0 "${flags[@]}" -c OrdinaryRoleWitness.hs
+"${g[@]}" -O0 "${flags[@]}" -c NativeRetainedCastDomainWorker.hs
+mkdir ordinary
+cp NativeRetainedCastDomainWorker.hi NativeRetainedCastDomainClient.hs ordinary/
+cd ordinary
+"${g[@]}" -O0 "${flags[@]}" -c NativeRetainedCastDomainClient.hs
+"${g[@]}" NativeRetainedCastDomainClient.o ../NativeRetainedCastDomainWorker.o \
+    ../../provider/{PackedVecLibrary,ParameterizedIndexLibrary}.o -o run-domain
+./run-domain

@@ -12,7 +12,10 @@ module GHC.Core.Dependent (
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId)
+import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
+                     , isNativeIndexDomainConversion)
+import GHC.Core.TyCo.Compare (eqType)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
@@ -64,7 +67,7 @@ hasNativeDependentProgram binds rules =
     runScan AllMetadata (foldMap scanBind binds <> foldMap scanRule rules)
 
 -- | Admit algebraic index domains and checked opaque function heads.
--- Retained casts with a domain proof and local rules use the restricted pipeline.
+-- Local rules still use the restricted pipeline.
 supportsNativeGentle :: CoreProgram -> Bool
 supportsNativeGentle binds =
     not (runScanFor CheckGentle AllMetadata (foldMap scanBind binds))
@@ -256,11 +259,30 @@ scanRetainedIndex v = NativeScan (pure (not (isNativeIndexType (varType v) || is
 scanCallHead :: Id -> NativeScan
 scanCallHead f = NativeScan (pure (not (isNativeIndexFunctionId f))) <> scanVarKind f
 
+{- Note [Nominal domains in retained Gentle]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The domain proof of a DepFunCo is nominal even if the complete coercion
+is representational. The result type uses the backward nominal conversion.
+See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+Do not admit a representational-only domain proof or change its role.
+Check each endpoint against the structural or fixed-function index
+contract. Check the original proof and scoped body separately.
+-}
+
 -- | Inspect coercion annotations and dependencies.
 scanCo :: Coercion -> NativeScan
-scanCo (DepFunCo _ _ b MRefl body) =
-    gentleForm (scanRetainedIndex b <> scanCo body)
-scanCo DepFunCo{} = NativeScan (pure True)
+scanCo (DepFunCo _ _ b domain body) =
+    gentleForm (scanRetainedIndex b <> scanDomain domain <> scanCo body)
+  where
+    scanDomain MRefl = mempty
+    scanDomain (MCo delta) =
+        NativeScan (pure (not (coercionRole delta == Nominal
+                            && coercionLKind delta `eqType` varType b
+                            && isNativeIndexDomainConversion (varType b) target
+                            && (isNativeIndexType target || isNativeIndexFunctionId b))))
+          <> scanCo delta
+      where
+        target = coercionRKind delta
 scanCo (TermAppCo f co) = gentleForm (scanCallHead f <> scanCo co)
 scanCo (Refl ty) = scanType ty
 scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco

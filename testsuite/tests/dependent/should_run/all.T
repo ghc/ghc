@@ -285,6 +285,9 @@ test('NativeRetainedCast',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeRetainedCastClient.hs', 'NativeRetainedCastLength.hs',
                    'NativeRetainedCastNominal.hs', 'NativeLetIndependentRule.hs',
+                   'NativeRetainedCastDomainWorker.hs', 'NativeRetainedCastDomainClient.hs',
+                   'NativeRetainedCastDomainReject.hs',
+                   '../../../../docs/dependent-haskell/examples/qualified-pi/ParameterizedIndexLibrary.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeRetainedCast.sh "{compiler}" "{libdir}"'])
 
