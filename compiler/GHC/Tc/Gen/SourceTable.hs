@@ -1,7 +1,7 @@
 -- | Closed type families for checked functions that match one constructor.
 module GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCharTables, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
-                              sourceTableFamilyAppUse, sourcePairProjectionKindUse, isSourcePairProjection, sourceTableOwner,
+                              sourceTableFamilyAppUse, sourcePairCaseKindUse, isSourcePairCase, sourceTableOwner,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
@@ -199,15 +199,15 @@ sourceTableFamilyUse table = sourceTableFamilyUseAt table Nothing
 -- | Record evidence use at an application, including cache and plugin reductions.
 sourceTableFamilyAppUse :: TyCon -> [Type] -> TcM ()
 sourceTableFamilyAppUse table args
-  | isSourcePairProjection table, lengthIs args (tyConArity table) = do
+  | isSourcePairCase table, lengthIs args (tyConArity table) = do
       checked <- liftZonkM (zonkTcTypes args)
       sourceTableFamilyUseAt table (groundFirstHead checked)
   | otherwise = sourceTableFamilyUse table
 
 -- | Check the specialized kinds in a closed pair plan before running its operand.
-sourcePairProjectionKindUse :: TyCon -> [Kind] -> TcM ()
-sourcePairProjectionKindUse table kinds
-  | isSourcePairProjection table, lengthIs kinds (tyConArity table - 1)
+sourcePairCaseKindUse :: TyCon -> [Kind] -> TcM ()
+sourcePairCaseKindUse table kinds
+  | isSourcePairCase table, lengthIs kinds (tyConArity table - 1)
   = sourceTableFamilyUseAt table (groundFirstHead kinds)
   | otherwise = sourceTableFamilyUse table
 
@@ -732,8 +732,8 @@ sourceTableTyCons binds = do
                      (sequence branches)
       else pure Nothing
 
--- | Publish a checked Char worker or imported forwarding alias only after its final bindings are zonked.
--- See Note [Checked Char cases] and Note [Checked pair projections].
+-- | Publish checked Char and boxed pair equations from final zonked bindings.
+-- See Note [Checked Char cases] and Note [Checked pair cases].
 sourceCharTables :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
 sourceCharTables binds = do
   env <- getGblEnv
@@ -742,7 +742,7 @@ sourceCharTables binds = do
       eligible owner =
         idName owner `elemNameSet` exported &&
         not (idName owner `elemNameSet` ruled) &&
-        (varType owner `eqType` charArrow || not (isNothing (pairProjectionType (varType owner))))
+        (varType owner `eqType` charArrow || not (isNothing (pairCaseType (varType owner))))
       candidates = [ (bind, owner) | bind <- binds
                    , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
                    , eligible owner ]
@@ -764,8 +764,8 @@ sourceCharTables binds = do
           , [rhs] <- [expr | (ident, expr) <- fromOL core, idName ident == idName owner] ->
             case rhs of
               Core.Var target | varType owner `eqType` charArrow -> forwarding env owner target
-              _ | Just projection <- checkedPairProjection owner rhs ->
-                    Just . (owner,) <$> publishPairProjection owner projection
+              _ | Just projection <- checkedPairCase owner rhs ->
+                    Just . (owner,) <$> publishPairCase owner projection
                 | Right certificate <- certify owner rhs
                 , certOwner certificate == idName owner ->
                     publish owner (certRows certificate) id
@@ -833,14 +833,14 @@ original name and requires no forwarding table.
 -}
 
 -- | Identify the private telescope that only the direct pair certificate emits.
-isSourcePairProjection :: TyCon -> Bool
-isSourcePairProjection table =
+isSourcePairCase :: TyCon -> Bool
+isSourcePairCase table =
     not (isNothing (sourceTableTermOcc (nameOccName (tyConName table)))) &&
-    not (isNothing (pairProjectionType (tyConKind table)))
+    not (isNothing (pairCaseType (tyConKind table)))
 
--- | Identify the two field parameters and result parameter of a boxed projection.
-pairProjectionType :: Type -> Maybe ([ForAllTyBinder], TyVar, TyVar, TyVar)
-pairProjectionType tau = do
+-- | Identify the lifted parameter telescope and result of a boxed pair case.
+pairCaseType :: Type -> Maybe ([ForAllTyBinder], TyVar, TyVar, Type)
+pairCaseType tau = do
     let (telescope, body) = splitForAllForAllTyBinders tau
     binders <- traverse liftedBinder telescope
     (FTF_T_T, ma, mult, domain, result) <- splitFunTy_maybe body
@@ -849,50 +849,62 @@ pairProjectionType tau = do
     guard (tuple == tupleTyCon Boxed 2)
     x <- getTyVar_maybe first
     y <- getTyVar_maybe second
-    r <- getTyVar_maybe result
-    guard (r == x || r == y)
+    let field ty = ty `eqType` first || ty `eqType` second
+    guard (field result || case splitTyConApp_maybe result of
+             Just (tc, [a,b]) -> tc == tuple && field a && field b
+             _ -> False)
     let parameters = [v | Bndr v _ <- binders]
     guard (x `elem` parameters && y `elem` parameters)
     guard (all (\v -> v == x || v == y) parameters)
-    pure (binders, x, y, r)
+    pure (binders, x, y, result)
   where
     liftedBinder (_, binder@(Bndr v (Invisible _)))
       | isTyVar v, varType v `eqType` liftedTypeKind = Just binder
     liftedBinder _ = Nothing
 
--- | The original kind-parameter order and which pair field the body returns.
-data PairProjection = PairProjection [ForAllTyBinder] TyVar TyVar PairField
+-- | The original kind-parameter order and result of the alternative.
+data PairCase = PairCase [ForAllTyBinder] TyVar TyVar PairCaseResult
 
--- | The field selected by the checked alternative body.
+-- | The index of a field bound by the checked case.
 data PairField = FirstField | SecondField
 
--- | Certify a strict pair case whose sole branch returns one lazy field.
-checkedPairProjection :: Id -> Core.CoreExpr -> Maybe PairProjection
-checkedPairProjection owner rhs = do
+-- | Return a field or build another boxed pair from the bound fields.
+data PairCaseResult = SelectField PairField | BuildPair PairField PairField
+
+-- | Certify a strict pair case that uses only its bound fields.
+checkedPairCase :: Id -> Core.CoreExpr -> Maybe PairCase
+checkedPairCase owner rhs = do
     let rhs_type = exprType rhs
     guard (rhs_type `eqType` varType owner)
-    (binders, x, y, r) <- pairProjectionType rhs_type
-    (owner_binders, x_owner, y_owner, _) <- pairProjectionType (varType owner)
+    (binders, x, y, r) <- pairCaseType rhs_type
+    (owner_binders, x_owner, y_owner, _) <- pairCaseType (varType owner)
     let (parameters, rest) = Core.collectBinders rhs
         (type_args, term_args) = splitAt (length binders) parameters
     guard (type_args == [v | Bndr v _ <- binders])
     [pair] <- pure term_args
     guard (isId pair && varType pair `eqType` mkTyConApp (tupleTyCon Boxed 2) (mkTyVarTys [x,y]))
     Core.Case (Core.Var scrutinee) case_binder result
-      [Core.Alt (Core.DataAlt con) [first, second] (Core.Var chosen)] <- pure rest
+      [Core.Alt (Core.DataAlt con) [first, second] alternative] <- pure rest
     guard (scrutinee == pair && varType case_binder `eqType` varType pair)
     guard (con == tupleDataCon Boxed 2 && first /= second)
     guard (isId first && isId second)
     guard (varType first `eqType` mkTyVarTy x && varType second `eqType` mkTyVarTy y)
-    guard (result `eqType` mkTyVarTy r && varType chosen `eqType` result)
-    selected <- if chosen == first then Just FirstField
-                else if chosen == second then Just SecondField
-                else Nothing
-    pure (PairProjection owner_binders x_owner y_owner selected)
+    guard (result `eqType` r && exprType alternative `eqType` result)
+    let field v | v == first  = Just FirstField
+                | v == second = Just SecondField
+                | otherwise   = Nothing
+    selected <- case Core.collectArgs alternative of
+      (Core.Var chosen, []) -> SelectField <$> field chosen
+      (Core.Var worker, [Core.Type left, Core.Type right, Core.Var a, Core.Var b])
+        | worker == dataConWorkId con
+        , left `eqType` varType a, right `eqType` varType b ->
+            BuildPair <$> field a <*> field b
+      _ -> Nothing
+    pure (PairCase owner_binders x_owner y_owner selected)
 
 -- | Publish the single constructor equation certified by the ordinary pair case.
-publishPairProjection :: Id -> PairProjection -> TcM TyCon
-publishPairProjection owner (PairProjection telescope first second selected) = do
+publishPairCase :: Id -> PairCase -> TcM TyCon
+publishPairCase owner (PairCase telescope first second selected) = do
     kind_binders <- forM telescope $ \(Bndr variable visibility) -> do
       name <- newSysName (nameOccName (varName variable))
       pure (mkNamedTyConBinder visibility (mkTyVar name liftedTypeKind))
@@ -901,36 +913,44 @@ publishPairProjection owner (PairProjection telescope first second selected) = d
         instantiate = substTyWith source_variables (mkTyVarTys quantifiers)
         first_kind = instantiate (mkTyVarTy first)
         second_kind = instantiate (mkTyVarTy second)
-        select x y = case selected of
-          FirstField -> x
-          SecondField -> y
-    pair <- fresh_var "p" (mkTyConApp (tupleTyCon Boxed 2) [first_kind, second_kind])
+        pair_kind a b = mkTyConApp (tupleTyCon Boxed 2) [a, b]
+        promoted_pair ka kb a b =
+          mkTyConApp (promotedTupleDataCon Boxed 2) [ka, kb, a, b]
+    pair <- fresh_var "p" (pair_kind first_kind second_kind)
     x <- fresh_var "a" first_kind
     y <- fresh_var "b" second_kind
     let binders = kind_binders ++ mkAnonTyConBinders [pair]
-        result = select first_kind second_kind
-        pat = mkTyConApp (promotedTupleDataCon Boxed 2) [first_kind, second_kind, mkTyVarTy x, mkTyVarTy y]
+        field FirstField  = (first_kind, mkTyVarTy x)
+        field SecondField = (second_kind, mkTyVarTy y)
+        (result, rhs) = case selected of
+          SelectField f -> field f
+          BuildPair a b -> let (ka, ta) = field a
+                               (kb, tb) = field b
+                           in (pair_kind ka kb, promoted_pair ka kb ta tb)
+        pat = promoted_pair first_kind second_kind (mkTyVarTy x) (mkTyVarTy y)
         args = mkTyVarTys quantifiers ++ [pat]
         clause_binders = quantifiers ++ [x,y]
-        branch _ = mkCoAxBranch clause_binders [] [] args (select (mkTyVarTy x) (mkTyVarTy y))
+        branch _ = mkCoAxBranch clause_binders [] [] args rhs
                        (map (const Nominal) clause_binders) (nameSrcSpan (idName owner))
     makeSourceFamily (idName owner) binders result [branch]
   where
     fresh_var occ kind = flip mkTyVar kind <$> newSysName (mkTyVarOcc occ)
 
-{- Note [Checked pair projections]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Checked pair cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 A checked boxed case can publish one nominal constructor equation.
 The two bound field types become kind parameters in that equation.
 A homogeneous term type shares one kind parameter but still introduces
-two independent fields. Inspect the actual case, not the function name
-or a sample result. Returning the exact alternative binder requires no
-demand of the other field. With a neutral pair the family does not
-choose an alternative and the equality can survive an interface.
+two independent fields. The actual case determines which fields go into the equation. Returning the exact alternative binder requires no
+demand of the other field. Rebuilding a pair from the exact field binders leaves both fields lazy.
+Preserve the selected order, including repeated uses of the same field. Both bodies force the
+input pair to weak head normal form. With a neutral pair the family
+does not choose an alternative and the equality can survive an interface.
 
-The new family domain includes every promoted pair operand that this
-ordinary projection can use in the symbolic open observer. Functions
-whose bodies fail certification retain the ordinary term entry.
+An equation for a pair result matches only the input constructor.
+In particular, a body that rebuilds the pair in its original order does
+not equate a neutral pair with its fieldwise reconstruction. A case
+that also forces a field retains the ordinary term entry.
 -}
 
 -- | The first constructor pattern, any carried variable, and the checked RHS.

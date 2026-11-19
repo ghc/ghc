@@ -426,8 +426,35 @@ the consumer's package database.
 [Interpreter setup](../../../compiler/GHC/Runtime/Interpreter/Init.hs)
 and [the closed evaluator](R15-closed-term-evaluator.md#returning-a-pair).
 
-The next composition is `Prelude.fst (Data.Tuple.swap p) :~: Prelude.snd p`
-for a rigid `p :: (Bool, Char)`. The current compiler reports GHC-68947
-at `Data.Tuple.swap` because its interface supplies no checked equation
-for `swap`. This identifies a source test for a function that builds a
-pair from its fields.
+### Composing a projection with a swap
+
+The producer check now admits a strict case that constructs a boxed
+pair from its two bound fields. It records which input supplies each
+output. This admits `swap (x,y) = (y,x)` and `copyFirst (x,y) = (x,x)`.
+Forcing an unused field changes which inputs terminate and disqualifies
+that definition. A client with a constructor in hand can reduce both
+checked cases even when the fields are unknown.
+
+```haskell
+known :: forall (x :: Bool) (y :: Char). Proxy x -> Proxy y
+      -> Prelude.fst (Data.Tuple.swap '(x, y)) :~: y
+known _ _ = Refl
+```
+
+With an unknown pair `p`, the two constructor equations both get stuck.
+An interface that exports `get :: Proxy q -> Proxy (Prelude.fst q)`
+also needs the equality when a later client instantiates `q` with
+`Data.Tuple.swap p`. Rewriting the original source expression would miss
+that use.
+
+An isolated compiler checks a nominal Core coercion for this law and its
+dual. It checks the actual field order in the three family equations.
+It recorded the coercion in an optimized interface and a second module
+read it with Core Lint enabled. The compiler with the constructor
+equations alone rejected both proofs at `Refl` with GHC-83865.
+Before integration, check malformed coercions, local and imported rewrite
+rules, stale evidence, and interface format compatibility. The law
+requires both sides to force the same pair shell and select the same
+field. An arbitrary boxed pair can diverge when forced.
+[Source correspondence](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+and [Agda's projection and eta rules](../REFERENCES.md#closed-constructor-arguments-and-composition-of-strict-pair-cases).

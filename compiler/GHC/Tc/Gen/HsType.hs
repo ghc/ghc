@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (sourceTableFamilyUse, sourceTableTypeUses,
-                              sourcePairProjectionKindUse, isSourcePairProjection, sourceTableOwner)
+                              sourcePairCaseKindUse, isSourcePairCase, sourceTableOwner)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedCall, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -2334,7 +2334,7 @@ tcInferTyAppHead mode (L _ (HsTyVar _ _ (L _ (WithUserRdr _ tv)))) args
   | isSourceFamilyName tv
   , [_] <- [() | HsValArg{} <- args]
   = do table <- tcLookupTyCon tv
-       if isSourcePairProjection table
+       if isSourcePairCase table
          then return (mkTyConTy table, tyConKind table)
          else tcTyVar mode tv
   | otherwise = tcTyVar mode tv
@@ -2848,14 +2848,14 @@ tcPlanClosedHead mode ordinary_call rdr name args
         _ -> failWithTc (TcRnNoSourceTable name)
 
 -- | Preserve the ordinary execution route for an existing staged pair call.
--- See Note [Selecting the closed projection route].
+-- See Note [Selecting the closed pair case route].
 tcClosedPairExecutableOwner :: RdrName -> Name -> LHsType GhcRn -> TcM (Maybe Id)
 tcClosedPairExecutableOwner rdr name arg
   | Just True <- contains_staged_call arg
   , isQual rdr || isUnqual rdr
   = do
       table <- tcLookupTyCon name
-      owner <- if isSourcePairProjection table then sourceTableOwner table else pure Nothing
+      owner <- if isSourcePairCase table then sourceTableOwner table else pure Nothing
       case owner of
         Just fun -> do
           rdr_env <- getGlobalRdrEnv
@@ -2879,13 +2879,13 @@ tcClosedPairExecutableOwner rdr name arg
       | Just (_, _, head_name, args) <- nestedClosedCall operand = do
           children <- traverse contains_staged_call args
           return (isVarName head_name || or children)
-      | isJust (familyLiteralKind operand) = Just False
+      | closedConstructorLiteral operand = Just False
       | otherwise = Nothing
 
-{- Note [Selecting the closed projection route]
+{- Note [Selecting the closed pair case route]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An ordinary computed operand needs the staged evaluator. If the linker can
-plan execution of the projection, use the ordinary plan before
+plan execution of the checked pair function, use the ordinary plan before
 registering any nominal family use. This preserves existing staged calls
 even if later declarations add a rule for the projection. An imported
 constraint, a rigid operand, or an unavailable executable still uses the
@@ -2903,7 +2903,7 @@ tcPlanSourceFamilyCall :: TcTyMode -> Bool -> Name -> LHsType GhcRn -> TcM (Kind
 tcPlanSourceFamilyCall mode ordinary_call name arg = do
   loc <- getSrcSpanM
   table <- tcLookupTyCon name
-  unless (isSourcePairProjection table) (sourceTableFamilyUse table)
+  unless (isSourcePairCase table) (sourceTableFamilyUse table)
   owner <- case sourceTableTermOcc (nameOccName name) of
     Just occ -> lookupOrig (nameModule name) occ
     Nothing -> return name
@@ -2925,7 +2925,7 @@ tcPlanSourceFamilyCall mode ordinary_call name arg = do
   -- Keep the existing ground source-family grammar. The polymorphic route
   -- must determine every invisible kind from a single prepared operand.
   when (null ty_params && not (supported domain && supported result)) unsupported
-  unless (null ty_params || isSourcePairProjection table) unsupported
+  unless (null ty_params || isSourcePairCase table) unsupported
   let specialize actual
         | null ty_params = do
             unless (actual `tcEqType` domain) $ at_operand $ do
@@ -2968,7 +2968,7 @@ tcPlanSourceFamilyCall mode ordinary_call name arg = do
         tc_check_lhs_type mode arg checked_domain
       zonked <- liftZonkM (zonkTcType checked)
       return (kinds, checked_domain, checked_result, return zonked)
-  when (isSourcePairProjection table) (sourcePairProjectionKindUse table kind_args)
+  when (isSourcePairCase table) (sourcePairCaseKindUse table kind_args)
   let run = setSrcSpan loc $ do
         input <- run_arg
         unless (typeKind input `tcEqType` input_kind && noFreeVarsOfType input) $

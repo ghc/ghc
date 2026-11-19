@@ -41,6 +41,7 @@ cp "$src"/{PreludePairExport,WrongRigidPair}.hs .
 "${ghc[@]}" --show-iface PreludePairExport.hi >exported.iface
 grep -Fq 'GHC.Internal.Data.Tuple.T:fst' exported.iface
 grep -Fq 'GHC.Internal.Data.Tuple.T:snd' exported.iface
+grep -Fq 'GHC.Internal.Data.Tuple.T:swap' exported.iface
 cp PreludePairExport.hi "$out/interfaces/"
 expect_rejection WrongRigidPair.hs '^wrong _ _ = Refl' '\[GHC-25897\]' 'x :~: fst p'
 
