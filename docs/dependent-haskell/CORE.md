@@ -2856,3 +2856,21 @@ type synonym contains the result of the observation. A client can use
 that synonym with only the interface.
 [Declaration scheduler](../../compiler/GHC/Tc/Module.hs)
 and [interface client](../../testsuite/tests/dependent/should_run/NativeLocalOpen.hs).
+
+The scheduler follows references in selected term bodies, including
+those needed only to typecheck ignored arguments. The observer records
+the smaller set of bodies it actually reads. The late rewrite-rule check
+uses the heads of those definitions.
+[Local rule regression](../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
+### GADT result indices during closed evaluation
+
+For `Pair :: a -> a -> Mark a 'True`, the Core case binds an erased
+equality that relates the scrutinee index to `'True`. The two values
+are the fields to reify. GHC rules out `Off :: Mark a 'False` when it
+plans the case. The interpreter returns a constructor tag and the fields.
+The decoder applies the promoted constructor to its source arguments,
+then checks the resulting kind. The ordinary constructor wrapper
+supplies equality evidence when constructing an operand for a later call.
+[Renderer and decoder](../../compiler/GHC/Tc/Gen/Splice.hs)
+and [source checks](roadmap/R15-closed-term-evaluator.md#m129-constructors-at-a-known-gadt-index).

@@ -8,11 +8,19 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 201 lines.
-The normal-way dependent directory passed 207 of 243 cases. All 36 failures
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 203 lines.
+The normal-way dependent directory passed 212 of 248 cases. All 36 failures
 produced the same output as on the previous fork tip. Fifteen reject existing
 programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+The Showcase checks `IndexedMark.readMark (IndexedMark.sample 6) :~: 67`.
+The ordinary producer returns `Pair 6 7 :: Mark Natural 'True`. A
+dependent client needs only the two constructors that can inhabit that
+index. Another example uses the same local function on types and on
+ordinary characters. Its body calls a second local function.
+[Indexed GADT](examples/closed-evaluation/IndexedMark.hs)
+and [local helper chain](examples/open-evaluation/LocalOpen.hs).
 
 The Showcase now includes two ordinary Haskell functions on trees.
 `FiniteTree.sample 4` builds a binary tree. During type checking,

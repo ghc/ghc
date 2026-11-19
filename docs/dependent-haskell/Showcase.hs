@@ -56,6 +56,7 @@ import GHC.Exts (FUN, M, U, Matchability (..), Multiplicity (Many))
 import qualified GHC.TypeNats as TypeNats
 import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
+import qualified IndexedMark
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
@@ -878,6 +879,10 @@ main = do
         (Refl :: FiniteTree.leaves (FiniteTree.sample 4) :~: '[4,5,6])
     observe "select a type with a function defined later in the same module"
         (LocalOpen.keepFirst 'x' False)
+    observe "use a chain of local functions on types and on values"
+        (Refl :: LocalOpen.LastOf Char Bool :~: Bool, LocalOpen.lastOf 'x' 'y')
+    observe "read the fields of a result indexed by True"
+        (Refl :: IndexedMark.readMark (IndexedMark.sample 6) :~: 67)
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

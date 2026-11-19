@@ -5354,3 +5354,27 @@ constructor identities. User functions operate on the ordinary value.
 [Agda's example datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#example-datatypes),
 [Dependently Typed Programming with Singletons](https://richarde.dev/papers/2012/singletons/paper.pdf)
 and [fork tree example](examples/closed-evaluation/FiniteTree.hs).
+
+### Scheduling helpers and reifying an indexed result
+
+The dependency graph for a type-level call includes the definition
+of its head. Serokell distinguishes this edge from an ordinary reference
+that needs only a type signature. The fork schedules a local chain in the
+renamer's value-binding order. It infers unsigned functions with GHC's
+existing typechecker. When an unqualified term name is used, the lookup
+rules come from the accepted dependent-type design. Explicitly bound type
+variables retain their scope.
+[Serokell on dependency analysis](https://serokell.io/blog/dependency-analysis-haskell),
+[proposal 378 on term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types)
+and [fork scheduling examples](roadmap/R21-dependency-analysis.md#m128-following-a-local-dependency-chain).
+
+Agda's vector has a shared element parameter and a length index that
+differs by constructor. The Haskell example uses a Boolean index so that
+the result arguments determine all constructor parameters. GHC already
+separates the source type of a constructor from the representation type
+of its worker. M129 uses that distinction when reifying a closed result.
+Agda's vector cons has a predecessor index bound at the constructor;
+recovering such an index is a further step in GHC.
+[Agda indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes),
+[GHC constructor representation](../../compiler/GHC/Core/DataCon.hs)
+and [source GADT](examples/closed-evaluation/IndexedMark.hs).

@@ -8493,3 +8493,39 @@ Template Haskell controls passed. `TH_reifyDecl1` also compiled, but its
 printed declaration exposes explicit arrow matchability. The archived
 pre-M124 compiler and the new compiler produced byte-identical output
 for that test. The full GHC testsuite was not run.
+
+## M128: follow local value dependencies in source types
+
+- [x] Schedule an acyclic chain using the renamer's binding groups.
+      Infer unsigned producers and helpers. Preserve shared signatures,
+      INLINE and NOINLINE pragmas, and lexical type-variable scope.
+- [x] Observe the checked definitions that a call demands. Accept a rule
+      on an ignored helper. Reject a rule that changes the selection.
+- [x] Check an earlier helper across a splice. Reject a reachable pending
+      typed splice. Change only a helper body and recheck the ordinary
+      interface-only client.
+
+[Declaration scheduling and source examples](roadmap/R21-dependency-analysis.md#m128-following-a-local-dependency-chain).
+
+## M129: reify constructors at known indices
+
+- [x] Select reachable GADT constructors at a checked ground result type.
+      Use the existing Core case binders and ordinary constructor wrapper
+      for the result equalities. Reconstruct DataKinds applications in user
+      binder order.
+- [x] Pass a value of `Mark Natural 'True` to a second ordinary function.
+      Reject a wrong field value and a wrong Boolean index at their
+      respective source locations.
+- [x] Check only reachable constructor imports and track the parent
+      declaration. Change a hidden constructor's result index in the
+      interface and reject the unchanged client with original object files.
+
+[Indexed source example and limits](roadmap/R15-closed-term-evaluator.md#m129-constructors-at-a-known-gadt-index).
+
+Both compiler stages built. Native execution and GHCi matched all 203
+Showcase lines. Internal and external interpreters passed the indexed
+constructor and recompilation controls. Both checked strict fields,
+reordered constructor parameters and two simultaneous index equalities
+with Core and STG lint. The dependent directory passed 212 of 248
+normal cases. All 36 prior failures produced the same diagnostics as at
+M127. The full GHC testsuite was not run.
