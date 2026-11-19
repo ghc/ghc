@@ -5333,3 +5333,24 @@ of both expressions and limits their dependencies on ordinary source rules.
 [Agda 2.8.0 pair projections](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#example-the-pair-type-constructor),
 [Agda standard library 2.3 `Data.Product.Base`](https://agda.github.io/agda-stdlib/v2.3/Data.Product.Base.html)
 and [the local Core rule](../../compiler/GHC/Builtin/CoercionRules.hs).
+
+### Local source definitions and recursive constructor values
+
+Serokell distinguishes a reference to a declaration's signature from a
+dependency on its definition. Agda also distinguishes a forward type
+declaration from its defining clauses. M126 needs the checked body to
+determine which rigid argument a term selects. A complete signature
+permits its independent definition to be checked first within a Haskell
+declaration group. Top-level splices delimit those groups.
+[Serokell's declaration analysis](https://serokell.io/blog/dependency-analysis-haskell),
+[Agda's forward declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration)
+and [fork source check](roadmap/R21-dependency-analysis.md).
+
+Agda's datatype examples include a binary tree with natural numbers at
+the leaves. Eisenberg and Weirich use singleton constructors to connect
+promoted and ordinary data. M127 uses the same constructor correspondence
+for an ordinary Haskell tree. GHC supplies the checked field kinds and
+constructor identities. User functions operate on the ordinary value.
+[Agda's example datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#example-datatypes),
+[Dependently Typed Programming with Singletons](https://richarde.dev/papers/2012/singletons/paper.pdf)
+and [fork tree example](examples/closed-evaluation/FiniteTree.hs).

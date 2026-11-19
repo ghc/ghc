@@ -8455,3 +8455,41 @@ Showcase lines. The two interpreter modes passed the enumeration and
 recompilation controls. The normal-way dependent directory passed 205
 of 241 cases. All 36 prior failures had the same individual output as
 at M123. The full GHC testsuite was not run.
+
+## M126: schedule local definitions for open evaluation
+
+- [x] Check a qualified call to an independent signed definition in the
+      same declaration group. Accept either source order. Give the open
+      evaluator its solved Core definition.
+- [x] Reuse an earlier group across a top-level splice. Diagnose a cycle,
+      a demand on an unknown argument, and a reference across a later
+      splice. Detect a pending typed splice before zonking the producer.
+- [x] Export a reduced synonym to an ordinary interface-only client.
+      Change the producer body and check the unchanged client's equality.
+      Reject a same-module closed literal call even with a stale object.
+
+[R21 source and staging checks](roadmap/R21-dependency-analysis.md).
+
+## M127: return finite recursive datatypes from closed calls
+
+- [x] Reify a finite value of an imported, parameterized algebraic
+      datatype. Build a finite graph of the instantiated constructor
+      representations. Detect expanding recursion before running the call.
+- [x] Pass the resulting tree to an ordinary polymorphic traversal.
+      Check mutual recursion, strict boxed fields and a failing field.
+- [x] Construct a known operand using only its selected constructors.
+      Reject a hidden constructor even when a public type synonym names
+      it. Recheck an unchanged client when an import becomes partial.
+
+[R15 examples and representation limits](roadmap/R15-closed-term-evaluator.md#m127-returning-finite-values-of-ordinary-algebraic-datatypes).
+
+Both compiler stages built. The compiled Showcase and GHCi produced
+the same 201 lines. Both interpreter modes passed the recursive datatype,
+visibility and enumeration recompilation checks. The boundary splice
+and solver plugin passed their positive and negative checks. The normal-way
+dependent directory passed 207 of 243 cases. Each of the 36 remaining
+failures produced the same diagnostics as at M125. Six of seven ordinary
+Template Haskell controls passed. `TH_reifyDecl1` also compiled, but its
+printed declaration exposes explicit arrow matchability. The archived
+pre-M124 compiler and the new compiler produced byte-identical output
+for that test. The full GHC testsuite was not run.

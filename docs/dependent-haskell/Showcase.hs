@@ -46,6 +46,7 @@ import qualified Data.List
 import qualified Data.Maybe
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:) (Refl))
+import qualified FiniteTree
 import qualified FunctionFieldClient
 import qualified FunctionFieldLibrary as FunctionFields
 import qualified FunctionPackageLibrary as FunctionPackages
@@ -57,6 +58,7 @@ import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
+import qualified LocalOpen
 import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
 import qualified OpenSource
@@ -872,6 +874,10 @@ main = do
         , Refl :: Signal.shouldStop (Signal.at 3) :~: 'False )
     observe "project the second copy of an unknown pair's first field"
         (duplicateProjection (Proxy @'( 'True, 'x')))
+    observe "read the leaves of a tree returned by an ordinary function"
+        (Refl :: FiniteTree.leaves (FiniteTree.sample 4) :~: '[4,5,6])
+    observe "select a type with a function defined later in the same module"
+        (LocalOpen.keepFirst 'x' False)
 
 -- | Read the two natural-number indices inferred from a computed pair.
 reflectPair :: forall q r. (TypeNats.KnownNat q, TypeNats.KnownNat r)

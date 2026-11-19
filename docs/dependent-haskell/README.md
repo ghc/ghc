@@ -8,11 +8,19 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. The compiled Showcase and GHCi agree on all 199 lines.
-The normal-way dependent directory passed 205 of 241 cases. All 36 failures
+Updated 2026-11-19. The compiled Showcase and GHCi agree on all 201 lines.
+The normal-way dependent directory passed 207 of 243 cases. All 36 failures
 produced the same output as on the previous fork tip. Fifteen reject existing
 programs that should compile.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+The Showcase now includes two ordinary Haskell functions on trees.
+`FiniteTree.sample 4` builds a binary tree. During type checking,
+`FiniteTree.leaves (FiniteTree.sample 4)` reduces to `'[4,5,6]`.
+A second example uses a function in the same module as the type
+that mentions it. The source can declare the function after the type.
+[Tree example](examples/closed-evaluation/FiniteTree.hs)
+and [same-module selection](examples/open-evaluation/LocalOpen.hs).
 
 An ordinary source module can now return a public enumeration, including
 a user-defined `Signal`. A dependent client checks the actual
