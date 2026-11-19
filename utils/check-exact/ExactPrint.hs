@@ -48,7 +48,7 @@ import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase), HsTypeCaseAlt(..)) -- Required for HsConDetails type-family instances
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias), HsTypeCaseAlt(..)) -- Required for HsConDetails type-family instances
 import GHC.TypeLits
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
@@ -4140,6 +4140,8 @@ instance ExactPrint (HsType GhcPs) where
         close' <- markEpToken close
         return (Just (open', close'), alts')
     return (XHsType (HsTypeCase (case_tok', of_tok') braces' scrutinee' alts'))
+  exact (XHsType (HsTypeCaseAlias generated alias body)) =
+    XHsType . HsTypeCaseAlias generated alias <$> markAnnotated body
   exact (XHsType (HsTypeLet (let_tok, eq, in_tok) var rhs body)) = do
     let' <- markEpToken let_tok
     var' <- markAnnotated var

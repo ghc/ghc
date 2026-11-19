@@ -22,7 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeCase), HsTypeCaseAlt(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -112,6 +112,12 @@ The ordinary declaration renamer brings implicit kind variables
 from the synonym header and its outer kind annotation into scope.
 Make those variables explicit parameters of each lifted family.
 Keep the original synonym's implicit binders and their order.
+
+If the lambda body is a case on one of its arguments, generate one
+family equation per constructor alternative. This leaves the case
+stuck on an unknown argument, even when the alternatives agree.
+A branch may use the whole matched value. See Note [Type case aliases]
+in GHC.Tc.TyCl.
 -}
 -- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
 liftTypeLambdas :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
@@ -164,15 +170,53 @@ liftTypeLambdas group =
       let owner_occ = rdrNameOcc (unLoc owner)
           occ = mkTcOcc ("$lambda:" ++ occNameString owner_occ ++ ":" ++ show salt)
           name = L (getLoc owner) (mkRdrUnqual occ)
-          params = map (HsValArg noExtField . typeName . snd) equation_scope
-          eqn = L loc (FamEqn ([], [], noAnn) name mkHsOuterImplicit params Prefix body)
+          equations
+            | L _ (XHsType (HsTypeCase (case_kw, _) _ scrutinee alts)) <- stripParens body
+            , L _ (HsTyVar _ NotPromoted scrut) <- stripParens scrutinee
+            , [selected] <- [i | (i, (_, v)) <- zip [0 :: Int ..] equation_scope
+                               , sameBinder v scrut]
+            , selected >= length captures
+            , Just branches <- traverse classifyBranch alts
+            = map (caseEquation name selected equation_scope case_kw scrut) branches
+            | otherwise
+            = [equation loc name (map (typeName . snd) equation_scope) body]
           family = L loc (FamDecl noExtField
-                   (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just [eqn])) TopLevel
+                   (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just equations)) TopLevel
                        name (HsQTvs noExtField (map fst equation_scope)) Prefix
                        (L (l2l loc) (NoSig noExtField)) Nothing))
           applied = foldl' (\f (_, n) -> L loc (HsAppTy noExtField f (typeName n)))
                            (typeName name) captures
       in (applied, (family, (occ, owner_occ)))
+
+    -- A tail case on a lambda argument can be represented directly by
+    -- the lambda's equations. Matching remains deferred until application.
+    classifyBranch (L loc (HsTypeCaseAlt pat _ rhs)) = do
+      (pat', bound) <- classifyTypeCasePattern pat
+      pure (loc, pat', bound, rhs)
+
+    caseEquation name selected scope case_kw scrut (loc, pat, bound, rhs) =
+      equation loc name (zipWith argument [0..] scope) body
+      where
+        body = L (noAnnSrcSpan (getEpTokenSrcSpan case_kw))
+                 (XHsType (HsTypeCaseAlias generated alias rhs))
+        alias
+          | unLoc scrut `notElem` bound
+          , any ((== unLoc scrut) . unLoc) (extractHsTyRdrTyVars rhs)
+          = Just (selected, scrut)
+          | otherwise = Nothing
+
+        generated = [unLoc (captureName index v)
+                    | (index, (_, v)) <- zip [0..] scope, index /= selected]
+        argument index (_, v)
+          | index == selected = pat
+          | otherwise = typeName (captureName index v)
+        captureName index v
+          | unLoc v `elem` bound = privateName "case-capture" 0 index v
+          | otherwise = v
+
+    equation loc name params =
+      L loc . FamEqn ([], [], noAnn) name mkHsOuterImplicit
+                     (map (HsValArg noExtField) params) Prefix
 
     -- An adjacent lambda shares the current telescope, so the inner
     -- closure is just a partial application of the same family.

@@ -11,7 +11,7 @@ g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
 
 cd "$out/provider"
 cp "$src"/{TypeLambda,NativeTypeLambdaScope}.hs .
-"${g[@]}" -c TypeLambda.hs
+"${g[@]}" -fomit-interface-pragmas -c TypeLambda.hs
 "${g[@]}" --show-iface TypeLambda.hi >provider.iface
 if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -F '$lambda:'; then exit 1; fi
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaScope.hs
@@ -23,7 +23,7 @@ module Ordinary where
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import NativeTypeLambdaScope
-import TypeLambda (L, Captured, Shadowed, WithError)
+import TypeLambda (L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild)
 import Data.Proxy (Proxy)
 result :: L :~: '[Maybe Int, Either String Int, IO Int]
 result = Refl
@@ -46,8 +46,69 @@ inferred :: InferredLevels 'True :~:
 inferred = Refl
 usesKind :: UsesKind 'True :~: (Proxy 'True, Proxy Bool, Bool, Char)
 usesKind = Refl
+mappedCase :: Mixed :~: '[Int, Bool]
+mappedCase = Refl
+branchScope :: CaseShadow 'LT :~: '[Proxy 'True, Proxy 'LT]
+branchScope = Refl
+knownCase :: Held 'True :~: Int
+knownCase = Refl
+rebuildNothing :: Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering)
+rebuildNothing = Refl
+rebuildJust :: Rebuild ('Just 'LT) :~: Proxy ('Just 'LT)
+rebuildJust = Refl
+ordinaryLambda :: a -> b -> a
+ordinaryLambda x = (\_ -> x)
 HS
 "${g[@]}" -c Ordinary.hs
+
+cat >RigidCase.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module RigidCase where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import TypeLambda (Held)
+wrong :: forall b. Proxy b -> Held b :~: Int
+wrong _ = Refl
+HS
+if "${g[@]}" -c RigidCase.hs >rigid-case.log 2>&1 ||
+   ! grep -Fq 'RigidCase.hs:7:11: error: [GHC-83865]' rigid-case.log; then
+    cat rigid-case.log >&2
+    exit 1
+fi
+
+cat >CaseFields.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, TypeFamilies #-}
+module CaseFields where
+import Data.Proxy
+type Fields (outer :: k) =
+  (\tag -> case tag of { Just x -> Proxy x; Nothing -> Proxy outer }) ('Just 'True)
+type Whole =
+  (\tag -> case tag of { Just _ -> Proxy tag; Nothing -> Proxy tag }) ('Just 'True)
+HS
+"${g[@]}" -Werror=unused-type-patterns -c CaseFields.hs
+sed 's/Just _ -> Proxy tag/Just field -> Proxy tag/' CaseFields.hs >Unused.hs
+if "${g[@]}" -Werror=unused-type-patterns -c Unused.hs >unused.log 2>&1 ||
+   ! grep -Fq 'Unused.hs:7:26: error: [GHC-40910]' unused.log; then
+    cat unused.log >&2
+    exit 1
+fi
+
+cat >Quoted.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell, TypeFamilies #-}
+module Quoted where
+import Data.Proxy
+import Language.Haskell.TH
+quoted :: Q [Dec]
+quoted = [d|
+  type QuotedCase = (\tag -> case tag of { Nothing -> Proxy tag; Just _ -> Proxy tag }) 'Nothing
+  |]
+HS
+if "${g[@]}" -c Quoted.hs >quote.log 2>&1 ||
+   ! grep -Fq 'Quoted.hs:7:30: error: [GHC-65904]' quote.log ||
+   ! grep -Fq 'Type case syntax' quote.log || grep -Fq '$lambda' quote.log; then
+    cat quote.log >&2
+    exit 1
+fi
 
 cat >WrongScope.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}

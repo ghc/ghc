@@ -1905,6 +1905,10 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
                 tc_check_lhs_type mode ty sig'
        ; checkExpKind mode rn_ty ty' sig' exp_kind }
 
+-- The case alias needs the checked pattern from its enclosing family equation.
+-- See Note [Type case aliases] in GHC.Tc.TyCl.
+tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
+
 -- See Note [Typechecking type lets].
 tcHsType mode (XHsType (HsTypeLetRn (L _ binder) rhs body)) exp_kind = do
   (rhs_ty, rhs_kind) <- tc_infer_lhs_type mode rhs

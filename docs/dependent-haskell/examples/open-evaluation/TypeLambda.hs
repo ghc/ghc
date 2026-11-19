@@ -1,7 +1,10 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures,
              TypeFamilies, TypeOperators #-}
 -- | Apply a type lambda to a list of type constructors.
-module TypeLambda (L, Captured, Shadowed, WithError, roadmap, partial) where
+module TypeLambda
+  ( L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild
+  , roadmap, partial, mixed
+  ) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -34,3 +37,22 @@ roadmap = Refl
 -- | Apply the partially applied lambda to Bool.
 partial :: WithError Bool :~: Either String Bool
 partial = Refl
+
+-- | Match each element with a tail case on the lambda parameter.
+type Mixed = Map (\b -> case b of { True -> Int; False -> Bool }) '[ 'True, 'False]
+
+-- | A rigid scrutinee leaves the constructor match stuck.
+type Held :: Bool -> Type
+type Held b = (\tag -> case tag of { True -> Int; False -> Int }) b
+
+-- | The Just field shadows a in that branch. Nothing uses the outer a.
+type CaseShadow (a :: k) =
+  Map (\b -> case b of { Just a -> Proxy a; Nothing -> Proxy a }) '[ 'Just 'True, 'Nothing]
+
+-- | Check both alternatives in the mapped result.
+mixed :: Mixed :~: '[Int, Bool]
+mixed = Refl
+
+-- | Preserve the entire scrutinee after matching its constructor.
+type Rebuild :: forall k. Maybe k -> Type
+type Rebuild m = (\tag -> case tag of { Nothing -> Proxy tag; Just _ -> Proxy tag }) m

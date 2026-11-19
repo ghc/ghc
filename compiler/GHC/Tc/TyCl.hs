@@ -33,6 +33,7 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Config.HsToCore
 
 import GHC.Hs
+import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeCaseAliasRn))
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
@@ -1353,7 +1354,7 @@ inferArrowIndices metadata decls tc
   , [FamDecl { tcdFam = FamilyDecl
        { fdInfo = ClosedTypeFamily _ (Just eqns), fdInjectivityAnn = Nothing } }] <-
       [d | L _ d <- decls, tcdName d == tyConName tc]
-  , any (matchabilityArrow . feqn_rhs . unLoc) eqns = do
+  , any (matchabilityArrow . caseAliasBody . feqn_rhs . unLoc) eqns = do
       ma <- newFlexiTyVar matchabilityTy
       pure (prefix [mkTyVar (getName ma) matchabilityTy], Nothing)
   | otherwise = pure (tc, Nothing)
@@ -3875,6 +3876,33 @@ tcDataDefn err_ctxt roles_info tc_name
                           data_cons
           NewTypeCon data_con -> mkNewTyConRhs tc_name tycon data_con
 
+-- | Expose the written RHS for checks which inspect its outer syntax.
+caseAliasBody :: LHsType GhcRn -> LHsType GhcRn
+caseAliasBody (L _ (XHsType (HsTypeCaseAliasRn _ body))) = body
+caseAliasBody rhs = rhs
+
+-- | Bind the checked scrutinee in its branch. See Note [Type case aliases].
+withCaseAlias :: TyCon -> TcType -> LHsType GhcRn -> (LHsType GhcRn -> TcM a) -> TcM a
+withCaseAlias owner lhs (L _ (XHsType (HsTypeCaseAliasRn (Just (index, L _ name)) body))) check
+  | Just (tc, args) <- tcSplitTyConApp_maybe lhs
+  , tc == owner
+  , arg : _ <- drop index [arg | (b, arg) <- zip (tyConBinders tc) args
+                               , isVisibleTyConBinder b]
+  = updLclCtxt (tcExtendLocalTypeEnv [(name, ATcTypeLet name arg (typeKind arg))]) $
+      check body
+  | otherwise = pprPanic "withCaseAlias" (ppr lhs)
+withCaseAlias _ _ rhs check = check (caseAliasBody rhs)
+
+{- Note [Type case aliases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A generated family equation checks the constructor pattern as an argument
+to its family. Keep that checked Type, including its inferred kind
+arguments, as the whole scrutinee in the branch RHS. Rechecking a source
+constructor can infer independent kind arguments even when it has no
+fields. The alias scopes over one RHS and never enters the family axiom
+as a separate argument. A branch field with the same name shadows it.
+-}
+
 -------------------------
 kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
 -- Used for the equations of a closed type family only
@@ -3895,8 +3923,9 @@ kcTyFamInstEqn tc_fam_tc
 
        ; discardResult $
          bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
-         do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
-            ; tcCheckLHsTypeInContext hs_rhs_ty (TheKind res_kind) }
+         do { (fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
+            ; withCaseAlias tc_fam_tc fam_app hs_rhs_ty $ \rhs ->
+                tcCheckLHsTypeInContext rhs (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066)
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
@@ -4056,9 +4085,9 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
                      ; addConsistencyConstraints mb_clsinfo lhs_ty
-                     ; rhs_ty <- case index of
-                           Just ma -> tcCheckMatchabilitySynRhs ma hs_rhs_ty rhs_kind
-                           Nothing -> tcCheckLHsTypeInContext hs_rhs_ty (TheKind rhs_kind)
+                     ; rhs_ty <- withCaseAlias fam_tc lhs_ty hs_rhs_ty $ \rhs -> case index of
+                           Just ma -> tcCheckMatchabilitySynRhs ma rhs rhs_kind
+                           Nothing -> tcCheckLHsTypeInContext rhs (TheKind rhs_kind)
                      ; return (lhs_ty, rhs_ty) }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs

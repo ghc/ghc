@@ -994,6 +994,9 @@ main = do
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "partially apply a two-argument type lambda" TypeLambda.partial
+    observe "map a type lambda with a constructor case" TypeLambda.mixed
+    observe "retain the kind of a matched Nothing"
+        (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
     observe "select the result type by a constructor" NativeCase.roadmap
     observe "pass a constructor to uncurry with two unknown fields"

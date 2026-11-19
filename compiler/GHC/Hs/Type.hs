@@ -539,6 +539,7 @@ type HsCoreTy = Type
 data HsTypeGhcRnExt
   = HsCoreTyRn HsCoreTy
   | HsTypeLetRn (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
+  | HsTypeCaseAliasRn (Maybe (Int, LocatedN Name)) (LHsType GhcRn)
 
 -- Extension of HsType during parsing.
 -- see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -569,6 +570,8 @@ data HsTypeGhcPsExt
   | HsRecTy     (EpToken "{", EpToken "}")
                 (Located [LHsConDeclRecField GhcPs])
     -- See Note [Parsing data type declarations]
+
+  | HsTypeCaseAlias [RdrName] (Maybe (Int, LocatedN RdrName)) (LHsType GhcPs)
 
 -- | A parsed constructor alternative in a type case.
 data HsTypeCaseAlt
@@ -1672,11 +1675,13 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
       text "case" <+> ppr_mono_lty scrutinee <+> text "of"
         $$ nest 2 (vcat [ppr_mono_lty pat <+> arrow <+> ppr_mono_lty rhs
                        | L _ (HsTypeCaseAlt pat _ rhs) <- alts])
+    HsTypeCaseAlias _ _ body -> ppr_mono_lty body
     HsTypeLet _ v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
         <+> text "in" <+> ppr_mono_lty body
   GhcRn -> case t of
     HsCoreTyRn ty -> ppr ty
+    HsTypeCaseAliasRn _ body -> ppr_mono_lty body
     HsTypeLetRn v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
         <+> text "in" <+> ppr_mono_lty body
@@ -1745,10 +1750,12 @@ hsTypeNeedsParens p = go_hs_ty
         HsBangTy{}  -> p > topPrec
         HsRecTy{}   -> False
         HsTypeLambda{} -> False
+        HsTypeCaseAlias{} -> p >= topPrec
         HsTypeLet{} -> p >= topPrec
         HsTypeCase{} -> p >= topPrec
       GhcRn -> case t of
         HsCoreTyRn ty -> go_core_ty ty
+        HsTypeCaseAliasRn{} -> p >= topPrec
         HsTypeLetRn{} -> p >= topPrec
 
     go_core_ty (TyVarTy{})    = False

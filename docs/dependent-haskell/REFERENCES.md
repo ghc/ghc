@@ -39,6 +39,14 @@ next implementation obligations:
 | [R19: type-level cases](roadmap/R19-type-level-cases.md) | Pass the scrutinee and lexical captures to a private closed family. Check when its branches may reduce on unknown inputs. [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf). |
 | [R23: unsaturated type families](roadmap/R23-unsaturated-type-families.md#prior-art-and-current-boundary) | Proposal #242, the higher-order type-level paper and the pinned 2024 implementation. Read the native integration correction with the draft. |
 
+Agda's as-patterns let a clause refer to the entire value matched by
+a constructor pattern. The name reduces to the matched pattern in that
+clause. R17/R19 uses the checked constructor argument for the same purpose
+when a branch mentions the lambda parameter. This preserves the implicit
+kind of a nullary constructor such as `'Nothing`.
+[Agda as-patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#as-patterns)
+and [type-lambda example](roadmap/R17-type-level-lambdas.md#matching-a-lambda-argument).
+
 ### Matchability and multiplicity on arrows
 
 Proposal #242 writes `a -> @m b` and defines it as `(->) @m a b`.

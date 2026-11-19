@@ -54,7 +54,7 @@ import GHC.Driver.Flags
 import GHC.Data.List.SetOps (findDupsEq)
 import GHC.Parser.PostProcess (setRdrNameSpace)
 
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase), HsTypeGhcRnExt(..), HsTypeCaseAlt(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias), HsTypeGhcRnExt(..), HsTypeCaseAlt(..))
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -988,6 +988,16 @@ rnHsTyKi env ty@(XHsType (HsBangTy _ bang (L _ inner))) = do
 rnHsTyKi _ (XHsType HsTypeLambda{}) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   failWithTc (if enabled then TcRnTypeLambdaContext else TcRnTypeLambdaDisabled)
+
+rnHsTyKi env (XHsType (HsTypeCaseAlias generated alias body)) = do
+  -- Compiler-generated family arguments are absent from the source pattern.
+  -- Keep the normal unused binder check for written constructor fields.
+  generated_names <- mapM (lookupOccRn WL_TyVar) generated
+  alias' <- forM alias $ \(index, binder) -> do
+    name <- newLocalBndrRn binder
+    pure (index, fmap (const name) binder)
+  (body', fvs) <- bindLocalNamesFV (maybeToList (unLoc . snd <$> alias')) (rnLHsTyKi env body)
+  pure (XHsType (HsTypeCaseAliasRn alias' body'), extendNameSetList fvs generated_names)
 
 rnHsTyKi env (XHsType (HsTypeLet (let_kw, _, _) binder rhs body)) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
@@ -2642,6 +2652,8 @@ extract_lty (L _ ty) acc
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }
                                   -> extract_lctxt ctxt $
                                      extract_lty ty acc
+      XHsType (HsTypeCaseAlias _ alias body) ->
+        filter (\v -> Just (unLoc v) /= (unLoc . snd <$> alias)) (extract_lty body []) ++ acc
       XHsType (HsTypeLet _ binder rhs body)
                                   -> extract_lty rhs
                                        (filter ((/= unLoc binder) . unLoc) (extract_lty body []) ++ acc)

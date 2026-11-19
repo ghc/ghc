@@ -68,6 +68,20 @@ With the M174 provider interface, it compiles and runs an ordinary
 client that proves both `L` and `Shadowed Bool 'True`. M173 already
 supports the unsaturated families used in this interface.
 
+## Matching a lambda argument
+
+A constructor case can form the body of a type lambda. For example,
+`Map (\b -> case b of { True -> Int; False -> Bool }) '[ 'True, 'False]`
+reduces to `'[Int, Bool]`. A branch can also refer to the original
+argument. In `Just _ -> Proxy tag`, the type of `tag` includes the
+field that the wildcard matched. In `Nothing -> Proxy tag`, it retains
+the kind of the input. GHC checks each branch as a separate equation
+of the lifted family. An unknown constructor leaves the family stuck.
+
+The [provider](../examples/open-evaluation/TypeLambda.hs) and its
+[interface-only consumer](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh)
+check the mapped result, lexical shadowing and both `Maybe` cases.
+
 ## Prior art
 
 Agda uses ordinary lambda syntax and accepts unannotated binders when
