@@ -8,10 +8,10 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-At M171, native execution at both compiler stages and self-hosted GHCi
-agreed on all 243 Showcase lines. The normal-way dependent directory
-passed 245 of 280 exercised cases. The 35 remaining failures produced
-the same output as at M169 (`3b2aecbe55`).
+At M172, native execution at both compiler stages and self-hosted GHCi
+agreed on all 244 Showcase lines. The normal-way dependent directory
+passed 246 of 281 exercised cases. The 35 remaining failures produced
+the same output as at M171 (`1eb80603ba`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 

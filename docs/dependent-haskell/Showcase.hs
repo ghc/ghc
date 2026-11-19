@@ -69,6 +69,7 @@ import qualified LocalAssociated
 import qualified IndependentFamily
 import qualified ImportedFamily
 import qualified MixedFamily
+import qualified InvisibleFamily
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -974,6 +975,8 @@ main = do
         (Refl :: Prelude.map Prelude.not '[ 'True, 'False] :~: '[ 'False, 'True])
     observe "pass an unapplied type family to another family"
         (Refl :: MapFlags FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
+    observe "pass a type family with an unapplied invisible binder"
+        (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "pass a constructor to uncurry with two unknown fields"
         (OpenBuildSource.uncurried (Proxy @Int) (Proxy @Char))
     observe "prove one map step for an arbitrary callback and tail"

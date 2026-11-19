@@ -178,3 +178,8 @@ test('NativeUnsaturatedFamily',
       extra_files(['NativeUnsaturatedProvider.hs', 'NativeUnsaturatedClient.hs',
                    'NativeUnsaturatedInverse.hs', 'NativeUnsaturatedEta.hs'])],
      run_command, ['bash NativeUnsaturatedFamily.sh "{compiler}" "{libdir}"'])
+test('NativeUnsaturatedInvisible',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + 'InvisibleFamily.hs', 'NativeUnsaturatedInvisibleConsumer.hs',
+                   'NativeUnsaturatedInvisibleInverse.hs', 'NativeUnsaturatedInvisibleMatchable.hs'])],
+     run_command, ['bash NativeUnsaturatedInvisible.sh "{compiler}" "{libdir}"'])

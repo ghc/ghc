@@ -1903,7 +1903,7 @@ coAxNthLHS :: CoAxiom br -> Int -> Type
 coAxNthLHS ax ind =
   mkTyConApp (coAxiomTyCon ax) (coAxBranchLHS (coAxiomNthBranch ax ind))
 
--- | A partial user family retains only known unmatchable visible binders.
+-- | A partial user family retains only known unmatchable type binders.
 -- See Note [Partial type family applications].
 isUnsaturatedUserFamily :: TyCon -> [Type] -> Bool
 isUnsaturatedUserFamily tc args
@@ -1916,6 +1916,9 @@ isUnsaturatedUserFamily tc args
   where
     unmatchable 0 _ = True
     unmatchable n kind
+      | ForAllTy ma (Bndr tv (Invisible _)) result <- coreFullView kind
+      , isTyVar tv, ma `eqType` unmatchableDataConTy =
+          unmatchable (n - 1) result
       | FunTy{ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult, ft_res = result} <- coreFullView kind
       , isManyTy mult, ma `eqType` unmatchableDataConTy =
           unmatchable (n - 1) result
@@ -1929,8 +1932,10 @@ its arguments by congruence and leave its head intact. Only a saturated
 application can be a TyFamLHS or enter the family reduction cache.
 Data family representation axioms have their own eta-reduced arity.
 
-Check each missing arrow in the instantiated kind, including its
-matchability. Equality of applications at U gives no inverse for the
+Check each missing binder in the instantiated kind, including its
+matchability. A partial family can retain an invisible type binder
+when its receiver already expects the entire polymorphic kind.
+Equality of applications at U gives no inverse for the
 arguments. In particular, failure to split two partial applications
 does not establish their apartness. The source validity check controls
 which modules can write a partial family. Core Lint must also accept

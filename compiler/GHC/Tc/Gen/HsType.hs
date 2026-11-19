@@ -2502,8 +2502,17 @@ tc_app_ty mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
 tc_app_ty_generic :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty_generic mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty hs_args
-       ; (ty, infered_kind) <- tcInferTyApps mode hs_fun_ty fun_ty hs_args
-       ; checkExpKind mode rn_ty ty infered_kind exp_kind }
+       ; (prefix, prefix_kind) <- tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args
+       -- Keep an invisible family binder only when the receiver expects
+       -- the whole polymorphic kind. Ordinary inference still saturates it.
+       ; allow_partial <- xoptM LangExt.ExperimentalDependentTypes
+       ; (ty, inferred_kind) <- case (exp_kind, tcSplitTyConApp_maybe prefix) of
+           (Check expected, Just (tc, args))
+             | allow_partial, expected `tcEqType` prefix_kind
+             , isUnsaturatedUserFamily tc args
+             -> return (prefix, prefix_kind)
+           _ -> saturateFamApp mode prefix prefix_kind
+       ; checkExpKind mode rn_ty ty inferred_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
 

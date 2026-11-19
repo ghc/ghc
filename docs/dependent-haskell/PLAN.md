@@ -9162,3 +9162,17 @@ GHCi agreed on 243 Showcase lines. The normal dependent directory
 passed 245 of 280 cases. Its 35 failures had the same individual
 diagnostics as M169. Both compilers accepted the same 115 of 124
 ordinary polykinds programs in the comparison.
+
+## M172. Pass a family with an unapplied invisible binder
+
+Keep the binder of `Select :: forall k. @U k` when the receiving
+argument expects that polymorphic kind. `Run Select` can then apply
+the family to `Bool`. Preserve normal saturation when inferring the
+kind of an alias. Check the exported result in an ordinary module,
+reject inverse equality, and recheck the client after changing the
+family equation. [Source and checked scope](roadmap/R23-unsaturated-type-families.md#passing-a-family-with-an-invisible-argument).
+
+Both shared compilers built. Their native executables and self-hosted
+GHCi agreed on 244 Showcase lines. The dependent directory passed
+246 of 281 normal-way cases. The other 35 had the same failures and
+diagnostics as M171.

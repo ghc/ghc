@@ -125,6 +125,23 @@ remain outside this checkpoint. A reducing use of a generated family
 must still establish its source owner and record its rewrite-rule and
 interface dependencies.
 
+### Passing a family with an invisible argument
+
+`InvisibleFamily` defines a family `Select` with kind
+`forall k. @U k` and an equation `Select @Bool = 'True`. A receiver
+that expects the entire polymorphic kind can take `Select` as its
+argument. The family `Run` supplies `@Bool` later. An ordinary client
+proves the result is `'True` through the provider interface. A receiver
+that expects `Bool` still gets the saturated application.
+[Provider](../examples/open-evaluation/InvisibleFamily.hs)
+and [consumer and rejection tests](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedInvisible.sh).
+
+This check requires a known expected kind and an unmatchable binder.
+The compiler still rejects inverse equality between two family heads
+and a family declaration whose argument is marked matchable. The
+compatibility failures above also need a policy for arrows in the
+*result* of a family equation.
+
 ## Goal and dependencies
 
 Allow direct higher-order use of type families under explicit matchability,

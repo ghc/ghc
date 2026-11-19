@@ -5779,3 +5779,13 @@ groups to check a local constructor before the term that requires it.
 The extra dependency on an imported type family comes from Haskell's
 open family instances. [Agda interleaved mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
 and [mixed Haskell declarations](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations).
+
+Agda inserts trailing implicit arguments when the expected type requires
+them. R23 uses an expected kind to distinguish two uses of a Haskell
+family. A receiver can ask for the entire polymorphic family, or it can
+ask for the result at one particular kind. Proposal 242 supplies the
+independent matchability restriction. Equality of results from an
+unmatchable application does not imply equality of arguments.
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+[GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities),
+and [source example](examples/open-evaluation/InvisibleFamily.hs).

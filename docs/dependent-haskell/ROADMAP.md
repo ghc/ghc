@@ -320,6 +320,7 @@ evaluator work has priority.
 | 107 | R13 and R16: instantiate the callback with a checked source function | [M169](PLAN.md#m169-carry-a-checked-named-callback-across-an-interface) | A traffic-light callback determines the head of the result through interfaces alone. |
 | 108 | R16: use a callback from an installed ordinary module | [M170](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback) | A client checks the head using `Prelude.not` and the rules visible at the proof. |
 | 109 | R21: order local datatypes, a term, and an imported family equation | [M171](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations) | A field whose type is `Payload Double` accepts `True`. Adding a cyclic dependency in another constructor's field rejects the equation. |
+| 110 | R23: pass a family with an invisible argument | [M172](roadmap/R23-unsaturated-type-families.md#passing-a-family-with-an-invisible-argument) | A receiver that expects the polymorphic family can apply it at `Bool`. An ordinary client checks the resulting equality. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
