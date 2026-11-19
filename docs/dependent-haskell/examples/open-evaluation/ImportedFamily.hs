@@ -1,4 +1,4 @@
-{-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}
+{-# LANGUAGE ExperimentalDependentTypes, MonoLocalBinds, TypeFamilies #-}
 module ImportedFamily (importedFamilyResults) where
 import Data.Proxy (Proxy(..))
 import ImportedFamilyProvider (Payload, importedFirst)
@@ -8,6 +8,7 @@ type instance Payload Int = ImportedFamily.keep Char Bool
 type instance Payload Char = ImportedFamily.lambda Ordering
 type instance Payload () = ImportedFamily.identity Char
 type instance Payload Ordering = ImportedFamily.viaMaybe (Maybe Bool)
+type instance Payload (Maybe Bool) = ImportedFamily.inferredMaybe Ordering
 
 constLocal :: forall a b. a -> b -> a
 constLocal x _ = x
@@ -21,8 +22,10 @@ lambda x = (\a _ -> a) x x
 identity :: forall a. a -> a
 identity x = Prelude.id x
 
-viaMaybe :: forall a. a -> a
+viaMaybe :: a -> a
 viaMaybe x = Prelude.maybe x Prelude.id (Just x)
+
+inferredMaybe x = Prelude.maybe x Prelude.id (Just x)
 
 class ReadPayload a where
   observed :: proxy a -> Payload a
@@ -43,6 +46,9 @@ identityResult = 'x'
 maybeResult :: Payload Ordering
 maybeResult = Just False
 
--- | An ordinary client can consume all four results through this interface.
-importedFamilyResults :: (Payload Int, Payload Char, Payload (), Payload Ordering)
-importedFamilyResults = (result, lambdaResult, identityResult, maybeResult)
+inferredResult :: Payload (Maybe Bool)
+inferredResult = LT
+
+-- | An ordinary client can consume all five results through this interface.
+importedFamilyResults :: (Payload Int, Payload Char, Payload (), Payload Ordering, Payload (Maybe Bool))
+importedFamilyResults = (result, lambdaResult, identityResult, maybeResult, inferredResult)

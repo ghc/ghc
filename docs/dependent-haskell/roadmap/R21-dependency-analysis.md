@@ -325,9 +325,27 @@ have an ordinary boxed representation and lazy fields.
 
 The fourth equation uses `Prelude.maybe x Prelude.id (Just x)` to
 return the supplied type `Maybe Bool`. The ordinary interface-only
-client checks the fourth component at that type and prints
-`(True,EQ,'x',Just False)`. The negative calls an imported function
+client checks that component at `Maybe Bool`. The negative calls an imported function
 whose declared type contains `Maybe (Payload Int)`. Although the
 producer never writes the family name, its early check rejects the
 dependency at the equation's call.
 [Source checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
+## M164. Inferred independent producer types
+
+An independent local producer can use an implicit signature or omit
+the signature. The scheduler preserves the original top-level binding
+groups and flags. GHC uses ordinary type inference and generalization,
+including under `MonoLocalBinds`. The checker verifies the solved
+monomorphic binding and its wrapper before the open evaluator can
+observe it. The source syntax still excludes overloaded literals,
+annotations and splices, and the imported type check still excludes
+hidden family arguments and dictionaries.
+
+The example checks `viaMaybe :: a -> a` and infers the same type for
+an unsigned producer. The resulting equations remain available to
+ordinary client code through the interface. The client prints
+`(True,EQ,'x',Just False,LT)`. A signed mutually recursive source
+group remains outside the early batch. The scheduler checks resolved
+body dependencies even when signatures break the renamer's typing
+cycle. [Interface and rejection checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).

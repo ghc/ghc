@@ -1,1 +1,1 @@
-(True,EQ,'x',Just False)
+(True,EQ,'x',Just False,LT)

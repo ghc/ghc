@@ -1933,11 +1933,11 @@ tcIndependentFamilyProducers demands group@HsGroup
       _ -> tcLocalOpenGroup demands group finish
 tcIndependentFamilyProducers demands group finish = tcLocalOpenGroup demands group finish
 
--- | Close a producer over complete signatures and lexical variable applications.
+-- | Close a producer over independent signatures and lexical applications.
 independentClosure :: Module -> [(RecFlag, [LHsBind GhcRn])] -> [LSig GhcRn]
                    -> [Name] -> Maybe (NameSet, NameSet)
 independentClosure this_mod binds sigs roots = do
-    names <- either (const Nothing) Just (closeLocalNames deps emptyNameSet roots)
+    names <- foldM (visit emptyNameSet) emptyNameSet roots
     let local = filterNameSet (nameIsLocalOrFrom this_mod) names
     pure (local, names `minusNameSet` local)
   where
@@ -1945,15 +1945,25 @@ independentClosure this_mod binds sigs roots = do
     functions = mkNameEnv
       [(name, matches) | (NonRecursive, [L _ FunBind{fun_id = L _ name, fun_matches = matches}]) <- binds]
 
+    -- Complete signatures can split a mutually recursive group for typing.
+    -- Check cycles in the resolved body dependencies too.
+    visit active done name
+      | name `elemNameSet` done = Just done
+      | name `elemNameSet` active = Nothing
+      | otherwise = do
+          refs <- deps name
+          checked <- foldM (visit (extendNameSet active name)) done (nameSetElemsStable refs)
+          pure (extendNameSet checked name)
+
     deps name
-      | isExternalName name, not (nameIsLocalOrFrom this_mod name) = Right emptyNameSet
+      | isExternalName name, not (nameIsLocalOrFrom this_mod name) = Just emptyNameSet
       | Just matches <- lookupNameEnv functions name
-      , Just pragmas <- lookupNameEnv signatures name
-      , [sig] <- filter is_type_sig pragmas
-      , valid_sig sig, all ordinary_pragma pragmas
+      , let pragmas = fromMaybe [] (lookupNameEnv signatures name)
+      , all ordinary_pragma pragmas
+      , independent_signature (filter is_type_sig pragmas)
       , Just refs <- match_refs emptyNameSet matches
-      = Right refs
-      | otherwise = Left "A producer has a dependency outside the independent fragment."
+      = Just refs
+      | otherwise = Nothing
 
     is_type_sig TypeSig{} = True
     is_type_sig _ = False
@@ -1961,12 +1971,16 @@ independentClosure this_mod binds sigs roots = do
     ordinary_pragma InlineSig{} = True
     ordinary_pragma _ = False
 
-    valid_sig (TypeSig _ [] _ (HsWC _ (L _ HsSig
-      { sig_bndrs = HsOuterExplicit{hso_matchability = Nothing, hso_bndrs = quantified}
-      , sig_body = body })))
-      | Just params <- traverse bare_binder quantified, not (null params) =
+    independent_signature [] = True
+    independent_signature [TypeSig _ [] _ (HsWC _ (L _ HsSig
+      { sig_bndrs = outer, sig_body = body }))]
+      | Just params <- signature_binders outer, not (null params) =
           arrow_type (mkNameSet params) body
-    valid_sig _ = False
+    independent_signature _ = False
+    signature_binders HsOuterImplicit{hso_ximplicit = quantified} = Just quantified
+    signature_binders HsOuterExplicit{hso_matchability = Nothing, hso_bndrs = quantified} =
+      traverse bare_binder quantified
+    signature_binders _ = Nothing
     bare_binder (L _ b@HsTvb {tvb_kind = HsBndrNoKind _}) = hsTyVarName b
     bare_binder _ = Nothing
     arrow_type params ty = case unLoc (ignoreParens ty) of
@@ -2046,12 +2060,26 @@ independentCore producers = go emptyNameSet emptyNameSet
     go tyvars locals (Core.Lam v body)
       | isTyVar v, independentConstant liftedTypeKind (varType v) =
           go (extendNameSet tyvars (getName v)) locals body
-      | isId v, not (isCoVar v), independentConstant manyDataConTy (idMult v), independentType tyvars (varType v) =
-          go tyvars (extendNameSet locals (getName v)) body
+      | term_binder tyvars v = go tyvars (extendNameSet locals (getName v)) body
       | otherwise = False
     go tyvars locals (Core.App fun operand) = go tyvars locals fun && go tyvars locals operand
+    go tyvars locals (Core.Let (Core.NonRec v rhs) body) =
+      independent_let tyvars locals v rhs body
+    -- The singleton inferred AbsBinds path in dsAbsBinds emits mkLetRec.
+    -- Check its RHS without the monomorphic binder in scope.
+    go tyvars locals (Core.Let (Core.Rec [(v, rhs)]) body) =
+      independent_let tyvars locals v rhs body
     go tyvars _ (Core.Type ty) = independentType tyvars ty
     go _ _ _ = False
+
+    independent_let tyvars locals v rhs body =
+      term_binder tyvars v && not (getName v `elemNameSet` producers) &&
+      go tyvars locals rhs &&
+      go tyvars (extendNameSet locals (getName v)) body
+
+    term_binder tyvars v =
+      isId v && not (isCoVar v) && independentConstant manyDataConTy (idMult v) &&
+      independentType tyvars (varType v)
 
     core_type (Core.Type ty) = Just ty
     core_type _ = Nothing
@@ -2085,7 +2113,7 @@ independentConstant expected actual
 An imported family can be named by an imported signature or a class
 instance. A renamed name closure alone cannot justify moving an ordinary
 producer ahead of that family's equation. Check a separate early batch
-with only signed lexical lambda/application bindings. Reject
+with lexical lambda/application bindings. Reject
 annotations and syntax with overloaded operations. An imported Id
 can enter this batch if its entire declared type is independent.
 Check all binder kinds, argument types and arrow metadata. This
@@ -2104,9 +2132,12 @@ Even an ignored type annotation may use the very equation we are
 checking. Inspect the renamed syntax before desugaring can erase it.
 
 Check the ordinary bindings and solve them without the candidate
-equation. Verify the resulting Core before observing the actual
-producer bodies. The regular source checker then receives its original
-type groups, instances, methods, defaults and deriving declarations.
+equation. Keep normal top-level inference for an unsigned binding.
+The source dependency graph still excludes recursive SCCs. Check
+each inferred monomorphic binding and its wrapper in the solved Core
+before observing the actual producer body. The regular source checker
+then receives its original type groups, instances, methods, defaults
+and deriving declarations.
 With a typechecker plugin, the early batch could have effects or solve
 constraints differently. Use the ordinary declaration order in that case.
 -}
