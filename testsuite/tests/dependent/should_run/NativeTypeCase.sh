@@ -15,12 +15,13 @@ reject() {
 }
 "${g[@]}" -c NativeCase.hs
 "${g[@]}" --show-iface NativeCase.hi >case.iface
-if sed -n '/^exports:/,/^defaults:/p' case.iface | grep -F '$case:'; then exit 1; fi
+if sed -n '/^exports:/,/^defaults:/p' case.iface | grep -E '\$case(:|-let-rhs:)'; then exit 1; fi
 mkdir interfaces
-cp NativeCase.hi NativeTypeCase{Client,Rigid}.hs interfaces/
+cp NativeCase.hi NativeTypeCase{Client,Rigid,LetWrong}.hs interfaces/
 (cd interfaces && "${g[@]}" -c NativeTypeCaseClient.hs &&
    reject NativeTypeCaseRigid 8:13 'case a of {True -> Int; False -> Int}' &&
-   grep -Fq "Just x1 -> '(x, x1)" bad.log)
+   grep -Fq "Just x1 -> '(x, x1)" bad.log &&
+   reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 reject NativeTypeCaseInvalid 6:3 'Not in scope: data constructor'
 reject NativeTypeCaseEscape 6:14 'Not in scope: type variable'
 reject NativeTypeCaseBadPattern 5:3 'A type case pattern needs a data constructor'
@@ -29,3 +30,5 @@ reject NativeTypeCaseFallback 5:3 'A type case pattern needs a data constructor'
 reject NativeTypeCaseDisabled 4:12 'GHC-98931'
 reject NativeTypeCaseBranchKind 6:12 "In the type case in"
 reject NativeTypeCaseScrutinee 4:15 'Not in scope: type constructor or class'
+reject NativeTypeCaseLetMonomorphic 6:22 'GHC-83865'
+reject NativeTypeCaseLetUnowned 4:26 'A type let used in a case body cannot generalize the kind of its right-hand side.'

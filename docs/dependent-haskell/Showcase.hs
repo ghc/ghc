@@ -1005,6 +1005,10 @@ main = do
     observe "bind the result of a constructor case"
         (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
     observe "select the result type by a constructor" NativeCase.roadmap
+    observe "use a local type in a constructor case"
+        (Just True :: NativeCase.Captured 'False 'False)
+    observe "infer one kind for a local type from both case branches"
+        (True :: NativeCase.ContextKind 'True)
     observe "pass a constructor to uncurry with two unknown fields"
         (OpenBuildSource.uncurried (Proxy @Int) (Proxy @Char))
     observe "prove one map step for an arbitrary callback and tail"

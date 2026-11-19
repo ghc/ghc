@@ -330,6 +330,9 @@ data TcTyThing
 
   | ATcTypeLet Name TcType TcKind    -- A checked lexical type let
 
+  -- A lifted type-let RHS and its lexical capture parameters.
+  | ATcCaseLet [TyVar] TcType TcKind (Maybe TyCon)
+
 -- | Matches on either a global 'TyCon' or a 'TcTyCon'.
 tcTyThingTyCon_maybe :: TcTyThing -> Maybe TyCon
 tcTyThingTyCon_maybe (AGlobal (ATyCon tc)) = Just tc
@@ -343,6 +346,7 @@ instance Outputable TcTyThing where     -- Debugging only
                                  <> ppr (varType (tct_id elt)) <> comma
                                  <+> ppr (tct_info elt))
    ppr (ATcTypeLet n ty ki) = text "Type let" <+> ppr n <+> equals <+> ppr ty <+> dcolon <+> ppr ki
+   ppr (ATcCaseLet vs ty ki _) = text "Case let" <+> ppr vs <+> equals <+> ppr ty <+> dcolon <+> ppr ki
    ppr (ATyVar n tv)    = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
                             <+> dcolon <+> ppr (varType tv)
    ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc <+> dcolon <+> ppr (tyConKind tc)
@@ -474,6 +478,7 @@ pprTcTyThingCategory = text . capitalise . tcTyThingCategory
 tcTyThingCategory :: TcTyThing -> String
 tcTyThingCategory (AGlobal thing)    = tyThingCategory thing
 tcTyThingCategory (ATcTypeLet{})    = "local type alias"
+tcTyThingCategory (ATcCaseLet{})    = "local type alias"
 tcTyThingCategory (ATyVar {})        = "type variable"
 tcTyThingCategory (ATcId {})         = "local identifier"
 tcTyThingCategory (ATcTyCon {})      = "local tycon"

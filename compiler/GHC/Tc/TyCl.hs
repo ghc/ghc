@@ -35,6 +35,7 @@ import GHC.Driver.Config.HsToCore
 import GHC.Hs
 import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeCaseAliasRn))
 
+import GHC.Tc.Types.BasicTypes (TcTyThing(ATcCaseLet))
 import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
@@ -623,6 +624,16 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
             -- had an ill-scoped kind forall (d::k) k (a::k). blah
             -- and that ill-scoped kind made role inference fall over.
 
+       ; let inferred = mkNameEnv [(tyConName tc, tc) | tc <- tc_tycons]
+       ; forM_ tyclds $ \(L _ decl) -> case decl of
+           SynDecl{tcdLName = L _ name, tcdRhs = rhs}
+             | "$case-let-rhs:" `List.isPrefixOf` occNameString (nameOccName name)
+             , Just tc <- lookupNameEnv inferred name
+             , not (all (determinedCaseLetBinder (tyConBinders tc)) (tyConBinders tc)) ->
+                 setSrcSpanA (getLoc rhs) $
+                   failWithTc (mkTcRnUnknownMessage (mkPlainError []
+                     (text "A type let used in a case body cannot generalize the kind of its right-hand side.")))
+           _ -> pure ()
        ; traceTc "tcTyAndCl generalized kinds" (vcat (map ppr_tc_tycon tc_tycons))
 
             -- Step 2: type-check all groups together, returning
@@ -649,10 +660,16 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
                  -- a TcTyCon for each knot-tied TyCon or Class
                  -- See Note [Type checking recursive type and class declarations]
                  -- and Note [Type environment evolution]
-             tcExtendKindEnvWithTyCons tc_tycons $
-
-                 -- Kind and type check declarations for this group
-               mapAndUnzipM (tcTyClDecl metadata roles) tyclds
+             tcExtendKindEnvWithTyCons tc_tycons $ do
+               let (helpers, remaining) = partition isCaseLet tyclds
+                   check = tcTyClDecl metadata roles
+               (helper_tcs, helper_derivs) <- mapAndUnzipM check helpers
+               let case_lets = [(tyConName tc, ATcCaseLet (binderVars (tyConBinders tc))
+                                      rhs (tyConResKind tc) (Just tc))
+                               | (tc, _) <- helper_tcs, Just rhs <- [synTyConRhs_maybe tc]]
+               (other_tcs, other_derivs) <- updLclCtxt (tcExtendLocalTypeEnv case_lets) $
+                 mapAndUnzipM check remaining
+               pure (helper_tcs ++ other_tcs, helper_derivs ++ other_derivs)
            ; return (tycons, concat data_deriv_infos, kindless)
            } }
   where
@@ -1266,7 +1283,7 @@ kcTyClGroup open_indices kisig_env decls
                          -- knock-on errors if we have tycons with
                          -- malformed kinds
 
-        ; (inferred_tcs, metadata0)
+        ; (inferred_tcs, metadata0, case_lets)
             <- tcExtendKindEnvWithTyCons checked_tcs  $
                pushLevelAndSolveKindArrows unkSkolAnon [] $
                      -- We are going to kind-generalise, so unification
@@ -1281,11 +1298,26 @@ kcTyClGroup open_indices kisig_env decls
                     -- NB: the environment extension overrides the tycon
                     --     promotion-errors bindings
                     --     See Note [Type environment evolution]
-                  ; metadata <- checkNoErrs $
-                    tcExtendKindEnvWithTyCons mono_tcs $
-                    mapM (kcLTyClDecl (isSingleton decls)) kindless_decls
+                  ; (metadata, case_lets) <- checkNoErrs $
+                    tcExtendKindEnvWithTyCons mono_tcs $ do
+                      let (helpers, remaining) = partition isCaseLet kindless_decls
+                      checked <- mapM kcCaseLet helpers
+                      results <- updLclCtxt (tcExtendLocalTypeEnv
+                        [(name, ATcCaseLet params rhs kind Nothing) | (_, name, params, rhs, kind) <- checked]) $
+                        mapM (kcLTyClDecl (isSingleton decls)) remaining
+                      pure (results, checked)
 
-                  ; return (mono_tcs, mkNameEnv (catMaybes metadata)) }
+                  ; return (mono_tcs, mkNameEnv (catMaybes metadata), case_lets) }
+
+        ; forM_ case_lets $ \(loc, _, params, rhs, kind) -> do
+            (params', rhs', kind') <- liftZonkM $
+              (,,) <$> mapM (zonkTcType . mkTyVarTy) params <*> zonkTcType rhs <*> zonkTcType kind
+            let captured = tyCoVarsOfTypes params'
+                owned = tyCoVarsOfTypes [rhs', kind']
+            unless (owned `subVarSet` captured) $
+              setSrcSpanA loc $
+                failWithTc (mkTcRnUnknownMessage (mkPlainError []
+                  (text "A type let used in a case body cannot generalize the kind of its right-hand side.")))
 
         -- Step 3: generalisation
         -- Finally, go through each tycon and give it its final kind,
@@ -1308,6 +1340,50 @@ kcTyClGroup open_indices kisig_env decls
   where
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
+
+{- Note [Checked RHSs for cases in type lets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check a lifted let RHS before checking the other declarations in its
+owning SCC. During kind checking, each row receives the checked RHS
+with its original metas. Instantiate only the explicit lexical
+captures. All rows can then constrain the same inferred kind. After
+the solver runs, reject any RHS variable outside that capture scope.
+
+During final checking, check the private synonyms first by the
+ordinary synonym rules. Make their returned RHSs available to the
+other declarations in this pass. This uses the checked synonyms
+directly without forcing the recursive type environment. The local
+environment is keyed by the generated Name. Nothing in this
+environment persists beyond the pass.
+-}
+
+-- | Select the private RHS synonyms generated by the case lifter.
+isCaseLet :: LTyClDecl GhcRn -> Bool
+isCaseLet (L _ SynDecl{tcdLName = L _ name}) =
+  "$case-let-rhs:" `List.isPrefixOf` occNameString (nameOccName name)
+isCaseLet _ = False
+
+-- | An inferred parameter may be the kind of an explicit capture.
+-- The checked argument determines this kind at each helper application.
+determinedCaseLetBinder :: [TyConBinder] -> TyConBinder -> Bool
+determinedCaseLetBinder binders binder
+  | isVisibleTyConBinder binder = True
+  | isInferredTyConBinder binder =
+      any (\p -> isVisibleTyConBinder p &&
+                varType (binderVar p) `tcEqType` mkTyVarTy (binderVar binder)) binders
+  | otherwise = False
+
+-- | Keep the checked RHS in the owning kind-checking scope.
+-- See Note [Checked RHSs for cases in type lets].
+kcCaseLet :: LTyClDecl GhcRn -> TcM (SrcSpanAnnA, Name, [TyVar], TcType, TcKind)
+kcCaseLet (L _ SynDecl{tcdLName = L _ name, tcdRhs = source}) =
+  setSrcSpanA (getLoc source) $ do
+    tc <- tcLookupTcTyCon name
+    let kind = tyConResKind tc
+    rhs <- tcExtendNameTyVarEnv (tcTyConScopedTyVars tc) $
+             tcCheckLHsTypeInContext source (TheKind kind)
+    pure (getLoc source, name, binderVars (tyConBinders tc), rhs, kind)
+kcCaseLet _ = panic "kcCaseLet: not a synonym"
 
 {- Note [Inferred synonym matchability]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

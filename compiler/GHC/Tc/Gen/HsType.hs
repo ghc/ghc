@@ -85,7 +85,7 @@ import GHC.Hs
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Types.BasicTypes (TcTyThing(ATcTypeLet))
+import GHC.Tc.Types.BasicTypes (TcTyThing(ATcTypeLet, ATcCaseLet))
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.ErrCtxt
@@ -1716,6 +1716,39 @@ tcLHsType mode (L span ty) exp_kind
   = setSrcSpanA span $
     tcHsType mode ty exp_kind
 
+-- | Instantiate the already checked captures of a lifted let RHS.
+-- See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
+tcInferTypeLetRhs :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
+tcInferTypeLetRhs mode source
+  | (L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))), args) <- splitHsAppTys (unLoc source)
+  , Just captures <- traverse capture args = do
+      env <- getLclTypeEnv
+      case lookupNameEnv env name of
+        Just (ATcCaseLet params rhs kind Nothing)
+          | equalLength params captures -> do
+              actuals <- check [] [] params captures
+              pure (instantiate params actuals rhs kind)
+        Just (ATcCaseLet params rhs kind (Just tc)) -> do
+          (applied, _) <- tcInferTyApps mode source (mkTyConTy tc) args
+          case splitTyConAppNoView_maybe applied of
+            Just (tc', actuals) | tc' == tc, equalLength params actuals ->
+              pure (instantiate params actuals rhs kind)
+            _ -> panic "tcInferTypeLetRhs: checked helper arity"
+        _ -> ordinary
+  | otherwise = ordinary
+  where
+    ordinary = tc_infer_lhs_type mode source
+    instantiate params actuals rhs kind =
+      (substTyWith params actuals rhs, substTyWith params actuals kind)
+    capture (HsValArg _ arg@(L _ HsTyVar{})) = Just arg
+    capture _ = Nothing
+
+    check _ _ [] [] = pure []
+    check vs args (v:rest) (arg:others) = do
+      actual <- tc_check_lhs_type mode arg (substTyWith vs args (varType v))
+      (actual :) <$> check (v:vs) (actual:args) rest others
+    check _ _ _ _ = panic "tcInferTypeLetRhs: capture arity"
+
 tcHsType :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 -- The main workhorse for type kind checking
 -- See Note [Bidirectional type checking]
@@ -1911,7 +1944,7 @@ tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
 
 -- See Note [Typechecking type lets].
 tcHsType mode (XHsType (HsTypeLetRn (L _ binder) rhs body)) exp_kind = do
-  (rhs_ty, rhs_kind) <- tc_infer_lhs_type mode rhs
+  (rhs_ty, rhs_kind) <- tcInferTypeLetRhs mode rhs
   updLclCtxt (tcExtendLocalTypeEnv [(binder, ATcTypeLet binder rhs_ty rhs_kind)]) $
     tcLHsType mode body exp_kind
 

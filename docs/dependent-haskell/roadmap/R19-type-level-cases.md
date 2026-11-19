@@ -32,3 +32,37 @@ and [Agda pattern lambdas](https://agda.readthedocs.io/en/stable/language/with-a
 The supported patterns have a constructor head and distinct variables or
 wildcards for fields. General nested cases, catch-all alternatives and
 case expressions inside arbitrary types remain open.
+
+## A case in a let body
+
+A case branch can use a let-bound type or kind. For example,
+`let k = PayloadKind a in case b of { False -> Maybe k; True -> [k] }`
+checks with `a` still unknown. The branches and the original let refer
+to one private synonym. The synonym takes the RHS's lexical captures,
+including any variables named in their kinds. A case nested in the
+scrutinee inherits the surrounding bindings. A branch pattern or
+inner let can shadow a name in its own scope. The ordinary
+interface-only client verifies both kinds of shadowing.
+[Provider](../examples/open-evaluation/NativeCase.hs)
+and [client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs).
+
+The compiler checks the helper RHS once in each declaration-checking
+pass. Each row substitutes its checked captures while sharing the RHS's
+unresolved kind variables. For example, both branches of
+`let m = 'Nothing in case b of …` can constrain `m` to `Maybe Bool`.
+The compiler rejects incompatible uses and unresolved variables outside
+the capture scope. Two separate lets can infer different kinds.
+
+The supported RHSs use names, type applications, promoted lists and tuples,
+kind annotations and type literals. A helper can infer the kind of a visible
+capture. An independent kind parameter remains ambiguous.
+Splices and RHSs that refer to another enclosing type let remain outside
+this slice.
+
+The private synonym follows the promotion paper's lifting of local
+bindings, and the rows follow its closed-family encoding of cases.
+Agda checks `let` as a local abbreviation and uses pattern lambdas for
+constructor cases inside expressions.
+[Eisenberg and Stolarek, §§4.5 and 4.7](https://richarde.dev/papers/2014/promotion/promotion.pdf),
+[Agda local definitions](https://agda.readthedocs.io/en/stable/language/let-and-where.html#let-expressions)
+and [Agda pattern lambdas](https://agda.readthedocs.io/en/stable/language/with-abstraction.html#pattern-lambdas).
