@@ -993,16 +993,19 @@ A private compiler has checked the direct source proof
 An ordinary client checked the exported alias without the projection's
 object file. Demanding the other field raised the expected exception.
 
-The producer emitted a private entry from its final Core. The entry
-returns either the selected field or the complete pair. The first
-choice requires evidence from the executable that the other field
-cannot return. Replacing only a transitive helper object changed that
-decision. GHC rechecked the client and compared the complete operand
-when both fields became available. This preserves reflexivity under a
-projection rule. A visible producer rule kept the existing execution path.
+The producer emits a private entry from its final Core. The entry can
+identify a nonreturning field or refer to the entry of a specific
+imported function. GHC follows these references during type checking.
+A positive result lets it evaluate only the selected field. A missing
+entry selects full readback. An ordinary program can therefore link
+against an older transitive helper that lacks the private entry.
+Replacing only that helper object or a registered package archive
+caused GHC to recheck the proof. When both fields returned, comparing
+the complete operand preserved reflexivity under a projection rule.
 
 The experiment used a private native build of `GHC.Internal.Err`.
-Integration still needs an ordinary package build and a representation
-that covers other supported field types. The shared branch continues
-to use the existing direct-projection case. [Previous object and equality
+Integration still needs verification of a quiet optional symbol lookup
+across the compiler and its interpreter. A genuinely missing ordinary
+symbol must keep the source diagnostic. The prototype covers the first
+field for supported scalar pairs. [Previous object and equality
 controls](#m161-observe-a-field-decision-from-the-loaded-executable).

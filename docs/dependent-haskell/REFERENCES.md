@@ -29,6 +29,7 @@ next implementation obligations:
 | --- | --- |
 | [R03: dependent products](roadmap/R03-dependent-products.md#research) | Proposal #378, pinned `singletons` source, and Agda telescope substitution and refinement. Separate source checking from runtime demand. |
 | [R05: dependent Core](roadmap/R05-dependent-core.md#research) | The D/DC specification, dependent roles, GraD and current Core. Review opaque Pi elimination and substitution of generic domain metadata. |
+| [R17: type-level lambdas](roadmap/R17-type-level-lambdas.md#prior-art) | Serokell supplies the source example. Agda supplies a comparison for anonymous binders. Eisenberg and Stolarek supply the family lifting technique. Proposal #242 supplies unmatchable application. |
 | [R23: unsaturated type families](roadmap/R23-unsaturated-type-families.md#prior-art-and-current-boundary) | Proposal #242, the higher-order type-level paper and the pinned 2024 implementation. Read the native integration correction with the draft. |
 
 These pages record the selected implementation sources, open questions and
@@ -5789,3 +5790,11 @@ unmatchable application does not imply equality of arguments.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 [GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities),
 and [source example](examples/open-evaluation/InvisibleFamily.hs).
+
+The `map` builder in Figure 2 of *A Short Cut to Deforestation* gives
+R16 a concrete producer to check. Theorem 8.2 of Johann and Voigtländer
+explains why a polymorphic builder's type alone cannot justify equality
+under `seq`. The fork checks the concrete mapper and keeps the
+unrestricted fusion rule outside conversion.
+[Fusion and definedness reading](papers/README.md#short-cut-fusion-and-definedness)
+and [ordinary GHC counterexample](examples/open-evaluation/check-map-fusion.sh).

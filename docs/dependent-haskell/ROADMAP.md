@@ -31,15 +31,16 @@ computations whose inputs are still unknown (R16). Dependency analysis
 same module. The [work queue](#current-work-queue) gives a source
 example and the next acceptance test for each card.
 
-M165 checks `Prelude.map Prelude.not` on a known list (R15). The
-current R23 and R16 work passes a function through a module interface
-when the input list is unknown. For example, an ordinary module can
-prove that mapping a checked traffic-light function over a list starting
-with `Red` yields a list starting with `Stop`, for every remaining tail.
-The worker in this proof is the ordinary rule-free `each`. The exact
-`Prelude.map` example still needs to account for its fusion rules and
-rules on their helper functions.
-[Mapper, proofs and fusion example](roadmap/R16-open-term-evaluator.md#passing-a-function-as-the-carried-operand).
+M165 checks `Prelude.map Prelude.not` on a known list (R15). In R16,
+an ordinary module can prove that mapping a traffic-light function over
+a list starting with `Red` yields a list starting with `Stop`, for every
+remaining tail. It uses the rule-free mapper `each`. M173 checks the
+installed `Prelude.map` itself. With rewrite rules disabled at the proof,
+negating a list with a `True` head produces a `False` head and leaves
+the recursive call on the unknown tail. A caller can introduce rules on
+helpers that fusion exposes. Checking equations with those rules enabled
+remains open.
+[Mapper, proofs and fusion example](roadmap/R16-open-term-evaluator.md#m173-check-the-installed-prelude-mapper-before-publishing-its-equations).
 
 The [Showcase](Showcase.hs) reads lengths from IO and uses them to
 replicate, append, index, and flatten vectors. [M95](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary)
@@ -166,17 +167,20 @@ General opaque proof projection stays open.
 **[R15, closed term evaluator](roadmap/R15-closed-term-evaluator.md) and
 [R16, open term evaluator](roadmap/R16-open-term-evaluator.md) are active.**
 They are separate subtasks of function promotion. The upstream graph has
-no dependency from one evaluator to the other. Work on the two cards in
-parallel, with one owner and one source acceptance example per card.
+no dependency from one evaluator to the other. Work on them in parallel.
+R17 exercises the open evaluator from source. R23 checks compatibility
+with programs that use functions in kinds.
 Use a source test on each card. R15 checks the result of running an
 ordinary closed call. R16 checks what the ordinary function demands
 when some of its operands are unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Prove `pick (bump 7) :~: 8` without forcing the other field. Preserve reflexivity when two different functions return equal, fully defined pairs. | [M157](roadmap/R15-closed-term-evaluator.md#when-equality-needs-the-whole-operand) exposed a compatibility regression. [M161](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable) proves which fields an explicit observer returned across an object-only change. Automatic projection still uses the M153 path. |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Export `NegateAll xs = Prelude.map Prelude.not xs`. Prove that supplying a `True` head produces a `False` head without supplying the tail. | [M170](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback) proves the equation with the installed `Prelude.not` and an ordinary rule-free mapper. The remaining function is `Prelude.map`, including its visible fusion rules. |
+| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Integrate `pick (bump 7) :~: 8` without forcing the other field. Preserve ordinary linking and staged fallback with older helper objects. | The [native prototype](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field) now links against an older transitive object and checks the direct proof. An optional symbol lookup still emits a warning on successful fallback. |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check a mapper equation when rewrite rules are enabled in the consumer. Account for rules on the mapper and the helpers its rewrites introduce. | [M173](roadmap/R16-open-term-evaluator.md#m173-check-the-installed-prelude-mapper-before-publishing-its-equations) proves the exact `Prelude.map Prelude.not` source example with rewriting disabled at the proof. |
 | [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Check a family equation whose local producer needs a local datatype. Preserve real cycles through constructor fields. | The [mixed declaration example](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations) checks ordinary constructor prerequisites and a scoped expression signature. Families in producer signatures and more general declaration groups remain open. |
+| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Integrate the source callback in `Map (\f -> f Int) [Maybe, Either String, IO]`. | A private compiler checks the unannotated source and its interface-only client. Quotation, source printing and diagnostics still need review. The card depends on R05 and R16. |
+| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Restore existing family-as-kind programs and preserve ordinary runtime arrows. | [M172](roadmap/R23-unsaturated-type-families.md#passing-a-family-with-an-invisible-argument) retains an invisible binder. A private compiler now checks unchanged `T14749` and preserves the 124-program polykinds comparison. Interface migration and the open associated family in `T14038` remain open. |
 
 The previous source controls now pass for a private parcel with an
 exceptional second field, a constructor containing two unknown types,
@@ -321,6 +325,7 @@ evaluator work has priority.
 | 108 | R16: use a callback from an installed ordinary module | [M170](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback) | A client checks the head using `Prelude.not` and the rules visible at the proof. |
 | 109 | R21: order local datatypes, a term, and an imported family equation | [M171](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations) | A field whose type is `Payload Double` accepts `True`. Adding a cyclic dependency in another constructor's field rejects the equation. |
 | 110 | R23: pass a family with an invisible argument | [M172](roadmap/R23-unsaturated-type-families.md#passing-a-family-with-an-invisible-argument) | A receiver that expects the polymorphic family can apply it at `Bool`. An ordinary client checks the resulting equality. |
+| 111 | R16: use the ordinary Prelude mapper across an interface | [M173](roadmap/R16-open-term-evaluator.md#m173-check-the-installed-prelude-mapper-before-publishing-its-equations) | An ordinary client proves the empty and cons equations with rewriting disabled. A changed optimized producer still compiles without issuing the evidence. |
 
 M64 now carries explicit forall metadata in the development source. The
 [Core contract](CORE.md#forall-matchability) records scope, nominal proofs,

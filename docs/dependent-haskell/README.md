@@ -8,10 +8,10 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-At M172, native execution at both compiler stages and self-hosted GHCi
-agreed on all 244 Showcase lines. The normal-way dependent directory
-passed 246 of 281 exercised cases. The 35 remaining failures produced
-the same output as at M171 (`1eb80603ba`).
+At M173, native execution at both compiler stages and self-hosted GHCi
+agreed on all 245 Showcase lines. The normal-way dependent directory
+passed 247 of 282 exercised cases. The 35 remaining failures produced
+the same output as at M172 (`f1c0681898`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
@@ -22,13 +22,13 @@ Look for `redStops` in the ordinary client and `Signals` in the
 dependent exporter. [Client proofs](examples/open-evaluation/OpenMapProof.hs)
 and [source aliases](examples/open-evaluation/OpenMapSource.hs).
 
-The mapper also accepts `Prelude.not` from a rebuilt ordinary library.
-For every tail `xs`, the client proves that negating `True ': xs`
-produces `False ': NegateAll xs`. An inherited rule that changes
-`not True` invalidates this proof while preserving the empty-list case.
-[Alias](examples/open-evaluation/InstalledNotSource.hs),
-[proof](examples/open-evaluation/InstalledNotProof.hs),
-and [remaining work on Prelude.map](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback).
+An ordinary client can also prove that mapping the installed `Prelude.not`
+over `True ': xs` with the installed `Prelude.map` gives a `False` head
+and maps negation over the same tail. The proof module disables rewrite
+rules. An optimized client can still consume an explicit witness for
+the head. [Source alias](examples/open-evaluation/PreludeMapSource.hs),
+[proof](examples/open-evaluation/PreludeMapProof.hs), and
+[optimization boundary](BOUNDARY-EVIDENCE.md).
 
 The mixed declaration example uses a local constructor in a function
 that determines a type family result. A later constructor uses that

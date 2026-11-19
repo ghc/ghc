@@ -1010,10 +1010,54 @@ spine, apply the same callback to the cons head and recurse on its
 original tail. The checker also rejected changes to the callback, the
 demand or the tail. This gives the producer a place to check the
 ordinary mapper before its unfolding can disappear from the interface.
-A private compiler used that evidence to check the exact
-`Prelude.map Prelude.not` proof with rewriting disabled. An optimized
-module could export the alias. A consumer with rewriting enabled
-received GHC-83605 when it tried to use the mapper equation at `Refl`.
-A fresh no-code producer supplied no final-Core evidence. Integration
-and the conditions for using the equation with rewriting enabled remain
-open.
+### M173. Check the installed Prelude mapper before publishing its equations
+
+`PreludeMapSource` exports the alias
+`PreludeNegateAll xs = Prelude.map Prelude.not xs`. Its ordinary client
+proves both the empty-list equation and the result for a `True` head
+with an unknown tail. The compiler checks the ordinary mapper's shape
+after desugaring and again after optimization. A change to the optimized
+body withdraws the equations. The ordinary module still builds. A
+fresh no-code build also omits this evidence.
+[Source alias](../examples/open-evaluation/PreludeMapSource.hs),
+[ordinary proof](../examples/open-evaluation/PreludeMapProof.hs),
+and [withdrawal and no-code checks](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
+
+On upgrade from M169 or M172, GHC recompiles a ruled mapper once to
+check its optimized body. The new interface records the certificate.
+The next build reuses it. The older reader diagnoses the new format.
+[Two-compiler upgrade check](../examples/open-evaluation/check-map-upgrade.sh).
+
+An optimized module can export the alias. The module that uses the
+mapper's equation at `Refl` must disable rewrite rules, for example
+with `-O1 -fno-enable-rewrite-rules`. With rules enabled, GHC reports
+GHC-83605 at the proof and explains the required flag. A closed
+application can still take the executable route.
+An optimized client can also consume an explicit witness from another
+module. A caller's rule on `build` can change the runtime result in
+that same client. [Compiler Note](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+and [witness and rewrite control](../examples/boundary-evidence/check-map-witness.sh).
+
+The GHC Core replay for the concrete map builder checks both endpoints
+of `foldr/build` with an unknown combiner and seed. It rejects a changed
+combiner, a changed seed, and a new demand on the combiner. Other rules
+can still apply to a producer supplied by a caller. In particular, a
+non-parametric builder can use `seq` to distinguish a constructor from
+a partial combiner. Rule-enabled conversion remains open.
+[Fusion and definedness](../papers/README.md#short-cut-fusion-and-definedness).
+
+### Checking an identity traversal with rules enabled
+
+A private compiler accepted an ordinary `-O1` client of a ruled
+mapper. The producer's only active rule replaces
+`mapper (\x -> x) xs` with `xs`. On an empty spine each side
+returns the empty list. On a cons each side returns the original head
+and leaves the tail lazy. This check depends on the compiled rule's
+binders, arguments and result. Its name has no bearing on the proof.
+
+The same client failed when the rule returned the input list for Boolean
+negation, or evaluated the head before returning a cons. An imported
+orphan rule and a rule declared after a splice also blocked the proof.
+Changing the producer's rule invalidated the cached ordinary client.
+The check covers the identity traversal. The fusion rules on the
+installed `Prelude.map` introduce other functions and need separate checks.

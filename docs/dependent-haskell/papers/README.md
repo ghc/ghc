@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
 Read on 2026-11-14 through 2026-11-19. The [manifest](manifest.json) records
-twenty-eight works and thirty-four downloaded PDF versions. It contains source URLs,
+thirty works and thirty-six downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -15,7 +15,8 @@ The JFP 2022 ANF paper and selected-page records are in
 The OutsideIn(X) author draft and selected-page records are in
 `native-let-conversion/`. The POPL 2004 `seq` paper and selected-page
 records are in `serokell-evaluators/`. This directory also holds the
-QuickSpec, call-by-need, and HERMIT papers with their reading records.
+QuickSpec, call-by-need and HERMIT papers, and the papers on list fusion
+and `seq`.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -56,6 +57,8 @@ versions and several selective readings.
 | [QuickSpec: Guessing Formal Specifications using Testing](https://smallbone.se/papers/quickspec.pdf) | Claessen, Smallbone and Hughes, TAP 2010 | R15, R16 | Candidate equations for an optional boundary checker. |
 | [Simulation in the Call-by-Need Lambda-Calculus with Letrec, Case, Constructors, and Seq](https://lmcs.episciences.org/930) | Schmidt-Schauß, Sabel and Machkasova, LMCS 2015 | R05, R16 | Contextual equivalence, convergence and the observations available through `seq`. |
 | [Reasoning with the HERMIT](https://ku-fpg.github.io/software/hermit/) | Farmer, Sculthorpe and Gill, Haskell 2015 | R16 | Checking a scripted proof of a GHC rewrite equation against the Core being compiled. |
+| [A Short Cut to Deforestation](https://www.microsoft.com/en-us/research/publication/a-short-cut-to-deforestation/) | Gill, Launchbury and Peyton Jones, FPCA 1993 | R16 | The list builder for `map` and the `foldr/build` transformation. |
+| [The Impact of seq on Free Theorems-Based Program Transformations](https://janis-voigtlaender.eu/JV06.html) | Johann and Voigtländer, Fundamenta Informaticae 2006 | R16 | Definedness conditions under which `foldr/build` gives equality. |
 
 ## Singletons, Haskell 2012
 
@@ -773,3 +776,30 @@ other active rules requires separate evidence. The
 [call-by-need entry above](#contextual-equivalence-in-a-call-by-need-calculus-lmcs-2015)
 provides semantic prior art for the definedness requirement.
 [Author PDF, sections 2.5 and 5.3](https://ku-fpg.github.io/files/Farmer-15-HERMIT-reasoning.pdf#page=4).
+
+## Short cut fusion and definedness
+
+Gill, Launchbury and Peyton Jones describe how a fold can consume a list
+without allocating it. Figure 2 gives the producer for `map`. It passes
+a mapped element and a suspended recursive result to the consumer's
+combining function. We read PDF pages 1–4, including the construction
+of the `foldr/build` rule and the condition on its polymorphic producer.
+[Author PDF, especially Figure 2](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/deforestation-short-cut.pdf#page=4).
+
+Johann and Voigtländer study the same transformation in a language with
+`seq`. In their model, the fused expression can be less defined than
+the original. Theorem 8.2 establishes equality when the seed is
+defined and the combining function produces a defined result on
+two bottom arguments. We read the abstract
+and the discussion of this theorem on PDF pages 28–30.
+[Authors' PDF, section 8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=28).
+
+R16 can also inspect a particular producer. In the GHC library's
+`map` specialization, both sides of `foldr/build` inspect the input
+spine and return the original seed for an empty list. For a cons,
+both pass the same callback application to the same combiner. The
+suspended second operand returns to the corresponding fold on the
+original input tail. Replaying the two saved cases on the unfused
+side and one on the fused side checked this specialization with an
+unknown seed and combiner. A rule on a caller's own builder can
+still change definedness. [Executable counterexample](../examples/open-evaluation/check-map-fusion.sh).

@@ -9176,3 +9176,25 @@ Both shared compilers built. Their native executables and self-hosted
 GHCi agreed on 244 Showcase lines. The dependent directory passed
 246 of 281 normal-way cases. The other 35 had the same failures and
 diagnostics as M171.
+
+## M173. Check the ordinary Prelude mapper on an unknown tail
+
+Check the mapper's two list equations again after optimization before
+publishing the evidence in its interface. An optimized ordinary module
+whose rules change the shape can still compile. Remove its provisional
+equations. Recheck eligible ordinary modules on upgrade from M169 and
+M172. At the consumer, admit a fresh proof using this evidence when
+rewrite rules are disabled. Report GHC-83605 at the proof otherwise.
+[Source, compilation modes and upgrade check](roadmap/R16-open-term-evaluator.md#m173-check-the-installed-prelude-mapper-before-publishing-its-equations).
+
+The bootstrap compiler checked the installed `Prelude.map Prelude.not`
+on both an empty list and a list with an unknown tail. A separate
+optimized client consumed an exported witness and changed the runtime
+mapping with its own rule. The executable printed `(False,True)`.
+[Witness and caller examples](BOUNDARY-EVIDENCE.md).
+
+Both compiler stages built. Native execution at both stages and self-hosted
+GHCi agreed on 245 Showcase lines. The dependent directory passed 247 of
+282 normal-way cases. The same 35 cases failed with the same diagnostics
+as at M172. Both compilers accepted the same 115 of 124 ordinary polykinds
+sources. The boundary examples passed against the self-hosted compiler.
