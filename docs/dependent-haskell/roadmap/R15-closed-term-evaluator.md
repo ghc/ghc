@@ -928,6 +928,9 @@ measured `-O1` build, the original field qualified. The rewritten
 character did not. At `-O0`, and with `-fignore-interface-pragmas`,
 the imported error function's demand signature was unavailable to the
 pass, even though its installed interface included that signature.
+At `-O0 -fno-ignore-interface-pragmas` the pass could read the
+signature and classify the original field. The rewritten character
+still had no such signature.
 
 The observer returns its decision and the worker's result together.
 One ordinary client printed `Partial 8` with the first object and
@@ -946,7 +949,23 @@ still needs a compiler representation that preserves the original
 projection and its proof-time rewrite checks. A compiler-generated
 observer must refer to the same worker implementation at the call
 site, including the implementations of any helpers used to classify
-a field. The probe exercises one native object change. It does not
-establish that correspondence for all linkables and compiler hooks.
+a field. The probe exercises native object changes. Establishing
+that correspondence for bytecode and custom compiler hooks remains open.
 [Core plugin](../examples/closed-evaluation/PairReadbackProbe.hs)
 and [source proofs](../examples/closed-evaluation/check-readback-entry.sh).
+
+Changing only a helper object shows why this matters. The worker calls
+an imported `NOINLINE` function for the second field. With the original
+helper, the observer reported `True` and forcing the field raised an
+exception. With a replacement helper, the same worker object still
+reported `True`, but forcing the field returned `'x'`. Returning the
+decision from the worker solves the worker-only replacement in this
+experiment. Using it to omit a field also requires validating the
+helper used to justify that decision.
+
+The compatibility test also computes the two sibling characters in
+different ways. At input `7` both return `'x'`. The identity function
+still checks under the projection rule. At input `8` the siblings are
+`'a'` and `'b'`. Although both selected numbers are `9`, GHC reports
+GHC-83605 when equality would require the guarded projection.
+[Input-sensitive reflexivity test](../../../testsuite/tests/dependent/should_run/NativeClosedPartialPair.sh).

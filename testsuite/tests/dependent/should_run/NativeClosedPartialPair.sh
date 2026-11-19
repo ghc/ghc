@@ -32,8 +32,8 @@ bad :: Natural -> Natural
 bad _ = errorWithoutStackTrace "ignored argument was forced"
 
 firstWorker, secondWorker :: Natural -> (Natural, Char)
-firstWorker n = (n + 1, 'x')
-secondWorker n = (n + 1, 'x')
+firstWorker n = (n + 1, if n <= 7 then 'x' else 'a')
+secondWorker n = (n + 1, if odd n then 'x' else 'b')
 HS
 "${ghc[@]}" "${ways[@]}" -c Builder.hs NativeClosedFamilyProjection.hs
 "${ghc[@]}" --show-iface Builder.hi >producer.iface
@@ -126,6 +126,11 @@ same :: N (F.pick (W.firstWorker 7)) -> N (F.pick (W.secondWorker 7))
 same x = x
 HS
 "${ghc[@]}" -i -i. -fenable-rewrite-rules -Wno-inline-rule-shadowing -c Reflexive.hs
+# At eight the selected numbers still agree but the complete operands differ.
+sed -e 's/module Reflexive where/module Distinct where/' -e 's/Worker 7/Worker 8/g' \
+    Reflexive.hs >Distinct.hs
+if "${ghc[@]}" -i -i. -fenable-rewrite-rules -Wno-inline-rule-shadowing -c Distinct.hs >err 2>&1 ||
+   ! grep -Fq '[GHC-83605]' err || ! grep -Fq 'pick' err; then cat err >&2; exit 1; fi
 
 # Both projected types can also arrive through ordinary exported values.
 cat >Values.hs <<'HS'

@@ -26,13 +26,16 @@ cp Worker.hs ../returning/
 cat >>../returning/Worker.hs <<'HS'
 {-# RULES "error/returns" forall (s :: String). errorWithoutStackTrace s = 'x' #-}
 HS
-for dir in ../throwing ../returning; do
+compile_worker() {
   (
-    cd "$dir"
+    cd "$1"
     "${g[@]}" -O1 -fno-worker-wrapper -fforce-recomp -i. -i../plugin -package ghc \
       -fplugin=PairReadbackProbe -fomit-interface-pragmas -fno-write-if-simplified-core \
       -Wno-inline-rule-shadowing -c Worker.hs
   )
+}
+for dir in ../throwing ../returning; do
+  compile_worker "$dir"
 done
 cd ../client
 cp ../throwing/Worker.hi .
@@ -75,4 +78,42 @@ HS
   sed 's/^module Proof /module Before /' Proof.hs >Before.hs
   cmp ../throwing/Worker.hi Worker.hi
   if [[ $dir == ../throwing ]]; then grep -Fqx 'Partial 8' out; else grep -Fqx "Whole 8 'x'" out; fi
+done
+
+# Keep the worker itself fixed and change the implementation of its callee.
+mkdir "$out"/{old-helper,new-helper,helper-worker,helper-client}
+cd "$out/old-helper"
+cat >Helper.hs <<'HS'
+module Helper (field) where
+import Numeric.Natural (Natural)
+{-# NOINLINE field #-}
+field :: Natural -> Char
+field n = errorWithoutStackTrace (show n)
+HS
+sed "s/errorWithoutStackTrace (show n)/if n == 7 then 'x' else 'y'/" Helper.hs >../new-helper/Helper.hs
+for dir in ../old-helper ../new-helper; do
+  (cd "$dir" && "${g[@]}" -O1 -fno-worker-wrapper -c Helper.hs)
+done
+cd ../helper-worker
+cp ../old-helper/Helper.hi .
+sed -e '/^import Numeric.Natural/a import qualified Helper' \
+    -e 's/errorWithoutStackTrace "unread"/Helper.field n/' ../throwing/Worker.hs >Worker.hs
+compile_worker .
+cd ../helper-client
+cp ../helper-worker/{Worker,Helper}.hi .
+cat >Main.hs <<'HS'
+module Main where
+import Control.Exception (ErrorCall, evaluate, try)
+import qualified Worker
+main :: IO ()
+main = do
+  field <- try (evaluate (snd (Worker.pair 7))) :: IO (Either ErrorCall Char)
+  print (fst (Worker.observe 7), either (const Nothing) Just field)
+HS
+"${g[@]}" -O0 -c Main.hs
+for dir in ../old-helper ../new-helper; do
+  "${g[@]}" Main.o ../helper-worker/Worker.o "$dir/Helper.o" -o run-observer
+  ./run-observer >out
+  cat out
+  if [[ $dir == ../old-helper ]]; then grep -Fqx '(True,Nothing)' out; else grep -Fqx "(True,Just 'x')" out; fi
 done

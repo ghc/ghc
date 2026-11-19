@@ -144,6 +144,13 @@ and [TH file dependencies](../../libraries/ghc-internal/src/GHC/Internal/TH/Mona
 
 ## What does an observation establish?
 
+The [pair readback experiment](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable)
+checks which fields an executable observer reports at input `7`. The
+number is `8` in both runs. One implementation throws when asked for
+the character. The other returns `'x'`. A `Refl` proof about either
+reported result applies to that observation. Establishing that a field
+can never return requires evidence about the worker and its dependencies.
+
 Running Haskell at compile time can establish equivalence for a specified
 finite set of observations. In the runnable example, the ordinary
 function `BoolObservation.sameResult` applies two functions to one input
