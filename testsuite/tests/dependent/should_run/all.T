@@ -208,3 +208,9 @@ test('NativeClosedMatchability',
       extra_files(['NativeClosedMatchabilityProvider.hs',
                    'NativeClosedMatchabilityClient.hs', 'NativeClosedMatchabilityConflict.hs'])],
      run_command, ['bash NativeClosedMatchability.sh "{compiler}" "{libdir}"'])
+
+test('NativeOpenMatchability',
+     [only_ways(['normal']),
+      extra_files(['../should_compile/T14038.hs',
+                   'NativeOpenMatchabilityClient.hs', 'NativeOpenMatchabilityConflict.hs'])],
+     run_command, ['bash NativeOpenMatchability.sh "{compiler}" "{libdir}"'])
