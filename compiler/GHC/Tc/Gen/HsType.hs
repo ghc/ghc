@@ -2385,10 +2385,10 @@ tc_app_ty mode rn_ty exp_kind
                                ; updTcRef pending (TcPendingTypeCall call_span fun checked result :)
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | ordinary_call
-                         , Just (instantiated, arity) <- instantiateOpenTypeFunction fun
-                         , arity == length args
-                         , all isTypeVariableArg args
-                         -> do { result <- tcOpenTypeCall mode name instantiated args
+                         , Just (instantiated, domains) <- instantiateOpenTypeFunction fun
+                         , equalLength domains args
+                         , all isOpenTypeOperand args
+                         -> do { result <- tcOpenTypeCall mode name instantiated (zip args domains)
                                ; checkExpKind mode rn_ty result liftedTypeKind exp_kind }
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
@@ -2418,7 +2418,7 @@ tc_app_ty mode rn_ty exp_kind
 
 -- | Check named rigid operands and record definitions used to reduce the call.
 -- See Note [Open source calls] in GHC.Tc.Gen.OpenTypeEval.
-tcOpenTypeCall :: TcTyMode -> Name -> Core.CoreExpr -> [LHsType GhcRn] -> TcM Type
+tcOpenTypeCall :: TcTyMode -> Name -> Core.CoreExpr -> [(LHsType GhcRn, Kind)] -> TcM Type
 tcOpenTypeCall mode name instantiated args = do
   when (mode_complete_type_arg mode == Just False) $
     reject "A visible type argument containing an open call must be complete. Replace its wildcards with types."
@@ -2428,8 +2428,8 @@ tcOpenTypeCall mode name instantiated args = do
   case level of
     Comp | not bootOrSig && not explicitLevels -> pure ()
     _ -> reject "This call requires an ordinary module outside quotes and splices, without ExplicitLevelImports."
-  skolems <- mapM checkOperand args
-  outcome <- observeOpenType instantiated skolems
+  operands <- mapM checkOperand args
+  outcome <- observeOpenType instantiated operands
   case outcome of
     Left reason -> let (definition, message) = openTypeFailureReason reason
                    in failWithTc (TcRnOpenTypeEval name definition message)
@@ -2438,15 +2438,19 @@ tcOpenTypeCall mode name instantiated args = do
       updTcRef (tcg_evaluated_term_uses env) (`unionNameSet` used)
       pure result
   where
-    checkOperand arg = do
-      checked <- tc_check_lhs_type mode arg liftedTypeKind
-      operand <- liftZonkM (zonkTcType checked)
-      case getTyVar_maybe operand of
-        Just skolem -> pure skolem
-        Nothing -> reject "Each argument must be a rigid type variable of kind Type."
+    checkOperand (arg, kind) = do
+      checked <- tc_check_lhs_type mode arg kind
+      liftZonkM (zonkTcType checked)
 
     reject :: String -> TcM a
     reject = failWithTc . TcRnOpenTypeEval name Nothing
+
+-- | Admit a rigid type variable or a promoted pair of rigid variables.
+isOpenTypeOperand :: LHsType GhcRn -> Bool
+isOpenTypeOperand arg
+  | L _ (HsExplicitTupleTy _ _ [x, y]) <- ignoreParens arg =
+      isTypeVariableArg x && isTypeVariableArg y
+  | otherwise = isTypeVariableArg arg
 
 -- | Let the open evaluator kind-check only named operands.
 isTypeVariableArg :: LHsType GhcRn -> Bool

@@ -7,8 +7,9 @@ import GHC (Ghc, InteractiveImport(..), TyThing(..), getSessionDynFlags, lookupN
             mkModuleName, parseName, runGhc, setContext, setSessionDynFlags,
             simpleImportDecl)
 import GHC.Builtin.WiredIn.Prim (charPrimTy)
-import GHC.Builtin.WiredIn.Types (boolTy, liftedTypeKind, manyDataConTy)
+import GHC.Builtin.WiredIn.Types (boolTy, liftedTypeKind, manyDataConTy, tupleDataCon)
 import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreExpr, Expr(..), maybeUnfoldingTemplate)
+import GHC.Core.Make (mkCoreBoxedTuple)
 import GHC.Core.OpenWhnf
 import GHC.Core.FVs (exprSomeFreeVarsList)
 import GHC.Core.Type (Type, mkTyVarTy, mkVisFunTyManyU, typeKind)
@@ -17,6 +18,7 @@ import GHC.Core.Utils (exprType)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Session (GeneralFlag(Opt_IgnoreInterfacePragmas), gopt_unset)
 import GHC.Tc.Utils.TcType (vanillaSkolemTvUnk)
+import GHC.Types.Basic (Boxity(Boxed))
 import GHC.Types.Id (Id, mkSysLocal, realIdUnfolding)
 import GHC.Types.Literal (mkLitChar)
 import GHC.Types.Name (mkSysTvName)
@@ -110,6 +112,41 @@ controls identity unfolding = do
     (isBlocked (Unsolved scrut) caseBinder rigid (openWhnf 32 available strictCase))
   expect "supplying the missing definition allows the case to reduce"
     (isRigid rigid strictCase (openWhnf 32 solved strictCase))
+  pairControls inputs rigid bottom
+
+-- | Keep a constructed pair lazy and retain a case on an unknown pair.
+pairControls :: OpenInputs -> Id -> CoreExpr -> IO ()
+pairControls inputs rigid bottom = do
+  let pair = mkCoreBoxedTuple [Var rigid, bottom]
+      pairTy = exprType pair
+      unknown = local "unknownPair" 10 pairTy
+      binder = local "pairCase" 11 pairTy
+      first = local "firstField" 12 boolTy
+      second = local "secondField" 13 boolTy
+      constructor = tupleDataCon Boxed 2
+      key = DataAlt constructor
+      project scrut = Case scrut binder boolTy [Alt key [first, second] (Var first)]
+      constructed = project pair
+      blocked = project (Var unknown)
+      pending = inputs {unsolved = unitVarSet unknown}
+      supplied = pending {definitions = extendVarEnv (definitions pending) unknown pair}
+      isPairCase expected result =
+        case result of
+          Right (Neutral (CaseBlocked headValue
+                           (CaseContinuation _ actual ty [Alt (DataAlt dc) [x,y] (Var rhs)]))) ->
+            expected headValue && actual == binder && eqType ty boolTy &&
+            dc == constructor && x == first && y == second && rhs == first
+          _ -> False
+  expect "boxed pair projection skips its divergent field"
+    (isRigid rigid constructed (openWhnf 32 inputs constructed))
+  expect "a rigid pair retains its constructor case"
+    (isPairCase (\headValue -> case headValue of Rigid v -> v == unknown; _ -> False)
+                (openWhnf 32 inputs blocked))
+  expect "an unsolved pair retains the same constructor case"
+    (isPairCase (\headValue -> case headValue of Unsolved v -> v == unknown; _ -> False)
+                (openWhnf 32 pending blocked))
+  expect "supplying the pair replays selection without demanding the unused field"
+    (isRigid rigid blocked (openWhnf 32 supplied blocked))
 
 -- | Collect checked interface templates reachable from the selected function.
 -- A template can refer to another exported Id, including an optimizer alias.

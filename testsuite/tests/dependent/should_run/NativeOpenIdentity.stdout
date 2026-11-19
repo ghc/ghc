@@ -3,5 +3,8 @@ unchanged one-shot recompilation reused the producer and consumer artifacts
 one-shot source calls select the expected type arguments
 home modules under --make select the expected type arguments
 both compilation modes report the demanded rigid argument at the strict call
+both compilation modes stop on the demanded rigid pair field
+both compilation modes stop on the demanded rigid pair
+changing the imported pair projection invalidates the consumer
 the unchanged consumer rejected the changed worker
 missing interface definition rejected at the source application

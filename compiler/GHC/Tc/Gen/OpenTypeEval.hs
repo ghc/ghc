@@ -8,13 +8,15 @@ module GHC.Tc.Gen.OpenTypeEval
 import GHC.Prelude
 
 import qualified Data.Set as Set
-import Control.Monad (foldM)
+import Control.Monad (foldM, guard)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT, throwE)
-import GHC.Builtin.WiredIn.Types (liftedTypeKind, manyDataConTy, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (liftedTypeKind, manyDataConTy, mkBoxedTupleTy,
+                                  promotedTupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreExpr, Expr(..))
-import GHC.Core.Type (Type, FunTyFlag(FTF_T_T), isManyTy, mkTyVarTy, mkVisFunTyManyU,
-                      splitForAllForAllTyBinders, splitFunTy_maybe)
+import GHC.Core.Make (mkCoreBoxedTuple)
+import GHC.Core.Type (Type, FunTyFlag(FTF_T_T), getTyVar_maybe, isManyTy, mkTyVarTy, mkVisFunTyManyU,
+                      splitForAllForAllTyBinders, splitFunTy_maybe, splitTyConApp_maybe)
 import GHC.Core.Utils (exprType)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Maybe (MaybeErr(..))
@@ -27,11 +29,12 @@ import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcR
                            liftIO, newTcRef, newUnique, readTcRef, tcg_imports,
                            tcg_semantic_mod, updTcRef)
 import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), tcEqType)
+import GHC.Types.Basic (Boxity(Boxed))
 import GHC.Types.Id (Id, idName, idType, mkSysLocal)
 import GHC.Types.Name (Name, getOccString, nameModule_maybe)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, extendNameSet)
 import GHC.Types.SourceFile (isHsBootOrSig)
-import GHC.Types.Var (ForAllTyFlag(Invisible), TyVar, VarBndr(..), isGlobalId, isTcTyVar, isTyVar,
+import GHC.Types.Var (ForAllTyFlag(Invisible), VarBndr(..), isGlobalId, isTcTyVar, isTyVar,
                       tcTyVarDetails, tyVarKind, varName)
 import GHC.Types.Var.Env (emptyVarEnv, extendVarEnv, lookupVarEnv)
 import GHC.Types.Var.Set (emptyVarSet)
@@ -54,13 +57,15 @@ data OpenTypeFailure
   | UnexpectedNeutral
 
 -- | Apply the instantiated function to symbolic operands of the checked kind.
-observeOpenType :: CoreExpr -> [TyVar] -> TcM (Either OpenTypeFailure (Type, NameSet))
-observeOpenType instantiated skolems
-  | all isRigidType skolems = runExceptT $ do
+observeOpenType :: CoreExpr -> [Type] -> TcM (Either OpenTypeFailure (Type, NameSet))
+observeOpenType instantiated operands
+  | Just args <- traverse checkedOperand operands = runExceptT $ do
       limit <- reductionDepth <$> lift getDynFlags
-      let expected = foldr (const (mkVisFunTyManyU liftedTypeKind)) liftedTypeKind skolems
-      (_, origins, application) <-
-        lift $ foldM applyOperand (emptyVarEnv, emptyVarEnv, instantiated) skolems
+      ((_, origins), revArgs) <- lift $
+        foldM buildArgument ((emptyVarEnv, emptyVarEnv), []) args
+      let coreArgs = reverse revArgs
+          expected = foldr (mkVisFunTyManyU . exprType) liftedTypeKind coreArgs
+          application = foldl App instantiated coreArgs
       if exprType instantiated `tcEqType` expected
          && exprType application `tcEqType` liftedTypeKind
         then do
@@ -93,20 +98,39 @@ observeOpenType instantiated skolems
             _ -> throwE UnexpectedNeutral
         else throwE InvalidInput
   where
-    isRigidType skolem
+    rigidAt kind skolem
       | isTcTyVar skolem
       , SkolemTv{} <- tcTyVarDetails skolem
-      = tyVarKind skolem `tcEqType` liftedTypeKind
+      = tyVarKind skolem `tcEqType` kind
       | otherwise = False
 
-    applyOperand (symbols, origins, application) skolem =
+    checkedOperand ty
+      | Just skolem <- getTyVar_maybe ty
+      , rigidAt liftedTypeKind skolem || rigidAt openPairKind skolem = Just (Left skolem)
+      | Just (tuple, [ka, kb, a, b]) <- splitTyConApp_maybe ty
+      , tuple == promotedTupleDataCon Boxed 2
+      , all (`tcEqType` liftedTypeKind) [ka, kb]
+      , Just x <- getTyVar_maybe a, rigidAt liftedTypeKind x
+      , Just y <- getTyVar_maybe b, rigidAt liftedTypeKind y
+      = Just (Right (x, y))
+      | otherwise = Nothing
+
+    buildArgument (state, args) (Left skolem) = do
+      (state', arg) <- symbolFor state skolem
+      pure (state', arg : args)
+    buildArgument (state, args) (Right (x, y)) = do
+      (state', first) <- symbolFor state x
+      (state'', second) <- symbolFor state' y
+      pure (state'', mkCoreBoxedTuple [first, second] : args)
+
+    symbolFor state@(symbols, origins) skolem =
       case lookupVarEnv symbols skolem of
-        Just symbol -> pure (symbols, origins, App application (Var symbol))
+        Just symbol -> pure (state, Var symbol)
         Nothing -> do
           unique <- newUnique
-          let symbol = mkSysLocal (fsLit "open-type-operand") unique manyDataConTy liftedTypeKind
-          pure (extendVarEnv symbols skolem symbol, extendVarEnv origins symbol skolem,
-                App application (Var symbol))
+          let symbol = mkSysLocal (fsLit "open-type-operand") unique manyDataConTy (tyVarKind skolem)
+          pure ((extendVarEnv symbols skolem symbol, extendVarEnv origins symbol skolem),
+                Var symbol)
 observeOpenType _ _ = pure (Left InvalidInput)
 
 -- | A demanded external definition was unavailable to the observer.
@@ -117,12 +141,17 @@ data DefinitionFailure
   | WrongTemplateType
   deriving (Eq, Show)
 
--- | Instantiate the checked type binders and count the remaining term arrows.
-instantiateOpenTypeFunction :: Id -> Maybe (CoreExpr, Int)
+-- | The kind of a pair whose fields are both types.
+openPairKind :: Type
+openPairKind = mkBoxedTupleTy [liftedTypeKind, liftedTypeKind]
+
+-- | Instantiate the type binders and recover the input kinds of the term arrows.
+instantiateOpenTypeFunction :: Id -> Maybe (CoreExpr, [Type])
 instantiateOpenTypeFunction function
   | not (null binders), all liftedUniversal binders
-  = do arity <- termArity 0 body
-       pure (foldl (\expr _ -> App expr (Type liftedTypeKind)) (Var function) binders, arity)
+  = do domains <- termDomains body
+       guard (not (null domains))
+       pure (foldl (\expr _ -> App expr (Type liftedTypeKind)) (Var function) binders, domains)
   | otherwise = Nothing
   where
     (binders, body) = splitForAllForAllTyBinders (idType function)
@@ -130,12 +159,17 @@ instantiateOpenTypeFunction function
       isTyVar v && tyVarKind v `tcEqType` liftedTypeKind
     liftedUniversal _ = False
     bound ty = any (\(_, Bndr v _) -> ty `tcEqType` mkTyVarTy v) binders
-    termArity arity ty
+    domainKind ty
+      | bound ty = Just liftedTypeKind
+      | Just (tuple, [a,b]) <- splitTyConApp_maybe ty
+      , tuple == tupleTyCon Boxed 2
+      , bound a, bound b = Just openPairKind
+      | otherwise = Nothing
+    termDomains ty
       | Just (FTF_T_T, matchability, multiplicity, domain, result) <- splitFunTy_maybe ty
       , matchability `tcEqType` unmatchableDataConTy
-      , isManyTy multiplicity
-      , bound domain = termArity (arity + 1) result
-      | arity > 0, bound ty = Just arity
+      , isManyTy multiplicity = (:) <$> domainKind domain <*> termDomains result
+      | bound ty = Just []
       | otherwise = Nothing
 
 -- | Read the checked expression for one demanded ordinary import.
@@ -199,7 +233,7 @@ openDefinitionIface hscEnv mod installed = do
 -- | Describe why a candidate cannot elaborate to a type.
 openTypeFailureReason :: OpenTypeFailure -> (Maybe Name, String)
 openTypeFailureReason InvalidInput =
-  (Nothing, "This call requires an imported function with lifted type parameters and rigid arguments of kind Type.")
+  (Nothing, "The arguments must be rigid variables or boxed pairs of rigid type variables at the declared input kinds.")
 openTypeFailureReason (UnavailableDefinition name failure) =
   (Just name, case failure of
     UnavailableModule -> "A referenced definition does not come from an ordinary imported module."
@@ -220,9 +254,12 @@ openTypeFailureReason UnexpectedNeutral =
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Serokell's open evaluator example applies a source function to a rigid
 type variable. GHC #27413 describes observation with unknowns. Start by
-observing an ordinary Core definition at the operands' common kind.
+observing an ordinary Core definition at its declared input kinds.
 Admit a lifted invisible forall telescope and ordinary saturated arrows.
-Every operand and the result must use one of those quantified variables.
+An input can use a quantified variable or a boxed pair of them. The
+result must use a quantified variable. Instantiate each parameter at Type.
+Construct a symbolic pair only when the source supplies a pair constructor.
+A variable of pair kind stays neutral. A projection on it must block.
 Use a fresh symbolic Id per distinct skolem in the observer only.
 Check the application's result kind and reify the returned Id by identity.
 The observer emits no residual Core expression or conversion proof.

@@ -12,15 +12,15 @@ import GHC.Prelude
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT, get, put)
-import GHC.Builtin.WiredIn.Types (charDataCon, unboxedUnitDataCon, unboxedUnitTy)
+import GHC.Builtin.WiredIn.Types (charDataCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy)
 import GHC.Core.DataCon (dataConWorkId)
-import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreAlt, CoreExpr, Expr(..))
+import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreAlt, CoreExpr, Expr(..), isTyCoArg)
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.Type (Type, isLiftedTypeKind, tyCoVarsOfType, typeKind)
-import GHC.Core.Utils (findAlt)
-import GHC.Types.Basic (IntWithInf, intGtLimit)
+import GHC.Core.Utils (exprType, findAlt)
+import GHC.Types.Basic (Boxity(Boxed), IntWithInf, intGtLimit)
 import GHC.Types.Literal (Literal(LitChar))
 import GHC.Types.Tickish (GenTickish(Breakpoint))
 import GHC.Types.Var (Var, isId, isTyVar, varType)
@@ -48,6 +48,7 @@ data Whnf
   = Lambda Var Suspension
   | Literal Literal
   | BoxedChar Char
+  | BoxedPair Suspension Suspension
   | Neutral Neutral
 
 -- | An unknown head and its suspended eliminations.
@@ -61,6 +62,7 @@ data Neutral
 -- The caller must supply typed Core. A step is not a Core coercion.
 data CaseStep
   = SelectBoxedChar Char AltCon
+  | SelectBoxedPair AltCon
   | SelectLiteral Literal AltCon
   | SelectLambdaDefault
   | ContinueWithUnit
@@ -103,6 +105,12 @@ evaluate limit obtain record unsolved (Suspension env expr) = do
           case payload of
             Literal (LitChar c) -> pure (BoxedChar c)
             _ -> lift (throwE UnsupportedCore)
+    App (App (App (App (Var worker) (Type a)) (Type b)) x) y
+      | worker == pairWorker
+      , not (isTyCoArg x), not (isTyCoArg y)
+      , isLiftedTypeKind (typeKind a), isLiftedTypeKind (typeKind b)
+      , exprType x `eqType` a, exprType y `eqType` b ->
+          pure (BoxedPair (Suspension env x) (Suspension env y))
     App fun arg -> do
       headValue <- recur (Suspension env fun)
       case headValue of
@@ -147,6 +155,12 @@ evaluate limit obtain record unsolved (Suspension env expr) = do
               lift (lift (record (SelectBoxedChar c DEFAULT)))
               recur (Suspension (extendVarEnv env binder suspended) body)
           | otherwise -> lift (throwE MissingAlternative)
+        BoxedPair first second
+          | Just (Alt key fields body) <- findAlt (DataAlt pairCon) alts
+          , Just fieldsEnv <- pairFields key fields first second -> do
+              lift (lift (record (SelectBoxedPair key)))
+              recur (Suspension (extendVarEnvList env ((binder, suspended) : fieldsEnv)) body)
+          | otherwise -> lift (throwE MissingAlternative)
         Literal lit
           | Just (Alt key [] body) <- findAlt (LitAlt lit) alts -> do
               lift (lift (record (SelectLiteral lit key)))
@@ -161,6 +175,15 @@ evaluate limit obtain record unsolved (Suspension env expr) = do
     _ -> lift (throwE UnsupportedCore)
   where
     recur = evaluate limit obtain record unsolved
+    pairCon = tupleDataCon Boxed 2
+    pairWorker = dataConWorkId pairCon
+    pairFields (DataAlt con) [x,y] first second
+      | con == pairCon, matches x first, matches y second =
+          Just [(x, first), (y, second)]
+    pairFields DEFAULT [] _ _ = Just []
+    pairFields _ _ _ _ = Nothing
+    matches field (Suspension _ body) =
+      liftedBinder field && varType field `eqType` exprType body
 
 -- | Only lifted term binders can enter the lazy environment.
 liftedBinder :: Var -> Bool
@@ -172,6 +195,12 @@ Save each operand with its lexical environment when forming an application.
 Extend the function's saved environment when entering its body. This keeps
 an ignored lifted operand lazy. Use Core's capture-avoiding substitution
 for type arguments.
+
+A saturated boxed pair is already in weak head normal form. Preserve both
+fields as independent suspensions. A pair alternative binds the fields
+without forcing either one. A neutral scrutinee still blocks case
+selection. See the ordinary fst and snd definitions in
+GHC.Internal.Data.Tuple.
 
 A case must inspect its scrutinee even when it has only a DEFAULT branch.
 If the scrutinee is neutral, retain the alternatives, the binder and their

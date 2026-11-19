@@ -31,6 +31,7 @@ grep -Fq 'OpenAlias.route' producer.iface
     grep -Eq '^[[:space:]]*worker [[:xdigit:]]{32}' usage.txt
     grep -Eq '^[[:space:]]*select [[:xdigit:]]{32}' usage.txt
     grep -Eq '^[[:space:]]*route [[:xdigit:]]{32}' usage.txt
+    grep -Eq '^[[:space:]]*pairFirst [[:xdigit:]]{32}' usage.txt
 )
 printf 'direct open calls and type binders checked, including alias usages\n'
 
@@ -94,6 +95,51 @@ expect_rigid_case() {
 (cd manager && expect_rigid_case --make -i. -no-link OpenStrict.hs)
 printf 'both compilation modes report the demanded rigid argument at the strict call\n'
 
+cat > negative/OpenStrictPair.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables #-}
+module OpenStrictPair where
+
+import qualified OpenProducer
+
+strict :: forall a b. a -> b -> OpenProducer.strictPairFirst '(a, b)
+strict x _ = x
+HS
+cp negative/OpenStrictPair.hs manager/
+expect_rigid_field() {
+    if "${ghc[@]}" "$@" > strict-pair.log 2>&1 ||
+       ! grep -Fxq 'OpenStrictPair.hs:6:33: error: [GHC-70566]' strict-pair.log ||
+       ! grep -Fq 'Reduction stopped at a case on the rigid argument b.' strict-pair.log; then
+        cat strict-pair.log >&2
+        exit 1
+    fi
+}
+(cd negative && expect_rigid_field -i../artifacts -c OpenStrictPair.hs)
+(cd manager && expect_rigid_field --make -i. -no-link OpenStrictPair.hs)
+printf 'both compilation modes stop on the demanded rigid pair field\n'
+
+cat > negative/OpenRigidPair.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, ScopedTypeVariables #-}
+module OpenRigidPair where
+
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+
+stuck :: forall (p :: (Type, Type)). Proxy p -> Proxy (Prelude.fst p)
+stuck _ = undefined
+HS
+cp negative/OpenRigidPair.hs manager/
+expect_rigid_pair() {
+    if "${ghc[@]}" "$@" > rigid-pair.log 2>&1 ||
+       ! grep -Fxq 'OpenRigidPair.hs:7:56: error: [GHC-70566]' rigid-pair.log ||
+       ! grep -Fq 'Reduction stopped at a case on the rigid argument p.' rigid-pair.log; then
+        cat rigid-pair.log >&2
+        exit 1
+    fi
+}
+(cd negative && expect_rigid_pair -i../artifacts -c OpenRigidPair.hs)
+(cd manager && expect_rigid_pair --make -i. -no-link OpenRigidPair.hs)
+printf 'both compilation modes stop on the demanded rigid pair\n'
+
 # The wrong branch must reach ordinary body checking after its signature.
 cat > negative/OpenWrongRoute.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
@@ -135,6 +181,27 @@ cp route-worker/OpenAlias.hi artifacts/
     fi
 )
 cp producer/OpenAlias.hi artifacts/
+
+# Change only the independent pair projection. The unchanged client should
+# stop at its body, after the imported signature checks using the new field.
+mkdir pair-worker pair-client
+cp -p consumer/OpenSource.{hs,hi,o} pair-client/
+(cd pair-client && expect_reuse -i../artifacts -c OpenSource.hs)
+sed 's/^pairFirst (x, _) = x$/pairFirst (_, y) = y/' "$src/OpenProducer.hs" >pair-worker/OpenProducer.hs
+(cd pair-worker && "${ghc[@]}" -i../artifacts -c OpenProducer.hs)
+cp pair-worker/OpenProducer.hi artifacts/
+(
+    cd pair-client
+    line=$(awk '/^workerFirst x/ { print NR }' OpenSource.hs)
+    if "${ghc[@]}" -i../artifacts -c OpenSource.hs >wrong-pair.log 2>&1 ||
+       ! grep -Eq "^OpenSource.hs:$line:[0-9]+(-[0-9]+)?: error: \\[GHC-25897\\]" wrong-pair.log ||
+       ! grep -Fq "Couldn't match" wrong-pair.log; then
+        cat wrong-pair.log >&2
+        exit 1
+    fi
+)
+cp producer/OpenProducer.hi artifacts/
+printf 'changing the imported pair projection invalidates the consumer\n'
 
 # Only the worker implementation changes. The consumer and direct alias
 # retain their original source and interface artifacts.

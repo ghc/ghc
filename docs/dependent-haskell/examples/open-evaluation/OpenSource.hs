@@ -1,9 +1,9 @@
-{-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
-module OpenSource (x, y, z, implicitlyBound, explicitlyBound, first, second, repeated, routedFirst, routedSecond) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, ScopedTypeVariables #-}
+module OpenSource (x, y, z, implicitlyBound, explicitlyBound, first, second, repeated, routedFirst, routedSecond, tupleFirst, tupleSecond, workerFirst, ignoresRigidPair) where
 
+import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import qualified OpenProducer
-
 -- | Use the upstream unqualified source syntax under an explicit forall.
 x :: forall a. Num a => id a
 x = 42
@@ -43,3 +43,19 @@ routedFirst x' _ = x'
 -- | Use the default branch to return the second rigid operand.
 routedSecond :: forall a b. a -> b -> OpenProducer.routeRight a b
 routedSecond _ y' = y'
+
+-- | Select the first field of a promoted pair of distinct rigid operands.
+tupleFirst :: forall a b. a -> b -> Prelude.fst '(a, b)
+tupleFirst x' _ = x'
+
+-- | Select the second field through the ordinary imported Prelude definition.
+tupleSecond :: forall a b. a -> b -> Prelude.snd '(a, b)
+tupleSecond _ y' = y'
+
+-- | Use an independent worker to check interface dependency on the projection.
+workerFirst :: forall a b. a -> b -> OpenProducer.pairFirst '(a, b)
+workerFirst x' _ = x'
+
+-- | A function that ignores a pair can return another rigid operand.
+ignoresRigidPair :: forall (p :: (Type, Type)) a. Proxy p -> a -> OpenProducer.ignorePair p a
+ignoresRigidPair _ x' = x'

@@ -9,3 +9,7 @@ passed neutral application retains a suspended operand
 passed rigid case preserves its strict scrutinee and alternatives
 passed unsolved case records a resumable unknown
 passed supplying the missing definition allows the case to reduce
+passed boxed pair projection skips its divergent field
+passed a rigid pair retains its constructor case
+passed an unsolved pair retains the same constructor case
+passed supplying the pair replays selection without demanding the unused field
