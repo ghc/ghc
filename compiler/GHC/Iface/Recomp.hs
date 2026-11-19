@@ -20,7 +20,8 @@ import GHC.Prelude
 import GHC.Data.FastString
 import GHC.Builtin.Modules (gHC_INTERNAL_ERR)
 import GHC.Builtin.WiredIn.Types
-  (boolTyConName, charTyConName, listTyConName, manyDataConName, naturalTyConName, pairTyCon)
+  (boolTyConName, charTyConName, listTyConName, manyDataConName, naturalTyConName, pairTyCon
+  , matchableDataConName, unmatchableDataConName)
 
 import GHC.Driver.Backend
 import GHC.Driver.Env
@@ -60,7 +61,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Types.Annotations
 import GHC.Types.Avail
 import GHC.Types.Basic ( ImportLevel(..), TupleSort(BoxedTuple) )
-import GHC.Types.Var (VarBndr(Bndr))
+import GHC.Types.Var (VarBndr(Bndr), ForAllTyFlag(Inferred))
 import GHC.Types.TyThing (TyThing(ATyCon))
 import GHC.Types.UnresolvedImport
 import GHC.Types.Name
@@ -567,13 +568,19 @@ checkFlagHash hsc_env iface self_recomp = do
                     callback_case_fp, enum_case_fp, final_mapper_fp]
         closed_matchability_fp = closedMatchabilityFingerprint base_fp
         open_matchability_fp = caseTreeFingerprint base_fp
-        new_fp = readbackRecipeFingerprint open_matchability_fp
+        old_readback_fp = readbackRecipeFingerprint open_matchability_fp
+        new_fp = familyKindMatchabilityFingerprint old_readback_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     if | old_fp == new_fp -> up_to_date logger (text "Module flags unchanged")
+       | old_fp `elem` (old_readback_fp : open_matchability_fp : closed_matchability_fp : archived)
+       , couldGeneralizeFamilyKindMatchability iface
+         -> recheck "Compiler now infers matchability in family kinds"
+       | old_fp == old_readback_fp
+         -> up_to_date logger (text "Module has no indexed family kind")
        | old_fp `elem` (closed_matchability_fp : archived), couldInferOpenMatchability iface
          -> recheck "Compiler now infers open-family matchability"
        | old_fp `elem` archived, couldInferClosedMatchability iface
@@ -696,18 +703,48 @@ couldExportReadbackRecipe iface =
     opaque IfaceAppTy{} = True
     opaque _ = False
 
+-- | Record that the compiler retains indexed metadata in family kinds.
+familyKindMatchabilityFingerprint :: Fingerprint -> Fingerprint
+familyKindMatchabilityFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "family-kind-matchability-v1" :: String)
+
+-- | An older declaration can have an omitted metadata argument fixed in
+-- a family kind. Its interface still identifies the inferred argument.
+couldGeneralizeFamilyKindMatchability :: ModIface -> Bool
+couldGeneralizeFamilyKindMatchability = any eligible . ifaceFamilyDecls
+  where
+    eligible IfaceFamily{ifBinders = bs, ifResKind = res, ifFamFlav = flav} =
+      case flav of
+        IfaceDataFamilyTyCon -> False
+        _ -> any indexed (res : [k | Bndr (IfaceTvBndr (_, k)) _ <- bs])
+    eligible _ = False
+
+    indexed (IfaceTyConApp _ (IA_Arg (IfaceTyConApp ma IA_Nil) (IfaceForAllTyFlag Inferred) _))
+      | ifaceTyConName ma `elem` [matchableDataConName, unmatchableDataConName] = True
+    indexed (IfaceTyConApp _ args) = any indexed (appArgsIfaceTypes args)
+    indexed (IfaceAppTy f args) = indexed f || any indexed (appArgsIfaceTypes args)
+    indexed (IfaceFunTy _ _ _ l r) = indexed l || indexed r
+    indexed (IfaceForAllTy _ (Bndr (IfaceTvBndr (_, k)) _) t) = indexed k || indexed t
+    indexed (IfaceTupleTy _ _ args) = any indexed (appArgsIfaceTypes args)
+    indexed (IfaceCastTy t _) = indexed t
+    indexed _ = False
+
+-- | Include associated families nested in class declarations.
+ifaceFamilyDecls :: ModIface -> [IfaceDecl]
+ifaceFamilyDecls = concatMap (familyDecls . snd) . mi_decls
+  where
+    familyDecls decl@IfaceFamily{} = [decl]
+    familyDecls IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
+      [decl | IfaceAT decl _ <- ats]
+    familyDecls _ = []
+
 -- | An old interface preserves the resolved heads of its declared family
 -- kinds. Include associated families because they are nested in IfaceClass.
 couldInferOpenMatchability :: ModIface -> Bool
 couldInferOpenMatchability iface =
     any candidate families
   where
-    families = concatMap (familyDecls . snd) (mi_decls iface)
-    familyDecls decl@IfaceFamily{} = [decl]
-    familyDecls IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
-      [decl | IfaceAT decl _ <- ats]
-    familyDecls _ = []
-
+    families = ifaceFamilyDecls iface
     heads = mkNameSet [head_name | IfaceFamily{ifBinders = bs, ifResKind = res} <- families
                                 , kind <- res : [k | Bndr (IfaceTvBndr (_, k)) _ <- bs]
                                 , IfaceTyConApp head_tc _ <- [kind]
@@ -1537,7 +1574,7 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
               else FingerprintWithValue flag_hash Nothing
 
       return (IfaceSelfRecomp
-                { mi_sr_flag_hash = include_detailed_flags (readbackRecipeFingerprint (caseTreeFingerprint flag_hash), flags)
+                { mi_sr_flag_hash = include_detailed_flags (familyKindMatchabilityFingerprint (readbackRecipeFingerprint (caseTreeFingerprint flag_hash)), flags)
                 , mi_sr_hpc_hash = hpc_hash
                 , mi_sr_opt_hash = opt_hash
                 , mi_sr_plugin_hash = plugin_hash

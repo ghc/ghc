@@ -38,7 +38,7 @@ module GHC.Tc.Gen.HsType (
         -- Type checking type and class decls, and instances thereof
         bindTyClTyVars, bindTyClTyVarsAndZonk,
         tcFamTyPats, tcInferredMatchabilityFamPats, matchabilityArrow, tcCheckMatchabilityArrow,
-        inferredMatchabilityIndex, tcCheckMatchabilitySynRhs, tcCheckSynonymMetadata,
+        inferredMatchabilityIndex, familyKindUsesMatchability, tcCheckMatchabilitySynRhs, tcCheckSynonymMetadata,
         maybeEtaExpandAlgTyCon, tcbVisibilities,
         etaExpandAlgTyCon,
 
@@ -60,7 +60,7 @@ module GHC.Tc.Gen.HsType (
         kindGeneralizeAll,
 
         -- Sort-checking kinds
-        tcLHsKindSig, checkDataKindSig, DataSort(..),
+        tcLHsKindSig, tcLHsFamilyResultKindSig, checkDataKindSig, DataSort(..),
         checkClassKindSig,
 
         -- Modifiers
@@ -1297,11 +1297,12 @@ tcFamTyPats = tcFamTyPatsX []
 
 -- | Give an inferred metadata binder a LHS argument before checking the RHS.
 tcInferredMatchabilityFamPats :: TyCon -> HsFamEqnPats GhcRn
-                               -> TcM (TcType, TcKind, TcType)
+                               -> TcM (TcType, TcKind, [TcType])
 tcInferredMatchabilityFamPats fam_tc hs_pats = do
-  ma <- newFlexiTyVarTy matchabilityTy
-  (lhs, result_kind) <- tcFamTyPatsX [ma] fam_tc hs_pats
-  pure (lhs, result_kind, ma)
+  let indices = takeWhile inferredMatchabilityIndex (tyConBinders fam_tc)
+  mas <- replicateM (length indices) (newFlexiTyVarTy matchabilityTy)
+  (lhs, result_kind) <- tcFamTyPatsX mas fam_tc hs_pats
+  pure (lhs, result_kind, mas)
 
 tcFamTyPatsX :: [TcType] -> TyCon -> HsFamEqnPats GhcRn -> TcM (TcType, TcKind)
 tcFamTyPatsX prefix fam_tc hs_pats
@@ -2266,6 +2267,12 @@ tc_fun_type mode = tc_fun_type_x (tc_check_lhs_type mode) (pure unmatchableDataC
 inferredMatchabilityIndex :: TyConBinder -> Bool
 inferredMatchabilityIndex b =
   isInferredTyConBinder b && tcEqType (tyVarKind (binderVar b)) matchabilityTy
+
+-- | A receiver can learn its index from a kind in its checked telescope.
+familyKindUsesMatchability :: TyCon -> TyConBinder -> Bool
+familyKindUsesMatchability tc b =
+  any (elemVarSet (binderVar b) . tyCoVarsOfType)
+      (tyConResKind tc : map (tyVarKind . binderVar) (tyConBinders tc))
 
 -- | Check a synonym RHS with controlled instantiation of metadata.
 tcCheckSynonymMetadata :: (Name -> Int -> TcM [Type])
@@ -3958,6 +3965,16 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
              args <- get_indices (tyConName tc)
                        (length (takeWhile inferredMatchabilityIndex (tyConBinders tc)))
              pure (mkTyConApp tc args)
+           (Nothing, TyConApp tc [])
+             | TypeLevel <- mode_tyki mode
+             , isTypeFamilyTyCon tc
+             , hasInferredMatchability tc
+             , b : _ <- tyConBinders tc
+             , familyKindUsesMatchability tc b -> do
+                 defaults <- tcl_kind_arrow_defaults <$> getLclEnv
+                 case defaults of
+                   Just owner -> mkTyConApp tc . (:[]) <$> fresh_kind_arrow owner
+                   Nothing -> pure fun
            _ -> pure fun
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args Nothing
        ; traceTc "tcInferTyApps }" (ppr f_args <+> dcolon <+> ppr res_k)
@@ -5128,7 +5145,9 @@ kcInferDeclHeader name flav
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
            -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
            <- bindImplicitTKBndrs_Q_Tv kv_ns              $
-              bindExplicitTKBndrs_Q_Tv ctxt_kind hs_bndrs $
+              bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+                                              , sm_tvtv = SMDTyVarTv, sm_kind = ctxt_kind
+                                              , sm_family_metadata = tcFlavourIsOpen flav }) hs_bndrs $
               newExpectedKind =<< kc_res_ki
               -- Why "_Tv" not "_Skol"? See third wrinkle in
               -- Note [Inferring kinds for type declarations] in GHC.Tc.TyCl,
@@ -6153,7 +6172,7 @@ bindExplicitTKBndrsX
     -> TcM ([VarBndr TyVar flag], a)  -- Returned [TcTyVar] are in 1-1 correspondence
                                       -- with the passed-in [LHsTyVarBndr]
 bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_kind
-                                   , sm_holes = hole_info })
+                                   , sm_holes = hole_info, sm_family_metadata = family_metadata })
                      hs_tvs thing_inside
   = do { traceTc "bindExplicitTKBndrs" (ppr hs_tvs)
        ; go hs_tvs }
@@ -6162,7 +6181,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
                          , mode_declaration = False
                          , mode_indices = emptyNameEnv
                          , mode_pending_calls = Nothing
-                         , mode_synonym_metadata = Nothing
+                         , mode_synonym_metadata = if family_metadata then familyKindMetadata else Nothing
                          , mode_complete_type_arg = Nothing }
                  -- Inherit the HoleInfo from the context
 
@@ -6310,6 +6329,7 @@ data SkolemMode
 
        , sm_kind   :: ContextKind  -- Use this for the kind of any new binders
 
+       , sm_family_metadata :: Bool
        , sm_holes  :: HoleInfo     -- What to do for wildcards in the kind
        }
 
@@ -6323,6 +6343,7 @@ smVanilla = SM { sm_clone  = panic "sm_clone"  -- We always override this
                , sm_parent = False
                , sm_tvtv   = pprPanic "sm_tvtv" callStackDoc -- We always override this
                , sm_kind   = AnyKind
+               , sm_family_metadata = False
                , sm_holes  = Nothing }
 
 {- Note [Cloning for type variable binders]
@@ -7427,6 +7448,15 @@ It does sort checking and desugaring at the same time, in one single pass.
 tcLHsKindSig :: UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
 tcLHsKindSig ctxt hs_kind
   = tc_lhs_kind_sig kindLevelMode ctxt hs_kind
+
+-- | A type-family result can depend on metadata chosen by each application.
+tcLHsFamilyResultKindSig :: UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
+tcLHsFamilyResultKindSig = tc_lhs_kind_sig
+  (kindLevelMode { mode_synonym_metadata = familyKindMetadata })
+
+-- | Give each checked kind application its own metadata variables.
+familyKindMetadata :: Maybe (Name -> Int -> TcM [Type])
+familyKindMetadata = Just (\_ n -> replicateM n (newFlexiTyVarTy matchabilityTy))
 
 tc_lhs_kind_sig :: TcTyMode -> UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
 tc_lhs_kind_sig mode ctxt hs_kind

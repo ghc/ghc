@@ -256,16 +256,10 @@ solveEqualitiesSelectingMetadata infer_arrows default_unresolved callsite thing_
                   ; (res, wanted) <- captureConstraints $
                       TcM.updLclEnv (setDefaults defaults) thing_inside
                   ; wanted <- runTcSEqualities (simplifyTopWanteds wanted)
-                  ; defaulted <- case defaults of
-                      Nothing -> return False
+                  ; wanted <- case defaults of
+                      Nothing -> return wanted
                       Just ref -> do { arrows <- TcM.readTcRef ref
-                                     ; if null arrows then return False else do
-                                         residual <- TcM.liftZonkM $
-                                           mapM TcM.zonkTcType (residualPredicates wanted)
-                                         or <$> mapM (defaultArrow owner residual) arrows }
-                  ; wanted <- if defaulted && not (isSolvedWC wanted)
-                                then runTcSEqualities (simplifyTopWanteds wanted)
-                                else return wanted
+                                     ; settleArrows owner arrows wanted }
                   ; return (wanted,res) }
        ; traceTc "pushLevelAndSolveEqualities }" (vcat [ text "Residual:" <+> ppr wanted
                                                        , text "Level:" <+> ppr tclvl ])
@@ -275,7 +269,23 @@ solveEqualitiesSelectingMetadata infer_arrows default_unresolved callsite thing_
     setDefaults Nothing env | Nothing <- tcl_kind_arrow_defaults env = env
     setDefaults defaults env = env { tcl_kind_arrow_defaults = defaults }
 
-    defaultArrow owner residual original = do
+    settleArrows _ [] wanted = return wanted
+    settleArrows owner arrows wanted = do
+      residual <- TcM.liftZonkM $ mapM TcM.zonkTcType (residualPredicates wanted)
+      chosen <- or <$> mapM (chooseArrow False owner residual) arrows
+      if chosen
+        then solveAgain wanted >>= settleArrows owner arrows
+        else if default_unresolved
+          then do
+            defaulted <- or <$> mapM (chooseArrow True owner []) arrows
+            if defaulted then solveAgain wanted else return wanted
+          else return wanted
+
+    solveAgain wanted
+      | isSolvedWC wanted = return wanted
+      | otherwise = runTcSEqualities (simplifyTopWanteds wanted)
+
+    chooseArrow fallback owner residual original = do
       current <- TcM.liftZonkM (TcM.zonkTcType (mkTyVarTy original))
       case getTyVar_maybe current of
         Just tv | isPromotableMetaTyVar tv, not (isTyVarTyVar tv)
@@ -285,7 +295,7 @@ solveEqualitiesSelectingMetadata infer_arrows default_unresolved callsite thing_
               wants_u = any (`tcEqType` unmatchableDataConTy) candidates
               choice | wants_m && not wants_u = Just matchableDataConTy
                      | wants_u && not wants_m = Just unmatchableDataConTy
-                     | default_unresolved = Just unmatchableDataConTy
+                     | fallback = Just unmatchableDataConTy
                      | otherwise = Nothing
           case choice of
             Just ma -> TcM.liftZonkM (TcM.writeMetaTyVar tv ma) >> return True
@@ -326,6 +336,10 @@ here. Nested complete checks replace the owner. Nested solveEqualities calls
 can float constraints to it. An application spine has neither the expected
 kind of its enclosing context nor the rest of the declaration's constraints.
 It must not default on its own.
+
+Repeat constrained choices before applying the fallback. One choice can
+make another residual comparison concrete. Each successful pass fills
+at least one metavariable owned by this check.
 
 A stuck wanted can still select an owned default. For K ?m b ~ K M b,
 choosing M makes the application reflexive when its other arguments

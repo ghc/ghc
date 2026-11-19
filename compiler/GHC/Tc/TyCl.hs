@@ -1295,7 +1295,8 @@ kcTyClGroup open_indices kisig_env decls
         ; generalized_tcs0 <- concatMapM (generaliseTyClDecl inferred_tc_env)
                                         kindless_decls
 
-        ; with_metadata <- traverse (inferArrowIndices metadata0 kindless_decls) generalized_tcs0
+        ; with_metadata <- traverse (inferArrowIndices metadata0 kindless_decls . prefixFamilyMetadata)
+                                    generalized_tcs0
         ; let (generalized_tcs, plans) = unzip with_metadata
               metadata = mkNameEnv [(tyConName tc, plan)
                                    | (tc, Just plan) <- zip generalized_tcs plans]
@@ -1405,6 +1406,17 @@ openFamiliesUsedAsKinds groups =
       HsAppKindTy _ f _ -> kindHead f
       HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) -> Just name
       _ -> Nothing
+
+-- | The inferred indices have closed kinds. Keep them ahead of the
+-- other inferred binders so equations can instantiate the checked prefix.
+prefixFamilyMetadata :: PolyTcTyCon -> PolyTcTyCon
+prefixFamilyMetadata tc
+  | OpenFamilyFlavour IAmType _ <- tyConFlavour tc
+  , (indices@(_:_), rest) <- partition inferredMatchabilityIndex (tyConBinders tc)
+  = let binders = indices ++ rest
+    in mkTcTyCon (tyConName tc) (mkTyConKindWithMatchability unmatchableDataConTy binders (tyConResKind tc))
+         binders 0 (tyConResKind tc) (tcTyConScopedTyVars tc) True (tyConFlavour tc)
+  | otherwise = tc
 
 -- | Install one inferred index when the local family will be used as a kind.
 inferOpenMatchability :: NameSet -> KindSigEnv -> PolyTcTyCon -> TcM PolyTcTyCon
@@ -2161,9 +2173,9 @@ get_fam_decl_initial_kind mb_parent_tycon
                , fdInfo      = info }
   = kcDeclHeader InitialKindInfer name flav ktvs $
     case resultSig of
-      KindSig _ ki                          -> TheKind <$> tcLHsKindSig ctxt ki
+      KindSig _ ki                          -> TheKind <$> tcLHsFamilyResultKindSig ctxt ki
       TyVarSig _ (L _ tvb) | HsTvb { tvb_kind = HsBndrKind _ ki } <- tvb
-                                            -> TheKind <$> tcLHsKindSig ctxt ki
+                                            -> TheKind <$> tcLHsFamilyResultKindSig ctxt ki
       _ -- open type families have * return kind by default
         | tcFlavourIsOpen flav              -> return (TheKind liftedTypeKind)
                -- closed type families have their return kind inferred
@@ -4028,8 +4040,10 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
                   bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
                   do { (lhs_ty, rhs_kind, index) <- case tyConBinders fam_tc of
                            b : _ | inferredMatchabilityIndex b -> do
-                             (lhs, kind, ma) <- tcInferredMatchabilityFamPats fam_tc hs_pats
-                             pure (lhs, kind, Just ma)
+                             (lhs, kind, mas) <- tcInferredMatchabilityFamPats fam_tc hs_pats
+                             let output = [ma | (bv, ma) <- zip (tyConBinders fam_tc) mas
+                                              , not (familyKindUsesMatchability fam_tc bv)]
+                             pure (lhs, kind, listToMaybe output)
                            _ -> do
                              (lhs, kind) <- tcFamTyPats fam_tc hs_pats
                              pure (lhs, kind, Nothing)
