@@ -166,9 +166,11 @@ General opaque proof projection stays open.
 
 ## Current work queue
 
-The shared build is checking R15 pair projections and R23 arrow
-matchability. R16's next boundary is using an equality supplied by
-an ordinary module when the client enables rewrite rules.
+Both native stages verified the R15 pair projections. Self-hosted
+GHCi can now print a kind with R23 arrow modifiers that checks when
+copied back into source. The shared compatibility run exposed two
+ordinary programs where a hidden matchability choice split the same
+source constraint. The next release check includes both programs.
 [R15](roadmap/R15-closed-term-evaluator.md) and
 [R16](roadmap/R16-open-term-evaluator.md) are separate subtasks of function promotion. The upstream graph has
 no dependency from one evaluator to the other. Work on them in parallel.
@@ -180,13 +182,13 @@ when some of its operands are unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Verify both projections and the compiler-upgrade path in the shared build. | The local branch reads either computed pair field without forcing an exceptional sibling. Isolated checks cover old object files and installed archives. [Readback design](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field). |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check a mapper equation when rewrite rules are enabled in the consumer. Account for rules on the mapper and the helpers its rewrites introduce. | [M173](roadmap/R16-open-term-evaluator.md#m173-check-the-installed-prelude-mapper-before-publishing-its-equations) proves the exact `Prelude.map Prelude.not` source example with rewriting disabled at the proof. |
+| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Extend scalar readback to more result shapes while preserving demand. | Both projections and the native object-upgrade check pass with the self-hosted compiler. The unselected exceptional sibling stays lazy. [Readback design](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field). |
+| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check which mapper equations remain valid when the consumer enables rewrite rules. | An optimized client infers the index from an [imported witness](examples/boundary-evidence/UseMapWitness.hs), including inside `Maybe` and lists. Constructing a fresh `Refl` still needs the mapper's equation. |
 | [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Check a family equation whose local producer needs a local datatype. Preserve real cycles through constructor fields. | The [mixed declaration example](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations) checks ordinary constructor prerequisites and a scoped expression signature. Families in producer signatures and more general declaration groups remain open. |
-| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Extend the source example to several binders, nested lambdas and additional type contexts. | M174 checks the unannotated `Map` example, kind-dependent capture, and ordinary interface clients. The first source form is a parenthesized lambda in a top-level synonym. The card depends on R05 and R16. |
+| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Support more type contexts and compose lambdas with local lets and cases. | M174 checks the unannotated `Map` example. An ordinary interface-only client now partially applies a two-argument lambda and distinguishes shadowed kind binders across nested lambdas. |
 | [R18, type-level lets](roadmap/R18-type-level-lets.md) | Verify `type F a = let b = G a in H b b` with the shared compiler. | An independent bootstrap checks the RHS once per checking pass and rejects an unused ill-kinded RHS. A client of an installed package reduces the exported synonym with only its interfaces. |
 | [R19, type-level cases](https://ghc.serokell.io/dh#type-level-case-expressions) | Integrate constructor alternatives and preserve the scope of a surrounding type-level `let`. | A private compiler reduces the selected branch from an interface. A case on an unknown scrutinee stays stuck. A separate experiment preserves `let k = Bool` inside branches for a closed RHS of monomorphic kind. RHSs that capture local variables still need lexical branch checking. |
-| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Verify `%U` and `%M` in the shared compiler. Restore `T13910` while preserving existing callback signatures. | The local branch restores unchanged `T14749`, `T14038`, `T13938a` and `T20875` in isolated checks. The R17 example accepts `(a %U -> b)` and rejects a matchable callback. [Arrow proposals and example](REFERENCES.md#matchability-and-multiplicity-on-arrows). |
+| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Preserve the `SDecide (Rep k)` constraint in `T14720` and `T15346` across family declarations. | The self-hosted compiler restores unchanged `T14749`, `T14038`, the first module `T13938a`, and `T20875`. Ordinary data declarations using a function-arrow synonym still fail in `T13910` and the second module of `T13938`. [Arrow proposals and example](REFERENCES.md#matchability-and-multiplicity-on-arrows). |
 
 The previous source controls now pass for a private parcel with an
 exceptional second field, a constructor containing two unknown types,
