@@ -161,3 +161,9 @@ test('NativeClosedCallback',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedCallbackLib.hs'])],
      run_command, ['bash NativeClosedCallback.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
+
+test('NativeUnsaturatedFamily',
+     [only_ways(['normal']),
+      extra_files(['NativeUnsaturatedProvider.hs', 'NativeUnsaturatedClient.hs',
+                   'NativeUnsaturatedInverse.hs', 'NativeUnsaturatedEta.hs'])],
+     run_command, ['bash NativeUnsaturatedFamily.sh "{compiler}" "{libdir}"'])

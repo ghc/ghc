@@ -1231,6 +1231,9 @@ reduceTyFamApp_maybe :: FamInstEnvs
 -- Always returns a *homogeneous* coercion -- type family reductions are always
 -- homogeneous
 reduceTyFamApp_maybe envs role tc tys
+  | isTypeFamilyTyCon tc, tys `lengthLessThan` tyConArity tc
+  = Nothing
+
   | Phantom <- role
   = Nothing
 
@@ -1488,7 +1491,7 @@ normaliseTcApp env role tc tys
 normalise_tc_app :: TyCon -> [Type] -> NormM Reduction
 normalise_tc_app tc tys
   | ExpandsSyn tenv rhs tys' <- expandSynTyCon_maybe tc tys
-  , not (isFamFreeTyCon tc)  -- Expand and try again
+  , synAppCanReduce tc tys
   = -- A synonym with type families in the RHS
     -- Expand and try again
     -- See Note [Normalisation and type synonyms]

@@ -832,7 +832,7 @@ rewrite_one (AppTy ty1 ty2)
 
 rewrite_one (TyConApp tc tys)
   -- If it's a type family application, try to reduce it
-  | isTypeFamilyTyCon tc
+  | isTypeFamilyTyCon tc, tys `lengthAtLeast` tyConArity tc
   = rewrite_fam_app tc tys
 
   | otherwise -- We just recursively rewrite the arguments.
@@ -968,7 +968,14 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
                 ; return $ mkHetReduction (mkAppRedns fun_redn redns) kind_co }
 
        ; role <- getRole
-       ; return (homogeniseHetRedn role het_redn) }
+       ; let redn = homogeniseHetRedn role het_redn
+       ; case tcSplitTyConApp_maybe fun_xi of
+           Just (tc, prefix)
+             | isTypeFamilyTyCon tc
+             , let missing = tyConArity tc - length prefix
+             , missing > 0, arg_tys `lengthAtLeast` missing ->
+                 rewrite_reduction redn
+           _ -> return redn }
 
 rewrite_ty_con_app :: TyCon -> [TcType] -> RewriteM Reduction
 rewrite_ty_con_app tc tys
@@ -1032,6 +1039,14 @@ we err on the side of more expansion.
 
 We also, of course, must expand type synonyms that mention type families,
 so those families can get reduced.
+
+Consider Consume f = f True. Substituting an unsaturated family for f
+can expose a redex. Include an application at a possibly unmatchable
+arrow when computing the family-free summary of a synonym RHS. This
+also covers an equality that fixes f after checking the synonym.
+For Id f = f the application can come entirely from oversaturation:
+Id Flip True must reduce Flip True. Inspect the extra arguments in
+synAppCanReduce. Use the same condition for pure type normalisation.
 
 ************************************************************************
 *                                                                      *
@@ -1316,6 +1331,7 @@ splitTyFamApp_maybe ty
   = splitTyFamApp_maybe ty'
   | TyConApp tc tys <- ty
   , isTypeFamilyTyCon tc
+  , tys `lengthAtLeast` tyConArity tc
   = Just $! case splitFamAppArgs tc tys of
       (_   , [])       -> (ty                , tc, tys , [])
       (tys1, tys_rest) -> (mkTyConApp tc tys1, tc, tys1, tys_rest)

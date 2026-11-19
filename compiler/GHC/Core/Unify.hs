@@ -1878,6 +1878,16 @@ unify_ty env ty1 ty2 kco
   , Just (tc,tys) <- mb_sat_fam_app2
   = uVarOrFam (umSwapRn env) (TyFamLHS tc tys) ty1 (mkSymCo kco)
 
+  -- A partial family is opaque. In particular, the absence of an
+  -- AppTy split does not establish apartness of two partial applications.
+  | Just (tc, args) <- mb_tc_app1
+  , isTypeFamilyTyCon tc, args `lengthLessThan` tyConArity tc
+  = unify_opaque_app env ty1 ty2
+
+  | Just (tc, args) <- mb_tc_app2
+  , isTypeFamilyTyCon tc, args `lengthLessThan` tyConArity tc
+  = unify_opaque_app env ty1 ty2
+
   -- Handle oversaturated type families. Suppose we have
   --     (F a b) ~ (c d)    where F has arity 1
   -- We definitely want to decompose that type application! (#22647)
@@ -2248,6 +2258,7 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go_tc bvs tc tys
       | isEmptyVarSet bvs   -- Never look up in um_fam_env under a forall (ATF3)
       , isTypeFamilyTyCon tc
+      , tys `lengthAtLeast` arity
       , Just ty' <- lookupFamEnv fam_env tc (take arity tys)
              -- NB: we look up /un-substituted/ types;
              -- See Note [Shortcomings of the apartness test]

@@ -2279,6 +2279,7 @@ lintTySynFamApp :: Bool -> Type -> TyCon -> [Type] -> LintM ()
 lintTySynFamApp report_unsat ty tc tys
   | report_unsat   -- Report unsaturated only if report_unsat is on
   , tys `lengthLessThan` tyConArity tc
+  , not (isUnsaturatedUserFamily tc tys)
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
 
   -- Deal with type synonyms
@@ -2639,8 +2640,13 @@ lintCoercion co@(TyConAppCo r tc cos)
   = do { checkTyCon tc
        ; mapM_ lintCoercion cos
        ; let tc_kind = tyConKind tc
-       ; lint_co_app co tc_kind (map coercionLKind cos)
-       ; lint_co_app co tc_kind (map coercionRKind cos)
+             lhs = map coercionLKind cos
+             rhs = map coercionRKind cos
+       ; when (isTypeFamilyTyCon tc && cos `lengthLessThan` tyConArity tc) $
+           lintL (isUnsaturatedUserFamily tc lhs && isUnsaturatedUserFamily tc rhs)
+                 (text "Invalid partial type family in a coercion:" <+> ppr co)
+       ; lint_co_app co tc_kind lhs
+       ; lint_co_app co tc_kind rhs
        ; zipWithM_ (lintRole co) (tyConRoleListX r tc) (map coercionRole cos) }
 
 

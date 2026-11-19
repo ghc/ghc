@@ -118,7 +118,7 @@ module GHC.Core.Type (
         isCoercionTy_maybe, isForAllTy,
         isForAllTy_ty, isForAllTy_co,
         isForAllTy_invis_ty,
-        isPiTy, isTauTy, isFamFreeTy,
+        isPiTy, isTauTy, isFamFreeTy, isUnsaturatedUserFamily,
         isAtomicTy,
 
         isValidJoinPointType,
@@ -185,7 +185,7 @@ module GHC.Core.Type (
         seqType, seqTypes, seqCo, seqCos, seqMCo,
 
         -- * Other views onto Types
-        coreView, coreFullView, rewriterView,
+        coreView, coreFullView, rewriterView, synAppCanReduce,
 
         tyConsOfType,
 
@@ -266,7 +266,7 @@ import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    , manyDataConTy, oneDataConTy, matchableDataConTy, unmatchableDataConTy
    , liftedRepTy )
 
-import GHC.Types.Name( Name, hasKnownKey )
+import GHC.Types.Name( Name, hasKnownKey, nameOccName, sourceTableTermOcc )
 import GHC.Builtin.KnownKeys
 
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
@@ -357,10 +357,22 @@ rewriterView :: Type -> Maybe Type
 {-# INLINE rewriterView #-}
 rewriterView (TyConApp tc tys)
   | isTypeSynonymTyCon tc
-  , isForgetfulSynTyCon tc || not (isFamFreeTyCon tc)
+  , isForgetfulSynTyCon tc || synAppCanReduce tc tys
   = expandSynTyConApp_maybe tc tys
 rewriterView _other
   = Nothing
+
+-- | Can expanding a type synonym expose a saturated type family?
+-- See Note [Rewriting synonyms] in GHC.Tc.Solver.Rewrite.
+synAppCanReduce :: TyCon -> [Type] -> Bool
+synAppCanReduce tc args =
+  not (isFamFreeTyCon tc) || case splitAt (tyConArity tc) args of
+    (_, []) -> False
+    (prefix, extra) -> appliesFamily (piResultTys (tyConKind tc) prefix) extra
+  where
+    appliesFamily _ [] = False
+    appliesFamily kind (arg : rest) =
+      not (isMatchableFunTy kind) || appliesFamily (piResultTy kind arg) rest
 
 coreView :: Type -> Maybe Type
 -- ^ This function strips off the /top layer only/ of a type synonym
@@ -1891,6 +1903,25 @@ coAxNthLHS :: CoAxiom br -> Int -> Type
 coAxNthLHS ax ind =
   mkTyConApp (coAxiomTyCon ax) (coAxBranchLHS (coAxiomNthBranch ax ind))
 
+-- | A partial user family retains only known unmatchable visible binders.
+-- Check the instantiated kind, not merely the TyCon's declared telescope.
+isUnsaturatedUserFamily :: TyCon -> [Type] -> Bool
+isUnsaturatedUserFamily tc args
+  | isTypeFamilyTyCon tc
+  , Nothing <- builtInClosedTyFamTyCon_maybe tc
+  , Nothing <- sourceTableTermOcc (nameOccName (tyConName tc))
+  , let missing = tyConArity tc - length args
+  , missing > 0 =
+      unmatchable missing (piResultTys (tyConKind tc) args)
+  | otherwise = False
+  where
+    unmatchable 0 _ = True
+    unmatchable n kind
+      | FunTy{ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult, ft_res = result} <- coreFullView kind
+      , isManyTy mult, ma `eqType` unmatchableDataConTy =
+          unmatchable (n - 1) result
+      | otherwise = False
+
 isFamFreeTy :: Type -> Bool
 isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
@@ -1899,7 +1930,7 @@ isFamFreeTy (TermVarTy _)     = True
 isFamFreeTy (DepFunTy _ b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
-isFamFreeTy (AppTy a b)       = isFamFreeTy a && isFamFreeTy b
+isFamFreeTy (AppTy a b)       = isMatchableFunTy (typeKind a) && isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (FunTy _ ma w a b) = isFamFreeTy ma && isFamFreeTy w && isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (ForAllTy ma _ ty)  = isFamFreeTy ma && isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
@@ -1916,7 +1947,7 @@ isSatTyFamApp :: Type -> Maybe (TyCon, [Type])
 -- Why saturated?  See (ATF4) in Note [Apartness and type families]
 isSatTyFamApp (TyConApp tc tys)
   |  isTypeFamilyTyCon tc
-  && not (tys `lengthExceeds` tyConArity tc)  -- Not over-saturated
+  && tys `lengthIs` tyConArity tc
   = Just (tc, tys)
 isSatTyFamApp _ = Nothing
 

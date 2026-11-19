@@ -101,6 +101,29 @@ hadrian/build --flavour=default --test-compiler=stage2 --test-speed=normal \
     --test-way=normal --test-root-dirs=testsuite/tests/dependent test
 ```
 
+### M166. Passing an unsaturated family to an unmatchable binder
+
+With `ExperimentalDependentTypes`, a user type family may omit a suffix
+of visible arguments whose arrows are known to be unrestricted and
+unmatchable. The type checker and Core Lint preserve this prefix.
+Reduction starts when the application reaches the family arity.
+The solver provides forward congruence and does not infer argument
+equalities from equality of applications at an unmatchable arrow.
+
+The bootstrap checks pass for implicit kind arguments, a partial prefix
+saturated after rewriting by a Given, and an ordinary consumer of an
+exported parameterized type synonym. Changing the open family equation
+invalidates the consumer's proof. Liberal type synonym expansion can
+still saturate a partial argument, and eta-reduced data-family newtype
+axioms retain their representational behavior. `NativeUnsaturatedFamily`
+covers separate compilation, invalidation, a stuck comparison of
+distinct prefixes, and rejection of inverse decomposition.
+
+Omitted invisible binders and generated source-certificate families
+remain outside this checkpoint. A reducing use of a generated family
+must still establish its source owner and record its rewrite-rule and
+interface dependencies.
+
 ## Goal and dependencies
 
 Allow direct higher-order use of type families under explicit matchability,

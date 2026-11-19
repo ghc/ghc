@@ -70,7 +70,7 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( Id, VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName
-                        , isId, isCoVar )
+                        , isId, isCoVar, varType )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
@@ -475,7 +475,7 @@ checkValidType ctxt ty
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                              , ve_rank = rank, ve_expand = expand
-                             , ve_indices = emptyVarSet }
+                             , ve_indices = emptyVarSet, ve_imported_synonym = False }
 
        -- Check the internal validity of the type itself
        -- Fail if bad things happen, else we misleading
@@ -502,7 +502,7 @@ checkValidMonoType ty
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
                              , ve_rank = MustBeMonoType, ve_expand = expand
-                             , ve_indices = emptyVarSet }
+                             , ve_indices = emptyVarSet, ve_imported_synonym = False }
        ; check_type ve ty }
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
@@ -795,7 +795,8 @@ data ValidityEnv = ValidityEnv
   , ve_ctxt     :: UserTypeCtxt
   , ve_rank     :: Rank
   , ve_expand   :: ExpandMode
-  , ve_indices  :: VarSet }
+  , ve_indices  :: VarSet
+  , ve_imported_synonym :: Bool }
 
 instance Outputable ValidityEnv where
   ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
@@ -1016,10 +1017,18 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
                            -- See Note [Unsaturated type synonyms in GHCi]
   = check_args_only expand
 
+  | isUnsaturatedUserFamily tc tys
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; if enabled || ve_imported_synonym ve || is_inferred ctxt
+           then check_args_only expand
+           else failWithTc (tyConArityErr tc tys) }
+
   | otherwise
   = failWithTc (tyConArityErr tc tys)
   where
     tc_arity  = tyConArity tc
+    is_inferred InfSigCtxt{} = True
+    is_inferred _ = False
 
     check_arg :: ExpandMode -> KindOrType -> TcM ()
     check_arg expand =
@@ -1032,8 +1041,47 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
       = assertPpr (isTypeSynonymTyCon tc) (ppr tc) $
         case coreView ty of
          Just ty' -> addErrCtxt (TySynErrCtxt tc) $
-                     check_type (ve{ve_expand = expand}) ty'
+           if ve_imported_synonym ve || isFamFreeTyCon tc
+             then check_type (ve { ve_expand = expand }) ty'
+             else check_imported_rhs expand ty'
          Nothing  -> pprPanic "check_syn_tc_app" (ppr ty)
+
+    check_imported_rhs expand ty' = do
+           mod <- tcg_semantic_mod <$> getGblEnv
+           -- Copy a validated exported RHS. Do not grant its permission to
+           -- an unvalidated partial family supplied through a parameter.
+           let imported = not (nameIsLocalOrFrom mod (tyConName tc)) &&
+                          maybe False hasWrittenPartialFamily (synTyConRhs_maybe tc) &&
+                          not (any hasWrittenPartialFamily tys)
+           check_type (ve { ve_expand = expand
+                          , ve_imported_synonym = imported }) ty'
+
+-- | Find a raw partial family without substituting or expanding synonyms.
+-- See Note [Imported partial family aliases].
+hasWrittenPartialFamily :: Type -> Bool
+hasWrittenPartialFamily = go
+  where
+    go (TyConApp tc tys) = isUnsaturatedUserFamily tc tys || any go tys
+    go (AppTy f a) = go f || go a
+    go (FunTy _ ma mult a b) = any go [ma, mult, a, b]
+    go (ForAllTy ma (Bndr v _) ty) = go ma || go (varType v) || go ty
+    go (DepFunTy _ v ty) = go (varType v) || go ty
+    go (TermAppTy _ arg) = go arg
+    go (CastTy ty _) = go ty
+    go _ = False
+
+{- Note [Imported partial family aliases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary module may use a validated imported type synonym whose
+RHS contains a partial family. This permission comes from the raw
+definition. Do not let a written partial family in a caller's type
+argument inherit it. Preserve LiberalTypeSynonyms expansion for
+ordinary synonyms that do not introduce this feature: an argument
+can become saturated after ordinary expansion. Combining a written
+partial family with a new imported partial-family RHS still requires
+the extension. An ordinary local re-export can refer to the imported
+synonym and leaves its source permission at that definition.
+-}
 
 {-
 Note [Unsaturated type synonyms in GHCi]
@@ -1397,7 +1445,8 @@ check_pred_ty indices env dflags ctxt expand pred
                     , ve_ctxt     = SigmaCtxt
                     , ve_rank     = rank
                     , ve_expand   = expand
-                    , ve_indices  = indices }
+                    , ve_indices  = indices
+                    , ve_imported_synonym = False }
 
 check_pred_help :: Bool    -- True <=> under a type synonym
                 -> TidyEnv
