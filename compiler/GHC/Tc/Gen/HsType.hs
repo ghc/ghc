@@ -2581,7 +2581,7 @@ tc_app_ty mode rn_ty exp_kind
            then case (lookupNameEnv (tcg_local_open_defs env) name, value_args) of
              (Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
-               , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction fun
+               , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction True fun
                , equalLength domains args, all is_local_open_operand args
                -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
                      ; checkExpKind mode rn_ty result result_kind exp_kind }
@@ -2628,7 +2628,7 @@ tc_app_ty mode rn_ty exp_kind
                                ; updTcRef pending (TcPendingTypeCall call_span fun checked result :)
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | ordinary_call
-                         , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction fun
+                         , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction False fun
                          , equalLength domains args
                          , all isOpenTypeOperand args
                          -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)

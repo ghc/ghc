@@ -5830,6 +5830,17 @@ The extra dependency on an imported type family comes from Haskell's
 open family instances. [Agda interleaved mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
 and [mixed Haskell declarations](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations).
 
+An imported family equation can use a local function whose signature
+mentions another, closed family. R21 follows the renamer's declaration
+dependencies first. The local evaluator then uses GHC's nominal
+closed-family reduction to adapt the function type. In
+`direct :: DirectInput a -> a`, the equation `DirectInput a = a`
+supplies that coercion. The observable example requires one reduction at
+an argument. A matching GHC term rewrite rule still blocks the observation.
+[GHC closed type families](../users_guide/exts/type_families.rst),
+[Agda interleaved declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
+and [ordinary client and negative controls](../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
 Agda's `subst` example infers the two implicit indices from the supplied
 equality and the indexed value. Agda's `rewrite` eliminates the equality
 by matching on `refl`. The R16 client similarly infers the public index

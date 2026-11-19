@@ -72,6 +72,7 @@ import qualified LocalOpen
 import qualified LocalInstance
 import qualified LocalAssociated
 import qualified IndependentFamily
+import qualified FamilySignature
 import qualified ImportedFamily
 import qualified MixedFamily
 import qualified InterpretedKind
@@ -979,6 +980,8 @@ main = do
         (ImportedFamily.importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
     observe "check a local datatype before an imported family equation"
         (case MixedFamily.mixedResult of MixedFamily.Stored flag -> flag)
+    observe "use a closed family in a helper and in the called function's signature"
+        (FamilySignature.observed, FamilySignature.directObserved)
     observe "select the second element through a private case"
         (Refl :: Spine.secondOrFirst ('Spine.More 'x' ('Spine.More 'y' 'Spine.Empty)) :~: 'Just 'y')
     observe "rebuild one spine cell while its tail remains unknown"

@@ -15,13 +15,15 @@ import Control.Monad.Trans.Except (runExceptT, throwE)
 import GHC.Builtin.WiredIn.Types (liftedTypeKind, manyDataConTy, mkBoxedTupleTy,
                                   promotedTupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreExpr, Expr(..))
+import GHC.Core.Coercion (mkSubCo)
+import GHC.Core.Reduction (Reduction(..))
 import GHC.Core.DataCon (DataCon, dataConName, dataConTyCon, dataConWorkId)
 import GHC.Core.TyCon (isBoxedDataTyCon, isPromotedDataCon_maybe, isTupleTyCon, tyConName)
 import GHC.Core.Make (mkCoreBoxedTuple)
 import GHC.Core.Type (Kind, Type, FunTyFlag(FTF_T_T), getTyVar_maybe, isLiftedTypeKind, isManyTy,
                       mkTyConApp, mkTyVarTy, mkVisFunTyManyU, splitForAllForAllTyBinders,
                       splitFunTy_maybe, splitTyConApp_maybe, typeKind)
-import GHC.Core.Utils (exprType)
+import GHC.Core.Utils (exprType, mkCast)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Maybe (MaybeErr(..))
 import GHC.Driver.DynFlags (HasDynFlags(getDynFlags), ghcMode, isOneShot, reductionDepth)
@@ -127,7 +129,7 @@ observeOpenType local_call instantiated result_kind operands
               visible con = pure $ case constructorGRE con of
                 Just gre -> isLocalGRE gre || any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
                 Nothing -> False
-          outcome <- openReadbackM limit obtain local origin visible result_kind application
+          outcome <- openReadbackM local_call limit obtain local origin visible result_kind application
           case outcome of
             Left (ReadbackEvaluation failure) -> throwE (CannotReduce failure)
             Left (ReadbackHidden con) -> throwE (HiddenConstructor (tyConName (dataConTyCon con)))
@@ -234,13 +236,20 @@ openPairKind :: Type
 openPairKind = mkBoxedTupleTy [liftedTypeKind, liftedTypeKind]
 
 -- | Instantiate the type binders and recover the checked input and result kinds.
-instantiateOpenTypeFunction :: Id -> Maybe (CoreExpr, [Kind], Kind)
-instantiateOpenTypeFunction function
+instantiateOpenTypeFunction :: Bool -> Id -> Maybe (CoreExpr, [Kind], Kind)
+instantiateOpenTypeFunction local_families function
   | not (null binders), all liftedUniversal binders
-  = do (domains, result) <- termKinds body
+  = do let instantiated = foldl (\expr _ -> App expr (Type liftedTypeKind)) (Var function) binders
+       (checked, (domains, result)) <- case termKinds body of
+         Just kinds -> Just (instantiated, kinds)
+         Nothing | local_families -> do
+           let Reduction _ reduced = openFamilyReduction body
+           kinds <- termKinds reduced
+           let Reduction co _ = openFamilyReduction (exprType instantiated)
+           pure (mkCast instantiated (mkSubCo co), kinds)
+         _ -> Nothing
        guard (not (null domains))
-       let instantiated = foldl (\expr _ -> App expr (Type liftedTypeKind)) (Var function) binders
-       pure (instantiated, domains, result)
+       pure (checked, domains, result)
   | otherwise = Nothing
   where
     (binders, body) = splitForAllForAllTyBinders (idType function)

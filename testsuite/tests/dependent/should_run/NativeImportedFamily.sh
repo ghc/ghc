@@ -24,11 +24,11 @@ cat >Client.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
 import ImportedFamily (importedFamilyResults)
-import FamilySignature (observed)
+import FamilySignature (observed, directObserved)
 import MixedFamily (Stored(..), mixedResult)
 main :: IO ()
 main = case mixedResult of
-    Stored True | observed -> print (importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
+    Stored True | observed && directObserved -> print (importedFamilyResults :: (Bool, Ordering, Char, Maybe Bool, Ordering))
     Stored True -> fail "expected a True payload from the signed producer"
     Stored False -> fail "expected a True payload"
 HS
@@ -84,10 +84,43 @@ sed -e 's/MixedFamily/TransitiveFieldCycle/g' \
 expect_cycle TransitiveFieldCycle
 
 # The only route to Wrap is through the helper signature's closed family.
-sed -e 's/FamilySignature/SignatureFieldCycle/g' \
+sed -e '/^type instance Payload Word/,$d' -e 's/, directObserved//' \
+    -e 's/FamilySignature/SignatureFieldCycle/g' \
     -e 's/data Wrap a = Wrap a/data Wrap a = Wrap (Payload Float)/' \
     ../producer/FamilySignature.hs >SignatureFieldCycle.hs
 expect_cycle SignatureFieldCycle
+
+# A typed adapter still observes demand and records the RULE owner.
+cat >StrictDirect.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}
+module StrictDirect where
+type family Payload a
+type instance Payload Word = StrictDirect.direct Bool
+type family Input a where
+  Input a = a
+direct :: forall a. Input a -> a
+direct x = seq x x
+HS
+if "${ghc[@]}" -c StrictDirect.hs >strict-direct.log 2>&1 ||
+   ! grep -Fq 'StrictDirect.hs:4:30: error: [GHC-70566]' strict-direct.log ||
+   ! grep -Fq 'Reduction cannot inspect the value of a type operand.' strict-direct.log; then
+    cat strict-direct.log >&2
+    exit 1
+fi
+
+sed -e '1s/TypeFamilies/TypeFamilies, TypeApplications/' \
+    -e 's/StrictDirect/RuledDirect/g' \
+    -e '/^module /a import Data.Kind (Type)' \
+    -e 's/direct x = seq x x/direct x = x/' StrictDirect.hs >RuledDirect.hs
+cat >>RuledDirect.hs <<'HS'
+{-# RULES "dependent/direct" forall (x :: Input Type). direct @Type x = x #-}
+HS
+if "${ghc[@]}" -fenable-rewrite-rules -Wno-inline-rule-shadowing -c RuledDirect.hs >rule-direct.log 2>&1 ||
+   ! grep -Fq 'RuledDirect.hs:10:11: error: [GHC-83605]' rule-direct.log ||
+   ! grep -Fq 'direct @Type' rule-direct.log; then
+    cat rule-direct.log >&2
+    exit 1
+fi
 
 cat >RecursiveProducer.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}

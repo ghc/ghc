@@ -368,3 +368,15 @@ there is a real cycle even though `keep` never applies that constructor.
 GHC reports GHC-70566 at the reference to `keep` in the family equation.
 An expression signature such as `(id :: a -> a)` can precede the
 equation when `a` is the producer's scoped type variable.
+
+A helper signature can also depend on a local closed family. GHC checks
+the family, the types used in its equations and the helper before the
+imported instance. In `direct :: forall a. DirectInput a -> a`, the
+call itself requires conversion. GHC uses the closed-family axiom
+`DirectInput a = a` to adapt the function to the checked argument.
+An ordinary client reads `True :: Payload Word` from the resulting
+interface. A constructor field that refers back to the imported family
+still creates a cycle. Forcing the symbolic argument and enabling a
+matching term rewrite rule each block the proof.
+[Checked declarations](../examples/open-evaluation/FamilySignature.hs)
+and [interface, cycle, demand and rule checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).

@@ -5,6 +5,7 @@ module GHC.Core.OpenWhnf
   , Suspension
   , CaseContinuation(..)
   , openWhnfM, openWhnfWithLocalM, openWhnfTraceM, CaseStep(..)
+  , openFamilyReduction
   , openDataConFieldTypes, openReadbackM, OpenReadbackFailure(..)
   ) where
 
@@ -16,6 +17,10 @@ import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE, withExceptT)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT, get, mapStateT, put)
 import GHC.Builtin.WiredIn.Types
   (charDataCon, mkPromotedPairTy, pairTyCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy)
+import GHC.Core.Coercion (coercionLKind, coercionRKind)
+import GHC.Core.FamInstEnv (emptyFamInstEnvs, reduceTyFamApp_maybe)
+import GHC.Core.Coercion.Axiom (Role(Nominal))
+import GHC.Core.Reduction (Reduction(..), isReflRedn, mkFunRedn, mkReflRedn)
 import GHC.Core.DataCon
   ( DataCon, dataConWorkId, dataConTyCon, dataConFullSig, dataConRepArity
   , dataConRepArgBinders, dataConStupidTheta, dataConImplBangs
@@ -26,9 +31,9 @@ import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.Opt.Arity (etaExpand)
 import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
 import GHC.Core.TyCo.Compare (eqType)
-import GHC.Core.TyCon (isBoxedDataTyCon)
+import GHC.Core.TyCon (closedFamilyTyConCoAxiom_maybe, isBoxedDataTyCon)
 import GHC.Core.TyCo.Rep (scaledThing)
-import GHC.Core.Type (Kind, Type, isLiftedTypeKind, mkTyConApp, splitTyConApp_maybe, substTyWith, tyCoVarsOfType, typeKind)
+import GHC.Core.Type (Kind, Type, splitFunTy_maybe, isLiftedTypeKind, mkTyConApp, splitTyConApp_maybe, substTyWith, tyCoVarsOfType, typeKind)
 import GHC.Core.Utils (exprType, findAlt)
 import GHC.Types.Basic (Boxity(Boxed), IntWithInf, intGtLimit)
 import GHC.Types.Id (isDataConWorkId_maybe)
@@ -109,19 +114,19 @@ openWhnfTraceM limit obtain = openWhnfTraceWithLocalM limit (\v _ -> obtain v) (
 openWhnfTraceWithLocalM :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
                        -> (CaseStep -> m ()) -> VarSet -> CoreExpr -> m (Either EvalFailure Whnf)
 openWhnfTraceWithLocalM limit obtain local record unsolved expr =
-  runExceptT $ evalStateT (evaluate limit obtain local record unsolved Nothing (Suspension emptyVarEnv expr)) 1
+  runExceptT $ evalStateT (evaluate False limit obtain local record unsolved Nothing (Suspension emptyVarEnv expr)) 1
 
 -- | Reflect a finite ordinary constructor value or a supplied rigid symbol.
 -- The first observation and every demanded field share one reduction budget.
-openReadbackM :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr))
+openReadbackM :: Monad m => Bool -> IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr))
               -> (Var -> m ()) -> (Var -> Maybe Type) -> (DataCon -> m Bool)
               -> Kind -> CoreExpr
               -> m (Either OpenReadbackFailure (Type, [DataCon]))
-openReadbackM limit obtain local origin visible expected expr =
+openReadbackM local_families limit obtain local origin visible expected expr =
   runExceptT $ evalStateT (readback [] expected (Suspension emptyVarEnv expr)) 1
   where
     observe = mapStateT (withExceptT ReadbackEvaluation)
-            . evaluate limit obtain local (const (pure ())) emptyVarSet Nothing
+            . evaluate local_families limit obtain local (const (pure ())) emptyVarSet Nothing
     readback used kind suspension = do
       whnf <- observe suspension
       case whnf of
@@ -150,10 +155,35 @@ openReadbackM limit obtain local origin visible expected expr =
       (ty, used') <- readback used kind field
       pure (ty : rev_tys, used')
 
-evaluate :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
+-- | Reduce at most one closed family at each function argument or result.
+-- See Note [Local open family conversion].
+openFamilyReduction :: Type -> Reduction
+openFamilyReduction ty
+  | Just (flag, ma, mult, arg, res) <- splitFunTy_maybe ty =
+      mkFunRedn Nominal flag (mkReflRedn Nominal ma) (mkReflRedn Nominal mult)
+        (openFamilyReduction arg) (openFamilyReduction res)
+  | Just (tc, args) <- splitTyConApp_maybe ty
+  , Just _ <- closedFamilyTyConCoAxiom_maybe tc
+  , Just reduction <- reduceTyFamApp_maybe emptyFamInstEnvs Nominal tc args =
+      reduction
+  | otherwise = mkReflRedn Nominal ty
+
+{- Note [Local open family conversion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked local definition can have an input or result type such as
+Ready a, where the closed family Ready reduces directly to a. The
+typechecker retains a real coercion when it adapts that function to
+symbolic operands. The worker may also cast its argument before returning
+it. A local observation may follow a cast only if independently
+normalizing the two endpoints gives the same nominal type. Do not use
+open instances or assume that representationally equal types have the
+same promoted constructor. Other observations leave casts unsupported.
+-}
+
+evaluate :: Monad m => Bool -> IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
          -> (CaseStep -> m ()) -> VarSet -> Maybe Type -> Suspension
          -> StateT Int (ExceptT EvalFailure m) Whnf
-evaluate limit obtain local record unsolved first_type (Suspension env expr) = do
+evaluate local_families limit obtain local record unsolved first_type (Suspension env expr) = do
   steps <- get
   if intGtLimit steps limit then lift (throwE Exhausted) else put (steps + 1)
   case expr of
@@ -176,6 +206,13 @@ evaluate limit obtain local record unsolved first_type (Suspension env expr) = d
             Nothing
               | v `elemVarSet` unsolved -> pure (Neutral (Unsolved v))
               | otherwise -> pure (Neutral (Rigid v))
+    Cast body co
+      | local_families
+      , let lhs = openFamilyReduction (coercionLKind co)
+            rhs = openFamilyReduction (coercionRKind co)
+      , not (isReflRedn lhs && isReflRedn rhs)
+      , reductionReducedType lhs `eqType` reductionReducedType rhs ->
+          recurHead first_type (Suspension env body)
     Tick Breakpoint{} body -> recurHead first_type (Suspension env body)
     Lit lit -> pure (Literal lit)
     Lam binder body -> pure (Lambda binder (Suspension env body))
@@ -255,7 +292,7 @@ evaluate limit obtain local record unsolved first_type (Suspension env expr) = d
         _ -> lift (throwE UnsupportedCore)
     _ -> lift (throwE UnsupportedCore)
   where
-    recurHead = evaluate limit obtain local record unsolved
+    recurHead = evaluate local_families limit obtain local record unsolved
     recur = recurHead Nothing
     pairCon = tupleDataCon Boxed 2
     pairWorker = dataConWorkId pairCon
