@@ -67,6 +67,7 @@ import qualified LocalOpen
 import qualified LocalInstance
 import qualified LocalAssociated
 import qualified IndependentFamily
+import qualified ImportedFamily
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -956,6 +957,10 @@ main = do
         (Refl :: Prelude.fst (Build.partialPair 7) :~: 7)
     observe "build a public constructor through three private helpers"
         (Refl :: MarkedHead ('Spine.More 'x' 'Spine.Empty) :~: 'Just ('Spine.Marked 'x'))
+    observe "use local functions in equations for an imported type family"
+        (ImportedFamily.importedFamilyResults :: (Bool, Ordering, Char))
+    observe "select the second element through a private case"
+        (Refl :: Spine.secondOrFirst ('Spine.More 'x' ('Spine.More 'y' 'Spine.Empty)) :~: 'Just 'y')
 
 -- | Keep the helper equation in the ordinary worker's case.
 type ViaHelper :: Spine.Spine a -> Maybe a

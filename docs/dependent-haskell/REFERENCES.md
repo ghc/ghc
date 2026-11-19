@@ -5652,3 +5652,23 @@ declines a recursive component. This establishes a finite chain of
 checked equations for the supported constructor results.
 [Agda 2.8 termination checking](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html)
 and [private helper chains](roadmap/R16-open-term-evaluator.md#m155-reachable-helper-chains).
+
+### Imported family equations and private constructor cases
+
+Agda allows declarations and bodies to appear at different points in an
+interleaved mutual block. In GHC, bringing a type family instance into
+scope can also change the dictionary selected for an ordinary call. M156
+checks a group of signed local functions before the imported family
+equations only when it can exclude those dependencies. The example runs
+the same ordinary source with and without the family equation to show
+the change in dictionary selection. [Agda interleaved mutual blocks](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
+[Serokell on declaration dependencies](https://ghc.serokell.io/dh#dependency-analysis)
+and [GHC source control](../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
+Agda's case trees distinguish a constructor known at the call site from
+a variable that still blocks selection of a clause. M158 applies the
+existing Core case checker to a private helper reachable from the
+exported result. Haskell can construct the outer `Just` before the
+helper inspects the spine. Its source clauses determine when the
+contained element can be identified. [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [private helper example](examples/open-evaluation/SpineWorker.hs).

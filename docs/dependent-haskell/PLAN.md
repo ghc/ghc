@@ -8948,3 +8948,44 @@ individually. Both compilers accepted the same 115 of 124 ordinary
 polykinds programs. The boundary plugin and splice checks passed.
 
 [Three private helpers](roadmap/R16-open-term-evaluator.md#m155-reachable-helper-chains).
+
+## M156: use a local function in an imported family equation
+
+- Check the signed local producer and its acyclic local callees before the
+  equation. The early bindings must typecheck without a family reduction or
+  class dictionary. Leave the instances in their original declaration groups.
+- Check three equations with an ordinary interface-only client. Reject a
+  producer that depends on the pending equation through an annotation or an
+  imported dictionary. Run the dictionary example with and without the equation.
+
+## M157 experiment: read a computed field without forcing its sibling
+
+- The prototype proved `pick (bump 7) :~: 8` through an interface-only
+  projection. It tracked the executable that computed `7 + 1` and its import.
+- The prototype failed a compatibility check. Two workers both returned
+  `(8, 'x')`. Distinct names for their unread fields prevented GHC from
+  recognizing equal operands in an ordinary identity function. The
+  published compiler retains full readback for this case. The R15 task
+  stays open. [Regression and proof obligation](roadmap/R15-closed-term-evaluator.md#when-equality-needs-the-whole-operand).
+
+## M158: check a constructor case in a private helper
+
+- Reuse the public case checker for a reachable private helper. Publish its
+  checked equations when an exported result refers to that helper. Check the
+  singleton and longer-spine branches using only stripped interfaces.
+- Reject an unsupported demand, an incomplete match and a matching rewrite
+  rule. Upgrade eligible M155 home interfaces and check reuse on the next build.
+
+The bootstrap and self-hosted compilers built. Both native runs and GHCi
+agreed on all 232 Showcase lines. The normal-way dependent directory
+passed 240 of 275 exercised cases. The 35 failures matched M155
+individually. Both versions accepted the same 115 of 124 ordinary
+polykinds sources. The interface upgrades and the boundary plugin and
+splice checks passed.
+
+Two source examples show what still blocks the next cards. For R16,
+an ordinary recursive `erase (More _ xs) = More True (erase xs)` in a
+separate module supplies no checked equation for a rigid spine.
+GHC-68947 points at `W.erase xs`. For R21, replacing the local identity
+body with `keep x = Prelude.id x` puts an imported function outside
+the early group. GHC-70566 points at `keep` in the family equation.

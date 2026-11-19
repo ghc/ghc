@@ -8,9 +8,9 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-Updated 2026-11-19. Native execution and GHCi agree on all 230 Showcase lines.
-The normal-way dependent directory passed 239 of 274 exercised cases.
-The 35 remaining failures produced the same output as at M154 (`78a9058621`).
+Updated 2026-11-19. Native execution and GHCi agree on all 232 Showcase lines.
+The normal-way dependent directory passed 240 of 275 exercised cases.
+The 35 remaining failures produced the same output as at M155 (`ea51579f6e`).
 Fourteen reject existing programs that should compile. `RAE_T32b` now passes.
 [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
@@ -20,9 +20,12 @@ exported alias. An ordinary `firstViaHelper` can also build an optional
 head by calling a private identity inside `Just`. In `firstViaMark`,
 three private helpers pass the head to the public `Marked` constructor.
 Changing the last helper to produce `Unmarked` rejects the unchanged
-client's proof. A family equation can
-use an independent local function before another producer needs that
-equation. [Current source examples](Showcase.hs)
+client's proof. An ordinary module can also export `secondOrFirst`.
+A client can prove that this function selects the second element of a
+spine even when the remaining tail is unknown. An imported open family
+can use signed local functions in its instance equations. An ordinary
+client uses the resulting `Bool`, `Ordering` and `Char` types through
+the interface. [Current source examples](Showcase.hs)
 and [next cases](ROADMAP.md#current-work-queue).
 
 An ordinary Haskell library can hide its parcel constructor and export
