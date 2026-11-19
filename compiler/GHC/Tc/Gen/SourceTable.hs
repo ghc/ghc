@@ -11,7 +11,7 @@ import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
-import GHC.Builtin.WiredIn.Types (charTy, charTyCon, integerTy, integerTyConName, listTyCon, liftedTypeKind, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (charTy, charTyCon, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import qualified GHC.Core as Core
 import GHC.Core.CharCase (certOwner, certRows, certify)
@@ -50,7 +50,7 @@ import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getTcEvBi
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
-import GHC.Types.Basic (Boxity(Boxed), Origin(..))
+import GHC.Types.Basic (Origin(..))
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
@@ -77,7 +77,7 @@ import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet)
-import GHC.Types.Var (Id, CoVar, ForAllTyBinder, ForAllTyFlag(Invisible), VarBndr(..), isId, isTyVar, mkTyVar, varName, varType)
+import GHC.Types.Var (Id, CoVar, VarBndr(..), isId, mkTyVar, varName)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (lengthIs)
 import GHC.Utils.Monad (allM)

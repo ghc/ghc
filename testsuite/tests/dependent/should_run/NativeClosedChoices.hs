@@ -18,8 +18,9 @@ instance {-# OVERLAPPING #-} Show (Either String (Maybe (Natural, Bool))) where
 optional :: ( Data.Maybe.listToMaybe '[5,7] :~: 'Just 5
             , Data.Maybe.listToMaybe '[] :~: ('Nothing :: Maybe Natural)
             , Data.Maybe.fromMaybe 9 (Data.Maybe.listToMaybe '[]) :~: 9
-            , Data.List.uncons '[2,3,5] :~: 'Just '(2, '[3,5]) )
-optional = (Refl, Refl, Refl, Refl)
+            , Data.List.uncons '[2,3,5] :~: 'Just '(2, '[3,5])
+            , Prelude.snd (Prelude.quotRem (Data.Maybe.fromMaybe 0 (Data.Maybe.listToMaybe '[17,5])) 5) :~: 2 )
+optional = (Refl, Refl, Refl, Refl, Refl)
 
 alternatives :: ( P.classify 0 :~: 'Left '[ 'a', '\n', '"', 'λ']
                 , P.classify 1 :~: 'Right 'Nothing
@@ -33,5 +34,5 @@ alternatives = (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)
 
 main :: IO ()
 main = case (optional, alternatives) of
-    ((Refl, Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)) ->
+    ((Refl, Refl, Refl, Refl, Refl), (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)) ->
         print (show (Just (5 :: Natural)), show (P.classify 0))
