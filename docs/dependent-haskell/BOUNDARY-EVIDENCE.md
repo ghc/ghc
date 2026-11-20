@@ -28,6 +28,10 @@ from a stripped interface. The producer can compile with `-fno-code`.
 GHC checks the source body before it exports an equation. Making
 `size` strict in each element or recurring on the original list
 prevents it from exporting this equation.
+If the library changes the step to count each element twice, GHC
+rechecks an unchanged proof that a singleton has size one. The error
+points to `Refl` in the client. If the library withdraws the equation,
+GHC reports the use of `size` in the intervening type alias.
 [Ordinary size producer](examples/open-evaluation/PreludeMapLengthSize.hs)
 and [proof and compiler checks](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
 
