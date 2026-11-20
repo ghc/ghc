@@ -104,6 +104,7 @@ import Data.Either ( isLeft, isRight )
 import Data.Function
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Map.Strict as Map
 import Data.Semigroup
 
 import GHC.Prelude
@@ -589,14 +590,14 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                      ; (subst, _) <- newMetaTyVarsX (Subst.mkEmptySubst (mkInScopeSet free))
                                                    result_vars
                      ; let schema = Subst.substTy subst template
-                     ; body <- open schema emptyNameEnv [] marked
+                     ; body <- open schema Map.empty [] marked
                      ; tcWrapResult rn_expr body schema expected }
              else check_mono marked }
       | otherwise = check_mono marked
 
     check_mono marked = do
       result_ty <- expTypeToType expected
-      open result_ty emptyNameEnv [] marked
+      open result_ty Map.empty [] marked
 
     (head_binders, head_sigma) = tcSplitForAllInvisTyVars fun_ty
     (_, head_body) = tcSplitPhiTy head_sigma
@@ -615,18 +616,19 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
 
     open result_ty opened rev_args [] = do
       let args = reverse rev_args
-      args' <- if isEmptyNameEnv opened then return args else mapM (reuse_opening opened) args
+      args' <- if Map.null opened then return args else mapM (reuse_opening opened) args
       check_app args' (mkCheckExpType result_ty)
     open result_ty opened rev_args (Left arg : rest) =
       open result_ty opened (arg : rev_args) rest
     open result_ty opened rev_args (Right (loc, mult, arg, rebuild) : rest) =
       do { (checked, actual) <- tcScalingUsage mult $ tcInferRho arg
          ; schema <- liftZonkM (zonkTcType actual)
-         ; let key | isManyTy mult, isNothing rebuild = lexicalPackage checked
-                   | otherwise = Nothing
-               shared = do
-                 name <- key
-                 (previous, payload) <- lookupNameEnv opened name
+         ; key <- if isManyTy mult && isNothing rebuild
+                  then openingKey arg checked
+                  else return Nothing
+         ; let shared = do
+                 identity <- key
+                 (previous, payload) <- Map.lookup identity opened
                  guard (eqType previous schema)
                  return payload
                continue env payload =
@@ -638,21 +640,52 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
              Just payload -> continue opened payload
              Nothing -> tcOpenImplicitPackage (getLocA arg) schema checked result_ty $ \payload ->
                let env = case key of
-                     Just name -> extendNameEnv opened name (schema, payload)
+                     Just identity -> Map.insert identity (schema, payload) opened
                      Nothing -> opened
                in tcExtendIdEnv [payload] $ continue env payload }
 
-    lexicalPackage :: LHsExpr GhcTc -> Maybe Name
-    lexicalPackage (L _ (HsPar _ arg)) = lexicalPackage arg
-    lexicalPackage (L _ (HsVar _ (L _ ident)))
-      | isLocalId ident
-      , let name = getName ident
-      , not (isExternalName name)
+    openingKey :: LHsExpr GhcRn -> LHsExpr GhcTc -> TcM (Maybe (Name, Maybe Name))
+    openingKey original checked
+      | HsVar _ (L _ ident) <- bare_expr checked
       , ExistsTy ImplicitExists _ _ <- coreFullView (varType ident)
-      = Just name
-    lexicalPackage _ = Nothing
+      = return ((\name -> (name, Nothing)) <$> lexicalName ident)
+      | HsApp _ fun operand <- bare_expr checked
+      , HsVar _ (L _ producer) <- bare_expr fun
+      , HsVar _ (L _ input) <- bare_expr operand
+      , let producer_name = getName producer
+      , isExternalName producer_name
+      , Just input_name <- lexicalName input
+      , FunTy{ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result}
+          <- coreFullView (varType producer)
+      , isVisibleFunArg af, isManyTy mult
+      , isTauTy domain
+      , ExistsTy ImplicitExists _ _ <- coreFullView result
+      , let key = (producer_name, Just input_name)
+      , renamedKey original == Just key
+      = do { input_type <- liftZonkM (zonkTcType (varType input))
+           ; return (if eqType domain input_type then Just key else Nothing) }
+      | otherwise = return Nothing
 
-    reuse_opening :: NameEnv (TcType, Id) -> HsExprArg 'TcpRn -> TcM (HsExprArg 'TcpRn)
+    lexicalName :: Id -> Maybe Name
+    lexicalName ident
+      | let name = getName ident
+      , isLocalId ident, not (isExternalName name) = Just name
+      | otherwise = Nothing
+
+    renamedKey :: LHsExpr GhcRn -> Maybe (Name, Maybe Name)
+    renamedKey expr = case bare_expr expr of
+      HsVar _ name -> Just (unLocWithUserRdr name, Nothing)
+      HsApp _ fun arg
+        | HsVar _ producer <- bare_expr fun
+        , HsVar _ input <- bare_expr arg
+        -> Just (unLocWithUserRdr producer, Just (unLocWithUserRdr input))
+      _ -> Nothing
+
+    bare_expr :: LHsExpr (GhcPass p) -> HsExpr (GhcPass p)
+    bare_expr = unLoc . stripParensLHsExpr
+
+    reuse_opening :: Map.Map (Name, Maybe Name) (TcType, Id)
+                  -> HsExprArg 'TcpRn -> TcM (HsExprArg 'TcpRn)
     reuse_opening opened arg@EValArg{ea_arg = expr} =
       do { expr' <- project expr
          ; return arg{ea_arg = expr'} }
@@ -660,8 +693,8 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
         project (L loc (HsPar ann nested)) =
           L loc . HsPar ann <$> project nested
         project original@(L loc (HsApp ann fun operand))
-          | HsVar _ package_name <- bare_expr operand
-          , Just (_, payload) <- lookupNameEnv opened (unLocWithUserRdr package_name)
+          | Just key <- renamedKey operand
+          , Just (_, payload) <- Map.lookup key opened
           , HsVar _ head_name <- bare_expr fun
           , let name = unLocWithUserRdr head_name
           , not (isDataOcc (nameOccName name))
@@ -674,8 +707,6 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                    _ -> original }
         project original = return original
 
-        bare_expr (L _ (HsPar _ nested)) = bare_expr nested
-        bare_expr (L _ expr) = expr
     reuse_opening _ arg = return arg
 
 
@@ -879,8 +910,8 @@ opening when both are the same checked local package variable at the
 same schema. Reuse the payload Id under its existing skolem. This is
 the lexical-variable case of IExistCore in An Existential Crisis
 Resolved. It preserves the source use check for each operand.
-Computed operands, instantiated variables and linear arguments each
-have their own opening. The map is local to the application spine.
+Instantiated variables and linear operands have their own opening.
+The map is local to the application spine.
 
 For snd p (fst p), the first argument opens p for the application.
 A nested unary value application can reuse that payload when its
@@ -889,6 +920,15 @@ Only reuse an opening from an unrestricted operand in an unrestricted
 domain. Its first source use already contributes Many, so the nested
 use cannot change its checked multiplicity. Check the nested call
 at the outer argument type. The projections determine payload demand.
+
+A named producer can also supply the same package to both selectors.
+Require an exact, monomorphic unary call with an unrestricted domain
+and the same bare local input. Use the resolved names of the checked
+producer and input. Instantiation, dictionary selection and argument
+conversion are absent from this equality check. Demand still comes
+from the surrounding calls. The opening shares the producer thunk,
+so it can reduce the number of evaluations. See Aside 2 and section
+9.2.2 of An Existential Crisis Resolved.
 
 Instantiate the application under all of the skolems. The
 outer result type is present before any of these scopes, so the
