@@ -80,6 +80,15 @@ index. The runtime test reads each field with an exceptional sibling.
 [second projection](examples/packed-vector/DependentProjection.hs),
 and [runtime test](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
+R04 uses an unmatchable arrow for an anonymous payload family. In Agda,
+the second parameter of `Σ` can be a constant function. In GHC such a
+family cannot establish its input from its output. Proposal #242 supplies
+the distinction between matchable and unmatchable application. Testing
+the lambda encoding exposed a separate issue with alpha-equivalent sum
+types compiled in different modules. [Agda's definition of Σ](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type),
+[GHC proposal #242](https://github.com/ghc-proposals/ghc-proposals/pull/242)
+and [R04 source and equality checks](roadmap/R04-dependent-sums.md#payload-families-for-the-some-binder).
+
 A closed written lambda kind supplies the lifted family's standalone kind
 signature. GHC checks it before the equations, so each constructor pattern
 can refine the index independently. This preserves specified and inferred
