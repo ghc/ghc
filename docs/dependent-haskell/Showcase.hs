@@ -81,6 +81,7 @@ import qualified InvisibleFamily
 import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
+import qualified NativeNestedCase
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -1011,6 +1012,13 @@ main = do
     observe "bind the result of a constructor case"
         (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
     observe "select the result type by a constructor" NativeCase.roadmap
+    observe "select through nested type case patterns"
+        ( Proxy :: NativeNestedCase.Pick ('Just ('Just 'True))
+        , 7 :: NativeNestedCase.Pick ('Just 'Nothing) )
+    observe "select through an ordinary type constructor"
+        ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
+        , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)
+        , () :: NativeNestedCase.TypeHead ('Just [Bool]) )
     observe "match Bool and Ordering directly in a type"
         (7 :: NativeCase.ByType Bool, 'x' :: NativeCase.ByType Ordering)
     observe "use a local type in a constructor case"

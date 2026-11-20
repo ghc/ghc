@@ -2,4 +2,4 @@
 module NativeTypeCaseBadPattern where
 
 type Bad a = case a of
-  Just Int -> Bool
+  Just 0 -> Bool

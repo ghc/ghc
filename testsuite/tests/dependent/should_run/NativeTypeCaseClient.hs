@@ -1,9 +1,11 @@
-{-# LANGUAGE GADTs, DataKinds, NoExperimentalDependentTypes, PolyKinds, TypeOperators #-}
+{-# LANGUAGE GADTs, DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeFamilies, PolyKinds, TypeOperators #-}
 module NativeTypeCaseClient where
 
+import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import Data.Proxy (Proxy)
 import NativeCase
+import qualified NativeNestedCase as N
 
 left :: F 'True :~: Int
 left = Refl
@@ -55,3 +57,27 @@ contextKind = Refl
 
 separateKinds :: SeparateKinds 'False :~: Bool
 separateKinds = Refl
+
+nested :: ( N.Pick ('Just ('Just 'True)) :~: Proxy 'True
+          , N.Pick ('Just 'Nothing) :~: Int
+          , N.SameFallback ('Just 'Nothing) :~: Int )
+nested = (Refl, Refl, Refl)
+
+wildcard :: N.IgnoreLeft ('N.Pair unknown ('Just 'True)) :~: Bool
+wildcard = Refl
+
+indexed :: ( N.IndexedPick @Bool ('Just ('N.BooleanTag 'False)) :~: Proxy 'False
+           , N.IndexedPick @Ordering ('Just ('N.OrderingTag 'GT)) :~: Proxy 'GT )
+indexed = (Refl, Refl)
+
+type family Known (a :: Type) :: Type where
+  Known Bool = Ordering
+
+typeHeads :: ( N.TypeHead ('Just Bool) :~: Int, N.TypeHead ('Just Ordering) :~: Char
+             , N.TypeHead ('Just [a]) :~: (), N.TypeHead 'Nothing :~: ()
+             , N.UniformTypeHead ('Just Bool) :~: Int
+             , N.Wrapped ('Just (Maybe a)) :~: Proxy a
+             , N.TypeHead ('Just (Known Bool)) :~: Char
+             , N.WrappedBool ('Just (Maybe Bool)) :~: Int
+             , N.WrappedBool ('Just (Maybe Char)) :~: () )
+typeHeads = (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)
