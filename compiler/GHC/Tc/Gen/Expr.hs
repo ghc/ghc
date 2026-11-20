@@ -371,10 +371,10 @@ tcLambdaExpr :: XLam GhcRn -> HsLamVariant -> MatchGroup GhcRn (LHsExpr GhcRn)
 tcLambdaExpr x lam_variant matches pat_tys expected
   | Check schema <- expected
   , ExistsTy ImplicitExists binder body <- coreFullView schema
-  , Just _ <- splitVisibleFunTy_maybe body
+  , Just _ <- splitVisibleFunTy_maybe (implicitPayloadType body)
   = do { witness <- newFlexiTyVarTy (tyVarKind binder)
        ; let payload_ty = substTyWith [binder] [witness] body
-       ; payload <- check_lambda (mkCheckExpType payload_ty)
+       ; payload <- tcLambdaExpr x lam_variant matches pat_tys (mkCheckExpType payload_ty)
        ; return (XExpr (NativeExistsPack schema witness (noLocA payload))) }
   | otherwise = check_lambda expected
   where
@@ -611,14 +611,17 @@ Polymorphic variables and checking-only expressions do not select this route.
 
 tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   | all tupArgPresent tup_args
-  = do { native_infer <- case res_ty of
+  = do { as_application <- case res_ty of
+             Check expected | Boxed <- boxity
+                            , ExistsTy ImplicitExists _ _ <- coreFullView expected
+               -> return True
              Infer _ | Boxed <- boxity
                -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
                      ; if enabled
                        then snd <$> tcRetainedInferableArg (noLocA expr)
                        else return False }
              _ -> return False
-       ; if native_infer
+       ; if as_application
          then do { checkTupSize (length tup_args)
                  ; let con = wrapGenSpan (mkHsVar
                                (noLocA (dataConName (tupleDataCon Boxed (length tup_args)))))
@@ -744,7 +747,7 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
             ; dependent <- xoptM LangExt.ExperimentalDependentTypes
             ; special <- case unLoc (stripParensLHsExpr scrut') of
                 _ | ExistsTy ImplicitExists _ payload_ty <- coreFullView scrut_ty
-                  , Just (tc, _) <- tcSplitTyConApp_maybe payload_ty
+                  , Just (tc, _) <- tcSplitTyConApp_maybe (implicitPayloadType payload_ty)
                   -> dot_case scrut' scrut_ty mult tc
                 HsVar _ (L _ index) | dependent, isNativeIndexId index ->
                   tcRetainedCase index matches res_ty

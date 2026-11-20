@@ -10,7 +10,7 @@
 -}
 
 module GHC.Tc.Gen.App
-       ( tcApp, tcOpenImplicitPackage
+       ( tcApp, tcOpenImplicitPackage, implicitPayloadType
        , tcExprPrag
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
@@ -686,30 +686,42 @@ implicitSpineHead ty = case coreFullView ty of
 
 -- | Check a value spine against the declared payload of an implicit head.
 opensImplicitHead :: Int -> TcType -> Bool
-opensImplicitHead arity body = arity > 0 && go arity body
+opensImplicitHead arity body = arity > 0 && go arity (implicitPayloadType body)
   where
     go 0 _ = True
     go n ty = case splitVisibleFunTy_maybe ty of
       Just (_, result) -> go (n - 1) result
       Nothing -> False
 
--- | Open a checked package while keeping its result type outside the scope.
+-- | Find the shape below consecutive dot binders.
+-- The result can mention those binders. Use it only to inspect its shape.
+implicitPayloadType :: TcType -> TcType
+implicitPayloadType ty = case coreFullView ty of
+  ExistsTy ImplicitExists _ body -> implicitPayloadType body
+  other -> other
+
+-- | Open checked dot binders with the result type outside every scope.
 tcOpenImplicitPackage :: SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
                       -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
-tcOpenImplicitPackage loc schema checked result_ty check_body
-  = case coreFullView schema of
-      ExistsTy ImplicitExists binder payload_ty ->
-        do { let origin = UnifyForAllSkol schema
-           ; skol <- mkSkolemInfo origin
-           ; name <- newSysName (getOccName binder)
-           ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
-           ; payload <- newSysLocalId (fsLit "unpacked") ManyTy $
-               substTyWith [binder] [mkTyVarTy witness] payload_ty
-           ; (ev_binds, body) <- setSrcSpan loc $
-               checkConstraints origin [witness] [] (check_body payload)
-           ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
-                               (mkHsDictLet ev_binds (noLocA body)))) }
-      _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema))
+tcOpenImplicitPackage loc schema checked result_ty check_body = open schema checked
+  where
+    open schema checked =
+      case coreFullView schema of
+        ExistsTy ImplicitExists binder payload_ty ->
+          do { let origin = UnifyForAllSkol schema
+             ; skol <- mkSkolemInfo origin
+             ; name <- newSysName (getOccName binder)
+             ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
+             ; let body_ty = substTyWith [binder] [mkTyVarTy witness] payload_ty
+             ; payload <- newSysLocalId (fsLit "unpacked") ManyTy body_ty
+             ; (ev_binds, body) <- setSrcSpan loc $
+                 checkConstraints origin [witness] [] $
+                   case coreFullView body_ty of
+                     ExistsTy ImplicitExists _ _ -> open body_ty (noLocA (mkHsVar (noLocA payload)))
+                     _ -> check_body payload
+             ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
+                                 (mkHsDictLet ev_binds (noLocA body)))) }
+        _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema))
 
 {- Note [Implicit existential arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -741,8 +753,10 @@ Instantiate the application under all of the skolems. The
 outer result type is present before any of these scopes, so the
 ordinary implication solver rejects a witness that would escape.
 If the result expects another dot package, check and pack the result
-inside the scopes. The erasure of Unpack preserves the payload's
-demand. Bar packages go through the ordinary checker.
+inside the scopes. An opening substitutes its skolem through the
+remaining schema before opening the next dot binder. The result type
+stays outside the whole chain. The erasure of Unpack preserves the
+payload's demand. Bar packages go through the ordinary checker.
 
 An inference slot at this level can receive a directly declared dot
 result. For example, `filterVec p (builder x)` returns the package
@@ -1645,31 +1659,31 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                      else return (rebuildHsApps tc_fun tc_args)
 
        ; traceTc "End tcApp }" (ppr tc_fun)
-       ; let checked = mkHsWrap res_wrap res_expr
-       ; return (case pack of
-           Nothing -> checked
-           Just (schema, witness) ->
-             XExpr (NativeExistsPack schema witness (noLocA checked))) }
+       ; return (pack (mkHsWrap res_wrap res_expr)) }
 
 -- | Introduce a dot package when the application has a fixed payload shape.
 -- See Note [Introducing an implicit existential].
 implicitResult :: HsExpr GhcRn -> TcRhoType -> ExpRhoType
-               -> TcM (ExpRhoType, Maybe (Type, Type))
+               -> TcM (ExpRhoType, HsExpr GhcTc -> HsExpr GhcTc)
 implicitResult rn_expr actual expected@(Check wanted)
-  | ExistsTy ImplicitExists binder body <- coreFullView wanted
+  | ExistsTy ImplicitExists _ _ <- coreFullView wanted
   = do { payload <- liftZonkM (zonkTcType actual)
        ; case coreFullView payload of
-           TyConApp{} -> pack binder body payload
-           AppTy{} -> pack binder body payload
-           FunTy{} -> pack binder body payload
-           _ -> return (expected, Nothing) }
+           TyConApp{} -> pack payload wanted
+           AppTy{} -> pack payload wanted
+           FunTy{} -> pack payload wanted
+           _ -> return (expected, id) }
   where
-    pack binder body payload = do
-      retained <- runMaybeT (matchRetainedExistsWitness (exprCtOrigin rn_expr) binder body payload)
-      witness <- maybe (newFlexiTyVarTy (tyVarKind binder)) return retained
-      let payload_ty = substTyWith [binder] [witness] body
-      return (mkCheckExpType payload_ty, Just (wanted, witness))
-implicitResult _ _ expected = return (expected, Nothing)
+    pack payload schema
+      | ExistsTy ImplicitExists binder body <- coreFullView schema
+      = do { retained <- runMaybeT $
+               matchRetainedExistsWitness (exprCtOrigin rn_expr) binder body payload
+           ; witness <- maybe (newFlexiTyVarTy (tyVarKind binder)) return retained
+           ; let payload_ty = substTyWith [binder] [witness] body
+           ; (expected', inner) <- pack payload payload_ty
+           ; return (expected', \expr -> XExpr (NativeExistsPack schema witness (noLocA (inner expr)))) }
+      | otherwise = return (mkCheckExpType schema, id)
+implicitResult _ _ expected = return (expected, id)
 
 -- | Match a stored index without assigning its local Id to a metavariable.
 -- See Note [Introducing an implicit existential].
@@ -1691,6 +1705,11 @@ matchRetainedExistsWitness ct_origin binder body actual = do
 {- Note [Introducing an implicit existential]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Check the application result at the dot payload type before packing it.
+Choose a witness for each consecutive dot binder in order. Substitute
+each witness through the remaining schema before checking the next binder
+kind. Check the final payload once and pack it from the inside out.
+See Elab-Gen in An Existential Crisis Resolved.
+
 Usually the solver can fill a fresh witness metavariable. A payload that
 already mentions a retained index needs an immutable choice instead.
 See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
