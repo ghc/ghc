@@ -8,6 +8,17 @@ increments.
 
 ## Family and package checkpoints
 
+At `b92cf1d999`, the 304-line Showcase covers inference of earlier invisible
+arguments. The previous compiler rejects the new family source with
+GHC-91028. Both readers compile and run the ordinary client from the new
+optimized interface. All 61 runnable focused tests passed. The dependent
+directory had 294 passes and 20 unexpected failures. Polykinds had 224 passes,
+one expected failure and 18 unexpected failures. The unexpected failures in
+both directories match `7185bd64f8` by name and category. All 21 expected
+passes in the impredicative suite passed. The linear suite had 106 passes and
+the same seven unexpected failures as at `7185bd64f8`.
+[Family source and client](roadmap/R23-unsaturated-type-families.md#inferring-a-kind-after-supplying-a-visible-argument).
+
 At `7185bd64f8`, the 303-line Showcase adds `(Right 7,False)` and uses the direct
 callback case. Both compiler stages reproduce the full output at
 `-O0`. The self-hosted compiler also reproduces it at default `-O1`,
