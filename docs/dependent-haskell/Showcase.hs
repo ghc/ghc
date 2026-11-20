@@ -1026,8 +1026,8 @@ main = do
         (OpenMapProof.ordinaryRedStops (Proxy @'[]))
     observe "use Prelude.not on a known head with an unknown tail"
         (InstalledNotProof.negateHead (Proxy @'[]))
-    observe "use Prelude.map and Prelude.not on an empty list and an unknown tail"
-        (PreludeMapProof.preludeNil, PreludeMapProof.preludeNegateHead (Proxy @'[]))
+    putStrLn ("use Prelude.map and Prelude.not on an empty list and an unknown tail: "
+              ++ PreludeMapProof.showPreludeMapProofs)
     observe "collect row heads with an ordinary polymorphic callback"
         (OpenMapProof.firstRowHead (Proxy @'True) (Proxy @'Spine.Empty) (Proxy @'[]))
 

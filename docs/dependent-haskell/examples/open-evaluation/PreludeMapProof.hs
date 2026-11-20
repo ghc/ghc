@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
-module PreludeMapProof (preludeNil, preludeNegateHead) where
+module PreludeMapProof (preludeNil, preludeNegateHead, showPreludeMapProofs) where
 
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import PreludeMapSource (PreludeNegateAll)
 
@@ -14,3 +14,7 @@ preludeNil = Refl
 preludeNegateHead :: Proxy xs
                   -> PreludeNegateAll ('True ': xs) :~: ('False ': PreludeNegateAll xs)
 preludeNegateHead _ = Refl
+
+-- | Inspect both proofs under the rewrite policy that certifies them.
+showPreludeMapProofs :: String
+showPreludeMapProofs = show (preludeNil, preludeNegateHead (Proxy :: Proxy '[]))
