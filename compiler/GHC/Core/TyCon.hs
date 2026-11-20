@@ -62,7 +62,7 @@ module GHC.Core.TyCon(
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon, famTyConHasInjectivity,
         isTypeFamilyTyCon, isDataFamilyTyCon,
-        isOpenTypeFamilyTyCon,
+        isOpenTypeFamilyTyCon, isConstrainedFamilyTyCon,
         closedTypeFamily_maybe,
         builtInClosedTyFamTyCon_maybe,
         closedFamilyTyConCoAxiom_maybe, closedFamilyScope_maybe,
@@ -1390,9 +1390,13 @@ data FamTyConFlav
    -- | A closed type family 'TyCon'. See Note [Closed type families].
    | ClosedTypeFamilyTyCon ClosedTyFam -- ^ the equations for this closed type family
 
+   -- | An associated type family guarded by its owning class predicate.
+   | ConstrainedTypeFamilyTyCon
+
 instance Outputable FamTyConFlav where
     ppr (DataFamilyTyCon n) = text "data family" <+> ppr n
     ppr OpenTypeFamilyTyCon = text "open type family"
+    ppr ConstrainedTypeFamilyTyCon = text "constrained type family"
     ppr (ClosedTypeFamilyTyCon ctf) =
       case ctf of
         CTF mb_coax    -> text "closed type family" <+> maybe empty ppr mb_coax
@@ -2581,6 +2585,7 @@ isOpenFamilyTyCon (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = flav } <- details
               = case flav of
                   OpenTypeFamilyTyCon      -> True
+                  ConstrainedTypeFamilyTyCon -> True
                   DataFamilyTyCon {}       -> True
                   ClosedTypeFamilyTyCon {} -> False
   | otherwise = False
@@ -2601,7 +2606,13 @@ isDataFamilyTyCon (TyCon { tyConDetails = details })
 isOpenTypeFamilyTyCon :: TyCon -> Bool
 isOpenTypeFamilyTyCon (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = OpenTypeFamilyTyCon } <- details = True
+  | FamilyTyCon {famTcFlav = ConstrainedTypeFamilyTyCon } <- details = True
   | otherwise                                                 = False
+
+isConstrainedFamilyTyCon :: TyCon -> Bool
+isConstrainedFamilyTyCon tc
+  | Just ConstrainedTypeFamilyTyCon <- famTyConFlav_maybe tc = True
+  | otherwise = False
 
 -- | Is this the 'TyCon' of a closed type family?
 closedTypeFamily_maybe :: TyCon -> Maybe ClosedTyFam
@@ -3283,6 +3294,7 @@ tyConFlavour (TyCon { tyConDetails = details })
   = case flav of
       DataFamilyTyCon{}       -> OpenFamilyFlavour (IAmData DataType) parent
       OpenTypeFamilyTyCon     -> OpenFamilyFlavour IAmType parent
+      ConstrainedTypeFamilyTyCon -> OpenFamilyFlavour IAmType parent
       ClosedTypeFamilyTyCon{} -> ClosedTypeFamilyFlavour
 
   | SynonymTyCon {} <- details                  = TypeSynonymFlavour

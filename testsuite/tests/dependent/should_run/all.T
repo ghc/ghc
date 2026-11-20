@@ -521,3 +521,8 @@ test('NativeImplicitExistential',
 test('NativeExistentialBeta',
      [req_host_target_ghc, unless(have_ncg(), skip), only_ways(['normal'])],
      compile_and_run, ['-O1 -dcore-lint -dstg-lint'])
+
+test('NativeConstrainedFamily',
+     [only_ways(['normal']),
+      extra_files(['NativeConstrainedFamilyProvider.hs', 'NativeConstrainedFamilyClient.hs'])],
+     run_command, ['bash NativeConstrainedFamily.sh "{compiler}" "{libdir}"'])
