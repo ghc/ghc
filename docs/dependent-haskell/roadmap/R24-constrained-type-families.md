@@ -136,3 +136,15 @@ class instance environment. Givens inherited by a local signature from
 its enclosing term need a later check. General kinds, family occurrences
 in aliases or visible type arguments, generated newtype or via equations,
 and partial applications also need separate formation rules.
+
+### Deferred errors at a module boundary
+
+An ordinary signature `missing :: Elem [Int] :~: Int` fails with GHC-39999
+when `Allowed Int` is absent. It also fails with `AllowAmbiguousTypes`.
+With `-fdefer-type-errors`, GHC reports the missing instance as a warning.
+The existing family axiom reduces the equality, so `missing = Refl` runs.
+A second module compiled with normal flags can read that interface and
+evaluate `case missing of Refl -> True`. The producer's successful
+compilation with deferred errors gives the consumer no evidence that
+the producer discharged the domain obligation.
+[GHC deferred type errors](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/defer_type_errors.html).
