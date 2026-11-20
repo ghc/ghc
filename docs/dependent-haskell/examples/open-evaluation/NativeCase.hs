@@ -5,7 +5,7 @@ module NativeCase
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
-  , retainedDoubleNot, retainedPermission
+  , retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
   ) where
 
 import Data.Kind (Type)
@@ -85,9 +85,18 @@ retainedKeep _ _ = 42
 
 -- | Select the result after two checked Boolean negations.
 retainedDoubleNot :: foreach (b :: Bool)
-                  -> (case P.not (P.not b) of { True -> Int; False -> Bool })
+                  -> (case not (not b) of { True -> Int; False -> Bool })
 retainedDoubleNot True = 42
 retainedDoubleNot False = False
+
+-- | Render the selected type through a qualified spelling of the same call.
+renderRetainedDoubleNot :: foreach (b :: Bool) -> String
+renderRetainedDoubleNot b = renderDoubleNot b (retainedDoubleNot b)
+
+renderDoubleNot :: foreach (b :: Bool)
+                -> (case P.not (P.not b) of { True -> Int; False -> Bool }) -> String
+renderDoubleNot True value = show value
+renderDoubleNot False value = show value
 
 -- | Select a type from two runtime operands.
 retainedPermission :: foreach (light :: Open.Lamp) -> foreach (allowed :: Bool)

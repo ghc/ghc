@@ -39,9 +39,9 @@ retainedSignature :: (Int, Char, String, String)
 retainedSignature =
   (retainedPick True, retainedPick False, renderRetainedPick True, renderRetainedPick False)
 
-computedRetained :: (Int, Bool, Proxy Int, Proxy Char)
+computedRetained :: (Int, Bool, String, Proxy Int, Proxy Char)
 computedRetained =
-  (retainedDoubleNot True, retainedDoubleNot False,
+  (retainedDoubleNot True, retainedDoubleNot False, renderRetainedDoubleNot True,
    retainedPermission Open.Green True, retainedPermission Open.Red True)
 
 field :: Field ('Just 'True) :~: '( 'True, 'True)
