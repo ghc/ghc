@@ -1101,20 +1101,20 @@ tcPatSig in_pat_bind sig res_ty
               when in_pat_bind
                 (addErr (TcRnCannotBindScopedTyVarInPatSig sig_tvs_ne))
 
-              unless in_pat_bind $
+              pat_ty <- if in_pat_bind then return sig_ty else
                 bindRetainedPatSigVars (mkVarSet (map snd sig_tvs)) sig_ty res_ty
 
               -- Now do a subsumption check of the pattern signature against res_ty
-              wrap <- addErrCtxt (PatSigErrCtxt sig_ty res_ty) $
-                      tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
+              wrap <- addErrCtxt (PatSigErrCtxt pat_ty res_ty) $
+                      tcSubTypePat PatSigOrigin PatSigCtxt res_ty pat_ty
 
               -- Phew!
-              return (sig_ty, sig_tvs, sig_wcs, wrap)
+              return (pat_ty, sig_tvs, sig_wcs, wrap)
        }
 
 -- | Name a retained index already present in a checked pattern type.
 -- See Note [Retained indices in pattern signatures].
-bindRetainedPatSigVars :: VarSet -> TcType -> ExpSigmaType -> TcM ()
+bindRetainedPatSigVars :: VarSet -> TcType -> ExpSigmaType -> TcM TcType
 bindRetainedPatSigVars binders sig_ty (Check expected)
   | Just (tc, sig_args) <- tcSplitTyConApp_maybe sig_ty
   , Just (expected_tc, expected_args) <- tcSplitTyConApp_maybe expected
@@ -1122,9 +1122,10 @@ bindRetainedPatSigVars binders sig_ty (Check expected)
   , isInjectiveTyCon tc Nominal
   , not (isTypeFamilyTyCon tc)
   , sig_args `equalLength` expected_args
-  = zipWithM_ bind sig_args expected_args
+  = do { changed <- foldM bind False (zip sig_args expected_args)
+       ; if changed then liftZonkM (zonkTcType sig_ty) else return sig_ty }
   where
-    bind sig (TermVarTy index)
+    bind changed (sig, TermVarTy index)
       | Just tv <- getTyVar_maybe sig
       , tv `elemVarSet` binders
       , isNativeIndexId index
@@ -1133,11 +1134,13 @@ bindRetainedPatSigVars binders sig_ty (Check expected)
                Just (ATcId { tct_id = actual }) | actual == index -> do
                  unfilled <- isUnfilledMetaTyVar tv
                  kind <- liftZonkM $ zonkTcType (tyVarKind tv)
-                 when (unfilled && kind `eqType` idType actual) $
-                   liftZonkM $ writeMetaTyVar tv (TermVarTy actual)
-               _ -> return () }
-    bind _ _ = return ()
-bindRetainedPatSigVars _ _ _ = return ()
+                 if unfilled && kind `eqType` idType actual
+                   then do { liftZonkM $ writeMetaTyVar tv (TermVarTy actual)
+                           ; return True }
+                   else return changed
+               _ -> return changed }
+    bind changed _ = return changed
+bindRetainedPatSigVars _ sig_ty _ = return sig_ty
 
 {- Note [Retained indices in pattern signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1151,9 +1154,11 @@ corresponding argument of the same nominally injective type constructor.
 Use the actual Id from the pattern environment. This neither introduces a
 second witness nor adds an equality between distinct runtime values.
 
-The alias only changes the signature's own fresh metavariable. The normal
-subsumption check still verifies the whole pattern signature, including
-any repeated occurrences. Do not infer through a type family or write
+The alias only changes the signature's own fresh metavariable. Zonk the
+signature after selecting an alias so the bound variable's declared type
+exposes the runtime index to application checking. The normal subsumption
+check still verifies the whole pattern signature, including any repeated
+occurrences. Do not infer through a type family or write
 inferred types that capture a retained Id outside its scope. In
 particular, leave the ordinary solver's escape check in place.
 -}

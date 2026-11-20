@@ -12,15 +12,18 @@ for opt in -O0 -O2; do
     "${g[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c PackedVecLibrary.hs
     cat >Opaque.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, TypeFamilies, UndecidableInstances #-}
-module Opaque (Opaque, Token) where
-import PackedVecLibrary (Nat)
+module Opaque (Fold, HiddenVec, Opaque, Token) where
+import PackedVecLibrary (Nat, Vec)
 type family Token (n :: Nat)
 type Opaque = some (n :: Nat) | Token n
+type family Fold (n :: Nat) :: Nat
+type HiddenVec = some (n :: Nat) | Vec Bool (Fold n)
 HS
     "${g[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c Opaque.hs
     cp {PackedVecLibrary,Opaque}.hi "$src/NamedSplitClient.hs" ../client/
     cd ../client
-    "${g[@]}" "$opt" -c NamedSplitClient.hs
+    "${g[@]}" "$opt" -XImpredicativeTypes -c NamedSplitClient.hs
+    "${g[@]}" "$opt" -XNoImpredicativeTypes -fforce-recomp -c NamedSplitClient.hs
     cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
 module Main where
@@ -86,6 +89,53 @@ HS
        ! grep -Eq '^Scope.hs:15:[0-9]+: error: \[GHC-25897\]' scope.log ||
        ! grep -Eq '^Scope.hs:18:[0-9]+: error: \[GHC-83865\]' scope.log; then
         cat scope.log >&2
+        exit 1
+    fi
+    cat >AppendIndices.hs <<'HS'
+{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators #-}
+module AppendIndices where
+
+import GHC.Sigma (Sigma(Pair))
+import Opaque (HiddenVec)
+import PackedVecLibrary (CheckedSplit, Nat(..), Vec, appendVec, toList, type (+))
+
+appendIndependent :: CheckedSplit Bool ('S 'Z) ('S 'Z)
+                  -> CheckedSplit Bool ('S 'Z) ('S ('S 'Z)) -> [Bool]
+appendIndependent (Pair _ (_, a :: Vec Bool n, _)) (Pair _ (_, b :: Vec Bool m, _)) =
+    let combined :: Vec Bool (n + m)
+        combined = appendVec a b
+    in toList combined
+
+appendOpaque :: Vec Bool 'Z -> HiddenVec -> [Bool]
+appendOpaque left (Pair _ right) = toList (appendVec left right)
+HS
+    "${g[@]}" "$opt" -c AppendIndices.hs
+
+    cat >RejectIndices.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, KindSignatures, NoExperimentalDependentTypes, ScopedTypeVariables #-}
+module RejectIndices where
+
+import Data.Proxy (Proxy)
+import GHC.Sigma (Sigma(Pair))
+import Opaque (Fold, HiddenVec)
+import PackedVecLibrary (CheckedSplit, Nat(..), Vec, toList, zipVec)
+
+joinDistinct :: CheckedSplit Bool ('S 'Z) ('S 'Z)
+             -> CheckedSplit Bool ('S 'Z) ('S ('S 'Z)) -> [(Bool, Bool)]
+joinDistinct (Pair _ (_, a, _)) (Pair _ (_, b, _)) = toList (zipVec a b)
+
+atNamedIndex :: Proxy n -> Vec Bool (Fold n) -> Bool
+atNamedIndex _ _ = True
+
+invert :: forall (other :: Nat). Proxy other -> HiddenVec -> Bool
+invert selected (Pair _ cells) = atNamedIndex selected cells
+HS
+    if "${g[@]}" "$opt" -c RejectIndices.hs >reject.log 2>&1 ||
+       ! grep -Eq '^RejectIndices.hs:11:[0-9]+: error: \[GHC-83865\]' reject.log ||
+       ! grep -Eq '^RejectIndices.hs:17:[0-9]+: error: \[GHC-83865\]' reject.log ||
+       ! grep -Fq 'Fold other' reject.log; then
+        cat reject.log >&2
         exit 1
     fi
     popd >/dev/null

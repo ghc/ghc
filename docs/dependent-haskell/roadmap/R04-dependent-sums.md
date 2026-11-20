@@ -266,7 +266,10 @@ An ordinary checked-split pattern can name the stored suffix in
 `(right :: Vec a n)`. The type name `n` refers to the same witness as
 the stored field. After matching `Refl`, a later pattern can use
 `Vec a ('S n)`. A lazy tuple can bind the alias and defer the proof
-match. Separate packages still have separate witnesses.
+match. Separate packages still have separate witnesses. At the
+declared original length, `appendVec left right` takes both erased
+indices from the operands. With Quick Look enabled, keep the appended
+vector in a typed local binding before passing it to `toList`.
 [Ordinary client](../examples/packed-vector/NamedSplitClient.hs) and
 [pattern signature rules in proposal #128](https://ghc-proposals.readthedocs.io/en/latest/proposals/0128-scoped-type-variables-types.html).
 
