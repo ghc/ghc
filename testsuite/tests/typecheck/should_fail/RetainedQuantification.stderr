@@ -1,5 +1,11 @@
-RetainedQuantification.hs:12:17: error: [GHC-83605]
-    • A retained value argument requires a lifted type parameter or a supported algebraic type.
-      Its declared domain is: Int
-    • In the type signature:
+RetainedQuantification.hs:12:38: error: [GHC-83865]
+    • Expected kind ‘Bool’, but ‘b’ has kind ‘Int’
+    • In the first argument of ‘Select’, namely ‘b’
+      In the type signature:
+        keep :: foreach (b :: Int) -> Select b -> Select b
+
+RetainedQuantification.hs:12:50: error: [GHC-83865]
+    • Expected kind ‘Bool’, but ‘b’ has kind ‘Int’
+    • In the first argument of ‘Select’, namely ‘b’
+      In the type signature:
         keep :: foreach (b :: Int) -> Select b -> Select b

@@ -1659,7 +1659,7 @@ lintCaseExpr scrut case_bndr alt_ty alts
        ; addLoc (CaseTy scrut) $ lintValueType alt_ty
 
        ; checkCaseAlts e scrut scrut_ty alts
-       ; when (any isNativeIndexAlt alts) $
+       ; when (any legacy_constructor_proof alts) $
            lintL (any is_default alts || covers_domain scrut_ty)
              (text "Native index proof alternatives must be exhaustive:" <+> ppr e)
 
@@ -1686,6 +1686,8 @@ lintCaseExpr scrut case_bndr alt_ty alts
        ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
        ; return (alt_ty, case_ue) } }
   where
+    legacy_constructor_proof (Alt (DataAlt con) args _) = isNativeIndexDataAlt con args
+    legacy_constructor_proof _ = False
     is_default (Alt DEFAULT _ _) = True
     is_default _ = False
     covers_domain ty
@@ -1834,7 +1836,7 @@ lintCoreAlt _ case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
     lit_ty = literalType lit
 
 lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rhs)
-  | isNativeIndexAlt alt
+  | isNativeIndexDataAlt con args
   = addLoc (CaseAlt alt) $ do
     { index <- case scrut_index of
         Just index -> return index
@@ -1903,14 +1905,31 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
           (text "Retained constructor fields require fresh local Ids:" <+> ppr args) }
 
         -- And now bring the new binders into scope
-    ; lintL (multiplicities `equalLength` args)
+    ; let (ordinary_args, native_proof)
+            | isNativeIndexedNullaryDataAlt con args
+            , [eq, proof] <- args = ([eq], Just proof)
+            | otherwise = (args, Nothing)
+    ; lintL (multiplicities `equalLength` ordinary_args)
         (text "Wrong number of constructor alternative binders:" <+> ppr alt)
-    ; lintBinders CasePatBind args $ do
-      { rhs_ue <- lintAltExpr rhs alt_ty
+    ; in_scope <- getInScope
+    ; lintBinders CasePatBind ordinary_args $ do
+      { rhs_ue <- case native_proof of
+          Nothing -> lintAltExpr rhs alt_ty
+          Just cv | [eq] <- ordinary_args
+                  , Just index <- scrut_index, isNativeCaseValueIndex index
+                  , Just constructor <- nativeIndexedNullaryCon_maybe scrut_ty con eq ->
+            do { lintL (isLocalId cv && isCoVar cv && cv /= eq
+                        && not (eq `elemInScopeSet` in_scope)
+                        && not (cv `elemInScopeSet` in_scope))
+                   (text "Invalid indexed constructor proof binder:" <+> ppr cv)
+               ; ensureEqTys (varType cv) (mkNomEqPred index constructor)
+                   (text "Invalid nominal indexed constructor proof:" <+> ppr cv)
+               ; lintBinder CasePatBind cv (fmap (`deleteUE` cv) (lintAltExpr rhs alt_ty)) }
+          Just cv -> failWithL (text "Invalid indexed constructor proof:" <+> ppr cv)
       ; rhs_ue' <- allowDeadOccs $  -- See Note [Dead occurrences]
                    addLoc (CasePat alt) $
                    lintAltBinders rhs_ue case_bndr scrut_ty con_payload_ty
-                                  (zipEqual multiplicities  args)
+                                  (zipEqual multiplicities ordinary_args)
       ; return $ deleteUE rhs_ue' case_bndr
       }
    }

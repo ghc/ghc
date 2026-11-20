@@ -62,6 +62,12 @@ cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-op
   Structural retained matching still requires a supported constructor schema.
   See [Agda's dependent function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
   and the `NativeRetainedPackage` source regression.
+- A checked `case` on a named retained vector can refine its identity in a
+  `VNil` branch. The branch uses GHC's ordinary length equality to cast the
+  promoted constructor to the scrutinee kind. The case still demands a
+  vector of known length zero. The initial source rule covers nullary
+  constructors with one closed index refinement. See the `NativeRetainedPackage`
+  source regression.
 - Closed parameterized domains such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
 - Retained workers and function fields through separate interfaces.
 - Nominal scalar-domain conversion with scoped source body solving at M58.

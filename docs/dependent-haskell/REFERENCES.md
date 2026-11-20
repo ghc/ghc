@@ -6587,3 +6587,38 @@ evidence from equality testing. The source examples and acceptance
 checks for this bridge are on the [R03 card](roadmap/R03-dependent-products.md#runtime-type-operands).
 [Proposal and review](https://github.com/ghc-proposals/ghc-proposals/pull/378)
 and [Peyton Jones, Weirich, Eisenberg and Vytiniotis (2016)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf).
+
+### Recursive append at runtime vector arguments
+
+Agda's vector append returns the left head and appends the left tail to
+the right operand. The Haskell proof applies that equation with three
+retained arguments. Ordinary DataKinds promotion supplies the kind of
+`VCons`, including its tail length. An importing module checks the head
+and tail against that kind. Reading the proof does not evaluate either
+field or the right operand.
+[Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
+[proof](examples/packed-vector/OpenVectorAppend.hs)
+and [ordinary client](examples/packed-vector/OrdinaryOpenVectorAppend.hs).
+
+### Eliminating an equality returned by a vector match
+
+Agda's coverage checker unifies the constructor result indices with the
+scrutinee indices. An empty branch can refine an unknown length to zero.
+A constructor clash, such as zero against a successor, rules out a branch.
+In the Haskell example, matching `HRefl` gives the ordinary length
+equality and the identity of the vector. While checking the branch,
+the solver can encounter the value equality before applying the length
+equality. It checks whether the two kinds are surely apart before
+reporting that the branch is unreachable.
+[Agda 2.8.0, matching on indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes)
+and [GHC apartness](../../compiler/GHC/Core/Unify.hs).
+
+The fork also preserves the nominal evidence when the optimizer rewrites
+a cast on a retained expression. GHC distinguishes nominal equality from
+representational equality. For a package payload, the optimizer can
+rewrite the nominal proof it already has and then reconstruct the outer
+representational cast. A cast that has only representational evidence
+follows GHC's ordinary simplification path.
+[GHC roles](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/roles.html),
+[coercion operations](../../compiler/GHC/Core/Coercion.hs)
+and [optimization checkpoint](CHECKPOINTS.md#family-and-package-checkpoints).

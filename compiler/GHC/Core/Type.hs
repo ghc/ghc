@@ -69,6 +69,7 @@ module GHC.Core.Type (
         isNativeOpaqueValueId, isNativeOpaqueValueType,
         isNativeIndexDomainConversion,
         isNativeRetainedBinder, isNativeRetainedBinderType,
+        isNativeRetainedField, isNativeRetainedFieldType,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
@@ -2597,6 +2598,20 @@ isNativeRetainedBinderType ty
   = (isNativeOpaqueValueType ty && isNativeAlgebraicOrAbstractDomain ty)
     || isJust (nativeIndexFunctionTypeTys_maybe ty)
 
+-- | Check the Id stored in a retained constructor field telescope.
+-- See Note [Opaque algebraic retained binders].
+isNativeRetainedField :: Id -> Bool
+isNativeRetainedField v
+  = isNativeIndexId v || isNativeIndexFunctionId v
+    || (isTyVarTy (varType v) && isNativeOpaqueValueId v)
+
+-- | Check the domain of a retained constructor field before making its Id.
+-- See Note [Opaque algebraic retained binders].
+isNativeRetainedFieldType :: Type -> Bool
+isNativeRetainedFieldType ty
+  = isNativeIndexType ty || isJust (nativeIndexFunctionTypeTys_maybe ty)
+    || (isTyVarTy ty && isNativeOpaqueValueType ty)
+
 -- | Test the head of an opaque value domain after expanding synonyms.
 -- The caller checks the full domain's lifted kind.
 isNativeAlgebraicOrAbstractDomain :: Type -> Bool
@@ -2621,6 +2636,14 @@ The binder does not reify Vec's constructors as indices. Constructor
 reification and structural matching still require isNativeIndexType.
 Function calls still use the fixed head check in
 Note [Function-valued retained binders].
+
+A named constructor field remains subject to the structural domain policy.
+Its checked telescope can also supply the fields of a promoted retained
+constructor. Keep the existing abstract witness and fixed function cases.
+That policy rejects a structural cycle through an unsupported retained
+telescope. The value-binder check only uses the outer lifted data head.
+Use the field predicate in source and interface constructor checking and
+when building DataCon metadata.
 
 Agda's checkPiTelescope checks the domain and extends the context for the
 result. See docs/dependent-haskell/REFERENCES.md#agda-provenance. The GHC

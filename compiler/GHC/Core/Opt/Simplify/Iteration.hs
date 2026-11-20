@@ -1289,7 +1289,10 @@ simplExprF1 env (Unpack witness payload package body) cont
 
 simplExprF1 env (Cast body co) cont
   = do  { co1 <- {-#SCC "simplCast-simplCoercion" #-}
-                 simplCoercion env co
+                 -- See Note [Simplifying casts on retained values].
+                 if sm_core_mode (seMode env) == RetainedCore
+                 then mapNativeIndexCastCoM (simplCoercion env) co
+                 else simplCoercion env co
 
         ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
                    if isReflCo co1
@@ -1492,6 +1495,19 @@ simplCoercion env co
     subst = getTCvSubst env
     opts  = seOptCoercionOpts env
     subst_only = isEmptyTvSubst subst || reSimplifying env
+
+{- Note [Simplifying casts on retained values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A package payload can be cast from its generated family type to Vec a n.
+If it is passed to a retained function, the result type can mention the
+same value at the latter index. The cast on the expression is
+representational, but its SubCo contains the nominal proof used by the
+type. Simplifying the outer coercion can discard that proof, for example
+when the simplifier substitutes an element type. Simplify the recoverable
+nominal proof and restore the value cast. A representational-only
+coercion takes the ordinary path. See Note [Nominal native index casts]
+in GHC.Core.
+-}
 
 {- Note [Optimising coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

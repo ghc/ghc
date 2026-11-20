@@ -32,6 +32,7 @@ for opt in -O0 -O1 -O2; do
     "${ghc[@]}" "$opt" "${interfaces[@]}" -fforce-recomp -fwrite-source-equations -c PackedVecLibrary.hs
     "${ghc[@]}" --show-iface PackedVecLibrary.hi > provider.iface
     grep -Fq 'FinalCoreSourceTable T:appendVec' provider.iface
+    grep -Fq "T:appendVec ('VCons" provider.iface
 
     # Compile the proof with only the producer interface.
     cd "$out/client"
@@ -48,11 +49,17 @@ for opt in -O0 -O1 -O2; do
 module Main where
 
 import Control.Exception (SomeException, evaluate, try)
+import Control.Monad (unless, void)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
-import OpenVectorAppend (appendEmptyAt)
-import OrdinaryOpenVectorAppend (appendContents, observeAppendEmpty)
+import OpenVectorAppend (appendConsAt, appendEmptyAt)
+import OrdinaryOpenVectorAppend (appendContents, observeAppendCons, observeAppendEmpty)
 import qualified PackedVecLibrary as P
+
+raises :: a -> IO Bool
+raises value = do
+    result <- try (void (evaluate value)) :: IO (Either SomeException ())
+    pure (case result of Left _ -> True; Right _ -> False)
 
 main :: IO ()
 main = do
@@ -60,15 +67,27 @@ main = do
     let proofOnly :: P.Vec Bool n -> Bool
         proofOnly v = case appendEmptyAt v of Refl -> True
     print (observeAppendEmpty, appendContents xs, proofOnly (error "forced proof input" :: P.Vec Bool 'P.Z))
-    left <- try (evaluate (P.appendVec (error "forced left" :: P.Vec Bool 'P.Z) P.VNil))
-      :: IO (Either SomeException (P.Vec Bool 'P.Z))
-    case left of
-      Left _ -> pure ()
-      Right _ -> fail "append did not inspect its left operand"
+    putStrLn observeAppendCons
+    let bottom = error "forced vector" :: P.Vec Bool 'P.Z
+    let consProof :: a -> P.Vec a n -> P.Vec a m -> Bool
+        consProof hd tl ys = case appendConsAt hd tl ys of Refl -> True
+    unless (consProof (error "forced proof head") bottom bottom) (fail "missing recursive proof")
+    left <- raises (P.appendVec bottom P.VNil)
+    unless left (fail "append did not inspect its left operand")
+    case P.appendVec (P.VCons (error "forced head") bottom) bottom of
+      P.VCons headValue tailValue -> do
+        headDemand <- raises headValue
+        leftTailDemand <- raises tailValue
+        unless (headDemand && leftTailDemand) (fail "append changed left field demand")
+    case P.appendVec (P.VCons True P.VNil) bottom of
+      P.VCons True tailValue -> do
+        rightDemand <- raises tailValue
+        unless rightDemand (fail "append changed right field demand")
+      P.VCons False _ -> fail "append changed the head"
 HS
     "${ghc[@]}" "$opt" -fforce-recomp -c OrdinaryOpenVectorAppend.hs Main.hs
     "${ghc[@]}" Main.o OrdinaryOpenVectorAppend.o OpenVectorAppend.o ../provider/PackedVecLibrary.o -o append-run
-    [[ $(./append-run) == '(("Refl",True),[True,False],True)' ]]
+    [[ $(./append-run) == $'(("Refl",True),[True,False],True)\nRefl' ]]
 done
 
 cat >WrongTail.hs <<'HS'
@@ -97,6 +116,32 @@ wrong xs ys = Refl
 HS
 reject WrongRuntime.hs 83865 'wrong xs ys = Refl' -O1
 
+cat >WrongConsAt.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module WrongConsAt where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+wrong :: foreach (x :: Bool) -> foreach (y :: Bool) -> foreach (xs :: P.Vec Bool n)
+      -> foreach (ys :: P.Vec Bool m)
+      -> P.appendVec ('P.VCons x xs) ys :~: 'P.VCons y (P.appendVec xs ys)
+wrong x y xs ys = Refl
+HS
+reject WrongConsAt.hs 83865 'wrong x y xs ys = Refl' -O1
+
+cat >AnnotatedField.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module AnnotatedField where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+proof :: forall n. foreach (xs :: P.Vec Bool n)
+      -> P.appendVec ('P.VCons 'True (xs :: P.Vec Bool n)) 'P.VNil
+         :~: 'P.VCons 'True (P.appendVec xs 'P.VNil)
+proof _ = Refl
+HS
+"${ghc[@]}" -O1 -c AnnotatedField.hs
+
 cat >OpaqueLeft.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
@@ -111,6 +156,66 @@ opaqueLeft :: forall (left :: P.Vec Bool 'P.Z) (xs :: P.Vec Bool ('P.S 'P.Z)).
 opaqueLeft _ = Refl
 HS
 reject OpaqueLeft.hs 25897 'opaqueLeft _ = Refl' -O1
+
+cat >AnnotatedOperands.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module AnnotatedOperands where
+
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+
+annotatedEmpty :: forall (n :: P.Nat) (xs :: P.Vec Bool n).
+                  P.appendVec ('P.VNil :: P.Vec Bool 'P.Z) xs :~: xs
+annotatedEmpty = Refl
+
+annotatedCons :: forall (n :: P.Nat) (m :: P.Nat) (x :: Bool)
+                        (xs :: P.Vec Bool n) (ys :: P.Vec Bool m).
+                 Proxy xs -> Proxy ys ->
+                 P.appendVec ('P.VCons x xs :: P.Vec Bool ('P.S n)) (ys :: P.Vec Bool m)
+                   :~: 'P.VCons x (P.appendVec xs ys)
+annotatedCons _ _ = Refl
+HS
+"${ghc[@]}" -O1 -c AnnotatedOperands.hs
+
+cat >BadIndexAnnotation.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module BadIndexAnnotation where
+
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+
+wrongIndex :: forall (n :: P.Nat) (xs :: P.Vec Bool n).
+              P.appendVec ('P.VNil :: P.Vec Bool ('P.S 'P.Z)) xs :~: xs
+wrongIndex = Refl
+HS
+reject BadIndexAnnotation.hs 83865 "'P.VNil" -O1
+
+cat >WrongCons.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, PolyKinds, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module WrongCons where
+
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+
+wrongHead :: forall a (n :: P.Nat) (m :: P.Nat) (x :: a) (x' :: a)
+                     (xs :: P.Vec a n) (ys :: P.Vec a m).
+              Proxy xs -> Proxy ys ->
+              P.appendVec ('P.VCons x xs) ys :~: 'P.VCons x' (P.appendVec xs ys)
+wrongHead _ _ = Refl
+
+wrongCarried :: forall a (n :: P.Nat) (m :: P.Nat) (x :: a)
+                        (xs :: P.Vec a n) (ys :: P.Vec a m) (zs :: P.Vec a m).
+                 Proxy xs -> Proxy ys -> Proxy zs ->
+                 P.appendVec ('P.VCons x xs) ys :~: 'P.VCons x (P.appendVec xs zs)
+wrongCarried _ _ _ = Refl
+HS
+reject WrongCons.hs 25897 'wrongHead _ _ = Refl' -O1
+grep -Fq 'wrongCarried _ _ _ = Refl' WrongCons.log
 
 sed '/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}$/d' "$src/OpenVectorAppend.hs" > OpenVectorAppend.hs
 reject OpenVectorAppend.hs 83605 'Use -fno-enable-rewrite-rules' -O1 -fenable-rewrite-rules
@@ -143,3 +248,29 @@ fi
 cd "$out/client"
 cp ../provider/PackedVecLibrary.hi "$src/OpenVectorAppend.hs" .
 reject OpenVectorAppend.hs 70565 'This operand contains an open or unsupported field.' -O1 -fforce-recomp
+
+# Preserve the empty equation if the cons branch forces a field or
+# changes the recursive call's carried operand.
+for mutant in force-head change-carried; do
+    cd "$out/provider"
+    case "$mutant" in
+      force-head)
+        replacement='appendVec (VCons x xs) ys = x `seq` VCons x (appendVec xs ys)' ;;
+      change-carried)
+        replacement='appendVec (VCons x xs) ys = VCons x (appendVec xs (error "changed right operand" `asTypeOf` ys))' ;;
+    esac
+    sed "s/^appendVec (VCons x xs) ys = .*/$replacement/" "$src/PackedVecLibrary.hs" > PackedVecLibrary.hs
+    "${ghc[@]}" -O1 -fforce-recomp -fwrite-source-equations -c PackedVecLibrary.hs
+    "${ghc[@]}" --show-iface PackedVecLibrary.hi > "$mutant.iface"
+    grep -Fq 'FinalCoreSourceTable T:appendVec' "$mutant.iface"
+    if grep -Fq "T:appendVec ('VCons" "$mutant.iface"; then
+        printf '%s unexpectedly exported a cons equation\n' "$mutant" >&2
+        exit 1
+    fi
+    cd "$out/client"
+    cp ../provider/PackedVecLibrary.hi .
+    sed -e '/^-- | Appending a cons/,$d' -e 's/^module OpenVectorAppend .*/module EmptyOnly (appendEmpty, appendEmptyAt) where/' \
+        "$src/OpenVectorAppend.hs" > EmptyOnly.hs
+    "${ghc[@]}" -O1 -fforce-recomp -c EmptyOnly.hs
+    reject OpenVectorAppend.hs 70565 'This operand contains an open or unsupported field.' -O1 -fforce-recomp
+done

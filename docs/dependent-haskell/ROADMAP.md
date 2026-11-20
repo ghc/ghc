@@ -14,7 +14,10 @@ A retained function can name an entire indexed vector as its argument.
 undefined vector. Using two different vector binders in the same equality
 fails at `Refl`. A type synonym can also name a dependent consumer. An
 ordinary module uses the exported synonym to pass an indexed payload.
-Matching an indexed vector constructor to refine the value `xs` remains open.
+A match on `VNil` now refines the value `xs` and its length. The
+branch can return a heterogeneous equality between `xs` and `VNil`.
+Matching the outer constructor still forces the vector. Refinement to
+`VCons x rest` with the actual head and tail remains under development.
 [Dependent products](roadmap/R03-dependent-products.md) and
 [named consumer](examples/packed-vector/DependentPair.hs).
 
@@ -38,8 +41,10 @@ equality proof fail at `Refl`. The ordinary polymorphic `appendVec` can itself a
 GHC infers the input lengths of two written vectors, reduces their sum,
 and checks the exact output elements. An ordinary client can also use
 `appendEmptyAt xs` to prove that appending an empty vector preserves
-its runtime input. The proof does not inspect `xs`. Reconstructing
-arbitrary inputs after splitting still needs the recursive case.
+its runtime input. The proof does not inspect `xs`. The recursive
+equation also applies to a runtime head, left tail, and right vector.
+Reconstructing an arbitrary input after splitting still needs a proof
+that identifies the vector matched in the successor branch.
 [Split and prior art](REFERENCES.md#split-a-vector-at-a-retained-length) and
 [contents proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
 
@@ -261,6 +266,24 @@ source examples. General promotion remains open.
 [R21 declaration dependencies](roadmap/R21-dependency-analysis.md).
 
 ## Current work queue
+
+1. **R03 and R05.** Check indexed constructor patterns. A caller must
+   be able to match a returned equality and use the refined length.
+   Extend the empty case to a constructor with runtime fields. Preserve
+   the identity of each field and the demand on the original scrutinee.
+   [Indexed patterns](roadmap/R03-dependent-products.md).
+2. **R16.** Check both equations of ordinary vector append at symbolic
+   arguments through separate compilation. The right operand can be
+   undefined. The recursive equation must preserve the head and must
+   recurse on the tail. [Append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
+3. **R03 and R04.** Return the prefix and suffix together with evidence
+   that their append equals the original vector. This uses both the
+   constructor refinement and the open equations. Check generated
+   package signatures where the kind of one captured variable mentions
+   an earlier capture. [Dependent sums](roadmap/R04-dependent-sums.md)
+   and [Agda's split proof](REFERENCES.md#split-a-vector-at-a-retained-length).
+
+### Other open work
 
 1. **R05.** A rule can match a retained head from another module.
    The same checked type application supplies the domains of `m`

@@ -1,9 +1,10 @@
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module Main (main) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
 import Data.List (isPrefixOf)
+import Data.Maybe (isJust)
 import GHC.Sigma (Sigma(Pair))
 import NativeGadtRetainedSumProvider
 
@@ -12,6 +13,15 @@ paired (Nested (Pair _ (xs, Pair _ (ys, _)))) = cells (zipVec xs ys)
 
 outerCells :: Nested a -> [a]
 outerCells (Nested (Pair _ (xs, _))) = cells xs
+
+isEmptyPack :: Packed Bool -> Bool
+isEmptyPack (Pair _ xs) = isJust (emptyWitness xs)
+
+phantomPayload :: Phantom -> Bool
+phantomPayload (Pair _ xs) = sameLength xs empty
+  where
+    empty :: Vec Bool 'Z
+    empty = VNil
 
 require :: Bool -> String -> IO ()
 require ok label = unless ok (fail label)
@@ -30,6 +40,10 @@ main = do
         value = makeNested (S Z) (S (S Z)) one other (VCons False one)
         hidden = makeHidden (S (S Z)) one other (VCons False one)
         aligned = [(True, False)]
+    require (isEmptyPack (pack Z VNil)) "inferred empty payload index"
+    require (not (isEmptyPack (pack (S Z) (VCons True (error "unused tail")))))
+        "inferred nonempty payload index without demanding its tail"
+    require (phantomPayload phantom) "the reduced payload determines the index"
     require (storedLengths value == (1, 2)) "stored lengths"
     require (innerCells value == [False, True]) "inner cells"
     require (paired value == aligned) "shared outer index"

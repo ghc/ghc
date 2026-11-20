@@ -1374,7 +1374,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                                  (\v -> isId v && not (v `elemVarSet` scope)) field_ty)
                             && case mb of
                                  Nothing -> True
-                                 Just _  -> isManyTy mult && isNativeRetainedBinderType field_ty
+                                 Just _  -> isManyTy mult && isNativeRetainedFieldType field_ty
                   ; unless valid $
                       failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
                                $$ text "Expected a lifted field with only earlier runtime indices;"
@@ -2062,7 +2062,10 @@ tcIfaceType = go
                _ -> return ()
            ; case isPromotedDataCon_maybe tc' of
                Just con
-                 | not (null (dataConRepArgBinders con)) ->
+                 -- See Note [Runtime arguments of promoted GADT constructors].
+                 | let (_, _, eqs, theta, _, _) = dataConFullSig con
+                       indexed = any (anyFreeVarsOfType isId) tks' && not (null eqs) && null theta
+                 , not (null (dataConRepArgBinders con)) || indexed ->
                    check_iface_retained_args (ppr tc) (tyConKind tc') tks'
                  | let (tys, fields) = splitAt (length (dataConUnivTyVars con)) tks'
                  , any (anyFreeVarsOfType isId) fields ->
@@ -2138,6 +2141,19 @@ checkIfaceForAllMatchability ma
   = unless (typeKind ma `eqType` matchabilityTy) $
       failIfM (text "Invalid forall matchability in interface:" <+> ppr ma
                $$ text "Expected kind Matchability.")
+
+{- Note [Runtime arguments of promoted GADT constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DataKinds gives 'VCons a telescope with an element type a, a tail length n,
+a head of kind a, and a tail of kind Vec a n. The result has kind Vec a (S n).
+The constructor can occur in an exported type with retained values for its
+head and tail. Check them against the promoted telescope, substituting each
+argument before checking the next one. Splitting arguments at the number
+of parent parameters cannot recover the tail length from the result index.
+
+This checks an application in a type. Deriving evidence from a case expression
+requires the constructor and fields of the actual scrutinee.
+-}
 
 -- | Check the exact lifted kind without printing a possibly recursive Type.
 -- See Note [Positioning of forkM] and Note [Detected recursive native interface domains].
@@ -2497,7 +2513,17 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         IfaceDefaultAlt   -> return DEFAULT
         IfaceDefaultAltWithProof -> return DEFAULT
         IfaceLitAlt lit   -> LitAlt <$> tcIfaceLit lit
-        IfaceDataAlt name -> DataAlt <$> tcIfaceDataCon name
+        IfaceDataAlt name -> do
+          dc <- tcIfaceDataCon name
+          when (isNativeIndexedNullaryDataAlt dc names) $
+            failIfM (text "Missing indexed constructor proof tag:" <+> ppr dc)
+          return (DataAlt dc)
+        IfaceIndexedDataAltWithProof name -> do
+          dc <- tcIfaceDataCon name
+          unless (isNativeIndexedNullaryDataAlt dc names && hasNoDups (case_bndr : names)) $
+            failIfM (text "Invalid indexed constructor proof in interface alternative:"
+                     <+> ppr dc <+> ppr names)
+          return (DataAlt dc)
         IfaceDataAltWithProof name -> do
           dc <- tcIfaceDataCon name
           unless (isNativeIndexDataAlt dc names) $
@@ -2509,7 +2535,10 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         has_alt con = any (\(c, _, _) -> c == con) resolved
         scrut_index = exprToNativeIndex scrut'
         constructor_proof = any native_alt resolved
-        native = constructor_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
+        indexed_proof = any (\(con, ns, _) -> case con of
+                               DataAlt dc -> isNativeIndexedNullaryDataAlt dc ns
+                               _ -> False) resolved
+        native = constructor_proof || indexed_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
     when constructor_proof $ do
       when (isNothing scrut_index) $
         failIfM (text "Unsupported scrutinee for native index interface evidence:" <+> ppr scrut')
@@ -2619,6 +2648,21 @@ tcIfaceAlt _ _ _ _ (con@(LitAlt _), names, rhs) = do
   Alt con [] <$> tcIfaceExpr rhs
 
 tcIfaceAlt scrut scrut_index case_bndr (tycon, inst_tys) (DataAlt con, names, rhs)
+  | isNativeIndexedNullaryDataAlt con names
+  , [eq_name, proof_name] <- names
+  = do { uniqs <- getUniquesM
+       ; let pat = dataConRepFSInstPat [ifLclNameFS eq_name] uniqs mult con inst_tys
+       ; case (scrut_index, pat) of
+           (Just index, ([], [eq]))
+             | isNativeCaseValueIndex index
+             , Just constructor <- nativeIndexedNullaryCon_maybe (exprType scrut) con eq ->
+                 do { fresh <- newIfaceName (mkVarOccFS (ifLclNameFS proof_name))
+                    ; let cv = mkCoVar fresh (mkNomEqPred index constructor)
+                          binders = [eq, cv]
+                    ; rhs' <- extendIfaceIdEnv binders (tcIfaceExpr rhs)
+                    ; return (Alt (DataAlt con) binders rhs') }
+           _ -> failIfM (text "Invalid indexed constructor proof endpoint:"
+                         <+> ppr con <+> ppr (exprType scrut)) }
   | isNativeIndexDataAlt con names
   = do { (field_names, proof_name) <- case splitAt (dataConRepArity con) names of
            (fs, [p]) | hasNoDups names -> return (fs, p)

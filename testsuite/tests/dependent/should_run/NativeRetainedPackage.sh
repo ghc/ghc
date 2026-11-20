@@ -13,6 +13,22 @@ cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness,DependentPa
 "${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs RetainedWitness.hs
 "${g[@]}" -O1 -fomit-interface-pragmas -fno-write-if-simplified-core -c DependentPair.hs
 cp DependentPair.hi "$out/client/"
+cat >IndexedCapture.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, NoStandaloneKindSignatures, PolyKinds, TypeFamilies, TypeOperators, UndecidableInstances #-}
+module IndexedCapture (captured) where
+import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import PackedVecLibrary (Add, Nat(..))
+
+type Keep (n :: Nat) (m :: Nat) (x :: Proxy (Add n m)) =
+    some (tag :: Bool) | (x :~: x)
+
+captured :: Keep 'Z ('S 'Z) 'Proxy
+captured = Pair True Refl
+HS
+"${g[@]}" -fomit-interface-pragmas -Werror=unused-foralls -c IndexedCapture.hs
+cp IndexedCapture.hi "$out/client/"
 cp {PackedVecLibrary,PackedLength,RetainedNat,RetainedWitness,DependentPair}.hi "$src"/{PackedProjection,RetainedProjection,DependentProjection}.hs "$out/projection/"
 cd "$out/projection"
 "${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs RetainedProjection.hs DependentProjection.hs
@@ -31,9 +47,12 @@ HS
 cp {PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness,PackedProjection,RetainedProjection,Mixed}.hi "$out/client/"
 cd "$out/client"
 cat >Main.hs <<'HS'
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module Main where
 import Data.Functor.Const (Const(..))
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import IndexedCapture (captured)
 import PackedVecLibrary
 import RetainedNat
 import RetainedProjection (project)
@@ -47,9 +66,12 @@ main = do
   let q = constantPackage (error "unused projected witness") (7 :: Int)
   print (getConst (project q))
   print (withRetained q (\_ box -> case box of Const x -> x))
+  case captured of
+    Pair True Refl -> pure ()
+    Pair False _ -> fail "unexpected captured witness"
 HS
 "${g[@]}" -c Main.hs
-"${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
+"${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{IndexedCapture,PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
 ./run
 cat >General.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds #-}
@@ -369,11 +391,11 @@ cd "$out/provider"
 cp "$src/"{StoredVector,ConservedPartition}.hs .
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c StoredVector.hs ConservedPartition.hs
 cat >VectorIdentity.hs <<'HS'
-{-# LANGUAGE CPP, ExperimentalDependentTypes, GADTs, PolyKinds #-}
-module VectorIdentity (vectorRefl, forwardVector) where
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
+module VectorIdentity (vectorRefl, forwardVector, zeroRefl, matchZero) where
 
-import Data.Type.Equality ((:~:)(Refl))
-import PackedVecLibrary (Vec)
+import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
+import PackedVecLibrary (Nat(..), Vec(..))
 
 vectorRefl :: foreach (xs :: Vec a n) -> xs :~: xs
 vectorRefl _ = Refl
@@ -381,14 +403,32 @@ vectorRefl _ = Refl
 forwardVector :: foreach (xs :: Vec a n) -> xs :~: xs
 forwardVector xs = vectorRefl xs
 
+zeroRefl :: foreach (xs :: Vec Bool 'Z) -> xs :~: ('VNil :: Vec Bool 'Z)
+zeroRefl xs = case xs of
+    VNil -> Refl
+
+matchZero :: foreach (xs :: Vec Bool n) -> Maybe (xs :~~: ('VNil :: Vec Bool 'Z))
+matchZero xs = case xs of
+    VNil -> Just HRefl
+    VCons _ _ -> Nothing
+
 #ifdef WRONG_VECTOR
 wrongVector :: foreach (xs :: Vec a n) -> foreach (ys :: Vec a n) -> xs :~: ys
 wrongVector _ _ = Refl
+
+wrongZero :: foreach (xs :: Vec Bool 'Z) -> foreach (ys :: Vec Bool 'Z) ->
+             (xs :~: ('VNil :: Vec Bool 'Z), ys :~: ('VNil :: Vec Bool 'Z))
+wrongZero xs _ = case xs of
+    VNil -> (Refl, Refl)
 #endif
 HS
-"${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
+"${g[@]}" -O2 -Werror=inaccessible-code -Werror=overlapping-patterns \
+    -fno-omit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
+"${g[@]}" --show-iface VectorIdentity.hi >vector-identity.iface
+grep -Fq 'indexed-constructor-case' vector-identity.iface
 if "${g[@]}" -ferror-spans -fforce-recomp -DWRONG_VECTOR -c VectorIdentity.hs >wrong-vector.log 2>&1 ||
-   ! grep -Fq 'VectorIdentity.hs:15:19-22: error: [GHC-83865]' wrong-vector.log; then
+   ! grep -Fq 'VectorIdentity.hs:24:19-22: error: [GHC-83865]' wrong-vector.log ||
+   ! grep -Fq 'VectorIdentity.hs:29:20-23: error: [GHC-83865]' wrong-vector.log; then
     cat wrong-vector.log >&2
     exit 1
 fi
@@ -398,19 +438,37 @@ cd "$out/projection"
 cp {StoredVector,ConservedPartition,ListVectorClient}.hi "$out/client/"
 cp "$out/provider/VectorIdentity.hi" "$out/client/"
 cd "$out/client"
+# A successor-length vector cannot be VNil.
+cat >Impossible.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module Impossible where
+import Data.Type.Equality ((:~~:)(HRefl))
+import PackedVecLibrary (Nat(..), Vec(..))
+impossible :: foreach (xs :: Vec Bool ('S n)) -> Maybe (xs :~~: ('VNil :: Vec Bool 'Z)) -> Bool
+impossible _ proof = case proof of
+    Just HRefl -> True
+    Nothing -> False
+HS
+if "${g[@]}" -Werror=inaccessible-code -c Impossible.hs >impossible.log 2>&1 ||
+   ! grep -Fq '[GHC-40564]' impossible.log; then
+    cat impossible.log >&2
+    exit 1
+fi
+
 cat >ListVectorMain.hs <<'HS'
-{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
+{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments, ScopedTypeVariables, TypeApplications #-}
 module Main where
+import Control.Exception (ErrorCall, evaluate, try)
 import ConservedPartition (Split, branchContents, partitionVec)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust, isNothing)
-import Data.Type.Equality ((:~:)(Refl))
+import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
 import GHC.Sigma (Sigma(Pair))
 import ListVectorClient
 import PackedVecLibrary (Add, Nat(..), Vec(..), appendNative, appendVec, dropVec, replicateNative,
                          splitAtVec, splitAtVecChecked, takeVec, toList)
 import StoredVector (ListVector)
-import VectorIdentity (forwardVector, vectorRefl)
+import VectorIdentity (forwardVector, matchZero, vectorRefl, zeroRefl)
 observe :: ListVector Char -> (Int, String)
 observe = contents
 empty :: Split Int 'Z
@@ -418,6 +476,12 @@ empty = partitionVec (error "unused empty predicate") (VNil :: Vec Int 'Z)
 onlyKept, onlyDropped :: Split Int ('S 'Z)
 onlyKept = Pair (S Z) (Pair Z (VCons 7 VNil, error "unused dropped partition", error "unused sum proof"))
 onlyDropped = Pair Z (Pair (S Z) (error "unused kept partition", VCons 9 VNil, Refl))
+-- | Matching the proof refines the original vector's unknown length.
+onlyEmpty :: forall n. Vec Bool n -> Maybe (Vec Bool 'Z)
+onlyEmpty xs = case matchZero @n xs of
+    Just HRefl -> Just xs
+    Nothing -> Nothing
+
 vectorProofs :: Vec Int n -> (Bool, Bool)
 vectorProofs xs =
     (case vectorRefl xs of Refl -> True, case forwardVector xs of Refl -> True)
@@ -448,9 +512,23 @@ main = do
                   length (toList (fst one)))
     let proofs = (vectorProofs (VCons 7 VNil),
                   vectorProofs (error "unused indexed vector" :: Vec Int 'Z))
-    case (mixed, lazy, selected, split, demand, proofs) of
+    let zero = VNil :: Vec Bool 'Z
+        nonzero = VCons (error "unused head") (error "unused tail" :: Vec Bool 'Z)
+        knownZero = case zeroRefl zero of Refl -> True
+        openZero = case matchZero zero of
+            Just HRefl -> True
+            Nothing -> False
+        lazyCons = case matchZero nonzero of
+            Nothing -> True
+            Just _ -> False
+        bottom = error "zero case demands the scrutinee" :: Vec Bool 'Z
+    forced <- try (evaluate (case zeroRefl bottom of Refl -> True)) :: IO (Either ErrorCall Bool)
+    let emptyResults = isJust (onlyEmpty zero) && isNothing (onlyEmpty nonzero)
+        zeroChecks = knownZero && openZero && lazyCons && emptyResults
+                  && either (const True) (const False) forced
+    case (mixed, lazy, selected, split, demand, proofs, zeroChecks) of
         ((4, [3, 4, 1, 2]), 1, [(0, []), (0, []), (1, [7]), (1, [9])],
-         ([7], [9]), (0, 1, 1), ((True, True), (True, True))) -> pure ()
+         ([7], [9]), (0, 1, 1), ((True, True), (True, True)), True) -> pure ()
         other -> fail (show other)
     cut <- newIORef (S (S Z)) >>= readIORef
     let joined = appendNative @Int cut (S Z) (replicateNative cut 7) (VCons 9 VNil)

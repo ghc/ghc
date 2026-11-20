@@ -61,6 +61,31 @@ HS
     fi
     grep -Eq 'BadBranch.hs:6:[0-9]+-[0-9]+: error: \[GHC-25897\]' reject.log || { cat reject.log >&2; exit 1; }
 
+    cat >BadPayload.hs <<'HS'
+{-# LANGUAGE CPP, GADTs, NoExperimentalDependentTypes #-}
+module BadPayload where
+import GHC.Sigma (Sigma(Pair))
+import NativeGadtRetainedSumProvider
+#ifdef ESCAPE
+bad :: Packed Bool -> Vec Bool caller
+bad (Pair _ xs) = forward xs
+#else
+bad :: Packed Bool -> Packed Bool -> Bool
+bad (Pair _ xs) (Pair _ ys) = sameLength xs ys
+#endif
+HS
+    for which in ESCAPE INDEPENDENT; do
+        if "${ghc[@]}" "${flags[@]}" -D"$which" -ferror-spans -c BadPayload.hs >reject.log 2>&1; then
+            echo "Accepted $which" >&2
+            exit 1
+        fi
+        case $which in
+            ESCAPE) expected='BadPayload.hs:7:19-[0-9]+: error: \[GHC-25897\]' ;;
+            INDEPENDENT) expected='BadPayload.hs:10:45-46: error: \[GHC-83865\]' ;;
+        esac
+        grep -Eq "$expected" reject.log || { cat reject.log >&2; exit 1; }
+    done
+
     cat >BadScope.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes #-}
 module BadScope where

@@ -68,7 +68,7 @@ import GHC.Types.Avail (availNames)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(SourceTableId, VanillaId))
-import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
@@ -1042,8 +1042,8 @@ sourceCaseTables binds = do
             table <- publishConstructorCase owner signature rows
             pure (Just (finalOwner owner table, table), [])
           Nothing | indexed_candidate owner
-                  , Just projection <- checkedIndexedProjection prepare owner body -> do
-            checked <- publishIndexedProjection owner projection
+                  , Just (projection, recursion) <- checkedIndexedProjection prepare owner body -> do
+            checked <- publishIndexedProjection owner projection recursion
             pure (fmap (\table -> (finalOwner owner table, table)) checked, [])
           _ -> pure (Nothing, [])
       let reverse_workers = mkNameEnv
@@ -1653,8 +1653,8 @@ ordinary function. Check that the function cases on its first operand
 and that the exact nullary alternative returns the second operand. A
 cast has no runtime effect. Use separate nominal evidence for the equation.
 
-The family quantifies the original invisible telescope. Its one row
-supplies the index from the constructor result and quantifies the
+The family quantifies the original invisible telescope. Each row
+supplies the index from its constructor result and quantifies the
 remaining parameters and the carried operand. Build the nominal
 result-kind cast using ordinary family axioms. Permit one reduction
 per argument under the same boxed result datatype. This check runs
@@ -1662,11 +1662,22 @@ before installing the module's source owners, so it uses the family
 matcher directly. The cast records its axioms. Installation and
 subsequent evidence use check those owners and their RULES.
 
-Check the same projection again in final Core. A different alternative
-does not need a certificate. Type application uses the family for the
-written constructor or a bare neutral left operand. Keep the ordinary
-term for closed inputs with a different constructor. The reduction
-cannot select the row from a length index alone.
+The second row can rebuild one lazy constructor. The ordinary GADT
+alternative binds its existential predecessor and its two fields. Check
+that the result copies that head and suspends the same owner applied to
+the strict subpattern and the same carried operand. Keep the other erased
+arguments unchanged. Derive the promoted output index from the recursive
+call's declared result. The same nominal argument check proves the cast
+to the current branch's result kind. This certificate gives a decreasing
+left operand and leaves argument definedness to the caller.
+
+Check each published row again in final Core. The typechecker uses the
+family for the nullary constructor, a checked recursive constructor with
+a symbolic operand, or a bare neutral left operand. Closed recursive calls
+keep the executable route. A symbolic field can be either an erased type
+variable or a retained value from the type checker's index environment.
+Check the original operand after selecting the equation. The length index
+alone cannot select a row.
 -}
 
 -- | The owner's telescope, visible types, and one specialized index.
@@ -1712,12 +1723,14 @@ indexedProjectionType ty = do
 
 -- | Read only the explicit case on the first operand and its selected row.
 checkedIndexedProjection :: (Core.CoreExpr -> Core.CoreExpr) -> Id -> Core.CoreExpr
-                         -> Maybe IndexedProjection
+                         -> Maybe (IndexedProjection, Maybe IndexedRecursion)
 checkedIndexedProjection prepare owner original = do
-  projection@(IndexedProjection binders _ _ con _ _ _) <- indexedProjectionType (varType owner)
+  projection@(IndexedProjection binders _ _ con slot _ _) <- indexedProjectionType (varType owner)
   guard (exprType original `eqType` varType owner)
   let (parameters, body) = Core.collectBinders (prepare original)
-  [left, right] <- pure (drop (length binders) parameters)
+      (core_types, arguments) = splitAt (length binders) parameters
+  [left, right] <- pure arguments
+  guard (all isTyVar core_types)
   Core.Case (Core.Var scrutinee) _ _ alts <- pure body
   guard (left == scrutinee && isId right)
   [rhs] <- pure [branch | Core.Alt (Core.DataAlt dc) [evidence] branch <- alts,
@@ -1725,16 +1738,21 @@ checkedIndexedProjection prepare owner original = do
   -- Bytecode inserts a debugger breakpoint around the selected RHS.
   -- It does not evaluate the captured variables. Keep the original Core.
   case stripTicksTopE breakpoint rhs of
-    Core.Var v | v == right -> pure projection
-    Core.Cast (Core.Var v) _ | v == right -> pure projection
+    Core.Var v | v == right -> pure ()
+    Core.Cast (Core.Var v) _ | v == right -> pure ()
     _ -> Nothing
+  let recursion = do
+        row <- indexedRecursionType projection
+        checkIndexedRecursion owner (binderVars binders) slot core_types right alts row
+        pure row
+  pure (projection, recursion)
   where
     breakpoint Breakpoint{} = True
     breakpoint _ = False
 
 -- | Publish the selected row with actual nominal result-kind evidence.
-publishIndexedProjection :: Id -> IndexedProjection -> TcM (Maybe TyCon)
-publishIndexedProjection owner (IndexedProjection telescope (left, right) result con slot index con_args) = do
+publishIndexedProjection :: Id -> IndexedProjection -> Maybe IndexedRecursion -> TcM (Maybe TyCon)
+publishIndexedProjection owner projection@(IndexedProjection telescope (left, right) result con slot index con_args) recursion = do
     (renaming, parameters) <- freshenTyVarBndrs (binderVars telescope)
     let named = zipWith mkNamedTyConBinder (map binderFlag telescope) parameters
         instantiate = substTyUnchecked renaming . expandTypeSynonyms
@@ -1754,8 +1772,10 @@ publishIndexedProjection owner (IndexedProjection telescope (left, right) result
             right_pat = mkTyVarTy carried
             branch _ = mkCoAxBranch vars [] [] (hidden ++ [constructor, right_pat])
               (mkCastTy right_pat cast) (map (const Nominal) vars) (nameSrcSpan term)
+        recursive <- maybe (pure Nothing)
+          (publishIndexedRecursion families projection parameters instantiate carried) recursion
         Just <$> makeSourceFamily term (named ++ mkAnonTyConBinders operands)
-                                  (instantiate result) [branch]
+                                  (instantiate result) (branch : maybe [] pure recursive)
       _ -> pure Nothing
   where
     term = idName owner
@@ -1779,45 +1799,186 @@ projectionResultCoercion families from to
           guard (reductionReducedType reduction `eqType` found)
           pure (mkSymCo (reductionCoercion reduction))
 
--- | Read the exact private one-row family for an imported ordinary owner.
-indexedProjectionSource :: Id -> Maybe (TyCon, DataCon)
+-- | The constructor's predecessor, result index, hidden arguments, and head kind.
+-- The input tail has the owner's left domain at the predecessor.
+data IndexedRecursion = IndexedRecursion DataCon TyVar Type [Type] Kind
+
+-- | Check one lazy constructor whose only existential is the tail index.
+indexedRecursionType :: IndexedProjection -> Maybe IndexedRecursion
+indexedRecursionType (IndexedProjection _ (left, _) _ nil slot _ _) = do
+    (_, args) <- splitTyConApp_maybe left
+    [row] <- pure (mapMaybe (refinement args) (tyConDataCons (dataConTyCon nil)))
+    pure row
+  where
+    refinement args con = do
+      let (universals, existentials, equalities, context, fields, _) = dataConFullSig con
+          instantiate = substTyWith universals args
+      guard (null context && null (dataConStupidTheta con) &&
+             lengthIs args (length universals) && isLazyDataConRep con &&
+             all (not . isUnpacked) (dataConImplBangs con) &&
+             dataConRepArity con == length fields + length equalities)
+      [predecessor] <- pure existentials
+      guard (isTyVar predecessor && varType predecessor `eqType` varType slot)
+      [equation] <- pure equalities
+      [head_kind, tail_kind] <- pure (map (instantiate . scaledThing) fields)
+      actual_slot <- lookup (eqSpecTyVar equation) (zip universals args)
+      let index = instantiate (eqSpecType equation)
+      (successor, [argument]) <- splitTyConApp_maybe index
+      _ <- isPromotedDataCon_maybe successor
+      guard (actual_slot `eqType` mkTyVarTy slot &&
+             argument `eqType` mkTyVarTy predecessor &&
+             not (anyFreeVarsOfType (\v -> v == predecessor || v == slot) head_kind) &&
+             isLiftedTypeKind (typeKind head_kind) &&
+             tail_kind `eqType` substTyWith [slot] [argument] left)
+      pure (IndexedRecursion con predecessor index
+              (map (instantiate . mkTyVarTy) (dataConUserTyVars con)) head_kind)
+
+-- | Verify the original head and the structurally smaller call in the
+-- rebuilding branch. Constructor wrapping and its result cast are erased.
+checkIndexedRecursion :: Id -> [TyVar] -> TyVar -> [TyVar] -> Id -> [Core.CoreAlt]
+                      -> IndexedRecursion -> Maybe ()
+checkIndexedRecursion owner parameters slot core_types carried alts (IndexedRecursion con _ _ _ _) = do
+    [(predecessor, evidence, hd, tl, rhs)] <-
+      pure [(p, co, x, xs, e) | Core.Alt (Core.DataAlt dc) [p, co, x, xs] e <- alts, dc == con]
+    guard (isTyVar predecessor && isCoVar evidence && isId hd && isId tl)
+    let value = case rhs of Core.Cast body _ -> body; _ -> rhs
+    (Core.Var rebuild, args) <- pure (Core.collectArgs value)
+    guard (isDataConId_maybe rebuild == Just con)
+    [Core.Var first, recurse] <- pure (dropWhile Core.isTyCoArg args)
+    guard (first == hd)
+    (Core.Var self, arguments) <- pure (Core.collectArgs recurse)
+    let (types, terms) = splitAt (length parameters) arguments
+        expected = [mkTyVarTy (if v == slot then predecessor else core_v)
+                   | (v, core_v) <- zip parameters core_types]
+    actual <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) types
+    [Core.Var tail_arg, Core.Var carried_arg] <- pure terms
+    guard (self == owner && eqTypes actual expected && tail_arg == tl && carried_arg == carried)
+
+-- | Check the index of the recursive result and compute the promoted
+-- constructor arguments, using the same untouched parameters as the input.
+indexedRecursionResult :: IndexedProjection -> IndexedRecursion -> [Type] -> Type
+                       -> Maybe ([Type], [Type], Kind)
+indexedRecursionResult (IndexedProjection telescope (left, _) result _ slot _ _)
+                       (IndexedRecursion _ predecessor index args _) hidden predecessor_ty = do
+    (input_tc, input_args) <- splitTyConApp_maybe left
+    let parameters = binderVars telescope
+        at applied = substTyWith parameters applied
+        recur_args = zipWith (\v ty -> if v == slot then predecessor_ty else ty) parameters hidden
+        recur_kind = at recur_args result
+        match (input, output)
+          | getTyVar_maybe input == Just slot = Just (Just output)
+          | at hidden input `eqType` output = Just Nothing
+          | otherwise = Nothing
+    (output_tc, output_args) <- splitTyConApp_maybe recur_kind
+    guard (input_tc == output_tc && lengthIs input_args (length output_args))
+    [output_index] <- catMaybes <$> traverse match (zip input_args output_args)
+    let instantiate = at hidden . substTyWith [predecessor] [output_index]
+        result_args = zipWith (\v ty -> if v == slot then instantiate index else ty) parameters hidden
+    pure (recur_args, map instantiate args, at result_args left)
+
+-- | Build the second row from the certified smaller call and exact head.
+publishIndexedRecursion :: FamInstEnvs -> IndexedProjection -> [TyVar]
+                        -> (Type -> Type) -> TyVar -> IndexedRecursion
+                        -> TcM (Maybe (TyCon -> CoAxBranch))
+publishIndexedRecursion families projection@(IndexedProjection telescope (left, right) result _ slot _ _)
+                        parameters instantiate carried
+                        row@(IndexedRecursion con predecessor index args head_kind) = do
+    p <- fresh "predecessor" (instantiate (varType slot))
+    let p_ty = mkTyVarTy p
+        specialized = instantiate . substTyWith [predecessor] [p_ty]
+        selected_index = specialized index
+        branch_arg v | v == slot = selected_index
+                     | otherwise = instantiate (mkTyVarTy v)
+        hidden = map branch_arg (binderVars telescope)
+        specialize = substTyWith (binderVars telescope) hidden
+        tail_kind = specialize (substTyWith [slot] [p_ty] left)
+    hd <- fresh "head" (specialize (specialized head_kind))
+    tl <- fresh "tail" tail_kind
+    pure $ do
+      (recur_args, result_args, rebuilt_kind) <- indexedRecursionResult projection row hidden p_ty
+      cast <- projectionResultCoercion families rebuilt_kind (specialize result)
+      let h = mkTyVarTy hd
+          t = mkTyVarTy tl
+          ys = mkTyVarTy carried
+          constructor = promoteDataCon con
+          pat = mkTyConApp constructor (map (specialize . specialized) args ++ [h, t])
+          vars = [v | (old, v) <- zip (binderVars telescope) parameters, old /= slot] ++ [p, hd, tl, carried]
+      guard (typeKind pat `eqType` specialize left && typeKind ys `eqType` specialize right)
+      pure $ \family ->
+        let call = mkTyConApp family (recur_args ++ [t, ys])
+            rhs = mkTyConApp constructor (result_args ++ [h, call])
+        in mkCoAxBranch vars [] [] (hidden ++ [pat, ys]) (mkCastTy rhs cast)
+                        (map (const Nominal) vars) (nameSrcSpan (tyConName family))
+  where
+    fresh occ kind = flip mkTyVar kind <$> newSysName (mkTyVarOcc occ)
+
+-- | Read the exact private family and the constructor heads it checks.
+indexedProjectionSource :: Id -> Maybe (TyCon, [DataCon])
 indexedProjectionSource owner = do
   guard (finalCoreMapperOwner owner)
   table <- sourceTableId_maybe owner
   guard (tyConKind table `eqType` varType owner)
-  IndexedProjection telescope (left, right) result con slot index con_args <-
-    indexedProjectionType (varType owner)
+  projection@(IndexedProjection _ _ _ nil _ _ _) <- indexedProjectionType (varType owner)
   axiom <- closedFamilyTyConCoAxiom_maybe table
   guard (coAxiomRole axiom == Nominal)
-  [branch] <- pure (fromBranches (coAxiomBranches axiom))
-  let (hidden, operands) = splitAt (length telescope) (coAxBranchLHS branch)
-  guard (lengthIs hidden (length telescope) && null (coAxBranchCoVars branch))
-  [constructor, carried] <- pure operands
-  carried_var <- getTyVar_maybe carried
-  hidden_vars <- traverse getTyVar_maybe
-    [arg | (Bndr v _, arg) <- zip telescope hidden, v /= slot]
-  let expected v arg
-        | v == slot = eqType index arg
-        | otherwise = True
-      specialize = substTyWith (binderVars telescope) hidden
-      selection = mkTyConApp (promoteDataCon con) (map specialize con_args)
-      rhs = coAxBranchRHS branch
-      vars = hidden_vars ++ [carried_var]
-  guard (and (zipWith expected (binderVars telescope) hidden) &&
-         coAxBranchTyVars branch == vars &&
-         eqTypes (map typeKind hidden) (map (specialize . varType) (binderVars telescope)) &&
-         lengthIs (coAxBranchRoles branch) (length vars) &&
-         all (== Nominal) (coAxBranchRoles branch) &&
-         selection `eqType` constructor &&
-         typeKind constructor `eqType` specialize left &&
-         typeKind carried `eqType` specialize right &&
-         typeKind rhs `eqType` specialize result)
-  case rhs of
-    CastTy payload co -> guard (payload `eqType` carried && coercionRole co == Nominal &&
-                                coercionLKind co `eqType` typeKind carried &&
-                                coercionRKind co `eqType` specialize result)
-    _ -> guard (rhs `eqType` carried)
-  pure (table, con)
+  case fromBranches (coAxiomBranches axiom) of
+    [empty] -> do
+      checkIndexedSourceBranch projection table Nothing empty
+      pure (table, [nil])
+    [empty, nonempty] -> do
+      checkIndexedSourceBranch projection table Nothing empty
+      row@(IndexedRecursion con _ _ _ _) <- indexedRecursionType projection
+      checkIndexedSourceBranch projection table (Just row) nonempty
+      pure (table, [nil, con])
+    _ -> Nothing
+
+-- | Check the binders, specialized index, and the nominal RHS cast.
+checkIndexedSourceBranch :: IndexedProjection -> TyCon -> Maybe IndexedRecursion -> CoAxBranch -> Maybe ()
+checkIndexedSourceBranch projection@(IndexedProjection telescope (left, right) result nil slot index con_args)
+                         table recursion branch = do
+    let parameters = binderVars telescope
+        (hidden, operands) = splitAt (length parameters) (coAxBranchLHS branch)
+        specialize = substTyWith parameters hidden
+    guard (lengthIs hidden (length parameters) && null (coAxBranchCoVars branch))
+    [constructor, carried] <- pure operands
+    carried_var <- getTyVar_maybe carried
+    [refined] <- pure [arg | (v, arg) <- zip parameters hidden, v == slot]
+    hidden_vars <- traverse getTyVar_maybe [arg | (v, arg) <- zip parameters hidden, v /= slot]
+    (local_vars, wanted) <- case recursion of
+      Nothing -> do
+        guard (index `eqType` refined &&
+               mkTyConApp (promoteDataCon nil) (map specialize con_args) `eqType` constructor)
+        pure ([], carried)
+      Just row@(IndexedRecursion con predecessor result_index args head_kind) -> do
+        (_, [pred_ty]) <- splitTyConApp_maybe refined
+        pred_var <- getTyVar_maybe pred_ty
+        (promoted, constructor_args) <- splitTyConApp_maybe constructor
+        let inst = specialize . substTyWith [predecessor] [pred_ty]
+            (promoted_params, fields) = splitAt (length args) constructor_args
+        [hd, tl] <- pure fields
+        field_vars <- traverse getTyVar_maybe fields
+        guard (promoted == promoteDataCon con && inst result_index `eqType` refined &&
+               eqTypes (map inst args) promoted_params &&
+               typeKind hd `eqType` inst head_kind &&
+               typeKind tl `eqType` specialize (substTyWith [slot] [pred_ty] left))
+        (recur_args, result_args, _) <- indexedRecursionResult projection row hidden pred_ty
+        let call = mkTyConApp table (recur_args ++ [tl, carried])
+        pure (pred_var : field_vars, mkTyConApp promoted (result_args ++ [hd, call]))
+    let rhs = coAxBranchRHS branch
+        vars = hidden_vars ++ local_vars ++ [carried_var]
+    guard (coAxBranchTyVars branch == vars &&
+           sizeUniqSet (mkUniqSet vars) == length vars &&
+           eqTypes (map typeKind hidden) (map (specialize . varType) parameters) &&
+           lengthIs (coAxBranchRoles branch) (length vars) &&
+           all (== Nominal) (coAxBranchRoles branch) &&
+           typeKind constructor `eqType` specialize left &&
+           typeKind carried `eqType` specialize right &&
+           typeKind rhs `eqType` specialize result)
+    case rhs of
+      CastTy payload co -> guard (payload `eqType` wanted && coercionRole co == Nominal &&
+                                  coercionLKind co `eqType` typeKind wanted &&
+                                  coercionRKind co `eqType` specialize result)
+      _ -> guard (rhs `eqType` wanted)
 
 -- | The two equations for a lazy constructor-to-constructor list map.
 -- Check the same complete shape before and after optimizing its owner.
@@ -2129,8 +2290,10 @@ verifyFinalCoreMapper binds original =
       , isReverseWorkerTable table || isJust (reverseWrapperWorker table)
       -> checkedReverseTable bindings table
       | varType owner `eqType` varType original
-      , Just _ <- indexedProjectionSource original
-      -> isJust (checkedIndexedProjection id owner expression)
+      , Just (_, constructors) <- indexedProjectionSource original
+      -> case checkedIndexedProjection id owner expression of
+           Just (_, recursion) -> lengthIs constructors 1 || isJust recursion
+           Nothing -> False
       | varType owner `eqType` varType original
       -> if lengthIs (finalCoreSourceFamilies original) 1
            then not (isNothing (directListMapper owner expression <|>

@@ -25,6 +25,44 @@ branches still withhold the equation.
 [Debugger regression](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppendGhci.sh)
 and [source matchability tests](../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.sh).
 
+At `fa8b71fb1c`, all 358 Showcase lines matched at `-O0`, default
+`-O1`, and default `-O2`. This run used the normal bootstrap compiler
+at `c94baacebe` with one rebuilt simplifier module. Before that change
+the full Showcase passed `-O0` and failed Core Lint at both optimized
+levels. The simplifier now keeps the nominal evidence for the cast
+from an opened package's payload type to `Vec a n`.
+`NativeRetainedCast`, `NativeOpenIndexedAppend`, `NativeGadtRetainedSum`,
+and `NativeRetainedPackage` passed on the corrected compiler.
+The bootstrap executable does not support interactive use. Self-hosted
+GHCi and the broader suites require the normal build of this revision.
+[Simplifier](../../compiler/GHC/Core/Opt/Simplify/Iteration.hs),
+[cast controls](../../testsuite/tests/dependent/should_run/NativeRetainedCast.sh)
+and [Showcase](Showcase.hs).
+
+At `2d1fd63cc6`, a relink of the 352-line bootstrap compiler checked
+the equality returned by an indexed empty-vector match inside an opened
+package. A nominal cast identifies the payload as a vector. All 352 lines
+matched at `-O0`. The default `-O1` run stopped in Core Lint after a
+simplifier pass lost the nominal evidence on a retained argument. This run
+did not reach `-O2`. In a separate ordinary client with a vector argument,
+the 352 bootstrap checked transport at unknown length and printed
+`(Just [],Nothing)`. Asking to match the empty proof at a successor length
+still gave GHC-40564.
+[Empty-branch proof](Showcase.hs)
+and [transport regression](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
+
+The four-module stage1 library relink at `789ee08833` passed
+`NativeDependentCore`, `NativeDependentCoreRun`, and `RetainedQuantification`.
+The first two matched their existing output. The third reported the two
+kind errors on the occurrences of `b` in `Select b`. The API fixture
+checks an opaque `Int` proof through desugaring. An independent ordinary
+client used the imported proof with a bottom `Int` and printed 42
+at `-O0` and `-O2`. The fresh constructor-field checks reject recursive
+retained constructor telescopes and preserve the ordinary opaque function
+binder.
+[Source and API cases](../../testsuite/tests/ghc-api/NativeDependentCoreRun.hs)
+and [diagnostic golden](../../testsuite/tests/typecheck/should_fail/RetainedQuantification.stderr).
+
 The bootstrap compiler relink at `fa6b3b44ca` reproduced all 356
 Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
 `NativeLocalOpen` and `NativeTypeCase` passed. The source-hidden shadow

@@ -1206,7 +1206,7 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
         && not (anyFreeVarsOfType (\v -> isId v && not (v `elemVarSet` scope)) ty)
         && case mb of
              Nothing -> valid_fields scope bs tys
-             Just b  -> isNativeRetainedBinder b && isManyTy mult
+             Just b  -> isNativeRetainedField b && isManyTy mult
                         && varType b `eqType` ty
                         && not (b `elemVarSet` mkVarSet univ_tvs)
                         && not (b `elemVarSet` scope)
