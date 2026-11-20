@@ -581,6 +581,11 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
                       -- on nullary constructors
                     | otherwise       = size_up_call f [] 0
 
+    -- Use explicit guidance for raw package operations until their
+    -- lazy representation has a size model.
+    size_up Pack{}   = TooBig
+    size_up Unpack{} = TooBig
+
     size_up (App fun arg)
       | isTyCoArg arg = size_up fun
       | otherwise     = size_up arg  `addSizeNSD`

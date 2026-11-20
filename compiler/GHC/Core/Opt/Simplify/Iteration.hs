@@ -1259,6 +1259,20 @@ simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit)
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
 simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
 
+-- See Note [Erased package scopes in the simplifier].
+simplExprF1 env (Pack schema witness payload) cont
+  = do { schema' <- simplType env schema
+       ; witness' <- simplType env witness
+       ; payload' <- simplExpr env payload
+       ; rebuild env (Pack schema' witness' payload') cont }
+
+simplExprF1 env (Unpack witness payload package body) cont
+  = do { package' <- simplExpr env package
+       ; (witness_env, witness') <- simplBinder env witness
+       ; (body_env, payload') <- simplLamBndr witness_env payload
+       ; body' <- simplExpr body_env body
+       ; rebuild env (Unpack witness' payload' package' body') cont }
+
 simplExprF1 env (Cast body co) cont
   = do  { co1 <- {-#SCC "simplCast-simplCoercion" #-}
                  simplCoercion env co
@@ -1357,6 +1371,20 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
     simplNonRecE env keep_index FromLet bndr (rhs, env) body cont
   where
     keep_index = retainedAnnotationUse env bndr body
+
+{- Note [Erased package scopes in the simplifier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The witness and payload of Pack use the surrounding scope. Unpack
+simplifies the package in the same scope as its outer continuation.
+Freshen the type witness before the payload binder because the
+payload's type can mention the witness. Only the Unpack body uses
+those fresh binders.
+
+Use simplExpr for both children of Unpack and the Pack payload.
+It closes each child's floats in that child. Unpack binds its package
+lazily. A strict continuation for the body result does not make the
+package strict. Rebuild the continuation outside these scopes.
+-}
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
