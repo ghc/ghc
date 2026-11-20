@@ -39,21 +39,26 @@ client compiled from its interface. The client returns the stored value
 and preserves the behavior of a demanded or ignored exception.
 [Rule and provider](examples/erased-existentials/PackageRules.hs).
 
-Both native compiler stages reproduce the 295-line Showcase at `-O0` and
-default `-O1`. The self-hosted compiler also matches the golden output with
-stripped interfaces and in GHCi. At each of three interface compression
-levels, the rule client prints `(7,5,9,True)`. The previous compiler
-at `9b11f47553` rejects the new rule format at the interface header.
-When the provider omits the rule, both compiler versions can build and run
-the client against the other version’s interface.
-[Newtype source](examples/packed-vector/StoredVector.hs),
+A stream can hide its state in an ordinary tuple with its step function.
+The same consumer reads a list-backed stream and an integer stream that
+skips even values. A one-element prefix leaves the rest of the input list
+unevaluated. [Stream example](examples/erased-existentials/ErasedStream.hs).
+
+Both native compiler stages reproduce the 296-line Showcase at `-O0`,
+default `-O1` and default `-O2`. The self-hosted compiler also checks
+stripped optimized interfaces and GHCi. Both the current compiler at
+`-O2` and the previous `6d16505aaa` compiler at `-O1` read the new
+optimized stream and rule providers. Their ordinary clients both print
+`([1,3,5],[True],5)` and apply the imported rule.
 [Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
 
-At `56461950da`, all 59 focused tests that ran passed. In the dependent
-directory 293 of 314 executed normal-way tests passed. The remaining
-21 failures have the same names and categories as at `9b11f47553`.
-The testsuite reports ten compile failures, ten stderr mismatches and
-a command failure in `T13938`.
+The compiler built from `dc4aecbd7b` passed all 59 focused tests after
+the GHC API test started checking demand at both `-O0` and `-O2`. Four
+ordinary optimizer tests also passed (`T11731`, `T23491c`, `T24944` and `T14003`).
+In the dependent directory, 293 of 314 executed normal-way tests passed.
+The 21 remaining failures have the same names and categories as at
+`6d16505aaa`. Ten programs fail to compile, ten diagnostics differ,
+and the test command for `T13938` fails.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -67,7 +72,7 @@ the header. The new reader checks the coercion's role and scope.
 | Card | What works | Remaining gap |
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider and an interface-only client can apply a local source rule over erased package types at default `-O1`. A given equality can change a payload type under its witness. | Check lexical package operations inside rules, more coercions and standard `-O2`. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can both apply a source rule over erased package types. | Check lexical package operations inside rules and broaden coercion support. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An unknown input that can still match an earlier row blocks a catch-all. | General mixed patterns and open GADT indices. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent tuple field, including in a nested application. | Generalize witness projections and inference for checking-only expressions. |
@@ -86,17 +91,17 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Extend liberate-case and constructor specialization under
-   `Pack` and `Unpack`. Check the standard `-O2` pipeline on retained
-   and erased source programs. Extend rule matching to lexical package
-   operations and check the scope of each witness.
-2. **R22.** Extend witness projections and check where lambdas still
-   need a type annotation. Keep the hidden type scoped to its opening.
-3. **R19.** Extend the supported constructor patterns. Keep earlier rows
-   and nominal evidence in scope when matching open GADT indices.
-4. **R04 and R23.** Extend retained fields to more GADT declarations.
-   For family applications, check matchability inference and preserve
-   ordinary GHC diagnostics when printing implicit binders.
+1. **R23.** Restore ordinary programs that interpret kinds with open type
+   families. In `KindEqualities2`, check how a declaration splice affects
+   the selector and how the expected result kind guides `(I a) (I b)`.
+   Keep incompatible explicit annotations and invalid inverse equalities
+   rejected. [Staged regression](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
+2. **R05.** Extend rule matching to lexical package operations. Check
+   substitution and witness scope on both sides of the rule.
+3. **R22 and R04.** Extend witness projections and retained fields under
+   GADT declarations. Check where a lambda still needs a type annotation.
+4. **R19.** Extend constructor patterns over open indices. Keep earlier
+   rows and nominal evidence in scope.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
