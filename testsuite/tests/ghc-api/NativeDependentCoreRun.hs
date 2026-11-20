@@ -1214,6 +1214,10 @@ runModuleChecks libdir = do
             , "zero m = Sum m Refl"
             , "zeroVTA :: foreach (m :: Nat) -> Sum Z m"
             , "zeroVTA m = Sum @Z m Refl"
+            , "alias :: forall (n :: Nat) (m :: Nat). foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m"
+            , "alias p proof = Sum p proof"
+            , "zeroAlias :: foreach (m :: Nat) -> Sum Z m"
+            , "zeroAlias m = alias m Refl"
             , "zeroUnused :: foreach (m :: Nat) -> SumUnused Z m"
             , "zeroUnused m = SumUnused Z m Refl"
             , "render :: Nat -> String"
@@ -1229,10 +1233,11 @@ runModuleChecks libdir = do
             , "  m <- readIORef cell"
             , "  putStrLn (observe (zero m))"
             , "  putStrLn (observe (zeroVTA m))"
+            , "  putStrLn (observe (zeroAlias m))"
             , "  putStrLn (observeUnused (zeroUnused m))"
             ]
         )
-        ["S Z", "S Z", "S Z"]
+        ["S Z", "S Z", "S Z", "S Z"]
     packedProducer <- readFile "PackedVecLibrary.hs"
     packedConsumer <- readFile "Main.hs"
     runModuleCase
@@ -4217,7 +4222,7 @@ runPackageSourceRejectChecks = do
         , ("AppendUnmatchedProof", 83865, "appendNative n m xs ys", ["TypeFamilies"], equalityImports, package ++ sums ++ ["bad :: PackedVec a -> PackedVec a -> PackedVec a", "bad (PackVec n xs) (PackVec m ys) = case sumNat n m of", "  Sum p proof -> PackVec p (appendNative n m xs ys)"])
         , ("SumSwapped", 5617, "Sum p Refl", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Sum m n", "bad n m = case sumNat n m of", "  Sum p Refl -> Sum p Refl"])
         , ("SumEscape", 5617, "replicateNative p 42", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (q :: Nat) -> Sum n m -> Vec Int q", "bad q (Sum p Refl) = replicateNative p 42"])
-        , ("SumAlias", 83865, "alias m Refl", ["TypeFamilies"], equalityImports, sums ++ ["alias :: forall (n :: Nat) (m :: Nat). foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m", "alias p proof = Sum p proof", "bad :: foreach (m :: Nat) -> Sum Z m", "bad m = alias m Refl"])
+        , ("SumAliasWrongEvidence", 83865, "alias m Refl", ["TypeFamilies"], equalityImports, sums ++ ["alias :: forall (n :: Nat) (m :: Nat). foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m", "alias p proof = Sum p proof", "bad :: foreach (m :: Nat) -> Sum (S Z) m", "bad m = alias m Refl"])
         , ("SumPartial", 83865, "Sum m", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (m :: Nat) -> (m :~: m) -> Sum Z m", "bad m = Sum m"])
         , ("LinearClause", 18872, "arising from a pattern", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
         , ("LinearCase", 18872, "arising from multiplicity", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad p = case p of PackVec n xs -> PackVec n xs"])
