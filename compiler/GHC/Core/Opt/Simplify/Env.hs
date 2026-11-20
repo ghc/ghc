@@ -52,7 +52,7 @@ module GHC.Core.Opt.Simplify.Env (
         wrapJoinFloats, wrapJoinFloatsX, unitJoinFloat, addJoinFlts
     ) where
 
-import GHC.Core.Opt.OccurAnal (SimplCoreMode)
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
 import GHC.Prelude
 
 import GHC.Core.Coercion.Opt ( OptCoercionOpts )
@@ -79,7 +79,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Id as Id
 import GHC.Types.InlinePragma ( ActivationGhc, CompilerPhase, isActiveInPhase )
 import GHC.Types.Basic
-import GHC.Types.Unique.FM      ( pprUniqFM )
+import GHC.Types.Unique.FM      ( mapMaybeUFM, pprUniqFM )
 
 import GHC.Data.OrdList
 import GHC.Data.Graph.UnVar
@@ -187,6 +187,7 @@ data SimplEnv
       , seTvSubst   :: TvSubstEnv      -- InTyVar |--> OutType
       , seCvSubst   :: CvSubstEnv      -- InCoVar |--> OutCoercion
       , seIdSubst   :: SimplIdSubst    -- InId    |--> OutExpr
+      , seIndexSubst :: IdSubstEnv     -- Runtime binder renamings in annotations
 
         -- | Fast OutVarSet tracking which recursive RHSs we are analysing.
         -- See Note [Eta reduction in recursive RHSs] in GHC.Core.Opt.Arity.
@@ -597,6 +598,7 @@ mkSimplEnv mode fam_envs
              , seTvSubst     = emptyVarEnv
              , seCvSubst     = emptyVarEnv
              , seIdSubst     = emptyVarEnv
+             , seIndexSubst  = emptyVarEnv
              , seRecIds      = emptyUnVarSet
              , seCaseDepth   = 0
              , seInlineDepth = 0 }
@@ -642,7 +644,8 @@ reSimplifying (SimplEnv { seInlineDepth = n }) = n>0
 extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
   = assertPpr (isId var && not (isCoVar var)) (ppr var) $
-    env { seIdSubst = extendVarEnv subst var res }
+    env { seIdSubst = extendVarEnv subst var res
+        , seIndexSubst = delVarEnv (seIndexSubst env) var }
 
 extendTvSubst :: SimplEnv -> TyVar -> Type -> SimplEnv
 extendTvSubst env@(SimplEnv {seTvSubst = tsubst}) var res
@@ -680,7 +683,8 @@ addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) v
         !id_subst1 = id_subst `delVarEnvList` vs
     in
     env { seInScope = in_scope1,
-          seIdSubst = id_subst1 }
+          seIdSubst = id_subst1
+        , seIndexSubst = seIndexSubst env `delVarEnvList` vs }
         -- Why delete?  Consider
         --      let x = a*b in (x, \x -> x+3)
         -- We add [x |-> a*b] to the substitution, but we must
@@ -732,10 +736,18 @@ zapSubstEnv :: SimplEnv -> SimplEnv
 -- simplify an already-simplified term
 zapSubstEnv env@(SimplEnv { seInlineDepth = n })
   = env { seTvSubst = emptyVarEnv, seCvSubst = emptyVarEnv, seIdSubst = emptyVarEnv
-        , seInlineDepth = n+1 }
+        , seIndexSubst = emptyVarEnv, seInlineDepth = n+1 }
 
 setSubstEnv :: SimplEnv -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst -> SimplEnv
-setSubstEnv env tvs cvs ids = env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }
+setSubstEnv env tvs cvs ids =
+    env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids
+        , seIndexSubst = getRenames ids }
+  where
+    getRenames
+      | sm_core_mode (seMode env) == RetainedCore = mapMaybeUFM rename
+      | otherwise = const emptyVarEnv
+    rename (DoneId v) = Just (Var v)
+    rename _ = Nothing
 
 {-
 ************************************************************************
@@ -1182,7 +1194,8 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               old_id adjust_type
   = assertPpr (not (isCoVar old_id)) (ppr old_id)
     (env { seInScope = new_in_scope,
-           seIdSubst = new_subst }, new_id)
+           seIdSubst = new_subst,
+           seIndexSubst = new_index_subst }, new_id)
     -- It's important that both seInScope and seIdSubst are updated with
     -- the new_id, /after/ applying adjust_type. That's why adjust_type
     -- is done here.  If we did adjust_type in simplJoinBndr (the only
@@ -1203,6 +1216,12 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               = extendVarEnv id_subst old_id (DoneId new_id)
               | otherwise
               = delVarEnv id_subst old_id
+
+    new_index_subst
+      | sm_core_mode (seMode env) == RetainedCore
+      , new_id /= old_id
+      = extendVarEnv (seIndexSubst env) old_id (Var new_id)
+      | otherwise = delVarEnv (seIndexSubst env) old_id
 
     !new_in_scope = in_scope `extendInScopeSet` new_id
 
@@ -1361,8 +1380,9 @@ See also Note [Return type for join points] and Note [Join points and case-of-ca
 -}
 
 getTCvSubst :: SimplEnv -> Subst
-getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env })
-  = mkSubst in_scope emptyVarEnv tv_env cv_env
+getTCvSubst (SimplEnv { seInScope = in_scope, seIndexSubst = indices
+                         , seTvSubst = tv_env, seCvSubst = cv_env })
+  = mkSubst in_scope indices tv_env cv_env
 
 getFullSubst :: InScopeSet -> SimplEnv -> Subst
 getFullSubst in_scope (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
@@ -1402,7 +1422,9 @@ substCo env co = Coercion.substCo (getTCvSubst env) co
 
 ------------------
 substIdType :: SimplEnv -> Id -> Id
-substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env }) id
+substIdType env@(SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env }) id
+  | sm_core_mode (seMode env) == RetainedCore
+  = Id.updateIdTypeAndMult (Type.substTyUnchecked (getTCvSubst env)) id
   | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
     || no_free_vars
   = id
