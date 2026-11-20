@@ -3277,7 +3277,7 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , null theta || hasNoConcreteTyVars fun
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) tau
   , isTauTy expected || (hasNoConcreteTyVars fun
-                         && (isRetainedValueType expected || forwards_package tvs result))
+                         && (isRetainedValueType expected || exactPackageResult tvs result expected))
   , isTauTy result
   , not (hasNativeDependentExpr (Core.Type body))
   , Just kind_subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst
@@ -3298,19 +3298,21 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
 
-    -- See Note [Exact expected existential packages].
-    forwards_package tvs (TyVarTy result_var)
-      | result_var `elem` tvs
-      , ExistsTy _ binder body <- coreFullView expected
-      = isTauTy (tyVarKind binder) && isFamFreeTy body && tau_payload body
-    forwards_package _ _ = False
+tcRetainedResultMatch do_ql expected args fun sigma
+  = tcRetainedWorkerResultMatch do_ql expected args fun sigma
 
+-- | Recognize a package expected at one invisible result parameter.
+-- See Note [Exact expected existential packages].
+exactPackageResult :: [TyVar] -> Type -> Type -> Bool
+exactPackageResult tvs (TyVarTy result_var) expected
+  | result_var `elem` tvs
+  , ExistsTy _ binder body <- coreFullView expected
+  = isTauTy (tyVarKind binder) && isFamFreeTy body && tau_payload body
+  where
     tau_payload ty = case coreFullView ty of
       ExistsTy _ binder body -> isTauTy (tyVarKind binder) && tau_payload body
       payload -> isTauTy payload
-
-tcRetainedResultMatch do_ql expected args fun sigma
-  = tcRetainedWorkerResultMatch do_ql expected args fun sigma
+exactPackageResult _ _ _ = False
 
 {- Note [Exact expected existential packages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3325,8 +3327,11 @@ tau syntax. The package body keeps the family-free guard.
 This immutable type application uses the existing exact result match.
 It supplies no witness, performs no opening, and creates no mutable
 existential instantiation. All needed outer parameters must have
-well-kinded choices. Keep the original context and check every
-argument and the result normally.
+well-kinded choices. When the result leaves unrelated ordinary
+parameters, seed the existing argument matcher with the same kind
+and type choice. The original context, argument and result checks
+remain authoritative. See Note [Ordinary parameters in native
+applications].
 -}
 
 {- Note [Retained choices for partial constructors]
@@ -4188,6 +4193,14 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
       , native_worker
       , isRetainedValueType expected_ty
       , Just subst <- matchRetainedAppType tvs Subst.emptySubst result expected_ty
+      = subst
+      | Just expected_ty <- expected
+      , not native_worker
+      , not index_route
+      , exactPackageResult tvs result expected_ty
+      , Just kinds <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst
+                                    (typeKind result) (typeKind expected_ty)
+      , Just subst <- tcMatchTyX_BM (bind_outer tvs) kinds result expected_ty
       = subst
       | Just expected_ty <- expected
       , not native_worker
