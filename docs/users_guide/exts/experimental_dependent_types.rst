@@ -104,8 +104,8 @@ patterns from ``GHC.Exists``. Both the producer and an ordinary client can
 compile at ``-O1``, including through a separately compiled interface.
 Two uses of the same unrestricted local package can share a witness in
 one application. Two independently filtered vectors have independent lengths.
-A program that transports equality under an existential binder can still
-require ``-O0``.
+A proof of element-type equality also applies under the hidden length binder.
+GHC can compile that transport at ``-O1``.
 
 Natural numerals in vector indices
 ----------------------------------

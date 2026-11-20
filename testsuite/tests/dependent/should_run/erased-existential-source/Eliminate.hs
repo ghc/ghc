@@ -1,10 +1,11 @@
 {-# LANGUAGE ExperimentalDependentTypes, GADTs #-}
 {-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-module Eliminate (inspect, inspectBare, ignoreBottom, ignoreCall, forceBottom, unpackLocal, shown, render, inlineArgument) where
+{-# LANGUAGE TypeApplications, TypeOperators #-}
+module Eliminate (inspect, inspectBare, ignoreBottom, ignoreCall, forceBottom, unpackLocal, shown, render, inlineArgument, transportPair, hidePair, readPair) where
 
 import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
 import qualified GHC.Exists as Exists
 import Provider
 import OrdinaryPack (observeArgument)
@@ -69,3 +70,16 @@ render p = case p of
 -- Exercise argument classification at an imported, polymorphic call.
 inlineArgument :: Bool -> Int -> Int
 inlineArgument x choice = observeArgument (Just x :: exists (a :: Type). Maybe a) choice
+
+type HiddenPair a = exists (w :: Type) | (w, a)
+
+hidePair :: a -> HiddenPair a
+hidePair x = Exists.Pack (type Bool) (True, x)
+
+-- Lift the given equality under the same erased witness on both sides.
+{-# NOINLINE transportPair #-}
+transportPair :: a :~: b -> HiddenPair a -> HiddenPair b
+transportPair Refl p = p
+
+readPair :: HiddenPair a -> a
+readPair p = case p of Exists.Pack _ pair -> snd pair

@@ -49,6 +49,7 @@ fi
 diff -u - actual <<'EXPECTED'
 ("present","present","absent","present","present")
 ("ignored","ignored application","absent")
+7
 13
 ("[True]","[7]")
 strict payload pattern forced the package

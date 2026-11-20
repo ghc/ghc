@@ -175,9 +175,12 @@ renders both a `Bool` and an `Int` through it.
 [Source regression](../../../testsuite/tests/dependent/should_run/NativeExistentialSource.sh).
 
 A module-level rewrite rule outside this schedule produces GHC-51063.
-The diagnostic names the rule. A binding that transports equality under
-an existential binder can still require `-O0`. GHC-59107 identifies the
-binding when it has a source span.
+The diagnostic names the rule. Forward congruence under an existential
+binder can run through the normal pipeline when its scoped payload
+coercion is supported. Core Lint checks the role and the two endpoints.
+`transportFiltered Refl xs = xs` preserves the hidden length while changing
+the element type under a given equality. GHC-59107 identifies a binding
+with other unsupported Core forms.
 
 ## Next increments
 

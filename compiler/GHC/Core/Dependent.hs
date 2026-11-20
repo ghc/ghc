@@ -334,7 +334,9 @@ scanCo (TyConAppCo _ _ args) = foldMap scanCo args
 scanCo (AppCo fun arg) = scanCo fun <> scanCo arg
 scanCo (CoVarCo cv) = scanVarKind cv
 scanCo (AxiomCo rule args)
-    | isExistsCoRule rule = NativeScan (pure True)
+    -- The proof binds the witness on both sides. Check its argument before
+    -- optimization. See Note [Lifting under an erased existential] in GHC.Core.Coercion.
+    | isExistsCoRule rule = gentleForm (foldMap scanCo args)
     | otherwise = foldMap scanCo args
 scanCo (HoleCo hole) = scanVarKind (coHoleCoVar hole)
 scanCo (SymCo co) = scanCo co

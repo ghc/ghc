@@ -15,7 +15,7 @@ import GHC.Core
      Unfolding (CoreUnfolding, uf_tmpl), UnfoldingCache (..), UnfoldingSource (VanillaSrc), mkApps, mkLams)
 import GHC.Core.Coercion (liftCoSubst, mkCoVarCo, mkLiftingContext, mkSubCo)
 import GHC.Core.Coercion.Axiom (Role(..))
-import GHC.Core.Dependent (hasExistentialExpr)
+import GHC.Core.Dependent (hasExistentialExpr, supportsNativeGentle)
 import GHC.Core.FamInstEnv (emptyFamInstEnv)
 import GHC.Core.Opt.Arity (exprIsDeadEnd)
 import GHC.Core.Opt.Exitify (exitifyProgram)
@@ -198,6 +198,9 @@ checkLiftingReadback libdir path = forM_ [(Nominal, mkNomEqPred), (Representatio
         co = liftCoSubst role (mkLiftingContext [(varying, mkCoVarCo given)]) (schema varying)
         box = mkSysLocal (fsLit "box") x manyDataConTy (schema lhs)
         core = mkLams [lhs, rhs, given, box] (Cast (Var box) (if role == Nominal then mkSubCo co else co))
+        transport = mkSysLocal (fsLit "transport") top manyDataConTy (exprType core)
+    unless (supportsNativeGentle [NonRec transport core]) $
+        fail "the retained optimizer rejected a checked existential coercion"
     session libdir $ \env _ -> writeConsumer env top path core
     session libdir $ \env _ -> do
         imported <- loadConsumer env path top core
