@@ -977,6 +977,7 @@ main = do
         PartitionChoices.partitionViews (VCons 7 (VCons 2 (VCons 9 VNil)))
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
+    observe "infer a polymorphic witness for a packaged lambda" (RankedPackage.runBuilder 11)
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
     observe "read streams with different hidden state types"
         (ErasedStream.toList (ErasedStream.oddThrough 6),
@@ -1089,6 +1090,10 @@ main = do
     observe "select through nested type case patterns"
         ( Proxy :: NativeNestedCase.Pick ('Just ('Just 'True))
         , 7 :: NativeNestedCase.Pick ('Just 'Nothing) )
+    observe "select a constructor at an open family index"
+        ( 7 :: NativeNestedCase.OpenIndexPick (NativeNestedCase.OpenCaseIndex 'False)
+                  ('Just ('NativeNestedCase.OpenIndexed ('Proxy :: Proxy 'False)))
+        , False :: NativeNestedCase.OpenIndexAtOrdering ('Just ('NativeNestedCase.OpenPlain 'False)) )
     observe "refine a constructor field and transport a later dependent index"
         ( Refl :: NativeNestedCase.IndexedFieldPick
             ('Just ('NativeNestedCase.RefinedFieldBox ('Proxy :: Proxy 'False)

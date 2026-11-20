@@ -1,6 +1,6 @@
 {-# LANGUAGE ExperimentalDependentTypes, ImpredicativeTypes, RankNTypes, TypeApplications #-}
 
-module RankedPackage (runCallback, runPair) where
+module RankedPackage (runCallback, runPair, runBuilder) where
 
 import Data.Kind (Type)
 
@@ -29,3 +29,20 @@ observePair (f, k) = k f
 -- | Infer the hidden type from the second component.
 runPair :: (Int, Bool)
 runPair = observePair (id, atTwoTypes)
+
+-- | Store a function that uses the same hidden witness on every call.
+type Builder = exists (t :: Type). Int -> Callback t
+
+-- | Use the declared result of makeCallback to infer the lambda's witness.
+builder :: Builder
+builder = \n -> makeCallback n
+  where
+    makeCallback :: Int -> Callback PolyId
+    makeCallback n = Callback @PolyId id (\f -> (f n, f True))
+
+-- | Apply the builder and use its hidden function at two types.
+runBuilder :: Int -> (Int, Bool)
+runBuilder n = apply (builder n)
+  where
+    apply :: Callback t -> (Int, Bool)
+    apply (Callback f call) = call f

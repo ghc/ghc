@@ -225,6 +225,7 @@ match hidden partition lengths in function equations: (Just 7,Nothing)
 map an ordinary observer over differently sized partitions: [([7,9],[2]),([2],[7,9])]
 use a hidden polymorphic identity at Int and Bool: (7,True)
 infer a hidden function type from its paired callback: (7,True)
+infer a polymorphic witness for a packaged lambda: (11,True)
 read an integer through an erased package: 7
 read streams with different hidden state types: ([1,3,5],[True])
 transport element equality under a hidden vector length: [7,9]
@@ -281,6 +282,7 @@ name and reuse a type-level intermediate result: Refl
 bind the result of a constructor case: (Right True,Left 'c')
 select the result type by a constructor: (7,False)
 select through nested type case patterns: (Proxy,7)
+select a constructor at an open family index: (7,False)
 refine a constructor field and transport a later dependent index: (Refl,Refl)
 select through an ordinary type constructor: (7,'x',())
 select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
