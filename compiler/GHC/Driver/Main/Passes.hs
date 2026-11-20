@@ -170,7 +170,7 @@ import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
-import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedReverseTables, finalCoreSourceFamilies, sourceTableCallees)
+import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, sourceTableCallees)
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -946,16 +946,16 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
 -- See Note [Final Core source equations] in GHC.Tc.Gen.SourceTable.
 keepValidatedSourceMappers :: ModGuts -> ModGuts -> ModGuts
 keepValidatedSourceMappers original final
-  | null failed && null rejected_reverse = final
+  | null failed && null rejected_list_tables = final
   | otherwise = final { mg_binds = map clearBind (mg_binds final)
                       , mg_tcs = filter (not . invalidFamily families) (mg_tcs final) }
   where
     owners = mkNameSet (map idName failed)
     failed = filter (not . verifyFinalCoreMapper (mg_binds final))
                     (finalCoreMappers (mg_binds original))
-    rejected_reverse = failedReverseTables (mg_binds final) (mg_tcs final)
+    rejected_list_tables = failedFinalListTables (mg_binds final) (mg_tcs final)
     families = close (mkNameSet (map tyConName
-                   (rejected_reverse ++ concatMap finalCoreSourceFamilies failed)))
+                   (rejected_list_tables ++ concatMap finalCoreSourceFamilies failed)))
     invalidFamily invalid tc = tyConName tc `elemNameSet` invalid
     close invalid =
       case [tyConName tc | tc <- mg_tcs final
