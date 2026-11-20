@@ -27,8 +27,9 @@ the payload invalidates the equation. [Second projection](../examples/packed-vec
 An older compiler that accepts `DPair` can leave its first projection
 without an equation. The `--abstract-witness` upgrade check rebuilds
 the pair owner and a separate worker that renames its type parameters.
-An unrelated module keeps its object and interface. A second build
-reuses all outputs. [Upgrade test](../examples/closed-evaluation/check-readback-upgrade.sh).
+A fixed-domain worker and an unrelated module keep their objects and
+interfaces. A second build reuses all outputs.
+[Upgrade test](../examples/closed-evaluation/check-readback-upgrade.sh).
 
 A GADT can already store a runtime length and a vector indexed by that
 length. The same encoding works for a family parameter `p`.

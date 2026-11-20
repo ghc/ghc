@@ -63,21 +63,31 @@ HS
     sed -e 's/module DependentProjection/module ImportedSecond/' \
         -e '/^import DependentPair/a import qualified ImportedFirst' \
         -e 's/(first q)/(ImportedFirst.witness q)/' DependentProjection.hs >ImportedSecond.hs
+    cat >FixedWitness.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module FixedWitness (Fixed(..), fixed) where
+import Data.Kind (Type)
+data Fixed (f :: Bool -> Type) where
+    Fix :: foreach (x :: Bool) -> f x -> Fixed f
+fixed :: Fixed f -> Bool
+fixed (Fix x _) = x
+HS
     printf '%s\n' 'module Unrelated where' 'n = True' >Unrelated.hs
-    "${old[@]}" "${flags[@]}" --make -no-link ImportedFirst.hs Unrelated.hs
-    sha256sum Unrelated.{o,hi} >unrelated.sha
+    "${old[@]}" "${flags[@]}" --make -no-link ImportedFirst.hs FixedWitness.hs Unrelated.hs
+    "${old[@]}" --show-iface FixedWitness.hi | grep -F 'SourceTable T:fixed'
+    sha256sum {FixedWitness,Unrelated}.{o,hi} >reuse.sha
     mkdir stale
     cp DependentPair.hi DependentProjection.hs stale/
     if (cd stale && "${new[@]}" "${flags[@]}" -c DependentProjection.hs) >stale.log 2>&1 ||
        ! grep -Eq '\[GHC-(68947|05617)\]' stale.log; then cat stale.log >&2; exit 1; fi
-    roots=(DependentProjection.hs ImportedSecond.hs Unrelated.hs)
+    roots=(DependentProjection.hs ImportedSecond.hs FixedWitness.hs Unrelated.hs)
     "${new[@]}" "${flags[@]}" --make -no-link "${roots[@]}" >upgrade.log 2>&1 ||
         { cat upgrade.log >&2; exit 1; }
     for worker in DependentPair ImportedFirst; do
         grep -F "Compiling $worker [Compiler now checks retained package case projections]" upgrade.log
     done
-    if grep -F 'Compiling Unrelated' upgrade.log; then exit 1; fi
-    sha256sum -c unrelated.sha --quiet
+    if grep -E 'Compiling (FixedWitness|Unrelated)' upgrade.log; then exit 1; fi
+    sha256sum -c reuse.sha --quiet
     sha256sum ./*.hi ./*.o >warm.sha
     "${new[@]}" "${flags[@]}" --make -no-link "${roots[@]}" >warm.log 2>&1
     if grep -F 'Compiling ' warm.log; then exit 1; fi
