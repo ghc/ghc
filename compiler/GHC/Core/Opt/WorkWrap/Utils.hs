@@ -37,7 +37,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.Set
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.SimpleOpt( SimpleOpts )
-import GHC.Core.Opt.OccurAnal (SimplCoreMode)
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -67,6 +67,7 @@ import Data.List ( unzip4 )
 import GHC.Types.RepType
 import GHC.Unit.Types
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare (eqType)
 
 {-
 ************************************************************************
@@ -237,11 +238,13 @@ mkWwBodies opts fun_id ww_arity arg_vars kept_args res_ty demands res_cpr
         ; let (work_args, work_marks) = unzip work_args_str
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr)
+        ; (useful2, work_res_ty, wrap_fn_cpr, work_fn_cpr)
               <- mkWWcpr_entry opts res_ty' res_cpr
 
         ; let (work_lam_args, work_call_args, work_call_str)
                 | needsVoidWorkerArg fun_id arg_vars work_args
+                  || (wo_core_mode opts == RetainedCore &&
+                      needs_result_arg (reverse work_args) work_res_ty)
                 = addVoidWorkerArg work_args work_marks
                 | otherwise
                 = (work_args, work_args, work_marks)
@@ -268,6 +271,13 @@ mkWwBodies opts fun_id ww_arity arg_vars kept_args res_ty demands res_cpr
         -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
         -- fw from being inlined into f's RHS
   where
+    -- See Note [Unboxed worker results under retained binders].
+    needs_result_arg _ ty | typeKind ty `eqType` liftedTypeKind = False
+    needs_result_arg [] _ = False
+    needs_result_arg (v:vs) ty
+      | isTyVar v || isCoVar v = needs_result_arg vs (mkLamType v ty)
+      | otherwise              = anyFreeVarsOfType (== v) ty
+
     zap_var v | isTyVar v = v
               | otherwise = modifyIdInfo zap_info v
     zap_info info -- See Note [Zap IdInfo on worker args]
@@ -419,6 +429,22 @@ addVoidWorkerArg work_args str_marks
     , str_marks ++ [NotMarkedStrict] )
 
 {-
+Note [Unboxed worker results under retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a function whose result is a pair indexed by its last argument:
+
+  f :: foreach (xs :: Vec a n) -> (Mark xs, Mark xs)
+
+CPR can return the two fields in an unboxed tuple. But the result of a
+retained binder must have kind Type. Give the worker the following type:
+
+  $wf :: foreach (xs :: Vec a n) -> Void# -> (# Mark xs, Mark xs #)
+
+The wrapper passes void# with the existing worker calling convention.
+Only the innermost value binder can need the extra argument. Every outer
+value binder returns a function of lifted type. Traverse any intervening
+type and coercion binders as mkLamType does when it types the worker.
+
 Note [Protecting the last value argument]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the user writes (\_ -> E), they might be intentionally disallowing
@@ -1616,11 +1642,12 @@ mkWWcpr_entry
   -> Type                              -- function body
   -> Cpr                               -- CPR analysis results
   -> UniqSM (WwUse,                    -- Is w/w'ing useful?
+             Type,                     -- Result type of the worker body
              CoreExpr -> CoreExpr,     -- New wrapper. 'nop_fn' if not useful
              CoreExpr -> CoreExpr)     -- New worker.  'nop_fn' if not useful
 -- ^ Entrypoint to CPR W/W. See Note [Worker/wrapper for CPR] for an overview.
 mkWWcpr_entry opts body_ty body_cpr
-  | not (wo_cpr_anal opts) = return (boringSplit, nop_fn, nop_fn)
+  | not (wo_cpr_anal opts) = return (boringSplit, body_ty, nop_fn, nop_fn)
   | otherwise = do
     -- Part (1)
     res_bndr <- mk_res_bndr body_ty
@@ -1637,8 +1664,8 @@ mkWWcpr_entry opts body_ty body_cpr
     let wrap_fn      = unbox_transit_tup rebuilt_result                 -- 3 2
         work_fn body = bind_res_bndr body (work_unpack_res transit_tup) -- 1 2 3
     return $ if not useful
-                then (boringSplit, nop_fn, nop_fn)
-                else (usefulSplit, wrap_fn, work_fn)
+                then (boringSplit, body_ty, nop_fn, nop_fn)
+                else (usefulSplit, exprType transit_tup, wrap_fn, work_fn)
 
 -- | Part (1) of Note [Worker/wrapper for CPR].
 mk_res_bndr :: Type -> UniqSM Id
