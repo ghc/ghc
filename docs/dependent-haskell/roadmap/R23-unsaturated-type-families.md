@@ -499,6 +499,20 @@ axioms retain their representational behavior. `NativeUnsaturatedFamily`
 covers separate compilation, invalidation, a stuck comparison of
 distinct prefixes, and rejection of inverse decomposition.
 
+A provider can export `type Callback b = Select b` after checking
+the partial application with `ExperimentalDependentTypes`. An
+ordinary client can pass `Callback 'True` to a higher-order family,
+including through an ordinary re-export or a second synonym. That
+use retains the unmatchable arrow and the dependency on the defining
+family equation. Writing `Select 'True` at the same argument still
+requires `ExperimentalDependentTypes`, even through a re-export.
+
+GHC-27346 currently reports only the family arity for that rejected
+application. [Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#proposed-change-specification)
+calls for an extension hint. The fork could suggest
+`ExperimentalDependentTypes` for an eligible prefix at that check.
+Re-exporting a family does not opt its consumers in.
+
 M166 initially excluded generated source-certificate families.
 M169 permits a partial application with a checked certificate.
 `OrdinaryPrefix = W.each W.signal` supplies the callback and leaves
