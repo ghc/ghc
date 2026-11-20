@@ -23,13 +23,20 @@ warm reuse and rejection of stale evidence.
 [R05 optimizer details](roadmap/R05-dependent-core.md#retained-operands-in-the-native-optimizer)
 and [earlier checkpoint](PLAN.md#r04-and-r19-project-through-an-ordinary-function-and-match-a-type-directly).
 
+The local compiler at `60014cbc8e` integrates pair projections, ordered type
+cases, arrow printing and two open mapper rules. Its bootstrap build matches
+all 271 lines of [Showcase](Showcase.hs) at `-O0` and stripped-interface
+`-O1`. The self-hosted build, directory tests and interface upgrade checks
+for this revision are in progress.
+
 | Card | Evidence beyond the published checkpoint | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A private compiler checks `second :: foreach (q :: DPair a p) -> p (first q)` through interfaces. The combined R04/R23 compiler runs 267 Showcase lines. | General domains and inference for `foreach`, and first-class retained `some`. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | A separate default-interface prototype exposes an ordinary worker to an optimized, source-free client. | An imported dependent projection still loses a branch coercion when reading its unfolding. Integrate the reader and version checks. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A private compiler handles nested constructors introduced by an alias. A rigid earlier test blocks a later fallback. Stripped-interface clients, TH reification and exact printing pass. A GADT index can use one reduction of a completed closed family. | Mixed patterns need an unambiguous test order. Open GADT indices and integration with the shared compiler remain open. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The integrated compiler checks `second :: foreach (q :: DPair a p) -> p (first q)`. An ordinary client reads the payload from a separately compiled provider. | General domains and inference for `foreach`, and first-class retained `some`. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | The private reader at `b0d4dd3850` reconstructs a branch's constructor fields and nominal equality. An ordinary client at default `-O1` reads the projected payload and leaves its bottom-valued IO witness lazy. | Verify the full optimizer and selective interface version in a consistent compiler build. The initial compiler linked from mixed artifacts crashed before it wrote the test interface. |
+| [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper's cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | The integrated compiler handles ordered constructor tests through aliases and selected GADT indices. Private revision `0af90fa373` also checks cases under `forall k (tag :: k)`. An ordinary interface client instantiates one annotated result at both `LiftedRep` and `IntRep`. | Integrate the dependent binder checks. General mixed patterns and open GADT indices remain open. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | An isolated compiler checks source `Pack (type Bool) (Just True)` and a lexical unpack pattern. A source-free ordinary client links and prints `True`. Core and STG dumps, demand and scope controls pass at `-O0`. | Build the marker library and compiler together from a clean checkout. General pattern matching and ordinary optimization remain open. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The private formatting patch restores both ordinary kind-error goldens, preserves explicit M/U differences and leaves all 124 polykinds exit statuses unchanged. It passes the modifier, reify and exact-print checks. | Review the diagnostics on alias-headed kinds and integrate the printer with the shared compiler. General family unsaturation remains open. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | Eight focused diagnostic tests pass on the private follow-up. An actual matchability conflict displays the conflicting arrow metadata. A stuck family no longer produces a speculative argument-count hint. | Integrate the diagnostics. General family unsaturation remains open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -44,12 +51,14 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. Integrate the R04 pair projections and R23 diagnostics. The combined
-   bootstrap overlay passes 267 Showcase lines at both optimization levels.
-2. Check the R19 ordered cases and R16 mapper rules against that compiler.
-   Compare old and new interfaces across separate producer/client builds.
-3. Build R22 source pack and unpack with the marker library exposed by the
-   ordinary build. Fix the R05 default-interface projection reader.
+1. Finish the self-hosted and upgrade checks for the 271-line integration.
+2. Integrate the R19 dependent binder checks and the R23 diagnostic fixes.
+   Verify reuse of existing provider interfaces. Check how Haddock renders
+   a public type case when its implementation uses a private family.
+3. Build R22 source pack and unpack together with the `GHC.Exists` marker
+   in `base`. Run an ordinary client from the producer interface and object.
+4. Check R05 default optimized unfoldings in both compiler stages. Test old
+   and new readers on the versioned projection and on an ordinary interface.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
