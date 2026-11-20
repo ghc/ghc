@@ -72,7 +72,9 @@ HS
 "${filter[@]}" FilterRun.o PreludeFilterProof.o ../filter/PreludeFilterSource.o -o filter-run
 [[ $(./filter-run) == True ]]
 
-sed 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' PreludeFilterProof.hs >RuleFilter.hs
+sed -e 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' \
+    -e 's/, showPreludeFilterProofs//' \
+    -e '/^showPreludeFilterProofs ::/,$d' PreludeFilterProof.hs >RuleFilter.hs
 if "${filter[@]}" -fforce-recomp -c RuleFilter.hs >filter-rules.log 2>&1 ||
    ! grep -Eq '(keepFalse|skipTrue) _ = Refl' filter-rules.log ||
    ! grep -Fq '[GHC-83605]' filter-rules.log ||

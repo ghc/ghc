@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
-module PreludeFilterProof (keepFalse, skipTrue, lazyHead) where
+module PreludeFilterProof (keepFalse, skipTrue, lazyHead, showPreludeFilterProofs) where
 
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import PreludeFilterSource (FilterNegated)
 
@@ -21,3 +21,8 @@ lazyHead :: [Bool] -> Bool
 lazyHead xs = case Prelude.filter not (False : xs) of
     False : _ -> True
     _ -> False
+
+-- | Observe both proofs under the rewrite policy that permits the equations.
+showPreludeFilterProofs :: String
+showPreludeFilterProofs =
+    show (keepFalse (Proxy :: Proxy '[]), skipTrue (Proxy :: Proxy '[]), lazyHead undefined)

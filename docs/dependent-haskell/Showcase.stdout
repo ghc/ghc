@@ -300,6 +300,7 @@ map Boolean negation and traffic signals over an unknown tail: (Refl,Refl)
 map an ordinary enumeration callback over an unknown tail: Refl
 use Prelude.not on a known head with an unknown tail: Refl
 use Prelude.map and Prelude.not on an empty list and an unknown tail: (Refl,Refl)
+filter a known head and leave the tail lazy: (Refl,Refl,True)
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl
