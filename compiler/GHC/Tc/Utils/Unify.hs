@@ -25,7 +25,8 @@ module GHC.Tc.Utils.Unify (
 
   -- Various unifications
   uType, unifyType, unifyKind, unifyInvisibleType,
-  tcRetainedCoercion, tcRetainedCallCoercion, retainedCallOccurs,
+  isRetainedConstructorProof, tcRetainedCoercion,
+  tcRetainedCallCoercion, retainedCallOccurs,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
   mightEqualLater,
@@ -3833,20 +3834,24 @@ instance Outputable SimpleUnifyResult where
 -- See Note [Transport through a retained index].
 tcRetainedCoercion :: Id -> CoercionN -> TcType -> TcM CoercionN
 tcRetainedCoercion index branch_co original_ty
-  = do { unless (isNativeIndexId index
-                 && coercionRole branch_co == Nominal
-                 && coercionLKind branch_co `eqType` TermVarTy index
-                 && is_constructor (coercionRKind branch_co)) $
+  = do { unless (isRetainedConstructorProof index branch_co) $
            pprPanic "tcRetainedCoercion: invalid branch proof"
              (ppr index $$ ppr branch_co $$ ppr original_ty)
        ; tcRetainedIndexCoercion (TermVarTy index) branch_co original_ty }
-  where
-    is_constructor ty
-      | TyConApp tc _ <- coreFullView ty
-      , Just con <- isPromotedDataCon_maybe tc
-      , Just _ <- nativeIndexDataConTyArgs (varType index) con
-      = typeKind ty `eqType` varType index
-      | otherwise = False
+
+-- | Check whether a nominal proof refines a retained index to a constructor.
+-- The proof must be oriented with the retained index on the left.
+isRetainedConstructorProof :: Id -> CoercionN -> Bool
+isRetainedConstructorProof index co
+  | isNativeIndexId index
+  , coercionRole co == Nominal
+  , coercionLKind co `eqType` TermVarTy index
+  , let ty = coercionRKind co
+  , TyConApp tc _ <- coreFullView ty
+  , Just con <- isPromotedDataCon_maybe tc
+  , Just _ <- nativeIndexDataConTyArgs (varType index) con
+  = typeKind ty `eqType` varType index
+  | otherwise = False
 
 -- | Find an exact free call index. Unsupported proof and kind dependencies
 -- are conservative candidates; the transport checker rejects these forms.
