@@ -265,6 +265,7 @@ select through nested type case patterns: (Proxy,7)
 select through an ordinary type constructor: (7,'x',())
 select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
 match Bool and Ordering directly in a type: (7,'x')
+remove a Maybe layer and keep any other type: (7,'x')
 use a local type in a constructor case: Just True
 infer one kind for a local type from both case branches: True
 pass a constructor to uncurry with two unknown fields: Refl

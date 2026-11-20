@@ -1047,6 +1047,8 @@ main = do
         , NativeNestedCase.forallResult (Proxy @'False) NativeNestedCase.CaseMissing )
     observe "match Bool and Ordering directly in a type"
         (7 :: NativeCase.ByType Bool, 'x' :: NativeCase.ByType Ordering)
+    observe "remove a Maybe layer and keep any other type"
+        (7 :: NativeCase.ElementOrSelf (Maybe Int), 'x' :: NativeCase.ElementOrSelf Char)
     observe "use a local type in a constructor case"
         (Just True :: NativeCase.Captured 'False 'False)
     observe "infer one kind for a local type from both case branches"

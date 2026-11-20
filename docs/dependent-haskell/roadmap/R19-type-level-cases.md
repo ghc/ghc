@@ -31,9 +31,12 @@ translation of Eisenberg and Stolarek. Agda's pattern lambdas provide
 a related way to match on an intermediate expression. [Promotion paper, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf)
 and [Agda pattern lambdas](https://agda.readthedocs.io/en/stable/language/with-abstraction.html#pattern-lambdas).
 
-Patterns have a constructor head. Fields can contain constructors,
-distinct variables or wildcards. Catch-all alternatives and case
-expressions inside arbitrary types remain open.
+Patterns can contain constructors, distinct variables, or wildcards.
+A variable at the root binds the scrutinee in that row. A wildcard at
+the root ignores it. The compiler tests earlier rows in source order.
+For example, `case b of { True -> Int; _ -> Int }` stays stuck for an
+unknown `b`. A first row `_ -> Int` returns `Int` immediately.
+Case expressions inside arbitrary types remain open.
 
 ## Type constructors in case patterns
 

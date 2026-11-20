@@ -97,6 +97,17 @@ checks clauses under a telescope that permits refinement from the matched
 constructor. [GHC proposal #54](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0054-kind-signatures.rst)
 and [Agda with-abstraction](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#generalisation).
 
+### Catch-all rows in type cases
+
+A variable pattern binds the scrutinee. A wildcard also succeeds without
+examining it. An earlier constructor pattern can still block the match.
+The Haskell Report gives the term matching rules in §3.17. Agda's
+`max m zero` example shows how the first split can block definitional
+equality at an unknown input. R19 checks that distinction across a GHC
+interface, including when the two rows return the same type.
+[Haskell 2010, §3.17](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-900003.17)
+and [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
+
 ### Matchability and multiplicity on arrows
 
 Proposal #242 names `GHC.Matchability` as the public module for the
