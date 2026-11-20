@@ -1530,6 +1530,10 @@ sourceAddition = do
     observe "check a runtime cut against a vector length"
         (ListVectorClient.checkedSplitObservation n checkedInput,
          ListVectorClient.checkedSplitObservation (S m) checkedInput)
+    oneCell <- newIORef (VCons True VNil)
+    proofFromIO <- ListVectorClient.checkedSplitIO
+        (splitAtVecChecked (S Z) (S Z) <$> readIORef oneCell) (VCons False VNil)
+    observe "use a split proof from IO in the next argument" proofFromIO
     case (Refl :: VectorSplitObservation.reassembleTwo ('VCons 'True ('VCons 'False 'VNil))
                :~: 'VCons 'True ('VCons 'False 'VNil)) of
         Refl -> observe "reassemble the same two vector elements"

@@ -1,12 +1,15 @@
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, RankNTypes, RequiredTypeArguments #-}
+{-# LANGUAGE BangPatterns, DataKinds, GADTs, NoExperimentalDependentTypes, RankNTypes, RequiredTypeArguments, ScopedTypeVariables #-}
 
 -- | Construct and open imported dependent pairs in ordinary Haskell.
-module ListVectorClient (fromList, contents, regroup, regroupObservation, choosePartition, checkedSplitObservation) where
+module ListVectorClient
+    ( fromList, contents, regroup, regroupObservation, choosePartition,
+      checkedSplitObservation, checkedSplitIO
+    ) where
 
 import ConservedPartition (Branch, Split, partitionVec)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
-import PackedVecLibrary (Nat, Vec, appendVec, natToInt, sourceLength, sourceVector,
+import PackedVecLibrary (CheckedSplit, Nat(..), Vec, appendVec, natToInt, sourceLength, sourceVector,
                          splitAtVecChecked, toList)
 import StoredVector (ListVector)
 
@@ -41,3 +44,15 @@ checkedSplitObservation cut input = case fromList input of
         Nothing -> Nothing
         Just (Pair suffix (left, right, _)) ->
             Just (natToInt suffix, toList left, toList right)
+
+-- | Observe a checked split with no suffix and a second vector at the original length.
+checkedSplitIO :: forall a total. IO (Maybe (CheckedSplit a ('S 'Z) total))
+               -> Vec a total -> IO (Maybe ([a], [a]))
+checkedSplitIO obtain later = do
+    split <- obtain
+    pure (split >>= \pair -> consume pair later)
+  where
+    consume :: CheckedSplit a ('S 'Z) total -> Vec a total -> Maybe ([a], [a])
+    consume (Pair Z !(left, right, Refl)) (second :: Vec a ('S 'Z)) =
+        Just (toList (appendVec left right), toList second)
+    consume _ _ = Nothing

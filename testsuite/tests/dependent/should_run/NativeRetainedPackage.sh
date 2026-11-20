@@ -460,12 +460,13 @@ cat >ListVectorMain.hs <<'HS'
 module Main where
 import Control.Exception (ErrorCall, evaluate, try)
 import ConservedPartition (Split, branchContents, partitionVec)
+import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust, isNothing)
 import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
 import GHC.Sigma (Sigma(Pair))
 import ListVectorClient
-import PackedVecLibrary (Add, Nat(..), Vec(..), appendNative, appendVec, dropVec, replicateNative,
+import PackedVecLibrary (Add, CheckedSplit, Nat(..), Vec(..), appendNative, appendVec, dropVec, replicateNative,
                          splitAtVec, splitAtVecChecked, takeVec, toList)
 import StoredVector (ListVector)
 import VectorIdentity (forwardVector, matchZero, vectorRefl, zeroRefl)
@@ -487,6 +488,13 @@ vectorProofs xs =
     (case vectorRefl xs of Refl -> True, case forwardVector xs of Refl -> True)
 rejoin :: Vec a cut -> Vec a suffix -> (Add cut suffix :~: total) -> Vec a total
 rejoin left right Refl = appendVec left right
+deferProof :: CheckedSplit Bool ('S 'Z) total -> Vec Bool total -> Maybe [Bool]
+deferProof (Pair Z ~(_, _, proof)) later = case proof of
+    Refl -> case later of
+        (next :: Vec Bool ('S 'Z)) -> Just (toList next)
+deferProof _ _ = Nothing
+ignoreTuple :: CheckedSplit Bool ('S 'Z) total -> Vec Bool total -> Bool
+ignoreTuple (Pair _ ~(_, _, _)) _ = True
 main :: IO ()
 main = do
     print (observe (fromList ""), observe (fromList "ab"),
@@ -570,11 +578,55 @@ main = do
     case (zero, success, unusedVector, failure, leftOnly, rightOnly) of
         (True, True, True, True, [7], [9]) -> pure ()
         other -> fail (show other)
+    cell <- newIORef (VCons True VNil)
+    let obtainSplit = splitAtVecChecked (S Z) (S Z) <$> readIORef cell
+        later = VCons False VNil
+    actual <- checkedSplitIO obtainSplit later
+    delayed <- fmap (>>= \pair -> deferProof pair later) obtainSplit
+    case (actual, delayed) of
+        (Just ([True], [False]), Just [False]) -> pure ()
+        other -> fail (show other)
+    let badTuple = Pair Z (error "split tuple forced") :: CheckedSplit Bool ('S 'Z) ('S 'Z)
+        badProof = Pair Z (VCons True VNil, VNil, error "split proof forced")
+                   :: CheckedSplit Bool ('S 'Z) ('S 'Z)
+        checkBottom message action = do
+            result <- try @ErrorCall action
+            case result of
+                Left err | takeWhile (/= '\n') (displayException err) == message -> pure ()
+                _ -> fail ("expected " ++ message)
+    if ignoreTuple badTuple later then pure () else fail "lazy tuple did not match"
+    checkBottom "split tuple forced" (checkedSplitIO (pure (Just badTuple)) later >>= evaluate)
+    checkBottom "split proof forced" (evaluate (deferProof badProof later))
 HS
 "${g[@]}" -c ListVectorMain.hs
 "${g[@]}" ListVectorMain.o ../projection/ListVectorClient.o \
     ../provider/{StoredVector,ConservedPartition,PackedVecLibrary,VectorIdentity}.o -o list-vector
 ./list-vector
+cat >SplitProofScope.hs <<'HS'
+{-# LANGUAGE BangPatterns, DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables #-}
+module SplitProofScope where
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import PackedVecLibrary (CheckedSplit, Nat(..), Vec)
+
+lazyProof :: CheckedSplit Bool ('S 'Z) total -> Vec Bool total -> Bool
+lazyProof (Pair Z ~(_, _, Refl)) (_ :: Vec Bool ('S 'Z)) = True
+lazyProof _ _ = False
+
+reversed :: Vec Bool total -> CheckedSplit Bool ('S 'Z) total -> Bool
+reversed (_ :: Vec Bool ('S 'Z)) (Pair Z !(_, _, Refl)) = True
+reversed _ _ = False
+
+escape :: CheckedSplit Bool ('S 'Z) ('S 'Z) -> Vec Bool suffix
+escape (Pair _ (_, right, Refl)) = right
+HS
+if "${g[@]}" -c SplitProofScope.hs >split-proof-scope.log 2>&1 ||
+   ! grep -Fq 'SplitProofScope.hs:8:35: error: [GHC-25897]' split-proof-scope.log ||
+   ! grep -Fq 'SplitProofScope.hs:12:11: error: [GHC-25897]' split-proof-scope.log ||
+   ! grep -Fq 'SplitProofScope.hs:16:36: error: [GHC-25897]' split-proof-scope.log; then
+    cat split-proof-scope.log >&2
+    exit 1
+fi
 cat >WrongPartition.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
 module WrongPartition where

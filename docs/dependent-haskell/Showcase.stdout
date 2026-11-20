@@ -159,6 +159,7 @@ split the appended vector at its first length: ([True],[False,False])
 take and drop at the first runtime length: ([True],[False,False])
 prove the runtime vector is VNil in the empty branch: (True,False)
 check a runtime cut against a vector length: (Just (1,[True],[False]),Nothing)
+use a split proof from IO in the next argument: Just ([True],[False])
 reassemble the same two vector elements: [True,False]
 outer successor ignores the second addend: True
 replicate at a computed runtime length: [True,True,True]

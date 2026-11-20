@@ -278,3 +278,23 @@ module can instead call a local worker with signature `forall n. Vec a n
 binder `total` in a type in the ordinary module produces GHC-45510.
 In both calls the required type argument is erased.
 [Runtime example](../Showcase.hs) and [ordinary selector](../examples/packed-vector/ListVectorClient.hs).
+
+## Scope a split proof from IO
+
+The ordinary `checkedSplitIO` caller takes a split from an IO action and
+a second vector at the same, abstract total length. It matches the zero
+suffix and the proof in `Pair Z !(left, right, Refl)`. The proof refines
+the second argument to a one-cell vector. GHC checks function patterns
+from left to right, so the reversed order fails.
+[Ordinary caller](../examples/packed-vector/ListVectorClient.hs),
+[GHC's GADT pattern rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/gadt.html)
+and [proposal #378 on dependent patterns](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-pattern-match).
+
+A lazy tuple can bind the proof as a value while leaving the tuple
+unevaluated. To refine the vector, match that value with `case` first.
+Putting `Refl` under the lazy pattern supplies no equality to the
+second argument. A result also cannot expose a caller-chosen suffix.
+Agda's `uncurry` opens a dependent pair by binding both components;
+here the equality also depends on which patterns Haskell evaluates.
+[Agda's dependent pair eliminator](https://github.com/agda/agda-stdlib/blob/master/src/Data/Product/Base.agda)
+and [scope and demand checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
