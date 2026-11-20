@@ -6481,8 +6481,9 @@ Idris evaluates ordinary arguments eagerly. In Haskell, `dropVec` projects the s
 uses direct recursion so a caller can inspect the first cell before
 forcing the rest of the prefix. A zero cut returns an empty prefix
 without evaluating the input. Dropping walks the discarded spine
-without evaluating its elements. For an abstract cut, `takeVec` accepts an explicit suffix index `@m`
-because the non-injective `Add n m` cannot determine it. The ordinary
+without evaluating its elements. Both functions quantify the suffix before
+the element type, so the caller can write `takeVec @m n xs`. For an abstract
+cut, the caller supplies `m` because the non-injective `Add n m` cannot determine it. The ordinary
 source-hidden test reads its cut from an `IORef`.
 [Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
 [Idris 2, Data.Vect.take and drop](https://idris-lang.org/Idris2/base/source/Data.Vect.html#99)

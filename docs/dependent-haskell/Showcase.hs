@@ -1465,7 +1465,7 @@ sourceAddition = do
         split :: (Vec Bool n, Vec Bool m)
         split = splitAtVec n joined
         prefix :: Vec Bool n
-        prefix = takeVec @Bool @m n joined
+        prefix = takeVec @m n joined
         suffix :: Vec Bool m
         suffix = dropVec n joined
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)

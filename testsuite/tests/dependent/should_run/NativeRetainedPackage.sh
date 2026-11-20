@@ -451,11 +451,11 @@ main = do
         other -> fail (show other)
     cut <- newIORef (S (S Z)) >>= readIORef
     let joined = appendNative @Int cut (S Z) (replicateNative cut 7) (VCons 9 VNil)
-        prefix = takeVec @Int @('S 'Z) cut joined
-        suffix = dropVec @Int @('S 'Z) cut joined
+        prefix = takeVec @('S 'Z) cut joined
+        suffix = dropVec @('S 'Z) cut joined
         takeZero = takeVec Z (error "unused vector at zero cut" :: Vec Int ('S 'Z))
         dropZero = dropVec Z (VCons (9 :: Int) VNil)
-        firstCell = take 1 (toList (takeVec @Int @'Z (S (S Z))
+        firstCell = take 1 (toList (takeVec @'Z (S (S Z))
                           (VCons 7 (error "unused rest of the prefix"))))
         onlyPrefix = takeVec (S Z) (VCons (7 :: Int) (error "unused suffix" :: Vec Int ('S 'Z)))
         onlySuffix = dropVec (S Z) (VCons (error "unused dropped element") (VCons (9 :: Int) VNil))

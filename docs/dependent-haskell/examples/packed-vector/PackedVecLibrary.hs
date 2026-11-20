@@ -279,12 +279,12 @@ splitAtVec (S k) (VCons x xs) = case splitAtVec k xs of
 
 -- | Take the first @n@ cells. The result yields each cell before the rest.
 -- Supply the suffix index @m@ explicitly when the cut is abstract.
-takeVec :: forall a m. foreach (n :: Nat) -> Vec a (Add n m) -> Vec a n
+takeVec :: forall m a. foreach (n :: Nat) -> Vec a (Add n m) -> Vec a n
 takeVec Z _ = VNil
-takeVec (S k) (VCons x xs) = VCons x (takeVec @a @m k xs)
+takeVec (S k) (VCons x xs) = VCons x (takeVec @m k xs)
 
 -- | Drop the first @n@ cells without evaluating their elements.
-dropVec :: forall a m. foreach (n :: Nat) -> Vec a (Add n m) -> Vec a m
+dropVec :: forall m a. foreach (n :: Nat) -> Vec a (Add n m) -> Vec a m
 dropVec n xs = snd (splitAtVec @a @m n xs)
 
 -- | Append vectors indexed by two retained runtime lengths.
