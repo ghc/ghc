@@ -322,6 +322,17 @@ its own specification.
 [class instances](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arrow-type-in-type-class-instances)
 and [inference](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference).
 
+In `T12088sg3`, the two saturated `TyCon2 (->)` patterns select
+different arrows. After the synonym and `Promote` migration above,
+the type pattern in the `Promote` equation selects U. The kind
+annotation in the promoted `MkArr` pattern selects M. The client
+reports GHC-83865. Stock GHC 9.14.1 accepts the bare pair. On
+`4bb020f702` and `f3833dbd90`, the client compiles when both
+selectors are U or both are M. Either mismatched pair still gives
+GHC-83865. Changing either default would also make a currently
+disjoint open equation conflict with GHC-34447.
+[Original program](../../../testsuite/tests/dependent/should_compile/T12088sg3.hs).
+
 ### Applying a type at a family-defined arrow kind
 
 `Wrap False` returns `Maybe`. `Wrap True` returns the unsaturated
