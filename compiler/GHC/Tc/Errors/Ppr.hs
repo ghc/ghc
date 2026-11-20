@@ -1118,6 +1118,21 @@ instance Diagnostic TcRnMessage where
     TcRnExistentialBinderKind kind
       -> mkSimpleDecorated $ hang (text "An explicit existential binder requires kind Type.")
                                   2 (text "This binder has kind" <+> quotes (ppr kind) <> dot)
+    TcRnExistsPack problem -> mkSimpleDecorated $ case problem of
+      ExistsPackExtension ->
+        text "GHC.Exists.Pack requires -XExperimentalDependentTypes."
+      ExistsPackArguments ->
+        text "Apply GHC.Exists.Pack to a required type witness and a payload."
+      ExistsPackMissingSchema ->
+        text "GHC.Exists.Pack needs an explicit existential type when its result type is inferred."
+      ExistsPackInvalidSchema ty ->
+        hang (text "GHC.Exists.Pack needs an explicit existential type.")
+          2 (text "The available type is" <+> quotes (ppr ty) <> dot)
+      ExistsPackInvalidKind kind ->
+        hang (text "The kind argument to GHC.Exists.Pack must be Type.")
+          2 (text "The argument is" <+> quotes (ppr kind) <> dot)
+      ExistsPackInvalidContext ->
+        text "Use GHC.Exists.Pack in an explicit existential application or case pattern."
     TcRnTypeCaseContext
       -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext
@@ -2484,6 +2499,7 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTypeCasePattern{} -> ErrorWithoutFlag
     TcRnExistentialBinderKind{} -> ErrorWithoutFlag
+    TcRnExistsPack{} -> ErrorWithoutFlag
     TcRnTypeCaseContext{} -> ErrorWithoutFlag
     TcRnTypeLambdaContext{}
       -> ErrorWithoutFlag
@@ -3197,6 +3213,7 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnTypeCasePattern{} -> noHints
     TcRnExistentialBinderKind{} -> noHints
+    TcRnExistsPack{} -> noHints
     TcRnTypeCaseContext{} -> noHints
     TcRnTypeLambdaContext{}
       -> noHints

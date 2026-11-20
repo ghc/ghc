@@ -1101,6 +1101,12 @@ zonkExpr (XExpr (ExpandedThingTc (HSE thing e)))
        return $ XExpr (ExpandedThingTc (HSE thing e'))
 
 -- See Note [Checked opaque case alias] in GHC.Hs.Expr.
+zonkExpr (XExpr (NativeExistsPack schema witness payload))
+  = do { schema' <- zonkTcTypeToTypeX schema
+       ; witness' <- zonkTcTypeToTypeX witness
+       ; payload' <- zonkLExpr payload
+       ; return (XExpr (NativeExistsPack schema' witness' payload')) }
+
 zonkExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
   = do { scrut' <- zonkLExpr scrut
        ; result_ty' <- zonkTcTypeToTypeX result_ty

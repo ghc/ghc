@@ -179,6 +179,7 @@ Library
         , GHC.Exception
         , GHC.Exception.Type
         , GHC.ExecutionStack
+        , GHC.Exists
         , GHC.Exts
         , GHC.Fingerprint
         , GHC.Fingerprint.Type

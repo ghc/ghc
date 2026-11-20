@@ -5,6 +5,7 @@ module GHC.Tc.Errors.Types (
     TcRnMessage(..)
   , TcRnMessageOpts(..)
   , RetainedQuantificationError(..)
+  , ExistsPackProblem(..)
   , mkTcRnUnknownMessage
   , TcRnMessageDetailed(..), ErrInfo(..)
   , TypeDataForbids(..)
@@ -4592,6 +4593,9 @@ data TcRnMessage where
 
   -- | An explicit erased existential has a lifted Type binder.
   TcRnExistentialBinderKind :: !Kind -> TcRnMessage
+
+  -- | Invalid use of the built-in explicit existential constructor.
+  TcRnExistsPack :: !ExistsPackProblem -> TcRnMessage
   deriving Generic
 
 ----
@@ -5351,6 +5355,15 @@ data BootMismatchWhat
   deriving Generic
 
 -- | Explain a restriction of source retained quantification.
+-- | Source contexts in which explicit existential syntax cannot be checked.
+data ExistsPackProblem
+  = ExistsPackExtension
+  | ExistsPackArguments
+  | ExistsPackMissingSchema
+  | ExistsPackInvalidSchema !TcType
+  | ExistsPackInvalidKind !Kind
+  | ExistsPackInvalidContext
+
 data RetainedQuantificationError
   = RetainedBinderCount
   | RetainedBinderNeedsName
