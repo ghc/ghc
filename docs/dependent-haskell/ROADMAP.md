@@ -39,11 +39,11 @@ the header. The new reader checks the coercion's role and scope.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A checked second projection can depend on the first. Independently written sum types can satisfy a repeated argument in a closed family. The matcher preserves the order of overlapping equations. | Write a sum directly in a function signature. Broaden dependent product domains and inference. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | An ordinary client can inherit a length-indexed class method, inline a retained case and fire a generated specialization across an interface. | Optimize functions that construct and open erased packages. Preserve demand and compulsory method expansion. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A function signature can name its argument or result sum directly with `some`. Independent sums can satisfy a repeated argument in a closed family. | Extend sum syntax to constructor fields. Broaden dependent product domains and inference. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | An ordinary client inherits a length-indexed default method and projects an imported pair at `-O1`. Worker/wrapper preserves an erased package and its payload scope in a GHC API test. | Admit surviving package operations to every scheduled optimizer pass. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | The compiler handles ordered constructor tests through aliases and selected GADT indices. It checks cases under `forall k (tag :: k)`. An interface client instantiates one annotated result at both `LiftedRep` and `IntRep`. | General mixed patterns and open GADT indices. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A polymorphic filter hides a vector’s length. An ordinary client reads the first passing element without forcing the tail. A separate example drops a stored witness while preserving its indexed payload. | Infer packing and opening for `exists n. …`, including the scope of an index introduced by a recursive call. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor row can precede a wildcard or named catch-all. The case stays stuck when an unknown input blocks an earlier constructor test. | General mixed patterns and open GADT indices. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | The recursive vector filter infers its result length under `exists (n :: Nat). Vec a n`. A caller can bind the result in a local `let`. A lambda can produce a packaged function. | Apply a hidden function directly, preserve witness scope across other expressions, and support general witness projections. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The integrated compiler reports conflicting arrow matchabilities and suppresses the argument-count hint for a stuck family. | General family unsaturation and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
@@ -59,29 +59,20 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R22.** At `64cc2ed6e0`, a private compiler infers packing and opening
-   for the recursive dot-form vector filter. Two independent packages keep
-   distinct lengths. Unsafe head and escaping-length examples fail. At
-   `0d31e72282`, the same inference handles a retained constructor field.
-   The combined bootstrap at `62a5eb24cd` passes the source and mixed
-   interface checks. Verify let-bound results and function payloads on the
-   same self-hosted compiler.
-2. **R04.** At `6d0a28fc77`, direct `some` binders work in argument and
-   result signatures in private tests. The self-host at `c5094c96c9`
-   round-trips an imported signature through Template Haskell. Extend the
-   same scoping rules to data constructor fields.
-3. **R05.** At `dc5fca502c`, common subexpression elimination preserves a
-   local index when an ordinary client projects from an imported pair. The
-   retained simplifier handles surviving erased package operations in an API
-   test at `46e150b595`. At `82c7c388c0`, demand analysis preserves an
-   unused package and a lazy field. Check worker/wrapper and the remaining
-   scheduled passes before enabling these operations in the normal `-O1`
-   pipeline.
-4. **R19 and R23.** The private R19 compiler at `6766ceb299` accepts
-   a variable or wildcard after a constructor row. An unknown input still
-   blocks reduction at the earlier constructor. Check this with the combined
-   compiler. Use the ordinary-program regression baseline when extending
-   family unsaturation.
+1. **R22.** Integrate direct application of an implicitly packaged function.
+   The private compiler at `a29d155eb0` checks the call inside a fresh
+   witness scope. Verify the consumer, linear use and escape diagnostics
+   with the combined compiler.
+2. **R04.** Verify direct sum types in ordinary constructor fields.
+   Check strict boxed storage, selector calls and the lifetime of a local
+   index during float-in. Check that TH can reify a field while generated
+   case helpers remain private.
+3. **R05.** At `4c454fdddc`, worker/wrapper preserves lazy erased packages.
+   The private call-arity change at `7bef69196c` also handles repeated
+   calls to a stored function. Check both floating passes, specialisation,
+   exitification and CSE before admitting raw packages to the normal pipeline.
+4. **R19 and R23.** Broaden type cases over indexed scrutinees. Use the
+   ordinary-program regression baseline when extending family unsaturation.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
