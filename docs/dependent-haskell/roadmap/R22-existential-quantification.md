@@ -18,6 +18,16 @@ constructor that carries only the element and tail at runtime.
 [proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
 and [Agda erasure](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html).
 
+The Showcase passes `builder n` to a consumer with the explicit type
+`Callback t -> (Int, Bool)`. The consumer can use the payload at its
+own hidden type. Writing `case builder n of Callback f call -> call f`
+still gives GHC-46956 at `builder n`. GHC tries to infer the scrutinee
+type before checking the alternatives. That inferred type would contain
+the witness opened by this application. This also occurs with a
+monomorphic witness. A future check can keep the scrutinee and its
+alternatives in the same scope. Returning the payload at a caller-chosen
+type must still fail. [Builder and typed consumer](../examples/erased-existentials/RankedPackage.hs).
+
 ## What to check first
 
 - [x] Form a lifted erased existential in private Core. The formation

@@ -77,9 +77,9 @@ the header. The new reader checks the coercion's role and scope.
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can both apply a source rule over erased package types. | Check lexical package operations inside rules and broaden coercion support. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An unknown input that can still match an earlier row blocks a catch-all. | General mixed patterns and open GADT indices. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent tuple field, including in a nested application. | Generalize witness projections and inference for checking-only expressions. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. An unknown head or field can still block a later row. | Check source annotations that capture a parameter under a noninjective index family. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. The declared result of a lambda body can supply the witness before its patterns are checked. | Extend witness inference to other expressions. Direct cases on a packaged function's result can still need a typed consumer. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. The original `KindEqualities2` program checks across its declaration splice. | Infer matchability for existing synonym and family uses in `GADTSingletons`. General unsaturation remains open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -94,17 +94,17 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R23.** Restore ordinary programs that interpret kinds with open type
-   families. In `KindEqualities2`, check how a declaration splice affects
-   the selector and how the expected result kind guides `(I a) (I b)`.
-   Keep incompatible explicit annotations and invalid inverse equalities
-   rejected. [Staged regression](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
+1. **R23.** Restore the unchanged `GADTSingletons` program. Check the
+   arrow synonym and the `PromoteX` and `DemoteX` equations separately.
+   Preserve rejection of incompatible explicit annotations and invalid
+   inverse equalities. [Ordinary source test](../../testsuite/tests/dependent/should_compile/GADTSingletons.hs).
 2. **R05.** Extend rule matching to lexical package operations. Check
    substitution and witness scope on both sides of the rule.
 3. **R22 and R04.** Extend witness projections and retained fields under
-   GADT declarations. Check where a lambda still needs a type annotation.
-4. **R19.** Extend constructor patterns over open indices. Keep earlier
-   rows and nominal evidence in scope.
+   GADT declarations. Check a direct case on the result of a packaged
+   function against its explicitly typed consumer.
+4. **R19.** Check a captured index `b` in a written `Gate (Index b)`
+   scrutinee. Preserve earlier rows, nominal evidence and ambiguity checks.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual

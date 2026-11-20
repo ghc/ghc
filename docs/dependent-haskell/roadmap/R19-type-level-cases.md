@@ -110,6 +110,14 @@ the provider interface.
 [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
 and [closed-family case translation, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf).
 
+A standalone kind signature can name an index under a noninjective family.
+For example, a synonym with kind
+`forall (b :: Bool) -> Maybe (Gate (Index b)) -> Type` can distinguish
+`Just (Plain True)` from `Just (Indexed …)`. The caller supplies `b`
+explicitly. An ordinary client can prove either result for a rigid `b`.
+When GHC has to infer that same synonym's kind, its generated case family
+can still lack the scope needed to refer to `b`.
+
 In `IndexedFieldPick`, the constructor index `FieldIndex seed active`
 reduces to `Bool`. The other index then unifies with `'True`, which
 lets the nested pattern match `FieldOn`. The nominal coercion records

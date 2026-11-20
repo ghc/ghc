@@ -3186,6 +3186,11 @@ The checked type also connects fields of an application. In
 fixes the hidden type of the first. Figure 10 applies the substitution
 from Quick Look before it fills any remaining variables with monotypes.
 The fork uses that order for direct applications and nested arguments.
+For a packaged lambda such as `\n -> makeCallback n`, its declared
+result `Callback PolyId` fixes the witness before the lambda patterns
+are in scope. A GADT pattern can then supply an equality needed by an
+operand. Replacing that pattern with a wildcard removes the equality
+and the call fails at that operand.
 Quick Look assumes an invariant arrow. With `DeepSubsumption`, GHC
 uses its usual subsumption check for a function payload.
 [Quick Look, §5.8](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=15),
