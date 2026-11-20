@@ -1105,6 +1105,11 @@ main = do
         ( 7 :: NativeNestedCase.OpenIndexPick (NativeNestedCase.OpenCaseIndex 'False)
                   ('Just ('NativeNestedCase.OpenIndexed ('Proxy :: Proxy 'False)))
         , False :: NativeNestedCase.OpenIndexAtOrdering ('Just ('NativeNestedCase.OpenPlain 'False)) )
+    observe "distinguish an outer index from a shadowing pattern variable"
+        ( Refl :: NativeNestedCase.ScopedOpenIndex 'True ('Just ('NativeNestedCase.OpenPlain 'True))
+                  :~: Proxy 'True
+        , Refl :: NativeNestedCase.ScopedOpenIndex 'True ('Just ('NativeNestedCase.OpenPlain 'False))
+                  :~: Proxy 'False )
     observe "refine a constructor field and transport a later dependent index"
         ( Refl :: NativeNestedCase.IndexedFieldPick
             ('Just ('NativeNestedCase.RefinedFieldBox ('Proxy :: Proxy 'False)

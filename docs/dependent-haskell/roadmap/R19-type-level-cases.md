@@ -115,8 +115,26 @@ For example, a synonym with kind
 `forall (b :: Bool) -> Maybe (Gate (Index b)) -> Type` can distinguish
 `Just (Plain True)` from `Just (Indexed …)`. The caller supplies `b`
 explicitly. An ordinary client can prove either result for a rigid `b`.
-When GHC has to infer that same synonym's kind, its generated case family
-can still lack the scope needed to refer to `b`.
+The synonym can also give both parameters their kinds at their binders.
+GHC checks the lifted case family before the synonym when a later binder
+kind uses an earlier parameter. Its constructor rows can then match at an
+abstract index. The application supplies the enclosing `b` in `Index b`.
+In `ScopedOpenIndex`, the first branch returns `Proxy b` for the outer
+`b`. The next branch binds its own `b`. The fallback can refer to the
+entire original scrutinee. An unknown constructor or field still blocks
+the match. The change requires no injectivity assumption about `Index`.
+Agda's with-abstraction also orders the arguments to a generated helper
+according to the dependencies in their types.
+[Source example](../examples/open-evaluation/NativeNestedCase.hs),
+[interface proofs](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs)
+and [Agda's translation](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#technical-details).
+
+GHC also refreshes an older home interface for a lifted case with a
+dependent capture. A provider with a lexical package rule might already
+have its private helper. GHC retains that information when checking
+the type-case upgrade. Changing the provider's ABI recompiles its client
+through the ordinary dependency check.
+[Mixed-provider upgrade test](../examples/open-evaluation/check-scoped-case-upgrade.sh).
 
 In `IndexedFieldPick`, the constructor index `FieldIndex seed active`
 reduces to `Bool`. The other index then unifies with `'True`, which

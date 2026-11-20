@@ -115,7 +115,7 @@ the header. The new reader checks the coercion's role and scope.
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. | Support orphan rules, retained function rules and more dependent coercions. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. An unknown head or field can still block a later row. | Check source annotations that capture a parameter under a noninjective index family. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. A written scrutinee kind can capture an earlier parameter under a noninjective family. An unknown head or field can still block a later row. | Direct cases in value signatures still need scope and equality checks. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. The declared result of a lambda body can supply the witness before its patterns are checked. | Extend witness inference to other expressions. Direct cases on a packaged function's result can still need a typed consumer. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. The original `KindEqualities2` program checks across its declaration splice. | Infer matchability for existing synonym and family uses in `GADTSingletons`. General unsaturation remains open. |
 
@@ -141,13 +141,15 @@ source examples. General promotion remains open.
    Broadening it can overlap an existing M equation.
    [Two-module example](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
    Keep the explicit matchability and noninjective equality checks.
-   The staged interpreter with an unsaturated family still needs an explicit
-   `%U`. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
+   The staged interpreter selects U when its caller supplies an expected
+   U arrow. A result of kind `Type` alone still leaves the choice ambiguous. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
 3. **R22 and R04.** Extend witness projections and retained fields under
    GADT declarations. Check a direct case on the result of a packaged
    function against its explicitly typed consumer.
-4. **R19.** Check a captured index `b` in a written `Gate (Index b)`
-   scrutinee. Preserve earlier rows, nominal evidence and ambiguity checks.
+4. **R19.** Extend type cases from named synonyms to value signatures.
+   Repeated occurrences in a single signature must agree when they bind
+   the same variables and use the same ordered rows. Preserve blocked
+   matches on rigid scrutinees and report errors at the written case.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual

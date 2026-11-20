@@ -161,6 +161,7 @@ type OpenIndexAtOrdering (d :: Maybe (OpenCaseGate Ordering)) = case d of
   Just _ -> Bool
   Nothing -> Char
 
+-- | Name the outer index, a bound field, or the original scrutinee.
 type ScopedOpenIndex (b :: Bool) (d :: Maybe (OpenCaseGate (OpenCaseIndex b))) = case d of
   Just (OpenPlain True) -> Proxy b
   Just (OpenPlain b) -> Proxy b
