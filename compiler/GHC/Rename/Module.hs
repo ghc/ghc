@@ -400,11 +400,12 @@ data LiftedTypeSite
   deriving Eq
 
 -- | Prepare cases in top-level value signatures and sums in signatures and fields.
-liftDeclarationTypes :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
-liftDeclarationTypes named_wildcards group
+liftDeclarationTypes :: [(RdrName, (GlobalRdrElt, Name))] -> Bool -> HsGroup GhcPs
+                     -> (HsGroup GhcPs, LiftedDecls, [(LocatedN RdrName, GlobalRdrElt)])
+liftDeclarationTypes source_heads named_wildcards group
   | not (null synonyms)
-  = (group{hs_valds = values, hs_tyclds = anchors : type_groups}, names)
-  | otherwise = (group, [])
+  = (group{hs_valds = values, hs_tyclds = anchors : type_groups}, names, concat uses)
+  | otherwise = (group, [], [])
   where
     (values, signature_types) = case hs_valds group of
       ValBinds ann binds ->
@@ -413,17 +414,18 @@ liftDeclarationTypes named_wildcards group
         in (ValBinds ann binds', concat types)
       binds -> (binds, [])
     (type_groups, groups_sums) = unzip (map liftGroup (hs_tyclds group))
-    (_, shared_types) = mapAccumL shareRetainedCase [] signature_types
+    (_, shared) = mapAccumL shareRetainedCase [] signature_types
+    (shared_types, uses) = unzip shared
     (synonyms, names) = unzip (shared_types ++ map fst (concat groups_sums))
     anchors = TyClGroup noExtField synonyms [] [] []
 
-    shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, captures))
+    shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, captures, heads))
       | Just first <- lookup key seen
       = let rhs = applyAnchor loc first captures
-        in (seen, (L loc alias{tcdRhs = rhs}, names))
+        in (seen, ((L loc alias{tcdRhs = rhs}, names), heads))
       | otherwise
-      = ((key, occ) : seen, entry)
-    shareRetainedCase seen (entry, _) = (seen, entry)
+      = ((key, occ) : seen, (entry, []))
+    shareRetainedCase seen (entry, _) = (seen, (entry, []))
 
     liftGroup decls =
       let (decls', sums) = unzip (map liftData (group_tyclds decls))
@@ -503,7 +505,8 @@ liftDeclarationTypes named_wildcards group
                                                        wc{hswc_body = sig'})), aliases))
     liftBind counters bind = (counters, (bind, []))
 
-    signatureCaptures outer body = outerCaptures outer (extractHsTyRdrTyVars body)
+    signatureCaptures outer body = outerCaptures outer
+      [v | v <- extractHsTyRdrTyVars body, isNothing (lookup (unLoc v) source_heads)]
 
     outerCaptures HsOuterImplicit{} occurrences = implicitCaptures occurrences
     outerCaptures HsOuterExplicit{hso_bndrs = binders} _ = explicitCaptures binders
@@ -518,21 +521,29 @@ liftDeclarationTypes named_wildcards group
       [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
       | b <- binders, Just v <- [hsLTyVarLocName b]]
 
-    liftedAnchor FieldTypeSite ty@(L _ (XHsType HsTypeSome{}))
+    liftedAnchor FieldTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$field-sum:", Nothing)
-    liftedAnchor SignatureTypeSite ty@(L _ (XHsType HsTypeSome{}))
+    liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
-    liftedAnchor site (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
+    liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
       | site /= FieldTypeSite
-      , caseScrutinee site scrutinee
+      , caseScrutinee site scope scrutinee
       , copyable scrutinee
       , all copyableAlt alts
       = Just ("$signature-case:", signatureCaseKey scrutinee alts)
-    liftedAnchor _ _ = Nothing
+    liftedAnchor _ _ _ = Nothing
 
-    caseScrutinee (RetainedTypeSite names) scrutinee =
-      isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names)
-    caseScrutinee _ _ = True
+    caseScrutinee (RetainedTypeSite names) scope scrutinee =
+      isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names (resolveHead scope))
+    caseScrutinee _ _ _ = True
+
+    resolveHead scope name
+      | all ((/= name) . unLoc . snd) scope = lookup name source_heads
+      | otherwise = Nothing
+
+    retainedHeadUses RetainedTypeSite{} scope (L _ (XHsType (HsTypeCase _ _ scrutinee _))) =
+      [(v, gre) | v <- sourceCallHeads scrutinee, Just (gre, _) <- [resolveHead scope (unLoc v)]]
+    retainedHeadUses _ _ _ = []
 
     retainedNames (RetainedTypeSite names) = names
     retainedNames _ = []
@@ -564,9 +575,10 @@ liftDeclarationTypes named_wildcards group
     innerScope _ _ = Nothing
 
     liftBody site owner scope whole@(L loc _) (salt, seen)
-      | Just (prefix, key) <- liftedAnchor site whole
+      | Just (prefix, key) <- liftedAnchor site scope whole
       , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
-            (used, missing) = foldr select ([], free) scope
+            heads = retainedHeadUses site scope whole
+            (used, missing) = foldr select ([], free `Set.difference` Set.fromList (map (unLoc . fst) heads)) scope
       , Set.null missing
       , all (copyableCapture site) used
       = case key >>= (`lookup` seen) of
@@ -577,7 +589,7 @@ liftDeclarationTypes named_wildcards group
                 name = L (l2l loc) (mkRdrUnqual occ)
                 alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
-                shared = sharedRetainedCaseKey site used whole key
+                shared = sharedRetainedCaseKey site scope used whole key heads
             in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared)], (salt + 1, seen'))
     liftBody site owner scope (L loc quantified) (salt, seen)
       | Just (inner, locals, body) <- innerScope site quantified
@@ -628,15 +640,15 @@ liftDeclarationTypes named_wildcards group
       Just (L _ HsForEachTy{}) -> False
       _ -> and (gmapQ copyableDomain node)
 
-    sharedRetainedCaseKey (RetainedTypeSite names) used
-      (L _ (XHsType (HsTypeCase _ _ _ alts))) (Just (scrutinee, rows))
+    sharedRetainedCaseKey (RetainedTypeSite names) scope used
+      (L _ (XHsType (HsTypeCase _ _ _ alts))) (Just (scrutinee, rows)) heads
       | let indices = map (unLoc . snd) used
       , all (`elem` names) indices
       , Just domains <- traverse (closedDomain . fst) used
-      , Just scrutinee_key <- retainedCaseScrutinee indices scrutinee
+      , Just scrutinee_key <- retainedCaseScrutinee indices (resolveHead scope) scrutinee
       , all closedRow alts
-      = Just ((domains, scrutinee_key, rows), used)
-    sharedRetainedCaseKey _ _ _ _ = Nothing
+      = Just ((domains, scrutinee_key, rows), used, heads)
+    sharedRetainedCaseKey _ _ _ _ _ _ = Nothing
 
     closedDomain (L _ HsTvb{tvb_kind = HsBndrKind _ domain})
       | null (extractHsTyRdrTyVars domain) = signatureCasePart domain
@@ -654,12 +666,14 @@ data SignatureCasePart
   = CasePartName PromotionFlag RdrName
   | CasePartApp SignatureCasePart SignatureCasePart
   | CasePartCapture Int
+  | CasePartSource Name
   | CasePartWildcard
   deriving Eq
 
 -- | Admit applications of global names and normalize retained operands.
-retainedCaseScrutinee :: [RdrName] -> SignatureCasePart -> Maybe SignatureCasePart
-retainedCaseScrutinee names scrutinee = do
+retainedCaseScrutinee :: [RdrName] -> (RdrName -> Maybe (GlobalRdrElt, Name))
+                      -> SignatureCasePart -> Maybe SignatureCasePart
+retainedCaseScrutinee names resolve scrutinee = do
   checked <- operand scrutinee
   guard (hasCapture checked)
   pure checked
@@ -670,6 +684,8 @@ retainedCaseScrutinee names scrutinee = do
     operand name = global name
 
     application (CasePartApp fun arg) = CasePartApp <$> application fun <*> operand arg
+    application (CasePartName NotPromoted name)
+      | Just (_, table) <- resolve name = Just (CasePartSource table)
     application name = global name
 
     global part@(CasePartName _ name)
@@ -679,6 +695,39 @@ retainedCaseScrutinee names scrutinee = do
     hasCapture CasePartCapture{} = True
     hasCapture (CasePartApp fun arg) = hasCapture fun || hasCapture arg
     hasCapture _ = False
+
+-- | Locate the written heads of applications in a case scrutinee.
+sourceCallHeads :: LHsType GhcPs -> [LocatedN RdrName]
+sourceCallHeads = spine []
+  where
+    spine args ty = case unLoc (ignoreParens ty) of
+      HsAppTy _ fun arg -> spine (arg : args) fun
+      HsTyVar _ NotPromoted name | not (null args) -> name : concatMap sourceCallHeads args
+      _ -> []
+
+-- | Find the checked source family in the declaration group's scope.
+retainedSourceHeads :: [LSig GhcPs] -> RnM [(RdrName, (GlobalRdrElt, Name))]
+retainedSourceHeads sigs = do
+  envs@(global, local) <- getRdrEnvs
+  let candidates = [rdr | L _ (TypeSig _ _ _ sig) <- sigs, rdr <- heads sig]
+  fmap catMaybes $ forM (Set.toList (Set.fromList candidates)) $ \rdr ->
+    case demoteRdrNameTv rdr of
+      Just term
+        | not (elemLocalRdrEnv rdr local)
+        , null (lookupGRE global (LookupRdrName rdr (RelevantGREsFOS WantNormal)))
+        -> do
+          candidates <- lookupSourceTables envs term
+          pure $ case candidates of
+            [(gre, Just table)] -> Just (rdr, (gre, table))
+            _ -> Nothing
+      _ -> pure Nothing
+  where
+    heads :: Data a => a -> [RdrName]
+    heads node = here ++ concat (gmapQ heads node)
+      where
+        here = case cast node :: Maybe (LHsType GhcPs) of
+          Just (L _ (XHsType (HsTypeCase _ _ scrutinee _))) -> map unLoc (sourceCallHeads scrutinee)
+          _ -> []
 
 -- | The scrutinee followed by the pattern and result in each source row.
 type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])
@@ -992,19 +1041,23 @@ rnSrcDecls group = do
   dflags <- getDynFlags
   let sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
-      (with_signature_types, signature_names)
-        | enabled && not is_boot = liftDeclarationTypes named_wildcards group
+      (with_fields, field_names)
+        | enabled && not is_boot
+        , let (fields, names, _) = liftDeclarationTypes [] named_wildcards
+                                    group{hs_valds = hs_valds emptyRdrGroup}
+        = (fields{hs_valds = hs_valds group}, names)
         | otherwise = (group, [])
-      (with_cases, case_names) = if enabled then liftTypeCases with_signature_types else (group, [])
+      (with_cases, case_names) = if enabled then liftTypeCases with_fields else (group, [])
       (expanded, lambda_names, scopes) =
         if enabled then liftTypeLambdas sigma with_cases else (group, [], emptyOccEnv)
-  rnSrcDeclsWithLambdas (signature_names ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
+  rnSrcDeclsWithLambdas sigma named_wildcards
+                        (field_names ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
 
 -- | Rename the declarations and record the kind-inference edges of private families.
-rnSrcDeclsWithLambdas :: LiftedDecls -> OccEnv (OccName, Bool) -> HsGroup GhcPs
+rnSrcDeclsWithLambdas :: RdrName -> Bool -> LiftedDecls -> OccEnv (OccName, Bool) -> HsGroup GhcPs
                       -> RnM (TcGblEnv, HsGroup GhcRn)
-rnSrcDeclsWithLambdas hidden scopes group@(HsGroup { hs_valds   = val_decls,
+rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsGroup { hs_valds   = val_decls,
                             hs_splcds  = splice_decls,
                             hs_tyclds  = tycl_decls,
                             hs_derivds = deriv_decls,
@@ -1071,6 +1124,25 @@ rnSrcDeclsWithLambdas hidden scopes group@(HsGroup { hs_valds   = val_decls,
    restoreEnvs (gbl_env { tcg_rdr_env = rdr_env }, lcl_env) $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
+   --  See Note [Resolving retained case heads].
+   (sig_types, sigs, hidden, scopes) <-
+     if dependent && not is_boot
+     then do { heads <- retainedSourceHeads sigs'
+             ; let input = emptyRdrGroup{hs_valds = val_decls}
+                   (sig_group, aliases, uses) = liftDeclarationTypes heads named_wildcards input
+                   (cases, case_names) = liftTypeCases sig_group
+                   (late, lambdas, late_scopes) = liftTypeLambdas sigma cases
+                   late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+             ; forM_ uses $ \(loc, gre) -> setSrcSpanA (getLoc loc) (addUsedGRE AllDeprecationWarnings gre)
+             ; return (hs_tyclds late, case hs_valds late of
+                                         ValBinds _ entries -> val_sigs entries
+                                         _ -> sigs',
+                       early_hidden ++ late_hidden, plusOccEnv early_scopes late_scopes) }
+     else pure ([], sigs', early_hidden, early_scopes) ;
+   (sig_envs, sig_bndrs) <- if null sig_types
+     then (, emptyNameSet) <$> getEnvs
+     else getLocalNonValBinders local_fix_env emptyRdrGroup{hs_tyclds = sig_types} ;
+   restoreEnvs sig_envs $ do {
 
    -- (E) Rename type and class decls
    --     (note that value LHSes need to be in scope for default methods)
@@ -1083,12 +1155,12 @@ rnSrcDeclsWithLambdas hidden scopes group@(HsGroup { hs_valds   = val_decls,
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn "Start rnTyClDecls" (ppr tycl_decls) ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls hidden scopes tycl_decls ;
+   (rn_tycl_decls, src_fvs1) <- rnTyClDecls hidden scopes (sig_types ++ tycl_decls) ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
-   let { new_lhs = makeRnValBinds noExtField binds' sigs' } ;
+   let { new_lhs = makeRnValBinds noExtField binds' sigs } ;
    (rn_val_decls@(XValBindsLR (HsVBG rn_binds sigs')), bind_dus) <- if is_boot
     -- For an hs-boot, use tc_bndrs (which collects how we're renamed
     -- signatures), since val_bndr_set is empty (there are no x = ...
@@ -1101,7 +1173,7 @@ rnSrcDeclsWithLambdas hidden scopes group@(HsGroup { hs_valds   = val_decls,
 
    -- Rename fixity declarations and error if we try to
    -- fix something from another module (duplicates were checked in (A))
-   let { all_bndrs = tc_bndrs `unionNameSet` val_bndr_set } ;
+   let { all_bndrs = tc_bndrs `unionNameSet` sig_bndrs `unionNameSet` val_bndr_set } ;
    traceRn "rnSrcDecls fixity" $
      vcat [ text "all_bndrs:" <+> ppr all_bndrs ] ;
    rn_fix_decls <- mapM (mapM (rnSrcFixityDecl (TopSigCtxt all_bndrs)))
@@ -1170,7 +1242,22 @@ rnSrcDeclsWithLambdas hidden scopes group@(HsGroup { hs_valds   = val_decls,
    traceRn "finish rnSrc" (ppr rn_group) ;
    traceRn "finish Dus" (ppr src_dus ) ;
    return (final_tcg_env, rn_group)
-                    }}}}
+                    }}}}}
+
+{- Note [Resolving retained case heads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Prepare value signature aliases after the declaration group's type and
+term binders enter scope. The R16 lookup sees a local source definition
+or an actual visible import. Each signature's written telescope can
+shadow that lookup. A shared case compares resolved source family Names
+and the formal index positions. Keep the original expression in the
+checked helper. The regular renamer and type checker still check its
+source equation.
+
+An alias that uses a shared helper drops its own scrutinee expression.
+Record the original imports of its resolved application heads at their
+source locations. This keeps each qualifier and its deprecations.
+-}
 
 {- Note [Ordering local source tables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
