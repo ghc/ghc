@@ -1,7 +1,8 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, TypeApplications #-}
 module ForwardMain where
 
 import Control.Exception
+import Data.Proxy (Proxy(..))
 import Filter
 import Nested
 import NestedSignature
@@ -38,6 +39,10 @@ nestedAfter = keepAfter True (failAny "nested producer after an ordinary argumen
 
 strictAfter :: PackedPair a
 strictAfter = keepAfter (error "strict ordinary argument" :: Bool) (failAny "unselected argument")
+
+visibleAfter :: PackedPair a
+visibleAfter = keepTagged @Int @Char (Proxy @Int) (Proxy @Char) True
+    (failAny "visible arguments preserve binder order")
 
 cells :: PackedPair a -> ([a], [a])
 cells p = observe p
@@ -77,3 +82,4 @@ main = do
     demand "bar producer" (barIsEmpty bar)
     demand "nested producer after an ordinary argument" (fst (cells nestedAfter))
     demand "strict ordinary argument" (fst (cells strictAfter))
+    demand "visible arguments preserve binder order" (fst (cells visibleAfter))

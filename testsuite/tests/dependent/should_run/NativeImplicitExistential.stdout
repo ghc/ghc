@@ -34,3 +34,4 @@ nested kind
 bar producer
 nested producer after an ordinary argument
 strict ordinary argument
+visible arguments preserve binder order

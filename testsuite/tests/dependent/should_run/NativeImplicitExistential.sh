@@ -82,6 +82,7 @@ grep -Eq 'unpack unpacked.*:: k_' nested-client.log
 "$ghc" "${flags[@]}" -ddump-ds -c ForwardMain.hs -main-is ForwardMain >forward.log
 grep -A1 'ForwardProducer.choose$' forward.log | grep -Eq '@\(exists .*\. exists '
 grep -A1 'ForwardProducer.choose$' forward.log | grep -Eq '@\(exists .* \| '
+grep -A6 'ForwardProducer.keepTagged$' forward.log | grep -Eq '@\(exists .*\. exists '
 "$ghc" "${flags[@]}" ForwardMain.o ../provider/{Vector,Filter,Nested,ForwardProducer,ForwardSchemas}.o \
     -o forward -main-is ForwardMain
 ./run
@@ -99,7 +100,7 @@ bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              IntroEscape Shadowed HiddenName BarLambda HeadEscape HeadSame HeadDuplicate
              EscapePackage CaseEscape CaseLinearDuplicate BarCase
              NestedEscape NestedCapture NestedDuplicate NestedInnerBar
-             ForwardScopeEscape ForwardWrongMode)
+             ForwardScopeEscape ForwardWrongMode ForwardAmbiguous ForwardLinearCopy)
 for bad in "${bad_sources[@]}"; do
     cp "$src/$bad.hs" .
     if "$ghc" "${flags[@]}" -c "$bad.hs" >"$bad.log" 2>&1; then
@@ -111,9 +112,10 @@ for bad in "${bad_sources[@]}"; do
         BarClient|ModesAreDistinct|BarLambda|EscapePackage|BarCase|NestedInnerBar|ForwardScopeEscape|ForwardWrongMode) code=83865;;
         BarPack) code=27432;;
         DotForall|DotConstraint) code=91510;;
-        LinearDotDuplicate|HeadDuplicate|CaseLinearDuplicate|NestedDuplicate) code=18872;;
+        LinearDotDuplicate|HeadDuplicate|CaseLinearDuplicate|NestedDuplicate|ForwardLinearCopy) code=18872;;
         IntroEscape) code=46956;;
         HiddenName|NestedCapture) code=76037;;
+        ForwardAmbiguous) code=39999;;
     esac
     if [[ $bad == LetEscape ]]; then
         for binding in bad different; do
@@ -126,6 +128,13 @@ for bad in "${bad_sources[@]}"; do
     fi
     if ! grep -Eq "^$bad.hs:[0-9]+:[0-9]+: error: \[GHC-$code\]" "$bad.log"; then
         cat "$bad.log" >&2
+        exit 1
+    fi
+done
+
+for log in ForwardAmbiguous.log ForwardLinearCopy.log; do
+    if grep -Fq '[GHC-91028]' "$log"; then
+        cat "$log" >&2
         exit 1
     fi
 done
