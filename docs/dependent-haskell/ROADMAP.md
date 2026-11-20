@@ -14,9 +14,19 @@ of an ordered type case in a value signature. The sample renders the
 two results as `"7"` and `"'f'"`. A call that ignores its arguments
 still returns 42 with an undefined index and payload. An ordinary client
 can also open a hidden vector inside a pair without forcing the other
-field. All 321 Showcase lines ran with both compiler stages at `-O0`,
+field. All 330 Showcase lines ran with both compiler stages at `-O0`,
 default `-O1` and default `-O2`, and with the self-hosted GHCi.
 [Showcase](Showcase.hs) and [verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+An ordinary client can use an optimized rule whose payload type refers
+to a preceding Boolean. The rule fires even when the index comes from
+an `IORef`. A call whose result ignores the index can return 19 with an
+undefined Boolean. GHC checks type cases in ordinary and rank-n
+constructor fields. The same higher-order class method can map over
+values indexed by `Maybe` or by a partially applied type family.
+[Rewrite rules](examples/qualified-pi/RetainedRules.hs),
+[field cases](examples/open-evaluation/NativeNestedCase.hs) and
+[class method client](examples/open-evaluation/IndexedMapClient.hs).
 
 An ordinary module proves that filtering a finite list cannot increase
 its `size`. At each head, a checked `Prelude.filter` equation says
