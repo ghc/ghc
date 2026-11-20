@@ -270,6 +270,7 @@ pass a type family with an unapplied invisible binder: Refl
 infer the result kind after passing a visible family argument: Refl
 apply Maybe and a type family through a computed arrow kind: (Just 7,[7])
 interpret a kind code as an ordinary type constructor: Just True
+interpret two applications of the optional type constructor: Just (Just True)
 apply a type lambda to Maybe, Either String and IO: Refl
 partially apply a two-argument type lambda: Refl
 map a type lambda with a constructor case: Refl
