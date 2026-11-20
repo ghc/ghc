@@ -1344,8 +1344,10 @@ and [prior art](../REFERENCES.md#checked-runtime-decisions-for-filter).
 `decideOrdering` matches the actual result of `p x` and returns a witness
 indexed by that same application. `compareFrom` captures a runtime pivot
 in an ordinary `Prelude.compare` closure. An ordinary client can select
-its own closed payload family from the witness. It evaluates only the
-selected payload.
+its own closed payload family from the witness. Its helper takes
+`Witness o` and matches the three constructors. Each branch refines the
+variable `o`, so GHC reduces `Select o` and checks the selected payload.
+The other two payloads stay lazy.
 
 A nominal Given `p x ~ 'LT` supplies `Refl :: p x :~: 'LT`. Bare `Refl`
 for `Select (p x) :~: Int` can still get stuck when the application is
