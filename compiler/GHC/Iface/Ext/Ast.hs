@@ -1089,6 +1089,7 @@ instance (Data (HsModifier (GhcPass p)), HiePass p) => ToHie (PScoped (LocatedA 
               , toHie $ PS rsp scope pscope $ (L ospan pat)
               ]
             ExpansionPat _ p -> [ toHie $ PS rsp scope pscope (L ospan p) ]
+            NativeExistsPat _ _ _ _ p -> [ toHie $ PS rsp scope pscope (L ospan p) ]
     where
       contextify :: a ~ LPat (GhcPass p) => HsConDetails (GhcPass p) a (HsRecFields (GhcPass p) a)
                  -> HsConDetails (GhcPass p) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))

@@ -73,6 +73,7 @@ hsPatType (XPat ext) =
   case ext of
     CoPat _ _ ty       -> ty
     ExpansionPat _ pat -> hsPatType pat
+    NativeExistsPat ty _ _ _ _ -> ty
 hsPatType (SplicePat v _)               = dataConCantHappen v
 
 hsLitType :: forall p. IsPass p => HsLit (GhcPass p) -> Type

@@ -2447,6 +2447,7 @@ definitelyLazyPattern (L loc pat) =
       GhcTc -> case ext of
         ExpansionPat _ p -> definitelyLazyPattern (L loc p)
         CoPat {} -> panic "definitelyLazyPattern: CoPat"
+        NativeExistsPat _ _ _ _ p -> definitelyLazyPattern (L loc p)
 
 {-
 Note [ApplicativeDo and refutable patterns]

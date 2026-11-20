@@ -1342,6 +1342,7 @@ instance IsPass p => CollectPass (GhcPass p) where
       GhcTc -> case ext of
         CoPat _ pat _      -> collect_pat flag pat
         ExpansionPat _ pat -> collect_pat flag pat
+        NativeExistsPat _ _ _ _ pat -> collect_pat flag pat
   collectXXHsBindsLR ext =
     case ghcPass @p of
       GhcPs -> dataConCantHappen ext

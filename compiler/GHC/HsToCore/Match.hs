@@ -213,6 +213,7 @@ match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
             PgBang    -> matchBangs      vars ty (dropGroup eqns)
             PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
             PgView {} -> matchView       vars ty (dropGroup eqns)
+            PgExists  -> matchExists     vars ty (dropGroup eqns)
       where eqns' = NE.toList eqns
             ne l = case NE.nonEmpty l of
               Just nel -> nel
@@ -267,6 +268,16 @@ matchCoercion (var :| vars) ty eqns@(eqn1 :| _)
                  ; dsHsWrapper wrap $ \core_wrap -> do
                  { let bind = NonRec var' (core_wrap (matchIdExpr var))
                  ; return (mkCoLetMatchResult bind match_result) } } }
+
+-- | Open the package around this equation at the selected match column.
+matchExists :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE
+            -> DsM (MatchResult CoreExpr)
+matchExists (var :| vars) ty (eqn :| [])
+  | XPat (NativeExistsPat _ witness payload ev_binds pat) <- firstPat eqn
+  = dsTcEvBinds ev_binds $ \binds ->
+    do { result <- match (mkMatchId payload : vars) ty [decomposeFirstPat (const pat) eqn]
+       ; return (fmap (Unpack witness payload (matchIdExpr var) . mkCoreLets binds) result) }
+matchExists _ _ _ = panic "matchExists"
 
 matchView :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 -- Apply the view function to the scrutinee and then match that
@@ -1007,6 +1018,7 @@ data PatGroup
   | PgView (LHsExpr GhcTc) -- view pattern (e -> p):
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
+  | PgExists            -- A fresh witness for one equation
 
 instance Show PatGroup where
   show PgAny = "PgAny"
@@ -1291,6 +1303,7 @@ patGroup _ EmbTyPat{} = PgAny
 patGroup platform (XPat ext) = case ext of
   CoPat _ p _      -> PgCo (hsPatType p) -- Type of inner pattern
   ExpansionPat _ p -> patGroup platform p
+  NativeExistsPat {} -> PgExists
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 
 {-

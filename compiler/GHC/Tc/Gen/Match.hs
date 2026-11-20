@@ -268,13 +268,6 @@ becoming strict before any source pattern runs. The inner matches retain
 their FunRhs context for coverage checks and match failures.
 -}
 
--- | Find the shape below consecutive dot binders.
--- The result can mention those binders. Use it only to inspect its shape.
-implicitPayloadType :: TcType -> TcType
-implicitPayloadType ty = case coreFullView ty of
-  ExistsTy ImplicitExists _ body -> implicitPayloadType body
-  other -> other
-
 -- | Open checked dot binders with the result type outside every scope.
 tcOpenImplicitPackage :: SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
                       -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
@@ -298,24 +291,6 @@ tcOpenImplicitPackage loc schema checked result_ty check_body = open schema chec
              ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
                                  (mkHsDictLet ev_binds (noLocA body)))) }
         _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema))
-
--- | Does this source pattern select the payload of the given package?
--- Use data constructor identities. Other patterns alone keep their usual type.
-matchesImplicitPayloadPat :: TcType -> LPat GhcRn -> Bool
-matchesImplicitPayloadPat schema
-  | ExistsTy ImplicitExists _ body <- coreFullView schema
-  , Just (tc, _) <- tcSplitTyConApp_maybe (implicitPayloadType body)
-  = go (map dataConName (tyConDataCons tc))
-  | otherwise = const False
-  where
-    go constructors (L _ pat) = case pat of
-      ParPat _ nested -> go constructors nested
-      AsPat _ _ nested -> go constructors nested
-      BangPat _ nested -> go constructors nested
-      LazyPat _ nested -> go constructors nested
-      ConPat { pat_con = L _ (WithUserRdr _ name) } -> name `elem` constructors
-      TuplePat _ fields boxity -> tupleDataConName boxity (length fields) `elem` constructors
-      _ -> False
 
 {- Note [Invisible retained definition patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

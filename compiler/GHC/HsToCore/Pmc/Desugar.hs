@@ -207,6 +207,9 @@ desugarPat x pat = case pat of
 
         _ -> desugarPat x expansion
 
+    -- Inspect the type of this row's payload. Its witness is local to the row.
+    NativeExistsPat _ _ payload _ p -> desugarPat payload p
+
     -- See Note [Desugar CoPats]
     -- Generally the translation is
     -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat

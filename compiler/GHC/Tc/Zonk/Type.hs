@@ -1702,8 +1702,14 @@ zonk_pat (XPat ext) = case ext of
     do { co_fn'   <- zonkCoFn co_fn
        ; pat'     <- zonk_pat pat
        ; ty'      <- noBinders $ zonkTcTypeToTypeX ty
-       ; return (XPat $ CoPat co_fn' pat' ty')
-       } }
+       ; return (XPat $ CoPat co_fn' pat' ty') }
+  ; NativeExistsPat ty witness payload ev_binds pat ->
+    do { ty' <- noBinders $ zonkTcTypeToTypeX ty
+       ; witness' <- zonkTyBndrX witness
+       ; payload' <- zonkIdBndrX payload
+       ; ev_binds' <- zonkTcEvBinds ev_binds
+       ; pat' <- zonk_pat pat
+       ; return (XPat $ NativeExistsPat ty' witness' payload' ev_binds' pat') } }
 
 zonk_pat pat@(SplicePat {}) = pprPanic "zonk_pat" (ppr pat)
 zonk_pat pat@(QualLitPat {}) = pprPanic "zonk_pat" (ppr pat)
