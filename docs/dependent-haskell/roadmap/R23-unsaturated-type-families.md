@@ -603,18 +603,36 @@ See [Note [Decomposing AppTy equalities]](../../../compiler/GHC/Tc/Solver/Equali
 
 A separate test hides the result application behind a type family. A
 functional dependency on the receiver's class fixes the index during
-constraint solving. This version checks in both modes. With the direct
-projection `getCells (fromKey False) :: [Maybe Bool]`, Quick Look can
-choose `Maybe` before the class constraint is solved. The direct call
-checks with Quick Look disabled. Its `Choose Bool Maybe` error with
-Quick Look predates the solver change. Section 3.1 describes
-result-directed instantiation in [A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf).
+constraint solving. The direct projection
+`getCells (fromKey False) :: [Maybe Bool]` and the version with a result
+family check in both modes. Quick Look only splits an application
+comparison when both consumed arrows are matchable. This leaves the
+receiver index open until the functional dependency supplies it. Section
+3.1 describes result-directed instantiation in
+[A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf).
 
 The Showcase prints `([Just True,Nothing],[Just True,Nothing])` for the
 named family receiver and the named `Maybe` receiver.
 [Provider](../examples/open-evaluation/IndexedMap.hs),
 [ordinary client](../examples/open-evaluation/IndexedMapClient.hs)
 and [interface and error checks](../../../testsuite/tests/dependent/should_run/NativeIndexedClassReceiver.sh).
+
+### Inferring a callback arrow in a closed family
+
+An unsigned closed `Map f xs` learns the kind of `f` from `f x`.
+With `ExperimentalDependentTypes` and `PolyKinds`, its callback
+matchability generalises. An unsigned `ForwardMap` can pass the same
+callback to `Map`. Both the family kind and its equations retain the
+inferred selector. An explicit higher-order kind signature with a bare
+arrow still selects M.
+
+An ordinary client proves results for both `Maybe` and a user family
+prefix exported as `Callback a`. The client reads only the stripped
+provider interface. The provider uses the experimental extension for
+the bare partial application.
+[Provider](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedProvider.hs),
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedClient.hs)
+and [proposal #242, higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments).
 
 ## Goal and dependencies
 
@@ -646,8 +664,7 @@ path does not implement R23. Generic fields add an independent obligation:
 a saturated family can expose a function-valued field to ordinary application
 and projection. Preserve already-derived coercions when substituting that
 field. Rebuilding the resulting type application alone is insufficient.
-Current function-occurrence gates reject the starting input. No executed
-counterexample against the current closed subset is claimed.
+M65 checks this transport for function fields in closed algebraic domains.
 
 ## Next increments
 
@@ -695,9 +712,18 @@ This does not implement source family unsaturation or close R23.
 - [x] Add useful diagnostics for hidden matchability differences. Preserve
       multiplicity and quantifier information. An inverse-call explanation
       must not discard independent equality evidence that solves the goal.
-- [ ] Check the generic-domain client with saturated families before source
-      unsaturation is enabled. An internal flag alone does not establish the
-      invariant through all compiler paths.
+- [x] Check the M65 function-field client with a saturated family.
+      `Stored x` exposes the stored function before it is applied to `b`.
+      An interface-only consumer refines the container and passes the proof
+      to an imported direct-call signature. The ordinary runner checks
+      separate demand on the function and argument at O0 and O1.
+      [Source, interface and runtime checks](../../../testsuite/tests/dependent/should_run/NativeFunctionIndex.sh).
+      Separately compiled versions of `T`, `F` and the signed `Map` use
+      saturated calls with `Maybe` at O0 and O2. The ordinary client reads
+      stripped interfaces from providers compiled with the extension off
+      and on.
+      [Proposal #242, higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments)
+      and [backwards compatibility](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#unresolved-questions).
 - [ ] Complete source unsaturation, inference/defaulting, arity rules,
       application, interfaces and the higher-order family examples.
 

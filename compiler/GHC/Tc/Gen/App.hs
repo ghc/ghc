@@ -6792,12 +6792,16 @@ qlUnify ty1 ty2
 
     -- Don't allow unifying (a => b) with the AppTy 'arr[tau] a b'.
     -- To ensure this, use 'tcSplitAppTyNoView_maybe' which does not split (=>).
+    -- Both arrows must already be matchable. Otherwise the argument or
+    -- result comparison can choose a type constructor before the solver
+    -- learns that the receiver supplies an unmatchable family. See
+    -- Note [Decomposing AppTy equalities] in GHC.Tc.Solver.Equality.
     go' (AppTy t1a t1b) ty2
       | Just (t2a, t2b) <- tcSplitAppTyNoView_maybe ty2
-      = do { go t1a t2a; go t1b t2b }
+      = go_app t1a t1b t2a t2b
     go' ty1 (AppTy t2a t2b)
       | Just (t1a, t1b) <- tcSplitAppTyNoView_maybe ty1
-      = do { go t1a t2a; go t1b t2b }
+      = go_app t1a t1b t2a t2b
 
     -- Type families have a monomorphic result, so if we see (say)
     --     Maybe kappa ~ F ty
@@ -6807,6 +6811,17 @@ qlUnify ty1 ty2
 
     go' _ _ = return ()
        -- Don't look under foralls; see (UQL4) of Note [QuickLook unification]
+
+    go_app f1 a1 f2 a2 =
+      do { m1 <- matchable_arrow f1
+         ; when m1 $
+           do { m2 <- matchable_arrow f2
+              ; when m2 $ do { go f1 f2; go a1 a2 } } }
+
+    matchable_arrow fun
+      | isMatchableFunTy kind = return True
+      | otherwise = isMatchableFunTy <$> liftZonkM (zonkTcType kind)
+      where kind = typeKind fun
 
     ----------------
     go_meta tv1 ty2

@@ -21,7 +21,7 @@ keep _ value = value
 {-# RULES
 "keep/off" forall value. keep False value = value
 "keep/choose" forall (b :: Bool). keep b (choose b) = choose b
-"read/kept" forall (b :: Bool) (x :: Choice b). readKept b x = readChoice x
+"read/kept" forall b x. readKept b x = readChoice x
   #-}
 
 -- | Observe the selected value without inspecting the index.

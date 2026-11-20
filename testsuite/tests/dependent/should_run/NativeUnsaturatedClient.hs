@@ -4,7 +4,7 @@ module NativeUnsaturatedClient where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (FUN, U, Multiplicity(Many))
-import NativeUnsaturatedProvider (Callback, Same)
+import NativeUnsaturatedProvider (Callback, Same, ForwardMap)
 
 type Alias a = Callback a
 
@@ -23,3 +23,9 @@ given Refl = Refl
 -- Both prefixes agree after rewriting with the index equality.
 congruence :: a :~: b -> Callback a :~: Callback b
 congruence Refl = Refl
+
+forwardedFamily :: ForwardMap (Alias 'True) '[ 'True, 'True] :~: '[ 'True, 'True]
+forwardedFamily = Refl
+
+forwardedConstructor :: ForwardMap Maybe '[Bool, Int] :~: '[Maybe Bool, Maybe Int]
+forwardedConstructor = Refl

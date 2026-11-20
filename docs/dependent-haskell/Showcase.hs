@@ -234,7 +234,7 @@ booleans = do
     observe "runtime Bool choice" (renderChoice b (choose b))
     observe "apply retained function rules without forcing an unused index"
         (RetainedRulesClient.fromInput b, RetainedRulesClient.atFalse 11, RetainedRulesClient.ignoredIndex)
-    observe "match a rule payload at the preceding runtime index" (RetainedRulesClient.boundPayload b)
+    observe "infer both rule binders from readKept" (RetainedRulesClient.boundPayload b)
     observe "choose True has result Int" (choose True)
     observe "choose False has result Bool" (choose False)
     let bottomB :: Bool
@@ -1029,6 +1029,8 @@ main = do
     observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
     observe "infer callback witnesses from a type argument and separate equations"
         RankedPackageClient.runDeclaredWitnesses
+    observe "choose each branch's callback witness by type application"
+        RankedPackageClient.runExplicitBranches
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
     observe "apply an imported integer package rule and keep the witness lazy"
         (PackageRules.open (41 :: Int, (+ 1)),

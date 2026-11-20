@@ -436,6 +436,19 @@ Checking the final payload can still reject an incompatible family result.
 [Rank-n callback](../examples/erased-existentials/RankedPackage.hs)
 and [GenImpredicative in Figure 10](https://richarde.dev/papers/2021/exists/exists.pdf#page=22).
 
+An ordinary client with `ImpredicativeTypes` can name a witness in each
+branch. In an expected `exists t. Callback t`, `Callback @PolyId` and
+`Callback @PolyMaybe` fix the types of their callback arguments.
+Each branch introduces its own package. The example observes both
+results and leaves an exceptional input unused.
+[Ordinary client](../examples/erased-existentials/RankedPackageClient.hs).
+
+A constructor with two parameters can fix both dot witnesses. For
+`exists l. exists r. Callbacks l r`, define
+`data Callbacks l r = Callbacks (Callback l) (Callback r)`.
+Then `Callbacks @PolyId @PolyMaybe left right` checks each field at
+its selected witness.
+
 An expected dot package can also hide the callback type in a lambda.
 For an expected `exists t. Bool -> Callback t`, the lambda
 `\b -> prepare b` takes its witness from a declared result of

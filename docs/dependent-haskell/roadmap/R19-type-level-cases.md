@@ -192,14 +192,24 @@ declaration telescope. A field can also bind a written erased
 parameter. Calling `f @'True Proxy` selects the branch for the inner
 binder. The compiler keeps the quantifier in the field type.
 
-A captured parameter can have a kind variable that the inner forall
-shadows. For example, the kind of an outer `a :: k` remains the original
-`k` under `forall (k :: Type)`. GHC saves the outer kind with a type
-let and passes it to the helper. The inner kind still has its own
-binder. Compound capture kinds that cross the shadow and cases under
-retained binders remain outside this rule.
+A captured parameter can use several outer variables that the inner
+forall shadows. For example, the kind of `a :: Tag k l` still uses
+the outer `k` and `l` under `forall (k :: Type) (l :: Type)`. GHC saves
+those arguments with type lets and restores their names inside the
+copied kind. The inner binders keep their original scope. A stuck
+noninjective family in a capture kind can still need a named helper
+with a standalone kind signature.
 [Provider](../examples/open-evaluation/NativeNestedCase.hs) and
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs).
+
+In a GADT, a field-local `foreach` can supply the scrutinee. For example,
+`One :: (foreach (b :: Bool) -> (case b of { True -> Int; False -> Char })) -> One`
+keeps `b` as a runtime argument. A later field can also inspect a retained
+argument in the constructor telescope. The helper copies the written
+domain and keeps the original field scope. An interface-only client can
+call either branch after refining the Boolean. At an unknown index, the
+case still waits for the first row. Function-arrow domains and computed
+scrutinees in retained fields remain outside this rule.
 
 ## A case in a value signature
 

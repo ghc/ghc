@@ -46,7 +46,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Unify( DeepSubsumptionFlag(..), tcSkolemise, unifyType, buildImplicationFor )
-import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
+import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstType, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env
 
 import GHC.Tc.Types.Origin
@@ -57,12 +57,14 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Zonk.Type
 
-import GHC.Core( Expr(Type), hasSomeUnfolding )
-import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core( Expr(Type, Var), hasSomeUnfolding )
+import GHC.Core.Dependent ( hasNativeDependentExpr, hasRetainedRuleHead )
+import GHC.Core.Utils ( applyTypeToArgs )
+import GHC.Core.Unify ( matchBindTv, tcMatchRetainedTyX_BM )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
-import GHC.Core.TyCo.Rep( mkNakedFunTy )
+import GHC.Core.TyCo.Rep( Type(DepFunTy), mkNakedFunTy )
 import GHC.Core.TyCon( isTypeFamilyTyCon )
 
 import GHC.Types.Var
@@ -993,7 +995,7 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
        ; traceTc "tcSpecPrag SpecSigE {" (ppr nm $$ ppr spec_e)
        ; skol_info <- mkSkolemInfo skol_info_anon
        ; (rhs_tclvl, spec_e_wanted, (rule_bndrs', (tc_spec_e, _rho)))
-            <- tcRuleBndrs skol_info rule_bndrs $
+            <- tcRuleBndrs skol_info Nothing rule_bndrs $
                tcInferRho spec_e
 
          -- (2) Solve the resulting wanteds
@@ -1215,7 +1217,7 @@ tcRule (HsRule { rd_ext  = ext
        ; skol_info <- mkSkolemInfo (RuleSkol name_fs)
         -- Note [Typechecking rules]
        ; (tc_lvl, lhs_wanted, stuff)
-              <- tcRuleBndrs skol_info bndrs $
+              <- tcRuleBndrs skol_info (Just lhs) bndrs $
                  do { (lhs', rule_ty)    <- tcInferRho lhs
                     ; (rhs', rhs_wanted) <- captureConstraints $
                                             tcCheckMonoExpr rhs rule_ty
@@ -1299,35 +1301,37 @@ tcRule (HsRule { rd_ext  = ext
 *                                                                                 *
 ******************************************************************************** -}
 
-tcRuleBndrs :: SkolemInfo -> RuleBndrs GhcRn
+tcRuleBndrs :: SkolemInfo -> Maybe (LHsExpr GhcRn) -> RuleBndrs GhcRn
             -> TcM a      -- Typecheck this with the rule binders in scope
             -> TcM (TcLevel, WantedConstraints, ([Var], a))
                         -- The [Var] are the explicitly-quantified variables,
                         -- both type variables and term variables
-tcRuleBndrs skol_info (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bndrs })
+tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bndrs })
             thing_inside
   = pushLevelAndCaptureConstraints $
     case mb_tv_bndrs of
-      Nothing       ->  go_tms tm_bndrs thing_inside
+      Nothing       ->  check_terms
       Just tv_bndrs -> do { (bndrs1, (bndrs2, res)) <- go_tvs tv_bndrs $
-                                                       go_tms tm_bndrs $
-                                                       thing_inside
+                                                       check_terms
                           ; return (binderVars bndrs1 ++ bndrs2, res) }
   where
     --------------
     go_tvs tvs thing_inside = bindExplicitTKBndrs_Skol skol_info tvs thing_inside
 
+    check_terms = do { domain <- ruleBinderDomain mb_lhs
+                     ; go_tms domain emptyNameEnv tm_bndrs thing_inside }
+
     --------------
-    go_tms [] thing_inside
+    go_tms _ _ [] thing_inside
       = do { res <- thing_inside; return ([], res) }
-    go_tms (L _ (RuleBndr _ (L _ name)) : rule_bndrs) thing_inside
-      = do  { ty <- newOpenFlexiTyVarTy
+    go_tms domain scope (L _ (RuleBndr _ (L _ name)) : rule_bndrs) thing_inside
+      = do  { ty <- maybe newOpenFlexiTyVarTy return (domain scope name)
             ; let bndr_id = mkLocalId name ManyTy ty
             ; (bndrs, res) <- tcExtendIdEnv [bndr_id] $
-                              go_tms rule_bndrs thing_inside
+                              go_tms domain (extendNameEnv scope name bndr_id) rule_bndrs thing_inside
             ; return (bndr_id : bndrs, res) }
 
-    go_tms (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs) thing_inside
+    go_tms domain scope (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs) thing_inside
       --  e.g         x :: a->a
       --  The tyvar 'a' is brought into scope first, just as if you'd written
       --              a::*, x :: a->a
@@ -1340,8 +1344,77 @@ tcRuleBndrs skol_info (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bndrs })
                      -- The type variables scope over subsequent bindings; yuk
             ; (bndrs, res) <- tcExtendNameTyVarEnv tv_prs $
                               tcExtendIdEnv [bndr_id]     $
-                              go_tms rule_bndrs thing_inside
+                              go_tms domain (extendNameEnv scope name bndr_id) rule_bndrs thing_inside
             ; return (map snd tv_prs ++ bndr_id : bndrs, res) }
+
+-- | Read a bare rule binder's expected type from a retained application.
+-- See Note [Dependent RULE binder domains].
+ruleBinderDomain :: Maybe (LHsExpr GhcRn) -> TcM (NameEnv Id -> Name -> Maybe Type)
+ruleBinderDomain mb_lhs
+  | Just (head_name, args) <- mb_lhs >>= spine []
+  = do { mb_id <- tcLookupIdMaybe head_name
+       ; case mb_id of
+           Just fun | hasRetainedRuleHead fun ->
+             do { (inst, _, tau) <- tcInstType newMetaTyVars fun
+                ; return (\scope name -> walk (mkVarSet (map snd inst)) scope name tau args) }
+           _ -> return no_domain }
+  | otherwise = return no_domain
+  where
+    no_domain _ _ = Nothing
+
+    spine args expr = case unLoc (stripParensLHsExpr expr) of
+      HsApp _ f x     -> spine (x : args) f
+      OpApp _ x f y   -> spine (x : y : args) f
+      HsVar _ (L _ f) -> Just (getName f, args)
+      _               -> Nothing
+
+    bare expr = case unLoc (stripParensLHsExpr expr) of
+      HsVar _ (L _ v) -> Just (getName v)
+      _               -> Nothing
+
+    walk tvs scope name ty (arg : args)
+      | DepFunTy DepFunVisible binder _ <- coreFullView ty
+      , Just operand <- bare arg
+      = if operand == name
+        then Just (idType binder)
+        else do { actual <- lookupNameEnv scope operand
+                ; specialized <- specialize tvs ty binder actual
+                ; if isNativeOpaqueValueId actual
+                  then walk tvs scope name (applyTypeToArgs specialized [Var actual]) args
+                  else Nothing }
+      | Just (input, result) <- splitVisibleFunTy_maybe ty
+      = if bare arg == Just name && isTauTy input && anyFreeVarsOfType in_scope input
+        then Just input
+        else walk tvs scope name result args
+      where in_scope v = isNonCoVarId v && getName v `elemNameEnv` scope
+    walk _ _ _ _ _ = Nothing
+
+    -- A signed earlier operand can specialize the head's erased parameters.
+    -- Only the fresh parameters of this signature are match variables.
+    specialize tvs ty binder actual
+      | idType binder `eqType` idType actual = Just ty
+      | otherwise = do
+          subst <- tcMatchRetainedTyX_BM (matchBindTv tvs) emptySubst (idType binder) (idType actual)
+          let ty' = substTyAddInScope subst ty
+          DepFunTy _ binder' _ <- pure (coreFullView ty')
+          if idType binder' `eqType` idType actual then Just ty' else Nothing
+
+{- Note [Dependent RULE binder domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a rule such as
+  forall b xs. keep b xs = xs
+the signature foreach (b :: Bool) -> Choice b -> Choice b gives both
+binders their types. An ordinary unification variable cannot acquire
+a free runtime Id. Give the binder its declared argument domain before
+checking the rule. Substitute only actual Ids bound earlier in the rule
+telescope. Explicit binder signatures take precedence.
+
+Inspect the renamed application without expanding or checking its operands.
+The normal application checker still checks the whole left side, including
+all erased arguments and constraints. A different occurrence of the same
+binder must also check at its inferred type. A type family in the domain
+can stay stuck throughout. No inverse family equation is needed.
+-}
 
 
 {-
