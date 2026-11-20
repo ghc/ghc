@@ -83,4 +83,20 @@ badBinderDefault :: Proxy P.Abstract -> Proxy P.Abstract
 badBinderDefault = binderDefault @P.Abstract
 HS
     reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
+
+    sed -e 's/^module DependentArrowMatchability/module Rejected/' \
+        -e '/^nestedBinder ::/s/(Type -> Type)/(Type %M -> Type)/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    line=$(grep -n '^ *Proxy (g P.Abstract)' Rejected.hs | cut -d: -f1)
+    reject "$line" '[GHC-83865]' -X"$mode"
+
+    sed 's/^module DependentArrowMatchability/module Rejected/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    cat >> Rejected.hs <<'HS'
+
+type family NestedAbstract :: (Type %U -> Type) %U -> Type
+badNestedDefault :: Proxy (NestedAbstract P.Abstract) -> Proxy NestedAbstract -> Proxy NestedAbstract
+badNestedDefault = nestedBinder @NestedAbstract
+HS
+    reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
 done

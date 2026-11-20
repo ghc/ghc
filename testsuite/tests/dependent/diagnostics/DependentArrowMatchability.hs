@@ -58,6 +58,27 @@ binderDefault = id
 binderDefaultM :: Proxy Maybe -> Proxy Maybe
 binderDefaultM = binderDefault @Maybe
 
+-- | A callback application selects U for the inner arrow only.
+nestedBinder :: forall (g :: (Type -> Type) -> Type).
+                Proxy (g P.Abstract) -> Proxy g -> Proxy g
+nestedBinder _ = id
+
+-- | A constructor uses the outer M default.
+data NestedCode (f :: Type %U -> Type)
+
+nestedDefault :: Proxy (NestedCode P.Abstract) -> Proxy NestedCode -> Proxy NestedCode
+nestedDefault = nestedBinder @NestedCode
+
+-- | A U outer arrow can also be inferred when a use requires it.
+nestedBoth :: forall (g :: (Type -> Type) -> Type).
+              Proxy (P.D ((Type %U -> Type) %U -> Type) g) -> Proxy g -> Proxy g
+nestedBoth _ = id
+
+-- | Result arrows use the same inference as domain arrows.
+nestedResult :: forall (g :: Type -> Type -> Type).
+                Proxy (P.D (Type %M -> Type %U -> Type) g) -> Proxy g -> Proxy g
+nestedResult _ = id
+
 -- | An earlier binder can also fix the arrow in the same telescope.
 scopedBinder :: forall (m :: Matchability) (f :: Type -> Type).
                 Proxy (P.D (FUN @m 'Many Type Type) f) -> Proxy f -> Proxy f

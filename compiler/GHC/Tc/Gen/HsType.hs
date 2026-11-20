@@ -6506,25 +6506,35 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
            ; kind' <- tc_hs_bndr_kind name kind
            ; newTyVarBndr skol_mode name kind' }
 
-    -- Let a complete signature constrain the omitted arrow in a binder kind.
-    -- Check the binder kind's shape first, then register its arrow with the
-    -- signature's defaulting pass. scopedSortOuter still checks that each
-    -- binder kind refers only to binders earlier in the telescope.
+    -- Let a complete signature constrain omitted arrows in a binder kind.
+    -- Check its shape first. Give each written bare arrow a separate variable
+    -- in the signature's defaulting pass. scopedSortOuter checks the dependency
+    -- order of the resulting binder kinds.
     tc_hs_bndr_kind :: Name -> HsBndrKind GhcRn -> TcM Kind
     tc_hs_bndr_kind _    (HsBndrNoKind _)    = newExpectedKind ctxt_kind
     tc_hs_bndr_kind name (HsBndrKind _ kind)
       = do { checked <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) kind
            ; case checked of
-               FunTy flag _ mult domain result
-                 | sig_kind_arrows, matchabilityArrow kind
-                 -> do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
-                       ; case owner of
-                           Just (defaults, _) ->
-                             do { ma <- newFlexiTyVar matchabilityTy
-                                ; updTcRef defaults ((ma, KindLevel) :)
-                                ; return (FunTy flag (mkTyVarTy ma) mult domain result) }
-                           Nothing -> return checked }
-               _ -> return checked }
+               FunTy{} | sig_kind_arrows ->
+                 do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
+                    ; case owner of
+                        Just (defaults, _) -> defer_kind_arrows defaults kind checked
+                        Nothing -> pure checked }
+               _ -> pure checked }
+
+    defer_kind_arrows defaults hs_kind checked
+      | L _ (HsFunTy _ arrow domain result) <- ignoreParens hs_kind
+      , FunTy flag ma mult domain_ty result_ty <- checked
+      = do { ma' <- case arrow of
+                       HsModifiedFunArr _ [] HsStandardArr{} ->
+                         do { v <- newFlexiTyVar matchabilityTy
+                            ; updTcRef defaults ((v, KindLevel) :)
+                            ; pure (mkTyVarTy v) }
+                       _ -> pure ma
+           ; domain_ty' <- defer_kind_arrows defaults domain domain_ty
+           ; result_ty' <- defer_kind_arrows defaults result result_ty
+           ; pure (FunTy flag ma' mult domain_ty' result_ty') }
+      | otherwise = pure checked
 
     -- Check the HsBndrKind against the kind of the parent type variable,
     -- e.g. the following is rejected:
