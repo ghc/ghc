@@ -26,19 +26,25 @@ checking a later argument whose kind refers to that index. When a family
 cannot reduce, the case still waits for more information.
 [Type-level case](examples/open-evaluation/NativeNestedCase.hs).
 
-Both native compiler stages reproduce the 291-line Showcase at `-O0` and
+An existential witness can itself be polymorphic. Given a value of type
+`Callback (forall a. a -> a)`, GHC can infer the hidden type when it
+constructs `exists t. Callback t`. Opening the package lets the callback
+use its stored function at both `Int` and `Bool`.
+[Callback example](examples/erased-existentials/RankedPackage.hs).
+
+Both native compiler stages reproduce the 293-line Showcase at `-O0` and
 default `-O1`. The self-hosted compiler also matches the golden output with
-stripped interfaces and in GHCi. An ordinary client compiled with either
-this compiler or the previous `abf27ce1a2` compiler reads the partition
-and the retained newtype field from compiled providers. It gets
-`(Just 7,Nothing)` from the two function equations and `(2,"hs")` from
-the newtype selector. An unused newtype pattern leaves the argument lazy.
+stripped interfaces and in GHCi. An ordinary client built with either
+this compiler or the previous `aabdff469b` compiler reads the same
+compiled providers. It gets `(7,True)` from each of two packaged callbacks
+and reads length `1` through a GADT-style newtype selector. Both compilers
+still choose `Int` for the existing deep-subsumption example.
 [Newtype source](examples/packed-vector/StoredVector.hs),
 [Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
 
-At `accb08e84a`, all 59 focused tests that ran passed. In the dependent
+At `0aea1d0b99`, all 59 focused tests that ran passed. In the dependent
 directory 284 of 314 executed normal-way tests passed. Each of the 30
-failures has the same test name and failure category as at `abf27ce1a2`.
+failures has the same test name and failure category as at `aabdff469b`.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -51,11 +57,11 @@ the header. The new reader checks the coercion's role and scope.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | An ordinary newtype field can store a retained length and a vector at that length. Its record selector, role and Template Haskell reification work across an interface. | Broaden dependent product domains and inference. Check the binder scope of GADT-style fields. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider can construct and open erased packages at default `-O1`. A given equality can change the payload type under a hidden witness. | Cover more coercions, rewrite rules and optimization settings. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An unknown input that can still match an earlier row blocks a catch-all. | General mixed patterns and open GADT indices. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a package containing a rank-n function or an opaque family, and an ordinary list can hold such packages. | Infer higher-rank witnesses at package construction and generalize witness projections. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. At construction it can also infer a polymorphic witness from an already typed callback. | Use package type information earlier when checking arguments. Generalize witness projections. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
@@ -71,18 +77,17 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R22.** Infer a higher-rank witness during package construction.
-   For `exists t. Callback t`, a supplied callback can determine
-   `t = forall a. a -> a`. Check witness scope, conflicting family
-   results, and compatibility with `DeepSubsumption`.
+1. **R22.** Use the expected package type while checking an application.
+   For `Duo id calls :: exists t. Duo t (Calls t)`, the type of
+   `calls` determines that `id` must keep its polymorphic type.
+   Check nested applications, witness scope and deep subsumption.
 2. **R05.** Extend optimizer coverage beyond the supported coercions and
    settings. Check package expressions in rewrite rules and at `-O2`.
 3. **R19.** Extend the supported constructor patterns. Keep earlier rows
    and nominal evidence in scope when matching open GADT indices.
-4. **R04 and R23.** Check retained sum fields under GADT constructor
-   binders. Preserve ordinary result-kind, role and newtype diagnostics.
-   Use the ordinary-program regression baseline when extending higher-rank
-   family application and defaulting.
+4. **R04 and R23.** Extend retained fields to more GADT declarations.
+   For family applications, check matchability inference and preserve
+   ordinary GHC diagnostics when printing implicit binders.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
