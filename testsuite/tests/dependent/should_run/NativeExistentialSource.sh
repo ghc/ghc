@@ -77,7 +77,7 @@ mkdir ../optimized
 )
 echo "optimized package providers and clients preserve payload demand"
 
-# A module-level rule still requires the restricted optimization setting.
+# The optimized interface records this rule on the imported id as an orphan.
 cat >RuleOwner.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
 module RuleOwner where
@@ -90,14 +90,11 @@ constant = Just True
 {-# RULES "package/id" forall (x :: Bool). id (Just x :: Hidden) = constant #-}
 HS
 "$ghc" "${flags[@]}" -Wno-inline-rule-shadowing -fforce-recomp -c RuleOwner.hs
-if "$ghc" "${flags[@]}" -O1 -Wno-inline-rule-shadowing -fforce-recomp -c RuleOwner.hs >rule.log 2>&1; then
-    echo "unexpectedly admitted a dependent module's rewrite rule" >&2
-    exit 1
-fi
-grep -Fq '[GHC-51063]' rule.log && grep -Fq 'package/id' rule.log || {
-    cat rule.log >&2
-    exit 1
-}
+"$ghc" "${flags[@]}" -O1 -fno-omit-interface-pragmas -Wno-inline-rule-shadowing \
+    -fforce-recomp -c RuleOwner.hs
+"$ghc" "-B$lib" --show-iface RuleOwner.hi >rule.iface
+grep -Fq '"package/id" [orphan]' rule.iface
+grep -Fq 'orphan-user-rule' rule.iface
 
 mkdir -p fake/GHC
 cp "$src/fake/GHC.Exists.hs" fake/GHC/Exists.hs
