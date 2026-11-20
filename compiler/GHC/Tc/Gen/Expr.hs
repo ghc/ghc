@@ -1496,29 +1496,36 @@ tcExistsCase expr@(HsCase ctxt scrut matches)
     open_pack con_loc con mb_name payload_pat
       = do { (scrut', scrut_ty) <- tcScalingUsage ManyTy $ tcInferRhoFRR FRRCase scrut
            ; schema <- liftZonkM (zonkTcType scrut_ty)
-           ; case coreFullView schema of
-               ExistsTy ExplicitExists binder inner -> do
-                 { result_ty <- expTypeToType expected
-                 ; con_like <- RealDataCon <$> tcLookupDataCon con
-                 ; let origin = PatSkol con_like ctxt
-                 ; skol_info <- mkSkolemInfo origin
-                 ; name <- maybe (newSysName (getOccName binder)) return mb_name
-                 ; witness <- pushTcLevelM_ $ newSkolemTyVar skol_info name (tyVarKind binder)
-                 ; let payload_ty = substTyWith [binder] [mkTyVarTy witness] inner
-                       replace_pat = fmap (\row -> row { m_pats = [payload_pat] <$ m_pats row })
-                       payload_matches = matches { mg_alts = fmap (map replace_pat) (mg_alts matches) }
-                 ; payload <- newSysLocalId (fsLit "unpacked") ManyTy payload_ty
-                 ; (ev_binds, body_matches) <- setSrcSpanA con_loc $
-                     checkConstraints origin [witness] [] $
-                       tcExtendNameTyVarEnv [(n, witness) | n <- maybeToList mb_name] $
-                         tcCaseMatches ctxt tcBody (Scaled ManyTy payload_ty) payload_matches
-                           (mkCheckExpType result_ty)
-                 ; let body = noLocA (HsCase ctxt (nlHsVar payload) body_matches)
-                       opened = NativeExistsUnpack witness payload result_ty scrut'
-                                  (mkHsDictLet ev_binds body)
-                 ; return (XExpr (ExpandedThingTc (HSE (ExprCtxt expr)
-                                    (noLocA (XExpr opened))))) }
-               _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema)) }
+           ; result_ty <- expTypeToType expected
+           ; let open_bar = open_explicit con_loc con mb_name payload_pat result_ty
+           ; opened <- case coreFullView schema of
+               ExistsTy ImplicitExists _ inner
+                 | ExistsTy ExplicitExists _ _ <- implicitPayloadType inner
+                 -> tcOpenImplicitPackage (getLocA scrut) schema scrut' result_ty $ \bar ->
+                      open_bar (nlHsVar bar) (varType bar)
+               _ -> open_bar scrut' schema
+           ; return (XExpr (ExpandedThingTc (HSE (ExprCtxt expr) (noLocA opened)))) }
+
+    open_explicit con_loc con mb_name payload_pat result_ty scrut' schema
+      | ExistsTy ExplicitExists binder inner <- coreFullView schema
+      = do { con_like <- RealDataCon <$> tcLookupDataCon con
+           ; let origin = PatSkol con_like ctxt
+           ; skol_info <- mkSkolemInfo origin
+           ; name <- maybe (newSysName (getOccName binder)) return mb_name
+           ; witness <- pushTcLevelM_ $ newSkolemTyVar skol_info name (tyVarKind binder)
+           ; let payload_ty = substTyWith [binder] [mkTyVarTy witness] inner
+                 replace_pat = fmap (\row -> row { m_pats = [payload_pat] <$ m_pats row })
+                 payload_matches = matches { mg_alts = fmap (map replace_pat) (mg_alts matches) }
+           ; payload <- newSysLocalId (fsLit "unpacked") ManyTy payload_ty
+           ; (ev_binds, body_matches) <- setSrcSpanA con_loc $
+               checkConstraints origin [witness] [] $
+                 tcExtendNameTyVarEnv [(n, witness) | n <- maybeToList mb_name] $
+                   tcCaseMatches ctxt tcBody (Scaled ManyTy payload_ty) payload_matches
+                     (mkCheckExpType result_ty)
+           ; let body = noLocA (HsCase ctxt (nlHsVar payload) body_matches)
+           ; return (XExpr (NativeExistsUnpack witness payload result_ty scrut'
+                              (mkHsDictLet ev_binds body))) }
+      | otherwise = failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema))
 tcExistsCase _ _ = return Nothing
 
 {- Note [Matching an implicit existential payload]
@@ -1549,6 +1556,11 @@ payload pattern, such as Just x, demands it in the usual way. The scope of the
 skolem covers the payload pattern and the whole alternative. A wildcard
 witness still needs this skolem to type the payload. Only a written witness
 name enters the source type environment.
+
+When the scrutinee has dot binders before the bar package, open the dot
+binders around the explicit match. Keep the result type outside both
+openings. The written Pack pattern still binds the bar witness, and its
+payload pattern still determines demand.
 -}
 
 -- | Classify an opaque call after ordinary expression and usage checking.
