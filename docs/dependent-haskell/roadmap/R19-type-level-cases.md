@@ -229,14 +229,35 @@ type codec and rejects a runtime name used as an erased variable.
 [test](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedTh.sh).
 
 The retained and erased binders follow the distinction in proposal #378.
-Proposal #281 establishes visible erased quantification. The GADT syntax review
-for #402 asks which namespace owns a constructor binder. Reifying a flat
-constructor declaration whose later fields refer to its retained binder still
-reports GHC-75721. That declaration needs a constructor telescope in the TH
-AST. Raw type-case quotation still has its own representation boundary.
+Proposal #281 establishes visible erased quantification. Raw type-case
+quotation still has its own representation boundary.
 [Design #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#quantifiers),
-[proposal #281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html)
-and [review #402](https://github.com/ghc-proposals/ghc-proposals/pull/402#issuecomment-801420999).
+and [proposal #281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html).
+
+### Quote and reify retained GADT constructors
+
+`RetainedGadtC` carries the ordered fields and result of a prefix constructor.
+A retained field binds its runtime name over later field types. An ordinary
+field carries its source strictness and multiplicity. The bound name remains
+in the declaration even when the constructor type simplifies it to an arrow.
+Ordinary `GadtC`, `RecGadtC` and `ForallC` keep their representation.
+The external-interpreter test reifies a declaration from a stripped interface
+and splices a copy. It checks lazy fields, erased binders and the constructor
+codec. The Showcase passes its runtime input and dependent payload to a
+constructor declared in a quote.
+[Provider](../examples/open-evaluation/NativeRetainedConTH.hs) and
+[test](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedConTh.sh).
+
+The current source checker rejects a retained name in the final result, a
+retained telescope with record fields, and strictness annotations after the
+first retained binder. Required erased forall in a constructor declaration
+still receives the Template Haskell diagnostic. Proposal #402 separates
+record fields and prefix arguments. Its review considers the namespace of a
+constructor binder. Eisenberg's thesis describes ordered dependencies among
+constructor arguments.
+[Proposal #402](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html),
+[review #402](https://github.com/ghc-proposals/ghc-proposals/pull/402#issuecomment-801420999),
+and [thesis §5.4.1](https://www.cis.upenn.edu/~sweirich/papers/eisenberg-thesis.pdf).
 
 ## A case in a value signature
 

@@ -116,6 +116,7 @@ import qualified TypeLet
 import qualified NativeCase
 import qualified NativeNestedCase
 import qualified NativeRetainedTH
+import qualified NativeRetainedConTH
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -1314,17 +1315,24 @@ main = do
                 False -> show (choose b :: Int)
         quotedResult :: Bool -> String
         quotedResult b = NativeRetainedTH.render b (NativeRetainedTH.quoted b)
+        storedResult :: Bool -> String
+        storedResult b =
+            NativeRetainedConTH.renderStored
+                (NativeRetainedConTH.Stored b (NativeRetainedTH.quoted b))
     fieldFlag <- newIORef True
     firstField <- fieldResult <$> readIORef fieldFlag
     firstNegated <- negatedResult <$> readIORef fieldFlag
     firstQuoted <- quotedResult <$> readIORef fieldFlag
+    firstStored <- storedResult <$> readIORef fieldFlag
     writeIORef fieldFlag False
     secondField <- fieldResult <$> readIORef fieldFlag
     secondNegated <- negatedResult <$> readIORef fieldFlag
     secondQuoted <- quotedResult <$> readIORef fieldFlag
+    secondStored <- storedResult <$> readIORef fieldFlag
     observe "pass a refined runtime Boolean to a retained field" (firstField, secondField)
     observe "choose a field result by negating its runtime index" (firstNegated, secondNegated)
     observe "choose a result with a quoted retained signature" (firstQuoted, secondQuoted)
+    observe "store a runtime index in a quoted constructor" (firstStored, secondStored)
     let aliasResult :: Bool -> String
         aliasResult b = case LocalAliasField.aliasField of
             LocalAliasField.AliasField choose -> case b of
