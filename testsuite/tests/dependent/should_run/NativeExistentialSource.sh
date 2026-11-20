@@ -80,7 +80,10 @@ for bad in Escape Scope WrongWitnessKind WitnessTerm WrongPayload MissingSchema 
     exit 1
   fi
   case "$bad" in
-    Escape) expected='escape its scope|rigid.*type variable' ;;
+    Escape)
+      expected='escape its scope|rigid.*type variable'
+      grep -Fq 'badWildcard' "$bad.log" || { cat "$bad.log" >&2; exit 1; }
+      ;;
     Scope) expected='[Nn]ot in scope' ;;
     WrongWitnessKind|WrongPayload) expected='\[GHC-83865\]' ;;
     WitnessTerm) expected='Illegal term-level use of the type variable' ;;

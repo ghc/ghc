@@ -1205,10 +1205,21 @@ tcExistsCase expr@(HsCase ctxt scrut matches)
                  | EmbTyPat _ HsTP{ hstp_ext = HsTPRn [] [] [name], hstp_body = witness_ty }
                      <- strip_pat witness_pat
                  , HsTyVar{} <- unLoc (ignoreParens witness_ty)
-                 -> open_pack con_loc con name payload_pat
+                 -> open_pack con_loc con (Just name) payload_pat
+                 | wildcard_witness (strip_pat witness_pat)
+                 -> open_pack con_loc con Nothing payload_pat
+                 | otherwise -> setSrcSpanA (getLoc witness_pat) $
+                                  failWithTc (TcRnExistsPack ExistsPackInvalidContext)
                _ -> failWithTc (TcRnExistsPack ExistsPackInvalidContext) }
 
-    open_pack con_loc con name payload_pat
+    wildcard_witness :: Pat GhcRn -> Bool
+    wildcard_witness WildPat{} = True
+    wildcard_witness (EmbTyPat _ HsTP{ hstp_body = ty })
+      | HsWildCardTy (HoleVar (L _ hole)) <- unLoc (ignoreParens ty)
+      = hole == unnamedHoleRdrName
+    wildcard_witness _ = False
+
+    open_pack con_loc con mb_name payload_pat
       = do { (scrut', scrut_ty) <- tcScalingUsage ManyTy $ tcInferRhoFRR FRRCase scrut
            ; schema <- liftZonkM (zonkTcType scrut_ty)
            ; case coreFullView schema of
@@ -1217,6 +1228,7 @@ tcExistsCase expr@(HsCase ctxt scrut matches)
                  ; con_like <- RealDataCon <$> tcLookupDataCon con
                  ; let origin = PatSkol con_like ctxt
                  ; skol_info <- mkSkolemInfo origin
+                 ; name <- maybe (newSysName (getOccName binder)) return mb_name
                  ; witness <- pushTcLevelM_ $ newSkolemTyVar skol_info name (tyVarKind binder)
                  ; let payload_ty = substTyWith [binder] [mkTyVarTy witness] inner
                        replace_pat = fmap (\row -> row { m_pats = [payload_pat] <$ m_pats row })
@@ -1224,7 +1236,7 @@ tcExistsCase expr@(HsCase ctxt scrut matches)
                  ; payload <- newSysLocalId (fsLit "unpacked") ManyTy payload_ty
                  ; (ev_binds, body_matches) <- setSrcSpanA con_loc $
                      checkConstraints origin [witness] [] $
-                       tcExtendNameTyVarEnv [(name, witness)] $
+                       tcExtendNameTyVarEnv [(n, witness) | n <- maybeToList mb_name] $
                          tcCaseMatches ctxt tcBody (Scaled ManyTy payload_ty) payload_matches
                            (mkCheckExpType result_ty)
                  ; let body = noLocA (HsCase ctxt (nlHsVar payload) body_matches)
@@ -1245,7 +1257,9 @@ constraints in the payload match and its right-hand side.
 Translate the payload pattern to an ordinary case inside Unpack. A variable
 or wildcard does not demand the payload in a lazy module. An ordinary strict
 payload pattern, such as Just x, demands it in the usual way. The scope of the
-skolem covers the payload pattern and the whole alternative.
+skolem covers the payload pattern and the whole alternative. A wildcard
+witness still needs this skolem to type the payload. Only a written witness
+name enters the source type environment.
 -}
 
 -- | Classify an opaque call after ordinary expression and usage checking.

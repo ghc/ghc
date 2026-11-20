@@ -35,13 +35,13 @@ filterVec :: (a -> Bool) -> Vec a n -> Filtered a
 filterVec _ VNil = Pack (type 'Z) VNil
 filterVec p (VCons x xs)
   | p x = case filterVec p xs of
-      Pack (type m) ys -> Pack (type ('S m)) (VCons x ys)
+      Pack _ ys -> Pack _ (VCons x ys)
   | otherwise = filterVec p xs
 
 -- | Read the result without recovering a runtime length.
 cells :: Filtered a -> [a]
 cells xs = case xs of
-  Pack (type m) ys -> toList ys
+  Pack (type _) ys -> toList ys
 
 -- | Observe one passing element before inspecting the input tail.
 filterObservation :: ([Int], [Int])
