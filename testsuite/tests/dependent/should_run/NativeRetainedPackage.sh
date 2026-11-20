@@ -9,8 +9,9 @@ g=("$1" "-B$2" -v0 -package-env - -O0 -i -i. -dcore-lint -dstg-lint -fdiagnostic
 shift 2
 g+=("$@")
 cd "$out/provider"
-cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness}.hs .
-"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs RetainedWitness.hs
+cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness,DependentPair}.hs .
+"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs RetainedWitness.hs DependentPair.hs
+cp DependentPair.hi "$out/client/"
 cp {PackedVecLibrary,PackedLength,RetainedNat,RetainedWitness}.hi "$src"/{PackedProjection,RetainedProjection}.hs "$out/projection/"
 cd "$out/projection"
 "${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs RetainedProjection.hs
@@ -48,6 +49,59 @@ HS
 "${g[@]}" -c Main.hs
 "${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
 ./run
+cat >General.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds #-}
+module General where
+import Data.Functor.Const
+import DependentPair
+
+data Flag b where
+  Yes :: Flag 'True
+  No  :: Flag 'False
+
+pack :: a -> r -> DPair a (Const r)
+pack x value = Pair x (Const value)
+
+readInt :: DPair Int (Const Int) -> Int
+readInt (Pair _ (Const value)) = value
+
+readFlag :: DPair Bool Flag -> Bool
+readFlag (Pair _ Yes) = True
+readFlag (Pair _ No)  = False
+
+main :: IO ()
+main = print (readInt (pack (error "unused integer witness") 7),
+              withPair (pack (error "unused IO" :: IO Int) 'i') (\_ c -> getConst c),
+              withPair (pack (error "unused function" :: Int -> Int) 'f') (\_ c -> getConst c),
+              withPair (pack (12 :: Int) (error "unused payload" :: Char)) (\x _ -> x),
+              readFlag (Pair True Yes))
+HS
+"${g[@]}" -main-is General -c General.hs
+"${g[@]}" -main-is General General.o ../provider/DependentPair.o -o general
+./general
+cat >WrongPair.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
+module WrongPair where
+import DependentPair
+import General (Flag(..))
+wrong :: DPair Bool Flag
+wrong = Pair True No
+HS
+if "${g[@]}" -c WrongPair.hs >bad.log 2>&1 || ! grep -Fq 'WrongPair.hs:6:19: error: [GHC-83865]' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
+cat >EscapePair.hs <<'HS'
+{-# LANGUAGE PolyKinds, NoExperimentalDependentTypes #-}
+module EscapePair where
+import DependentPair
+escape :: DPair a p -> p w
+escape (Pair _ value) = value
+HS
+if "${g[@]}" -c EscapePair.hs >bad.log 2>&1 || ! grep -Fq 'EscapePair.hs:5:25: error:' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
 cat >Escape.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
 module Escape where

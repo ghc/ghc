@@ -59,6 +59,13 @@ explicit promotion tick always selects the data namespace.
 [GHC closed-family equations](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#closed-type-families)
 and [fork lookup rule](roadmap/R19-type-level-cases.md#type-constructors-in-case-patterns).
 
+Agda's built-in `Σ` quantifies over the domain of its first component
+and the family of its second component. The fork's `DPair a p` uses
+these same two parameters. The Haskell consumer can ignore either value,
+including a witness whose type is an IO action. This demand property is
+checked by running Haskell code. [Agda's Sigma definition](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
+and [Haskell declaration and eliminator](examples/packed-vector/DependentPair.hs).
+
 A closed written lambda kind supplies the lifted family's standalone kind
 signature. GHC checks it before the equations, so each constructor pattern
 can refine the index independently. This preserves specified and inferred

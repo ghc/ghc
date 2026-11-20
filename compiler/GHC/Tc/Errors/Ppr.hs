@@ -3656,7 +3656,7 @@ pprRetainedQuantificationError reason = case reason of
   RetainedUnsupportedDomain ty ->
     vcat [ if isPiTy ty
            then text "This retained argument has an unsupported function domain."
-           else text "A retained argument requires a supported structural algebraic domain."
+           else text "A retained value argument requires a lifted type parameter or a supported algebraic type."
          , text "Its declared domain is:" <+> ppr ty ]
   RetainedResultKind ty ->
     vcat [ text "The result of retained quantification must have kind" <+> quotes (text "Type")

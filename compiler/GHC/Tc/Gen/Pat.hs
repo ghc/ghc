@@ -1472,7 +1472,8 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                     ; let index = mkLocalId name ManyTy (scaledThing original_ty)
                           subst' = CoreSubst.extendIdSubst
                             (extendSubstInScope subst index) template (Var index)
-                    ; unless (isManyTy (scaledMult original_ty) && isNativeRetainedBinder index) bad_pattern
+                    -- See Note [Abstract witness domains] in GHC.Core.Type.
+                    ; unless (isManyTy (scaledMult original_ty) && isNativeOpaqueValueId index) bad_pattern
                     ; case bindRetainedWildcard name pat of
                         field@(L _ VarPat{}) ->
                           do { (pat', (pats', res)) <- tcConArg (RealDataCon con) penv

@@ -48,7 +48,7 @@ import qualified Data.Char
 import qualified Data.Either
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
-import Data.Functor.Const (getConst)
+import Data.Functor.Const (Const(..))
 import Data.Kind (Type)
 import Data.List (isInfixOf)
 import qualified Data.List
@@ -104,6 +104,7 @@ import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
 import PackedVecLibrary
 import RetainedNat (Retained(..), constantPackage, withRetained)
+import qualified DependentPair as Pair
 import qualified RetainedProjection
 import qualified QualifiedPiLibrary as Qualified
 import qualified ReadNatural
@@ -1298,6 +1299,12 @@ listBoundaries = do
         (toList (RetainedProjection.project vector), getConst (RetainedProjection.project seven))
     observe "use the stored length and vector in a generic dependent eliminator"
         (withRetained vector (\k v -> (natToInt k, toList v)))
+    let chars = Pair.Pair n (replicateNative n 'x') :: Pair.DPair Nat (Vec Char)
+        action = error "unused IO witness" :: IO Int
+        tag = Pair.Pair action (Const 'i') :: Pair.DPair (IO Int) (Const Char)
+    observe "use one dependent pair type at two witness types"
+        (Pair.withPair chars (\k v -> (natToInt k, toList v)),
+         Pair.withPair tag (\_ c -> getConst c))
     observe "read either package field without demanding its sibling"
         ( withRetained (constantPackage (error "unused witness") (7 :: Int))
               (\_ box -> getConst box)

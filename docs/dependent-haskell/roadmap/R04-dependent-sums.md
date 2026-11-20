@@ -9,6 +9,19 @@ An erased existential can hide an index without providing its value.
 
 ## What source programs can express
 
+A package can abstract over the type of the witness as well as the payload
+family. The ordinary client uses the same constructor at `Bool`, `Int`,
+`Int -> Int` and `IO Int`. Reading a constant payload leaves its
+witness unevaluated. At `Bool`, GHC rejects a payload indexed by
+`False` when the supplied witness is `True`. A consumer can bind
+the stored index and use the payload at that index.
+[Pair and eliminator](../examples/packed-vector/DependentPair.hs)
+and [separate client](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
+
+The next projection has type `foreach (q :: DPair a p) -> p (first q)`.
+The abstract pair currently fails the structural check on `DPair a p`.
+The existing length projection below uses a closed witness domain.
+
 A GADT can already store a runtime length and a vector indexed by that
 length. The same encoding works for a family parameter `p`.
 

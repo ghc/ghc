@@ -23,6 +23,10 @@ through compilation, and the runtime sum stays lazy.
 [Computed retained length](../PLAN.md#m81-a-computed-retained-length).
 
 - Runtime Bool and Peano Nat indices, checked equations and bounded lambdas.
+- A retained binder can have a lifted type parameter as its domain.
+  The `withPair` callback can name that argument as the index of its
+  payload. A function-valued witness can pass through this callback
+  without being evaluated. [Example](../examples/packed-vector/DependentPair.hs).
 - Closed parameterized domains such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
 - Retained workers and function fields through separate interfaces.
 - Nominal scalar-domain conversion with scoped source body solving at M58.

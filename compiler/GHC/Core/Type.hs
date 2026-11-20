@@ -2553,8 +2553,9 @@ Other function values can remain opaque fields. The conversion predicate
 checks endpoints only; its caller must retain nominal evidence and direction.
 
 Core retained value binders and occurrences use the opaque Id judgment.
-Source foreach roots use isNativeRetainedBinder instead. That predicate keeps
-the structural-domain or fixed-call-head policy. Neither judgment establishes
+Source foreach roots use isNativeRetainedBinder instead. A root can also
+have a lifted type parameter as its domain. See Note [Abstract witness domains].
+Neither judgment establishes
 scope, nominal domain equality or runtime evaluation of an opaque value.
 -}
 
@@ -2563,16 +2564,37 @@ isNativeIndexId :: Id -> Bool
 isNativeIndexId v
   = isNativeOpaqueValueId v && isNativeIndexType (varType v)
 
--- | Test whether an Id can bind a structural source root or a fixed call head.
+-- | Test whether an Id can bind a source value index or a fixed call head.
 -- See Note [Function-valued retained binders].
 isNativeRetainedBinder :: Id -> Bool
-isNativeRetainedBinder v = isNativeIndexId v || isNativeIndexFunctionId v
+isNativeRetainedBinder v
+  = isNativeIndexId v || isNativeIndexFunctionId v
+    || (isTyVarTy (varType v) && isNativeOpaqueValueId v)
 
 -- | Test a source retained-root domain without constructing a temporary Id.
 -- See Note [Function-valued retained binders].
 isNativeRetainedBinderType :: Type -> Bool
 isNativeRetainedBinderType ty
   = isNativeIndexType ty || isJust (nativeIndexFunctionTypeTys_maybe ty)
+    || (isTyVarTy ty && isNativeOpaqueValueType ty)
+
+{- Note [Abstract witness domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the constructor
+
+  Pair :: foreach (x :: a) -> p x -> DPair a p
+
+the type parameter a has kind Type. The second field refers to the
+identity of x. It needs neither the constructors of a nor an equation
+for x. Check the witness as an unrestricted local Id at this domain.
+Keep the existing checks for constructor refinement and for call heads.
+
+When matching Pair at a concrete type, the declaration has already
+established which field binds x. For example, matching a DPair Int p
+binds a local Int witness. Check the instantiated field as an opaque Id.
+Requiring Int to be a structural index domain here would prevent an
+ordinary client from opening that package.
+-}
 
 {- Note [Function fields in native index domains]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2604,8 +2626,8 @@ and forward evidence.
 
 {- Note [Function-valued retained binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A source foreach root can bind a structural index or an eligible opaque call
-head. Core retained value binders use the separate opaque Id judgment. See
+A source foreach root can bind a structural index, an abstract witness or
+an eligible opaque call head. Core retained value binders use the opaque Id judgment. See
 Note [Opaque runtime index values].
 The function head has a closed ordinary visible Many arrow A -> B. Both A and
 B are independently supported scalar domains. The Id is local, unrestricted,

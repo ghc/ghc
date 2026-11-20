@@ -3950,7 +3950,7 @@ escape its binder. General native unification remains unsupported.
 Checking an existing Given is different from assigning a metavariable.
 For a Given with a type-variable LHS and native syntax in its RHS,
 checkTypeEqNoUnification enables tefTyVar_allowNativeGivenRhs. Accept an opaque
-TermVarTy only when isNativeRetainedBinder validates its closed unrestricted domain.
+TermVarTy only when isNativeRetainedBinder validates its unrestricted binder.
 For DepFunTy, require a valid retained binder and a lifted body. Function
 binders keep the same fixed domain in call heads and stored function values.
 See Note [Function-valued retained binders] in GHC.Core.Type.
