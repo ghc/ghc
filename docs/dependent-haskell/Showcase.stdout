@@ -183,6 +183,7 @@ project the length of a known dependent package in a type: Refl
 project from two payload families with the same dependent function: ("xx",7)
 use the stored length and vector in a generic dependent eliminator: (2,"xx")
 use one dependent pair type at two witness types: ((2,"xx"),'i')
+name a dependent consumer at a runtime vector length: ("row","xx")
 project the payload at the first field of a dependent pair: (2,"xx",'i')
 read either package field without demanding its sibling: (7,2)
 checked row prefix with a runtime length: (Just "xab",Nothing)

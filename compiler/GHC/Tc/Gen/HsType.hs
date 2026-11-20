@@ -633,7 +633,7 @@ tcCheckRetainedType allow_function = go
             case bndr of
               HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
                 do { domain_ty <- tcRetainedBinderDomain True mode domain
-                   ; unless (allow_function || isNativeIndexType domain_ty) $
+                   ; when (not allow_function && isFunTy domain_ty) $
                        failWithTc $ TcRnRetainedQuantificationError $
                          if mode_complete_type_arg mode == Just False
                          then RetainedPartialTypeArgument
@@ -744,7 +744,10 @@ Then check the next binder and the body in the extended environment. The
 domain is a value type, so its annotation does not require KindSignatures.
 It must satisfy isNativeRetainedBinderType. Each runtime binder has multiplicity
 Many. See Note [Exported function-valued retained signatures] for the function
-domain permission. Check before mkDepFunTy can remove a vacuous binder.
+domain permission. Apply that permission check to an arrow domain. A lifted
+type parameter is already a valid opaque domain. For example, a synonym
+can bind foreach (x :: a) and refer to x without applying it as a function.
+Check before mkDepFunTy can remove a vacuous binder.
 An eligible function Id can also occur as a value index in a closed algebraic
 constructor. Its complete fixed type retains U matchability. Retained
 constructor fields use the same function-domain policy.

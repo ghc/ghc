@@ -6482,3 +6482,15 @@ uses the append identity. The successor case applies constructor
 congruence to the proof for the tail.
 [Ordinary reassembly](examples/closed-evaluation/VectorSplitObservation.hs)
 and [checked witness](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
+
+## Naming a dependent function type
+
+Agda checks the domain of a dependent function before checking its codomain
+with the argument in scope. Its vector example uses a previously bound type
+and length in a later domain. The fork uses this rule when a Haskell type
+synonym names a dependent consumer. GHC expands the synonym when checking
+the signature for ambiguity. A type parameter can be the domain of an
+opaque witness. Applying that witness as a function requires separate
+evidence about its type.
+[Agda 2.8.0, Function Types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
+and [dependent-pair consumer](examples/packed-vector/DependentPair.hs).

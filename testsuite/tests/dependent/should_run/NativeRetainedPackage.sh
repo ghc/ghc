@@ -73,12 +73,21 @@ readFlag q = case second q of
   Yes -> True
   No  -> False
 
+type AsWritten t = t
+
+-- Name a retained consumer through an ordinary synonym.
+readTag :: AsWritten (Consumer a (Const Char) Char)
+readTag _ c = getConst c
+
+readAction :: Consumer (IO Int) (Const Char) Char
+readAction action tag = readTag action tag
+
 value :: DPair a (Const r) -> r
 value q = getConst (second q)
 
 main :: IO ()
 main = print (readInt (pack (error "unused integer witness") 7),
-              withPair (pack (error "unused IO" :: IO Int) 'i') (\_ c -> getConst c),
+              withPair (pack (error "unused IO" :: IO Int) 'i') readAction :: Char,
               value (pack (error "unused function" :: Int -> Int) 'f'),
               first (pack (12 :: Int) (error "unused payload" :: Char)),
               readFlag (Pair True Yes), readFlag (Pair False No))
@@ -86,6 +95,21 @@ HS
 "${g[@]}" -main-is General -c General.hs
 "${g[@]}" -main-is General General.o ../provider/DependentPair.o ../projection/DependentProjection.o -o general
 ./general
+cat >AmbiguousConsumer.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}
+module AmbiguousConsumer where
+import Data.Functor.Const (Const(..))
+import Data.Kind (Type)
+import DependentPair (Consumer)
+type family Hidden a :: Type
+bad :: Consumer (Hidden a) (Const Bool) Bool
+bad _ (Const b) = b
+HS
+if "${g[@]}" -c AmbiguousConsumer.hs >bad.log 2>&1 ||
+   ! grep -Fq "In the ambiguity check for" bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
 cat >StrictRetainedField.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module StrictRetainedField where

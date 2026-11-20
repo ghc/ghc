@@ -17,6 +17,16 @@ all Core transformations. Normal optimization remains a broader release gate.
 
 ## Supported subset and evidence
 
+A type synonym can name a dependent function over a lifted parameter.
+The ordinary caller can use `Consumer a p r` in a signature and supply a
+witness and its indexed payload. The Showcase instantiates the witness
+type with a vector whose length comes from IO. An abstract family such as
+`Hidden a` still leaves `a` ambiguous when the rest of the signature
+cannot determine it. A named callback passed to `withPair` can require
+an expected result type.
+[Consumer](../examples/packed-vector/DependentPair.hs) and
+[formation rule](../REFERENCES.md#naming-a-dependent-function-type).
+
 A retained length can be a checked source call such as `plus n m`.
 Its two inputs can come from IO. The result index remains the same
 through compilation, and the runtime sum stays lazy.
