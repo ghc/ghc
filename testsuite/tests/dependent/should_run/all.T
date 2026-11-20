@@ -12,7 +12,8 @@ test('NativeMapWitnessInference',
      run_command, ['bash check-map-witness.sh "{compiler}" "{libdir}"'])
 test('NativeOpenIdentity',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs',
-                 'OpenSource.hs', 'RunOpenSource.hs', 'RunOpenSource.stdout', 'check-source.sh']]),
+                 'OpenSource.hs', 'RunOpenSource.hs', 'RunOpenSource.stdout', 'check-source.sh',
+                 'RuntimeOrdering.hs', 'OrderingPayload.hs']]),
      run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
 test('NativeLocalOpen',
      [req_interp, req_rts_linker, only_ways(['normal']),

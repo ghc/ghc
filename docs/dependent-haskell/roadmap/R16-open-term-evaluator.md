@@ -1339,6 +1339,24 @@ pure decider separately. [Runtime decider](../examples/open-evaluation/PreludeFi
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
 and [prior art](../REFERENCES.md#checked-runtime-decisions-for-filter).
 
+### Check a three-way runtime comparison
+
+`decideOrdering` matches the actual result of `p x` and returns a witness
+indexed by that same application. `compareFrom` captures a runtime pivot
+in an ordinary `Prelude.compare` closure. An ordinary client can select
+its own closed payload family from the witness. It evaluates only the
+selected payload.
+
+A nominal Given `p x ~ 'LT` supplies `Refl :: p x :~: 'LT`. Bare `Refl`
+for `Select (p x) :~: Int` can still get stuck when the application is
+opaque. Pass the first proof to a congruence function over abstract
+`Ordering` variables. Matching `Refl` there transports the equality through
+the family. This is the same direction as Agda's explicit `rewrite` or
+`cong`. An observation of `p y` supplies only the equality for `p y`.
+[Provider](../examples/open-evaluation/RuntimeOrdering.hs),
+[ordinary consumer](../examples/open-evaluation/OrderingPayload.hs), and
+[Agda with-abstraction](https://agda.readthedocs.io/en/latest/language/with-abstraction.html#rewrite).
+
 ### Capture a runtime cutoff in the predicate
 
 `packCutoff` closes over a Peano cutoff read from an `IORef`. It checks

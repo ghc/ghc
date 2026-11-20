@@ -109,6 +109,7 @@ import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
+import qualified OrderingPayload
 import qualified PreludeFilterCutoff
 import qualified PreludeFilterDecider
 import qualified PreludeAppendLengthProof
@@ -1264,6 +1265,12 @@ main = do
     rows <- newIORef [[], [False], [True, False]] >>= readIORef
     putStrLn ("prove the filter bound for rows at a runtime cutoff: "
               ++ PreludeFilterCutoff.showCutoffBound (PreludeFilterCutoff.packCutoff cutoff rows))
+    pivot <- newIORef True >>= readIORef
+    let unused = error "comparison forced an unused payload"
+    observe "select a payload with a checked runtime comparison"
+        [ OrderingPayload.showComparison (not pivot) pivot (17, unused, unused)
+        , OrderingPayload.showComparison pivot pivot (unused, True, unused)
+        , OrderingPayload.showComparison pivot (not pivot) (unused, unused, 'G') ]
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"
