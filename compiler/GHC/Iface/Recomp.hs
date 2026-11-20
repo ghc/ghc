@@ -585,19 +585,25 @@ checkFlagHash hsc_env iface self_recomp = do
         staged_fp = stagedMatchabilityFingerprint previous_fp
         class_base_fp = classDefaultMatchabilityFingerprint staged_fp
         family_base_fp = forwardedResultFingerprint class_base_fp
+        filter_base_fp = guardedListFilterFingerprint class_base_fp
+        joint_base_fp = guardedListFilterFingerprint family_base_fp
+        -- See Note [Recompiling package rule providers].
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
-        class_fp = stamp_rules class_base_fp
-        new_fp = stamp_rules family_base_fp
+        base_class_fps = [class_base_fp, family_base_fp, filter_base_fp, joint_base_fp]
+        class_default_fps = map stamp_rules base_class_fps
+        forwarded_fps = map stamp_rules [family_base_fp, joint_base_fp]
+        guarded_fps = map stamp_rules [filter_base_fp, joint_base_fp]
+        new_fp = stamp_rules joint_base_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
-       | (old_fp == class_base_fp && old_fp /= class_fp)
-         || (old_fp == family_base_fp && old_fp /= new_fp)
+       | old_fp `elem` base_class_fps, old_fp /= stamp_rules old_fp
          -> recheck "Compiler now retains private helpers in erased package rules"
-       | old_fp `elem` [new_fp, class_fp, staged_fp, previous_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
+       | old_fp `elem` (class_default_fps ++ [staged_fp, previous_fp, abstract_fp,
+                                            ordered_fp, retained_case_fp, result_kind_fp])
          -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
        , couldSeparateFamilyResultMatchability iface
@@ -682,7 +688,7 @@ checkFlagHash hsc_env iface self_recomp = do
         out_of_date logger FlagsChanged (fmap vcat diffs)
     retained <- case previous of
       UpToDate
-        | old_fp `notElem` [new_fp, class_fp, staged_fp, previous_fp, ordered_fp]
+        | old_fp `notElem` (class_default_fps ++ [staged_fp, previous_fp, ordered_fp])
         , mi_hsc_src iface == HsSrcFile
         , couldExportOrderedTypeCase iface ->
             liftIO $ recheck "Compiler now checks type case constructor order"
@@ -698,21 +704,29 @@ checkFlagHash hsc_env iface self_recomp = do
             else pure UpToDate
       _ -> pure previous
     flags <- case retained of
-      UpToDate | old_fp `notElem` [new_fp, class_fp], couldInferClassDefaultSelector iface ->
+      UpToDate | old_fp `notElem` class_default_fps, couldInferClassDefaultSelector iface ->
         liftIO $ recheck "Compiler now infers matchability for associated type defaults"
       _ -> pure retained
+    guarded <- case flags of
+      UpToDate
+        | old_fp `notElem` guarded_fps
+        , backendGeneratesCode (backend dflags)
+        , mi_hsc_src iface == HsSrcFile
+        , couldExportGuardedListFilter iface ->
+            liftIO $ recheck "Compiler now checks guarded list filters"
+      _ -> pure flags
     let check_family_uses
-          | old_fp `elem` [new_fp, class_fp, staged_fp] = pure UpToDate
+          | old_fp `elem` (staged_fp : class_default_fps) = pure UpToDate
           | otherwise = do
               candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
               if candidate
                 then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
                 else pure UpToDate
         check_forwarded_result
-          | old_fp /= new_fp, couldForwardFamilyResult iface =
+          | old_fp `notElem` forwarded_fps, couldForwardFamilyResult iface =
               liftIO $ recheck "Compiler now separates a family result from its kind"
           | otherwise = pure UpToDate
-    pure (flags, check_family_uses `recompThen` check_forwarded_result)
+    pure (guarded, check_family_uses `recompThen` check_forwarded_result)
 
 -- | Record the independent selector on an open equation returning its kind family.
 forwardedResultFingerprint :: Fingerprint -> Fingerprint
@@ -726,6 +740,15 @@ stampPackageRuleProvider rules info =
     info { mi_sr_flag_hash = FingerprintWithValue (packageRuleProviderFingerprint rules fp) flags }
   where
     FingerprintWithValue fp flags = mi_sr_flag_hash info
+
+{- Note [Recompiling package rule providers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The interface writer stamps the flag hash after it knows which rules
+the module exports. The reader uses the stored rules to recognize the
+stamp on each compatible family and filter hash. A provider without
+the stamp needs the private helper check, even if it already has one
+of the other checks. Its next interface records all current checks.
+-}
 
 -- | Only providers that publish lexical package rules need an upgrade.
 packageRuleProviderFingerprint :: [IfaceRule] -> Fingerprint -> Fingerprint
@@ -743,6 +766,11 @@ stagedMatchabilityFingerprint fp =
 classDefaultMatchabilityFingerprint :: Fingerprint -> Fingerprint
 classDefaultMatchabilityFingerprint fp =
     computeFingerprint putNameLiterally (fp, "class-default-matchability-v1" :: String)
+
+-- | Record the final Core check for a list with a predicate guard.
+guardedListFilterFingerprint :: Fingerprint -> Fingerprint
+guardedListFilterFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "guarded-list-filter-v1" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -1243,6 +1271,25 @@ couldExportCallbackCase iface = any candidate (mi_decls iface)
     opaque IfaceCastTy{} = True
     opaque IfaceAppTy{} = True
     opaque _ = False
+
+-- | Check exported signatures of the form @(a -> Bool) -> [a] -> [a]@.
+-- The signature selects recompilation. The Core check decides publication.
+couldExportGuardedListFilter :: ModIface -> Bool
+couldExportGuardedListFilter iface = any candidate (mi_decls iface)
+  where
+    exports = mkNameSet (concatMap availNames (mi_exports iface))
+    candidate (_, IfaceId{ifName = n, ifType = ty}) = n `elemNameSet` exports && filter_type ty
+    candidate _ = False
+
+    filter_type (IfaceForAllTy _ _ body) = filter_type body
+    filter_type (IfaceFunTy FTF_T_T _ _ (IfaceFunTy FTF_T_T _ _ (IfaceTyVar a) (IfaceTyConApp bool IA_Nil))
+                 (IfaceFunTy FTF_T_T _ _ input output))
+      | ifaceTyConName bool == boolTyConName = list_element a input && list_element a output
+    filter_type _ = False
+
+    list_element a (IfaceTyConApp tc (IA_Arg (IfaceTyVar ty) _ IA_Nil)) =
+      ifaceTyConName tc == listTyConName && a == ty
+    list_element _ _ = False
 
 -- | An exported function can hide its result pair behind a type synonym.
 couldExportPairBuilder :: ModIface -> Bool
@@ -1955,7 +2002,8 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = forwardedResultFingerprint
+          current_flag_hash = guardedListFilterFingerprint
+                            $ forwardedResultFingerprint
                             $ classDefaultMatchabilityFingerprint
                             $ stagedMatchabilityFingerprint
                             $ orderedTypeCaseFingerprint
