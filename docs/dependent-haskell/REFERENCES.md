@@ -3084,6 +3084,25 @@ requires a header that both earlier readers reject.
 [the Haskell example](examples/erased-existentials/ForgetWitness.hs)
 and [the interface writer](../../compiler/GHC/Iface/Binary.hs).
 
+Eisenberg, Weirich, Vytiniotis and Peyton Jones use a repeated type
+variable to illustrate the choice between overlapping equations. A
+later incompatible equation must remain unavailable if an earlier
+equation could match after reduction. The scoped-sum matcher uses
+nominal evidence for a repeated argument and checks apartness before
+selecting a branch. An opaque payload family can still leave the
+application stuck.
+[Closed Type Families with Overlapping Equations, §3](https://simon.peytonjones.org/assets/pdfs/closed-type-families.pdf)
+and [the repeated-argument example](examples/erased-existentials/PackageEquality.hs).
+
+Haskell lets an instance inherit a method body from its class. The
+`DefaultElement` example uses this rule for a method whose runtime
+length appears in the result type. The fork checks the compulsory
+unfolding against the original class method when reading the interface.
+The length-indexed result and the instance dictionary survive separate
+compilation.
+[Haskell 2010 Report, §§4.3.1–4.3.2](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html)
+and [DefaultVector](examples/packed-vector/DefaultVector.hs).
+
 The explicit Core design in the “Alternatives” section of #473 gives
 `ExistsCo` as the congruence rule required by `liftCoSubst`. The vector
 filter needs it even at `-O0` because expanding `Filtered a` substitutes for the

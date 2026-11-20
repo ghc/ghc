@@ -2,11 +2,12 @@
 {-# OPTIONS_GHC -O0 #-}
 
 -- | Keep the indexed payload and discard the runtime witness.
-module ForgetWitness (Retained, Hidden, forget, retained, unknown, observe) where
+module ForgetWitness (Flag, Retained, Hidden, forget, retained, unknown, observe) where
 
 import GHC.Exists
 import GHC.Sigma (Sigma(Pair))
 
+-- | A Boolean-indexed payload. Unknown can accompany either Boolean.
 data Flag (b :: Bool) where
   On  :: Flag 'True
   Off :: Flag 'False

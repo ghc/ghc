@@ -46,6 +46,7 @@ import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
 import qualified Data.Char
 import qualified Data.Either
+import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
 import qualified ForgetWitness
 import qualified ExistentialVec as E
@@ -106,6 +107,7 @@ import qualified PairProjection as ComputedProjection
 import qualified OrdinaryVecClient as Ordinary
 import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
+import qualified PackageEquality
 import PackedVecLibrary
 import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified DependentPair as Pair
@@ -838,6 +840,9 @@ duplicateProjection :: forall (p :: (Bool, Char)). Proxy p
                     -> Prelude.snd (PreludePairExport.duplicateFirst p) :~: Prelude.fst p
 duplicateProjection _ = Refl
 
+instance DefaultElement Char where
+    defaultElement = 'x'
+
 main :: IO ()
 main = do
     putStrLn "Dependent Haskell: completed source features"
@@ -937,6 +942,10 @@ main = do
     observe "forget the retained witness and inspect the indexed payload"
         ( map (ForgetWitness.observe . ForgetWitness.forget . ForgetWitness.retained) [True, False]
         , ForgetWitness.observe (ForgetWitness.forget (ForgetWitness.unknown (error "forced witness"))) )
+    observe "match independent retained sums in a repeated type-family argument"
+        PackageEquality.sameRetained
+    observe "inherit a class method that fills a length-indexed vector"
+        (toList (filled @Char 3))
     observe "read the cells of a vector packaged with its length"
         (Refl :: E.readSomeVec ('E.SomeVec ('E.SS ('E.SS 'E.SZ))
                     ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))) :~: '[4, 5])

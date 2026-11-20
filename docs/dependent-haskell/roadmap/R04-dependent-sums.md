@@ -155,9 +155,13 @@ module’s interface can use this proof at `-O0` and `-O1`. Changing a
 payload or the priority of overlapping branches rejects the proof.
 An unrelated nominal family keeps its own identity.
 
-The private self-hosted compiler at `a957f54932` passed the positive
-and negative checks with `GHC.Sigma` registered in `base`. A closed
-family such as `Same a a` can still get stuck when the two arguments
-are equivalent sums written in different modules.
+At `a957f54932`, the self-hosted compiler proved this equality for a
+source-free client using `GHC.Sigma` from `base`. At `8b7c23d47a`, a
+closed-family equation such as `Same a a = Bool` also accepts two such
+sums as its arguments. The matcher constructs evidence between the real
+argument and the instantiated equation. It still checks apartness before
+using a later equation. An opaque result kind or an unrelated nominal
+family can leave the application stuck.
+[Repeated argument example](../examples/erased-existentials/PackageEquality.hs).
 [Serokell’s R04 card](https://ghc.serokell.io/dh#dependent-sums)
 and [type-lambda elaboration](R17-type-level-lambdas.md#source-and-evidence).

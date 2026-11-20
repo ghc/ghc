@@ -131,9 +131,20 @@ zero, producing `[42,42]` and `[]`. An older compiler that supports the
 rule alone rejects a mixed interface at the header. The reader also
 rejects repeated field names in imported branch evidence. The 272-line
 Showcase passes with default
-`-O1` on that private bootstrap compiler. A retained class method needs
-additional checks because a client that inherits the default can require
-its unfolding even when optional interface pragmas are disabled.
+`-O1` on that private bootstrap compiler. A class method can require its
+unfolding when an instance omits its own definition. The private compiler
+at `55c7fb4606` checks that the unfolding belongs to the declared default
+method and has the selector’s type. A separately compiled instance
+inherits the default at `-O0` with interface pragmas enabled or ignored.
+A retained-sum result also works at default `-O1`. Each set of required
+interface features has a header that an earlier reader can check.
+
+The [vector example](../examples/packed-vector/DefaultVector.hs) defines
+`filled :: foreach (n :: Nat) -> Vec a n` in terms of the class’s element.
+An instance for `Char` supplies only `defaultElement`. An ordinary client
+gets `"xxx"` from `toList (filled @Char 3)`. In that client,
+`safeHead (filled @Char 0)` fails with GHC-83865. Its actual length is
+`Z` and the head function requires `S n0`.
 
 ## Next increments
 

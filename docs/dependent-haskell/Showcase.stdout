@@ -215,6 +215,8 @@ ignore a recursive helper in a type and at runtime: (Refl,'x')
 open erased packages and leave an unused payload lazy: (True,False,True)
 filter a vector without forcing the tail to learn the result length: ([7],[7,9])
 forget the retained witness and inspect the indexed payload: ([Just True,Just False],Nothing)
+match independent retained sums in a repeated type-family argument: Refl
+inherit a class method that fills a length-indexed vector: "xxx"
 read the cells of a vector packaged with its length: Refl
 select a type with a locally declared route: (Refl,'y')
 select unknown fields from known constructors: ('x',7)

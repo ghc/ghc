@@ -38,7 +38,7 @@ flags=(-dcore-lint -dstg-lint -fwrite-ide-info -Werror=inaccessible-code
     "$docs/Showcase.hs" -o "$out/showcase"
 "$out/showcase" | tee "$out/native.stdout"
 diff -u "$docs/Showcase.stdout" "$out/native.stdout"
-for module in Main PackedVecLibrary ClosedTableLibrary ErasedPackage ForgetWitness; do
+for module in Main PackedVecLibrary ClosedTableLibrary ErasedPackage ForgetWitness PackageEquality DefaultVector; do
     test -s "$out/hie/$module.hie"
 done
 
