@@ -1237,3 +1237,10 @@ its interface has no checked equation. Clients with only an old
 interface need the producer to publish the equation before they can
 prove it. See the [installed list regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh)
 and [prior art](../REFERENCES.md#exporting-an-ordinary-identity-equation).
+
+A saturated symbolic call can still use an ordinary unfolding with
+rewrite rules enabled. The open evaluator follows the definitions it
+needs and checks the rules for each observed binding. A rule on a
+visited alias can block the call. In an implicitly quantified signature,
+an unqualified type variable keeps its earlier scope.
+[Open source regression](../examples/open-evaluation/check-source.sh).

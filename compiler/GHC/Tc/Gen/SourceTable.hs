@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies, isFinalCoreIdentity, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
@@ -65,7 +65,7 @@ import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
-import GHC.Types.Id.Info (IdDetails(SourceTableId))
+import GHC.Types.Id.Info (IdDetails(SourceTableId, VanillaId))
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
@@ -645,6 +645,15 @@ recordSourceUses ops = do
            else RetainedSourceRule (idName v)))
       Nothing -> publishSourceUses ops
 
+-- | Use the exact dependencies visited by the open evaluator.
+-- See Note [Identity certificates and open unfoldings].
+recordUnfoldedSourceUses :: [(Id, Maybe Name)] -> TcM ()
+recordUnfoldedSourceUses = recordSourceUses . map ordinary_use
+  where
+    ordinary_use (v, arg)
+      | isFinalCoreIdentity v = (setIdDetails v VanillaId, arg)
+      | otherwise = (v, arg)
+
 -- | Record checked operations without changing the location of late-rule errors.
 publishSourceUses :: [(Id, Maybe Name)] -> TcM ()
 publishSourceUses ops = do
@@ -673,9 +682,12 @@ checkSourceMethodUsesWithPending :: TcGblEnv -> TcM ()
 checkSourceMethodUsesWithPending env = do
     commitOptionalSourceUses env
     uses <- filterNameSet (isVarOcc . nameOccName) <$> readTcRef (tcg_source_table_uses env)
+    unfolded <- readTcRef (tcg_evaluated_term_uses env)
     rewriting <- goptM Opt_EnableRewriteRules
+    let uses_final_core v = finalCoreMapperOwner v
+          && not (isFinalCoreIdentity v && idName v `elemNameSet` unfolded)
     checked_uses <- if rewriting then pure uses else
-      mkNameSet <$> filterM (fmap (maybe True (not . finalCoreMapperOwner)) . tcLookupIdMaybe)
+      mkNameSet <$> filterM (fmap (maybe True (not . uses_final_core)) . tcLookupIdMaybe)
         (nameSetElemsStable uses)
     unless (isEmptyNameSet checked_uses) $ do
       types <- readTcRef (tcg_source_rule_types env)
@@ -695,7 +707,7 @@ checkSourceMethodUsesWithPending env = do
         visible <- visibleSourceMethodRules env
         forM_ (nameSetElemsStable imported) $ \name -> do
           v <- tcLookupId name
-          let changed | finalCoreMapperOwner v = not (checkedMapperRules visible v)
+          let changed | uses_final_core v = not (checkedMapperRules visible v)
                       | otherwise = any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name)
           when changed (report name)
 
@@ -1289,6 +1301,25 @@ checkedIdentitySource :: Id -> Core.CoreExpr -> Maybe ([ForAllTyBinder], [Type],
 checkedIdentitySource owner rhs = do
     guard (isIdentitySourceType (varType owner))
     checkedConstructorHelper (const False) (const Nothing) owner rhs
+
+-- | Recognize an identity whose equation was checked against final Core.
+isFinalCoreIdentity :: Id -> Bool
+isFinalCoreIdentity v = finalCoreMapperOwner v && isIdentitySourceType (varType v)
+
+{- Note [Identity certificates and open unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An identity certificate can supply a bare callback without an unfolding.
+It does not record the aliases exposed by optimizer inlining. A consumer
+of the certificate must disable rewriting.
+
+Keep the ordinary unfolding path for a written symbolic application.
+See GHC.Rename.Env. The open evaluator reads each
+definition it visits, including aliases, and records its instantiated
+rule head. Present those identities as ordinary Ids to the rule check.
+Their Names, types, and attached rules are the same. The late rule
+check can identify them in tcg_evaluated_term_uses. Keep the stricter
+rule policy for nominal uses and for non-identity final Core owners.
+-}
 
 -- | Recognize a private constructor-case family and its nominal equations.
 isSourceConstructorCase :: TyCon -> Bool
