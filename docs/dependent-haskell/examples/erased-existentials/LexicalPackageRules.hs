@@ -25,10 +25,15 @@ increment :: Int -> Int
 increment x = x + 1
 
 {-# RULES "read/int-pair" forall (x :: Int) (k :: Int -> Int). readHidden (x, k) = k x #-}
-{-# RULES "hide/int" forall (x :: Int). hideInt x = ((x, id) :: Hidden) #-}
+{-# RULES "hide/int" forall (x :: Int). hideInt x = ((x, privateIdentity) :: Hidden) #-}
 {-# RULES "project/hidden" forall (p :: Hidden). project p = case p of (x, k) -> k x #-}
 {-# RULES "increment/hidden" forall (p :: Hidden).
       increment (case p of (x, k) -> k x) = project p + 1 #-}
+
+-- | Identity callback referenced only by the exported packing rule.
+{-# NOINLINE privateIdentity #-}
+privateIdentity :: Int -> Int
+privateIdentity x = x
 
 -- | Apply the rules in the module that defines them.
 local :: Int -> Hidden -> (Int, Int, Int)

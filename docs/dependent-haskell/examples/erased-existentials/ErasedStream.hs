@@ -1,7 +1,8 @@
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
 module ErasedStream (Stream, fromList, oddThrough, toList) where
 
 import Data.Kind (Type)
+import GHC.Exts (build)
 
 -- | One transition of a stream with state s.
 data Step a s = Done | Yield a s | Skip s
@@ -27,9 +28,18 @@ oddThrough limit = (step, 1)
 
 -- | Produce the next list cell as soon as the step function yields.
 toList :: Stream a -> [a]
-toList (step, start) = go start
+{-# INLINE [1] toList #-}
+toList (step, start) = foldSteps (:) [] step start
+
+-- | Fold yielded elements in order. The combining function can ignore the tail.
+foldSteps :: (a -> b -> b) -> b -> (s -> Step a s) -> s -> b
+foldSteps cons done step = go
   where
     go s = case step s of
-      Done -> []
+      Done -> done
       Skip next -> go next
-      Yield x next -> x : go next
+      Yield x next -> cons x (go next)
+
+{-# RULES "toList/build" [~1] forall (stream :: Stream a).
+    toList stream = build (\cons nil -> case stream of
+      (step, start) -> foldSteps cons nil step start) #-}

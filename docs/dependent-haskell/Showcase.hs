@@ -53,6 +53,7 @@ import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
 import qualified ErasedStream
+import qualified StreamFold
 import qualified PackageRules
 import qualified LexicalPackageRules
 import qualified RankedPackage
@@ -986,6 +987,10 @@ main = do
     observe "read streams with different hidden state types"
         (ErasedStream.toList (ErasedStream.oddThrough 6),
          take 1 (ErasedStream.toList (ErasedStream.fromList (True : error "unused stream tail"))))
+    observe "fold a stream and stop before an undefined tail"
+        (StreamFold.digits (ErasedStream.oddThrough 6),
+         StreamFold.first (ErasedStream.fromList (True : error "unused fold tail")),
+         StreamFold.first (ErasedStream.fromList ([] :: [Bool])))
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $

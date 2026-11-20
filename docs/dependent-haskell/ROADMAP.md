@@ -69,6 +69,15 @@ result can differ from the choice in its kind. The client prints
 original `GADTSingletons` program still needs two source annotations.
 [Interpreter and compatibility boundary](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
+The list interface of a stream with hidden state supports two ordinary
+`foldr` consumers. With a separately compiled provider, both consume the
+producer's builder at `-O1` and `-O2`. The first-element fold returns
+`Just True` for a stream with an undefined tail. The integer fold reads
+the odd digits in order and gives 531. The focused checks also run the
+same source at `-O0`.
+[Source folds](examples/erased-existentials/StreamFold.hs) and
+[Core and recompilation checks](roadmap/R05-dependent-core.md#a-list-fold-over-a-hidden-stream-state).
+
 The 302-line Showcase adds `(4,3,6)` from the package rules. Both
 compiler stages reproduce every line at `-O0`, default `-O1` and
 default `-O2`. The self-hosted compiler also reproduces it in GHCi.
@@ -137,8 +146,10 @@ source examples. General promotion remains open.
    retained functions. Both currently report GHC-51063. Preserve the
    witness-scope checks used for erased packages.
    [Current rule support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
-2. **R23.** Restore the unchanged `GADTSingletons` program. Check the
-   arrow synonym and the `PromoteX` and `DemoteX` equations separately.
+2. **R23.** Resolve the compatibility policy for unchanged
+   `GADTSingletons`. A bare arrow pattern in `Promote` currently matches U.
+   Broadening it can overlap an existing M equation.
+   [Two-module example](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
    Keep the explicit matchability and noninjective equality checks.
    The staged interpreter with an unsaturated family still needs an explicit
    `%U`. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).

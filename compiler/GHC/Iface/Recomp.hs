@@ -13,6 +13,7 @@ module GHC.Iface.Recomp
    , recompileRequired
    , addFingerprints
    , mkSelfRecomp
+   , stampPackageRuleProvider
    )
 where
 
@@ -582,14 +583,20 @@ checkFlagHash hsc_env iface self_recomp = do
         ordered_fp = orderedTypeCaseFingerprint retained_case_fp
         previous_fp = orderedTypeCaseFingerprint abstract_fp
         staged_fp = stagedMatchabilityFingerprint previous_fp
-        class_fp = classDefaultMatchabilityFingerprint staged_fp
-        new_fp = forwardedResultFingerprint class_fp
+        class_base_fp = classDefaultMatchabilityFingerprint staged_fp
+        family_base_fp = forwardedResultFingerprint class_base_fp
+        stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
+        class_fp = stamp_rules class_base_fp
+        new_fp = stamp_rules family_base_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
+       | (old_fp == class_base_fp && old_fp /= class_fp)
+         || (old_fp == family_base_fp && old_fp /= new_fp)
+         -> recheck "Compiler now retains private helpers in erased package rules"
        | old_fp `elem` [new_fp, class_fp, staged_fp, previous_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
          -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
@@ -711,6 +718,21 @@ checkFlagHash hsc_env iface self_recomp = do
 forwardedResultFingerprint :: Fingerprint -> Fingerprint
 forwardedResultFingerprint fp =
     computeFingerprint putNameLiterally (fp, "forwarded-family-result-v1" :: String)
+
+-- | Mark providers compiled with the scope traversal in GHC.Iface.Tidy.
+-- See Note [Private helpers in erased package rules] in GHC.Iface.Tidy.
+stampPackageRuleProvider :: [IfaceRule] -> IfaceSelfRecomp -> IfaceSelfRecomp
+stampPackageRuleProvider rules info =
+    info { mi_sr_flag_hash = FingerprintWithValue (packageRuleProviderFingerprint rules fp) flags }
+  where
+    FingerprintWithValue fp flags = mi_sr_flag_hash info
+
+-- | Only providers that publish lexical package rules need an upgrade.
+packageRuleProviderFingerprint :: [IfaceRule] -> Fingerprint -> Fingerprint
+packageRuleProviderFingerprint rules fp
+  | any isLexicalPackageRule rules =
+      computeFingerprint putNameLiterally (fp, "lexical-rule-private-helpers-v1" :: String)
+  | otherwise = fp
 
 -- | Record the inference rules used to compile open family applications.
 stagedMatchabilityFingerprint :: Fingerprint -> Fingerprint
