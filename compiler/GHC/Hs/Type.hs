@@ -814,6 +814,7 @@ hsTypeHasNoAnonWildcards lty = go lty
       HsTyLit{} -> True
       HsTyVar{} -> True
       HsStarTy{} -> True
+      XHsType (HsTypeExistsRn binder body) -> hsTyVarBndrHasNoAnonWildcards binder && go body
       XHsType{} -> True
 
     gos = all go

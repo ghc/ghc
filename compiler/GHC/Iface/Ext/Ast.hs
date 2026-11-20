@@ -2054,6 +2054,10 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsTyLit _ _ -> []
       HsWildCardTy _ -> []
       HsStarTy _ -> []
+      XHsType (HsTypeExistsRn binder body) ->
+        [ toHie $ tvScopes (ResolvedScopes [mkScope (getLocA body)]) NoScope [binder]
+        , toHie body
+        ]
       XHsType _ -> []
 
 instance (Data (HsModifierOf ty (GhcPass p)), ToHie ty) => ToHie (LocatedA (HsModifierOf ty (GhcPass p))) where

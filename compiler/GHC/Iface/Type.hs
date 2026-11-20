@@ -1419,7 +1419,7 @@ ppr_ty ctxt_prec (IfaceFreeTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
 ppr_ty ctxt_prec (IfaceExistsTy (var, arg) res)
   = maybeParen ctxt_prec funPrec $
-      sep [text "exists" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg) <> dot,
+      sep [text "exists" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg) <+> vbar,
            ppr_ty_nested res]
 ppr_ty ctxt_prec (IfaceDepFunTy vis (_, var, arg) res)
   = maybeParen ctxt_prec funPrec $
