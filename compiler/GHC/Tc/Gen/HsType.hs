@@ -50,7 +50,7 @@ module GHC.Tc.Gen.HsType (
         InitialKindStrategy(..),
         SAKS_or_CUSK(..),
         ContextKind(..),
-        kcDeclHeader, checkForDuplicateScopedTyVars,
+        kcDeclHeader, kcInferSumPayloadHeader, checkForDuplicateScopedTyVars,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcInferLHsType, tcInferLHsTypeKind, tcInferLHsTypeUnsaturated,
@@ -5302,7 +5302,12 @@ kcDeclHeader
   -> TcM ContextKind    -- ^ The result kind
   -> TcM TcTyCon        -- ^ A suitably-kinded TcTyCon
 kcDeclHeader (InitialKindCheck msig) = kcCheckDeclHeader msig
-kcDeclHeader InitialKindInfer = kcInferDeclHeader
+kcDeclHeader InitialKindInfer = kcInferDeclHeader False
+
+-- | Infer the header of a generated sum payload family.
+-- See Note [Provisional kinds of sum payloads] in GHC.Tc.TyCl.
+kcInferSumPayloadHeader :: Name -> LHsQTyVars GhcRn -> TcM ContextKind -> TcM MonoTcTyCon
+kcInferSumPayloadHeader name = kcInferDeclHeader True name ClosedTypeFamilyFlavour
 
 {- Note [kcCheckDeclHeader vs kcInferDeclHeader]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5439,12 +5444,13 @@ mkExplicitTyConBinder dep_set (Bndr tv flag) =
 --
 -- This function does not do telescope checking.
 kcInferDeclHeader
-  :: Name               -- ^ of the thing being checked
+  :: Bool               -- ^ Generated sum payload family
+  -> Name               -- ^ of the thing being checked
   -> TyConFlavour TyCon -- ^ What sort of 'TyCon' is being checked
   -> LHsQTyVars GhcRn
   -> TcM ContextKind    -- ^ The result kind
   -> TcM MonoTcTyCon    -- ^ A suitably-kinded non-generalized TcTyCon
-kcInferDeclHeader name flav
+kcInferDeclHeader is_sum name flav
               (HsQTvs { hsq_ext = kv_ns
                       , hsq_explicit = hs_bndrs }) kc_res_ki
   -- No standalone kind signature and no CUSK.
@@ -5471,8 +5477,16 @@ kcInferDeclHeader name flav
                -- Discard visibility flags. We made sure all of them are HsBndrRequired
                -- by the call to rejectInvisibleBinders above.
 
-             tc_binders = mkAnonTyConBinders tc_tvs
-               -- This has to be mkAnonTyConBinder!
+             tc_binders
+               | is_sum
+               = map (mkRequiredTyConBinder (tyCoVarsOfTypes (map tyVarKind tc_tvs))) tc_tvs
+               | otherwise
+               = mkAnonTyConBinders tc_tvs
+               -- The sum payload path keeps dependencies already present in
+               -- the checked header. See Note [Provisional kinds of sum
+               -- payloads] in GHC.Tc.TyCl.
+               --
+               -- Ordinary declarations must use mkAnonTyConBinders.
                -- See Note [No polymorphic recursion in type decls] in GHC.Tc.TyCl
                --
                -- Also, note that tc_binders has the tyvars from only the
