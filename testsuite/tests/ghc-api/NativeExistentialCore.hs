@@ -30,8 +30,8 @@ import GHC.Driver.Env.Types (HscEnv (hsc_NC, hsc_dflags))
 import GHC.Driver.Session (targetProfile)
 import GHC.Iface.Binary
 import GHC.Iface.Type (IfaceType (..), getIfaceType, mkIfLclName)
-import GHC.Iface.Ext.Binary (hie_file_result, readHieFile, writeHieFile)
-import GHC.Iface.Ext.Types (HieASTs (HieASTs), HieFile (..))
+import GHC.Iface.Ext.Binary (hie_file_result, hie_file_result_version, readHieFile, writeHieFile)
+import GHC.Iface.Ext.Types (HieASTs (HieASTs), HieFile (..), hieImplicitExistsVersion)
 import GHC.Iface.Ext.Utils
     (freshIndex, getTypeIndex, hieTypeToIface, htyTable, initialHTS, recoverFullType)
 import GHC.Iface.Syntax (IfaceDecl (IfaceId), IfaceIdDetails (IfVanillaId), ifName, ifType)
@@ -43,7 +43,7 @@ import GHC.Types.Name.Occurrence (mkVarOcc)
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.Unique.Supply (mkSplitUniqSupplyGrimily, uniqsFromSupply)
-import GHC.Types.Var (ExistsTyFlag (ExplicitExists), TyVar, mkCoVar, mkTyVar, varType, VarBndr (Bndr), data Specified)
+import GHC.Types.Var (ExistsTyFlag (ExplicitExists, ImplicitExists), TyVar, mkCoVar, mkTyVar, varType, VarBndr (Bndr), data Specified)
 import GHC.Types.Var.Set (elemVarSet, isEmptyVarSet)
 import GHC.Unit.Module (mkModule)
 import GHC.Unit.Module.ModDetails (md_types)
@@ -161,22 +161,27 @@ verify interfacePath env = do
             Just (AnId value) -> assert "changed signature after interface roundtrip" (varType value `eqType` closed)
             _ -> fail "missing value in decoded module"
       _ -> fail "missing signature in interface"
-    let types = (,,) <$> getTypeIndex closed
-                     <*> getTypeIndex renamed
-                     <*> getTypeIndex (universal a abstract)
-        ((index, renamedIndex, forallIndex), table) = runState types initialHTS
+    let dot = ExistsTy ImplicitExists a abstract
+        types = (,,,) <$> getTypeIndex closed
+                      <*> getTypeIndex renamed
+                      <*> getTypeIndex (universal a abstract)
+                      <*> getTypeIndex dot
+        ((index, renamedIndex, forallIndex, dotIndex), table) = runState types initialHTS
         hie = HieFile "ExistentialSignature.hs" mdl
                   (A.array (0, freshIndex table - 1) (IM.toList (htyTable table)))
                   (HieASTs mempty) [] mempty mempty
         hiePath = interfacePath ++ ".hie"
     assert "HIE did not deduplicate alpha-equivalent binders" (index == renamedIndex)
     assert "HIE merged an existential with a forall" (index /= forallIndex)
+    assert "HIE merged dot and bar existentials" (index /= dotIndex)
     writeHieFile hiePath hie
-    decodedHie <- hie_file_result <$> readHieFile (hsc_NC env) hiePath
-    let recovered = hieTypeToIface (recoverFullType index (hie_types decodedHie))
-    assert "wrong type constructor after HIE roundtrip" $
-        case recovered of
-          IfaceExistsTy {} -> True
+    decodedHie <- readHieFile (hsc_NC env) hiePath
+    assert "dot existential did not select its HIE version" $
+        hie_file_result_version decodedHie == hieImplicitExistsVersion
+    let recover i = hieTypeToIface (recoverFullType i (hie_types (hie_file_result decodedHie)))
+    assert "wrong separator after HIE roundtrip" $
+        case (recover index, recover dotIndex) of
+          (IfaceExistsTy ExplicitExists _ _, IfaceExistsTy ImplicitExists _ _) -> True
           _ -> False
     let reject suffix ty = do
             let path = interfacePath ++ suffix

@@ -40,7 +40,7 @@ and [Agda erasure](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrele
   payload must observe the exception. Opening a package and ignoring its
   payload should preserve laziness. Inspect the generated code for an
   extra constructor or witness argument.
-- [ ] Infer packing and opening in the vector filter. Test the first
+- [x] Infer packing and opening in the vector filter. Test the first
   element of a vector whose tail raises an exception. If the first element
   passes the predicate, the first result should be available immediately.
 
@@ -89,11 +89,19 @@ temporary target package database with the base marker compiled in the
 configured base unit. The source test `NativeExistentialSource` runs
 those controls against the `GHC.Exists` provided by the built base.
 
-This slice supports one lifted witness, saturated applications and a
-sole prefix Pack case alternative. Compile modules that use erased
-existential types or expressions at `-O0`. The Showcase module exports
-its observation as an ordinary tuple for the optimized Showcase entry
-point. The implicit dot form and its vector filter remain open.
+This slice supports one erased witness with a checked kind, saturated
+applications and a sole prefix Pack case alternative. Compile modules
+that use erased existential types or expressions at `-O0`. The Showcase
+module exports its observation as an ordinary tuple for the optimized
+Showcase entry point.
+
+The self-hosted compiler at `3aab77ca78` writes
+`-erased-existentials-v1` when an interface contains an erased
+existential type, package, elimination or congruence rule. Ordinary
+interfaces retain the base version. The bootstrap-built and
+self-hosted compilers each link a source-free client using a package
+interface written by the other. The earlier Type-only trial uses its
+own experimental suffix.
 
 ### A lazy filter with an erased length
 
@@ -149,11 +157,41 @@ should still have to match the vector before calling a nonempty head
 function. At `7a2fe4027b`, `exists (m :: Nat). Vec a m` fails at the dot
 with GHC-58481. This gives separate checks for parsing, inferred binder
 scope, and demand. [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
+
+### An implicit package in an application
+
+The `NativeImplicitExistential` test uses
+`type Hidden a = exists (m :: Nat). Vec m a`. Its passing branch is
+`Cons x (filterVec p xs)`. The recursive call opens under a fresh
+length `m`. The expected result type packs `Cons` at witness
+`'S m` inside that scope. Core preserves both operations. Final STG
+passes the recursive call to the constructor as a lazy thunk.
+
+The ordinary client imports only interfaces and links against the
+provider objects. It reads the first passing cell with a bottom tail.
+A function with independent length parameters accepts two packages.
+Requiring the same length, assuming a successor, or returning a
+caller-chosen length produces GHC-25897. A polymorphic `id` forwards an
+existing package. A payload whose type refers to a retained field can
+also supply the witness for an implicit package in that field's scope.
+The same application rule checks a linear operand once. Using that
+operand in two linear arguments is a multiplicity error.
+
+The separator survives in checked types and interfaces. Core uses the
+same Pack and Unpack operations for each mode. This is a GHC adaptation
+of the draft. It preserves bar-only interface bytes and gives dot
+types and coercions their own interface version.
+
+Opening is limited to an application with a known operand head and an
+ordinary payload domain. Each opening introduces a fresh scoped
+witness. The draft's general opaque witness projections, scope
+repacking across lambda, let or case, and `@Pack` remain open.
+[Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
 and [the inference rules](https://richarde.dev/papers/2021/exists/exists.pdf).
 
-At `e04f9add03`, the filter signature fails at the dot in `exists m.`
-with GHC-68947. An ordinary GADT control uses `Some :: Vec n a -> Some a`.
+At `7a2fe4027b`, the filter signature fails at the dot with GHC-58481.
+At `e04f9add03` it fails with GHC-68947. The ordinary GADT control uses
+`Some :: Vec n a -> Some a`.
 Its successful branch matches `Some tail` from the recursive call before
 returning `Some (Cons x tail)`. Reading the first result in this version
-raises the tail exception. This is the demand difference the filter test
-must distinguish.
+raises the tail exception.
