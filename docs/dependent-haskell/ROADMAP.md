@@ -40,13 +40,20 @@ compression levels the old reader rejects new constructor evidence at
 the header. The new reader checks the coercion's role and scope.
 [R05 interface checks](roadmap/R05-dependent-core.md#default-optimized-interfaces).
 
+At `e669e68e31`, the private combined bootstrap compiler produces all
+277 Showcase lines at `-O0` and default `-O1`. It converts a retained
+pair to an erased package, matches two independently written sums in a
+closed family, and checks an inherited method that fills a length-indexed
+vector. Self-hosting and the dependent-directory comparison are in progress.
+The 272-line results above apply to the published checkpoint `d8f2802ddb`.
+
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The integrated compiler checks `second :: foreach (q :: DPair a p) -> p (first q)`. A private bootstrap compiler proves equality between two independently written `some` types after a binder rename, using the registered `GHC.Sigma` in `base`. | Check whole-sum equality after self-hosting. A closed family can still get stuck comparing whole sums. General domains and inference for `foreach` remain open. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | Both stages run the default `-O1` Showcase. A private compiler also inlines a retained case on a callback and fires a generated specialization rule in a source-free client. | Integrate the private optimizer changes. Retained class defaults still encounter compulsory unfoldings that the writer cannot export. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A checked second projection can depend on the first. Independently written sum types can satisfy a repeated argument in a closed family. The matcher preserves the order of overlapping equations. | Write a sum directly in a function signature. Broaden dependent product domains and inference. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | An ordinary client can inherit a length-indexed class method, inline a retained case and fire a generated specialization across an interface. | Optimize functions that construct and open erased packages. Preserve demand and compulsory method expansion. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | The compiler handles ordered constructor tests through aliases and selected GADT indices. It checks cases under `forall k (tag :: k)`. An interface client instantiates one annotated result at both `LiftedRep` and `IntRep`. | General mixed patterns and open GADT indices. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A private compiler checks a polymorphic filter that hides the output vector’s length. An ordinary source-free client infers the element type and reads the first cell without forcing the tail. | Complete the self-hosted witness and interface checks. Implicit packing and opening with `exists n. …`, general patterns and optimization of existential expressions remain open. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A polymorphic filter hides a vector’s length. An ordinary client reads the first passing element without forcing the tail. A separate example drops a stored witness while preserving its indexed payload. | Infer packing and opening for `exists n. …`, including the scope of an index introduced by a recursive call. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The integrated compiler reports conflicting arrow matchabilities and suppresses the argument-count hint for a stuck family. | General family unsaturation and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
@@ -62,17 +69,16 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R22.** Run the vector filter in both compiler directions through a
-   separately compiled provider. The bootstrap checks already cover old
-   readers presented with erased package expressions or the equality proof
-   alone. Carry these checks through self-hosting. Then implement implicit
-   packing and opening.
-2. **R04.** Check whole-sum equality in the self-hosted compiler. Read
-   the scoped evidence from a cached interface. Retain the bootstrap tests
-   for nested sums and interface changes when a payload changes.
-3. **R05.** Integrate checked specialization rules and explicit inlining
-   pragmas. For class defaults, test a separately compiled instance that
-   inherits a retained method.
+1. **R22.** Compile the dot-form vector filter from source. The recursive
+   call introduces a fresh length. Its scope must include construction
+   of the result. Check two independent packages and the unsafe head.
+2. **R04.** Support a `some` binder written in a function argument or
+   result. Test equality with a separately declared sum and reject
+   payloads that come from a different lexical owner.
+3. **R05.** Check the combined module and interface paths for erased
+   operations at `-O1`. Reduce a known pack followed by an unpack without
+   evaluating the payload. Exercise optimized and ordinary clients with
+   optional and compulsory unfoldings.
 4. **R19 and R23.** Extend ordered type cases to mixed patterns. Use the
    ordinary-program regression baseline when extending family unsaturation.
 
