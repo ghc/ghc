@@ -1309,6 +1309,14 @@ its induction hypothesis, and the proof with rewrite rules enabled.
 At runtime, counting the complete appended spine ignores bottom elements
 in both lists. Counting only its first constructor also leaves the left
 tail and the right list unevaluated.
+A code build rechecks an old provider whose exported signature can
+supply append equations. An old `GHC.Internal.Base` interface and object
+can stay in place for this build. An unrelated module reuses its
+interface. A subsequent build reuses the checked provider, including
+one whose body could not supply equations. No-code builds neither
+publish equations nor record the final Core check.
+[Interface upgrade](../examples/open-evaluation/check-append-upgrade.sh).
+
 [Aliases](../examples/open-evaluation/PreludeAppendLengthSource.hs),
 [proof](../examples/open-evaluation/PreludeAppendLengthProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),

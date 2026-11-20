@@ -597,6 +597,7 @@ checkFlagHash hsc_env iface self_recomp = do
         scoped_identity_fp = checkedIdentityFingerprint scoped_filter_fp
         binary_base_fp = binaryEnumFingerprint scoped_family_fp
         new_fp = binaryEnumFingerprint scoped_identity_fp
+        append_fp = checkedListAppendFingerprint new_fp
         retained_signature_fp = retainedSignatureCaseFingerprint new_fp
         earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp,
                                     scoped_family_fp, filter_base_fp, filter_family_fp,
@@ -608,12 +609,15 @@ checkFlagHash hsc_env iface self_recomp = do
         scoped_fps = [scoped_base_fp, scoped_family_fp, scoped_filter_fp, scoped_identity_fp, binary_base_fp, new_fp]
         -- See Note [Recompiling package rule providers].
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
-        (old_fp, shared_retained_cases)
-          | stored_fp == retained_signature_fp = (new_fp, True)
-          | stored_fp `elem` class_generations = (stored_fp, False)
-          | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = (fp, False)
-          | stored_fp == retainedSignatureCaseFingerprint (stamp_rules new_fp) = (new_fp, True)
-          | otherwise = (stored_fp, False)
+        append_fps = [append_fp, stamp_rules append_fp]
+        (old_fp, checked_append, shared_retained_cases)
+          | stored_fp `elem` append_fps = (new_fp, True, False)
+          | stored_fp `elem` map retainedSignatureCaseFingerprint append_fps = (new_fp, True, True)
+          | stored_fp == retained_signature_fp = (new_fp, False, True)
+          | stored_fp `elem` class_generations = (stored_fp, False, False)
+          | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = (fp, False, False)
+          | stored_fp == retainedSignatureCaseFingerprint (stamp_rules new_fp) = (new_fp, False, True)
+          | otherwise = (stored_fp, False, False)
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
@@ -745,6 +749,15 @@ checkFlagHash hsc_env iface self_recomp = do
                 then liftIO $ recheck "Compiler now checks guarded list filters"
                 else pure UpToDate
           | otherwise = pure UpToDate
+        check_append
+          | not checked_append
+          , backendGeneratesCode (backend dflags)
+          , mi_hsc_src iface == HsSrcFile = do
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface ListAppend
+              if candidate
+                then liftIO $ recheck "Compiler now checks list append equations"
+                else pure UpToDate
+          | otherwise = pure UpToDate
         check_family_uses
           | old_fp `elem` (staged_fp : class_generations) = pure UpToDate
           | otherwise = do
@@ -776,7 +789,9 @@ checkFlagHash hsc_env iface self_recomp = do
                                             (mi_exports iface) (map snd (mi_decls iface)) =
               liftIO $ recheck "Compiler now shares retained signature type cases"
           | otherwise = pure UpToDate
-    pure (flags, check_identity `recompThen` check_guarded_filter `recompThen` check_family_uses
+    pure (flags, check_identity `recompThen` check_guarded_filter
+                                     `recompThen` check_append
+                                     `recompThen` check_family_uses
                                      `recompThen` check_forwarded_result
                                      `recompThen` check_scoped_case
                                      `recompThen` check_binary_enum
@@ -885,6 +900,11 @@ guardedListFilterFingerprint fp =
 checkedIdentityFingerprint :: Fingerprint -> Fingerprint
 checkedIdentityFingerprint fp =
     computeFingerprint putNameLiterally (fp, "checked-polymorphic-identity-v1" :: String)
+
+-- | Record that a code-generating build checked for append equations.
+checkedListAppendFingerprint :: Fingerprint -> Fingerprint
+checkedListAppendFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "checked-list-append-v1" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -1425,7 +1445,7 @@ couldExportCallbackCase iface = any candidate (mi_decls iface)
 data SourceIfaceType = SourceIfaceType IfaceType [(IfLclName, Either Int SourceIfaceType)]
 
 -- | The signature shapes used to find producers with missing source equations.
-data SourceSignature = GuardedListFilter | PolymorphicIdentity
+data SourceSignature = GuardedListFilter | PolymorphicIdentity | ListAppend
 
 -- | Check whether an exported signature could supply the requested equation.
 -- See Note [Looking through type synonyms for checked source signatures].
@@ -1441,12 +1461,15 @@ couldExportSourceSignature one_shot iface signature =
           GuardedListFilter -> check (filter_type 0)
           PolymorphicIdentity
             | IfSourceTableId{} <- details -> pure False
-            | otherwise -> check identity_type
+            | otherwise -> check (one_lifted_parameter identity_arrow)
+          ListAppend
+            | IfSourceTableId{} <- details -> pure False
+            | otherwise -> check (one_lifted_parameter (append_arrows (2 :: Int)))
       where
         check shape = isJust <$> runMaybeT (shape (SourceIfaceType ty []))
     candidate _ = pure False
 
-    identity_type ty = lift (view ty) >>= \case
+    one_lifted_parameter check_body ty = lift (view ty) >>= \case
       Nothing -> pure ()
       Just (SourceIfaceType (IfaceForAllTy ma (Bndr (IfaceTvBndr (name, kind))
                                               (IfaceForAllTyFlag (Invisible _))) body) args)
@@ -1454,7 +1477,7 @@ couldExportSourceSignature one_shot iface signature =
             lift (view (SourceIfaceType kind args)) >>= \case
               Just (SourceIfaceType kind' _) -> guard (isIfaceLiftedTypeKind kind')
               Nothing -> pure ()
-            identity_arrow (SourceIfaceType body ((name, Left 0) : args))
+            check_body (SourceIfaceType body ((name, Left 0) : args))
       _ -> mzero
 
     identity_arrow ty = lift (view ty) >>= \case
@@ -1464,6 +1487,18 @@ couldExportSourceSignature one_shot iface signature =
             from <- element (SourceIfaceType input args)
             to <- element (SourceIfaceType output args)
             guard (all (== 0) (catMaybes [from, to]))
+      _ -> mzero
+
+    append_arrows 0 ty = do
+      result <- list_element ty
+      guard (maybe True (== 0) result)
+    append_arrows n ty = lift (view ty) >>= \case
+      Nothing -> pure ()
+      Just (SourceIfaceType (IfaceFunTy FTF_T_T ma mult input output) args)
+        | nullary_name unmatchableDataConName ma, nullary_name manyDataConName mult -> do
+            operand <- list_element (SourceIfaceType input args)
+            guard (maybe True (== 0) operand)
+            append_arrows (n - 1) (SourceIfaceType output args)
       _ -> mzero
 
     nullary_name expected (IfaceTyConApp tc IA_Nil) = ifaceTyConName tc == expected
@@ -1567,9 +1602,10 @@ The Core check expands synonyms and treats known family heads as rigid.
 A cast, unresolved declaration or opaque application can hide a shape.
 Treat that component as unknown and check the visible components.
 A known structural mismatch excludes the signature. An existing identity
-certificate also excludes its owner. The final Core check decides whether
-to publish a new certificate. Record that check on the next write so an
-uncertain match causes one rebuild.
+or append certificate also excludes its owner. The final Core check decides
+whether to publish a new certificate. Record that check on the next write
+so an uncertain match causes one rebuild. For append, only a build that
+generates code records the check.
 -}
 
 -- | An exported function can hide its result pair behind a type synonym.
@@ -2283,7 +2319,11 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = binaryEnumFingerprint
+          append_stamp
+            | backendGeneratesCode (backend dflags) = checkedListAppendFingerprint
+            | otherwise = id
+          current_flag_hash = append_stamp
+                            $ binaryEnumFingerprint
                             $ checkedIdentityFingerprint
                             $ scopedTypeCaseFingerprint
                             $ guardedListFilterFingerprint
