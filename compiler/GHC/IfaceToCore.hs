@@ -2057,7 +2057,10 @@ tcIfaceType = go
                _ -> return ()
            ; case isPromotedDataCon_maybe tc' of
                Just con
-                 | not (null (dataConRepArgBinders con)) ->
+                 -- See Note [Runtime arguments of promoted GADT constructors].
+                 | let (_, _, eqs, theta, _, _) = dataConFullSig con
+                       indexed = any (anyFreeVarsOfType isId) tks' && not (null eqs) && null theta
+                 , not (null (dataConRepArgBinders con)) || indexed ->
                    check_iface_retained_args (ppr tc) (tyConKind tc') tks'
                  | let (tys, fields) = splitAt (length (dataConUnivTyVars con)) tks'
                  , any (anyFreeVarsOfType isId) fields ->
@@ -2133,6 +2136,19 @@ checkIfaceForAllMatchability ma
   = unless (typeKind ma `eqType` matchabilityTy) $
       failIfM (text "Invalid forall matchability in interface:" <+> ppr ma
                $$ text "Expected kind Matchability.")
+
+{- Note [Runtime arguments of promoted GADT constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DataKinds gives 'VCons a telescope with an element type a, a tail length n,
+a head of kind a, and a tail of kind Vec a n. The result has kind Vec a (S n).
+The constructor can occur in an exported type with retained values for its
+head and tail. Check them against the promoted telescope, substituting each
+argument before checking the next one. Splitting arguments at the number
+of parent parameters cannot recover the tail length from the result index.
+
+This checks an application in a type. Deriving evidence from a case expression
+requires the constructor and fields of the actual scrutinee.
+-}
 
 -- | Check the exact lifted kind without printing a possibly recursive Type.
 -- See Note [Positioning of forkM] and Note [Detected recursive native interface domains].
