@@ -277,13 +277,17 @@ solveEqualitiesSelectingMetadata infer_arrows default_unresolved callsite thing_
     settleArrows owner arrows indices wanted = do
       residual <- TcM.liftZonkM $ mapM TcM.zonkTcType (residualPredicates wanted)
       owned <- familyIndexRoots owner indices
-      chosen <- or <$> mapM (chooseArrow False owner residual) (arrows ++ owned)
-      linked <- if chosen then pure False else linkFamilyIndices (mkVarSet owned) residual
+      let keep = mkVarSet owned
+          vars = map fst arrows
+      chosen <- or <$> mapM (chooseArrow Nothing owner residual) (vars ++ owned)
+      linked <- if chosen || null owned then pure False else do
+        defaults <- familyIndexRoots owner vars
+        linkFamilyIndices keep (mkVarSet defaults) residual
       if chosen || linked
         then solveAgain wanted >>= settleArrows owner arrows indices
         else if default_unresolved
           then do
-            defaulted <- or <$> mapM (chooseArrow True owner []) arrows
+            defaulted <- or <$> mapM (\(v,lvl) -> chooseArrow (Just (keep,lvl)) owner [] v) arrows
             if defaulted then solveAgain wanted else return wanted
           else return wanted
 
@@ -301,7 +305,8 @@ solveEqualitiesSelectingMetadata infer_arrows default_unresolved callsite thing_
               wants_u = any (`tcEqType` unmatchableDataConTy) candidates
               choice | wants_m && not wants_u = Just matchableDataConTy
                      | wants_u && not wants_m = Just unmatchableDataConTy
-                     | fallback = Just unmatchableDataConTy
+                     | Just (keep, lvl) <- fallback, not (tv `elemVarSet` keep)
+                               = Just (defaultForAllMatchability lvl)
                      | otherwise = Nothing
           case choice of
             Just ma -> TcM.liftZonkM (TcM.writeMetaTyVar tv ma) >> return True
@@ -326,13 +331,15 @@ familyIndexRoots owner indices = do
            , tcTyVarLevel tv `sameDepthAs` owner]
 
 -- | Share a choice only when both fresh indices belong to this declaration.
-linkFamilyIndices :: TyVarSet -> [PredType] -> TcM Bool
-linkFamilyIndices owned residual =
+linkFamilyIndices :: TyVarSet -> TyVarSet -> [PredType] -> TcM Bool
+linkFamilyIndices owned defaults residual =
   case [(a, b) | pred_ty <- residual
                , Just (lhs, rhs) <- [familyArrowPair pred_ty]
-               , Just a <- [getTyVar_maybe lhs]
-               , Just b <- [getTyVar_maybe rhs]
-               , a `elemVarSet` owned, b `elemVarSet` owned] of
+               , Just x <- [getTyVar_maybe lhs]
+               , Just y <- [getTyVar_maybe rhs]
+               , (a,b) <- [(x,y), (y,x)]
+               , b `elemVarSet` owned
+               , a `elemVarSet` owned || a `elemVarSet` defaults] of
     (a, b) : _ -> TcM.liftZonkM (TcM.writeMetaTyVar a (mkTyVarTy b)) >> pure True
     [] -> pure False
 
@@ -383,6 +390,22 @@ Do not identify specified or rigid indices. In particular, zonking a
 registered metavariable to an unregistered one does not transfer
 ownership. Do not apply the U fallback to a telescope index. A remaining
 index may become an inferred binder.
+
+The left side of a family instance also owns its telescope indices. An
+application on its right side may create a defaultable index. Link that
+index to the left side when the other family arguments agree. Preserve
+the left-side representative during defaulting so the equation can
+quantify it. Recheck the unchanged wanted after each link.
+
+When checking an application against TYPE r, its result must classify
+values. Prefer M for an unresolved selector in the family's telescope.
+For example, zero's result I a in KindEqualities2 needs the constructor
+Maybe. During kind inference there is no such expected sort. Keep the
+ordinary U default there. In T15346 the kind of PFrom a at a visible
+type argument must agree with Rep k in the SDecide constraint. Both
+refer to the same unknown kind. Selectors that describe the result
+type itself keep their type-level default. Explicit choices and solved
+constraints take precedence.
 
 Repeat constrained choices and identifications before the fallback.
 Each successful pass either fills an owned metavariable with concrete

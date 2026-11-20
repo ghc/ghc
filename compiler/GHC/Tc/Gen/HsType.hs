@@ -1336,7 +1336,11 @@ tcInferredMatchabilityFamPats :: TyCon -> HsFamEqnPats GhcRn
                                -> TcM (TcType, TcKind, [TcType])
 tcInferredMatchabilityFamPats fam_tc hs_pats = do
   let indices = takeWhile inferredMatchabilityIndex (tyConBinders fam_tc)
-  mas <- replicateM (length indices) (newFlexiTyVarTy matchabilityTy)
+  vars <- replicateM (length indices) (newFlexiTyVar matchabilityTy)
+  owner <- tcl_kind_arrow_defaults <$> getLclEnv
+  forM_ owner $ \(_, ref) ->
+    updTcRef ref ([v | (b, v) <- zip indices vars, familyKindUsesMatchability fam_tc b] ++)
+  let mas = mkTyVarTys vars
   (lhs, result_kind) <- tcFamTyPatsX mas fam_tc hs_pats
   pure (lhs, result_kind, mas)
 
@@ -1443,7 +1447,7 @@ tcInferLHsTypeUnsaturated hs_ty
        ; case splitHsAppTys_maybe (unLoc hs_ty) of
            Just (hs_fun_ty, hs_args)
               -> do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty hs_args
-                    ; tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args }
+                    ; tcInferTyApps_nosat TypeLevel mode hs_fun_ty fun_ty hs_args }
                       -- Notice the 'nosat'; do not instantiate trailing
                       -- invisible arguments of a type family.
                       -- See Note [Dealing with :kind]
@@ -2755,7 +2759,10 @@ tc_app_ty mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
 tc_app_ty_generic :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty_generic mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty hs_args
-       ; (prefix, prefix_kind) <- tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args
+       ; let index_level = case exp_kind of
+               Check expected | isTypeLikeKind expected -> KindLevel
+               _ -> TypeLevel
+       ; (prefix, prefix_kind) <- tcInferTyApps_nosat index_level mode hs_fun_ty fun_ty hs_args
        -- A checked receiver can require the whole invisible telescope even
        -- when its kind contains metavariables. Keep the prefix for the kind
        -- check below in that case. Ordinary inference still saturates it.
@@ -4008,7 +4015,7 @@ See docs/dependent-haskell/REFERENCES.md for the pinned source record.
 --   of a type-family application, which is usually the right thing to do
 -- tcInferTyApps_nosat does not do this saturation; it is used only
 --   by ":kind" in GHCi
-tcInferTyApps, tcInferTyApps_nosat
+tcInferTyApps
     :: TcTyMode
     -> LHsType GhcRn        -- ^ Function (for printing only)
     -> TcType               -- ^ Function
@@ -4044,10 +4051,13 @@ Note [Ordinary arrow matchability] in GHC.Core.TyCo.Rep.
 -}
 
 tcInferTyApps mode hs_ty fun hs_args
-  = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args
+  = do { (f_args, res_k) <- tcInferTyApps_nosat TypeLevel mode hs_ty fun hs_args
        ; saturateFamApp mode f_args res_k }
 
-tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
+-- | Apply the arguments while retaining the remaining invisible binders.
+tcInferTyApps_nosat :: TypeOrKind -> TcTyMode -> LHsType GhcRn -> TcType
+                    -> [LHsTypeArg GhcRn] -> TcM (TcType, TcKind)
+tcInferTyApps_nosat index_level mode orig_hs_ty fun orig_hs_args
   = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
        ; fun <- case (mode_synonym_metadata mode, fun) of
            (Just get_indices, TyConApp tc []) | hasInferredMatchability tc -> do
@@ -4061,12 +4071,12 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
              , let indices = takeWhile inferredMatchabilityIndex (tyConBinders tc)
              , any (familyKindUsesMatchability tc) indices -> do
                  defaults <- tcl_kind_arrow_defaults <$> getLclEnv
-                 case defaults of
-                   Just (owner, _) -> mkTyConApp tc <$>
-                     traverse (\b -> if familyKindUsesMatchability tc b
-                                      then fresh_kind_arrow owner
-                                      else pure unmatchableDataConTy) indices
-                   Nothing -> pure fun
+                 let choose b
+                       | familyKindUsesMatchability tc b = case defaults of
+                           Just (owner, _) -> fresh_kind_arrow index_level owner
+                           Nothing -> pure (defaultForAllMatchability index_level)
+                       | otherwise = pure unmatchableDataConTy
+                 mkTyConApp tc <$> traverse choose indices
            _ -> pure fun
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args Nothing
        ; traceTc "tcInferTyApps }" (ppr f_args <+> dcolon <+> ppr res_k)
@@ -4261,18 +4271,18 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
       check_arrows defaults arg expected
     check_arrows defaults (L loc (HsFunTy _ mult domain range)) expected =
       setSrcSpanA loc $
-      tc_fun_type_x (check_arrows defaults) (fresh_kind_arrow defaults)
+      tc_fun_type_x (check_arrows defaults) (fresh_kind_arrow TypeLevel defaults)
                     mode mult domain range (Check expected)
     check_arrows defaults arg expected =
       let deferred_mode = case mode_synonym_metadata mode of
             Just _ -> mode
             Nothing -> mode {mode_synonym_metadata =
-                       Just (\_ n -> replicateM n (fresh_kind_arrow defaults))}
+                       Just (\_ n -> replicateM n (fresh_kind_arrow TypeLevel defaults))}
       in tc_check_lhs_type deferred_mode arg expected
 
-    fresh_kind_arrow defaults =
+    fresh_kind_arrow level defaults =
       do { ma <- newFlexiTyVar matchabilityTy
-         ; updTcRef defaults (ma :)
+         ; updTcRef defaults ((ma, level) :)
          ; return (mkTyVarTy ma) }
 
     -- Detect a registered runtime Name in a source argument.

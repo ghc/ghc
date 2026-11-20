@@ -43,7 +43,7 @@ import GHC.Core.UsageEnv ( UsageEnv )
 import GHC.Types.Name.Reader ( LocalRdrEnv )
 import GHC.Types.Name.Env ( NameEnv )
 import GHC.Types.SrcLoc ( RealSrcSpan )
-import GHC.Types.Basic ( TopLevelFlag )
+import GHC.Types.Basic ( TopLevelFlag, TypeOrKind )
 import GHC.Types.Var ( EvVar )
 import GHC.Types.Var.Env ( VarEnv )
 
@@ -88,8 +88,8 @@ data TcLclEnv           -- Changes as we move inside an expression
 
         tcl_usage :: TcRef UsageEnv, -- Required multiplicity of bindings is accumulated here.
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        -- Omitted arrows can default. Family kind indices can generalize.
-        tcl_kind_arrow_defaults :: Maybe (TcRef [TcTyVar], TcRef [TcTyVar]),
+        -- Omitted arrows default at their source level. Telescope indices can generalize.
+        tcl_kind_arrow_defaults :: Maybe (TcRef [(TcTyVar, TypeOrKind)], TcRef [TcTyVar]),
         tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 

@@ -373,7 +373,7 @@ tcTyAndClassDecls tyclds_s
   -- Type check each group in dependency order folding the global env
   = checkNoErrs $ go mempty tyclds_s
   where
-    open_indices = openFamiliesUsedAsKinds tyclds_s
+    open_indices = openFamilyMatchabilityCandidates tyclds_s
 
     go :: TcTyClGroupsAccum
        -> [TyClGroup GhcRn]
@@ -1510,17 +1510,19 @@ type and as a kind for an applicable type constructor.
 
 The declaration pass collects the resolved family heads before checking
 the SCCs. This lets a later declaration select a scheme for an earlier
-family. An importer cannot change the arity of a family already in an
-interface. An owner can declare the index in a standalone signature when
-there is no local declaration use. Preserve explicit signatures and
+family. Also inspect bare arrows in the owner's type instances, as for
+closed family equations. A later declaration group can then use the
+exported result as a kind. An importer cannot change a family's arity.
+An owner can declare the index in a standalone signature when its
+declarations provide neither use. Preserve explicit signatures and
 injectivity annotations.
 -}
 
--- | Infer only from a declaration-site use of the exact family as a kind.
+-- | Collect local family heads that need an inferred result selector.
 -- Imported families keep the scheme that their owner has published.
-openFamiliesUsedAsKinds :: [TyClGroup GhcRn] -> NameSet
-openFamiliesUsedAsKinds groups =
-  intersectNameSet local_open_families referenced_families
+openFamilyMatchabilityCandidates :: [TyClGroup GhcRn] -> NameSet
+openFamilyMatchabilityCandidates groups =
+  intersectNameSet local_open_families (referenced_families `unionNameSet` arrow_equations)
   where
     declarations = [fam | tg <- groups, L _ decl <- group_tyclds tg, fam <- families decl]
     local_open_families = mkNameSet
@@ -1528,6 +1530,16 @@ openFamiliesUsedAsKinds groups =
                                 fdInjectivityAnn = Nothing} <- declarations]
     referenced_families = mkNameSet
       [name | fam <- declarations, kind <- declaredKinds fam, Just name <- [kindHead kind]]
+
+    arrow_equations = mkNameSet
+      [family | group <- groups, L _ inst <- group_instds group,
+                FamEqn{feqn_tycon = L _ family, feqn_rhs = rhs} <- equations inst,
+                matchabilityArrow (caseAliasBody rhs)]
+
+    equations (TyFamInstD{tfid_inst = inst}) = [tfid_eqn inst]
+    equations (ClsInstD{cid_inst = ClsInstDecl{cid_ext = (_, nested)}}) =
+      map (tfid_eqn . unLoc) (ng_tyfam_insts nested)
+    equations _ = []
 
     families (FamDecl{tcdFam = f}) = [f]
     families (ClassDecl{tcdCExt = (HsNestedGroup{ng_ats = ats}, _)}) = map unLoc ats
@@ -2447,7 +2459,7 @@ kcLTyClDecl collect_metadata (L loc decl)
              let choose name n = do
                    indices <- replicateM n (newFlexiTyVar matchabilityTy)
                    owner <- tcl_kind_arrow_defaults <$> getLclEnv
-                   forM_ owner $ \(defaults, _) -> updTcRef defaults (indices ++)
+                   forM_ owner $ \(defaults, _) -> updTcRef defaults (map (, TypeLevel) indices ++)
                    let vars = mkTyVarTys indices
                    updTcRef ref ((name, vars) :)
                    pure vars
