@@ -9,6 +9,15 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+A function can read a Boolean from an `IORef` and use it as the index
+of an ordered type case in a value signature. The sample renders the
+two results as `"7"` and `"'f'"`. A call that ignores its arguments
+still returns 42 with an undefined index and payload. An ordinary client
+can also open a hidden vector inside a pair without forcing the other
+field. All 321 Showcase lines ran with both compiler stages at `-O0`,
+default `-O1` and default `-O2`, and with the self-hosted GHCi.
+[Showcase](Showcase.hs) and [verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
 An ordinary module proves that filtering a finite list cannot increase
 its `size`. At each head, a checked `Prelude.filter` equation says
 whether that element stays or goes. For `Prelude.not`, knowing the
@@ -26,10 +35,6 @@ interface and obtains `(42,False)`. A second example checks that an outer
 index under a type family stays distinct from a shadowing pattern binder.
 A staged interpreter can use the arrow kind supplied by its caller to
 produce `(Just 3,Right 3)`.
-Both compiler stages reproduced all 311 Showcase lines at `-O0`,
-default `-O1`, and default `-O2`. The self-hosted compiler also
-reproduced them in GHCi. The finite-spine proof uses the same
-`size` function in the type and at runtime.
 [Value signature](examples/open-evaluation/NativeCase.hs),
 [scoped indices](examples/open-evaluation/NativeNestedCase.hs) and
 [staged interpreter](examples/open-evaluation/InterpretedKindUseSite.hs).
@@ -161,7 +166,7 @@ and [two-way filter and case upgrade](examples/open-evaluation/check-filter-scop
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | GADT data constructors can store nested retained sums and refer to erased parameters from the constructor signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. Source rules can have an imported head and a local anchor, or come from a visible orphan module. | Rules for retained functions and general dependent coercions remain open. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | Retained signatures can match a runtime index or an application of a checked function. Two qualified imports of the same checked function can share a case in one declaration group. | Separately compiled modules still need a shared result type at an unknown index. Check compiler upgrades for older signature providers. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | Retained signatures can match a runtime index or an application of a checked function. Two qualified imports of the same checked function can share a case in one declaration group. The upgrade test rebuilds an affected home provider once. | Separately compiled modules still need a shared result type at an unknown index. Older installed providers need rebuilding to export a shared result. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | A constructor pattern can open a hidden vector length inside a tuple. A typed consumer can fix the higher-rank witness of a guarded callback. | Extend inference to callbacks without a result declaration that determines the witness. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A later GADT argument can fix the matchability of a partially applied family. The original `KindEqualities2` checks across its declaration splice. | Higher-order inference and compatibility of existing unannotated programs remain open. |
 
