@@ -9,3 +9,4 @@ import {-# SOURCE #-} GHC.Types.Var
 idName   :: Id -> Name
 sourceTableId_maybe :: Id -> Maybe TyCon
 isDataConWorkId_maybe :: Id -> Maybe DataCon
+isDataConWrapId_maybe :: Id -> Maybe DataCon

@@ -1665,7 +1665,7 @@ lintCaseExpr scrut case_bndr alt_ty alts
 
        ; when (any isNativeIndexAliasAlt alts) $
            do { in_scope <- getInScope
-              ; lintL (isNativeIndexId case_bndr
+              ; lintL (isNativeIndexAliasBinder scrut case_bndr
                         && not (case_bndr `elemInScopeSet` in_scope))
                   (text "Native index alias case requires a fresh unrestricted local index binder:"
                    <+> ppr case_bndr) }

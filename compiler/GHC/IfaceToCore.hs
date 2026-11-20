@@ -2536,7 +2536,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     let native_alt (DataAlt con, names, _) = isNativeIndexDataAlt con names
         native_alt _ = False
         has_alt con = any (\(c, _, _) -> c == con) resolved
-        scrut_index = exprToNativeIndex scrut'
+        scrut_index = exprToNativeCaseIndex scrut'
         constructor_proof = any native_alt resolved
         indexed_proof = any (\(con, ns, _) -> case con of
                                DataAlt dc -> isNativeIndexedDataAlt dc ns
@@ -2636,7 +2636,7 @@ tcIfaceAlt :: CoreExpr -> Maybe Type -> Id -> (TyCon, [Type])
 tcIfaceAlt _ _ _ _ (DEFAULT, [], rhs) =
   Alt DEFAULT [] <$> tcIfaceExpr rhs
 tcIfaceAlt scrut _ case_bndr _ (DEFAULT, [proof], rhs)
-  | isNativeIndexId case_bndr
+  | isNativeIndexAliasBinder scrut case_bndr
   , Just index <- exprToNativeCaseIndex scrut
   , eqType (idType case_bndr) (typeKind index)
   = do { name <- newIfaceName (mkVarOccFS (ifLclNameFS proof))

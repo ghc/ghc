@@ -1209,34 +1209,54 @@ nameNativeIndexArg result_ty arg
       _ -> name_constructor normal index
   | otherwise = nativeIndexTransportError "an unsupported retained argument"
   where
-    name_constructor normal index = case collectArgs normal of
-      (Var worker, args)
-        | Just con <- isDataConWorkId_maybe worker
-        , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
-        , not (null fields)
-        -> do { (scrut, field_co, wrap_fields) <-
-                   nameNativeConFields result_ty con type_args fields
-              ; let scrut_index = coercionLKind field_co
-              ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
-              ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
-                           (mkNomEqPred (TermVarTy value) scrut_index)
-              ; let co = mkTransCo (mkCoVarCo proof) field_co
-                    wrap body = wrap_fields $
-                      Case scrut value result_ty [Alt DEFAULT [proof] body]
-              ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
-                  return (Var value, co, wrap) }
-      (Var _, args) | all isTypeArg args -> return (normal, mkReflCo Nominal index, id)
-      _ -> nativeIndexTransportError "an unsupported normalized retained argument"
+    name_constructor normal index
+      | Just (con, tys, build, fields) <- nativeConFields_maybe normal
+      , not (null fields)
+      = do { (scrut, field_co, wrap_fields) <-
+                 nameNativeConFields result_ty con tys build fields
+           ; let scrut_index = coercionLKind field_co
+           ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
+           ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
+                        (mkNomEqPred (TermVarTy value) scrut_index)
+           ; let co = mkTransCo (mkCoVarCo proof) field_co
+                 wrap body = wrap_fields $
+                   Case scrut value result_ty [Alt DEFAULT [proof] body]
+           ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
+               return (Var value, co, wrap) }
+      | (Var _, args) <- collectArgs normal, all isTypeArg args
+      = return (normal, mkNomReflCo index, id)
+      | otherwise = nativeIndexTransportError "an unsupported normalized retained argument"
+
+-- | Split a checked constructor application into its promotion arguments and builder.
+-- See Note [Naming fields of a dependent case scrutinee].
+nativeConFields_maybe :: CoreExpr
+                      -> Maybe (DataCon, [Type], [CoreArg] -> CoreExpr, [CoreArg])
+nativeConFields_maybe expr
+  | (head_expr, args) <- collectArgs expr
+  , let (prefix, fields) = span isTyCoArg args
+        build = mkApps (mkApps head_expr prefix)
+  , Just (con, tys) <- constructor head_expr prefix
+  = Just (con, tys, build, fields)
+  | otherwise = Nothing
+  where
+    constructor head_expr prefix
+      | Just (con, tys, _) <- splitNativeIndexedConApp expr = Just (con, tys)
+      | Var worker <- head_expr
+      , Just con <- isDataConWorkId_maybe worker
+      , let tys = [ty | Type ty <- prefix]
+      , tys `equalLength` dataConUnivTyVars con
+      , prefix `equalLength` tys
+      = Just (con, tys)
+      | otherwise = Nothing
 
 -- | Name constructor fields and lift their equalities through the constructor.
-nameNativeConFields :: Type -> DataCon -> [CoreArg] -> [CoreArg]
+nameNativeConFields :: Type -> DataCon -> [Type] -> ([CoreArg] -> CoreExpr) -> [CoreArg]
                     -> UniqSM (CoreExpr, CoercionN, CoreExpr -> CoreExpr)
-nameNativeConFields result_ty con type_args fields
+nameNativeConFields result_ty con tys build fields
   = do { named <- mapM (nameNativeIndexArg result_ty) fields
-       ; let scrut = mkConApp con (type_args ++ [atom | (atom, _, _) <- named])
-             static_cos = [mkNomReflCo ty | Type ty <- type_args]
+       ; let scrut = build [atom | (atom, _, _) <- named]
              co = mkTyConAppCo Nominal (promoteDataCon con)
-                    (static_cos ++ [field_co | (_, field_co, _) <- named])
+                    (map mkNomReflCo tys ++ [field_co | (_, field_co, _) <- named])
        ; return (scrut, co, foldr (.) id [wrap | (_, _, wrap) <- named]) }
 
 -- | Prepare a scrutinee whose branch proofs refer to its original index.
@@ -1248,11 +1268,9 @@ prepareNativeCaseScrutinee ty (App (Var fun) arg)
   = Just $ do { (atom, co, wrap) <- nameNativeIndexArg ty arg
               ; return (App (Var fun) atom, mkTermAppCo fun co, wrap) }
 prepareNativeCaseScrutinee ty scrut
-  | (Var worker, args) <- collectArgs scrut
-  , Just con <- isDataConWorkId_maybe worker
-  , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
+  | Just (con, tys, build, fields) <- nativeConFields_maybe scrut
   , any (not . exprIsTrivial) fields
-  = Just (nameNativeConFields ty con type_args fields)
+  = Just (nameNativeConFields ty con tys build fields)
   | otherwise = Nothing
 
 -- | Give the alternative its prepared proof and recover the original proof in its RHS.
@@ -1294,6 +1312,13 @@ Use sym q ; p wherever the original branch used its proof. For a DEFAULT
 alias use p ; q, since its right endpoint is the scrutinee. The original
 case still scrutinises the outer constructor. Naming an inner constructor
 does not evaluate its fields. Variable fields keep their original names.
+
+An indexed constructor worker has a representation prefix. It includes
+the parent parameters, existentials, and nominal result evidence. The
+wrapper takes the constructor's user type arguments. Keep the actual
+prefix when rebuilding the expression. Use the promoted constructor's
+user type arguments when lifting the field equalities.
+
 See Note [Retained constructor arguments in CorePrep].
 -}
 

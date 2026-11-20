@@ -3368,8 +3368,13 @@ tcRetainedArg domain arg
            _ -> unsupported }
   where
     resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
-    resolve env expected original =
-      tcRetainedValueOperand (resolve_expr env expected) expected original
+    resolve env expected original = do
+      result@(core, checked) <- tcRetainedValueOperand (resolve_expr env expected) expected original
+      case Core.splitNativeIndexedConApp core of
+        Just _ | let actual = exprType core, not (actual `tcEqType` expected) -> do
+          co <- unifyType Nothing actual expected
+          return (Core.Cast core (SubCo co), checked)
+        _ -> return result
 
     resolve_expr :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
     resolve_expr env expected original@(L loc expr)
@@ -3436,7 +3441,10 @@ tcRetainedArg domain arg
     -- Instantiate the erased parameters from the complete expected domain.
     constructor expected dc = case nativeIndexDataConTyArgs expected dc of
       Just tys -> return (Core.mkTyApps (Core.Var (dataConWorkId dc)) tys)
-      Nothing -> unsupported
+      Nothing -> case Core.nativeIndexedConApp_maybe expected dc of
+        Just app -> return app
+        Nothing -> do { refined <- tcRetainedDeclaredTypeView expected
+                      ; maybe unsupported return (Core.nativeIndexedConApp_maybe refined dc) }
 
     resolve_app :: NameEnv Id -> Type -> LHsExpr GhcRn -> LHsExpr GhcRn
                 -> TcM (Core.CoreExpr, LHsExpr GhcRn, LHsExpr GhcRn)
