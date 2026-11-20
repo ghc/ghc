@@ -1,6 +1,7 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, RankNTypes, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, RankNTypes, TypeOperators, UndecidableInstances #-}
 module NativeGadtRetainedSumProvider where
 
+import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 
 data Nat = Z | S Nat
@@ -96,3 +97,29 @@ data FieldScope (a :: k) where
 fieldScope :: FieldScope 'True
 fieldScope = FieldScope (S (S Z)) (\_ _ xs -> Pair Z (KindTag, KindTag, xs, VNil))
              (Pair Z (VCons False (VCons True VNil), VNil))
+
+-- | Return a reflexive witness only for the empty vector.
+emptyWitness :: forall a n. foreach (xs :: Vec a n) -> Maybe (xs :~: xs)
+emptyWitness xs
+    | null (cells xs) = Just Refl
+    | otherwise = Nothing
+
+-- | Package a vector with its runtime length.
+type Packed a = some (n :: Nat) | Vec a n
+
+pack :: foreach (n :: Nat) -> Vec Bool n -> Packed Bool
+pack n xs = Pair n xs
+
+-- | Store an unrelated runtime witness beside an empty vector.
+type Phantom = some (n :: Nat) | Vec Bool Z
+
+phantom :: Phantom
+phantom = Pair (S Z) VNil
+
+-- | Compare values whose vector indices must agree.
+sameLength :: forall n. foreach (xs :: Vec Bool n) -> foreach (ys :: Vec Bool n) -> Bool
+sameLength _ _ = True
+
+-- | Pass the vector through at its original index.
+forward :: forall a n. foreach (xs :: Vec a n) -> Vec a n
+forward xs = xs
