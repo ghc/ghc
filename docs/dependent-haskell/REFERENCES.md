@@ -6356,5 +6356,8 @@ in the guard tree. Their GADT examples use equalities from earlier matches
 to check the remaining alternatives. R22 uses this distinction when a
 pattern opens an erased package. Opening records a witness for the same
 scrutinee. Matching a vector constructor then demands its payload.
-[*Lower Your Guards*, sections 2.4 and 3.1](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
+Section 7.2.3 identifies term constraints as a further requirement for
+full dependent coverage. Our example checks one such relation between
+a package and its openings.
+[*Lower Your Guards*, sections 2.4, 3.1 and 7.2.3](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
 and [local R22 examples](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
