@@ -75,15 +75,19 @@ for level in 0 1 2; do
     mkdir -p "rule$level/client"
     (
         cd "rule$level"
-        cp "$area"/{PackageRules,LexicalPackageRules}.hs .
+        cp "$area"/{PackageRules,LexicalPackageRules,ErasedStream}.hs .
         extra=()
         if [[ $level == 0 ]]; then extra=("${flags[@]}"); fi
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c PackageRules.hs >provider.log
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c LexicalPackageRules.hs >>provider.log
-        cp PackageRules.hi LexicalPackageRules.hi "$area/NativePackageRuleClient.hs" client/
+        "${g[@]}" "-O$level" "${extra[@]}" -c ErasedStream.hs
+        cp PackageRules.hi LexicalPackageRules.hi ErasedStream.hi "$area"/{NativePackageRuleClient,StreamFold}.hs client/
         cd client
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c NativePackageRuleClient.hs >client.log
+        "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c StreamFold.hs >fold.log
         if [[ $level != 0 ]]; then
+            test "$(grep -Fc 'Rule fired: toList/build (ErasedStream)' fold.log)" -ge 2
+            test "$(grep -Fc 'Rule fired: fold/build (GHC.Internal.Base)' fold.log)" -ge 2
             for log in ../provider.log client.log; do
                 grep -Fq 'Rule fired: open/hide (PackageRules)' "$log"
                 for rule in read/int-pair hide/int project/hidden increment/hidden; do

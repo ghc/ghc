@@ -225,6 +225,15 @@ state types, a skipped step and a lazy list tail.
 [Stream Fusion, §2](https://www.cs.tufts.edu/~nr/cs257/archive/duncan-coutts/stream-fusion.pdf#page=2)
 and [stream source](examples/erased-existentials/ErasedStream.hs).
 
+The list interface uses Gill, Launchbury and Peyton Jones's short cut fusion.
+The producer rewrites `toList s` to `build` with the stream's step function.
+An ordinary client uses Prelude's `foldr`. GHC's existing `fold/build`
+rule combines them. The tests inspect both rule firings and evaluate a fold
+whose first element is defined and whose tail is bottom.
+[A Short Cut to Deforestation](https://www.microsoft.com/en-us/research/publication/a-short-cut-to-deforestation/),
+[GHC's rule](../../libraries/ghc-internal/src/GHC/Internal/Base.hs)
+and [client folds](examples/erased-existentials/StreamFold.hs).
+
 ## Reading order
 
 For M59, use the same-domain congruence and scoped comparison references in

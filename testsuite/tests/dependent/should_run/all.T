@@ -284,7 +284,9 @@ test('NativeSimplifier',
       extra_files(['NativeSimplifierProvider.hs', 'NativeSimplifierClient.hs',
                    'NativeSimplifierLocalRec.hs', 'NativePackageRuleClient.hs', 'NativePackageSpecialise.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/PackageRules.hs',
-                   '../../../../docs/dependent-haskell/examples/erased-existentials/LexicalPackageRules.hs'])],
+                   '../../../../docs/dependent-haskell/examples/erased-existentials/LexicalPackageRules.hs',
+                   '../../../../docs/dependent-haskell/examples/erased-existentials/ErasedStream.hs',
+                   '../../../../docs/dependent-haskell/examples/erased-existentials/StreamFold.hs'])],
      run_command, ['bash NativeSimplifier.sh "{compiler}" "{libdir}"'])
 
 test('NativeOptimizedReadback',

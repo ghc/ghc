@@ -228,6 +228,26 @@ all three interface compression levels with the same target libraries.
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativePackageRuleClient.hs)
 and [interface check](../examples/erased-existentials/check-rule-interfaces.sh).
 
+### A list fold over a hidden stream state
+
+A library defines `toList :: Stream a -> [a]` and exports a rule that
+opens the stream and calls a private fold. An ordinary client can fold
+the resulting list with Prelude's `foldr`. The local `toList/build`
+rule exposes the builder to GHC's existing `fold/build` rule. The rule
+matcher gets `a` from the type argument to `toList` before it compares
+the existential types. It cannot learn a type through a hidden witness.
+Both the integer fold and the polymorphic first-element fold use these
+two rules. Skipped states yield the digits 1, 3 and 5 in order. The
+first-element fold leaves an undefined tail unevaluated.
+
+The client needs only the provider's interface to compile. The interface
+must include a declaration for the private step-fold function. Older
+providers could record its name as an unbound local. A rule directly on
+the imported `foldr` still reaches the orphan-rule restriction.
+[Producer](../examples/erased-existentials/ErasedStream.hs),
+[ordinary client](../examples/erased-existentials/StreamFold.hs)
+and [rule-firing test](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
+
 ## Next increments
 
 - [x] Specify and run an opaque whole-function cast probe. Use genuinely
