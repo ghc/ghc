@@ -1175,7 +1175,7 @@ main = do
     observe "map cells with a class method over a family prefix and Maybe" mappedCells
     observe "infer the matchability of a family prefix from a later argument" laterMatchability
     observe "forward an inferred partial-family callback and an ordinary constructor" forwardedMap
-    observe "use an imported family prefix with a bare kind arrow" annotatedMap
+    observe "infer both bare kind arrows in a list family proof" annotatedMap
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"

@@ -397,6 +397,16 @@ ordinary type `Proxy (Abstract :: Type -> Type)` checks when `Abstract`
 has kind `Type %U -> Type` in a stripped provider interface. Writing
 `%M` there still conflicts. If the annotation leaves the arrow
 undetermined, GHC defaults it to M.
+A complete signature also uses its body to infer the outer bare arrow
+of a kinded binder in its outer `forall`. In
+`forall (f :: Type -> Type). Proxy (f :: Type %U -> Type) -> Proxy f`,
+the body selects U. An earlier matchability binder can supply the
+arrow. An inferred dependency on a later binder gives GHC-97739.
+If the body leaves the arrow undetermined, GHC defaults it to M.
+An explicit conflicting modifier gives GHC-83865. The inference here
+covers the outer arrow of a kind in the outer telescope of a complete
+signature.
+
 [Interface and defaulting controls](../../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.sh)
 and [proposal #242 on kind arrows in type signatures](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#kind-arrows-in-type-signatures).
 
