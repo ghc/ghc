@@ -194,6 +194,45 @@ matchable head. [Equality controls](../../../testsuite/tests/dependent/diagnosti
 
 ### An open family used after a declaration splice
 
+The ordinary GHC program `KindEqualities2` declares an interpreter for
+kinds before a Template Haskell splice. After the splice it declares
+a family `I` and an equation `I (TApp a b) = (I a) (I b)`. The unchanged
+program now compiles and prints `Nothing`. In the Showcase, two
+applications of the optional constructor produce `Just (Just True)`.
+[Upstream test](../../../testsuite/tests/dependent/should_compile/KindEqualities2.hs)
+and [Showcase source](../examples/open-evaluation/InterpretedKind.hs).
+
+Three checks matter. First, a bare result arrow in a local open-family
+instance can determine the telescope published by its owner. The owner
+does not need to see the later declaration of `I`. Second, when checking
+a recursive equation, two fresh implicit arguments can share a choice
+if that makes their otherwise identical family applications agree. GHC
+checks the whole equality again. Third, when `I a` is checked as a value
+type, an unresolved argument in its kind can default to M. During kind
+inference the ordinary default remains U. Defaulting to M in both
+positions broke the existing `SDecide (Rep k)` constraint in two
+programs. Both now compile unchanged.
+[Default signatures](../../../testsuite/tests/dependent/should_compile/T14720.hs)
+and [visible type arguments](../../../testsuite/tests/dependent/should_compile/T15346.hs).
+
+In a variant where `I TMaybe` returns an unsaturated family, writing
+the interpreter's arrow explicitly as `%U` makes it run. The bare
+arrow still leaves the final expression ill-typed. An explicit `%U`
+with the ordinary `Maybe` fails at the family equation. The current
+rules do not infer an implicit argument from an arbitrary value body.
+
+An upgrade can also change the meaning of a use whose provider is
+binary-only. An ordinary module can export `get :: F AtBase`, where the
+family's hidden selector occurs in its result kind. The old and new
+defaults give this signature different ABIs. The upgrade check uses a
+package that re-exports `F`, then compares the incremental client ABI
+with a clean one. For a source provider that gains an argument, it
+checks that the provider rebuilds, unrelated objects retain their
+modification times, and the next build reuses the results.
+[Upgrade check, option `--family-stages`](../examples/closed-evaluation/check-readback-upgrade.sh).
+
+#### Earlier failures
+
 In `KindEqualities2`, the equation for `IK (Arr k1 k2)` returns
 `IK k1 -> IK k2`. After a Template Haskell declaration splice, the
 family `I` uses `IK` as its result kind. At `6d16505aaa` the original
@@ -203,7 +242,7 @@ program reports GHC-83865 at `Maybe` and at `(I a) (I b)`. Writing
 Moving only the declaration of `I` before the splice lets GHC check
 the `Maybe` equation. In the application equation GHC still expects
 `IK @{t} k2` and gets `IK @{M} k2`. The family is non-injective.
-Inferring the result selector for this equation remains open.
+At that revision the application equation could not infer its result selector.
 [Original program](../../../testsuite/tests/dependent/should_compile/KindEqualities2.hs).
 
 Separate compilation reproduces both failures. A provider that declares

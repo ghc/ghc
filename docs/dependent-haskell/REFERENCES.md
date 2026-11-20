@@ -5828,6 +5828,23 @@ an error. [Serokell closed evaluator](https://ghc.serokell.io/dh#closed-term-eva
 [fromIntegral](../../libraries/ghc-internal/src/GHC/Internal/Real.hs)
 and [Nat](../../libraries/ghc-internal/src/GHC/Internal/TypeNats.hs).
 
+### Inferring matchability across a declaration splice
+
+Proposal 242 distinguishes inference from checking a written kind
+signature. It also describes how a generalized argument can block
+family reduction. The fork extends its compatibility policy to an
+open family whose owner writes a bare arrow equation. The provider
+publishes the selector before later declarations or modules can use
+the family as a kind. The receiver checks its recursive equations at
+that declared kind. When checking a value type the fork can prefer M
+for an unresolved telescope index. During kind inference it retains U.
+These are local choices. In Agda an expected type can help fill an
+implicit argument, and unresolved arguments can still cause an error.
+Agda has no corresponding GHC matchability default.
+[Proposal 242, inference and alternatives](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference),
+[Agda 2.8.0 implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [staging and compatibility examples](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
+
 ### Applications at a computed arrow kind
 
 Kiss, Field, Eisenbach and Peyton Jones allow type application at
