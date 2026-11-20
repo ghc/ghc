@@ -4034,6 +4034,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     rhs_is_bad (TermAppTy {}) = True
     rhs_is_bad (TermVarTy {}) = True
     rhs_is_bad (DepFunTy {})  = True
+    rhs_is_bad ty@ExistsTy{} = lhs_tv_is_concrete || not (isTauTy ty)
     rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
     rhs_is_bad (FunTy {ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = a, ft_res = r})
@@ -4752,6 +4753,10 @@ check_ty_eq_rhs flags ty
       CoercionTy co -> do { co_res <- checkCo flags co
                           ; return (mkReflCoRedn Nominal <$> co_res) }
 
+      ExistsTy {}
+        | not (isTauTy ty) -> return $ PuFail impredicativeProblem
+        | tefConcrete flags -> return $ PuFail (cteProblem cteConcrete)
+        | otherwise -> return $ okCheckRefl ty
       ForAllTy {}   -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
          -- No need to worry about RuntimeUnkTv
   where
