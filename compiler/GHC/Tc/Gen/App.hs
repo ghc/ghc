@@ -663,18 +663,7 @@ tcExistsPack rn_expr args expected
 
     infer_retained_witness binder body payload = runMaybeT $ do
       actual <- MaybeT (tcRetainedDeclaredArgType return payload)
-      guard (hasNativeDependentExpr (Core.Type actual))
-      loc <- liftMaybeT $ getCtLocM (lexprCtOrigin payload) (Just TypeLevel)
-      view <- liftMaybeT $ reductionReducedType <$> tcRewriteFamilyAxioms loc actual
-      witness <- MaybeT $ return $ do
-        subst <- matchRetainedAppType [binder] Subst.emptySubst body view
-        Subst.lookupTyVar subst binder
-      guard (hasNativeDependentExpr (Core.Type witness)
-             && eqType (typeKind witness) (tyVarKind binder)
-             && eqType (substTyWith [binder] [witness] body) view)
-      scoped <- liftMaybeT (tcRetainedInstScope [witness])
-      guard scoped
-      return witness
+      matchRetainedExistsWitness (lexprCtOrigin payload) binder body actual
 
     expected_schema = traverse (liftZonkM . zonkTcType) =<< readExpType_maybe expected
     read_schema = expected_schema >>= maybe (failWithTc (TcRnExistsPack ExistsPackMissingSchema)) return
@@ -1550,23 +1539,28 @@ implicitResult rn_expr actual expected@(Check wanted)
            _ -> return (expected, Nothing) }
   where
     pack binder body payload = do
-      retained <- runMaybeT $ do
-        guard (hasNativeDependentExpr (Core.Type payload))
-        loc <- liftMaybeT $ getCtLocM (exprCtOrigin rn_expr) (Just TypeLevel)
-        view <- liftMaybeT $ reductionReducedType <$> tcRewriteFamilyAxioms loc payload
-        witness <- MaybeT $ return $ do
-          subst <- matchRetainedAppType [binder] Subst.emptySubst body view
-          Subst.lookupTyVar subst binder
-        guard (hasNativeDependentExpr (Core.Type witness)
-               && eqType (typeKind witness) (tyVarKind binder)
-               && eqType (substTyWith [binder] [witness] body) view)
-        scoped <- liftMaybeT (tcRetainedInstScope [witness])
-        guard scoped
-        return witness
+      retained <- runMaybeT (matchRetainedExistsWitness (exprCtOrigin rn_expr) binder body payload)
       witness <- maybe (newFlexiTyVarTy (tyVarKind binder)) return retained
       let payload_ty = substTyWith [binder] [witness] body
       return (mkCheckExpType payload_ty, Just (wanted, witness))
 implicitResult _ _ expected = return (expected, Nothing)
+
+-- | Match a stored index without assigning its local Id to a metavariable.
+-- See Note [Introducing an implicit existential].
+matchRetainedExistsWitness :: CtOrigin -> TyVar -> Type -> Type -> MaybeT TcM Type
+matchRetainedExistsWitness ct_origin binder body actual = do
+  guard (hasNativeDependentExpr (Core.Type actual))
+  loc <- liftMaybeT $ getCtLocM ct_origin (Just TypeLevel)
+  view <- liftMaybeT $ reductionReducedType <$> tcRewriteFamilyAxioms loc actual
+  witness <- MaybeT $ return $ do
+    subst <- matchRetainedAppType [binder] Subst.emptySubst body view
+    Subst.lookupTyVar subst binder
+  guard (hasNativeDependentExpr (Core.Type witness)
+         && eqType (typeKind witness) (tyVarKind binder)
+         && eqType (substTyWith [binder] [witness] body) view)
+  scoped <- liftMaybeT (tcRetainedInstScope [witness])
+  guard scoped
+  return witness
 
 {- Note [Introducing an implicit existential]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
