@@ -229,14 +229,14 @@ instance Diagnostic DriverMessage where
                    <> (pprWithUnitState state $ ppr (moduleUnit m))
                    <> text ") the module resides in isn't trusted."
                ]
-    DriverUnsupportedRetainedRule rule ->
+    DriverUnsupportedRetainedRule rule level ->
       mkSimpleDecorated $ vcat
-        [ text "The dependent optimizer cannot run the rewrite rule" <+> quotes (ftext rule) <+> text "at -O1."
+        [ text "The dependent optimizer cannot run the rewrite rule" <+> quotes (ftext rule) <+> (text "at -O" <> int level <> char '.')
         , text "Compile this module with -O0." ]
-    DriverUnsupportedRetainedBinding binder ->
+    DriverUnsupportedRetainedBinding binder level ->
       mkSimpleDecorated $ vcat
         [ text "The dependent optimizer does not support all Core forms"
-            <+> maybe (text "in this module") (\b -> text "in" <+> quotes (ppr b)) binder <+> text "at -O1."
+            <+> maybe (text "in this module") (\b -> text "in" <+> quotes (ppr b)) binder <+> (text "at -O" <> int level <> char '.')
         , text "Compile this module with -O0." ]
     DriverRedirectedNoMain mod_name
       -> mkSimpleDecorated $ (text

@@ -372,10 +372,10 @@ data DriverMessage where
   DriverRedirectedNoMain :: !ModuleName -> DriverMessage
 
   -- | A dependent module defines a rewrite rule outside the retained schedule.
-  DriverUnsupportedRetainedRule :: !RuleName -> DriverMessage
+  DriverUnsupportedRetainedRule :: !RuleName -> !Int -> DriverMessage
 
   -- | A binding contains a native form outside the retained optimizer.
-  DriverUnsupportedRetainedBinding :: !(Maybe OccName) -> DriverMessage
+  DriverUnsupportedRetainedBinding :: !(Maybe OccName) -> !Int -> DriverMessage
 
   DriverHomePackagesNotClosed :: ![(UnitId, UnitId)] -> DriverMessage
 

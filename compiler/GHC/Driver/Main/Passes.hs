@@ -44,7 +44,7 @@ import GHC.Driver.Main.Hsc
       iface_core_bindings,
       handleWarningsThrowErrors,
       ioMsgMaybe,
-      supportsNativeO1Flags,
+      nativeOptLevel,
       checkNativeDependentModule,
       nativeCodeGenFlags,
       hscSimpleIface )
@@ -1504,14 +1504,14 @@ hscSimplify' plugins ds_result = do
           let simplified = simpleOptNativeProgram binds
           endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt simplified rules
           let result = ds_result { mg_binds = simplified }
-          if supportsNativeO1Flags (hsc_dflags lint_env)
-            then do
+          case nativeOptLevel (hsc_dflags lint_env) of
+            Just level -> do
               let report loc message =
                     throwOneError (initSourceErrorContext (hsc_dflags lint_env)) $
                       mkPlainErrorMsgEnvelope loc (GhcDriverMessage message)
                   module_loc = mg_loc ds_result
               case rules of
-                rule : _ -> report module_loc (DriverUnsupportedRetainedRule (ru_name rule))
+                rule : _ -> report module_loc (DriverUnsupportedRetainedRule (ru_name rule) level)
                 [] -> return ()
               unless (supportsNativeRuleBinds simplified) $
                 case [b | (b, rhs) <- flattenBinds simplified,
@@ -1519,15 +1519,14 @@ hscSimplify' plugins ds_result = do
                   b : _ -> do
                     let src = nameSrcSpan (idName b)
                         message = case filter (not . supportsErasedUserRule b) (idCoreRules b) of
-                          rule : _ -> DriverUnsupportedRetainedRule (ru_name rule)
-                          [] -> DriverUnsupportedRetainedBinding (Just (getOccName b))
+                          rule : _ -> DriverUnsupportedRetainedRule (ru_name rule) level
+                          [] -> DriverUnsupportedRetainedBinding (Just (getOccName b)) level
                     report (if isGoodSrcSpan src then src else module_loc) message
-                  [] -> report module_loc (DriverUnsupportedRetainedBinding Nothing)
+                  [] -> report module_loc (DriverUnsupportedRetainedBinding Nothing level)
               optimized <- core2coreRetained lint_env result
               endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt (mg_binds optimized) rules
               return optimized
-            else if null rules && supportsNativeGentle simplified
-            then do
+            Nothing | null rules && supportsNativeGentle simplified -> do
               let df = hsc_dflags lint_env
                   opts = initSimplifyOpts df [] 1
                            ((initGentleSimplMode df) { sm_core_mode = RetainedCore }) emptyRuleBase
@@ -1536,7 +1535,7 @@ hscSimplify' plugins ds_result = do
               let final = simpleOptNativeProgram (mg_binds optimized)
               endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt final rules
               return (optimized { mg_binds = final })
-            else return result
+            Nothing -> return result
         else {-# SCC "Core2Core" #-} core2core hsc_env_with_plugins ds_result
 
 {- Note [Retained Core in the Gentle simplifier]
@@ -1546,7 +1545,7 @@ when the module has no local rules and supportsNativeGentle accepts its
 bindings. The scan checks retained binders, their proofs, and nominal
 conversions between eligible endpoints.
 See Note [Nominal domains in retained Gentle] in GHC.Core.Dependent.
-The -O1 path uses the same scan before it runs the retained optimizer.
+The standard -O1 and -O2 schedules also check any local user rules.
 See Note [Compiling native dependent modules].
 
 A local Id can occur only in a type or coercion. Occurrence analysis must

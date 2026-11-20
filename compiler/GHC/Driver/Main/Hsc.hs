@@ -37,13 +37,16 @@ module GHC.Driver.Main.Hsc
     , hscSimpleIface'
     , writeInterfaceOnlyMode
     , genModDetails
-    , supportsNativeO1Flags
+    , nativeOptLevel
     , checkNativeDependentModule
     , nativeCodeGenFlags
 
     ) where
 
 import GHC.Prelude
+
+import Data.List (find)
+import Data.Maybe (isJust, isNothing)
 
 import GHC.Driver.Plugins
 import GHC.Driver.Session
@@ -176,6 +179,7 @@ checkNativeDependentModule hsc_env binds rules tycons = do
       native = hasNativeDependentProgram binds rules
                || any hasNativeDependentExpr implicit_cons
       dflags = hsc_dflags hsc_env
+      opt_level = nativeOptLevel dflags
       reject phase = do
         rejectNativeDependentProgram phase binds rules
         mapM_ (rejectNativeDependentExpr phase) implicit_cons
@@ -190,9 +194,9 @@ checkNativeDependentModule hsc_env binds rules tycons = do
           || any (`gopt` dflags) [ Opt_ProfLateInlineCcs, Opt_ProfLateCcs
                                 , Opt_ProfLateOverloadedCcs, Opt_ProfLateoverloadedCallsCCs ]) $
       reject "profiling or late cost-centre insertion"
-    when (usesOptimizedFlags dflags && not (supportsNativeO1Flags dflags)) $
-      reject "optimized module compilation with these options (use -O0 or the standard -O1 native object pipeline)"
-    unless (gopt Opt_OmitInterfacePragmas dflags || supportsNativeO1Flags dflags) $
+    when (usesOptimizedFlags dflags && isNothing opt_level) $
+      reject "optimized module compilation with these options (use -O0 or a standard -O1 or -O2 native object pipeline)"
+    unless (gopt Opt_OmitInterfacePragmas dflags || isJust opt_level) $
       reject "interface unfolding generation (use -fomit-interface-pragmas)"
     when (gopt Opt_WriteIfSimplifiedCore dflags) $
       reject "Core interface serialization (use -fno-write-if-simplified-core)"
@@ -200,12 +204,11 @@ checkNativeDependentModule hsc_env binds rules tycons = do
       reject "module plugins"
   return native
 
--- | Select the verified normal -O1 object-code schedule and simplifier.
+-- | Select a standard -O1 or -O2 object-code schedule.
 -- Native modules still require the interface and plugin checks above.
-supportsNativeO1Flags :: DynFlags -> Bool
-supportsNativeO1Flags dflags =
-    backendNeedsPlatformNcgSupport (backend dflags)
-    && all matchesO1 optLevelFlags
+nativeOptLevel :: DynFlags -> Maybe Int
+nativeOptLevel dflags
+  | backendNeedsPlatformNcgSupport (backend dflags)
     && simplPhases dflags == 2
     && maxSimplIterations dflags == 4
     && null (strictnessBefore dflags)
@@ -214,10 +217,12 @@ supportsNativeO1Flags dflags =
           [ Opt_ByteCodeAndObjectCode, Opt_WriteByteCode,
             Opt_LateDmdAnal, Opt_LateSpecialise, Opt_StaticArgumentTransformation,
             Opt_WorkerWrapperUnlift, Opt_SpecEvalDictFun ])
+  = find (\level -> all (matchesLevel level) optLevelFlags) [1, 2]
+  | otherwise = Nothing
   where
-    matchesO1 (levels, flag)
+    matchesLevel level (levels, flag)
       | flag == Opt_OmitInterfacePragmas = True
-      | otherwise = gopt flag dflags == (1 `elem` levels)
+      | otherwise = gopt flag dflags == (level `elem` levels)
 
 usesOptimizedFlags :: DynFlags -> Bool
 usesOptimizedFlags dflags =
