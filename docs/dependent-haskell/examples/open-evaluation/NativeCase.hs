@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, TypeFamilies #-}
 -- | Select a type from the constructor of a type-level scrutinee.
 module NativeCase
-  ( F, ByType, Field, Same, Capture, Braces, roadmap
+  ( F, ByType, ElementOrSelf, Field, Same, Capture, Braces, roadmap
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
   ) where
@@ -18,6 +18,11 @@ type F a = case a of
 type ByType (a :: Type) = case a of
   Bool     -> Int
   Ordering -> Char
+
+-- | Remove one Maybe layer and keep any other type.
+type ElementOrSelf (a :: Type) = case a of
+  Maybe b -> b
+  other -> other
 
 -- | Bind the field of Just in its alternative.
 type Field x = case x of

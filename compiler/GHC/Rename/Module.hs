@@ -419,8 +419,9 @@ liftSignatureSums _ group = (group, [])
 {- Note [Lifting type cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Use a checked closed family to match a type case. Each source branch
-becomes one equation. Only constructor patterns are admitted, so a
-rigid scrutinee cannot select an equation. Keep lexical captures as
+becomes one equation. A constructor pattern tests the scrutinee. A
+variable or wildcard accepts it when the earlier tests permit that row.
+See Note [Publishing ordered type cases] in GHC.Tc.TyCl. Keep lexical captures as
 additional arguments. Hide a captured argument's name in any branch
 where a pattern binds that spelling. Put the family and its owning
 synonym in the same kind-checking SCC.

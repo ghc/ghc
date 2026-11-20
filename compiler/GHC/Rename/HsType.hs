@@ -1068,27 +1068,26 @@ rnHsTyKi env (HsWildCardTy h)
        ; return (HsWildCardTy h, emptyFNs) }
 
 
--- | Recognize a flat constructor pattern and collect its branch-local binders.
--- The closed family must demand its scrutinee, so a bare variable or wildcard
--- cannot form an alternative. See Note [Lifting type cases] in GHC.Rename.Module.
+-- | Recognize a type case pattern and collect its branch-local binders.
+-- See Note [Lifting type cases] in GHC.Rename.Module.
 classifyTypeCasePattern :: LHsType GhcPs -> Maybe (LHsType GhcPs, [RdrName])
 classifyTypeCasePattern pat = do
-  (pat', bound) <- constructorPattern pat
+  (pat', bound) <- argumentPattern pat
   guard (null (findDupsEq (==) bound))
   pure (pat', bound)
   where
+    argumentPattern field = case unLoc (ignoreParens field) of
+      HsTyVar _ NotPromoted (L _ name) | isRdrTyVar name -> Just (field, [name])
+      HsWildCardTy{} -> Just (field, [])
+      _ -> constructorPattern field
+
     constructorPattern (L loc (HsParTy ann pat)) = do
       (pat', bound) <- constructorPattern pat
       pure (L loc (HsParTy ann pat'), bound)
     constructorPattern (L loc (HsAppTy ann con field)) = do
       (con', bound) <- constructorPattern con
-      case unLoc field of
-        HsTyVar _ NotPromoted (L _ name) | isRdrTyVar name ->
-          pure (L loc (HsAppTy ann con' field), name : bound)
-        HsWildCardTy{} -> pure (L loc (HsAppTy ann con' field), bound)
-        _ -> do
-          (field', field_bound) <- constructorPattern field
-          pure (L loc (HsAppTy ann con' field'), bound ++ field_bound)
+      (field', field_bound) <- argumentPattern field
+      pure (L loc (HsAppTy ann con' field'), bound ++ field_bound)
     constructorPattern (L loc pat@(HsTyVar _ promotion name))
       | isRdrTc (unLoc name) || isRdrDataCon (unLoc name)
       = Just (L loc (if isPromoted promotion then pat else XHsType (HsTypeCaseHead name)), [])

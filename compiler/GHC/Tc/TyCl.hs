@@ -4144,6 +4144,7 @@ hasCasePattern VI{vi_case_pattern = Just _} = True
 hasCasePattern _ = False
 
 hasOrderedPattern :: TyFamEqnValidityInfo -> Bool
+hasOrderedPattern VI{vi_case_pattern = Just (_, _, CasePatternField, _)} = True
 hasOrderedPattern VI{vi_case_pattern = Just (_, _, pat, _)} = nestedTypeCasePattern pat
 hasOrderedPattern _ = False
 

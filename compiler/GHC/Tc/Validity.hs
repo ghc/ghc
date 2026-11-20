@@ -2618,7 +2618,8 @@ checkTyFamEqnValidityInfo fam_tc = \ case
       case pattern of
         CasePatternConstructor span _ _ -> setSrcSpan span $
           checkTc (isJust (tcSplitTyConApp_maybe (typeCasePatternView pat))) (TcRnTypeCasePattern (Just pat))
-        CasePatternField -> setSrcSpan loc $ failWithTc (TcRnTypeCasePattern (Just pat))
+        CasePatternField -> setSrcSpan loc $
+          checkTc (isJust (getTyVar_maybe (typeCasePatternView pat))) (TcRnTypeCasePattern (Just pat))
     setSrcSpan loc $
       checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
 
@@ -2631,9 +2632,11 @@ typeCasePatternView ty = case coreFullView ty of
 
 {- Note [Constructor heads in type cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A case row must demand a constructor in its scrutinee. A source synonym
-such as Identity x expands to a variable. A family axiom for that row would
-reduce even when its scrutinee is an unknown variable. Keep the checked
+A variable or wildcard accepts the scrutinee at its position in the row
+order. An earlier constructor row must still select a branch, even when
+the two right-hand sides agree. Use the ordered case compiler for these
+rows. A source synonym written as a constructor pattern, such as Identity x,
+must still expose a constructor after expansion. Keep the checked
 pattern and source location in TyFamEqnValidityInfo. Inspect it after the
 recursive group is complete and the synonym cycle check has run. Expanding
 synonyms during the family equation check can force the unfinished knot.

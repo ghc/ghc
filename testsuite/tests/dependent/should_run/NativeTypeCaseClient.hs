@@ -7,6 +7,17 @@ import GHC.Exts (Int(I#), LiftedRep, RuntimeRep(IntRep))
 import Data.Proxy (Proxy(..))
 import NativeCase
 import qualified NativeNestedCase as N
+import qualified NativeTypeCaseFallback as Catch
+
+always :: Proxy b -> Catch.Always b :~: Int
+always _ = Refl
+
+echo :: Proxy a -> Catch.Echo a :~: a
+echo _ = Refl
+
+catchAll :: '(Catch.Shadow 'True 'False, ElementOrSelf Int, ElementOrSelf (Maybe Bool), Catch.Nested ('Just 'False))
+         :~: '( 'False, Int, Bool, Char)
+catchAll = Refl
 
 left :: F 'True :~: Int
 left = Refl

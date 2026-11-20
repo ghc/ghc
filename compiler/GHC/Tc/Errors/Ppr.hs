@@ -1112,7 +1112,7 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ text "A type-level" <+> quotes (text "case")
                               <+> text "requires -XExperimentalDependentTypes."
     TcRnTypeCasePattern Nothing
-      -> mkSimpleDecorated $ text "A type case pattern needs a constructor head with distinct variable or wildcard arguments."
+      -> mkSimpleDecorated $ text "Expected a constructor pattern, a variable, or a wildcard. Each pattern variable must be distinct."
     TcRnTypeCasePattern (Just pat)
       -> mkSimpleDecorated $ hang (text "After expanding type synonyms, the pattern has no constructor head:")
                                 2 (ppr (coreFullView pat))

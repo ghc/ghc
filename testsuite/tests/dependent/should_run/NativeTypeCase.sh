@@ -14,13 +14,15 @@ reject() {
       ! grep -Fq "$message" bad.log; then cat bad.log >&2; exit 1; fi
 }
 "${g[@]}" -c NativeCase.hs
+"${g[@]}" -c NativeTypeCaseFallback.hs
 "${g[@]}" -fomit-interface-pragmas -c NativeNestedCase.hs
 "${g[@]}" --show-iface NativeNestedCase.hi >nested.iface
 if sed -n '/^exports:/,/^defaults:/p' nested.iface | grep -E '\$(case(-node)?|lambda):'; then exit 1; fi
 "${g[@]}" --show-iface NativeCase.hi >case.iface
 if sed -n '/^exports:/,/^defaults:/p' case.iface | grep -E '\$case(:|-let-rhs:)'; then exit 1; fi
 mkdir interfaces
-cp NativeCase.hi NativeNestedCase.hi NativeTypeCase{Client,Rigid,LetWrong}.hs interfaces/
+cp NativeCase.hi NativeNestedCase.hi NativeTypeCaseFallback.hi NativeTypeCase{Client,Rigid,LetWrong,FallbackRigid}.hs interfaces/
+(cd interfaces && reject NativeTypeCaseFallbackRigid 9:13 'GHC-83865' && grep -Fq 'Force b' bad.log)
 (cd interfaces && "${g[@]}" -c NativeTypeCaseClient.hs &&
    reject NativeTypeCaseRigid 10:13 'case a of {True -> Int; False -> Int}' &&
    grep -Fq "Just x1 -> '(x, x1)" bad.log &&
@@ -52,9 +54,8 @@ grep -Fq 'NativeTypeCaseSynonymCatchAll.hs:10:35: error: [GHC-55789]' bad.log
 grep -Fq 'NativeTypeCaseSynonymCatchAll.hs:11:41: error: [GHC-55789]' bad.log)
 reject NativeTypeCaseInvalid 6:3 'Not in scope: data constructor'
 reject NativeTypeCaseEscape 6:14 'Not in scope: type variable'
-reject NativeTypeCaseBadPattern 5:3 'A type case pattern needs a constructor head'
+reject NativeTypeCaseBadPattern 5:3 'Expected a constructor pattern, a variable, or a wildcard'
 grep -Fq '[GHC-55789]' bad.log
-reject NativeTypeCaseFallback 5:3 'A type case pattern needs a constructor head'
 reject NativeTypeCaseDisabled 4:12 'GHC-98931'
 reject NativeTypeCaseBranchKind 6:12 "In the type case in"
 grep -Fq 'NativeTypeCaseBranchKind.hs:10:12: error: [GHC-83865]' bad.log
