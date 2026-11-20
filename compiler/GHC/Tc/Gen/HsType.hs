@@ -95,7 +95,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, isMonomorphicEnumCaseType, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
+                              sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
@@ -3546,7 +3546,7 @@ tcClosedCaseExecutableOwner rdr name args staging
   , Just needs_execution <- staging
   = do
       table <- tcLookupTyCon name
-      let expect_eager = lengthIs args 1 && isMonomorphicEnumCaseType (tyConKind table)
+      let expect_eager = monomorphicEnumCaseArity (tyConKind table) == Just (length args)
           visible = filterOut isInvisibleTyConBinder (tyConBinders table)
           nominal_prefix = length args < length visible && all nominalCallback args
           staged = needs_execution &&

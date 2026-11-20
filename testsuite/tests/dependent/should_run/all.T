@@ -53,6 +53,9 @@ test('NativeOpenInstalledUpper',
                                         'NativeOpenInstalledInterfaces.sh'])],
      run_command,
      ['bash NativeOpenInstalledUpper.sh "{compiler}" "{libdir}" "{ghc_pkg}"'])
+test('NativeBinaryEnum',
+     [req_interp, req_rts_linker, only_ways(['normal'])],
+     run_command, ['bash NativeBinaryEnum.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledNot',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['OpenMapWorker.hs', 'InstalledNotSource.hs', 'InstalledNotProof.hs']]

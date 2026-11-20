@@ -990,6 +990,21 @@ Recompilation also finds functions on imported wired-in enumerations,
 including `Ordering`. [Upgrade check](../examples/open-evaluation/check-enum-upgrade.sh)
 and [Agda comparison](../REFERENCES.md#an-ordinary-enumeration-function-as-a-callback).
 
+An ordinary worker with two unrestricted, unmatchable arguments can
+publish a certificate for public enumerations. It checks the first
+argument exhaustively. Each branch returns an enumeration constructor
+or the second argument. A branch that returns a constructor can leave
+the second variable unused or write it as a wildcard. The checker
+rejects a case that forces this argument, including demands from a
+bang pattern or `Strict`. A third argument or a rule on the worker in
+its defining module also makes the worker ineligible.
+
+A consumer can supply the first argument and pass the remaining
+function to a higher-order type family. The consuming proof checks any
+rules visible at the point where it uses the equation. A closed call
+with object code records the object dependency.
+[Binary enumeration regression](../../../testsuite/tests/dependent/should_run/NativeBinaryEnum.sh).
+
 The remaining part of the roadmap example is the mapper. The installed
 `Prelude.map` has fusion rules. Its interface can omit the recursive
 unfolding. Evidence for the mapper must survive compilation of its

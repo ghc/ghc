@@ -27,6 +27,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Driver.Backend
 import GHC.Driver.Env
 import GHC.Driver.DynFlags
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.Ppr
 import GHC.Driver.Plugins
 
@@ -586,9 +587,10 @@ checkFlagHash hsc_env iface self_recomp = do
         class_base_fp = classDefaultMatchabilityFingerprint staged_fp
         family_base_fp = forwardedResultFingerprint class_base_fp
         scoped_base_fp = scopedTypeCaseFingerprint class_base_fp
-        new_fp = scopedTypeCaseFingerprint family_base_fp
+        combined_fp = scopedTypeCaseFingerprint family_base_fp
+        new_fp = binaryEnumFingerprint combined_fp
         earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp]
-        class_generations = new_fp : earlier_rule_generations
+        class_generations = new_fp : combined_fp : earlier_rule_generations
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
         -- The family and scope changes were available independently. Match either
         -- old producer stamp before checking which change its interface needs.
@@ -639,7 +641,7 @@ checkFlagHash hsc_env iface self_recomp = do
          -> recheck "Compiler now checks sum projections"
        | old_fp `elem` [base_fp, sum_fp, projection_fp, result_fp, helper_fp, pair_builder_fp,
                         reachable_helper_fp, private_case_fp, recursive_case_fp, carried_case_fp, callback_case_fp]
-       , couldExportEnumCallback iface
+       , couldExportEnumCallback 1 iface
          -> recheck "Compiler now checks ordinary enumeration callbacks"
        | old_fp == callback_case_fp, final_possible
          -> recheck "Compiler now validates optimized source mappers"
@@ -718,16 +720,24 @@ checkFlagHash hsc_env iface self_recomp = do
                 then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
                 else pure UpToDate
         check_forwarded_result
-          | old_fp `notElem` [new_fp, family_base_fp], couldForwardFamilyResult iface =
+          | old_fp `notElem` [new_fp, combined_fp, family_base_fp], couldForwardFamilyResult iface =
               liftIO $ recheck "Compiler now separates a family result from its kind"
           | otherwise = pure UpToDate
         check_scoped_case
-          | old_fp `notElem` [new_fp, scoped_base_fp]
+          | old_fp `notElem` [new_fp, combined_fp, scoped_base_fp]
           , mi_hsc_src iface == HsSrcFile
           , couldExportScopedTypeCase iface =
               liftIO $ recheck "Compiler now checks dependent type case captures"
           | otherwise = pure UpToDate
-    pure (flags, check_family_uses `recompThen` check_forwarded_result `recompThen` check_scoped_case)
+        check_binary_enum
+          | old_fp /= new_fp
+          , mi_hsc_src iface == HsSrcFile
+          , not (xopt LangExt.ExperimentalDependentTypes dflags)
+          , couldExportEnumCallback 2 iface =
+              liftIO $ recheck "Compiler now checks ordinary binary enumeration callbacks"
+          | otherwise = pure UpToDate
+    pure (flags, check_family_uses `recompThen` check_forwarded_result `recompThen` check_scoped_case
+                                  `recompThen` check_binary_enum)
 
 -- | Mark providers compiled with the scope traversal in GHC.Iface.Tidy.
 -- See Note [Private helpers in erased package rules] in GHC.Iface.Tidy.
@@ -743,6 +753,11 @@ packageRuleProviderFingerprint rules fp
   | any isLexicalPackageRule rules =
       computeFingerprint putNameLiterally (fp, "lexical-rule-private-helpers-v1" :: String)
   | otherwise = fp
+
+-- | Record the check for ordinary workers with two enumeration operands.
+binaryEnumFingerprint :: Fingerprint -> Fingerprint
+binaryEnumFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "binary-enumeration-callback-v1" :: String)
 
 -- | Record the independent selector on an open equation returning its kind family.
 forwardedResultFingerprint :: Fingerprint -> Fingerprint
@@ -1214,9 +1229,9 @@ exportedCaseDatatypes iface =
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     exported name = name `elemNameSet` exports
 
--- | Find exported ordinary signatures that can hide an enumeration arrow.
-couldExportEnumCallback :: ModIface -> Bool
-couldExportEnumCallback iface = any candidate (mi_decls iface)
+-- | Find exported ordinary signatures that can hide the given number of enumeration arrows.
+couldExportEnumCallback :: Int -> ModIface -> Bool
+couldExportEnumCallback arity iface = any candidate (mi_decls iface)
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     exported n = n `elemNameSet` exports
@@ -1224,11 +1239,19 @@ couldExportEnumCallback iface = any candidate (mi_decls iface)
     candidate (_, IfaceId{ifName = n, ifType = ty, ifIdDetails = details}) =
       exported n && case details of
         IfSourceTableId{} -> False
-        _ -> arrow ty
+        _ -> arrow arity ty
     candidate _ = False
 
-    arrow (IfaceFunTy FTF_T_T _ _ domain result) = enum domain && enum result
-    arrow ty = opaque ty
+    arrow n (IfaceFunTy FTF_T_T ma mult domain result)
+      | arity == 2
+      , not (canHide unmatchableDataConName ma && canHide manyDataConName mult)
+      = False
+      | n == 1 = enum domain && enum result
+      | otherwise = enum domain && arrow (n - 1) result
+    arrow _ ty = opaque ty
+
+    canHide name ty@(IfaceTyConApp tc IA_Nil) = ifaceTyConName tc == name || opaque ty
+    canHide _ ty = opaque ty
 
     enum (IfaceTupleTy BoxedTuple NotPromoted IA_Nil) = True
     enum ty@(IfaceTyConApp tc _) =
@@ -1992,7 +2015,8 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = scopedTypeCaseFingerprint
+          current_flag_hash = binaryEnumFingerprint
+                            $ scopedTypeCaseFingerprint
                             $ forwardedResultFingerprint
                             $ classDefaultMatchabilityFingerprint
                             $ stagedMatchabilityFingerprint

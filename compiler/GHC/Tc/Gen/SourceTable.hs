@@ -1,7 +1,7 @@
 -- | Closed type families for checked functions that match one constructor.
 module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
-                              sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, isMonomorphicEnumCaseType, groundFirstHead,
+                              sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
@@ -103,7 +103,7 @@ import Control.Applicative ((<|>))
 import Data.Functor.Identity (Identity(..))
 import Data.List (find, findIndex, nubBy, partition, sortBy)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (catMaybes, fromMaybe, isNothing, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, mapMaybe)
 
 -- | Read the current defining Id without registering use of its equations.
 -- A local occurrence can still carry the Id from before equation checking.
@@ -1045,8 +1045,8 @@ sourceCaseTables binds = do
       | otherwise = helperClosure tables seen rest
 
     eligibleCase env exported enum_enabled imported owner
-      | isMonomorphicEnumCaseType (varType owner)
-      = enum_enabled && maybe False enumVisible (caseArrow (varType owner))
+      | Just kinds <- monomorphicEnumCaseKinds (varType owner)
+      = enum_enabled && all enumVisible kinds
       | Just (ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
       = (position == 1 && tc == listTyCon) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
@@ -1056,9 +1056,7 @@ sourceCaseTables binds = do
          publicCaseType env exported imported tc)
       | otherwise = False
       where
-        enumVisible (input, output) =
-          all (maybe False (publicCaseType env exported imported . fst) . caseDatatype)
-              [input, output]
+        enumVisible = maybe False (publicCaseType env exported imported . fst) . caseDatatype
 
     publicCaseType env exported imported tc =
       all available (tyConName tc : map dataConName (tyConDataCons tc))
@@ -1088,13 +1086,15 @@ sourceCaseTables binds = do
             _ | Just projection <- checkedPairCase owner rhs ->
                   Just . (owner,) <$> publishPairCase owner projection
               | let imported = ordinaryImport rdr_env
+                    enum_arity = monomorphicEnumCaseArity (varType owner)
               , eligibleCase env exported enum_enabled imported owner
               , Just (signature, rows) <- checkedConstructorCase
                   (publicCaseType env exported imported)
-                  (lookupHelper env imported helpers) owner rhs -> do
+                  (lookupHelper env imported helpers) owner rhs
+              , enum_arity /= Just 2 || all enum_binary_row rows -> do
                   table <- publishConstructorCase owner signature rows
                   let certified
-                        | isMonomorphicEnumCaseType (varType owner) = setIdDetails owner
+                        | isJust enum_arity = setIdDetails owner
                             (SourceTableId (idName owner) table ExecutableSourceTable)
                         | otherwise = owner
                   pure (Just (certified, table))
@@ -1102,6 +1102,15 @@ sourceCaseTables binds = do
               , certOwner certificate == idName owner ->
                   publish owner (certRows certificate) id
               | otherwise -> pure Nothing
+
+    -- A binary enumeration certificate inspects the first argument.
+    -- Each row can return the second argument without inspecting it.
+    enum_binary_row (ConstructorCaseRow [CaseConstructor{}, CaseField{}] result) =
+      case result of
+        CaseField{} -> True
+        CaseConstructor _ _ [] -> True
+        _ -> False
+    enum_binary_row _ = False
 
     lookupHelper env imported helpers actual
       | nameModule_maybe (idName actual) == Just (tcg_semantic_mod env) =
@@ -1228,7 +1237,7 @@ sourceCaseVisibleArity table
             _ -> Nothing
         Nothing -> case constructorCaseType kind of
           Just (ConstructorCaseType telescope tc _ domains position _)
-            | not (isMonomorphicEnumCaseType kind)
+            | isNothing (monomorphicEnumCaseArity kind)
             , let visible = length domains
             , Just roots <- traverse (projectionBranch telescope tc visible position) branches
             , mkUniqSet roots == mkUniqSet (tyConDataCons tc) -> Just visible
@@ -1342,7 +1351,7 @@ constructorCaseType tau = do
     guard (all isLiftedTypeKind binder_kinds ||
            (isRetainedCaseRoot domain tc && noFreeVarsOfType (mkForAllTys telescope liftedTypeKind)))
     parameters <- catMaybes <$> traverse domainParameter args
-    guard ((isMonomorphicEnumCaseType tau || not (null parameters)) &&
+    guard ((isJust (monomorphicEnumCaseArity tau) || not (null parameters)) &&
            sizeUniqSet (mkUniqSet parameters) == length parameters &&
            tyCoVarsOfTypes domains == mkUniqSet quantified &&
            caseKind kinds result && all (caseKind kinds) carried)
@@ -1399,11 +1408,19 @@ splitCaseOperand i xs = case splitAt i xs of
     (before, x : after) -> Just (before, x, after)
     _ -> Nothing
 
--- | A non-polymorphic arrow between ordinary nullary enumerations.
-isMonomorphicEnumCaseType :: Type -> Bool
-isMonomorphicEnumCaseType ty = case caseArrow ty of
-  Just (domain, result) -> all enumeration [domain, result]
-  Nothing -> False
+-- | The number of value arguments of an ordinary enumeration worker.
+monomorphicEnumCaseArity :: Type -> Maybe Int
+monomorphicEnumCaseArity = fmap (subtract 1 . length) . monomorphicEnumCaseKinds
+
+-- | The domain and result kinds of a unary or binary enumeration worker.
+monomorphicEnumCaseKinds :: Type -> Maybe [Type]
+monomorphicEnumCaseKinds ty = do
+    (domain, rest) <- caseArrow ty
+    let kinds = case caseArrow rest of
+          Just (carried, result) -> [domain, carried, result]
+          Nothing -> [domain, rest]
+    guard (all enumeration kinds)
+    pure kinds
   where
     enumeration t = case caseDatatype t of
       Just (tc, []) -> all nullary (tyConDataCons tc)
