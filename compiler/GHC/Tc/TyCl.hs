@@ -4209,6 +4209,13 @@ A decision family branches on that result. Its successful branch also
 matches the exact tested constructor to bind its fields. The classifier
 default cannot bypass a test on an unknown input with a compatible RHS.
 
+Use the same test for an ordinary constructor of a datatype with a
+family index. A wildcard can cover a different constructor even when
+its index is stuck. Enumerating that constructor can require an unsolved
+equality or place a family application in the generated LHS. Give the
+classifier the captured variables of the scrutinee kind. The checked
+constructor pattern must have that kind without refining the captures.
+
 A promoted constructor result kind can contain a closed type family.
 After ordinary unification fails, try one checked reduction at each
 index of the same nominally generative kind constructor. Use only a
@@ -4321,8 +4328,8 @@ buildOrderedTypeCase root infos = do
             case drop field slots of
               slot:_ | Just scrut <- getTyVar_maybe slot ->
                 if varType scrut `eqType` liftedTypeKind
-                  then openColumn sourceArgs variables slots result liveRows row_loc span field scrut con
-                  else closedColumn sourceArgs variables slots result liveRows row_loc field scrut
+                  then classifyColumn sourceArgs variables slots result liveRows row_loc span field scrut con
+                  else closedColumn sourceArgs variables slots result liveRows row_loc span field scrut con
               _ -> unsupported
         where
           specialize field con (row, pats) = case splitAt field pats of
@@ -4334,26 +4341,32 @@ buildOrderedTypeCase root infos = do
             _ -> Nothing
             where arity = count isVisibleTyConBinder (tyConBinders con)
 
-          closedColumn sourceArgs variables slots result liveRows row_loc field scrut = do
+          closedColumn sourceArgs variables slots result liveRows row_loc span field scrut con = do
             (parent, _) <- maybe unsupported pure (tcSplitTyConApp_maybe (varType scrut))
             cs <- maybe unsupported pure (tyConDataCons_maybe parent)
-            let promotable dc = case dataConFullSig dc of
-                  (_, _, _, theta, _, _) -> null theta
-            results <- forM (filter promotable cs) $ \dc -> do
-              let con = promoteDataCon dc
-                  selected = mapMaybe (specialize field con) liveRows
-              if null selected then pure Nothing else do
-                unless (null (dataConRepArgBinders dc)) unsupported
-                onConstructor sourceArgs variables slots result row_loc field scrut con selected
-            let branches = catMaybes results
-            if null branches then unsupported else
-              pure ([branch lhs rhs | (_, lhs, rhs, _) <- branches],
-                    concat [helpers | (_, _, _, helpers) <- branches])
+            case isPromotedDataCon_maybe con of
+              Just dc
+                | isVanillaDataCon dc, null (dataConRepArgBinders dc)
+                , any (not . isFamFreeTy . dataConOrigResTy) cs ->
+                    classifyColumn sourceArgs variables slots result liveRows row_loc span field scrut con
+              _ -> do
+                let promotable dc = case dataConFullSig dc of
+                      (_, _, _, theta, _, _) -> null theta
+                results <- forM (filter promotable cs) $ \dc -> do
+                  let promoted = promoteDataCon dc
+                      selected = mapMaybe (specialize field promoted) liveRows
+                  if null selected then pure Nothing else do
+                    unless (null (dataConRepArgBinders dc)) unsupported
+                    onConstructor sourceArgs variables slots result row_loc field scrut promoted selected
+                let branches = catMaybes results
+                if null branches then unsupported else
+                  pure ([branch lhs rhs | (_, lhs, rhs, _) <- branches],
+                        concat [helpers | (_, _, _, helpers) <- branches])
 
           -- The classifier returns distinct Bool constructors. In particular
           -- its default cannot become compatible with its test even if both
           -- branches of the original case return an identical value.
-          openColumn sourceArgs variables slots result liveRows row_loc span field scrut con = do
+          classifyColumn sourceArgs variables slots result liveRows row_loc span field scrut con = do
             unless (isGenerativeTyCon con Nominal && not (isTypeFamilyTyCon con)) $
               setSrcSpan span $ failWithTc (TcRnNestedTypeCasePattern (mkTyVarTy scrut))
             let matchRows = mapMaybe (specialize field con) liveRows
@@ -4362,18 +4375,23 @@ buildOrderedTypeCase root infos = do
                   _ -> True
                 missRows = filter missRow liveRows
                 args = mkTyVarTys variables
+                kind = varType scrut
+                kindVars = scopedSort (tyCoVarsOfTypesList [kind])
+                testArgs arg = mkTyVarTys kindVars ++ [arg]
+            unless (all isTyVar kindVars) unsupported
             matched <- onConstructor sourceArgs variables slots result row_loc field scrut con matchRows
             (pattern, lhs, matchedRhs, matchedHelpers) <- maybe unsupported pure matched
-            testArg <- fresh liftedTypeKind
-            classify <- makeFamily (mkAnonTyConBinders [testArg]) boolTy
-              [branch [pattern] true, branch [mkTyVarTy testArg] false]
+            unless (typeKind pattern `eqType` kind) unsupported
+            testArg <- fresh kind
+            classify <- makeFamily (bindersFor kindVars ++ [mkAnonTyConBinder testArg]) boolTy
+              [branch (testArgs pattern) true, branch (testArgs (mkTyVarTy testArg)) false]
             (missBranches, missHelpers) <- if null missRows then pure ([], []) else do
               (missRhs, helpers) <- makeChild sourceArgs slots result missRows
               pure ([branch (false : args) missRhs], helpers)
             selector <- fresh boolTy
             decision <- makeFamily (mkAnonTyConBinder selector : bindersFor variables) result
               (branch (true : lhs) matchedRhs : missBranches)
-            pure ([branch args (mkTyConApp decision (mkTyConApp classify [mkTyVarTy scrut] : args))],
+            pure ([branch args (mkTyConApp decision (mkTyConApp classify (testArgs (mkTyVarTy scrut)) : args))],
                   classify : decision : matchedHelpers ++ missHelpers)
 
       build _ _ _ _ _ = unsupported
