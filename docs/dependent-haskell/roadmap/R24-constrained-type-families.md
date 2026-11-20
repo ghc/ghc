@@ -116,10 +116,23 @@ that a family application evaluates to a proper type. That calculus
 omits kinds, classes and partial applications.
 [Morris and Eisenberg, 2017](https://richarde.dev/papers/2017/partiality/partiality.pdf).
 
-- [ ] Give `Elem` the declared domain `Collects c`. Compile the provider
-  separately and check a client using only its stripped interface.
-  The client can form `Elem [Bool]` and use `Elem c` under a local
-  `Collects c` assumption. It reports the unsatisfied domain at
-  `Proxy (Elem [Int])`, where the current axiom can reduce the family.
-  The interface must retain the predicate and its mapping to family
-  arguments so the reader can make the same check.
+- [x] Form the fully applied `Elem` under its parent `Collects` predicate.
+  A plain declaration in an experimental producer records the domain
+  in its interface. An ordinary reader accepts a local `Collects c`
+  Given and the ground instance for `Elem [Bool]`. Its written
+  `Elem [Int]` fails with the missing `Allowed Int` constraint before
+  reduction can erase that obligation. The same client accepts the
+  application from an ordinary producer. The producer marker changes
+  the ABI and rechecks an existing client.
+  [Provider](../examples/open-evaluation/ConstrainedElements.hs),
+  [ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs)
+  and [stripped-interface check](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh).
+
+The experiment covers fully applied associated type families with result
+kind `Type` and the same binders as their owner class. It permits a
+different binder order. Each instance supplies an equation or a default.
+The check uses Givens in the same written signature and the imported
+class instance environment. Givens inherited by a local signature from
+its enclosing term need a later check. General kinds, family occurrences
+in aliases or visible type arguments, generated newtype or via equations,
+and partial applications also need separate formation rules.
