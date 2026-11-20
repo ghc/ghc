@@ -8,6 +8,20 @@ increments.
 
 ## Family and package checkpoints
 
+At `c24dcec367`, the fork includes both vector append equations, the
+optimized cast fix and inferred matchability for higher-order callbacks.
+The bootstrap and self-hosted compiler relinks each reproduced all 360
+Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
+Self-hosted GHCi reproduced the same output from source. A live breakpoint
+stopped in `appendVec` and resumed. The recursive vector program returned
+`[False,True]` with breakpoints both enabled and disabled.
+
+The relinks rebuilt `GHC.Core.Opt.Simplify.Iteration`, `GHC.Tc.Gen.HsType`
+and `GHC.Tc.Gen.SourceTable` for the two compiler stages. The self-hosted
+relink used the remaining compiler objects from the fingerprinted
+`c94baacebe` build. [Vector equations](examples/packed-vector/OpenVectorAppend.hs)
+and [registered debugger controls](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppendGhci.sh).
+
 The bootstrap and self-hosted compiler relinks at `91341c4172` each
 ran all 358 Showcase observations at stripped `-O0` and default
 `-O1` and `-O2`. Self-hosted source-loaded GHCi matched the same

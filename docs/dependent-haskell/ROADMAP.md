@@ -9,6 +9,10 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+The 360-line checkpoint compiles and runs the vector proofs in native
+code and source-loaded GHCi, including when a debugger breakpoint is
+active in the recursive function. [Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
+
 A retained function can name an entire indexed vector as its argument.
 `foreach (xs :: Vec a n) -> xs :~: xs` returns `Refl` even for an
 undefined vector. Using two different vector binders in the same equality
