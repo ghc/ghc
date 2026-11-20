@@ -95,7 +95,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
+                              sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
@@ -2717,6 +2717,13 @@ tc_app_ty mode rn_ty exp_kind
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
+                         | ordinary_call
+                         , [left, _] <- args
+                         , Just (table, constructor) <- indexedProjectionSource fun
+                         , L _ (HsTyVar _ _ (L _ (WithUserRdr _ operand))) <- ignoreParens left
+                         , isTyVarName operand || operand == getName constructor
+                         -> do { sourceTableReferenceUse table
+                               ; tc_app_ty_with_head mode rn_ty exp_kind (mkTyConTy table) }
                          | [arg] <- args, isQual rdr
                          , Just (wildcards, call_owner, pending) <- mode_pending_calls mode
                          , Just (owner_level, HM_Sig) <- mode_holes mode
@@ -2808,9 +2815,16 @@ tc_app_ty mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
 
 tc_app_ty_generic :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty_generic mode rn_ty exp_kind
-  = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty hs_args
+  = do { (fun_ty, _) <- tcInferTyAppHead mode hs_fun_ty hs_args
+       ; tc_app_ty_with_head mode rn_ty exp_kind fun_ty }
+  where
+    (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
+
+-- | Infer the arguments of an already resolved type application.
+tc_app_ty_with_head :: TcTyMode -> HsType GhcRn -> ExpKind -> TcType -> TcM TcType
+tc_app_ty_with_head mode rn_ty exp_kind fun_ty
        -- See Note [Owning omitted arrows in kind-valued arguments] in GHC.Tc.Solver.
-       ; let index_level = case exp_kind of
+  = do { let index_level = case exp_kind of
                Check expected | isTypeLikeKind expected -> KindLevel
                _ -> TypeLevel
              expected_kind = checkingExpType_maybe exp_kind

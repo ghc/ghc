@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies, isFinalCoreIdentity, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
@@ -18,21 +18,22 @@ import GHC.Core.CharCase (certOwner, certRows, certify)
 import GHC.Core.OpenWhnf (openDataConFieldTypes)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
-import GHC.Core.Coercion (abstractNativeIndices)
+import GHC.Core.Coercion (abstractNativeIndices, coercionLKind, coercionRKind, coercionRole, mkNomReflCo, mkSymCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch, coAxiomBranches, coAxiomRole,
-                                coAxBranchCoVars, coAxBranchLHS, coAxBranchRHS, coAxBranchTyVars,
+                                coAxBranchCoVars, coAxBranchLHS, coAxBranchRHS, coAxBranchRoles, coAxBranchTyVars,
                                 fromBranches)
 import GHC.Core.ConLike (ConLike(..))
 import GHC.Core.DataCon
 import GHC.Core.Dependent (hasNativeDependentExprRhs)
 import GHC.Core.FVs (exprSomeFreeVarsList)
-import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
+import GHC.Core.FamInstEnv (FamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, reduceTyFamApp_maybe)
 import GHC.Core.InstEnv (instanceDFunId, lookupUniqueInstEnv)
 import GHC.Core.Multiplicity (scaledThing)
+import GHC.Core.Reduction (reductionCoercion, reductionReducedType)
 import GHC.Core.SimpleOpt (simpleOptExpr)
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCo.FVs (tyConsOfTypes)
-import GHC.Core.TyCo.Rep (Type(TyConApp, TermVarTy))
+import GHC.Core.TyCo.Rep (Coercion, Type(TyConApp, TermVarTy, CastTy))
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Utils (exprType)
@@ -52,6 +53,7 @@ import GHC.Iface.Env (lookupOrig)
 import GHC.Iface.Load (loadInterfaceForName)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Tc.Errors.Types (RetainedQuantificationError(..), TcRnMessage(..))
+import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), isEmptyEvBindsMap)
@@ -93,7 +95,7 @@ import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
-import GHC.Types.Var (Id, CoVar, idDetails, VarBndr(..), isId, mkTyVar, setIdDetails, varName)
+import GHC.Types.Var (Id, CoVar, idDetails, VarBndr(..), isId, isCoVar, mkTyVar, setIdDetails, varName)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (lengthAtLeast, lengthIs)
 import GHC.Utils.Monad (allM, anyM)
@@ -161,6 +163,8 @@ sourceTableOwner table
       pure $ do
         fun <- owner
         actual <- sourceTableId_maybe fun
+        guard (not (finalCoreMapperOwner fun && isJust (indexedProjectionType (varType fun))) ||
+               isJust (indexedProjectionSource fun))
         guard (tyConName actual == tyConName table ||
                (finalCoreMapperOwner fun && isFilterGuardFor actual table &&
                 maybe False (any ((== tyConName table) . tyConName)) (sourceTableCallees actual)))
@@ -979,7 +983,12 @@ sourceCaseTables binds = do
         , Just (ConstructorCaseType _ tc _ _ position _) <- constructorCaseType (varType owner)
         , tc == listTyCon = Just position
         | otherwise = Nothing
-      final_candidate = isJust . list_case_position
+      indexed_candidate owner
+        | generates_code
+        , Just (IndexedProjection _ _ _ con _ _ _) <- indexedProjectionType (varType owner)
+        = publicCaseType env exported imported (dataConTyCon con)
+        | otherwise = False
+      final_candidate owner = isJust (list_case_position owner) || indexed_candidate owner
       append_candidate owner = list_case_position owner == Just 0
       identity_candidate owner = generates_code && isIdentitySourceType (varType owner)
       is_exported owner = idName owner `elemNameSet` exported
@@ -994,7 +1003,7 @@ sourceCaseTables binds = do
                , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
       candidates = [(bind, owner) | (bind, owner) <- owners
                     , eligible owner ||
-                      (is_exported owner && (identity_candidate owner || append_candidate owner))]
+                      (is_exported owner && (identity_candidate owner || append_candidate owner || indexed_candidate owner))]
   if isHsBootOrSig (tcg_src env) || null candidates
     then pure ([], [])
     else do
@@ -1002,8 +1011,8 @@ sourceCaseTables binds = do
       let changed owner = idName owner `elemNameSet` ruled || hasSourceMethodRule visible owner
       prepared <- fmap catMaybes $ forM candidates $ \(bind, owner) -> do
         let ruled_owner = changed owner
-            check_final = final_candidate owner
-        if ruled_owner && not (check_final || identity_candidate owner) then pure Nothing else do
+            check_final = isJust (list_case_position owner)
+        if ruled_owner && not (final_candidate owner || identity_candidate owner) then pure Nothing else do
           rhs <- bindingCore bind owner
           pure $ do
             body <- rhs
@@ -1023,6 +1032,10 @@ sourceCaseTables binds = do
                       (guard (append_candidate owner) *> directListAppend owner body) -> do
             table <- publishConstructorCase owner signature rows
             pure (Just (finalOwner owner table, table), [])
+          Nothing | indexed_candidate owner
+                  , Just projection <- checkedIndexedProjection (simpleOptExpr (initSimpleOpts dflags)) owner body -> do
+            checked <- publishIndexedProjection owner projection
+            pure (fmap (\table -> (finalOwner owner table, table)) checked, [])
           _ -> pure (Nothing, [])
       let localCall v = isId v && nameModule_maybe (idName v) == Just (tcg_semantic_mod env)
           references = map idName . exprSomeFreeVarsList localCall
@@ -1584,7 +1597,9 @@ data ConstructorCaseRow = ConstructorCaseRow [ConstructorCaseTree] ConstructorCa
 
 {- Note [Final Core source equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check complete lazy list equations at final typechecking publication. At this point the module has checked all user declarations.
+Check lazy list equations and indexed projections at final typechecking
+publication. At this point the module has checked all user declarations.
+See Note [Nullary indexed source projections].
 The new private family is available to neither user declarations nor the
 helper collector. A no-code producer does not create it.
 
@@ -1604,6 +1619,174 @@ Forming a type records the interface dependency without using the
 equation. The solver checks the rules when it uses an equation,
 including through an imported alias.
 -}
+
+{- Note [Nullary indexed source projections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A nullary GADT constructor can fix an invisible index of a binary
+ordinary function. Check that the function cases on its first operand
+and that the exact nullary alternative returns the second operand. A
+cast has no runtime effect. Use separate nominal evidence for the equation.
+
+The family quantifies the original invisible telescope. Its one row
+supplies the index from the constructor result and quantifies the
+remaining parameters and the carried operand. Build the nominal
+result-kind cast using ordinary family axioms. Permit one reduction
+per argument under the same boxed result datatype. This check runs
+before installing the module's source owners, so it uses the family
+matcher directly. The cast records its axioms. Installation and
+subsequent evidence use check those owners and their RULES.
+
+Check the same projection again in final Core. A different alternative
+does not need a certificate. Type application uses the family for the
+written constructor or a bare neutral left operand. Keep the ordinary
+term for closed inputs with a different constructor. The reduction
+cannot select the row from a length index alone.
+-}
+
+-- | The owner's telescope, visible types, and one specialized index.
+-- The constructor arguments use the owner's original type variables.
+data IndexedProjection =
+  IndexedProjection [ForAllTyBinder] (Type, Type) Type DataCon TyVar Type [Type]
+
+-- | Recognize one nullary indexed constructor in an ordinary function's
+-- first domain. The other binders and carried domain must be independent of
+-- the refined variable.
+indexedProjectionType :: Type -> Maybe IndexedProjection
+indexedProjectionType ty = do
+  let (binders, body) = splitForAllForAllTyBinders ty
+  telescope <- traverse ordinary binders
+  (left, more) <- caseArrow body
+  (right, result) <- caseArrow more
+  (tc, args) <- splitTyConApp_maybe left
+  guard (not (null telescope) && isBoxedDataTyCon tc && isLiftedAlgTyCon tc &&
+         lengthIs args (tyConArity tc))
+  [(con, slot, index, parameters)] <- pure (mapMaybe (refinement args) (tyConDataCons tc))
+  let quantified = binderVars telescope
+  guard (slot `elem` quantified &&
+         not (anyFreeVarsOfType (== slot) right) &&
+         all (not . anyFreeVarsOfType (== slot) . varType) quantified)
+  pure (IndexedProjection telescope (left, right) result con slot index parameters)
+  where
+    ordinary (ma, binder@(Bndr v (Invisible _)))
+      | ma `eqType` unmatchableDataConTy, isTyVar v = Just binder
+    ordinary _ = Nothing
+
+    refinement args con = do
+      let (universals, existentials, equalities, context, fields, _) = dataConFullSig con
+      guard (null existentials && null context && null fields &&
+             null (dataConStupidTheta con) && lengthIs universals (length args))
+      [equation] <- pure equalities
+      arg <- lookup (eqSpecTyVar equation) (zip universals args)
+      slot <- getTyVar_maybe arg
+      let index = eqSpecType equation
+      guard (noFreeVarsOfType index && isTyFamFree index &&
+             typeKind index `eqType` varType slot)
+      parameters <- traverse (`lookup` zip universals args) (dataConUserTyVars con)
+      pure (con, slot, index, parameters)
+
+-- | Read only the explicit case on the first operand and its selected row.
+checkedIndexedProjection :: (Core.CoreExpr -> Core.CoreExpr) -> Id -> Core.CoreExpr
+                         -> Maybe IndexedProjection
+checkedIndexedProjection prepare owner original = do
+  projection@(IndexedProjection binders _ _ con _ _ _) <- indexedProjectionType (varType owner)
+  guard (exprType original `eqType` varType owner)
+  let (parameters, body) = Core.collectBinders (prepare original)
+  [left, right] <- pure (drop (length binders) parameters)
+  Core.Case (Core.Var scrutinee) _ _ alts <- pure body
+  guard (left == scrutinee && isId right)
+  [rhs] <- pure [branch | Core.Alt (Core.DataAlt dc) [evidence] branch <- alts,
+                         dc == con, isCoVar evidence]
+  case rhs of
+    Core.Var v | v == right -> pure projection
+    Core.Cast (Core.Var v) _ | v == right -> pure projection
+    _ -> Nothing
+
+-- | Publish the selected row with actual nominal result-kind evidence.
+publishIndexedProjection :: Id -> IndexedProjection -> TcM (Maybe TyCon)
+publishIndexedProjection owner (IndexedProjection telescope (left, right) result con slot index con_args) = do
+    (renaming, parameters) <- freshenTyVarBndrs (binderVars telescope)
+    let named = zipWith mkNamedTyConBinder (map binderFlag telescope) parameters
+        instantiate = substTyUnchecked renaming . expandTypeSynonyms
+        specialize = instantiate . substTyWith [slot] [index]
+        hidden = map (specialize . mkTyVarTy) (binderVars telescope)
+        branch_params = [v | (old, v) <- zip (binderVars telescope) parameters, old /= slot]
+        left_kind = specialize left
+        right_kind = specialize right
+        result_kind = specialize result
+        constructor = mkTyConApp (promoteDataCon con) (map specialize con_args)
+    families <- tcGetFamInstEnvs
+    case projectionResultCoercion families right_kind result_kind of
+      Just cast | typeKind constructor `eqType` left_kind -> do
+        carried <- fresh "carried" right_kind
+        operands <- mapM (fresh "arg" . instantiate) [left, right]
+        let vars = branch_params ++ [carried]
+            right_pat = mkTyVarTy carried
+            branch _ = mkCoAxBranch vars [] [] (hidden ++ [constructor, right_pat])
+              (mkCastTy right_pat cast) (map (const Nominal) vars) (nameSrcSpan term)
+        Just <$> makeSourceFamily term (named ++ mkAnonTyConBinders operands)
+                                  (instantiate result) [branch]
+      _ -> pure Nothing
+  where
+    term = idName owner
+    fresh occ kind = flip mkTyVar kind <$> newSysName (mkTyVarOcc occ)
+
+-- | Prove the result kind nominally, with at most one family step per index.
+projectionResultCoercion :: FamInstEnvs -> Kind -> Kind -> Maybe Coercion
+projectionResultCoercion families from to
+  | from `eqType` to = Just (mkNomReflCo from)
+  | otherwise = do
+      (tc, left) <- splitTyConApp_maybe from
+      (result_tc, right) <- splitTyConApp_maybe to
+      guard (tc == result_tc && isBoxedDataTyCon tc && lengthIs left (length right))
+      mkTyConAppCo Nominal tc <$> zipWithM check left right
+  where
+    check found expected
+      | found `eqType` expected = Just (mkNomReflCo found)
+      | otherwise = do
+          (fam, args) <- splitTyConApp_maybe expected
+          reduction <- reduceTyFamApp_maybe families Nominal fam args
+          guard (reductionReducedType reduction `eqType` found)
+          pure (mkSymCo (reductionCoercion reduction))
+
+-- | Read the exact private one-row family for an imported ordinary owner.
+indexedProjectionSource :: Id -> Maybe (TyCon, DataCon)
+indexedProjectionSource owner = do
+  guard (finalCoreMapperOwner owner)
+  table <- sourceTableId_maybe owner
+  guard (tyConKind table `eqType` varType owner)
+  IndexedProjection telescope (left, right) result con slot index con_args <-
+    indexedProjectionType (varType owner)
+  axiom <- closedFamilyTyConCoAxiom_maybe table
+  guard (coAxiomRole axiom == Nominal)
+  [branch] <- pure (fromBranches (coAxiomBranches axiom))
+  let (hidden, operands) = splitAt (length telescope) (coAxBranchLHS branch)
+  guard (lengthIs hidden (length telescope) && null (coAxBranchCoVars branch))
+  [constructor, carried] <- pure operands
+  carried_var <- getTyVar_maybe carried
+  hidden_vars <- traverse getTyVar_maybe
+    [arg | (Bndr v _, arg) <- zip telescope hidden, v /= slot]
+  let expected v arg
+        | v == slot = eqType index arg
+        | otherwise = True
+      specialize = substTyWith (binderVars telescope) hidden
+      selection = mkTyConApp (promoteDataCon con) (map specialize con_args)
+      rhs = coAxBranchRHS branch
+      vars = hidden_vars ++ [carried_var]
+  guard (and (zipWith expected (binderVars telescope) hidden) &&
+         coAxBranchTyVars branch == vars &&
+         eqTypes (map typeKind hidden) (map (specialize . varType) (binderVars telescope)) &&
+         lengthIs (coAxBranchRoles branch) (length vars) &&
+         all (== Nominal) (coAxBranchRoles branch) &&
+         selection `eqType` constructor &&
+         typeKind constructor `eqType` specialize left &&
+         typeKind carried `eqType` specialize right &&
+         typeKind rhs `eqType` specialize result)
+  case rhs of
+    CastTy payload co -> guard (payload `eqType` carried && coercionRole co == Nominal &&
+                                coercionLKind co `eqType` typeKind carried &&
+                                coercionRKind co `eqType` specialize result)
+    _ -> guard (rhs `eqType` carried)
+  pure (table, con)
 
 -- | The two equations for a lazy constructor-to-constructor list map.
 -- Check the same complete shape before and after optimizing its owner.
@@ -1801,6 +1984,9 @@ verifyFinalCoreMapper binds original =
       | varType owner `eqType` varType original
       , isIdentitySourceType (varType owner)
       -> verifyProjection (unitNameSet (idName owner)) owner expression
+      | varType owner `eqType` varType original
+      , Just _ <- indexedProjectionSource original
+      -> isJust (checkedIndexedProjection id owner expression)
       | varType owner `eqType` varType original
       -> if lengthIs (finalCoreSourceFamilies original) 1
            then not (isNothing (directListMapper owner expression <|>
