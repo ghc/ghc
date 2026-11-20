@@ -3,7 +3,9 @@ set -euo pipefail
 export LC_ALL=C
 area=$(cd "$(dirname "$0")" && pwd)
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
-     -fomit-interface-pragmas -fno-write-if-simplified-core -fdiagnostics-color=never)
+     -fdiagnostics-color=never)
+# Apply these after -O so the retained modules use the stripped interface.
+interface_flags=(-fomit-interface-pragmas -fno-write-if-simplified-core)
 shift 2
 ghc+=("$@")
 ways=()
@@ -52,7 +54,9 @@ observe b = case keep b of
 main :: IO ()
 main = print (observe (error "unused index"))
 HS
-"${ghc[@]}" -O1 "${ways[@]}" --make Main.hs -o run
+"${ghc[@]}" -O1 "${interface_flags[@]}" "${ways[@]}" \
+    -ddump-rule-firings -ddump-to-file -fno-dump-with-ways --make Main.hs -o run
+grep -Fq 'Rule fired: score/empty (Rule)' Producer.dump-rule-firings
 ./run
 
 # Compile the proof using the same optimized objects that produced the value.
@@ -60,7 +64,7 @@ mkdir client
 cp ./*.hi ./*.o "$area/NativeClosedFamilyProjection.hs" client/
 if [[ -f Producer.dyn_o ]]; then cp ./*.dyn_o ./*.dyn_hi client/; fi
 cd client
-"${ghc[@]}" -O0 "${ways[@]}" -c NativeClosedFamilyProjection.hs
+"${ghc[@]}" -O0 "${interface_flags[@]}" "${ways[@]}" -c NativeClosedFamilyProjection.hs
 cat >Proof.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
 module Proof where
@@ -70,7 +74,7 @@ import qualified Producer as P
 proof :: F.pick (P.pair 7) :~: 36
 proof = Refl
 HS
-"${ghc[@]}" -O0 -c Proof.hs
+"${ghc[@]}" -O0 "${interface_flags[@]}" -c Proof.hs
 sed 's/:~: 36$/:~: 14/' Proof.hs >Stale.hs
-if "${ghc[@]}" -O0 -fforce-recomp -c Stale.hs >stale.log 2>&1; then exit 1; fi
+if "${ghc[@]}" -O0 "${interface_flags[@]}" -fforce-recomp -c Stale.hs >stale.log 2>&1; then exit 1; fi
 grep -Fq GHC-83865 stale.log || { cat stale.log; exit 1; }
