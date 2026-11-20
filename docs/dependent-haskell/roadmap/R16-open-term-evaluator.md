@@ -1338,3 +1338,25 @@ callback, head, left tail, and right list.
 [Proof](../examples/open-evaluation/PreludeMapAppendProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),
 and [prior art](../REFERENCES.md#distributing-map-over-append).
+
+### Prove that reverse preserves list length
+
+`lengthReverse` relates the result of installed `Prelude.reverse` to
+the original list. The proof uses an accumulator invariant. The
+worker's result has length `Plus (Count xs) (Count acc)`. The cons
+clause moves the same head to the accumulator. The recursive step
+uses right-successor transport, and the wrapper uses right-zero for
+the empty accumulator.
+
+The library names the existing tail-recursive worker `reverseOnto`
+in `GHC.Internal.List`. The source aliases use its checked equations
+and the checked equation for the public wrapper. The ordinary proof
+exports a theorem about the result of the wrapper.
+
+The compiler checks the exact worker, head, tail, and accumulator in
+desugared and optimized Core. It checks that the wrapper calls that
+worker with an empty accumulator. A finite spine exposes the reverse
+result without evaluating its elements. A bottom tail prevents the
+result from exposing a cons.
+[Source aliases](../examples/open-evaluation/PreludeReverseLengthSource.hs)
+and [ordinary proof](../examples/open-evaluation/PreludeReverseLengthProof.hs).

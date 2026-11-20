@@ -77,6 +77,13 @@ test('NativeOpenInstalledAppend',
                                                'PreludeMapLengthSize.hs', 'PreludeMapLengthSource.hs',
                                                'PreludeMapLengthProof.hs']])],
      run_command, ['bash NativeOpenInstalledAppend.sh "{compiler}" "{libdir}"'])
+test('NativeOpenInstalledReverse',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['PreludeReverseLengthSource.hs', 'PreludeReverseLengthProof.hs',
+                                               'PreludeAppendLengthSource.hs', 'PreludeMapLengthSize.hs',
+                                               'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']]
+                  + ['NativeOpenInstalledReverseProducer.hs'])],
+     run_command, ['bash NativeOpenInstalledReverse.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludePairExport.hs',

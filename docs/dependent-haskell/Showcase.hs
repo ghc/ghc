@@ -117,6 +117,7 @@ import qualified PreludeAppendLengthProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeMapAppendProof
 import qualified PreludeMapLengthProof
+import qualified PreludeReverseLengthProof
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
 import qualified OpenBuildWorker as Build
@@ -1251,6 +1252,8 @@ main = do
               ++ PreludeMapLengthProof.showPreludeMapLength)
     putStrLn ("prove that append adds the list lengths: "
               ++ PreludeAppendLengthProof.showPreludeAppendLength)
+    putStrLn ("prove that reverse preserves list length: "
+              ++ PreludeReverseLengthProof.showPreludeReverseLength)
     putStrLn ("prove that map distributes over append: "
               ++ PreludeMapAppendProof.showPreludeMapAppend)
     putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
