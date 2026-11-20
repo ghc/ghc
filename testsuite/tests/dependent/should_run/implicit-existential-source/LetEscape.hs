@@ -4,6 +4,7 @@ module LetEscape where
 
 import Filter (Hidden)
 import LetFilter (letFilter)
+import Nested (partitionPair)
 import Vector
 
 copy :: Vec n a -> Vec n a
@@ -17,3 +18,9 @@ different packages = let (xs, ys) = packages in same xs ys
   where
     same :: Vec n a -> Vec n a -> Bool
     same _ _ = True
+
+nested :: (a -> Bool) -> Vec i a -> Vec n a
+nested p xs = let rows = partitionPair p xs in left rows
+  where
+    left :: (Vec l a, Vec r a) -> Vec l a
+    left (ls, _) = ls

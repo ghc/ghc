@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, PolyKinds, TypeApplications #-}
 module Nested
-  ( packPair, partitionPair, buildPair, roundTrip, hiddenKind
+  ( packPair, partitionPair, localPartition, buildPair, roundTrip, hiddenKind
   , HiddenProduct, productPair, Product(..)
   ) where
 
@@ -21,6 +21,10 @@ partitionPair p (Cons x xs)
     yes y ~(ls, rs) = (Cons y ls, rs)
     no :: a -> (Vec l a, Vec r a) -> PackedPair a
     no y ~(ls, rs) = (ls, Cons y rs)
+
+-- Store the whole package while the element type is still abstract.
+localPartition :: (a -> Bool) -> Vec n a -> PackedPair a
+localPartition p xs = let rows = partitionPair p xs in roundTrip rows
 
 type Builder a = exists (n :: Nat). exists (m :: Nat). a -> (Vec n a, Vec m a)
 

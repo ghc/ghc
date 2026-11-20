@@ -52,7 +52,7 @@ bottom = abort
 
 main :: IO ()
 main = do
-    print (cells (partitionPair odd (Cons 7 (Cons 2 (Cons 9 Nil)))))
+    print (cells (localPartition odd (Cons 7 (Cons 2 (Cons 9 Nil)))))
     print (cells (roundTrip (packPair (Cons 7 Nil) (Cons 2 (Cons 4 Nil)))))
     let yes = partitionPair odd (Cons 7 (error "forced the unseen passing tail"))
         no = partitionPair odd (Cons 2 (error "forced the unseen failing tail"))

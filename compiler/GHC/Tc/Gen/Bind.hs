@@ -57,7 +57,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
-import GHC.Core.Type (mkStrLitTy, mkCastTy, coreFullView, isFamFreeTy)
+import GHC.Core.Type (mkStrLitTy, mkCastTy, coreFullView, isFamFreeTy, noFreeVarsOfType)
 import GHC.Core.TyCo.Rep (Type(ExistsTy))
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
@@ -1340,17 +1340,21 @@ checkInferredRetainedTypes local_value infos
                else failWithTc $ TcRnRetainedQuantificationError (RetainedInference ty) }
 
     closed_package ty
-      | ExistsTy _ _ payload <- coreFullView ty
-      = isTauTy ty && not (hasNativeDependentExpr (Type payload))
+      | ExistsTy _ binder body <- coreFullView ty
+      = noFreeVarsOfType ty && isFamFreeTy ty
+        && isTauTy (varType binder) && ordinary_schema body
       | otherwise = False
 
     scoped_type ty
-      | ExistsTy ImplicitExists binder body <- coreFullView ty
-      = let kind = varType binder in
-        isTauTy kind && isTauTy body && isFamFreeTy ty
-        && all isTyVar (tyCoVarsOfTypeList ty)
-        && not (hasNativeDependentExpr (Type kind) || hasNativeDependentExpr (Type body))
+      | ExistsTy ImplicitExists _ _ <- coreFullView ty
+      = all isTyVar (tyCoVarsOfTypeList ty) && isFamFreeTy ty && ordinary_schema ty
       | otherwise = isTauTy ty
+
+    -- Check the kinds and final payload inside the whole package's scope.
+    ordinary_schema ty = case coreFullView ty of
+      ExistsTy _ binder body -> ordinary_type (varType binder) && ordinary_schema body
+      payload                -> ordinary_type payload
+    ordinary_type ty = isTauTy ty && not (hasNativeDependentExpr (Type ty))
 
 {- Note [Inference of retained types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1366,9 +1370,12 @@ complete signatures on their checking path, including those in a binding group.
 Ordinary inferred functions whose types contain no native syntax are unchanged.
 See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
 
-A closed erased package is a monotype when its payload is a family-free
-tau type. Let a saturated Pack with a supplied schema synthesize this type.
-Keep the retained type check for native syntax in its payload. See
+An inferred existential can have consecutive binders. Check closure on the
+whole package. In `exists n. exists m. Rows Int n m`, the inner package
+refers to n, which the outer package binds. Check each binder kind and
+the final payload for ordinary tau syntax. Keep the family-free check.
+This examines a type that the RHS already synthesized. A metavariable
+assignment has separate requirements. See
 Note [Closed existential packages in type inference] in GHC.Core.Type.
 
 Note [Scoped inferred native values]
