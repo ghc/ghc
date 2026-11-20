@@ -7,11 +7,12 @@ export LC_ALL=C
 # supplies the old boot interfaces for the original GHC.Internal.Err source.
 upgrade=
 case ${1:-} in
-    --family-kinds|--family-results|--family-stages|--packed-projections|--abstract-witness) upgrade=$1; shift ;;
+    --family-kinds|--family-results|--family-stages|--family-forwarding|--packed-projections|--abstract-witness) upgrade=$1; shift ;;
 esac
 if (( $# < 4 || $# > 5 )) || { [[ $upgrade == --family-* || $upgrade == --abstract-witness ]] && (( $# != 4 )); }; then
     echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB [OLD_GHC_INTERNAL_BUILD]" >&2
     echo "       $0 --family-stages OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
+    echo "       $0 --family-forwarding OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-kinds M177_GHC M177_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-results INTERMEDIATE_GHC INTERMEDIATE_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --packed-projections OLD_GHC OLD_LIB NEW_GHC NEW_LIB [NEW_GHC_PKG]" >&2
@@ -259,6 +260,30 @@ HS
     if grep -F 'Compiling Unrelated' upgrade.log; then exit 1; fi
     "${new[@]}" "${args[@]}" >warm.log 2>&1
     if grep -F 'Compiling ' warm.log; then exit 1; fi
+    exit 0
+fi
+
+if [[ $upgrade == --family-forwarding ]]; then
+    cd "$work/home"
+    cp "$repo/docs/dependent-haskell/examples/open-evaluation"/{NestedFunctionKind,NestedFunctionClient}.hs .
+    printf '%s\n' 'module Unrelated where' 'answer :: Int' 'answer = 42' >Unrelated.hs
+    flags=(-O0 -v1 -fomit-interface-pragmas -fno-write-if-simplified-core -i -i. "${sanity[@]}")
+    "${old[@]}" "${flags[@]}" --make -no-link NestedFunctionKind.hs Unrelated.hs
+    stat -c '%y %n' Unrelated.{hi,o} >unrelated.before
+    if "${old[@]}" "${flags[@]}" -c NestedFunctionClient.hs >old.log 2>&1; then exit 1; fi
+    grep -Fq 'GHC-83865' old.log || { cat old.log; exit 1; }
+    "${new[@]}" "${flags[@]}" --make -no-link NestedFunctionClient.hs Unrelated.hs >upgrade.log 2>&1 || { cat upgrade.log; exit 1; }
+    grep -E 'Compiling NestedFunctionKind .*\[Compiler now separates a family result from its kind\]' upgrade.log
+    stat -c '%y %n' Unrelated.{hi,o} | cmp unrelated.before -
+    "${new[@]}" "${flags[@]}" --make -no-link NestedFunctionClient.hs Unrelated.hs >warm.log 2>&1
+    if grep -F 'Compiling ' warm.log; then exit 1; fi
+    for module in NestedFunctionKind NestedFunctionClient; do
+        "${new[@]}" --show-iface "$module.hi" | grep -F '  ABI hash:' >"$module.abi"
+    done
+    "${new[@]}" "${flags[@]}" -fforce-recomp --make -no-link NestedFunctionClient.hs
+    for module in NestedFunctionKind NestedFunctionClient; do
+        "${new[@]}" --show-iface "$module.hi" | grep -F '  ABI hash:' | cmp "$module.abi" -
+    done
     exit 0
 fi
 

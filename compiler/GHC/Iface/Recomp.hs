@@ -582,14 +582,15 @@ checkFlagHash hsc_env iface self_recomp = do
         ordered_fp = orderedTypeCaseFingerprint retained_case_fp
         previous_fp = orderedTypeCaseFingerprint abstract_fp
         staged_fp = stagedMatchabilityFingerprint previous_fp
-        new_fp = classDefaultMatchabilityFingerprint staged_fp
+        class_fp = classDefaultMatchabilityFingerprint staged_fp
+        new_fp = forwardedResultFingerprint class_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
-       | old_fp `elem` [new_fp, staged_fp, previous_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
+       | old_fp `elem` [new_fp, class_fp, staged_fp, previous_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
          -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
        , couldSeparateFamilyResultMatchability iface
@@ -674,7 +675,7 @@ checkFlagHash hsc_env iface self_recomp = do
         out_of_date logger FlagsChanged (fmap vcat diffs)
     retained <- case previous of
       UpToDate
-        | old_fp `notElem` [new_fp, staged_fp, previous_fp, ordered_fp]
+        | old_fp `notElem` [new_fp, class_fp, staged_fp, previous_fp, ordered_fp]
         , mi_hsc_src iface == HsSrcFile
         , couldExportOrderedTypeCase iface ->
             liftIO $ recheck "Compiler now checks type case constructor order"
@@ -690,17 +691,26 @@ checkFlagHash hsc_env iface self_recomp = do
             else pure UpToDate
       _ -> pure previous
     flags <- case retained of
-      UpToDate | old_fp /= new_fp, couldInferClassDefaultSelector iface ->
+      UpToDate | old_fp `notElem` [new_fp, class_fp], couldInferClassDefaultSelector iface ->
         liftIO $ recheck "Compiler now infers matchability for associated type defaults"
       _ -> pure retained
     let check_family_uses
-          | old_fp == new_fp || old_fp == staged_fp = pure UpToDate
+          | old_fp `elem` [new_fp, class_fp, staged_fp] = pure UpToDate
           | otherwise = do
               candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
               if candidate
                 then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
                 else pure UpToDate
-    pure (flags, check_family_uses)
+        check_forwarded_result
+          | old_fp /= new_fp, couldForwardFamilyResult iface =
+              liftIO $ recheck "Compiler now separates a family result from its kind"
+          | otherwise = pure UpToDate
+    pure (flags, check_family_uses `recompThen` check_forwarded_result)
+
+-- | Record the independent selector on an open equation returning its kind family.
+forwardedResultFingerprint :: Fingerprint -> Fingerprint
+forwardedResultFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "forwarded-family-result-v1" :: String)
 
 -- | Record the inference rules used to compile open family applications.
 stagedMatchabilityFingerprint :: Fingerprint -> Fingerprint
@@ -952,6 +962,32 @@ ifaceResultArrow (IfaceFunTy FTF_T_T _ _ _ _) = True
 ifaceResultArrow (IfaceCastTy t _) = ifaceResultArrow t
 ifaceResultArrow _ = False
 
+-- | Check the owning family before reusing an equation with its old arity.
+-- See Note [Recompiling inferred open family applications].
+couldForwardFamilyResult :: ModIface -> Bool
+couldForwardFamilyResult iface = any changed (map snd (mi_decls iface))
+  where
+    result_heads = mkNameEnv
+      [(name, owner) | IfaceFamily{ ifName = name, ifBinders = bs, ifResKind = kind
+                                  , ifFamInj = NotInjective
+                                  , ifFamFlav = IfaceOpenTypeFamilyTyCon } <- ifaceFamilyDecls iface
+                     , any isVisibleTyConBinder bs, not (isIfaceLiftedTypeKind kind)
+                     , Just owner <- [head_name kind]]
+
+    changed IfaceAxiom{ifTyCon = tc, ifAxBranches = branches} =
+      any (returns_target (ifaceTyConName tc) . ifaxbRHS) branches
+    changed IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
+      or [returns_target (ifName fam) rhs | IfaceAT fam (Just rhs) <- ats]
+    changed _ = False
+    returns_target family rhs = case lookupNameEnv result_heads family of
+      Just owner -> head_name rhs == Just owner
+      Nothing -> False
+
+    head_name (IfaceTyConApp tc _) = Just (ifaceTyConName tc)
+    head_name (IfaceAppTy fun _) = head_name fun
+    head_name (IfaceCastTy body _) = head_name body
+    head_name _ = Nothing
+
 -- | Recheck old providers and uses of an inferred family selector.
 -- See Note [Recompiling inferred open family applications].
 checkStagedMatchability :: ModIface -> [Usage] -> IfG Bool
@@ -1002,6 +1038,11 @@ internal use from its exported types, so consult its usage records.
 Signatures in boot files also use these defaults. Class defaults reside
 in the class interface even when a different module will supply the
 first instance. Recheck the owning class before reading that instance.
+
+An equation can return the family named in its own result kind. The old
+interface keeps the RHS, possibly under a kind cast. Recheck the owner
+when both heads name the same family. A changed family arity invalidates
+its clients through the usual dependency checks.
 -}
 
 -- | Check old family headers that may need an independent result selector.
@@ -1892,7 +1933,8 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = classDefaultMatchabilityFingerprint
+          current_flag_hash = forwardedResultFingerprint
+                            $ classDefaultMatchabilityFingerprint
                             $ stagedMatchabilityFingerprint
                             $ orderedTypeCaseFingerprint
                             $ abstractWitnessFingerprint
