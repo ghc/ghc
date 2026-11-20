@@ -96,8 +96,19 @@ At an indexed promoted kind, each constructor refines the index.
 When ordinary unification fails, the compiler can try one nominal
 reduction at each constructor result index using an imported or
 previously checked closed-family axiom. This step can also establish
-that a constructor is impossible at the scrutinee kind. Open or
-unresolved index applications can still prevent compilation.
+that a constructor is impossible at the scrutinee kind. An open or
+unresolved index can still block an explicit constructor pattern.
+
+An ordinary constructor can be tested at an open index. In
+`OpenIndexPick`, `OpenPlain True` has the scrutinee kind for every
+index. Its decision family tests that head before inspecting its field.
+A different constructor can reach the fallback without solving its
+index. An unknown head or field still blocks the fallback, even when
+both rows return `Int`. The classifier takes the variables of the
+scrutinee kind. An ordinary client can prove both outcomes using only
+the provider interface.
+[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [closed-family case translation, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf).
 
 In `IndexedFieldPick`, the constructor index `FieldIndex seed active`
 reduces to `Bool`. The other index then unifies with `'True`, which
