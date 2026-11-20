@@ -42,9 +42,6 @@ singletonBuilder = \x -> VCons x VNil
 
 -- | Open the builder, then filter its output at a new hidden length.
 runBuilder :: Builder a -> (a -> Bool) -> a -> [a]
-runBuilder builder p x = collect builder p x
-  where
-    collect :: (a -> Vec a n) -> (a -> Bool) -> a -> [a]
-    collect f keep y =
-      let selected = filterVec keep (f y)
-      in cells selected
+runBuilder builder p x =
+  let selected = filterVec p (builder x)
+  in cells selected
