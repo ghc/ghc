@@ -2759,6 +2759,7 @@ tc_app_ty mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
 tc_app_ty_generic :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty_generic mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty hs_args
+       -- See Note [Owning omitted arrows in kind-valued arguments] in GHC.Tc.Solver.
        ; let index_level = case exp_kind of
                Check expected | isTypeLikeKind expected -> KindLevel
                _ -> TypeLevel
@@ -4013,8 +4014,8 @@ See docs/dependent-haskell/REFERENCES.md for the pinned source record.
 --
 -- tcInferTyApps also arranges to saturate any trailing invisible arguments
 --   of a type-family application, which is usually the right thing to do
--- tcInferTyApps_nosat does not do this saturation; it is used only
---   by ":kind" in GHCi
+-- tcInferTyApps_nosat preserves the remaining invisible binders for :kind
+-- and for checking an application against an expected kind.
 tcInferTyApps
     :: TcTyMode
     -> LHsType GhcRn        -- ^ Function (for printing only)
@@ -4076,7 +4077,9 @@ tcInferTyApps_nosat index_level mode orig_hs_ty fun orig_hs_args
                            Just (owner, _) -> fresh_kind_arrow index_level owner
                            Nothing -> pure (defaultForAllMatchability index_level)
                        | otherwise = pure unmatchableDataConTy
-                 mkTyConApp tc <$> traverse choose indices
+                 case (defaults, index_level) of
+                   (Nothing, TypeLevel) -> pure fun
+                   _ -> mkTyConApp tc <$> traverse choose indices
            _ -> pure fun
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args Nothing
        ; traceTc "tcInferTyApps }" (ppr f_args <+> dcolon <+> ppr res_k)
