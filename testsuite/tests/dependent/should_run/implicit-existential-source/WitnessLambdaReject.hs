@@ -11,3 +11,6 @@ duplicate = \b -> buildTwice b b
 
 wrongOperand :: RankedBuilder
 wrongOperand = \_ -> buildAt 'a'
+
+missingEquality :: FlaggedBuilder a
+missingEquality = \_ b -> buildAt b

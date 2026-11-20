@@ -3,6 +3,7 @@ module WitnessSchema
     ( Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer
     , CallbackPair, atTwoTypes, observePair, ignorePair
     , RankedBuilder, buildAt, observeBuilder
+    , Flag(..), FlaggedBuilder, observeFlagged
     , Captured(..), CapturedBuilder, LinearBuilder, buildLinear, buildTwice
     ) where
 import Data.Kind (Type)
@@ -47,10 +48,18 @@ buildAt :: Bool -> Payload PolyId
 buildAt b = Payload @PolyId id (\f -> (f (if b then 7 else 9), f b))
 
 observeBuilder :: RankedBuilder -> Bool -> (Int, Bool)
-observeBuilder builder b = inspect (builder b)
-  where
-    inspect :: Payload t -> (Int, Bool)
-    inspect (Payload value run) = run value
+observeBuilder builder b = observePayload (builder b)
+
+data Flag a where
+    Flag :: Flag Bool
+
+type FlaggedBuilder a = exists (t :: Type). Flag a -> a -> Payload t
+
+observeFlagged :: FlaggedBuilder Bool -> Bool -> (Int, Bool)
+observeFlagged builder b = observePayload (builder Flag b)
+
+observePayload :: Payload t -> (Int, Bool)
+observePayload (Payload value run) = run value
 
 data Captured where
     Captured :: Payload (forall r. r -> x) -> Captured
