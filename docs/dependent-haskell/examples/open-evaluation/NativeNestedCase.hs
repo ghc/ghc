@@ -9,6 +9,7 @@ module NativeNestedCase
   , DependentFieldGate(..), DependentFieldPick
   , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
   , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
+  , ScopedOpenIndex
   ) where
 
 import Data.Kind (Type)
@@ -158,6 +159,12 @@ type OpenIndexPick (k :: Type) (d :: Maybe (OpenCaseGate k)) = case d of
 type OpenIndexAtOrdering (d :: Maybe (OpenCaseGate Ordering)) = case d of
   Just (OpenPlain True) -> Int
   Just _ -> Bool
+  Nothing -> Char
+
+type ScopedOpenIndex (b :: Bool) (d :: Maybe (OpenCaseGate (OpenCaseIndex b))) = case d of
+  Just (OpenPlain True) -> Proxy b
+  Just (OpenPlain b) -> Proxy b
+  Just _ -> Proxy d
   Nothing -> Char
 
 type family FieldIndex (seed :: Bool) (active :: Bool) :: Type where

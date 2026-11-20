@@ -540,6 +540,17 @@ polymorphic recursion. Copy the written kind of the scrutinee from its
 binder. A kind annotation on the case also gives the family its result
 kind. See Note [Result kinds of dependent type cases] in GHC.Tc.TyCl.
 
+A named scrutinee can also depend on an earlier binder of the synonym.
+Generalize the family before checking the synonym when the captures
+form a telescope. Its initial monomorphic kind would leave the capture
+variables free. For `(b :: Bool) (d :: Gate (Index b))`, checking
+the application would then require equality of family applications at
+different `b` variables. The generalized family substitutes the
+supplied `b`. Infer the scrutinee kind from the rows as before.
+This lets the patterns match at an abstract index and keeps `Index b`
+out of their constructor arguments.
+See Note [No polymorphic recursion in type decls] in GHC.Tc.TyCl.
+
 Stop if a binder shadows a capture, including a kind variable in its
 header. The name in the copied header must keep its original meaning.
 Stop in an active case-let alias environment. The alias bindings belong
@@ -644,7 +655,15 @@ liftTypeCases group =
                      Prefix (L (l2l loc) (maybe (NoSig noExtField) (KindSig noExtField) result_kind)) Nothing))
           (scrutinee', nested, next) = liftRhs owner independent captures aliases scrutinee (salt + 1)
           result = applyType loc name ([typeName v | (_, _, v) <- captures] ++ [scrutinee'])
-      in (result, (fam, (occ, if independent then Nothing else Just owner_occ)) : nested, next)
+          separate = independent || (null aliases && dependentScrutinee captures scrutinee)
+      in (result, (fam, (occ, if separate then Nothing else Just owner_occ)) : nested, next)
+
+    dependentScrutinee captures scrutinee
+      | Just (HsBndrKind _ kind) <- caseScrutineeKind True captures scrutinee
+      , Just (_:_) <- lexicalNames kind
+      , Just _ <- foldM extendForall [] captures
+      = True
+    dependentScrutinee _ _ = False
 
     caseScrutineeKind False _ _ = Just (HsBndrNoKind noExtField)
     caseScrutineeKind True captures scrutinee
