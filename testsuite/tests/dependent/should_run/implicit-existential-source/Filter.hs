@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
-module Filter (Hidden, filterVec, toList) where
+module Filter (Hidden, filterVec, partitionVec, toList) where
 import Vector
 
 type Hidden a = exists (m :: Nat). Vec m a
@@ -9,6 +9,12 @@ filterVec _ Nil = Nil
 filterVec p (Cons x xs)
     | p x = Cons x (filterVec p xs)
     | otherwise = filterVec p xs
+
+partitionVec :: (a -> Bool) -> Vec n a -> (Hidden a, Hidden a)
+partitionVec _ Nil = (Nil, Nil)
+partitionVec p (Cons x xs) =
+    let (yes, no) = partitionVec p xs
+    in if p x then (Cons x yes, no) else (yes, Cons x no)
 
 toList :: Hidden a -> [a]
 toList xs = go xs

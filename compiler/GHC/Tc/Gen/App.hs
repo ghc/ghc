@@ -33,7 +33,7 @@ import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env ( isExistsPackName, tcLookupIdMaybe, tcLookupConLike
-                        , tcLookupGlobal, tcLookupLcl_maybe, tcExtendIdEnv )
+                        , tcLookup, tcLookupGlobal, tcLookupLcl_maybe, tcExtendIdEnv )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -74,7 +74,7 @@ import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
 import GHC.Driver.DynFlags ( DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
-import GHC.Types.TyThing ( TyThing(AnId, AConLike) )
+import GHC.Types.TyThing ( TyThing(AnId, AConLike, ATyCon) )
 import GHC.Types.Basic ( TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
@@ -712,36 +712,114 @@ demands_payload _ = False
 -- See Note [Type arguments before an implicit package head].
 tcImplicitOperand :: LHsExpr GhcRn
                   -> TcM (Maybe (LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn)))
-tcImplicitOperand arg = find_head 0 id arg
+tcImplicitOperand arg = find_head [] id arg
   where
-    find_head n rebuild (L loc (HsApp x fun operand)) =
-      find_head (n + 1) (\f -> rebuild (L loc (HsApp x f operand))) fun
-    find_head n rebuild (L loc (HsPar x fun)) =
-      find_head n (\f -> rebuild (L loc (HsPar x f))) fun
-    find_head n rebuild head_expr
-      | HsVar _ name <- unLoc (package_head head_expr)
+    find_head operands rebuild (L loc (HsApp x fun operand)) =
+      find_head (operand : operands) (\f -> rebuild (L loc (HsApp x f operand))) fun
+    find_head operands rebuild (L loc (HsPar x fun)) =
+      find_head operands (\f -> rebuild (L loc (HsPar x f))) fun
+    find_head [] _ (L _ (ExprWithTySig _ _ sig))
+      = do { implicit <- tcImplicitOperandSignature sig
+           ; return (if implicit then Just (arg, Nothing) else Nothing) }
+    find_head operands rebuild head_expr
+      | (base, written) <- package_head [] head_expr
+      , HsVar _ name <- unLoc base
       , let id_name = unLocWithUserRdr name
       , not (isDataOcc (nameOccName id_name))
       = do { ident <- tcLookupIdMaybe id_name
-           ; return $ case implicitSpineHead . varType <$> ident of
+           ; let n = length operands
+           ; case implicitSpineHead . varType <$> ident of
                Just (ExistsTy ImplicitExists _ body)
-                 | opensImplicitHead n body -> Just (head_expr, Just rebuild)
+                 | opensImplicitHead n body -> return (Just (head_expr, Just rebuild))
                Just ty | HsVar{} <- unLoc head_expr
-                       , hasDotResult n ty -> Just (arg, Nothing)
-               _ -> Nothing }
+                       , Just result <- implicitSpineResult n ty
+                       , ExistsTy ImplicitExists _ _ <- result -> return (Just (arg, Nothing))
+               _ | Just var <- ident, [operand] <- operands
+                 -> do { implicit <- tcImplicitOperandProjection (varType var) written operand
+                       ; return (if implicit then Just (arg, Nothing) else Nothing) }
+               _ -> return Nothing }
     find_head _ _ _ = return Nothing
 
-    package_head (L _ (HsAppType _ fun _)) = package_head fun
-    package_head (L _ (HsPar _ fun)) = package_head fun
-    package_head expr = expr
+    package_head written (L _ (HsAppType _ fun ty)) = package_head (ty : written) fun
+    package_head written (L _ (HsPar _ fun)) = package_head written fun
+    package_head written expr = (expr, written)
 
-    hasDotResult 0 ty = case implicitSpineHead ty of
-      ExistsTy ImplicitExists _ _ -> True
-      _ -> False
-    hasDotResult n ty = case implicitSpineHead ty of
-      FunTy { ft_af = af, ft_res = result } | isVisibleFunArg af ->
-        hasDotResult (n - 1) result
-      _ -> False
+-- | Read the result after the written ordinary arguments.
+implicitSpineResult :: Int -> TcType -> Maybe TcType
+implicitSpineResult 0 ty = Just (implicitSpineHead ty)
+implicitSpineResult n ty
+  | Just (_, result) <- splitVisibleFunTy_maybe (implicitSpineHead ty)
+  = implicitSpineResult (n - 1) result
+  | otherwise = Nothing
+
+-- | Recognize a written dot type without checking the expression or signature.
+-- See Note [Projected implicit existential operands].
+tcImplicitOperandSignature :: LHsSigWcType GhcRn -> TcM Bool
+tcImplicitOperandSignature sig@(HsWC { hswc_body = L _ (HsSig { sig_body = body }) })
+  | isCompleteHsSig sig = tcImplicitOperandType body
+  | otherwise = return False
+
+-- | Read the outer shape of a written type.
+tcImplicitOperandType :: LHsType GhcRn -> TcM Bool
+tcImplicitOperandType (L _ (HsParTy _ nested)) = tcImplicitOperandType nested
+tcImplicitOperandType (L _ (XHsType (HsTypeExistsRn ImplicitExists _ _))) = return True
+tcImplicitOperandType ty
+  | Just (L _ (WithUserRdr _ name)) <- hsTyGetAppHead_maybe ty
+  , isTcOcc (nameOccName name)
+  = do { thing <- tcLookup name
+       ; return $ case thing of
+           AGlobal (ATyCon tc)
+             | Just rhs <- synTyConRhs_maybe tc
+             , ExistsTy ImplicitExists _ _ <- coreFullView rhs -> True
+           _ -> False }
+  | otherwise = return False
+
+-- | Recognize a dot result selected by a named projection.
+-- See Note [Projected implicit existential operands].
+tcImplicitOperandProjection :: TcSigmaType -> [LHsWcType GhcRn] -> LHsExpr GhcRn -> TcM Bool
+tcImplicitOperandProjection sigma written operand
+  | (_, binders, body) <- tcSplitForAllTyVarsReqTVBindersN 0 sigma
+  , let tvs = map (binderVar . snd) binders
+        specified = [binderVar b | (_, b) <- binders, isSpecifiedForAllTyFlag (binderFlag b)]
+  , length written <= length specified
+  , isTauTy body
+  , not (hasNativeDependentExpr (Core.Type body))
+  , Just (domain, result) <- splitVisibleFunTy_maybe body
+  , TyVarTy result_var <- coreFullView result, result_var `elem` tvs
+  , Just (tc, domain_args) <- tcSplitTyConApp_maybe domain
+  , isGenerativeTyCon tc Nominal
+  , any (eqType (mkTyVarTy result_var)) domain_args
+  = do { declared <- declared_result 0 operand
+       ; case declared >>= match_dot tvs tc domain result_var of
+           Just () -> case lookup result_var (zip specified written) of
+             Just (HsWC { hswc_body = ty }) -> tcImplicitOperandType ty
+             Nothing -> return True
+           Nothing -> return False }
+  | otherwise = return False
+  where
+    declared_result n (L _ (HsApp _ fun _)) = declared_result (n + 1) fun
+    declared_result n (L _ (HsPar _ fun)) = declared_result n fun
+    declared_result n (L _ (HsVar _ lname))
+      | let name = unLocWithUserRdr lname
+      , not (isDataOcc (nameOccName name))
+      = do { ident <- tcLookupIdMaybe name
+           ; return (ident >>= implicitSpineResult n . varType) }
+    declared_result _ _ = return Nothing
+
+    match_dot tvs tc domain result_var actual = do
+      (actual_tc, _) <- tcSplitTyConApp_maybe actual
+      guard (actual_tc == tc && supportsQuickLookType actual && noQuickLookVars actual)
+      guard (not (any (`elemVarSet` tyCoVarsOfType actual) tvs))
+      let in_scope = mkInScopeSet (tyCoVarsOfTypes [domain, actual])
+      subst <- tcMatchTyX_BM (bind_outer tvs) (Subst.mkEmptySubst in_scope) domain actual
+      guard (eqType (Subst.substTy subst domain) actual)
+      selected <- Subst.lookupTyVar subst result_var
+      case coreFullView selected of
+        ExistsTy ImplicitExists _ _ -> Just ()
+        _ -> Nothing
+
+    bind_outer tvs tv _ | tv `elem` tvs = BindMe
+                        | otherwise = DontBindMe
 
 -- | Find the declared shape after ordinary invisible instantiation.
 implicitSpineHead :: TcType -> TcType
@@ -829,6 +907,32 @@ its declared package. The ordinary head instantiation still takes
 place inside the opening, so argument-only variables can match the
 witness. Fill the usual inference slot after closing the implication.
 The outer result's metavariables cannot capture the opened witness.
+-}
+
+{- Note [Projected implicit existential operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In foldr step z (fst (partition p xs)), the declared result of fst is a
+type variable. A declared result of partition has two dot packages under
+the rigid pair constructor. The argument type of fst determines which one
+the application returns.
+
+Use the same guarded premise as Quick Look (Serrano et al., Fig. 5).
+Read the producer's declared spine and match the projection's rigid
+domain. Use the immutable matcher. The result parameter must be a direct
+argument of the nominally injective domain constructor. A match under a
+type family would not determine the result parameter. Select the route
+only if that parameter has a dot package at the head. A written type for
+that parameter must also show a dot package, directly or through a known
+synonym. The same check applies to a written expression signature. These
+checks consume no source usages and create no constraints or Quick Look
+variables.
+
+The selected type is only a shape. It can mention binders from the
+declaration of the producer. The ordinary inference of the original
+operand checks the arguments, type applications, and constraints once.
+tcOpenImplicitArgs scales that check by the formal multiplicity and uses
+its actual result to open the package. It keeps the consumer's result
+outside the new skolem. See Note [Implicit existential arguments].
 -}
 
 -- | Check a saturated explicit existential constructor application.

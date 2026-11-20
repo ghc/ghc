@@ -214,12 +214,22 @@ also construct a package at the call site. For example,
 `runBuilder (\x -> VCons x VNil) odd (7 :: Int)` returns `[7]`.
 [Optimizer scope](R05-dependent-core.md#optimizing-erased-packages).
 
-Opening is limited to an application with a known operand head and an
-ordinary payload domain. An opening introduces a fresh scoped
-witness. The recursive filter result can also be named with
+An application with an ordinary payload domain can open an operand whose
+type exposes a dot package. An opening introduces a fresh scoped witness.
+The recursive filter result can also be named with
 `let rest = filterVec p xs in Cons x rest`. The nonrecursive local
 binding retains the exact dot package type, including its enclosing
 element type. Opening the binding stays inside the application.
+
+An ordinary client can also write `foldr step z (fst (partitionVec p xs))`.
+The result of `partitionVec` exposes the dot package in a rigid pair type.
+Matching that pair against the domain of `fst` identifies its result
+parameter before the fold checks its operands. The compiler then checks the
+original operand once at its declared multiplicity. A complete type
+annotation can also identify the dot package. The resulting witness remains
+local to the fold, and the fold can return its first result with an
+exceptional input tail.
+
 The draft's general opaque witness projections, scope
 repacking across lambda, let or case, and `@Pack` remain open.
 [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
