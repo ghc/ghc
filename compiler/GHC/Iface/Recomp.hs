@@ -84,7 +84,7 @@ import GHC.Unit.Module.Deps
 
 import Control.Monad
 import Control.Monad.Trans.State
-import Data.List (sortBy, sort, sortOn)
+import Data.List (isPrefixOf, sortBy, sort, sortOn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Word (Word64)
@@ -572,14 +572,17 @@ checkFlagHash hsc_env iface self_recomp = do
         old_readback_fp = readbackRecipeFingerprint open_matchability_fp
         intermediate_kind_fp = familyKindMatchabilityFingerprint old_readback_fp
         result_kind_fp = familyResultMatchabilityFingerprint intermediate_kind_fp
-        new_fp = retainedCaseFingerprint result_kind_fp
+        retained_case_fp = retainedCaseFingerprint result_kind_fp
+        abstract_fp = abstractWitnessFingerprint retained_case_fp
+        ordered_fp = orderedTypeCaseFingerprint retained_case_fp
+        new_fp = orderedTypeCaseFingerprint abstract_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
-       | old_fp == new_fp || old_fp == result_kind_fp
+       | old_fp `elem` [new_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
          -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
        , couldSeparateFamilyResultMatchability iface
@@ -665,10 +668,17 @@ checkFlagHash hsc_env iface self_recomp = do
     case previous of
       UpToDate
         | old_fp /= new_fp
-        , old_fp `elem` (result_kind_fp : intermediate_kind_fp : old_readback_fp :
+        , old_fp /= ordered_fp
+        , mi_hsc_src iface == HsSrcFile
+        , couldExportOrderedTypeCase iface ->
+            liftIO $ recheck "Compiler now checks type case constructor order"
+        | old_fp /= new_fp
+        , old_fp `elem` (ordered_fp : retained_case_fp : result_kind_fp :
+                         intermediate_kind_fp : old_readback_fp :
                          open_matchability_fp : closed_matchability_fp : archived)
         , mi_hsc_src iface == HsSrcFile -> do
-          candidate <- couldExportRetainedCase iface (mi_sr_usages self_recomp)
+          let abstract_only = old_fp == retained_case_fp || old_fp == ordered_fp
+          candidate <- couldExportRetainedCase abstract_only iface (mi_sr_usages self_recomp)
           if candidate
             then liftIO $ recheck "Compiler now checks retained package case projections"
             else pure UpToDate
@@ -739,27 +749,63 @@ retainedCaseFingerprint :: Fingerprint -> Fingerprint
 retainedCaseFingerprint fp =
     computeFingerprint putNameLiterally (fp, "retained-package-case-v1" :: String)
 
+-- | Record that a retained witness may have a datatype parameter as its type.
+abstractWitnessFingerprint :: Fingerprint -> Fingerprint
+abstractWitnessFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "retained-abstract-witness-v1" :: String)
+
+-- | Record that the compiler preserves the constructor test order of type cases.
+orderedTypeCaseFingerprint :: Fingerprint -> Fingerprint
+orderedTypeCaseFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "ordered-type-cases-v1" :: String)
+
+{- Note [Recompiling ordered type cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old interface can contain flat equations for a source type case.
+If a synonym introduced an inner constructor test, a later compatible
+equation could bypass that test. Recheck a lifted case with several
+equations when its source is available. A lifted type lambda can also
+contain such a case. The old interface need not preserve the written
+pattern order. Let the usual ABI checks recompile callers when the
+provider's axioms change.
+
+Reusing a provider compiled by either standalone implementation can
+still lose the other feature's check. Recognize each standalone hash.
+Use the producer's missing check to decide whether to recompile.
+-}
+
+-- | Does the interface contain a lifted type case that may use flat equations?
+-- See Note [Recompiling ordered type cases].
+couldExportOrderedTypeCase :: ModIface -> Bool
+couldExportOrderedTypeCase = any candidate . mi_decls
+  where
+    candidate (_, IfaceFamily {ifName = name, ifFamFlav = family})
+      | IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon (Just (_, _:_:_))) <- family
+      = let occ = occNameString (nameOccName name)
+        in any (`isPrefixOf` occ) ["$case:", "$lambda:"]
+    candidate _ = False
+
 -- | Find exported ordinary worker signatures whose direct domain uses a
 -- retained package telescope from a normal import or a local declaration.
 -- The actual source certification still checks the body and RULES.
 -- See Note [Recompiling retained package workers].
-couldExportRetainedCase :: ModIface -> [Usage] -> IfG Bool
-couldExportRetainedCase iface usages = anyM candidate (mi_decls iface)
+couldExportRetainedCase :: Bool -> ModIface -> [Usage] -> IfG Bool
+couldExportRetainedCase abstract_only iface usages = anyM candidate (mi_decls iface)
   where
     exportNames = mkNameSet . concatMap availNames . mi_exports
     exports = exportNames iface
 
     candidate (_, IfaceId{ifIdDetails = IfSourceTableId{}}) = pure False
     candidate (_, IfaceId{ifName = name, ifType = ty})
-      | name `elemNameSet` exports, Just (domain, result) <- operand ty
+      | name `elemNameSet` exports, Just (domain, args, result) <- operand ty
       , not (isWiredInName domain), Just owner <- nameModule_maybe domain
       = if owner == mi_semantic_module iface
-        then pure (any (package exports domain result owner) (mi_decls iface))
+        then pure (any (package exports domain args result owner) (mi_decls iface))
         else if any (fromModuleWithConstructor owner) usages then do
           mb_provider <- readProvider owner
           pure $ case mb_provider of
             Just provider | mi_hsc_src provider == HsSrcFile ->
-              any (package (exportNames provider) domain result owner) (mi_decls provider)
+              any (package (exportNames provider) domain args result owner) (mi_decls provider)
             _ -> False
         else pure False
     candidate _ = pure False
@@ -780,28 +826,35 @@ couldExportRetainedCase iface usages = anyM candidate (mi_decls iface)
 
     operand (IfaceForAllTy ma (Bndr IfaceTvBndr{} _) body)
       | nullaryName ma == Just unmatchableDataConName = operand body
-    operand (IfaceFunTy FTF_T_T ma mult (IfaceTyConApp tc IA_Arg{}) res@IfaceTyConApp{})
+    operand (IfaceFunTy FTF_T_T ma mult (IfaceTyConApp tc args@IA_Arg{}) res)
       | nullaryName ma == Just unmatchableDataConName
       , nullaryName mult == Just manyDataConName
-      = Just (ifaceTyConName tc, res)
+      , let actuals = appArgsIfaceTypes args
+      , (not abstract_only && is_tycon_app res) || res `elem` actuals
+      = Just (ifaceTyConName tc, actuals, res)
     operand _ = Nothing
+
+    is_tycon_app IfaceTyConApp{} = True
+    is_tycon_app _               = False
 
     nullaryName (IfaceTyConApp tc IA_Nil) = Just (ifaceTyConName tc)
     nullaryName _ = Nothing
 
-    package names domain result owner (_, IfaceData{ifName = name, ifCons = IfDataTyCon False [con]})
+    package names domain actuals result owner (_, IfaceData{ifName = name, ifCons = IfDataTyCon False [con]})
       | name == domain
       , name `elemNameSet` names, ifConName con `elemNameSet` names
       , not (ifConWrapper con), null (ifConExTCvs con), null (ifConEqSpec con)
       , null (ifConCtxt con)
       , [Just witness, Nothing] <- ifConArgBinders con
       , [(mult, witness_kind), (_, payload)] <- ifConArgTys con
-      , witness_kind == result
+      , case witness_kind of
+          IfaceTyVar var -> lookup var (zip (map ifaceBndrName (ifConUnivTvs con)) actuals) == Just result
+          _ -> not abstract_only && witness_kind == result
       , nullaryName mult == Just manyDataConName
       , payloadUsesWitness con witness payload
       = owner == mi_semantic_module iface ||
         any (usesConstructor owner (ifConName con)) usages
-    package _ _ _ _ _ = False
+    package _ _ _ _ _ _ = False
 
     payloadUsesWitness _ witness (IfaceTyConApp _ args)
       | IfaceTermVar use : _ <- reverse (appArgsIfaceTypes args) = witness == use
@@ -832,6 +885,10 @@ reasons. If a recognized older flag hash otherwise allows reuse, inspect
 exported ordinary signatures with a direct datatype operand. Read that
 datatype's interface to find its retained witness and dependent payload.
 The direct result must be the witness type.
+For a witness declared at a datatype parameter, look up that parameter
+in the applied datatype. Its name in the worker can differ from the
+name in the constructor interface. After the fixed-domain upgrade only
+this parameter case can require a new certificate.
 A home use records the constructor occurrence.
 Package uses have only module-level usage. Read the full defining
 interface directly when the home graph does not have it. The external
@@ -1732,7 +1789,9 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = retainedCaseFingerprint
+          current_flag_hash = orderedTypeCaseFingerprint
+                            $ abstractWitnessFingerprint
+                            $ retainedCaseFingerprint
                             $ familyResultMatchabilityFingerprint
                             $ familyKindMatchabilityFingerprint
                             $ readbackRecipeFingerprint

@@ -1115,6 +1115,11 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCasePattern (Just pat)
       -> mkSimpleDecorated $ hang (text "After expanding type synonyms, the pattern has no constructor head:")
                                 2 (ppr (coreFullView pat))
+    TcRnNestedTypeCasePattern pat
+      -> mkSimpleDecorated $ hang (text "Cannot use this constructor pattern in a nested type case:") 2 (ppr pat)
+    TcRnTypeCaseIndexApartness kind
+      -> mkSimpleDecorated $ hang
+           (text "Cannot determine which constructors are possible at this scrutinee kind:") 2 (ppr kind)
     TcRnTypeCaseContext
       -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext
@@ -2480,6 +2485,8 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCaseDisabled{}
       -> ErrorWithoutFlag
     TcRnTypeCasePattern{} -> ErrorWithoutFlag
+    TcRnNestedTypeCasePattern{} -> ErrorWithoutFlag
+    TcRnTypeCaseIndexApartness{} -> ErrorWithoutFlag
     TcRnTypeCaseContext{} -> ErrorWithoutFlag
     TcRnTypeLambdaContext{}
       -> ErrorWithoutFlag
@@ -3192,6 +3199,8 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCaseDisabled{}
       -> noHints
     TcRnTypeCasePattern{} -> noHints
+    TcRnNestedTypeCasePattern{} -> noHints
+    TcRnTypeCaseIndexApartness{} -> noHints
     TcRnTypeCaseContext{} -> noHints
     TcRnTypeLambdaContext{}
       -> noHints
@@ -4905,6 +4914,9 @@ view. The expanded-types diagnostic can still show the family.
 -- | Show the constructor case checked by a private family, without reducing it.
 pprTypeCaseMismatch :: Type -> SDoc
 pprTypeCaseMismatch ty
+  | Just (tc, _) <- splitTyConAppNoView_maybe ty
+  , Just owner <- liftedTypeOwner "$case-node:" (tyConName tc)
+  = text "the type case in" <+> quotes (text owner)
   | Just (tc, args) <- splitTyConAppNoView_maybe ty
   , Just source <- liftedTypeContext (tyConName tc)
   = let fallback | isJust (liftedTypeOwner "$case:" (tyConName tc)) = text "the" <+> source
@@ -5310,12 +5322,18 @@ unnecessary clutter:
 
         (a -> b)
 
+  - Matchability. Controlled by -fprint-explicit-matchabilities.
+    Ordinary user-style arrows omit fixed matchability annotations.
+    Show them when they distinguish otherwise identical types. Keep
+    the modifier syntax in modules that use -XModifiers.
+
 To achieve this, each of these user-facing flags controls a field of
 'SDocContext', respectively:
 
     * sdocPrintExplicitKinds
     * sdocPrintExplicitRuntimeReps
     * sdocLinearTypes
+    * sdocPrintExplicitMatchabilities
 
 The pretty-printer in GHC.Iface.Type then consults these when deciding how much
 to show.
@@ -8380,13 +8398,20 @@ pprHsCtxt = \case
   ClosedFamEqnCtxt tc ->
     text "In the equations for closed type family" <+>
            quotes (ppr tc)
-  DeclKindSynonymCtxt name local ->
+  DeclKindSynonymCtxt name forall_vis local ->
     vcat [ text "The kind synonym" <+> quotes (ppr name)
-           <+> text "supplies an unmatchable (U) arrow."
-         , text "This declaration requires a matchable (M) arrow."
+           <+> text "supplies an unmatchable (U)" <+> binder <> dot
+         , text "This declaration requires a matchable (M)" <+> binder <> dot
          , if local
-           then text "Use '%M ->' in the synonym's definition, or use a separate matchable synonym here."
-           else text "Use a kind with a matchable arrow or import a matchable synonym." ]
+           then text "Use" <+> annotation
+                <+> text "in the synonym's definition, or use a separate matchable synonym here."
+           else text "Use a kind with a matchable" <+> binder
+                <+> text "or import a matchable synonym." ]
+    where
+      (binder, annotation) = case forall_vis of
+        Nothing        -> (text "arrow", text "'%M ->'")
+        Just Required  -> (text "visible forall", text "'forall ... -> @M'")
+        Just Invisible{} -> (text "invisible forall", text "'forall ... . @M'")
   TySynErrCtxt tc ->
     text "In the expansion of type synonym" <+> quotes (ppr tc)
   RoleAnnotErrCtxt name ->

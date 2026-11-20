@@ -18,9 +18,18 @@ the stored index and use the payload at that index.
 [Pair and eliminator](../examples/packed-vector/DependentPair.hs)
 and [separate client](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
-The next projection has type `foreach (q :: DPair a p) -> p (first q)`.
-The abstract pair currently fails the structural check on `DPair a p`.
-The existing length projection below uses a closed witness domain.
+The second projection has type `foreach (q :: DPair a p) -> p (first q)`.
+The ordinary first projection supplies its equation through the pair
+module's interface. The compiler substitutes the witness type into the
+kind of the payload family. Changing the first projection to force
+the payload invalidates the equation. [Second projection](../examples/packed-vector/DependentProjection.hs).
+
+An older compiler that accepts `DPair` can leave its first projection
+without an equation. The `--abstract-witness` upgrade check rebuilds
+the pair owner and a separate worker that renames its type parameters.
+A fixed-domain worker and an unrelated module keep their objects and
+interfaces. A second build reuses all outputs.
+[Upgrade test](../examples/closed-evaluation/check-readback-upgrade.sh).
 
 A GADT can already store a runtime length and a vector indexed by that
 length. The same encoding works for a family parameter `p`.

@@ -54,6 +54,7 @@ import GHC.Driver.Flags
 import GHC.Data.List.SetOps (findDupsEq)
 import GHC.Parser.PostProcess (setRdrNameSpace)
 
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead), HsTypeGhcRnExt(..), HsTypeCaseAlt(..))
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -999,15 +1000,16 @@ rnHsTyKi env (XHsType (HsTypeCaseHead name))
            Nothing -> rnHsTyVar lookupTypeOccRn env (HsTyVar noAnn NotPromoted name) NotPromoted
                         (fmap (`setRdrNameSpace` tcName) name) }
 
-rnHsTyKi env (XHsType (HsTypeCaseAlias generated alias body)) = do
+rnHsTyKi env (XHsType (HsTypeCaseAlias generated (owner, index, alias) body)) = do
   -- Compiler-generated family arguments are absent from the source pattern.
   -- Keep the normal unused binder check for written constructor fields.
   generated_names <- mapM (lookupOccRn WL_TyVar) generated
-  alias' <- forM alias $ \(index, binder) -> do
+  owner' <- lookupLocatedOccRn WL_TyCon owner
+  alias' <- forM alias $ \binder -> do
     name <- newLocalBndrRn binder
-    pure (index, fmap (const name) binder)
-  (body', fvs) <- bindLocalNamesFV (maybeToList (unLoc . snd <$> alias')) (rnLHsTyKi env body)
-  pure (XHsType (HsTypeCaseAliasRn alias' body'), extendNameSetList fvs generated_names)
+    pure (fmap (const name) binder)
+  (body', fvs) <- bindLocalNamesFV (maybeToList (unLoc <$> alias')) (rnLHsTyKi env body)
+  pure (XHsType (HsTypeCaseAliasRn (unLoc owner', index, alias') body'), extendNameSetList fvs generated_names)
 
 rnHsTyKi env (XHsType (HsTypeLet (let_kw, _, _) binder rhs body)) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
@@ -1072,7 +1074,9 @@ classifyTypeCasePattern pat = do
         HsTyVar _ NotPromoted (L _ name) | isRdrTyVar name ->
           pure (L loc (HsAppTy ann con' field), name : bound)
         HsWildCardTy{} -> pure (L loc (HsAppTy ann con' field), bound)
-        _ -> Nothing
+        _ -> do
+          (field', field_bound) <- constructorPattern field
+          pure (L loc (HsAppTy ann con' field'), bound ++ field_bound)
     constructorPattern (L loc pat@(HsTyVar _ promotion name))
       | isRdrTc (unLoc name) || isRdrDataCon (unLoc name)
       = Just (L loc (if isPromoted promotion then pat else XHsType (HsTypeCaseHead name)), [])
@@ -2662,8 +2666,8 @@ extract_lty (L _ ty) acc
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }
                                   -> extract_lctxt ctxt $
                                      extract_lty ty acc
-      XHsType (HsTypeCaseAlias _ alias body) ->
-        filter (\v -> Just (unLoc v) /= (unLoc . snd <$> alias)) (extract_lty body []) ++ acc
+      XHsType (HsTypeCaseAlias _ (_, _, alias) body) ->
+        filter (\v -> Just (unLoc v) /= (unLoc <$> alias)) (extract_lty body []) ++ acc
       XHsType (HsTypeLet _ binder rhs body)
                                   -> extract_lty rhs
                                        (filter ((/= unLoc binder) . unLoc) (extract_lty body []) ++ acc)

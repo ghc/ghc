@@ -81,6 +81,7 @@ import qualified InvisibleFamily
 import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
+import qualified NativeNestedCase
 import qualified LocalDataFamily
 import qualified LazyParcel
 import qualified LegacyKindArgument
@@ -88,6 +89,7 @@ import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified InstalledNotProof
 import qualified PreludeMapProof
+import qualified ConsRuleMapProof
 import qualified OpenBuildWorker as Build
 import qualified SpineWorker as Spine
 import qualified OpenConstructorSource
@@ -105,6 +107,7 @@ import qualified PackedProjection
 import PackedVecLibrary
 import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified DependentPair as Pair
+import qualified DependentProjection as Pair
 import qualified RetainedProjection
 import qualified QualifiedPiLibrary as Qualified
 import qualified ReadNatural
@@ -1010,6 +1013,13 @@ main = do
     observe "bind the result of a constructor case"
         (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
     observe "select the result type by a constructor" NativeCase.roadmap
+    observe "select through nested type case patterns"
+        ( Proxy :: NativeNestedCase.Pick ('Just ('Just 'True))
+        , 7 :: NativeNestedCase.Pick ('Just 'Nothing) )
+    observe "select through an ordinary type constructor"
+        ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
+        , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)
+        , () :: NativeNestedCase.TypeHead ('Just [Bool]) )
     observe "match Bool and Ordering directly in a type"
         (7 :: NativeCase.ByType Bool, 'x' :: NativeCase.ByType Ordering)
     observe "use a local type in a constructor case"
@@ -1028,6 +1038,10 @@ main = do
         (InstalledNotProof.negateHead (Proxy @'[]))
     putStrLn ("use Prelude.map and Prelude.not on an empty list and an unknown tail: "
               ++ PreludeMapProof.showPreludeMapProofs)
+    observe "use a checked cons rule without forcing the callback, head or tail"
+        (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
+    observe "compose two checked traversals without forcing the inner callback"
+        (ConsRuleMapProof.twiceHead (Proxy @'[]), ConsRuleMapProof.composedHead (undefined : undefined))
     observe "collect row heads with an ordinary polymorphic callback"
         (OpenMapProof.firstRowHead (Proxy @'True) (Proxy @'Spine.Empty) (Proxy @'[]))
 
@@ -1305,6 +1319,8 @@ listBoundaries = do
     observe "use one dependent pair type at two witness types"
         (Pair.withPair chars (\k v -> (natToInt k, toList v)),
          Pair.withPair tag (\_ c -> getConst c))
+    observe "project the payload at the first field of a dependent pair"
+        (natToInt (Pair.first chars), toList (Pair.second chars), getConst (Pair.second tag))
     observe "read either package field without demanding its sibling"
         ( withRetained (constantPackage (error "unused witness") (7 :: Int))
               (\_ box -> getConst box)

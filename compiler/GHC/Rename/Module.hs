@@ -22,6 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
+import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -210,7 +211,7 @@ liftTypeLambdas group =
                                , sameBinder v scrut]
             , selected >= length captures
             , Just branches <- traverse classifyBranch alts
-            = map (caseEquation name selected equation_scope case_kw scrut) branches
+            = map (caseEquation owner name selected equation_scope case_kw scrut) branches
             | otherwise
             = [equation loc name (map (typeName . snd) equation_scope) body]
           family = L loc (FamDecl noExtField
@@ -229,15 +230,15 @@ liftTypeLambdas group =
       (pat', bound) <- classifyTypeCasePattern pat
       pure (loc, pat', bound, rhs)
 
-    caseEquation name selected scope case_kw scrut (loc, pat, bound, rhs) =
+    caseEquation owner name selected scope case_kw scrut (loc, pat, bound, rhs) =
       equation loc name (zipWith argument [0..] scope) body
       where
         body = L (noAnnSrcSpan (getEpTokenSrcSpan case_kw))
-                 (XHsType (HsTypeCaseAlias generated alias rhs))
+                 (XHsType (HsTypeCaseAlias generated (owner, selected, alias) rhs))
         alias
           | unLoc scrut `notElem` bound
           , any ((== unLoc scrut) . unLoc) (extractHsTyRdrTyVars rhs)
-          = Just (selected, scrut)
+          = Just scrut
           | otherwise = Nothing
 
         generated = [unLoc (captureName index v)
@@ -375,7 +376,7 @@ liftTypeCases group =
           scrut_var = L (getLoc owner) (mkRdrUnqual (mkTyVarOcc "$scrutinee"))
           scrut_binder = L loc (HsTvb noAnn (HsBndrRequired noExtField)
                          (HsBndrVar noExtField scrut_var) (HsBndrNoKind noExtField))
-          eqns = map (branch name captures aliases) patterns
+          eqns = map (branch owner name captures aliases) patterns
           fam = L loc (FamDecl noExtField
                   (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just eqns)) TopLevel
                      name (HsQTvs noExtField ([h | (h, _, _) <- captures] ++ [scrut_binder]))
@@ -423,7 +424,7 @@ liftTypeCases group =
       (pat', bound) <- classifyTypeCasePattern pat
       pure (loc, pat', bound, rhs)
 
-    branch name captures aliases (loc, pat, bound, rhs) =
+    branch owner name captures aliases (loc, pat, bound, rhs) =
       let alias_names = [unLoc v | (_, v, _, _) <- aliases]
           pat_capture index (_, n@(L name_loc var), _)
             | var `elem` bound || var `elem` alias_names =
@@ -432,7 +433,7 @@ liftTypeCases group =
           captured = zipWith pat_capture [0 :: Int ..] captures
           pats = captured ++ [pat]
           branch_rhs = foldr restore rhs aliases
-          body = L (getLoc branch_rhs) (XHsType (HsTypeCaseAlias [] Nothing branch_rhs))
+          body = L (getLoc branch_rhs) (XHsType (HsTypeCaseAlias [] (owner, length captures, Nothing) branch_rhs))
           restore (ann, binder, helper, indices) rest
             | unLoc binder `notElem` bound =
                 letTy (getLoc rhs) ann binder

@@ -28,7 +28,7 @@ import GHC.Tc.Utils.TcType   ( TcType, TcTyCon, ExpType )
 import GHC.Types.Basic       ( TyConFlavour )
 import GHC.Types.Name        ( Name )
 import GHC.Types.SrcLoc      ( SrcSpan, noSrcSpan )
-import GHC.Types.Var         ( Id, TyCoVar )
+import GHC.Types.Var         ( Id, TyCoVar, ForAllTyFlag )
 
 import GHC.Unit.Types ( Module, InstantiatedModule, ModuleName )
 
@@ -376,8 +376,9 @@ data HsCtxt
   | MergeSignaturesCtxt !UnitState !ModuleName ![InstantiatedModule]
   -- | While checking that a module implements a Backpack signature.
   | CheckImplementsCtxt !UnitState !Module !InstantiatedModule
-  -- | An algebraic declaration consumes a synonym's unmatchable arrow.
-  | DeclKindSynonymCtxt !Name !Bool -- ^ True for a synonym defined in this module
+  -- | A declaration consumes a synonym's unmatchable arrow or forall.
+  | DeclKindSynonymCtxt !Name !(Maybe ForAllTyFlag)
+                       !Bool -- ^ True for a synonym defined in this module
 
 
 isHsCtxtLandmark :: HsCtxt -> Bool

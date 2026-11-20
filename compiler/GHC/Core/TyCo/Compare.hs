@@ -821,6 +821,7 @@ data InvisibleBit
   = InvisibleKind
   | InvisibleRuntimeRep
   | InvisibleMultiplicity
+  | InvisibleMatchability
   deriving stock (Eq, Ord, Show)
 instance Outputable InvisibleBit where
   ppr thing = text (show thing)
@@ -840,6 +841,8 @@ pprWithInvisibleBits invis_bits
               = show_reps  || sdocPrintExplicitRuntimeReps ctx
           , sdocLinearTypes
               = show_mults || sdocLinearTypes ctx
+          , sdocPrintExplicitMatchabilities
+              = show_matchabilities || sdocPrintExplicitMatchabilities ctx
   -- Question: what about 'sdocPrintExplicitCoercions'?
   -- Currently, we never enable that automatically; it's always up to the user
   -- to enable it.
@@ -848,12 +851,14 @@ pprWithInvisibleBits invis_bits
     show_kinds = InvisibleKind         `Set.member` invis_bits
     show_reps  = InvisibleRuntimeRep   `Set.member` invis_bits
     show_mults = InvisibleMultiplicity `Set.member` invis_bits
+    show_matchabilities = InvisibleMatchability `Set.member` invis_bits
 
 mayLookIdentical :: Type -> Type -> InvisibleBits
 -- | 'mayLookIdentical' returns:
 --
 --  - An empty set if the two types are distinct unequal, and remain distinct
---    even if we hide explicit kinds, runtime-reps, multiplicities.
+--    even if we hide explicit kinds, runtime reps, multiplicities and
+--    ordinary arrow matchabilities.
 --  - A non-empty set of 'invis_bits', if the two types might look equal, but
 --    are in fact distinct in the returned 'invis_bits'.
 --
@@ -963,8 +968,8 @@ mayLookIdentical orig_ty1 orig_ty2
            ; _reps_ok <- tell_on_mismatch InvisibleRuntimeRep $
                (&&) <$> go env False (typeKind arg1) (typeKind arg2)
                     <*> go env False (typeKind res1) (typeKind res2)
-           ; (&&) <$> go env False ma1 ma2
-                  <*> ((&&) <$> go env False arg1 arg2 <*> go env False res1 res2) }
+           ; _ma_ok <- tell_on_mismatch InvisibleMatchability $ go env False ma1 ma2
+           ; (&&) <$> go env False arg1 arg2 <*> go env False res1 res2 }
 
       -- See Note [Equality on AppTys] in GHC.Core.Type
     go env _top (AppTy s1 t1) ty2
@@ -1003,7 +1008,8 @@ mayLookIdentical orig_ty1 orig_ty2
 As described in Note [Showing invisible bits of types in error messages]
 in GHC.Tc.Errors.Ppr, the job of 'mayLookIdentical' is to compute whether two
 types that are not equal may in fact look identical when pretty-printed to the
-user, due to the hiding of explicit kinds, runtime-reps or multiplicities.
+user, due to the hiding of explicit kinds, runtime reps, multiplicities or
+ordinary arrow matchabilities.
 
 'mayLookIdentical' can return:
 

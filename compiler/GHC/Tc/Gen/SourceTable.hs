@@ -53,6 +53,7 @@ import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), isEmptyEvBindsMap)
 import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
+import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
 import GHC.Tc.Utils.Env (tcLookupGlobal, tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
 import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobalRdrEnv, getTcEvBindsMap, getTcEvBindsState,
                            checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
@@ -363,12 +364,12 @@ hasSourceMethodRuleAt rules first fun = any user_rule (getRules rules (globalise
     user_rule rule = not (isAutoRule rule || isNeverActive (ruleActivation rule))
 
 -- | Check that every visible rule of a certified mapper preserves its two list equations.
--- See Note [Identity traversal rules].
+-- See Note [Checked list traversal rules].
 checkedMapperRules :: RuleEnv -> Id -> Bool
 checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation)
                                          (getRules env (globaliseId owner)) of
     [] -> False
-    rules -> all identityTraversal rules
+    rules -> all (\rule -> identityTraversal rule || consTraversal rule || composeTraversals rule) rules
   where
     identityTraversal Rule{ru_fn = fn, ru_bndrs = [a, xs],
                            ru_args = [Core.Type input, Core.Type output,
@@ -379,16 +380,83 @@ checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation
         && isId xs && xs == arg && arg == result && eqType (varType xs) (mkListTy input)
     identityTraversal _ = False
 
-{- Note [Identity traversal rules]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    consTraversal Rule{ru_fn = fn, ru_bndrs = binders,
+                       ru_args = [Core.Type input, Core.Type output, Core.Var f, spine],
+                       ru_rhs = rhs}
+      | fn == idName owner
+      , Just a <- getTyVar_maybe input, Just b <- getTyVar_maybe output
+      , (Core.Var in_cons, [Core.Type in_ty, Core.Var x, Core.Var xs]) <- Core.collectArgs spine
+      , in_cons == dataConWorkId consDataCon, eqType in_ty input
+      , lengthIs binders 5, mkUniqSet binders == mkUniqSet [a, b, f, x, xs]
+      , isId f, isId x, isId xs
+      , Just (domain, range) <- caseArrow (varType f)
+      , eqType input domain, eqType output range
+      , eqType (varType x) input, eqType (varType xs) (mkListTy input)
+      , (Core.Var out_cons, [Core.Type out_ty, hd, tl]) <- Core.collectArgs rhs
+      , out_cons == dataConWorkId consDataCon, eqType out_ty output
+      , (Core.Var callback, [Core.Var h']) <- Core.collectArgs hd
+      , callback == f, h' == x
+      , Just (a', b', Core.Var f', Core.Var t') <- mapperCall tl
+      = eqType a' input && eqType b' output && f' == f && t' == xs
+    consTraversal _ = False
+
+    composeTraversals Rule{ru_fn = fn, ru_bndrs = binders,
+                           ru_args = [Core.Type middle, Core.Type output, Core.Var f, inner],
+                           ru_rhs = rhs}
+      | fn == idName owner
+      , Just (input, middle', Core.Var g, Core.Var xs) <- mapperCall inner
+      , eqType middle' middle
+      , Just a <- getTyVar_maybe input
+      , Just b <- getTyVar_maybe middle
+      , Just c <- getTyVar_maybe output
+      , lengthIs binders 6, mkUniqSet binders == mkUniqSet [a, b, c, f, g, xs]
+      , isId f, isId g, isId xs
+      , Just (f_in, f_out) <- caseArrow (varType f)
+      , eqType f_in middle, eqType f_out output
+      , Just (g_in, g_out) <- caseArrow (varType g)
+      , eqType g_in input, eqType g_out middle
+      , eqType (varType xs) (mkListTy input)
+      , Just (input', output', Core.Lam x body, Core.Var xs') <- mapperCall rhs
+      , eqType input' input, eqType output' output, xs' == xs
+      , isId x, x `notElem` binders, eqType (varType x) input
+      , (Core.Var f', [g_app]) <- Core.collectArgs body
+      , (Core.Var g', [Core.Var x']) <- Core.collectArgs g_app
+      = f' == f && g' == g && x' == x
+    composeTraversals _ = False
+
+    mapperCall expr = case Core.collectArgs expr of
+      (Core.Var mapper, [Core.Type input, Core.Type output, callback, spine])
+        | mapper == owner -> Just (input, output, callback, spine)
+      _ -> Nothing
+
+{- Note [Checked list traversal rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the checked list mapper, mapping the identity lambda over an empty
 list gives the empty list. On a cons it returns the original head and
 maps the same lambda over the tail. Neither side forces the head or
 the tail. These equations also preserve a divergent spine.
 
+On a cons, a rule can also expose the checked mapper's own equation.
+The left side supplies the list constructor, so neither side needs to
+force its fields. The right side builds a lazy cons with the same
+callback application and the same recursive call on the input tail.
+The callback stays a rule parameter. This reasoning covers a divergent
+callback and does not require properties of any particular function.
+
+Two traversals can become one with the lambda \x -> f (g x). Both
+sides inspect the original spine and return [] for []. For a cons,
+both produce the same lazy head f (g x). Their tails satisfy the same
+equation on the original input tail. This argument also covers partial
+and infinite lists because each observation of a cons needs one step.
+In particular, g can diverge when f ignores its argument.
+
+The cons and composition rules introduce no fixed rule head except
+the same mapper.
+See getRules in GHC.Core.Rules for the list constructor.
+
 Check the binders and both sides of every visible rule. An unverified
-rule can change the result even when another rule is the identity
-traversal. Recheck after processing declarations and splices.
+rule can change the result or its demand even if the other rules pass.
+Recheck after processing declarations and splices.
 -}
 
 -- | Check the selected method at the occurrence, and record its semantic dependencies.
@@ -1272,7 +1340,7 @@ constructorCaseType tau = do
     (tc, args) <- caseDatatype domain
     let binder_kinds = map (varType . binderVar) binders
     guard (all isLiftedTypeKind binder_kinds ||
-           (isRetainedCaseRoot domain tc && all noFreeVarsOfType binder_kinds))
+           (isRetainedCaseRoot domain tc && noFreeVarsOfType (mkForAllTys telescope liftedTypeKind)))
     parameters <- catMaybes <$> traverse domainParameter args
     guard ((isMonomorphicEnumCaseType tau || not (null parameters)) &&
            sizeUniqSet (mkUniqSet parameters) == length parameters &&
@@ -1299,8 +1367,9 @@ Check both fields and the result before publishing an equation.
 
 The axiom has type variables instead of runtime Ids. Publish the witness
 before the payload. Use the earlier variables to abstract the payload's
-kind. A payload family parameter keeps its declared arrow kind and
-matchability. Match the result Id to the exact pattern leaf. The resulting RHS
+kind. For `DPair a (p :: a -> Type)`, freshen `a` before using it in
+the kind of the new `p` binder. Keep the declared arrow matchability.
+Match the result Id to the exact pattern leaf. The resulting RHS
 does not introduce a free runtime Id or a new axiom about evaluation.
 The ordinary visibility, constructor coverage, and RULE checks still
 apply. Interface recognition checks the instantiated promoted argument
@@ -1387,9 +1456,8 @@ continues. See keepValidatedSourceMappers in GHC.Driver.Main.Passes.
 The final worker check says what the produced binding does. It does not
 prove the rules that another module can use to rewrite a call. The distinct
 interface origin requires the consumer to disable rewriting or check
-every visible rule. The identity traversal rule can pass this check
-because its RHS exposes no new call. A fusion rule can expose other
-rule heads and requires a separate proof.
+every visible rule. See Note [Checked list traversal rules]. A fusion
+rule can expose other rule heads and requires a separate proof.
 
 Forming a type records the interface dependency without using the
 equation. The solver checks the rules when it uses an equation,
@@ -1638,12 +1706,9 @@ publishConstructorCase owner (ConstructorCaseType telescope _ _ domains _ result
 -- | Publish checked rows with the original kind telescope and visible domains.
 publishConstructorRows :: Id -> [ForAllTyBinder] -> [Type] -> Type -> [ConstructorCaseRow] -> TcM TyCon
 publishConstructorRows owner telescope domains result rows = do
-    kind_binders <- forM telescope $ \(Bndr variable visibility) -> do
-      name <- newSysName (nameOccName (varName variable))
-      pure (mkNamedTyConBinder visibility (mkTyVar name (varType variable)))
-    let quantifiers = [v | Bndr v _ <- kind_binders]
-        instantiate = substTyWith [v | Bndr v _ <- telescope] (mkTyVarTys quantifiers)
-                      . expandTypeSynonyms
+    (renaming, quantifiers) <- freshenTyVarBndrs (binderVars telescope)
+    let kind_binders = zipWith mkNamedTyConBinder (map binderFlag telescope) quantifiers
+        instantiate = substTyUnchecked renaming . expandTypeSynonyms
     operands <- mapM (fresh "arg" . instantiate) domains
     branches <- forM rows $ \(ConstructorCaseRow patterns result_value) -> do
       (lhs, scoped) <- publishPatterns instantiate [] patterns

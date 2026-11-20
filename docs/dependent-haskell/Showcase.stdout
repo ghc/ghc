@@ -177,6 +177,7 @@ project the length of a known dependent package in a type: Refl
 project from two payload families with the same dependent function: ("xx",7)
 use the stored length and vector in a generic dependent eliminator: (2,"xx")
 use one dependent pair type at two witness types: ((2,"xx"),'i')
+project the payload at the first field of a dependent pair: (2,"xx",'i')
 read either package field without demanding its sibling: (7,2)
 checked row prefix with a runtime length: (Just "xab",Nothing)
 ordinary length evaluated while checking the type: 3
@@ -254,6 +255,8 @@ retain the kind of a matched Nothing: Refl
 name and reuse a type-level intermediate result: Refl
 bind the result of a constructor case: (Right True,Left 'c')
 select the result type by a constructor: (7,False)
+select through nested type case patterns: (Proxy,7)
+select through an ordinary type constructor: (7,'x',())
 match Bool and Ordering directly in a type: (7,'x')
 use a local type in a constructor case: Just True
 infer one kind for a local type from both case branches: True
@@ -263,4 +266,6 @@ map Boolean negation and traffic signals over an unknown tail: (Refl,Refl)
 map an ordinary enumeration callback over an unknown tail: Refl
 use Prelude.not on a known head with an unknown tail: Refl
 use Prelude.map and Prelude.not on an empty list and an unknown tail: (Refl,Refl)
+use a checked cons rule without forcing the callback, head or tail: (Refl,True)
+compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl

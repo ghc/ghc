@@ -1302,12 +1302,34 @@ pprIfaceDepFunArrow :: DepFunTyFlag -> SDoc
 pprIfaceDepFunArrow DepFunVisible = arrow
 pprIfaceDepFunArrow DepFunInvisible = dot
 
+{- Note [Ordinary arrow matchability in user output]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Proposal #242 (section "Showing matchabilities") introduces
+-fprint-explicit-matchabilities. User output without Modifiers can
+omit fixed M and U on ordinary arrows. For example, show the kind of
+Maybe as Type -> Type. These arrows can have either matchability.
+
+Show both annotations when the explicit flag is set. The mismatch
+reporter can also set that flag. See Note [Showing invisible bits of
+types in error messages] in GHC.Tc.Errors.Ppr. Modifiers output still
+shows M and symbolic matchabilities. Debug and dump output retain their
+annotations.
+
+https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities
+-}
+
 pprTypeArrow :: FunTyFlag -> IfaceMatchability -> IfaceMult -> SDoc
 pprTypeArrow af ma mult =
   getPprStyle $ \style ->
+  getPprDebug $ \debug ->
   sdocOption sdocModifiers $ \modifiers ->
   sdocOption sdocPrintExplicitMatchabilities $ \explicit ->
-    let show_ma = ma /= ifaceUnmatchable || (userStyle style && explicit && isFUNArg af)
+    let user_arrow = userStyle style && isFUNArg af
+        -- See Note [Ordinary arrow matchability in user output].
+        show_ma
+          | user_arrow && explicit = True
+          | user_arrow && not debug && not modifiers && ma == ifaceMatchable = False
+          | otherwise = ma /= ifaceUnmatchable
     in if userStyle style && modifiers && isFUNArg af
       then pprArrowWithModifiers ([pprPrecIfaceType appPrec ma | show_ma] ++ mods) af arr
       else pprArrowWithModifiers mods af arr

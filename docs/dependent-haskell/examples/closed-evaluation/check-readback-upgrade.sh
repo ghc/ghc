@@ -7,13 +7,14 @@ export LC_ALL=C
 # supplies the old boot interfaces for the original GHC.Internal.Err source.
 upgrade=
 case ${1:-} in
-    --family-kinds|--family-results|--packed-projections) upgrade=$1; shift ;;
+    --family-kinds|--family-results|--packed-projections|--abstract-witness) upgrade=$1; shift ;;
 esac
-if (( $# < 4 || $# > 5 )) || { [[ $upgrade == --family-* ]] && (( $# != 4 )); }; then
+if (( $# < 4 || $# > 5 )) || { [[ $upgrade == --family-* || $upgrade == --abstract-witness ]] && (( $# != 4 )); }; then
     echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB [OLD_GHC_INTERNAL_BUILD]" >&2
     echo "       $0 --family-kinds M177_GHC M177_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-results INTERMEDIATE_GHC INTERMEDIATE_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --packed-projections OLD_GHC OLD_LIB NEW_GHC NEW_LIB [NEW_GHC_PKG]" >&2
+    echo "       $0 --abstract-witness PAIR_GHC PAIR_LIB NEW_GHC NEW_LIB" >&2
     exit 2
 fi
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -46,6 +47,54 @@ replace() {
     cp "$1" "$2.new"
     mv -f "$2.new" "$2"
 }
+
+if [[ $upgrade == --abstract-witness ]]; then
+    cd "$work/home"
+    cp "$repo"/docs/dependent-haskell/examples/packed-vector/{DependentPair,DependentProjection}.hs .
+    flags=(-i -i. -O0 -fhide-source-paths -fomit-interface-pragmas -fno-write-if-simplified-core "${sanity[@]}")
+    cat >ImportedFirst.hs <<'HS'
+{-# LANGUAGE ExplicitForAll, GADTs, PolyKinds #-}
+module ImportedFirst (witness) where
+import Data.Kind (Type)
+import DependentPair (DPair(..))
+witness :: forall b (f :: b -> Type). DPair b f -> b
+witness (Pair x _) = x
+HS
+    sed -e 's/module DependentProjection/module ImportedSecond/' \
+        -e '/^import DependentPair/a import qualified ImportedFirst' \
+        -e 's/(first q)/(ImportedFirst.witness q)/' DependentProjection.hs >ImportedSecond.hs
+    cat >FixedWitness.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module FixedWitness (Fixed(..), fixed) where
+import Data.Kind (Type)
+data Fixed (f :: Bool -> Type) where
+    Fix :: foreach (x :: Bool) -> f x -> Fixed f
+fixed :: Fixed f -> Bool
+fixed (Fix x _) = x
+HS
+    printf '%s\n' 'module Unrelated where' 'n = True' >Unrelated.hs
+    "${old[@]}" "${flags[@]}" --make -no-link ImportedFirst.hs FixedWitness.hs Unrelated.hs
+    "${old[@]}" --show-iface FixedWitness.hi | grep -F 'SourceTable T:fixed'
+    sha256sum {FixedWitness,Unrelated}.{o,hi} >reuse.sha
+    mkdir stale
+    cp DependentPair.hi DependentProjection.hs stale/
+    if (cd stale && "${new[@]}" "${flags[@]}" -c DependentProjection.hs) >stale.log 2>&1 ||
+       ! grep -Eq '\[GHC-(68947|05617)\]' stale.log; then cat stale.log >&2; exit 1; fi
+    roots=(DependentProjection.hs ImportedSecond.hs FixedWitness.hs Unrelated.hs)
+    "${new[@]}" "${flags[@]}" --make -no-link "${roots[@]}" >upgrade.log 2>&1 ||
+        { cat upgrade.log >&2; exit 1; }
+    for worker in DependentPair ImportedFirst; do
+        grep -F "Compiling $worker [Compiler now checks retained package case projections]" upgrade.log
+    done
+    if grep -E 'Compiling (FixedWitness|Unrelated)' upgrade.log; then exit 1; fi
+    sha256sum -c reuse.sha --quiet
+    sha256sum ./*.hi ./*.o >warm.sha
+    "${new[@]}" "${flags[@]}" --make -no-link "${roots[@]}" >warm.log 2>&1
+    if grep -F 'Compiling ' warm.log; then exit 1; fi
+    sha256sum -c warm.sha --quiet
+    echo 'The abstract witness equation is available, and the next build reused every output.'
+    exit 0
+fi
 
 if [[ $upgrade == --packed-projections ]]; then
     packed="$repo/docs/dependent-haskell/examples/packed-vector"
