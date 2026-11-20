@@ -6612,6 +6612,26 @@ equality while reporting a distinct, unsolved input identity.
 [irreducible solver](../../compiler/GHC/Tc/Solver/Irred.hs) and
 [coercion-hole invariant](../../compiler/GHC/Core/TyCo/Rep.hs).
 
+### Recover the predecessor of a bounded position
+
+Agda's `Fin.zero` has type `Fin (suc n)`. Its predecessor bound `n`
+is implicit. The `suc` constructor takes a position at that bound.
+The Haskell example uses the existing `FZ` and `FS` constructors of
+`Fin`. The zero alternative binds its erased bound and the equality
+between the scrutinee's bound and the successor. It can identify the
+actual input as `'FZ` without a runtime field.
+[Agda stdlib v2.3, Data.Fin.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Fin.Base.html)
+and [Haskell finite positions](examples/qualified-pi/ParameterizedIndexLibrary.hs).
+
+The successor view stores the predecessor value and a proof that
+applying `FS` to it recovers the input. Inspecting the constructor or
+its proof leaves the predecessor unevaluated. When GHC exports the
+zero alternative in an unfolding, the interface identifies its erased
+binders. An older reader rejects this feature in the interface header.
+[View](examples/qualified-pi/FinitePosition.hs),
+[ordinary client](examples/qualified-pi/FinitePositionClient.hs) and
+[regression](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
+
 ## Check a split at an independent runtime cut
 
 `splitAtVecChecked` compares the runtime cut and total before splitting

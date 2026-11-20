@@ -295,3 +295,19 @@ the remaining mismatch can overflow the stack. The regression checks
 the GHC-83865 diagnostic at the source expression.
 [Checked constructor](../examples/packed-vector/CertifiedSplit.hs)
 and [negative regression](../../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
+
+## Retain a bounded position and its actual predecessor
+
+The two constructors of `Fin n` have different telescopes. `FZ` has no
+runtime fields. Its result still fixes the bound to a successor.
+`FS` stores a position at the predecessor bound. `viewFin` uses the
+ordinary GADT equality in each alternative to prove which value matched.
+
+An ordinary client reads position two from IO, opens the successor
+view, matches its proof, and returns position one. The zero view has
+no predecessor. A bottom position fails when matched. The successor
+view can return its proof with a bottom predecessor. Supplying another
+predecessor at the same bound fails at `Refl`.
+[Haskell source](../examples/qualified-pi/FinitePosition.hs),
+[ordinary client](../examples/qualified-pi/FinitePositionClient.hs)
+and [Agda provenance](../REFERENCES.md#recover-the-predecessor-of-a-bounded-position).

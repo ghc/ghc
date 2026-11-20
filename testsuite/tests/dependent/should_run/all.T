@@ -421,6 +421,12 @@ test('NativeNamedSplit',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeNamedSplit.sh "{compiler}" "{libdir}"'])
 
+test('NativeIndexedFin',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']
+                  + ['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
+                     for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs', 'FinitePositionClient.hs']])],
+     run_command, ['bash NativeIndexedFin.sh "{compiler}" "{libdir}"'])
 test('NativeIndexedConsProof',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeIndexedConsProof.hs', 'NativeIndexedConsProofClient.hs',
