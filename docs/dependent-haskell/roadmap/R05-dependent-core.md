@@ -185,6 +185,16 @@ below cover rules that construct or open a package directly.
 [Package rule](../examples/erased-existentials/PackageRules.hs)
 and [source regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
 
+For a retained function, check the source and optimized Core separately.
+The rule `forall xs. keep False xs = xs` reaches Core and reports
+GHC-51063 at `-O1` or `-O2`. With `forall (b :: Bool) xs`, the type
+checker instead rejects `xs` with GHC-25897. Giving `xs` the type
+`Vec Int (Length b)` introduces a distinct type variable in that rule
+signature. The compiler reports GHC-53522 and discards the rule. A rule
+for `keep b (choose b)` reaches Core with one argument index. These
+cases distinguish a rule-binder scope change from the optimizer change.
+An acceptance test must observe the rule firing as well as the result.
+
 Forward congruence under an existential
 binder can run through the normal pipeline when its scoped payload
 coercion is supported. Core Lint checks the role and the two endpoints.
