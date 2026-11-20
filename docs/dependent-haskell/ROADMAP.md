@@ -26,25 +26,28 @@ checking a later argument whose kind refers to that index. When a family
 cannot reduce, the case still waits for more information.
 [Type-level case](examples/open-evaluation/NativeNestedCase.hs).
 
-An existential witness can itself be polymorphic. Given a value of type
-`Callback (forall a. a -> a)`, GHC can infer the hidden type when it
-constructs `exists t. Callback t`. Opening the package lets the callback
-use its stored function at both `Int` and `Bool`.
+An existential witness can itself be polymorphic. A producer can write
+`(id, atTwoTypes)` for `exists t. (t, t -> (Int, Bool))`. The second field
+determines that the first has type `forall a. a -> a`. A consumer can write
+`observePair (f, k) = k f`. If it tries to return `f` at an arbitrary type,
+the error identifies both the use and the pattern that opened the package.
 [Callback example](examples/erased-existentials/RankedPackage.hs).
 
-Both native compiler stages reproduce the 293-line Showcase at `-O0` and
+Both native compiler stages reproduce the 294-line Showcase at `-O0` and
 default `-O1`. The self-hosted compiler also matches the golden output with
 stripped interfaces and in GHCi. An ordinary client built with either
-this compiler or the previous `aabdff469b` compiler reads the same
-compiled providers. It gets `(7,True)` from each of two packaged callbacks
+this compiler or the previous `ffcc494626` compiler reads the same
+compiled providers. It gets `(7,True)` from each of three packaged callbacks
 and reads length `1` through a GADT-style newtype selector. Both compilers
 still choose `Int` for the existing deep-subsumption example.
 [Newtype source](examples/packed-vector/StoredVector.hs),
 [Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
 
-At `0aea1d0b99`, all 59 focused tests that ran passed. In the dependent
-directory 284 of 314 executed normal-way tests passed. Each of the 30
-failures has the same test name and failure category as at `aabdff469b`.
+At `58a014ba91`, all 59 focused tests that ran passed. In the dependent
+directory 293 of 314 executed normal-way tests passed. Nine original
+diagnostic goldens now match, including `BadTelescope` and `BadTelescope4`.
+The remaining 21 failures have the same test names and failure categories
+as at `ffcc494626`.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -61,8 +64,8 @@ the header. The new reader checks the coercion's role and scope.
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider can construct and open erased packages at default `-O1`. A given equality can change the payload type under a hidden witness. | Cover more coercions, rewrite rules and optimization settings. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An unknown input that can still match an earlier row blocks a catch-all. | General mixed patterns and open GADT indices. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. At construction it can also infer a polymorphic witness from an already typed callback. | Use package type information earlier when checking arguments. Generalize witness projections. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent tuple field, including in a nested application. | Generalize witness projections and inference for checking-only expressions. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. Ordinary scope errors show the binder order without internal matchability annotations. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -77,12 +80,11 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R22.** Use the expected package type while checking an application.
-   For `Duo id calls :: exists t. Duo t (Calls t)`, the type of
-   `calls` determines that `id` must keep its polymorphic type.
-   Check nested applications, witness scope and deep subsumption.
-2. **R05.** Extend optimizer coverage beyond the supported coercions and
-   settings. Check package expressions in rewrite rules and at `-O2`.
+1. **R05.** Check a source rule such as `open (hide x) = x` at default
+   `-O1`. The provider and an interface-only client must each fire the
+   rule and preserve demand. Broader coercions and `-O2` remain open.
+2. **R22.** Extend witness projections and check where lambdas still
+   need a type annotation. Keep the hidden type scoped to its opening.
 3. **R19.** Extend the supported constructor patterns. Keep earlier rows
    and nominal evidence in scope when matching open GADT indices.
 4. **R04 and R23.** Extend retained fields to more GADT declarations.
