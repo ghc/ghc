@@ -73,7 +73,9 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.Set
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Core.Dependent ( hasNativeDependentExprRhs, hasNativeDependentUnfolding )
+import GHC.Core.Dependent
+  ( hasNativeDependentExprRhs, hasNativeDependentUnfolding
+  , isRetainedVanillaDefaultMethod )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
@@ -2745,7 +2747,7 @@ tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL U
 -- See Note [Lazily checking Unfoldings]
 tcUnfolding toplvl name ty info (IfCoreUnfold src cache if_guidance if_expr)
   = do  { uf_opts <- unfoldingOpts <$> getDynFlags
-        ; expr <- tcUnfoldingRhs (isCompulsorySource src) toplvl name ty if_expr
+        ; expr <- tcUnfoldingRhs src toplvl name ty if_expr
         ; let guidance = case if_guidance of
                  IfWhen arity unsat_ok boring_ok -> UnfWhen arity unsat_ok boring_ok
                  IfNoGuidance -> calcUnfoldingGuidance uf_opts is_top_bottoming False expr
@@ -2837,10 +2839,9 @@ lazy in `expr`.
 Ticket #21139
 -}
 
-tcUnfoldingRhs :: Bool -- ^ Is this unfolding compulsory?
-                       -- See Note [Checking for representation polymorphism] in GHC.Core.Lint
+tcUnfoldingRhs :: UnfoldingSource
                -> TopLevelFlag -> Name -> Type -> IfaceExpr -> IfL CoreExpr
-tcUnfoldingRhs is_compulsory toplvl name declared_ty expr
+tcUnfoldingRhs source toplvl name declared_ty expr
   = forkM doc $ do
     core_expr' <- tcIfaceExpr expr
 
@@ -2848,6 +2849,15 @@ tcUnfoldingRhs is_compulsory toplvl name declared_ty expr
     -- See Note [Native dependent unfolding templates] in GHC.Core.Unfold.Make.
     let native = hasNativeDependentExprRhs core_expr'
                  || hasNativeDependentExprRhs (Type declared_ty)
+    -- See Note [Compulsory retained defaults] in GHC.Iface.Tidy.
+    case source of
+      RetainedDefaultSrc ->
+        unless (isRetainedVanillaDefaultMethod name declared_ty) $
+          failIfM (text "Invalid compulsory retained default method:" <+> ppr name)
+      CompulsorySrc ->
+        when native $
+          failIfM (text "Unsupported compulsory retained unfolding:" <+> ppr name)
+      _ -> pure ()
     dflags <- getDynFlags
     -- Check for type consistency in the unfolding
     -- See Note [Linting Unfoldings from Interfaces] in GHC.Core.Lint
@@ -2868,6 +2878,7 @@ tcUnfoldingRhs is_compulsory toplvl name declared_ty expr
                $$ text "Unfolding type:" <+> ppr (exprType core_expr'))
     return core_expr'
   where
+    is_compulsory = isCompulsorySource source
     doc = ppWhen is_compulsory (text "Compulsory") <+>
           text "Unfolding of" <+> ppr name
 

@@ -45,6 +45,7 @@ import GHC.Core.TyCo.Compare ( eqType )
 
 import GHC.Types.Literal
 import GHC.Types.Id
+import GHC.Types.Name (isDefaultMethodOcc, nameOccName)
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
 import GHC.Types.InlinePragma ( isAlwaysActive )
 import GHC.Types.Var      ( isNonCoVarId )
@@ -693,6 +694,12 @@ simple_app :: HasDebugCallStack => SimpleOptEnv -> InExpr -> [SimpleContItem] ->
 simple_app env (Var v) as
   | Just (env', e) <- lookupVarEnv (soe_inl env) v
   = simple_app (soeSetInScope (soeInScope env) env') e as
+
+  -- See Note [Compulsory retained defaults] in GHC.Iface.Tidy.
+  | soe_native env
+  , isDefaultMethodOcc (nameOccName (idName v))
+  , CoreUnfolding { uf_src = RetainedDefaultSrc, uf_tmpl = rhs } <- idUnfolding v
+  = simple_app (soeZapSubst env) rhs as
 
   | not (soe_native env)
     || v `hasKey` leftSectionKey

@@ -44,7 +44,8 @@ import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
 import GHC.Core.Dependent
-  ( hasNativeDependentExpr, hasNativeDependentExprRhs, hasNativeDependentUnfolding )
+  ( hasNativeDependentExpr, hasNativeDependentExprRhs, hasNativeDependentUnfolding
+  , isRetainedVanillaDefaultMethod )
 import GHC.Core.SimpleOpt
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
@@ -448,8 +449,13 @@ makeCorePair :: DynFlags -> Id -> Bool -> CoreExpr
              -> (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method rhs
   | is_default_method
+  , native_rhs
+  , isRetainedVanillaDefaultMethod (idName gbl_id) (idType gbl_id)
+  = (gbl_id `setIdUnfolding` mkRetainedDefaultUnfolding rhs, rhs)
+
+  | is_default_method
   , hasNativeDependentExpr rhs
-  -- See Note [Written retained unfolding pragmas].
+  -- See Note [Compulsory retained defaults] in GHC.Iface.Tidy.
   = throwGhcException (Sorry
       ("Native dependent Core cannot enter default-method unfolding construction while desugaring binding "
        ++ showSDoc dflags (ppr gbl_id)
@@ -510,8 +516,8 @@ dependencies in the template.
 Only a retained signature selects the retained pipeline in a client.
 Keep the existing restriction on written pragmas for ordinary signatures
 with retained RHSs. Compulsory default-method unfoldings still use the
-ordinary path. Reject a retained RHS before constructing one. An ordinary
-binding without an unfolding request needs no native scan here.
+separate check in Note [Compulsory retained defaults] in GHC.Iface.Tidy.
+An ordinary binding without an unfolding request needs no native scan here.
 -}
 
 -- | Convert the arity of the written patterns to Core call saturation.

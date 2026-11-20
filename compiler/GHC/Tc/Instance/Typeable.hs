@@ -695,6 +695,7 @@ kindIsTypeable (TyVarTy _)          = return True
 kindIsTypeable (TermVarTy {})       = return False
 kindIsTypeable (TermAppTy {})       = return False
 kindIsTypeable (DepFunTy {})        = return False
+kindIsTypeable (ExistsTy {})        = return False
 kindIsTypeable (AppTy a b)          = allM kindIsTypeable [a,b]
 kindIsTypeable (FunTy _ ma w a b)   = allM kindIsTypeable [ma,w,a,b]
 kindIsTypeable (TyConApp tc args)

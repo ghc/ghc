@@ -13,6 +13,7 @@ module GHC.Core.Unfold.Make
    , mkInlinableUnfolding
    , mkWrapperUnfolding
    , mkCompulsoryUnfolding, mkCompulsoryUnfolding'
+   , mkRetainedDefaultUnfolding
    , mkDFunUnfolding
    , mkDataConUnfolding
    , specUnfolding
@@ -68,8 +69,15 @@ mkCompulsoryUnfolding' opts expr = mkCompulsoryUnfolding (simpleOptExpr opts exp
 
 -- | Used for things that absolutely must be unfolded
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
-mkCompulsoryUnfolding expr
-  = mkCoreUnfolding CompulsorySrc True
+mkCompulsoryUnfolding = mkCompulsoryUnfoldingWithSource CompulsorySrc
+
+-- | Construct the compulsory template for a checked retained default method.
+mkRetainedDefaultUnfolding :: CoreExpr -> Unfolding
+mkRetainedDefaultUnfolding = mkCompulsoryUnfoldingWithSource RetainedDefaultSrc . simpleOptNativeExpr
+
+mkCompulsoryUnfoldingWithSource :: UnfoldingSource -> CoreExpr -> Unfolding
+mkCompulsoryUnfoldingWithSource src expr
+  = mkCoreUnfolding src True
                     expr Nothing
                     (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
                              , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })

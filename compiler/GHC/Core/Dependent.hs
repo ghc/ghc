@@ -6,6 +6,7 @@ module GHC.Core.Dependent (
     hasExistentialExpr,
     hasNativeDependentExprRhs,
     hasNativeDependentUnfolding,
+    isRetainedVanillaDefaultMethod,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
 ) where
@@ -13,16 +14,21 @@ module GHC.Core.Dependent (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Class (classOpItems)
+import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
-                     , isNativeRetainedBinder, isNativeIndexDomainConversion)
+                     , isNativeRetainedBinder, isNativeIndexDomainConversion
+                     , splitForAllTyCoVars, splitFunTy_maybe)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, isExistsCoRule)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
 import GHC.Core.TyCon.Set
-import GHC.Types.Id (idCoreRules, realIdUnfolding)
+import GHC.Types.Basic (DefMethSpec(VanillaDM))
+import GHC.Types.Id (idCoreRules, idType, realIdUnfolding)
 import GHC.Types.Literal (literalType)
+import GHC.Types.Name (Name, isDefaultMethodOcc, isExternalName, nameOccName)
 import GHC.Types.Tickish (CoreTickish, GenTickish (..))
 import GHC.Types.Var
 import GHC.Types.Unique.DSet (uniqDSetToList)
@@ -105,6 +111,20 @@ Do not force unstable nested unfolding templates.
 -}
 hasNativeDependentUnfolding :: CoreExpr -> Bool
 hasNativeDependentUnfolding = runScan StableMetadata . scanExpr
+
+-- | Check that a retained signature belongs to its class's vanilla default.
+-- See Note [Compulsory retained defaults] in GHC.Iface.Tidy.
+isRetainedVanillaDefaultMethod :: Name -> Type -> Bool
+isRetainedVanillaDefaultMethod name ty
+  | isExternalName name
+  , isDefaultMethodOcc (nameOccName name)
+  , Just (vis, _, _, dict_ty, _) <- splitFunTy_maybe (snd (splitForAllTyCoVars ty))
+  , isInvisibleFunArg vis
+  , Just (cls, _) <- getClassPredTys_maybe dict_ty
+  , hasNativeDependentExprRhs (Type ty)
+  = or [name == method && ty `eqType` idType selector
+       | (selector, Just (method, VanillaDM)) <- classOpItems cls]
+  | otherwise = False
 
 -- | Reject native dependent Core before an unsupported program pass.
 rejectNativeDependentProgram :: String -> CoreProgram -> [CoreRule] -> IO ()
