@@ -31,6 +31,36 @@ cp producer/NativeUnsaturatedProvider.hi NativeUnsaturatedClient.hs client/
     done
 )
 
+# A direct partial family needs the extension when the named binder accepts U.
+cat >client/DirectCallback.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, TypeApplications, TypeOperators #-}
+module DirectCallback where
+
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (M, U)
+import NativeUnsaturatedProvider (NamedMap, Select)
+
+checked :: NamedMap @Bool @U @Bool (Select 'True) '[ 'True] :~: '[Select 'True 'True]
+checked = Refl
+HS
+if (cd client && "${ghc[@]}" -XNoExperimentalDependentTypes -c DirectCallback.hs) >direct.log 2>&1 ||
+   ! grep -Fq 'DirectCallback.hs:8:37: error: [GHC-27346]' direct.log ||
+   ! grep -Fq 'ExperimentalDependentTypes' direct.log; then
+    cat direct.log
+    exit 1
+fi
+(cd client && "${ghc[@]}" -XExperimentalDependentTypes -fforce-recomp -c DirectCallback.hs)
+
+# A fixed M binder rejects the U family prefix while checking its kind.
+sed -e 's/module DirectCallback/module DirectMismatch/' -e 's/@U/@M/' \
+    client/DirectCallback.hs >client/DirectMismatch.hs
+if (cd client && "${ghc[@]}" -XNoExperimentalDependentTypes -c DirectMismatch.hs) >direct-m.log 2>&1 ||
+   ! grep -Fq 'DirectMismatch.hs:8:37: error: [GHC-83865]' direct-m.log ||
+   grep -Fq 'ExperimentalDependentTypes' direct-m.log; then
+    cat direct-m.log
+    exit 1
+fi
+
 # A written higher-order arrow keeps its M default.
 cat >client/WrittenArrow.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
