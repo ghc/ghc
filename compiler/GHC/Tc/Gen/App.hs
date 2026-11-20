@@ -1784,7 +1784,6 @@ seedClassReceiver do_ql rn_head = go []
          ; return (selected || selected_rest) }
 
     seed_receiver callbacks arg expected = fmap isJust $ runMaybeT $ do
-      (_, L _ (HsVar _ lname)) <- liftMaybe (retainedNamedCallback arg)
       (tc, indices) <- MaybeT (tcSplitTyConApp_maybe <$> liftZonkM (zonkTcType expected))
       guard (isAlgTyCon tc)
       let shared f = any (elemVarSet f . tyCoVarsOfType) callbacks
@@ -1795,9 +1794,7 @@ seedClassReceiver do_ql rn_head = go []
                     , shared f ]
       open <- liftMaybeT (isUnfilledMetaTyVar f)
       guard open
-      ident <- MaybeT (tcLookupIdMaybe (unLocWithUserRdr lname))
-      let actual = varType ident
-      guard (isTauTy actual && noFreeVarsOfType actual)
+      actual <- declared_receiver 0 arg
       (outer, outer_args) <- liftMaybe (tcSplitTyConApp_maybe actual)
       guard (any family_prefix outer_args)
       (actual_tc, actual_indices) <- if outer == tc
@@ -1824,6 +1821,15 @@ seedClassReceiver do_ql rn_head = go []
         NoQL -> void (unifyType Nothing target (mkTyVarTy f))
         DoQL -> qlUnify target (mkTyVarTy f)
 
+    declared_receiver n (L _ (HsPar _ fun)) = declared_receiver n fun
+    declared_receiver n (L _ (HsApp _ fun _)) = declared_receiver (n + 1) fun
+    declared_receiver n arg = do
+      (_, L _ (HsVar _ lname)) <- liftMaybe (retainedNamedCallback arg)
+      ident <- MaybeT (tcLookupIdMaybe (unLocWithUserRdr lname))
+      let ty = varType ident
+      guard (isTauTy ty && noFreeVarsOfType ty)
+      liftMaybe (tcRetainedOrdinaryResult n ty)
+
     eligible tv = isTcTyVar tv && isMetaTyVar tv &&
       case do_ql of
         NoQL -> not (isQLInstTyVar tv)
@@ -1844,7 +1850,10 @@ can select a matchable f before it checks familyInput :: Batch (Pick True).
 
 Check only classes with a parameter that can have an unmatchable arrow
 kind. Use the receiver's closed declared type when it contains a family
-prefix. Look through at most one nominal family equation to expose the same
+prefix. For makeReceiver (), peel the visible arrows of the monomorphic
+producer's declared type. This reads no producer operands and permits no
+type instantiation or dependent arrows. Look through at most one nominal
+family equation to expose the same
 algebraic constructor. Avoid recursive reduction in this optional step.
 An earlier callback must use the same receiver index. Unify that index
 with the partial unmatchable family. The ordinary receiver check supplies

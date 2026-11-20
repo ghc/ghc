@@ -588,8 +588,11 @@ The same program runs with and without `ImpredicativeTypes`. In both
 modes, the checker reads the receiver's declared type and then checks terms
 in source order. An empty receiver can leave the function index unknown.
 An explicit M argument still rejects the family receiver.
-Passing a producer call directly, as in `mapIndexed (fmap not) (makeReceiver ())`,
-still fails in both modes. Binding the call to a local name succeeds.
+A producer with the closed signature `makeReceiver :: () -> FamilyBatch`
+can supply the receiver directly in `mapIndexed (fmap not) (makeReceiver ())`.
+The checker reads the producer's result type, then checks its arguments
+in source order. A polymorphic call such as `id familyInput` still needs a
+local binding to expose its receiver type.
 Without Quick Look, an explicit result signature on
 `getCells (mapIndexed (fmap not) familyInput) :: [Maybe Bool]` can also
 select `Maybe` before the receiver fixes the partial family.

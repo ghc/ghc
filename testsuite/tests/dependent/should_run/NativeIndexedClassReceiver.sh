@@ -15,6 +15,40 @@ cp "$src/IndexedMap.hs" provider/
 cp "$src/"{IndexedMapClient,NativeIndexedClassReceiver}.hs provider/IndexedMap.hi client/
 cd client
 
+cat >../provider/ReceiverProducer.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module ReceiverProducer (makeReceiver) where
+
+import IndexedMap (FamilyBatch, familyInput)
+
+makeReceiver :: () -> FamilyBatch
+makeReceiver () = familyInput
+HS
+(cd ../provider && "${ghc[@]}" -c ReceiverProducer.hs)
+cp ../provider/ReceiverProducer.hi .
+
+cat >TypedReceiverClient.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module TypedReceiverClient (main) where
+
+import IndexedMap (getCells, mapIndexed)
+import ReceiverProducer (makeReceiver)
+
+main :: IO ()
+main = print (getCells (mapIndexed (fmap not) (makeReceiver ())))
+HS
+
+cat >WrongProducer.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module WrongProducer where
+
+import IndexedMap (getCells, mapIndexed)
+import ReceiverProducer (makeReceiver)
+
+wrong :: IO ()
+wrong = print (getCells (mapIndexed (fmap not) (makeReceiver True)))
+HS
+
 cat >Underdetermined.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes, TypeApplications #-}
 module Underdetermined where
@@ -42,6 +76,18 @@ for mode in NoImpredicativeTypes ImpredicativeTypes; do
     "${ghc[@]}" "-X$mode" -fforce-recomp -c IndexedMapClient.hs NativeIndexedClassReceiver.hs
     "${ghc[@]}" IndexedMapClient.o NativeIndexedClassReceiver.o ../provider/IndexedMap.o -o observe
     [[ $(./observe) == '([Just True,Nothing],[Just True,Nothing])' ]]
+
+    "${ghc[@]}" "-X$mode" -fforce-recomp -c TypedReceiverClient.hs -main-is TypedReceiverClient
+    "${ghc[@]}" -main-is TypedReceiverClient TypedReceiverClient.o \
+        ../provider/{IndexedMap,ReceiverProducer}.o -o typed-receiver
+    [[ $(./typed-receiver) == '[Just True,Nothing]' ]]
+
+    if "${ghc[@]}" "-X$mode" -c WrongProducer.hs >producer.log 2>&1 ||
+       ! grep -Fq '[GHC-83865]' producer.log ||
+       ! grep -Fq "namely \`True'" producer.log; then
+        cat producer.log >&2
+        exit 1
+    fi
 
     if "${ghc[@]}" "-X$mode" -c Underdetermined.hs >ambiguous.log 2>&1 ||
        ! grep -Fq '[GHC-39999]' ambiguous.log; then
