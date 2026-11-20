@@ -197,7 +197,11 @@ keeps the same header. Reserializing the cached payload preserves its bytes.
 
 Opening is limited to an application with a known operand head and an
 ordinary payload domain. Each opening introduces a fresh scoped
-witness. The draft's general opaque witness projections, scope
+witness. The recursive filter result can also be named with
+`let rest = filterVec p xs in Cons x rest`. The nonrecursive local
+binding retains the exact dot package type, including its enclosing
+element type. Opening the binding stays inside the application.
+The draft's general opaque witness projections, scope
 repacking across lambda, let or case, and `@Pack` remain open.
 [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
 and [the inference rules](https://richarde.dev/papers/2021/exists/exists.pdf).

@@ -14,12 +14,14 @@ flags=(-B"$lib" -v0 -O0 -package-env - -i -i.
 
 mkdir provider hidden client
 cd provider
-cp "$src/"{Vector,Filter,BarProvider,DotHie,BarRank,RetainedDot}.hs .
+cp "$src/"{Vector,Filter,LetFilter,BarProvider,DotHie,BarRank,RetainedDot}.hs .
 "$ghc" "${flags[@]}" -c Vector.hs BarRank.hs RetainedDot.hs
 "$ghc" "${flags[@]}" -fwrite-ide-info -c BarProvider.hs
 "$ghc" "${flags[@]}" -ddump-ds -ddump-stg-final -c Filter.hs >filter.log
 grep -Eq 'unpack \(Filter.filterVec' filter.log
 grep -Eq "pack \('Vector.S " filter.log
+"$ghc" "${flags[@]}" -ddump-ds -c LetFilter.hs >let-filter.log
+grep -Eq 'unpack rest' let-filter.log
 sed -n '/Final STG:/,$p' filter.log >filter.stg
 test -s filter.stg
 if grep -Eiq '\b(Pack|Unpack|PackTag)\b' filter.stg; then
@@ -40,29 +42,29 @@ done
 IFS= read -r dot_hie < DotHie.hie
 IFS= read -r bar_hie < BarProvider.hie
 [[ $dot_hie == "HIE$(( ${bar_hie#HIE} + 1 ))" ]]
-mv -- Vector.hs Filter.hs BarProvider.hs RetainedDot.hs ../hidden/
+mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs ../hidden/
 
 cd ../client
-cp ../provider/{Vector,Filter,BarProvider,RetainedDot}.hi .
+cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot}.hi .
 cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot}.hs .
 "$ghc" "${flags[@]}" -c Main.hs Identity.hs Opening.hs LinearDot.hs
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
 "$ghc" "${flags[@]}" Main.o ../provider/{Vector,Filter}.o -o run
-"$ghc" "${flags[@]}" AuditMain.o Identity.o Opening.o ../provider/{Vector,Filter}.o -o audit -main-is AuditMain
+"$ghc" "${flags[@]}" AuditMain.o Identity.o Opening.o ../provider/{Vector,Filter,LetFilter}.o -o audit -main-is AuditMain
 "$ghc" "${flags[@]}" -c RetainedClient.hs -main-is RetainedClient
 "$ghc" "${flags[@]}" RetainedClient.o ../provider/RetainedDot.o -o retained -main-is RetainedClient
 ./run
 ./audit
 ./retained
 
-cp "$src/"{UnsafeHead,SameWitness,Escape,BarClient,ModesAreDistinct,BarPack,DotForall,DotConstraint,LinearDotDuplicate}.hs .
-for bad in UnsafeHead SameWitness Escape BarClient ModesAreDistinct BarPack DotForall DotConstraint LinearDotDuplicate; do
+cp "$src/"{UnsafeHead,SameWitness,Escape,LetEscape,BarClient,ModesAreDistinct,BarPack,DotForall,DotConstraint,LinearDotDuplicate}.hs .
+for bad in UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct BarPack DotForall DotConstraint LinearDotDuplicate; do
     if "$ghc" "${flags[@]}" -c "$bad.hs" >"$bad.log" 2>&1; then
         echo "$bad unexpectedly compiled." >&2
         exit 1
     fi
     case "$bad" in
-        UnsafeHead|SameWitness|Escape) code=25897;;
+        UnsafeHead|SameWitness|Escape|LetEscape) code=25897;;
         BarClient|ModesAreDistinct) code=83865;;
         BarPack) code=27432;;
         DotForall|DotConstraint) code=91510;;

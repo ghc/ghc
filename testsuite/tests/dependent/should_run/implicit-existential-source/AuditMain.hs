@@ -3,6 +3,7 @@ module AuditMain where
 
 import Filter
 import Identity
+import LetFilter (letFilter)
 import Opening
 import Vector
 
@@ -19,3 +20,4 @@ main = do
         lazy = filterVec odd (Cons 7 (error "inferred opening forced the tail"))
     print (audit p q, take 1 (toList (forward lazy)),
            observeUnused (error "identity forced the package"))
+    print (take 1 (toList (letFilter odd (Cons (7 :: Int) (error "let forced the tail")))))
