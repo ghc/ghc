@@ -415,7 +415,7 @@ checkVersions hsc_env mod_summary iface self_recomp
             then return $ outOfDateItemBecause SourceFileChanged Nothing else do {
        ; if not (isHomeModule home_unit (mi_module iface))
             then return $ outOfDateItemBecause ThisUnitIdChanged Nothing else do {
-       ; flags_recomp <- checkFlagHash hsc_env iface self_recomp
+       ; (flags_recomp, check_family_uses) <- checkFlagHash hsc_env iface self_recomp
        ; recomp <- liftIO $ pure flags_recomp
                              `recompThen` checkOptimHash hsc_env self_recomp
                              `recompThen` checkHpcHash hsc_env self_recomp
@@ -444,7 +444,10 @@ checkVersions hsc_env mod_summary iface self_recomp
        ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) u
                              | u <- mi_sr_usages self_recomp]
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
-       ; return $ UpToDateItem iface
+       ; family_recomp <- check_family_uses
+       ; return $ case family_recomp of
+           NeedsRecompile reason -> OutOfDateItem reason Nothing
+           UpToDate -> UpToDateItem iface
     }}}}}}}
   where
     logger = hsc_logger hsc_env
@@ -546,8 +549,10 @@ checkHie dflags mod_summary =
                  -> needsRecompileBecause HieOutdated
              _ -> UpToDate
 
--- | Check the flags haven't changed
-checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp -> IfG RecompileRequired
+-- | Check the flags and return the family check to run after normal usage checks.
+-- See Note [Recompiling inferred open family applications].
+checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp
+              -> IfG (RecompileRequired, IfG RecompileRequired)
 checkFlagHash hsc_env iface self_recomp = do
     let logger   = hsc_logger hsc_env
     let FingerprintWithValue old_fp old_flags = mi_sr_flag_hash self_recomp
@@ -684,15 +689,18 @@ checkFlagHash hsc_env iface self_recomp = do
             then liftIO $ recheck "Compiler now checks retained package case projections"
             else pure UpToDate
       _ -> pure previous
-    case retained of
+    flags <- case retained of
       UpToDate | old_fp /= new_fp, couldInferClassDefaultSelector iface ->
         liftIO $ recheck "Compiler now infers matchability for associated type defaults"
-      UpToDate | old_fp /= new_fp, old_fp /= staged_fp -> do
-        candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
-        if candidate
-          then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
-          else pure UpToDate
       _ -> pure retained
+    let check_family_uses
+          | old_fp == new_fp || old_fp == staged_fp = pure UpToDate
+          | otherwise = do
+              candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
+              if candidate
+                then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
+                else pure UpToDate
+    pure (flags, check_family_uses)
 
 -- | Record the inference rules used to compile open family applications.
 stagedMatchabilityFingerprint :: Fingerprint -> Fingerprint
@@ -982,6 +990,8 @@ An open family that returns a bare arrow can gain a selector before a
 declaration splice or an import. The older interface records its equation.
 It cannot distinguish a bare source arrow from an explicit one.
 Recheck that owner once. The new family ABI invalidates existing clients.
+Check ordinary usage fingerprints first. When a dependency has changed,
+GHC can report its name and skip the additional family check.
 
 An existing family with an inferred selector can also keep the same
 header. Its equations and the defaults at a source use can change.
