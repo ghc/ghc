@@ -183,25 +183,28 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Check source rules over retained arguments. A rule for
-   `keep False xs` reaches the optimized Core restriction. With a variable
-   `b`, the type of `xs` must use the same index as the call. An annotated
-   rule can compile with GHC-53522 and be discarded. Check its firing in a
-   separately compiled client.
-   [Rule and interface support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
-2. **R23.** Follow the inferred arrow through an ordinary higher-order
-   class method. Check both argument orders and an unrelated argument.
-   The later GADT argument already distinguishes M from U.
+1. **R05.** Local rules can match an unknown runtime index and its
+   dependent payload in an optimized client. Check imported rule heads,
+   including an orphan rule whose only retained argument is a constant.
+   A visible type application in the rule head also needs a checked
+   source of types for unannotated payload binders.
+   [Rule and interface support](roadmap/R05-dependent-core.md).
+2. **R23.** An ordinary higher-order class method can get its arrow from
+   the receiver. Check the next example from proposal #242. An unsigned
+   higher-order family should accept both a constructor and a partial
+   family through the same inferred arrow. Check recursive equations and
+   forwarding through another module.
    [Later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
-3. **R22 and R04.** Extend hidden-witness inference beyond callbacks
-   whose checked result determines the witness. Keep independent packages
-   distinct under pattern matching and retain the demand of guards.
+3. **R22 and R04.** A conditional can package a different callback type
+   in each branch. Check introduction and elimination when an implicit
+   existential encloses an explicit one. For retained sums, compare the
+   native list-to-vector producer with the handwritten vector package.
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
-4. **R19.** Check the upgrade of a provider that used separate type families
-   for equivalent retained signature cases. An ordinary client that uses
-   a runtime index needs the provider to expose the shared result type.
+4. **R19.** A GADT field can use an ordered type case under a retained
+   Boolean binder. Extend Template Haskell reification to this field
+   type. H98 fields under a retained binder still use a named helper.
    [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
 
 Use this queue for current priorities, the linked card for its acceptance
