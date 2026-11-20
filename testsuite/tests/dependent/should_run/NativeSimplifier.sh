@@ -7,21 +7,48 @@ trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 flags=(-fomit-interface-pragmas -fno-write-if-simplified-core)
-cp "$area"/{NativeSimplifierProvider,NativeSimplifierLocalRec}.hs .
-"${g[@]}" -O0 "${flags[@]}" -ddump-simpl-iterations -c NativeSimplifierProvider.hs >retained.log 2>&1 || { cat retained.log; exit 1; }
-grep -Fq 'Simplifier iteration=1' retained.log || { cat retained.log; exit 1; }
-"${g[@]}" -O0 "${flags[@]}" -ddump-simpl-iterations -c NativeSimplifierLocalRec.hs >local-rec.log 2>&1 ||
-  { cat local-rec.log; exit 1; }
-grep -Fq 'Simplifier iteration=1' local-rec.log || { cat local-rec.log; exit 1; }
-status=0
-"${g[@]}" -O1 "${flags[@]}" -fforce-recomp -c NativeSimplifierProvider.hs >optimized.log 2>&1 || status=$?
-if [[ $status != 1 ]] || ! grep -Fq 'Native dependent Core cannot enter optimized module compilation' optimized.log; then
-  cat optimized.log
-  exit 1
-fi
-mkdir client
-cp "$area/NativeSimplifierClient.hs" NativeSimplifierProvider.hi NativeSimplifierLocalRec.hi client/
-cd client
-"${g[@]}" -O0 "${flags[@]}" -c NativeSimplifierClient.hs
-"${g[@]}" NativeSimplifierClient.o ../NativeSimplifierProvider.o ../NativeSimplifierLocalRec.o -o run
-./run
+for level in 0 1; do
+    mkdir "O$level"
+    (
+        cd "O$level"
+        cp "$area"/{NativeSimplifierProvider,NativeSimplifierLocalRec}.hs .
+        for module in NativeSimplifierProvider NativeSimplifierLocalRec; do
+            "${g[@]}" "-O$level" "${flags[@]}" -ddump-simpl-iterations -ddump-worker-wrapper \
+                -c "$module.hs" >"$module.log" 2>&1 || { cat "$module.log"; exit 1; }
+            grep -Fq 'Simplifier iteration=1' "$module.log" || { cat "$module.log"; exit 1; }
+            if [[ "$level" == 1 ]]; then
+                grep -Fq 'Worker Wrapper binds' "$module.log" || { cat "$module.log"; exit 1; }
+            fi
+        done
+        mkdir client
+        cp "$area/NativeSimplifierClient.hs" ./*.hi client/
+        cd client
+        "${g[@]}" -O0 "${flags[@]}" -c NativeSimplifierClient.hs
+        "${g[@]}" NativeSimplifierClient.o ../NativeSimplifierProvider.o ../NativeSimplifierLocalRec.o -o run
+        ./run >observed
+    )
+done
+diff -u O0/client/observed O1/client/observed
+
+cd O1
+reject() {
+    local diagnostic=$1 status=0
+    shift
+    "${g[@]}" "$@" -fforce-recomp >reject.log 2>&1 || status=$?
+    if [[ $status != 1 ]] || ! grep -Fq "$diagnostic" reject.log; then
+        cat reject.log
+        exit 1
+    fi
+}
+reject 'optimized module compilation with these options' -O2 "${flags[@]}" -c NativeSimplifierProvider.hs
+reject 'optimized module compilation with these options' -O1 "${flags[@]}" -fno-worker-wrapper -c NativeSimplifierProvider.hs
+reject 'interface unfolding generation' -O1 -fno-write-if-simplified-core -c NativeSimplifierProvider.hs
+reject 'Core interface serialization' -O1 -fomit-interface-pragmas -fwrite-if-simplified-core -c NativeSimplifierProvider.hs
+
+sed 's/^module NativeSimplifierProvider /module LocalRuleProvider /' NativeSimplifierProvider.hs >LocalRuleProvider.hs
+cat >>LocalRuleProvider.hs <<'SRC'
+
+{-# RULES "ordinary control" observeProof Refl = 8 #-}
+SRC
+reject 'no local RULES' -O1 "${flags[@]}" -c LocalRuleProvider.hs
+cat client/observed
