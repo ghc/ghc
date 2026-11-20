@@ -40,6 +40,8 @@ sed '/^bad ::/,$d; s/^module NativeRetainedCastDomainReject where/module Ordinar
     NativeRetainedCastDomainReject.hs >OrdinaryRoleWitness.hs
 "${g[@]}" -O0 "${flags[@]}" -c OrdinaryRoleWitness.hs
 reject NativeRetainedCastDomainWorker GHC-05617 'In the second argument of' -DWRONG_BRANCH_LENGTH
+swapped=$(awk '/S k -> [(]observeVector .* ys, observeVector .* xs[)]/ { print NR }' NativeRetainedCastDomainWorker.hs)
+reject NativeRetainedCastDomainWorker GHC-05617 "NativeRetainedCastDomainWorker.hs:$swapped:13:" -DWRONG_BRANCH_VECTOR
 "${g[@]}" -O0 "${flags[@]}" -c NativeRetainedCastDomainWorker.hs
 mkdir ordinary
 cp NativeRetainedCastDomainWorker.hi NativeRetainedCastDomainClient.hs PackedVecLibrary.hi ordinary/
@@ -47,4 +49,18 @@ cd ordinary
 "${g[@]}" -O0 "${flags[@]}" -c NativeRetainedCastDomainClient.hs
 "${g[@]}" NativeRetainedCastDomainClient.o ../NativeRetainedCastDomainWorker.o \
     ../../provider/{PackedVecLibrary,ParameterizedIndexLibrary}.o -o run-domain
-./run-domain
+./run-domain | tee baseline.stdout
+
+cd ..
+for opt in -O1 -O2; do
+    "${g[@]}" "$opt" -fforce-recomp -c NativeRetainedCastDomainWorker.hs
+    cp NativeRetainedCastDomainWorker.hi ordinary/
+    (
+        cd ordinary
+        "${g[@]}" "$opt" -fforce-recomp -c NativeRetainedCastDomainClient.hs
+        "${g[@]}" NativeRetainedCastDomainClient.o ../NativeRetainedCastDomainWorker.o \
+            ../../provider/{PackedVecLibrary,ParameterizedIndexLibrary}.o -o run-domain
+        ./run-domain > optimized.stdout
+        diff -u baseline.stdout optimized.stdout
+    )
+done

@@ -1,6 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes, CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, RankNTypes, ScopedTypeVariables, StandaloneKindSignatures, TypeApplications #-}
 module NativeRetainedCastDomainWorker
-    (observe, forceWorker, forceIndex, observeBranch, branchVector, BranchVector(..)) where
+    (observe, forceWorker, forceIndex, observeBranch, observePair, branchVector, BranchVector(..)) where
 
 import Data.IORef (newIORef, readIORef)
 import Data.Kind (Type)
@@ -56,3 +56,17 @@ branchVector (S k) xs = observeVector @('S (Add k m)) xs
 observeBranch :: foreach (cut :: Nat) -> foreach (xs :: Vec Bool (Add cut 'Z)) -> Bool
 observeBranch cut xs = case branchVector @'Z cut xs of
     BranchVector -> True
+
+-- Both arguments occur in the result type of the worker.
+branchPair :: foreach (n :: Nat) -> foreach (xs :: Vec Bool n) -> foreach (ys :: Vec Bool n)
+           -> (BranchVector xs, BranchVector ys)
+branchPair n xs ys = case n of
+    Z -> (observeVector @'Z xs, observeVector @'Z ys)
+#ifdef WRONG_BRANCH_VECTOR
+    S k -> (observeVector @('S k) ys, observeVector @('S k) xs)
+#else
+    S k -> (observeVector @('S k) xs, observeVector @('S k) ys)
+#endif
+
+observePair :: foreach (n :: Nat) -> Vec Bool n -> Vec Bool n -> Bool
+observePair n xs ys = case branchPair n xs ys of (BranchVector, BranchVector) -> True

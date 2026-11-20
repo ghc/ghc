@@ -6532,6 +6532,27 @@ See Note [Retained argument application] in `GHC.Tc.Gen.App`.
 [Source equations](../../testsuite/tests/dependent/should_run/NativeRetainedCastDomainWorker.hs)
 and [ordinary client](../../testsuite/tests/dependent/should_run/NativeRetainedCastDomainClient.hs).
 
+### Capturing two vectors when matching their length
+
+Agda's with-abstraction generalizes the types of later arguments along
+with the goal. In the Haskell case checker, a vector can occur by value
+in a branch and by identity in the result type. Bind each such capture in
+dependency order. Substitute its fresh binder in later argument types,
+evidence predicates and the result. Two vectors with the same width still
+have two distinct binders.
+[Agda 2.8.0, technical details of with-abstraction](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#technical-details)
+and [case checker](../../compiler/GHC/Tc/Gen/Match.hs).
+
+GHC's constructed product result analysis can unbox a pair whose fields
+mention those binders. When the last retained argument would return an
+unboxed tuple directly, the worker takes a trailing zero-width argument.
+This keeps the retained function's result at kind `Type`. GHC already
+uses such an argument to protect worker types when removing a parameter.
+See Notes [Unboxed worker results under retained binders] and [Protecting
+the last value argument] in `GHC.Core.Opt.WorkWrap.Utils`.
+[Worker construction](../../compiler/GHC/Core/Opt/WorkWrap/Utils.hs)
+and [case regression](../../testsuite/tests/dependent/should_run/NativeRetainedCastDomainWorker.hs).
+
 ## Check a split at an independent runtime cut
 
 `splitAtVecChecked` compares the runtime cut and total before splitting

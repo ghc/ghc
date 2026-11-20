@@ -14,6 +14,7 @@ main = do
         singleton = error "unused singleton vector" :: Vec Bool ('S 'Z)
     print (observeBranch Z empty, observeBranch (S Z) singleton)
     print (literalCut undefined)
+    print (observePair Z empty empty, observePair (S Z) singleton singleton)
 
 literalCut :: Vec Bool ('S ('S ('S 'Z))) -> Bool
 literalCut xs = case branchVector @('S 'Z) (S (S Z)) xs of
