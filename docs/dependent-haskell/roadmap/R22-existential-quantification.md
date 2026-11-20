@@ -356,3 +356,13 @@ complete erased package from an argument. For example,
 coercions before using the package. A nested runtime index or retained
 function still reports GHC-83605 on this path.
 [Ordinary client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs).
+
+### Inferring a higher-rank witness
+
+A package can store `Callback t` with a hidden `t`. If the supplied
+value already has type `Callback (forall a. a -> a)`,
+`ImpredicativeTypes` lets the producer infer that entire witness when it
+constructs the package. Consecutive witnesses are chosen in scope.
+Checking the final payload can still reject an incompatible family result.
+[Rank-n callback](../examples/erased-existentials/RankedPackage.hs)
+and [GenImpredicative in Figure 10](https://richarde.dev/papers/2021/exists/exists.pdf#page=22).

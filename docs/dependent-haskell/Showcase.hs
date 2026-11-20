@@ -52,6 +52,7 @@ import qualified ErasedPackage
 import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
+import qualified RankedPackage
 import qualified StoredVector
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
@@ -949,8 +950,10 @@ main = do
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
     observe "read a retained length through a newtype record selector" $
-        StoredVector.wrappedContents (StoredVector.wrapVector (S (S Z))
+        StoredVector.wrappedContents (StoredVector.wrapVector 2
             (VCons 'h' (VCons 's' VNil)))
+    observe "read a GADT newtype length without forcing its vector" $
+        StoredVector.gadtLength 1 (error "unused vector" :: Vec Char 1)
     let (passing, failing) = ImplicitVector.partitionVec odd
             (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
         (firstPart, _) = ImplicitVector.partitionVec odd (VCons (7 :: Int) (error "unused partition tail"))
@@ -970,6 +973,7 @@ main = do
             (VCons (2 :: Int) VNil)))
     observe "map an ordinary observer over differently sized partitions" $
         PartitionChoices.partitionViews (VCons 7 (VCons 2 (VCons 9 VNil)))
+    observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $

@@ -3155,6 +3155,17 @@ package and leaves equality between package types to subsumption.
 [A Quick Look at Impredicativity, Figure 5](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf)
 and [An Existential Crisis Resolved, §8](https://richarde.dev/papers/2021/exists/exists.pdf#page=21).
 
+Figure 10 extends package introduction when the witness can itself be a
+polytype. Given a payload of type `Callback (forall a. a -> a)`, the fork
+can infer the hidden type from that application. It allocates the witness
+variables in binder order and checks the final payload type. A closure in
+the package uses the hidden identity at both `Int` and `Bool`.
+Quick Look assumes an invariant arrow. With `DeepSubsumption`, GHC
+uses its usual subsumption check for a function payload.
+[Quick Look, §5.8](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=15),
+[GenImpredicative, Figure 10](https://richarde.dev/papers/2021/exists/exists.pdf#page=22)
+and [executable example](examples/erased-existentials/RankedPackage.hs).
+
 Figure 1(b) of *An Existential Crisis Resolved* gives the source rule for
 the [implicit vector filter](examples/erased-existentials/ImplicitVector.hs).
 The passing branch constructs a cell from a recursive call with a fresh

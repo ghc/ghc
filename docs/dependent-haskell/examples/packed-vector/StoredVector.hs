@@ -1,7 +1,7 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, GADTs, ScopedTypeVariables #-}
 
 -- | Store vectors of different lengths behind one record type.
-module StoredVector (Batch(..), singleton, cells, Wrapped(..), wrapVector, wrappedContents) where
+module StoredVector (Batch(..), singleton, cells, Wrapped(..), wrapVector, wrappedContents, gadtLength) where
 
 import GHC.Sigma (Sigma(Pair))
 import GHC.Sigma.Projection (second)
@@ -29,3 +29,12 @@ wrapVector n xs = Wrapped (Pair n xs)
 wrappedContents :: Wrapped a -> (Int, [a])
 wrappedContents value = case wrapped value of
     Pair n xs -> (natToInt n, toList xs)
+
+-- | The constructor's element type scopes over the dependent field.
+newtype GadtWrapped a where
+    GadtWrapped :: forall b. { gadtPair :: some (n :: Nat) | Vec b n } -> GadtWrapped b
+
+-- | Read the retained length without inspecting the vector.
+gadtLength :: forall a. foreach (n :: Nat) -> Vec a n -> Int
+gadtLength n xs = case gadtPair (GadtWrapped (Pair n xs) :: GadtWrapped a) of
+    Pair m _ -> natToInt m

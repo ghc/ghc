@@ -217,11 +217,13 @@ filter a vector without forcing the tail to learn the result length: ([7],[7,9])
 infer the hidden lengths of a lazy filter and a retained vector: ([7],[],[9])
 project a stored vector from a strict record field: "h"
 read a retained length through a newtype record selector: (2,"hs")
+read a GADT newtype length without forcing its vector: 1
 partition a vector at two independent result lengths: ([7,9],[2],[7])
 match both hidden lengths in one partition result: ([7,9],[2])
 choose a partition without forcing the unused branch: ([7,9],[2])
 match hidden partition lengths in function equations: (Just 7,Nothing)
 map an ordinary observer over differently sized partitions: [([7,9],[2]),([2],[7,9])]
+use a hidden polymorphic identity at Int and Bool: (7,True)
 transport element equality under a hidden vector length: [7,9]
 zip a filtered vector with itself at its hidden length: [(7,7)]
 pass a lambda with a hidden vector length and filter its result: [7]
