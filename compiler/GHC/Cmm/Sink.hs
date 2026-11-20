@@ -482,7 +482,9 @@ tryToInline platform liveAfter node assigs =
 
         keep :: CmmNode O x -> (CmmNode O x, Assignments)
         keep node' = (final_node, a : rest')
-          where (final_node, rest') = go usages live' node' (insertLRegSet l skipped) rest
+          where
+                -- Always forced eventually so the bang avoids a pointless thunk.
+                !(final_node, rest') = go usages live' node' (insertLRegSet l skipped) rest
 
                 -- Avoid discarding of assignments to vars on the rhs.
                 -- See Note [Keeping assignments mentioned in skipped RHSs]
