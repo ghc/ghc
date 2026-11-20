@@ -51,6 +51,7 @@ import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
 import qualified ForgetWitness
 import qualified ImplicitVector
+import qualified PartitionChoices
 import qualified StoredVector
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
@@ -947,6 +948,9 @@ main = do
         ImplicitVector.observations
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
+    observe "read a retained length through a newtype record selector" $
+        StoredVector.wrappedContents (StoredVector.wrapVector (S (S Z))
+            (VCons 'h' (VCons 's' VNil)))
     let (passing, failing) = ImplicitVector.partitionVec odd
             (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
         (firstPart, _) = ImplicitVector.partitionVec odd (VCons (7 :: Int) (error "unused partition tail"))
@@ -964,6 +968,8 @@ main = do
             (VCons (7 :: Int) (error "unused equation tail"))),
          ImplicitVector.firstPassing (ImplicitVector.partitionRows odd
             (VCons (2 :: Int) VNil)))
+    observe "map an ordinary observer over differently sized partitions" $
+        PartitionChoices.partitionViews (VCons 7 (VCons 2 (VCons 9 VNil)))
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $
