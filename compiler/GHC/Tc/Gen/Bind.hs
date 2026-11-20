@@ -57,7 +57,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
-import GHC.Core.Type (mkStrLitTy, mkCastTy, coreFullView)
+import GHC.Core.Type (mkStrLitTy, mkCastTy, coreFullView, isFamFreeTy)
 import GHC.Core.TyCo.Rep (Type(ExistsTy))
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
@@ -1334,7 +1334,7 @@ checkInferredRetainedTypes local_value infos
       = setSrcSpan (nameSrcSpan name) $
         do { ty <- liftZonkM $ zonkTcType (idType mono_id)
            ; when (hasNativeDependentExpr (Type ty) && not (closed_package ty)) $
-               if local_value && isNothing (mbi_sig info) && isTauTy ty
+               if local_value && isNothing (mbi_sig info) && scoped_type ty
                then checkValidType (InfSigCtxt name) ty
                else failWithTc $ TcRnRetainedQuantificationError (RetainedInference ty) }
 
@@ -1342,6 +1342,14 @@ checkInferredRetainedTypes local_value infos
       | ExistsTy _ _ payload <- coreFullView ty
       = isTauTy ty && not (hasNativeDependentExpr (Type payload))
       | otherwise = False
+
+    scoped_type ty
+      | ExistsTy ImplicitExists binder body <- coreFullView ty
+      = let kind = varType binder in
+        isTauTy kind && isTauTy body && isFamFreeTy ty
+        && all isTyVar (tyCoVarsOfTypeList ty)
+        && not (hasNativeDependentExpr (Type kind) || hasNativeDependentExpr (Type body))
+      | otherwise = isTauTy ty
 
 {- Note [Inference of retained types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1380,6 +1388,15 @@ Do not generalise the result. Keep the rejection for recursive groups, pattern
 bindings, partial signatures and retained function telescopes. isTauTy rejects
 DepFunTy as well as forall and predicate arrows. Existing infer-cell promotion
 and branch joining remain responsible for type-variable and GADT escape.
+
+A local dot package can also refer to an enclosing type variable. For example,
+in the polymorphic filter, `let rest = filterVec p xs in Cons x rest` gives rest
+the type `exists (n :: Nat). Vec n a`. Its witness remains bound in the package.
+Check the ordinary tau kind and payload, and require a family-free schema with
+only type variables free. This path records the exact checked type on the local
+Id. It does not assign the schema to a metavariable or generalise it. The usual
+application check opens rest at its use with a fresh scoped witness.
+
 Agda's lexical let context supplies prior art; it does not justify transparent
 Haskell index aliases. See docs/dependent-haskell/REFERENCES.md,
 "Scoped native source inference".
