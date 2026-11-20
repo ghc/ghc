@@ -6,7 +6,8 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 cp "$area"/Native*.hs .
-g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
+plain=("$1" "-B$2" -v0 -package-env - -i -i. -fdiagnostics-color=never)
+g=("${plain[@]}" -dcore-lint -dstg-lint)
 reject() {
   local file=$1 span=$2 message=$3 status=0
   "${g[@]}" -c "$file.hs" >bad.log 2>&1 || status=$?
@@ -39,7 +40,9 @@ cp NativeCase.hi NativeNestedCase.hi NativeTypeCaseFallback.hi NativeTypeCase{Cl
    grep -Fq 'NativeTypeCaseRigid.hs:48:17: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:52:22: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:55:31: error: [GHC-83865]' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:59:23: error: [GHC-83865]' bad.log &&
    grep -Eq 'the type case in .*ForallResult' bad.log &&
+   grep -Eq 'the type case in .*IndexedFieldOrder' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
@@ -73,8 +76,10 @@ grep -Fq 'Not in scope: type constructor or class' bad.log
 reject NativeTypeCaseDominatedWrongKind 8:20 'GHC-83865'
 grep -Eq 'has kind .*Bool' bad.log
 reject NativeTypeCaseNestedAliasHead 5:8 'GHC-55789'
-reject NativeTypeCaseOpaqueIndex 12:3 'GHC-79642'
-grep -Fq 'NativeTypeCaseOpaqueIndex.hs:25:3: error: [GHC-79642]' bad.log
+reject NativeTypeCaseOpaqueIndex 14:3 'GHC-79642'
+grep -Fq 'NativeTypeCaseOpaqueIndex.hs:27:3: error: [GHC-79642]' bad.log
+grep -Fq 'NativeTypeCaseOpaqueIndex.hs:39:3: error: [GHC-79642]' bad.log
+grep -Fq 'NativeTypeCaseOpaqueIndex.hs:53:3: error: [GHC-79642]' bad.log
 grep -Fq 'Cannot determine which constructors are possible' bad.log
 reject NativeTypeCaseErasedAlias 8:3 'GHC-30337'
 grep -Fq 'appear in an injective position' bad.log
@@ -83,3 +88,8 @@ grep -Fq 'appear in an injective position' bad.log
 reject NativeTypeCaseHiddenAlias 11:11 "GHC-83865"
 grep -Fq "In the expression: Refl" bad.log
 reject NativeTypeCaseHiddenErased 6:3 'GHC-30337'
+
+# Check that malformed index transport is rejected without Core Lint.
+g=("${plain[@]}")
+reject NativeTypeCaseOpaqueIndex 53:3 'GHC-79642'
+! grep -Fq 'Core Lint errors' bad.log

@@ -6,6 +6,7 @@ module NativeNestedCase
   , AliasFirst, MixedAlias, ArrowResult
   , CaseFlag(..), ForallResult, ForallRepResult, forallResult
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
+  , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
   ) where
 
 import Data.Kind (Type)
@@ -139,6 +140,28 @@ newtype GateIndexOther = GateIndexOther Bool
 type ApartGatePick (d :: Maybe (FamilyGate GateIndexOther)) = case d of
   Just (PlainGate True) -> Int
   Just _ -> Bool
+  Nothing -> Char
+
+type family FieldIndex (seed :: Bool) (active :: Bool) :: Type where
+  FieldIndex seed active = Bool
+
+data IndexedFieldPayload (active :: Bool) where
+  FieldOn :: Bool -> IndexedFieldPayload 'True
+  FieldOff :: Ordering -> IndexedFieldPayload 'False
+
+data IndexedFieldBox (k :: Type) (active :: Bool) where
+  PlainFieldBox :: Bool -> IndexedFieldBox k active
+  RefinedFieldBox :: Proxy seed -> IndexedFieldPayload active
+                  -> IndexedFieldBox (FieldIndex seed active) active
+
+type IndexedFieldPick (d :: Maybe (IndexedFieldBox Bool 'True)) = case d of
+  Just (RefinedFieldBox _ (FieldOn flag)) -> Proxy flag
+  Just _ -> Char
+  Nothing -> ()
+
+type IndexedFieldOrder (d :: Maybe (IndexedFieldBox Bool 'True)) = case d of
+  Just (RefinedFieldBox _ (FieldOn True)) -> Int
+  Just _ -> Int
   Nothing -> Char
 
 type ArrowResult (tag :: k) (d :: Maybe (Maybe Bool)) =

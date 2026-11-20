@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ExplicitForAll, KindSignatures, RankNTypes, TypeApplications, TypeFamilies, TypeOperators #-}
 module NativeTypeCaseRigid where
 import Data.Kind (Type)
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import NativeCase
 import qualified NativeNestedCase as N
@@ -53,3 +53,7 @@ rigidArrowResult _ = Refl
 
 rigidForall :: N.ForallResult -> Proxy 'LT -> N.CaseFlag ('Just x) -> (Proxy 'LT, Int)
 rigidForall select tag flag = select tag flag
+
+rigidIndexedField :: Proxy flag ->
+  N.IndexedFieldOrder ('Just ('N.RefinedFieldBox ('Proxy :: Proxy 'False) ('N.FieldOn flag))) :~: Int
+rigidIndexedField _ = Refl

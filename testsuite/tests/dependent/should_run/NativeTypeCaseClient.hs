@@ -126,6 +126,15 @@ apartIndex = Refl
 hiddenIndex :: N.HiddenGatePick ('Just 'N.IndexedGate) :~: Int
 hiddenIndex = Refl
 
+refinedField :: Proxy (seed :: Bool) ->
+  N.IndexedFieldPick ('Just ('N.RefinedFieldBox ('Proxy :: Proxy seed) ('N.FieldOn flag))) :~: Proxy flag
+refinedField _ = Refl
+
+refinedFieldOrder ::
+  ( N.IndexedFieldOrder ('Just ('N.RefinedFieldBox ('Proxy :: Proxy 'False) ('N.FieldOn 'True))) :~: Int
+  , N.IndexedFieldOrder ('Just ('N.RefinedFieldBox ('Proxy :: Proxy 'True) ('N.FieldOn 'False))) :~: Int )
+refinedFieldOrder = (Refl, Refl)
+
 arrowResult ::
   N.ArrowResult 'LT ('Just ('Just 'True)) :~: (() -> (Proxy 'LT, Proxy 'True))
 arrowResult = Refl
