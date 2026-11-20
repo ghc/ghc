@@ -89,12 +89,10 @@ or an SMT solver's exit code cannot by itself construct a membership path.
 [GHC's plugin evidence interface](../users_guide/extending_ghc.rst#typechecker-plugins)
 and [Agda's decidable propositions and witnesses](https://agda.github.io/agda-stdlib/v2.3/Relation.Nullary.Decidable.Core.html).
 
-A QuickCheck generator can also propose a field position. The file-backed
-example below turns that position into a path. GHC checks whether the
-path selects the requested label. One successful candidate proves membership
-because the claim asks for one position. If every attempt misses, the
-search has established only that those positions failed. To establish
-absence in this finite list, a checker must account for every position.
+The file-backed example below uses a seed to generate field positions.
+GHC checks a proposed position by typechecking the corresponding
+membership path. To establish absence in a finite list, a checker must
+account for every position.
 
 ## Running a search in a splice
 
@@ -156,6 +154,30 @@ fact refers to the producer's result at build time.
 [Checked module](examples/boundary-evidence/FileOffer.hs),
 [evidence builder](examples/boundary-evidence/EmitMembership.hs)
 and [TH file dependencies](../../libraries/ghc-internal/src/GHC/Internal/TH/Monad.hs).
+
+### Replay a sampled membership search
+
+`SearchOffer` runs the ordinary producer at the supplied input. It samples
+up to two positions with replacement and compares each label it reads
+with the requested label. The harness saves the first matching position
+in the candidate file. The search reports the seed, input, requested label,
+offer, and observed position-label pairs. A miss reports the same
+information and emits no position.
+
+| Seed and inputs | What happened |
+| --- | --- |
+| Seed `4`, input `7`, label `8` | The search observes `(0,7)` then `(1,8)`. A replay gives the same report and candidate. GHC checks `There Here` at `Member 8 (OrdinaryOffer.offered 7)`, and the program selects the second field. |
+| Seed `0`, input `8`, label `8` | The search observes `(0,8)` and proposes position `0`. GHC rejects `Here` for the unchanged obligation at input `7`. |
+| Seed `0`, input `7`, label `8` | The search observes `(0,7)` twice and reports that it found no candidate. Position `1` still has label `8`. |
+
+Sampling tests the reported observations. The checked witness establishes
+membership for the specified producer input. A universal claim or a
+claim of absence would require additional evidence.
+QuickCheck uses generated inputs to test Haskell properties. Agda's
+`Any` uses `here` and `there` to carry evidence for an element of a list.
+[Search source](examples/boundary-evidence/SearchOffer.hs),
+[QuickCheck paper](https://www.cis.upenn.edu/~bcpierce/courses/552-2008/resources/icfp-quickcheck.pdf)
+and [Agda standard library, Any](https://agda.github.io/agda-stdlib/v2.3/Data.List.Relation.Unary.Any.html).
 
 ## What does an observation establish?
 
@@ -294,9 +316,9 @@ The self-hosted compiler verified these results with Core and STG lint.
 
 ## Further work
 
-- Use the same separation for property testing. Keep the seed, generated
-  inputs, observer, and counterexample in the report. Feed candidate
-  witnesses back to the checker when a property has a witness type.
+- Extend the [seeded membership example](#replay-a-sampled-membership-search)
+  to generators with larger domains. Record the seed, generated inputs,
+  observer, and counterexample. Check generated paths at their witness types.
 - For an external solver, specify the fragment and the certificate the
   checker can validate. If a translation or answer must be trusted,
   record that assumption. Liquid Haskell's refinement reflection and
