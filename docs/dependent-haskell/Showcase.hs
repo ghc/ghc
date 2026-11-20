@@ -1465,6 +1465,9 @@ sourceAddition = do
         split :: (Vec Bool n, Vec Bool m)
         split = splitAtVec @Bool @m n joined
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
+    observe "use ordinary vector append in a type"
+        (Refl :: PackedVecLibrary.appendVec ('VCons 'True 'VNil) ('VCons 'False 'VNil)
+              :~: 'VCons 'True ('VCons 'False 'VNil))
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     case (Refl :: VectorSplitObservation.reassembleTwo ('VCons 'True ('VCons 'False 'VNil))
@@ -1579,6 +1582,9 @@ listBoundaries = do
     observe "use one dependent pair type at two witness types"
         (Pair.withPair chars (\k v -> (natToInt k, toList v)),
          Pair.withPair tag (\_ c -> getConst c))
+    observe "expand a named consumer over an indexed vector"
+        (Refl :: Pair.Consumer (Vec Char 'Z) (Const String) String
+              :~: (foreach (v :: Vec Char 'Z) -> Const String v -> String))
     let row = replicateNative n 'x'
     observe "name a dependent consumer at a runtime vector length"
         (describeVector row (Const "row"))

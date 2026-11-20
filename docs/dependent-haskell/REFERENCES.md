@@ -6494,3 +6494,14 @@ opaque witness. Applying that witness as a function requires separate
 evidence about its type.
 [Agda 2.8.0, Function Types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
 and [dependent-pair consumer](examples/packed-vector/DependentPair.hs).
+
+### Checking the result kind of ordinary vector append
+
+Agda's vector append returns a vector indexed by the sum of its two input
+lengths. The Haskell example applies the ordinary polymorphic `appendVec`
+to two promoted constructor values. GHC infers the erased inputs from these
+arguments. It reduces the ground result index with its nominal family axioms
+before checking the returned vector. A symbolic tail leaves an open proof
+obligation. [Agda vector append](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [closed evaluator](roadmap/R15-closed-term-evaluator.md).
