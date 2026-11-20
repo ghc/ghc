@@ -3168,7 +3168,7 @@ Compiler `0447f8a7a199675423cd7f5fafa94567afa40114` and fixture source
 The v7 snapshot records all 77 compiler inputs and 92 source paths.
 At that M42 checkpoint, source opaque-call formation and new wire encoding
 remained gated. M43 implements the source subset described below. Its
-[plan](PLAN.md#m43-strict-opaque-call-refinement-from-source-unimplemented)
+[plan](PLAN.md#m43-strict-opaque-call-refinement-from-source)
 retains the historical anchor. New wire encoding remains gated.
 
 
@@ -3277,7 +3277,7 @@ local signature. The complete local signature requirement governs retained
 binder formation. Scalar TermVarTy and constructor fields keep their policies.
 Inverse call decomposition, function equality, heterogeneous transport and
 call-interface codecs remain outside this increment. See
-[the concrete plan](PLAN.md#m46-head-only-function-valued-retained-binders).
+[the concrete plan](PLAN.md#m46-head-only-function-valued-retained-binders-compiler-validation-complete).
 
 Agda v2.8.0 [Conversion 746–761](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L746-L761)
 and [827–850](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L850),
@@ -3422,7 +3422,7 @@ Haskell demand, evidence liveness or FC lowering.
 
 Both builds, selected API1, both-stage source/public21 and final9 checks pass.
 Artifact checks are tracked in
-[the current checkpoint](README.md#m49-constructed-worker-case-activation).
+[the current checkpoint](CHECKPOINTS.md#m49-constructed-worker-case-activation).
 GHC-05617 points at each wrong payload, but relevant bindings can still show a
 generated `call_motive` name. No new paper, PDF, full-file reading, Agda execution
 or theorem claim is added. The ledger remains seven works and nine PDFs.
@@ -3458,7 +3458,7 @@ whole-paper reading is claimed.
 
 The operational source evidence and remaining gates are in
 [the M50 contract](CORE.md#multi-constructor-retained-package-patterns) and
-[checkpoint](README.md#m50-multi-constructor-retained-package-patterns).
+[checkpoint](CHECKPOINTS.md#m50-multi-constructor-retained-package-patterns).
 
 
 ## Function-valued retained package fields prior art
@@ -3507,7 +3507,7 @@ actual old/new reader checks. See [the M51 plan](PLAN.md#m51-function-valued-ret
 
 M51's measured implementation is now described in the
 [contract](CORE.md#function-valued-retained-package-fields) and
-[checkpoint](README.md#m51-function-valued-retained-package-fields). The source
+[checkpoint](CHECKPOINTS.md#m51-function-valued-retained-package-fields). The source
 and mixed-domain object programs pass in both stages. The ordinary body
 rejection for inverse call equality is distinct from the two explicit policy
 guards. These operational results do not transfer Agda's totality or D/DC's
@@ -3546,7 +3546,7 @@ calls preserve actual imported function/input binders. The same interface
 version and type tags encode the telescope. No runtime function equality or
 inverse call rule follows from this change. See the
 [contract](CORE.md#exported-function-valued-retained-value-signatures) and
-[checkpoint](README.md#m52-exported-function-valued-retained-value-signatures).
+[checkpoint](CHECKPOINTS.md#m52-exported-function-valued-retained-value-signatures).
 
 The selected Agda v2.8.0 manual reading now also covers
 [function domains and telescopes, lines20–55](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/function-types.lagda.rst#L20-L55).

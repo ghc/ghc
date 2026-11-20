@@ -416,7 +416,7 @@ direction. M42 selects a dedicated residual-call node for a bounded Core
 kernel. The token/family alternative remains research. Keep scalar domains, function-head
 eligibility and retained function-binder domains separate. No general evaluation
 or preservation result follows. See
-[the detailed comparison](../REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison)
+[the detailed comparison](../REFERENCES.md#opaque-runtime-function-indices-c1-comparison-and-first-kernel)
 and the exact versions, hashes and reading scope in
 `_build/verification/native-next-core-function-indices-v1/`.
 
@@ -568,7 +568,7 @@ GHC reads known worker metadata and reconstructs scalar constructor trees at
 expected domains. Ordinary checking and motive/row Given evidence retain their
 roles. This adds no App/Core/solver or backend rule. Both builds, selected API1,
 the source matrix, public21 and final9 pass. Artifact checks are recorded in
-[the current checkpoint](../README.md#m49-constructed-worker-case-activation).
+[the current checkpoint](../CHECKPOINTS.md#m49-constructed-worker-case-activation).
 These focused results do not establish a theorem or full GHC suite result.
 See [the source comparison](../REFERENCES.md#constructed-worker-case-activation-prior-art).
 
@@ -586,7 +586,7 @@ The cached ICFP2017 author PDF was reread at section9, printed31:27/PDF27.
 Primitive datatypes and pattern matching remain outside its presented D/DC
 proof. No Coq replay, new PDF or whole-paper rereading is claimed. The canonical
 ledger stays at seven works and nine PDFs. M50's source/interface/runtime
-checks are component evidence; see [the checkpoint](../README.md#m50-multi-constructor-retained-package-patterns)
+checks are component evidence; see [the checkpoint](../CHECKPOINTS.md#m50-multi-constructor-retained-package-patterns)
 for the measured source, legacy8, constructor11 and final9 scope. These results
 do not replace artifact checks. Freeze and independent audit must pass before
 publication.

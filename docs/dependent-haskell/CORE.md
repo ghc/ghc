@@ -2138,7 +2138,7 @@ The selected source matrix and public21 pass both stages. Eight new quiet
 values retain the old 1/37 goldens. Wrong-key payloads reject with GHC-05617 at
 source locations; relevant bindings can still expose a generated `call_motive`
 name. Final9 passes. Artifact status is recorded in the
-[current checkpoint](README.md#m49-constructed-worker-case-activation).
+[current checkpoint](CHECKPOINTS.md#m49-constructed-worker-case-activation).
 Note [Source opaque call refinement] in GHC.Tc.Gen.Match owns the trigger.
 C1 and C2 remain open. See [the plan](PLAN.md#m49-constructed-worker-case-activation)
 and [prior art](REFERENCES.md#constructed-worker-case-activation-prior-art).
@@ -2172,7 +2172,7 @@ Actual object-module imports cover both declaration orders, ordinary fields,
 ordinary GADT sibling evidence and two distinct retained telescopes. Sigma3
 already passes the parent baseline. This scope does not implement first-class
 existentials, arbitrary universes or dependent record projections. See
-[the checkpoint](README.md#m50-multi-constructor-retained-package-patterns) and
+[the checkpoint](CHECKPOINTS.md#m50-multi-constructor-retained-package-patterns) and
 [primary sources](REFERENCES.md#multi-constructor-retained-packages-prior-art).
 
 
@@ -2220,7 +2220,7 @@ M51 left the generic `IfaceDepFunTy` function-domain reader gated. M52 admits
 the bounded signature form described below. Native coercion encoding and
 native unfoldings remain gated. Primitive constructor
 field telescopes do not implement first-class dependent sums or projections.
-See [the checkpoint](README.md#m51-function-valued-retained-package-fields)
+See [the checkpoint](CHECKPOINTS.md#m51-function-valued-retained-package-fields)
 and [primary sources](REFERENCES.md#function-valued-retained-package-fields-prior-art).
 
 
@@ -2430,7 +2430,7 @@ exclude the tested unsupported function shapes. The observations do not
 establish totality or a preservation theorem.
 
 See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType,
-[the checkpoint](README.md#m52-exported-function-valued-retained-value-signatures),
+[the checkpoint](CHECKPOINTS.md#m52-exported-function-valued-retained-value-signatures),
 and [primary sources](REFERENCES.md#exported-function-valued-retained-signatures-prior-art).
 
 ## Native dead local bindings

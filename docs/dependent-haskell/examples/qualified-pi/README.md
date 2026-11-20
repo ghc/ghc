@@ -254,7 +254,7 @@ arguments retain their restrictions. No singleton, new interface tag or wire
 version is added. Native coercion encoding, unfoldings and general optimization
 remain gated. See the
 [contract](../../CORE.md#exported-function-valued-retained-value-signatures) and
-[checkpoint](../../README.md#m52-exported-function-valued-retained-value-signatures).
+[checkpoint](../../CHECKPOINTS.md#m52-exported-function-valued-retained-value-signatures).
 
 ## Closed parameterized runtime indices
 

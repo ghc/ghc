@@ -1,419 +1,70 @@
 # Dependent Haskell program roadmap
 
-Use this file to plan the whole program. Use [PLAN.md](PLAN.md) for individual
-compiler increments, [CORE.md](CORE.md) for the current Core contract, and
-[REFERENCES.md](REFERENCES.md) for design provenance. The work queue below owns
-project priorities. The `M` checkpoints in PLAN.md record implementation and
-evidence; their numbers do not define the program's structure.
-
-The primary map is [Serokell's Dependent Haskell roadmap](https://ghc.serokell.io/dh),
-dated **2026-11-12** and reviewed on **2026-11-19**. This checklist records its
-50 feature cards and all 67 feature-to-feature graph edges. Layout nodes are
-excluded. The graph describes prerequisites **or subtasks**. It is not a build
-order. In particular, two edges below are explicitly loose ends of a completed
-feature. The card lists omit already completed children; the graph retains them.
-
-The upstream snapshot has 23 completed cards, seven accepted cards, and 20 cards
-without a status marker. These counts do not measure implementation effort.
-An unmarked card can have research or an implementation prototype.
+Serokell’s roadmap has 50 cards and 67 edges. Its 2026-11-12 snapshot marks
+23 cards complete and seven proposals accepted. Twenty cards have no status
+marker. An edge can identify a prerequisite or a subtask. The
+[dependency index](#upstream-checklist-and-complete-dependency-index)
+records every edge. The R numbers are local labels for those cards.
+[Upstream roadmap](https://ghc.serokell.io/dh).
 
 ## Where this fork stands
 
-We have an end-to-end native experiment within the retained-quantifier part of
-the map. Source programs use a runtime value as a type index, refine that index
-by pattern matching, store it with dependent fields, and run compiled code.
-The supported static subset and native pipeline remain restricted.
+The published compiler at `dd00726ab6` accepts runtime-indexed functions,
+retained constructor fields and selected ordinary Haskell calls in types.
+An ordinary client can project a vector at its package’s stored length.
+A type-level case can select `Int` for `Bool` and `Char` for `Ordering`.
+Both native stages and self-hosted GHCi agree on all 265 Showcase output
+lines. The dependent tests pass 267 of 299 cases, with the same 32
+diagnostics as the preceding checkpoint. The focused run passes 35 of
+37. The other two tests expect different arrow formatting in kind errors.
+Both diagnostics match the archived M177 compiler byte for byte.
+[Checkpoint and upgrade results](PLAN.md#r04-and-r19-project-through-an-ordinary-function-and-match-a-type-directly).
 
-The active part of the map spans function promotion (R13) and
-unsaturated families (R23). R23 supplies the callback kind in the
-R17 type-level `Map` example. The two function-promotion
-evaluators check ordinary calls on known inputs (R15) and preserve
-computations whose inputs are still unknown (R16). Dependency analysis
-(R21) determines when a local function can appear in a type in the
-same module. The [work queue](#current-work-queue) gives a source
-example and the next acceptance test for each card.
-
-M165 checks `Prelude.map Prelude.not` on a known list (R15). In R16,
-an ordinary module can prove that mapping a traffic-light function over
-a list starting with `Red` yields a list starting with `Stop`, for every
-remaining tail. It uses the rule-free mapper `each`. M173 checks the
-installed `Prelude.map` itself. With rewrite rules disabled at the proof,
-negating a list with a `True` head produces a `False` head and leaves
-the recursive call on the unknown tail. A caller can introduce rules on
-helpers that fusion exposes. Checking equations with those rules enabled
-remains open.
-[Mapper, proofs and fusion example](roadmap/R16-open-term-evaluator.md#m173-check-the-installed-prelude-mapper-before-publishing-its-equations).
-
-The [Showcase](Showcase.hs) reads lengths from IO and uses them to
-replicate, append, index, and flatten vectors. [M95](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary)
-accepts an ordinary list at a requested length or packages it with its
-own length. [M96](PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks)
-uses ordinary `fmap` to add a cell while preserving the tail's runtime
-index. The largest remaining obligations are normal Core optimization,
-general computation in types, and general dependent functions and pairs.
-The [remaining work table](#remaining-work-by-roadmap-area) lists their
-dependencies. The [local library and assurance tasks](#local-subset-library-and-assurance-work)
-track module boundaries and totality separately.
-
-The restricted `-O0` simplifier can remove an ordinary constructor
-immediately inspected in a dependent module. For example, wrapping a
-runtime-indexed vector in `Just` and extracting it again required an
-extra 16 bytes per call in the measured loop. M97 removes that cost
-while preserving strict fields, shared thunks and index-only uses.
-[Core contract](CORE.md#cases-of-known-ordinary-constructors)
-and [allocation measurements](PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core).
-
-| Area | Demonstrated in this fork | Work before the roadmap task is complete |
+| Card | Evidence beyond the published checkpoint | Remaining gap |
 | --- | --- | --- |
-| Dependent Core (`R05`) | `TermVarTy`, `DepFunTy`, retained fields, scoped coercions, Core Lint, interfaces, and a checked backend path | Reconcile the representation with the published calculi. Complete transformations, normal optimization, unfoldings, and compatibility with the rest of GHC. |
-| Dependent products (`R03`) | Visible `foreach`, leading `foreach (n :: Nat).` with a written or inferred runtime operand, dependent equations and checked lambdas, qualified higher-order values, and checked positions for retained `[a]` | General domains and applications, and predictable inference beyond the measured subset. |
-| Dependent sums (`R04`) | ADTs with retained field telescopes, including a length with its vector and a bound proof | First-class existential and dependent-pair types. Current constructor syntax does not implement general `exists` or `some`. |
-| Function promotion (`R13`, under `R06`) | A list-length function works at any lifted element type. Multiplication calls checked addition on a recursive result. Source types can also contain lambdas, local lets and constructor cases. | General function promotion, polymorphic helper calls, and composition of those source expressions. |
-| Evaluation (`R15`, `R16`) | Both an imported natural-number length and the installed `Prelude.length` with `fromIntegral` compute vector indices. Installed `Data.Char` functions compute character and Boolean indices. `Prelude.sum` uses ordinary instance resolution. `Prelude.reverse` returns a promoted list. A saturated call can use several inputs to determine its dictionaries and can return nested lists, boxed pairs, `Maybe`, and `Either`. Open projections select a rigid type variable from a known pair. Installed Prelude projections of an unknown pair can remain in exported equalities. A client can prove that the first projection of a swapped pair equals its second input field. A pattern can fix a wildcard and unblock a call before generalization. Computed operands of a closed call can determine each other’s types. An ordinary sum projection can stay in an exported type until its input constructor is known. | More operand and result types, and checked evidence for compositions that remain in exported constraints. |
-| Numeric literals (`R07`) | The vector library registers an interpretation for nonnegative literals. Clients can write `Vec Bool 3`, `replicateNative 3 x` and `replicateNative (n + 1) x`. The retained calls check the actual `Num Nat` dictionary. | More general literal conversions and literal constraints such as finite bounds. |
-| Language preparation (`R20`) | Existing GHC facilities such as DataKinds, required type arguments, type abstractions, and explicit namespaces | The remaining upstream tasks below. Reuse their implementations and track their known restrictions. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The shared bootstrap at `898bff9a64` runs one pair declaration at different witness types. An ordinary client reads the payload without forcing an integer, function or IO witness. A private compiler also checks `second :: foreach (q :: DPair a p) -> p (first q)` through interfaces and runs 267 Showcase lines. | General domains and inference for `foreach`, and first-class retained `some`. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | Both shared native stages and self-hosted GHCi agree on 266 Showcase lines at `-O0`. Selected native modules pass the standard `-O1` optimization passes when they omit interface pragmas and serialized Core. | The full `-O1` Showcase exposes invalid replacements by common-subexpression elimination. Default interface unfoldings, coercion encoding and ordinary optimized clients still need integration. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A private compiler handles nested `Just Bool` and `Just Ordering`, GADT indices and reordered aliases. A source-free client checks the known cases. An unknown first field keeps the case stuck. | An alias that introduces another constructor test before a fallback is rejected. Unresolved GADT index comparisons also remain open. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Two GHC API regressions exercise formation and elimination. Seven runtime and STG checks cover a package received through an interface. The source experiment accepts the explicit binder and reaches the provider’s term body. | GHC-91028 rejects an inferred existential result at `error`. A complete source client, ordinary optimization and source-level pack/unpack still need verification. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The published fork accepts 116 of 124 unmodified programs in the polykinds comparison. A private formatting change restores the two ordinary kind-error goldens. | Preserve useful M/U differences, explicit printing and compatibility across the full suite. |
 
-The example `Nat` is the source datatype `data Nat = Z | S Nat`. It is not a
-claim about native support for every built-in numeric or unboxed domain.
-Runtime names retain lexical identity: two separately bound lengths need a
-proof to be interchangeable, even when their runtime values happen to agree.
-This follows the identity rule in [proposal #378, term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types).
-
-These declarations already compile in the public vector example:
-
-```haskell
-replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n
-reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n
-appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat)
-             -> Vec a n -> Vec a m -> Vec a (Add n m)
-```
-
-In M79, `Add n m` names the result of the ordinary Peano function
-`plus n m`. The public append signatures use that source function directly.
-M80 adds the infix spelling `n + m` and decimal lengths. A required
-type argument makes `replicateAt 3 True :: Vec Bool 3` possible.
-M81 accepts `replicateNative (plus n m) True :: Vec Bool (n + m)`
-when both lengths come from IO. It checks the function's equations
-at compile time and leaves the sum lazy at runtime.
-M82 lets this expression use `n + m` with Prelude addition. The
-selected `Num Nat` instance defines `(+) = plus`. The compiler checks
-that dictionary before using the equations to type the vector.
-M83 extends this call to `n + 1` and accepts `replicateNative 3 x`. The
-compiler checks the concrete instance's conversion from nonnegative integers.
-M84 lets a caller take the head of `replicateNative (1 + n) x` directly.
-M85 also accepts `safeHead (sourceVector (x : xs))`. The list constructor
-determines the element type even if it contains a runtime index.
-M86 allows an unused length to be written as `_` in a function equation or
-a package pattern. Later fields and the result still refer to the same length.
-General evaluation of Haskell functions in types remains open.
-
-M74 checks consecutive invisible retained arguments. The two vectors in
-`appendHidden xs ys` supply separate runtime lengths, and the result has
-index `Add n m`. A caller can also write either the leading operand or both
-operands. Both stages match 133 Showcase output lines through seventeen
-source modules, including the banner. R03, R05 and R23 remain open.
-M75 lets a type use an ordinary source function on a finite enumeration.
-The imported `flipBit` determines a payload type. The three equations of a
-traffic-light function reduce in a client with only the object interface.
-Both use checked clauses from the producer. M76 adds shallow field patterns.
-An ordinary predecessor function now computes the return index of `dropFirst`.
-M77 admits structural recursion on the tail of a list. An ordinary
-`listCount :: [Bool] -> Nat` now indexes the result of a vector
-constructor in the public example.
-
-```haskell
-boolVector :: foreach (xs :: [Bool]) -> Vec Bool (listCount xs)
-boolVector []       = VNil
-boolVector (b : bs) = VCons b (boolVector bs)
-```
-
-GHC checks the cons branch using the source equation
-`listCount (b : bs) = S (listCount bs)`. This works with an unknown tail,
-including a list read from an `IORef`. The producer exports the checked
-equations in its interface. M78 generalizes the same definition to
-`sourceLength :: forall a. [a] -> Nat`. A module can write
-`sourceLength @a (x ': xs)` and prove that it equals `S (sourceLength xs)`.
-Overloaded functions, including Prelude's `length`, remain open.
-See [M75](PLAN.md#m75-closed-evaluation-of-a-source-function),
-[M76](PLAN.md#m76-constructor-fields-in-a-source-equation),
-[M77](PLAN.md#m77-structural-recursion-on-a-list-spine), and
-[M78](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type).
-
-M62 supplied the earlier 88-line source group through fourteen modules.
-M56 provides
-the closed parameterized domains. M57 provides nominal scalar-domain conversion
-in Core. M58 exposes that conversion and scoped body solving from source.
-M59 compares bodies beneath fixed function domains and selects ordinary payloads.
-Its compiler checkpoint is `5c527cd8b92a`; its source fixture checkpoint is
-`5e33b194f1e6`. Its independently audited documentation is `a5bdd43f6764`.
-The canonical audit is
-`_build/verification/dependent-haskell-M59-final-audit-v1.json`.
-See [the M59 specification](PLAN.md#m59-bodies-beneath-fixed-function-domains).
-M60 composes safe indexing with the existing compiler. Both stages pass its
-nineteen runtime observations, five rejections, compile-only equal-count reuse
-and the 84-observation Showcase. Its separate audit passes 616 checks.
-The canonical record is
-`_build/verification/dependent-haskell-M60-final-audit-v1.json`.
-Observation counts measure those programs. They do not count roadmap features.
-
-M61 checks opaque whole-function casts with both rebuilt compilers and the
-selected API/source/registered cohort. A bounded native beta-substitution fix
-prevents a function alias from escaping through a partial result type. The
-existing cast supports the measured lowering path. Its independent audit passes.
-The canonical record is
-`_build/verification/dependent-haskell-M61-final-audit-v1.json`.
-General opaque proof projection stays open.
+The published evaluator work covers closed calls such as `Prelude.sum` and
+open equations such as mapping `Prelude.not` over a list with a known head
+and unknown tail. The proofs depend on what the function demands and on its
+visible rewrite rules. Local lambdas, lets and mixed declarations have
+source examples. General promotion remains open.
+[R15 closed evaluation](roadmap/R15-closed-term-evaluator.md),
+[R16 open evaluation](roadmap/R16-open-term-evaluator.md),
+[R17 lambdas](roadmap/R17-type-level-lambdas.md),
+[R18 lets](roadmap/R18-type-level-lets.md) and
+[R21 declaration dependencies](roadmap/R21-dependency-analysis.md).
 
 ## Current work queue
 
-At `88cef2bf98`, both native stages and self-hosted GHCi produce the
-same 256 Showcase lines. The self-host passes all 25 focused tests.
-These cover type lambdas, lets, constructor cases, matchability syntax,
-exact printing and ordinary programs that use families in kinds.
-The dependent directory passes 265 of 297 exercised cases. Its 32
-failures match the previous checkpoint. Eight diagnostics now identify
-the arrow synonym involved. The separate polykinds comparison accepts
-116 of 124 programs. It recovers `T14174a` with its original source.
+Both compiler stages build at the local integration checkpoint `898bff9a64`.
+The focused suite passes 38 of 40 tests. One test requests unsupported
+interface unfoldings. One checks for the previous wording of a retained
+domain error. The dependent directory passes 270 of 303 tests. Its one new
+failure is the unfolding test. The 32 previous diagnostics match the
+published baseline. The full optimized Showcase also fails in
+common-subexpression elimination. These results keep the optimizer work local.
 
-At `bc3798ad63`, the specializer respects disabled rewrite rules. A
-fresh proof about a negated list head agrees with the runtime call.
-Both compiler stages rebuilt. All five focused self-hosted tests passed.
-[Regression and flags](roadmap/R16-open-term-evaluator.md#keep-a-checked-mapper-equation-consistent-with-specialization).
+1. Check the whole Showcase from the tracked source, compiler and expected
+   output. Keep an ordinary interface client and a failure case for each
+   feature whose correctness depends on the module boundary.
+2. Review duplicate compiler checks against their existing callers. Preserve
+   the error location, the type equality being proved and runtime demand.
+3. Resolve the R05 optimizer failures before advertising broader optimization.
+   Keep the R19 and R22 prototypes available for the next source increment.
 
-At `e04f9add03`, both native stages and self-hosted GHCi agree on 261
-Showcase lines. The 30 focused self-hosted tests pass. The five new
-observations read fields at two GADT indices, use a local type in two
-case expressions, and unpack two choices of payload family. The package
-tests check that reading one field leaves the other unevaluated.
-The normal-way dependent directory passes 266 of 298 exercised cases.
-Its 32 remaining failures match the previous diagnostics.
-[Package tests](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
+Use this queue for current priorities, the linked card for its acceptance
+criteria, and the [implementation log](PLAN.md) for results from individual
+checkpoints. Earlier work orders and measurements are in the
+[historical records](CHECKPOINTS.md#historical-roadmap-checkpoints).
 
-At `004f679c42`, all three modes produce the same 264 Showcase lines.
-The new examples project the payload of a vector package, check the
-length of a known package in a type, and apply the same projection to
-two payload families. The normal-way dependent directory passes 267
-of 299 cases with the same 32 diagnostics. An upgrade from M177
-rechecks the ordinary length function once, including when the datatype
-comes from an installed package. A second build reuses the outputs.
-[R04 source and interface checks](roadmap/R04-dependent-sums.md#project-a-payload-at-the-length-of-its-input-package).
+## Remaining work by roadmap area
 
-At `dd00726ab6`, an ordinary imported witness function also checks the
-projection when the payload family is a parameter. A source type case
-can distinguish `Bool` from `Ordering` without a wrapper datatype.
-Both native stages and self-hosted GHCi agree on the 265 Showcase lines.
-The dependent directory retains its 267 passes and 32 failures. Two
-additional ordinary kind-error tests give the same diagnostics as M177
-and differ from the upstream golden files.
-[Projection](examples/packed-vector/RetainedProjection.hs)
-and [type case](examples/open-evaluation/NativeCase.hs).
-
-The source checkpoint uses the restricted native optimizer. In a
-separate R05 build, one Gentle iteration preserves term identities in
-recursive groups and casts with nominal domain evidence. The normal
-`-O1` pipeline still needs independent checks for optimizer passes,
-worker unfoldings and cross-module compilation.
-
-[R15](roadmap/R15-closed-term-evaluator.md) and
-[R16](roadmap/R16-open-term-evaluator.md) are separate subtasks of function promotion. The upstream graph has
-no dependency from one evaluator to the other. Work on them in parallel.
-R17, R18 and R19 cover lambdas, local bindings and cases in source
-types. R23 checks compatibility with programs that use functions in kinds.
-Use a source test on each card. R15 checks the result of running an
-ordinary closed call. R16 checks what the ordinary function demands
-when some of its operands are unknown.
-
-| Card | Next evidence | Dependency or boundary |
-| --- | --- | --- |
-| [R04, dependent sums](roadmap/R04-dependent-sums.md) | Generalize the witness type as well as the payload family. | Ordinary imported functions supply the first projection for both `PackedVec a` and `Retained p`. Both still store a `Nat` witness. |
-| [R22, existential quantification](roadmap/R22-existential-quantification.md) | Check the native erased binder and open an unknown package across an interface. | Its witness erases. Opening an unused payload must preserve laziness. |
-| [R05, dependent Core](roadmap/R05-dependent-core.md#occurrence-analysis) | Run the ordinary optimization schedule while keeping every runtime index in scope. | The worker and its unfolding must use the same bound index. Absence at runtime does not imply absence from the result type. |
-| [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Extend scalar readback to more result shapes while preserving demand. | Both projections and the native object-upgrade check pass with the self-hosted compiler. The unselected exceptional sibling stays lazy. [Readback design](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field). |
-| [R16, open evaluator](roadmap/R16-open-term-evaluator.md) | Check more rules used by the installed `Prelude.map`. | The compiler checks an identity traversal rule on an ordinary mapper. An imported orphan rule that changes the head invalidates a cached proof. |
-| [R21, dependency analysis](roadmap/R21-dependency-analysis.md) | Extend the dependency check to more signed producers while retaining cycle, strictness and rewrite-rule diagnostics. | A producer can call through a closed family in its own signature. A separate client checks the resulting `Payload Word` using only compiled interfaces. [Provider](examples/open-evaluation/FamilySignature.hs). |
-| [R17, type-level lambdas](roadmap/R17-type-level-lambdas.md) | Check additional lambdas whose arguments have indexed constructor patterns. | An explicit polymorphic kind lets a stripped-interface client prove both GADT branches. A splice in a capture kind executes once. |
-| [R18, type-level lets](roadmap/R18-type-level-lets.md) | Extend the local RHS forms that can be checked once and used under a case. | Two case branches constrain one local `'Nothing`. Separate let bindings can choose different kinds. |
-| [R19, type-level cases](roadmap/R19-type-level-cases.md) | Cover nested eliminations that refine a GADT index and use a local type. | An interface-only client checks a known constructor. An unknown scrutinee remains stuck. |
-| [R23, unsaturated families](roadmap/R23-unsaturated-type-families.md) | Recheck ordinary GHC compatibility as more type-level functions use inferred and explicit kinds. | Both the private compatibility run and the self-hosted test accept `T14174a` unchanged. The other 123 polykinds results agree in the private comparison. The compiler identifies the unmatchable synonym when a data declaration requires M. [Compatibility examples](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell). |
-
-The previous source controls now pass for a private parcel with an
-exceptional second field, a constructor containing two unknown types,
-and a local function in a module with derived instances.
-[Closed composition](roadmap/R15-closed-term-evaluator.md#m136-composing-ordinary-calls-before-observation),
-[open construction](roadmap/R16-open-term-evaluator.md#reading-back-an-ordinary-constructor-result)
-and [deriving and defaults](roadmap/R21-dependency-analysis.md#m138-deriving-clauses-and-module-defaults).
-
-At M139, the vector index fixes the result of `Prelude.fromIntegral (Prelude.length '[1, 2, 3])`
-to `Nat`. Using the same call in a bare `Proxy` leaves the conversion
-ambiguous. [Checked length and conversion](roadmap/R15-closed-term-evaluator.md#m139-using-the-installed-prelude-length-in-a-vector-index).
-
-M142 can export `type Swap p = W.swapPair p` for a rigid pair and reduce it
-when another module supplies the constructor.
-An explicit local instance can now supply a dictionary to a producer.
-Its methods can use a dependent type that needs that producer first.
-
-[R03](roadmap/R03-dependent-products.md), [R05](roadmap/R05-dependent-core.md)
-and [R23](roadmap/R23-unsaturated-type-families.md) retain their own completion
-criteria. The [R23 compatibility results](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell)
-include ordinary programs rejected because of arrow matchability. Revisit
-a dependency when it blocks an active card's executable example. Treat the arrows as prerequisites or subtasks, as on Serokell's
-graph. A workaround in an example library does not close a dependency.
-
-### Local checkpoints
-
-The table records implementation history and proposed local work.
-M75–M88 include examples motivated by R15. Their computation rules
-compile checked clauses to type families under R13.
-M98's two-list zip is a proposed extension of that mechanism. The
-evaluator work has priority.
-
-| Order | Owner and contribution | State | Gate and next result |
-| --- | --- | --- | --- |
-| 1 | R03: fixed function-domain body comparison; exercises R05 evidence | Complete bounded increment: M59 | Both stages and independent audit pass. The larger R03/R05 features remain open. |
-| 2 | R03: safe indexing over a retained `[Bool]` | Complete bounded increment: M60 | Both stages and the evidence audit pass. The next compiler task is the R05 opaque-cast probe. |
-| 3 | R05: application through opaque whole-function evidence | Complete bounded increment: M61 | Both builds, selected cohort and independent audit pass. Typed opaque proof projection remains separate. |
-| 4 | R03: explicit complete retained-function type arguments | Complete bounded increment: M62 | Both builds, nested source arguments, worker demand, the selected cohort and independent audit pass. Next: the R23 foundation. |
-| 5 | R23: matchability foundation; also advances R05 | M63/M64 foundation integrated and published | Explicit arrow and forall metadata pass Core, source, interface, TH and reflection checks. The generic native client and source family unsaturation remain open. |
-| 6 | R05: function values in closed algebraic indices; enables R03 source work | Complete bounded increment: M65 | Both rebuilt stages pass source/interface controls and Showcase100/16. Seven registered tests pass. Generic `[a]`, higher-order endpoints and changed dependent domains remain open. |
-| 7 | R05: bounded family views in native frontend inference | Complete bounded increment: M66 | Both builds, exact source diagnostics, finite controls, Showcase100/16 and seven registered tests pass. Other pure normalization paths remain separate. |
-| 8 | R05: structural generic domains and dependent-domain transport; enables R03 | Complete bounded increment: M67 | Both builds, selected API/source controls, Showcase116/16 and seven registered tests pass. Generic elements include arbitrary lifted and runtime-index-bearing values. Old readers reject the new typed signature cleanly. R05 and general source domains remain open. See M67 in PLAN.md. |
-| 9 | R03: ordinary callers of imported retained APIs; preserves R05 evidence | Complete bounded increment: M68 | Both rebuilt stages pass source/interface checks, scope and multiplicity controls, Showcase118/17 and seven registered tests. Published M67 readers accept the interfaces. Explicit syntax, Expr inference modes and native pipeline policies retain their scope. |
-| 10 | R03: safe indexing over a generic retained list | Complete bounded increment: M69 | Reuses Fin and GenericCount with scoped list refinement. Both rebuilt stages pass the reviewed primary/focused source collections, API1/37, Showcase124/17 and seven registered tests. Guarded list-declaration advice preserves the original runtime-vector callback. Case-based ordinary clients pass. Measured literal-list/fmap and NoEDT native let-list inference retain their limits; named-list fmap is unmeasured. No new Core judgment or wire field. R03, R05 and R23 remain open. |
-| 11 | R03: higher-order calls with native list arguments | Complete bounded increment: M70 | List fields supply an anchor to the existing argument cache. The literal fmap call passes with and without the dependent source extension. Both stages pass the 125-line Showcase, and seven selected registered tests pass. |
-| 12 | R05: invisible retained function types and coercions; enables R03 | Complete bounded increment: M71 | Both stages compile. The API, versioned interface and object tests cover visibility and demand. |
-| 13 | R03: source definitions and omitted invisible runtime operands | Complete bounded increment: M72 | The imported call passes the IO-sourced Nat from a later vector declaration. Native object tests cover ignored bottom, name shadowing and located missing and conflicting operands. |
-| 14 | R03: explicit invisible runtime operands | Complete bounded increment: M73 | Written `@{n}` works with or without erased `@Int`. The interface-only client preserves demand. A wrong written index reports the later argument where the two indices disagree. |
-| 15 | R03: consecutive invisible runtime operands | Complete bounded increment: M74 | The interface-only vector append infers two lengths and checks their sum in the result type. Constructor inference respects term scope and records import usage. |
-| 16 | R13: finite tables of source equations | M75 finite constructor tables | Check the complete table once and export its equations. A body change invalidates an unchanged client proof. |
-| 17 | R13: constructor fields in a source equation | [M76](PLAN.md#m76-constructor-fields-in-a-source-equation) | The checked `previous` clause returns the length of the tail. A `VCons` branch can therefore return its tail directly from `dropFirst`. |
-| 18 | R13: structural recursion on a list spine | [M77](PLAN.md#m77-structural-recursion-on-a-list-spine) | A checked recursive call on the tail computes the Peano result index of `boolVector`. A call on the rebuilt list has no checked equation. |
-| 19 | R13: parametric list length | [M78](PLAN.md#m78-one-list-length-function-for-every-lifted-element-type) | One checked family proves the cons equation for an abstract element type and tail. The named length function indexes a vector built from a list of `Int` read at runtime. |
-| 20 | R13: a second ordinary argument | [M79](PLAN.md#m79-addition-from-an-ordinary-two-argument-function) | The runtime addition function computes the length index of vector append. The second length can stay unknown. |
-| 21 | R07 and R13: numerals and infix addition | [M80](PLAN.md#m80-numerals-and-infix-addition-in-vector-types) | Use `Vec a 3` and `Vec a (n + 1)` with the original Peano-indexed GADT. |
-| 22 | R03 and R13: a computed retained argument | [M81](PLAN.md#m81-a-computed-retained-length) | Pass the ordinary call `plus n m` directly as a vector length. Keep its index through Core Lint and share its value as a lazy STG thunk. |
-| 23 | R12 and R03: a concrete class method | [M82](PLAN.md#m82-overloaded-addition-in-a-retained-argument) | Pass the overloaded `n + m` as a retained length when the selected instance's addition method is the checked `plus`. |
-| 24 | R07, R12 and R03: term numerals as retained lengths | [M83](PLAN.md#m83-ordinary-numerals-in-retained-arguments) | Use a checked `fromInteger` for `replicateNative 3 x` and `replicateNative (n + 1) x`. |
-| 25 | R03: infer a runtime index from a nested call | [M84](PLAN.md#m84-infer-a-nonempty-vectors-tail-at-a-nested-application) | Match the checked successor equations in `safeHead (replicateNative (1 + n) x)` and preserve the unevaluated tail. |
-| 26 | R03: infer parameters from constructor fields | [M85](PLAN.md#m85-infer-the-parameters-of-a-retained-constructor-argument) | Read the fields of a saturated constructor in a retained argument to select erased parameters. |
-| 27 | R03 and R04: wildcard argument and field patterns | [M86](PLAN.md#m86-wildcard-patterns-for-retained-arguments-and-fields) | Ignore a runtime field while preserving its identity in later types. |
-| 28 | R05: interactive bytecode | [M87](PLAN.md#m87-persistent-dependent-definitions-in-ghci) | Store a retained function and call it from a subsequent GHCi command. |
-| 29 | R13: composition of source equations | [M88](PLAN.md#m88-compose-checked-source-equations) | Check multiplication in terms of addition and use the product as the length of a flattened rectangle. |
-| 30 | R03 and R05: nested retained operands | [M89](PLAN.md#m89-nested-computations-in-retained-operands) | Pass `1 + rows * cols` directly to a vector constructor and preserve demand on the product. |
-| 31 | R03 and R05: equality for lazy local definitions | [M90](PLAN.md#m90-equality-for-lazy-local-definitions) | Give a named checked product its defining index and share its runtime value. |
-| 32 | R03 and R05: dictionary evidence for local definitions | [M91](PLAN.md#m91-dictionary-evidence-for-a-local-index-definition) | Use the selected multiplication and literal conversion to check a local vector length. |
-| 33 | R03 and R05: signed and grouped local lengths | [M92](PLAN.md#m92-signed-and-grouped-local-lengths) | Check signed runtime lengths in dependency order and compose their equalities in the body. |
-| 34 | R05: retained types in editor metadata | [M93](PLAN.md#m93-retained-types-in-hie-files) | Write and read retained binders, runtime indices and opaque applications in HIE files. |
-| 35 | R03: inferred nonempty local lengths | [M94](PLAN.md#m94-infer-a-nonempty-tail-through-local-length-definitions) | Infer the tail of a vector through checked let and where definitions, then check the call against its actual argument. |
-| 36 | R03 and R04: ordinary lists at an indexed boundary | [M95](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary) | Check a requested length or package the list's own length. Match ordinary list patterns in retained equations. |
-| 37 | R03: partial constructor callbacks | [M96](PLAN.md#m96-infer-retained-indices-for-partial-constructor-callbacks) | Use a checked input's runtime index in `VCons x <$> fromListExact n xs`. Preserve constructor multiplicities and check the full callback type. General callback inference remains open. |
-| 38 | R05: simplify a case of a known constructor | [M97](PLAN.md#m97-simplify-a-case-of-an-ordinary-constructor-in-dependent-core) | Remove a measured allocation and dispatch while keeping dependencies in types, lazy field sharing and strict-field demand. |
-| 39 | R13: the length of ordinary zip | [M98, deferred](PLAN.md#m98-the-length-of-zip-over-two-ordinary-lists) | Check equations that inspect two list spines and recurse on both tails. Preserve the empty-first equation with an unknown second input. |
-| 40 | R15: evaluate an imported closed call | [M99, verified for literal Natural lists](PLAN.md#m99-evaluate-an-imported-closed-call) | The source call computes the vector length. The unchanged client observes an ABI-preserving implementation change. |
-| 41 | R16: evaluate with a rigid argument | [M100, verified for polymorphic identities](PLAN.md#m100-reduce-an-ordinary-identity-at-a-rigid-type-variable) | Both compilers accept the upstream signature. Changing a worker behind an imported alias invalidates the unchanged consumer. |
-| 42 | R15: closed character calls | [M101](PLAN.md#m101-evaluate-closed-character-calls-from-installed-libraries) | The ordinary `Data.Char.toUpper` and `Data.Char.isDigit` check equality witnesses. Both interpreters track the producer code they loaded. |
-| 43 | R16: open projections | [M102](PLAN.md#m102-reduce-open-projections) | Prelude's `const` and an independent second projection return the selected rigid type variable. A strict second projection identifies the operand blocking evaluation. |
-| 44 | R15: overloaded closed calls | [M103](PLAN.md#m103-infer-a-closed-overloaded-call-from-its-argument) | `Prelude.sum '[2, 3, 5]` computes the index 10 using ordinary dictionaries. The client records the selected instance even if the interpreter calls its method implementation directly. |
-| 45 | R16: retry after local inference | [M104](PLAN.md#m104-retry-a-type-call-after-inference-determines-its-input) | A pattern fixes the input. GHC checks the computed result before generalization. An ordinary client reads the concrete signature from the interface. |
-| 46 | R15: lists as results | [M105](PLAN.md#m105-return-a-promoted-list-from-a-closed-call) | Prelude's ordinary `reverse` checks a list equality. The checked scalar element kind determines how to read the result, including for an empty list. |
-| 47 | R15: nested closed calls | [M106](PLAN.md#m106-check-a-closed-call-inside-another-closed-call) | A reversed list supplies the argument to an ordinary `sum`. The client records dependencies on both producers. |
-| 48 | R16: observe a character case | [M107](PLAN.md#m107-observe-a-character-case-with-rigid-result-operands) | An imported worker selects between two rigid types. The API regression records and checks the selected branches against its typed Core. |
-| 49 | R15: use computed operands | [M108](PLAN.md#m108-accept-a-computed-value-at-each-supported-result-kind) | The result kind determines the next operand's representation, including an arbitrary-precision natural and lists of Boolean or character values. |
-| 50 | R16: export a character case | [M109](PLAN.md#m109-carry-an-open-call-in-an-exported-equality) | A client solves an exported worker equality at a literal from two interfaces. A visible conflicting rewrite rule prevents that use. |
-| 51 | R15: accept source literals | [M110](PLAN.md#m110-check-ground-source-operands-at-their-declared-kinds) | The argument kind selects how to check the literal. A mixed list fails at the element with the wrong kind. |
-| 52 | R15: accept the upstream spelling | [M111](PLAN.md#m111-use-the-closed-evaluator-with-the-roadmaps-source-spelling) | The existing name lookup rules admit an unqualified imported length function on `[1,2,3]`. |
-| 53 | R15/R16: compose a family result with an ordinary call | [M112](PLAN.md#m112-pass-a-checked-family-result-to-the-closed-evaluator) | The solver supplies the inner character and the interpreter runs the outer function. Each records its own dependency. |
-| 54 | R15: check ordinary functions with several arguments | [M113](PLAN.md#m113-check-fully-applied-ordinary-functions) | `gcd 18 24` computes six; later operands determine the kind of earlier empty lists. |
-| 55 | R16: project a rigid type from a boxed pair | [M114](PLAN.md#m114-project-a-type-from-a-known-pair) | The imported `fst` and `snd` select original type variables. A demanded rigid pair still blocks. |
-| 56 | R23: diagnose arrow matchability after family reduction | [M115](PLAN.md#m115-distinguish-matchability-errors-from-missing-arguments) | GHC reports conflicting matchabilities at `Maybe` and retains the hint for a genuinely missing argument. Ordinary program compatibility remains open. |
-| 57 | R15: return and use a boxed pair | [M116](PLAN.md#m116-return-a-boxed-pair-from-a-closed-call) | `quotRem 17 5` returns `'(3,2)` during type checking. Nested pairs retain their field kinds. |
-| 58 | R15: return an optional value or a sum | [M118](PLAN.md#m118-check-maybe-and-either-results) | `uncons` returns a promoted optional pair. Another closed call can consume either alternative of a parser's result. |
-| 59 | R16: export checked projections of unknown pairs | [M119](PLAN.md#m119-export-checked-projections-of-unknown-pairs) | An ordinary client checks both fields from the exported equality with only the interfaces available. |
-| 60 | R15: check finite lists of compound results | [M120](PLAN.md#m120-check-lists-of-compound-closed-results) | The list of suffixes from `tails` supplies the operand to ordinary `concat`. |
-| 61 | R16: certify a pair constructor case | [M121](PLAN.md#m121-export-a-checked-pair-constructor-case) | An installed `swap` equation retains the identity of both fields. Its result can feed either projection. |
-| 62 | R15: check closed constructor arguments together | [M122](PLAN.md#m122-check-closed-constructor-arguments-together) | `catMaybes` accepts a literal list of optional values. Another argument can determine a missing constructor kind before evaluation. |
-| 63 | R16: prove a projection through a swap | [M123](PLAN.md#m123-prove-strict-pair-composition-after-substitution) | An ordinary client combines three imports at a rigid pair index. GHC checks nominal evidence even when substitution first exposes the composition. |
-| 64 | R15: public enumerations in closed calls | [M124](PLAN.md#m124-reify-public-enumeration-constructors-in-closed-calls) | An ordinary producer returns a user-defined constructor that becomes the input to another ordinary function. |
-| 65 | R16: compose strict field selections | [M125](PLAN.md#m125-follow-strict-field-projections-through-pair-reconstructions) | A nominal proof relates two field paths from a shared scrutinee, including duplication. |
-| 66 | R21/R16: schedule an independent local definition | [M126](PLAN.md#m126-schedule-local-definitions-for-open-evaluation) | The same source module uses an ordinary selection function on rigid type arguments in either declaration order. |
-| 67 | R15: reify finite recursive datatypes | [M127](PLAN.md#m127-return-finite-recursive-datatypes-from-closed-calls) | A function returns an ordinary binary tree that another function traverses at type checking. |
-| 68 | R21/R16: observe a local helper chain | [M128](PLAN.md#m128-follow-local-value-dependencies-in-source-types) | Changing a transitive helper changes the exported type. A rule on an ignored helper leaves the proof valid. |
-| 69 | R15: reify fixed-index GADT constructors | [M129](PLAN.md#m129-reify-constructors-at-known-indices) | A partial constructor import covers every value at one result index. A second ordinary function consumes the result. |
-| 70 | R15: recover a constructor-local vector index | [M130](PLAN.md#m130-recover-constructor-local-vector-indices) | The same ordinary polymorphic `safeHead` runs on a vector and computes a closed index from its first cell. |
-| 71 | R21/R16: observe recursive local value groups | [M131](PLAN.md#m131-observe-recursive-local-value-groups) | GHC can infer a mutually recursive group and use its terminating selection in a type. A demanded loop reaches the open reduction limit. |
-| 72 | R15: apply an ordinary consumer to a written existential | [M132](PLAN.md#m132-consume-a-written-existential-package) | The kind checker supplies a vector's erased length from a written singleton and vector. |
-| 73 | R16: select a symbolic field by constructor | [M133](PLAN.md#m133-select-symbolic-fields-by-constructor) | A case selects different field positions in two alternatives using only the producer interface. |
-| 74 | R21: interleave local type and value checking | [M134](PLAN.md#m134-order-mixed-type-and-value-dependencies) | A type can use a local function whose signature depends on another local type-level call. |
-| 75 | R15: read back a witnessed existential | [M135](PLAN.md#m135-reify-a-package-at-its-witnessed-index) | An ordinary function chooses a vector length and a dependent client checks the returned contents. |
-| 76 | R15: preserve demand across ordinary calls | [M136](PLAN.md#m136-preserve-demand-in-nested-ordinary-calls) | An ordinary consumer reads the first field of a private intermediate. |
-| 77 | R16: return a constructor with symbolic fields | [M137](PLAN.md#m137-read-back-open-constructor-results) | A producer constructs a user datatype or boxed pair of unknown types. An ordinary client checks the exported result. |
-| 78 | R21: install derived instances and defaults | [M138](PLAN.md#m138-check-derived-instances-and-defaults-before-local-functions) | A dependent type and its ordinary consumer use the same instance and default environments. |
-| 79 | R15: infer the target of a closed conversion | [M139](PLAN.md#m139-use-the-expected-kind-of-a-closed-call) | The installed Prelude length and conversion compute the index of a three-cell vector. |
-| 80 | R15: infer nested results from a declared domain | [M140](PLAN.md#m140-check-a-nested-conversion) | The target of a nested conversion can come from a sibling literal in either position. |
-| 81 | R23: check omitted matchability in dependent arguments | [M141](PLAN.md#m141-infer-arrow-matchability-in-a-dependent-argument) | An ordinary type declaration uses `D (Type -> Type) Maybe`. Both explicit mismatches still fail. |
-| 82 | R16: export an open equation for an ordinary pair case | [M142](PLAN.md#m142-export-a-stuck-pair-swap-from-an-ordinary-producer) | A separate ordinary consumer reduces an imported swap when it supplies the pair. |
-| 83 | R15: share inferred kinds across ordinary calls | [M143](roadmap/R15-closed-term-evaluator.md#m143-sharing-the-kinds-of-computed-operands) | Two computed operands specialize each other in either order. |
-| 84 | R16: keep a sum projection in an exported type | [M144](roadmap/R16-open-term-evaluator.md#m144-deferring-a-projection-over-an-ordinary-sum) | An ordinary consumer supplies either constructor and recovers the selected field. |
-| 85 | R15: infer a computed argument through a checked case | [M145](PLAN.md#m145-infer-a-computed-operand-through-a-checked-case) | The known result fixes part of the kind of a computed pair. |
-| 86 | R16: defer the constructor tests in a nested case | [M146](PLAN.md#m146-export-an-ordinary-nested-constructor-case) | A downstream client supplies the constructors and recovers the selected field or fallback. |
-| 87 | R21: schedule an explicit class instance in a dependent module | [M147](PLAN.md#m147-check-a-local-instance-head-before-its-methods) | An ordinary client runs a method whose type annotation needs a later checked producer. |
-| 88 | R16: construct results of an open case | [M148](roadmap/R16-open-term-evaluator.md#m148-constructor-results-from-a-checked-case) | An ordinary client proves an optional head from two interfaces with a rigid tail. |
-| 89 | R15: project a computed pair inside an ordinary call | [M149](roadmap/R15-closed-term-evaluator.md#m149-demand-only-the-selected-field-of-a-computed-pair) | A closed test for oddness leaves the unused pair field unevaluated. |
-| 90 | R21: schedule family instances with local producers | [M150](roadmap/R21-dependency-analysis.md#m150-constructors-and-selectors-of-family-instances) | An ordinary client uses a method, a selector, and derived instances from the dependent module. |
-| 91 | R16: retain a helper under a result constructor | [M151](roadmap/R16-open-term-evaluator.md#m151-checked-helper-calls-inside-constructor-results) | An ordinary client checks an optional head through a private helper. |
-| 92 | R21: check a local producer needed by an instance equation | [M152](roadmap/R21-dependency-analysis.md#m152-independent-local-producers-for-type-instances) | An independent identity supplies the result type of a local family equation. |
-| 93 | R15: keep an unevaluated pair field in an interface | [M153](roadmap/R15-closed-term-evaluator.md#m153-export-a-direct-projection-of-a-partial-pair) | A direct projection of the copied input checks through two stripped interfaces. |
-| 94 | R16: check the body of a private constructor helper | [M154](roadmap/R16-open-term-evaluator.md#m154-a-helper-can-construct-its-result) | A case result can call a private helper that wraps its input in a public lazy constructor. |
-| 95 | R16: follow private helper chains | [M155](roadmap/R16-open-term-evaluator.md#m155-reachable-helper-chains) | An ordinary client proves a constructor result through three private helpers. A changed leaf or a cycle invalidates the proof. |
-| 96 | R21: schedule local functions before imported family equations | [M156](roadmap/R21-dependency-analysis.md#m156-independent-producers-for-imported-type-families) | An ordinary client can use all three equations. The test observes the change in dictionary selection that would make unrestricted reordering incorrect. |
-| 97 | R16: select a branch of a private case | [M158](roadmap/R16-open-term-evaluator.md#m158-a-private-helper-can-match-a-constructor) | A client proves which element of a nonempty spine the helper selects. The remaining tail can stay unknown. |
-| 98 | R16: reduce a structurally recursive constructor result | [M159](roadmap/R16-open-term-evaluator.md#m159-structural-recursion-under-a-result-constructor) | The first output cell and its recursive tail agree with the worker's equation for every tail. |
-| 99 | R21: check independent imported function types | [M160](roadmap/R21-dependency-analysis.md#m160-independent-imported-function-types) | An ordinary imported projection determines a family result. Changing the projection's body invalidates the method that consumes it. |
-| 100 | R16: preserve an argument through a recursive call | [M162](roadmap/R16-open-term-evaluator.md#m162-structural-recursion-with-an-unchanged-argument) | A client checks one output cell and its recursive tail with the tag still unknown. |
-| 101 | R21: use ordinary constructors in an imported family equation | [M163](roadmap/R21-dependency-analysis.md#m163-ordinary-data-in-an-independent-producer) | A local function uses the installed `Prelude.maybe` on `Just x`. A hidden family inside an imported `Maybe` type still prevents premature checking. |
-| 102 | R21: infer an independent local producer | [M164](PLAN.md#m164-infer-a-local-function-before-an-imported-family-equation) | The ordinary client reads the family result from the interface when the producer has no signature. |
-| 103 | R15: pass an imported function to a closed call | [M165](PLAN.md#m165-pass-an-imported-function-to-a-closed-call) | `map not` reduces at a known list. Changing only a callback object invalidates the unchanged client proof. |
-| 104 | R23: pass a type family to another family | [M166](PLAN.md#m166-pass-an-unapplied-type-family) | `Each Flip` accepts an unapplied user family. Its equations can reduce when a client supplies an argument. |
-| 105 | R16: supply a constructor as a function | [M167](PLAN.md#m167-pass-a-constructor-to-an-ordinary-helper-during-open-evaluation) | `uncurry` can build a constructor from two rigid fields. |
-| 106 | R16: preserve a callback while mapping over an unknown list | [M168](PLAN.md#m168-check-the-list-equation-of-a-higher-order-source-function) | A rule-free mapper exports the cons equation for an arbitrary callback and tail. |
-| 107 | R13 and R16: instantiate the callback with a checked source function | [M169](PLAN.md#m169-carry-a-checked-named-callback-across-an-interface) | A traffic-light callback determines the head of the result through interfaces alone. |
-| 108 | R16: use a callback from an installed ordinary module | [M170](roadmap/R16-open-term-evaluator.md#m170-use-the-installed-boolean-callback) | A client checks the head using `Prelude.not` and the rules visible at the proof. |
-| 109 | R21: order local datatypes, a term, and an imported family equation | [M171](roadmap/R21-dependency-analysis.md#mixed-type-and-term-declarations) | A field whose type is `Payload Double` accepts `True`. Adding a cyclic dependency in another constructor's field rejects the equation. |
-| 110 | R23: pass a family with an invisible argument | [M172](roadmap/R23-unsaturated-type-families.md#passing-a-family-with-an-invisible-argument) | A receiver that expects the polymorphic family can apply it at `Bool`. An ordinary client checks the resulting equality. |
-| 111 | R16: use the ordinary Prelude mapper across an interface | [M173](roadmap/R16-open-term-evaluator.md#m173-check-the-installed-prelude-mapper-before-publishing-its-equations) | An ordinary client proves the empty and cons equations with rewriting disabled. A changed optimized producer still compiles without issuing the evidence. |
-
-M64 now carries explicit forall metadata in the development source. The
-[Core contract](CORE.md#forall-matchability) records scope, nominal proofs,
-runtime U and the conservative expression and constructor-evidence limits.
-The selected builds and checks pass, including Showcase95 with 14 home
-modules in both stages. The standard selection passes seven tests with
-54 skipped ways. R23 remains open for the generic native client and family source
-unsaturation.
-
-M65 connects stored function values to canonical opaque call indices. A
-saturated family can expose the stored function without losing its forward
-application proof. Later package fields retain the actual function identity.
-See [the Core contract](CORE.md#function-values-in-algebraic-indices) and
-[the validation record](PLAN.md#m65-validation). This increment does not
-complete R05, R03 or R23.
-
-M67 adds generic `[a]` constructor refinement and nominal transport through
-later dependent domains. M68 measures direct retained API use without the
-dependent extension. At baseline, three ordinary consumers reject because
-their erased index cannot be inferred. M68 uses imported type contracts to
-enable the existing application checker. Explicit dependent
-syntax and the restricted native pipeline keep their current policies.
-Both rebuilt stages and the selected tests pass that bounded application change.
-M69 followed with generic safe indexing. The local subset and
-dependent-base tasks below retain their own scope.
-
-The user resumed GHC execution on **2026-11-16 at 17:53 CET**. Run heavy checks
-serially under the configured memory cap. This execution policy does not add
-feature dependencies.
-
-### Remaining work by roadmap area
-
-Keep these tasks visible when selecting the next increment. Each completed
-increment has a bounded scope.
+The table gives the completion criteria for each area.
 
 | Roadmap area | Remaining local work | Main obligations before completion |
 | --- | --- | --- |
@@ -427,26 +78,10 @@ increment has a bounded scope.
 | R20, R27, R34–R36 and R41: language preparation | Remaining accepted cleanup and binder work | Follow each proposal and its current implementation. Track loose ends without reopening an entire completed upstream card. |
 | R01, R02 and R06: aggregate goals | Integrate retained quantification, promotion and language preparation | Complete their required feature scope and broader compatibility checks. A single example cannot close an aggregate goal. |
 
-### Rules for the next increment
-
-1. Name one owning roadmap card. List related cards when the increment crosses
-   layers. Keep the existing `M` identifiers for historical checkpoints.
-2. Add the bounded specification to [PLAN.md](PLAN.md) before compiler changes.
-   State the contribution, required prerequisites, acceptance checks and limits.
-3. Use the owning feature page to find the research and open obligations.
-   Record new sources and their reading scope in [REFERENCES.md](REFERENCES.md).
-4. Record compiler, source, runtime and rejection evidence separately. Extend
-   [Showcase.hs](Showcase.hs) when a source feature is checked.
-5. Update the feature page and this queue after verification. Mark the increment
-   complete only within its measured scope. Close a roadmap card only when its
-   full goal and compatibility requirements are supported.
-
 ## Local subset, library and assurance work
 
 The user selected an opt-in dependent subset in modules. A small dependent-base
-library should make that subset useful with ordinary Haskell libraries. These
-local tasks do not add cards or edges to the upstream roadmap. They do not
-change M63's acceptance criteria.
+library should make that subset useful with ordinary Haskell libraries. These local tasks have their own acceptance criteria.
 
 | Task | Roadmap relation | Next result and boundary |
 | --- | --- | --- |
@@ -583,262 +218,10 @@ arguments already exist while syntax unification and nested GADT quantifiers
 remain incomplete. Do not infer completion by propagating checkmarks through
 the graph.
 
-## Historical work packages
+## Research and provenance
 
-These names predate the roadmap-aligned work queue. Keep them as references for
-the recorded increments. S0–S3 map to R03/R05; C1/C2 to R05; Q1 to R03; Q2 to
-R04/R22; E1/E2 to R15/R16; P1 to R13; P2 to the remaining promotion domains;
-L1 to R20; and I1 to R01. The current queue above owns the next work.
-
-- [x] **S0: Retain a runtime index.** Native Bool functions, checked case
-  refinement, and `choose`/`keep` execution. `keep` does not force its index.
-  Evidence: CORE.md and the existing Core/API runtime fixtures.
-- [x] **S1: Use dependent data from source.** Nat-indexed vectors, retained
-  packages, append/reverse, dynamic-length equality, and bounded filtering.
-  Evidence: the public packed-vector example and its 562 observations.
-- [x] **S2: Cross module and IO boundaries.** Separate interfaces, retained
-  closures, runtime IO indices, scoped local types, and measured lazy fields.
-  Evidence: the public examples and the M23–M35 checkpoints in PLAN.md.
-  M52 also exports complete ordinary function-retained signatures through the
-  existing interface type forms. Both stages pass the19-line imported worker
-  program and53-line showcase. This does not complete the general product or
-  transformation tasks.
-- [x] **S3: Instantiate known native workers.** Expected types, visible type
-  arguments, and declared monomorphic arguments select immutable erased choices.
-  ImpredicativeTypes controls pass at M38. General mutable native instantiation
-  stays gated. Evidence: `KnownArgumentClient.hs`, M36–M38, and the two source
-  matrices above. M52 calls an imported `idCall @a f n xs` with actual stored
-  function/input fields. Exact local function operands and ordinary one-time
-  argument/usage checks remain required. No new inference rule is added.
-- [ ] **C1: Reconcile the Core contract with the research.** Depends on the
-  measured S0–S3 baseline. Map each native form and coercion to the relevant
-  rules in the 2017 specification, 2019 roles paper, and 2021 graded paper.
-  State the differences. Specify substitution, conversion, scope, runtime usage,
-  and erasure before extending the representation. Close this task with a
-  reviewable contract and focused transformation checks, not a claim that the
-  papers prove our implementation. Advances `R05`.
-  M39 records the correspondence limits and adds checked Core beta exposure.
-  The [contract](CORE.md#checked-beta-exposure) and existing API fixtures cover
-  this bounded reduction. M40 exposes the same subset from source with checked
-  scope, multiplicity and Strict-mode boundaries. Its
-  [source contract](CORE.md#bounded-source-beta-applications) preserves ordinary
-  usage checking. The full C1 obligation remains open.
-  M54 reports detected recursive interface-domain failures through the normal
-  interface diagnostic path. It preserves valid first-order recursive domains
-  and ordinary fields containing valid retained Pi types. This is not a
-  shape-first loader, guaranteed loop detection or a termination proof.
-  M55 adds derived data and synonym views before field decoding and generic
-  binder allocation. Known unsupported graphs fail before typed recursion.
-  Valid data cycles remain supported. Unclassified normalization keeps the
-  typed fallback. Missing headers and general termination remain open.
-  C1 remains open.
-  M42 adds scoped opaque call indices with independently closed scalar input
-  and result domains. It checks forward nominal congruence, conservative
-  noninjectivity, function-head substitution and actual strict-call lowering.
-  M43 adds source formation and exact whole-call refinement for `case f n`.
-  Checked alias evidence preserves call demand, captures and lazy fields.
-  Both stages pass the focused source, runtime and negative controls.
-  M44 admits checked constructor-tree arguments in these source cases. It
-  preserves exact whole-call identity and reuses the existing Core bridge.
-  Both stages pass source, demand and located negative controls. General
-  computation and a preservation theorem remain open.
-  M45 implements an explicitly signed immediate-lambda step. It requires
-  actual assigned Many metadata and excludes Strict from that new path.
-- [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
-  missing transformations incrementally, including normal simplification and
-  unfolding handling. Preserve Core Lint, type preservation, runtime demand,
-  sharing, and diagnostics at each step. Keep unsupported passes gated until
-  checked. Run broader GHC compatibility checks before closing this task.
-  Advances `R05`; it is also a release gate for later frontend work.
-  M41 adds one checked local variable-alias substitution. Direct API checks
-  cover scope, exact types, type-only dependencies and demand. Both stages
-  preserve the 106 raw/public and 562 vector observations. Ordinary inlining,
-  occurrence analysis and general unfolding handling remain gated.
-  M53 adds a restricted dead-local analysis from GHC's deep FV annotations.
-  It retains type-only dependencies and removes eligible unused lifted Many
-  locals. It preserves remaining nodes and metadata and adds no occurrence
-  counts. Both stages pass source19 and Showcase53. General occurrence
-  analysis, native unfolding export and the full optimizer remain gated.
-  M42 extends the checked alias and traversal rules to eligible function heads.
-  Direct CorePrep checks consume call proofs and preserve argument demand.
-  Top-level Tidy protection is implemented and reviewed. It has no separate
-  isolated execution probe.
-  M43 adds a typed source carrier and preserves native index identities through
-  `seq` desugaring. Its `Strict` and opaque-head demand controls pass both stages.
-  M44 extends the source classifier and structural annotation matcher. It adds
-  no Core or backend transformation. Ordinary optimization remains gated.
-  M45 adds assigned-Many signed source beta using the existing scalar bridge.
-  It preserves the checked runtime expression and ordinary Strict fallback.
-  M46 implements complete local keepCall/idCall signatures with a separate
-  binder policy and exact local variable function operands. Scalar TermVarTy,
-  constructor fields and exported call codecs keep their gates. Bootstrap
-  snapshot6 builds, source/API catalogs, constructor supplements, legacy8 and
-  final9 pass. Canonical audit/publication records are separate. Direct
-  in-case probes2/3 reject
-  payloads with GHC-83865 in both stages. M47 remembers the motive-to-call
-  equality as an ordinary evidence parameter. Existing constructor transport
-  and Wanted/Given solving support direct calls, including row `where`
-  bindings. Bootstrap, self-host, API and selected both-stage source/runtime
-  controls pass. Final9 passes its two API4 reuses and seven launches, including
-  both-stage raw/public106 and packed562. The registered run gives five passes,
-  39 cases and 34 skips, with no unexpected/framework failures or warnings. No custom App cast, solver rule,
-  evaluator or codec is added. M48 adds a metadata-only activation policy for
-  known lexical workers when earlier triggers are absent. Bootstrap fresh and
-  freshwhere clients run without payload annotations. Snapshot2 API1 passes
-  ten new quiet values with exact 1/37 goldens. Ordinary, quote and duplicate
-  controls retain their measured behavior; independent wrong-head/index clients
-  reject with located errors. Self-hosting, selected both-stage source controls
-  and public17 pass. Legacy8, both-stage constructor11 and all nine final
-  phases pass. Both stages preserve raw/public106 and packed562; registered
-  results are 39 cases, 34 skips and five expected passes, with no unexpected/
-  framework failures or warnings. Artifact audit and publication remain separate. This changes no Core, evidence,
-  solver or backend rule. M48 is published at `3e6f9aa35f`, with canonical
-  audit `953f58351b6ed84eaaccf0a93e957fe7fc7e291ac7bfafef0161cb3516d16aa8`.
-  M49 extends the metadata query to resolved scalar constructor trees, using
-  expected field domains and the existing scalar converter. Function operands
-  stay bare local Vars. The selected source matrix and public21 pass both stages;
-  legacy8, constructor11 and final9 pass. Both-stage raw/public106 and packed562
-  pass. The registered run has 39 cases, 34 skips and five expected passes,
-  with zero unexpected/framework failures or warnings. Artifact checks remain
-  separate. M49 is published at `7029ed2a7d`, canonical audit
-  `ba310681ec8effaf4c6a84bc4e4dfe26ca902ee0545a89cd0aefe5f069cf25a7`.
-  M50 changes source package pattern checking and row desugaring, with no new
-  Core, solver, codec or backend rule. C1 and C2 remain open.
-- [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
-  release. Broaden the documented static subset and supported domains. Extend application and definition checking beyond the leading invisible
-  binders supported by M72–M74. Reuse inherited
-  visibility and scoping machinery. State when annotations are required. Never
-  infer a new retained quantifier merely because a definition could have one.
-  Advances `R03` and `R02`.
-- [ ] **Q2: Add first-class dependent sums.** Depends on C1 and a specified
-  first-class existential design (`R22`). Reuse retained fields for storage,
-  but specify first-class formation, introduction, elimination, scope, and
-  erasure separately. Existing `PackVec` is the execution baseline. Keep erased
-  `exists` and retained `some` distinct. Advances `R04` and `R02`.
-  M50 admits the bounded multi-constructor package slice. Both stages pass
-  public17, mixed17 and twin17 through actual interfaces; lazy and linear
-  clients retain located compile-only rejections. Constructor-local scopes
-  and row failure reuse existing field metadata and case lowering. The Sigma3
-  control already passes the parent baseline. This does not implement general
-  first-class sums, universes or dependent projections and closes none of R22,
-  C1 or C2. Legacy/final evidence and artifact checks remain separate.
-  M51 adds closed function-valued retained fields with generic call-indexed
-  payloads. Source24 and mixed14 pass both stages through actual object
-  interfaces. Matching retains actual function/input scope and lazy fields.
-  Four logical body errors and two policy guards pass per stage. The maintained
-  `docs/dependent-haskell/Showcase.hs` now passes both stages with51 lines and
-  twelve actual source modules. M52 admits complete ordinary exported function
-  Pi signatures. Public19 and the updated53-line showcase pass both stages.
-  The source permission remains separate from class, instance, foreign,
-  partial and hs-boot contexts. Native coercion encoding, unfolding handling
-  and general optimization remain separate gates. The malformed ordinary-
-  domain interface-knot gap remains open. C1, C2 and R22 stay unchecked.
-- [ ] **E1: Specify and implement closed evaluation.** Requires an explicit
-  compile-time execution boundary. M99 can use existing typed Core for a
-  closed call that elaborates to a literal. A call remaining in Core needs
-  a representation and checked evidence under C1.
-  Select the smallest closed pure expression subset. Specify constraint,
-  divergence, caching, staging, and error behavior. A closed computation such
-  as list length must work in an actual type without a parallel handwritten
-  type family. A runtime executable alone does not close this task.
-  M77 and M78 use R13 source equations to compute Peano lengths across
-  an interface. M99 executes an imported call during source elaboration
-  and tracks the producer object in the client interface.
-- [ ] **E2: Specify and implement open evaluation.** Depends on C1. Select and
-  document normalization rules for expressions with rigid variables. Include
-  stuck terms and capture avoidance. A lambda application to a rigid variable
-  must normalize while an opaque function application remains well scoped.
-  Closed evaluation alone does not close this task. Advances `R16`.
-- [ ] **P1: Reuse term definitions in types.** Depends on E1, E2, and the
-  selected requirements from `R17`–`R19`, `R21`, and `R23`. Integrate lambda,
-  let, and case syntax with the Core rules. Interleave term/type declaration
-  dependencies. Track matchability for unsaturated families. Demonstrate one
-  source function used at both levels across a module interface. Advances
-  `R13`; completing it does not finish all of `R06`.
-- [ ] **P2: Complete promotion domains.** Coordinate `R07`, `R10`–`R12`,
-  `R14`, and `R24`. Account for homogeneous equality, unboxed representations,
-  overloaded literals, dictionaries, and data families. Reuse the completed
-  Char/Natural work. Close each domain with its own boundary and evidence.
-- [ ] **L1: Finish language preparation.** Coordinate accepted upstream work
-  on `R21`, `R23`, `R27`, `R34`–`R36`, and `R41`, plus `R22` and `R24`.
-  Reuse inherited parser, renamer, namespace, and binder implementations.
-  Treat known issues on completed cards as individual follow-ups. This work can
-  proceed beside Core and evaluation work.
-- [ ] **I1: Integrate the full program.** Depends on the required work above.
-  Check ordinary Haskell compatibility, normal optimization, interfaces,
-  recompilation, tools, backends, errors, documentation, and compiler resources.
-  Establish a broad GHC regression baseline. State the remaining research and
-  implementation restrictions before a production-readiness claim.
-
-M56 completes a bounded part of C1: closed parameterized first-order domains.
-Ordinary type arguments now remain consistent across constructor indices,
-substitution, branch evidence, Lint, lowering and separate interfaces. Both
-stages check runtime `[Bool]`, `Maybe Nat` and `Tree Bool` source examples.
-Closed families compute vector lengths and heterogeneous tree payloads.
-Uniform recursive declarations qualify. General promotion, arbitrary term
-computation in types, native unfoldings and normal optimization remain open.
-This increment does not complete C1, C2 or R22.
-
-M57 adds nominal domain conversion to retained congruence. Its body proof uses
-one source-domain binder. Its right endpoint substitutes a backward-converted
-target argument. Checked application uses that same actual argument. Scope,
-substitution, role weakening, symmetry and distinct-domain composition pass
-the Core controls. Seven bytecode observations and one native object control
-check runtime behavior. The object control preserves native forms through
-SimpleOpt and ignores a bottom token. This increment adds no source observation.
-C1, C2 and R22 remain open.
-
-M58 uses that nominal rule from source. A private body solve preserves ordinary
-payload inference and keeps runtime indices local. Source wrappers retain the
-nominal proof through zonking. Both compilers run the 68-observation Showcase,
-including nine new conversion and demand observations. Three located rejection
-controls prevent unrelated domains, mismatched payloads and local-index escape.
-The older parameterized-domain rejection controls remain in force.
-This is progress within R05/C1. It completes none of C1, C2 or R22.
-M59 addresses fixed function-domain body comparison. Opaque Pi instantiation
-and domain projection remain separate obligations. Representational Pi equality
-alone cannot supply nominal domain equality.
-
-## Research constraints and references
-
-[Proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html)
-is the accepted design direction. It leaves room for later proposals. Its
-quantifiers separate visibility from retention. Its dependent matching rules
-use a known result type. Its static subset can grow incrementally. Ordinary
-let-bound runtime names remain opaque. Preserve these distinctions when an
-experiment adds syntax or inference.
-
-The roadmap cites several complementary Core results. The
-[2017 specification](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf)
-studies explicit equality and erasure with nontermination. The
-[2019 roles paper](https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf)
-studies dependent nominal and representational equality. The
-[2021 graded paper](https://richarde.dev/papers/2021/grad/grad-extended.pdf)
-studies usage and dependent typing. These results do not constitute a combined
-implementation proof. See [the paper reading records](papers/README.md) for the
-sections already read and the limits of each result. Use Agda as the primary
-comparison for dependent checking and normalization. Preserve Haskell's chosen
-nontermination, laziness, coercion, and erasure behavior explicitly.
-
-The [first-class existentials proposal](https://github.com/ghc-proposals/ghc-proposals/pull/473)
-remains a proposal under discussion. Its witness is erased. The roadmap's
-retained sums need a separate runtime representation. The
-[type-functions proposal](https://github.com/ghc-proposals/ghc-proposals/pull/509)
-also remains under discussion. Its closed evaluation design does not supply
-general open evaluation. Neither proposal is a completed feature in this fork.
-
-The remaining family work has its own prior art:
-[Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf)
-and [Constrained Type Families](https://richarde.dev/papers/2017/partiality/partiality-extended.pdf).
-These references guide `R23` and `R24`; they are not evidence that our fork
-implements them. The roadmap also cites
-[Gundry's thesis](https://adam.gundry.co.uk/pub/thesis/) for the static
-subset. This review does not claim a full reading of that thesis.
-
-The ignored cache `_build/verification/native-known-arguments-roadmap-research-v1/`
-keeps the fetched HTML, SVG, extracted cards and edges, proposal snapshots,
-paper extracts, reading notes, and hashes. The checklist contains all graph
-relations so that it remains usable without the cache. Refresh the source date
-and evidence when upstream changes. At each compiler checkpoint, update the
-relevant local box, record the narrower completed behavior in PLAN.md, and leave
-an upstream box open until its full stated task is supported.
+The [reference ledger](REFERENCES.md) connects implementation decisions to
+GHC proposals, Agda, the singleton encoding and the published Core calculi.
+The [paper notes](papers/README.md) record the sections studied. The
+[historical port](PORT.md) identifies Eisenberg’s branch and the commits
+used for the native Core design.
