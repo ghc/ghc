@@ -84,6 +84,8 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
 
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State
 import Data.List (find, isPrefixOf, isSuffixOf, sortBy, sort, sortOn)
 import qualified Data.Map as Map
@@ -586,12 +588,18 @@ checkFlagHash hsc_env iface self_recomp = do
         class_base_fp = classDefaultMatchabilityFingerprint staged_fp
         family_base_fp = forwardedResultFingerprint class_base_fp
         scoped_base_fp = scopedTypeCaseFingerprint class_base_fp
-        new_fp = scopedTypeCaseFingerprint family_base_fp
-        earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp]
+        scoped_family_fp = scopedTypeCaseFingerprint family_base_fp
+        filter_base_fp = guardedListFilterFingerprint class_base_fp
+        filter_family_fp = guardedListFilterFingerprint family_base_fp
+        new_fp = scopedTypeCaseFingerprint filter_family_fp
+        earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp,
+                                    scoped_family_fp, filter_base_fp, filter_family_fp]
         class_generations = new_fp : earlier_rule_generations
+        forwarded_fps = [new_fp, family_base_fp, scoped_family_fp, filter_family_fp]
+        guarded_fps = [new_fp, filter_base_fp, filter_family_fp]
+        scoped_fps = [new_fp, scoped_base_fp, scoped_family_fp]
+        -- See Note [Recompiling package rule providers].
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
-        -- The family and scope changes were available independently. Match either
-        -- old producer stamp before checking which change its interface needs.
         old_fp | stored_fp `elem` class_generations = stored_fp
                | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = fp
                | otherwise = stored_fp
@@ -705,12 +713,19 @@ checkFlagHash hsc_env iface self_recomp = do
             else pure UpToDate
       _ -> pure previous
     flags <- case retained of
-      UpToDate
-        | old_fp `notElem` class_generations
-        , couldInferClassDefaultSelector iface ->
-            liftIO $ recheck "Compiler now infers matchability for associated type defaults"
+      UpToDate | old_fp `notElem` class_generations, couldInferClassDefaultSelector iface ->
+        liftIO $ recheck "Compiler now infers matchability for associated type defaults"
       _ -> pure retained
-    let check_family_uses
+    let check_guarded_filter
+          | old_fp `notElem` guarded_fps
+          , backendGeneratesCode (backend dflags)
+          , mi_hsc_src iface == HsSrcFile = do
+              candidate <- couldExportGuardedListFilter (isOneShot (ghcMode dflags)) iface
+              if candidate
+                then liftIO $ recheck "Compiler now checks guarded list filters"
+                else pure UpToDate
+          | otherwise = pure UpToDate
+        check_family_uses
           | old_fp `elem` (staged_fp : class_generations) = pure UpToDate
           | otherwise = do
               candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
@@ -718,16 +733,18 @@ checkFlagHash hsc_env iface self_recomp = do
                 then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
                 else pure UpToDate
         check_forwarded_result
-          | old_fp `notElem` [new_fp, family_base_fp], couldForwardFamilyResult iface =
+          | old_fp `notElem` forwarded_fps, couldForwardFamilyResult iface =
               liftIO $ recheck "Compiler now separates a family result from its kind"
           | otherwise = pure UpToDate
         check_scoped_case
-          | old_fp `notElem` [new_fp, scoped_base_fp]
+          | old_fp `notElem` scoped_fps
           , mi_hsc_src iface == HsSrcFile
           , couldExportScopedTypeCase iface =
               liftIO $ recheck "Compiler now checks dependent type case captures"
           | otherwise = pure UpToDate
-    pure (flags, check_family_uses `recompThen` check_forwarded_result `recompThen` check_scoped_case)
+    pure (flags, check_guarded_filter `recompThen` check_family_uses
+                                     `recompThen` check_forwarded_result
+                                     `recompThen` check_scoped_case)
 
 -- | Mark providers compiled with the scope traversal in GHC.Iface.Tidy.
 -- See Note [Private helpers in erased package rules] in GHC.Iface.Tidy.
@@ -736,6 +753,15 @@ stampPackageRuleProvider rules info =
     info { mi_sr_flag_hash = FingerprintWithValue (packageRuleProviderFingerprint rules fp) flags }
   where
     FingerprintWithValue fp flags = mi_sr_flag_hash info
+
+{- Note [Recompiling package rule providers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The interface writer stamps the flag hash after it knows which rules
+the module exports. The reader uses the stored rules to recognize the
+stamp on each compatible family, filter and scoped-case hash. A provider without
+the stamp needs the private helper check, even if it already has one
+of the other checks. Its next interface records all current checks.
+-}
 
 -- | Only providers that publish lexical package rules need an upgrade.
 packageRuleProviderFingerprint :: [IfaceRule] -> Fingerprint -> Fingerprint
@@ -758,6 +784,11 @@ stagedMatchabilityFingerprint fp =
 classDefaultMatchabilityFingerprint :: Fingerprint -> Fingerprint
 classDefaultMatchabilityFingerprint fp =
     computeFingerprint putNameLiterally (fp, "class-default-matchability-v1" :: String)
+
+-- | Record the final Core check for a list with a predicate guard.
+guardedListFilterFingerprint :: Fingerprint -> Fingerprint
+guardedListFilterFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "guarded-list-filter-v1" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -986,7 +1017,11 @@ the current key do not repeat this check.
 
 -- | Read declarations from the home table or the installed interface file.
 readRecompProvider :: SDoc -> Module -> IfG (Maybe ModIface)
-readRecompProvider reason owner = do
+readRecompProvider reason = readRecompProviderWithBoot reason NotBoot
+
+-- | Read the requested boot or full interface when the home table has no entry.
+readRecompProviderWithBoot :: SDoc -> IsBootInterface -> Module -> IfG (Maybe ModIface)
+readRecompProviderWithBoot reason boot owner = do
   env <- getTopEnv
   liftIO $ lookupHugByModule owner (hsc_HUG env) >>= \case
     Just hmi -> pure (Just (hm_iface hmi))
@@ -994,7 +1029,7 @@ readRecompProvider reason owner = do
       RealUnit (Definite uid) -> do
         let installed = mkModule uid (moduleName owner)
         found <- findAndReadIface env reason
-                     installed owner NotBoot
+                     installed owner boot
         pure $ case found of
           Succeeded (provider, _) -> Just provider
           Failed _ -> Nothing
@@ -1280,6 +1315,126 @@ couldExportCallbackCase iface = any candidate (mi_decls iface)
     opaque IfaceCastTy{} = True
     opaque IfaceAppTy{} = True
     opaque _ = False
+
+-- | A signature component with its quantified variables and synonym arguments.
+-- See Note [Looking through type synonyms for guarded list filters].
+data FilterIfaceType = FilterIfaceType IfaceType [(IfLclName, Either Int FilterIfaceType)]
+
+-- | Check whether an exported signature could have the filter shape.
+-- See Note [Looking through type synonyms for guarded list filters].
+couldExportGuardedListFilter :: Bool -> ModIface -> IfG Bool
+couldExportGuardedListFilter one_shot iface =
+    evalStateT (anyM candidate (mi_decls iface))
+      (mkModuleEnv [(mi_semantic_module iface, decl_index iface)])
+  where
+    exports = mkNameSet (concatMap availNames (mi_exports iface))
+    boot_deps = mkModDeps (dep_boot_mods (mi_deps iface))
+    candidate (_, IfaceId{ifName = n, ifType = ty})
+      | n `elemNameSet` exports = isJust <$> runMaybeT (filter_type 0 (FilterIfaceType ty []))
+    candidate _ = pure False
+
+    filter_type depth ty = lift (view ty) >>= \case
+      Nothing -> pure ()
+      Just (FilterIfaceType (IfaceForAllTy _ (Bndr binder _) body) args) ->
+        filter_type (depth + 1) (FilterIfaceType body ((ifaceBndrName binder, Left depth) : args))
+      Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ callback rest) args) -> do
+        variable <- callback_element (FilterIfaceType callback args)
+        lift (view (FilterIfaceType rest args)) >>= \case
+          Nothing -> pure ()
+          Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ input output) rest_args) -> do
+            from <- list_element (FilterIfaceType input rest_args)
+            to <- list_element (FilterIfaceType output rest_args)
+            case catMaybes [variable, from, to] of
+              first : others -> guard (all (== first) others)
+              [] -> pure ()
+          _ -> mzero
+      _ -> mzero
+
+    callback_element ty = lift (view ty) >>= \case
+      Nothing -> pure Nothing
+      Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ domain result) args) -> do
+        lift (view (FilterIfaceType result args)) >>= \case
+          Nothing -> element (FilterIfaceType domain args)
+          Just (FilterIfaceType (IfaceTyConApp tc IA_Nil) _)
+            | ifaceTyConName tc == boolTyConName -> element (FilterIfaceType domain args)
+          _ -> mzero
+      _ -> mzero
+
+    list_element ty = lift (view ty) >>= \case
+      Nothing -> pure Nothing
+      Just (FilterIfaceType (IfaceTyConApp tc (IA_Arg arg _ IA_Nil)) args)
+        | ifaceTyConName tc == listTyConName -> element (FilterIfaceType arg args)
+      _ -> mzero
+
+    element ty = lift (view ty) >>= \case
+      Nothing -> pure Nothing
+      Just (FilterIfaceType (IfaceTyVar var) args) -> pure (either Just (const Nothing) =<< lookup var args)
+      _ -> mzero
+
+    view component@(FilterIfaceType ty args) = case ty of
+      IfaceTyVar var | Just (Right arg) <- lookup var args -> view arg
+      IfaceTyConApp tc actuals | let name = ifaceTyConName tc, not (isWiredInName name) ->
+        declaration name >>= \case
+          Just IfaceSynonym{ifBinders = binders, ifSynRhs = rhs} ->
+            let actual_types = appArgsIfaceTypes actuals in
+            if binders `equalLength` actual_types
+              then view (FilterIfaceType rhs
+                          (zip (map ifTyConBinderName binders)
+                               [Right (FilterIfaceType arg args) | arg <- actual_types]))
+              else pure Nothing
+          Just _ -> pure (Just component)
+          Nothing -> pure Nothing
+      IfaceAppTy{} -> pure Nothing
+      IfaceCastTy{} -> pure Nothing
+      _ -> pure (Just component)
+
+    declaration name = case nameModule_maybe name of
+      Nothing -> pure Nothing
+      Just owner -> do
+        cached <- gets (`lookupModuleEnv` owner)
+        decls <- case cached of
+          Just decls -> pure decls
+          Nothing -> do
+            provider <- lift $ readRecompProviderWithBoot (text "Checking guarded list filter type")
+                                (provider_boot owner) owner
+            let decls = maybe emptyNameEnv decl_index provider
+            modify' (\env -> extendModuleEnv env owner decls)
+            pure decls
+        pure (lookupNameEnv decls name)
+
+    provider_boot owner
+      | one_shot
+      , Just dep <- lookupInstalledModuleEnv boot_deps (toUnitId <$> owner)
+      = gwib_isBoot dep
+      | otherwise = NotBoot
+
+    decl_index provider = mkNameEnv (concatMap (named_declaration . snd) (mi_decls provider))
+    named_declaration decl@IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
+      (ifName decl, decl) : [(ifName family, family) | IfaceAT family _ <- ats]
+    named_declaration decl = [(ifName decl, decl)]
+
+{- Note [Looking through type synonyms for guarded list filters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old interface can store Select a in the type of an exported filter.
+The new compiler must recheck the producer to publish the checked equations.
+Use the local declarations and the ordinary recompilation provider lookup
+to inspect saturated synonyms at the arrow, callback and list positions.
+Check dependencies and usages first. The home table supplies the current
+interface in --make. In one-shot mode, use the recorded boot dependencies
+to choose which file to read. Cache each provider for this check. Re-exports
+keep the original defining Name, so use that Name to choose the provider.
+Keep each argument in its original scope when entering a synonym body.
+Give each quantified variable a distinct binder depth for the element check.
+The presentation-only IfaceType substitution cannot handle every binder.
+
+The Core shape check expands synonyms and treats known family heads as
+rigid. A cast, unresolved declaration or other opaque application can hide
+the necessary shape. Treat that component as unknown and continue checking
+the visible components. A known structural mismatch excludes the signature.
+The final Core check still decides publication. The existing guard fingerprint
+records that check on the next write, so an opaque candidate can cause one
+extra rebuild.
+-}
 
 -- | An exported function can hide its result pair behind a type synonym.
 couldExportPairBuilder :: ModIface -> Bool
@@ -1993,6 +2148,7 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
           current_flag_hash = scopedTypeCaseFingerprint
+                            $ guardedListFilterFingerprint
                             $ forwardedResultFingerprint
                             $ classDefaultMatchabilityFingerprint
                             $ stagedMatchabilityFingerprint

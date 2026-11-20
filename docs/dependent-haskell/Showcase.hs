@@ -103,6 +103,7 @@ import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified InstalledNotProof
+import qualified PreludeFilterProof
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
 import qualified OpenBuildWorker as Build
@@ -1150,6 +1151,8 @@ main = do
         (InstalledNotProof.negateHead (Proxy @'[]))
     putStrLn ("use Prelude.map and Prelude.not on an empty list and an unknown tail: "
               ++ PreludeMapProof.showPreludeMapProofs)
+    putStrLn ("filter a known head and leave the tail lazy: "
+              ++ PreludeFilterProof.showPreludeFilterProofs)
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"

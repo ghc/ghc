@@ -170,7 +170,7 @@ import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
-import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper)
+import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies)
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -954,7 +954,7 @@ keepValidatedSourceMappers original final
     failed = filter (not . verifyFinalCoreMapper (mg_binds final))
                     (finalCoreMappers (mg_binds original))
     owners = mkNameSet (map idName failed)
-    families = mkNameSet [tyConName table | owner <- failed, Just table <- [sourceTableId_maybe owner]]
+    families = mkNameSet (map tyConName (concatMap finalCoreSourceFamilies failed))
     invalidFamily tc = tyConName tc `elemNameSet` families
     clearOwner v
       | idName v `elemNameSet` owners = setIdDetails v VanillaId

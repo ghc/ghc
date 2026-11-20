@@ -1144,3 +1144,27 @@ returns `False`. With rewriting enabled, the type checker rejects
 the fresh proof. An ordinary call in that configuration still returns
 `True` when the orphan rule fires.
 [Provider, proof and runtime check](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
+
+### Filter one known head and keep the recursive tail
+
+`Prelude.filter Prelude.not` keeps a `False` head and skips a `True`
+head. An ordinary client proves both equations with `Refl` and an
+unknown tail. The true predicate branch returns a cons without
+evaluating the tail. The false branch leaves the recursive call on the
+tail. An unknown predicate leaves the branch unresolved.
+[Aliases](../examples/open-evaluation/PreludeFilterSource.hs) and
+[proofs](../examples/open-evaluation/PreludeFilterProof.hs).
+
+GHC checks the guarded filter before and after optimizing the defining
+module. The guard tests the original predicate on the original head.
+Both branches recurse with the same predicate and tail. The compiled
+interface carries the checked equations even when it omits the term
+unfolding. A normal build omits both equations if a producer rule changes
+the checked body.
+
+The proof module disables rewrite rules locally. With rules enabled,
+GHC reports GHC-83605 at `Refl` because the installed fusion rules still
+need a check. The regression also verifies that a kept runtime head can
+be observed with a bottom tail.
+[Interface and runtime regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh)
+and [prior art](../REFERENCES.md#list-filtering-with-a-known-predicate-result).

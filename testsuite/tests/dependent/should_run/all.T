@@ -61,6 +61,7 @@ test('NativeOpenInstalledNot',
 test('NativeOpenInstalledMap',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludeMapSource.hs', open_eval_dir + 'PreludeMapProof.hs',
+                   open_eval_dir + 'PreludeFilterSource.hs', open_eval_dir + 'PreludeFilterProof.hs',
                    'NativeOpenInstalledMapProducer.hs'])],
      run_command, ['bash NativeOpenInstalledMap.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledPair',

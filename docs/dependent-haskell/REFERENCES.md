@@ -6229,6 +6229,23 @@ object can change a closed result with the old interface still present.
 These are GHC separate-compilation decisions. [Ordinary mapper and callback](examples/open-evaluation/OpenMapWorker.hs)
 and [checks for both changes](../../testsuite/tests/dependent/should_run/NativeOpenMap.sh).
 
+### List filtering with a known predicate result
+
+Agda's Boolean list filter tests the predicate on the head. It
+selects the corresponding branch even when the tail is a variable.
+Agda's case trees describe when each branch reduces definitionally.
+[Agda standard library 2.3, Data.List.Base](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html)
+and [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
+
+The Haskell filter must produce a cons on the true branch even when the
+tail is bottom. GHC's fusion rules include
+a composition rule that tests the inner predicate first. The rule
+order matters when a predicate diverges. R16 checks the exported filter
+body and requires rewrite rules to be disabled at the proof site.
+[GHC filter definition and fusion rules](../../libraries/ghc-internal/src/GHC/Internal/List.hs),
+[GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
+and [R16 application](roadmap/R16-open-term-evaluator.md#filter-one-known-head-and-keep-the-recursive-tail).
+
 Agda permits a datatype declaration and its constructors to appear at
 different positions in an interleaved mutual block. Haskell's renamer
 already groups mutually dependent type declarations. R21 uses those

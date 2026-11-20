@@ -8,6 +8,19 @@ increments.
 
 ## Family and package checkpoints
 
+At `4bb020f702`, both stages reproduce the 305-line Showcase at `-O0`.
+The self-hosted compiler also reproduces it in GHCi and at default
+`-O1` and `-O2`. Two ordinary stream folds eliminate the intermediate
+list. On a compiler upgrade a provider with a forwarded family and a
+package rule referring to a private helper recompiles once and stays
+up to date on the next build. All 61 runnable focused tests passed.
+The dependent directory recorded 294 passes and 20 unexpected failures.
+Polykinds recorded 224 passes, one expected failure and 18 unexpected
+failures. The names and categories of all unexpected failures match
+`b92cf1d999`.
+[Stream source](examples/erased-existentials/StreamFold.hs)
+and [interface checks](examples/erased-existentials/check-rule-interfaces.sh).
+
 At `b92cf1d999`, the 304-line Showcase covers inference of earlier invisible
 arguments. The previous compiler rejects the new family source with
 GHC-91028. Both readers compile and run the ordinary client from the new
