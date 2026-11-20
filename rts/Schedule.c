@@ -421,11 +421,20 @@ schedule (Capability *initialCapability, Task *task)
         RELAXED_STORE(&cap->context_switch, 1);
     }
 
-run_thread:
+    /* Now keep running the same thread until we decide to switch thread.
+     * There are various conditions where threads will return to the scheduler
+     * but we keep running the same thread, rather than switching.
+     *
+     * This includes:
+     *  + heap overflow (but no forced context switch)
+     *  + stack overflow
+     *  + switching between compiled/interpreted code
+     *  + yielding (without a forced context switch)
+     */
+    while (1) {
 
     // CurrentTSO is the thread to run. It might be different if we
-    // loop back to run_thread, so make sure to set CurrentTSO after
-    // that.
+    // loop back here, so make sure to set CurrentTSO after that.
     cap->r.rCurrentTSO = t;
 
     resumeHeapProfTimer();
@@ -589,7 +598,7 @@ run_thread:
     case ThreadYielding:
         if (scheduleHandleYield(t, prev_what_next)) {
             // shortcut for switching between compiler/interpreter:
-            goto run_thread;
+            continue;
         } else {
             // Reset the context switch flag.  We don't do this just before
             // running the thread, because that would mean we would lose ticks
@@ -619,10 +628,12 @@ run_thread:
       barf("schedule: invalid thread return code %d", (int)ret);
     }
 
+    } /* end of run thread loop while() */
+
     if (ready_to_gc || scheduleNeedHeapProfile(ready_to_gc)) {
       scheduleDoGC(&cap,task,false,ready_to_gc,false,false);
     }
-  } /* end of while() */
+  } /* end of scheduler loop while() */
 }
 
 /* -----------------------------------------------------------------------------
