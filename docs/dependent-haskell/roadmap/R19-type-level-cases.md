@@ -99,6 +99,18 @@ previously checked closed-family axiom. This step can also establish
 that a constructor is impossible at the scrutinee kind. Open or
 unresolved index applications can still prevent compilation.
 
+In `IndexedFieldPick`, the constructor index `FieldIndex seed active`
+reduces to `Bool`. The other index then unifies with `'True`, which
+lets the nested pattern match `FieldOn`. The nominal coercion records
+the refined index and keeps `seed` in scope for the other field.
+An ordinary client checks the extracted field type through the
+interface. A rigid leaf still blocks an earlier constructor test.
+The reduced arguments must still fit the constructor kind. A reduction
+that changes the kind of a later index needs explicit nominal transport.
+An index equation that requires refinement before it can reduce also
+remains outside this check.
+[Agda indexed matching](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes).
+
 The tests compile an ordinary client using only stripped interfaces.
 They also check reification, exact printing and rejected rigid
 equalities. On an upgrade, GHC rechecks a home module with an old
