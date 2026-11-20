@@ -60,4 +60,35 @@ HS
         exit 1
     fi
     grep -Eq 'BadBranch.hs:6:[0-9]+-[0-9]+: error: \[GHC-25897\]' reject.log || { cat reject.log >&2; exit 1; }
+
+    cat >BadScope.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes #-}
+module BadScope where
+import NativeGadtRetainedSumProvider
+#ifdef HIDDEN_KIND
+data BadScope where
+    BadScope :: foreach (n :: Nat)
+             -> (foreach (n :: FlagAt n) -> (some (m :: Nat) | (KindTag n, Vec Char m)))
+             -> BadScope
+#else
+data BadScope (a :: Nat) where
+    BadScope :: forall (a :: Nat). foreach (n :: Nat)
+             -> (foreach (n :: Nat) -> (some (m :: Nat) | Vec Char m))
+             -> BadScope m
+#endif
+HS
+    for which in HIDDEN_KIND RESULT_SCOPE; do
+        if "${ghc[@]}" "${flags[@]}" -D"$which" -ferror-spans -c BadScope.hs >reject.log 2>&1; then
+            echo "Accepted $which" >&2
+            exit 1
+        fi
+        case $which in
+            HIDDEN_KIND)
+                expected='BadScope.hs:7:46-86: error:'
+                grep -Fq 'A retained dependent sum is supported' reject.log || { cat reject.log >&2; exit 1; }
+                ;;
+            RESULT_SCOPE) expected='BadScope.hs:13:26: error: \[GHC-76037\]' ;;
+        esac
+        grep -Eq "$expected" reject.log || { cat reject.log >&2; exit 1; }
+    done
 done

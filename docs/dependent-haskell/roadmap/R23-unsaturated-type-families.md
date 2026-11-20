@@ -651,6 +651,19 @@ fixed matchability annotations. The explicit print flag shows the annotations.
 A matchability mismatch still shows the expected and actual annotations.
 [Display rule in proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
 
+## Substituting an equal index in a partial family
+
+An ordinary client can prove `Callback a :~: Callback b` from an
+argument of type `a :~: b`. Pattern matching on `Refl` identifies the
+indices. After rewriting both indices, GHC compares the complete
+partial applications for reflexivity. The earlier compiler reported
+GHC-83865 at the second `Refl`, even though it printed identical types.
+
+The inverse still requires a separate proof. Two distinct prefixes
+can also keep a closed family stuck at a repeated pattern.
+[Source and inverse checks](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
+and [Agda and GHC provenance](../REFERENCES.md#equality-of-a-partial-family-after-rewriting-its-argument).
+
 ## Completion boundary
 
 The first increments establish a shared kernel foundation for R05 and R03.

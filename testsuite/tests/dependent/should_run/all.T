@@ -293,6 +293,7 @@ test('NativeSimplifier',
                    'NativePackageRuleCase.hs', 'implicit-existential-source/WitnessSchema.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/PackageRules.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/LexicalPackageRules.hs',
+                   '../../../../docs/dependent-haskell/examples/erased-existentials/OrphanPackageRules.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/ErasedStream.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/StreamFold.hs'])],
      run_command, ['bash NativeSimplifier.sh "{compiler}" "{libdir}"'])

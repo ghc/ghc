@@ -251,7 +251,7 @@ first-element fold leaves an undefined tail unevaluated.
 
 The client needs only the provider's interface to compile. The interface
 must include a declaration for the private step-fold function. Older
-providers could record its name as an unbound local. A provider can also
+providers could record its name as an unbound local. The list-builder rule has the local head `toList`. A provider can also
 write a rule directly for `foldr k z (mapToList f s)`. The local name `mapToList`
 anchors the rule. Both the writer and reader check that the anchor still
 occurs in its left-hand side. The rule requires the anchored-rule interface
@@ -262,6 +262,12 @@ compression level. It rejects the anchored rule at the header.
 [producer](../examples/erased-existentials/ErasedStream.hs),
 [ordinary client](../examples/erased-existentials/StreamFold.hs)
 and [rule-firing test](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
+
+The [integer package rule](../examples/erased-existentials/OrphanPackageRules.hs)
+is a separate example. Importing its module brings the specialization of
+`PackageRules.open` into scope. A Boolean package still uses the original
+function. The test compiles the same integer calls with and without the
+import and checks which rules fire.
 
 ## Next increments
 
