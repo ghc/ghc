@@ -58,6 +58,7 @@ import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.Core.Utils (exprType)
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
@@ -676,7 +677,14 @@ toIfaceExpr (Unpack witness value package body)
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
-  | otherwise               = IfaceCase (toIfaceExpr s) (mkIfLclName (getOccFS x)) (map toIfaceAlt as)
+  | otherwise               = IfaceCase scrut (mkIfLclName (getOccFS x)) (map toIfaceAlt as)
+  where
+    -- Inlining a retained application can leave a constructed scrutinee.
+    -- The branch proof then requires the same reader support as the application.
+    scrut | any (\alt -> isNativeIndexAlt alt || isNativeIndexAliasAlt alt) as
+          , containsIndexedConOperand s
+          = IfaceIndexedConArg (toIfaceExpr s)
+          | otherwise = toIfaceExpr s
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
 toIfaceExpr (Tick t e)      = IfaceTick (toIfaceTickish t) (toIfaceExpr e)
@@ -779,12 +787,19 @@ toIfaceApp (Var v) as
             tup_args  = map toIfaceExpr val_args
             tc        = dataConTyCon dc
 
-        _ -> mkIfaceApps (toIfaceVar v) as
+        _ -> mkIfaceApps (Var v) (toIfaceVar v) as
 
-toIfaceApp e as = mkIfaceApps (toIfaceExpr e) as
+toIfaceApp e as = mkIfaceApps e (toIfaceExpr e) as
 
-mkIfaceApps :: IfaceExpr -> [CoreExpr] -> IfaceExpr
-mkIfaceApps f as = foldl' (\f a -> IfaceApp f (toIfaceExpr a)) f as
+mkIfaceApps :: CoreExpr -> IfaceExpr -> [CoreExpr] -> IfaceExpr
+mkIfaceApps _ iface [] = iface
+mkIfaceApps fun iface (arg : rest)
+  = mkIfaceApps (App fun arg) (IfaceApp iface encoded) rest
+  where
+    encoded | containsIndexedConOperand arg
+            , DepFunTy{} <- coreFullView (exprType fun)
+            = IfaceIndexedConArg (toIfaceExpr arg)
+            | otherwise = toIfaceExpr arg
 
 ---------------------
 toIfaceVar :: Id -> IfaceExpr

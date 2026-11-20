@@ -2489,6 +2489,16 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
                 ; return (Unpack witness' value' package' body') }
            _ -> failIfM (text "Unpack requires an existential package in interface.") }
 
+tcIfaceExpr (IfaceApp fun (IfaceIndexedConArg arg))
+  = do { f <- tcIfaceExpr fun
+       ; a <- tcIfaceExpr arg
+       ; case coreFullView (exprType f) of
+           DepFunTy _ binder _ | containsIndexedConOperand a
+             , Just index <- retainedArgIndex a
+             , typeKind index `eqType` varType binder -> return (App f a)
+           _ -> failIfM (text "Invalid indexed constructor argument in retained interface application.") }
+tcIfaceExpr (IfaceIndexedConArg _)
+  = failIfM (text "Indexed constructor operand outside a retained application or proof case.")
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
 
@@ -2506,7 +2516,9 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         [proof] | proof /= case_bndr -> return ()
         _ -> failIfM (text "An index alias alternative requires one proof distinct from its case binder:" <+> ppr names)
       _ -> return ()
-    scrut' <- tcIfaceExpr scrut
+    (tagged_operand, scrut') <- case scrut of
+      IfaceIndexedConArg operand -> (True,) <$> tcIfaceExpr operand
+      _ -> (False,) <$> tcIfaceExpr scrut
     -- Resolve each constructor once, before inspecting its representation arity.
     let indexed_data_alt fieldful name names = do
           dc <- tcIfaceDataCon name
@@ -2542,6 +2554,10 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                                DataAlt dc -> isNativeIndexedDataAlt dc ns
                                _ -> False) resolved
         native = constructor_proof || indexed_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
+    when tagged_operand $
+      unless (native && isJust scrut_index && containsIndexedConOperand scrut') $
+        failIfM (text "Invalid indexed constructor scrutinee in native index interface proof:"
+                 <+> ppr scrut')
     when constructor_proof $ do
       when (isNothing scrut_index) $
         failIfM (text "Unsupported scrutinee for native index interface evidence:" <+> ppr scrut')

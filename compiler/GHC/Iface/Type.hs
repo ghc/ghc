@@ -2980,6 +2980,7 @@ data IfaceEvidence
   | LexicalPackageRuleEvidence | OrphanErasedUserRuleEvidence | AnchoredErasedRuleEvidence
   | RetainedUserRuleEvidence | ImportedRetainedRuleEvidence
   | IndexedConstructorCaseEvidence | IndexedConstructorFieldsEvidence
+  | IndexedConstructorOperandEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

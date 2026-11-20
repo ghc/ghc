@@ -38,6 +38,7 @@ module GHC.Core (
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex,
         exprToNativeCaseIndex, isNativeCaseValueIndex, nativeIndexFunctionVar_maybe,
         nativeIndexArgKinds, nativeIndexedConApp_maybe, splitNativeIndexedConApp,
+        containsIndexedConOperand,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
         nativeIndexedCon_maybe,
@@ -3068,6 +3069,17 @@ nativeIndexedOperandSpec_maybe con = do
       , getTyVar_maybe arg == Just predecessor
       -> Just spec
     _ -> Nothing
+
+-- | Detect indexed constructor operands that require a new interface reader.
+containsIndexedConOperand :: CoreExpr -> Bool
+containsIndexedConOperand (Var v)
+  | Just con <- isDataConWorkId_maybe v = isJust (nativeIndexedOperandSpec_maybe con)
+  | Just con <- isDataConWrapId_maybe v = isJust (nativeIndexedOperandSpec_maybe con)
+containsIndexedConOperand (App fun arg) = containsIndexedConOperand fun || containsIndexedConOperand arg
+containsIndexedConOperand (Lam _ body)  = containsIndexedConOperand body
+containsIndexedConOperand (Tick _ body) = containsIndexedConOperand body
+containsIndexedConOperand (Cast body _) = containsIndexedConOperand body
+containsIndexedConOperand _             = False
 
 {- Note [Indexed GADT constructor operands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

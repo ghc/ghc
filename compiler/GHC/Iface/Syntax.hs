@@ -510,6 +510,7 @@ hasIfacePackageExpr = go
     go (IfaceTuple _ args) = any go args
     go (IfaceLam _ rhs) = go rhs
     go (IfaceApp fun arg) = go fun || go arg
+    go (IfaceIndexedConArg arg) = go arg
     go (IfaceCase scrut _ alts) = go scrut || any (\(IfaceAlt _ _ rhs) -> go rhs) alts
     go (IfaceECase scrut _) = go scrut
     go (IfaceLet binding rhs) = goBind binding || go rhs
@@ -824,6 +825,7 @@ data IfaceExpr
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
   | IfacePack   IfaceType IfaceType IfaceExpr
   | IfaceUnpack IfaceTvBndr IfaceIdBndr IfaceExpr IfaceExpr
+  | IfaceIndexedConArg IfaceExpr
 
 
 data IfaceTickish
@@ -1948,6 +1950,7 @@ pprIfaceExpr add_par (IfaceUnpack (witness, _) (_, payload, _) package body)
                     2 (ppr body)
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
+pprIfaceExpr add_par (IfaceIndexedConArg arg) = pprIfaceExpr add_par arg
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -2364,6 +2367,7 @@ freeNamesIfExpr (IfaceUnpack witness payload@(mult, _, _) package body)
   = freeNamesIfTvBndr witness &&& freeNamesIfType mult &&& freeNamesIfIdBndr payload
       &&& freeNamesIfExpr package &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
+freeNamesIfExpr (IfaceIndexedConArg a) = freeNamesIfExpr a
 freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTick t e)       = freeNamesIfTickish t &&& freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
@@ -3114,6 +3118,10 @@ instance Binary IfaceExpr where
         put_ bh ae
         put_ bh os
         put_ bh af
+    put_ bh (IfaceIndexedConArg arg) = do
+        requireIfaceEvidenceVersion bh IndexedConstructorOperandEvidence
+        putByte bh 17
+        put_ bh arg
     put_ bh (IfaceApp ag ah) = do
         putByte bh 5
         put_ bh ag
@@ -3213,6 +3221,7 @@ instance Binary IfaceExpr where
                      return (IfaceLitRubbish torc r)
             15 -> IfacePack <$> get bh <*> get bh <*> get bh
             16 -> IfaceUnpack <$> get bh <*> get bh <*> get bh <*> get bh
+            17 -> IfaceIndexedConArg <$> get bh
             _ -> ioError (userError ("get IfaceExpr: invalid expression tag " ++ show h))
 
 instance Binary IfaceTickish where
@@ -3504,6 +3513,7 @@ instance NFData IfaceExpr where
     IfacePack schema w e -> rnf schema `seq` rnf w `seq` rnf e
     IfaceUnpack w v p e -> rnf w `seq` rnf v `seq` rnf p `seq` rnf e
     IfaceApp e1 e2 -> rnf e1 `seq` rnf e2
+    IfaceIndexedConArg e -> rnf e
     IfaceCase e nm alts -> rnf e `seq` rnf nm `seq` rnf alts
     IfaceECase e ty -> rnf e `seq` rnf ty
     IfaceLet bind e -> rnf bind `seq` rnf e
