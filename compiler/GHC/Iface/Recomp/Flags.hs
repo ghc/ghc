@@ -117,10 +117,23 @@ fingerprintDynFlags hsc_env this_mod nameio =
           , ifaceCallerCCFilters = callerCcFilters
           }
 
-        -- See Note [Recompiling ordinary pair producers].
+        -- See Note [Recompiling ordinary pair producers]
+        -- and Note [Opting in to checked source equations].
         fp | xopt LangExt.ExperimentalDependentTypes dflags = computeFingerprint nameio f
+           | gopt Opt_WriteSourceEquations dflags =
+               computeFingerprint nameio (f, "write-source-equations-v1" :: String)
            | otherwise = computeFingerprint nameio (f, "ordinary-pair-equations-v1" :: String)
     in (fp, f)
+
+{- Note [Opting in to checked source equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The producer can request the same checked source equations without
+enabling dependent syntax. Enabling or disabling the option changes
+the producer's interface. Fingerprint the effective option so an
+old home interface cannot stand in for that change. Keep the flag
+out of IfaceDynFlags. An older reader can load the existing equation
+format without decoding a new GeneralFlag tag.
+-}
 
 {- Note [Recompiling ordinary pair producers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

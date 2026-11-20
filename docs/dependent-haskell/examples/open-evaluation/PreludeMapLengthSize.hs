@@ -1,4 +1,5 @@
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# OPTIONS_GHC -fwrite-source-equations #-}
 module PreludeMapLengthSize (Size(..), size) where
 
 -- | Count a finite spine in successors.

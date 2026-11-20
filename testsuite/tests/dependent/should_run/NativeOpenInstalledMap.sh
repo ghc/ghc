@@ -75,6 +75,22 @@ HS
 "${ghc[@]}" Main.o PreludeMapLengthProof.o ../length-source/PreludeMapLength{Size,Source}.o -o length-run
 [[ $(./length-run) == '(Refl,Succ (Succ Zero))' ]]
 
+# The ordinary provider can change this option without changing its source.
+mkdir "$out/length-no-code"
+cd "$out/length-no-code"
+sed '/^{-# OPTIONS_GHC -fwrite-source-equations #-}$/d' \
+    "$src/PreludeMapLengthSize.hs" >PreludeMapLengthSize.hs
+no_code=("${ghc[@]}" -O1 -fno-code -fwrite-interface -c PreludeMapLengthSize.hs)
+"${no_code[@]}" -fno-write-source-equations
+"${ghc[@]}" --show-iface PreludeMapLengthSize.hi >size.iface
+if grep -Fxq '  SourceTable T:size' size.iface; then
+    cat size.iface >&2
+    exit 1
+fi
+"${no_code[@]}" -fwrite-source-equations
+"${ghc[@]}" --show-iface PreludeMapLengthSize.hi >size.iface
+grep -Fxq '  SourceTable T:size' size.iface
+
 # The installed filter needs a known predicate result before choosing a branch.
 # The ordinary client has only the producer interface and keeps the tail open.
 mkdir "$out"/{filter,filter-client}

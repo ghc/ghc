@@ -6240,6 +6240,14 @@ the example. Peano constructors give an unbounded count.
 [Data.Type.Equality source](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs)
 and [R16 map length proof](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
 
+An ordinary producer can request checked equations with
+`-fwrite-source-equations`. The list size example descends by one
+constructor, the primitive recursion case in Agda. The option asks
+GHC to check the definition. An `INLINABLE` pragma can retain a
+runtime unfolding, which alone supplies no generic size equation.
+[Agda termination checking](https://agda.readthedocs.io/en/latest/language/termination-checking.html)
+and [GHC's INLINABLE pragma](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/pragmas.html#inlinable-pragma).
+
 ### An ordinary enumeration function as a callback
 
 Agda's standard library defines Boolean negation by two constructor

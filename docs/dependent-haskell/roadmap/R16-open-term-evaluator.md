@@ -1150,7 +1150,8 @@ the fresh proof. An ordinary call in that configuration still returns
 An ordinary client proves that the list produced by `Prelude.map`
 has the original length for an arbitrary callback. `Count` refers to
 the checked equations of an ordinary `size :: [a] -> Size`. The
-provider enables `ExperimentalDependentTypes` to export those equations.
+provider uses `-fwrite-source-equations` to export those equations
+with `ExperimentalDependentTypes` disabled.
 The proof uses the equations through `Count`, and the runtime example
 calls the same `size`. Its Peano result uses `Zero` and `Succ`.
 
@@ -1168,10 +1169,12 @@ ordinary client can quantify over that arrow in a type or kind.
 
 The public 308-line compiler at `68357dc283` checks the ordinary client
 using just the provider and alias interfaces, built with `-O1` and
-`-fomit-interface-pragmas`. The provider interface contains the checked
-equations for `size`. Adding a successor to the law gives GHC-83865 at
-the empty clause, where `Zero` and `Succ Zero` differ. Removing the
-induction hypothesis gives GHC-05617 at the cons clause, with
+`-fomit-interface-pragmas`. That compiler used extension-enabled source
+to build the provider. The producer option runs the same checker and
+uses the same interface format. A recursive unfolding alone does not
+supply the generic equation for `size`. Adding a successor to the law
+gives GHC-83865 at the empty clause, where `Zero` and `Succ Zero` differ.
+Removing the induction hypothesis gives GHC-05617 at the cons clause, with
 `size (map f xs1) ~ size xs1` still to prove. At runtime the regression
 prints `(Refl,Succ (Succ Zero))` with a bottom callback.
 [Size definition](../examples/open-evaluation/PreludeMapLengthSize.hs),
