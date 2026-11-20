@@ -410,6 +410,11 @@ test('NativeRetainedPackage',
                    '../../../../docs/dependent-haskell/examples/packed-vector/RetainedProjection.hs'])],
      run_command, ['bash NativeRetainedPackage.sh "{compiler}" "{libdir}"'])
 
+test('NativeCertifiedSplit',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['PackedVecLibrary.hs', 'CertifiedSplit.hs', 'CertifiedSplitClient.hs']])],
+     run_command, ['bash NativeCertifiedSplit.sh "{compiler}" "{libdir}"'])
 test('NativeNamedSplit',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/NamedSplitClient.hs',

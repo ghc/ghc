@@ -6563,6 +6563,27 @@ the last value argument] in `GHC.Core.Opt.WorkWrap.Utils`.
 [Worker construction](../../compiler/GHC/Core/Opt/WorkWrap/Utils.hs)
 and [case regression](../../testsuite/tests/dependent/should_run/NativeRetainedCastDomainWorker.hs).
 
+### Prove that the pieces reconstruct the input
+
+Agda's `Data.Vec.Base.splitAt` returns two vectors and a proof that the
+input equals their append. The successor clause applies congruence for
+the original head to the recursive proof. The Haskell example stores
+both vectors in nested retained sums. Its equality has append on the
+left. Matching the tail proof on `HRefl` allows GHC to check the same
+induction step using the ordinary `appendVec` equations.
+[Agda stdlib v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html#splitAt)
+and [Haskell definition](examples/packed-vector/CertifiedSplit.hs).
+
+The source names the original vector length as a separate parameter of
+the sum. Heterogeneous equality relates the two vector types under that
+parameter. Each caller instantiates it with the sum of the actual widths.
+CorePrep names the constructed prefix and transports the inner sum through
+that equality. The GADT length proof can mention the prefix's length
+without mentioning the prefix. See Note [Scoped native index abstraction]
+in `GHC.Core.Coercion`.
+[Source-hidden caller](examples/packed-vector/CertifiedSplitClient.hs) and
+[demand and missing-premise checks](../../testsuite/tests/dependent/should_run/NativeCertifiedSplit.sh).
+
 ## Check a split at an independent runtime cut
 
 `splitAtVecChecked` compares the runtime cut and total before splitting
