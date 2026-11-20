@@ -133,12 +133,16 @@ ranked _ (OrderedRankedCaseField f) = f @('Just bit) Proxy
 
 rankedShadow :: RankedCaseField 'False -> Char
 rankedShadow (RankedCaseField f) = f @'True Proxy
+
+badCapture :: CapturedKindCaseField Bool 'True 'False -> Proxy Int
+badCapture (CapturedKindCaseField f) = f @Int @'True Proxy
 HS
     reject NativeTypeCaseFieldRigid 7:23 '[GHC-83865]'
     grep -Eq 'the type case in a field of .*CaseField' bad.log
     grep -Fq 'NativeTypeCaseFieldRigid.hs:10:34: error: [GHC-83865]' bad.log
     grep -Fq 'NativeTypeCaseFieldRigid.hs:13:39: error: [GHC-83865]' bad.log
     grep -Fq 'NativeTypeCaseFieldRigid.hs:16:36: error: [GHC-83865]' bad.log
+    grep -Fq 'NativeTypeCaseFieldRigid.hs:19:40: error: [GHC-83865]' bad.log
     ! grep -Fq '$field-case:' bad.log
 )
 
@@ -151,6 +155,18 @@ data Escape (d :: Maybe Bool) where
     (case d of { Just bit -> Proxy bit; Nothing -> Proxy bit }) -> Escape d
 HS
 reject NativeTypeCaseFieldEscape 6:6 '[GHC-97233]'
+
+cat >NativeTypeCaseFieldCompoundKind.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, RankNTypes, TypeFamilies #-}
+module NativeTypeCaseFieldCompoundKind where
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+type family PayloadKind (k :: Type) :: Type
+data Compound (k :: Type) (a :: PayloadKind k) = Compound
+  (forall (k :: Type) (b :: Bool). Proxy b ->
+    (case b of { True -> Proxy a; False -> Proxy k }))
+HS
+reject NativeTypeCaseFieldCompoundKind 8:6 '[GHC-97233]'
 
 # A speculative branch gets one family step. Checking a written use
 # of the same constructor still reports the solver's reduction limit.

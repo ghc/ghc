@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TemplateHaskell #-}
-{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeOperators #-}
+{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeAbstractions, TypeApplications, TypeOperators #-}
 module NativeTypeCaseReify where
 import Data.Type.Equality ((:~:)(Refl))
 import Data.Proxy (Proxy(..))
@@ -88,3 +88,8 @@ $(do
 
 checkedRankedCaseField :: N.RankedCaseField 'False
 checkedRankedCaseField = reifiedRankedCaseField (\_ -> error "unused field")
+
+type ReifiedCapturedKindCaseField = $(reifyType 'N.CapturedKindCaseField)
+
+reifiedCapturedKindCaseField :: ReifiedCapturedKindCaseField
+reifiedCapturedKindCaseField f = N.CapturedKindCaseField (\ @k @b p -> f @k @b p)

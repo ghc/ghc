@@ -190,8 +190,13 @@ declaration telescope. A field can also bind a written erased
 `forall`. For example, the inner `b` in
 `forall (b :: Bool). Proxy b -> (case b of …)` can shadow the data
 parameter. Calling `f @'True Proxy` selects the branch for the inner
-binder. The compiler keeps the quantifier in the field type and
-checks that capture kinds keep their original scope. Cases under
+binder. The compiler keeps the quantifier in the field type.
+
+A captured parameter can have a kind variable that the inner forall
+shadows. For example, the kind of an outer `a :: k` remains the original
+`k` under `forall (k :: Type)`. GHC saves the outer kind with a type
+let and passes it to the helper. The inner kind still has its own
+binder. Compound capture kinds that cross the shadow and cases under
 retained binders remain outside this rule.
 [Provider](../examples/open-evaluation/NativeNestedCase.hs) and
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs).

@@ -10,7 +10,7 @@ module NativeNestedCase
   , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
   , RefinedGate(..), RefinedLeaf(..), RefinedBranchPick
   , PlainCaseField(..), CaseField(..), ShadowedCaseField(..)
-  , RankedCaseField(..), OrderedRankedCaseField(..)
+  , RankedCaseField(..), OrderedRankedCaseField(..), CapturedKindCaseField(..)
   , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
   , ScopedOpenIndex
   ) where
@@ -292,3 +292,9 @@ data RankedCaseField (b :: Bool) = RankedCaseField
 data OrderedRankedCaseField (d :: Bool) = OrderedRankedCaseField
   (forall (d :: Maybe Bool). Proxy d ->
     (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }))
+
+-- | Retain the original kind of an outer capture under a shadowing forall.
+data CapturedKindCaseField (k :: Type) (a :: k) (c :: k) =
+  CapturedKindCaseField
+    (forall (k :: Type) (b :: Bool). Proxy b ->
+      (case b of { True -> Proxy '(a, c); False -> Proxy k }))

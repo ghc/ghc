@@ -250,3 +250,10 @@ rankedCaseFieldFalse (N.RankedCaseField f) = f @'False Proxy
 
 orderedRankedCaseField :: N.OrderedRankedCaseField 'True -> Int
 orderedRankedCaseField (N.OrderedRankedCaseField f) = f @('Just 'False) Proxy
+
+capturedKindCaseField :: forall k (a :: k) (c :: k).
+  N.CapturedKindCaseField k a c -> Proxy '(a, c)
+capturedKindCaseField (N.CapturedKindCaseField f) = f @Int @'True Proxy
+
+shadowedKindCaseField :: N.CapturedKindCaseField Bool 'True 'False -> Proxy Int
+shadowedKindCaseField (N.CapturedKindCaseField f) = f @Int @'False Proxy

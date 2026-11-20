@@ -411,8 +411,11 @@ case its own helper, including cases in different fields of one
 constructor. A copied retained domain can change matchability in
 the helper, so leave cases under a retained binder outside this
 field rule. Keep an inner erased forall and put the helper
-application in its body. A copied capture kind must still refer
-to the same binders after shadowing.
+application in its body. If an outer capture has a bare kind
+variable that the forall shadows, save that variable with a type let
+before the forall. Use the saved variable in the helper's header
+and application. The original kind remains in scope for that
+capture. Other kinds that cross a shadow still need a named helper.
 -}
 -- | Select the expressions that can be lifted at a declaration type position.
 data LiftedTypeSite
@@ -529,6 +532,43 @@ liftDeclarationTypes source_heads named_wildcards group
         && localKindsInScope shadowed locals
       where
         shadowed = Set.fromList (map (unLoc . snd) hidden)
+
+    -- Save a bare kind variable of a capture before an erased forall
+    -- shadows it. The helper takes the original kind as an argument.
+    rankedFieldScope scope hidden outer locals loc salt
+      | fieldKindsInScope hidden outer locals = Just (outer ++ locals, [])
+      | otherwise = do
+          guard (localKindsInScope hidden_names locals)
+          copied <- traverse copy scope
+          pure (catMaybes copied ++ locals, saved)
+      where
+        hidden_names = Set.fromList (map (unLoc . snd) hidden)
+        needed = [v | (_, v) <- hidden
+                    , any (Set.member (unLoc v) . kindNames . fst) outer]
+        occupied = Set.fromList (map (unLoc . snd) (scope ++ locals))
+        fresh = [L (l2l loc) name
+                | i <- [0 :: Int ..]
+                , let name = mkRdrUnqual (mkTyVarOcc
+                             ("$field-kind:" ++ show salt ++ ":" ++ show i))
+                , not (Set.member name occupied)]
+        saved = zip needed fresh
+        name_for n = lookup (unLoc n) [(unLoc old, new) | (old, new) <- saved]
+        independent = Set.disjoint hidden_names . kindNames
+
+        copy entry@(L binder_loc binder@HsTvb{}, v)
+          | Just new <- name_for v
+          , independent (fst entry)
+          , HsBndrVar ann _ <- tvb_var binder
+          = Just (Just (L binder_loc binder{tvb_var = HsBndrVar ann new}, new))
+          | unLoc v `Set.member` hidden_names
+          = if isJust (name_for v) then Nothing else Just Nothing
+          | independent (fst entry)
+          = Just (Just entry)
+          | HsBndrKind ann kind <- tvb_kind binder
+          , L _ (HsTyVar _ NotPromoted old) <- ignoreParens kind
+          , Just new <- name_for old
+          = Just (Just (L binder_loc binder{tvb_kind = HsBndrKind ann (typeName new)}, v))
+        copy _ = Nothing
 
     localKindsInScope _ [] = True
     localKindsInScope hidden ((binder, name):locals) =
@@ -675,10 +715,17 @@ liftDeclarationTypes source_heads named_wildcards group
       , let names = map (unLoc . snd) locals
       , null (findDupsEq (==) names)
       , let (hidden, outer) = partition ((`elem` names) . unLoc . snd) scope
-      , inner /= FieldTypeSite || fieldKindsInScope hidden outer locals
-      = let (body', aliases, (next, _)) = liftBody inner owner
-                                          (outer ++ locals) body (salt, [])
-        in (L loc quantified{hst_body = body'}, aliases, (next, seen))
+      , Just (scope', saved) <- if inner == FieldTypeSite
+                                then rankedFieldScope scope hidden outer locals loc salt
+                                else Just (outer ++ locals, [])
+      = let (body', aliases, (next, _)) = liftBody inner owner scope' body (salt, [])
+            uses = Set.fromList (map unLoc (extractHsTyRdrTyVars body'))
+            save (old, new) ty
+              | unLoc new `Set.member` uses =
+                  L loc (XHsType (HsTypeLet (noAnn, noAnn, noAnn) new (typeName old) ty))
+              | otherwise = ty
+            result = foldr save (L loc quantified{hst_body = body'}) saved
+        in (result, aliases, (next, seen))
     liftBody site owner scope (L loc (HsFunTy ann arrow arg result)) state =
       let (arg', arg_aliases, next) = liftBody site owner scope arg state
           (result', result_aliases, end) = liftBody site owner scope result next
