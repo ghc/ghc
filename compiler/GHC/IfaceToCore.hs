@@ -17,7 +17,7 @@ module GHC.IfaceToCore (
         tcIfaceDefaults,
         typecheckIfacesForMerging,
         typecheckIfaceForInstantiate,
-        tcIfaceDecl, tcIfaceDecls,
+        tcIfaceDecl, tcIfaceDecls, tcIfaceDeclsFromIface,
         tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteMatches,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
@@ -100,6 +100,7 @@ import GHC.Data.Bag
 import GHC.Data.List.SetOps (hasNoDups)
 import GHC.Data.Maybe
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Annotations
 import GHC.Types.SourceFile
@@ -139,6 +140,7 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.List(nub)
+import qualified Data.Set as Set
 import GHC.Builtin.Modules   ( rOOT_MAIN )
 import GHC.Iface.Errors.Types
 
@@ -232,7 +234,7 @@ typecheckIface iface
                 -- Typecheck the decls.  This is done lazily, so that the knot-tying
                 -- within this single module works out right.  It's the callers
                 -- job to make sure the knot is tied.
-        ; names_w_things <- tcIfaceDecls ignore_prags (mi_decls iface)
+        ; names_w_things <- tcIfaceDeclsFromIface ignore_prags iface
         ; let type_env = mkNameEnv names_w_things
 
                 -- Now do those rules, instances and annotations
@@ -466,7 +468,7 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
                             IfaceId { ifIdDetails = IfDFunId } -> False -- exclude DFuns
                             IfaceId { ifIdDetails = IfSourceDFunId{} } -> False
                             _ -> True ]
-        decl_envs = map (mk_decl_env . map snd . mi_decls) ifaces
+        decl_envs = map (mk_decl_env . map snd . ifaceDeclsForTc) ifaces
                         :: [OccEnv IfaceDecl]
         decl_env = foldl' mergeIfaceDecls emptyOccEnv decl_envs
                         ::  OccEnv IfaceDecl
@@ -483,7 +485,7 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
         -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
         type_env <- fixM $ \type_env ->
             setImplicitEnvM type_env $ do
-                decls <- tcIfaceDecls ignore_prags (mi_decls iface)
+                decls <- tcIfaceDeclsFromIface ignore_prags iface
                 return (mkNameEnv decls)
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
@@ -526,7 +528,7 @@ typecheckIfaceForInstantiate nsubst iface
     -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
     type_env <- fixM $ \type_env ->
         setImplicitEnvM type_env $ do
-            decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
+            decls     <- tcIfaceDeclsFromIface ignore_prags iface
             return (mkNameEnv decls)
     -- See Note [rnIfaceNeverExported]
     setImplicitEnvM type_env $ do
@@ -1043,11 +1045,72 @@ mk_top_id (IfLclTopBndr raw_name iface_type info details) = do
    let new_id = mkGlobalId details' name ty info'
    return new_id
 
+-- | Read declarations, omitting optional templates outside the supported subset.
+tcIfaceDeclsFromIface :: Bool -> ModIface -> IfL [(Name, TyThing)]
+tcIfaceDeclsFromIface ignore_prags = tcIfaceDecls ignore_prags . ifaceDeclsForTc
+
 tcIfaceDecls :: Bool
           -> [(Fingerprint, IfaceDecl)]
           -> IfL [(Name,TyThing)]
 tcIfaceDecls ignore_prags ver_decls
    = concatMapM (tc_iface_decl_fingerprint ignore_prags) ver_decls
+
+-- | Remove optional erased package templates before exposing IdInfo.
+-- See Note [Erased package unfoldings].
+ifaceDeclsForTc :: ModIface -> [(Fingerprint, IfaceDecl)]
+ifaceDeclsForTc iface
+  | FullIfaceBinHandle (Strict.Just (features, _)) <- mi_hi_bytes iface
+  , ErasedExistentialEvidence `Set.member` features
+  = [(fingerprint, prune decl) | (fingerprint, decl) <- mi_decls iface]
+  | otherwise = mi_decls iface
+  where
+    prune decl@IfaceId { ifIdInfo = info } = decl { ifIdInfo = filter keep info }
+    prune decl = decl
+
+    keep (HsUnfold _ (IfCoreUnfold src _ _ rhs))
+      = isCompulsorySource src || not (hasIfacePackageExpr rhs)
+    keep _ = True
+
+-- | Check interface syntax without forcing a typed unfolding.
+hasIfacePackageExpr :: IfaceExpr -> Bool
+hasIfacePackageExpr = go
+  where
+    go IfacePack{} = True
+    go IfaceUnpack{} = True
+    go (IfaceTuple _ args) = any go args
+    go (IfaceLam _ rhs) = go rhs
+    go (IfaceApp fun arg) = go fun || go arg
+    go (IfaceCase scrut _ alts) = go scrut || any (\(IfaceAlt _ _ rhs) -> go rhs) alts
+    go (IfaceECase scrut _) = go scrut
+    go (IfaceLet binding rhs) = goBind binding || go rhs
+    go (IfaceCast rhs _) = go rhs
+    go (IfaceTick (IfaceBreakpoint _ args) rhs) = any go args || go rhs
+    go (IfaceTick _ rhs) = go rhs
+    go _ = False
+
+    goBind (IfaceNonRec binder rhs) = goPair (binder, rhs)
+    goBind (IfaceRec pairs) = any goPair pairs
+
+    goPair (IfLetBndr _ _ info _, rhs) = go rhs || any goInfo info
+
+    goInfo (HsUnfold _ (IfCoreUnfold _ _ _ rhs)) = go rhs
+    goInfo (HsUnfold _ (IfDFunUnfold _ args)) = any go args
+    goInfo _ = False
+
+{- Note [Erased package unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An existential type can pass through an optimized module as an abstract
+value. The optimized simplifier cannot process Pack and Unpack yet.
+The reader withholds optional templates containing these expressions.
+An importer can still call the original object code. Core Tidy applies
+the same rule to optional templates in memory.
+
+Check the serialized syntax only when the interface header records an
+erased existential tag. This leaves ordinary interface loading unchanged
+and keeps the typed unfolding lazy. See Note [Lazily checking Unfoldings].
+Keep mandatory templates. Restricted SimpleOpt must expand them before
+the driver checks whether the result can enter optimization.
+-}
 
 tc_iface_decl_fingerprint :: Bool                    -- Don't load pragmas into the decl pool
           -> (Fingerprint, IfaceDecl)

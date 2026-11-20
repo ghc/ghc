@@ -50,7 +50,7 @@ import GHC.Core.Unfold
 import GHC.Core.FVs
 import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
-    ( hasNativeDependentExprRhs, hasNativeDependentProgram
+    ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentProgram
     , hasNativeDependentUnfolding, isRetainedVanillaDefaultMethod )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
@@ -838,8 +838,9 @@ addExternal opts mb_rhs id
 
     can_expose_body rhs
       = not (opt_has_retained_core opts)
-        || hasNativeDependentExprRhs (Type (idType id))
-        || not (hasNativeDependentUnfolding rhs)
+        || (not (hasExistentialExpr rhs) &&
+            (hasNativeDependentExprRhs (Type (idType id))
+              || not (hasNativeDependentUnfolding rhs)))
 
 {- Note [Retained Core across module boundaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -855,6 +856,8 @@ checked template. The interface reader reconstructs constructor and index
 alias evidence from the case. See Note [Native index alias evidence in
 interfaces] in GHC.IfaceToCore. Interface loading also rejects retained
 dictionary operations. Do not expose their optional templates.
+Withhold optional erased package operations as well. See
+Note [Erased package unfoldings] in GHC.IfaceToCore.
 
 A specialization such as numericCall @Int can leave an exported worker and
 an automatic rule that redirects calls to it. Export a retained rule only

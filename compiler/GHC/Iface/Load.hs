@@ -55,7 +55,7 @@ import GHC.Platform.Profile
 import GHC.Data.FastString (fastStringToShortText)
 
 import {-# SOURCE #-} GHC.IfaceToCore
-   ( tcIfaceDecls, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
+   ( tcIfaceDeclsFromIface, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteMatches, tcIfaceDefaults)
 
 import GHC.Hs.Extension (GhcPass)
@@ -847,7 +847,7 @@ loadInterface doc_str mod from
                 || mod == gHC_PRIM)
                 (text "Attempting to load home package interface into the EPS" $$ ppr (HUG.allUnits hug) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
+        ; new_eps_decls     <- tcIfaceDeclsFromIface ignore_prags iface
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
         ; new_eps_defaults  <- tcIfaceDefaults mod (mi_defaults iface)
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)

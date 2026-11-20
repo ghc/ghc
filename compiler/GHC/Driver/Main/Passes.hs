@@ -1507,7 +1507,9 @@ hscSimplify' plugins ds_result = do
             then do
               unless (null rules && supportsNativeGentle simplified) $
                 throwGhcExceptionIO (ProgramError
-                  "Retained -O1 requires checked index domains and no local RULES. Use -O0 for this module.")
+                  (if any (any hasExistentialExpr . rhssOfBind) simplified
+                   then "Retained -O1 cannot optimize erased package construction or elimination. Use -O0 for this module."
+                   else "Retained -O1 requires checked index domains and no local RULES. Use -O0 for this module."))
               optimized <- core2coreRetained lint_env result
               endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt (mg_binds optimized) rules
               return optimized

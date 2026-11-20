@@ -12,8 +12,8 @@ import GHC.Types.CompleteMatch
 import GHC.Types.Annotations ( Annotation )
 import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Name
+import GHC.Unit.Module.ModIface (ModIface)
 import GHC.Unit.Types      ( Module )
-import GHC.Fingerprint.Type
 
 
 tcIfaceDecl            :: Bool -> IfaceDecl -> IfL TyThing
@@ -23,4 +23,4 @@ tcIfaceInst            :: IfaceClsInst -> IfL ClsInst
 tcIfaceFamInst         :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations     :: [IfaceAnnotation] -> IfL [Annotation]
 tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL CompleteMatches
-tcIfaceDecls           :: Bool -> [(Fingerprint, IfaceDecl)] -> IfL [(Name,TyThing)]
+tcIfaceDeclsFromIface  :: Bool -> ModIface -> IfL [(Name, TyThing)]
