@@ -6576,3 +6576,16 @@ field or the right operand.
 [Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
 [proof](examples/packed-vector/OpenVectorAppend.hs)
 and [ordinary client](examples/packed-vector/OrdinaryOpenVectorAppend.hs).
+
+### Eliminating an equality returned by a vector match
+
+Agda's coverage checker unifies the constructor result indices with the
+scrutinee indices. An empty branch can refine an unknown length to zero.
+A constructor clash, such as zero against a successor, rules out a branch.
+In the Haskell example, matching `HRefl` gives the ordinary length
+equality and the identity of the vector. While checking the branch,
+the solver can encounter the value equality before applying the length
+equality. It checks whether the two kinds are surely apart before
+reporting that the branch is unreachable.
+[Agda 2.8.0, matching on indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes)
+and [GHC apartness](../../compiler/GHC/Core/Unify.hs).
