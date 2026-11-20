@@ -135,11 +135,11 @@ and [two-way filter and case upgrade](examples/open-evaluation/check-filter-scop
 | Card | What works | Remaining gap |
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | GADT data constructors can store nested retained sums and refer to erased parameters from the constructor signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. | Support orphan rules, retained function rules and more dependent coercions. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. Source rules can have an imported head and a local anchor, or come from a visible orphan module. | Rules for retained functions and general dependent coercions remain open. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. A written scrutinee kind can capture an earlier parameter under a noninjective family. A top-level value signature can repeat the same ordered case in an argument and the result. | Extend direct cases to nested quantifiers and preserve distinct scopes when binder names repeat. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. A direct case on a packaged function call keeps the hidden witness in scope for all alternatives. The call head can take visible type arguments. | Extend witness inference beyond single unguarded lambdas. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. The original `KindEqualities2` program checks across its declaration splice. A curried family result can use the matchability required by its caller. | Restore the unannotated `~>` synonym and `Promote` equation in `GADTSingletons`. General unsaturation remains open. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | Retained signatures can match a runtime index or an application of a checked function. Two qualified imports of the same checked function can share a case in one declaration group. | Separately compiled modules still need a shared result type at an unknown index. Check compiler upgrades for older signature providers. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A constructor pattern can open a hidden vector length inside a tuple. A typed consumer can fix the higher-rank witness of a guarded callback. | Extend inference to callbacks without a result declaration that determines the witness. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A later GADT argument can fix the matchability of a partially applied family. The original `KindEqualities2` checks across its declaration splice. | Higher-order inference and compatibility of existing unannotated programs remain open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -154,25 +154,26 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Extend source rule support to imported heads and rules over
-   retained functions. Check an imported head with a local anchor and a true orphan. Both currently report GHC-51063. Preserve the
-   witness-scope checks used for erased packages.
-   [Current rule support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
-2. **R23.** Check when a later argument fixes the arrow of a partial family.
-   Keep the compatibility example for `GADTSingletons`. Its separate M and U
-   equations compile. Generalizing the bare U equation can make an existing
-   M instance in a client module conflict.
-   [Two-module example](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
-   Keep the explicit matchability and noninjective equality checks.
-   The staged interpreter selects U when its caller supplies an expected
-   U arrow. A result of kind `Type` alone still leaves the choice ambiguous. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
-3. **R22 and R04.** Bring earlier retained constructor arguments into scope in
-   later sum fields. Check the difference between the index of a field
-   and the index of the constructor result.
-4. **R19.** Check direct type cases under nested explicit `forall` binders
-   in a value signature. Preserve the distinction between two sibling
-   binders with the same name and keep rigid matches stuck.
-   [Current signature scope](roadmap/R19-type-level-cases.md#a-case-in-a-value-signature).
+1. **R05.** Check source rules over retained arguments. A rule for
+   `keep False xs` reaches the optimized Core restriction. With a variable
+   `b`, the type of `xs` must use the same index as the call. An annotated
+   rule can compile with GHC-53522 and be discarded. Check its firing in a
+   separately compiled client.
+   [Rule and interface support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
+2. **R23.** Follow the inferred arrow through an ordinary higher-order
+   class method. Check both argument orders and an unrelated argument.
+   The later GADT argument already distinguishes M from U.
+   [Later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
+   and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
+3. **R22 and R04.** Extend hidden-witness inference beyond callbacks
+   whose checked result determines the witness. Keep independent packages
+   distinct under pattern matching and retain the demand of guards.
+   [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
+   and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
+4. **R19.** Check the upgrade of a provider that used separate type families
+   for equivalent retained signature cases. An ordinary client that uses
+   a runtime index needs the provider to expose the shared result type.
+   [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
