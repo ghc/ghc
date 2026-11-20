@@ -74,7 +74,7 @@ module GHC.Core.Coercion (
         isReflCoVar_maybe, assertGoodForAllCo,
 
 
-        coToMCo, kindCoToMKindCo,
+        coToMCo, kindCoToMKindCo, mCoToCo,
         mkTransMCo, mkTransMCoL, mkTransMCoR, mkCastTyMCo, mkSymMCo,
         mkFunResMCo, mkPiMCos,
         isReflMCo, checkReflexiveMCo,
