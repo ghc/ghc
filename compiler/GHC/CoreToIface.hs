@@ -723,10 +723,12 @@ toIfaceTopBind b =
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
-toIfaceAlt alt
-  | isNativeIndexAliasAlt alt
-  -- See Note [Native index alias evidence in interfaces] in GHC.IfaceToCore.
-  = pprPanic "toIfaceAlt: native index alias evidence has no interface codec" (ppr alt)
+-- See Note [Native index alias evidence in interfaces] in GHC.IfaceToCore.
+toIfaceAlt (Alt DEFAULT [cv] rhs)
+  | isCoVar cv, isLocalId cv
+  = IfaceAlt IfaceDefaultAltWithProof [mkIfLclName (getOccFS cv)] (toIfaceExpr rhs)
+toIfaceAlt alt@(Alt DEFAULT (_:_) _)
+  = pprPanic "toIfaceAlt: invalid index alias proof binder" (ppr alt)
 toIfaceAlt alt@(Alt (DataAlt con) bs rhs)
   | isNativeIndexDataAlt con bs
   = case splitAt (dataConRepArity con) bs of

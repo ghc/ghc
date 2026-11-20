@@ -2786,6 +2786,29 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             "Missing or unsupported constructor proof" [xs] (listCase [nilAlt, consAlt [hd, tl] (IfaceLcl hd)])
         rejectsIfaceExpr "two constructor fields must have distinct names"
             "distinct field and proof names" [xs] (listCase [nilAlt, consAlt [hd, hd, co] (IfaceLcl hd)])
+        let arg = local 12020 "alias_arg" boolTy
+            alias = local 12021 "case_alias" boolTy
+            witness = mkCoVar (mkSystemName (unique 12022) (mkVarOcc "alias_proof"))
+                              (mkNomEqPred (TermVarTy alias) (TermVarTy arg))
+            original = Case (Var arg) alias boolTy [Alt DEFAULT [witness] (Var alias)]
+            aliasName = listName "case_alias"
+            aliasCase names scrut rhs = IfaceCase scrut aliasName [IfaceAlt IfaceDefaultAltWithProof names rhs]
+        forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
+            encoded <- roundtrip compression (toIfaceExpr original)
+            decoded <- restoreExpr [arg] encoded
+            lintAccepts dflags "imported DEFAULT alias binds nominal evidence" [arg] decoded
+            case decoded of
+                Case _ fresh _ [Alt DEFAULT [cv] (Var result)] -> do
+                    check "alias copy binds fresh identities" (fresh == result && fresh /= alias && cv /= witness)
+                    let evidence = mkCoVarCo cv
+                    check "DEFAULT alias proof has nominal role" (coercionRole evidence == Nominal)
+                    checkType dflags "alias proof names the fresh case binder" (TermVarTy fresh) (coercionLKind evidence)
+                    checkType dflags "alias proof names the actual scrutinee" (TermVarTy arg) (coercionRKind evidence)
+                _ -> fail "FAIL: imported DEFAULT alias changed shape"
+        forM_ [[], [co, hd], [aliasName]] $ \names ->
+            rejectsIfaceExpr "DEFAULT alias needs one distinct proof name"
+                "requires one proof distinct from its case binder" [arg]
+                (aliasCase names (toIfaceExpr (Var arg)) (IfaceLcl aliasName))
         rejectsIfaceExpr "proof name collides with a constructor field"
             "distinct field and proof names" [xs] (listCase [nilAlt, consAlt [hd, tl, hd] (IfaceLcl hd)])
         rejectsIfaceExpr "one constructor cannot read another constructor's field"
@@ -2827,7 +2850,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     (wrap scrut [falseAlt])
                 reject
                     "interface DEFAULT cannot bind proof names"
-                    "Native index alias evidence has no interface codec"
+                    "An ordinary interface DEFAULT alternative cannot bind names"
                     (wrap scrut [IfaceAlt IfaceDefaultAlt [proofName] rhs, falseAlt, IfaceAlt trueCon [proofName] rhs])
                 reject
                     "interface literal cannot bind proof names"

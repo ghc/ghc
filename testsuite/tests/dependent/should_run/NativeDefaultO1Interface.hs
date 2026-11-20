@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module Main where
 
 import Control.Exception (ErrorCall, evaluate, try)
@@ -10,6 +10,11 @@ import DependentProjection (second)
 import NativeDefaultO1InterfaceProducer
 import qualified PackedVecLibrary as Vec
 import System.Environment (getArgs)
+
+observeFlag :: (Bool -> Bool) -> Bool -> Char
+observeFlag f b = case classify f b of
+    Off -> 'f'
+    On  -> 't'
 
 main :: IO ()
 main = do
@@ -34,3 +39,6 @@ main = do
     secondPair <- readIORef =<< newIORef pair
     print (withPair firstPair (\x payload -> (Vec.natToInt x, Vec.toList payload)),
            withPair secondPair (\_ payload -> getConst payload))
+    strict <- try (evaluate (observeFlag id (error "forced flag"))) :: IO (Either ErrorCall Char)
+    print (observeFlag not True, observeFlag (const True) (error "unused input"),
+           either (isInfixOf "forced flag" . show) (const False) strict)

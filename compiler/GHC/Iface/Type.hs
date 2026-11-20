@@ -2849,6 +2849,7 @@ instance Binary IfaceMCoercion where
 -- in GHC.Iface.Binary.
 data IfaceEvidenceVersion
   = NoRetainedEvidence | DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
+  | IndexAliasEvidence
   deriving (Eq, Ord)
 
 -- | Record a feature only while writing the full interface.

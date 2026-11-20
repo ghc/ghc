@@ -171,7 +171,7 @@ readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path = do
     wantedGot "Version" our_ver check_ver text
     let evidence = fromMaybe NoRetainedEvidence $
                    find (\v -> evidenceSuffix v `isSuffixOf` check_ver)
-                        [RetainedSpecRuleEvidence, ConstructorCaseEvidence, DepFunCoEvidence]
+                        [IndexAliasEvidence, RetainedSpecRuleEvidence, ConstructorCaseEvidence, DepFunCoEvidence]
         version = take (length check_ver - length (evidenceSuffix evidence)) check_ver
     unless (version `elem` [our_ver, enumCallbackIfaceVersion, finalCoreIfaceVersion,
                             matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion]) $
@@ -319,6 +319,7 @@ evidenceSuffix NoRetainedEvidence       = ""
 evidenceSuffix DepFunCoEvidence         = "-retained-depfunco-v1"
 evidenceSuffix ConstructorCaseEvidence  = "-retained-constructor-case-v1"
 evidenceSuffix RetainedSpecRuleEvidence = "-retained-specialisation-rule-v1"
+evidenceSuffix IndexAliasEvidence       = "-retained-index-alias-v1"
 
 {- Note [Versioning retained evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -336,6 +337,11 @@ An automatically generated retained specialization rule uses its own
 tag in the rule origin byte. Older readers reject a retained rule at
 the header. Ordinary user and automatic rules retain their byte values.
 See Note [Exported retained specialisations] in GHC.Core.Rules.
+
+An index alias uses a distinct DEFAULT alternative tag. An older reader
+accepts ordinary DEFAULT alternatives from the same compiler. It must reject
+the alias form at the header. See Note [Native index alias evidence in
+interfaces] in GHC.IfaceToCore.
 -}
 
 

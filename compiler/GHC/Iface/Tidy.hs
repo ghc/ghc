@@ -51,7 +51,7 @@ import GHC.Core.FVs
 import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
     ( hasNativeDependentExprRhs, hasNativeDependentProgram
-    , hasNativeDependentUnfolding, hasNativeIndexAliasUnfolding )
+    , hasNativeDependentUnfolding )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )
@@ -811,9 +811,8 @@ addExternal opts mb_rhs id
 
     can_expose_body rhs
       = not (opt_has_retained_core opts)
-        || (not (hasNativeIndexAliasUnfolding rhs)
-            && (hasNativeDependentExprRhs (Type (idType id))
-                || not (hasNativeDependentUnfolding rhs)))
+        || hasNativeDependentExprRhs (Type (idType id))
+        || not (hasNativeDependentUnfolding rhs)
 
 {- Note [Retained Core across module boundaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -825,15 +824,14 @@ happens in --make, which imports the in-memory result of Core Tidy.
 Keep those unfolding bodies private. Keep ordinary unfoldings from the same
 module available. In a client, a reference to an Id with retained Core in
 its type already selects the retained optimizer. That Id can expose its
-checked template when its branch evidence has an interface encoding. Native
-index alias alternatives lack that encoding. Interface loading also rejects
-retained dictionary operations. Do not expose their optional templates.
+checked template. The interface reader reconstructs constructor and index
+alias evidence from the case. See Note [Native index alias evidence in
+interfaces] in GHC.IfaceToCore. Interface loading also rejects retained
+dictionary operations. Do not expose their optional templates.
 
 A specialization such as numericCall @Int can leave an exported worker and
-an automatic rule that redirects calls to it. If the rule contains retained
-Core, the interface rule reader cannot reconstruct it. Keep the worker and
-the local specialization. Omit this optional rule from the exported rules.
-See Note [Trimming auto-rules].
+an automatic rule that redirects calls to it. Export a retained rule only
+when the reader can validate its specialization. See Note [Trimming auto-rules].
 
 A compulsory template cannot be removed. Check it after the simplifier,
 which can change the body that the desugarer checked. Exported RULES must

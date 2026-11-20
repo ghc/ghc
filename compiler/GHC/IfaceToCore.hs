@@ -2346,13 +2346,17 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     -- See Note [Native index alias evidence in interfaces].
     forM_ alts $ \ (IfaceAlt con names _) -> case con of
       IfaceDefaultAlt | not (null names) ->
-        failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
+        failIfM (text "An ordinary interface DEFAULT alternative cannot bind names:" <+> ppr names)
+      IfaceDefaultAltWithProof -> case names of
+        [proof] | proof /= case_bndr -> return ()
+        _ -> failIfM (text "An index alias alternative requires one proof distinct from its case binder:" <+> ppr names)
       _ -> return ()
     scrut' <- tcIfaceExpr scrut
     -- Resolve each constructor once, before inspecting its representation arity.
     resolved <- forM alts $ \ (IfaceAlt con names rhs) -> do
       alt_con <- case con of
         IfaceDefaultAlt   -> return DEFAULT
+        IfaceDefaultAltWithProof -> return DEFAULT
         IfaceLitAlt lit   -> LitAlt <$> tcIfaceLit lit
         IfaceDataAlt name -> DataAlt <$> tcIfaceDataCon name
         IfaceDataAltWithProof name -> do
@@ -2365,8 +2369,9 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         native_alt _ = False
         has_alt con = any (\(c, _, _) -> c == con) resolved
         scrut_index = exprToNativeIndex scrut'
-        native = any native_alt resolved
-    when native $ do
+        constructor_proof = any native_alt resolved
+        native = constructor_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
+    when constructor_proof $ do
       when (isNothing scrut_index) $
         failIfM (text "Unsupported scrutinee for native index interface evidence:" <+> ppr scrut')
       unless (has_alt DEFAULT || case splitTyConApp_maybe (exprType scrut') of
@@ -2388,7 +2393,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                 --     corresponds to the datacon in this case alternative
 
     extendIfaceIdEnv [case_bndr'] $ do
-     alts' <- mapM (tcIfaceAlt scrut' scrut_index case_mult tc_app) resolved
+     alts' <- mapM (tcIfaceAlt scrut' scrut_index case_bndr' tc_app) resolved
      result_ty <- if native
        then do
          -- coreAltType panics on an escaping binder. Report the interface error.
@@ -2455,19 +2460,26 @@ tcIfaceLit :: Literal -> IfL Literal
 tcIfaceLit lit = return lit
 
 -------------------------
-tcIfaceAlt :: CoreExpr -> Maybe Type -> Mult -> (TyCon, [Type])
+tcIfaceAlt :: CoreExpr -> Maybe Type -> Id -> (TyCon, [Type])
            -> (AltCon, [IfLclName], IfaceExpr) -> IfL CoreAlt
-tcIfaceAlt _ _ _ _ (DEFAULT, names, rhs) = do
-  unless (null names) $
-    failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
+tcIfaceAlt _ _ _ _ (DEFAULT, [], rhs) =
   Alt DEFAULT [] <$> tcIfaceExpr rhs
+tcIfaceAlt scrut _ case_bndr _ (DEFAULT, [proof], rhs)
+  | isNativeIndexId case_bndr
+  , Just index <- exprToNativeCaseIndex scrut
+  , eqType (idType case_bndr) (typeKind index)
+  = do { name <- newIfaceName (mkVarOccFS (ifLclNameFS proof))
+       ; let cv = mkCoVar name (mkNomEqPred (TermVarTy case_bndr) index)
+       ; Alt DEFAULT [cv] <$> extendIfaceIdEnv [cv] (tcIfaceExpr rhs) }
+tcIfaceAlt scrut _ _ _ (DEFAULT, _, _) =
+  failIfM (text "Unsupported scrutinee for native index alias interface evidence:" <+> ppr scrut)
 
 tcIfaceAlt _ _ _ _ (con@(LitAlt _), names, rhs) = do
   unless (null names) $
     failIfM (text "Interface literal alternative cannot bind names:" <+> ppr names)
   Alt con [] <$> tcIfaceExpr rhs
 
-tcIfaceAlt scrut scrut_index mult (tycon, inst_tys) (DataAlt con, names, rhs)
+tcIfaceAlt scrut scrut_index case_bndr (tycon, inst_tys) (DataAlt con, names, rhs)
   | isNativeIndexDataAlt con names
   = do { (field_names, proof_name) <- case splitAt (dataConRepArity con) names of
            (fs, [p]) | hasNoDups names -> return (fs, p)
@@ -2497,20 +2509,26 @@ tcIfaceAlt scrut scrut_index mult (tycon, inst_tys) (DataAlt con, names, rhs)
                dataConRepFSInstPat (map ifLclNameFS names) uniqs mult con inst_tys
        ; rhs' <- extendIfaceEnvs ex_tvs $ extendIfaceIdEnv arg_ids $ tcIfaceExpr rhs
        ; return (Alt (DataAlt con) (ex_tvs ++ arg_ids) rhs') }
+  where
+    mult = idMult case_bndr
 
 {- Note [Native index alias evidence in interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A DEFAULT index alias alternative binds a CoVar. Its equality relates the
-case binder to the scrutinee index. The current interface expression codec
-cannot reconstruct this proof. Reject every DEFAULT CoVar shape in the writer,
-including malformed shapes. The reader has only local names, without binder
-sorts. Reject any DEFAULT alternative with names before decoding the scrutinee
-or branch body. Do not use the ordinary DEFAULT assertion for these proofs.
+A case on a callback can name its result before matching its constructors.
+In classify f b, the outer DEFAULT binds the equality call_index ~# f b.
+The inner case inspects call_index. The expression that the caller evaluates
+must still be the same application after reading the unfolding.
 
-This gate applies to expression templates. It does not change the type codec
-or the separate module unfolding gate. Add explicit versioned codec support
-before serializing these proofs. See Note [Native index alias evidence]
-in GHC.Core.Lint.
+Write a distinct alternative tag and one local proof name. Derive the left
+endpoint from the fresh, unrestricted case binder and the right endpoint
+from the actual scrutinee with exprToNativeCaseIndex, as in Core Lint.
+This preserves the identity of a local function without unfolding it.
+Bind the fresh nominal CoVar only while reading this branch. Check the
+result type for escaping binders before returning the case.
+
+An ordinary DEFAULT has no binders. Its existing tag and bytes stay the
+same. See Note [Native index alias evidence] in GHC.Core.Lint and
+Note [Versioning retained evidence] in GHC.Iface.Binary.
 -}
 
 {- Note [Native constructor evidence in interfaces]
