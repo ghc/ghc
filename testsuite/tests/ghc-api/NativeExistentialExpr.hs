@@ -17,6 +17,7 @@ import GHC.Core.Coercion (liftCoSubst, mkCoVarCo, mkLiftingContext, mkSubCo)
 import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Dependent (hasExistentialExpr)
 import GHC.Core.FamInstEnv (emptyFamInstEnv)
+import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Core.Opt.OccurAnal (SimplCoreMode(RetainedCore))
 import GHC.Core.Opt.WorkWrap (wwTopBinds)
 import GHC.Core.Lint (lintExpr)
@@ -121,7 +122,11 @@ checkPackageOptimizers libdir = session libdir $ \env _ -> do
         opts = initWorkWrapOpts mdl (hsc_dflags env) (emptyFamInstEnv, emptyFamInstEnv)
         top = mkSysLocal (fsLit "top") topId manyDataConTy boolTy
         rhs = Unpack witness payload package true
-    case wwTopBinds RetainedCore opts supply [NonRec top rhs] of
+        called = callArityRHS rhs
+    unless (hasExistentialExpr called && isNothing (lint called)) $
+        fail "call arity changed the package or its scope"
+    putStrLn "call arity preserves the scope of an opened package"
+    case wwTopBinds RetainedCore opts supply [NonRec top called] of
       [NonRec _ result@(Unpack _ _ Pack{} _)] | isNothing (lint result) ->
         putStrLn "worker/wrapper preserves the scope of an opened package"
       _ -> fail "worker/wrapper changed the package or its scope"

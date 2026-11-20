@@ -430,6 +430,18 @@ annotation on join points is not actually used. As it would be equally valid
 choice, and hence Call Arity sets the call arity for join points as well.
 -}
 
+{- Note [Call arity for erased packages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An existential hides the type of its payload. A function stored in a package
+may escape and be applied multiple times. The package type supplies no lower
+bound on the number of arguments at those calls. Analyse the packaged value
+at arity zero and allow repeated uses of the functions it mentions.
+
+Unpack passes the calling context to its body. The package stays lazy. Its
+free functions and the body's free functions may both run. Mask the two local
+binders in the body and keep the uses in the two scopes separate.
+-}
+
 -- Main entry point
 
 callArityAnalProgram :: CoreProgram -> CoreProgram
@@ -476,6 +488,19 @@ callArityAnal arity int (Tick t e)
     = second (Tick t) $ callArityAnal arity int e
 callArityAnal arity int (Cast e co)
     = second (\e -> Cast e co) $ callArityAnal arity int e
+
+-- See Note [Call arity for erased packages].
+callArityAnal _ int (Pack schema witness payload)
+    = (calledMultipleTimes uses, Pack schema witness payload')
+  where
+    (uses, payload') = callArityAnal 0 int payload
+
+callArityAnal arity int (Unpack witness binder package body)
+    = (calledMultipleTimes package_uses `both` body_uses,
+       Unpack witness binder package' body')
+  where
+    (package_uses, package') = callArityAnal 0 int package
+    (body_uses, body') = callArityAnal arity (int `delVarSetList` [witness, binder]) body
 
 -- The interesting case: Variables, Lambdas, Lets, Applications, Cases
 callArityAnal arity int e@(Var v)

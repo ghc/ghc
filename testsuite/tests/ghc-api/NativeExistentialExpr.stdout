@@ -6,4 +6,5 @@ imported Unpack returns the body result for a defined package
 demanding Pack observes payload bottom
 Unpack leaves a computed package unevaluated
 adjacent package reduction preserves witness scope
+call arity preserves the scope of an opened package
 worker/wrapper preserves the scope of an opened package
