@@ -17,8 +17,7 @@ variables:
   # Bump to invalidate GitLab CI cache.
   CACHE_REV: 12
 
-  # Disable shallow clones; they break our linting rules
-  GIT_DEPTH: 0
+  GIT_DEPTH: 1
 
   # Always start with a fresh clone to avoid non-hermetic builds
   GIT_STRATEGY: clone
@@ -267,6 +266,7 @@ ghc-linters:
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
+    GIT_DEPTH: 0
   script:
     - .gitlab/ci.sh configure
     - timeout 10m .gitlab/ci.sh run_hadrian test --test-root-dirs="testsuite/tests/linters"
@@ -282,7 +282,6 @@ lint-changelog:
   extends: .lint-ghc-toolchain
   variables:
     CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
-    GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
   script:
     - .gitlab/ci.sh lint_changelog
@@ -297,7 +296,6 @@ lint-changelog:
 lint-linters:
   extends: .lint-python
   variables:
-    GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
   script:
     - mypy testsuite/tests/linters/regex-linters/*.py
@@ -307,7 +305,6 @@ lint-linters:
 lint-testsuite:
   extends: .lint-ghc-toolchain
   variables:
-    GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
   script:
     - make -Ctestsuite list_broken TEST_HC=$(which ghc)
@@ -317,7 +314,6 @@ lint-testsuite:
 typecheck-testsuite:
   extends: .lint-python
   variables:
-    GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
   script:
     - mypy testsuite/driver/runtests.py
@@ -330,6 +326,7 @@ typecheck-testsuite:
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
+    GIT_DEPTH: 0
     GIT_SUBMODULE_DEPTH: 0 # full history
   script:
     - .gitlab/ci.sh configure
@@ -346,6 +343,7 @@ typecheck-testsuite:
 lint-author:
   extends: .lint-python
   variables:
+    GIT_DEPTH: 0
     GIT_SUBMODULE_STRATEGY: none
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -362,7 +360,6 @@ lint-ci-config:
   extends: .lint
   # We don't need history/submodules in this job
   variables:
-    GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf

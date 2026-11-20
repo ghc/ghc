@@ -433,6 +433,12 @@ def baseline_commit_log(commit: Union[GitHash,GitRef]) -> List[GitHash]:
 # including the input commit. The output commits are all commit hashes.
 # str -> [str]
 def commit_log(commitOrRange, n=None):
+    # default gitlab git cloning is shallow: for git perf notes we still need to be able
+    # to catch up on history. This unshallows the repository and fetches a blobless tree.
+    is_shallow = subprocess.check_output( ['git', 'rev-parse', '--is-shallow-repository']).decode().strip() == 'true'
+    if is_shallow:
+        subprocess.check_call(['git', 'fetch', '--unshallow', '--filter=blob:none', 'origin', '+refs/notes/*:refs/notes/*'])
+
     nArgs = ['-n' + str(n)] if n != None else []
     output = subprocess.check_output(['git', 'log', '--format=%H'] + nArgs + [commitOrRange]).decode()
     hashes = list(filter(is_commit_hash, output.split('\n')))
