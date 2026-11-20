@@ -1,11 +1,13 @@
 {-# LANGUAGE ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments #-}
-module RankedPackageClient (runGuarded, runProjections, projectAt, runDeclaredWitnesses) where
+module RankedPackageClient
+    ( runGuarded, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
+    ) where
 
 import Data.Proxy (Proxy(..))
 import RankedPackage
-    ( Callback(..), CallbackPair, GuardedBuilder, PolyId, TwoWitnessBuilder
-    , atTwoTypes, consumeIdentity, fromLeft, fromRight, observeGuarded
-    , observeTwo, pairFor, withWitness
+    ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
+    , TwoWitnessBuilder, atTwoTypes, consumeIdentity, fromLeft, fromRight
+    , observeCallback, observeGuarded, observeTwo, pairFor, withWitness
     )
 
 -- | Both projections use the package chosen for the same input.
@@ -45,3 +47,18 @@ runDeclaredWitnesses =
     joint = \cases
         False input -> fromLeft input
         True input -> fromRight input
+
+-- | Select each branch's witness and leave an unused result field lazy.
+runExplicitBranches :: ((Int, Bool), (Int, Bool), Int)
+runExplicitBranches =
+    ( observeCallback (choose True True)
+    , observeCallback (choose False False)
+    , fst (observeCallback (choose False (error "unused callback input")))
+    )
+  where
+    choose :: Bool -> Bool -> Hidden
+    choose branch input =
+        if branch
+            then Callback @PolyId id (\f -> (f 7, f input))
+            else Callback @PolyMaybe Just
+                (\f -> (maybe 0 id (f 17), maybe False id (f input)))

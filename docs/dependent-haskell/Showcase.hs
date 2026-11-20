@@ -1029,6 +1029,8 @@ main = do
     observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
     observe "infer callback witnesses from a type argument and separate equations"
         RankedPackageClient.runDeclaredWitnesses
+    observe "choose each branch's callback witness by type application"
+        RankedPackageClient.runExplicitBranches
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
     observe "apply an imported integer package rule and keep the witness lazy"
         (PackageRules.open (41 :: Int, (+ 1)),
