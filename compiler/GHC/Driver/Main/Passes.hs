@@ -44,6 +44,7 @@ import GHC.Driver.Main.Hsc
       iface_core_bindings,
       handleWarningsThrowErrors,
       ioMsgMaybe,
+      supportsNativeO1Flags,
       checkNativeDependentModule,
       nativeCodeGenFlags,
       hscSimpleIface )
@@ -1502,7 +1503,15 @@ hscSimplify' plugins ds_result = do
           let simplified = simpleOptNativeProgram binds
           endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt simplified rules
           let result = ds_result { mg_binds = simplified }
-          if null rules && supportsNativeGentle simplified
+          if supportsNativeO1Flags (hsc_dflags lint_env)
+            then do
+              unless (null rules && supportsNativeGentle simplified) $
+                throwGhcExceptionIO (ProgramError
+                  "Retained -O1 requires checked index domains and no local RULES. Use -O0 for this module.")
+              optimized <- core2coreRetained lint_env result
+              endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt (mg_binds optimized) rules
+              return optimized
+            else if null rules && supportsNativeGentle simplified
             then do
               let df = hsc_dflags lint_env
                   opts = initSimplifyOpts df [] 1

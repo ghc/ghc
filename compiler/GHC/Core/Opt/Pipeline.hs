@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr, pairObservationOcc, pairObservationType, scalarRecipeTableOcc ) where
+module GHC.Core.Opt.Pipeline ( core2core, core2coreRetained, simplifyExpr, pairObservationOcc, pairObservationType, scalarRecipeTableOcc ) where
 
 import GHC.Prelude
 
@@ -45,13 +45,14 @@ import GHC.Types.TyThing (TyThing(AnId))
 import GHC.Types.Var (Var, VarBndr(Bndr), isId)
 import GHC.Types.Var.Set (emptyVarSet, elemVarSet, extendVarSet)
 import GHC.Core.Dependent
-import GHC.Core.SimpleOpt (simpleOptPgm)
+import GHC.Core.SimpleOpt (simpleOptNativeProgram, simpleOptPgm)
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram, diffBinds, stripTicksE, exprType )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
-import GHC.Core.Opt.Simplify ( SimplifyExprOpts, simplifyPgm )
+import GHC.Core.Opt.Simplify ( SimplifyExprOpts, SimplifyOpts(..), simplifyPgm )
+import GHC.Core.Opt.Simplify.Env (SimplMode(..))
 import qualified GHC.Core.Opt.Simplify as Simplify
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad
@@ -109,22 +110,37 @@ simplifyExpr logger euc opts expr = do
   Simplify.simplifyExpr logger euc opts expr
 
 core2core :: HscEnv -> ModGuts -> IO ModGuts
-core2core hsc_env guts@(ModGuts { mg_module  = mod
+core2core = core2coreFor OrdinaryCore
+
+-- | Run the standard optimizer for a module that passed the retained gate.
+core2coreRetained :: HscEnv -> ModGuts -> IO ModGuts
+core2coreRetained = core2coreFor RetainedCore
+
+core2coreFor :: SimplCoreMode -> HscEnv -> ModGuts -> IO ModGuts
+core2coreFor mode hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_rdr_env = rdr_env })
   = do { hpt_rule_base <- home_pkg_rules
-       ; let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
+       ; let planned = getCoreToDo dflags hpt_rule_base extra_vars
+             builtin_passes = case mode of
+               OrdinaryCore -> planned
+               RetainedCore -> foldr retainedPass [] planned
              uniq_tag = SimplTag
 
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_tag mod
                                     name_ppr_ctx loc $
                            do { hsc_env' <- getHscEnv
-                              ; all_passes <- withPlugins (hsc_plugins hsc_env')
-                                                installCoreToDos
-                                                builtin_passes
-                              ; optimized <- runCorePasses all_passes guts
+                              ; all_passes <- case mode of
+                                  RetainedCore -> pure builtin_passes
+                                  OrdinaryCore -> withPlugins (hsc_plugins hsc_env')
+                                                    installCoreToDos builtin_passes
+                              ; optimized <- runCorePasses mode all_passes guts
+                              ; let final
+                                      | RetainedCore <- mode
+                                      = optimized { mg_binds = simpleOptNativeProgram (mg_binds optimized) }
+                                      | otherwise = optimized
                               ; withTiming logger (text "Pair field observations" <+> brackets (ppr mod))
-                                  (const ()) (addPairObservations optimized) }
+                                  (const ()) (addPairObservations final) }
 
        ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
@@ -136,7 +152,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     dflags         = hsc_dflags hsc_env
     logger         = hsc_logger hsc_env
     unit_env       = hsc_unit_env hsc_env
-    extra_vars     = interactiveInScope (hsc_IC hsc_env)
+    extra_vars | RetainedCore <- mode = []
+               | otherwise = interactiveInScope (hsc_IC hsc_env)
     home_pkg_rules = hugRulesBelow hsc_env (moduleUnitId mod)
                       (GWIB { gwib_mod = moduleName mod, gwib_isBoot = NotBoot })
     name_ppr_ctx   = mkNamePprCtx ptc unit_env rdr_env
@@ -146,6 +163,14 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
+
+    -- The caller has already run restricted native desugaring.
+    retainedPass CoreDesugarOpt rest = rest
+    retainedPass (CoreDoFloatOutwards opts) rest =
+      CoreDoFloatOutwards (opts { floatCoreMode = RetainedCore }) : rest
+    retainedPass (CoreDoSimplify opts) rest =
+      CoreDoSimplify (opts { so_mode = (so_mode opts) { sm_core_mode = RetainedCore } }) : rest
+    retainedPass pass rest = pass : rest
 
 {- Note [Executable pair field observations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -631,9 +656,10 @@ This extra run of the simplifier has a cost, but this is only with -O2.
 ************************************************************************
 -}
 
-runCorePasses :: [CoreToDo] -> ModGuts -> CoreM ModGuts
-runCorePasses passes guts
-  = do { liftIO $ rejectNativeDependentProgram "the Core optimization pipeline" (mg_binds guts) (mg_rules guts)
+runCorePasses :: SimplCoreMode -> [CoreToDo] -> ModGuts -> CoreM ModGuts
+runCorePasses mode passes guts
+  = do { when (mode == OrdinaryCore) $ liftIO $
+           rejectNativeDependentProgram "the Core optimization pipeline" (mg_binds guts) (mg_rules guts)
        ; foldM do_pass guts passes }
   where
     do_pass guts CoreDoNothing = return guts
@@ -642,7 +668,7 @@ runCorePasses passes guts
       logger <- getLogger
       withTiming logger (ppr pass <+> brackets (ppr mod))
                    (const ()) $ do
-            guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
+            guts' <- lintAnnots (ppr pass) (doCorePassFor mode pass) guts
             case pass of
               CoreDoPluginPass{} -> liftIO $
                 rejectNativeDependentProgram "the output of a Core plugin" (mg_binds guts') (mg_rules guts')
@@ -651,9 +677,6 @@ runCorePasses passes guts
             return guts'
 
     mod = mg_module guts
-
-doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
-doCorePass = doCorePassFor OrdinaryCore
 
 doCorePassFor :: SimplCoreMode -> CoreToDo -> ModGuts -> CoreM ModGuts
 doCorePassFor core_mode pass guts = do
@@ -735,7 +758,7 @@ doCorePassFor core_mode pass guts = do
     CoreDoRuleCheck phase pat -> {-# SCC "RuleCheck" #-}
                                  ruleCheckPass phase pat guts
     CoreDoNothing             -> return guts
-    CoreDoPasses passes       -> runCorePasses passes guts
+    CoreDoPasses passes       -> runCorePasses core_mode passes guts
 
     CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-} p guts
 

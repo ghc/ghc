@@ -37,6 +37,7 @@ module GHC.Driver.Main.Hsc
     , hscSimpleIface'
     , writeInterfaceOnlyMode
     , genModDetails
+    , supportsNativeO1Flags
     , checkNativeDependentModule
     , nativeCodeGenFlags
 
@@ -189,8 +190,8 @@ checkNativeDependentModule hsc_env binds rules tycons = do
           || any (`gopt` dflags) [ Opt_ProfLateInlineCcs, Opt_ProfLateCcs
                                 , Opt_ProfLateOverloadedCcs, Opt_ProfLateoverloadedCallsCCs ]) $
       reject "profiling or late cost-centre insertion"
-    when (any (\(levels, flag) -> 0 `notElem` levels && gopt flag dflags) optLevelFlags) $
-      reject "optimized module compilation (use -O0)"
+    when (usesOptimizedFlags dflags && not (supportsNativeO1Flags dflags)) $
+      reject "optimized module compilation with these options (use -O0 or the standard -O1 native object pipeline)"
     unless (gopt Opt_OmitInterfacePragmas dflags) $
       reject "interface unfolding generation (use -fomit-interface-pragmas)"
     when (gopt Opt_WriteIfSimplifiedCore dflags) $
@@ -198,6 +199,29 @@ checkNativeDependentModule hsc_env binds rules tycons = do
     unless (null (pluginsWithArgs (hsc_plugins hsc_env)) && null (pluginModNames dflags)) $
       reject "module plugins"
   return native
+
+-- | Select the verified normal -O1 object-code schedule and simplifier.
+-- Native modules still require the interface and plugin checks above.
+supportsNativeO1Flags :: DynFlags -> Bool
+supportsNativeO1Flags dflags =
+    backendNeedsPlatformNcgSupport (backend dflags)
+    && all matchesO1 optLevelFlags
+    && simplPhases dflags == 2
+    && maxSimplIterations dflags == 4
+    && null (strictnessBefore dflags)
+    && floatLamArgs dflags == Just 0
+    && not (any (`gopt` dflags)
+          [ Opt_ByteCodeAndObjectCode, Opt_WriteByteCode,
+            Opt_LateDmdAnal, Opt_LateSpecialise, Opt_StaticArgumentTransformation,
+            Opt_WorkerWrapperUnlift, Opt_SpecEvalDictFun ])
+  where
+    matchesO1 (levels, flag)
+      | flag == Opt_OmitInterfacePragmas = True
+      | otherwise = gopt flag dflags == (1 `elem` levels)
+
+usesOptimizedFlags :: DynFlags -> Bool
+usesOptimizedFlags dflags =
+    any (\(levels, flag) -> 0 `notElem` levels && gopt flag dflags) optLevelFlags
 
 -- | Enable the mandatory Core and STG checks for native code generation.
 nativeCodeGenFlags :: Bool -> DynFlags -> DynFlags
