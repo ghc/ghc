@@ -53,6 +53,9 @@ test('NativeOpenInstalledUpper',
                                         'NativeOpenInstalledInterfaces.sh'])],
      run_command,
      ['bash NativeOpenInstalledUpper.sh "{compiler}" "{libdir}" "{ghc_pkg}"'])
+test('NativeBinaryEnum',
+     [req_interp, req_rts_linker, only_ways(['normal'])],
+     run_command, ['bash NativeBinaryEnum.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledNot',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['OpenMapWorker.hs', 'InstalledNotSource.hs', 'InstalledNotProof.hs']]
@@ -199,6 +202,11 @@ test('NativeUnsaturatedFamily',
       extra_files(['NativeUnsaturatedProvider.hs', 'NativeUnsaturatedClient.hs',
                    'NativeUnsaturatedInverse.hs', 'NativeUnsaturatedEta.hs'])],
      run_command, ['bash NativeUnsaturatedFamily.sh "{compiler}" "{libdir}"'])
+test('NativeLaterMatchability',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['AnchorReceiver.hs', 'LaterMatchability.hs',
+                                              'LaterMatchabilityClient.hs']])],
+     run_command, ['bash NativeLaterMatchability.sh "{compiler}" "{libdir}"'])
 test('NativeUnsaturatedInvisible',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'InvisibleFamily.hs', 'NativeUnsaturatedInvisibleConsumer.hs',
@@ -236,6 +244,17 @@ test('NativeGadtRetainedSum',
       extra_files(['NativeGadtRetainedSumProvider.hs', 'NativeGadtRetainedSumClient.hs'])],
      run_command, ['bash NativeGadtRetainedSum.sh "{compiler}" "{libdir}"'])
 
+test('NativeNestedPackagePat',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeGadtRetainedSumProvider.hs', 'NativeNestedPackagePatProvider.hs',
+                   'NativeNestedPackagePatClient.hs', 'NativeNestedPackagePatBad.hs'])],
+     run_command, ['bash NativeNestedPackagePat.sh "{compiler}" "{libdir}"'])
+
+test('NativeRetainedIndexHpc',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeRetainedIndexHpcProvider.hs', 'NativeRetainedIndexHpcClient.hs'])],
+     run_command, ['bash NativeRetainedIndexHpc.sh "{compiler}" "{libdir}" "{hpc}"'])
+
 test('NativeTypeLet',
      [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs'])],
      run_command, ['bash NativeTypeLet.sh "{compiler}" "{libdir}"'])
@@ -272,6 +291,7 @@ test('NativePercentArrowPpr',
 test('NativeTypeCase',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'NativeCase.hs', open_eval_dir + 'NativeNestedCase.hs',
+                   open_eval_dir + 'OpenMapWorker.hs',
                    'NativeTypeCaseClient.hs', 'NativeTypeCaseRigid.hs',
                    'NativeTypeCaseInvalid.hs', 'NativeTypeCaseEscape.hs', 'NativeTypeCaseBadPattern.hs',
                    'NativeTypeCaseFallback.hs', 'NativeTypeCaseFallbackRigid.hs', 'NativeTypeCaseDisabled.hs', 'NativeTypeCaseBranchKind.hs',
@@ -287,7 +307,8 @@ test('NativeTypeCase',
      run_command, ['bash NativeTypeCase.sh "{compiler}" "{libdir}"'])
 test('NativeTypeCaseReify',
      [req_interp, req_rts_linker, only_ways(['normal']),
-      extra_files([open_eval_dir + 'NativeCase.hs', open_eval_dir + 'NativeNestedCase.hs'])],
+      extra_files([open_eval_dir + 'NativeCase.hs', open_eval_dir + 'NativeNestedCase.hs',
+                   open_eval_dir + 'OpenMapWorker.hs'])],
      multimod_compile, ['NativeTypeCaseReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
 
 test('NativeSimplifier',
@@ -297,6 +318,7 @@ test('NativeSimplifier',
                    'NativePackageRuleCase.hs', 'implicit-existential-source/WitnessSchema.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/PackageRules.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/LexicalPackageRules.hs',
+                   '../../../../docs/dependent-haskell/examples/erased-existentials/OrphanPackageRules.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/ErasedStream.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/StreamFold.hs'])],
      run_command, ['bash NativeSimplifier.sh "{compiler}" "{libdir}"'])

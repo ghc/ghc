@@ -199,6 +199,9 @@ data VarInfo
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
   -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
   -- to recognise completion of a COMPLETE set efficiently for large enums.
+
+  , vi_opening :: !(Maybe (Type, TyVar, Id))
+  -- ^ Schema, witness and payload from a prior opening of this package.
   }
 
 data PmAltConApp
@@ -230,8 +233,8 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI x pos neg bot cache)
-    = braces (hcat (punctuate comma [pp_x, pp_pos, pp_neg, ppr bot, pp_cache]))
+  ppr (VI x pos neg bot cache opening)
+    = braces (hcat (punctuate comma [pp_x, pp_pos, pp_neg, ppr bot, pp_cache, ppr opening]))
     where
       pp_x = ppr x <> dcolon <> ppr (idType x)
       pp_pos
@@ -297,6 +300,7 @@ emptyVarInfo x
   -- in GHC.HsToCore.Pmc.Solver
   , vi_bot = MaybeBot
   , vi_rcm = emptyRCM
+  , vi_opening = Nothing
   }
 
 lookupVarInfo :: TmState -> Id -> VarInfo

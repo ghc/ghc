@@ -554,6 +554,28 @@ kind the compiler keeps the existing saturation rule.
 [Provider](../examples/open-evaluation/InvisibleFamily.hs) and
 [ordinary interface client](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedInvisibleConsumer.hs).
 
+### Choosing a prefix's matchability from a later argument
+
+In `Receiver (Select 'True) 'Match`, both declarations have an invisible
+matchability parameter. The earlier family prefix supplies a higher-order
+argument. The later argument `'Match :: Anchor M` fixes both parameters.
+The previous checker fixed them to U before it checked `'Match` and
+reported GHC-83865.
+
+The checker now defers an omitted index in experimental type applications
+when a function-valued argument kind and another supplied argument kind
+share it. The earlier prefix also checks its index against the expected
+function kind. Showcase runs an ordinary client at `(Maybe Bool, Bool)`
+and prints `(Just True,True)`. The regression checks the same client
+with stripped provider interfaces. An isolated `Select 'True`, an
+unrelated `Bool` argument, and an anchor whose family maps both indices to
+the same result all retain U. Explicit conflicts and an undetermined
+selector still fail.
+[Provider](../examples/open-evaluation/AnchorReceiver.hs),
+[aliases](../examples/open-evaluation/LaterMatchability.hs),
+[ordinary client](../examples/open-evaluation/LaterMatchabilityClient.hs)
+and [interface and rejection controls](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh).
+
 ## Goal and dependencies
 
 Allow direct higher-order use of type families under explicit matchability,
@@ -643,6 +665,19 @@ Default diagnostics for an ill-scoped telescope show its binder order without
 fixed matchability annotations. The explicit print flag shows the annotations.
 A matchability mismatch still shows the expected and actual annotations.
 [Display rule in proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
+
+## Substituting an equal index in a partial family
+
+An ordinary client can prove `Callback a :~: Callback b` from an
+argument of type `a :~: b`. Pattern matching on `Refl` identifies the
+indices. After rewriting both indices, GHC compares the complete
+partial applications for reflexivity. The earlier compiler reported
+GHC-83865 at the second `Refl`, even though it printed identical types.
+
+The inverse still requires a separate proof. Two distinct prefixes
+can also keep a closed family stuck at a repeated pattern.
+[Source and inverse checks](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
+and [Agda and GHC provenance](../REFERENCES.md#equality-of-a-partial-family-after-rewriting-its-argument).
 
 ## Completion boundary
 

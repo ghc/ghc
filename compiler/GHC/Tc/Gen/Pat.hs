@@ -15,6 +15,7 @@ module GHC.Tc.Gen.Pat
    , LetBndrSpec(..)
    , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcMatchPats
+   , implicitPayloadType, matchesImplicitPayloadPat
    , bindRetainedConFields, isRetainedVarPat
    , tcRetainedCon, retainedConPat, retainedConIndex, bindRetainedWildcard
    , addDataConStupidTheta
@@ -45,7 +46,7 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Core.TyCo.Ppr ( pprTyVars )
-import GHC.Core.TyCo.Rep ( Type(TermVarTy) )
+import GHC.Core.TyCo.Rep ( Type(ExistsTy, TermVarTy) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Gen.HsType
@@ -476,11 +477,17 @@ tcMultiple tc_pat penv args thing_inside
 --------------------
 tc_lpat :: Scaled ExpSigmaTypeFRR -- ^ expected type (FRR because of Note [Patterns & FixedRuntimeRep])
         -> Checker (LPat GhcRn) (LPat GhcTc)
-tc_lpat pat_ty penv (L span pat) thing_inside
+tc_lpat pat_ty@(Scaled mult expected) penv lpat@(L span pat) thing_inside
   = setSrcSpanA span $
-    do  { (pat', res) <- maybeWrapPatCtxt (locA span) pat (tc_pat pat_ty penv pat)
-                                          thing_inside
-        ; return (L span pat', res) }
+    do { (pat', res) <- maybeWrapPatCtxt (locA span) pat check thing_inside
+       ; return (L span pat', res) }
+  where
+    check
+      | Check ty <- expected
+      , matchesImplicitPayloadPat ty lpat
+      = tcImplicitPat penv lpat (Scaled mult ty)
+      | otherwise
+      = tc_pat pat_ty penv pat
 
 tc_lpats :: [Scaled ExpSigmaTypeFRR] -- ^ expected types (FRR because of Note [Patterns & FixedRuntimeRep])
          -> Checker [LPat GhcRn] [LPat GhcTc]
@@ -2218,6 +2225,67 @@ tcConArg con_like penv (arg_pos, arg_pat, Scaled arg_mult arg_ty) thing_inside
   = withFixedRuntimeRepPat (conArgFRRContext con_like arg_pos) arg_ty $
     \ arg_ty_frr ->
       tc_lpat (Scaled arg_mult (mkCheckExpType arg_ty_frr)) penv arg_pat thing_inside
+
+{- Note [Opening implicit packages in patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A constructor pattern can request the payload of a known implicit package.
+Check it at the declared payload type. A fresh skolem scopes over the later
+patterns and right-hand side of that equation. Keep the expected result
+outside this scope. A variable or wildcard can still match the package.
+
+Use the located pattern checker for constructor fields and tuple components.
+The lowered match opens the package at its original column. The inner
+pattern controls demand. If the match fails, the next equation has its own
+witness. See 'matchExists' in GHC.HsToCore.Match.
+-}
+
+-- | Check a selected pattern and its continuation under the package opening.
+tcImplicitPat :: PatEnv -> LPat GhcRn -> Scaled TcTypeFRR
+              -> TcM a -> TcM (Pat GhcTc, a)
+tcImplicitPat penv arg_pat@(L _ pat) (Scaled mult schema) thing_inside
+  = do { when (pe_lazy penv) $ failWithTc TcRnLazyGADTPattern
+       ; case pe_ctxt penv of
+           LamPat ArrowMatchCtxt{} -> failWithTc TcRnArrowProcGADTPattern
+           _ -> return ()
+       ; checkManyPattern OtherPatternReason arg_pat (Scaled mult schema)
+       ; open schema }
+  where
+    open ty
+      | ExistsTy ImplicitExists binder body <- coreFullView ty
+      = do { let origin = UnifyForAllSkol ty
+           ; skol <- mkSkolemInfo origin
+           ; name <- newSysName (getOccName binder)
+           ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
+           ; let payload_ty = substTyWith [binder] [mkTyVarTy witness] body
+           ; payload <- newSysLocalId (fsLit "unpacked") ManyTy payload_ty
+           ; (ev_binds, (pat', res)) <- checkConstraints origin [witness] [] (open payload_ty)
+           ; return (XPat (NativeExistsPat ty witness payload ev_binds pat'), res) }
+      | otherwise = tc_pat (Scaled mult (mkCheckExpType ty)) penv pat thing_inside
+
+-- | Find the shape below consecutive dot binders.
+-- The result can mention those binders. Use it only to inspect its shape.
+implicitPayloadType :: TcType -> TcType
+implicitPayloadType ty = case coreFullView ty of
+  ExistsTy ImplicitExists _ body -> implicitPayloadType body
+  other -> other
+
+-- | Does this source pattern select the payload of the given package?
+-- Use data constructor identities. Other patterns alone keep their usual type.
+matchesImplicitPayloadPat :: TcType -> LPat GhcRn -> Bool
+matchesImplicitPayloadPat schema
+  | ExistsTy ImplicitExists _ body <- coreFullView schema
+  , Just (tc, _) <- tcSplitTyConApp_maybe (implicitPayloadType body)
+  = go (map dataConName (tyConDataCons tc))
+  | otherwise = const False
+  where
+    go constructors (L _ pat) = case pat of
+      ParPat _ nested -> go constructors nested
+      AsPat _ _ nested -> go constructors nested
+      BangPat _ nested -> go constructors nested
+      LazyPat _ nested -> go constructors nested
+      ConPat { pat_con = L _ (WithUserRdr _ name) } -> name `elem` constructors
+      TuplePat _ fields boxity -> tupleDataConName boxity (length fields) `elem` constructors
+      _ -> False
 
 -- | Perform a representation polymorphism check on the expected type of
 -- a pattern:

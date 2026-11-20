@@ -4,6 +4,8 @@ module WitnessSchema
     , CallbackPair, atTwoTypes, observePair, ignorePair
     , Payload(..), RankedBuilder, buildAt, configured, observeBuilder, ranked
     , Flag(..), FlaggedBuilder, observeFlagged
+    , PolyId, GuardedBuilder, consumeAt, observeGuarded, never, different
+    , CapturedMono(..), CapturedMonoBuilder
     , Captured(..), CapturedBuilder, LinearBuilder, buildLinear, buildTwice
     ) where
 import Data.Kind (Type)
@@ -54,6 +56,26 @@ configured _ test tag = buildAt (test tag)
 observeBuilder :: RankedBuilder -> Bool -> (Int, Bool)
 observeBuilder builder b = case builder b of
     Payload value run -> run value
+
+type GuardedBuilder = exists (t :: Type). Bool -> Bool -> Payload t
+
+consumeAt :: forall {k} (tag :: k). Proxy tag -> PolyId -> Bool -> Payload PolyId
+consumeAt _ value b = Payload @PolyId value (\f -> (f 11, f b))
+
+observeGuarded :: GuardedBuilder -> Bool -> Bool -> (Int, Bool)
+observeGuarded builder flag b = observePayload (builder flag b)
+
+never :: Bool
+never = False
+{-# NOINLINE never #-}
+
+different :: Bool -> Payload PolyMaybe
+different b = Payload @PolyMaybe Just (\f -> (maybe 0 id (f 13), maybe False id (f b)))
+
+data CapturedMono where
+    CapturedMono :: Payload t -> CapturedMono
+
+type CapturedMonoBuilder = exists (t :: Type). CapturedMono -> Bool -> Payload t
 
 data Flag a where
     Flag :: Flag Bool

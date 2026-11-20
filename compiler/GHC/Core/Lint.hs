@@ -1613,6 +1613,7 @@ lintRetainedArgument b arg
        ; lint_source_owners arg }
   | otherwise = failWithL unsupported
   where
+    lint_source_owners (Tick HpcTick{} body) = lint_source_owners body
     lint_source_owners expr = case collectArgs expr of
       (Var fun, args@(_ : _)) -> do
         case sourceTableId_maybe fun of

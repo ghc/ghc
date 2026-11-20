@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, GADTs, ScopedTypeVariables, UndecidableInstances #-}
 
 -- | Store vectors of different lengths behind one record type.
-module StoredVector (Batch(..), singleton, cells, Wrapped(..), wrapVector, wrappedContents, gadtLength, nestedObservation) where
+module StoredVector (Batch(..), singleton, cells, Wrapped(..), wrapVector, wrappedContents, gadtLength, nestedObservation, viewSelection) where
 
 import GHC.Sigma (Sigma(Pair))
 import GHC.Sigma.Projection (second)
@@ -60,3 +60,21 @@ nestedObservation = case sample of
     build :: foreach (n :: Nat) -> foreach (m :: Nat)
           -> Vec Char n -> Vec Char n -> Vec Char m -> NestedVectors Char
     build n m xs ys zs = NestedVectors (Pair n (xs, Pair m (ys, zs)))
+
+-- | Store a vector with its fallback and a selector usable at any length.
+data Selection a where
+    Selection :: foreach (n :: Nat)
+              -> (foreach (n :: Nat) -> Vec a n -> (some (m :: Nat) | Vec a m))
+              -> (some (m :: Nat) | (Vec a n, Vec a m))
+              -> Selection a
+
+-- | Apply the selector to a singleton and read the stored input separately.
+viewSelection :: (String, String)
+viewSelection = case plan of
+    Selection _ select (Pair _ (input, _)) ->
+        case select (S Z) (VCons 'x' VNil) of
+            Pair _ chosen -> (toList input, toList chosen)
+  where
+    plan :: Selection Char
+    plan = Selection (S (S Z)) (\n xs -> Pair n xs)
+        (Pair Z (VCons 'a' (VCons 'b' VNil), VNil))

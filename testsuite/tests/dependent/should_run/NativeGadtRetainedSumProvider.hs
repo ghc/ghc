@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, RankNTypes, UndecidableInstances #-}
 module NativeGadtRetainedSumProvider where
 
 import GHC.Sigma (Sigma(Pair))
@@ -58,3 +58,41 @@ innerWitnessBottom = build (error "inner witness")
 
 innerPairBottom :: Nested Bool
 innerPairBottom = Nested (Pair (S Z) (VCons True VNil, error "inner pair"))
+
+-- | Share the first constructor argument with a later retained sum.
+data Later a b where
+    Later :: foreach (n :: Nat) -> (some (m :: Nat) | (Vec a n, Vec b m)) -> Later a b
+
+-- | Construct the sum at the two supplied lengths.
+makeLater :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec b m -> Later a b
+makeLater n m xs ys = Later n (Pair m (xs, ys))
+
+-- | Give the consumer both lengths and their vectors.
+withLater :: Later a b -> (foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec b m -> r) -> r
+withLater (Later n (Pair m (xs, ys))) consume = consume n m xs ys
+
+-- | Supply an inner vector with an unused outer witness and vector.
+laterWitnessBottom :: Later Bool Char
+laterWitnessBottom = build (error "earlier witness")
+  where
+    build :: Nat -> Later Bool Char
+    build n = makeLater n (S Z) (error "earlier vector") (VCons 'x' VNil)
+
+-- | Use a captured value at its declared kind.
+data KindTag (a :: k) = KindTag
+
+-- | Use a written index in the domain of a retained flag.
+type FlagAt (n :: Nat) = Bool
+
+-- | The function field shadows the length seen by the following field.
+data FieldScope (a :: k) where
+    FieldScope :: forall k (a :: k). foreach (n :: Nat)
+               -> (foreach (n :: Nat) (p :: FlagAt n) -> Vec Bool n
+                   -> (some (m :: Nat) | (KindTag a, KindTag p, Vec Bool n, Vec Char m)))
+               -> (some (m :: Nat) | (Vec Bool n, Vec Char m))
+               -> FieldScope a
+
+-- | Give the two fields different vector lengths.
+fieldScope :: FieldScope 'True
+fieldScope = FieldScope (S (S Z)) (\_ _ xs -> Pair Z (KindTag, KindTag, xs, VNil))
+             (Pair Z (VCons False (VCons True VNil), VNil))

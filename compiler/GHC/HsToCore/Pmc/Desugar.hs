@@ -207,6 +207,9 @@ desugarPat x pat = case pat of
 
         _ -> desugarPat x expansion
 
+    NativeExistsPat schema witness payload _ p ->
+      consGrdDag (PmUnpack x schema witness payload) <$> desugarPat payload p
+
     -- See Note [Desugar CoPats]
     -- Generally the translation is
     -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat

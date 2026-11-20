@@ -67,6 +67,7 @@ import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr (pprScopeError)
+import GHC.Tc.Gen.SourceTable (isFinalCoreIdentity)
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Utils.Monad
@@ -93,7 +94,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
-import GHC.Types.TyThing ( tyThingGREInfo )
+import GHC.Types.TyThing ( TyThing(AnId), tyThingGREInfo )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -1236,7 +1237,10 @@ lookupTypeOcc position rdr_name
 
     lookup_table term_rdr = do
       envs <- getRdrEnvs
-      candidates <- lookupSourceTables envs term_rdr
+      let legacy_identity = case position of
+            TypeApplicationHead{} -> True
+            _ -> False
+      candidates <- lookupSourceTables legacy_identity envs term_rdr
       case candidates of
         [(gre, Just table)] -> do
           addUsedGRE AllDeprecationWarnings gre
@@ -1278,10 +1282,12 @@ lookupTypeOcc position rdr_name
         _ -> lookup_demoted rdr_name
 
 -- | Find the in-scope term bindings and their finite source tables.
+-- The flag keeps the ordinary term for a final Core identity.
 -- See Note [Names of finite source functions].
-lookupSourceTables :: (GlobalRdrEnv, LocalRdrEnv) -> RdrName
+-- See Note [Identity certificates and open unfoldings] in GHC.Tc.Gen.SourceTable.
+lookupSourceTables :: Bool -> (GlobalRdrEnv, LocalRdrEnv) -> RdrName
                       -> RnM [(GlobalRdrElt, Maybe Name)]
-lookupSourceTables (gbl, lcl) term_rdr
+lookupSourceTables legacy_identity (gbl, lcl) term_rdr
   | isJust (lookupLocalRdrEnv lcl term_rdr) = return []
   | otherwise = mapM candidate $
       lookupGRE gbl (LookupRdrName term_rdr (RelevantGREsFOS WantNormal))
@@ -1306,7 +1312,13 @@ lookupSourceTables (gbl, lcl) term_rdr
               -- Keep the ordinary function available for executable calls.
               -- See Note [A partial pair in a nominal operand] in GHC.Tc.Gen.SourceTable.
               if present occ && not (present (mkSourceFstOcc term_occ) || present (mkSourceSndOcc term_occ))
-                then return (Just name)
+                then if legacy_identity
+                     then do
+                       thing <- tcLookupGlobal term
+                       pure $ case thing of
+                         AnId v | isFinalCoreIdentity v -> Nothing
+                         _ -> Just name
+                     else pure (Just name)
                 else do
                   updTcRef (tcg_source_table_uses env) (`extendNameSet` name)
                   return Nothing

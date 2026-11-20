@@ -377,7 +377,7 @@ tcLambdaExpr x lam_variant matches pat_tys expected
   , ExistsTy ImplicitExists binder body <- coreFullView schema
   , Just _ <- splitVisibleFunTy_maybe (implicitPayloadType body)
   = do { impred <- xoptM LangExt.ImpredicativeTypes
-       ; declared <- if impred && lam_variant == LamSingle
+       ; declared <- if impred
                      then tcDeclaredLambdaWitness binder body matches
                      else return Nothing
        ; witness <- maybe (newFlexiTyVarTy (tyVarKind binder)) return declared
@@ -391,26 +391,33 @@ tcLambdaExpr x lam_variant matches pat_tys expected
                                                 lam_variant matches pat_tys expected_ty
            ; return (mkHsWrap wrap (HsLam x lam_variant matches')) }
 
--- | Read the result of an ordinary application before entering the lambda.
+-- | Read a declared application result before entering any lambda equation.
 -- See Note [Implicit existential lambda payloads].
 tcDeclaredLambdaWitness :: TyVar -> Type -> MatchGroup GhcRn (LHsExpr GhcRn)
                         -> TcM (Maybe Type)
-tcDeclaredLambdaWitness binder body (MG { mg_alts = L _ [L _ match] })
-  | Match { m_pats = L _ pats, m_grhss = rhss } <- match
-  , GRHSs _ (L _ (GRHS _ [] rhs) NE.:| []) (L _ EmptyLocalBinds{}) <- rhss
-  , all isVisArgLPat pats
-  , Just formal <- result_after (length pats) body
-  , Just (name, ntypes, nargs) <- application 0 0 rhs
-  = do { mb_id <- if isExternalName name
-                 then tcLookupIdMaybe name
-                 else fmap local_id (tcLookupLcl_maybe name)
-       ; declared <- traverse (liftZonkM . zonkTcType . varType) mb_id
-       ; formal <- liftZonkM (zonkTcType formal)
-       ; return $ do { (consumed, residual) <- declared >>= type_prefix ntypes
-                     ; actual <- result_after nargs residual
-                     ; guard (not (any (`elemVarSet` tyCoVarsOfType actual) consumed))
-                     ; matchPolytypeExistsWitness binder formal actual } }
+tcDeclaredLambdaWitness binder body (MG { mg_alts = L _ matches })
+  = firstJustsM (map match_witness matches)
   where
+    match_witness (L _ (Match { m_pats = L _ pats
+                             , m_grhss = GRHSs _ rhss (L _ EmptyLocalBinds{}) }))
+      | all isVisArgLPat pats
+      , Just formal <- result_after (length pats) body
+      = firstJustsM (fmap (rhs_witness formal) rhss)
+    match_witness _ = return Nothing
+
+    rhs_witness formal (L _ (GRHS _ _ rhs))
+      | Just (name, ntypes, nargs) <- application 0 0 rhs
+      = do { mb_id <- if isExternalName name
+                     then tcLookupIdMaybe name
+                     else fmap local_id (tcLookupLcl_maybe name)
+           ; declared <- traverse (liftZonkM . zonkTcType . varType) mb_id
+           ; formal' <- liftZonkM (zonkTcType formal)
+           ; return $ do { (consumed, residual) <- declared >>= type_prefix ntypes
+                         ; actual <- result_after nargs residual
+                         ; guard (not (any (`elemVarSet` tyCoVarsOfType actual) consumed))
+                         ; matchPolytypeExistsWitness binder formal' actual } }
+    rhs_witness _ _ = return Nothing
+
     application ntypes nargs expr = case unLoc (stripParensLHsExpr expr) of
       HsApp _ fun _ | ntypes == 0 -> application ntypes (nargs + 1) fun
       HsAppType _ fun _           -> application (ntypes + 1) nargs fun
@@ -432,7 +439,6 @@ tcDeclaredLambdaWitness binder body (MG { mg_alts = L _ [L _ match] })
 
     local_id (Just (ATcId { tct_id = ident })) = Just ident
     local_id _ = Nothing
-tcDeclaredLambdaWitness _ _ _ = return Nothing
 
 {- Note [Implicit existential lambda payloads]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -452,7 +458,10 @@ expected payload to guide witness selection. Here the result declaration
 fixes the choice before the lambda patterns enter scope. Read the head's
 declared type and follow its written ordinary application arrows. The
 ordinary check instantiates types, checks operands and records usage.
-A head bound by a lambda pattern is unavailable. Exact invariant matching
+For a guarded or multi-equation lambda, read the first matching result
+declaration in source order. Check every guard and result with the same
+witness. The selected declaration supplies no local evidence. A head bound
+by a pattern or guard is unavailable at this point. Exact invariant matching
 chooses a type without filling any Quick Look variables. Runtime indices
 use their existing checks.
 

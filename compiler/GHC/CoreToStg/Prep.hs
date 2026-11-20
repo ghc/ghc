@@ -1594,7 +1594,7 @@ cpeApp top_env expr
         where
            co' = cpSubstCo env co
 
-      AIApp arg@App{}
+      AIApp arg
         | cp_allowNativeDependent (cpe_config env)
         , DepFunTy {} <- coreFullView (exprType fun')
         , Just index <- nativeComputedIndex arg
@@ -1607,6 +1607,7 @@ cpeApp top_env expr
                "CorePrep could not preserve the index of a computed retained argument.")
         where
           prepare_computation (App f a) = App (prepare_computation f) (prepare_computation a)
+          prepare_computation (Tick tick@HpcTick{} body) = Tick tick (prepare_computation body)
           prepare_computation (Type ty) = Type (cpSubstTy env ty)
           prepare_computation (Var v) = lookupCorePrepEnv env v
           prepare_computation e = pprPanic "CorePrep: malformed retained computation" (ppr e)
@@ -1660,6 +1661,11 @@ thunk. This includes nested certified calls and constructors over calls.
 Each binding retains the actual source head and fields. No binding floats
 out of its enclosing computation. A nested call runs only when its caller
 demands that operand.
+
+An HPC tick leaves the nominal index unchanged. Preserve the tick in the
+same thunk that contains the instrumented operand. The strict alias case
+for an ordinary constructor would enter this thunk before the callee needs
+it and increment the coverage counter too early.
 -}
 
 {- Note [Retained constructor arguments in CorePrep]

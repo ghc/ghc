@@ -8,6 +8,23 @@ increments.
 
 ## Family and package checkpoints
 
+At `65eebfca2d`, both compiler stages reproduced the 321-line Showcase
+at `-O0`, default `-O1` and default `-O2`. The self-hosted GHCi matched
+the same output. All 12 focused tests passed. In the dependent directory,
+299 tests passed and 20 failed unexpectedly. The failing names and
+categories match the 311-line checkpoint. A separately compiled typed
+splice ran the nested vector patterns and preserved their demand.
+
+The first integration run exposed three regressions in ordinary uses of
+`id`. A saturated call now keeps its ordinary evaluator, including the
+expected result kind of a nested `fromIntegral`. Passing `id` as a
+callback still requires its checked equation. The existential regression
+also checks the emitted orphan-rule header. The retained-provider rebuild,
+bidirectional filter upgrade, and three interface compression levels passed.
+[R16](roadmap/R16-open-term-evaluator.md),
+[R19](roadmap/R19-type-level-cases.md) and
+[imported rule checks](examples/erased-existentials/check-imported-rule-interfaces.sh).
+
 At compiler source `c70b3be78f`, all 17 focused tests passed. The
 dependent directory recorded 295 passes and 20 unexpected failures.
 The failing names and categories match the 309-line checkpoint.

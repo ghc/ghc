@@ -55,11 +55,13 @@ import qualified PartitionChoices
 import qualified ErasedStream
 import qualified StreamFold
 import qualified PackageRules
+import OrphanPackageRules ()
 import qualified LexicalPackageRules
 import qualified RankedPackage
+import qualified RankedPackageClient
 import qualified StoredVector
 import qualified ExistentialVec as E
-import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Functor.Const (Const(..))
 import Data.Kind (Type)
 import Data.List (isInfixOf)
@@ -93,6 +95,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
+import LaterMatchabilityClient (laterMatchability)
 import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
@@ -102,6 +105,7 @@ import qualified LazyParcel
 import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenMapProof
+import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified PreludeFilterProof
 import qualified PreludeFilterLengthProof
@@ -233,6 +237,14 @@ booleans = do
     let payload :: Select bottomB
         payload = bottomValue @(Select bottomB) "showcase-payload"
     observe "keep ignores bottom index and payload" (keep bottomB payload)
+    writeIORef cell False
+    other <- readIORef cell
+    ignored <- newIORef bottomB >>= readIORef
+    observe "inline retained type case"
+        ( NativeCase.renderRetainedPick b
+        , NativeCase.renderRetainedPick other
+        , NativeCase.retainedKeep ignored (error "showcase-inline-payload")
+        )
   where
     -- Return a result at the selected Boolean type.
     choose :: foreach (b :: Bool) -> Select b
@@ -965,12 +977,16 @@ main = do
         StoredVector.gadtLength 1 (error "unused vector" :: Vec Char 1)
     observe "read nested lengths and the first aligned cells"
         StoredVector.nestedObservation
+    observe "apply a stored selector at a different vector length" StoredVector.viewSelection
     let (passing, failing) = ImplicitVector.partitionVec odd
             (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
         (firstPart, _) = ImplicitVector.partitionVec odd (VCons (7 :: Int) (error "unused partition tail"))
     observe "partition a vector at two independent result lengths"
         (ImplicitVector.cells passing, ImplicitVector.cells failing,
          take 1 (ImplicitVector.cells firstPart))
+    observe "match a hidden vector inside a pair without opening its other field"
+        (ImplicitVector.firstKept (firstPart, error "unused rejected partition"),
+         ImplicitVector.firstKept (ImplicitVector.partitionVec odd (VCons (2 :: Int) VNil)))
     let rows = ImplicitVector.partitionRows odd
             (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
     observe "match both hidden lengths in one partition result" $
@@ -987,7 +1003,12 @@ main = do
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
+    observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
+    observe "apply an imported integer package rule and keep the witness lazy"
+        (PackageRules.open (41 :: Int, (+ 1)),
+         PackageRules.open (undefined :: Int, const 7),
+         PackageRules.open (True, fromEnum))
     observe "match and open existential packages in optimizer rules"
         (LexicalPackageRules.local 3 (LexicalPackageRules.hideInt 5))
     observe "read streams with different hidden state types"
@@ -997,6 +1018,9 @@ main = do
         (StreamFold.digits (ErasedStream.oddThrough 6),
          StreamFold.first (ErasedStream.fromList (True : error "unused fold tail")),
          StreamFold.first (ErasedStream.fromList ([] :: [Bool])))
+    observe "fold a mapped stream without forcing its head or tail"
+        (StreamFold.firstMapped not (ErasedStream.fromList [False]),
+         StreamFold.firstMapped (const 'x') (ErasedStream.fromList (undefined : undefined)))
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $
@@ -1085,6 +1109,8 @@ main = do
         (Refl :: Prelude.map Prelude.not '[ 'True, 'False] :~: '[ 'False, 'True])
     observe "pass an unapplied type family to another family"
         (Refl :: MapFlags FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
+    observe "replace an equal callback before supplying the input list"
+        (sameMapping (Refl :: FlipFlag :~: FlipFlag))
     observe "pass a type family with an unapplied invisible binder"
         (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "infer the result kind after passing a visible family argument"
@@ -1092,6 +1118,7 @@ main = do
     observe "infer the first invisible family argument and leave the second open"
         (Refl :: InvisibleFamily.ReadFlag :~: 'True, Refl :: InvisibleFamily.ReadType :~: Int)
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
+    observe "infer the matchability of a family prefix from a later argument" laterMatchability
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"
@@ -1151,13 +1178,16 @@ main = do
         (OpenMapProof.negateHead (Proxy @'[]), OpenMapProof.redStops (Proxy @'[]))
     observe "map an ordinary enumeration callback over an unknown tail"
         (OpenMapProof.ordinaryRedStops (Proxy @'[]))
+    observe "leave the permission argument open in an ordinary traffic-light function"
+        ( OpenMapProof.greenPermission (Proxy @'True)
+        , OpenMapWorker.mayProceed OpenMapWorker.Red (error "unused permission") )
     observe "use Prelude.not on a known head with an unknown tail"
         (InstalledNotProof.negateHead (Proxy @'[]))
-    putStrLn ("use Prelude.map and Prelude.not on an empty list and an unknown tail: "
+    putStrLn ("map Prelude.not and Prelude.id over a known head and an unknown tail: "
               ++ PreludeMapProof.showPreludeMapProofs)
     putStrLn ("prove map preserves length and leaves the callback lazy: "
               ++ PreludeMapLengthProof.showPreludeMapLength)
-    putStrLn ("filter a known head and leave the tail lazy: "
+    putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     putStrLn ("prove filter never increases length: "
               ++ PreludeFilterLengthProof.showPreludeFilterLength)
@@ -1178,6 +1208,10 @@ type MapFlags :: (Bool %U -> Bool) -> [Bool] -> [Bool]
 type family MapFlags f xs where
     MapFlags f '[] = '[]
     MapFlags f (x ': xs) = f x ': MapFlags f xs
+
+-- | Equal callbacks give equal traversals before either traversal receives a list.
+sameMapping :: (f :: Bool %U -> Bool) :~: g -> MapFlags f :~: MapFlags g
+sameMapping Refl = Refl
 
 -- | Prove the first output cell without supplying the input tail.
 erasedCell :: forall (xs :: Spine.Spine Bool). Proxy xs

@@ -3,6 +3,7 @@ runtime Bool choice: "42"
 choose True has result Int: 42
 choose False has result Bool: False
 keep ignores bottom index and payload: 42
+inline retained type case: ("7","'f'",42)
 three-constructor runtime domain: "'G'"
 empty-domain elimination demands its scrutinee: showcase-empty-domain
 IORef length and dependent vector: (3,[7,7,7])
@@ -219,7 +220,9 @@ project a stored vector from a strict record field: "h"
 read a retained length through a newtype record selector: (2,"hs")
 read a GADT newtype length without forcing its vector: 1
 read nested lengths and the first aligned cells: (2,1,[('h','s')])
+apply a stored selector at a different vector length: ("ab","x")
 partition a vector at two independent result lengths: ([7,9],[2],[7])
+match a hidden vector inside a pair without opening its other field: (Just 7,Nothing)
 match both hidden lengths in one partition result: ([7,9],[2])
 choose a partition without forcing the unused branch: ([7,9],[2])
 match hidden partition lengths in function equations: (Just 7,Nothing)
@@ -227,10 +230,13 @@ map an ordinary observer over differently sized partitions: [([7,9],[2]),([2],[7
 use a hidden polymorphic identity at Int and Bool: (7,True)
 infer a hidden function type from its paired callback: (7,True)
 infer a polymorphic lambda witness and call its builder at Int: (11,True)
+infer a guarded callback and skip an unused input: ((7,True),(11,False))
 read an integer through an erased package: 7
+apply an imported integer package rule and keep the witness lazy: (42,7,1)
 match and open existential packages in optimizer rules: (4,3,6)
 read streams with different hidden state types: ([1,3,5],[True])
 fold a stream and stop before an undefined tail: (531,Just True,Nothing)
+fold a mapped stream without forcing its head or tail: (Just True,Just 'x')
 transport element equality under a hidden vector length: [7,9]
 zip a filtered vector with itself at its hidden length: [(7,7)]
 pass a lambda with a hidden vector length and filter its result: [7]
@@ -271,10 +277,12 @@ rebuild one spine cell while its tail remains unknown: Refl
 carry the same tag through a recursive spine: Refl
 apply Prelude.map to Prelude.not at a known list: Refl
 pass an unapplied type family to another family: Refl
+replace an equal callback before supplying the input list: Refl
 pass a type family with an unapplied invisible binder: Refl
 infer the result kind after passing a visible family argument: Refl
 infer the first invisible family argument and leave the second open: (Refl,Refl)
 apply Maybe and a type family through a computed arrow kind: (Just 7,[7])
+infer the matchability of a family prefix from a later argument: (Just True,True)
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
 choose an interpreted arrow from its expected kind: (Just 3,Right 3)
@@ -302,10 +310,11 @@ pass a constructor to uncurry with two unknown fields: Refl
 prove one map step for an arbitrary callback and tail: Refl
 map Boolean negation and traffic signals over an unknown tail: (Refl,Refl)
 map an ordinary enumeration callback over an unknown tail: Refl
+leave the permission argument open in an ordinary traffic-light function: (Refl,False)
 use Prelude.not on a known head with an unknown tail: Refl
-use Prelude.map and Prelude.not on an empty list and an unknown tail: (Refl,Refl)
+map Prelude.not and Prelude.id over a known head and an unknown tail: (Refl,Refl,Refl)
 prove map preserves length and leaves the callback lazy: (Refl,Succ (Succ Zero))
-filter a known head and leave the tail lazy: (Refl,Refl,True)
+filter with Prelude.not and Prelude.id without forcing the kept tail: ((Refl,Refl,True),(Refl,Refl,True))
 prove filter never increases length: (BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)

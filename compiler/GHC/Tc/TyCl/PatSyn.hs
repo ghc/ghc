@@ -1413,6 +1413,7 @@ tcCollectEx pat = go pat
     go1 (XPat ext) = case ext of
       CoPat _ p _      -> go1 p
       ExpansionPat _ p -> go1 p
+      NativeExistsPat _ witness _ _ p -> merge ([witness], []) (go1 p)
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty

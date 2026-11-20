@@ -999,7 +999,7 @@ rnHsTyKi _ (XHsType HsTypeLambda{}) = do
 
 rnHsTyKi _ (XHsType HsTypeSome{}) =
   failWithTc (mkTcRnUnknownMessage (mkPlainError []
-    (text "A retained dependent sum is supported in a top-level type synonym, a complete top-level value signature, or a constructor field that captures only outer erased type variables.")))
+    (text "A retained dependent sum is supported in a top-level type synonym, a complete top-level value signature, or a constructor field that captures outer type variables or earlier retained arguments.")))
 
 -- A bare case pattern prefers a data constructor, as before. Resolve it
 -- after the declaration group is in scope. If the data name is absent,
@@ -2469,6 +2469,7 @@ filterInScopeNonClassM cls_tvs vars
        ; filterSourceTableNames envs (filterInScopeNonClass cls_tvs tvc envs vars) }
 
 -- | Exclude finite source functions before binding implicit type variables.
+-- Keep the earlier implicit binding for a newly certified identity.
 -- See Note [Names of finite source functions] in GHC.Rename.Env.
 filterSourceTableNames :: (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> RnM FreeKiTyVars
 filterSourceTableNames envs@(_, lcl) vars = do
@@ -2477,7 +2478,7 @@ filterSourceTableNames envs@(_, lcl) vars = do
   where
     implicit (L _ rdr)
       | not (elemLocalRdrEnv rdr lcl), Just term_rdr <- demoteRdrNameTv rdr =
-          all (isNothing . snd) <$> lookupSourceTables envs term_rdr
+          all (isNothing . snd) <$> lookupSourceTables True envs term_rdr
       | otherwise = return True
 
 inScope :: TermVariableCapture -> (GlobalRdrEnv, LocalRdrEnv) -> RdrName -> Bool

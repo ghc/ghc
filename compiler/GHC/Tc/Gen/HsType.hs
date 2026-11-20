@@ -94,8 +94,8 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
-import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, isMonomorphicEnumCaseType, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
+import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
+                              sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
@@ -1447,7 +1447,7 @@ tcInferLHsTypeUnsaturated hs_ty
        ; case splitHsAppTys_maybe (unLoc hs_ty) of
            Just (hs_fun_ty, hs_args)
               -> do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty hs_args
-                    ; tcInferTyApps_nosat TypeLevel mode hs_fun_ty fun_ty hs_args }
+                    ; tcInferTyApps_nosat TypeLevel Nothing mode hs_fun_ty fun_ty hs_args }
                       -- Notice the 'nosat'; do not instantiate trailing
                       -- invisible arguments of a type family.
                       -- See Note [Dealing with :kind]
@@ -2763,7 +2763,8 @@ tc_app_ty_generic mode rn_ty exp_kind
        ; let index_level = case exp_kind of
                Check expected | isTypeLikeKind expected -> KindLevel
                _ -> TypeLevel
-       ; (prefix, prefix_kind) <- tcInferTyApps_nosat index_level mode hs_fun_ty fun_ty hs_args
+             expected_kind = checkingExpType_maybe exp_kind
+       ; (prefix, prefix_kind) <- tcInferTyApps_nosat index_level expected_kind mode hs_fun_ty fun_ty hs_args
        -- See Note [saturateFamApp] for a checked partial family.
        ; allow_partial <- xoptM LangExt.ExperimentalDependentTypes
        ; (ty, inferred_kind) <- case (exp_kind, tcSplitTyConApp_maybe prefix) of
@@ -2803,7 +2804,7 @@ tcOpenTypeCall mode name instantiated result_kind args = do
             Just (owner, _) -> pure owner
             Nothing -> tcLookupId n
       dependencies <- forM used $ \(n, first) -> (, first) <$> lookup_owner n
-      recordSourceUses dependencies
+      recordUnfoldedSourceUses dependencies
       updTcRef (tcg_evaluated_term_uses env) (\seen -> seen `unionNameSet` constructors `unionNameSet` mkNameSet (map fst used))
       pure result
   where
@@ -3546,7 +3547,7 @@ tcClosedCaseExecutableOwner rdr name args staging
   , Just needs_execution <- staging
   = do
       table <- tcLookupTyCon name
-      let expect_eager = lengthIs args 1 && isMonomorphicEnumCaseType (tyConKind table)
+      let expect_eager = monomorphicEnumCaseArity (tyConKind table) == Just (length args)
           visible = filterOut isInvisibleTyConBinder (tyConBinders table)
           nominal_prefix = length args < length visible && all nominalCallback args
           staged = needs_execution &&
@@ -4058,13 +4059,13 @@ Note [Ordinary arrow matchability] in GHC.Core.TyCo.Rep.
 -}
 
 tcInferTyApps mode hs_ty fun hs_args
-  = do { (f_args, res_k) <- tcInferTyApps_nosat TypeLevel mode hs_ty fun hs_args
+  = do { (f_args, res_k) <- tcInferTyApps_nosat TypeLevel Nothing mode hs_ty fun hs_args
        ; saturateFamApp mode f_args res_k }
 
 -- | Apply the arguments while retaining the remaining invisible binders.
-tcInferTyApps_nosat :: TypeOrKind -> TcTyMode -> LHsType GhcRn -> TcType
+tcInferTyApps_nosat :: TypeOrKind -> Maybe Kind -> TcTyMode -> LHsType GhcRn -> TcType
                     -> [LHsTypeArg GhcRn] -> TcM (TcType, TcKind)
-tcInferTyApps_nosat index_level mode orig_hs_ty fun orig_hs_args
+tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
   = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
        ; fun <- case (mode_synonym_metadata mode, fun) of
            (Just get_indices, TyConApp tc []) | hasInferredMatchability tc -> do
@@ -4138,7 +4139,7 @@ tcInferTyApps_nosat index_level mode orig_hs_ty fun orig_hs_args
         case ki_binder of
 
         -- FunTy with PredTy on LHS, or ForAllTy with Inferred
-        Named (Bndr kv Inferred)         -> instantiate kv inner_ki
+        Named (Bndr kv Inferred)         -> instantiate kv Inferred inner_ki
 
         Named (Bndr _ Specified) ->  -- Visible kind application
           do { traceTc "tcInferTyApps (vis kind app)"
@@ -4190,9 +4191,9 @@ tcInferTyApps_nosat index_level mode orig_hs_ty fun orig_hs_args
                                  (arg_ty : arg_kind : fun' : substTy subst' result_kind : choices)
                              ; if valid
                                then go n fun' subst' result_kind all_args checked
-                               else instantiate_checked kv inner_ki checked }
-                        Nothing -> instantiate_checked kv inner_ki checked }
-            else instantiate kv inner_ki
+                               else instantiate_checked kv flag inner_ki checked }
+                        Nothing -> instantiate_checked kv flag inner_ki checked }
+            else instantiate kv flag inner_ki
 
         -- "normal" case
         | otherwise
@@ -4229,18 +4230,58 @@ tcInferTyApps_nosat index_level mode orig_hs_ty fun orig_hs_args
               ; go_init n fun' all_args checked_arg }
                 -- Use go_init to establish go's INVARIANT
       where
-        instantiate ki_binder inner_ki
-          = instantiate_checked ki_binder inner_ki checked_arg
+        instantiate kv flag inner_ki
+          = instantiate_checked kv flag inner_ki checked_arg
 
-        instantiate_checked ki_binder inner_ki checked
+        instantiate_checked kv flag inner_ki checked
           = do { traceTc "tcInferTyApps (need to instantiate)"
-                         (vcat [ ppr ki_binder, ppr subst])
-               ; (subst', arg') <-
-                   tcInstInvisibleTyBinder (matchabilityInstantiationMode mode) subst ki_binder
+                         (vcat [ ppr kv, ppr subst])
+               ; (subst', arg') <- choose_matchability kv flag inner_ki
                ; go n (mkAppTy fun arg') subst' inner_ki all_args checked }
                  -- Because tcInvisibleTyBinder instantiate ki_binder,
                  -- the kind of arg' will have the same shape as the kind
                  -- of ki_binder.  So we don't need mkAppTyM here.
+
+        choose_matchability tv flag inner_ki
+          | Specified <- flag
+          , TypeLevel <- mode_tyki mode
+          , Nothing <- mode_holes mode
+          , HsValArg{} : _ <- dropWhile is_par all_args
+          , substTy subst (tyVarKind tv) `tcEqType` matchabilityTy
+          = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+               ; if not enabled
+                 then default_binder tv
+                 else do
+                   { owner <- tcl_kind_arrow_defaults <$> getLclEnv
+                   ; case owner of
+                       Just (defaults, _)
+                         | Just (tc, _) <- tcSplitTyConApp_maybe fun
+                         , isTypeFamilyTyCon tc || isAlgTyCon tc
+                         , higher_order_use tv inner_ki
+                         -> do { ma <- fresh_kind_arrow TypeLevel defaults
+                               ; return (extendTvSubstAndInScope subst tv ma, ma) }
+                       _ -> default_binder tv } }
+          | otherwise = default_binder tv
+
+        higher_order_use tv inner_ki =
+          any (isJust . tcSplitFunTy_maybe) (filter uses_index domains) &&
+          (maybe False (isJust . tcSplitFunTy_maybe) expected_kind ||
+           lengthAtLeast (filter uses_index (take supplied_args domains)) 2)
+          where
+            domains = visible_domains inner_ki
+            uses_index domain = tv `elemVarSet` tyCoVarsOfType domain
+            supplied_args = length [() | HsValArg{} <- all_args]
+
+        default_binder =
+          tcInstInvisibleTyBinder (matchabilityInstantiationMode mode) subst
+
+        -- See Note [Omitted matchability in higher-order arguments].
+        visible_domains kind
+          | Just (_, binder, rest) <- tcSplitPiTy_maybe kind
+          , isInvisiblePiTyBinder binder = visible_domains rest
+          | Just (_, binder, rest) <- tcSplitPiTy_maybe kind
+          = piTyBinderType binder : visible_domains rest
+          | otherwise = []
 
         try_again_after_substing_or fallthrough
           | not (isEmptyTCvSubst subst)
@@ -4370,6 +4411,25 @@ tcInferTyApps_nosat index_level mode orig_hs_ty fun orig_hs_args
 
     ty_app_err arg ty
       = failWith $ TcRnInvalidVisibleKindArgument arg ty
+
+{- Note [Omitted matchability in higher-order arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider Receiver (Select 'True) 'Match. Both Receiver and Select have a
+specified invisible matchability parameter. The kind of the last argument
+of Receiver fixes M. When checking the family prefix first, defaulting
+either index to U would lose this choice.
+
+In an experimental type application, defer an omitted index used by
+a function-valued domain when another supplied domain shares that index.
+When an argument is checked against a function kind, allow its omitted
+index to agree with the expected kind. This also checks the inner family
+prefix in the example. The enclosing declaration solver collects those
+equalities and defaults any remaining index to U.
+
+An isolated partial application with an inferred kind keeps its original
+default. Otherwise its synonym kind could gain an extra invisible binder.
+An explicit kind argument and a family pattern keep their usual paths.
+-}
 
 {- Note [Immutable native kind arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

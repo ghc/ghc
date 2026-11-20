@@ -665,9 +665,8 @@ coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion token
        ; return (StgVarArg coercionTokenId : args', ts, binds) }
 
 -- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
-coreToStgArgs (call@(App _ last_arg) : args)
-  | not (isTyCoArg last_arg)
-  , Just {} <- nativeComputedIndex call
+coreToStgArgs (call : args)
+  | Just {} <- nativeComputedIndex call
   = do { uniq <- getCtsUnique
        ; let thunk = mkSysLocal (fsLit "retained_arg") uniq ManyTy (exprType call)
        ; call' <- nameComputedOperands call
@@ -709,6 +708,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 -- | Name each non-atomic operand inside its enclosing computation thunk.
 -- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
 nameComputedOperands :: CoreExpr -> CtsM CoreExpr
+nameComputedOperands (Tick tick body) = Tick tick <$> nameComputedOperands body
 nameComputedOperands call = do
     let (fun, args) = collectArgs call
     (rev_binds, atoms) <- mapAccumLM name_operand [] args

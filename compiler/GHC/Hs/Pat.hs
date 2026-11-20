@@ -298,6 +298,10 @@ data XXPatGhcTc
   -- See Note [Rebindable syntax and XXExprGhcRn].
   | ExpansionPat (Pat GhcRn) (Pat GhcTc)
 
+  -- | Open an implicit package while matching its payload pattern.
+  -- The witness and payload scope over the pattern and its match continuation.
+  | NativeExistsPat Type TyVar Id TcEvBinds (Pat GhcTc)
+
 
 -- See Note [Rebindable syntax and XXExprGhcRn].
 data HsPatExpansion a b
@@ -492,6 +496,7 @@ pprPat (XPat ext) = case ghcPass @p of
         then pprParendPat appPrec pat
         else pprPat pat
     ExpansionPat orig _ -> pprPat orig
+    NativeExistsPat _ _ _ _ pat -> pprPat pat
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p,
                      Outputable (Anno (IdGhcP p)))
@@ -697,6 +702,7 @@ isIrrefutableHsPat is_strict irref_conLike pat = go (unLoc pat)
       GhcTc -> case ext of
         CoPat _ pat _ -> go pat
         ExpansionPat _ pat -> go pat
+        NativeExistsPat _ _ _ _ pat -> go pat
 
 -- | Is the pattern any of combination of:
 --
@@ -768,6 +774,7 @@ isBoringHsPat = goL
          GhcTc -> case ext of
            CoPat _ pat _      -> go pat
            ExpansionPat _ pat -> go pat
+           NativeExistsPat _ _ _ _ pat -> go pat
 
 isPatSyn :: LPat GhcTc -> Bool
 isPatSyn (L _ (ConPat {pat_con = L _ (PatSynCon{})})) = True
@@ -1076,6 +1083,7 @@ patNeedsParens p = go @p
         HsPatExpanded orig _ -> go orig
       GhcTc -> case ext of
         CoPat _ inner _ -> go inner
+        NativeExistsPat _ _ _ _ inner -> go inner
         ExpansionPat orig _ -> go orig
           --                   ^^^^^^^
           -- NB: recursive call of go at a different GhcPass.
@@ -1164,6 +1172,7 @@ collectEvVarsPat pat =
     XPat ext -> case ext of
       CoPat _ p _      -> collectEvVarsPat p
       ExpansionPat _ p -> collectEvVarsPat p
+      NativeExistsPat _ _ _ _ p -> collectEvVarsPat p
     _other_pat       -> emptyBag
 
 {-

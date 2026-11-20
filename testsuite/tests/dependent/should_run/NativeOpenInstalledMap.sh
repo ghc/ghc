@@ -179,22 +179,23 @@ fi
 cat >FilterRun.hs <<'HS'
 module Main where
 import PreludeFilterLengthProof (showPreludeFilterLength)
-import PreludeFilterProof (lazyHead)
+import PreludeFilterProof (lazyHead, lazyIdentityHead)
 main :: IO ()
 main = do
-    print (lazyHead (error "filter forced the tail"))
+    let bottom = error "filter forced the tail"
+    print (lazyHead bottom, lazyIdentityHead bottom)
     putStrLn showPreludeFilterLength
 HS
 "${filter[@]}" -c FilterRun.hs
 "${filter[@]}" FilterRun.o PreludeFilter{Proof,LengthProof}.o ../filter/PreludeFilterSource.o \
     ../length-source/PreludeMapLength{Size,Source}.o -o filter-run
-[[ $(./filter-run) == $'True\n(BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))' ]]
+[[ $(./filter-run) == $'(True,True)\n(BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))' ]]
 
 sed -e 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' \
     -e 's/, showPreludeFilterProofs//' \
     -e '/^showPreludeFilterProofs ::/,$d' PreludeFilterProof.hs >RuleFilter.hs
 if "${filter[@]}" -fforce-recomp -c RuleFilter.hs >filter-rules.log 2>&1 ||
-   ! grep -Eq '(keepFalse|skipTrue) _ = Refl' filter-rules.log ||
+   ! grep -Eq '(keepFalse|skipTrue|keepTrue|skipFalse) _ = Refl' filter-rules.log ||
    ! grep -Fq '[GHC-83605]' filter-rules.log ||
    ! grep -Fq 'with the current rewrite rules' filter-rules.log; then
     cat filter-rules.log >&2

@@ -179,11 +179,21 @@ The example provider and a separately compiled client both fire
 `"open/hide" forall x. open (hide x) = x` at default `-O1`. The reader
 checks the rule head, the erased types in the rule and Core Lint.
 The interface records a capability for this rule. The previous compiler
-rejects that capability at the header. Orphan rules and rules over a
-retained function still report GHC-51063. The lexical package checks
+rejects that capability at the header. Rules over unsupported retained
+functions still report GHC-51063. The lexical package checks
 below cover rules that construct or open a package directly.
 [Package rule](../examples/erased-existentials/PackageRules.hs)
 and [source regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
+
+For a retained function, check the source and optimized Core separately.
+The rule `forall xs. keep False xs = xs` reaches Core and reports
+GHC-51063 at `-O1` or `-O2`. With `forall (b :: Bool) xs`, the type
+checker instead rejects `xs` with GHC-25897. Giving `xs` the type
+`Vec Int (Length b)` introduces a distinct type variable in that rule
+signature. The compiler reports GHC-53522 and discards the rule. A rule
+for `keep b (choose b)` reaches Core with one argument index. These
+cases distinguish a rule-binder scope change from the optimizer change.
+An acceptance test must observe the rule firing as well as the result.
 
 Forward congruence under an existential
 binder can run through the normal pipeline when its scoped payload
@@ -228,6 +238,15 @@ all three interface compression levels with the same target libraries.
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativePackageRuleClient.hs)
 and [interface check](../examples/erased-existentials/check-rule-interfaces.sh).
 
+A module can supply a true orphan rule over an imported function. The
+producer and the interface reader check the rule against the imported
+head's type. A rule-only import such as `import OrphanRules ()` brings
+the rule into scope through GHC's ordinary orphan dependencies. This also
+works through a module that imports the orphan. Removing both imports
+keeps the rule out of scope. The package matcher still checks the erased
+witness at the call. The interface records the orphan rule capability
+so that a reader without that capability rejects it at the header.
+
 ### A list fold over a hidden stream state
 
 A library defines `toList :: Stream a -> [a]` and exports a rule that
@@ -242,14 +261,23 @@ first-element fold leaves an undefined tail unevaluated.
 
 The client needs only the provider's interface to compile. The interface
 must include a declaration for the private step-fold function. Older
-providers could record its name as an unbound local. A rule directly on
-the imported `foldr` still receives GHC-51063. Its left-hand side contains
-the local `toList`, so GHC classifies this rule as non-orphan. A rule for
-`open (hide x)` declared in a third module with both names imported is an
-orphan. The optimizer currently rejects both imported heads.
-[Producer](../examples/erased-existentials/ErasedStream.hs),
+providers could record its name as an unbound local. The list-builder rule has the local head `toList`. A provider can also
+write a rule directly for `foldr k z (mapToList f s)`. The local name `mapToList`
+anchors the rule. Both the writer and reader check that the anchor still
+occurs in its left-hand side. The rule requires the anchored-rule interface
+capability. A true orphan with an imported head keeps its original format.
+The preceding reader still applies those orphan rules at each interface
+compression level. It rejects the anchored rule at the header.
+[Two-reader check](../examples/erased-existentials/check-imported-rule-interfaces.sh),
+[producer](../examples/erased-existentials/ErasedStream.hs),
 [ordinary client](../examples/erased-existentials/StreamFold.hs)
 and [rule-firing test](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
+
+The [integer package rule](../examples/erased-existentials/OrphanPackageRules.hs)
+is a separate example. Importing its module brings the specialization of
+`PackageRules.open` into scope. A Boolean package still uses the original
+function. The test compiles the same integer calls with and without the
+import and checks which rules fire.
 
 ## Next increments
 

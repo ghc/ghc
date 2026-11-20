@@ -148,6 +148,21 @@ for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKin
         exit 1
     }
 done
+cp "$src/"{WitnessGuardedClient,WitnessGuardedReject}.hs .
+"$ghc" "${flags[@]}" -c WitnessGuardedClient.hs -main-is WitnessGuardedClient
+"$ghc" "${flags[@]}" WitnessGuardedClient.o ../provider/WitnessSchema.o \
+    -main-is WitnessGuardedClient -o guarded-witness
+./guarded-witness
+if "$ghc" "${flags[@]}" -c WitnessGuardedReject.hs >guarded-witness.log 2>&1; then
+    echo "The guarded lambda accepted inconsistent or escaping witnesses." >&2
+    exit 1
+fi
+for diagnostic in '[GHC-83865]' '[GHC-46956]' 'would escape its scope'; do
+    grep -Fq "$diagnostic" guarded-witness.log || {
+        cat guarded-witness.log >&2
+        exit 1
+    }
+done
 if "$ghc" "${flags[@]}" -c WitnessMismatch.hs >family-mismatch.log 2>&1; then
     echo "A higher-rank witness hid a conflicting family result." >&2
     exit 1

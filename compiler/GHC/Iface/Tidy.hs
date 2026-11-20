@@ -418,6 +418,7 @@ data TidyOpts = TidyOpts
   , opt_static_ptr_opts :: !(Maybe StaticPtrOpts)
       -- ^ Options for generated static pointers, if enabled (/= Nothing).
   , opt_has_retained_core :: !Bool
+  , opt_check_imported_rule :: CoreRule -> IO Bool
   , opt_keep_auto_rules :: !Bool
   }
 
@@ -462,9 +463,11 @@ tidyProgram opts (ModGuts { mg_module           = mod
         _ -> pure ()
     let heads = mkNameEnv [(idName b, b) | b <- bindersOfBinds trimmed_binds]
     forM_ trimmed_rules $ \ rule ->
-      when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]
-            && not (maybe False (`supportsErasedUserRule` rule) (lookupNameEnv heads (ru_fn rule)))) $
-        throwGhcExceptionIO $ PprProgramError
+      when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]) $ do
+        allowed <- case lookupNameEnv heads (ru_fn rule) of
+          Just fun -> pure (supportsErasedUserRule fun rule)
+          Nothing -> opt_check_imported_rule opts rule
+        unless allowed $ throwGhcExceptionIO $ PprProgramError
           "Cannot export a rewrite rule that contains retained Core."
           (ppr rule)
 
@@ -867,8 +870,8 @@ when the reader can validate its specialization. See Note [Trimming auto-rules].
 
 A compulsory template cannot be removed. Check it after the simplifier,
 which can change the body that the desugarer checked. Exported RULES must
-also be safe to apply in ordinary importers. The retained driver rejects
-local user RULES before optimization. Keep an optional generated rule
+also be safe to apply in ordinary importers. The retained driver checks
+the supported erased user rules before optimization. Keep an optional generated rule
 private if it can introduce native Core into an ordinary client or if it
 has no supported shape. See Note [Exported retained specialisations] in
 GHC.Core.Rules. Tidy applies the same restriction to disk and --make
@@ -1369,6 +1372,7 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
       , args `lengthIs` tyConArity family
       = mkApps (Var (globaliseId owner)) (map protect_operand args)
     protect_operand (App fun arg) = App (protect_operand fun) (protect_operand arg)
+    protect_operand (Tick tick body) = Tick tick (protect_operand body)
     protect_operand expr = expr
 
     protect_bind (NonRec b r) = NonRec b <$> protect_calls r

@@ -333,6 +333,16 @@ empty vector. A wildcard in an earlier argument still leaves a later
 package lazy. Each argument has its own witness scope.
 [Partition equations](../examples/erased-existentials/ImplicitVector.hs).
 
+A pair of partitions stores each vector with its own erased length.
+The equations for `firstKept (VCons x _, _)` and `firstKept (VNil, _)`
+open the first package. They cover both vector constructors. The second
+package can be bottom. GHC records the opening on the matched field so
+that later alternatives can use the same witness. A different field
+retains its own witness. The regression checks a false guard, a guard
+that forces a second package, and an inaccessible GADT alternative.
+[Vector partition](../examples/erased-existentials/ImplicitVector.hs)
+and [nested match regression](../../../testsuite/tests/dependent/should_run/NativeNestedPackagePat.sh).
+
 ### A package with nested dot binders
 
 A partition can return one package that hides both output lengths.
@@ -402,8 +412,13 @@ For an expected `exists t. Bool -> Callback t`, the lambda
 `prepare :: Bool -> Callback PolyId`. GHC matches the invariant result
 types before it checks the lambda patterns. The usual lambda check then
 checks the operands and their usage. A pattern-local type cannot supply
-the outer witness. This case uses a single unguarded lambda and a result
-type available before checking its body.
+the outer witness. A guarded or multi-equation lambda uses the first
+matching result declaration in source order. Every guard and result
+checks against the same witness. For example, a declared consumer that
+takes a polymorphic callback and returns `Payload PolyId` can fix the
+witness for a different branch that constructs `Payload id atTwoTypes`.
+A branch with an incompatible result still reports a type error when
+its guard is unreachable.
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.

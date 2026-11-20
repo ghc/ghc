@@ -5900,6 +5900,17 @@ index. The matchable and unmatchable arrow choices are specific to GHC.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [the separate-module example](examples/open-evaluation/NestedFunctionClient.hs).
 
+### Equality of a partial family after rewriting its argument
+
+Agda's `cong` transports equality through any function by matching on
+`refl`. Proposal 242 distinguishes that direction from recovering an
+input from a type function's result. In the Showcase, equality of two
+callbacks suffices to replace one with the other in a partially applied
+`MapFlags`. The list argument remains open.
+[Agda standard library v2.3](https://agda.github.io/agda-stdlib/v2.3/Relation.Binary.PropositionalEquality.Core.html#cong),
+[proposal 242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities)
+and [ordinary client](../../testsuite/tests/dependent/should_run/NativeUnsaturatedClient.hs).
+
 ### Inferring a prefix of invisible family arguments
 
 Proposal 242 gives partial type family applications a kind with
@@ -6291,6 +6302,24 @@ for installed `Prelude.filter` at each head.
 [Agda with-abstraction](https://agda.readthedocs.io/en/latest/language/with-abstraction.html),
 and [R16 length bound](roadmap/R16-open-term-evaluator.md#prove-that-filter-never-increases-length).
 
+### Exporting an ordinary identity equation
+
+Agda defines identity by returning the argument directly. This equation
+reduces even when the argument is a variable. The Haskell report's
+definition of `seq` distinguishes bottom at function type from a
+lambda. GHC checks the identity body as well as its type before it
+publishes the projection.
+[Agda Function.Base](https://agda.github.io/agda-stdlib/v2.1/Function.Base.html)
+and [Haskell 2010, strict evaluation](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html#x13-1260006.2).
+
+GHC's `OPAQUE` pragma controls term optimization. An ordinary call to
+an opaque identity can stay in Core while its interface carries the
+separately checked projection. Rewrite rules at the proof site can
+change a call. The proof uses the existing policy for checked final
+Core equations. [GHC pragmas](../users_guide/exts/pragmas.rst),
+[GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
+and [R16 application](roadmap/R16-open-term-evaluator.md#use-an-ordinary-identity-as-an-open-callback).
+
 Agda permits a datatype declaration and its constructors to appear at
 different positions in an interleaved mutual block. Haskell's renamer
 already groups mutually dependent type declarations. R21 uses those
@@ -6336,3 +6365,16 @@ under `seq`. The fork checks the concrete mapper and keeps the
 unrestricted fusion rule outside conversion.
 [Fusion and definedness reading](papers/README.md#short-cut-fusion-and-definedness)
 and [ordinary GHC counterexample](examples/open-evaluation/check-map-fusion.sh).
+
+## Coverage of nested existential patterns
+
+Graf, Peyton Jones and Scott separate evaluation from constructor matching
+in the guard tree. Their GADT examples use equalities from earlier matches
+to check the remaining alternatives. R22 uses this distinction when a
+pattern opens an erased package. Opening records a witness for the same
+scrutinee. Matching a vector constructor then demands its payload.
+Section 7.2.3 identifies term constraints as a further requirement for
+full dependent coverage. Our example checks one such relation between
+a package and its openings.
+[*Lower Your Guards*, sections 2.4, 3.1 and 7.2.3](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
+and [local R22 examples](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).

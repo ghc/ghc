@@ -168,9 +168,27 @@ data Nested a where
 ```
 
 This nested field requires `UndecidableInstances`. The generated outer
-family uses the inner family at the same arguments. The constructor field
-pass copies the outer erased binders. A sum that refers to an earlier
-retained constructor argument remains outside this scope.
+family uses the inner family at the same arguments.
+
+A later field can also use a retained argument of the same constructor.
+In `Later :: foreach (n :: Nat) -> (some (m :: Nat) | (Vec a n, Vec b m)) -> Later a b`,
+the sum captures `n` where it occurs in the constructor signature. The
+private synonym takes `n` as a parameter. Each earlier binder scopes over
+later fields. Matching the constructor gives the consumer the same witness.
+Returning its vector at a caller-chosen index fails at the returned field.
+A later field can leave the earlier witness unevaluated. A GADT field
+can also open its own `foreach` telescope. Its witness can shadow one
+from the constructor. The field body uses the new witness and the next
+constructor field uses the original witness. Use a named sum if a
+written binder kind refers to a name hidden by this shadowing.
+Lifting stops at shadowing on the constructor's own argument spine.
+
+The constructor result has the enclosing telescope scope. A witness
+bound inside a field cannot escape into that result. The usual retained
+constructor restriction requires the erased quantifiers to name the
+datatype parameters. It rejects a constructor result indexed by one
+of its retained arguments.
+[Agda 2.8.0 telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html).
 [Interface and demand test](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
 
 Agda's dependent pair uses the stored first component to type the

@@ -171,15 +171,67 @@ caseIdentity _ input = input
 
 The renamer compares names, promotion marks, applications, wildcards
 and row order in one signature. Extra parentheses leave the case
-unchanged. Two distinct scrutinees, reordered rows, and separate
-signatures each have their own helper. The ordinary client can use the
-function at `Int` and `Bool` from its interface. Template Haskell can
+unchanged. Distinct scrutinees and reordered rows have separate helpers.
+The ordinary client can use the function at `Int` and `Bool` from
+its interface. Template Haskell can
 reify the signature in its owner or a client. A stuck mismatch names the
-source signature. Nested explicit quantifiers still require a named
-synonym in this implementation.
+source signature. An explicit nested erased `forall` can name its
+own scrutinee. Each nested telescope starts a fresh scope, even when
+two binders have the same spelling. A `foreach` binder can also supply
+a retained constructor index with a written algebraic domain. A bare
+function arrow copied from a runtime domain can change matchability
+in an erased kind, so that case still requires a named helper.
 [Source](../examples/open-evaluation/NativeCase.hs),
 [client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs)
 and [reification](../../../testsuite/tests/dependent/should_run/NativeTypeCaseReify.hs).
+
+### Compute a retained scrutinee
+
+A retained signature can match the result of an application tree.
+This signature uses ordinary Prelude imports and the checked R16
+equations for both calls to `not`.
+
+```haskell
+pick :: foreach (b :: Bool)
+     -> (case not (not b) of { True -> Int; False -> Bool })
+pick True = 42
+pick False = False
+```
+
+A call can use two retained indices. The supplied order determines
+which operands the source equations inspect. The private synonym
+receives the original indices and preserves that order. A checked
+equation may use the first constructor without inspecting the second
+operand. Unknown inputs still block an earlier test. A visible rule
+that can change a used source equation causes an error.
+[R16 checked functions](R16-open-term-evaluator.md) and
+[source and interface client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs).
+
+Identical retained cases in a declaration group can share one generated
+family when their captured domains are closed and their rows have no
+local captures or pattern binders. The comparison uses each retained
+operand's position in the captured telescope. It preserves the
+application tree and row order. The lookup runs after the declaration
+group's binders enter scope. Two import aliases can share a case when
+they resolve to the same checked source family. Each alias still counts
+as a use of its import. A shadowed variable keeps the identity of its
+own runtime binder. A different checked definition with the same
+spelling has a different identity.
+
+Across modules, export a named case result to give both signatures the
+same family. Infix calls, explicit kind applications and local callable
+heads remain outside this lifting rule.
+
+An old home module can still have separate private families for two
+equivalent retained signatures. GHC rechecks the provider when an
+exported retained signature refers to a local lifted case. The next
+build reuses the refreshed interface. If sharing changes an exported
+type, ordinary dependency tracking recompiles its clients. A client
+that has only the old interface can still fail at an unknown index,
+even when calls at known constructors work. Rebuild and reinstall an
+older installed provider to publish its shared family. A client build
+cannot rebuild the installed package.
+[Two-compiler upgrade check](../examples/open-evaluation/check-retained-case-upgrade.sh).
 
 ## A case as an arrow result
 

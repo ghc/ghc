@@ -27,6 +27,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Driver.Backend
 import GHC.Driver.Env
 import GHC.Driver.DynFlags
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.Ppr
 import GHC.Driver.Plugins
 
@@ -62,7 +63,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Types.Annotations
 import GHC.Types.Avail
 import GHC.Types.Basic ( ImportLevel(..), TupleSort(BoxedTuple) )
-import GHC.Types.Var (VarBndr(Bndr), ForAllTyFlag(Inferred, Required))
+import GHC.Types.Var (VarBndr(Bndr), ForAllTyFlag(Inferred, Invisible, Required))
 import GHC.Types.TyThing (TyThing(ATyCon))
 import GHC.Types.UnresolvedImport
 import GHC.Types.Name
@@ -591,18 +592,28 @@ checkFlagHash hsc_env iface self_recomp = do
         scoped_family_fp = scopedTypeCaseFingerprint family_base_fp
         filter_base_fp = guardedListFilterFingerprint class_base_fp
         filter_family_fp = guardedListFilterFingerprint family_base_fp
-        new_fp = scopedTypeCaseFingerprint filter_family_fp
+        scoped_filter_fp = scopedTypeCaseFingerprint filter_family_fp
+        identity_base_fp = checkedIdentityFingerprint filter_family_fp
+        scoped_identity_fp = checkedIdentityFingerprint scoped_filter_fp
+        binary_base_fp = binaryEnumFingerprint scoped_family_fp
+        new_fp = binaryEnumFingerprint scoped_identity_fp
+        retained_signature_fp = retainedSignatureCaseFingerprint new_fp
         earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp,
-                                    scoped_family_fp, filter_base_fp, filter_family_fp]
+                                    scoped_family_fp, filter_base_fp, filter_family_fp,
+                                    scoped_filter_fp, identity_base_fp, scoped_identity_fp, binary_base_fp]
         class_generations = new_fp : earlier_rule_generations
-        forwarded_fps = [new_fp, family_base_fp, scoped_family_fp, filter_family_fp]
-        guarded_fps = [new_fp, filter_base_fp, filter_family_fp]
-        scoped_fps = [new_fp, scoped_base_fp, scoped_family_fp]
+        filtered_family_fps = [filter_family_fp, scoped_filter_fp, identity_base_fp, scoped_identity_fp, new_fp]
+        forwarded_fps = family_base_fp : scoped_family_fp : binary_base_fp : filtered_family_fps
+        guarded_fps = filter_base_fp : filtered_family_fps
+        scoped_fps = [scoped_base_fp, scoped_family_fp, scoped_filter_fp, scoped_identity_fp, binary_base_fp, new_fp]
         -- See Note [Recompiling package rule providers].
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
-        old_fp | stored_fp `elem` class_generations = stored_fp
-               | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = fp
-               | otherwise = stored_fp
+        (old_fp, shared_retained_cases)
+          | stored_fp == retained_signature_fp = (new_fp, True)
+          | stored_fp `elem` class_generations = (stored_fp, False)
+          | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = (fp, False)
+          | stored_fp == retainedSignatureCaseFingerprint (stamp_rules new_fp) = (new_fp, True)
+          | otherwise = (stored_fp, False)
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
@@ -647,7 +658,7 @@ checkFlagHash hsc_env iface self_recomp = do
          -> recheck "Compiler now checks sum projections"
        | old_fp `elem` [base_fp, sum_fp, projection_fp, result_fp, helper_fp, pair_builder_fp,
                         reachable_helper_fp, private_case_fp, recursive_case_fp, carried_case_fp, callback_case_fp]
-       , couldExportEnumCallback iface
+       , couldExportEnumCallback 1 iface
          -> recheck "Compiler now checks ordinary enumeration callbacks"
        | old_fp == callback_case_fp, final_possible
          -> recheck "Compiler now validates optimized source mappers"
@@ -716,11 +727,20 @@ checkFlagHash hsc_env iface self_recomp = do
       UpToDate | old_fp `notElem` class_generations, couldInferClassDefaultSelector iface ->
         liftIO $ recheck "Compiler now infers matchability for associated type defaults"
       _ -> pure retained
-    let check_guarded_filter
+    let check_identity
+          | old_fp `notElem` [new_fp, identity_base_fp, scoped_identity_fp]
+          , backendGeneratesCode (backend dflags)
+          , mi_hsc_src iface == HsSrcFile = do
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface PolymorphicIdentity
+              if candidate
+                then liftIO $ recheck "Compiler now checks polymorphic identity equations"
+                else pure UpToDate
+          | otherwise = pure UpToDate
+        check_guarded_filter
           | old_fp `notElem` guarded_fps
           , backendGeneratesCode (backend dflags)
           , mi_hsc_src iface == HsSrcFile = do
-              candidate <- couldExportGuardedListFilter (isOneShot (ghcMode dflags)) iface
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface GuardedListFilter
               if candidate
                 then liftIO $ recheck "Compiler now checks guarded list filters"
                 else pure UpToDate
@@ -742,9 +762,75 @@ checkFlagHash hsc_env iface self_recomp = do
           , couldExportScopedTypeCase iface =
               liftIO $ recheck "Compiler now checks dependent type case captures"
           | otherwise = pure UpToDate
-    pure (flags, check_guarded_filter `recompThen` check_family_uses
+        check_binary_enum
+          | old_fp `notElem` [new_fp, binary_base_fp]
+          , mi_hsc_src iface == HsSrcFile
+          , not (xopt LangExt.ExperimentalDependentTypes dflags)
+          , couldExportEnumCallback 2 iface =
+              liftIO $ recheck "Compiler now checks ordinary binary enumeration callbacks"
+          | otherwise = pure UpToDate
+        check_retained_signature
+          | not shared_retained_cases
+          , mi_hsc_src iface == HsSrcFile
+          , couldExportRetainedSignatureCase (mi_semantic_module iface)
+                                            (mi_exports iface) (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now shares retained signature type cases"
+          | otherwise = pure UpToDate
+    pure (flags, check_identity `recompThen` check_guarded_filter `recompThen` check_family_uses
                                      `recompThen` check_forwarded_result
-                                     `recompThen` check_scoped_case)
+                                     `recompThen` check_scoped_case
+                                     `recompThen` check_binary_enum
+                                     `recompThen` check_retained_signature)
+
+{- Note [Recompiling retained signature case providers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old retained signature can reference a private case family from
+before the compiler shared identical cases in a declaration group.
+An ordinary unchanged client can still use each signature at a known
+constructor. A new neutral use can fail until the provider recompiles.
+Recheck a home source module whose exported retained signature uses
+one of its own lifted cases. The recheck does not imply that the
+provider has two cases that can share. Store its stamp even when
+the provider's ABI is unchanged.
+
+The stamp augments the current self-recompilation hash, after the
+stamp for lexical rules when present. Recognize unstamped generations
+and the plain retained stamp before inspecting rules. Let ordinary
+dependency checks give their reasons before checking this stamp.
+-}
+
+-- | Mark a provider checked for sharing of retained signature type cases.
+retainedSignatureCaseFingerprint :: Fingerprint -> Fingerprint
+retainedSignatureCaseFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "retained-signature-cases-v1" :: String)
+
+-- | Find a local lifted case in an exported retained signature.
+-- See Note [Recompiling retained signature case providers].
+couldExportRetainedSignatureCase :: Module -> [IfaceExport] -> [IfaceDecl] -> Bool
+couldExportRetainedSignatureCase owner exports = any candidate
+  where
+    exported = mkNameSet (concatMap availNames exports)
+    candidate decl@IfaceId{ifName = name, ifType = ty}
+      | name `elemNameSet` exported = containsRetained ty
+      where
+        containsRetained (IfaceDepFunTy _ (_, _, domain) body) =
+          any localCase (nameSetElemsStable (freeNamesIfDecl (decl { ifType = body, ifIdInfo = [] })))
+            || containsRetained domain
+        containsRetained (IfaceForAllTy _ _ body) = containsRetained body
+        containsRetained (IfaceFunTy _ _ _ arg body) = containsRetained arg || containsRetained body
+        containsRetained (IfaceAppTy head_ty args) =
+          containsRetained head_ty || any containsRetained (appArgsIfaceTypes args)
+        containsRetained (IfaceTyConApp _ args) = any containsRetained (appArgsIfaceTypes args)
+        containsRetained (IfaceTupleTy _ _ args) = any containsRetained (appArgsIfaceTypes args)
+        containsRetained (IfaceCastTy body _) = containsRetained body
+        containsRetained (IfaceExistsTy _ (_, domain) body) =
+          containsRetained domain || containsRetained body
+        containsRetained _ = False
+    candidate _ = False
+
+    localCase name = nameModule_maybe name == Just owner &&
+      any (`isPrefixOf` occNameString (nameOccName name))
+          ["$signature-case:", "$case:$signature-case:"]
 
 -- | Mark providers compiled with the scope traversal in GHC.Iface.Tidy.
 -- See Note [Private helpers in erased package rules] in GHC.Iface.Tidy.
@@ -770,6 +856,11 @@ packageRuleProviderFingerprint rules fp
       computeFingerprint putNameLiterally (fp, "lexical-rule-private-helpers-v1" :: String)
   | otherwise = fp
 
+-- | Record the check for ordinary workers with two enumeration operands.
+binaryEnumFingerprint :: Fingerprint -> Fingerprint
+binaryEnumFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "binary-enumeration-callback-v1" :: String)
+
 -- | Record the independent selector on an open equation returning its kind family.
 forwardedResultFingerprint :: Fingerprint -> Fingerprint
 forwardedResultFingerprint fp =
@@ -789,6 +880,11 @@ classDefaultMatchabilityFingerprint fp =
 guardedListFilterFingerprint :: Fingerprint -> Fingerprint
 guardedListFilterFingerprint fp =
     computeFingerprint putNameLiterally (fp, "guarded-list-filter-v1" :: String)
+
+-- | Record that the compiler checked ordinary polymorphic identity definitions.
+checkedIdentityFingerprint :: Fingerprint -> Fingerprint
+checkedIdentityFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "checked-polymorphic-identity-v1" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -1249,9 +1345,9 @@ exportedCaseDatatypes iface =
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     exported name = name `elemNameSet` exports
 
--- | Find exported ordinary signatures that can hide an enumeration arrow.
-couldExportEnumCallback :: ModIface -> Bool
-couldExportEnumCallback iface = any candidate (mi_decls iface)
+-- | Find exported ordinary signatures that can hide the given number of enumeration arrows.
+couldExportEnumCallback :: Int -> ModIface -> Bool
+couldExportEnumCallback arity iface = any candidate (mi_decls iface)
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     exported n = n `elemNameSet` exports
@@ -1259,11 +1355,19 @@ couldExportEnumCallback iface = any candidate (mi_decls iface)
     candidate (_, IfaceId{ifName = n, ifType = ty, ifIdDetails = details}) =
       exported n && case details of
         IfSourceTableId{} -> False
-        _ -> arrow ty
+        _ -> arrow arity ty
     candidate _ = False
 
-    arrow (IfaceFunTy FTF_T_T _ _ domain result) = enum domain && enum result
-    arrow ty = opaque ty
+    arrow n (IfaceFunTy FTF_T_T ma mult domain result)
+      | arity == 2
+      , not (canHide unmatchableDataConName ma && canHide manyDataConName mult)
+      = False
+      | n == 1 = enum domain && enum result
+      | otherwise = enum domain && arrow (n - 1) result
+    arrow _ ty = opaque ty
+
+    canHide name ty@(IfaceTyConApp tc IA_Nil) = ifaceTyConName tc == name || opaque ty
+    canHide _ ty = opaque ty
 
     enum (IfaceTupleTy BoxedTuple NotPromoted IA_Nil) = True
     enum ty@(IfaceTyConApp tc _) =
@@ -1317,33 +1421,65 @@ couldExportCallbackCase iface = any candidate (mi_decls iface)
     opaque _ = False
 
 -- | A signature component with its quantified variables and synonym arguments.
--- See Note [Looking through type synonyms for guarded list filters].
-data FilterIfaceType = FilterIfaceType IfaceType [(IfLclName, Either Int FilterIfaceType)]
+-- See Note [Looking through type synonyms for checked source signatures].
+data SourceIfaceType = SourceIfaceType IfaceType [(IfLclName, Either Int SourceIfaceType)]
 
--- | Check whether an exported signature could have the filter shape.
--- See Note [Looking through type synonyms for guarded list filters].
-couldExportGuardedListFilter :: Bool -> ModIface -> IfG Bool
-couldExportGuardedListFilter one_shot iface =
+-- | The signature shapes used to find producers with missing source equations.
+data SourceSignature = GuardedListFilter | PolymorphicIdentity
+
+-- | Check whether an exported signature could supply the requested equation.
+-- See Note [Looking through type synonyms for checked source signatures].
+couldExportSourceSignature :: Bool -> ModIface -> SourceSignature -> IfG Bool
+couldExportSourceSignature one_shot iface signature =
     evalStateT (anyM candidate (mi_decls iface))
       (mkModuleEnv [(mi_semantic_module iface, decl_index iface)])
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     boot_deps = mkModDeps (dep_boot_mods (mi_deps iface))
-    candidate (_, IfaceId{ifName = n, ifType = ty})
-      | n `elemNameSet` exports = isJust <$> runMaybeT (filter_type 0 (FilterIfaceType ty []))
+    candidate (_, IfaceId{ifName = n, ifType = ty, ifIdDetails = details})
+      | n `elemNameSet` exports = case signature of
+          GuardedListFilter -> check (filter_type 0)
+          PolymorphicIdentity
+            | IfSourceTableId{} <- details -> pure False
+            | otherwise -> check identity_type
+      where
+        check shape = isJust <$> runMaybeT (shape (SourceIfaceType ty []))
     candidate _ = pure False
+
+    identity_type ty = lift (view ty) >>= \case
+      Nothing -> pure ()
+      Just (SourceIfaceType (IfaceForAllTy ma (Bndr (IfaceTvBndr (name, kind))
+                                              (IfaceForAllTyFlag (Invisible _))) body) args)
+        | nullary_name unmatchableDataConName ma -> do
+            lift (view (SourceIfaceType kind args)) >>= \case
+              Just (SourceIfaceType kind' _) -> guard (isIfaceLiftedTypeKind kind')
+              Nothing -> pure ()
+            identity_arrow (SourceIfaceType body ((name, Left 0) : args))
+      _ -> mzero
+
+    identity_arrow ty = lift (view ty) >>= \case
+      Nothing -> pure ()
+      Just (SourceIfaceType (IfaceFunTy FTF_T_T ma mult input output) args)
+        | nullary_name unmatchableDataConName ma, nullary_name manyDataConName mult -> do
+            from <- element (SourceIfaceType input args)
+            to <- element (SourceIfaceType output args)
+            guard (all (== 0) (catMaybes [from, to]))
+      _ -> mzero
+
+    nullary_name expected (IfaceTyConApp tc IA_Nil) = ifaceTyConName tc == expected
+    nullary_name _ _ = False
 
     filter_type depth ty = lift (view ty) >>= \case
       Nothing -> pure ()
-      Just (FilterIfaceType (IfaceForAllTy _ (Bndr binder _) body) args) ->
-        filter_type (depth + 1) (FilterIfaceType body ((ifaceBndrName binder, Left depth) : args))
-      Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ callback rest) args) -> do
-        variable <- callback_element (FilterIfaceType callback args)
-        lift (view (FilterIfaceType rest args)) >>= \case
+      Just (SourceIfaceType (IfaceForAllTy _ (Bndr binder _) body) args) ->
+        filter_type (depth + 1) (SourceIfaceType body ((ifaceBndrName binder, Left depth) : args))
+      Just (SourceIfaceType (IfaceFunTy FTF_T_T _ _ callback rest) args) -> do
+        variable <- callback_element (SourceIfaceType callback args)
+        lift (view (SourceIfaceType rest args)) >>= \case
           Nothing -> pure ()
-          Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ input output) rest_args) -> do
-            from <- list_element (FilterIfaceType input rest_args)
-            to <- list_element (FilterIfaceType output rest_args)
+          Just (SourceIfaceType (IfaceFunTy FTF_T_T _ _ input output) rest_args) -> do
+            from <- list_element (SourceIfaceType input rest_args)
+            to <- list_element (SourceIfaceType output rest_args)
             case catMaybes [variable, from, to] of
               first : others -> guard (all (== first) others)
               [] -> pure ()
@@ -1352,35 +1488,35 @@ couldExportGuardedListFilter one_shot iface =
 
     callback_element ty = lift (view ty) >>= \case
       Nothing -> pure Nothing
-      Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ domain result) args) -> do
-        lift (view (FilterIfaceType result args)) >>= \case
-          Nothing -> element (FilterIfaceType domain args)
-          Just (FilterIfaceType (IfaceTyConApp tc IA_Nil) _)
-            | ifaceTyConName tc == boolTyConName -> element (FilterIfaceType domain args)
+      Just (SourceIfaceType (IfaceFunTy FTF_T_T _ _ domain result) args) -> do
+        lift (view (SourceIfaceType result args)) >>= \case
+          Nothing -> element (SourceIfaceType domain args)
+          Just (SourceIfaceType (IfaceTyConApp tc IA_Nil) _)
+            | ifaceTyConName tc == boolTyConName -> element (SourceIfaceType domain args)
           _ -> mzero
       _ -> mzero
 
     list_element ty = lift (view ty) >>= \case
       Nothing -> pure Nothing
-      Just (FilterIfaceType (IfaceTyConApp tc (IA_Arg arg _ IA_Nil)) args)
-        | ifaceTyConName tc == listTyConName -> element (FilterIfaceType arg args)
+      Just (SourceIfaceType (IfaceTyConApp tc (IA_Arg arg _ IA_Nil)) args)
+        | ifaceTyConName tc == listTyConName -> element (SourceIfaceType arg args)
       _ -> mzero
 
     element ty = lift (view ty) >>= \case
       Nothing -> pure Nothing
-      Just (FilterIfaceType (IfaceTyVar var) args) -> pure (either Just (const Nothing) =<< lookup var args)
+      Just (SourceIfaceType (IfaceTyVar var) args) -> pure (either Just (const Nothing) =<< lookup var args)
       _ -> mzero
 
-    view component@(FilterIfaceType ty args) = case ty of
+    view component@(SourceIfaceType ty args) = case ty of
       IfaceTyVar var | Just (Right arg) <- lookup var args -> view arg
       IfaceTyConApp tc actuals | let name = ifaceTyConName tc, not (isWiredInName name) ->
         declaration name >>= \case
           Just IfaceSynonym{ifBinders = binders, ifSynRhs = rhs} ->
             let actual_types = appArgsIfaceTypes actuals in
             if binders `equalLength` actual_types
-              then view (FilterIfaceType rhs
+              then view (SourceIfaceType rhs
                           (zip (map ifTyConBinderName binders)
-                               [Right (FilterIfaceType arg args) | arg <- actual_types]))
+                               [Right (SourceIfaceType arg args) | arg <- actual_types]))
               else pure Nothing
           Just _ -> pure (Just component)
           Nothing -> pure Nothing
@@ -1395,7 +1531,7 @@ couldExportGuardedListFilter one_shot iface =
         decls <- case cached of
           Just decls -> pure decls
           Nothing -> do
-            provider <- lift $ readRecompProviderWithBoot (text "Checking guarded list filter type")
+            provider <- lift $ readRecompProviderWithBoot (text "Checking source equation type")
                                 (provider_boot owner) owner
             let decls = maybe emptyNameEnv decl_index provider
             modify' (\env -> extendModuleEnv env owner decls)
@@ -1413,12 +1549,12 @@ couldExportGuardedListFilter one_shot iface =
       (ifName decl, decl) : [(ifName family, family) | IfaceAT family _ <- ats]
     named_declaration decl = [(ifName decl, decl)]
 
-{- Note [Looking through type synonyms for guarded list filters]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An old interface can store Select a in the type of an exported filter.
-The new compiler must recheck the producer to publish the checked equations.
+{- Note [Looking through type synonyms for checked source signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old interface can store a synonym in an exported type. Recheck the
+producer if the type can supply a new source equation.
 Use the local declarations and the ordinary recompilation provider lookup
-to inspect saturated synonyms at the arrow, callback and list positions.
+to inspect saturated synonyms in each signature component.
 Check dependencies and usages first. The home table supplies the current
 interface in --make. In one-shot mode, use the recorded boot dependencies
 to choose which file to read. Cache each provider for this check. Re-exports
@@ -1427,13 +1563,13 @@ Keep each argument in its original scope when entering a synonym body.
 Give each quantified variable a distinct binder depth for the element check.
 The presentation-only IfaceType substitution cannot handle every binder.
 
-The Core shape check expands synonyms and treats known family heads as
-rigid. A cast, unresolved declaration or other opaque application can hide
-the necessary shape. Treat that component as unknown and continue checking
-the visible components. A known structural mismatch excludes the signature.
-The final Core check still decides publication. The existing guard fingerprint
-records that check on the next write, so an opaque candidate can cause one
-extra rebuild.
+The Core check expands synonyms and treats known family heads as rigid.
+A cast, unresolved declaration or opaque application can hide a shape.
+Treat that component as unknown and check the visible components.
+A known structural mismatch excludes the signature. An existing identity
+certificate also excludes its owner. The final Core check decides whether
+to publish a new certificate. Record that check on the next write so an
+uncertain match causes one rebuild.
 -}
 
 -- | An exported function can hide its result pair behind a type synonym.
@@ -2147,7 +2283,9 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = scopedTypeCaseFingerprint
+          current_flag_hash = binaryEnumFingerprint
+                            $ checkedIdentityFingerprint
+                            $ scopedTypeCaseFingerprint
                             $ guardedListFilterFingerprint
                             $ forwardedResultFingerprint
                             $ classDefaultMatchabilityFingerprint
@@ -2214,15 +2352,24 @@ addFingerprints hsc_env iface0 = do
   --   - the things which can affect whether a module is recompiled
   --   - the module level annotations,
   --   - deps (home and external packages, dependent files)
-  let base_hash = computeFingerprint putNameLiterally
+  let iface
+        | mi_hsc_src iface0 == HsSrcFile
+        , Just info <- mi_self_recomp_info iface0
+        , FingerprintWithValue fp flags <- mi_sr_flag_hash info
+        , couldExportRetainedSignatureCase (mi_semantic_module iface0)
+                                          (mi_exports iface0) (mi_decls iface0) =
+            set_mi_self_recomp (Just info
+              { mi_sr_flag_hash = FingerprintWithValue (retainedSignatureCaseFingerprint fp) flags }) iface0
+        | otherwise = iface0
+      base_hash = computeFingerprint putNameLiterally
                         (mi_abi_mod_hash abiHashes,
-                         mi_self_recomp_info iface0,
+                         mi_self_recomp_info iface,
                          mi_deps iface0)
       !iface_hash = case sourceTableLocations sorted_decls of
         []   -> base_hash
         locs -> computeFingerprint putNameLiterally (base_hash, locs)
 
-  let final_iface = completePartialModIface iface0 iface_hash
+  let final_iface = completePartialModIface iface iface_hash
                      sorted_decls sorted_extra_decls abiHashes caches
    --
   return final_iface

@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, partitionVec, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, filterVec, partitionVec, firstKept, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
@@ -27,6 +27,11 @@ partitionVec _ VNil = (VNil, VNil)
 partitionVec p (VCons x xs) =
   let (yes, no) = partitionVec p xs
   in if p x then (VCons x yes, no) else (yes, VCons x no)
+
+-- | Read the first kept element without opening the rejected partition.
+firstKept :: (Filtered a, Filtered a) -> Maybe a
+firstKept (VNil, _) = Nothing
+firstKept (VCons x _, _) = Just x
 
 -- | Store both vectors in one payload.
 data Rows a n m = Rows (Vec a n) (Vec a m)

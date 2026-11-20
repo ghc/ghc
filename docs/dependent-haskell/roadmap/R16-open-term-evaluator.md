@@ -990,6 +990,30 @@ Recompilation also finds functions on imported wired-in enumerations,
 including `Ordering`. [Upgrade check](../examples/open-evaluation/check-enum-upgrade.sh)
 and [Agda comparison](../REFERENCES.md#an-ordinary-enumeration-function-as-a-callback).
 
+An ordinary worker with two unrestricted, unmatchable arguments can
+publish a certificate for public enumerations. It checks the first
+argument exhaustively. Each branch returns an enumeration constructor
+or the second argument. A branch that returns a constructor can leave
+the second variable unused or write it as a wildcard. The checker
+rejects a case that forces this argument, including demands from a
+bang pattern or `Strict`. A third argument or a rule on the worker in
+its defining module also makes the worker ineligible.
+
+A consumer can supply the first argument and pass the remaining
+function to a higher-order type family. The consuming proof checks any
+rules visible at the point where it uses the equation. A closed call
+with object code records the object dependency.
+[Binary enumeration regression](../../../testsuite/tests/dependent/should_run/NativeBinaryEnum.sh).
+
+The ordinary function `mayProceed Red _ = False` skips its second
+argument. The other branch returns it. A client can save
+`mayProceed 'Green` as a partial type-level function and prove that it
+returns an as-yet unknown permission. The runtime example calls the red
+branch with an undefined permission and gets `False`.
+[Ordinary producer](../examples/open-evaluation/OpenMapWorker.hs),
+[partial function](../examples/open-evaluation/OpenMapSource.hs)
+and [client proof](../examples/open-evaluation/OpenMapProof.hs).
+
 The remaining part of the roadmap example is the mapper. The installed
 `Prelude.map` has fusion rules. Its interface can omit the recursive
 unfolding. Evidence for the mapper must survive compilation of its
@@ -1217,6 +1241,36 @@ need a check. The regression also verifies that a kept runtime head can
 be observed with a bottom tail.
 [Interface and runtime regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh)
 and [prior art](../REFERENCES.md#list-filtering-with-a-known-predicate-result).
+
+### Use an ordinary identity as an open callback
+
+`Prelude.filter Prelude.id` keeps a `True` head and skips a `False`
+head without knowing the tail. `Prelude.map Prelude.id` preserves a
+rigid head at any lifted element type. The ordinary proof modules
+need only the [filter alias interface](../examples/open-evaluation/PreludeFilterSource.hs)
+or the [map alias interface](../examples/open-evaluation/PreludeMapSource.hs).
+
+GHC checks the ordinary definition before and after optimization. It
+requires an unrestricted function with one lifted type parameter and
+a body that returns its bound argument. When the optimizer shares the
+body, GHC follows aliases to a checked projection in the same module.
+This is how the installed `id` retains its equation after GHC shares
+its implementation with `breakpoint`. The interface can omit the
+term unfolding. A no-code producer cannot publish this equation.
+
+The proof site disables rewrite rules. An old source provider is
+rechecked if an exported signature can be the polymorphic identity and
+its interface has no checked equation. Clients with only an old
+interface need the producer to publish the equation before they can
+prove it. See the [installed list regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh)
+and [prior art](../REFERENCES.md#exporting-an-ordinary-identity-equation).
+
+A saturated symbolic call can still use an ordinary unfolding with
+rewrite rules enabled. The open evaluator follows the definitions it
+needs and checks the rules for each observed binding. A rule on a
+visited alias can block the call. In an implicitly quantified signature,
+an unqualified type variable keeps its earlier scope.
+[Open source regression](../examples/open-evaluation/check-source.sh).
 
 ### Prove that filter never increases length
 

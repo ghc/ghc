@@ -69,6 +69,46 @@ cp "$src"/{OpenSource,RunOpenSource}.hs manager/
 )
 printf 'home modules under --make select the expected type arguments\n'
 
+# A certified identity still supports ordinary symbolic calls with rules on.
+mkdir optimized
+cat >optimized/UnfoldedIdentity.hs <<'HS'
+{-# LANGUAGE CPP, ExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
+module UnfoldedIdentity where
+
+import Data.Proxy (Proxy(..))
+import Prelude
+import qualified Prelude as P
+
+unqualified :: forall a. a -> id a
+unqualified x = x
+
+qualified :: forall a. a -> P.id a
+qualified x = x
+
+implicit :: Proxy (id a)
+implicit = Proxy
+
+keepScope :: Proxy (Maybe Int)
+keepScope = implicit @Maybe @Int
+
+#ifdef CHANGE_IDENTITY
+{-# RULES "change observed identity" forall x. P.id x = P.undefined #-}
+#endif
+HS
+(
+    cd optimized
+    optimized=("${ghc[@]}" -O1 -fenable-rewrite-rules -Wno-orphans -Wno-inline-rule-shadowing)
+    "${optimized[@]}" -c UnfoldedIdentity.hs
+    line=$(awk '/^\{-# RULES "change observed identity"/ {print NR}' UnfoldedIdentity.hs)
+    if "${optimized[@]}" -fforce-recomp -DCHANGE_IDENTITY -c UnfoldedIdentity.hs >rule.log 2>&1 ||
+       ! grep -Fq "UnfoldedIdentity.hs:$line:" rule.log ||
+       ! grep -Fq '[GHC-83605]' rule.log ||
+       ! grep -Fq 'A rewrite rule can change the result of' rule.log; then
+        cat rule.log >&2
+        exit 1
+    fi
+)
+
 cat > negative/OpenStrict.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
 module OpenStrict where

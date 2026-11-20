@@ -1540,6 +1540,7 @@ instance CollectFldBinders (Pat GhcTc) where
     go sels (SumPat _ (L _ p) _ _)  = go sels p
     go sels (XPat (CoPat _ p _)) = go sels p
     go sels (XPat (ExpansionPat _ p)) = go sels p
+    go sels (XPat (NativeExistsPat _ _ _ _ p)) = go sels p
     go sels (ListPat _ ps) = plusVarEnvList (map (go sels . unLoc) ps)
     go sels (TuplePat _ ps _) = plusVarEnvList (map (go sels . unLoc) ps)
     go sels (ModifiedPat _ _ (L _ p)) = go sels p

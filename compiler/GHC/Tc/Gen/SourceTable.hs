@@ -1,7 +1,7 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies, isFinalCoreIdentity, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
-                              sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, isMonomorphicEnumCaseType, groundFirstHead,
+                              sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
@@ -65,7 +65,7 @@ import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
-import GHC.Types.Id.Info (IdDetails(SourceTableId))
+import GHC.Types.Id.Info (IdDetails(SourceTableId, VanillaId))
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
@@ -106,7 +106,7 @@ import Control.Applicative ((<|>))
 import Data.Functor.Identity (Identity(..))
 import Data.List (find, findIndex, nubBy, partition, sortBy, stripPrefix)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (catMaybes, fromMaybe, isNothing, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, mapMaybe)
 
 -- | Read the current defining Id without registering use of its equations.
 -- A local occurrence can still carry the Id from before equation checking.
@@ -645,6 +645,15 @@ recordSourceUses ops = do
            else RetainedSourceRule (idName v)))
       Nothing -> publishSourceUses ops
 
+-- | Use the exact dependencies visited by the open evaluator.
+-- See Note [Identity certificates and open unfoldings].
+recordUnfoldedSourceUses :: [(Id, Maybe Name)] -> TcM ()
+recordUnfoldedSourceUses = recordSourceUses . map ordinary_use
+  where
+    ordinary_use (v, arg)
+      | isFinalCoreIdentity v = (setIdDetails v VanillaId, arg)
+      | otherwise = (v, arg)
+
 -- | Record checked operations without changing the location of late-rule errors.
 publishSourceUses :: [(Id, Maybe Name)] -> TcM ()
 publishSourceUses ops = do
@@ -673,9 +682,12 @@ checkSourceMethodUsesWithPending :: TcGblEnv -> TcM ()
 checkSourceMethodUsesWithPending env = do
     commitOptionalSourceUses env
     uses <- filterNameSet (isVarOcc . nameOccName) <$> readTcRef (tcg_source_table_uses env)
+    unfolded <- readTcRef (tcg_evaluated_term_uses env)
     rewriting <- goptM Opt_EnableRewriteRules
+    let uses_final_core v = finalCoreMapperOwner v
+          && not (isFinalCoreIdentity v && idName v `elemNameSet` unfolded)
     checked_uses <- if rewriting then pure uses else
-      mkNameSet <$> filterM (fmap (maybe True (not . finalCoreMapperOwner)) . tcLookupIdMaybe)
+      mkNameSet <$> filterM (fmap (maybe True (not . uses_final_core)) . tcLookupIdMaybe)
         (nameSetElemsStable uses)
     unless (isEmptyNameSet checked_uses) $ do
       types <- readTcRef (tcg_source_rule_types env)
@@ -695,7 +707,7 @@ checkSourceMethodUsesWithPending env = do
         visible <- visibleSourceMethodRules env
         forM_ (nameSetElemsStable imported) $ \name -> do
           v <- tcLookupId name
-          let changed | finalCoreMapperOwner v = not (checkedMapperRules visible v)
+          let changed | uses_final_core v = not (checkedMapperRules visible v)
                       | otherwise = any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name)
           when changed (report name)
 
@@ -961,12 +973,15 @@ sourceCaseTables binds = do
       enum_enabled = not char_tables
       imported = ordinaryImport rdr_env
       eligible_case = eligibleCase env exported enum_enabled imported
-      final_candidate owner = backendGeneratesCode (backend dflags)
+      generates_code = backendGeneratesCode (backend dflags)
+      final_candidate owner = generates_code
         && case constructorCaseType (varType owner) of
              Just (ConstructorCaseType _ tc _ _ 1 _) -> tc == listTyCon
              _ -> False
+      identity_candidate owner = generates_code && isIdentitySourceType (varType owner)
+      is_exported owner = idName owner `elemNameSet` exported
       eligible owner =
-        idName owner `elemNameSet` exported &&
+        is_exported owner &&
         (final_candidate owner || not (idName owner `elemNameSet` ruled)) &&
         ((char_tables && varType owner `eqType` charArrow) ||
          not (isNothing (pairCaseType (varType owner))) ||
@@ -974,7 +989,8 @@ sourceCaseTables binds = do
          eligible_case owner)
       owners = [ (bind, owner) | bind <- binds
                , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
-      candidates = filter (eligible . snd) owners
+      candidates = [(bind, owner) | (bind, owner) <- owners
+                    , eligible owner || (is_exported owner && identity_candidate owner)]
   if isHsBootOrSig (tcg_src env) || null candidates
     then pure ([], [])
     else do
@@ -983,7 +999,7 @@ sourceCaseTables binds = do
       prepared <- fmap catMaybes $ forM candidates $ \(bind, owner) -> do
         let ruled_owner = changed owner
             check_final = final_candidate owner
-        if ruled_owner && not check_final then pure Nothing else do
+        if ruled_owner && not (check_final || identity_candidate owner) then pure Nothing else do
           rhs <- bindingCore bind owner
           pure $ do
             body <- rhs
@@ -991,7 +1007,8 @@ sourceCaseTables binds = do
                           then directListFilter (simpleOptExpr (initSimpleOpts dflags)) owner body
                           else Nothing
             pure (owner, body, ruled_owner, guarded)
-      let root_cores = [(owner, body) | (owner, body, False, Nothing) <- prepared]
+      let root_cores = [(owner, body) | (owner, body, False, Nothing) <- prepared
+                                     , eligible owner]
       final <- forM prepared $ \(owner, body, ruled_owner, guarded) ->
         case guarded of
           Just signature -> do
@@ -1027,8 +1044,18 @@ sourceCaseTables binds = do
           helper_tables = mkNameEnv [(tyConName table, table) | (_, table) <- helpers]
           used = helperClosure helper_tables emptyNameSet (calleeNames roots)
           referenced (_, table) = tyConName table `elemNameSet` used
+          used_helpers = filter referenced helpers
+          helper_owners = mkNameSet (map (idName . fst) used_helpers)
+      identities <- forM [(owner, projection)
+                         | (owner, body, _, _) <- prepared
+                         , identity_candidate owner
+                         , not (idName owner `elemNameSet` helper_owners)
+                         , Just projection <- [checkedIdentitySource owner body]] $
+        \(owner, (telescope, domains, result, row)) -> do
+          table <- publishConstructorRows owner telescope domains result [row]
+          pure (finalOwner owner table, table)
       let (final_tables, guard_tables) = unzip final
-      pure (catMaybes final_tables ++ roots ++ filter referenced helpers,
+      pure (catMaybes final_tables ++ identities ++ roots ++ used_helpers,
             concat guard_tables ++ concat fields)
   where
     charArrow = mkVisFunTyManyU charTy charTy
@@ -1072,8 +1099,8 @@ sourceCaseTables binds = do
       | otherwise = helperClosure tables seen rest
 
     eligibleCase env exported enum_enabled imported owner
-      | isMonomorphicEnumCaseType (varType owner)
-      = enum_enabled && maybe False enumVisible (caseArrow (varType owner))
+      | Just kinds <- monomorphicEnumCaseKinds (varType owner)
+      = enum_enabled && all enumVisible kinds
       | Just (ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
       = (position == 1 && tc == listTyCon) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
@@ -1083,9 +1110,7 @@ sourceCaseTables binds = do
          publicCaseType env exported imported tc)
       | otherwise = False
       where
-        enumVisible (input, output) =
-          all (maybe False (publicCaseType env exported imported . fst) . caseDatatype)
-              [input, output]
+        enumVisible = maybe False (publicCaseType env exported imported . fst) . caseDatatype
 
     publicCaseType env exported imported tc =
       all available (tyConName tc : map dataConName (tyConDataCons tc))
@@ -1115,13 +1140,15 @@ sourceCaseTables binds = do
             _ | Just projection <- checkedPairCase owner rhs ->
                   Just . (owner,) <$> publishPairCase owner projection
               | let imported = ordinaryImport rdr_env
+                    enum_arity = monomorphicEnumCaseArity (varType owner)
               , eligibleCase env exported enum_enabled imported owner
               , Just (signature, rows) <- checkedConstructorCase
                   (publicCaseType env exported imported)
-                  (lookupHelper env imported helpers) owner rhs -> do
+                  (lookupHelper env imported helpers) owner rhs
+              , enum_arity /= Just 2 || all enum_binary_row rows -> do
                   table <- publishConstructorCase owner signature rows
                   let certified
-                        | isMonomorphicEnumCaseType (varType owner) = setIdDetails owner
+                        | isJust enum_arity = setIdDetails owner
                             (SourceTableId (idName owner) table ExecutableSourceTable)
                         | otherwise = owner
                   pure (Just (certified, table))
@@ -1129,6 +1156,15 @@ sourceCaseTables binds = do
               , certOwner certificate == idName owner ->
                   publish owner (certRows certificate) id
               | otherwise -> pure Nothing
+
+    -- A binary enumeration certificate inspects the first argument.
+    -- Each row can return the second argument without inspecting it.
+    enum_binary_row (ConstructorCaseRow [CaseConstructor{}, CaseField{}] result) =
+      case result of
+        CaseField{} -> True
+        CaseConstructor _ _ [] -> True
+        _ -> False
+    enum_binary_row _ = False
 
     lookupHelper env imported helpers actual
       | nameModule_maybe (idName actual) == Just (tcg_semantic_mod env) =
@@ -1236,6 +1272,57 @@ checkedConstructorHelper public helper owner rhs = do
                              (\v -> v <$ guard (v `elem` terms)) (const Nothing) result body
     pure (declared, domains, result, ConstructorCaseRow (map CaseField terms) value)
 
+{- Note [Published polymorphic identity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The constructor helper check derives the equation that returns its
+argument. An exported identity can supply this equation even when its
+interface omits its Core unfolding. Require a single lifted type
+parameter and a single ordinary argument of that type. Check the same
+projection before and after optimization.
+
+The optimizer can share a body with another binding. Follow aliases
+only within this module's final Core, and check the terminal body.
+
+Keep an identity's private helper table when another source table
+depends on it. A provisional final Core table cannot be a dependency
+of another table. See Note [Final Core source equations].
+-}
+
+-- | Recognize an ordinary lifted polymorphic identity signature.
+isIdentitySourceType :: Type -> Bool
+isIdentitySourceType ty =
+    case constructorHelperType ty of
+      Just ([Bndr a _], [domain], result) ->
+        getTyVar_maybe domain == Just a && domain `eqType` result
+      _ -> False
+
+-- | Check the exact projection using the existing constructor helper.
+checkedIdentitySource :: Id -> Core.CoreExpr -> Maybe ([ForAllTyBinder], [Type], Type, ConstructorCaseRow)
+checkedIdentitySource owner rhs = do
+    guard (isIdentitySourceType (varType owner))
+    checkedConstructorHelper (const False) (const Nothing) owner rhs
+
+-- | Recognize an identity whose equation was checked against final Core.
+isFinalCoreIdentity :: Id -> Bool
+isFinalCoreIdentity v = finalCoreMapperOwner v && isIdentitySourceType (varType v)
+
+{- Note [Identity certificates and open unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An identity certificate can supply a bare callback without an unfolding.
+It does not record the aliases exposed by optimizer inlining. A consumer
+of the certificate must disable rewriting.
+
+Keep the ordinary evaluator for a written application. The expected kind
+of a closed call can determine the result of its operand, as in
+(id (fromIntegral x) :: Nat). A closed executable call also uses the
+ordinary staging rules. See GHC.Rename.Env. The open evaluator reads
+each definition it visits, including aliases, and records its instantiated
+rule head. Present those identities as ordinary Ids to the rule check.
+Their Names, types, and attached rules are the same. The late rule
+check can identify them in tcg_evaluated_term_uses. Keep the stricter
+rule policy for nominal uses and for non-identity final Core owners.
+-}
+
 -- | Recognize a private constructor-case family and its nominal equations.
 isSourceConstructorCase :: TyCon -> Bool
 isSourceConstructorCase table = not (isNothing (sourceCaseVisibleArity table))
@@ -1255,7 +1342,7 @@ sourceCaseVisibleArity table
             _ -> Nothing
         Nothing -> case constructorCaseType kind of
           Just (ConstructorCaseType telescope tc _ domains position _)
-            | not (isMonomorphicEnumCaseType kind)
+            | isNothing (monomorphicEnumCaseArity kind)
             , let visible = length domains
             , Just roots <- traverse (projectionBranch telescope tc visible position) branches
             , mkUniqSet roots == mkUniqSet (tyConDataCons tc) -> Just visible
@@ -1375,7 +1462,7 @@ constructorCaseType tau = do
     guard (all isLiftedTypeKind binder_kinds ||
            (isRetainedCaseRoot domain tc && noFreeVarsOfType (mkForAllTys telescope liftedTypeKind)))
     parameters <- catMaybes <$> traverse domainParameter args
-    guard ((isMonomorphicEnumCaseType tau || not (null parameters)) &&
+    guard ((isJust (monomorphicEnumCaseArity tau) || not (null parameters)) &&
            sizeUniqSet (mkUniqSet parameters) == length parameters &&
            tyCoVarsOfTypes domains == mkUniqSet quantified &&
            caseKind kinds result && all (caseKind kinds) carried)
@@ -1432,11 +1519,19 @@ splitCaseOperand i xs = case splitAt i xs of
     (before, x : after) -> Just (before, x, after)
     _ -> Nothing
 
--- | A non-polymorphic arrow between ordinary nullary enumerations.
-isMonomorphicEnumCaseType :: Type -> Bool
-isMonomorphicEnumCaseType ty = case caseArrow ty of
-  Just (domain, result) -> all enumeration [domain, result]
-  Nothing -> False
+-- | The number of value arguments of an ordinary enumeration worker.
+monomorphicEnumCaseArity :: Type -> Maybe Int
+monomorphicEnumCaseArity = fmap (subtract 1 . length) . monomorphicEnumCaseKinds
+
+-- | The domain and result kinds of a unary or binary enumeration worker.
+monomorphicEnumCaseKinds :: Type -> Maybe [Type]
+monomorphicEnumCaseKinds ty = do
+    (domain, rest) <- caseArrow ty
+    let kinds = case caseArrow rest of
+          Just (carried, result) -> [domain, carried, result]
+          Nothing -> [domain, rest]
+    guard (all enumeration kinds)
+    pure kinds
   where
     enumeration t = case caseDatatype t of
       Just (tc, []) -> all nullary (tyConDataCons tc)
@@ -1669,13 +1764,25 @@ finalCoreMappers = filter finalCoreMapperOwner . map fst . Core.flattenBinds
 -- | Confirm the same owner and the same checked equations after optimization.
 verifyFinalCoreMapper :: [Core.CoreBind] -> Id -> Bool
 verifyFinalCoreMapper binds original =
-  case [(v, rhs) | (v, rhs) <- Core.flattenBinds binds, idName v == idName original] of
+  case [(v, rhs) | (v, rhs) <- bindings, idName v == idName original] of
     [(owner, expression)]
-      | varType owner `eqType` varType original ->
-          if lengthIs (finalCoreSourceFamilies original) 1
-            then not (isNothing (directListMapper owner expression))
-            else not (isNothing (directListFilter id owner expression))
+      | varType owner `eqType` varType original
+      , isIdentitySourceType (varType owner)
+      -> verifyProjection (unitNameSet (idName owner)) owner expression
+      | varType owner `eqType` varType original
+      -> if lengthIs (finalCoreSourceFamilies original) 1
+           then not (isNothing (directListMapper owner expression))
+           else not (isNothing (directListFilter id owner expression))
     _ -> False
+  where
+    bindings = Core.flattenBinds binds
+    verifyProjection seen owner (Core.Var target)
+      | not (idName target `elemNameSet` seen)
+      , varType target `eqType` varType owner
+      , Just rhs <- lookup target bindings
+      = verifyProjection (extendNameSet seen (idName target)) target rhs
+    verifyProjection _ owner expression =
+      not (isNothing (checkedIdentitySource owner expression))
 
 -- | Read exhaustive cases on exact bound operands and check each result.
 checkedConstructorCase :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr

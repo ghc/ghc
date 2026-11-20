@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
-Read on 2026-11-14 through 2026-11-19. The [manifest](manifest.json) records
-thirty works and thirty-six downloaded PDF versions. It contains source URLs,
+Read on 2026-11-14 through 2026-11-20. The [manifest](manifest.json) records
+thirty-one works and thirty-seven downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -16,7 +16,8 @@ The OutsideIn(X) author draft and selected-page records are in
 `native-let-conversion/`. The POPL 2004 `seq` paper and selected-page
 records are in `serokell-evaluators/`. This directory also holds the
 QuickSpec, call-by-need and HERMIT papers, and the papers on list fusion
-and `seq`.
+and `seq`. The R22 coverage paper and reading record are in
+`r22-coverage-reading/`.
 
 Page references below identify the downloaded version. Author drafts can have
 different pagination from the publisher record. The thesis was read in selected
@@ -27,6 +28,7 @@ versions and several selective readings.
 
 | Work | Publication | Roadmap | Use in this project |
 | --- | --- | --- | --- |
+| [Lower Your Guards](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf) | Graf, Peyton Jones and Scott, ICFP 2020 | R22, R04 | Distinguish a lazy opening from a demanding payload match. Use the scrutinee equality to relate repeated openings. |
 | [Dependently Typed Programming with Singletons](https://richarde.dev/papers/2012/singletons/paper.pdf) | Eisenberg and Weirich, Haskell 2012 | R03, R04, R05, R13 | Comparison encoding, promotion and the original native-Pi alternative |
 | [System FC with Explicit Kind Equality](https://richarde.dev/papers/2013/fckinds/fckinds.pdf) | Weirich, Hsu and Eisenberg, ICFP 2013 | R05 | Explicit kind evidence and scoped congruence |
 | [Dependent Types in Haskell: Theory and Practice](https://richarde.dev/papers/2016/thesis/eisenberg-thesis.pdf) | Eisenberg, PhD thesis, 2016; supervised by Weirich | R03, R04, R05, R23 | Binder properties, Pico and Bake |
