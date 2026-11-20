@@ -14,7 +14,7 @@ flags=(-B"$lib" -v0 -O0 -package-env - -i -i.
 
 mkdir provider hidden client
 cd provider
-cp "$src/"{Vector,Filter,LetFilter,BarProvider,DotHie,BarRank,RetainedDot}.hs .
+cp "$src/"{Vector,Filter,LetFilter,BarProvider,DotHie,BarRank,RetainedDot,Builder}.hs .
 "$ghc" "${flags[@]}" -c Vector.hs BarRank.hs RetainedDot.hs
 "$ghc" "${flags[@]}" -fwrite-ide-info -c BarProvider.hs
 "$ghc" "${flags[@]}" -ddump-ds -ddump-stg-final -c Filter.hs >filter.log
@@ -22,6 +22,9 @@ grep -Eq 'unpack \(Filter.filterVec' filter.log
 grep -Eq "pack \('Vector.S " filter.log
 "$ghc" "${flags[@]}" -ddump-ds -c LetFilter.hs >let-filter.log
 grep -Eq 'unpack rest' let-filter.log
+"$ghc" "${flags[@]}" -fwrite-ide-info -ddump-ds -c Builder.hs >builder.log
+grep -Eq "pack \('Vector.S " builder.log
+test -s Builder.hie
 sed -n '/Final STG:/,$p' filter.log >filter.stg
 test -s filter.stg
 if grep -Eiq '\b(Pack|Unpack|PackTag)\b' filter.stg; then
@@ -42,33 +45,41 @@ done
 IFS= read -r dot_hie < DotHie.hie
 IFS= read -r bar_hie < BarProvider.hie
 [[ $dot_hie == "HIE$(( ${bar_hie#HIE} + 1 ))" ]]
-mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs ../hidden/
+mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs Builder.hs ../hidden/
 
 cd ../client
-cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot}.hi .
-cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot}.hs .
+cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder}.hi .
+cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain}.hs .
 "$ghc" "${flags[@]}" -c Main.hs Identity.hs Opening.hs LinearDot.hs
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
 "$ghc" "${flags[@]}" Main.o ../provider/{Vector,Filter}.o -o run
 "$ghc" "${flags[@]}" AuditMain.o Identity.o Opening.o ../provider/{Vector,Filter,LetFilter}.o -o audit -main-is AuditMain
 "$ghc" "${flags[@]}" -c RetainedClient.hs -main-is RetainedClient
 "$ghc" "${flags[@]}" RetainedClient.o ../provider/RetainedDot.o -o retained -main-is RetainedClient
+"$ghc" "${flags[@]}" -c LambdaMain.hs -main-is LambdaMain
+"$ghc" "${flags[@]}" LambdaMain.o ../provider/{Vector,Builder}.o -o lambda -main-is LambdaMain
 ./run
 ./audit
 ./retained
+./lambda
 
-cp "$src/"{UnsafeHead,SameWitness,Escape,LetEscape,BarClient,ModesAreDistinct,BarPack,DotForall,DotConstraint,LinearDotDuplicate}.hs .
-for bad in UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct BarPack DotForall DotConstraint LinearDotDuplicate; do
+bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
+             BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape
+             IntroEscape Shadowed HiddenName BarLambda)
+for bad in "${bad_sources[@]}"; do
+    cp "$src/$bad.hs" .
     if "$ghc" "${flags[@]}" -c "$bad.hs" >"$bad.log" 2>&1; then
         echo "$bad unexpectedly compiled." >&2
         exit 1
     fi
     case "$bad" in
-        UnsafeHead|SameWitness|Escape|LetEscape) code=25897;;
-        BarClient|ModesAreDistinct) code=83865;;
+        UnsafeHead|SameWitness|Escape|LetEscape|LambdaEscape|Shadowed) code=25897;;
+        BarClient|ModesAreDistinct|BarLambda) code=83865;;
         BarPack) code=27432;;
         DotForall|DotConstraint) code=91510;;
         LinearDotDuplicate) code=18872;;
+        IntroEscape) code=46956;;
+        HiddenName) code=76037;;
     esac
     if ! grep -Eq "^$bad.hs:[0-9]+:[0-9]+: error: \[GHC-$code\]" "$bad.log"; then
         cat "$bad.log" >&2

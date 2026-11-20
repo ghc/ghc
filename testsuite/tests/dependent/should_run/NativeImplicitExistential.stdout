@@ -2,3 +2,7 @@
 ([7],[7],True)
 [7]
 [True,False]
+([True],[False],[])
+(True,True)
+([True],[],[False],[True])
+forcing the result entered the builder body

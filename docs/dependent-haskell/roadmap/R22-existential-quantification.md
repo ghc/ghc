@@ -212,3 +212,23 @@ At `e04f9add03` it fails with GHC-68947. The ordinary GADT control uses
 Its successful branch matches `Some tail` from the recursive call before
 returning `Some (Cons x tail)`. Reading the first result in this version
 raises the tail exception.
+
+### A function payload
+
+`exists (n :: Nat). Bool -> Vec n Bool` can check a lambda such as
+`\b -> Cons b Nil`. The expected arrow determines the lambda's shape.
+The match checker checks the lambda at a fresh instance of that arrow.
+Core packs the checked lambda with witness `'S 'Z`. The function body
+still waits for application. An ordinary higher-order client opens the
+package through the application rule.
+
+The witness is chosen outside the lambda's patterns. A GADT pattern's
+local type variable cannot determine this witness. Type binders of an
+enclosing forall retain their scope. A binder declared by the dot type
+does not enter source scope.
+
+This checks a lambda when its expected dot schema has a visible
+ordinary arrow payload. Inference for a lambda without that expected
+shape and automatic opening of a package as an application head remain
+open. [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
+and [the Elab-Gen rule](https://richarde.dev/papers/2021/exists/exists.pdf).
