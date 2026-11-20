@@ -1460,6 +1460,8 @@ Agda uses the same cons equation for the recursive step in
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppend.sh),
 and [Agda vector append and split](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).
 
+### Two append equalities at one runtime length
+
 `appendEmptyAtBoth` matches one retained length and proves the empty
 append equation for each of two vectors at that length. Each equality
 names its own input vector. GHC rejects substituting the first vector

@@ -28,6 +28,23 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `f8d7a68fb1`, a source-hidden client demands empty-append proofs
+for two vectors at one length. It checks literal cuts of zero, one and
+two, two cuts from IO, and an undefined cut. Using the first vector twice fails at the
+second proof. The earlier compiler failed Core Lint on this client
+at `-O1`. The revised compiler preserves the constructor proof through
+occurrence analysis, float-out, and CorePrep.
+
+The self-hosted relink matched all 364 Showcase lines at stripped `-O0`,
+default `-O1`, default `-O2`, and in source-loaded GHCi. The ordinary
+client passed at all three optimization levels with Core and STG Lint.
+The GHCi provider-edit test also passed. The updated fork revision adds
+the independently tested literal-cut case to the retained cast regression.
+Its compiler differs from the tested relink only in comments.
+[Ordinary client](examples/packed-vector/OrdinaryOpenVectorAppend.hs),
+[proof provider](examples/packed-vector/OpenVectorAppend.hs)
+and [registered test](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppend.sh).
+
 At `ecfe7ca89f`, matching the runtime cut supplies the nominal equality
 needed to pass the same vector at the branch's width. The source-hidden
 ordinary client returned `(True,True)` on two undefined vectors. A wrong
