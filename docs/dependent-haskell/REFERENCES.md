@@ -207,6 +207,14 @@ the rule's scope and types. The rule supplies no equality to the type checker.
 [Playing by the Rules](https://inst.eecs.berkeley.edu/~cs294-260/sp24/papers/haskell-rules.pdf)
 and [Agda rewriting](https://agda.readthedocs.io/en/latest/language/rewriting.html).
 
+Coutts, Leshchinskiy and Stewart represent a stream by a step function
+and an existentially quantified initial state. A step can yield an
+element, skip a state or finish. The fork uses the same representation
+with an erased `exists` and an ordinary tuple. The Showcase checks two
+state types, a skipped step and a lazy list tail.
+[Stream Fusion, §2](https://www.cs.tufts.edu/~nr/cs257/archive/duncan-coutts/stream-fusion.pdf#page=2)
+and [stream source](examples/erased-existentials/ErasedStream.hs).
+
 ## Reading order
 
 For M59, use the same-domain congruence and scoped comparison references in

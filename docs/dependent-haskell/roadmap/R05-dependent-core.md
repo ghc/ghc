@@ -192,6 +192,23 @@ coercion is supported. Core Lint checks the role and the two endpoints.
 the element type under a given equality. GHC-59107 identifies a binding
 with other unsupported Core forms.
 
+### Standard `-O2` object code
+
+Liberate-case traverses a package and places the opened witness and value
+at the current binding level. It can unroll a recursive call after examining
+an outer variable. A case on the value just opened inside the recursion
+does not trigger the same unrolling. Constructor specialization substitutes
+the witness in the field type before it enters the body. It keeps a case
+that binds index equality evidence so that the proof remains in scope.
+
+The native source test specializes a recursive loop over `Maybe` and runs
+the generated code. The vector library also checks a constructor field that
+becomes live during specialization. The Showcase uses ordinary stream
+consumers with integer state and list state. An ignored list tail stays lazy.
+[Optimizer regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh),
+[Core scope regression](../../../testsuite/tests/ghc-api/NativeExistentialExpr.hs)
+and [stream example](../examples/erased-existentials/ErasedStream.hs).
+
 ## Next increments
 
 - [x] Specify and run an opaque whole-function cast probe. Use genuinely

@@ -3,7 +3,7 @@ set -euo pipefail
 export LC_ALL=C
 
 usage() {
-    echo "Usage: bash $0 GHC LIBDIR [-O1 | --default-o1] [--ghci]" >&2
+    echo "Usage: bash $0 GHC LIBDIR [-O1 | -O2 | --default-o1 | --default-o2] [--ghci]" >&2
     exit 2
 }
 [[ $# -ge 2 ]] || usage
@@ -16,8 +16,9 @@ native_interfaces=("${stripped_interfaces[@]}")
 interactive=false
 for option in "$@"; do
     case "$option" in
-        -O1) native_opt=-O1 ;;
+        -O1|-O2) native_opt=$option ;;
         --default-o1) native_opt=-O1; native_interfaces=() ;;
+        --default-o2) native_opt=-O2; native_interfaces=() ;;
         --ghci) interactive=true ;;
         *) usage ;;
     esac

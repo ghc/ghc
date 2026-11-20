@@ -52,6 +52,7 @@ import qualified ErasedPackage
 import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
+import qualified ErasedStream
 import qualified PackageRules
 import qualified RankedPackage
 import qualified StoredVector
@@ -977,6 +978,9 @@ main = do
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
+    observe "read streams with different hidden state types"
+        (ErasedStream.toList (ErasedStream.oddThrough 6),
+         take 1 (ErasedStream.toList (ErasedStream.fromList (True : error "unused stream tail"))))
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $
