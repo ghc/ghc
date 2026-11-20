@@ -1,18 +1,11 @@
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 module PreludeMapLengthProof (Spine(..), Count, lengthMap, showPreludeMapLength) where
 
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import PreludeMapLengthSource (Mapped)
-
--- | Count the constructors of a finite list.
-data Size = Zero | Succ Size
-
--- | Count the spine without using any element.
-type family Count (xs :: [a]) :: Size where
-    Count '[] = 'Zero
-    Count (_ ': xs) = 'Succ (Count xs)
+import qualified PreludeMapLengthSize as S
+import PreludeMapLengthSource (Count, Mapped)
 
 -- | Witness the constructors without storing the elements.
 data Spine (xs :: [a]) where
@@ -27,8 +20,8 @@ lengthMap f (Cons xs) = case lengthMap f xs of
 
 -- | Count the result of map without demanding the callback.
 {-# NOINLINE observedLength #-}
-observedLength :: (a -> b) -> [a] -> Int
-observedLength f xs = length (map f xs)
+observedLength :: (a -> b) -> [a] -> S.Size
+observedLength f xs = S.size (map f xs)
 
 -- | Observe the proof and count two elements with a bottom callback.
 showPreludeMapLength :: String
