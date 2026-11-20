@@ -284,13 +284,20 @@ source examples. General promotion remains open.
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
 4. **R19.** A branch on an ordinary Boolean can pass that same value to
-   a retained field. The proof is local to the selected constructor branch.
+   a retained field. Matching on an expression such as `not b` in
+   the field selects the result type using the function in scope.
    Template Haskell still needs a representation for the retained field binder.
    [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
 5. **R16.** The checked list worker supports the length theorem for
    `Prelude.reverse`. The next task is structural recursion with an
    arbitrary step function and seed, starting with a list right fold.
    [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
+
+6. **R21.** A retained field's worker can use a nullary local synonym
+   for its argument type. A worker in a later splice group gives
+   GHC-76037 at the function name. A worker that needs the unfinished
+   constructor still gives GHC-68947.
+   [Declaration groups and aliases](roadmap/R21-dependency-analysis.md#local-synonyms-in-a-retained-field-worker).
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual

@@ -91,10 +91,13 @@ worker. It then uses the worker's checked equations to check the field
 and the remaining declarations in the same splice group.
 
 The same source works when an empty declaration splice checks the
-synonym in an earlier group. A worker after the splice remains out of
-scope. A worker whose helper needs the unfinished field constructor
-still fails with GHC-68947. The ordinary client uses stripped interfaces
-and observes a character at False and an integer at True.
+synonym in an earlier group. Both qualified and unqualified calls to a
+worker in a later group give GHC-76037 at the call head. A separate type
+occurrence can establish an implicit constructor binder of the same name.
+Such a binder still gives GHC-97233 when the retained case cannot lift
+that application. A worker whose helper needs the unfinished field
+constructor still gives GHC-68947. The ordinary client uses stripped
+interfaces and observes a character at False and an integer at True.
 [Source example](../examples/open-evaluation/LocalAliasField.hs) and
 [source controls](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
 

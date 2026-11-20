@@ -36,7 +36,8 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
                         , noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars
                         , makeRnValBinds)
-import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_Global) )
+import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_Global)
+                          , reportUnboundName, WhatLooking(WL_Anything) )
 import GHC.Rename.Names
 
 import GHC.Tc.Errors.Types
@@ -432,12 +433,13 @@ data LiftedTypeSite
 
 -- | Rewrite the declarations and return their new private synonyms separately.
 -- See Note [Lifting types from signatures and fields].
-liftDeclarationTypes :: [(RdrName, (GlobalRdrElt, Name))] -> Bool -> HsGroup GhcPs
-                     -> (HsGroup GhcPs, [TyClGroup GhcPs], LiftedDecls, [(LocatedN RdrName, GlobalRdrElt)])
+liftDeclarationTypes :: [(RdrName, Maybe (GlobalRdrElt, Name))] -> Bool -> HsGroup GhcPs
+                     -> (HsGroup GhcPs, [TyClGroup GhcPs], LiftedDecls,
+                         [(LocatedN RdrName, GlobalRdrElt)], [LocatedN RdrName])
 liftDeclarationTypes source_heads named_wildcards group
   | not (null synonyms)
-  = (group{hs_valds = values, hs_tyclds = type_groups}, [anchors], names, concat uses)
-  | otherwise = (group, [], [], [])
+  = (group{hs_valds = values, hs_tyclds = type_groups}, [anchors], names, concat uses, missing)
+  | otherwise = (group, [], [], [], [])
   where
     (values, signature_types) = case hs_valds group of
       ValBinds ann binds ->
@@ -448,16 +450,18 @@ liftDeclarationTypes source_heads named_wildcards group
     (type_groups, groups_sums) = unzip (map liftGroup (hs_tyclds group))
     (_, shared) = mapAccumL shareRetainedCase [] signature_types
     (shared_types, uses) = unzip shared
-    (synonyms, names) = unzip (shared_types ++ map fst (concat groups_sums))
+    field_types = concat groups_sums
+    (synonyms, names) = unzip (shared_types ++ [entry | (entry, _, _) <- field_types])
+    missing = concat [unbound | (_, _, unbound) <- field_types]
     anchors = TyClGroup noExtField synonyms [] [] []
 
-    shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, captures, heads))
+    shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, captures, heads), _)
       | Just first <- lookup key seen
       = let rhs = applyAnchor loc first captures
         in (seen, ((L loc alias{tcdRhs = rhs}, names), heads))
       | otherwise
       = ((key, occ) : seen, (entry, []))
-    shareRetainedCase seen (entry, _) = (seen, (entry, []))
+    shareRetainedCase seen (entry, _, _) = (seen, (entry, []))
 
     liftGroup decls =
       let (decls', sums) = unzip (map liftData (group_tyclds decls))
@@ -493,7 +497,8 @@ liftDeclarationTypes source_heads named_wildcards group
               | otherwise = Set.fromList
                   [(loc, unLoc v) | v <- retainedFieldCallHeads args result
                                   , RealSrcSpan loc _ <- [getLocA v]
-                                  , isJust (lookup (unLoc v) source_heads)]
+                                  , isJust (lookup (unLoc v) source_heads)
+                                  , not (namedWildcard (unLoc v)) ]
             is_call_head v = case getLocA v of
               RealSrcSpan loc _ -> Set.member (loc, unLoc v) call_sites
               _ -> False
@@ -632,14 +637,16 @@ liftDeclarationTypes source_heads named_wildcards group
     liftBind counters bind = (counters, (bind, []))
 
     signatureCaptures outer body = outerCaptures outer
-      [v | v <- extractHsTyRdrTyVars body, isNothing (lookup (unLoc v) source_heads)]
+      [v | v <- extractHsTyRdrTyVars body, isNothing (join (lookup (unLoc v) source_heads))]
 
     outerCaptures HsOuterImplicit{} occurrences = implicitCaptures occurrences
     outerCaptures HsOuterExplicit{hso_bndrs = binders} _ = explicitCaptures binders
 
     implicitCaptures occurrences =
       [(liftedTypeVarBinder v, v) | v <- nubN occurrences
-                                , not (named_wildcards && startsWithUnderscore (rdrNameOcc (unLoc v)))]
+                                , not (namedWildcard (unLoc v))]
+
+    namedWildcard = (named_wildcards &&) . startsWithUnderscore . rdrNameOcc
 
     explicitCaptures :: [LHsTyVarBndr flag GhcPs]
                      -> [(LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)]
@@ -672,22 +679,31 @@ liftDeclarationTypes source_heads named_wildcards group
       | L _ (HsTyVar _ _ name) <- ignoreParens scrutinee
       , let rdr = unLoc name
       = not (isTvOcc (rdrNameOcc rdr)) || rdr `elem` names
-      | otherwise = checkedRetainedScrutinee names scope scrutinee
+      | otherwise = checkedRetainedScrutinee names True scope scrutinee
     caseScrutinee (RetainedTypeSite names) scope scrutinee =
-      checkedRetainedScrutinee names scope scrutinee
+      checkedRetainedScrutinee names False scope scrutinee
     caseScrutinee _ _ _ = True
 
-    checkedRetainedScrutinee names scope scrutinee =
-      isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names (resolveHead scope))
+    checkedRetainedScrutinee names diagnose scope scrutinee =
+      isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names (resolvePart diagnose scope))
 
     resolveHead scope name
       | all ((/= name) . unLoc . snd) scope = lookup name source_heads
       | otherwise = Nothing
 
+    resolvePart diagnose scope name = case resolveHead scope name of
+      Just (Just (_, table)) -> Just (CasePartSource table)
+      Just Nothing | diagnose, not (namedWildcard name) -> Just (CasePartName NotPromoted name)
+      _ -> Nothing
+
     retainedHeadUses site scope (L _ (XHsType (HsTypeCase _ _ scrutinee _)))
       | not (null (retainedNames site)) =
-          [(v, gre) | v <- sourceCallHeads scrutinee, Just (gre, _) <- [resolveHead scope (unLoc v)]]
-    retainedHeadUses _ _ _ = []
+          let heads = [(v, entry) | v <- sourceCallHeads scrutinee
+                                  , Just entry <- [resolveHead scope (unLoc v)]]
+          in ( [(v, gre) | (v, Just (gre, _)) <- heads]
+             , [v | RetainedFieldTypeSite{} <- [site], (v, Nothing) <- heads
+                  , not (namedWildcard (unLoc v))] )
+    retainedHeadUses _ _ _ = ([], [])
 
     retainedNames (RetainedTypeSite names) = names
     retainedNames (RetainedFieldTypeSite names) = names
@@ -726,8 +742,9 @@ liftDeclarationTypes source_heads named_wildcards group
     liftBody site owner scope whole@(L loc _) (salt, seen)
       | Just (prefix, key) <- liftedAnchor site scope whole
       , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
-            heads = retainedHeadUses site scope whole
-            (used, missing) = foldr select ([], free `Set.difference` Set.fromList (map (unLoc . fst) heads)) scope
+            (heads, unbound) = retainedHeadUses site scope whole
+            written = Set.fromList (map (unLoc . fst) heads ++ map unLoc unbound)
+            (used, missing) = foldr select ([], free `Set.difference` written) scope
       , Set.null missing
       , all (copyableCapture site whole) used
       = case key >>= (`lookup` seen) of
@@ -739,7 +756,7 @@ liftDeclarationTypes source_heads named_wildcards group
                 alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
                 shared = sharedRetainedCaseKey site scope used whole key heads
-            in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared)], (salt + 1, seen'))
+            in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared, unbound)], (salt + 1, seen'))
     liftBody site owner scope (L loc quantified) (salt, seen)
       | Just (inner, locals, body) <- innerScope site quantified
       , let names = map (unLoc . snd) locals
@@ -804,7 +821,7 @@ liftDeclarationTypes source_heads named_wildcards group
       | let indices = map (unLoc . snd) used
       , all (`elem` names) indices
       , Just domains <- traverse (closedDomain . fst) used
-      , Just scrutinee_key <- retainedCaseScrutinee indices (resolveHead scope) scrutinee
+      , Just scrutinee_key <- retainedCaseScrutinee indices (resolvePart False scope) scrutinee
       , all closedRow alts
       = Just ((domains, scrutinee_key, rows), used, heads)
     sharedRetainedCaseKey _ _ _ _ _ _ = Nothing
@@ -830,7 +847,7 @@ data SignatureCasePart
   deriving Eq
 
 -- | Admit applications of global names and normalize retained operands.
-retainedCaseScrutinee :: [RdrName] -> (RdrName -> Maybe (GlobalRdrElt, Name))
+retainedCaseScrutinee :: [RdrName] -> (RdrName -> Maybe SignatureCasePart)
                       -> SignatureCasePart -> Maybe SignatureCasePart
 retainedCaseScrutinee names resolve scrutinee = do
   checked <- operand scrutinee
@@ -844,7 +861,7 @@ retainedCaseScrutinee names resolve scrutinee = do
 
     application (CasePartApp fun arg) = CasePartApp <$> application fun <*> operand arg
     application (CasePartName NotPromoted name)
-      | Just (_, table) <- resolve name = Just (CasePartSource table)
+      | Just part <- resolve name = Just part
     application name = global name
 
     global part@(CasePartName _ name)
@@ -864,26 +881,30 @@ sourceCallHeads = spine []
       HsTyVar _ NotPromoted name | not (null args) -> name : concatMap sourceCallHeads args
       _ -> []
 
--- | Find the checked source family in the declaration group's scope.
-retainedSourceHeads :: [LSig GhcPs] -> [TyClGroup GhcPs] -> RnM [(RdrName, (GlobalRdrElt, Name))]
+-- | Find a checked source family or an absent unqualified field head.
+retainedSourceHeads :: [LSig GhcPs] -> [TyClGroup GhcPs]
+                    -> RnM [(RdrName, Maybe (GlobalRdrElt, Name))]
 retainedSourceHeads sigs type_groups = do
   envs@(global, local) <- getRdrEnvs
-  let candidates = [unLoc v | L _ (TypeSig _ _ _ sig) <- sigs, v <- caseCallHeads sig] ++
-                   [unLoc v | grp <- type_groups
-                            , L _ DataDecl{tcdDataDefn = HsDataDefn{dd_cons = cs}} <- group_tyclds grp
-                            , L _ ConDeclGADT{con_g_args = args, con_res_ty = res} <- toList cs
-                            , v <- retainedFieldCallHeads args res]
-  fmap catMaybes $ forM (Set.toList (Set.fromList candidates)) $ \rdr ->
+  let signature_heads = Set.fromList
+        [unLoc v | L _ (TypeSig _ _ _ sig) <- sigs, v <- caseCallHeads sig]
+      field_heads = Set.fromList
+        [unLoc v | grp <- type_groups
+                 , L _ DataDecl{tcdDataDefn = HsDataDefn{dd_cons = cs}} <- group_tyclds grp
+                 , L _ ConDeclGADT{con_g_args = args, con_res_ty = res} <- toList cs
+                 , v <- retainedFieldCallHeads args res]
+  fmap catMaybes $ forM (Set.toList (Set.union signature_heads field_heads)) $ \rdr ->
     case demoteRdrNameTv rdr of
       Just term
-        | not (elemLocalRdrEnv rdr local)
+        | not (elemLocalRdrEnv rdr local || elemLocalRdrEnv term local)
         , null (lookupGRE global (LookupRdrName rdr (RelevantGREsFOS WantNormal)))
         -> do
-          -- Compare names here. The original source call still determines
-          -- whether the type checker uses its unfolding or its checked equation.
+          -- Use the same lookup as ordinary calls. Keep an existing name
+          -- without a checked table separate from an absent name.
           candidates <- lookupSourceTables False envs term
           pure $ case candidates of
-            [(gre, Just table)] -> Just (rdr, (gre, table))
+            [(gre, Just table)] -> Just (rdr, Just (gre, table))
+            [] | isUnqual rdr, Set.member rdr field_heads -> Just (rdr, Nothing)
             _ -> Nothing
       _ -> pure Nothing
 
@@ -1331,10 +1352,14 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
      if dependent && not is_boot
      then do { heads <- retainedSourceHeads sigs' tycl_decls
              ; let input = emptyRdrGroup{hs_valds = val_decls, hs_tyclds = tycl_decls}
-                   (updated, anchors, aliases, uses) = liftDeclarationTypes heads named_wildcards input
+                   (updated, anchors, aliases, uses, unbound) = liftDeclarationTypes heads named_wildcards input
                    (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
                    (late, lambdas, late_scopes) = liftTypeLambdas sigma cases
                    late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+             ; forM_ unbound $ \v ->
+                 forM_ (demoteRdrNameTv (unLoc v)) $ \term ->
+                   setSrcSpanA (getLoc v) (void (reportUnboundName WL_Anything term))
+             ; unless (null unbound) failIfErrsM
              ; forM_ uses $ \(loc, gre) -> setSrcSpanA (getLoc loc) (addUsedGRE AllDeprecationWarnings gre)
              ; return (hs_tyclds late, hs_tyclds updated, case hs_valds updated of
                                          ValBinds _ entries -> val_sigs entries
@@ -1458,6 +1483,13 @@ head such as `not` in `case not b of ...` can name a checked function.
 Exclude that occurrence from the implicit binder list when lookup finds
 the function. Keep other occurrences of the same spelling and all explicit
 binders. A field always keeps its own helper and original call.
+
+An unqualified head with no binding in the current declaration group can
+also reach the retained-case shape check. If the case can be lifted and
+the head has no separate type occurrence or lexical binder, report the
+ordinary unbound-name diagnostic at the head before renaming the helper.
+Keep a separate type occurrence as evidence for an implicit constructor
+binder. This lookup uses the current group and earlier checked groups.
 
 The R16 lookup sees a local source definition or a visible import.
 Each signature's written telescope can

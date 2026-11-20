@@ -90,12 +90,30 @@ SOURCE
     expect_rejection LocalAliasField "$line" '\[GHC-68947\]' 'No checked equations'
 
     # Keep the earlier successful .hi and .o visible while moving the worker.
-    sed -e '/^worker ::/i $(pure [])' \
-        -e 's/case worker b/case LocalAliasField.worker b/' \
-        "$src/LocalAliasField.hs" > LocalAliasField.hs
-    line=$(grep -n 'case LocalAliasField.worker' LocalAliasField.hs | cut -d: -f1)
     ghc+=(-XTemplateHaskell)
+    for head in worker LocalAliasField.worker; do
+        sed -e '/^worker ::/i $(pure [])' -e "s/case worker b/case $head b/" \
+            "$src/LocalAliasField.hs" > LocalAliasField.hs
+        line=$(grep -n "case $head b" LocalAliasField.hs | cut -d: -f1)
+        expect_rejection LocalAliasField "$line" '\[GHC-76037\]' 'Not in scope'
+        grep -Fq "LocalAliasField.hs:$line:11:" reject.log
+    done
+
+    sed '/^worker ::/,$d' "$src/LocalAliasField.hs" > LocalAliasField.hs
+    line=$(grep -n 'case worker b' LocalAliasField.hs | cut -d: -f1)
     expect_rejection LocalAliasField "$line" '\[GHC-76037\]' 'Not in scope'
+    grep -Fq "LocalAliasField.hs:$line:11:" reject.log
+
+    # The separate type occurrence establishes an implicit GADT binder.
+    sed -e '/^module /s/, aliasField//' -e '/^module /a import Data.Proxy (Proxy)' \
+        -e 's/^  AliasField :: (/  AliasField :: Proxy worker -> (/' \
+        -e '/^aliasField ::/,$d' "$src/LocalAliasField.hs" > LocalAliasField.hs
+    line=$(grep -n 'case worker b' LocalAliasField.hs | cut -d: -f1)
+    expect_rejection LocalAliasField "$line" '\[GHC-97233\]' 'A type case needs'
+    if grep -Fq '[GHC-76037]' reject.log; then
+        cat reject.log >&2
+        exit 1
+    fi
 )
 
 cat > NativeLocalOpenNames.hs <<'SOURCE'
