@@ -19,7 +19,19 @@ Matching an indexed vector constructor to refine the value `xs` remains open.
 [named consumer](examples/packed-vector/DependentPair.hs).
 
 `splitAtVec` takes a runtime cut `n` and a vector of length `Add n m`.
-It returns two vectors of lengths `n` and `m`. The Showcase also
+It returns two vectors of lengths `n` and `m`. An expected pair of
+vectors determines the suffix length. So does the result of `dropVec`.
+Use `takeVec @m` when only the prefix occurs in the result.
+
+For a cut read independently of the vector, `splitAtVecChecked cut total xs`
+returns `Nothing` when the cut exceeds the length. A successful split
+packages a suffix length, the two vectors, and a proof of
+`Add cut suffix :~: total`. An ordinary caller can match on `Refl` and
+rejoin the vectors at the original length. Checking the bound only inspects
+the lengths. [Checked split](examples/packed-vector/PackedVecLibrary.hs)
+and [ordinary caller](examples/packed-vector/ListVectorClient.hs).
+
+The Showcase also
 checks the contents of a concrete split. Appending the two parts of
 `[True, False]` gives that same vector. Swapping the elements makes the
 equality proof fail at `Refl`. The ordinary polymorphic `appendVec` can itself appear in a type.

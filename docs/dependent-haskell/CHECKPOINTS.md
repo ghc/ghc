@@ -8,6 +8,26 @@ increments.
 
 ## Family and package checkpoints
 
+At `6ac33d43bf`, a checked vector split takes an independent runtime
+cut. The success case supplies the proof needed to rejoin the vectors.
+The compiler relink matched all 349 Showcase lines at `-O0`, default
+`-O1`, and default `-O2`. The four registered tests for splitting,
+package use, and application inference passed. The ordinary client
+checked empty, interior, exact, and oversized cuts. The check also
+returned its bounds decision with an undefined vector.
+[Split regression](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [inference diagnostics](../../testsuite/tests/dependent/should_fail/NativeSplitResult.hs).
+
+Both compiler stages at `7278fc1e52` matched the 347-line Showcase in
+all three native modes. Self-hosted GHCi also matched. The focused
+suite had 74 passes, one missing-library skip, and three unexpected
+failures. `NativeDependentCore` exposed a recursive constructor field
+accepted by the wider function binder domain. `NativeDependentCoreRun`
+and `RetainedQuantification` still expected rejection at an opaque
+`Int` binder. The dependent directory recorded 309 passes and 17
+unexpected failures. Polykinds recorded 227 passes, one expected
+failure, and 15 unexpected failures.
+
 At `7278fc1e52`, an ordinary client can pass a named callback to
 `withPair` and infer its `Char` result. The solver compares the callback
 bodies under one shared runtime binder of type `IO Int`. Inferring a
