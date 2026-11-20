@@ -115,10 +115,32 @@ At `7a2fe4027b` the client observes `([7],[7,9],[],[])` when the element
 type is fixed to `Int` and the length constructors have kind `Type`.
 Using a promoted `Nat` instead reaches GHC-97230 at the existential binder.
 Keeping the element polymorphic reaches a missing `liftCoSubst` case.
-The candidate checks the witness against its declared kind and transports
-payload equality under the binder. The original polymorphic, `Nat`-indexed
-source program is the acceptance test. Implicit packing and opening for
-the dot form require additional inference.
+
+At `28ee2947a7`, the same ordinary client calls the polymorphic,
+`Nat`-indexed filter using only provider interfaces and objects. The
+client infers `Int` from the input. It prints `([7],[7,9],[],[])` with
+Core and STG lint enabled. A checked head compiles. An unchecked
+`safeHead xs` reports GHC-25897 at `xs`, with expected length `S n0`
+and actual length `n`. Explicitly repacking a nonempty vector at its
+hidden length succeeds. Returning an arbitrary hidden-length package
+as a nonempty package fails.
+
+The solver compares payloads under a common fresh length and checks the
+resulting nominal or representational coercion against the original
+packages. The GHC API tests restore both forms in a fresh compiler
+session. The R22 Showcase matches all 268 output lines. Its existential
+provider is compiled at `-O0`.
+
+For the implicit form the crucial source branch is
+`VCons x (filterVec p xs)`. Opening the recursive result introduces a
+fresh length `m`. The result witness `'S m` must be packed inside that
+scope, as in the explicit branch above. The outer application returns
+only the package. An ordinary client should read the same first cell and
+should still have to match the vector before calling a nonempty head
+function. At `7a2fe4027b`, `exists (m :: Nat). Vec a m` fails at the dot
+with GHC-58481. This gives separate checks for parsing, inferred binder
+scope, and demand. [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
+and [the inference rules](https://richarde.dev/papers/2021/exists/exists.pdf).
 
 At `e04f9add03`, the filter signature fails at the dot in `exists m.`
 with GHC-68947. An ordinary GADT control uses `Some :: Vec n a -> Some a`.
