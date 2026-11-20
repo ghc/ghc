@@ -335,3 +335,12 @@ compiles each module from the preceding modules' interfaces at
 [ordinary client](../examples/packed-vector/CertifiedSplitClient.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeCertifiedSplit.sh)
 and [Agda provenance](../REFERENCES.md#prove-that-the-pieces-reconstruct-the-input).
+
+An independent runtime cut uses the existing remainder proof.
+`checkedSplitAtValue cut total input` returns `Nothing` when the cut
+exceeds the total. A successful result stores the actual suffix length,
+its addition equality, the two vectors, and their contents equality.
+The client can inspect the length result without evaluating the vector.
+The source-hidden regression checks zero, interior, exact, and excessive
+cuts. [Checked split](../examples/packed-vector/CertifiedSplit.hs)
+and [ordinary client](../examples/packed-vector/CertifiedSplitClient.hs).

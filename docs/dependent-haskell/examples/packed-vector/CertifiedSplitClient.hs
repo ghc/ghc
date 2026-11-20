@@ -1,11 +1,11 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
-module CertifiedSplitClient (splitObservation, checkDemand) where
+module CertifiedSplitClient (splitObservation, checkDemand, checkedObservation, checkBounds) where
 
-import CertifiedSplit (splitAtValue)
+import CertifiedSplit (checkedSplitAtValue, splitAtValue)
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
-import Data.Type.Equality ((:~~:)(HRefl))
+import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
 import GHC.Sigma (Sigma(Pair))
 import qualified PackedVecLibrary as P
 
@@ -44,3 +44,37 @@ checkDemand = do
     forced <- try (evaluate (atOne (error "forced input"))) :: IO (Either ErrorCall Bool)
     pure (atZero (error "forced zero input"), atOne (P.VCons (error "forced head") (error "forced suffix")),
            either ((== "forced input") . takeWhile (/= '\n') . displayException) (const False) forced)
+
+-- | Use both equations after reading independent lengths.
+contents :: P.Nat -> P.Nat -> [Bool] -> Maybe (Int, [Bool], [Bool], [Bool])
+contents cut total list = do
+    input <- P.fromListExact total list
+    split <- checkedSplitAtValue cut total input
+    case split of
+        Pair suffix (Refl, Pair left (Pair right HRefl)) ->
+            Just (P.natToInt suffix, P.toList left, P.toList right, P.toList (P.appendVec left right))
+
+-- | Ask for the length proof while the original vector is bottom.
+bound :: P.Nat -> P.Nat -> Maybe Int
+bound cut total =
+    let missing :: a -> a
+        missing _ = error "forced checked input"
+        input = missing (P.replicateNative total True)
+    in case checkedSplitAtValue cut total input of
+        Nothing -> Nothing
+        Just (Pair suffix (Refl, _)) -> Just (P.natToInt suffix)
+
+-- | Read the cut, length, and list independently. Also try an excessive cut.
+checkedObservation :: IO [Maybe (Int, [Bool], [Bool], [Bool])]
+checkedObservation = do
+    one <- newIORef (P.S P.Z) >>= readIORef
+    two <- newIORef (P.S (P.S P.Z)) >>= readIORef
+    values <- newIORef [True,False] >>= readIORef
+    pure [contents one two values, contents (P.S two) two values]
+
+-- | Observe the bounds without evaluating the missing vector in any case.
+checkBounds :: [Maybe Int]
+checkBounds = [bound P.Z P.Z, bound one two, bound two two, bound (P.S two) two, bound one P.Z]
+  where
+    one = P.S P.Z
+    two = P.S one

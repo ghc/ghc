@@ -6596,6 +6596,14 @@ constructors needed to reach the cut or detect exhaustion.
 [Haskell implementation](examples/packed-vector/PackedVecLibrary.hs) and
 [ordinary caller](examples/packed-vector/ListVectorClient.hs).
 
+`checkedSplitAtValue` uses the same bound to return the contents
+equality from `splitAtValue`. An ordinary caller can open the suffix
+length and the addition equality before it asks for either piece.
+The vector stays lazy for this observation. On demand, the client
+opens both stored pieces and their contents equality.
+[Checked contents](examples/packed-vector/CertifiedSplit.hs)
+and [ordinary observations](examples/packed-vector/CertifiedSplitClient.hs).
+
 Agda's bounded vector padding turns a length bound into a remainder and
 an addition equality. Idris 2's `isLTE` compares two runtime lengths and
 `plusMinusLte` relates the difference to the original length. Its

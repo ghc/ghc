@@ -1,9 +1,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, ScopedTypeVariables, TypeApplications, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
-module CertifiedSplit (SplitAtValue, splitAtValue) where
+module CertifiedSplit (SplitAtValue, splitAtValue, CheckedSplitAtValue, checkedSplitAtValue) where
 
-import Data.Type.Equality ((:~~:)(HRefl))
+import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
 import GHC.Sigma (Sigma(Pair))
 import qualified PackedVecLibrary as P
 
@@ -38,3 +38,29 @@ stepProof :: forall a p q.
   -> (P.appendVec left right :~~: tailVec)
   -> P.appendVec ('P.VCons x left) right :~~: 'P.VCons x tailVec
 stepProof _ _ _ _ HRefl = HRefl
+
+-- | Store the runtime remainder, the length equation, and the split contents.
+type CheckedSplitAtValue a (cut :: P.Nat) (total :: P.Nat) (v :: P.Vec a total) =
+    some (suffix :: P.Nat) | (P.Add cut suffix :~: total, SplitAtValue a cut suffix total v)
+
+-- | Check the cut bound before evaluating the vector.
+checkedSplitAtValue :: forall a. foreach (cut :: P.Nat) -> foreach (total :: P.Nat)
+                    -> foreach (v :: P.Vec a total) -> Maybe (CheckedSplitAtValue a cut total v)
+checkedSplitAtValue cut total v = case P.cutRemainder cut total of
+    Nothing -> Nothing
+    Just (Pair suffix Refl) ->
+        -- See Note [Checking the cut before splitting the input].
+        let parts :: SplitAtValue a cut suffix total v
+            parts = case splitAtValue @a @suffix cut v of
+                Pair left (Pair right proof) -> Pair left (Pair right proof)
+        in Just (Pair suffix (Refl, parts))
+
+{- Note [Checking the cut before splitting the input]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The caller can ask whether the cut fits without demanding either vector.
+Compute the remainder from the lengths, then store the recursive split in
+a lazy pair field. The branch equality identifies Add cut suffix with
+total. Open the recursive result inside that field and rebuild its two
+packages at the caller's total. Both packages keep their original
+vectors and their original contents proof.
+-}

@@ -24,6 +24,8 @@ main :: IO ()
 main = do
     splitObservation >>= print
     checkDemand >>= print
+    checkedObservation >>= print
+    print checkBounds
 HS
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o CertifiedSplitClient.o ../proof/CertifiedSplit.o ../provider/PackedVecLibrary.o -o run

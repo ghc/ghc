@@ -65,6 +65,8 @@ module PackedVecLibrary (
     splitAtVec,
     takeVec,
     dropVec,
+    CutRemainder,
+    cutRemainder,
     CheckedSplit,
     splitAtVecChecked,
     appendNative,
