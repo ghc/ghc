@@ -613,8 +613,10 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       | Just (_, res) <- splitVisibleFunTy_maybe ty = spine_result res rest
     spine_result _ _ = Nothing
 
-    open result_ty _ rev_args [] =
-      check_app (reverse rev_args) (mkCheckExpType result_ty)
+    open result_ty opened rev_args [] = do
+      let args = reverse rev_args
+      args' <- if isEmptyNameEnv opened then return args else mapM (reuse_opening opened) args
+      check_app args' (mkCheckExpType result_ty)
     open result_ty opened rev_args (Left arg : rest) =
       open result_ty opened (arg : rev_args) rest
     open result_ty opened rev_args (Right (loc, mult, arg, rebuild) : rest) =
@@ -650,6 +652,33 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       = Just name
     lexicalPackage _ = Nothing
 
+    reuse_opening :: NameEnv (TcType, Id) -> HsExprArg 'TcpRn -> TcM (HsExprArg 'TcpRn)
+    reuse_opening opened arg@EValArg{ea_arg = expr} =
+      do { expr' <- project expr
+         ; return arg{ea_arg = expr'} }
+      where
+        project (L loc (HsPar ann nested)) =
+          L loc . HsPar ann <$> project nested
+        project original@(L loc (HsApp ann fun operand))
+          | HsVar _ package_name <- bare_expr operand
+          , Just (_, payload) <- lookupNameEnv opened (unLocWithUserRdr package_name)
+          , HsVar _ head_name <- bare_expr fun
+          , let name = unLocWithUserRdr head_name
+          , not (isDataOcc (nameOccName name))
+          = do { ident <- tcLookupIdMaybe name
+               ; return $ case implicitSpineHead . varType <$> ident of
+                   Just FunTy{ft_af = af, ft_mult = mult, ft_arg = domain}
+                     | isVisibleFunArg af, isManyTy mult, demands_payload (coreFullView domain)
+                     -> let ref = mkExpandedLExpr (unLoc operand) (nlHsVar (getName payload))
+                        in L loc (HsApp ann fun (L (getLoc operand) ref))
+                   _ -> original }
+        project original = return original
+
+        bare_expr (L _ (HsPar _ nested)) = bare_expr nested
+        bare_expr (L _ expr) = expr
+    reuse_opening _ arg = return arg
+
+
 -- | Find operands that need an implicit package opening before checking a call.
 -- See Note [Implicit existential arguments].
 -- See Note [Quick Look and implicit existential arguments].
@@ -669,12 +698,14 @@ tcImplicitAppArgs ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
                Just (package, replace) -> Right (loc, mult, package, replace)
                Nothing -> Left ordinary
        ; (operand :) <$> tcImplicitAppArgs result rest }
-  where
-    demands_payload TyConApp{} = True
-    demands_payload AppTy{} = True
-    demands_payload FunTy{} = True
-    demands_payload _ = False
 tcImplicitAppArgs _ rest = return (map Left rest)
+
+-- | Check if a declared argument domain requests the payload of a package.
+demands_payload :: TcType -> Bool
+demands_payload TyConApp{} = True
+demands_payload AppTy{} = True
+demands_payload FunTy{} = True
+demands_payload _ = False
 
 -- | Read the declaration for an implicit package or a call with a package head.
 -- The replacement function rebuilds a call on a checked payload.
@@ -772,6 +803,14 @@ the lexical-variable case of IExistCore in An Existential Crisis
 Resolved. It preserves the source use check for each operand.
 Computed operands, instantiated variables and linear arguments each
 have their own opening. The map is local to the application spine.
+
+For snd p (fst p), the first argument opens p for the application.
+A nested unary value application can reuse that payload when its
+declared domain also asks for the same local package to be opened.
+Only reuse an opening from an unrestricted operand in an unrestricted
+domain. Its first source use already contributes Many, so the nested
+use cannot change its checked multiplicity. Check the nested call
+at the outer argument type. The projections determine payload demand.
 
 Instantiate the application under all of the skolems. The
 outer result type is present before any of these scopes, so the
