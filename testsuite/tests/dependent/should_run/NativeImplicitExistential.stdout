@@ -56,4 +56,5 @@ selected package raised the original exception
 [(7,True),(11,True),(9,False)]
 only the selected guard forced its argument
 (((7,True),(13,False)),13)
+((7,True),(13,False))
 ((7,True),(7,True),9)

@@ -31,19 +31,17 @@ runGuarded :: ((Int, Bool), (Int, Bool))
 runGuarded = (observeGuarded builder False (error "unused guard input"),
               observeGuarded builder True True)
 
--- | Select the witness with a required type argument.
-required :: GuardedBuilder
-required = \_ input -> (withWitness @Int (type PolyId) Proxy) id (\f -> (f 7, f input))
-
--- | Select the left and right witnesses in separate equations.
-joint :: TwoWitnessBuilder
-joint = \cases
-    False input -> fromLeft input
-    True input -> fromRight input
-
--- | Run both builders and leave the first branch's input unused.
+-- | Read one witness from a type argument and two from separate equations.
 runDeclaredWitnesses :: ((Int, Bool), ((Int, Bool), (Int, Bool)))
 runDeclaredWitnesses =
     ( observeGuarded required True True
     , (observeTwo joint False (error "unused callback input"), observeTwo joint True False)
     )
+  where
+    required :: GuardedBuilder
+    required = \_ input -> (withWitness @Int (type PolyId) Proxy) id (\f -> (f 7, f input))
+
+    joint :: TwoWitnessBuilder
+    joint = \cases
+        False input -> fromLeft input
+        True input -> fromRight input
