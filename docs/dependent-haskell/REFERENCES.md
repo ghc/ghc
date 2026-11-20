@@ -3067,6 +3067,14 @@ rule. The recursive filter tests demand when the package comes from an
 unknown computation. [Agda's erased vector argument](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html)
 provides the comparison for erasing the witness.
 
+Figure 1(b) of *An Existential Crisis Resolved* gives the source rule for
+the [implicit vector filter](examples/erased-existentials/ImplicitVector.hs).
+The passing branch constructs a cell from a recursive call with a fresh
+hidden length. Section 2.2 requires that the caller can read that cell
+before it forces the recursive tail. The Showcase checks this with a tail
+that raises an exception. It also passes a retained vector through the same
+erased result type. [Eisenberg, Duboc, Weirich and Lee, §2.2](https://richarde.dev/papers/2021/exists/exists.pdf#page=3).
+
 Proposal #473 uses a required type argument for the witness of `Pack`.
 In an expression, `Pack _ payload` asks GHC to infer that argument. In
 a pattern, `Pack _ payload` opens the package with a fresh witness and

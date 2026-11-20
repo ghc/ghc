@@ -182,6 +182,19 @@ same Pack and Unpack operations for each mode. This is a GHC adaptation
 of the draft. It preserves bar-only interface bytes and gives dot
 types and coercions their own interface version.
 
+The [combined example](../examples/erased-existentials/ImplicitVector.hs)
+also accepts a retained pair directly in the signature of `forgetLength`.
+The vector fixes its erased result length. An ordinary interface-only
+client prints `([7],[],[9])` at both optimization levels. It can read
+the first passing element with an exceptional input tail.
+
+An interface that uses both a scoped sum and a dot existential records
+both requirements. A compulsory retained default adds a third requirement.
+At all three compression levels, the two historical readers reject these
+mixed interfaces at the header. Each reader can still open an interface
+that contains only the feature it supports. Reversing the declarations
+keeps the same header. Reserializing the cached payload preserves its bytes.
+
 Opening is limited to an application with a known operand head and an
 ordinary payload domain. Each opening introduces a fresh scoped
 witness. The draft's general opaque witness projections, scope

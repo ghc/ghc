@@ -32,6 +32,11 @@ fi
 "$ghc" -B"$lib" --show-iface BarProvider.hi >bar.log
 grep -Eq '^ *got +[0-9]+-implicit-existentials-v1$' dot.log
 grep -Eq '^ *got +[0-9]+-erased-existentials-v1$' bar.log
+for level in 1 2 3; do
+    "$ghc" "${flags[@]}" "-fwrite-if-compression=$level" -fforce-recomp -c "$src/MixedModes.hs" -outputdir .
+    "$ghc" -B"$lib" --show-iface MixedModes.hi >mixed.log
+    grep -Eq '^ *got +[0-9]+-retained-features-v1-implicit\+scoped$' mixed.log
+done
 IFS= read -r dot_hie < DotHie.hie
 IFS= read -r bar_hie < BarProvider.hie
 [[ $dot_hie == "HIE$(( ${bar_hie#HIE} + 1 ))" ]]

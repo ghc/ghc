@@ -49,6 +49,7 @@ import qualified Data.Either
 import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
 import qualified ForgetWitness
+import qualified ImplicitVector
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Functor.Const (Const(..))
@@ -940,6 +941,8 @@ main = do
         ErasedPackage.observation
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
+    observe "infer the hidden lengths of a lazy filter and a retained vector"
+        ImplicitVector.observations
     observe "forget the retained witness and inspect the indexed payload"
         ( map (ForgetWitness.observe . ForgetWitness.forget . ForgetWitness.retained) [True, False]
         , ForgetWitness.observe (ForgetWitness.forget (ForgetWitness.unknown (error "forced witness"))) )
