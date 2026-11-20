@@ -321,3 +321,48 @@ if ! grep -Eq "^NestedDuplicate.hs:$line:[0-9]+: error: \[GHC-18872\]" NestedDup
     cat NestedDuplicate.log >&2
     exit 1
 fi
+
+# Keep the bar witness lexical and keep both openings lazy.
+for opt in 0 2; do
+    mkdir -p "$out/mixed-$opt/"{provider,client}
+    cd "$out/mixed-$opt/provider"
+    mixed_flags=("${flags[@]}" "-O$opt")
+    if [[ $opt == 2 ]]; then
+        mixed_flags+=(-fno-omit-interface-pragmas)
+    fi
+    "$ghc" "${mixed_flags[@]}" -fwrite-ide-info -ddump-ds -ddump-stg-final \
+        -c "$src/MixedPackageProvider.hs" -outputdir . >provider.log
+    test -s MixedPackageProvider.hie
+    "$ghc" -B"$lib" --show-iface MixedPackageProvider.hi >iface.log
+    grep -Eq '^ *got +[0-9]+-implicit-existentials-v1$' iface.log
+    grep -Eq '^  type Inner a = exists .* \|' iface.log
+    grep -Eq '^  type Mixed = exists .*\. Inner a$' iface.log
+    sed -n '/Final STG:/,$p' provider.log >provider.stg
+    test -s provider.stg
+    if grep -Eiq '\b(Pack|Unpack|PackTag)\b' provider.stg; then
+        cat provider.stg >&2
+        exit 1
+    fi
+
+    cd ../client
+    cp ../provider/MixedPackageProvider.hi .
+    cp "$src/"{MixedPackageMain,MixedPackageReject}.hs .
+    "$ghc" "${mixed_flags[@]}" -c MixedPackageMain.hs
+    "$ghc" "${mixed_flags[@]}" MixedPackageMain.o ../provider/MixedPackageProvider.o -o run
+    ./run >mixed.out
+    printf '(11,11,13,True)\n("ignored","ignored")\nTrue\n' | diff -u - mixed.out
+    if "$ghc" "${mixed_flags[@]}" -c MixedPackageReject.hs >mixed-reject.log 2>&1; then
+        echo "MixedPackageReject unexpectedly compiled." >&2
+        exit 1
+    fi
+    for rejection in wrongWitness:83865 wrongMode:27432 crossed:83865; do
+        line=$(grep -n "^${rejection%:*} =" MixedPackageReject.hs | cut -d: -f1)
+        grep -Eq "^MixedPackageReject.hs:$line:[0-9]+: error: \[GHC-${rejection#*:}\]" mixed-reject.log ||
+            { cat mixed-reject.log >&2; exit 1; }
+    done
+    for pattern in 'Pack _ (x, _, _) -> x' '(_, y :: witness, _) -> y'; do
+        line=$(grep -nF "$pattern" MixedPackageReject.hs | cut -d: -f1)
+        grep -Eq "^MixedPackageReject.hs:$line:[0-9]+: error: \[GHC-25897\]" mixed-reject.log ||
+            { cat mixed-reject.log >&2; exit 1; }
+    done
+done

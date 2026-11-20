@@ -385,7 +385,19 @@ The first binder is in scope in the second binder's kind and in
 the payload. Checking the payload chooses witnesses in that order.
 Core wraps the checked payload with an inner Pack and an outer
 Pack. An application that requests the payload opens consecutive
-dot binders with separate skolems. The result type stays outside both scopes. An inner bar package requires explicit elimination.
+dot binders with separate skolems. The result type stays outside both scopes.
+
+One outer dot binder can hide the index of an existing bar package. For
+`type Inner a = exists b | (a, b)` and `type Mixed = exists a. Inner a`,
+a value of type `Inner Bool` fixes the dot witness to `Bool`. An ordinary
+client can use this introduction through an interface. A written
+`Pack @(Inner Bool) (type Int) (True, 7 :: Int)` also gives the inner
+schema. In `case p of Pack (type b) payload -> ...`, the case opens the
+dot package before checking the explicit pattern. The pattern binds the
+bar witness. The ordinary payload pattern determines demand.
+
+A call that expects a polymorphic bar package still requires the package
+at its declared type. Use the explicit case to open a mixed package.
 
 A local binding can store the whole nested package. For example,
 `let rows = partitionPair p xs in roundTrip rows` keeps both lengths

@@ -1027,7 +1027,8 @@ tcExistsPack rn_expr args expected
                          ; let payload_ty = substTyWith [binder] [witness_ty] body
                          ; payload' <- tcScalingUsage ManyTy $ tcCheckPolyExpr payload payload_ty
                          ; let packed = XExpr (NativeExistsPack schema witness_ty payload')
-                         ; tcWrapResult rn_expr packed schema expected }
+                         ; (result_expected, pack) <- implicitResult NoQL rn_expr schema expected
+                         ; pack <$> tcWrapResult rn_expr packed schema result_expected }
                     _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema)) }
            _ -> failWithTc (TcRnExistsPack ExistsPackArguments) }
   where
@@ -2086,6 +2087,11 @@ implicitResult do_ql rn_expr actual expected@(Check wanted)
            AppTy{} -> pack quick payload schema
            FunTy{} | Deep{} <- ds_flag -> pack False payload schema
                    | otherwise         -> pack quick payload schema
+           ExistsTy ExplicitExists _ _
+             | NoQL <- do_ql
+             , Just (witness, inner) <- matchMixedExistsResult schema payload
+             -> return (mkCheckExpType inner,
+                        \expr -> XExpr (NativeExistsPack schema witness (noLocA expr)))
            _ -> return (expected, id) }
   where
     pack quick payload schema
@@ -2105,6 +2111,32 @@ implicitResult do_ql rn_expr actual expected@(Check wanted)
       = do { when quick (qlUnify schema payload)
            ; return (mkCheckExpType schema, id) }
 implicitResult _ _ _ expected = return (expected, id)
+
+-- | Choose a dot witness for an already checked bar package.
+-- See Note [Introducing an implicit existential].
+matchMixedExistsResult :: Type -> Type -> Maybe (Type, Type)
+matchMixedExistsResult schema actual
+  | ExistsTy ImplicitExists outer formal <- coreFullView schema
+  , Just template <- bar_signature formal
+  , Just target <- bar_signature actual
+  , all supportsQuickLookType [formal, actual]
+  , all noQuickLookVars [formal, actual]
+  = do { let bind_outer tv _ | tv == outer = BindMe
+                             | otherwise = DontBindMe
+             empty_subst = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes [template, target]))
+             actual_fvs = tyCoVarsOfType actual
+       ; subst <- tcMatchTyX_BM bind_outer empty_subst template target
+       ; witness <- Subst.lookupTyVar subst outer
+       ; guard (all (`elemVarSet` actual_fvs) (tyCoVarsOfTypeList witness))
+       ; let inner = substTyWith [outer] [witness] formal
+       ; guard (eqType (typeKind witness) (tyVarKind outer) && eqType inner actual)
+       ; return (witness, inner) }
+  | otherwise = Nothing
+  where
+    bar_signature ty
+      | ExistsTy ExplicitExists binder body <- coreFullView ty
+      = Just (mkTyCoForAllTy unmatchableDataConTy binder (Invisible SpecifiedSpec) body)
+      | otherwise = Nothing
 
 -- | Select a higher-rank witness from equal invariant result types.
 -- See Note [Implicit existential lambda payloads] in GHC.Tc.Gen.Expr.
@@ -2190,6 +2222,13 @@ Match the body against the result type with only the existential binder
 as a template. Reduce type families before matching. Check the selected
 witness in the current scope. The match does not supply evidence. The
 ordinary application checker still checks subsumption and every argument.
+
+For `exists a. exists b | (a, b)`, the checked bar package may already fix
+the dot witness. Match its binder kind and body using a scoped forall
+template. Keep the bar binder out of the selected witness. Substitute the
+witness into the original bar type and check nominal equality of the whole
+type. Store the original modes in Core. The comparison supplies a candidate
+witness only and does not change the treatment of existentials in unification.
 -}
 
 quickLookResultType :: TcRhoType -> TcRhoType -> TcM ()
