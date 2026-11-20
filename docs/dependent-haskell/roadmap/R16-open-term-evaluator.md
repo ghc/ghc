@@ -1104,6 +1104,30 @@ for the installed `Prelude.map` still need a proof for the fusion
 helpers they introduce. [Agda rewriting](https://agda.readthedocs.io/en/latest/language/rewriting.html)
 and [GHC rewrite rule semantics](../../users_guide/exts/rewrite_rules.rst).
 
+### Composing two traversals over an unknown list
+
+An ordinary mapper can replace two traversals with one.
+
+```haskell
+{-# RULES "mapper/compose" [~1] forall f g xs.
+    mapper f (mapper g xs) = mapper (\x -> f (g x)) xs #-}
+```
+
+The checker requires the exact mapper in all three calls, with the
+original input list and callbacks. Both sides inspect that list and
+return an empty list for an empty input. On a cons they both produce
+the lazy head `f (g x)`. The same argument applies to the tail, including
+when only part of the input list is defined. A divergent `g` is permitted
+when `f` ignores its argument. [HERMIT's map fusion proof](../papers/README.md#checking-ghc-rewrite-equations-with-hermit-haskell-2015).
+
+An ordinary client imports an alias for two applications of the mapper
+with `Prelude.not`. It proves that a `True` head remains `True` for any
+tail with rules enabled. This uses the mapper's two existing equations.
+An equality between arbitrary applications on a fully unknown spine
+still needs separate evidence. A replacement rule that forces `g x`
+changes the native result and blocks the unchanged proof.
+[Mapper regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
+
 ### Keep a checked mapper equation consistent with specialization
 
 An orphan rule can replace `mapper not xs` with `xs`. The input

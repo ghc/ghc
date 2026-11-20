@@ -214,3 +214,70 @@ for control in FORCE_HEAD DROP_TAIL; do
         exit 1
     fi
 done
+
+# Compose two traversals on an open list. A strict intermediate changes
+# the result when the outer callback ignores the inner callback's result.
+mkdir "$out"/{compose,compose-client}
+cd "$out/compose"
+cp "$src/NativeOpenInstalledMapProducer.hs" .
+cat >TwiceSource.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, StandaloneKindSignatures #-}
+module TwiceSource (Twice) where
+import qualified NativeOpenInstalledMapProducer as W
+import qualified Prelude as P
+
+type Twice :: [P.Bool] -> [P.Bool]
+type Twice xs = W.mapper P.not (W.mapper P.not xs)
+HS
+cat >Compose.hs <<'HS'
+module Main where
+import Control.Exception (SomeException, evaluate, try)
+import qualified NativeOpenInstalledMapProducer as W
+
+{-# NOINLINE observe #-}
+observe :: (Bool -> Bool) -> (Bool -> Bool) -> [Bool] -> Bool
+observe f g xs = case W.mapper f (W.mapper g xs) of
+    x : _ -> x
+    [] -> False
+
+main :: IO ()
+main = do
+    result <- try (evaluate (observe (const True) undefined (False : undefined)))
+    print (either (const "forced") show (result :: Either SomeException Bool))
+HS
+compose=("${ghc[@]}" -O1 -fenable-rewrite-rules -DCOMPOSE_RULE)
+"${compose[@]}" -c NativeOpenInstalledMapProducer.hs
+"${compose[@]}" -c TwiceSource.hs
+"${compose[@]}" --make Compose.hs -ddump-rule-firings -o run >compose.log
+grep -Fq 'Rule fired: mapper/compose' compose.log
+[[ $(./run) == '"True"' ]]
+
+cd "$out/compose-client"
+cp ../compose/{NativeOpenInstalledMapProducer,TwiceSource}.hi .
+cat >TwiceProof.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module TwiceProof where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import TwiceSource (Twice)
+
+proof :: Proxy xs -> Twice ('True ': xs) :~: ('True ': Twice xs)
+proof _ = Refl
+HS
+proof=("${ghc[@]}" -O1 -fenable-rewrite-rules -c TwiceProof.hs)
+"${proof[@]}"
+
+cd "$out/compose"
+"${compose[@]}" -DFORCE_INTERMEDIATE -fforce-recomp -c NativeOpenInstalledMapProducer.hs
+"${compose[@]}" -DFORCE_INTERMEDIATE --make Compose.hs -ddump-rule-firings -o run >compose.log
+grep -Fq 'Rule fired: mapper/compose' compose.log
+[[ $(./run) == '"forced"' ]]
+cd "$out/compose-client"
+cp ../compose/NativeOpenInstalledMapProducer.hi .
+line=$(awk '/^proof _ = Refl/ { print NR }' TwiceProof.hs)
+if "${proof[@]}" >changed.log 2>&1 ||
+   ! grep -Fq "TwiceProof.hs:$line:" changed.log ||
+   ! grep -Fq '[GHC-83605]' changed.log; then
+    cat changed.log >&2
+    exit 1
+fi

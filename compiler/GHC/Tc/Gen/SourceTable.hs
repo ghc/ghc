@@ -369,7 +369,7 @@ checkedMapperRules :: RuleEnv -> Id -> Bool
 checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation)
                                          (getRules env (globaliseId owner)) of
     [] -> False
-    rules -> all (\rule -> identityTraversal rule || consTraversal rule) rules
+    rules -> all (\rule -> identityTraversal rule || consTraversal rule || composeTraversals rule) rules
   where
     identityTraversal Rule{ru_fn = fn, ru_bndrs = [a, xs],
                            ru_args = [Core.Type input, Core.Type output,
@@ -396,9 +396,38 @@ checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation
       , out_cons == dataConWorkId consDataCon, eqType out_ty output
       , (Core.Var callback, [Core.Var h']) <- Core.collectArgs hd
       , callback == f, h' == x
-      , (Core.Var mapper, [Core.Type a', Core.Type b', Core.Var f', Core.Var t']) <- Core.collectArgs tl
-      = mapper == owner && eqType a' input && eqType b' output && f' == f && t' == xs
+      , Just (a', b', Core.Var f', Core.Var t') <- mapperCall tl
+      = eqType a' input && eqType b' output && f' == f && t' == xs
     consTraversal _ = False
+
+    composeTraversals Rule{ru_fn = fn, ru_bndrs = binders,
+                           ru_args = [Core.Type middle, Core.Type output, Core.Var f, inner],
+                           ru_rhs = rhs}
+      | fn == idName owner
+      , Just (input, middle', Core.Var g, Core.Var xs) <- mapperCall inner
+      , eqType middle' middle
+      , Just a <- getTyVar_maybe input
+      , Just b <- getTyVar_maybe middle
+      , Just c <- getTyVar_maybe output
+      , lengthIs binders 6, mkUniqSet binders == mkUniqSet [a, b, c, f, g, xs]
+      , isId f, isId g, isId xs
+      , Just (f_in, f_out) <- caseArrow (varType f)
+      , eqType f_in middle, eqType f_out output
+      , Just (g_in, g_out) <- caseArrow (varType g)
+      , eqType g_in input, eqType g_out middle
+      , eqType (varType xs) (mkListTy input)
+      , Just (input', output', Core.Lam x body, Core.Var xs') <- mapperCall rhs
+      , eqType input' input, eqType output' output, xs' == xs
+      , isId x, x `notElem` binders, eqType (varType x) input
+      , (Core.Var f', [g_app]) <- Core.collectArgs body
+      , (Core.Var g', [Core.Var x']) <- Core.collectArgs g_app
+      = f' == f && g' == g && x' == x
+    composeTraversals _ = False
+
+    mapperCall expr = case Core.collectArgs expr of
+      (Core.Var mapper, [Core.Type input, Core.Type output, callback, spine])
+        | mapper == owner -> Just (input, output, callback, spine)
+      _ -> Nothing
 
 {- Note [Checked list traversal rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -413,7 +442,16 @@ force its fields. The right side builds a lazy cons with the same
 callback application and the same recursive call on the input tail.
 The callback stays a rule parameter. This reasoning covers a divergent
 callback and does not require properties of any particular function.
-The rule introduces no fixed rule head except the same mapper.
+
+Two traversals can become one with the lambda \x -> f (g x). Both
+sides inspect the original spine and return [] for []. For a cons,
+both produce the same lazy head f (g x). Their tails satisfy the same
+equation on the original input tail. This argument also covers partial
+and infinite lists because each observation of a cons needs one step.
+In particular, g can diverge when f ignores its argument.
+
+The cons and composition rules introduce no fixed rule head except
+the same mapper.
 See getRules in GHC.Core.Rules for the list constructor.
 
 Check the binders and both sides of every visible rule. An unverified
@@ -1418,8 +1456,7 @@ continues. See keepValidatedSourceMappers in GHC.Driver.Main.Passes.
 The final worker check says what the produced binding does. It does not
 prove the rules that another module can use to rewrite a call. The distinct
 interface origin requires the consumer to disable rewriting or check
-every visible rule. The identity traversal and the cons equation can
-pass this check. See Note [Checked list traversal rules]. A fusion
+every visible rule. See Note [Checked list traversal rules]. A fusion
 rule can expose other rule heads and requires a separate proof.
 
 Forming a type records the interface dependency without using the
