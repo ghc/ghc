@@ -1308,9 +1308,17 @@ tcRetainedKnownArgPlan expected fun sigma args
       | any (`elemVarSet` tyCoVarsOfType formal) tvs
       = do { actual <- if retained then tcRetainedConstructorArgType arg
                          else tcRetainedDeclaredArgType tcRetainedDeclaredTypeView arg
-           ; return ((formal,) <$> actual) }
+           ; return ((formal,) . declared_domain_view retained formal <$> actual) }
       | otherwise = return Nothing
     declared_arg _ _ = return Nothing
+
+    -- See Note [Declared retained-domain choices].
+    declared_domain_view True formal actual
+      | Just (tc, _) <- tcSplitTyConApp_maybe formal
+      , isAlgTyCon tc
+      , Just (_, params) <- matchSumPayload tc actual
+      = mkTyConApp tc params
+    declared_domain_view _ _ actual = actual
 
 tcRetainedKnownArgPlan _ _ _ _ = return Nothing
 
@@ -1745,6 +1753,13 @@ Visible retained domains can also use constructor fields. See
 Note [Erased parameters of a retained constructor argument]. Look through
 parentheses without expanding source syntax. A built-in list literal can
 use a declared native variable field as element advice. See Note [Declared retained-domain choices].
+
+A retained operand bound by Sigma.Pair can have the generated family type
+of its payload. For a known algebraic domain, reuse matchSumPayload to find
+the nominal result of that generated family equation. The family arguments
+supply no injectivity evidence. The result can determine erased parameters from
+Vec a size while size is still in scope. Keep the original declared type
+for argument checking and for its nominal cast.
 
 Match known types against declared independent visible argument domains.
 Include retained domains without choosing their runtime arguments. See
