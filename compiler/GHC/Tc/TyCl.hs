@@ -4173,10 +4173,18 @@ default cannot bypass a test on an unknown input with a compatible RHS.
 A promoted constructor result kind can contain a closed type family.
 After ordinary unification fails, try one checked reduction at each
 index of the same nominally generative kind constructor. Use only a
-completed family's axiom. Cast the constructor pattern with the
-resulting nominal coercion. The case still tests the constructor.
-If this step cannot establish equality, keep the ordinary distinction
-between known apartness and failure to determine the constructor set.
+completed family's axiom. The global type environment contains local
+families from completed groups. A family from the current group may be
+tied to the decision families that we are building, so do not inspect
+its axiom.
+
+Use the ordinary closed-family branch matcher for this step. Cast the
+constructor with the nominal kind coercion if all the reduced indices
+match. A reduced index can also establish apartness. Check apartness
+only between indices whose kinds agree. The case still tests the
+constructor when the indices agree. The source pattern can already
+carry a kind cast from ordinary kind checking. Read the constructor
+under that cast. The generated branch constructs its own evidence.
 -}
 
 data CheckedCasePattern
@@ -4270,7 +4278,7 @@ buildOrderedTypeCase root infos = do
             where arity = count isVisibleTyConBinder (tyConBinders con)
 
           closedColumn sourceArgs variables slots result liveRows vi field scrut = do
-            (parent, _) <- maybe unsupported pure (splitTyConAppNoView_maybe (varType scrut))
+            (parent, _) <- maybe unsupported pure (tcSplitTyConApp_maybe (varType scrut))
             cs <- maybe unsupported pure (tyConDataCons_maybe parent)
             let promotable dc = case dataConFullSig dc of
                   (_, _, _, theta, _, _) -> null theta
@@ -4321,14 +4329,18 @@ buildOrderedTypeCase root infos = do
         let scrut_kind = varType scrut
         refinement <- case tcUnifyTy con_kind scrut_kind of
           Just refine -> pure (Just (refine, Nothing))
-          Nothing -> do
-            proof <- checkedCaseKindCo con_kind scrut_kind
-            pure (fmap (\co -> (mkEmptySubst emptyInScopeSet, Just co)) proof)
-        case refinement of
           Nothing
             | typeListsAreApart [con_kind] [scrut_kind] -> pure Nothing
-            | otherwise -> setSrcSpan (vi_loc vi) $
-                failWithTc (TcRnTypeCaseIndexApartness scrut_kind)
+            | otherwise -> do
+                (proof, apart) <- checkedCaseKindCo con_kind scrut_kind
+                case proof of
+                  Just co -> pure (Just (mkEmptySubst emptyInScopeSet, Just co))
+                  Nothing
+                    | apart -> pure Nothing
+                    | otherwise -> setSrcSpan (vi_loc vi) $
+                        failWithTc (TcRnTypeCaseIndexApartness scrut_kind)
+        case refinement of
+          Nothing -> pure Nothing
           Just (refine, kind_co) -> do
             let refineTy = substTyUnchecked refine
                 extras = result : sourceArgs ++ slots ++ mkTyVarTys binders
@@ -4365,35 +4377,41 @@ buildOrderedTypeCase root infos = do
       field <- fresh (subst (varType var))
       pure (previous ++ [(var, field)])
 
--- | Check a result-kind mismatch using one checked closed-family step
--- per index. Do not try to solve constraints or force another family
--- in the group that is still being checked.
-checkedCaseKindCo :: Kind -> Kind -> TcM (Maybe CoercionN)
+-- | Try one checked closed-family step per index. Return nominal
+-- equality evidence when all indices agree, or report definite apartness.
+-- See Note [Publishing ordered type cases].
+checkedCaseKindCo :: Kind -> Kind -> TcM (Maybe CoercionN, Bool)
 checkedCaseKindCo actual expected
-  | Just (tc, as) <- splitTyConAppNoView_maybe actual
-  , Just (tc', bs) <- splitTyConAppNoView_maybe expected
+  | Just (tc, as) <- tcSplitTyConApp_maybe actual
+  , Just (tc', bs) <- tcSplitTyConApp_maybe expected
   , tc == tc'
   , isGenerativeTyCon tc Nominal
-  , length as == length bs
+  , as `equalLength` bs
   = do env <- getGblEnv
        fams <- tcGetFamInstEnvs
        let index_step a b
-             | a `eqType` b = Just (mkNomReflCo a)
-             | Just (family, args) <- splitTyConAppNoView_maybe a
+             | not (a `eqType` b)
+             , Just (family, args) <- tcSplitTyConApp_maybe a
              , let name = tyConName family
              , not (nameIsLocalOrFrom (tcg_mod env) name)
                || name `elemNameEnv` tcg_type_env env
              , Just _ <- closedFamilyTyConCoAxiom_maybe family
-             , Just (Reduction co rhs) <- reduceTyFamApp_maybe fams Nominal family args
-             , rhs `eqType` b = Just co
-             | otherwise = Nothing
-       pure (mkTyConAppCo Nominal tc <$> sequence (zipWith index_step as bs))
-  | otherwise = pure Nothing
+             , Just redn <- reduceTyFamApp_maybe fams Nominal family args
+             = redn
+             | otherwise = Reduction (mkNomReflCo a) a
+           redns = zipWith index_step as bs
+           reduced = map reductionReducedType redns
+           index_apart a b = typeKind a `eqType` typeKind b && typesAreApart a b
+       if reduced `eqTypes` bs
+         then pure (Just (mkTyConAppCo Nominal tc (map reductionCoercion redns)), False)
+         else pure (Nothing, or (zipWith index_apart reduced bs))
+  | otherwise = pure (Nothing, False)
 
 -- | Align nominal fields with the checked arguments written at the alias.
 -- See Note [Publishing ordered type cases].
 checkedCasePattern :: [Int] -> TypeCasePattern -> Type -> TcM CheckedCasePattern
 checkedCasePattern _ CasePatternField _ = pure CheckedCaseField
+checkedCasePattern path pat (CastTy ty _) = checkedCasePattern path pat ty
 checkedCasePattern path (CasePatternConstructor span _ fields) ty =
   setSrcSpan span $ case (splitTyConAppNoView_maybe ty, tcSplitTyConApp_maybe ty) of
     (Just (written, original), Just (resolved, canonical))

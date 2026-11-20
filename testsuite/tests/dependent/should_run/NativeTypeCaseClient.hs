@@ -104,3 +104,9 @@ knownIndex = Refl
 
 ordinaryIndex :: N.FamilyGatePick ('Just ('N.PlainGate 'True)) :~: Int
 ordinaryIndex = Refl
+
+writtenIndex :: N.WrittenGatePick ('Just 'N.IndexedGate) :~: Int
+writtenIndex = Refl
+
+apartIndex :: N.ApartGatePick ('Just ('N.PlainGate 'False)) :~: Bool
+apartIndex = Refl

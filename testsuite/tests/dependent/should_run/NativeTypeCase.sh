@@ -63,6 +63,7 @@ reject NativeTypeCaseDominatedWrongKind 8:20 'GHC-83865'
 grep -Eq 'has kind .*Bool' bad.log
 reject NativeTypeCaseNestedAliasHead 5:8 'GHC-55789'
 reject NativeTypeCaseOpaqueIndex 12:3 'GHC-79642'
+grep -Fq 'NativeTypeCaseOpaqueIndex.hs:25:3: error: [GHC-79642]' bad.log
 grep -Fq 'Cannot determine which constructors are possible' bad.log
 reject NativeTypeCaseErasedAlias 8:3 'GHC-30337'
 grep -Fq 'appear in an injective position' bad.log
