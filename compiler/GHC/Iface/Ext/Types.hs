@@ -28,7 +28,7 @@ import GHC.Core.Type              ( coreFullView, isFunTy, Var (..) )
 import GHC.Core.TyCon             ( isTypeSynonymTyCon, isClassTyCon, isFamilyTyCon )
 import GHC.Types.Id               ( Id, isRecordSelector, isClassOpId )
 import GHC.Types.TyThing          ( TyThing (..) )
-import GHC.Types.Var              ( isTyVar, isFUNArg, cmpForAllTyFlagExactly, DepFunTyFlag )
+import GHC.Types.Var              ( isTyVar, isFUNArg, cmpForAllTyFlagExactly, DepFunTyFlag, ExistsTyFlag(..), pprExistsTy )
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -50,6 +50,10 @@ type Span = RealSrcSpan
 -- See Note [Retained types in HIE].
 hieVersion :: Integer
 hieVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "66") :: Integer
+
+-- | A type table with dot existentials has a separate version.
+hieImplicitExistsVersion :: Integer
+hieImplicitExistsVersion = hieVersion + 1
 
 {- |
 GHC builds up a wealth of information about Haskell source as it compiles it.
@@ -180,7 +184,7 @@ data HieType a
   | HAppTy a (HieArgs a)
   | HTyConApp IfaceTyCon (HieArgs a)
   | HForAllTy a ((Name, a),ForAllTyFlag) a
-  | HExistsTy (Name, a) a -- ^ Erased binder with its kind, and payload type.
+  | HExistsTy ExistsTyFlag (Name, a) a -- ^ Erased binder with its kind, and payload type.
   | HFunTy a a a a
     -- ^ Matchability, multiplicity, argument and result.
     -- See Note [HIE arrow matchability].
@@ -200,7 +204,7 @@ instance Eq a => Eq (HieType a) where
   HTermVarTy n1      == HTermVarTy n2       = n1 == n2
   HTermAppTy n1 a1   == HTermAppTy n2 a2    = n1 == n2 && a1 == a2
   HDepFunTy v1 b1 r1 == HDepFunTy v2 b2 r2  = v1 == v2 && b1 == b2 && r1 == r2
-  HExistsTy b1 t1    == HExistsTy b2 t2    = b1 == b2 && t1 == t2
+  HExistsTy f1 b1 t1 == HExistsTy f2 b2 t2 = f1 == f2 && b1 == b2 && t1 == t2
   HAppTy f1 as1       == HAppTy f2 as2       = f1 == f2 && as1 == as2
   HTyConApp tc1 as1   == HTyConApp tc2 as2   = tc1 == tc2 && as1 == as2
   HForAllTy ma1 ((n1,k1),vis1) b1 == HForAllTy ma2 ((n2,k2),vis2) b2
@@ -222,8 +226,8 @@ instance Outputable a => Outputable (HieType a) where
       <+> brackets (text (show vis)) <+> ppr body <+> ppr mult
   ppr (HAppTy fun arg) = parens $ ppr fun <+> ppr arg
   ppr (HTyConApp tc args) = parens $ ppr tc <+> ppr args
-  ppr (HExistsTy (name, ty) body) =
-    text "exists" <+> parens (ppr name <+> dcolon <+> ppr ty) O.<> dot <+> ppr body
+  ppr (HExistsTy flag (name, ty) body) =
+    pprExistsTy flag (parens (ppr name <+> dcolon <+> ppr ty)) (ppr body)
   ppr (HForAllTy ma ((name, ty), flag) body) =
     text "forall" <+> ppr flag <+> ppr name O.<> text ":" <+> ppr ty O.<> text "."
       <+> text "@" O.<> ppr ma <+> ppr body
@@ -307,8 +311,8 @@ instance Binary (HieType TypeIndex) where
     put_ bh bndr
     put_ bh body
 
-  put_ bh (HExistsTy bndr body) = do
-    putByte bh 12
+  put_ bh (HExistsTy flag bndr body) = do
+    putByte bh (case flag of ExplicitExists -> 12; ImplicitExists -> 13)
     put_ bh bndr
     put_ bh body
 
@@ -327,7 +331,8 @@ instance Binary (HieType TypeIndex) where
       9 -> HTermVarTy <$> get bh
       10 -> HTermAppTy <$> get bh <*> get bh
       11 -> HDepFunTy <$> get bh <*> get bh <*> get bh
-      12 -> HExistsTy <$> get bh <*> get bh
+      12 -> HExistsTy ExplicitExists <$> get bh <*> get bh
+      13 -> HExistsTy ImplicitExists <$> get bh <*> get bh
       _ -> panic "Binary (HieArgs Int): invalid tag"
 
 

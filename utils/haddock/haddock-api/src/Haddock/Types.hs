@@ -64,7 +64,7 @@ import GHC.Types.ForeignCall (CType)
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.SrcLoc (srcSpanToRealSrcSpan)
-import GHC.Types.Var (Specificity)
+import GHC.Types.Var (ExistsTyFlag, Specificity)
 import GHC.Utils.Outputable hiding ((<>))
 
 import Documentation.Haddock.Types
@@ -860,13 +860,13 @@ class MapHsExists a where
     -> Maybe (HsType a)
 
 instance MapHsExists GhcRn where
-  mapHsExists mapBinder mapBody (XHsType (HsTypeExistsRn binder body)) =
-    Just (XHsType (HsTypeExistsRn (mapBinder binder) (mapBody body)))
+  mapHsExists mapBinder mapBody (XHsType (HsTypeExistsRn flag binder body)) =
+    Just (XHsType (HsTypeExistsRn flag (mapBinder binder) (mapBody body)))
   mapHsExists _ _ _ = Nothing
 
 instance MapHsExists DocNameI where
-  mapHsExists mapBinder mapBody (XHsType (HsErasedExists binder body)) =
-    Just (XHsType (HsErasedExists (mapBinder binder) (mapBody body)))
+  mapHsExists mapBinder mapBody (XHsType (HsErasedExists flag binder body)) =
+    Just (XHsType (HsErasedExists flag (mapBinder binder) (mapBody body)))
   mapHsExists _ _ _ = Nothing
 
 type instance XValArg DocNameI = NoExtField
@@ -916,7 +916,7 @@ data HsTypeDocNameIExt
 
   | HsCheckedTypeCase (LHsType DocNameI) [(LHsType DocNameI, LHsType DocNameI)]
 
-  | HsErasedExists (LHsTyVarBndr Specificity DocNameI) (LHsType DocNameI)
+  | HsErasedExists ExistsTyFlag (LHsTyVarBndr Specificity DocNameI) (LHsType DocNameI)
 
   | HsRedacted  (HsType DocNameI) -- ^ contains the kind of the redacted type
 

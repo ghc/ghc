@@ -1060,7 +1060,7 @@ tcIfaceDecls ignore_prags ver_decls
 ifaceDeclsForTc :: ModIface -> [(Fingerprint, IfaceDecl)]
 ifaceDeclsForTc iface
   | FullIfaceBinHandle (Strict.Just (features, _)) <- mi_hi_bytes iface
-  , ErasedExistentialEvidence `Set.member` features
+  , any (`Set.member` features) [ErasedExistentialEvidence, ImplicitExistentialEvidence]
   = [(fingerprint, prune decl) | (fingerprint, decl) <- mi_decls iface]
   | otherwise = mi_decls iface
   where
@@ -1999,12 +1999,12 @@ tcIfaceType = go
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
-    go (IfaceExistsTy bndr@(name, _) body)
+    go (IfaceExistsTy flag bndr@(name, _) body)
       = bindIfaceTyVar bndr $ \tv -> do
           check_exists_kind name (text "binder kind") (typeKind (varType tv))
           body' <- go body
           check_exists_kind name (text "payload") (typeKind body')
-          return (ExistsTy tv body')
+          return (ExistsTy flag tv body')
     go (IfaceDepFunTy vis bndr@(mult, name, domain) body)
       -- See Note [Retained binders in interfaces].
       -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
@@ -2432,7 +2432,7 @@ tcIfaceExpr (IfacePack schema witness payload)
        ; when (isTyCoArg payload') $
            failIfM (text "An existential Pack payload must be a term in interface.")
        ; case coreFullView schema' of
-           ExistsTy a body
+           ExistsTy _ a body
              | typeKind witness' `eqType` varType a
              , substTyWith [a] [witness'] body `eqType` exprType payload'
              -> return (Pack schema' witness' payload')
@@ -2443,7 +2443,7 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
        ; when (isTyCoArg package') $
            failIfM (text "An existential package must be a term in interface.")
        ; case coreFullView (exprType package') of
-           ExistsTy a payload_ty ->
+           ExistsTy _ a payload_ty ->
              bindIfaceTyVar witness $ \witness' ->
              bindIfaceId value $ \value' ->
              do { valid <- evaluateIfaceValidation (ppr name) (varType witness' `eqType` varType a)

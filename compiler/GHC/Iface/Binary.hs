@@ -322,14 +322,17 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
 evidenceSuffix :: IfaceEvidenceVersion -> String
 evidenceSuffix requirements
   | needs RetainedDefaultEvidence
-  , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence
-  = featureSetPrefix ++ intercalate "+" [name | (name, feature) <- independentFeatures, needs feature]
+  , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
+  = feature_set
+  | needs ImplicitExistentialEvidence && needs ScopedSigmaEvidence
+  = feature_set
   | needs ScopedSigmaEvidence
   , needs IndexAliasEvidence || needs ErasedExistentialEvidence
   = combinedScopedSigmaSuffix
   | otherwise = maybe "" legacyEvidenceSuffix (Set.lookupMax requirements)
   where
     needs feature = Set.member feature requirements
+    feature_set = featureSetPrefix ++ intercalate "+" [name | (name, feature) <- independentFeatures, needs feature]
 
 legacyEvidenceSuffix :: IfaceEvidence -> String
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
@@ -337,6 +340,7 @@ legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
 legacyEvidenceSuffix RetainedSpecRuleEvidence  = "-retained-specialisation-rule-v1"
 legacyEvidenceSuffix IndexAliasEvidence        = "-retained-index-alias-v1"
 legacyEvidenceSuffix ErasedExistentialEvidence = "-erased-existentials-v1"
+legacyEvidenceSuffix ImplicitExistentialEvidence = "-implicit-existentials-v1"
 legacyEvidenceSuffix ScopedSigmaEvidence       = "-r04-scoped-sigma-experiment-v1"
 legacyEvidenceSuffix RetainedDefaultEvidence   = "-retained-compulsory-default-v1"
 
@@ -350,6 +354,7 @@ featureSetPrefix = "-retained-features-v1-"
 independentFeatures :: [(String, IfaceEvidence)]
 independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("erased", ErasedExistentialEvidence)
+                      , ("implicit", ImplicitExistentialEvidence)
                       , ("scoped", ScopedSigmaEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
@@ -396,7 +401,9 @@ unfolding can have an ordinary result type and refer to a package from
 another interface. Select the version when writing each existential
 expression tag as well. An existential coercion can serialize an ordinary
 forall premise without an existential type tag. Select the version when
-writing either of its built-in rule names.
+writing either of its built-in rule names. The dot existential reader also
+knows the bar tags. It predates scoped sums and compulsory retained defaults.
+Record the separate requirements when either occurs with a dot existential.
 
 A retained-sum codomain uses a scoped family tag. A consumer can also
 publish a proof that refers to the scoped equality rule. Either feature

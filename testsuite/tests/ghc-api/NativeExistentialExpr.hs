@@ -49,7 +49,7 @@ import GHC.Types.Name.Occurrence (mkVarOcc)
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.Unique (Unique, UniqueTag (PluginTag))
 import GHC.Types.Unique.Supply (mkSplitUniqSupply, uniqsFromSupply)
-import GHC.Types.Var (mkCoVar, mkTyVar, varType)
+import GHC.Types.Var (ExistsTyFlag (ExplicitExists), mkCoVar, mkTyVar, varType)
 import GHC.Unit.Module (IsBootInterface (NotBoot), mkModule)
 import GHC.Unit.Module.ModIface (emptyFullModIface, mi_decls, set_mi_decls)
 import GHC.Unit.Types (mainUnit)
@@ -101,7 +101,7 @@ checkLiftingReadback libdir path = forM_ [(Nominal, mkNomEqPred), (Representatio
         rhs = tv r "r"
         witness = tv w "w"
         varying = tv t "t"
-        schema el = ExistsTy witness (mkBoxedTupleTy [TyVarTy witness, TyVarTy el])
+        schema el = ExistsTy ExplicitExists witness (mkBoxedTupleTy [TyVarTy witness, TyVarTy el])
         given = mkCoVar (mkSystemName c (mkVarOcc "cv")) (predicate (TyVarTy lhs) (TyVarTy rhs))
         co = liftCoSubst role (mkLiftingContext [(varying, mkCoVarCo given)]) (schema varying)
         box = mkSysLocal (fsLit "box") x manyDataConTy (schema lhs)
@@ -138,7 +138,7 @@ construct load env example response = do
         param = tv ix "param"
         witness = tv a "witness"
         maybeOf ty = mkTyConApp maybeTyCon [ty]
-        schema = ExistsTy param (maybeOf (TyVarTy param))
+        schema = ExistsTy ExplicitExists param (maybeOf (TyVarTy param))
         input = local p "arbitraryPackage" schema
         value = local x "payload" (maybeOf (TyVarTy witness))
         result = exprType response

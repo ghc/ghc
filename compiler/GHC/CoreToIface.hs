@@ -211,8 +211,8 @@ toIfaceTypeX fr (TermAppTy fun arg)
   | otherwise = IfaceTermAppTy (mkIfLclName (occNameFS (getOccName fun))) arg'
   where
     arg' = toIfaceTypeX fr arg
-toIfaceTypeX fr (ExistsTy var body)
-  = IfaceExistsTy (toIfaceTvBndrX fr var)
+toIfaceTypeX fr (ExistsTy flag var body)
+  = IfaceExistsTy flag (toIfaceTvBndrX fr var)
                   (toIfaceTypeX (fr `delVarSet` var) body)
 toIfaceTypeX fr (DepFunTy vis var res)
   = IfaceDepFunTy vis (toIfaceIdBndrX fr var)

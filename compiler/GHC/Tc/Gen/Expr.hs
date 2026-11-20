@@ -1223,7 +1223,7 @@ tcExistsCase expr@(HsCase ctxt scrut matches)
       = do { (scrut', scrut_ty) <- tcScalingUsage ManyTy $ tcInferRhoFRR FRRCase scrut
            ; schema <- liftZonkM (zonkTcType scrut_ty)
            ; case coreFullView schema of
-               ExistsTy binder inner -> do
+               ExistsTy _ binder inner -> do
                  { result_ty <- expTypeToType expected
                  ; con_like <- RealDataCon <$> tcLookupDataCon con
                  ; let origin = PatSkol con_like ctxt

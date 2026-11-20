@@ -4154,12 +4154,14 @@ instance ExactPrint (HsType GhcPs) where
     return (XHsType (HsTypeSome (some', open', signature', close', bar') binder' domain' body'))
   exact (XHsType (HsTypeCaseAlias generated alias body)) =
     XHsType . HsTypeCaseAlias generated alias <$> markAnnotated body
-  exact (XHsType (HsTypeExists (exists, bar) binder body)) = do
+  exact (XHsType (HsTypeExists (exists, sep_tok) binder body)) = do
     exists' <- markEpToken exists
     binder' <- markAnnotated binder
-    bar' <- markEpToken bar
+    sep_tok' <- case sep_tok of
+      Left bar -> Left <$> markEpToken bar
+      Right dot_tok -> Right <$> markEpToken dot_tok
     body' <- markAnnotated body
-    return (XHsType (HsTypeExists (exists', bar') binder' body'))
+    return (XHsType (HsTypeExists (exists', sep_tok') binder' body'))
 
   exact (XHsType (HsTypeLet (let_tok, eq, in_tok) var rhs body)) = do
     let' <- markEpToken let_tok

@@ -804,7 +804,7 @@ typeNames ty = go ty Set.empty
         FunTy _ ma w t1 t2 -> go t2 $ go t1 $ go w $ go ma acc
         TyConApp tcon args -> List.foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
         ForAllTy ma bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) $ go ma acc
-        ExistsTy tv t' -> go t' $ go (tyVarKind tv) acc
+        ExistsTy _ tv t' -> go t' $ go (tyVarKind tv) acc
         LitTy _ -> acc
         CastTy t' _ -> go t' acc
         CoercionTy{} -> acc
@@ -881,8 +881,8 @@ defaultRuntimeRepVars = go emptyVarEnv
     go subs (DepFunTy vis binder body) =
       -- See Note [Retained types in Haddock] in Haddock.Convert.
       DepFunTy vis (go_id subs binder) (go subs body)
-    go subs (ExistsTy binder body) =
-      ExistsTy (updateTyVarKind (go subs) binder) (go subs body)
+    go subs (ExistsTy flag binder body) =
+      ExistsTy flag (updateTyVarKind (go subs) binder) (go subs body)
     go subs (TyConApp tc tc_args) =
       TyConApp tc (map (go subs) tc_args)
     go subs (FunTy af ma w arg res) =

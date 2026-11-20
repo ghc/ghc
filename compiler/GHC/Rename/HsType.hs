@@ -858,11 +858,11 @@ rnLHsTyKi env (L loc ty)
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 
-rnHsTyKi env (XHsType (HsTypeExists _ binder body))
+rnHsTyKi env (XHsType (HsTypeExists (_, sep_tok) binder body))
   = bindLHsTyVarBndrs (rtke_ctxt env) WarnUnusedForalls Nothing [binder] $ \case
       [binder'] -> do
         (body', fvs) <- rnLHsTyKi env body
-        pure (XHsType (HsTypeExistsRn binder' body'), fvs)
+        pure (XHsType (HsTypeExistsRn (hsExistsTyFlag sep_tok) binder' body'), fvs)
       _ -> panic "rnHsTyKi: existential binder count"
 
 rnHsTyKi env (HsForEachTy x bndrs body)

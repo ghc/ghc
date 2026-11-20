@@ -944,9 +944,9 @@ synifyType _ boundTvs (DepFunTy vis binder body) =
         (HsBndrKind noExtField $ synifyType WithinType boundTvs (varType binder))]
     , hst_body = synifyType WithinType (extendVarSet boundTvs binder) body
     }
-synifyType _ boundTvs (ExistsTy binder body) =
+synifyType _ boundTvs (ExistsTy flag binder body) =
   -- See Note [Erased existentials in Haddock].
-  noLocA $ XHsType $ HsTypeExistsRn tvb body'
+  noLocA $ XHsType $ HsTypeExistsRn flag tvb body'
   where
     tvb = noLocA $ HsTvb noAnn SpecifiedSpec
       (HsBndrVar noExtField (noLocA (getName binder)))
@@ -1091,10 +1091,10 @@ synifyType _ _ (CoercionTy{}) = error "synifyType:Coercion"
 
 {- Note [Erased existentials in Haddock]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Render the explicit source form `exists (a :: k) | body`. The binder
+Render the source separator stored in the checked binder. The binder
 is in scope in the body. Its own kind is outside that scope. Keep the
 kind, including Type, so the signature shows the witness the checker
-expects. The implicit dot form requires inference and remains open.
+expects.
 -}
 
 {- Note [Forall matchability in Haddock]

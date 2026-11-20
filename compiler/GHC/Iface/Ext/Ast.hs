@@ -2056,7 +2056,7 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsTyLit _ _ -> []
       HsWildCardTy _ -> []
       HsStarTy _ -> []
-      XHsType (HsTypeExistsRn binder body) ->
+      XHsType (HsTypeExistsRn _ binder body) ->
         [ toHie $ tvScopes (ResolvedScopes [mkScope (getLocA body)]) NoScope [binder]
         , toHie body
         ]

@@ -19,6 +19,7 @@ import GHC.Core.Type
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Types.Basic (Boxity(Boxed))
+import GHC.Types.Var (ExistsTyFlag(..))
 import GHC.Types.Name (nameOccName)
 import GHC.Types.Name.Occurrence (sourceTableTermOcc)
 import GHC.Types.Unique.FM (UniqFM, addToUFM)
@@ -31,7 +32,8 @@ builtInCoAxiomRules =
     foldl' (\rules (name, rule) -> addToUFM rules name rule) typeNatCoAxiomRules
       [ (boxedPairCompositionName, boxedPairCompositionRule)
       , (boxedPairReconstructionName, boxedPairReconstructionRule)
-      , existsCoRule Nominal, existsCoRule Representational
+      , existsCoRule ExplicitExists Nominal, existsCoRule ExplicitExists Representational
+      , existsCoRule ImplicitExists Nominal, existsCoRule ImplicitExists Representational
       , (scopedSigmaClosureName, scopedSigmaClosureRule) ]
 
 scopedSigmaClosureRule :: CoAxiomRule

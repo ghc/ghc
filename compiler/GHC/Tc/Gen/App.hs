@@ -534,7 +534,7 @@ tcExistsPack rn_expr args expected
            [EValArg { ea_arg = witness }, EValArg { ea_arg = payload }] ->
              do { schema <- check_schema [ty | ETypeArg { ea_hs_ty = ty } <- type_args]
                 ; case coreFullView schema of
-                    ExistsTy binder body ->
+                    ExistsTy _ binder body ->
                       do { arg <- expr_to_type witness
                          ; inferred <- case arg of
                              HsWC [] ty | HsWildCardTy (HoleVar (L _ name)) <- unLoc (ignoreParens ty)
@@ -591,7 +591,7 @@ tcExistsPack rn_expr args expected
          ; check_kind k ty }
     check_schema _ = failWithTc (TcRnExistsPack ExistsPackArguments)
     check_kind k schema = case coreFullView schema of
-      ExistsTy binder _ | not (eqType k (tyVarKind binder)) ->
+      ExistsTy _ binder _ | not (eqType k (tyVarKind binder)) ->
         failWithTc (TcRnExistsPack (ExistsPackInvalidKind k (tyVarKind binder)))
       _ -> return schema
 

@@ -75,6 +75,9 @@ module GHC.Types.Var (
         -- * Retained function visibility
         DepFunTyFlag(..),
 
+        -- * Erased existential visibility
+        ExistsTyFlag(..), pprExistsTy,
+
         -- * FunTyFlag
         FunTyFlag(..), isVisibleFunArg, isInvisibleFunArg, isFUNArg,
         mkFunTyFlag, visArg, invisArg,
@@ -575,6 +578,17 @@ cmpForAllTyFlagExactly Specified Specified = EQ
 cmpForAllTyFlagExactly Specified Required  = LT
 cmpForAllTyFlagExactly Required  Required  = EQ
 cmpForAllTyFlagExactly Required  _         = GT
+
+-- | Selects checking and elimination at the source existential binder.
+data ExistsTyFlag = ExplicitExists | ImplicitExists
+  deriving (Eq, Ord, Data)
+
+-- | Print the source binder and payload with the selected separator.
+pprExistsTy :: ExistsTyFlag -> SDoc -> SDoc -> SDoc
+pprExistsTy flag binder payload =
+  text "exists" <+> (case flag of
+    ExplicitExists -> binder <+> vbar
+    ImplicitExists -> binder <> dot) <+> payload
 
 -- | The source visibility of a retained runtime binder. Both flags
 -- represent value arguments in Core.

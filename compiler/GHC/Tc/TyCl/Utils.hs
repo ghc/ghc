@@ -97,7 +97,7 @@ synonymTyConsOfType ty
      go (TermVarTy v)     = go (varType v)
      go (TermAppTy f arg) = go (varType f) `plusNameEnv` go arg
      go (DepFunTy _ v ty) = go (varType v) `plusNameEnv` go ty
-     go (ExistsTy v ty)   = go (varType v) `plusNameEnv` go ty
+     go (ExistsTy _ v ty)   = go (varType v) `plusNameEnv` go ty
      go (TyConApp tc tys) = go_tc tc `plusNameEnv` go_s tys
      go (LitTy _)         = emptyNameEnv
      go (TyVarTy _)       = emptyNameEnv
@@ -619,7 +619,7 @@ irType = go
       = markNominal lcls (varType v) >> go (extendVarSet lcls v) body
       | otherwise = pprPanic "irType: invalid retained binder" (ppr ty)
     -- Keep existential parameters nominal until Core has an ExistsCo.
-    go lcls (ExistsTy v body)
+    go lcls (ExistsTy _ v body)
       = markNominal lcls (varType v) >> markNominal (extendVarSet lcls v) body
     go lcls (TyVarTy tv)       = unless (tv `elemVarSet` lcls) $
                                  updateRole Representational tv
@@ -679,7 +679,7 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
       = get_ty_vars scope (varType v) `unionVarSet`
           get_ty_vars (extendVarSet scope v) body
       | otherwise = pprPanic "markNominal: invalid retained binder" (ppr ty)
-    get_ty_vars scope (ExistsTy v body)
+    get_ty_vars scope (ExistsTy _ v body)
       = get_ty_vars scope (varType v) `unionVarSet`
           (get_ty_vars (extendVarSet scope v) body `delVarSet` v)
     get_ty_vars _ (TyVarTy tv) = unitVarSet tv

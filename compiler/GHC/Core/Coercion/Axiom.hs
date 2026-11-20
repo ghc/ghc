@@ -55,10 +55,12 @@ import Data.Array
 import Data.List ( mapAccumL )
 
 -- | The wire name of an existential congruence rule at a checked role.
-existsCoRuleName :: Role -> FastString
-existsCoRuleName Nominal = fsLit "NominalExistsCo"
-existsCoRuleName Representational = fsLit "RepresentationalExistsCo"
-existsCoRuleName Phantom = panic "existsCoRuleName: phantom lifting"
+existsCoRuleName :: ExistsTyFlag -> Role -> FastString
+existsCoRuleName ExplicitExists Nominal = fsLit "NominalExistsCo"
+existsCoRuleName ExplicitExists Representational = fsLit "RepresentationalExistsCo"
+existsCoRuleName ImplicitExists Nominal = fsLit "NominalImplicitExistsCo"
+existsCoRuleName ImplicitExists Representational = fsLit "RepresentationalImplicitExistsCo"
+existsCoRuleName _ Phantom = panic "existsCoRuleName: phantom lifting"
 
 {-
 Note [Coercion axiom branches]

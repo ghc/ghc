@@ -1651,7 +1651,7 @@ hasUnmatchableApplication = go
     go (ForAllTy ma (Bndr tv _) body) = go ma || go (varType tv) || go body
     go (CastTy ty _) = go ty
     go (DepFunTy _ binder body) = go (varType binder) || go body
-    go (ExistsTy binder body) = go (varType binder) || go body
+    go (ExistsTy _ binder body) = go (varType binder) || go body
     go _ = False
 
 -- | Detect retained binders, including those with no free runtime indices.
@@ -2273,7 +2273,7 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
       -- A supported index Id has a closed algebraic domain and Many
       -- multiplicity. Its type has no type variables or family applications.
       -- See Note [Apartness of retained runtime indices].
-    go bvs (ExistsTy v body)
+    go bvs (ExistsTy _ v body)
       = go bvs (varType v) ||
         (case lhs of
            TyVarLHS tv -> tv /= v && go (bvs `extendVarSet` v) body

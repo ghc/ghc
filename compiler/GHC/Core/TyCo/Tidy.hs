@@ -234,7 +234,7 @@ tidyType _   t@(LitTy {})           = t -- Preserve sharing
 tidyType env (TyVarTy tv)           = TyVarTy $! tidyTyCoVarOcc env tv
 tidyType env (TermVarTy var)        = TermVarTy $! tidyTyCoVarOcc env var
 tidyType env (TermAppTy fun arg)    = (TermAppTy $! tidyTyCoVarOcc env fun) $! tidyType env arg
-tidyType env (ExistsTy var body)   = (ExistsTy $! var') $! tidyType body_env body
+tidyType env (ExistsTy flag var body) = (ExistsTy flag $! var') $! tidyType body_env body
   where
     (body_env, var') = tidyVarBndr env var
 tidyType env (DepFunTy vis var res) = (DepFunTy vis $! var') $! tidyType body_env res

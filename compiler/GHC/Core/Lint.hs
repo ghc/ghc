@@ -888,7 +888,7 @@ lintCoreExpr (Pack package_ty witness payload)
        ; lintType witness
        ; (payload_ty, usage) <- markAllJoinsBad (lintCoreExpr payload)
        ; case coreFullView package_ty of
-           ExistsTy a body ->
+           ExistsTy _ a body ->
              do { ensureEqTys (varType a) (typeKind witness) (text "Pack witness has the wrong kind")
                 ; lintL (substTyWith [a] [witness] body `eqType` payload_ty) $
                     text "Pack payload does not match the witness:" <+> ppr payload_ty
@@ -898,7 +898,7 @@ lintCoreExpr (Pack package_ty witness payload)
 lintCoreExpr (Unpack witness payload package body)
   = do { (package_ty, usage) <- markAllJoinsBad (lintCoreExpr package)
        ; case coreFullView package_ty of
-           ExistsTy a payload_ty ->
+           ExistsTy _ a payload_ty ->
              do { lintL (isTyVar witness && varType witness `eqType` varType a) $
                     text "Invalid Unpack witness:" <+> ppr witness
                 ; lintTyCoBndr witness $
@@ -2200,7 +2200,7 @@ lintType (TermAppTy f arg)
            (text "Opaque runtime call argument has the wrong kind:" <+> ppr arg
             $$ text "Expected:" <+> ppr domain) }
 
-lintType (ExistsTy b body)
+lintType (ExistsTy _ b body)
   = do { lintL (isTyVar b)
            (text "Existential binder is not a type variable:" <+> ppr b)
        ; lintBinder LambdaBind b $

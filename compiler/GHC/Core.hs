@@ -366,7 +366,7 @@ data Expr b
 
 {- Note [Lexical erased existential expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Pack annotates the payload with ExistsTy a body and supplies a type witness
+Pack annotates the payload with ExistsTy flag a body and supplies a type witness
 w of kind Type. The payload has type body[w/a]. Pack has precisely the
 payload's representation and demand.
 

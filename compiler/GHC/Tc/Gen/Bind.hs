@@ -1339,7 +1339,7 @@ checkInferredRetainedTypes local_value infos
                else failWithTc $ TcRnRetainedQuantificationError (RetainedInference ty) }
 
     closed_package ty
-      | ExistsTy _ payload <- coreFullView ty
+      | ExistsTy _ _ payload <- coreFullView ty
       = isTauTy ty && not (hasNativeDependentExpr (Type payload))
       | otherwise = False
 

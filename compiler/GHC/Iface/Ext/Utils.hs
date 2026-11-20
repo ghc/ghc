@@ -162,8 +162,8 @@ hieTypeToIface = foldType go
     go (HTyVarTy n) = IfaceTyVar $ (mkIfLclName (occNameFS $ getOccName n))
     go (HTermVarTy n) = IfaceTermVar (mkIfLclName (occNameFS $ getOccName n))
     go (HTermAppTy n arg) = IfaceTermAppTy (mkIfLclName (occNameFS $ getOccName n)) arg
-    go (HExistsTy (name, kind) body) =
-      IfaceExistsTy (mkIfLclName (occNameFS $ getOccName name), kind) body
+    go (HExistsTy flag (name, kind) body) =
+      IfaceExistsTy flag (mkIfLclName (occNameFS $ getOccName name), kind) body
     go (HDepFunTy vis (mult, n, domain) body) =
       IfaceDepFunTy vis (mult, mkIfLclName (occNameFS $ getOccName n), domain) body
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
@@ -233,9 +233,9 @@ getTypeIndex t
 
     go (TermVarTy v) = return $ HTermVarTy (varName v)
     go (TermAppTy fun arg) = HTermAppTy (varName fun) <$> getTypeIndex arg
-    go (ExistsTy binder body) = do
+    go (ExistsTy flag binder body) = do
       kind <- getTypeIndex (varType binder)
-      HExistsTy (varName binder, kind) <$> getTypeIndex body
+      HExistsTy flag (varName binder, kind) <$> getTypeIndex body
     go (DepFunTy vis binder body) = do
       mult <- getTypeIndex (idMult binder)
       domain <- getTypeIndex (varType binder)

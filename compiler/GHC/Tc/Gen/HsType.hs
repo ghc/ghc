@@ -1947,7 +1947,7 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
 
 -- The case alias needs the checked pattern from its enclosing family equation.
 -- See Note [Type case aliases] in GHC.Tc.TyCl.
-tcHsType mode src@(XHsType (HsTypeExistsRn binder body)) exp_kind
+tcHsType mode src@(XHsType (HsTypeExistsRn flag binder body)) exp_kind
   = do { skol <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn [unLoc binder]))
        ; (binders, body') <- tcExplicitTKBndrs skol [binder] $
            tcLHsType mode body (Check liftedTypeKind)
@@ -1957,7 +1957,7 @@ tcHsType mode src@(XHsType (HsTypeExistsRn binder body)) exp_kind
                kind <- liftZonkM $ zonkTcType (varType tv)
                unless (typeKind kind `tcEqType` liftedTypeKind) $
                  failWithTc (TcRnExistentialBinderKind kind)
-             checkExpKind mode src (ExistsTy tv body') liftedTypeKind exp_kind
+             checkExpKind mode src (ExistsTy flag tv body') liftedTypeKind exp_kind
            _ -> panic "tcHsType: existential binder count" }
 
 tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext

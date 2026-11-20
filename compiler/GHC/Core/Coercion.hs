@@ -1878,10 +1878,10 @@ coercion binder also gives substitution, Core Lint and interface readback the
 same account of its scope.
 -}
 -- | Return the wire name and checked rule for existential congruence.
-existsCoRule :: Role -> (FastString, CoAxiomRule)
-existsCoRule role = (name, BuiltInRule name role [role] proves)
+existsCoRule :: ExistsTyFlag -> Role -> (FastString, CoAxiomRule)
+existsCoRule flag role = (name, BuiltInRule name role [role] proves)
   where
-    name = existsCoRuleName role
+    name = existsCoRuleName flag role
     proves [Pair lhs rhs] = Pair <$> package lhs <*> package rhs
     proves _ = Nothing
     package (ForAllTy ma (Bndr tv vis) body)
@@ -1890,13 +1890,15 @@ existsCoRule role = (name, BuiltInRule name role [role] proves)
       , ma `eqType` unmatchableDataConTy
       , typeKind (varType tv) `eqType` liftedTypeKind
       , typeKind body `eqType` liftedTypeKind
-      = Just (ExistsTy tv body)
+      = Just (ExistsTy flag tv body)
     package _ = Nothing
 
 -- | Detect existential congruence even when its premise contains only foralls.
 isExistsCoRule :: CoAxiomRule -> Bool
 isExistsCoRule rule@(BuiltInRule _ role [_] _)
-  | role /= Phantom = rule == snd (existsCoRule role)
+  | role /= Phantom =
+      rule == snd (existsCoRule ExplicitExists role)
+      || rule == snd (existsCoRule ImplicitExists role)
 isExistsCoRule _ = False
 
 -- | Bind the common witness in the premise of existential congruence.
@@ -1905,8 +1907,8 @@ existsCoScope v = mkForAllTy unmatchableDataConTy (Bndr v coreTyLamForAllTyFlag)
 
 -- | Lift a scoped payload equality at the role of its premise.
 -- See Note [Lifting under an erased existential].
-mkExistsCo :: Role -> Coercion -> Coercion
-mkExistsCo role scoped = AxiomCo (snd (existsCoRule role)) [scoped]
+mkExistsCo :: ExistsTyFlag -> Role -> Coercion -> Coercion
+mkExistsCo flag role scoped = AxiomCo (snd (existsCoRule flag role)) [scoped]
 
 -- | Erase the environments in a lifting context
 zapLiftingContext :: LiftingContext -> LiftingContext
@@ -1943,9 +1945,9 @@ ty_co_subst !lc role ty
           _ -> pprPanic "ty_co_subst: native function head changed" (ppr ty)
     go r (TermVarTy v) = liftCoSubstNative lc r v
     -- See Note [Lifting under an erased existential].
-    go r ty@(ExistsTy v body)
+    go r ty@(ExistsTy flag v body)
       | isReflCo scoped = mkReflCo r (substTy (lcSubstLeft lc) ty)
-      | otherwise = mkExistsCo r scoped
+      | otherwise = mkExistsCo flag r scoped
       where
         scoped = go r (existsCoScope v body)
     go r (DepFunTy vis b body)

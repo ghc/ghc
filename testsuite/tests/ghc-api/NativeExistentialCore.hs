@@ -43,7 +43,7 @@ import GHC.Types.Name.Occurrence (mkVarOcc)
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.Unique.Supply (mkSplitUniqSupplyGrimily, uniqsFromSupply)
-import GHC.Types.Var (TyVar, mkCoVar, mkTyVar, varType, VarBndr (Bndr), data Specified)
+import GHC.Types.Var (ExistsTyFlag (ExplicitExists), TyVar, mkCoVar, mkTyVar, varType, VarBndr (Bndr), data Specified)
 import GHC.Types.Var.Set (elemVarSet, isEmptyVarSet)
 import GHC.Unit.Module (mkModule)
 import GHC.Unit.Module.ModDetails (md_types)
@@ -56,7 +56,7 @@ import GHC.Utils.Outputable (showSDocUnsafe, vcat)
 import System.Environment (getArgs)
 
 fixture :: TyVar -> Type -> Type
-fixture = ExistsTy
+fixture = ExistsTy ExplicitExists
 
 universal :: TyVar -> Type -> Type
 universal a = ForAllTy unmatchableDataConTy (Bndr a Specified)
@@ -132,7 +132,7 @@ verify interfacePath env = do
         assert "Core Lint rejected the lifted existential evidence" (wellScoped scope co)
         when (role == Representational) $ case co of
             AxiomCo _ [premise] ->
-                case lintCo scope (AxiomCo (snd (existsCoRule Nominal)) [premise]) of
+                case lintCo scope (AxiomCo (snd (existsCoRule ExplicitExists Nominal)) [premise]) of
                     Just errors -> do
                         let diagnostic = showSDocUnsafe (vcat (bagToList errors))
                         assert diagnostic $ all (`isInfixOf` diagnostic)
@@ -141,7 +141,7 @@ verify interfacePath env = do
                     Nothing -> fail "representational evidence yielded nominal existential equality"
             _ -> fail "expected a representational existential coercion with one premise"
     assert "a non-universal premise yielded existential equality"
-        (not (wellScoped [] (AxiomCo (snd (existsCoRule Nominal)) [mkNomReflCo boolTy])))
+        (not (wellScoped [] (AxiomCo (snd (existsCoRule ExplicitExists Nominal)) [mkNomReflCo boolTy])))
 
     let mdl = mkModule mainUnit (mkModuleName "ExistentialSignature")
         nm = mkExternalName top mdl (mkVarOcc "value") noSrcSpan
@@ -196,8 +196,8 @@ verify interfacePath env = do
     reject ".payload" (toIfaceType (fixture a dictPayload))
     let scopeName = mkIfLclName (fsLit "selfKind")
         external = mkIfLclName (fsLit "missingPayloadBinder")
-    reject ".self-scope" (IfaceExistsTy (scopeName, IfaceTyVar scopeName) (IfaceTyVar scopeName))
-    reject ".payload-scope" (IfaceExistsTy (scopeName, toIfaceType liftedTypeKind) (IfaceTyVar external))
+    reject ".self-scope" (IfaceExistsTy ExplicitExists (scopeName, IfaceTyVar scopeName) (IfaceTyVar scopeName))
+    reject ".payload-scope" (IfaceExistsTy ExplicitExists (scopeName, toIfaceType liftedTypeKind) (IfaceTyVar external))
     let unknown = interfacePath ++ ".unknown-type"
     writer <- openBinMem 32
     putByte writer 254

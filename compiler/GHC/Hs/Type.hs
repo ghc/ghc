@@ -20,7 +20,7 @@ module GHC.Hs.Type (
         pprHsModifiedFunArr, pprHsModifier, pprLHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeGhcRnExt(..),
+        HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeGhcRnExt(..), hsExistsTyFlag,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -113,7 +113,7 @@ import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..) )
-import GHC.Types.Var ( DepFunTyFlag(..), VarBndr, visArgTypeLike )
+import GHC.Types.Var ( DepFunTyFlag(..), ExistsTyFlag(..), VarBndr, visArgTypeLike, pprExistsTy )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.WiredIn.Types( mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
@@ -538,7 +538,7 @@ type HsCoreTy = Type
 -- | Renamed type extensions that need kind checking.
 data HsTypeGhcRnExt
   = HsCoreTyRn HsCoreTy
-  | HsTypeExistsRn (LHsTyVarBndr Specificity GhcRn) (LHsType GhcRn)
+  | HsTypeExistsRn !ExistsTyFlag (LHsTyVarBndr Specificity GhcRn) (LHsType GhcRn)
   | HsTypeLetRn (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
   | HsTypeCaseAliasRn (Name, Int, Maybe (LocatedN Name)) (LHsType GhcRn)
 
@@ -561,7 +561,7 @@ data HsTypeGhcPsExt
   | HsTypeLambda (EpToken "(", EpToken "\\", EpUniToken "->" "→", EpToken ")")
                  [LocatedN RdrName] (LHsType GhcPs)
 
-  | HsTypeExists (EpToken "exists", EpToken "|")
+  | HsTypeExists (EpToken "exists", Either (EpToken "|") (EpToken "."))
       (LHsTyVarBndr Specificity GhcPs) (LHsType GhcPs)
   | HsTypeLet (EpToken "let", EpToken "=", EpToken "in") (LocatedN RdrName)
               (LHsType GhcPs) (LHsType GhcPs)
@@ -817,7 +817,7 @@ hsTypeHasNoAnonWildcards lty = go lty
       HsTyLit{} -> True
       HsTyVar{} -> True
       HsStarTy{} -> True
-      XHsType (HsTypeExistsRn binder body) -> hsTyVarBndrHasNoAnonWildcards binder && go body
+      XHsType (HsTypeExistsRn _ binder body) -> hsTyVarBndrHasNoAnonWildcards binder && go body
       XHsType{} -> True
 
     gos = all go
@@ -1690,17 +1690,22 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
       text "some" <+> parens (ppr binder <+> dcolon <+> ppr_mono_lty domain)
         <+> char '|' <+> ppr_mono_lty body
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
-    HsTypeExists _ b body -> text "exists" <+> ppr b <+> vbar <+> ppr_mono_lty body
+    HsTypeExists (_, sep_tok) b body -> pprExistsTy (hsExistsTyFlag sep_tok) (ppr b) (ppr_mono_lty body)
     HsTypeLet _ v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
         <+> text "in" <+> ppr_mono_lty body
   GhcRn -> case t of
     HsCoreTyRn ty -> ppr ty
     HsTypeCaseAliasRn _ body -> ppr_mono_lty body
-    HsTypeExistsRn b body -> text "exists" <+> ppr b <+> vbar <+> ppr_mono_lty body
+    HsTypeExistsRn flag b body -> pprExistsTy flag (ppr b) (ppr_mono_lty body)
     HsTypeLetRn v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
         <+> text "in" <+> ppr_mono_lty body
+
+-- | Classify the parsed existential separator.
+hsExistsTyFlag :: Either (EpToken "|") (EpToken ".") -> ExistsTyFlag
+hsExistsTyFlag (Left _) = ExplicitExists
+hsExistsTyFlag (Right _) = ImplicitExists
 
 ppr_infix_ty :: (OutputableBndrId p) => LHsType (GhcPass p) -> Maybe SDoc
 ppr_infix_ty (L _ (HsTyVar _ prom (L _ op))) = Just (pprOccWithTick Infix prom op)
@@ -1786,6 +1791,7 @@ hsTypeNeedsParens p = go_hs_ty
     go_core_ty (TyConApp _ args)
       | null args             = False
       | otherwise             = p >= appPrec
+    go_core_ty (ExistsTy{})   = p >= funPrec
     go_core_ty (ForAllTy{})   = p >= funPrec
     go_core_ty (FunTy{})      = p >= funPrec
     go_core_ty (LitTy{})      = False

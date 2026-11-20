@@ -922,7 +922,7 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
   where
     (arg_rank, res_rank) = funArgResRank rank
 
-check_type ve (ExistsTy tv body)
+check_type ve (ExistsTy _ tv body)
   = do { check_type (ve { ve_rank = MustBeMonoType }) (varType tv)
        ; check_type ve body }
 

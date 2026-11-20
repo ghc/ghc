@@ -30,6 +30,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Text as T
 import GHC hiding (HsTypeGhcPsExt (..), fromMaybeContext)
 import GHC.Core.Type (Specificity (..))
+import GHC.Types.Var (ExistsTyFlag(..))
 import GHC.Data.FastString (unpackFS)
 import Language.Haskell.Syntax.Text (unpackHText)
 import GHC.Types.Name (getOccString, nameOccName, tidyNameOcc)
@@ -1358,9 +1359,13 @@ ppr_mono_ty (HsIParamTy _ (L _ n) ty) u = ppIPName n <+> dcolon u <+> ppr_mono_l
 ppr_mono_ty (HsSpliceTy v _) _ = dataConCantHappen v
 ppr_mono_ty (XHsType (HsBangTy b ty)) u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (XHsType HsRecTy{}) _ = text "{..}"
-ppr_mono_ty (XHsType (HsErasedExists binder body)) u =
-  keyword "exists" <+> ppHsTyVarBndr u (unLoc binder) <+> char '|'
-    <+> ppr_mono_lty body u
+ppr_mono_ty (XHsType (HsErasedExists flag binder body)) u =
+  keyword "exists" <+> binder' <+> ppr_mono_lty body u
+  where
+    name = ppHsTyVarBndr u (unLoc binder)
+    binder' = case flag of
+      ExplicitExists -> name <+> char '|'
+      ImplicitExists -> name <> dot
 ppr_mono_ty (XHsType (HsCheckedTypeCase scrutinee rows)) u =
   keyword "case" <+> pp scrutinee <+> keyword "of"
     <+> (char '{' <> hsep (punctuate semi (map row rows)) <> char '}')

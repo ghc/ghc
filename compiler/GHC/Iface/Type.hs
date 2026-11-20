@@ -196,7 +196,7 @@ data IfaceType
   | IfaceForAllTy  IfaceMatchability IfaceForAllBndr IfaceType
       -- See Note [Forall interface metadata].
   -- See Note [Retained Boolean interface types].
-  | IfaceExistsTy IfaceTvBndr IfaceType
+  | IfaceExistsTy ExistsTyFlag IfaceTvBndr IfaceType
   | IfaceDepFunTy !DepFunTyFlag IfaceIdBndr IfaceType
       -- See Note [Retained interface visibility].
   | IfaceTermVar IfLclName
@@ -895,7 +895,7 @@ visibleTypeVarOccurencies = go
     go (IfaceFreeTermVar {})    = mempty
     go (IfaceTermAppTy _ arg)   = go arg
     go (IfaceFreeTermAppTy _ arg) = go arg
-    go (IfaceExistsTy (_, arg) res) = go arg <> go res
+    go (IfaceExistsTy _ (_, arg) res) = go arg <> go res
     go (IfaceDepFunTy _vis (w, _, arg) res) = go w <> go arg <> go res
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ ma w arg res) = go ma <> go w <> go arg <> go res
@@ -940,8 +940,8 @@ substIfaceType env ty
     go ty@(IfaceFreeTermVar {}) = ty
     go (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go arg)
     go (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun (go arg)
-    go (IfaceExistsTy (name, kind) body)
-      = IfaceExistsTy (name', go kind) (substIfaceType body_env body)
+    go (IfaceExistsTy flag (name, kind) body)
+      = IfaceExistsTy flag (name', go kind) (substIfaceType body_env body)
       where
         without_binder = delFromFsEnv env (ifLclNameFS name)
         range_names = nonDetFoldFsEnv (Set.union . ifaceLocalNames) Set.empty without_binder
@@ -1006,7 +1006,7 @@ ifaceLocalNames = go
       IfaceTermVar var -> one var
       IfaceTermAppTy fun arg -> one fun `union` go arg
       IfaceFreeTermAppTy _ arg -> go arg
-      IfaceExistsTy (var, arg) body -> names [one var, go arg, go body]
+      IfaceExistsTy _ (var, arg) body -> names [one var, go arg, go body]
       IfaceDepFunTy _ (w, var, arg) body -> names [one var, go w, go arg, go body]
       IfaceAppTy fun args -> go fun `union` go_args args
       IfaceFunTy _ ma w arg res -> names (map go [ma, w, arg, res])
@@ -1439,10 +1439,9 @@ ppr_ty ctxt_prec (IfaceTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
 ppr_ty ctxt_prec (IfaceFreeTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
-ppr_ty ctxt_prec (IfaceExistsTy (var, arg) res)
+ppr_ty ctxt_prec (IfaceExistsTy flag (var, arg) res)
   = maybeParen ctxt_prec funPrec $
-      sep [text "exists" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg) <+> vbar,
-           ppr_ty_nested res]
+      pprExistsTy flag (parens (ppr var <+> dcolon <+> ppr_ty_nested arg)) (ppr_ty_nested res)
 ppr_ty ctxt_prec (IfaceDepFunTy vis (_, var, arg) res)
   = maybeParen ctxt_prec funPrec $
     case vis of
@@ -1626,8 +1625,8 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
     go subs rank1 (IfaceForAllTy ma bndr ty)
       = IfaceForAllTy (go subs False ma) (go_ifacebndr subs bndr) (go subs rank1 ty)
 
-    go subs rank1 (IfaceExistsTy (var, arg) res)
-      = IfaceExistsTy (var, go subs False arg) (go subs rank1 res)
+    go subs rank1 (IfaceExistsTy flag (var, arg) res)
+      = IfaceExistsTy flag (var, go subs False arg) (go subs rank1 res)
 
     go subs rank1 (IfaceDepFunTy vis (w, var, arg) res)
       = IfaceDepFunTy vis (go subs False w, var, go subs False arg) (go subs rank1 res)
@@ -2838,9 +2837,15 @@ putIfaceType _ (IfaceFreeTermAppTy fun _)
   = pprPanic "Can't serialise IfaceFreeTermAppTy" (ppr fun)
 putIfaceType bh (IfaceTermAppTy fun arg)
   = do { putByte bh 12; put_ bh fun; put_ bh arg }
-putIfaceType bh (IfaceExistsTy bndr body)
-  = do { requireIfaceEvidenceVersion bh ErasedExistentialEvidence
-       ; putByte bh 13; put_ bh bndr; put_ bh body }
+putIfaceType bh (IfaceExistsTy flag bndr body)
+  = do { case flag of
+           ExplicitExists -> do
+             requireIfaceEvidenceVersion bh ErasedExistentialEvidence
+             putByte bh 13
+           ImplicitExists -> do
+             requireIfaceEvidenceVersion bh ImplicitExistentialEvidence
+             putByte bh 14
+       ; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceDepFunTy vis bndr body)
   = do { putByte bh 10; put_ bh vis; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceTermVar var)
@@ -2914,7 +2919,8 @@ getIfaceType bh = do
                        ; return (IfaceDepFunTy vis bndr body) }
               11 -> IfaceTermVar <$> get bh
               12 -> IfaceTermAppTy <$> get bh <*> get bh
-              13 -> IfaceExistsTy <$> get bh <*> get bh
+              13 -> IfaceExistsTy ExplicitExists <$> get bh <*> get bh
+              14 -> IfaceExistsTy ImplicitExists <$> get bh <*> get bh
               _  -> ioError (userError ("getIfaceType: invalid type tag " ++ show h))
 
 instance Binary IfLclName where
@@ -2943,7 +2949,7 @@ instance Binary IfaceMCoercion where
 data IfaceEvidence
   = DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
   | IndexAliasEvidence | ErasedExistentialEvidence | ScopedSigmaEvidence
-  | RetainedDefaultEvidence
+  | RetainedDefaultEvidence | ImplicitExistentialEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3122,8 +3128,12 @@ instance Binary IfaceUnivCoDep where
 
 instance Binary IfaceAxiomRule where
   put_ bh (IfaceAR_X n) = do
-    when (ifLclNameFS n `elem` [existsCoRuleName Nominal, existsCoRuleName Representational]) $
+    let uses flag = ifLclNameFS n `elem`
+          [existsCoRuleName flag Nominal, existsCoRuleName flag Representational]
+    when (uses ExplicitExists) $
       requireIfaceEvidenceVersion bh ErasedExistentialEvidence
+    when (uses ImplicitExists) $
+      requireIfaceEvidenceVersion bh ImplicitExistentialEvidence
     when (ifLclNameFS n == scopedSigmaClosureName) $
       requireIfaceEvidenceVersion bh ScopedSigmaEvidence
     putByte bh 0
@@ -3154,7 +3164,7 @@ instance NFData (DefMethSpec IfaceType) where
 instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()
-    IfaceExistsTy bndr res -> rnf bndr `seq` rnf res
+    IfaceExistsTy _ bndr res -> rnf bndr `seq` rnf res
     IfaceDepFunTy vis bndr res -> vis `seq` rnf bndr `seq` rnf res
     IfaceTermVar var -> rnf var
     IfaceFreeTermVar var -> var `seq` ()

@@ -1843,7 +1843,7 @@ isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
 isTauTy (TyVarTy _)       = True
 isTauTy (TermAppTy _ arg) = isTauTy arg
 isTauTy (TermVarTy _)     = True
-isTauTy ty@(ExistsTy binder body)
+isTauTy ty@(ExistsTy _ binder body)
   = isTauTy (varType binder) && isTauTy body
     && noFreeVarsOfType ty && isFamFreeTy ty
     -- See Note [Closed existential packages in type inference].
@@ -1972,7 +1972,7 @@ isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
 isFamFreeTy (TermAppTy _ arg) = isFamFreeTy arg
 isFamFreeTy (TermVarTy _)     = True
-isFamFreeTy (ExistsTy b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
+isFamFreeTy (ExistsTy _ b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (DepFunTy _ b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc

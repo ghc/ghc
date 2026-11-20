@@ -610,9 +610,9 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel
   = can_eq_nc_forall ev eq_rel s1 s2
 
 can_eq_nc _rewritten _rdr_env _envs ev eq_rel
-           s1@ExistsTy{} _
-           s2@ExistsTy{} _
-  | isWanted ev
+           s1@(ExistsTy flag1 _ _) _
+           s2@(ExistsTy flag2 _ _) _
+  | flag1 == flag2, isWanted ev
   = can_eq_nc_forall ev eq_rel s1 s2
   -- See Note [Solving existential package equalities].
 
@@ -1116,8 +1116,8 @@ can_eq_nc_forall ev eq_rel orig1 orig2
 
  where
     (s1, s2, close) = case (orig1, orig2) of
-      (ExistsTy a t, ExistsTy b u) ->
-        (existsCoScope a t, existsCoScope b u, mkExistsCo (eqRelRole eq_rel))
+      (ExistsTy flag a t, ExistsTy _ b u) ->
+        (existsCoScope a t, existsCoScope b u, mkExistsCo flag (eqRelRole eq_rel))
       _ -> (orig1, orig2, id)
 
     -- See Note [CoVar forall touchability] in GHC.Tc.Solver.Monad.

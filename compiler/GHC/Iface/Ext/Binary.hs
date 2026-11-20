@@ -27,6 +27,7 @@ import GHC.Iface.Binary           ( putAllTables )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Var (ExistsTyFlag(..))
 import GHC.Types.Unique.FM
 import qualified GHC.Utils.Binary as Binary
 import GHC.Utils.Panic
@@ -75,7 +76,12 @@ writeHieFile hie_file_path hiefile = do
   -- Write the header: hieHeader followed by the
   -- hieVersion and the GHC version used to generate this file
   mapM_ (putByte bh0) hieMagic
-  putBinLine bh0 $ BSC.pack $ show hieVersion
+  let version
+        | any usesDot (hie_types hiefile) = hieImplicitExistsVersion
+        | otherwise = hieVersion
+      usesDot (HExistsTy ImplicitExists _ _) = True
+      usesDot _ = False
+  putBinLine bh0 $ BSC.pack $ show version
   putBinLine bh0 $ ghcVersion
 
   (fs_tbl, fs_w) <- initFastStringWriterTable
@@ -148,7 +154,7 @@ readHieFileWithVersion readVersion name_cache file = do
   (readHieVersion, ghcVersion) <- readHieFileHeader file bh0
 
   -- See Note [HIE arrow matchability] in GHC.Iface.Ext.Types.
-  if readHieVersion == hieVersion && readVersion (readHieVersion, ghcVersion)
+  if supportedHieVersion readHieVersion && readVersion (readHieVersion, ghcVersion)
   then do
     hieFile <- readHieFileContents bh0 name_cache
     return $ Right (HieFileResult readHieVersion ghcVersion hieFile)
@@ -166,7 +172,7 @@ readHieFile name_cache file = do
 
   -- Check if the versions match
   -- See Note [HIE arrow matchability] in GHC.Iface.Ext.Types.
-  when (readHieVersion /= hieVersion) $
+  when (not (supportedHieVersion readHieVersion)) $
     panic $ unwords ["readHieFile: hie file versions don't match for file:"
                     , file
                     , "Expected"
@@ -174,7 +180,11 @@ readHieFile name_cache file = do
                     , "but got", show readHieVersion
                     ]
   hieFile <- readHieFileContents bh0 name_cache
-  return $ HieFileResult hieVersion ghcVersion hieFile
+  return $ HieFileResult readHieVersion ghcVersion hieFile
+
+-- | Both type-table versions share the rest of the HIE format.
+supportedHieVersion :: Integer -> Bool
+supportedHieVersion v = v == hieVersion || v == hieImplicitExistsVersion
 
 readBinLine :: ReadBinHandle -> IO ByteString
 readBinLine bh = BS.pack . reverse <$> loop []

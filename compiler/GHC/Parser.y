@@ -2301,7 +2301,10 @@ ctype   :: { LHsType GhcPs }
                                                          , hst_body = $2 } }
         | 'exists' tv_bndr_no_braces '|' ctype
                                      {% amsA' (sLL $1 $> $
-                                          XHsType (HsTypeExists (epTok $1, epTok $3) $2 $4)) }
+                                          XHsType (HsTypeExists (epTok $1, Left (epTok $3)) $2 $4)) }
+        | 'exists' tv_bndr_no_braces '.' ctype
+                                     {% amsA' (sLL $1 $> $
+                                          XHsType (HsTypeExists (epTok $1, Right (epTok $3)) $2 $4)) }
         | 'foreach' foreach_bndrs foreach_separator ctype
                                      {% do { bndrs <- fromSpecTyVarBndrs $2
                                            ; amsA' (sLL $1 $> $
