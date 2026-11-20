@@ -8,6 +8,17 @@ increments.
 
 ## Family and package checkpoints
 
+At `c753344c5b`, a compiler relink with the opaque-domain, beta-reduction,
+and signature changes matched all 345 Showcase lines at `-O0`, default
+`-O1`, and default `-O2`. Core and STG Lint passed.
+`NativeRetainedPackage` checked direct vector binders, forwarding,
+distinct vector identities and a named callback in an ordinary consumer.
+A non-injective family in the callback signature still produced an
+ambiguity error. `NativeFunctionIndex` matched its existing golden.
+[Domain check](../../compiler/GHC/Core/Type.hs),
+[source regression](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [callback type](examples/packed-vector/DependentPair.hs).
+
 At `a35653b580`, the public 341-line compiler relink matched all 344
 Showcase lines at `-O0`, default `-O1`, and default `-O2`, with Core and
 STG Lint. The registered source tests for the comparison and the split
