@@ -1071,6 +1071,7 @@ main = do
         (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "infer the result kind after passing a visible family argument"
         (Refl :: InvisibleFamily.ObservedVisible :~: Int)
+    observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "partially apply a two-argument type lambda" TypeLambda.partial

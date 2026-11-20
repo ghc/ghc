@@ -1,9 +1,9 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, RankNTypes #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, RankNTypes #-}
 {-# LANGUAGE StandaloneKindSignatures, TypeAbstractions, TypeApplications, TypeFamilies #-}
-module InvisibleFamily (Test, Observed, Inferred, PickVisible, ObservedVisible, IndexedVisible) where
+module InvisibleFamily (Test, Observed, Inferred, PickVisible, ObservedVisible, IndexedVisible, wrappedValues) where
 
 import Data.Kind (Type)
-import GHC.Exts (U)
+import GHC.Exts (M, U)
 
 -- | A family indexed by the kind of its result.
 type Select :: forall k. @U k
@@ -44,3 +44,21 @@ type family RunVisible @r f where
 
 type ObservedVisible = RunVisible (PickVisible 'True)
 type IndexedVisible flag = RunVisible (PickVisible flag)
+
+-- | Select the kind of the type function returned by Wrap.
+type family Arrow (list :: Bool) where
+  Arrow False = Type %M -> Type
+  Arrow True  = Type %U -> Type
+
+-- | Return either an ordinary constructor or a type family.
+type family Wrap (list :: Bool) :: Arrow list
+type instance Wrap False = Maybe
+type instance Wrap True  = AsList
+
+-- | Wrap the element type in a list.
+type family AsList a where
+  AsList a = [a]
+
+-- | Apply both functions through their family-defined arrow kinds.
+wrappedValues :: (Wrap False Int, Wrap True Int)
+wrappedValues = (Just 7, [7])
