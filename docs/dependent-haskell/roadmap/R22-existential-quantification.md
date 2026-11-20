@@ -95,6 +95,31 @@ existential types or expressions at `-O0`. The Showcase module exports
 its observation as an ordinary tuple for the optimized Showcase entry
 point. The implicit dot form and its vector filter remain open.
 
+### A lazy filter with an erased length
+
+The [example](../examples/erased-existentials/ErasedPackage.hs) gives the
+filter an explicit result schema.
+
+```haskell
+type Filtered a = exists (m :: Nat) | Vec a m
+filterVec :: (a -> Bool) -> Vec a n -> Filtered a
+```
+
+On a passing element, the filter opens the recursive result and packs
+the new vector with witness `'S m`. The length is erased. Reading the first
+cell should demand the predicate and its result while leaving the tail
+unevaluated. The source-free client also checks a rejected prefix, an empty
+result, and an empty input.
+
+At `7a2fe4027b` the client observes `([7],[7,9],[],[])` when the element
+type is fixed to `Int` and the length constructors have kind `Type`.
+Using a promoted `Nat` instead reaches GHC-97230 at the existential binder.
+Keeping the element polymorphic reaches a missing `liftCoSubst` case.
+The candidate checks the witness against its declared kind and transports
+payload equality under the binder. The original polymorphic, `Nat`-indexed
+source program is the acceptance test. Implicit packing and opening for
+the dot form require additional inference.
+
 At `e04f9add03`, the filter signature fails at the dot in `exists m.`
 with GHC-68947. An ordinary GADT control uses `Some :: Vec n a -> Some a`.
 Its successful branch matches `Some tail` from the recursive call before
