@@ -203,6 +203,16 @@ same index. The client can use the rule while its input Boolean is unknown.
 The matcher rejects two distinct indices and never inverts `Length`.
 [Vector regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
 
+The Boolean and its payload can both omit their annotations. In
+`forall b x. readKept b x = readChoice x`, the declared arguments of
+`readKept` give `b :: Bool` and then `x :: Choice b`. The compiler
+checks every occurrence of each variable at this type. The index must
+already be in scope when the compiler assigns the payload's type.
+The same rule works for two indices and for a polymorphic `Maybe a`
+domain. A leading visible type application on the rule head still
+requires the dependent payload annotation.
+[Source and rejection checks](../examples/qualified-pi/check-retained-rules.sh).
+
 Agda registers an equality proof with `REWRITE` and can use it when
 reducing a neutral type. GHC's `RULES` typechecks both sides and gives
 the programmer responsibility for preserving their meaning. R05 follows

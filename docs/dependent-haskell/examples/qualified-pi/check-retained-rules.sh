@@ -46,6 +46,34 @@ for opt in 0 1 2; do
     [[ $(./observe) == '(7,0,11,19,7,0)' ]]
 done
 
+cd "$out"
+cat >RuleScope.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, ScopedTypeVariables #-}
+module RuleScope where
+import Data.Kind (Type)
+data Reading (m :: Maybe a) (b :: Bool) = Reading Int
+{-# NOINLINE keepReading #-}
+keepReading :: forall (a :: Type). foreach (m :: Maybe a) -> foreach (b :: Bool)
+            -> Reading m b -> Reading m b
+keepReading _ _ x = x
+{-# RULES "keep/reading" forall (m :: Maybe a) b x. keepReading m b x = x #-}
+HS
+"$ghc" "${flags[@]}" -O2 -c RuleScope.hs
+cat >BadRuleScope.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module BadRuleScope where
+data Choice (b :: Bool) = Choice Int
+{-# NOINLINE compareAt #-}
+compareAt :: foreach (b :: Bool) -> foreach (c :: Bool) -> Choice b -> Choice c -> Int
+compareAt _ _ _ _ = 0
+{-# RULES "different indices" forall b c x. compareAt b c x x = 0 #-}
+HS
+if "$ghc" "${flags[@]}" -O2 -c BadRuleScope.hs >wrong.log 2>&1; then exit 1; fi
+grep -Fq '[GHC-83865]' wrong.log || { cat wrong.log; exit 1; }
+sed 's/forall b x\. readKept/forall x b. readKept/' "$src/RetainedRules.hs" >RetainedRules.hs
+if "$ghc" "${flags[@]}" -O2 -c RetainedRules.hs >later.log 2>&1; then exit 1; fi
+grep -Fq '[GHC-25897]' later.log || { cat later.log; exit 1; }
+
 if [[ -n $old ]]; then
     # The closed rule must select the interface header on its own.
     cd "$out/O2/provider"
