@@ -29,6 +29,7 @@ import GHC.Prelude
 import GHC.ByteCode.Binary
 import GHC.ByteCode.Recomp.Binary (computeFingerprint)
 import GHC.ByteCode.Types
+import GHC.Data.Maybe (rightToMaybe)
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.Iface.Binary
@@ -36,6 +37,7 @@ import GHC.Iface.Recomp.Binary (putNameLiterally)
 import GHC.Linker.Types
 import GHC.Unit.Types
 import GHC.Utils.Binary
+import GHC.Utils.Exception (tryIO)
 import GHC.Utils.Fingerprint (Fingerprint(..), fingerprintFingerprints)
 import GHC.Utils.Logger
 import GHC.Utils.Panic
@@ -148,8 +150,9 @@ readBytecodeLib hsc_env path = do
   res <- getWithUserData (hsc_NC hsc_env) bh
   pure res
 
+-- | 'Nothing' if the file can't be read or its header is not valid.
 -- See Note [Hash of bytecode libs]
-readBytecodeLibInputsHash :: FilePath -> IO Fingerprint
+readBytecodeLibInputsHash :: FilePath -> IO (Maybe Fingerprint)
 readBytecodeLibInputsHash = readPersistentBytecodeHash BytecodeLibraryFile
 
 -- | Convert an 'OnDiskModuleByteCode' to an 'ModuleByteCode'.
@@ -237,7 +240,8 @@ readBinByteCode hsc_env f = do
   decodeOnDiskModuleByteCode hsc_env odbco
 
 -- | Read the hash of a bytecode file, without reading the rest of the file.
-readBinByteCodeHash :: FilePath -> IO Fingerprint
+-- 'Nothing' if the file can't be read or its header is not valid.
+readBinByteCodeHash :: FilePath -> IO (Maybe Fingerprint)
 readBinByteCodeHash = readPersistentBytecodeHash ModuleByteCodeFile
 
 readOnDiskModuleByteCode :: HscEnv -> FilePath -> IO OnDiskModuleByteCode
@@ -318,44 +322,46 @@ writePersistentBytecodeHeader file_kind (Fingerprint w1 w2) bh = do
   put_ bh (FixedLengthEncoding w1)
   put_ bh (FixedLengthEncoding w2)
 
+-- | Read only the header of a persistent bytecode file.
+getPersistentBytecodeHeader :: PersistentBytecodeFile -> ReadBinHandle -> IO (Either String Fingerprint)
+getPersistentBytecodeHeader file_kind bh = do
+  magic <- get bh
+  if unFixedLength magic /= unFixedLength expected_magic
+    then mismatch "magic" (show $ unFixedLength expected_magic) (show $ unFixedLength magic)
+    else do
+      version <- get bh
+      if version /= persistentBytecodeVersion
+        then mismatch "version"
+               (showPersistentBytecodeVersion persistentBytecodeVersion)
+               (showPersistentBytecodeVersion version)
+        else do
+          w1 <- get bh
+          w2 <- get bh
+          pure $ Right (Fingerprint (unFixedLength w1) (unFixedLength w2))
+  where
+    expected_magic = persistentBytecodeMagic file_kind
+    mismatch what expected actual =
+      pure $ Left $ what ++ " (expected " ++ expected ++ ", got " ++ actual ++ ")"
+
 -- | Validate the header of a persistent bytecode file, and return its hash.
 readPersistentBytecodeHeader :: PersistentBytecodeFile -> FilePath -> ReadBinHandle -> IO Fingerprint
 readPersistentBytecodeHeader file_kind path bh = do
-  let mismatch what expected actual =
-        headerMismatch file_kind path $
-          what ++ " (expected " ++ expected ++ ", got " ++ actual ++ ")"
-
-  magic <- get bh
-  let expected_magic = persistentBytecodeMagic file_kind
-  if unFixedLength magic == unFixedLength expected_magic
-    then pure ()
-    else mismatch "magic" (show $ unFixedLength expected_magic) (show $ unFixedLength magic)
-
-  version <- get bh
-  if version == persistentBytecodeVersion
-    then pure ()
-    else mismatch "version"
-           (showPersistentBytecodeVersion persistentBytecodeVersion)
-           (showPersistentBytecodeVersion version)
-
-  w1 <- get bh
-  w2 <- get bh
-  pure (Fingerprint (unFixedLength w1) (unFixedLength w2))
-
-headerMismatch :: PersistentBytecodeFile -> FilePath -> String -> IO a
-headerMismatch file_kind path what =
-  throwGhcExceptionIO $ ProgramError $
-    persistentBytecodeFileDescription file_kind ++ " header mismatch in " ++ path ++
-    ": " ++ what
+  r <- getPersistentBytecodeHeader file_kind bh
+  case r of
+    Right hash -> pure hash
+    Left what -> throwGhcExceptionIO $ ProgramError $
+      persistentBytecodeFileDescription file_kind ++ " header mismatch in " ++ path ++
+      ": " ++ what
 
 -- | Read the hash from the header of a persistent bytecode file, without
--- reading the rest of the file.
-readPersistentBytecodeHash :: PersistentBytecodeFile -> FilePath -> IO Fingerprint
+-- reading the rest of the file. 'Nothing' if the file can't be read or its
+-- header is not valid.
+readPersistentBytecodeHash :: PersistentBytecodeFile -> FilePath -> IO (Maybe Fingerprint)
 readPersistentBytecodeHash file_kind path = do
-  mb_bh <- readBinMemN persistentBytecodeHeaderSize path
-  case mb_bh of
-    Just bh -> readPersistentBytecodeHeader file_kind path bh
-    Nothing -> headerMismatch file_kind path "file too short"
+  r <- tryIO $ readBinMemN persistentBytecodeHeaderSize path
+  case r of
+    Right (Just bh) -> rightToMaybe <$> getPersistentBytecodeHeader file_kind bh
+    _ -> pure Nothing
 
 persistentBytecodeFileDescription :: PersistentBytecodeFile -> String
 persistentBytecodeFileDescription ModuleByteCodeFile = "bytecode file"

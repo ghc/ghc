@@ -550,11 +550,11 @@ checkBytecodeLibraryLinkingNeeded _logger dflags unit_env linkables _pkg_deps = 
     Nothing  -> return $ NeedsRecompile MustCompile
     Just _ -> do
         -- See Note [Hash of bytecode libs] in GHC.ByteCode.Serialize
-        e_recorded <- tryIO (readBytecodeLibInputsHash exe_file)
+        recorded <- readBytecodeLibInputsHash exe_file
         let current = bytecodeLibInputsHash (map linkableHash linkables)
-        case e_recorded of
-          Right recorded | recorded == current -> return UpToDate
-          _ -> return $ needsRecompileBecause ObjectsChanged
+        if recorded == Just current
+          then return UpToDate
+          else return $ needsRecompileBecause ObjectsChanged
 
 checkNativeLibraryLinkingNeeded :: Bool -> Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired
 checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps = do
