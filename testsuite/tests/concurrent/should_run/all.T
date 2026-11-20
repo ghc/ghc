@@ -168,7 +168,11 @@ test('conc030', extra_run_opts('+RTS -K4M -RTS'), compile_and_run, [''])
 test('conc031', exit_code(1), compile_and_run, [''])
 
 test('conc032', normal, compile_and_run, [''])
-test('conc033', when(config.have_ext_interp, extra_ways(['ghci-ext'])), compile_and_run, [''])
+# You don't get any guarantee that the RTS ever throws a BlockedIndefinitely
+# exception, so it's fine if ghci doesn't throw one to the sandboxed thread.
+test('conc033', [when(config.have_ext_interp, extra_ways(['ghci-ext'])),
+                 expect_fail_for(['ghci-ext'])],
+     compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 test('conc034', [

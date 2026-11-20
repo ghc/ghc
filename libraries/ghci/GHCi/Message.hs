@@ -144,13 +144,14 @@ data Message a where
   EvalStmt
     :: EvalOpts
     -> EvalExpr HValueRef {- IO [a] -}
-    -> Message (EvalStatus [HValueRef]) {- [a] -}
+    -> Message (RemoteRef ThreadId)
+    -- ^ 'WaitThreadResult' of this thread id yields [a]
 
   -- | Resume evaluation of a statement after a breakpoint
   ResumeStmt
    :: EvalOpts
    -> RemoteRef ThreadId
-   -> Message (EvalStatus [HValueRef])
+   -> Message ()
 
   -- | Abandon evaluation of a statement after a breakpoint
   AbandonStmt
@@ -254,12 +255,26 @@ data Message a where
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
     :: HValueRef
-    -> Message (EvalStatus [HValueRef])
+    -> Message (RemoteRef ThreadId)
 
   -- | Resume forcing a free variable in a breakpoint (#2950)
   ResumeSeq
     :: RemoteRef ThreadId
+    -> Message ()
+
+  -- | Await the result or a breakpoint of a sandbox thread.
+  WaitThreadResult
+    :: Bool
+    -- ^ Whether to read all thread breaks on any forked threads (@True@) or
+    -- just this thread's breakpoints or its eval result (@False@)
+    -> RemoteRef ThreadId
     -> Message (EvalStatus [HValueRef])
+
+  -- | Throw a serializable exception to the given thread
+  ThrowToThread
+    :: RemoteRef ThreadId
+    -> SerializableException
+    -> Message ()
 
   -- | User-defined request encoded as a tag/payload pair.  This is left
   -- uninterpreted by GHC and is meant for GHC API applications to be able to supply
@@ -295,20 +310,22 @@ resultRemoteResources msg res = case msg of
   PrepFFI{}                 -> [RemoteFFI res]
   LookupClosure{}           -> map RemoteHValueRef $ toList res
   CreateBCOs{}              -> map RemoteHValueRef $ res
-  EvalStmt{}                -> map RemoteHValueRef $ evalStatus id res
-  ResumeStmt{}              -> map RemoteHValueRef $ evalStatus id res
   NewBreakArray{}           -> map RemoteHValueRef $ [castRemoteRef res]
   GetBreakpointVar{}        -> map RemoteHValueRef $ toList res
   StartTH{}                 -> [RemoteHValueRef $ castRemoteRef res]
   GetClosure{}              -> map RemoteHValueRef $ toList res
-  Seq{}                     -> map RemoteHValueRef $ evalStatus (const []) res
-  ResumeSeq{}               -> map RemoteHValueRef $ evalStatus (const []) res
   AddLibrarySearchPath{}    -> [RemoteLibrarySearchPath res]
+  WaitThreadResult{}        -> map RemoteHValueRef $ evalStatus id res
+  EvalStmt{}                -> [RemoteHValueRef $ castRemoteRef res]
+  Seq{}                     -> [RemoteHValueRef $ castRemoteRef res]
 
   (CustomMessage _ _ CustomMessageMethods{..})
                             -> customResultRemoteResources res
   (CustomMessage _ _ Deserialized)
                             -> error "resultRemoteRefs on deserialized CustomMessage"
+  -- resume returns ()
+  ResumeStmt{}              -> []
+  ResumeSeq{}               -> []
 
   -- 'LoadDLLs' is idempotent.
   LoadDLLs{}                -> []
@@ -343,6 +360,7 @@ resultRemoteResources msg res = case msg of
   RunModFinalizers{}        -> []
   WhereFrom{}               -> []
   FreeRemoteResources{}     -> []
+  ThrowToThread{}           -> []
   where
     evalStatus :: (b -> [HValueRef]) -> EvalStatus b -> [HValueRef]
     evalStatus f = \case
@@ -694,6 +712,8 @@ getMessage = do
       41 -> Msg <$> (AddHpcModule <$> get <*> get <*> get <*> get)
       42 -> Msg <$> (CustomMessage <$> get <*> get <*> pure Deserialized)
       43 -> Msg <$> (FreeRemoteResources <$> get)
+      44 -> Msg <$> (WaitThreadResult <$> get <*> get)
+      45 -> Msg <$> (ThrowToThread <$> get <*> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -743,6 +763,8 @@ putMessage m = case m of
   AddHpcModule m n h ticks    -> putWord8 41 >> put m >> put n >> put h >> put ticks
   CustomMessage tag payload _ -> putWord8 42 >> put tag >> put payload
   FreeRemoteResources ps      -> putWord8 43 >> put ps
+  WaitThreadResult b tid      -> putWord8 44 >> put b >> put tid
+  ThrowToThread tid e         -> putWord8 45 >> put tid >> put e
 
 {-
 Note [Parallelize CreateBCOs serialization]

@@ -198,6 +198,10 @@ data Resume = Resume
        , resumeCCS       :: RemotePtr CostCentreStack
        , resumeHistory   :: [History]
        , resumeHistoryIx :: Int           -- 0 <==> at the top of the history
+       , resumeMainThread :: ForeignRef ThreadId
+         -- ^ The corresponding main evaluation thread. A breakpoint may be on
+         -- a forked thread: we resume the stopped thread ('resumeContext'),
+         -- but await on the main evaluation one ('resumeMainThread')
        }
 
 type ResumeBindings = ([TyThing], IcGlobalRdrEnv)

@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad (join)
 import System.IO
 import GHC.Driver.Session
 import GHC
@@ -25,10 +26,10 @@ main
           setContext [ IIDecl (simpleImportDecl pRELUDE_NAME)
                      , IIDecl (simpleImportDecl (mkModuleNameFS (fsLit "System.IO")))]
           runDecls "data X = Y ()"
-          execStmt "print True" execOptions
-          MC.try $ execStmt "print (Y ())" execOptions :: GhcMonad m => m (Either SomeException ExecResult)
+          join $ execStmt "print True" execOptions
+          MC.try $ join $ execStmt "print (Y ())" execOptions :: GhcMonad m => m (Either SomeException ExecResult)
           runDecls "data X = Y () deriving Show"
           _ <- dynCompileExpr "'x'"
-          execStmt "print (Y ())" execOptions
-          execStmt "System.IO.hFlush System.IO.stdout" execOptions
+          join $ execStmt "print (Y ())" execOptions
+          join $ execStmt "System.IO.hFlush System.IO.stdout" execOptions
         print "done"

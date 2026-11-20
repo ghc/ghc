@@ -54,18 +54,17 @@ noCustomHandler _ _ = return Nothing
 trace :: String -> IO ()
 trace s = getProgName >>= \name -> hPrintf stderr "[%20s] %s\n" name s
 
-serv :: Bool -> MessageHook -> Pipe -> (forall a .IO a -> IO a) -> IO ()
-serv verbose hook pipe restore =
-  servWithCustom verbose hook pipe restore noCustomHandler
+serv :: Bool -> MessageHook -> Pipe -> IO ()
+serv verbose hook pipe =
+  servWithCustom verbose hook pipe noCustomHandler
 
 servWithCustom
   :: Bool
   -> MessageHook
   -> Pipe
-  -> (forall a. IO a -> IO a)
   -> CustomMessageHandler
   -> IO ()
-servWithCustom verbose hook pipe restore customHandler = do
+servWithCustom verbose hook pipe customHandler = do
   ref <- newIORef False
   withThreadManager $ \mngr -> handle @PipeClosedException (const $ pure ()) $ do
     loop ref mngr `finally` closePipe pipe
@@ -75,7 +74,6 @@ servWithCustom verbose hook pipe restore customHandler = do
 
     handleRemoteCall pipe hook $ \wr setCancel (msg :: Message a) ->
 
-      discardCtrlC                                 %>>= \_ ->
       when verbose (trace ("msg: " ++ (show msg))) %>>= \_ ->
 
       case msg of
@@ -83,12 +81,29 @@ servWithCustom verbose hook pipe restore customHandler = do
         Shutdown                  -> writeIORef doneRef True >> closingPipe pipe >>
                                      reply ()                %>>= \r ->
                                      runWriteReply wr (Right r) ignorePipeClosedException
+
+        -- Run splices concurrently without blocking the server thread
         RunTH ii st q ty loc      -> handleAsync wr
-                                     (restore $ wrapRunTH ii (runTH pipe ii st q ty loc))
+                                     (wrapRunTH ii (runTH pipe ii st q ty loc))
                                      (setCancel . void . forkIO . killThread)
         RunModFinalizers ii st qs -> handleAsync wr
-                                     (restore $ wrapRunTH ii (runModFinalizerRefs pipe ii st qs))
+                                     (wrapRunTH ii (runModFinalizerRefs pipe ii st qs))
                                      (setCancel . void . forkIO . killThread)
+
+        -- Wait off the main thread and reply asynchronously once ready. This
+        -- wait thread is killed if the wait request is cancelled, but a result
+        -- of the target thread can still be read e.g. with a follow-up wait.
+        -- If the target thread should be killed, see 'ThrowToThread'.
+        -- See Note [interpreter redirectInterrupts and signal handling] for both.
+        WaitThreadResult{}        -> handleAsync wr
+                                     (run msg >>= reply)
+                                     (setCancel . void . forkIO . killThread)
+        -- Run throwTo off the main thread in case the user program behaves
+        -- "badly" wrt async exceptions.
+        ThrowToThread{}           -> handleAsync wr
+                                     (run msg >>= reply)
+                                     (setCancel . void . forkIO . killThread)
+
         _other                    -> run msg >>= reply        %>>= writeReply wr
 
     isDone <- readIORef doneRef
@@ -157,17 +172,6 @@ servWithCustom verbose hook pipe restore customHandler = do
        Left e -> showException e
        Right str -> return str
 
-  -- throw away any pending ^C exceptions while we're not running
-  -- interpreted code.  GHC will also get the ^C, and either ignore it
-  -- (if this is GHCi), or tell us to quit with a Shutdown message.
-  discardCtrlC = do
-    when verbose $ trace "discardCtrlC"
-    r <- try $ restore $ return ()
-    case r of
-      Left UserInterrupt -> return () >> discardCtrlC
-      Left e -> throwIO e
-      _ -> return ()
-
 -- | Default server
 #if defined(wasm32_HOST_ARCH)
 defaultServer :: Callback (JSVal -> IO ()) -> Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
@@ -212,12 +216,12 @@ defaultServerWithCustom customHandler = do
 
 #if defined(wasm32_HOST_ARCH)
   -- See Note [wasm ghci signal handlers] for details
-  installSignalHandlers $ js_register_signal_handler cb_sig
+  ignoreInterrupts $ js_register_signal_handler cb_sig
   pipe <- mkPipeFromContinuations (recv_buf cb_recv) (send_buf cb_send) (pure ()) (pure ())
 #else
   when verbose $
     printf "GHC iserv starting (in: %s; out: %s)\n" (show inh) (show outh)
-  installSignalHandlers
+  ignoreInterrupts
   pipe <- mkPipeFromHandles inh outh
 #endif
 
@@ -226,11 +230,9 @@ defaultServerWithCustom customHandler = do
       putStrLn "Waiting 3s"
     threadDelay 3000000
 
-  uninterruptibleMask $ \restore -> servWithCustom verbose hook pipe restore customHandler
+  servWithCustom verbose hook pipe customHandler
 
   where hook = return -- empty hook
-    -- we cannot allow any async exceptions while communicating, because
-    -- we will lose sync in the protocol, hence uninterruptibleMask.
 
 dieWithUsage :: IO a
 dieWithUsage = do

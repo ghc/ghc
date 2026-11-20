@@ -10,6 +10,8 @@ module GHC.Runtime.Interpreter
   -- * High-level interface to the interpreter
   , evalStmt, EvalStatus(..), EvalResult(..), EvalExpr(..)
   , resumeStmt
+  , waitThreadResult
+  , redirectInterrupts
   , abandonStmt
   , evalIO
   , evalString
@@ -104,7 +106,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
-import GHCi.Run
+import GHCi.Run hiding (redirectInterrupts)
 #endif
 
 import Control.Concurrent
@@ -322,11 +324,11 @@ evalStmt
   :: SafeInterp
   -> EvalOpts
   -> EvalExpr ForeignHValue
-  -> IO (EvalStatus [ForeignHValue])
+  -> IO (ForeignRef ThreadId)
 evalStmt interp0 opts foreign_expr = withInterp interp0 $ \ interp -> do
-  status <- withExpr foreign_expr $ \expr ->
+  rtid <- withExpr foreign_expr $ \expr ->
     interpCmd interp (EvalStmt opts expr)
-  handleEvalStatus interp status
+  mkFinalizedHValue interp rtid
  where
   withExpr :: EvalExpr ForeignHValue -> (EvalExpr HValueRef -> IO a) -> IO a
   withExpr (EvalThis fhv) cont =
@@ -340,11 +342,47 @@ resumeStmt
   :: SafeInterp
   -> EvalOpts
   -> ForeignRef ThreadId
-  -> IO (EvalStatus [ForeignHValue])
+  -- ^ The thread to resume
+  -> IO ()
 resumeStmt interp0 opts resume_tid = withInterp interp0 $ \interp -> do
-  status <- withForeignRef resume_tid $ \rhv ->
+  withForeignRef resume_tid $ \rhv -> do
     interpCmd interp (ResumeStmt opts rhv)
+
+-- | Await the result of an action of type @IO [a]@, running on the given
+-- interpreter thread, returning 'ForeignHValue's for each of the results.
+waitThreadResult
+  :: SafeInterp
+  -> ForeignRef ThreadId
+  -- ^ The thread on the interpreter on which asynchronous exceptions raised in
+  -- this host thread are thrown to. Typically this should be the same as the
+  -- thread whose result we're awaiting.
+  -> EvalOpts
+  -- ^ Use 'readAllBreaks' as: @True@ to read breakpoints on all non-isolated
+  -- interpreter threads (such as those forked off by the debuggee evaluation
+  -- statement); @False@ to only return the result or breakpoints in this
+  -- thread specifically.
+  -> ForeignRef ThreadId
+  -- ^ The main isolated evaluation thread whose status is awaited
+  -> IO (EvalStatus [ForeignHValue])
+waitThreadResult interp0 redirect_ftid opts wait_ftid = withInterp interp0 $ \interp -> do
+  status <- withForeignRef redirect_ftid $ \redirect_tid -> do
+    redirectInterrupts interp redirect_tid $
+      withForeignRef wait_ftid $ \wait_tid ->
+        interpCmd interp (WaitThreadResult (readAllBreaks opts) wait_tid)
   handleEvalStatus interp status
+
+-- | While we're waiting for the possibly remote interpreter thread to yield a
+-- result, if the current host thread receives an asynchronous exception, we
+-- re-throw it at the target thread on the possibly remote interpreter and
+-- continue to wait. This allows e.g. a ^C on the host to interrupt an
+-- 'evalStmt' on the external interpreter.
+--
+-- Akin 'GHCi.Run.redirectInterrupts', but on the ghc side.
+redirectInterrupts :: Interp -> RemoteRef ThreadId -> IO a -> IO a
+redirectInterrupts interp rtid wait =
+  wait `catch` \(e::SomeAsyncException) -> do
+    interpCmd interp (ThrowToThread rtid (toSerializableException (toException e)))
+    wait
 
 abandonStmt :: SafeInterp -> ForeignRef ThreadId -> IO ()
 abandonStmt interp0 resume_tid = withInterp interp0 $ \ interp ->
@@ -452,7 +490,11 @@ whereFrom interp0 ref = withInterp interp0 $ \ interp ->
 seqHValue :: SafeInterp -> UnitEnv -> Logger -> ForeignHValue -> IO (EvalResult ())
 seqHValue interp0 unit_env logger ref = withInterp interp0 $ \ interp ->
   withForeignRef ref $ \hval -> do
-    status <- interpCmd interp (Seq hval)
+    rtid <- interpCmd interp (Seq hval)
+    frtid <- mkFinalizedHValue interp rtid
+    status <- withForeignRef frtid $ \rtid ->
+      redirectInterrupts interp rtid $ do
+        interpCmd interp (WaitThreadResult False rtid)
     handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
 
 evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
@@ -496,7 +538,12 @@ handleSeqHValueStatus interp unit_env logger eval_status =
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_tid_fhv $ \rtid -> do
-        status <- interpCmd interp (ResumeSeq rtid)
+        interpCmd interp (ResumeSeq rtid)
+        status <- redirectInterrupts interp rtid $ do
+          -- Resume the stopped thread. The stopped thread must be the main
+          -- `:seq` thread, since readAllBreaks=False on @Seq@ cmd implies an
+          -- EvalBreak on a :seq must be from from the seq main thread
+          interpCmd interp (WaitThreadResult False rtid)
         handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
     (EvalComplete _ r) -> return r
 
