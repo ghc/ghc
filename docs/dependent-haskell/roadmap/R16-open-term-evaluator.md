@@ -1711,11 +1711,12 @@ checked list fold equations at the selector's specialized type. The
 ordinary solver must select the same dictionary in the written and lexical
 evidence scopes. A given constraint can therefore block this reduction.
 
-The installed dictionary exposes its compiled method fields as interface
-pragmas. Keep those pragmas available when checking the proof, including
-with `-fno-ignore-interface-pragmas` at `-O0`. An interface that omits its
-method fields needs an existing checked method alias to supply the same
-evidence. The proof also disables rewrite rules for the list worker.
+A code-generating build checks the dictionary's final Core constructor.
+If its field names the checked list fold, the compiler records the selector
+and worker Names in the dictionary's mandatory interface details. The
+proof works at `-O0` with interface pragmas ignored. An older interface
+can also supply the field through its dictionary unfolding when interface
+pragmas are available. The proof disables rewrite rules for the list worker.
 [Proof using `Prelude.foldr`](../examples/open-evaluation/PreludeFoldrProof.hs),
 [class promotion roadmap](https://ghc.serokell.io/dh#promote-classes), and
 [GHC's lexical scoping principle](https://github.com/ghc-proposals/ghc-proposals/blob/master/principles.rst#221lexical-scoping-principle-lsp).

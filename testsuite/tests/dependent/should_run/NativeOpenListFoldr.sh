@@ -99,7 +99,8 @@ for optimization in -O0 -O2; do
             absent "valid$optimization" "$term"
         done
     )
-    "${ghc[@]}" "$optimization" -fforce-recomp -c ListFoldrProof.hs PreludeFoldrProof.hs UserProof.hs Main.hs
+    "${ghc[@]}" "$optimization" -fforce-recomp -c ListFoldrProof.hs UserProof.hs Main.hs
+    "${ghc[@]}" "$optimization" -fignore-interface-pragmas -fforce-recomp -c PreludeFoldrProof.hs
     "${ghc[@]}" Main.o "../producer/$producer.o" -o fold-run
     ./fold-run >native.stdout
     for _ in {1..4}; do printf "'s'\n'n'\n'h'\n'i'\n"; done >native.expected

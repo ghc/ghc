@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers #-}
 {-# LANGUAGE PolyKinds, ScopedTypeVariables, TypeApplications, TypeOperators #-}
-{-# OPTIONS_GHC -fno-enable-rewrite-rules -fno-ignore-interface-pragmas #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 module PreludeFoldrProof (foldNil, foldCons, foldAppend, example) where
 
 import Data.Proxy (Proxy(..))

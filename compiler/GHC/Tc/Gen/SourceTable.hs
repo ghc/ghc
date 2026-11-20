@@ -3,14 +3,14 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
-                              lookupSourceListFoldMethod, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
+                              lookupSourceListFoldMethod, publishListFoldMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses) where
 
 import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
-import GHC.Core.Class (classAllSelIds, classTyCon)
+import GHC.Core.Class (Class, classAllSelIds, classMethods, classTyCon)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
 import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, boolTy, falseDataCon, trueDataCon, charTy, charTyCon, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
@@ -68,9 +68,9 @@ import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
-import GHC.Types.Id.Info (IdDetails(SourceTableId, VanillaId))
+import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..))
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
-                     sourceMethodTarget_maybe)
+                     setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
@@ -523,11 +523,9 @@ lookupSourceListFoldMethod selector domain
                   target <- case sourceMethodTarget_maybe dfun selector of
                     Just term -> tcLookupIdMaybe term
                     Nothing -> pure $ do
-                      Core.DFunUnfolding [] con (Core.Type applied : fields) <- pure (idUnfolding dfun)
-                      let selectors = classAllSelIds cls
-                      guard (applied `eqType` domain && con == tyConSingleDataCon (classTyCon cls) &&
-                             lengthIs fields (length selectors))
-                      Core.Var method <- lookup selector (zip selectors fields)
+                      Core.DFunUnfolding [] con fields <- pure (idUnfolding dfun)
+                      slots <- dictionarySlots cls domain con fields
+                      Core.Var method <- lookup selector slots
                       pure method
                   pure $ do
                     method <- target
@@ -538,6 +536,60 @@ lookupSourceListFoldMethod selector domain
                 _ -> pure Nothing
         _ -> pure Nothing
   | otherwise = pure Nothing
+
+-- | Pair the actual fields of a complete ground dictionary with its selectors.
+dictionarySlots :: Class -> Type -> DataCon -> [Core.CoreExpr] -> Maybe [(Id, Core.CoreExpr)]
+dictionarySlots cls domain con (Core.Type applied : fields)
+  | applied `eqType` domain, con == tyConSingleDataCon (classTyCon cls)
+  , let selectors = classAllSelIds cls
+  , lengthIs fields (length selectors)
+  = Just (zip selectors fields)
+dictionarySlots _ _ _ _ = Nothing
+
+{- Note [Mandatory list fold method evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Record just the selector and implementation Names from the final dictionary
+constructor. The actual field must be a checked fold at the specialized
+method type. Read a local field's current binder after final source-table
+validation. A Core occurrence can still carry the pre-validation IdDetails.
+Keep older mandatory evidence for other methods.
+
+The ordinary DFun unfolding can disappear when the producer omits interface
+pragmas or the reader ignores them. The SourceDFun pair remains available.
+It records only the exact method choice and does not supply any equations
+by itself. The client still checks its scoped dictionary and visible rules.
+-}
+
+-- | Publish exact list fold aliases from the final dictionary bindings.
+-- See Note [Mandatory list fold method evidence].
+publishListFoldMethods :: Module -> [Core.CoreBind] -> [Core.CoreBind]
+publishListFoldMethods mod binds = map publishBind binds
+  where
+    locals = mkNameEnv [(idName v, v) | (v, _) <- Core.flattenBinds binds]
+    publishBind (Core.NonRec v rhs) = Core.NonRec (publish v rhs) rhs
+    publishBind (Core.Rec pairs) = Core.Rec [(publish v rhs, rhs) | (v, rhs) <- pairs]
+    publish v rhs = fromMaybe v $ do
+      DFunId terminating _ <- pure (idDetails v)
+      (cls, [domain]) <- getClassPredTys_maybe (varType v)
+      guard (domain `eqType` mkTyConTy listTyCon)
+      (Core.Var worker, fields) <- pure (Core.collectArgs rhs)
+      con <- isDataConWorkId_maybe worker
+      slots <- dictionarySlots cls domain con fields
+      let methods =
+            [ (selector, target)
+            | (selector, Core.Var field) <- slots, selector `elem` classMethods cls
+            , Just target <- [current field]
+            , varType target `eqType` classMethodInstTy selector [domain]
+            , Just table <- [sourceTableId_maybe target], isListFoldTable table ]
+      guard (not (null methods))
+      DFunId _ (Just checked) <- pure (idDetails (setSourceMethodIds v methods))
+      let selected = map fst (sdf_methods checked)
+          aliases = sdf_methods checked ++ filter ((`notElem` selected) . fst) (sourceMethodAliases v)
+      pure (setIdDetails v (DFunId terminating (Just checked { sdf_methods = aliases })))
+
+    current field
+      | nameModule_maybe (idName field) == Just mod = lookupNameEnv locals (idName field)
+      | otherwise = Just field
 
 -- | The selector's first type argument is fixed by this ground dictionary.
 -- Its monomorphic target and the dictionary itself can have any active rule.
