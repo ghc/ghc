@@ -597,6 +597,7 @@ checkFlagHash hsc_env iface self_recomp = do
         scoped_identity_fp = checkedIdentityFingerprint scoped_filter_fp
         binary_base_fp = binaryEnumFingerprint scoped_family_fp
         new_fp = binaryEnumFingerprint scoped_identity_fp
+        retained_signature_fp = retainedSignatureCaseFingerprint new_fp
         earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp,
                                     scoped_family_fp, filter_base_fp, filter_family_fp,
                                     scoped_filter_fp, identity_base_fp, scoped_identity_fp, binary_base_fp]
@@ -607,9 +608,12 @@ checkFlagHash hsc_env iface self_recomp = do
         scoped_fps = [scoped_base_fp, scoped_family_fp, scoped_filter_fp, scoped_identity_fp, binary_base_fp, new_fp]
         -- See Note [Recompiling package rule providers].
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
-        old_fp | stored_fp `elem` class_generations = stored_fp
-               | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = fp
-               | otherwise = stored_fp
+        (old_fp, shared_retained_cases)
+          | stored_fp == retained_signature_fp = (new_fp, True)
+          | stored_fp `elem` class_generations = (stored_fp, False)
+          | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = (fp, False)
+          | stored_fp == retainedSignatureCaseFingerprint (stamp_rules new_fp) = (new_fp, True)
+          | otherwise = (stored_fp, False)
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
@@ -765,10 +769,68 @@ checkFlagHash hsc_env iface self_recomp = do
           , couldExportEnumCallback 2 iface =
               liftIO $ recheck "Compiler now checks ordinary binary enumeration callbacks"
           | otherwise = pure UpToDate
+        check_retained_signature
+          | not shared_retained_cases
+          , mi_hsc_src iface == HsSrcFile
+          , couldExportRetainedSignatureCase (mi_semantic_module iface)
+                                            (mi_exports iface) (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now shares retained signature type cases"
+          | otherwise = pure UpToDate
     pure (flags, check_identity `recompThen` check_guarded_filter `recompThen` check_family_uses
                                      `recompThen` check_forwarded_result
                                      `recompThen` check_scoped_case
-                                     `recompThen` check_binary_enum)
+                                     `recompThen` check_binary_enum
+                                     `recompThen` check_retained_signature)
+
+{- Note [Recompiling retained signature case providers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old retained signature can reference a private case family from
+before the compiler shared identical cases in a declaration group.
+An ordinary unchanged client can still use each signature at a known
+constructor. A new neutral use can fail until the provider recompiles.
+Recheck a home source module whose exported retained signature uses
+one of its own lifted cases. The recheck does not imply that the
+provider has two cases that can share. Store its stamp even when
+the provider's ABI is unchanged.
+
+The stamp augments the current self-recompilation hash, after the
+stamp for lexical rules when present. Recognize unstamped generations
+and the plain retained stamp before inspecting rules. Let ordinary
+dependency checks give their reasons before checking this stamp.
+-}
+
+-- | Mark a provider checked for sharing of retained signature type cases.
+retainedSignatureCaseFingerprint :: Fingerprint -> Fingerprint
+retainedSignatureCaseFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "retained-signature-cases-v1" :: String)
+
+-- | Find a local lifted case in an exported retained signature.
+-- See Note [Recompiling retained signature case providers].
+couldExportRetainedSignatureCase :: Module -> [IfaceExport] -> [IfaceDecl] -> Bool
+couldExportRetainedSignatureCase owner exports = any candidate
+  where
+    exported = mkNameSet (concatMap availNames exports)
+    candidate decl@IfaceId{ifName = name, ifType = ty}
+      | name `elemNameSet` exported = containsRetained ty
+      where
+        containsRetained (IfaceDepFunTy _ (_, _, domain) body) =
+          any localCase (nameSetElemsStable (freeNamesIfDecl (decl { ifType = body, ifIdInfo = [] })))
+            || containsRetained domain
+        containsRetained (IfaceForAllTy _ _ body) = containsRetained body
+        containsRetained (IfaceFunTy _ _ _ arg body) = containsRetained arg || containsRetained body
+        containsRetained (IfaceAppTy head_ty args) =
+          containsRetained head_ty || any containsRetained (appArgsIfaceTypes args)
+        containsRetained (IfaceTyConApp _ args) = any containsRetained (appArgsIfaceTypes args)
+        containsRetained (IfaceTupleTy _ _ args) = any containsRetained (appArgsIfaceTypes args)
+        containsRetained (IfaceCastTy body _) = containsRetained body
+        containsRetained (IfaceExistsTy _ (_, domain) body) =
+          containsRetained domain || containsRetained body
+        containsRetained _ = False
+    candidate _ = False
+
+    localCase name = nameModule_maybe name == Just owner &&
+      any (`isPrefixOf` occNameString (nameOccName name))
+          ["$signature-case:", "$case:$signature-case:"]
 
 -- | Mark providers compiled with the scope traversal in GHC.Iface.Tidy.
 -- See Note [Private helpers in erased package rules] in GHC.Iface.Tidy.
@@ -2290,15 +2352,24 @@ addFingerprints hsc_env iface0 = do
   --   - the things which can affect whether a module is recompiled
   --   - the module level annotations,
   --   - deps (home and external packages, dependent files)
-  let base_hash = computeFingerprint putNameLiterally
+  let iface
+        | mi_hsc_src iface0 == HsSrcFile
+        , Just info <- mi_self_recomp_info iface0
+        , FingerprintWithValue fp flags <- mi_sr_flag_hash info
+        , couldExportRetainedSignatureCase (mi_semantic_module iface0)
+                                          (mi_exports iface0) (mi_decls iface0) =
+            set_mi_self_recomp (Just info
+              { mi_sr_flag_hash = FingerprintWithValue (retainedSignatureCaseFingerprint fp) flags }) iface0
+        | otherwise = iface0
+      base_hash = computeFingerprint putNameLiterally
                         (mi_abi_mod_hash abiHashes,
-                         mi_self_recomp_info iface0,
+                         mi_self_recomp_info iface,
                          mi_deps iface0)
       !iface_hash = case sourceTableLocations sorted_decls of
         []   -> base_hash
         locs -> computeFingerprint putNameLiterally (base_hash, locs)
 
-  let final_iface = completePartialModIface iface0 iface_hash
+  let final_iface = completePartialModIface iface iface_hash
                      sorted_decls sorted_extra_decls abiHashes caches
    --
   return final_iface
