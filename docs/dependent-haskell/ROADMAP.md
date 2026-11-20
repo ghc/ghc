@@ -9,6 +9,25 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+An ordinary module proves that `Prelude.map` preserves the length of
+any finite list for any callback. It counts the list constructors with
+`Count`. The empty case is immediate. In the cons case the proof uses
+the equation from the installed library and the induction hypothesis
+for the tail. A claim that mapping adds one element fails at the empty
+case with GHC-83865. Counting two mapped elements at runtime also
+returns 2 when the callback is undefined.
+[Proof](examples/open-evaluation/PreludeMapLengthProof.hs)
+and [assumptions and checks](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
+
+A GADT field can package three vectors with two runtime lengths. Two
+vectors share the outer length and can be zipped directly. The third
+uses the inner length. The sample reads lengths 2 and 1 and the first
+aligned pair `('h','s')` without evaluating either remaining tail or
+the third vector. Giving either length the wrong vector is a type error
+in the client that constructs the package.
+[Source](examples/packed-vector/StoredVector.hs)
+and [constructor and interface checks](roadmap/R04-dependent-sums.md#sums-in-constructor-fields).
+
 A vector partition can store its two result lengths in one erased package.
 The producer writes `Rows yes no`. An ordinary function equation can
 inspect the passing vector with `firstPassing (Rows (VCons x _) _) = Just x`.
@@ -84,15 +103,19 @@ the result kind `Bool` and leaves the input type for `RunVisible`.
 The same family produces `Int` when the receiver requests kind `Type`.
 [Source and ordinary client](roadmap/R23-unsaturated-type-families.md#inferring-a-kind-after-supplying-a-visible-argument).
 
-Both compiler stages reproduce the 305-line Showcase at `-O0`.
-The self-hosted compiler also reproduces it in GHCi and at default
-`-O1` and `-O2`. The optimized stream folds consume the builder
-without constructing an intermediate list. An upgrade test uses one
-provider that exports a partially applied family and a package rule
-whose right-hand side calls a private helper. GHC rebuilds the provider
-once. Both clients run, and the next build reuses its interface.
-[Showcase](Showcase.hs), [interface checks](examples/erased-existentials/check-rule-interfaces.sh)
-and [earlier suite results](CHECKPOINTS.md#family-and-package-checkpoints).
+An ordinary client can prove two equations about the installed
+`Prelude.filter Prelude.not`. A `False` head survives. A `True` head
+is skipped. Both proofs leave the list tail unknown. The client reads
+only the producer interface and disables rewrite rules in the module
+that proves the equations. Keeping rewrite rules enabled reports
+GHC-83605 at the proof. A runtime check reads the kept head with an
+undefined tail. The Showcase checks the two proofs and this
+demand behavior. The bootstrap and self-hosted compilers reproduce the
+308-line output at `-O0`. The self-hosted compiler also reproduces it in
+GHCi and at default `-O1` and `-O2`.
+[Proof source](examples/open-evaluation/PreludeFilterProof.hs),
+[filter alias](examples/open-evaluation/PreludeFilterSource.hs)
+and [Showcase](Showcase.hs).
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -105,9 +128,9 @@ the header. The new reader checks the coercion's role and scope.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | GADT data constructors can store nested retained sums and refer to erased parameters from the constructor signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. | Support orphan rules, retained function rules and more dependent coercions. |
-| [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
+| [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. An unknown head or field can still block a later row. | Check source annotations that capture a parameter under a noninjective index family. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. A direct case on a packaged function call keeps the hidden witness in scope for all alternatives. The call head can take visible type arguments. | Extend witness inference beyond single unguarded lambdas. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. The original `KindEqualities2` program checks across its declaration splice. A curried family result can use the matchability required by its caller. | Restore the unannotated `~>` synonym and `Promote` equation in `GADTSingletons`. General unsaturation remains open. |
@@ -136,9 +159,9 @@ source examples. General promotion remains open.
    Keep the explicit matchability and noninjective equality checks.
    The staged interpreter with an unsaturated family still needs an explicit
    `%U`. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
-3. **R22 and R04.** Extend retained sum fields to GADT constructors
-   with local type parameters. Check that a separately compiled client
-   preserves the stored vector lengths at default optimization.
+3. **R22 and R04.** Bring earlier retained constructor arguments into scope in
+   later sum fields. Check the difference between the index of a field
+   and the index of the constructor result.
 4. **R19.** Check a captured index `b` in a written `Gate (Index b)`
    scrutinee. Preserve earlier rows, nominal evidence and ambiguity checks.
 

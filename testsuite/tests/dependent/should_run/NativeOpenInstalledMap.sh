@@ -33,6 +33,35 @@ if "${ghc[@]}" -O0 -fenable-rewrite-rules -fforce-recomp -c PreludeMapProof.hs >
     exit 1
 fi
 
+# An ordinary client uses the installed map equation and a recursive proof.
+mkdir "$out"/{length-source,length-client}
+cd "$out/length-source"
+cp "$src/PreludeMapLengthSource.hs" .
+"${ghc[@]}" -O1 -fenable-rewrite-rules -c PreludeMapLengthSource.hs
+cd "$out/length-client"
+cp ../length-source/PreludeMapLengthSource.hi "$src/PreludeMapLengthProof.hs" .
+"${ghc[@]}" -O1 -fenable-rewrite-rules -c PreludeMapLengthProof.hs
+
+sed "s/:~: Count xs$/:~: 'Succ (Count xs)/" PreludeMapLengthProof.hs >FalseLength.hs
+line=$(awk '/^lengthMap _ Empty = Refl/ { print NR }' FalseLength.hs)
+if "${ghc[@]}" -O1 -c FalseLength.hs >false-length.log 2>&1 ||
+   ! grep -Fq "FalseLength.hs:$line:" false-length.log ||
+   ! grep -Fq '[GHC-83865]' false-length.log ||
+   ! grep -Eq 'Zero.*Succ Zero' false-length.log; then
+    cat false-length.log >&2
+    exit 1
+fi
+
+cat >Main.hs <<'HS'
+module Main where
+import PreludeMapLengthProof (showPreludeMapLength)
+main :: IO ()
+main = putStrLn showPreludeMapLength
+HS
+"${ghc[@]}" -O1 -c Main.hs
+"${ghc[@]}" Main.o PreludeMapLengthProof.o ../length-source/PreludeMapLengthSource.o -o length-run
+[[ $(./length-run) == '(Refl,2)' ]]
+
 # The installed filter needs a known predicate result before choosing a branch.
 # The ordinary client has only the producer interface and keeps the tail open.
 mkdir "$out"/{filter,filter-client}

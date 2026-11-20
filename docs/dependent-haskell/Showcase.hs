@@ -104,6 +104,7 @@ import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified InstalledNotProof
 import qualified PreludeFilterProof
+import qualified PreludeMapLengthProof
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
 import qualified OpenBuildWorker as Build
@@ -1151,6 +1152,8 @@ main = do
         (InstalledNotProof.negateHead (Proxy @'[]))
     putStrLn ("map Prelude.not and Prelude.id over a known head and an unknown tail: "
               ++ PreludeMapProof.showPreludeMapProofs)
+    putStrLn ("prove map preserves length and leaves the callback lazy: "
+              ++ PreludeMapLengthProof.showPreludeMapLength)
     putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     observe "use a checked cons rule without forcing the callback, head or tail"
