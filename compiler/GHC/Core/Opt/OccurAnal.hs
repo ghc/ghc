@@ -2168,6 +2168,8 @@ cheapExprSize e
     go1 n (Coercion {})   = n
     go1 n (Tick _ e)      = go1 n e
     go1 n (Cast e _)      = go1 n e
+    go1 n (Pack _ _ e)    = go (n+1) e
+    go1 n (Unpack _ _ p e) = go (go (n+1) p) e
     go1 n (App f a)       = go (go1 n f) a
     go1 n (Lam b e)
       | isTyVar b         = go1 n e
@@ -2743,6 +2745,29 @@ occAnal env (Tick tickish body)
 
       | otherwise
       = usage1
+
+-- Pack carries the representation of its payload. Treat the payload as
+-- non-tail until join-point lowering can see through the erased package.
+occAnal env (Pack schema witness payload)
+  = WUD (addManyOccs (markAllManyNonTail usage) static) (Pack schema witness payload')
+  where
+    WUD usage payload' = occAnal (setNonTailCtxt OccVanilla env) payload
+    static = occTypeUses env schema `unionVarSet` occTypeUses env witness
+
+-- The package is a lazy binding for the body. Only the body sees the
+-- witness and payload binders, and only the body is in tail position.
+occAnal env (Unpack witness payload package body)
+  = WUD (markAllManyNonTail package_usage `andUDs` body_usage)
+        (Unpack witness payload' package' body')
+  where
+    WUD package_usage package' = occAnal (setNonTailCtxt OccVanilla env) package
+    WUD body_usage (payload', body') =
+      addInScopeList env [witness, payload] $ \body_env ->
+        let WUD usage body' = occAnal body_env body
+            !payload' = tagLamBinder usage payload
+            static = occTypeUses env (varType witness)
+                     `unionVarSet` occTypeUses body_env (varType payload)
+        in WUD (addManyOccs usage static) (payload', body')
 
 occAnal env (Cast expr co)
   = let
