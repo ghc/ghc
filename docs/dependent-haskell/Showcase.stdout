@@ -227,6 +227,7 @@ use a hidden polymorphic identity at Int and Bool: (7,True)
 infer a hidden function type from its paired callback: (7,True)
 infer a polymorphic witness for a packaged lambda: (11,True)
 read an integer through an erased package: 7
+match and open existential packages in optimizer rules: (4,3,6)
 read streams with different hidden state types: ([1,3,5],[True])
 transport element equality under a hidden vector length: [7,9]
 zip a filtered vector with itself at its hidden length: [(7,7)]

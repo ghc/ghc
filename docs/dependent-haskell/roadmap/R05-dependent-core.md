@@ -180,8 +180,8 @@ The example provider and a separately compiled client both fire
 checks the rule head, the erased types in the rule and Core Lint.
 The interface records a capability for this rule. The previous compiler
 rejects that capability at the header. Orphan rules and rules over a
-retained function still report GHC-51063. Lexical Pack and Unpack in the
-rule template require further matching support.
+retained function still report GHC-51063. The lexical package checks
+below cover rules that construct or open a package directly.
 [Package rule](../examples/erased-existentials/PackageRules.hs)
 and [source regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
 
@@ -211,15 +211,19 @@ and [stream example](../examples/erased-existentials/ErasedStream.hs).
 
 ### Lexical package operations in user rules
 
-Three small source examples specify the next optimizer checks. In the
-first, `open (x, k) = k x` in a rule introduces a package on the left.
-In the second, `hide x = ((x, id) :: Hidden)` introduces a package on
-the right. In the third, `project p = case p of (x, k) -> k x` opens a
-package on the right. At `7c873b5f46`, all three rules report GHC-51063
-at default `-O2`. The diagnostic names the rule and points to its
-head function's source binding. The existing `open (hide x) = x` rule
-contains ordinary calls and already fires across an interface.
-[Provider](../examples/erased-existentials/PackageRules.hs).
+An optimizer rule can construct or open a package on either side.
+`readHidden (x, k) = k x` matches a package at the witness type
+`Int`. A call with a `Bool` witness keeps its own callback.
+`increment (case p of (x, k) -> k x)` matches the opening even when
+the caller uses different names for the two fields.
+
+The provider and a client compiled from its interface each fire all
+four rules at default `-O1` and `-O2`. The `-O0` comparison checks
+the same results, including a callback that ignores an undefined
+value. Readers that only support the earlier `open (hide x) = x`
+rule reject the lexical rule at the interface header.
+[Four rules](../examples/erased-existentials/LexicalPackageRules.hs)
+and [ordinary client](../../../testsuite/tests/dependent/should_run/NativePackageRuleClient.hs).
 
 ## Next increments
 

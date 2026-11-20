@@ -54,6 +54,7 @@ import qualified ImplicitVector
 import qualified PartitionChoices
 import qualified ErasedStream
 import qualified PackageRules
+import qualified LexicalPackageRules
 import qualified RankedPackage
 import qualified StoredVector
 import qualified ExistentialVec as E
@@ -979,6 +980,8 @@ main = do
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
     observe "infer a polymorphic witness for a packaged lambda" (RankedPackage.runBuilder 11)
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
+    observe "match and open existential packages in optimizer rules"
+        (LexicalPackageRules.local 3 (LexicalPackageRules.hideInt 5))
     observe "read streams with different hidden state types"
         (ErasedStream.toList (ErasedStream.oddThrough 6),
          take 1 (ErasedStream.toList (ErasedStream.fromList (True : error "unused stream tail"))))

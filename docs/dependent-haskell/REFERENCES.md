@@ -207,6 +207,16 @@ the rule's scope and types. The rule supplies no equality to the type checker.
 [Playing by the Rules](https://inst.eecs.berkeley.edu/~cs294-260/sp24/papers/haskell-rules.pdf)
 and [Agda rewriting](https://agda.readthedocs.io/en/latest/language/rewriting.html).
 
+Agda distinguishes variables bound inside a rewrite pattern from the
+variables instantiated by a match. GHC's Core rule matcher already
+makes that distinction under lambdas. An existential opening adds two
+binders. Its witness is in scope in the payload type, and both binders
+are in scope in the body. A rule variable may match an expression under
+those binders only if its substitution can leave that scope.
+[Agda rewrite patterns](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html#general-shape-of-rewrite-rules),
+[GHC rule semantics](../users_guide/exts/rewrite_rules.rst)
+and [scope checks](../../testsuite/tests/ghc-api/NativeExistentialExpr.hs).
+
 Coutts, Leshchinskiy and Stewart represent a stream by a step function
 and an existentially quantified initial state. A step can yield an
 element, skip a state or finish. The fork uses the same representation
