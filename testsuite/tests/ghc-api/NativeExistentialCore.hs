@@ -17,7 +17,7 @@ import GHC.Core (Expr (Coercion, Lam, Var))
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, existsCoRule, liftCoSubst, mkCoVarCo, mkLiftingContext, mkNomReflCo)
 import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Lint (lintExpr)
-import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
+import GHC.Core.Predicate (EqRel (NomEq, ReprEq), mkNomEqPred, mkReprEqPred)
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
 import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type (..))
 import GHC.Core.Type (isForAllTy, mkTyConApp, substTyWith, typeKind, tyCoVarsOfType)
@@ -36,6 +36,7 @@ import GHC.Iface.Ext.Utils
     (freshIndex, getTypeIndex, hieTypeToIface, htyTable, initialHTS, recoverFullType)
 import GHC.Iface.Syntax (IfaceDecl (IfaceId), IfaceIdDetails (IfVanillaId), ifName, ifType)
 import GHC.IfaceToCore (typecheckIface)
+import GHC.Tc.Utils.TcType (anyRewritableTyVar)
 import GHC.Tc.Utils.Monad (initIfaceLoad)
 import GHC.Types.Id (mkSysLocal)
 import GHC.Types.Name (mkExternalName, mkSysTvName, mkSystemName)
@@ -107,6 +108,11 @@ verify interfacePath env = do
         isJust (tcUnifyTy (TyVarTy c) closed) && isJust (tcMatchTy (TyVarTy c) closed)
     assert "occurs check accepted a recursive existential instantiation" $
         isNothing (tcUnifyTy (TyVarTy c) open)
+    forM_ [NomEq, ReprEq] $ \role -> do
+        let rewritable = anyRewritableTyVar role (\_ _ tv -> tv == c)
+        assert "the forall scan missed a free variable" (rewritable (universal a free))
+        assert "the bar scan entered an opaque package" (not (rewritable open))
+        assert "the dot scan entered an opaque package" (not (rewritable (ExistsTy ImplicitExists a free)))
     let known = fixture a (mkTyConApp maybeTyCon [boolTy])
     assert "opaque existential matching solved through the body" $
         isNothing (tcMatchTy open known) && not (typesCantMatch [(open, known)])

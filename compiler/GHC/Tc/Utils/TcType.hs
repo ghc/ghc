@@ -1104,6 +1104,8 @@ any_rewritable role tv_pred tc_pred ty
     go _ bvs _ (TermAppTy _ arg) = go True bvs NomEq arg
     go uf bvs rl (DepFunTy _ v ty)
       = go uf bvs NomEq (varType v) || go uf (bvs `extendVarSet` v) rl ty
+    -- GHC.Tc.Solver.Rewrite keeps the checked package opaque.
+    go _  _   _  (ExistsTy {})       = False
     go uf bvs rl (TyVarTy tv)        = go_tv uf bvs rl tv
     go _  _    _ (LitTy {})          = False
     go uf bvs rl (AppTy fun arg)     = go under bvs rl fun || go under bvs NomEq arg
