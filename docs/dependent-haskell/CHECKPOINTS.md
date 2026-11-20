@@ -6,6 +6,56 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Family and package checkpoints
+
+At `7185bd64f8`, the 303-line Showcase adds `(Right 7,False)` and uses the direct
+callback case. Both compiler stages reproduce the full output at
+`-O0`. The self-hosted compiler also reproduces it at default `-O1`,
+default `-O2` and in GHCi. The family upgrade rebuilds the provider
+once and reuses it on the next build. The old and new compilers both
+compile the ordinary client from the new interface. The R22 source
+test checks witness escapes, linear use and the original GADT pattern.
+[Showcase](Showcase.hs) and [family source and upgrade checks](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+At the 302-line checkpoint (`b8cb91ff6f`), all 61 focused tests that ran
+passed. The dependent directory recorded 294 passes and 20 unexpected
+failures. Polykinds recorded 224 passes, one expected failure and 18
+unexpected failures. Each unexpected failure had the same name and
+failure category as at the 301-line checkpoint.
+
+The 302-line Showcase adds `(4,3,6)` from the package rules. Both
+compiler stages reproduce every line at `-O0`, default `-O1` and
+default `-O2`. The self-hosted compiler also reproduces it in GHCi.
+The Core matcher rejects substitutions that would capture an opened
+witness or payload. The preceding compiler can still use older-style
+rules from a new interface at each of the three compression levels.
+[Showcase](Showcase.hs) and [interface check](examples/erased-existentials/check-rule-interfaces.sh).
+
+At `73bffa1a15`, the 301-line Showcase includes a constructor match at an open family
+index and a packaged lambda whose hidden witness is polymorphic.
+Both compiler stages reproduce the expected output at `-O0`. The
+self-hosted compiler also reproduces it in GHCi and at default `-O2`.
+All nine focused tests passed. The dependent directory recorded 294
+passes and 20 unexpected failures. Its failure summary matches the
+preceding 299-line checkpoint. The split-interface and family-upgrade
+checks passed. [Showcase source](Showcase.hs) and [run commands](README.md#run-the-showcase).
+
+At `4b59f93deb`, both compiler stages reproduced the 299-line Showcase at `-O0`,
+default `-O1` and default `-O2`. The self-hosted compiler also checks
+stripped optimized interfaces and GHCi. Both this compiler and the
+previous release, `7c873b5f46`, compile the ordinary client from the
+new optimized interfaces. It prints `(Just (Just True),Just True)`.
+The previous release rejects the interpreter's source.
+[Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
+
+At `55c20e158c`, all 61 focused tests that ran passed. In the dependent
+directory, 294 passed and 20 failed. The unchanged `KindEqualities2`
+now compiles and prints `Nothing` at `-O0` and `-O2`. In polykinds,
+224 passed, one failed as expected, and 18 failed unexpectedly. In
+indexed-types, 420 passed, four failed as expected, and 15 failed
+unexpectedly. The remaining failures in all three directories have the
+same names and failure categories as at `7c873b5f46`.
+
 ## Local integration checkpoints
 
 These local refs preserve work that has separate acceptance checks. To
