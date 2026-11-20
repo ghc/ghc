@@ -72,6 +72,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import qualified FiniteTree
 import qualified FunctionFieldClient
 import qualified FunctionFieldLibrary as FunctionFields
+import qualified RetainedRulesClient
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
@@ -231,6 +232,9 @@ booleans = do
     cell <- newIORef True
     b <- readIORef cell
     observe "runtime Bool choice" (renderChoice b (choose b))
+    observe "apply retained function rules without forcing an unused index"
+        (RetainedRulesClient.fromInput b, RetainedRulesClient.atFalse 11, RetainedRulesClient.ignoredIndex)
+    observe "match a rule payload at the preceding runtime index" (RetainedRulesClient.boundPayload b)
     observe "choose True has result Int" (choose True)
     observe "choose False has result Bool" (choose False)
     let bottomB :: Bool

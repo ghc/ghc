@@ -316,6 +316,11 @@ test('NativeTypeCaseReify',
                    open_eval_dir + 'OpenMapWorker.hs'])],
      multimod_compile, ['NativeTypeCaseReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
 
+test('NativeRetainedFunctionRules',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f for f in
+                   ['RetainedRules.hs', 'RetainedRulesClient.hs', 'check-retained-rules.sh']])],
+     run_command, ['bash check-retained-rules.sh "{compiler}" "{libdir}"'])
 test('NativeSimplifier',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeSimplifierProvider.hs', 'NativeSimplifierClient.hs',

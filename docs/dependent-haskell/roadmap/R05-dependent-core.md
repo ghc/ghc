@@ -185,15 +185,31 @@ below cover rules that construct or open a package directly.
 [Package rule](../examples/erased-existentials/PackageRules.hs)
 and [source regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
 
-For a retained function, check the source and optimized Core separately.
-The rule `forall xs. keep False xs = xs` reaches Core and reports
-GHC-51063 at `-O1` or `-O2`. With `forall (b :: Bool) xs`, the type
-checker instead rejects `xs` with GHC-25897. Giving `xs` the type
-`Vec Int (Length b)` introduces a distinct type variable in that rule
-signature. The compiler reports GHC-53522 and discards the rule. A rule
-for `keep b (choose b)` reaches Core with one argument index. These
-cases distinguish a rule-binder scope change from the optimizer change.
-An acceptance test must observe the rule firing as well as the result.
+The provider can declare `forall xs. keep False xs = xs` and
+`forall (b :: Bool). keep b (choose b) = choose b`. An ordinary client
+imports both rules from the interface. Both fire at default `-O1` and
+`-O2`. Reading a runtime Boolean gives 7 or 0. A separate call returns
+19 with an undefined index. The same observations hold at `-O0`.
+A closed rule can have ordinary types throughout its payload. Its head
+still has a retained argument, so the interface records that requirement.
+[Provider](../examples/qualified-pi/RetainedRules.hs),
+[ordinary client](../examples/qualified-pi/RetainedRulesClient.hs)
+and [rule firing checks](../examples/qualified-pi/check-retained-rules.sh).
+
+A later pattern variable can name the earlier runtime index in its type.
+In `forall (b :: Bool) (xs :: Vec Int (Length b)). keep b xs = xs`,
+the matcher first matches the value of `b`. It then checks `xs` at that
+same index. The client can use the rule while its input Boolean is unknown.
+The matcher rejects two distinct indices and never inverts `Length`.
+[Vector regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
+
+Agda registers an equality proof with `REWRITE` and can use it when
+reducing a neutral type. GHC's `RULES` typechecks both sides and gives
+the programmer responsibility for preserving their meaning. R05 follows
+the GHC contract. The retained index must agree on both sides during
+Core checking. A rule firing changes the optimized program and supplies
+no equality evidence to a Haskell proof. [Agda rewrite rules](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html#general-shape-of-rewrite-rules)
+and [GHC rule semantics](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html#semantics).
 
 Forward congruence under an existential
 binder can run through the normal pipeline when its scoped payload
