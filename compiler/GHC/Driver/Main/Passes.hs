@@ -155,7 +155,7 @@ import GHC.Types.ForeignStubs
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails(VanillaId))
 import GHC.Types.Var (setIdDetails)
-import GHC.Types.Name.Set (mkNameSet, elemNameSet)
+import GHC.Types.Name.Set (mkNameSet, elemNameSet, extendNameSetList)
 import GHC.Types.IPE
 import GHC.Types.Name
 import GHC.Types.Name.Ppr
@@ -170,7 +170,7 @@ import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
-import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies)
+import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedReverseTables, finalCoreSourceFamilies, sourceTableCallees)
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -941,23 +941,32 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           then return $ HscUpdate (getGhcPrimIface (hsc_hooks hsc_env))
           else return $ HscUpdate iface
 
--- | Drop provisional certificates whose exact owner no longer checks.
--- The typechecker creates them after checking all source uses. The family
--- cannot occur in a user declaration or another certificate in this module.
+-- | Drop provisional certificates whose exact owner or callee no longer checks.
+-- The typechecker creates them after checking all source uses.
 -- See Note [Final Core source equations] in GHC.Tc.Gen.SourceTable.
 keepValidatedSourceMappers :: ModGuts -> ModGuts -> ModGuts
 keepValidatedSourceMappers original final
-  | null failed = final
+  | null failed && null rejected_reverse = final
   | otherwise = final { mg_binds = map clearBind (mg_binds final)
-                      , mg_tcs = filter (not . invalidFamily) (mg_tcs final) }
+                      , mg_tcs = filter (not . invalidFamily families) (mg_tcs final) }
   where
+    owners = mkNameSet (map idName failed)
     failed = filter (not . verifyFinalCoreMapper (mg_binds final))
                     (finalCoreMappers (mg_binds original))
-    owners = mkNameSet (map idName failed)
-    families = mkNameSet (map tyConName (concatMap finalCoreSourceFamilies failed))
-    invalidFamily tc = tyConName tc `elemNameSet` families
+    rejected_reverse = failedReverseTables (mg_binds final) (mg_tcs final)
+    families = close (mkNameSet (map tyConName
+                   (rejected_reverse ++ concatMap finalCoreSourceFamilies failed)))
+    invalidFamily invalid tc = tyConName tc `elemNameSet` invalid
+    close invalid =
+      case [tyConName tc | tc <- mg_tcs final
+                        , not (invalidFamily invalid tc)
+                        , maybe False (any (invalidFamily invalid)) (sourceTableCallees tc)] of
+        [] -> invalid
+        callers -> close (extendNameSetList invalid callers)
     clearOwner v
-      | idName v `elemNameSet` owners = setIdDetails v VanillaId
+      | idName v `elemNameSet` owners ||
+        maybe False (invalidFamily families) (sourceTableId_maybe v)
+      = setIdDetails v VanillaId
       | otherwise = v
     clearBind (NonRec v rhs) = NonRec (clearOwner v) rhs
     clearBind (Rec pairs) = Rec [(clearOwner v, rhs) | (v, rhs) <- pairs]

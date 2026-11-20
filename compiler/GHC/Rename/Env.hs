@@ -67,7 +67,7 @@ import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr (pprScopeError)
-import GHC.Tc.Gen.SourceTable (isFinalCoreIdentity)
+import GHC.Tc.Gen.SourceTable (isFinalCoreIdentity, isFinalCoreReverseWrapper)
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Utils.Monad
@@ -1240,7 +1240,10 @@ lookupTypeOcc position rdr_name
       let legacy_identity = case position of
             TypeApplicationHead{} -> True
             _ -> False
-      candidates <- lookupSourceTables legacy_identity envs term_rdr
+      candidates0 <- lookupSourceTables legacy_identity envs term_rdr
+      candidates <- case position of
+        TypeApplicationHead False -> mapM preserveClosedReverse candidates0
+        _ -> pure candidates0
       case candidates of
         [(gre, Just table)] -> do
           addUsedGRE AllDeprecationWarnings gre
@@ -1280,6 +1283,15 @@ lookupTypeOcc position rdr_name
               addNameClashErrRn term_rdr (gre NE.:| map fst rest)
               return (mkUnboundGRE (rdrNameOcc rdr_name))
         _ -> lookup_demoted rdr_name
+
+    -- Keep literal reversal on its existing staged path.
+    preserveClosedReverse candidate@(gre, Just _)
+      | isImportedGRE gre = do
+          thing <- tcLookupGlobal (greName gre)
+          pure $ case thing of
+            AnId v | isFinalCoreReverseWrapper v -> (gre, Nothing)
+            _ -> candidate
+    preserveClosedReverse candidate = pure candidate
 
 -- | Find the in-scope term bindings and their finite source tables.
 -- The flag keeps the ordinary term for a final Core identity.

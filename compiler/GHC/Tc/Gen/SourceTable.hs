@@ -1,6 +1,6 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, finalCoreSourceFamilies, isFinalCoreIdentity, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
-                              sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, failedReverseTables, finalCoreSourceFamilies, isFinalCoreIdentity, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+                              sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
@@ -383,6 +383,8 @@ hasSourceMethodRuleAt rules first fun = any user_rule (getRules rules (globalise
 checkedMapperRules :: RuleEnv -> Id -> Bool
 checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation)
                                          (getRules env (globaliseId owner)) of
+    rules | Just table <- sourceTableId_maybe owner
+          , isReverseWorkerTable table || isJust (reverseWrapperWorker table) -> null rules
     [] -> False
     rules -> all (\rule -> identityTraversal rule || consTraversal rule || composeTraversals rule) rules
   where
@@ -980,7 +982,9 @@ sourceCaseTables binds = do
         , tc == listTyCon = Just position
         | otherwise = Nothing
       final_candidate = isJust . list_case_position
-      append_candidate owner = list_case_position owner == Just 0
+      binary_list_candidate owner = list_case_position owner == Just 0
+      reverse_wrapper_candidate owner =
+        generates_code && isJust (listReverseWrapperType (varType owner))
       identity_candidate owner = generates_code && isIdentitySourceType (varType owner)
       is_exported owner = idName owner `elemNameSet` exported
       eligible owner =
@@ -994,21 +998,24 @@ sourceCaseTables binds = do
                , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
       candidates = [(bind, owner) | (bind, owner) <- owners
                     , eligible owner ||
-                      (is_exported owner && (identity_candidate owner || append_candidate owner))]
+                      (is_exported owner && (identity_candidate owner ||
+                       binary_list_candidate owner || reverse_wrapper_candidate owner))]
   if isHsBootOrSig (tcg_src env) || null candidates
     then pure ([], [])
     else do
       visible <- visibleSourceMethodRules env
       let changed owner = idName owner `elemNameSet` ruled || hasSourceMethodRule visible owner
+          prepare = simpleOptExpr (initSimpleOpts dflags)
       prepared <- fmap catMaybes $ forM candidates $ \(bind, owner) -> do
         let ruled_owner = changed owner
             check_final = final_candidate owner
-        if ruled_owner && not (check_final || identity_candidate owner) then pure Nothing else do
+        if ruled_owner && not (check_final || identity_candidate owner ||
+                              reverse_wrapper_candidate owner) then pure Nothing else do
           rhs <- bindingCore bind owner
           pure $ do
             body <- rhs
             let guarded = if check_final
-                          then directListFilter (simpleOptExpr (initSimpleOpts dflags)) owner body
+                          then directListFilter prepare owner body
                           else Nothing
             pure (owner, body, ruled_owner, guarded)
       let root_cores = [(owner, body) | (owner, body, False, Nothing) <- prepared
@@ -1020,10 +1027,27 @@ sourceCaseTables binds = do
             pure (Just (finalOwner owner table, table), [guard_table])
           Nothing | Just (signature, rows) <-
                       (guard ruled_owner *> directListMapper owner body) <|>
-                      (guard (append_candidate owner) *> directListAppend owner body) -> do
+                      (guard (binary_list_candidate owner) *>
+                        (directListAppend owner body <|> directListReverseWorker owner (prepare body))) -> do
             table <- publishConstructorCase owner signature rows
             pure (Just (finalOwner owner table, table), [])
           _ -> pure (Nothing, [])
+      let reverse_workers = mkNameEnv
+            [(idName worker, table) | (Just (worker, table), _) <- final,
+                                      isReverseWorkerTable table]
+      reverse_wrappers <- forM
+        [ (owner, binders, operand, element, table)
+        | (owner, body, _, _) <- prepared
+        , reverse_wrapper_candidate owner
+        , Just (binders, operand, element, callee) <- [directListReverseWrapper owner (prepare body)]
+        , Just table <- [lookupNameEnv reverse_workers (idName callee)]
+        ] $ \(owner, binders, operand, element, worker) -> do
+          let domain = varType operand
+              row = ConstructorCaseRow [CaseField operand]
+                      (CaseCall worker [element]
+                         [CaseField operand, CaseConstructor nilDataCon [element] []])
+          table <- publishConstructorRows owner binders [domain] domain [row]
+          pure (finalOwner owner table, table)
       let localCall v = isId v && nameModule_maybe (idName v) == Just (tcg_semantic_mod env)
           references = map idName . exprSomeFreeVarsList localCall
           reachable = concatMap (references . snd)
@@ -1060,7 +1084,7 @@ sourceCaseTables binds = do
           table <- publishConstructorRows owner telescope domains result [row]
           pure (finalOwner owner table, table)
       let (final_tables, guard_tables) = unzip final
-      pure (catMaybes final_tables ++ identities ++ roots ++ used_helpers,
+      pure (catMaybes final_tables ++ reverse_wrappers ++ identities ++ roots ++ used_helpers,
             concat guard_tables ++ concat fields)
   where
     charArrow = mkVisFunTyManyU charTy charTy
@@ -1084,7 +1108,7 @@ sourceCaseTables binds = do
       | Just (telescope, domains, result, row) <- checkedConstructorHelper public helper owner rhs
       = publish (publishConstructorRows owner telescope domains result [row])
       | Just (signature, rows) <- checkedConstructorCase public helper owner rhs
-      , not (isListAppendCase signature)
+      , not (isBinaryListCase signature)
       = publish (publishConstructorCase owner signature rows)
       where
         helper = lookupHelper env imported done
@@ -1108,7 +1132,7 @@ sourceCaseTables binds = do
       | Just kinds <- monomorphicEnumCaseKinds (varType owner)
       = enum_enabled && all enumVisible kinds
       | Just signature@(ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
-      , not (isListAppendCase signature)
+      , not (isBinaryListCase signature)
       = (position == 1 && tc == listTyCon) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
          publicCaseType env exported (const False) tc) ||
@@ -1337,6 +1361,7 @@ isSourceConstructorCase table = not (isNothing (sourceCaseVisibleArity table))
 -- | Return the number of value operands of a certified constructor case.
 sourceCaseVisibleArity :: TyCon -> Maybe Int
 sourceCaseVisibleArity table
+  | Just _ <- reverseWrapperWorker table = Just 1
   | Nothing <- sourceTableTermOcc (nameOccName (tyConName table)) = Nothing
   | Just axiom <- closedFamilyTyConCoAxiom_maybe table
   , coAxiomRole axiom == Nominal
@@ -1449,9 +1474,9 @@ helperInvisibleArity = length . takeWhile isInvisibleTyConBinder . tyConBinders
 -- | The kind telescope, input datatype, value domains, case position and result.
 data ConstructorCaseType = ConstructorCaseType [ForAllTyBinder] TyCon [Type] [Type] Int Type
 
--- | List append uses final Core evidence. Exclude it from ordinary cases.
-isListAppendCase :: ConstructorCaseType -> Bool
-isListAppendCase (ConstructorCaseType _ root _ _ position _) =
+-- | Binary list cases use final Core evidence. Exclude them from ordinary cases.
+isBinaryListCase :: ConstructorCaseType -> Bool
+isBinaryListCase (ConstructorCaseType _ root _ _ position _) =
     root == listTyCon && position == 0
 
 -- | Check the ordinary unary or binary signature for a constructor case.
@@ -1576,7 +1601,7 @@ data ConstructorCaseTree
   = CaseField Id
   | CaseConstructor DataCon [Type] [ConstructorCaseTree]
   | CaseCall TyCon [Type] [ConstructorCaseTree]
-  | CaseSelf [Type] [Id]
+  | CaseSelf [Type] [ConstructorCaseTree]
   | CaseApply Id Id
 
 -- | A complete path through the Core cases and its checked result.
@@ -1615,7 +1640,7 @@ directListMapper owner body = do
   case rows of
     [ ConstructorCaseRow [CaseField _, CaseConstructor nil _ []] (CaseConstructor retNil _ [])
       , ConstructorCaseRow [CaseField callback, CaseConstructor cons _ [CaseField h, CaseField t]]
-          (CaseConstructor retCons _ [CaseApply f x, CaseSelf _ [f', xs]]) ]
+          (CaseConstructor retCons _ [CaseApply f x, CaseSelf _ [CaseField f', CaseField xs]]) ]
       | nil == nilDataCon, retNil == nilDataCon, cons == consDataCon, retCons == consDataCon
       , callback == f, callback == f', h == x, t == xs -> pure result
     _ -> Nothing
@@ -1625,14 +1650,123 @@ directListAppend :: Id -> Core.CoreExpr -> Maybe (ConstructorCaseType, [Construc
 directListAppend owner body = do
   result@(signature, rows) <-
     checkedConstructorCase (const False) (const Nothing) owner body
-  guard (isListAppendCase signature)
+  guard (isBinaryListCase signature)
   case rows of
     [ ConstructorCaseRow [CaseConstructor nil _ [], CaseField right] (CaseField returned)
       , ConstructorCaseRow [CaseConstructor cons _ [CaseField h, CaseField t], CaseField right']
-          (CaseConstructor retCons _ [CaseField head', CaseSelf _ [tail', carried]]) ]
+          (CaseConstructor retCons _ [CaseField head', CaseSelf _ [CaseField tail', CaseField carried]]) ]
       | nil == nilDataCon, cons == consDataCon, retCons == consDataCon
       , right == returned, h == head', t == tail', right' == carried -> pure result
     _ -> Nothing
+
+{- Note [Checked list reverse]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The worker scrutinizes only its first list. An empty list returns the
+accumulator. A cons replaces the first list with its original tail and
+adds its original head to the same accumulator. The call is in tail
+position. It can return a constructor only after traversing the input
+spine. Match the recursive callee, type argument, and both operands.
+The simple optimizer removes desugaring aliases before this check.
+
+The wrapper calls that checked local worker with its original input
+and an empty accumulator. Publish both equations from the desugared
+Core and recheck both at their original names after optimization. A
+different target with the same shape cannot justify the wrapper's
+equation. The library exposes the worker in GHC.Internal.List so an
+ordinary proof can state an invariant for any accumulator.
+-}
+-- | Check the original tail and the exact lazy cons onto the carried list.
+directListReverseWorker :: Id -> Core.CoreExpr
+                        -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
+directListReverseWorker owner rhs = do
+  let rhs_type = exprType rhs
+  guard (rhs_type `eqType` varType owner)
+  signature@(ConstructorCaseType [binder] _ _ _ _ _) <- constructorCaseType rhs_type
+  guard (isBinaryListCase signature)
+  ConstructorCaseType [Bndr _ visibility] tc _ _ position _ <-
+    constructorCaseType (varType owner)
+  let (binders, body) = Core.collectBinders rhs
+  [element, input, acc] <- pure binders
+  guard (element == binderVar binder && isId input && isId acc)
+  Core.Case (Core.Var actual) _ _
+    [Core.Alt (Core.DataAlt nil) [] (Core.Var returned),
+     Core.Alt (Core.DataAlt cons) [input_head, input_tail] step] <- pure body
+  guard (actual == input && returned == acc && nil == nilDataCon && cons == consDataCon)
+  (Core.Var self, [Core.Type kind, Core.Var next, pushed]) <- pure (Core.collectArgs step)
+  guard (self == owner && kind `eqType` mkTyVarTy element && next == input_tail)
+  (Core.Var cell, [Core.Type cell_kind, Core.Var first, Core.Var carried]) <-
+    pure (Core.collectArgs pushed)
+  guard (cell == dataConWorkId consDataCon && cell_kind `eqType` kind &&
+         first == input_head && carried == acc)
+  -- Publish with the actual Core type binder and the declared visibility.
+  ConstructorCaseType _ _ core_args core_domains _ core_output <- pure signature
+  let rows = [ ConstructorCaseRow [CaseConstructor nil [kind] [], CaseField acc] (CaseField acc)
+             , ConstructorCaseRow [CaseConstructor cons [kind] [CaseField input_head, CaseField input_tail],
+                                   CaseField acc]
+                 (CaseSelf [kind] [CaseField input_tail,
+                    CaseConstructor cons [kind] [CaseField input_head, CaseField acc]]) ]
+  pure (ConstructorCaseType [Bndr element visibility] tc core_args core_domains position core_output, rows)
+
+-- | Recognize the wrapper's ordinary polymorphic list signature.
+listReverseWrapperType :: Type -> Maybe [ForAllTyBinder]
+listReverseWrapperType ty = do
+  (binders@[Bndr element _], [domain], output) <- constructorHelperType ty
+  guard (domain `eqType` mkListTy (mkTyVarTy element) && domain `eqType` output)
+  pure binders
+
+-- | Require the original operand and an empty accumulator at the same kind.
+directListReverseWrapper :: Id -> Core.CoreExpr -> Maybe ([ForAllTyBinder], Id, Type, Id)
+directListReverseWrapper owner rhs = do
+  let rhs_type = exprType rhs
+      (binders, body) = Core.collectBinders rhs
+  guard (rhs_type `eqType` varType owner)
+  [Bndr _ visibility] <- listReverseWrapperType (varType owner)
+  [core_element, input] <- pure binders
+  guard (isTyVar core_element && isId input)
+  (Core.Var callee, [Core.Type kind, Core.Var operand, empty]) <-
+    pure (Core.collectArgs body)
+  guard (kind `eqType` mkTyVarTy core_element && operand == input)
+  (Core.Var nil, [Core.Type nil_kind]) <- pure (Core.collectArgs empty)
+  guard (nil == dataConWorkId nilDataCon && nil_kind `eqType` kind)
+  pure ([Bndr core_element visibility], input, kind, callee)
+
+-- | A checked tail-recursive worker has a self-call at the root of its result.
+isReverseWorkerTable :: TyCon -> Bool
+isReverseWorkerTable table
+  | Just _ <- sourceTableTermOcc (nameOccName (tyConName table))
+  , Just axiom <- closedFamilyTyConCoAxiom_maybe table
+  , coAxiomRole axiom == Nominal
+  , Just signature <- constructorCaseType (tyConKind table)
+  , isBinaryListCase signature =
+      any tail_call (fromBranches (coAxiomBranches axiom))
+  | otherwise = False
+  where
+    tail_call branch
+      | Just (callee, _) <- splitTyConApp_maybe (coAxBranchRHS branch) = callee == table
+      | otherwise = False
+
+-- | Preserve the executable path for a closed call to the reverse wrapper.
+isFinalCoreReverseWrapper :: Id -> Bool
+isFinalCoreReverseWrapper owner =
+    finalCoreMapperOwner owner && isJust (sourceTableId_maybe owner >>= reverseWrapperWorker)
+
+-- | Read a checked wrapper's exact worker and classify its single equation.
+reverseWrapperWorker :: TyCon -> Maybe TyCon
+reverseWrapperWorker table = do
+  _ <- sourceTableTermOcc (nameOccName (tyConName table))
+  _ <- listReverseWrapperType (tyConKind table)
+  axiom <- closedFamilyTyConCoAxiom_maybe table
+  guard (coAxiomRole axiom == Nominal)
+  [branch] <- pure (fromBranches (coAxiomBranches axiom))
+  [element, operand] <- pure (coAxBranchTyVars branch)
+  let kind = mkTyVarTy element
+      left = mkTyVarTy operand
+  guard (null (coAxBranchCoVars branch) && eqTypes (coAxBranchLHS branch) [kind, left])
+  (worker, [actual, input, nil]) <- splitTyConApp_maybe (coAxBranchRHS branch)
+  guard (eqTypes [actual, input, nil]
+                 [kind, left, mkTyConApp (promoteDataCon nilDataCon) [kind]] &&
+         isReverseWorkerTable worker)
+  pure worker
 
 {- Note [Checked list filters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1797,6 +1931,10 @@ verifyFinalCoreMapper binds original =
       , isIdentitySourceType (varType owner)
       -> verifyProjection (unitNameSet (idName owner)) owner expression
       | varType owner `eqType` varType original
+      , Just table <- sourceTableId_maybe original
+      , isReverseWorkerTable table || isJust (reverseWrapperWorker table)
+      -> checkedReverseTable bindings table
+      | varType owner `eqType` varType original
       -> if lengthIs (finalCoreSourceFamilies original) 1
            then not (isNothing (directListMapper owner expression <|>
                                 directListAppend owner expression))
@@ -1811,6 +1949,34 @@ verifyFinalCoreMapper binds original =
       = verifyProjection (extendNameSet seen (idName target)) target rhs
     verifyProjection _ owner expression =
       not (isNothing (checkedIdentitySource owner expression))
+
+-- | Check reverse tables even if earlier Core simplification dropped Id details.
+failedReverseTables :: [Core.CoreBind] -> [TyCon] -> [TyCon]
+failedReverseTables binds tables =
+    [table | table <- tables
+           , isReverseWorkerTable table || isJust (reverseWrapperWorker table)
+           , not (checkedReverseTable bindings table)]
+  where
+    bindings = Core.flattenBinds binds
+
+-- | Require the same final owner and the same exact call from its wrapper.
+checkedReverseTable :: [(Id, Core.CoreExpr)] -> TyCon -> Bool
+checkedReverseTable bindings table = isJust $ do
+    (owner, rhs) <- find (owns table . fst) bindings
+    guard (sourceTableId_maybe owner == Just table)
+    case reverseWrapperWorker table of
+      Just worker -> do
+        (_, _, _, callee) <- directListReverseWrapper owner rhs
+        guard (owns worker callee)
+        worker_rhs <- lookup callee bindings
+        directListReverseWorker callee worker_rhs
+      Nothing -> directListReverseWorker owner rhs
+  where
+    owns family value =
+      let family_name = tyConName family
+          owner_name = idName value
+      in nameModule_maybe owner_name == nameModule_maybe family_name &&
+         sourceTableTermOcc (nameOccName family_name) == Just (nameOccName owner_name)
 
 -- | Read exhaustive cases on exact bound operands and check each result.
 checkedConstructorCase :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr
@@ -1921,7 +2087,7 @@ checkedConstructorCase visible helper owner rhs = do
       original <- traverse (\case CaseField v -> Just v; _ -> Nothing) (before ++ after)
       actual <- traverse (\case Core.Var v -> Just (resolve aliases v); _ -> Nothing) (left ++ right)
       guard (actual == original)
-      pure (CaseSelf types (take position original ++ field : drop position original))
+      pure (CaseSelf types (map CaseField (take position original ++ field : drop position original)))
 
     checkedCallback (ConstructorCaseType _ _ _ _ 1 _) patterns aliases expr = do
       [CaseField carried, root@CaseConstructor{}] <- pure patterns
@@ -2066,7 +2232,7 @@ publishConstructorRows owner telescope domains result rows = do
       mkTyConApp table (map instantiate args ++ map publish children)
       where publish = publishResult family instantiate fields
     publishResult family instantiate fields (CaseSelf args operands) =
-      mkTyConApp family (map instantiate args ++ map (fieldType fields) operands)
+      mkTyConApp family (map instantiate args ++ map (publishResult family instantiate fields) operands)
 
     publishResult _ _ fields (CaseApply fun arg) =
       mkAppTy (fieldType fields fun) (fieldType fields arg)

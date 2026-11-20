@@ -598,6 +598,7 @@ checkFlagHash hsc_env iface self_recomp = do
         binary_base_fp = binaryEnumFingerprint scoped_family_fp
         new_fp = binaryEnumFingerprint scoped_identity_fp
         append_fp = checkedListAppendFingerprint new_fp
+        reverse_fp = checkedListReverseFingerprint append_fp
         retained_signature_fp = retainedSignatureCaseFingerprint new_fp
         earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp,
                                     scoped_family_fp, filter_base_fp, filter_family_fp,
@@ -610,14 +611,17 @@ checkFlagHash hsc_env iface self_recomp = do
         -- See Note [Recompiling package rule providers].
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
         append_fps = [append_fp, stamp_rules append_fp]
-        (old_fp, checked_append, shared_retained_cases)
-          | stored_fp `elem` append_fps = (new_fp, True, False)
-          | stored_fp `elem` map retainedSignatureCaseFingerprint append_fps = (new_fp, True, True)
-          | stored_fp == retained_signature_fp = (new_fp, False, True)
-          | stored_fp `elem` class_generations = (stored_fp, False, False)
-          | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = (fp, False, False)
-          | stored_fp == retainedSignatureCaseFingerprint (stamp_rules new_fp) = (new_fp, False, True)
-          | otherwise = (stored_fp, False, False)
+        reverse_fps = [reverse_fp, stamp_rules reverse_fp]
+        (old_fp, checked_append, checked_reverse, shared_retained_cases)
+          | stored_fp `elem` reverse_fps = (new_fp, True, True, False)
+          | stored_fp `elem` map retainedSignatureCaseFingerprint reverse_fps = (new_fp, True, True, True)
+          | stored_fp `elem` append_fps = (new_fp, True, False, False)
+          | stored_fp `elem` map retainedSignatureCaseFingerprint append_fps = (new_fp, True, False, True)
+          | stored_fp == retained_signature_fp = (new_fp, False, False, True)
+          | stored_fp `elem` class_generations = (stored_fp, False, False, False)
+          | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = (fp, False, False, False)
+          | stored_fp == retainedSignatureCaseFingerprint (stamp_rules new_fp) = (new_fp, False, False, True)
+          | otherwise = (stored_fp, False, False, False)
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
@@ -758,6 +762,16 @@ checkFlagHash hsc_env iface self_recomp = do
                 then liftIO $ recheck "Compiler now checks list append equations"
                 else pure UpToDate
           | otherwise = pure UpToDate
+        check_reverse
+          | not checked_reverse
+          , backendGeneratesCode (backend dflags)
+          , mi_hsc_src iface == HsSrcFile = do
+              -- An exported accumulator worker has the same signature as append.
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface ListAppend
+              if candidate
+                then liftIO $ recheck "Compiler now checks list reverse equations"
+                else pure UpToDate
+          | otherwise = pure UpToDate
         check_family_uses
           | old_fp `elem` (staged_fp : class_generations) = pure UpToDate
           | otherwise = do
@@ -791,6 +805,7 @@ checkFlagHash hsc_env iface self_recomp = do
           | otherwise = pure UpToDate
     pure (flags, check_identity `recompThen` check_guarded_filter
                                      `recompThen` check_append
+                                     `recompThen` check_reverse
                                      `recompThen` check_family_uses
                                      `recompThen` check_forwarded_result
                                      `recompThen` check_scoped_case
@@ -905,6 +920,11 @@ checkedIdentityFingerprint fp =
 checkedListAppendFingerprint :: Fingerprint -> Fingerprint
 checkedListAppendFingerprint fp =
     computeFingerprint putNameLiterally (fp, "checked-list-append-v1" :: String)
+
+-- | Record that a code-generating build checked for reverse equations.
+checkedListReverseFingerprint :: Fingerprint -> Fingerprint
+checkedListReverseFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "checked-list-reverse-v1" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -2319,10 +2339,11 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          append_stamp
-            | backendGeneratesCode (backend dflags) = checkedListAppendFingerprint
+          list_stamp
+            | backendGeneratesCode (backend dflags) =
+                checkedListReverseFingerprint . checkedListAppendFingerprint
             | otherwise = id
-          current_flag_hash = append_stamp
+          current_flag_hash = list_stamp
                             $ binaryEnumFingerprint
                             $ checkedIdentityFingerprint
                             $ scopedTypeCaseFingerprint
