@@ -83,7 +83,7 @@ import Data.List ( mapAccumL, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
-import qualified Data.Set as Set ( difference, fromList, toList, null )
+import qualified Data.Set as Set ( delete, difference, fromList, toList, null, member, union )
 
 {- Note [Lifting type lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -152,7 +152,7 @@ liftTypeLambdas sigma group =
       | Just scoped <- traverse capture captures
       = let (kind_occs, _) = hsQTyVarKindOccs captures (extractHsTyRdrTyVarsKindVars rhs)
             kinds = nubN kind_occs
-            implicit = [(lambdaBinder k, k) | k <- kinds]
+            implicit = [(liftedTypeVarBinder k, k) | k <- kinds]
             (rhs', families, _) = liftRhs Nothing owner (implicit ++ scoped) rhs (0 :: Int)
         in (L loc syn{tcdRhs = rhs'}, families)
     liftDecl decl = (decl, [])
@@ -210,7 +210,7 @@ liftTypeLambdas sigma group =
           header_names
             | hasDuplicates binders = binders
             | otherwise = zipWith (privateName "header" salt) [0..] binders
-          locals = zip (map lambdaBinder header_names) binders
+          locals = zip (map liftedTypeVarBinder header_names) binders
           equation_captures = zipWith (hideCapture binders salt) [0..] captures
           equation_scope = equation_captures ++ locals
           (body', families, next) =
@@ -303,10 +303,6 @@ liftTypeLambdas sigma group =
       (mkTyVarOcc ("$lambda-" ++ role ++ ":" ++ show (salt :: Int)
                               ++ ":" ++ show (index :: Int))))
 
-    lambdaBinder v =
-      L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
-        (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
-
     capture original@(L loc (HsTvb ann vis@(HsBndrRequired _) var@(HsBndrVar _ n) kind)) =
       Just (capture_binder, n)
       where
@@ -320,6 +316,105 @@ liftTypeLambdas sigma group =
     capture _ = Nothing
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
+
+-- | Form a required parameter for a lifted type expression.
+liftedTypeVarBinder :: LocatedN RdrName -> LHsTyVarBndr (HsBndrVis GhcPs) GhcPs
+liftedTypeVarBinder v =
+  L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
+    (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
+
+{- Note [Retained sums in value signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A value signature is checked after type declarations. Give each written
+sum a private synonym so the synonym and its lifted family can share
+kind inference. The synonym checks the witness domain and fixes the
+missing argument of the payload family. The family keeps its checked
+lexical owner. See Note [Lifting type lambdas].
+
+Name the synonym from the value name and the position of the sum in its
+signature. Count from left to right in the argument and result types.
+Different values use separate counters. The private type namespace also
+separates a function operator from a same-spelled type operator. A
+signature shared by several values uses its first name.
+
+Copy only the erased parameters used by the sum and the parameters
+used in their written kinds. Keep their original order. The source
+signature still checks its written forall. Every free variable must
+come from that signature. Otherwise kind inference for the synonym
+could bind a variable that is out of scope at the source occurrence.
+Skip types that contain splices or holes. Do not lift across nested
+binders. They can shadow the original names or bind a retained index.
+-}
+-- | Prepare the retained sums in top-level value signatures for type lifting.
+liftSignatureSums :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
+liftSignatureSums named_wildcards group@HsGroup{hs_valds = ValBinds ann binds}
+  | not (null synonyms)
+  = (group{hs_valds = ValBinds ann binds', hs_tyclds = anchors : hs_tyclds group}, names)
+  where
+    (_, lifted) = mapAccumL liftBind emptyOccEnv binds
+    (binds', generated) = unzip lifted
+    (synonyms, names) = unzip (concat generated)
+    anchors = TyClGroup noExtField synonyms [] [] []
+
+    liftBind counters (VbSig (L loc (TypeSig sig_ann mods names@(owner:_) wc@HsWC
+                  {hswc_body = L sig_loc sig@HsSig{sig_bndrs = outer, sig_body = body}}))) =
+      let occ = rdrNameOcc (unLoc owner)
+          first = fromMaybe 0 (lookupOccEnv counters occ)
+          (body', aliases, next) = liftBody owner (signatureCaptures outer body) body first
+          sig' = L sig_loc (sig{sig_body = body'})
+      in (extendOccEnv counters occ next, (VbSig (L loc (TypeSig sig_ann mods names
+                                                       wc{hswc_body = sig'})), aliases))
+    liftBind counters bind = (counters, (bind, []))
+
+    signatureCaptures HsOuterImplicit{} body =
+      [(liftedTypeVarBinder v, v) | v <- nubN (extractHsTyRdrTyVars body)
+                                , not (named_wildcards && startsWithUnderscore (rdrNameOcc (unLoc v)))]
+    signatureCaptures (HsOuterExplicit{hso_bndrs = binders}) _ =
+      [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
+      | b <- binders, Just v <- [hsLTyVarLocName b]]
+
+    liftBody owner scope whole@(L loc (XHsType HsTypeSome{})) salt
+      | copyable whole
+      , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
+            (used, missing) = foldr select ([], free) scope
+      , Set.null missing
+      , all (copyable . fst) used
+      = let occ = mkTcOcc ("$signature-sum:" ++ occNameString (rdrNameOcc (unLoc owner))
+                           ++ ":" ++ show (salt :: Int))
+            name = L (l2l loc) (mkRdrUnqual occ)
+            alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
+            applied = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
+                             (typeName name) used
+        in (applied, [(alias, (occ, Nothing))], salt + 1)
+    liftBody owner scope (L loc (HsFunTy ann arrow arg result)) salt =
+      let (arg', arg_aliases, next) = liftBody owner scope arg salt
+          (result', result_aliases, end) = liftBody owner scope result next
+      in (L loc (HsFunTy ann arrow arg' result'), arg_aliases ++ result_aliases, end)
+    liftBody owner scope (L loc (HsQualTy ann ctxt body)) salt =
+      let (body', aliases, next) = liftBody owner scope body salt
+      in (L loc (HsQualTy ann ctxt body'), aliases, next)
+    liftBody owner scope (L loc (HsKindSig ann body kind)) salt =
+      let (body', aliases, next) = liftBody owner scope body salt
+      in (L loc (HsKindSig ann body' kind), aliases, next)
+    liftBody owner scope ty salt = liftTypeChildren (liftBody owner scope) ty salt
+
+    select pair@(binder, name) (captures, used)
+      | unLoc name `Set.member` used
+      = (pair : captures, Set.delete (unLoc name) used `Set.union` kindNames binder)
+      | otherwise = (captures, used)
+
+    kindNames (L _ HsTvb{tvb_kind = HsBndrKind _ kind}) =
+      Set.fromList (map unLoc (extractHsTyRdrTyVars kind))
+    kindNames _ = Set.fromList []
+
+    copyable :: Data a => a -> Bool
+    copyable node = case cast node :: Maybe (LHsType GhcPs) of
+      Just (L _ HsSpliceTy{}) -> False
+      Just (L _ HsWildCardTy{}) -> False
+      _ -> and (gmapQ copyable node)
+
+    typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
+liftSignatureSums _ group = (group, [])
 
 {- Note [Lifting type cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -590,13 +685,18 @@ rnSrcDecls :: HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 -- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls group = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
+  named_wildcards <- xoptM LangExt.NamedWildCards
+  is_boot <- tcIsHsBootOrSig
   dflags <- getDynFlags
   let sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
-      (with_cases, case_names) = if enabled then liftTypeCases group else (group, [])
+      (with_sigs, sig_names)
+        | enabled && not is_boot = liftSignatureSums named_wildcards group
+        | otherwise = (group, [])
+      (with_cases, case_names) = if enabled then liftTypeCases with_sigs else (group, [])
       (expanded, lambda_names, scopes) =
         if enabled then liftTypeLambdas sigma with_cases else (group, [], emptyOccEnv)
-  rnSrcDeclsWithLambdas (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
+  rnSrcDeclsWithLambdas (sig_names ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
 
 -- | Rename the declarations and record the kind-inference edges of private families.

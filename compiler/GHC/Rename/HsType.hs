@@ -999,7 +999,7 @@ rnHsTyKi _ (XHsType HsTypeLambda{}) = do
 
 rnHsTyKi _ (XHsType HsTypeSome{}) =
   failWithTc (mkTcRnUnknownMessage (mkPlainError []
-    (text "A retained dependent sum is supported in a top-level type synonym right-hand side.")))
+    (text "A retained dependent sum is supported in a top-level type synonym or a complete top-level value signature.")))
 
 -- A bare case pattern prefers a data constructor, as before. Resolve it
 -- after the declaration group is in scope. If the data name is absent,
@@ -2682,15 +2682,22 @@ extract_lty (L _ ty) acc
         extract_hs_tv_bndrs [binder] acc (extract_lty body [])
       XHsType (HsTypeCaseAlias _ (_, _, alias) body) ->
         filter (\v -> Just (unLoc v) /= (unLoc <$> alias)) (extract_lty body []) ++ acc
+      XHsType (HsTypeLambda _ binders body)
+                                  -> extract_body (map unLoc binders) body acc
       XHsType (HsTypeLet _ binder rhs body)
-                                  -> extract_lty rhs
-                                       (filter ((/= unLoc binder) . unLoc) (extract_lty body []) ++ acc)
+                                  -> extract_lty rhs (extract_body [unLoc binder] body acc)
       XHsType (HsTypeSome _ binder domain body)
-                                  -> extract_lty domain
-                                       (filter ((/= unLoc binder) . unLoc) (extract_lty body []) ++ acc)
+                                  -> extract_lty domain (extract_body [unLoc binder] body acc)
+      XHsType (HsTypeCase _ _ scrutinee alts)
+                                  -> extract_lty scrutinee (foldr extract_alt acc alts)
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
+  where
+    extract_alt (L _ (HsTypeCaseAlt pat _ body)) acc =
+      extract_body (map unLoc (extract_lty pat [])) body acc
+    extract_body bound body acc =
+      filter ((`notElem` bound) . unLoc) (extract_lty body []) ++ acc
 
 extract_kind_sig :: LHsType GhcPs -- type
                  -> LHsType GhcPs -- kind
