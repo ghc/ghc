@@ -87,6 +87,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs     -- all of it
@@ -97,7 +98,8 @@ import GHC.Core.Make    ( sortQuantVars )
 import GHC.Core.Make.Box ( mkCanonicalCo )
 import GHC.Core.Coercion ( MCoercion(..), MCoercionR, mkSymMCo )
 import GHC.Core.DataCon ( DataCon, dataConTyCon )
-import GHC.Core.Type    ( Type, mightBeUnliftedType, typeHasFixedRuntimeRep
+import GHC.Core.TyCo.Rep (Type(DepFunTy))
+import GHC.Core.Type    ( Type, coreFullView, mightBeUnliftedType, typeHasFixedRuntimeRep
                         , mkTyConTy, getRuntimeRep )
 import GHC.Core.Multiplicity     ( pattern ManyTy )
 
@@ -397,6 +399,25 @@ lvlApp :: LevelEnv
        -> CoreExprWithFVs
        -> (CoreExprWithFVs, [CoreExprWithFVs]) -- Input application
        -> LvlM LevelledExpr                    -- Result expression
+lvlApp env _ (fun, args)
+  | floatCoreMode (le_switches env) == RetainedCore
+  , not (isRunRW fun)
+  = do { fun' <- lvlExpr env fun
+       ; args' <- retainedArgs (exprType (deAnnotate fun)) args
+       ; return (foldl' App fun' args') }
+  where
+    isRunRW (_, AnnVar fn) = fn `hasKey` runRWKey
+    isRunRW _ = False
+
+    retainedArgs _ [] = return []
+    retainedArgs ty (arg : rest) = do
+      let expr = deAnnotate arg
+      arg' <- case coreFullView ty of
+        DepFunTy{} -> return (keepIndexArg (le_ctxt_lvl env)
+                                         (substExpr (le_subst env) expr))
+        _ -> lvlMFE env False arg
+      rest' <- retainedArgs (applyTypeToArgs ty [expr]) rest
+      return (arg' : rest')
 lvlApp env orig_expr ((_,AnnVar fn), args)
   -- Try to ensure that runRW#'s continuation isn't floated out.
   -- See Note [Simplification of runRW#].
@@ -437,6 +458,26 @@ lvlApp env _ (fun, args)
      do { args' <- mapM (lvlNonTailMFE env False) args
         ; fun'  <- lvlNonTailExpr env fun
         ; return (foldl' App fun' args') }
+
+-- | Tag a retained operand without introducing an opaque binding for any
+-- part of its checked index. Work on the renamed expression.
+keepIndexArg :: Level -> CoreExpr -> LevelledExpr
+keepIndexArg lvl = go
+  where
+    tag b = stayPut lvl b
+    go (Var v) = Var v
+    go (Lit l) = Lit l
+    go (Type t) = Type t
+    go (Coercion c) = Coercion c
+    go (App f a) = App (go f) (go a)
+    go (Cast e co) = Cast (go e) co
+    go (Tick t e) = Tick t (go e)
+    go (Lam b e) = Lam (tag b) (go e)
+    go (Let bind e) = Let (tagBind bind) (go e)
+    go (Case e b t alts) = Case (go e) (tag b) t (map tagAlt alts)
+    tagBind (NonRec b rhs) = NonRec (tag b) (go rhs)
+    tagBind (Rec pairs) = Rec [(tag b, go rhs) | (b, rhs) <- pairs]
+    tagAlt (Alt con bs rhs) = Alt con (map tag bs) (go rhs)
 
 -------------------------------------------
 lvlCase :: LevelEnv             -- Level of in-scope names/tyvars
@@ -619,6 +660,7 @@ lvlMFE env strict_ctxt e@(_, AnnCase {})
 lvlMFE env strict_ctxt ann_expr
   |  notWorthFloating expr abs_vars
   || not float_me
+  || hasRuntimeIndexRefs env fvs_ty
   || floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || hasFreeJoin env fvs   -- If there is a free join, don't float
@@ -1283,6 +1325,7 @@ lvlBind env (AnnNonRec bndr rhs)
   || isCoVar bndr  -- Don't float CoVars: difficult to fix up CoVar occurrences
                    --                     (see extendPolyLvlEnv)
   || not (wantToFloat env NonRecursive dest_lvl is_join is_top_bindable)
+  || hasRuntimeIndexRefs env ty_fvs
   = -- No float
     do { rhs' <- lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
        ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
@@ -1329,6 +1372,7 @@ lvlBind env (AnnNonRec bndr rhs)
 
 lvlBind env (AnnRec pairs)
   |  not (wantToFloat env Recursive dest_lvl is_join is_top_bindable)
+  || hasRuntimeIndexRefs env ty_fvs
   = -- No float
     do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
@@ -1629,6 +1673,24 @@ destLevel env fvs fvs_ty is_function is_bot
 
     as_far_as_poss = maxFvLevel' idsOnly env fvs_ty
                      -- See Note [Floating and kind casts]
+
+-- | Keep the binding scope of the free runtime indices in a float's type.
+-- See Note [Floating a dependent result].
+hasRuntimeIndexRefs :: LevelEnv -> TyCoVarSet -> Bool
+hasRuntimeIndexRefs env refs =
+    floatCoreMode (le_switches env) == RetainedCore
+      && anyVarSet (\v -> isId v && not (isCoVar v)) refs
+
+{- Note [Floating a dependent result]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do not float an expression or binding whose result type contains a free
+runtime Id. A new top-level binder cannot name the local Id in its type.
+The ordinary abstraction path also cannot introduce a dependent lambda
+and rewrite its applications. Keep these bindings in their existing scope
+until floating supports that abstraction. Free coercion variables still
+use the existing level constraint. A closed dependent arrow has no free
+runtime Id and can float.
+-}
 
 {- Note [Floating and kind casts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

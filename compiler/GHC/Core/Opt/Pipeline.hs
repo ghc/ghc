@@ -55,6 +55,7 @@ import GHC.Core.Opt.Simplify ( SimplifyExprOpts, simplifyPgm )
 import qualified GHC.Core.Opt.Simplify as Simplify
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
 import GHC.Core.Opt.Pipeline.Types
 import GHC.Core.Opt.FloatIn      ( floatInwards )
 import GHC.Core.Opt.FloatOut     ( floatOutwards )
@@ -410,7 +411,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
 
         runWhen full_laziness
            (CoreDoFloatOutwards $ FloatOutSwitches
-                { floatOutLambdas     = Just 0
+                { floatCoreMode       = OrdinaryCore
+                , floatOutLambdas     = Just 0
                 , floatOutConstants   = True
                 , floatOutOverSatApps = False
                 , floatToTopLevelOnly = False
@@ -472,7 +474,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- catch it.  For the record, the redex is
         --        f_el22 (f_el21 r_midblock)
         runWhen full_laziness $ CoreDoFloatOutwards $ FloatOutSwitches
-               { floatOutLambdas     = floatLamArgs dflags
+               { floatCoreMode       = OrdinaryCore
+               , floatOutLambdas     = floatLamArgs dflags
                , floatOutConstants   = True
                , floatOutOverSatApps = True
                , floatToTopLevelOnly = False

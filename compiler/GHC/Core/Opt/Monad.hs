@@ -45,6 +45,7 @@ import GHC.Driver.Config.Diagnostic ( initDiagOpts )
 import GHC.Driver.Env
 
 import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv )
+import GHC.Core.Opt.OccurAnal (SimplCoreMode)
 import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
 
 import GHC.Types.Annotations
@@ -75,7 +76,8 @@ import Control.Monad
 import Control.Applicative ( Alternative(..) )
 
 data FloatOutSwitches = FloatOutSwitches
-  { floatOutLambdas   :: Maybe Int  -- ^ Just n <=> float lambdas to top level, if
+  { floatCoreMode     :: SimplCoreMode
+  , floatOutLambdas   :: Maybe Int  -- ^ Just n <=> float lambdas to top level, if
                                     -- doing so will abstract over n or fewer
                                     -- value variables
                                     -- Nothing <=> float all lambdas to top level,
