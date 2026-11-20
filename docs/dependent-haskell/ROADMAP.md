@@ -49,19 +49,30 @@ arrow for a type family. Both results apply to `Int`. Before this change,
 the fork rejected the second application. An ordinary client now prints
 `(Just 7,[7])` from the producer interface. [Computed arrow kinds](examples/open-evaluation/InvisibleFamily.hs).
 
-Both native compiler stages reproduce the 297-line Showcase at `-O0`,
+An interpreter can define arrow kinds before a declaration splice and
+apply the interpreted type constructor after it. Interpreting two
+applications of `Maybe` gives `Just (Just True)`. A class can also give
+one associated type default, `type Callback a = a -> Maybe a`. An
+ordinary client uses the default as both the kind of the promoted
+constructor `'Just` and the type of a runtime callback.
+[Interpreter](examples/open-evaluation/InterpretedKind.hs) and
+[callback client](examples/open-evaluation/LegacyKindArgument.hs).
+
+Both native compiler stages reproduce the 299-line Showcase at `-O0`,
 default `-O1` and default `-O2`. The self-hosted compiler also checks
-stripped optimized interfaces and GHCi. Both this compiler and
-`2da8cf75ec` compile the ordinary client against the new optimized
-`Wrap` provider. The previous compiler cannot check the provider source.
+stripped optimized interfaces and GHCi. Both this compiler and the
+previous release, `7c873b5f46`, compile the ordinary client from the
+new optimized interfaces. It prints `(Just (Just True),Just True)`.
+The previous release rejects the interpreter's source.
 [Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
 
-At `192e7c3158`, all 60 focused tests that ran passed. In the dependent
-directory, 293 tests passed and 21 failed. In the polykinds directory,
-224 passed, one failed as expected, and 18 failed unexpectedly. Both
-directories have the same unexpected failures as `2da8cf75ec`.
-In the dependent directory, ten programs fail to compile, ten diagnostics
-differ, and the test command for `T13938` fails.
+At `55c20e158c`, all 61 focused tests that ran passed. In the dependent
+directory, 294 passed and 20 failed. The unchanged `KindEqualities2`
+now compiles and prints `Nothing` at `-O0` and `-O2`. In polykinds,
+224 passed, one failed as expected, and 18 failed unexpectedly. In
+indexed-types, 420 passed, four failed as expected, and 15 failed
+unexpectedly. The remaining failures in all three directories have the
+same names and failure categories as at `7c873b5f46`.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -94,13 +105,13 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R23.** Restore ordinary programs that interpret kinds with open type
-   families. In `KindEqualities2`, check how a declaration splice affects
-   the selector and how the expected result kind guides `(I a) (I b)`.
-   Keep incompatible explicit annotations and invalid inverse equalities
-   rejected. [Staged regression](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
-2. **R05.** Extend rule matching to lexical package operations. Check
-   substitution and witness scope on both sides of the rule.
+1. **R05.** Extend rule matching to source rules that construct or open
+   an erased package. Check substitution and witness scope on both sides.
+   [Three source cases](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
+2. **R23.** Test ordinary programs still rejected by the fork, starting
+   with `GADTSingletons`. The staged interpreter already accepts ordinary
+   type constructors. Its variant with an unsaturated family still needs
+   an explicit `%U`. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
 3. **R22 and R04.** Extend witness projections and retained fields under
    GADT declarations. Check where a lambda still needs a type annotation.
 4. **R19.** Extend constructor patterns over open indices. Keep earlier
