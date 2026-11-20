@@ -8,6 +8,21 @@ increments.
 
 ## Family and package checkpoints
 
+The bootstrap compiler relink at `fa6b3b44ca` reproduced all 356
+Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
+`NativeLocalOpen` and `NativeTypeCase` passed. The source-hidden shadow
+test selected the local worker. The worker that needs its own unfinished
+constructor failed with GHC-68947 at both optimization levels.
+[Local field worker](examples/open-evaluation/LocalAliasField.hs) and
+[scope checks](../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
+Both compiler stages at `91382c33c4` reproduced all 351 Showcase lines
+at the same three optimization levels. Self-hosted GHCi matched the
+golden. All 27 focused normal tests and the separate GHCi inference
+test passed. Of 327 dependent normal cases, 310 passed and 17 failed.
+`T14880`, `T14880-2`, and `T15825` matched their unchanged diagnostics.
+The other 17 failures kept their previous categories.
+
 At `90f02cc9f5`, the bootstrap compiler relink reproduced all 354
 Showcase lines at stripped `-O0` and default `-O1` and `-O2`. The
 indexed vector append and installed list reverse tests passed, including
