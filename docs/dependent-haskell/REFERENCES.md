@@ -6274,6 +6274,15 @@ body and requires rewrite rules to be disabled at the proof site.
 [GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
 and [R16 application](roadmap/R16-open-term-evaluator.md#filter-one-known-head-and-keep-the-recursive-tail).
 
+Agda's `length-filter` splits on the current predicate result.
+It adds a successor to both sizes when the head is kept and to
+the upper bound when the head is dropped. The Haskell proof uses
+the same induction. Its witness supplies the corresponding equation
+for installed `Prelude.filter` at each head.
+[Agda standard library 2.4, length-filter](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1588),
+[Agda with-abstraction](https://agda.readthedocs.io/en/latest/language/with-abstraction.html),
+and [R16 length bound](roadmap/R16-open-term-evaluator.md#prove-that-filter-never-increases-length).
+
 Agda permits a datatype declaration and its constructors to appear at
 different positions in an interleaved mutual block. Haskell's renamer
 already groups mutually dependent type declarations. R21 uses those

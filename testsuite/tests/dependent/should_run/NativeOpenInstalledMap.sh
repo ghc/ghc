@@ -81,38 +81,69 @@ mkdir "$out"/{filter,filter-client}
 cd "$out/filter"
 cp "$src/PreludeFilterSource.hs" .
 filter=("${ghc[@]}" -O1 -fenable-rewrite-rules)
-"${filter[@]}" -c PreludeFilterSource.hs
+"${filter[@]}" -fomit-interface-pragmas -c PreludeFilterSource.hs
 cd "$out/filter-client"
-cp ../filter/PreludeFilterSource.hi "$src/PreludeFilterProof.hs" .
-"${filter[@]}" -c PreludeFilterProof.hs
+cp ../filter/PreludeFilterSource.hi ../length-source/PreludeMapLength{Size,Source}.hi \
+   "$src"/PreludeFilter{Proof,LengthProof}.hs .
+"${filter[@]}" -c PreludeFilterProof.hs PreludeFilterLengthProof.hs
 
 cat >UnknownFilter.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module UnknownFilter where
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import PreludeFilterSource (FilterWith)
+import PreludeFilterSource (FilterNegated, FilterWith)
 
 unknown :: Proxy p -> Proxy xs
         -> FilterWith p ('False ': xs) :~: ('False ': FilterWith p xs)
 unknown _ _ = Refl
+
+unknownHead :: Proxy x -> Proxy xs
+            -> FilterNegated (x ': xs) :~: (x ': FilterNegated xs)
+unknownHead _ _ = Refl
 HS
 if "${filter[@]}" -fno-enable-rewrite-rules -c UnknownFilter.hs >unknown.log 2>&1 ||
    ! grep -Fq '[GHC-83865]' unknown.log ||
-   ! grep -Fq 'unknown _ _ = Refl' unknown.log; then
+   ! grep -Fq 'unknown _ _ = Refl' unknown.log ||
+   ! grep -Fq 'unknownHead _ _ = Refl' unknown.log; then
     cat unknown.log >&2
+    exit 1
+fi
+
+cat >ReverseBound.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module ReverseBound where
+import PreludeFilterLengthProof (AtMost(..))
+import PreludeFilterSource (FilterNegated)
+import PreludeMapLengthSource (Count)
+
+wrong :: AtMost (Count '[ 'True]) (Count (FilterNegated '[ 'True]))
+wrong = BothSucc ZeroBound
+HS
+line=$(awk '/^wrong =/ { print NR }' ReverseBound.hs)
+if "${filter[@]}" -c ReverseBound.hs >reverse-bound.log 2>&1 ||
+   ! grep -Fq "ReverseBound.hs:$line:" reverse-bound.log ||
+   ! grep -Fq '[GHC-83865]' reverse-bound.log ||
+   ! grep -Eq "Couldn.t match type.*PreludeMapLengthSize\.Succ" reverse-bound.log ||
+   ! grep -Eq 'with.*PreludeMapLengthSize\.Zero' reverse-bound.log; then
+    cat reverse-bound.log >&2
     exit 1
 fi
 
 cat >FilterRun.hs <<'HS'
 module Main where
+import PreludeFilterLengthProof (showPreludeFilterLength)
 import PreludeFilterProof (lazyHead)
 main :: IO ()
-main = print (lazyHead (error "filter forced the tail"))
+main = do
+    print (lazyHead (error "filter forced the tail"))
+    putStrLn showPreludeFilterLength
 HS
 "${filter[@]}" -c FilterRun.hs
-"${filter[@]}" FilterRun.o PreludeFilterProof.o ../filter/PreludeFilterSource.o -o filter-run
-[[ $(./filter-run) == True ]]
+"${filter[@]}" FilterRun.o PreludeFilter{Proof,LengthProof}.o ../filter/PreludeFilterSource.o \
+    ../length-source/PreludeMapLength{Size,Source}.o -o filter-run
+[[ $(./filter-run) == $'True\n(BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))' ]]
 
 sed -e 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' \
     -e 's/, showPreludeFilterProofs//' \

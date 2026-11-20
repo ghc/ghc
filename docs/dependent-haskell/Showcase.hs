@@ -104,6 +104,7 @@ import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified InstalledNotProof
 import qualified PreludeFilterProof
+import qualified PreludeFilterLengthProof
 import qualified PreludeMapLengthProof
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
@@ -1158,6 +1159,8 @@ main = do
               ++ PreludeMapLengthProof.showPreludeMapLength)
     putStrLn ("filter a known head and leave the tail lazy: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
+    putStrLn ("prove filter never increases length: "
+              ++ PreludeFilterLengthProof.showPreludeFilterLength)
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"
