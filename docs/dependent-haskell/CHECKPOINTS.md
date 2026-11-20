@@ -38,6 +38,25 @@ ordinary rank-n `($)` and nested vector append controls also passed.
 [Packed-vector client](examples/packed-vector/Main.hs) and
 [Quick Look proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/274#issuecomment-533664634).
 
+At `bcf4d0c389`, the self-hosted relink matched all 366 Showcase lines
+at stripped `-O0`, default `-O1`, default `-O2`, and in source-loaded
+GHCi. The source-hidden recursive proof and its demand checks passed at all
+three optimization levels. The test rejects omission of the induction
+premise at the written `Refl`. The retained-cast, indexed-append and
+GHCi provider-reload regressions passed on this compiler. A comparison of
+14 ordinary GHC tests across their selected ways produced 26 expected
+passes on each of the public and combined compilers. Both used the same
+installed libraries.
+[Split proof and independent bounds](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector)
+and [registered client](../../testsuite/tests/dependent/should_run/NativeCertifiedSplit.sh).
+
+The fieldful constructor checks also exercise old and current interface
+readers. The current reader accepts and inlines an older nullary
+provider. An earlier reader rejects an interface that requires support
+for a new constructor operand. Matching a constructor preserves the
+actual fields through optimization and GHCi reload.
+[Constructor test](../../testsuite/tests/dependent/should_run/NativeIndexedConsProof.sh).
+
 At `f8d7a68fb1`, a source-hidden client demands empty-append proofs
 for two vectors at one length. It checks literal cuts of zero, one and
 two, two cuts from IO, and an undefined cut. Using the first vector twice fails at the
