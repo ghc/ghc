@@ -12,4 +12,5 @@ worker/wrapper preserves the scope of an opened package
 the dead-end check distinguishes a lazy opening from a demanded payload
 expression keys distinguish erased witnesses and identify alpha-renamed openings
 erased package rules match bound variables and reject escaping substitutions
+retained rules distinguish shared, distinct and shadowed indices
 exitification abstracts the hidden witness before its payload

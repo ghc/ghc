@@ -89,6 +89,20 @@ contextKind = Refl
 separateKinds :: SeparateKinds 'False :~: Bool
 separateKinds = Refl
 
+nestedLet :: Proxy a ->
+  ( NestedLetCase a ('Just 'True) :~: Proxy '(Maybe a, Either (Maybe a) (Maybe a))
+  , NestedLetCase a ('Just 'False) :~: Proxy '(Maybe a, Either (Maybe a) (Maybe a))
+  , NestedLetCase a 'Nothing :~: Proxy '(Maybe a, Either (Maybe a) (Maybe a)) )
+nestedLet _ = (Refl, Refl, Refl)
+
+nestedLetShadow :: Proxy b ->
+  ( NestedLetShadow b ('Just 'False) :~: (Proxy 'False, Proxy ('Just b))
+  , NestedLetShadow b 'Nothing :~: (Proxy ('Just b), Proxy ('Just b)) )
+nestedLetShadow _ = (Refl, Refl)
+
+nestedLetKind :: (NestedLetKind 'True :~: Bool, NestedLetKind 'False :~: Bool)
+nestedLetKind = (Refl, Refl)
+
 nested :: ( N.Pick ('Just ('Just 'True)) :~: Proxy 'True
           , N.Pick ('Just 'Nothing) :~: Int
           , N.SameFallback ('Just 'Nothing) :~: Int )
@@ -179,6 +193,13 @@ refinedFieldOrder ::
   , N.IndexedFieldOrder ('Just ('N.RefinedFieldBox ('Proxy :: Proxy 'True) ('N.FieldOn 'False))) :~: Int )
 refinedFieldOrder = (Refl, Refl)
 
+refinedBranches :: Proxy seed ->
+  ( N.RefinedBranchPick seed ('Just ('N.RefinedBranch 'Proxy ('N.RefinedBit 'True))) :~: Int
+  , N.RefinedBranchPick seed ('Just ('N.RefinedBranch 'Proxy ('N.RefinedBit 'False))) :~: Int
+  , N.RefinedBranchPick seed ('Just ('N.RefinedBranch 'Proxy 'N.InnerDisjoint)) :~: Bool
+  , N.RefinedBranchPick seed ('Just 'N.OuterDisjoint) :~: Char )
+refinedBranches _ = (Refl, Refl, Refl, Refl)
+
 arrowResult ::
   N.ArrowResult 'LT ('Just ('Just 'True)) :~: (() -> (Proxy 'LT, Proxy 'True))
 arrowResult = Refl
@@ -199,3 +220,40 @@ transportedField = Refl
 
 ordinaryField :: N.DependentFieldPick ('Just ('N.DefaultField 'True)) :~: Int
 ordinaryField = Refl
+
+plainCaseField :: N.PlainCaseField 'True -> Int
+plainCaseField (N.PlainCaseField n) = n
+
+presentCaseField :: N.CaseField ('Just 'True) -> Int
+presentCaseField (N.CaseField n) = n
+
+otherCaseField :: N.CaseField ('Just 'False) -> Int
+otherCaseField (N.CaseField n) = n
+
+missingCaseField :: N.CaseField 'Nothing -> Char
+missingCaseField (N.CaseField c) = c
+
+copyCaseField :: N.CaseField d -> N.CaseField d
+copyCaseField (N.CaseField field) = N.CaseField field
+
+shadowedCaseField :: N.ShadowedCaseField 'True ('Just 'False) -> Proxy 'False
+shadowedCaseField (N.ShadowedCaseField bit) = bit
+
+outerCaseField :: N.ShadowedCaseField 'True 'Nothing -> Proxy 'True
+outerCaseField (N.ShadowedCaseField bit) = bit
+
+rankedCaseField :: N.RankedCaseField 'False -> Int
+rankedCaseField (N.RankedCaseField f) = f @'True Proxy
+
+rankedCaseFieldFalse :: N.RankedCaseField 'True -> Char
+rankedCaseFieldFalse (N.RankedCaseField f) = f @'False Proxy
+
+orderedRankedCaseField :: N.OrderedRankedCaseField 'True -> Int
+orderedRankedCaseField (N.OrderedRankedCaseField f) = f @('Just 'False) Proxy
+
+capturedKindCaseField :: forall k (a :: k) (c :: k).
+  N.CapturedKindCaseField k a c -> Proxy '(a, c)
+capturedKindCaseField (N.CapturedKindCaseField f) = f @Int @'True Proxy
+
+shadowedKindCaseField :: N.CapturedKindCaseField Bool 'True 'False -> Proxy Int
+shadowedKindCaseField (N.CapturedKindCaseField f) = f @Int @'False Proxy

@@ -3,7 +3,7 @@ module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
     supportsNativeRuleBinds,
-    supportsErasedUserRule, supportsImportedErasedRule,
+    hasRetainedRuleHead, supportsLocalUserRule, supportsErasedUserRule, supportsImportedErasedRule,
     supportsQuickLookType,
     hasNativeDependentExpr,
     hasExistentialExpr,
@@ -20,7 +20,7 @@ import GHC.Core
 import GHC.Core.FVs (orphNamesOfExprs)
 import GHC.Core.Class (classOpItems)
 import GHC.Core.Predicate (getClassPredTys_maybe)
-import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
+import GHC.Core.Type (coreFullView, isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
                      , isNativeRetainedBinder, isNativeIndexDomainConversion
                      , splitForAllTyCoVars, splitFunTy_maybe)
 import GHC.Core.TyCo.Compare (eqType)
@@ -89,12 +89,44 @@ supportsNativeRuleBinds :: CoreProgram -> Bool
 supportsNativeRuleBinds binds =
     not (runScanFor CheckUserRules AllMetadata (foldMap scanBind binds))
 
+-- | Does the rule head take a retained argument in its function telescope?
+hasRetainedRuleHead :: Id -> Bool
+hasRetainedRuleHead = go . idType
+  where
+    go ty = case coreFullView ty of
+      DepFunTy{} -> True
+      ForAllTy _ _ body -> go body
+      FunTy{ft_res = res} -> go res
+      _ -> False
+
+-- | Check the local rule with the same retained forms as the optimizer.
+-- See Note [Rules at a retained function head].
+supportsLocalUserRule :: Id -> CoreRule -> Bool
+supportsLocalUserRule fun rule@Rule{ru_fn = name, ru_origin = origin, ru_orphan = NotOrphan{}}
+  | maybe (isLocalId fun) (== origin) (nameModule_maybe name)
+  = userRuleShape purpose fun rule
+  where
+    purpose | hasRetainedRuleHead fun = CheckGentle
+            | otherwise = CheckErasedTypes
+supportsLocalUserRule _ _ = False
+
+{- Note [Rules at a retained function head]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the rule forall xs. keep False xs = xs, the retained binder belongs
+to keep. The rule payload may contain only ordinary vector types. Inspect
+the head's telescope as well as the payload when writing the interface.
+The rule for keep b (choose b) also mentions the runtime index in an
+operand. Check both shapes with the retained optimizer's existing type
+and coercion checks. The producer and the reader lint the whole rule.
+An imported use of keep selects the retained optimizer from its type.
+-}
+
 -- | Can the producer and reader process this local source rule?
 -- See Note [User rules over erased package types].
 supportsErasedUserRule :: Id -> CoreRule -> Bool
 supportsErasedUserRule fun rule@Rule{ru_fn = name, ru_origin = origin, ru_orphan = NotOrphan{}}
   | maybe (isLocalId fun) (== origin) (nameModule_maybe name)
-  = erasedRuleShape fun rule
+  = userRuleShape CheckErasedTypes fun rule
 supportsErasedUserRule _ _ = False
 
 -- | Check an imported head and its ordinary rule visibility.
@@ -107,18 +139,18 @@ supportsImportedErasedRule fun rule@Rule{ru_fn = name, ru_origin = origin,
   , case orphan of
       IsOrphan -> True
       NotOrphan anchor -> NameSet.nameSetAny (is_anchor anchor) (orphNamesOfExprs args)
-  = erasedRuleShape fun rule
+  = userRuleShape CheckErasedTypes fun rule
   where
     is_anchor anchor n = nameIsLocalOrFrom origin n && nameOccName n == anchor
 supportsImportedErasedRule _ _ = False
 
 -- | Check the typed operands shared by local and imported rule heads.
-erasedRuleShape :: Id -> CoreRule -> Bool
-erasedRuleShape fun rule@Rule{ru_fn = name, ru_auto = False}
+userRuleShape :: ScanPurpose -> Id -> CoreRule -> Bool
+userRuleShape purpose fun rule@Rule{ru_fn = name, ru_auto = False}
   | varName fun == name
   , not (isJoinId fun || isImplicitId fun)
-  = not (runScanFor CheckErasedTypes StableMetadata (scanAnnotations fun <> scanRule rule))
-erasedRuleShape _ _ = False
+  = not (runScanFor purpose StableMetadata (scanAnnotations fun <> scanRule rule))
+userRuleShape _ _ _ = False
 
 {- Note [Imported heads of erased package rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -313,7 +345,7 @@ scanBinder v =
                         let rules = idCoreRules v
                         case purpose of
                             CheckGentle | not (null rules) -> pure True
-                            CheckUserRules | not (all (supportsErasedUserRule v) rules) -> pure True
+                            CheckUserRules | not (all (supportsLocalUserRule v) rules) -> pure True
                             _ -> runNativeScan (foldMap scanRule rules <> scanUnfolding (realIdUnfolding v))
             )
 

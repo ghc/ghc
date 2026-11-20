@@ -48,7 +48,7 @@ import GHC.Driver.Ppr( showSDoc )
 import GHC.Core         -- All of it
 import GHC.Core.Subst
 import GHC.Core.Dependent (hasNativeDependentExprRhs)
-import GHC.Core.Predicate (isDictId)
+import GHC.Core.Predicate (isDictId, tyCoVarsOfTypeWellScoped)
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, bindFreeVars
                           , rulesFreeVarsDSet, orphNamesOfExprs )
@@ -58,7 +58,8 @@ import GHC.Core.Ppr       ( pprRules )
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Core.Type as Type
    ( Type, extendTvSubst, extendCvSubst
-   , substTy, getTyVar_maybe )
+   , substTy, getTyVar_maybe, anyFreeVarsOfType, typeKind, isNativeIndexFunctionId )
+import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Ppr( pprParendType )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
@@ -99,7 +100,7 @@ import GHC.Utils.Constants (debugIsOn)
 
 import Data.List (sortBy, mapAccumL, isPrefixOf)
 import Data.Function    ( on )
-import Control.Monad    ( guard )
+import Control.Monad    ( foldM, guard )
 
 {-
 Note [Overall plumbing for rules]
@@ -1756,12 +1757,51 @@ match_ty :: RuleMatchEnv
 -- We only want to replace (f T) with f', not (f Int).
 
 match_ty (RV { rv_tmpls = tmpls, rv_lcl = rn_env })
-         subst@(RS { rs_tv_subst = tv_subst })
+         subst@(RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst })
          ty1 ty2
-  = do  { tv_subst' <- Unify.ruleMatchTyKiX tmpls rn_env tv_subst ty1 ty2
-               -- NB: ruleMatchTyKiX applis tv_subst to ty1 only
-               --     and of course only binds 'tmpls'
+  = do  { tv_subst' <- if isEmptyVarEnv id_subst || not (anyFreeVarsOfType matched_index ty1)
+                       then match_type rn_env ty1
+                       else do
+                         s <- foldM add_var (mkEmptySubst scope) (tyCoVarsOfTypeWellScoped ty1)
+                         match_type (nukeRnEnvL rn_env) (Type.substTy s ty1)
         ; return (subst { rs_tv_subst = tv_subst' }) }
+  where
+    match_type env ty = Unify.ruleMatchTyKiX tmpls env tv_subst ty ty2
+    scope = extendInScopeSetList (rnInScopeSet rn_env) (rs_bndrs subst)
+    matched_index v = isNonCoVarId v && rnOccL rn_env v `elemVarEnv` id_subst
+
+    -- See Note [Matching a runtime index in a RULE].
+    add_var s v
+      | isTyVar v, Just ty <- lookupVarEnv tv_subst renamed
+      = Just (Type.extendTvSubst s v ty)
+      | isCoVar v, Just (Coercion co) <- lookupVarEnv id_subst renamed
+      = Just (Type.extendCvSubst s v co)
+      | isNonCoVarId v
+      = do { let actual = lookupVarEnv id_subst renamed `orElse` Var renamed
+                 domain = Type.substTy s (varType v)
+           ; if isNativeIndexFunctionId v
+             then do { f <- nativeIndexFunctionVar_maybe actual
+                     ; guard (varType f `eqType` domain) }
+             else do { index <- retainedArgIndex actual
+                     ; guard (typeKind index `eqType` domain) }
+           ; return (extendIdSubst s v actual) }
+      | otherwise = Just (extendSubstWithVar s v renamed)
+      where
+        renamed = rnOccL rn_env v
+
+{- Note [Matching a runtime index in a RULE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In forall b (xs :: Choice b). keep b xs = xs, matching the first
+argument fixes b. When matching xs, check its type at that same index.
+Read term substitutions that the expression matcher has already checked
+for scope. Never solve for an unknown runtime value by matching types.
+
+The template binders can have fresh names in the matcher. Look up each
+substitution with the renamed binder. Apply the left renaming and the
+matched arguments together, in dependency order, so each index has its
+instantiated domain. The resulting type contains target occurrences.
+Clear the left renaming before matching it against the target type.
+-}
 
 {- Note [Matching variable types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

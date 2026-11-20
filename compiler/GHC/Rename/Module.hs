@@ -79,7 +79,7 @@ import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 import Control.Monad
 import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
-import Data.List ( elemIndex, mapAccumL, partition, unzip4 )
+import Data.List ( elemIndex, find, mapAccumL, nub, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
@@ -404,16 +404,29 @@ at the source occurrence.
 Skip types that contain splices or holes. A wildcard in a case pattern
 is part of the match. Leave nested binders outside these field telescopes
 to the ordinary renamer.
+
+For a type case in an ordinary constructor field, use the same
+lexical capture check as for a value signature. Give each written
+case its own helper, including cases in different fields of one
+constructor. A copied retained domain can change matchability in
+the helper, so leave cases under a retained binder outside this
+field rule. Keep an inner erased forall and put the helper
+application in its body. If an outer capture has a bare kind
+variable that the forall shadows, save that variable with a type let
+before the forall. Use the saved variable in the helper's header
+and application. The original kind remains in scope for that
+capture. Other kinds that cross a shadow still need a named helper.
 -}
 -- | Select the expressions that can be lifted at a declaration type position.
 data LiftedTypeSite
   = FieldTypeSite
+  | RetainedFieldTypeSite
   | SignatureTypeSite
   | ForallTypeSite
   | RetainedTypeSite [RdrName]
   deriving Eq
 
--- | Prepare cases in top-level value signatures and sums in signatures and fields.
+-- | Prepare type cases and retained sums in signatures and constructor fields.
 liftDeclarationTypes :: [(RdrName, (GlobalRdrElt, Name))] -> Bool -> HsGroup GhcPs
                      -> (HsGroup GhcPs, LiftedDecls, [(LocatedN RdrName, GlobalRdrElt)])
 liftDeclarationTypes source_heads named_wildcards group
@@ -460,7 +473,7 @@ liftDeclarationTypes source_heads named_wildcards group
     liftData decl = (decl, [])
 
     liftConstructor scope (L loc con@ConDeclH98{con_telescope = [], con_name = owner, con_args = args}) =
-      let (args', sums) = liftFields (liftField (liftFieldSums owner scope)) args
+      let (args', sums) = liftFields (liftField (liftFieldAt FieldTypeSite owner scope)) args
       in (L loc con{con_args = args'}, sums)
     liftConstructor _ (L loc con@ConDeclGADT
       { con_names = names, con_outer_bndrs = L _ outer, con_telescope = telescope
@@ -471,7 +484,7 @@ liftDeclarationTypes source_heads named_wildcards group
                           extractHsTysRdrTyVars [result] []
             owner = head names
             scope = outerCaptures outer occurrences
-            visit = liftField (liftFieldType owner scope)
+            visit = liftField (liftFieldType FieldTypeSite owner scope)
             (args', sums) = case args of
               PrefixConGADT ann fields -> first (PrefixConGADT ann) (liftFieldList visit fields)
               RecConGADT ann fields -> first (RecConGADT ann) (liftRecordFields visit fields)
@@ -491,7 +504,7 @@ liftDeclarationTypes source_heads named_wildcards group
             let (body', sums, next) = liftRetainedFields owner scope' body salt
             in (L loc node{hst_body = body'}, sums, next)
       HsFunTy ann arrow arg result ->
-        let (arg', sums, next) = liftFieldType owner scope arg salt
+        let (arg', sums, next) = liftFieldType RetainedFieldTypeSite owner scope arg salt
             (result', later, end) = liftRetainedFields owner scope result next
         in (L loc (HsFunTy ann arrow arg' result'), sums ++ later, end)
       HsParTy ann body ->
@@ -499,22 +512,63 @@ liftDeclarationTypes source_heads named_wildcards group
         in (L loc (HsParTy ann body'), sums, next)
       _ -> (ty, [], salt)
 
-    liftFieldType owner scope ty@(L loc node) salt = case node of
+    liftFieldType site owner scope ty@(L loc node) salt = case node of
       HsForEachTy{hst_bndrs = binders, hst_body = body}
         | let locals = explicitCaptures binders
               names = map (unLoc . snd) locals
               (hidden, outer) = partition ((`elem` names) . unLoc . snd) scope
-              shadowed = Set.fromList (map (unLoc . snd) hidden)
         , length locals == length binders
         , null (findDupsEq (==) names)
-        , all (Set.disjoint shadowed . kindNames . fst) outer
-        , localKindsInScope shadowed locals ->
-            let (body', sums, next) = liftFieldType owner (outer ++ locals) body salt
+        , fieldKindsInScope hidden outer locals ->
+            let (body', sums, next) = liftFieldType RetainedFieldTypeSite owner (outer ++ locals) body salt
             in (L loc node{hst_body = body'}, sums, next)
       HsParTy ann body ->
-        let (body', sums, next) = liftFieldType owner scope body salt
+        let (body', sums, next) = liftFieldType site owner scope body salt
         in (L loc (HsParTy ann body'), sums, next)
-      _ -> liftFieldSums owner scope ty salt
+      _ -> liftFieldAt site owner scope ty salt
+
+    fieldKindsInScope hidden outer locals =
+      all (Set.disjoint shadowed . kindNames . fst) outer
+        && localKindsInScope shadowed locals
+      where
+        shadowed = Set.fromList (map (unLoc . snd) hidden)
+
+    -- Save a bare kind variable of a capture before an erased forall
+    -- shadows it. The helper takes the original kind as an argument.
+    rankedFieldScope scope hidden outer locals loc salt
+      | fieldKindsInScope hidden outer locals = Just (outer ++ locals, [])
+      | otherwise = do
+          guard (localKindsInScope hidden_names locals)
+          copied <- traverse copy scope
+          pure (catMaybes copied ++ locals, saved)
+      where
+        hidden_names = Set.fromList (map (unLoc . snd) hidden)
+        needed = [v | (_, v) <- hidden
+                    , any (Set.member (unLoc v) . kindNames . fst) outer]
+        occupied = Set.fromList (map (unLoc . snd) (scope ++ locals))
+        fresh = [L (l2l loc) name
+                | i <- [0 :: Int ..]
+                , let name = mkRdrUnqual (mkTyVarOcc
+                             ("$field-kind:" ++ show salt ++ ":" ++ show i))
+                , not (Set.member name occupied)]
+        saved = zip needed fresh
+        name_for n = lookup (unLoc n) [(unLoc old, new) | (old, new) <- saved]
+        independent = Set.disjoint hidden_names . kindNames
+
+        copy entry@(L binder_loc binder@HsTvb{}, v)
+          | Just new <- name_for v
+          , independent (fst entry)
+          , HsBndrVar ann _ <- tvb_var binder
+          = Just (Just (L binder_loc binder{tvb_var = HsBndrVar ann new}, new))
+          | unLoc v `Set.member` hidden_names
+          = if isJust (name_for v) then Nothing else Just Nothing
+          | independent (fst entry)
+          = Just (Just entry)
+          | HsBndrKind ann kind <- tvb_kind binder
+          , L _ (HsTyVar _ NotPromoted old) <- ignoreParens kind
+          , Just new <- name_for old
+          = Just (Just (L binder_loc binder{tvb_kind = HsBndrKind ann (typeName new)}, v))
+        copy _ = Nothing
 
     localKindsInScope _ [] = True
     localKindsInScope hidden ((binder, name):locals) =
@@ -574,21 +628,25 @@ liftDeclarationTypes source_heads named_wildcards group
       [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
       | b <- binders, Just v <- [hsLTyVarLocName b]]
 
-    liftFieldSums owner scope ty salt =
-      let (ty', sums, (next, _)) = liftBody FieldTypeSite owner scope ty (salt, [])
+    liftFieldAt site owner scope ty salt =
+      let (ty', sums, (next, _)) = liftBody site owner scope ty (salt, [])
       in (ty', sums, next)
 
-    liftedAnchor FieldTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
-      | copyable ty = Just ("$field-sum:", Nothing)
+    liftedAnchor site _ ty@(L _ (XHsType HsTypeSome{}))
+      | fieldSite site, copyable ty = Just ("$field-sum:", Nothing)
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
     liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
-      | site /= FieldTypeSite
+      | site /= RetainedFieldTypeSite
       , caseScrutinee site scope scrutinee
       , copyable scrutinee
       , all copyableAlt alts
-      = Just ("$signature-case:", signatureCaseKey scrutinee alts)
+      = if site == FieldTypeSite
+          then Just ("$field-case:", Nothing)
+          else Just ("$signature-case:", signatureCaseKey scrutinee alts)
     liftedAnchor _ _ _ = Nothing
+
+    fieldSite site = site == FieldTypeSite || site == RetainedFieldTypeSite
 
     caseScrutinee (RetainedTypeSite names) scope scrutinee =
       isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names (resolveHead scope))
@@ -624,8 +682,12 @@ liftDeclarationTypes source_heads named_wildcards group
       | site == SignatureTypeSite || site == ForallTypeSite
       , Just locals <- forallCaptures tele
       = Just (ForallTypeSite, locals, body)
+      | site == FieldTypeSite
+      , HsForAllInvis{hsf_matchability = Nothing} <- tele
+      , Just locals <- forallCaptures tele
+      = Just (FieldTypeSite, locals, body)
     innerScope site HsForEachTy{hst_bndrs = binders, hst_body = body}
-      | site /= FieldTypeSite
+      | not (fieldSite site)
       , Just locals <- writtenCaptures binders
       , not (null locals)
       = Just (RetainedTypeSite (map (unLoc . snd) locals ++ retainedNames site), locals, body)
@@ -652,10 +714,18 @@ liftDeclarationTypes source_heads named_wildcards group
       | Just (inner, locals, body) <- innerScope site quantified
       , let names = map (unLoc . snd) locals
       , null (findDupsEq (==) names)
-      = let outer = filter (\(_, name) -> unLoc name `notElem` names) scope
-            (body', aliases, (next, _)) = liftBody inner owner
-                                          (outer ++ locals) body (salt, [])
-        in (L loc quantified{hst_body = body'}, aliases, (next, seen))
+      , let (hidden, outer) = partition ((`elem` names) . unLoc . snd) scope
+      , Just (scope', saved) <- if inner == FieldTypeSite
+                                then rankedFieldScope scope hidden outer locals loc salt
+                                else Just (outer ++ locals, [])
+      = let (body', aliases, (next, _)) = liftBody inner owner scope' body (salt, [])
+            uses = Set.fromList (map unLoc (extractHsTyRdrTyVars body'))
+            save (old, new) ty
+              | unLoc new `Set.member` uses =
+                  L loc (XHsType (HsTypeLet (noAnn, noAnn, noAnn) new (typeName old) ty))
+              | otherwise = ty
+            result = foldr save (L loc quantified{hst_body = body'}) saved
+        in (result, aliases, (next, seen))
     liftBody site owner scope (L loc (HsFunTy ann arrow arg result)) state =
       let (arg', arg_aliases, next) = liftBody site owner scope arg state
           (result', result_aliases, end) = liftBody site owner scope result next
@@ -824,6 +894,11 @@ even if a pattern binds a variable with the same source name. Give
 cases in the scrutinee the same alias environment. A new let extends
 it only after checking its RHS in the original lexical scope. The
 helper fragment accepts references to the synonym's parameters.
+An inner let can refer to an earlier let through its existing helper.
+Copy the earlier helper's capture arguments into the inner helper's
+telescope. Use the nearest alias for each written name. A restored
+alias can shadow a capture that another alias needs, so save that
+capture under a fresh name before restoring the aliases.
 An inferred kind parameter must be determined by a checked capture.
 See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
 
@@ -892,31 +967,31 @@ liftTypeCases group =
                                    (scrutinee, scrut_kind) (Just kind) patterns salt
         in (L loc (HsKindSig ann body' kind), cases, next)
     liftRhs owner independent captures aliases
-      (L loc (XHsType (HsTypeLet ann binder rhs
-        (L case_loc (XHsType (HsTypeCase _ _ scrutinee alts)))))) salt
+      (L loc (XHsType (HsTypeLet ann binder rhs body))) salt
       | not independent
-      , Just patterns <- traverse checkAlt alts
-      , Just used <- rhsCaptures captures aliases rhs =
-          let owner_occ = rdrNameOcc (unLoc owner)
-              occ = mkTcOcc ("$case-let-rhs:" ++ occNameString owner_occ ++ ":" ++ show salt)
-              name = L (l2l (getLoc rhs)) (mkRdrUnqual occ)
-              helper = L loc (SynDecl noAnn name
-                         (HsQTvs noExtField [header | (_, (header, _, _)) <- used]) Prefix rhs)
-              rhs_ref = applyType loc name [typeName v | (_, (_, _, v)) <- used]
-              saved = L (getLoc binder) (mkRdrUnqual (mkTyVarOcc ("$case-let-outer:" ++ show salt)))
-              shadowed (_, _, current) = unLoc current == unLoc binder
-              hide capture@(header, v, _)
-                | shadowed capture = (header, v, saved)
-                | otherwise = capture
-              branch_binding = (ann, binder, name, map fst used)
-              (case', generated, next) = liftCase owner False (map hide captures)
-                      (aliases ++ [branch_binding]) case_loc
-                      (scrutinee, HsBndrNoKind noExtField) Nothing patterns (salt + 1)
-              result = letTy loc ann binder rhs_ref case'
-              result'
-                | any shadowed captures = letTy loc ann saved (typeName binder) result
-                | otherwise = result
-          in (result', (helper, (occ, Just owner_occ)) : generated, next)
+      , letCaseBody body
+      , Just (used, references) <- rhsCaptures captures aliases rhs
+      , let owner_occ = rdrNameOcc (unLoc owner)
+            occ = mkTcOcc ("$case-let-rhs:" ++ occNameString owner_occ ++ ":" ++ show salt)
+            name = L (l2l (getLoc rhs)) (mkRdrUnqual occ)
+            helper_rhs = restoreRhs ann used references rhs
+            helper = L loc (SynDecl noAnn name
+                       (HsQTvs noExtField [header | (_, (header, _, _)) <- used]) Prefix helper_rhs)
+            rhs_ref = applyType loc name [typeName v | (_, (_, _, v)) <- used]
+            saved = L (getLoc binder) (mkRdrUnqual (mkTyVarOcc ("$case-let-outer:" ++ show salt)))
+            shadowed (_, _, current) = unLoc current == unLoc binder
+            hide capture@(header, v, _)
+              | shadowed capture = (header, v, saved)
+              | otherwise = capture
+            branch_binding = (ann, binder, name, map fst used)
+            (body', generated, next) = liftRhs owner False (map hide captures)
+                (aliases ++ [branch_binding]) body (salt + 1)
+      , not (null generated)
+      = let result = letTy loc ann binder rhs_ref body'
+            result'
+              | any shadowed captures = letTy loc ann saved (typeName binder) result
+              | otherwise = result
+        in (result', (helper, (occ, Just owner_occ)) : generated, next)
     liftRhs owner False captures aliases (L loc (XHsType (HsTypeLet ann v rhs body))) salt =
       let (rhs', cases, next) = liftRhs owner False captures aliases rhs salt
       in (letTy loc ann v rhs' body, cases, next)
@@ -978,16 +1053,44 @@ liftTypeCases group =
     letTy loc ann v rhs body = L loc (XHsType (HsTypeLet ann v rhs body))
     applyType loc name = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
 
-    -- Include earlier variables mentioned in the kind of a captured binder.
+    -- Follow a chain of nonrecursive lets to the ordered case.
+    letCaseBody ty = case unLoc (ignoreParens ty) of
+      XHsType (HsTypeCase _ _ _ alts) -> all (isJust . checkAlt) alts
+      XHsType (HsTypeLet _ _ rhs body) -> isJust (lexicalNames rhs) && letCaseBody body
+      _ -> False
+
+    -- Include the captures of every referenced alias, and their kinds.
     rhsCaptures captures aliases rhs = do
       names <- lexicalNames rhs
-      let alias_names = [unLoc v | (_, v, _, _) <- aliases]
-      guard (all (`notElem` alias_names) names)
-      needed <- foldr captureKind (Just names) captures
+      let named alias (_, v, _, _) = alias == unLoc v
+          resolve n = find (named n) (reverse aliases)
+          references = mapMaybe resolve (nub names)
+          transitive = concat [indices | (_, _, _, indices) <- references]
+          direct = [n | n <- names, not (any (named n) references)]
+          numbered = zip [0 :: Int ..] captures
+          names' = direct ++ [unLoc v | (i, (_, v, _)) <- numbered, i `elem` transitive]
+      needed <- foldr captureKind (Just names') captures
       let available = [unLoc n | (_, n, _) <- captures]
-      if all (`elem` available) needed
-        then Just [pair | pair@(_, (_, v, _)) <- zip [0 :: Int ..] captures, unLoc v `elem` needed]
-        else Nothing
+      guard (all (`elem` available) needed)
+      pure ([pair | pair@(_, (_, v, _)) <- numbered, unLoc v `elem` needed], references)
+
+    -- Keep capture variables visible to later alias applications.
+    restoreRhs ann used references rhs = foldr save restored arguments
+      where
+        loc = getLoc rhs
+        alias_names = [unLoc v | (_, v, _, _) <- references]
+        arguments = [(i, v, argument i v) | (i, (_, v, _)) <- used]
+        argument i v
+          | unLoc v `elem` alias_names =
+              L (getLoc v) (mkRdrUnqual (mkTyVarOcc ("$case-let-argument:" ++ show i)))
+          | otherwise = v
+        save (_, original, saved) body
+          | unLoc original /= unLoc saved = letTy loc ann saved (typeName original) body
+          | otherwise = body
+        restored = foldr restore rhs references
+        restore (alias_ann, binder, helper, indices) =
+          letTy loc alias_ann binder
+            (applyType loc helper [typeName v | (i, _, v) <- arguments, i `elem` indices])
 
     captureKind (L _ HsTvb{tvb_kind = HsBndrKind _ kind}, v, _) inside = do
       names <- inside

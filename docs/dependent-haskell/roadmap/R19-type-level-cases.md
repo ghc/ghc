@@ -144,8 +144,17 @@ An ordinary client checks the extracted field type through the
 interface. A rigid leaf still blocks an earlier constructor test.
 The reduced arguments must still fit the constructor kind. A reduction
 that changes the kind of a later index needs explicit nominal transport.
-An index equation that requires refinement before it can reduce also
-remains outside this check.
+
+A constructor can also fix an index that a closed family needs in
+another index. In `RefinedBranchPick`, the outer constructor fixes
+one tag to `True` and the inner constructor fixes a different tag to
+`False`. Each tests its own tag and carries the same rigid seed.
+The compiler collects the nominal equalities from family-free index
+pairs at the current constructor. Under that substitution it tries
+one reduction per family index and checks the whole result kind.
+Each retry starts from the original indices. A recursive result
+stays stuck. The first test of a rigid Boolean leaf still blocks the
+same-result fallback, and either disjoint constructor can match.
 [Agda indexed matching](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes).
 
 The tests compile an ordinary client using only stripped interfaces.
@@ -155,6 +164,42 @@ multirow type-case or type-lambda interface when the source is
 available. A separately distributed provider must be rebuilt to
 publish ordered equations. [Nested provider](../examples/open-evaluation/NativeNestedCase.hs)
 and [interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
+
+## A case in a constructor field
+
+An ordinary data constructor can choose a field type from an index
+in its type. For example, the first two rows select `Int`, while
+the disjoint `Nothing` row selects `Char`.
+
+```haskell
+data Box (d :: Maybe Bool) where
+  Box :: forall (d :: Maybe Bool).
+    (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }) -> Box d
+```
+
+An ordinary client can use the constructor at a known index or copy
+the field at the same unknown index. Matching `Just b` with rigid
+`b` still waits at the `True` test. A type-case pattern binder
+shadows an enclosing constructor binder in its own row. The
+constructor's field type keeps its helper private in the interface.
+Each written field case has its own helper. To share a case between
+fields, name the type synonym and use it from both fields.
+
+The field rule applies to ordinary H98 and GADT arguments in their
+declaration telescope. A field can also bind a written erased
+`forall`. For example, the inner `b` in
+`forall (b :: Bool). Proxy b -> (case b of …)` can shadow the data
+parameter. Calling `f @'True Proxy` selects the branch for the inner
+binder. The compiler keeps the quantifier in the field type.
+
+A captured parameter can have a kind variable that the inner forall
+shadows. For example, the kind of an outer `a :: k` remains the original
+`k` under `forall (k :: Type)`. GHC saves the outer kind with a type
+let and passes it to the helper. The inner kind still has its own
+binder. Compound capture kinds that cross the shadow and cases under
+retained binders remain outside this rule.
+[Provider](../examples/open-evaluation/NativeNestedCase.hs) and
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs).
 
 ## A case in a value signature
 
@@ -290,8 +335,14 @@ the capture scope. Two separate lets can infer different kinds.
 The supported RHSs use names, type applications, promoted lists and tuples,
 kind annotations and type literals. A helper can infer the kind of a visible
 capture. An independent kind parameter remains ambiguous.
-Splices and RHSs that refer to another enclosing type let remain outside
-this slice.
+
+In a chain of lets leading to a case, an inner RHS can refer to an
+enclosing let. For example,
+`let x = a in let x = Maybe x in case d of …` takes the second RHS's
+`x` from the first let and uses the second `x` in the case body.
+The compiler checks the helpers in dependency order and shares their
+inferred kinds across rows. The first constructor test can still block
+the fallback at a rigid index. RHS splices remain outside this slice.
 
 The private synonym follows the promotion paper's lifting of local
 bindings, and the rows follow its closed-family encoding of cases.

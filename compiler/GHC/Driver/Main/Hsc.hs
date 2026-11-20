@@ -73,10 +73,11 @@ import GHC.HsToCore.Breakpoints.Types (ModBreaks)
 import GHC.Core
 import GHC.Core.Dependent
     ( hasNativeDependentProgram, rejectNativeDependentProgram
-    , hasNativeDependentExpr, rejectNativeDependentExpr )
+    , hasNativeDependentExpr, rejectNativeDependentExpr, hasRetainedRuleHead )
 import GHC.Core.DataCon ( dataConRepArgBinders, dataConWorkId )
 import GHC.Core.TyCon ( TyCon, tyConDataCons_maybe )
 import GHC.Types.Id ( idType )
+import GHC.Types.TyThing ( TyThing(AnId) )
 
 import GHC.Parser.Errors.Types
 import GHC.Platform ( platformArch, Arch(ArchJavaScript) )
@@ -176,13 +177,20 @@ checkNativeDependentModule hsc_env binds rules tycons = do
                       , Just dcs <- [tyConDataCons_maybe tc]
                       , dc <- dcs
                       , not (null (dataConRepArgBinders dc)) ]
-      native = hasNativeDependentProgram binds rules
-               || any hasNativeDependentExpr implicit_cons
+      native_body = hasNativeDependentProgram binds rules
+                    || any hasNativeDependentExpr implicit_cons
+  -- A closed user rule can mention its imported retained function only
+  -- through ru_fn. See Note [Rules at a retained function head].
+  retained_heads <- if native_body then pure [] else
+    fmap concat $ forM [ru_fn rule | rule@Rule{ru_auto = False} <- rules] $ \name -> do
+      thing <- GHC.Driver.Env.lookupType hsc_env name
+      pure [Type (idType fun) | Just (AnId fun) <- [thing], hasRetainedRuleHead fun]
+  let native = native_body || not (null retained_heads)
       dflags = hsc_dflags hsc_env
       opt_level = nativeOptLevel dflags
       reject phase = do
         rejectNativeDependentProgram phase binds rules
-        mapM_ (rejectNativeDependentExpr phase) implicit_cons
+        mapM_ (rejectNativeDependentExpr phase) (implicit_cons ++ retained_heads)
   when native $ do
     -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
     unless (backendGeneratesCode (backend dflags)) $

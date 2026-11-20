@@ -1,5 +1,7 @@
 Dependent Haskell: completed source features
 runtime Bool choice: "42"
+apply retained function rules without forcing an unused index: (7,11,19)
+match a rule payload at the preceding runtime index: 7
 choose True has result Int: 42
 choose False has result Bool: False
 keep ignores bottom index and payload: 42
@@ -229,8 +231,11 @@ match hidden partition lengths in function equations: (Just 7,Nothing)
 map an ordinary observer over differently sized partitions: [([7,9],[2]),([2],[7,9])]
 use a hidden polymorphic identity at Int and Bool: (7,True)
 infer a hidden function type from its paired callback: (7,True)
+apply the second projection to the first in an ordinary module: (7,True)
+project twice from the same package producer call: [(8,True),(11,False)]
 infer a polymorphic lambda witness and call its builder at Int: (11,True)
 infer a guarded callback and skip an unused input: ((7,True),(11,False))
+infer callback witnesses from a type argument and separate equations: ((7,True),((11,False),(13,False)))
 read an integer through an erased package: 7
 apply an imported integer package rule and keep the witness lazy: (42,7,1)
 match and open existential packages in optimizer rules: (4,3,6)
@@ -282,6 +287,7 @@ pass a type family with an unapplied invisible binder: Refl
 infer the result kind after passing a visible family argument: Refl
 infer the first invisible family argument and leave the second open: (Refl,Refl)
 apply Maybe and a type family through a computed arrow kind: (Just 7,[7])
+map cells with a class method over a family prefix and Maybe: ([Just True,Nothing],[Just True,Nothing])
 infer the matchability of a family prefix from a later argument: (Just True,True)
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
@@ -293,6 +299,7 @@ map a type lambda with a constructor case: Refl
 read fields from two indexed type case branches: (Refl,Refl)
 retain the kind of a matched Nothing: Refl
 name and reuse a type-level intermediate result: Refl
+refer to an outer type let before shadowing it in a case: Refl
 bind the result of a constructor case: (Right True,Left 'c')
 select the result type by a constructor: (7,False)
 repeat a type case in a function argument and result: (42,False)
@@ -300,6 +307,8 @@ select through nested type case patterns: (Proxy,7)
 select a constructor at an open family index: (7,False)
 distinguish an outer index from a shadowing pattern variable: (Refl,Refl)
 refine a constructor field and transport a later dependent index: (Refl,Refl)
+refine the outer and inner GADT indices in one type case: (7,True,'x')
+choose types in ordinary and rank-n constructor fields: (7,'x')
 select through an ordinary type constructor: (7,'x',())
 select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
 match Bool and Ordering directly in a type: (7,'x')

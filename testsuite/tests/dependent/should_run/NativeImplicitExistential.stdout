@@ -1,4 +1,5 @@
 ([7],[7,9],[],[])
+(Just 7,Just 2)
 ([7],[7],True)
 [7]
 (([],[7,9]),[7])
@@ -15,6 +16,10 @@ forcing the result entered the builder body
 ([7],[],[])
 (Just (7,7),Nothing,Just (7,7))
 (True,[7])
+([8,11,13],[8,11,13])
+([8,11],19)
+(19,19)
+the projection demanded the package
 (Just 7,Nothing,Just 9)
 ([7],[7],[7])
 (True,True)
@@ -45,7 +50,11 @@ strict ordinary argument
 visible arguments preserve binder order
 (7,11,9)
 selected package raised the original exception
+([7],[2])
 ((7,True),(9,False),(7,True),(9,False),(9,False),(7,True))
+((7,False),(7,False))
 [(7,True),(11,True),(9,False)]
 only the selected guard forced its argument
+(((7,True),(13,False)),13)
+((7,True),(13,False))
 ((7,True),(7,True),9)

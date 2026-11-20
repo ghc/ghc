@@ -72,6 +72,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import qualified FiniteTree
 import qualified FunctionFieldClient
 import qualified FunctionFieldLibrary as FunctionFields
+import qualified RetainedRulesClient
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
@@ -95,6 +96,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
+import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (laterMatchability)
 import qualified TypeLambda
 import qualified TypeLet
@@ -230,6 +232,9 @@ booleans = do
     cell <- newIORef True
     b <- readIORef cell
     observe "runtime Bool choice" (renderChoice b (choose b))
+    observe "apply retained function rules without forcing an unused index"
+        (RetainedRulesClient.fromInput b, RetainedRulesClient.atFalse 11, RetainedRulesClient.ignoredIndex)
+    observe "match a rule payload at the preceding runtime index" (RetainedRulesClient.boundPayload b)
     observe "choose True has result Int" (choose True)
     observe "choose False has result Bool" (choose False)
     let bottomB :: Bool
@@ -870,6 +875,22 @@ duplicateProjection _ = Refl
 instance DefaultElement Char where
     defaultElement = 'x'
 
+data RankedField (d :: Maybe Bool) = RankedField
+  (forall (d :: Maybe Bool). NativeNestedCase.CaseFlag d ->
+    (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }))
+
+constructorFieldCases :: (Int, Char)
+constructorFieldCases =
+  case (RankedField (\case
+          NativeNestedCase.CaseOn -> 7
+          NativeNestedCase.CaseOff -> 0
+          NativeNestedCase.CaseMissing -> 'x') :: RankedField ('Just 'True)) of
+    RankedField select ->
+      ( case (NativeNestedCase.CaseField (select NativeNestedCase.CaseOn)
+                  :: NativeNestedCase.CaseField ('Just 'True)) of
+          NativeNestedCase.CaseField n -> n
+      , select NativeNestedCase.CaseMissing )
+
 main :: IO ()
 main = do
     putStrLn "Dependent Haskell: completed source features"
@@ -1002,8 +1023,12 @@ main = do
         PartitionChoices.partitionViews (VCons 7 (VCons 2 (VCons 9 VNil)))
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
+    observe "apply the second projection to the first in an ordinary module" RankedPackageClient.runProjections
+    observe "project twice from the same package producer call" (map RankedPackageClient.projectAt [True,False])
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
     observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
+    observe "infer callback witnesses from a type argument and separate equations"
+        RankedPackageClient.runDeclaredWitnesses
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
     observe "apply an imported integer package rule and keep the witness lazy"
         (PackageRules.open (41 :: Int, (+ 1)),
@@ -1118,6 +1143,7 @@ main = do
     observe "infer the first invisible family argument and leave the second open"
         (Refl :: InvisibleFamily.ReadFlag :~: 'True, Refl :: InvisibleFamily.ReadType :~: Int)
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
+    observe "map cells with a class method over a family prefix and Maybe" mappedCells
     observe "infer the matchability of a family prefix from a later argument" laterMatchability
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
@@ -1132,6 +1158,8 @@ main = do
     observe "retain the kind of a matched Nothing"
         (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    observe "refer to an outer type let before shadowing it in a case"
+        (Refl :: NativeCase.NestedLetShadow 'True ('Just 'False) :~: (Proxy 'False, Proxy ('Just 'True)))
     observe "bind the result of a constructor case"
         (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
     observe "select the result type by a constructor" NativeCase.roadmap
@@ -1155,6 +1183,13 @@ main = do
                      ('NativeNestedCase.FieldOn 'True))) :~: Proxy 'True
         , Refl :: NativeNestedCase.DependentFieldPick
             ('Just ('NativeNestedCase.IndexedField 'Proxy)) :~: Char )
+    observe "refine the outer and inner GADT indices in one type case"
+        ( 7 :: NativeNestedCase.RefinedBranchPick 'False
+            ('Just ('NativeNestedCase.RefinedBranch 'Proxy ('NativeNestedCase.RefinedBit 'True)))
+        , True :: NativeNestedCase.RefinedBranchPick 'False
+            ('Just ('NativeNestedCase.RefinedBranch 'Proxy 'NativeNestedCase.InnerDisjoint))
+        , 'x' :: NativeNestedCase.RefinedBranchPick 'False ('Just 'NativeNestedCase.OuterDisjoint) )
+    observe "choose types in ordinary and rank-n constructor fields" constructorFieldCases
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
         , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)

@@ -103,6 +103,7 @@ import GHC.Types.Basic
 import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Data.Graph.Directed (Node(..), flattenSCC, stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList, equivClasses )
@@ -682,13 +683,14 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
                  tcExtendKindEnvWithTyCons tc_tycons $ do
                    let (helpers, remaining) = partition isCaseLet tyclds
                        check = tcTyClDecl rec_case_axioms metadata roles
-                   (helper_tcs, helper_derivs) <- mapAndUnzipM check helpers
-                   let case_lets = [(tyConName tc, ATcCaseLet (binderVars (tyConBinders tc))
-                                          rhs (tyConResKind tc) (Just tc))
-                                   | (tc, _) <- helper_tcs, Just rhs <- [synTyConRhs_maybe tc]]
-                   (other_tcs, other_derivs) <- updLclCtxt (tcExtendLocalTypeEnv case_lets) $
-                     mapAndUnzipM check remaining
-                   pure (helper_tcs ++ other_tcs, helper_derivs ++ other_derivs)
+                       checked ((tc, _), _) =
+                         [(tyConName tc, ATcCaseLet (binderVars (tyConBinders tc))
+                             rhs (tyConResKind tc) (Just tc))
+                         | Just rhs <- [synTyConRhs_maybe tc]]
+                   withCaseLets check checked helpers $ \checked_helpers -> do
+                     (other_tcs, other_derivs) <- mapAndUnzipM check remaining
+                     let (helper_tcs, helper_derivs) = unzip checked_helpers
+                     pure (helper_tcs ++ other_tcs, helper_derivs ++ other_derivs)
                ; pure (tycons, data_deriv_infos) }
              check_syn_cycles tycons = do
                home_unit <- hsc_home_unit <$> getTopEnv
@@ -1343,11 +1345,11 @@ kcTyClGroup open_indices kisig_env decls
                   ; (metadata, case_lets) <- checkNoErrs $
                     tcExtendKindEnvWithTyCons mono_tcs $ do
                       let (helpers, remaining) = partition isCaseLet kindless_decls
-                      checked <- mapM kcCaseLet helpers
-                      results <- updLclCtxt (tcExtendLocalTypeEnv
-                        [(name, ATcCaseLet params rhs kind Nothing) | (_, name, params, rhs, kind) <- checked]) $
-                        mapM (kcLTyClDecl (isSingleton decls)) remaining
-                      pure (results, checked)
+                          checked (_, name, params, rhs, kind) =
+                            [(name, ATcCaseLet params rhs kind Nothing)]
+                      withCaseLets kcCaseLet checked helpers $ \case_lets -> do
+                        results <- mapM (kcLTyClDecl (isSingleton decls)) remaining
+                        pure (results, case_lets)
 
                   ; return (mono_tcs, mkNameEnv (catMaybes metadata), case_lets) }
 
@@ -1386,10 +1388,14 @@ kcTyClGroup open_indices kisig_env decls
 {- Note [Checked RHSs for cases in type lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Check a lifted let RHS before checking the other declarations in its
-owning SCC. During kind checking, each row receives the checked RHS
-with its original metas. Instantiate only the explicit lexical
-captures. All rows can then constrain the same inferred kind. After
-the solver runs, reject any RHS variable outside that capture scope.
+owning SCC. An inner helper can refer to an earlier helper. Use the
+renamed free names to check in dependency order and extend the local
+environment after each check. These dependencies point only from an
+inner let to an enclosing let. During kind checking, each row receives
+the checked RHS with its original metas. Instantiate only the
+explicit lexical captures. All rows can then constrain the same
+inferred kind. After the solver runs, reject any RHS variable
+outside that capture scope.
 
 During final checking, check the private synonyms first by the
 ordinary synonym rules. Make their returned RHSs available to the
@@ -1398,6 +1404,21 @@ directly without forcing the recursive type environment. The local
 environment is keyed by the generated Name. Nothing in this
 environment persists beyond the pass.
 -}
+
+-- | Check each lifted RHS once, with its enclosing let helpers in scope.
+-- See Note [Checked RHSs for cases in type lets].
+withCaseLets :: (LTyClDecl GhcRn -> TcM a) -> (a -> [(Name, TcTyThing)])
+             -> [LTyClDecl GhcRn] -> ([a] -> TcM b) -> TcM b
+withCaseLets check binding helpers body =
+  foldr extend (body . reverse) ordered []
+  where
+    edges = [DigraphNode h (tcdName decl) (nameSetElemsStable fvs)
+            | h@(L _ decl@SynDecl{tcdSExt = fvs}) <- helpers]
+    ordered = concatMap flattenSCC (stronglyConnCompFromEdgedVerticesUniq edges)
+    extend helper rest checked = do
+      rhs <- check helper
+      updLclCtxt (tcExtendLocalTypeEnv (binding rhs)) $
+        rest (rhs : checked)
 
 -- | Select the private RHS synonyms generated by the case lifter.
 isCaseLet :: LTyClDecl GhcRn -> Bool
@@ -4295,6 +4316,17 @@ pattern can carry a kind cast from ordinary kind checking. Read the constructor
 under that cast, including casts reached by expanding an alias. The
 generated branch constructs its own evidence. The checked source
 pattern, with its casts, still determines the substitution for the RHS.
+
+A family index can need a refinement from another index of the same
+constructor. For example, the result kind Gate (Index tag) seed tag
+can match Gate Bool seed 'True when Index 'True reduces to Bool.
+The indices of the nominally generative Gate head must agree in this
+branch. Use the family-free pairs of indices to find a substitution.
+Apply it to both kinds before retrying the closed-family steps. Only
+a complete unification proves the equality needed for the branch.
+This substitution is local to this constructor and its nested tests.
+The retry starts from the original arguments and still takes only one
+family step per index. It never reduces the result of a previous step.
 -}
 
 data CheckedCasePattern
@@ -4531,18 +4563,31 @@ checkedCaseKindRefinement actual expected
              = redn
              | otherwise = Reduction (mkNomReflCo a) a
            binders = binderVars (tyConBinders tc)
-           index_steps = zipWith index_step as bs
-           redns
-             | binders `equalLength` index_steps, all isTyVar binders
-             = snd (List.mapAccumL transport (emptyLiftingContext emptyInScopeSet)
-                                 (zip binders index_steps))
-             | otherwise = index_steps
+           check_indices prior actual_args expected_args =
+             let index_steps = zipWith index_step actual_args expected_args
+                 redns
+                   | binders `equalLength` index_steps, all isTyVar binders
+                   = snd (List.mapAccumL transport (emptyLiftingContext emptyInScopeSet)
+                                         (zip binders index_steps))
+                   | otherwise = index_steps
+                 reduced = map reductionReducedType redns
+                 refinement = do
+                   guard (kinded_args (tyConKind tc) reduced)
+                   tcUnifyTy (mkTyConApp tc reduced) (mkTyConApp tc expected_args)
+             in case refinement of
+               Just refine ->
+                 let co = mkTyConAppCo Nominal tc (map reductionCoercion redns)
+                     complete = maybe refine (composeTCvSubst refine) prior
+                     -- A reduction can discard an argument that is still in its proof.
+                     scoped = extendSubstInScopeSetFromSource complete (tyCoVarsOfCo co)
+                 in (Just (scoped, co), False)
+               Nothing -> (Nothing, or (zipWith index_apart reduced expected_args))
+
            transport lc (binder, Reduction co arg) =
              let kind_co = liftCoSubst Nominal lc (varType binder)
                  arg_co = co `mkTransCo` mkGReflRightMCo Nominal arg (MCo kind_co)
                  lc' = extendLiftingContextAndInScope lc binder arg_co
              in (lc', Reduction arg_co (mkCastTy arg kind_co))
-           reduced = map reductionReducedType redns
            index_apart a b = typeKind a `eqType` typeKind b && typesAreApart a b
            kinded_args _ [] = True
            kinded_args kind (arg:args)
@@ -4550,16 +4595,16 @@ checkedCaseKindRefinement actual expected
              , typeKind arg `eqType` piTyBinderType bndr
              = kinded_args (piResultTy kind arg) args
              | otherwise = False
-           refinement = do
-             guard (kinded_args (tyConKind tc) reduced)
-             tcUnifyTy (mkTyConApp tc reduced) expected
-       case refinement of
-         Just refine ->
-           let co = mkTyConAppCo Nominal tc (map reductionCoercion redns)
-               -- A reduction can discard an argument that is still in its proof.
-               scoped = extendSubstInScopeSetFromSource refine (tyCoVarsOfCo co)
-           in pure (Just (scoped, co), False)
-         Nothing -> pure (Nothing, or (zipWith index_apart reduced bs))
+           structural_pair (a, b) =
+             isFamFreeTy a && isFamFreeTy b && typeKind a `eqType` typeKind b
+
+       pure $ case check_indices Nothing as bs of
+         (Nothing, False)
+           | let (lhs, rhs) = unzip (filter structural_pair (zip as bs))
+           , Just prior <- tcUnifyTys alwaysBindTv lhs rhs
+           , not (isEmptySubst prior)
+           -> check_indices (Just prior) (substTys prior as) (substTys prior bs)
+         result -> result
   | otherwise = pure (Nothing, False)
 
 -- | Align nominal fields with the checked arguments written at the alias.

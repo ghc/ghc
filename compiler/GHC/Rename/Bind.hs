@@ -49,7 +49,7 @@ import GHC.Driver.DynFlags
 import GHC.Data.BooleanFormula ( bfTraverse )
 import GHC.Data.FastString     ( FastString )
 import GHC.Data.Graph.Directed ( SCC(..) )
-import GHC.Data.Maybe          ( orElse, mapMaybe )
+import GHC.Data.Maybe          ( isNothing, orElse, mapMaybe )
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps    ( findDupsEq )
 import GHC.Data.FastString (mkFastStringShortText)
@@ -1349,20 +1349,46 @@ bindRuleTmVars doc tyvs vars names thing_inside
     bindLocalNamesFV names (thing_inside vars')
   where
     go ((L l (RuleBndr _ (L loc _))) : vars) (n : ns) thing_inside
-      = go vars ns $ \ vars' ->
+      = scope_index n $ go vars ns $ \ vars' ->
         thing_inside (L l (RuleBndr noAnn (L loc n)) : vars')
 
     go ((L l (RuleBndrSig _ (L loc _) bsig)) : vars)
        (n : ns) thing_inside
       = rnHsPatSigType bind_free_tvs doc bsig $ \ bsig' ->
-        go vars ns $ \ vars' ->
+        scope_index n $ go vars ns $ \ vars' ->
         thing_inside (L l (RuleBndrSig noAnn (L loc n) bsig') : vars')
 
     go [] [] thing_inside = thing_inside []
     go vars names _ = pprPanic "bindRuleVars" (ppr vars $$ ppr names)
 
+    -- See Note [Runtime indices in RULE binders].
+    scope_index name inside
+      | RuleCtx{} <- doc
+      = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+           ; env <- getLocalRdrEnv
+           ; let occ = setOccNameSpace tvName (nameOccName name)
+           ; if enabled && isNothing (lookupLocalRdrEnv env (Unqual occ))
+             then setLocalRdrEnv (extendLocalRdrEnvWithAlias env occ name) $
+                  bindLocalNamesFV [name] inside
+             else inside }
+      | otherwise = inside
+
     bind_free_tvs = case tyvs of Nothing -> AlwaysBind
                                  Just _  -> NeverBind
+
+{- Note [Runtime indices in RULE binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In forall (b :: Bool) (xs :: Vec (Length b)). keep b xs = xs, both
+occurrences of b denote the same term. Give an earlier rule variable a
+type-lookup alias after checking its own annotation. An explicit type
+binder with the same spelling keeps its scope. Without the alias the
+second annotation can quantify a fresh b, and rule checking discards
+the rule because the two lengths might differ.
+
+tcRuleBndrs in GHC.Tc.Gen.Sig already brings each Id into scope before
+checking the following binder. Use that Id as the runtime index when
+checking the renamed annotation in GHC.Tc.Gen.HsType.
+-}
 
 bindRuleTyVars :: HsDocContext -> Maybe [LHsTyVarBndr () GhcPs]
                -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeNames))

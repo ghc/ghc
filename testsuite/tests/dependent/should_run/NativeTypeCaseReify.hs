@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TemplateHaskell #-}
-{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeOperators #-}
+{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeAbstractions, TypeApplications, TypeOperators #-}
 module NativeTypeCaseReify where
 import Data.Type.Equality ((:~:)(Refl))
 import Data.Proxy (Proxy(..))
@@ -72,3 +72,24 @@ $(do
 
 checkedIdentity :: Bool
 checkedIdentity = reifiedIdentity (Proxy :: Proxy 'False) True
+
+$(do
+    ty <- reifyType 'N.CaseField
+    let copy = mkName "reifiedCaseField"
+    pure [SigD copy ty, ValD (VarP copy) (NormalB (ConE 'N.CaseField)) []])
+
+checkedCaseField :: N.CaseField ('Just 'True)
+checkedCaseField = reifiedCaseField 42
+
+$(do
+    ty <- reifyType 'N.RankedCaseField
+    let copy = mkName "reifiedRankedCaseField"
+    pure [SigD copy ty, ValD (VarP copy) (NormalB (ConE 'N.RankedCaseField)) []])
+
+checkedRankedCaseField :: N.RankedCaseField 'False
+checkedRankedCaseField = reifiedRankedCaseField (\_ -> error "unused field")
+
+type ReifiedCapturedKindCaseField = $(reifyType 'N.CapturedKindCaseField)
+
+reifiedCapturedKindCaseField :: ReifiedCapturedKindCaseField
+reifiedCapturedKindCaseField f = N.CapturedKindCaseField (\ @k @b p -> f @k @b p)

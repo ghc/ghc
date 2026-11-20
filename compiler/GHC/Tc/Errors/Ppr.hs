@@ -1142,7 +1142,7 @@ instance Diagnostic TcRnMessage where
         text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable or _ for the witness, followed by a payload pattern."
     TcRnTypeCaseContext
       -> mkSimpleDecorated $
-           text "A type case needs a supported position in a top-level type synonym or value signature."
+           text "A type case needs a supported position in a top-level type synonym, a top-level value signature, or a constructor field."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
            text "This type lambda needs the right-hand side of a top-level synonym with ordinary parameters."
@@ -4899,11 +4899,13 @@ liftedTypeContext name
   | Just owner <- liftedTypeOwner "$lambda:" name = Just (text "type lambda in" <+> quotes (text owner))
   | otherwise = Nothing
 
--- | Describe a case by its source synonym or value signature.
+-- | Describe a case by its source synonym, value signature or constructor.
 pprTypeCaseOwner :: String -> SDoc
 pprTypeCaseOwner owner
   | Just signature <- stripLiftedTypeOwner "$signature-case:" owner
   = text "type case in the signature for" <+> quotes (text signature)
+  | Just constructor <- stripLiftedTypeOwner "$field-case:" owner
+  = text "type case in a field of" <+> quotes (text constructor)
   | otherwise = text "type case in" <+> quotes (text owner)
 
 -- | Find the generated head in an application context.

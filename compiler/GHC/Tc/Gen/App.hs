@@ -33,7 +33,7 @@ import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env ( isExistsPackName, tcLookupIdMaybe, tcLookupConLike
-                        , tcLookupGlobal, tcLookupLcl_maybe, tcExtendIdEnv )
+                        , tcLookup, tcLookupGlobal, tcLookupLcl_maybe, tcExtendIdEnv )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -48,7 +48,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
 
-import GHC.Core.Class ( Class )
+import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
@@ -69,12 +69,12 @@ import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
 
-import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy )
+import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
 import GHC.Driver.DynFlags ( DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
-import GHC.Types.TyThing ( TyThing(AnId, AConLike) )
+import GHC.Types.TyThing ( TyThing(AnId, AConLike, ATyCon) )
 import GHC.Types.Basic ( TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
@@ -100,9 +100,11 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Data ( Data, cast, gmapQ )
+import Data.Either ( isLeft, isRight )
 import Data.Function
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Map.Strict as Map
 import Data.Semigroup
 
 import GHC.Prelude
@@ -573,7 +575,7 @@ tcOpenImplicitArgs :: HsExpr GhcRn -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRh
                    -> ([HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc))
                    -> TcM (HsExpr GhcTc)
 tcOpenImplicitArgs rn_expr fun_ty args expected check_app
-  = do { marked <- mark fun_ty args
+  = do { marked <- tcImplicitAppArgs fun_ty args
        ; if all isLeft marked
          then check_app args expected
          else check_opened marked }
@@ -588,14 +590,14 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                      ; (subst, _) <- newMetaTyVarsX (Subst.mkEmptySubst (mkInScopeSet free))
                                                    result_vars
                      ; let schema = Subst.substTy subst template
-                     ; body <- open schema emptyNameEnv [] marked
+                     ; body <- open schema Map.empty [] marked
                      ; tcWrapResult rn_expr body schema expected }
              else check_mono marked }
       | otherwise = check_mono marked
 
     check_mono marked = do
       result_ty <- expTypeToType expected
-      open result_ty emptyNameEnv [] marked
+      open result_ty Map.empty [] marked
 
     (head_binders, head_sigma) = tcSplitForAllInvisTyVars fun_ty
     (_, head_body) = tcSplitPhiTy head_sigma
@@ -612,44 +614,21 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       | Just (_, res) <- splitVisibleFunTy_maybe ty = spine_result res rest
     spine_result _ _ = Nothing
 
-    isLeft (Left _) = True
-    isLeft (Right _) = False
-
-    mark :: TcType -> [HsExprArg 'TcpRn]
-         -> TcM [Either (HsExprArg 'TcpRn)
-                        (HsExprLoc, Mult, LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn))]
-    mark ty (wrapper@EWrap{} : rest) = (Left wrapper :) <$> mark ty rest
-    mark ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
-      | FunTy { ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result }
-          <- implicitSpineHead ty
-      , isVisibleFunArg af
-      = do { implicit <- if (isManyTy mult || isOneTy mult)
-                            && demandsPayload (coreFullView domain)
-                         then tcImplicitOperand arg
-                         else return Nothing
-           ; let operand = case implicit of
-                   Just (package, replace) -> Right (loc, mult, package, replace)
-                   Nothing -> Left ordinary
-           ; (operand :) <$> mark result rest }
-    mark _ rest = return (map Left rest)
-
-    demandsPayload TyConApp{} = True
-    demandsPayload AppTy{} = True
-    demandsPayload FunTy{} = True
-    demandsPayload _ = False
-
-    open result_ty _ rev_args [] =
-      check_app (reverse rev_args) (mkCheckExpType result_ty)
+    open result_ty opened rev_args [] = do
+      let args = reverse rev_args
+      args' <- if Map.null opened then return args else mapM (reuse_opening opened) args
+      check_app args' (mkCheckExpType result_ty)
     open result_ty opened rev_args (Left arg : rest) =
       open result_ty opened (arg : rev_args) rest
     open result_ty opened rev_args (Right (loc, mult, arg, rebuild) : rest) =
       do { (checked, actual) <- tcScalingUsage mult $ tcInferRho arg
          ; schema <- liftZonkM (zonkTcType actual)
-         ; let key | isManyTy mult, isNothing rebuild = lexicalPackage checked
-                   | otherwise = Nothing
-               shared = do
-                 name <- key
-                 (previous, payload) <- lookupNameEnv opened name
+         ; key <- if isManyTy mult && isNothing rebuild
+                  then openingKey arg checked
+                  else return Nothing
+         ; let shared = do
+                 identity <- key
+                 (previous, payload) <- Map.lookup identity opened
                  guard (eqType previous schema)
                  return payload
                continue env payload =
@@ -661,55 +640,217 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
              Just payload -> continue opened payload
              Nothing -> tcOpenImplicitPackage (getLocA arg) schema checked result_ty $ \payload ->
                let env = case key of
-                     Just name -> extendNameEnv opened name (schema, payload)
+                     Just identity -> Map.insert identity (schema, payload) opened
                      Nothing -> opened
                in tcExtendIdEnv [payload] $ continue env payload }
 
-    lexicalPackage :: LHsExpr GhcTc -> Maybe Name
-    lexicalPackage (L _ (HsPar _ arg)) = lexicalPackage arg
-    lexicalPackage (L _ (HsVar _ (L _ ident)))
-      | isLocalId ident
-      , let name = getName ident
-      , not (isExternalName name)
+    openingKey :: LHsExpr GhcRn -> LHsExpr GhcTc -> TcM (Maybe (Name, Maybe Name))
+    openingKey original checked
+      | HsVar _ (L _ ident) <- bare_expr checked
       , ExistsTy ImplicitExists _ _ <- coreFullView (varType ident)
-      = Just name
-    lexicalPackage _ = Nothing
+      = return ((\name -> (name, Nothing)) <$> lexicalName ident)
+      | HsApp _ fun operand <- bare_expr checked
+      , HsVar _ (L _ producer) <- bare_expr fun
+      , HsVar _ (L _ input) <- bare_expr operand
+      , let producer_name = getName producer
+      , isExternalName producer_name
+      , Just input_name <- lexicalName input
+      , FunTy{ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result}
+          <- coreFullView (varType producer)
+      , isVisibleFunArg af, isManyTy mult
+      , isTauTy domain
+      , ExistsTy ImplicitExists _ _ <- coreFullView result
+      , let key = (producer_name, Just input_name)
+      , renamedKey original == Just key
+      = do { input_type <- liftZonkM (zonkTcType (varType input))
+           ; return (if eqType domain input_type then Just key else Nothing) }
+      | otherwise = return Nothing
+
+    lexicalName :: Id -> Maybe Name
+    lexicalName ident
+      | let name = getName ident
+      , isLocalId ident, not (isExternalName name) = Just name
+      | otherwise = Nothing
+
+    renamedKey :: LHsExpr GhcRn -> Maybe (Name, Maybe Name)
+    renamedKey expr = case bare_expr expr of
+      HsVar _ name -> Just (unLocWithUserRdr name, Nothing)
+      HsApp _ fun arg
+        | HsVar _ producer <- bare_expr fun
+        , HsVar _ input <- bare_expr arg
+        -> Just (unLocWithUserRdr producer, Just (unLocWithUserRdr input))
+      _ -> Nothing
+
+    bare_expr :: LHsExpr (GhcPass p) -> HsExpr (GhcPass p)
+    bare_expr = unLoc . stripParensLHsExpr
+
+    reuse_opening :: Map.Map (Name, Maybe Name) (TcType, Id)
+                  -> HsExprArg 'TcpRn -> TcM (HsExprArg 'TcpRn)
+    reuse_opening opened arg@EValArg{ea_arg = expr} =
+      do { expr' <- project expr
+         ; return arg{ea_arg = expr'} }
+      where
+        project (L loc (HsPar ann nested)) =
+          L loc . HsPar ann <$> project nested
+        project original@(L loc (HsApp ann fun operand))
+          | Just key <- renamedKey operand
+          , Just (_, payload) <- Map.lookup key opened
+          , HsVar _ head_name <- bare_expr fun
+          , let name = unLocWithUserRdr head_name
+          , not (isDataOcc (nameOccName name))
+          = do { ident <- tcLookupIdMaybe name
+               ; return $ case implicitSpineHead . varType <$> ident of
+                   Just FunTy{ft_af = af, ft_mult = mult, ft_arg = domain}
+                     | isVisibleFunArg af, isManyTy mult, demands_payload (coreFullView domain)
+                     -> let ref = mkExpandedLExpr (unLoc operand) (nlHsVar (getName payload))
+                        in L loc (HsApp ann fun (L (getLoc operand) ref))
+                   _ -> original }
+        project original = return original
+
+    reuse_opening _ arg = return arg
+
+
+-- | Find operands that need an implicit package opening before checking a call.
+-- See Note [Implicit existential arguments].
+-- See Note [Quick Look and implicit existential arguments].
+tcImplicitAppArgs :: TcType -> [HsExprArg 'TcpRn]
+                  -> TcM [Either (HsExprArg 'TcpRn)
+                                 (HsExprLoc, Mult, LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn))]
+tcImplicitAppArgs ty (wrapper@EWrap{} : rest) = (Left wrapper :) <$> tcImplicitAppArgs ty rest
+tcImplicitAppArgs ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
+  | FunTy { ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result }
+      <- implicitSpineHead ty
+  , isVisibleFunArg af
+  = do { implicit <- if (isManyTy mult || isOneTy mult)
+                        && demands_payload (coreFullView domain)
+                     then tcImplicitOperand arg
+                     else return Nothing
+       ; let operand = case implicit of
+               Just (package, replace) -> Right (loc, mult, package, replace)
+               Nothing -> Left ordinary
+       ; (operand :) <$> tcImplicitAppArgs result rest }
+tcImplicitAppArgs _ rest = return (map Left rest)
+
+-- | Check if a declared argument domain requests the payload of a package.
+demands_payload :: TcType -> Bool
+demands_payload TyConApp{} = True
+demands_payload AppTy{} = True
+demands_payload FunTy{} = True
+demands_payload _ = False
 
 -- | Read the declaration for an implicit package or a call with a package head.
 -- The replacement function rebuilds a call on a checked payload.
 -- See Note [Type arguments before an implicit package head].
 tcImplicitOperand :: LHsExpr GhcRn
                   -> TcM (Maybe (LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn)))
-tcImplicitOperand arg = find_head 0 id arg
+tcImplicitOperand arg = find_head [] id arg
   where
-    find_head n rebuild (L loc (HsApp x fun operand)) =
-      find_head (n + 1) (\f -> rebuild (L loc (HsApp x f operand))) fun
-    find_head n rebuild (L loc (HsPar x fun)) =
-      find_head n (\f -> rebuild (L loc (HsPar x f))) fun
-    find_head n rebuild head_expr
-      | HsVar _ name <- unLoc (package_head head_expr)
+    find_head operands rebuild (L loc (HsApp x fun operand)) =
+      find_head (operand : operands) (\f -> rebuild (L loc (HsApp x f operand))) fun
+    find_head operands rebuild (L loc (HsPar x fun)) =
+      find_head operands (\f -> rebuild (L loc (HsPar x f))) fun
+    find_head [] _ (L _ (ExprWithTySig _ _ sig))
+      = do { implicit <- tcImplicitOperandSignature sig
+           ; return (if implicit then Just (arg, Nothing) else Nothing) }
+    find_head operands rebuild head_expr
+      | (base, written) <- package_head [] head_expr
+      , HsVar _ name <- unLoc base
       , let id_name = unLocWithUserRdr name
       , not (isDataOcc (nameOccName id_name))
       = do { ident <- tcLookupIdMaybe id_name
-           ; return $ case implicitSpineHead . varType <$> ident of
+           ; let n = length operands
+           ; case implicitSpineHead . varType <$> ident of
                Just (ExistsTy ImplicitExists _ body)
-                 | opensImplicitHead n body -> Just (head_expr, Just rebuild)
+                 | opensImplicitHead n body -> return (Just (head_expr, Just rebuild))
                Just ty | HsVar{} <- unLoc head_expr
-                       , hasDotResult n ty -> Just (arg, Nothing)
-               _ -> Nothing }
+                       , Just result <- implicitSpineResult n ty
+                       , ExistsTy ImplicitExists _ _ <- result -> return (Just (arg, Nothing))
+               _ | Just var <- ident, [operand] <- operands
+                 -> do { implicit <- tcImplicitOperandProjection (varType var) written operand
+                       ; return (if implicit then Just (arg, Nothing) else Nothing) }
+               _ -> return Nothing }
     find_head _ _ _ = return Nothing
 
-    package_head (L _ (HsAppType _ fun _)) = package_head fun
-    package_head (L _ (HsPar _ fun)) = package_head fun
-    package_head expr = expr
+    package_head written (L _ (HsAppType _ fun ty)) = package_head (ty : written) fun
+    package_head written (L _ (HsPar _ fun)) = package_head written fun
+    package_head written expr = (expr, written)
 
-    hasDotResult 0 ty = case implicitSpineHead ty of
-      ExistsTy ImplicitExists _ _ -> True
-      _ -> False
-    hasDotResult n ty = case implicitSpineHead ty of
-      FunTy { ft_af = af, ft_res = result } | isVisibleFunArg af ->
-        hasDotResult (n - 1) result
-      _ -> False
+-- | Read the result after the written ordinary arguments.
+implicitSpineResult :: Int -> TcType -> Maybe TcType
+implicitSpineResult 0 ty = Just (implicitSpineHead ty)
+implicitSpineResult n ty
+  | Just (_, result) <- splitVisibleFunTy_maybe (implicitSpineHead ty)
+  = implicitSpineResult (n - 1) result
+  | otherwise = Nothing
+
+-- | Recognize a written dot type without checking the expression or signature.
+-- See Note [Projected implicit existential operands].
+tcImplicitOperandSignature :: LHsSigWcType GhcRn -> TcM Bool
+tcImplicitOperandSignature sig@(HsWC { hswc_body = L _ (HsSig { sig_body = body }) })
+  | isCompleteHsSig sig = tcImplicitOperandType body
+  | otherwise = return False
+
+-- | Read the outer shape of a written type.
+tcImplicitOperandType :: LHsType GhcRn -> TcM Bool
+tcImplicitOperandType (L _ (HsParTy _ nested)) = tcImplicitOperandType nested
+tcImplicitOperandType (L _ (XHsType (HsTypeExistsRn ImplicitExists _ _))) = return True
+tcImplicitOperandType ty
+  | Just (L _ (WithUserRdr _ name)) <- hsTyGetAppHead_maybe ty
+  , isTcOcc (nameOccName name)
+  = do { thing <- tcLookup name
+       ; return $ case thing of
+           AGlobal (ATyCon tc)
+             | Just rhs <- synTyConRhs_maybe tc
+             , ExistsTy ImplicitExists _ _ <- coreFullView rhs -> True
+           _ -> False }
+  | otherwise = return False
+
+-- | Recognize a dot result selected by a named projection.
+-- See Note [Projected implicit existential operands].
+tcImplicitOperandProjection :: TcSigmaType -> [LHsWcType GhcRn] -> LHsExpr GhcRn -> TcM Bool
+tcImplicitOperandProjection sigma written operand
+  | (_, binders, body) <- tcSplitForAllTyVarsReqTVBindersN 0 sigma
+  , let tvs = map (binderVar . snd) binders
+        specified = [binderVar b | (_, b) <- binders, isSpecifiedForAllTyFlag (binderFlag b)]
+  , length written <= length specified
+  , isTauTy body
+  , not (hasNativeDependentExpr (Core.Type body))
+  , Just (domain, result) <- splitVisibleFunTy_maybe body
+  , TyVarTy result_var <- coreFullView result, result_var `elem` tvs
+  , Just (tc, domain_args) <- tcSplitTyConApp_maybe domain
+  , isGenerativeTyCon tc Nominal
+  , any (eqType (mkTyVarTy result_var)) domain_args
+  = do { declared <- declared_result 0 operand
+       ; case declared >>= match_dot tvs tc domain result_var of
+           Just () -> case lookup result_var (zip specified written) of
+             Just (HsWC { hswc_body = ty }) -> tcImplicitOperandType ty
+             Nothing -> return True
+           Nothing -> return False }
+  | otherwise = return False
+  where
+    declared_result n (L _ (HsApp _ fun _)) = declared_result (n + 1) fun
+    declared_result n (L _ (HsPar _ fun)) = declared_result n fun
+    declared_result n (L _ (HsVar _ lname))
+      | let name = unLocWithUserRdr lname
+      , not (isDataOcc (nameOccName name))
+      = do { ident <- tcLookupIdMaybe name
+           ; return (ident >>= implicitSpineResult n . varType) }
+    declared_result _ _ = return Nothing
+
+    match_dot tvs tc domain result_var actual = do
+      (actual_tc, _) <- tcSplitTyConApp_maybe actual
+      guard (actual_tc == tc && supportsQuickLookType actual && noQuickLookVars actual)
+      guard (not (any (`elemVarSet` tyCoVarsOfType actual) tvs))
+      let in_scope = mkInScopeSet (tyCoVarsOfTypes [domain, actual])
+      subst <- tcMatchTyX_BM (bind_outer tvs) (Subst.mkEmptySubst in_scope) domain actual
+      guard (eqType (Subst.substTy subst domain) actual)
+      selected <- Subst.lookupTyVar subst result_var
+      case coreFullView selected of
+        ExistsTy ImplicitExists _ _ -> Just ()
+        _ -> Nothing
+
+    bind_outer tvs tv _ | tv `elem` tvs = BindMe
+                        | otherwise = DontBindMe
 
 -- | Find the declared shape after ordinary invisible instantiation.
 implicitSpineHead :: TcType -> TcType
@@ -769,8 +910,25 @@ opening when both are the same checked local package variable at the
 same schema. Reuse the payload Id under its existing skolem. This is
 the lexical-variable case of IExistCore in An Existential Crisis
 Resolved. It preserves the source use check for each operand.
-Computed operands, instantiated variables and linear arguments each
-have their own opening. The map is local to the application spine.
+Instantiated variables and linear operands have their own opening.
+The map is local to the application spine.
+
+For snd p (fst p), the first argument opens p for the application.
+A nested unary value application can reuse that payload when its
+declared domain also asks for the same local package to be opened.
+Only reuse an opening from an unrestricted operand in an unrestricted
+domain. Its first source use already contributes Many, so the nested
+use cannot change its checked multiplicity. Check the nested call
+at the outer argument type. The projections determine payload demand.
+
+A named producer can also supply the same package to both selectors.
+Require an exact, monomorphic unary call with an unrestricted domain
+and the same bare local input. Use the resolved names of the checked
+producer and input. Instantiation, dictionary selection and argument
+conversion are absent from this equality check. Demand still comes
+from the surrounding calls. The opening shares the producer thunk,
+so it can reduce the number of evaluations. See Aside 2 and section
+9.2.2 of An Existential Crisis Resolved.
 
 Instantiate the application under all of the skolems. The
 outer result type is present before any of these scopes, so the
@@ -789,6 +947,32 @@ its declared package. The ordinary head instantiation still takes
 place inside the opening, so argument-only variables can match the
 witness. Fill the usual inference slot after closing the implication.
 The outer result's metavariables cannot capture the opened witness.
+-}
+
+{- Note [Projected implicit existential operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In foldr step z (fst (partition p xs)), the declared result of fst is a
+type variable. A declared result of partition has two dot packages under
+the rigid pair constructor. The argument type of fst determines which one
+the application returns.
+
+Use the same guarded premise as Quick Look (Serrano et al., Fig. 5).
+Read the producer's declared spine and match the projection's rigid
+domain. Use the immutable matcher. The result parameter must be a direct
+argument of the nominally injective domain constructor. A match under a
+type family would not determine the result parameter. Select the route
+only if that parameter has a dot package at the head. A written type for
+that parameter must also show a dot package, directly or through a known
+synonym. The same check applies to a written expression signature. These
+checks consume no source usages and create no constraints or Quick Look
+variables.
+
+The selected type is only a shape. It can mention binders from the
+declaration of the producer. The ordinary inference of the original
+operand checks the arguments, type applications, and constraints once.
+tcOpenImplicitArgs scales that check by the formal multiplicity and uses
+its actual result to open the package. It keeps the consumer's result
+outside the new skolem. See Note [Implicit existential arguments].
 -}
 
 -- | Check a saturated explicit existential constructor application.
@@ -1679,6 +1863,11 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                                    app_res_rho result_expected
 
          -- Step 6: Typecheck the arguments
+       ; case do_ql of
+           NoQL | null cache, classHasUnmatchableReceiver tc_fun
+                , all valueOrWrapper inst_args ->
+             void (seedClassReceiver NoQL (rn_fun, fun_loc) (valueDomains inst_args))
+           _ -> return ()
        ; tc_args <- tcValArgsWithCache cache do_ql (rn_fun, fun_loc) inst_args
 
          -- Step 7: Horrible special case for tagToEnum#.
@@ -1688,6 +1877,140 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
 
        ; traceTc "End tcApp }" (ppr tc_fun)
        ; return (pack (mkHsWrap res_wrap res_expr)) }
+
+-- | Identify class selectors with an unmatchable-capable class parameter.
+classHasUnmatchableReceiver :: HsExpr GhcTc -> Bool
+classHasUnmatchableReceiver (HsVar _ (L _ selector))
+  | Just cls <- isClassOpId_maybe selector
+  = any unmatchable_parameter (classTyVars cls)
+  where
+    unmatchable_parameter tv
+      | Just (ma, _, _) <- tcSplitFunTy_maybe (tyVarKind tv)
+      = isTyVarTy ma || ma `eqType` unmatchableDataConTy
+      | otherwise = False
+classHasUnmatchableReceiver _ = False
+
+-- | Recognize ordinary arguments for a declaration-only receiver hint.
+valueOrWrapper :: HsExprArg 'TcpInst -> Bool
+valueOrWrapper EValArg{} = True
+valueOrWrapper EWrap{} = True
+valueOrWrapper ETypeArg{} = True
+valueOrWrapper _ = False
+
+-- | Preserve positions of checked arguments after type applications.
+valueDomains :: [HsExprArg 'TcpInst] -> [(Int, LHsExpr GhcRn, Type)]
+valueDomains = go 1
+  where
+    go _ [] = []
+    go pos (EValArg{ea_arg = arg, ea_arg_ty = Scaled _ expected} : rest) =
+      (pos, arg, expected) : go (pos + 1) rest
+    go pos (ETypeArg{ea_loc_span = l} : rest)
+      | not (isGeneratedSrcSpan (locA l)) = go (pos + 1) rest
+    go pos (_ : rest) = go pos rest
+
+-- | Learn a closed unmatchable class receiver before checking its callback.
+-- See Note [Unmatchable class receivers].
+seedClassReceiver :: QLFlag -> (HsExpr GhcRn, SrcSpan)
+                  -> [(Int, LHsExpr GhcRn, Type)] -> TcM Bool
+seedClassReceiver do_ql rn_head = go []
+  where
+    go _ [] = return False
+    go callbacks ((pos, arg, expected) : rest) =
+      do { selected <- if null callbacks
+                       then return False
+                       else addArgCtxt pos rn_head arg $
+                              seed_receiver callbacks arg expected
+         ; callbacks' <- if isJust (tcSplitFunTy_maybe expected)
+                         then do { ty <- liftZonkM (zonkTcType expected)
+                                 ; return (ty : callbacks) }
+                         else return callbacks
+         ; selected_rest <- go callbacks' rest
+         ; return (selected || selected_rest) }
+
+    seed_receiver callbacks arg expected = fmap isJust $ runMaybeT $ do
+      (tc, indices) <- MaybeT (tcSplitTyConApp_maybe <$> liftZonkM (zonkTcType expected))
+      guard (isAlgTyCon tc)
+      let shared f = any (elemVarSet f . tyCoVarsOfType) callbacks
+      [(f, kind)] <- return
+        [ (f, kind) | TyVarTy f <- indices, eligible f
+                    , Just kind@(ma, _, _) <- [tcSplitFunTy_maybe (tyVarKind f)]
+                    , isTyVarTy ma || ma `eqType` unmatchableDataConTy
+                    , shared f ]
+      open <- liftMaybeT (isUnfilledMetaTyVar f)
+      guard open
+      actual <- declared_receiver 0 arg
+      (outer, outer_args) <- liftMaybe (tcSplitTyConApp_maybe actual)
+      guard (any family_prefix outer_args)
+      (actual_tc, actual_indices) <- if outer == tc
+        then return (outer, outer_args)
+        else do
+          guard (isTypeFamilyTyCon outer)
+          envs <- liftMaybeT tcGetFamInstEnvs
+          reduction <- liftMaybe (reduceTyFamApp_maybe envs Nominal outer outer_args)
+          liftMaybe (tcSplitTyConApp_maybe (reductionReducedType reduction))
+      guard (tc == actual_tc)
+      [target] <- return
+        [ t | (TyVarTy v, t) <- zip indices actual_indices, v == f, family_prefix t ]
+      guard (not (hasNativeDependentExpr (Core.Type target)))
+      (target_ma, Scaled target_mult target_domain, target_result) <-
+        liftMaybe (tcSplitFunTy_maybe (typeKind target))
+      let (ma, Scaled mult domain, result) = kind
+      guard (target_ma `eqType` unmatchableDataConTy && mult `eqType` target_mult
+             && domain `eqType` target_domain && result `eqType` target_result)
+      compatible <- case getTyVar_maybe ma of
+        Just tv | eligible tv -> liftMaybeT (isUnfilledMetaTyVar tv)
+        _ -> return (ma `eqType` target_ma)
+      guard compatible
+      liftMaybeT $ case do_ql of
+        NoQL -> void (unifyType Nothing target (mkTyVarTy f))
+        DoQL -> qlUnify target (mkTyVarTy f)
+
+    declared_receiver n (L _ (HsPar _ fun)) = declared_receiver n fun
+    declared_receiver n (L _ (HsApp _ fun _)) = declared_receiver (n + 1) fun
+    declared_receiver n arg = do
+      (_, L _ (HsVar _ lname)) <- liftMaybe (retainedNamedCallback arg)
+      ident <- MaybeT (tcLookupIdMaybe (unLocWithUserRdr lname))
+      let ty = varType ident
+      guard (isTauTy ty && noFreeVarsOfType ty)
+      liftMaybe (tcRetainedOrdinaryResult n ty)
+
+    eligible tv = isTcTyVar tv && isMetaTyVar tv &&
+      case do_ql of
+        NoQL -> not (isQLInstTyVar tv)
+        DoQL -> isQLInstTyVar tv
+
+    liftMaybe :: Maybe a -> MaybeT TcM a
+    liftMaybe = MaybeT . pure
+
+    family_prefix t
+      | Just (tc, args) <- tcSplitTyConApp_maybe t = isUnsaturatedUserFamily tc args
+      | otherwise = False
+
+{- Note [Unmatchable class receivers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider mapIndexed (fmap not) familyInput. The class method checks its
+callback against f Bool -> f Bool. If f is unknown, the ordinary check
+can select a matchable f before it checks familyInput :: Batch (Pick True).
+
+Check only classes with a parameter that can have an unmatchable arrow
+kind. Use the receiver's closed declared type when it contains a family
+prefix. For makeReceiver (), peel the visible arrows of the monomorphic
+producer's declared type. This reads no producer operands and permits no
+type instantiation or dependent arrows. Look through at most one nominal
+family equation to expose the same
+algebraic constructor. Avoid recursive reduction in this optional step.
+An earlier callback must use the same receiver index. Unify that index
+with the partial unmatchable family. The ordinary receiver check supplies
+the family coercion and checks the other indices. Its context can contain
+witnesses from opening earlier implicit operands. Keep checking terms and
+recording usage in source order. For Quick Look, use the same hint on
+the already instantiated visible telescope before looking at the callback.
+Fill only its instantiation variables. Zonk the callback type after the
+hint so an application of that index takes the family path in qlUnify.
+The callback already had a visible arrow, so its outer shape and the
+guardedness test stay the same. Continue with the original Quick Look
+order and cache.
+-}
 
 -- | Introduce a dot package when the application has a fixed payload shape.
 -- See Note [Introducing an implicit existential].
@@ -2420,10 +2743,26 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                 matchActualFunTy herald
                   (Just $ HsExprTcThing tc_fun)
                   (n_val_args, fun_sigma) fun_ty
-           ; arg' <- quickLookArg do_ql (pos + count written_prefix_arg acc)
-                                  ctxt rn_head arg arg_ty
+           ; let arg_pos = pos + count written_prefix_arg acc
+           ; selected <- case do_ql of
+               DoQL | classHasUnmatchableReceiver tc_fun
+                    , Just{} <- tcSplitFunTy_maybe (scaledThing arg_ty)
+                    , Just domains <- receiverDomains (arg_pos + 1) res_ty rest_args
+                    , not (null domains) ->
+                 seedClassReceiver DoQL rn_head ((arg_pos, arg, scaledThing arg_ty) : domains)
+               _ -> return False
+           ; arg_ty <- if selected then liftZonkM (zonkScaledTcType arg_ty) else return arg_ty
+           ; arg' <- quickLookArg do_ql arg_pos ctxt rn_head arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go plan fun_orig (pos+1) acc' res_ty rest_args }
+
+    -- Read only the visible domains that already follow this callback.
+    receiverDomains _ _ [] = Just []
+    receiverDomains pos ty (EValArg{ea_arg = arg} : rest)
+      | Just (_, Scaled _ domain, result) <- tcSplitFunTy_maybe ty
+      = ((pos, arg, domain) :) <$> receiverDomains (pos + 1) result rest
+    receiverDomains pos ty (EWrap{} : rest) = receiverDomains pos ty rest
+    receiverDomains _ _ _ = Nothing
 
     new_arg_ty :: CtOrigin -> LHsExpr GhcRn -> Int -> TcM (Scaled TcType)
     -- Make a fresh nus for each argument in rule IVAR
@@ -6041,6 +6380,43 @@ isGuardedTy ty
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | otherwise                               = False
 
+{- Note [Quick Look and implicit existential arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In take 1 (toList (fst (partitionVec odd xs))), checking the call to
+toList opens the package at the head of its argument. Quick Look can
+prepare toList as an EValArgQL for take. Resuming that argument calls
+finishApp directly. It skips the opening in tcOrdinaryApp.
+
+For a plain named value application, consult the same read-only
+argument classifier before Quick Look checks the head and arguments.
+If the call needs to open an argument, keep its original syntax for
+ordinary checking. This leaves the opening, result scope, constraints
+and multiplicities with tcOpenImplicitArgs. Calls without an opening
+can still perform the APP-lightning-bolt step of Quick Look (Figure 5).
+See Note [Quick Look at value arguments].
+
+Do not select this fallback after splitting an expansion. The ordinary
+check would split it again and could repeat an untyped Template Haskell
+splice.
+-}
+
+-- | Leave openings in plain named applications to the ordinary checker.
+-- See Note [Quick Look and implicit existential arguments].
+tcQuickLookNeedsImplicitArgs :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM Bool
+tcQuickLookNeedsImplicitArgs (HsVar _ lname) args
+  | let name = unLocWithUserRdr lname
+  , not (isDataOcc (nameOccName name))
+  , any isHsValArg args, all plain args
+  = do { ident <- tcLookupIdMaybe name
+       ; case ident of
+           Just var -> any isRight <$> tcImplicitAppArgs (varType var) args
+           Nothing -> return False }
+  where
+    plain EValArg{} = True
+    plain (EWrap EPar{}) = True
+    plain _ = False
+tcQuickLookNeedsImplicitArgs _ _ = return False
+
 quickLookArg1 :: Int
               -> HsExprLoc
               -> (HsExpr GhcRn, SrcSpan)
@@ -6060,7 +6436,8 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
        ; fun_lspan_arg <- getFunSrcSpan rn_args
 
        -- Step 1: get the type of the head of the argument
-       ; (fun_ue, mb_fun_ty) <- if any isExplicitRetainedArg rn_args
+       ; opens_args <- tcQuickLookNeedsImplicitArgs rn_fun_arg rn_args
+       ; (fun_ue, mb_fun_ty) <- if opens_args || any isExplicitRetainedArg rn_args
                                then return (zeroUE, Nothing)
                                else tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg
          -- tcCollectingUsage: the use of an Id at the head generates usage-info

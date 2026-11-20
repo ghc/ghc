@@ -9,7 +9,7 @@ import GHC hiding (exprType)
 import GHC.Builtin.KnownOccs (returnIOIdOcc)
 import GHC.Builtin.Modules (gHC_INTERNAL_BASE)
 import GHC.Builtin.WiredIn.Types
-    (boolTy, charTy, falseDataCon, trueDataCon, liftedTypeKind, manyDataConTy, maybeTyCon, mkBoxedTupleTy, mkListTy, trueDataConId)
+    (boolTy, charTy, falseDataCon, trueDataCon, liftedTypeKind, manyDataConTy, maybeTyCon, mkBoxedTupleTy, mkListTy, promotedTrueDataCon, trueDataConId)
 import GHC.Core
     (Alt (..), AltCon (DEFAULT, DataAlt), Bind (NonRec, Rec), CoreExpr, Expr (..), InScopeEnv (ISE), noUnfolding,
      Unfolding (CoreUnfolding, uf_tmpl), UnfoldingCache (..), UnfoldingSource (VanillaSrc), mkApps, mkLams)
@@ -31,7 +31,7 @@ import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Make (mkCharExpr, mkListExpr, mkNothingExpr, mkRuntimeErrorApp, pAT_ERROR_ID)
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import GHC.Core.TyCo.Compare (eqType)
-import GHC.Core.TyCo.Rep (Type (ExistsTy, TyVarTy))
+import GHC.Core.TyCo.Rep (Type (ExistsTy, TermVarTy, TyVarTy))
 import GHC.Core.Type (mkTyConApp, mkVisFunTyManyU)
 import GHC.Core.Utils (exprType)
 import GHC.CoreToStg (coreToStg)
@@ -205,6 +205,22 @@ checkPackageOptimizers libdir = session libdir $ \env _ -> do
             && not (matches [witness] (Type (openSchema element)) (Type (openSchema boolTy)))) $
         fail "A rule must fix the element type before comparing whole existential types"
     putStrLn "erased package rules match bound variables and reject escaping substitutions"
+
+    indexId : otherIndexId : polyIndexId : _ <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
+    let index = local indexId "index" boolTy
+        otherIndex = local otherIndexId "otherIndex" boolTy
+        polyIndex = local polyIndexId "polyIndex" (TyVarTy witness)
+        indices = ISE (mkInScopeSetList [index, outer, otherIndex, trueDataConId]) (const noUnfolding)
+        matchAt value indexTy = isJust (matchExprs indices [index]
+              [Var index, Type (TermVarTy index)] [value, Type indexTy])
+        matchPoly valueIndex = isJust (matchExprs indices [witness, polyIndex]
+              [Type (TyVarTy witness), Var polyIndex, Type (TermVarTy polyIndex)]
+              [Type boolTy, Var outer, Type (TermVarTy valueIndex)])
+    unless (matchAt (Var outer) (TermVarTy outer) && matchAt true (mkTyConApp promotedTrueDataCon [])
+            && matchAt (Var index) (TermVarTy index) && not (matchAt (Var outer) (TermVarTy index))
+            && matchPoly outer && not (matchPoly otherIndex)) $
+        fail "a rule must reuse the earlier runtime argument at its instantiated domain"
+    putStrLn "retained rules distinguish shared, distinct and shadowed indices"
 
     -- A lifted exit uses the abstract payload in a strict case. Its type
     -- witness must precede the payload in the new join's telescope.

@@ -207,6 +207,11 @@ test('NativeLaterMatchability',
       extra_files([open_eval_dir + f for f in ['AnchorReceiver.hs', 'LaterMatchability.hs',
                                               'LaterMatchabilityClient.hs']])],
      run_command, ['bash NativeLaterMatchability.sh "{compiler}" "{libdir}"'])
+test('NativeIndexedClassReceiver',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + 'IndexedMap.hs', open_eval_dir + 'IndexedMapClient.hs',
+                   'NativeIndexedClassReceiver.hs'])],
+     run_command, ['bash NativeIndexedClassReceiver.sh "{compiler}" "{libdir}"'])
 test('NativeUnsaturatedInvisible',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'InvisibleFamily.hs', 'NativeUnsaturatedInvisibleConsumer.hs',
@@ -311,6 +316,11 @@ test('NativeTypeCaseReify',
                    open_eval_dir + 'OpenMapWorker.hs'])],
      multimod_compile, ['NativeTypeCaseReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
 
+test('NativeRetainedFunctionRules',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f for f in
+                   ['RetainedRules.hs', 'RetainedRulesClient.hs', 'check-retained-rules.sh']])],
+     run_command, ['bash check-retained-rules.sh "{compiler}" "{libdir}"'])
 test('NativeSimplifier',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeSimplifierProvider.hs', 'NativeSimplifierClient.hs',

@@ -62,12 +62,27 @@ SRC
 "${g[@]}" -O1 "${flags[@]}" -c LocalRuleProvider.hs
 cat >>LocalRuleProvider.hs <<'SRC'
 
-{-# RULES "dependent keep" forall xs. keep False xs = xs #-}
+{-# NOINLINE keep #-}
+{-# RULES "dependent keep" forall (b :: Bool) (xs :: Vec Int (Length b)). keep b xs = xs #-}
 SRC
-reject '[GHC-51063]' -O1 "${flags[@]}" -c LocalRuleProvider.hs
-grep -Fq 'dependent keep' reject.log
-reject '[GHC-51063]' -O2 "${flags[@]}" -c LocalRuleProvider.hs
-grep -Fq 'at -O2.' reject.log
+"${g[@]}" -O2 -fforce-recomp -c LocalRuleProvider.hs
+mkdir local-rule-client
+cp LocalRuleProvider.hi local-rule-client/
+(
+    cd local-rule-client
+    cat >Main.hs <<'HS'
+module Main where
+import LocalRuleProvider (choose, keep, toList)
+run :: Bool -> [Int]
+run b = toList (keep b (choose b))
+main :: IO ()
+main = print (run True, run False)
+HS
+    "${g[@]}" -O2 -ddump-rule-firings -c Main.hs >firings
+    grep -Fq 'Rule fired: dependent keep (LocalRuleProvider)' firings || { cat firings; exit 1; }
+    "${g[@]}" Main.o ../LocalRuleProvider.o -o run
+    [[ $(./run) == '([7],[])' ]]
+)
 cat client/observed
 
 cd "$tmp"

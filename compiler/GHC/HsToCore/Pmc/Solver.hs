@@ -1046,6 +1046,10 @@ makeDictsCoherent (App f a)
   = App (makeDictsCoherent f) (makeDictsCoherent a)
 makeDictsCoherent (Lam f body)
   = Lam f (makeDictsCoherent body)
+makeDictsCoherent (Pack schema witness payload)
+  = Pack schema witness (makeDictsCoherent payload)
+makeDictsCoherent (Unpack witness payload package body)
+  = Unpack witness payload (makeDictsCoherent package) (makeDictsCoherent body)
 makeDictsCoherent (Let bndr body)
   = Let
       (go_bndr bndr)
@@ -1122,6 +1126,11 @@ In the end, replacing dictionaries with an error value in the pattern-match
 checker was the most self-contained, although we might want to revisit once
 we implement a more robust approach to computing equality in the pattern-match
 checker (see #19272).
+
+An existential package can occur in a guard or in a local binding used by
+a guard. Normalize the dictionary expressions in its payload. An opening
+also has a source expression and a body. Keep the schema, witness, and
+binders so the CoreMap compares the body in the scope of that opening.
 
 Wrinkle (UD1): ticks
 --------------------

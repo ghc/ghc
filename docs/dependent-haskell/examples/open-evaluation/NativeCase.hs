@@ -4,6 +4,7 @@ module NativeCase
   ( F, ByType, ElementOrSelf, Field, Same, Capture, Braces, roadmap
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
+  , NestedLetCase, NestedLetShadow, NestedLetKind
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
   , retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
   ) where
@@ -163,3 +164,30 @@ type SeparateKinds b = let m = 'Nothing in
     'False -> TypeFlag n) of
     'True  -> BoolUse m
     'False -> Maybe (BoolUse m)
+
+
+-- | Use two earlier aliases before shadowing one of them.
+type NestedLetCase (a :: Type) (d :: Maybe Bool) =
+  let a = Maybe a in
+  let b = Either a a in
+  let a = '(a, b) in
+  case d of
+    'Just 'True -> Proxy a
+    'Just _ -> Proxy a
+    'Nothing -> Proxy a
+
+-- | A pattern shadows the written name only in its own branch.
+type NestedLetShadow (b :: Bool) (d :: Maybe Bool) =
+  let b = 'Just b in
+  let inner = b in
+  case d of
+    'Just b -> (Proxy b, Proxy inner)
+    'Nothing -> (Proxy b, Proxy inner)
+
+-- | Both aliases share the inferred kind of the outer RHS.
+type NestedLetKind (b :: Bool) =
+  let outer = 'Nothing in
+  let inner = outer in
+  case b of
+    'True  -> BoolUse inner
+    'False -> BoolUse outer

@@ -7455,6 +7455,11 @@ tc_type_in_pat ctxt mb_skol hole_mode hs_ty wcs ns ctxt_kind
                bindNamedWildCardBinders wcs $ \ wcs ->
                tcExtendNameTyVarEnv tkv_prs $
                do { ek <- newExpectedKind ctxt_kind
+                  ; mode <- case ctxt of
+                      RuleBndrTypeCtxt{} -> do
+                        indices <- tcRetainedAmbientIndices RetainedLocalSignatureIndex hs_ty
+                        return (mode { mode_indices = indices })
+                      _ -> return mode
                   ; ty <- tc_check_lhs_type mode hs_ty ek
                   ; return (wcs, ty) }
 

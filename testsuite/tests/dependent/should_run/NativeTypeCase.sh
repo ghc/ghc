@@ -20,7 +20,7 @@ reject() {
 "${g[@]}" -c NativeTypeCaseFallback.hs
 "${g[@]}" -fomit-interface-pragmas -c NativeNestedCase.hs
 "${g[@]}" --show-iface NativeNestedCase.hi >nested.iface
-if sed -n '/^exports:/,/^defaults:/p' nested.iface | grep -E '\$(case(-node)?|lambda):'; then exit 1; fi
+if sed -n '/^exports:/,/^defaults:/p' nested.iface | grep -E '\$(case(-node)?|field-case|lambda):'; then exit 1; fi
 "${g[@]}" --show-iface NativeCase.hi >case.iface
 if sed -n '/^exports:/,/^defaults:/p' case.iface | grep -E '\$case(:|-let-rhs:)'; then exit 1; fi
 mkdir interfaces
@@ -49,6 +49,10 @@ cp NativeCase.hi NativeNestedCase.hi OpenMapWorker.hi NativeTypeCaseFallback.hi 
    grep -Eq 'the type case in .*ForallResult' bad.log &&
    grep -Eq 'the type case in .*IndexedFieldOrder' bad.log &&
    grep -Fq 'blockedTransport _ = Refl' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:81:21: error: [GHC-83865]' bad.log &&
+   grep -Eq 'the type case in .*RefinedBranchPick' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:85:24: error: [GHC-83865]' bad.log &&
+   grep -Eq 'the type case in .*NestedLetCase' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
@@ -81,6 +85,8 @@ grep -Fq 'the type case in the signature for' bad.log
 reject NativeTypeCaseScrutinee 4:15 'Not in scope: type constructor or class'
 reject NativeTypeCaseLetMonomorphic 6:22 'GHC-83865'
 reject NativeTypeCaseLetUnowned 4:26 'A type let used in a case body cannot generalize the kind of its right-hand side.'
+grep -Fq 'NativeTypeCaseLetUnowned.hs:9:15: error:' bad.log
+test "$(grep -Fc 'cannot generalize the kind of its right-hand side' bad.log)" = 2
 
 reject NativeTypeCaseDominatedRhs 6:20 'GHC-76037'
 grep -Fq 'Not in scope: type constructor or class' bad.log
@@ -89,7 +95,7 @@ grep -Eq 'has kind .*Bool' bad.log
 reject NativeTypeCaseNestedAliasHead 5:8 'GHC-55789'
 reject NativeTypeCaseOpaqueIndex 14:9 'GHC-83865'
 grep -Fq 'NativeTypeCaseOpaqueIndex.hs:27:9: error: [GHC-83865]' bad.log
-grep -Fq 'NativeTypeCaseOpaqueIndex.hs:39:3: error: [GHC-79642]' bad.log
+grep -Fq 'NativeTypeCaseOpaqueIndex.hs:40:3: error: [GHC-79642]' bad.log
 test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 1
 grep -Fq 'Cannot determine which constructors are possible' bad.log
 reject NativeTypeCaseErasedAlias 8:3 'GHC-30337'
@@ -102,6 +108,90 @@ reject NativeTypeCaseHiddenErased 6:3 'GHC-30337'
 
 # A stuck family still blocks refinement without Core Lint.
 g=("${plain[@]}")
-reject NativeTypeCaseOpaqueIndex 39:3 'GHC-79642'
+reject NativeTypeCaseOpaqueIndex 40:3 'GHC-79642'
 test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 1
 ! grep -Fq 'Core Lint errors' bad.log
+
+
+# Read the constructor field from its interface with the extension off.
+(
+    cd interfaces
+    cat >NativeTypeCaseFieldRigid.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, GADTs, RankNTypes, ScopedTypeVariables, TypeApplications #-}
+module NativeTypeCaseFieldRigid where
+import Data.Proxy (Proxy(..))
+import NativeNestedCase
+
+rigid :: CaseField ('Just bit) -> Int
+rigid (CaseField n) = n
+
+shadow :: ShadowedCaseField 'True ('Just 'False) -> Proxy 'True
+shadow (ShadowedCaseField bit) = bit
+
+ranked :: forall (bit :: Bool). Proxy bit -> OrderedRankedCaseField 'True -> Int
+ranked _ (OrderedRankedCaseField f) = f @('Just bit) Proxy
+
+rankedShadow :: RankedCaseField 'False -> Char
+rankedShadow (RankedCaseField f) = f @'True Proxy
+
+badCapture :: CapturedKindCaseField Bool 'True 'False -> Proxy Int
+badCapture (CapturedKindCaseField f) = f @Int @'True Proxy
+HS
+    reject NativeTypeCaseFieldRigid 7:23 '[GHC-83865]'
+    grep -Eq 'the type case in a field of .*CaseField' bad.log
+    grep -Fq 'NativeTypeCaseFieldRigid.hs:10:34: error: [GHC-83865]' bad.log
+    grep -Fq 'NativeTypeCaseFieldRigid.hs:13:39: error: [GHC-83865]' bad.log
+    grep -Fq 'NativeTypeCaseFieldRigid.hs:16:36: error: [GHC-83865]' bad.log
+    grep -Fq 'NativeTypeCaseFieldRigid.hs:19:40: error: [GHC-83865]' bad.log
+    ! grep -Fq '$field-case:' bad.log
+)
+
+cat >NativeTypeCaseFieldEscape.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module NativeTypeCaseFieldEscape where
+import Data.Proxy (Proxy)
+data Escape (d :: Maybe Bool) where
+  Escape :: forall (d :: Maybe Bool).
+    (case d of { Just bit -> Proxy bit; Nothing -> Proxy bit }) -> Escape d
+HS
+reject NativeTypeCaseFieldEscape 6:6 '[GHC-97233]'
+
+cat >NativeTypeCaseFieldCompoundKind.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, RankNTypes, TypeFamilies #-}
+module NativeTypeCaseFieldCompoundKind where
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+type family PayloadKind (k :: Type) :: Type
+data Compound (k :: Type) (a :: PayloadKind k) = Compound
+  (forall (k :: Type) (b :: Bool). Proxy b ->
+    (case b of { True -> Proxy a; False -> Proxy k }))
+HS
+reject NativeTypeCaseFieldCompoundKind 8:6 '[GHC-97233]'
+
+# A speculative branch gets one family step. Checking a written use
+# of the same constructor still reports the solver's reduction limit.
+cat >NativeTypeCaseRecursiveIndex.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, UndecidableInstances #-}
+module NativeTypeCaseRecursiveIndex where
+
+import Data.Kind (Type)
+
+type family Loop (tag :: Bool) :: Type where
+  Loop 'True = Loop 'True
+  Loop 'False = Ordering
+
+data Gate k (tag :: Bool) where
+  Known :: Bool -> Gate Bool 'True
+  Recursive :: Gate (Loop tag) tag
+
+type Pick (d :: Maybe (Gate Bool 'True)) = case d of
+  Just (Known True) -> Int
+  Just _ -> Bool
+  Nothing -> ()
+HS
+g=("${plain[@]}" -dcore-lint -dstg-lint -freduction-depth=8)
+reject NativeTypeCaseRecursiveIndex 15:3 'GHC-79642'
+sed 's/Just (Known True) -> Int/Just Recursive -> Int/' NativeTypeCaseRecursiveIndex.hs >recursive.hs
+mv recursive.hs NativeTypeCaseRecursiveIndex.hs
+reject NativeTypeCaseRecursiveIndex 15:8 'GHC-40404'
+grep -Fq 'Reduction stack overflow; size = 9' bad.log

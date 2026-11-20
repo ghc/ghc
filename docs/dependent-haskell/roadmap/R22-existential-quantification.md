@@ -214,12 +214,22 @@ also construct a package at the call site. For example,
 `runBuilder (\x -> VCons x VNil) odd (7 :: Int)` returns `[7]`.
 [Optimizer scope](R05-dependent-core.md#optimizing-erased-packages).
 
-Opening is limited to an application with a known operand head and an
-ordinary payload domain. An opening introduces a fresh scoped
-witness. The recursive filter result can also be named with
+An application with an ordinary payload domain can open an operand whose
+type exposes a dot package. An opening introduces a fresh scoped witness.
+The recursive filter result can also be named with
 `let rest = filterVec p xs in Cons x rest`. The nonrecursive local
 binding retains the exact dot package type, including its enclosing
 element type. Opening the binding stays inside the application.
+
+An ordinary client can also write `foldr step z (fst (partitionVec p xs))`.
+The result of `partitionVec` exposes the dot package in a rigid pair type.
+Matching that pair against the domain of `fst` identifies its result
+parameter before the fold checks its operands. The compiler then checks the
+original operand once at its declared multiplicity. A complete type
+annotation can also identify the dot package. The resulting witness remains
+local to the fold, and the fold can return its first result with an
+exceptional input tail.
+
 The draft's general opaque witness projections, scope
 repacking across lambda, let or case, and `@Pack` remain open.
 [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
@@ -306,6 +316,26 @@ witness at each use. Witness sharing does not allow the witness to
 escape its opening or permit duplicate linear use. This is the
 lexical-variable fragment of the paper's IExistCore projection rule.
 [An Existential Crisis Resolved, section 6.1](https://richarde.dev/papers/2021/exists/exists.pdf).
+
+An ordinary client can also write `snd p (fst p)` for
+`p :: exists t. (t, t -> Int)`. The nested unary call reuses the
+unrestricted opening of the same local package in the enclosing
+application. Both calls keep the ordinary demand of their selectors.
+The source-free test agrees with `case p of (x, k) -> k x` when it
+demands the result or ignores the whole application. Returning
+`fst p` at a caller-chosen type, combining independent packages, and
+duplicating a linear package still fail. The paper also accepts
+alpha-equivalent computed package expressions.
+[An Existential Crisis Resolved, Aside 2](https://richarde.dev/papers/2021/exists/exists.pdf#page=21).
+
+The same client can write `snd (supply x) (fst (supply x))` when
+`supply` is a top-level producer with a known monomorphic unrestricted
+arrow to a dot package and both calls use the same local input. The checked producer and input
+must resolve to the same Ids. The opening shares the pure producer
+call as a local `let` would. Ignoring both projections leaves the
+producer unevaluated. Independent calls at different inputs retain
+separate witnesses. The rule covers this fragment of computed
+expressions. [An Existential Crisis Resolved, sections 7.4 and 9.2.2](https://richarde.dev/papers/2021/exists/exists.pdf).
 
 
 ### Constructor cases on the payload
@@ -422,6 +452,17 @@ its guard is unreachable.
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.
+An explicitly marked required argument can also select the witness.
+For example `\b -> (withWitness @Int (type PolyId) Proxy) id (use b)`
+reads the closed `PolyId` synonym from the producer interface.
+An ordinary rank-n consumer uses the selected callback at two types.
+A type introduced by a lambda pattern cannot supply the outer witness.
+Consecutive dot binders can take their witnesses from separate
+equations. The interface can declare one branch with
+`TwoCallbacks PolyId r` and another with `TwoCallbacks l PolyMaybe`.
+The corresponding direct fields fix both witnesses before the client
+checks the lambda. Each field needs an agreed closed polytype, and
+the ordinary checker still checks every equation.
 The witness erases before code generation. Agda's `@0` record fields
 use the same runtime distinction between a payload and erased evidence.
 [Source-free client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/WitnessClient.hs)

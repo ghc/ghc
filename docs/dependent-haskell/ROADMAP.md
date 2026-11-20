@@ -14,9 +14,19 @@ of an ordered type case in a value signature. The sample renders the
 two results as `"7"` and `"'f'"`. A call that ignores its arguments
 still returns 42 with an undefined index and payload. An ordinary client
 can also open a hidden vector inside a pair without forcing the other
-field. All 321 Showcase lines ran with both compiler stages at `-O0`,
+field. All 330 Showcase lines ran with both compiler stages at `-O0`,
 default `-O1` and default `-O2`, and with the self-hosted GHCi.
 [Showcase](Showcase.hs) and [verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+An ordinary client can use an optimized rule whose payload type refers
+to a preceding Boolean. The rule fires even when the index comes from
+an `IORef`. A call whose result ignores the index can return 19 with an
+undefined Boolean. GHC checks type cases in ordinary and rank-n
+constructor fields. The same higher-order class method can map over
+values indexed by `Maybe` or by a partially applied type family.
+[Rewrite rules](examples/qualified-pi/RetainedRules.hs),
+[field cases](examples/open-evaluation/NativeNestedCase.hs) and
+[class method client](examples/open-evaluation/IndexedMapClient.hs).
 
 The module that defines the Peano list `size` can keep dependent syntax
 off. Its `-fwrite-source-equations` option publishes the checked
@@ -191,15 +201,14 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Check source rules over retained arguments. A rule for
-   `keep False xs` reaches the optimized Core restriction. With a variable
-   `b`, the type of `xs` must use the same index as the call. An annotated
-   rule can compile with GHC-53522 and be discarded. Check its firing in a
-   separately compiled client.
+1. **R05.** The optimizer matches payloads at an earlier runtime
+   index. Infer these rule binder types from the function signature
+   when the source omits them. Extend the check to imported rule heads.
    [Rule and interface support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
-2. **R23.** Follow the inferred arrow through an ordinary higher-order
-   class method. Check both argument orders and an unrelated argument.
-   The later GADT argument already distinguishes M from U.
+2. **R23.** A class receiver can determine the callback arrow during
+   ordinary constraint solving. Check direct projection when Quick Look
+   runs first. Then check the inferred arrow of an unsigned higher-order
+   type family from proposal #242.
    [Later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
 3. **R22 and R04.** Extend hidden-witness inference beyond callbacks
@@ -207,9 +216,9 @@ source examples. General promotion remains open.
    distinct under pattern matching and retain the demand of guards.
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
-4. **R19.** Check the upgrade of a provider that used separate type families
-   for equivalent retained signature cases. An ordinary client that uses
-   a runtime index needs the provider to expose the shared result type.
+4. **R19.** Ordinary and rank-n constructor fields can use type cases.
+   Check fields where an inner binder shadows names in a compound outer
+   kind. Extend the direct source form to a field with a retained binder.
    [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
 
 Use this queue for current priorities, the linked card for its acceptance

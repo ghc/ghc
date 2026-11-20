@@ -8,6 +8,9 @@ module NativeNestedCase
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   , DependentFieldGate(..), DependentFieldPick
   , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
+  , RefinedGate(..), RefinedLeaf(..), RefinedBranchPick
+  , PlainCaseField(..), CaseField(..), ShadowedCaseField(..)
+  , RankedCaseField(..), OrderedRankedCaseField(..), CapturedKindCaseField(..)
   , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
   , ScopedOpenIndex
   ) where
@@ -203,6 +206,33 @@ type IndexedFieldOrder (d :: Maybe (IndexedFieldBox Bool 'True)) = case d of
   Just _ -> Int
   Nothing -> Char
 
+type family OuterBranchIndex (tag :: Bool) (seed :: Bool) :: Type where
+  OuterBranchIndex 'True seed = Bool
+  OuterBranchIndex 'False seed = Ordering
+
+type family InnerBranchIndex (tag :: Bool) (seed :: Bool) :: Type where
+  InnerBranchIndex 'False seed = Bool
+  InnerBranchIndex 'True seed = Ordering
+
+-- | A promoted leaf whose result kind depends on its last index.
+data RefinedLeaf k (seed :: Bool) (tag :: Bool) where
+  RefinedBit :: Bool -> RefinedLeaf (InnerBranchIndex tag seed) seed tag
+  InnerDisjoint :: RefinedLeaf Bool seed 'False
+
+-- | A gate that fixes the inner leaf's index independently of its own.
+data RefinedGate k (seed :: Bool) (tag :: Bool) where
+  RefinedBranch :: Proxy seed -> RefinedLeaf Bool seed 'False
+                -> RefinedGate (OuterBranchIndex tag seed) seed tag
+  OuterDisjoint :: RefinedGate Bool seed 'True
+
+-- | Refine the index at each constructor and keep the tests in source order.
+type RefinedBranchPick (seed :: Bool) (d :: Maybe (RefinedGate Bool seed 'True)) = case d of
+  Just (RefinedBranch _ (RefinedBit True)) -> Int
+  Just (RefinedBranch _ (RefinedBit _)) -> Int
+  Just (RefinedBranch _ InnerDisjoint) -> Bool
+  Just OuterDisjoint -> Char
+  Nothing -> ()
+
 type ArrowResult (tag :: k) (d :: Maybe (Maybe Bool)) =
   () -> (case d of
     Just (Just field) -> (Proxy tag, Proxy field)
@@ -239,3 +269,32 @@ type ForallRepResult = forall k (tag :: k) (r :: RuntimeRep) (d :: Maybe Bool).
         Just True -> AtRep r
         Just _ -> AtRep r
         Nothing -> AtRep r) :: TYPE r)
+
+-- | Select a field type from an index of an ordinary data type.
+data PlainCaseField (b :: Bool) =
+  PlainCaseField (case b of { True -> Int; False -> Char })
+
+-- | Keep the order of the tests in a GADT field.
+data CaseField (d :: Maybe Bool) where
+  CaseField :: forall (d :: Maybe Bool).
+    (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }) -> CaseField d
+
+-- | A pattern shadows the constructor binder in its own branch.
+data ShadowedCaseField (b :: Bool) (d :: Maybe Bool) where
+  ShadowedCaseField :: forall (b :: Bool) (d :: Maybe Bool).
+    Proxy (case d of { Just b -> b; Nothing -> b }) -> ShadowedCaseField b d
+
+-- | Use the inner erased binder to select the result of this field.
+data RankedCaseField (b :: Bool) = RankedCaseField
+  (forall (b :: Bool). Proxy b -> (case b of { True -> Int; False -> Char }))
+
+-- | Keep the earlier test of a field even under its erased forall.
+data OrderedRankedCaseField (d :: Bool) = OrderedRankedCaseField
+  (forall (d :: Maybe Bool). Proxy d ->
+    (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }))
+
+-- | Retain the original kind of an outer capture under a shadowing forall.
+data CapturedKindCaseField (k :: Type) (a :: k) (c :: k) =
+  CapturedKindCaseField
+    (forall (k :: Type) (b :: Bool). Proxy b ->
+      (case b of { True -> Proxy '(a, c); False -> Proxy k }))

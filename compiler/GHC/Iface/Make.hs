@@ -41,7 +41,7 @@ import GHC.CoreToIface
 import GHC.Core
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
-import GHC.Core.Dependent (hasNativeDependentProgram)
+import GHC.Core.Dependent (hasNativeDependentProgram, hasRetainedRuleHead)
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Ppr
@@ -358,7 +358,7 @@ mkIface_ hsc_env
           -- deterministic, so we sort by OccName to canonicalize it.
           -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details.
         warns       = toIfaceWarnings src_warns
-        iface_rules = map coreRuleToIfaceRule rules
+        iface_rules = map (coreRuleToIfaceRule type_env) rules
         iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode (instEnvElts insts)
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
@@ -468,15 +468,15 @@ ifaceRoughMatchTcs tcs = map do_rough tcs
     do_rough (RM_KnownTc n) = Just (toIfaceTyCon_name n)
 
 --------------------------
-coreRuleToIfaceRule :: CoreRule -> IfaceRule
+coreRuleToIfaceRule :: TypeEnv -> CoreRule -> IfaceRule
 -- A plugin that installs a BuiltinRule in a CoreDoPluginPass should
 -- ensure that there's another CoreDoPluginPass that removes the rule.
 -- Otherwise a module using the plugin and compiled with -fno-omit-interface-pragmas
 -- would cause panic when the rule is attempted to be written to the interface file.
-coreRuleToIfaceRule rule@(BuiltinRule {})
+coreRuleToIfaceRule _ rule@(BuiltinRule {})
   = pprPanic "toHsRule:" (pprRule rule)
 
-coreRuleToIfaceRule rule@(Rule { ru_name = name, ru_fn = fn,
+coreRuleToIfaceRule type_env rule@(Rule { ru_name = name, ru_fn = fn,
                             ru_act = act, ru_bndrs = bndrs,
                             ru_args = args, ru_rhs = rhs,
                             ru_orphan = orph, ru_auto = auto, ru_origin = origin })
@@ -489,7 +489,9 @@ coreRuleToIfaceRule rule@(Rule { ru_name = name, ru_fn = fn,
                 ifRuleKind   = kind,
                 ifRuleOrph   = orph }
   where
-    kind | hasNativeDependentProgram [] [rule] =
+    kind | not auto, Just (AnId fun) <- lookupTypeEnv type_env fn
+         , hasRetainedRuleHead fun = IfaceRetainedUserRule
+         | hasNativeDependentProgram [] [rule] =
              if auto then IfaceRetainedAutoRule
              else case nameModule_maybe fn of
                Just owner | owner /= origin, NotOrphan{} <- orph -> IfaceAnchoredErasedRule

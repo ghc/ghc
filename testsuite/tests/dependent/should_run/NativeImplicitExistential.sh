@@ -71,7 +71,18 @@ grep -Eq 'unpack f' call-head.log
 "$ghc" "${flags[@]}" -ddump-ds -ddump-stg-final -dsuppress-uniques \
     -c WitnessMain.hs -main-is WitnessMain >witness.log
 grep -Eq 'firstPair @m unpacked unpacked' witness.log
-"$ghc" "${flags[@]}" WitnessMain.o ../provider/{Vector,Filter}.o -o witness -main-is WitnessMain
+awk '/^WitnessMain.projected$/ { body = 1 }
+     body && /^-- RHS size:/ { exit }
+     body { $1 = $1; printf "%s ", $0 }' witness.log >projected.log
+[[ $(grep -o 'unpack p as' projected.log | wc -l) == 1 ]]
+grep -Eq 'snd @t @\(t -> [[:alnum:].]*Int\) unpacked' projected.log
+grep -Eq 'fst @t @\(t -> [[:alnum:].]*Int\) unpacked' projected.log
+awk '/^WitnessMain.fromProducer$/ { body = 1 }
+     body && /^-- RHS size:/ { exit }
+     body { print }' witness.log >computed-projection.log
+[[ $(grep -o 'unpack ' computed-projection.log | wc -l) == 1 ]]
+[[ $(grep -o 'WitnessSchema.projectionPair' computed-projection.log | wc -l) == 1 ]]
+"$ghc" "${flags[@]}" WitnessMain.o ../provider/{Vector,Filter,WitnessSchema}.o -o witness -main-is WitnessMain
 "$ghc" "${flags[@]}" -ddump-ds -fwrite-ide-info -c CaseMain.hs -main-is CaseMain >case.log
 test -s CaseMain.hie
 grep -Eq 'unpack .*selection' case.log
@@ -100,7 +111,7 @@ grep -A6 'ForwardProducer.keepTagged$' forward.log | grep -Eq '@\(exists .*\. ex
 
 cp "$src/"{QuickLookForward,QuickLookRuntime}.hs .
 "$ghc" "${flags[@]}" -c QuickLookForward.hs -main-is QuickLookForward
-"$ghc" "${flags[@]}" QuickLookForward.o ../provider/ForwardSchemas.o ../provider/Vector.o \
+"$ghc" "${flags[@]}" QuickLookForward.o ../provider/{Filter,ForwardSchemas,Vector}.o \
     -o quick-look -main-is QuickLookForward
 ./quick-look
 if "$ghc" "${flags[@]}" -c QuickLookRuntime.hs >quick-look-runtime.log 2>&1; then
@@ -134,12 +145,15 @@ for binding in hidden both atKind viaCall viaValue viaTypeArg viaLinear viaGadt;
         exit 1
     }
 done
+line=$(grep -n '^viaRequired =' WitnessClient.hs | cut -d: -f1)
+grep -Eq "^WitnessClient.hs:$line:[0-9]+: error: \[GHC-91510\]" monomorphic.log
 if "$ghc" "${flags[@]}" -c WitnessLambdaReject.hs >lambda-witness.log 2>&1; then
     echo "The lambda witness check accepted an invalid body." >&2
     exit 1
 fi
 for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKind:83865 \
-                 missingEquality:25897 wrongPackageArgument:83865 escapePackageCall:25897; do
+                 wrongRequiredOperand:83865 missingEquality:25897 \
+                 wrongPackageArgument:83865 escapePackageCall:25897; do
     binding=${rejection%:*}
     code=${rejection#*:}
     line=$(grep -n "^$binding .*=" WitnessLambdaReject.hs | cut -d: -f1)
@@ -148,8 +162,15 @@ for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKin
         exit 1
     }
 done
-cp "$src/"{WitnessGuardedClient,WitnessGuardedReject}.hs .
-"$ghc" "${flags[@]}" -c WitnessGuardedClient.hs -main-is WitnessGuardedClient
+line=$(grep -n '^    (withWitness @Int (type t) Proxy)' WitnessLambdaReject.hs | cut -d: -f1)
+grep -Eq "^WitnessLambdaReject.hs:$line:[0-9]+: error: \[GHC-46956\]" lambda-witness.log
+cp "$src/"{WitnessGuardedClient,WitnessGuardedReject,WitnessJointReject}.hs .
+"$ghc" "${flags[@]}" -ddump-ds -c WitnessGuardedClient.hs -main-is WitnessGuardedClient >guarded.core
+awk '/^WitnessGuardedClient.viaJoint$/ { body = 1 }
+     body && /^-- RHS size:/ { exit }
+     body { print }' guarded.core >joint.core
+grep -Fq 'pack WitnessSchema.PolyId' joint.core
+grep -Fq 'pack WitnessSchema.PolyMaybe' joint.core
 "$ghc" "${flags[@]}" WitnessGuardedClient.o ../provider/WitnessSchema.o \
     -main-is WitnessGuardedClient -o guarded-witness
 ./guarded-witness
@@ -162,6 +183,14 @@ for diagnostic in '[GHC-83865]' '[GHC-46956]' 'would escape its scope'; do
         cat guarded-witness.log >&2
         exit 1
     }
+done
+if "$ghc" "${flags[@]}" -c WitnessJointReject.hs >joint-reject.log 2>&1; then
+    echo "The joint witness check accepted a conflicting or local witness." >&2
+    exit 1
+fi
+for binding in 'never -> conflictingLeft b' '(Captured value) True -> fromCaptured value'; do
+    line=$(grep -Fn "$binding" WitnessJointReject.hs | cut -d: -f1)
+    grep -Eq "^WitnessJointReject.hs:$line:[0-9]+: error: \[GHC-91028\]" joint-reject.log
 done
 if "$ghc" "${flags[@]}" -c WitnessMismatch.hs >family-mismatch.log 2>&1; then
     echo "A higher-rank witness hid a conflicting family result." >&2
@@ -185,6 +214,13 @@ fi
 line=$(grep -n '^escape (f, _) =' WitnessPairEscape.hs | cut -d: -f1)
 grep -Fq "WitnessPairEscape.hs:$line:17: error: [GHC-25897]" tuple-escape.log
 grep -Fq "at WitnessPairEscape.hs:$line:8-13" tuple-escape.log
+for rejection in crossed:25897 projectedEscape:25897 duplicated:18872 \
+                 crossedInputs:25897 computedEscape:25897 duplicatedInput:18872; do
+    binding=${rejection%:*}
+    code=${rejection#*:}
+    line=$(grep -n "^$binding .*=" WitnessPairEscape.hs | cut -d: -f1)
+    grep -Eq "^WitnessPairEscape.hs:$line:[0-9]+: error: \[GHC-$code\]" tuple-escape.log
+done
 
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape
@@ -221,6 +257,13 @@ for bad in "${bad_sources[@]}"; do
         line=$(grep -n '^    vec -> vec$' CaseEscape.hs | cut -d: -f1)
         grep -Eq "^CaseEscape.hs:$line:[0-9]+: error: \[GHC-25897\]" CaseEscape.log || {
             cat CaseEscape.log >&2
+            exit 1
+        }
+    fi
+    if [[ $bad == Escape ]]; then
+        line=$(grep -n '^projected .*=' Escape.hs | cut -d: -f1)
+        grep -Fq "Escape.hs:$line:23: error: [GHC-25897]" Escape.log || {
+            cat Escape.log >&2
             exit 1
         }
     fi

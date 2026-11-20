@@ -50,7 +50,7 @@ import GHC.Core.Unfold
 import GHC.Core.FVs
 import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
-    ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentProgram, supportsErasedUserRule
+    ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentProgram, hasRetainedRuleHead, supportsLocalUserRule
     , hasNativeDependentUnfolding, isRetainedVanillaDefaultMethod )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
@@ -462,10 +462,12 @@ tidyProgram opts (ModGuts { mg_module           = mod
                (ppr bndr)
         _ -> pure ()
     let heads = mkNameEnv [(idName b, b) | b <- bindersOfBinds trimmed_binds]
-    forM_ trimmed_rules $ \ rule ->
-      when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]) $ do
-        allowed <- case lookupNameEnv heads (ru_fn rule) of
-          Just fun -> pure (supportsErasedUserRule fun rule)
+    forM_ trimmed_rules $ \ rule -> do
+      let head_id = lookupNameEnv heads (ru_fn rule)
+      when (not (isAutoRule rule) &&
+            (maybe False hasRetainedRuleHead head_id || hasNativeDependentProgram [] [rule])) $ do
+        allowed <- case head_id of
+          Just fun -> pure (supportsLocalUserRule fun rule)
           Nothing -> opt_check_imported_rule opts rule
         unless allowed $ throwGhcExceptionIO $ PprProgramError
           "Cannot export a rewrite rule that contains retained Core."

@@ -1,10 +1,13 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ImpredicativeTypes, LinearTypes, PolyKinds, RankNTypes, TypeApplications #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ImpredicativeTypes, LinearTypes, PolyKinds, RankNTypes, RequiredTypeArguments, TypeApplications #-}
 module WitnessSchema
     ( Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer
     , CallbackPair, atTwoTypes, observePair, ignorePair
-    , Payload(..), RankedBuilder, buildAt, configured, observeBuilder, ranked
+    , ProjectionPair, projectionPair, projectionLazy
+    , Payload(..), RankedBuilder, buildAt, configured, withWitness, observeBuilder, ranked
     , Flag(..), FlaggedBuilder, observeFlagged
-    , PolyId, GuardedBuilder, consumeAt, observeGuarded, never, different
+    , PolyId, PolyMaybe, GuardedBuilder, consumeAt, observeGuarded, never, different
+    , TwoCallbacks, TwoWitnessBuilder, fromLeft, fromRight, observeTwo
+    , ConfinedTwoWitnessBuilder, conflictingLeft, fromCaptured
     , CapturedMono(..), CapturedMonoBuilder
     , Captured(..), CapturedBuilder, LinearBuilder, buildLinear, buildTwice
     ) where
@@ -44,6 +47,15 @@ observePair (f, k) = k f
 ignorePair :: CallbackPair -> Int
 ignorePair (_, _) = 9
 
+type ProjectionPair = exists (t :: Type). (t, t -> Int)
+
+projectionPair :: Bool -> ProjectionPair
+projectionPair True = (7 :: Int, (+ 1) :: Int -> Int)
+projectionPair False = (True, \b -> if b then 11 else 12)
+
+projectionLazy :: ProjectionPair
+projectionLazy = (error "forced the element" :: Bool, const 13 :: Bool -> Int)
+
 type RankedBuilderAt a = exists (t :: Type). a -> Payload t
 type RankedBuilder = RankedBuilderAt Bool
 
@@ -52,6 +64,9 @@ buildAt b = Payload @PolyId id (\f -> (f (if b then 7 else 9), f b))
 
 configured :: forall {k} (flag :: k) tag. Proxy flag -> (tag -> Bool) -> tag -> Payload PolyId
 configured _ test tag = buildAt (test tag)
+
+withWitness :: forall tag. forall t -> Proxy tag -> t -> (t -> (Int, Bool)) -> Payload t
+withWitness (type t) _ value run = Payload @t value run
 
 observeBuilder :: RankedBuilder -> Bool -> (Int, Bool)
 observeBuilder builder b = case builder b of
@@ -71,6 +86,28 @@ never = False
 
 different :: Bool -> Payload PolyMaybe
 different b = Payload @PolyMaybe Just (\f -> (maybe 0 id (f 13), maybe False id (f b)))
+
+data TwoCallbacks l r = FromLeft (Payload l) | FromRight (Payload r)
+
+type TwoWitnessBuilder = exists l. exists r. Bool -> Bool -> TwoCallbacks l r
+type ConfinedTwoWitnessBuilder = exists l. exists r. Captured -> Bool -> TwoCallbacks l r
+
+fromLeft :: forall r. Bool -> TwoCallbacks PolyId r
+fromLeft _ = FromLeft callback
+
+fromRight :: forall l. Bool -> TwoCallbacks l PolyMaybe
+fromRight b = FromRight (different b)
+
+conflictingLeft :: forall r. Bool -> TwoCallbacks PolyMaybe r
+conflictingLeft b = FromLeft (different b)
+
+fromCaptured :: forall a r. Payload (forall x. x -> a) -> TwoCallbacks (forall x. x -> a) r
+fromCaptured = FromLeft
+
+observeTwo :: TwoWitnessBuilder -> Bool -> Bool -> (Int, Bool)
+observeTwo builder choose b = case builder choose b of
+    FromLeft payload -> observePayload payload
+    FromRight payload -> observePayload payload
 
 data CapturedMono where
     CapturedMono :: Payload t -> CapturedMono
