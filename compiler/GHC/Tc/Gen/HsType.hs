@@ -2719,9 +2719,12 @@ tc_app_ty mode rn_ty exp_kind
                        AnId fun
                          | ordinary_call
                          , [left, _] <- args
-                         , Just (table, constructor) <- indexedProjectionSource fun
-                         , L _ (HsTyVar _ _ (L _ (WithUserRdr _ operand))) <- ignoreParens left
-                         , isTyVarName operand || operand == getName constructor
+                         , Just (table, nullary : recursive) <- indexedProjectionSource fun
+                         , (L _ (HsTyVar _ _ (L _ (WithUserRdr _ operand))), left_args) <-
+                             splitHsAppTys (unLoc (indexed_operand left))
+                         , (null left_args && (isTyVarName operand || operand == getName nullary)) ||
+                           (any ((== operand) . getName) recursive &&
+                            any (isOpenTypeOperand . indexed_operand) args)
                          -> do { sourceTableReferenceUse table
                                ; tc_app_ty_with_head mode rn_ty exp_kind (mkTyConTy table) }
                          | [arg] <- args, isQual rdr
@@ -2757,6 +2760,12 @@ tc_app_ty mode rn_ty exp_kind
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name
+    -- Inspect the constructor head for routing. Check the original operand
+    -- and its annotation when applying the selected kind.
+    indexed_operand ty = case ignoreParens ty of
+      L _ (HsKindSig _ operand _) -> indexed_operand operand
+      operand -> operand
+
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
     value_args = traverse value_arg (filterOut is_par hs_args)
     is_par HsArgPar{} = True
