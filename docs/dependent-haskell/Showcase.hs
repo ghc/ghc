@@ -943,6 +943,8 @@ main = do
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"
         ImplicitVector.observations
+    observe "pass a lambda with a hidden vector length and filter its result"
+        (ImplicitVector.runBuilder ImplicitVector.singletonBuilder odd (7 :: Int))
     observe "forget the retained witness and inspect the indexed payload"
         ( map (ForgetWitness.observe . ForgetWitness.forget . ForgetWitness.retained) [True, False]
         , ForgetWitness.observe (ForgetWitness.forget (ForgetWitness.unknown (error "forced witness"))) )

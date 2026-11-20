@@ -146,6 +146,22 @@ gets `"xxx"` from `toList (filled @Char 3)`. In that client,
 `safeHead (filled @Char 0)` fails with GHC-83865. Its actual length is
 `Z` and the head function requires `S n0`.
 
+### Optimizing erased packages
+
+Restricted SimpleOpt eliminates an adjacent pack and unpack when the
+witness stays in scope. The ordinary optimizer can then process the
+result. For a surviving operation, a GHC API check runs the retained
+simplifier, demand analysis, CPR, worker/wrapper and late demand analysis.
+Worker/wrapper produces an unboxed pair worker in this program. The native
+output matches the `-O0` program when the caller ignores a package or
+demands its payload. The [Core API regression](../../../testsuite/tests/ghc-api/NativeExistentialExpr.hs)
+also checks the scope of both operations after worker/wrapper.
+
+The normal `-O1` pipeline still rejects surviving operations.
+Specialisation, floating in both directions, call arity, exitification
+and common subexpression elimination still need checks on raw packages.
+An ordinary `-O1` module can call a separately compiled `-O0` provider.
+
 ## Next increments
 
 - [x] Specify and run an opaque whole-function cast probe. Use genuinely

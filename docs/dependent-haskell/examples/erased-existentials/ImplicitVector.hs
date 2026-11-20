@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -O0 #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, cells, forgetLength, observations) where
+module ImplicitVector (Filtered, filterVec, cells, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import GHC.Sigma (Sigma(Pair))
 import PackedVecLibrary (Nat(..), Vec(..), toList)
@@ -32,3 +32,19 @@ observations =
   , cells (filterVec odd (VCons 2 VNil))
   , cells (forgetLength (Pair (S Z) (VCons 9 VNil)))
   )
+
+-- | The builder chooses one length for all of its inputs.
+type Builder a = exists (n :: Nat). a -> Vec a n
+
+-- | Package a lambda that always returns one element.
+singletonBuilder :: Builder a
+singletonBuilder = \x -> VCons x VNil
+
+-- | Open the builder, then filter its output at a new hidden length.
+runBuilder :: Builder a -> (a -> Bool) -> a -> [a]
+runBuilder builder p x = collect builder p x
+  where
+    collect :: (a -> Vec a n) -> (a -> Bool) -> a -> [a]
+    collect f keep y =
+      let selected = filterVec keep (f y)
+      in cells selected

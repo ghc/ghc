@@ -195,6 +195,13 @@ mixed interfaces at the header. Each reader can still open an interface
 that contains only the feature it supports. Reversing the declarations
 keeps the same header. Reserializing the cached payload preserves its bytes.
 
+The same example passes `singletonBuilder` to `runBuilder`. The producer
+checks a lambda against `exists (n :: Nat). a -> Vec a n`. The consumer
+opens that function and binds the filtered result in a local `let`.
+The optimized Showcase imports the packaged lambda from the `-O0`
+producer. Writing the lambda at the call site introduces a raw package
+there and reaches the [optimizer restriction](R05-dependent-core.md#optimizing-erased-packages).
+
 Opening is limited to an application with a known operand head and an
 ordinary payload domain. Each opening introduces a fresh scoped
 witness. The recursive filter result can also be named with
