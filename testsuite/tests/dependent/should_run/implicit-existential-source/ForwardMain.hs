@@ -25,6 +25,12 @@ nestedKind = failAny "nested kind"
 bar :: HiddenBar a
 bar = failAny "bar producer"
 
+missingSlot :: SlotBox Int
+missingSlot = failAny "opaque family"
+
+missingRanked :: Ranked
+missingRanked = failAny "rank-n payload"
+
 chooseNested :: Bool -> PackedPair a -> PackedPair a -> PackedPair a
 chooseNested flag p q = choose flag p q
 
@@ -75,6 +81,10 @@ main = do
            cells (chooseNested False nestedOther right),
            cells (keepKnown left))
     print (barIsEmpty (chooseBar True barValue bar))
+    print (slotLabel (choose False missingSlot (slotBox (7 :: Int))),
+           inspectRanked (choose True ranked missingRanked))
+    demand "opaque family" (slotLabel missingSlot)
+    demand "rank-n payload" (inspectRanked missingRanked)
     demand "single dot" (toList single)
     demand "nested dot" (fst (cells nested))
     demand "nested producer" (fst (cells nestedOther))

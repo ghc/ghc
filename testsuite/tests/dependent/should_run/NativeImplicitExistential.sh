@@ -100,7 +100,7 @@ bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              IntroEscape Shadowed HiddenName BarLambda HeadEscape HeadSame HeadDuplicate
              EscapePackage CaseEscape CaseLinearDuplicate BarCase
              NestedEscape NestedCapture NestedDuplicate NestedInnerBar
-             ForwardScopeEscape ForwardWrongMode ForwardAmbiguous ForwardLinearCopy)
+             ForwardScopeEscape ForwardWrongMode ForwardAmbiguous ForwardLinearCopy ForwardFamilyMismatch)
 for bad in "${bad_sources[@]}"; do
     cp "$src/$bad.hs" .
     if "$ghc" "${flags[@]}" -c "$bad.hs" >"$bad.log" 2>&1; then
@@ -109,7 +109,7 @@ for bad in "${bad_sources[@]}"; do
     fi
     case "$bad" in
         UnsafeHead|SameWitness|Escape|LetEscape|LambdaEscape|Shadowed|HeadEscape|HeadSame|CaseEscape|NestedEscape) code=25897;;
-        BarClient|ModesAreDistinct|BarLambda|EscapePackage|BarCase|NestedInnerBar|ForwardScopeEscape|ForwardWrongMode) code=83865;;
+        BarClient|ModesAreDistinct|BarLambda|EscapePackage|BarCase|NestedInnerBar|ForwardScopeEscape|ForwardWrongMode|ForwardFamilyMismatch) code=83865;;
         BarPack) code=27432;;
         DotForall|DotConstraint) code=91510;;
         LinearDotDuplicate|HeadDuplicate|CaseLinearDuplicate|NestedDuplicate|ForwardLinearCopy) code=18872;;
@@ -118,7 +118,7 @@ for bad in "${bad_sources[@]}"; do
         ForwardAmbiguous) code=39999;;
     esac
     if [[ $bad == LetEscape ]]; then
-        for binding in bad different; do
+        for binding in bad different nested; do
             line=$(grep -n "^$binding .*=" LetEscape.hs | cut -d: -f1)
             grep -Eq "^LetEscape.hs:$line:[0-9]+: error: \[GHC-25897\]" LetEscape.log || {
                 cat LetEscape.log >&2

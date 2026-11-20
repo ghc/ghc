@@ -1,6 +1,11 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RequiredTypeArguments #-}
-module ForwardSchemas (HiddenBar, Restricted, barValue, barIsEmpty, restrict) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, RequiredTypeArguments, TypeFamilies #-}
+module ForwardSchemas
+    ( HiddenBar, Restricted, barValue, barIsEmpty, restrict
+    , SlotBox, slotBox, slotLabel, Ranked, ranked, inspectRanked
+    ) where
 
+import Data.Kind (Type)
+import Data.Proxy (Proxy(..))
 import qualified GHC.Exists as Exists
 import Vector
 
@@ -18,3 +23,20 @@ barIsEmpty p = case p of
 
 restrict :: Vec n a -> Vec m a -> Restricted n a
 restrict ls rs = (ls, rs)
+
+type family Slot (w :: Type) :: Type
+type SlotBox a = exists (w :: Type) | (a, Proxy (Slot w))
+
+slotBox :: a -> SlotBox a
+slotBox x = Exists.Pack (type Bool) (x, Proxy)
+
+slotLabel :: SlotBox a -> a
+slotLabel p = case p of Exists.Pack _ (x, _) -> x
+
+type Ranked = exists (w :: Type) | forall b. b -> (b, Proxy w)
+
+ranked :: Ranked
+ranked = Exists.Pack (type Bool) (\x -> (x, Proxy))
+
+inspectRanked :: Ranked -> Int
+inspectRanked p = case p of Exists.Pack _ f -> fst (f (11 :: Int))
