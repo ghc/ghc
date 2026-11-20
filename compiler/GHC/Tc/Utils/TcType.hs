@@ -1489,6 +1489,8 @@ getDFunTyKey (TyVarTy tv)            = getOccName tv
 getDFunTyKey ty@(TermAppTy {})       = pprPanic "getDFunTyKey: unsupported runtime call index" (ppr ty)
 getDFunTyKey ty@(TermVarTy {})       = pprPanic "getDFunTyKey: unsupported runtime index" (ppr ty)
 getDFunTyKey ty@(DepFunTy {})        = pprPanic "getDFunTyKey: unsupported retained function" (ppr ty)
+-- See Note [Existential types in instance arguments].
+getDFunTyKey ExistsTy{}              = mkVarOcc "exists"
 getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
@@ -1496,6 +1498,20 @@ getDFunTyKey (FunTy { ft_af = af })  = getOccName (funTyFlagTyCon af)
 getDFunTyKey (ForAllTy _ _ t)          = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
+
+{- Note [Existential types in instance arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An instance argument can contain a first-class existential package.
+Use a fixed dictionary name component for the package head.
+GHC.Tc.Utils.Env chooses a distinct occurrence when two instances
+have the same component. The bound variable's name is irrelevant.
+
+The Paterson check counts the binder's kind and its body, just
+as it does for a quantified type. An occurrence of the witness in
+the body contributes to the size. Only free variables contribute
+to the variable occurrence check. Matching still uses the rules in
+Note [Opaque existential matching] in GHC.Core.Unify.
+-}
 
 getDFunTyLitKey :: TyLit -> OccName
 getDFunTyLitKey (NumTyLit n) = mkOccName Name.varName (show n)
@@ -2426,6 +2442,9 @@ pSizeTypeX bvs (TyConApp tc tys)         = pSizeTyConAppX bvs tc tys
 pSizeTypeX bvs (AppTy fun arg)           = pSizeTypeX bvs fun `addPSize` pSizeTypeX bvs arg
 pSizeTypeX bvs (FunTy _ ma w arg res)    = pSizeTypeX bvs ma `addPSize` pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
                                            pSizeTypeX bvs res
+pSizeTypeX bvs (ExistsTy _ tv body)     = pSizeTypeX bvs (tyVarKind tv) `addPSize`
+                                           pSizeTypeX (bvs `extendVarSet` tv) body
+  -- See Note [Existential types in instance arguments].
 pSizeTypeX bvs (ForAllTy ma (Bndr tv _) ty) = pSizeTypeX bvs ma `addPSize`
                                            pSizeTypeX bvs (tyVarKind tv) `addPSize`
                                            pSizeTypeX (bvs `extendVarSet` tv) ty
