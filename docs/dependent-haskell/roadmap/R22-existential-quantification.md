@@ -318,3 +318,21 @@ payload pair forces it. Both length witnesses stay independent,
 including after interface readback. The dependent-kind control
 checks `exists (k :: Type). exists (v :: k). Proxy v`.
 [Elab-Gen and Elab-IExist in An Existential Crisis Resolved](https://richarde.dev/papers/2021/exists/exists.pdf).
+
+
+### Forwarding at a known package type
+
+An ordinary polymorphic producer can use the expected package as its
+result type argument. For example, `choose flag p q` can return an
+existing `PackedPair a`. The same rule covers a user-defined
+exception producer or `error`. A choice can include consecutive
+binders and a kind that depends on an earlier binder. The chosen
+type argument preserves the bar and dot modes.
+
+The checker matches the kind and complete package type. Each
+binder's kind and the final payload must have tau syntax, and the
+body must be family-free. Any other ordinary parameters still use
+the application checker. Returning a package through this route
+preserves the producer's demand. An ordinary client can ignore a
+bottom package and observes the producer's original exception when
+it demands the payload.

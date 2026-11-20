@@ -25,3 +25,12 @@ constructor pattern demanded the package
 (True,True)
 ([7],[2])
 observing the payload demanded the pair
+(True,([7],[2,4]),([],[9]),([7],[2,4]))
+True
+single dot
+nested dot
+nested producer
+nested kind
+bar producer
+nested producer after an ordinary argument
+strict ordinary argument
