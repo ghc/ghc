@@ -3764,7 +3764,7 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
                                parent inj'
   ; return (tycon, []) }
 
-  | ClosedTypeFamily scope mb_eqns <- fam_info
+  | ClosedTypeFamily (_, scope) mb_eqns <- fam_info
   = -- Closed type families are a little tricky, because they contain the definition
     -- of both the type family and the equations for a CoAxiom.
     do { traceTc "tcFamDecl1 Closed type family:" (ppr tc_name)

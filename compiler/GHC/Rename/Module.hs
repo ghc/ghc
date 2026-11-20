@@ -2704,10 +2704,10 @@ rnTyClDecl :: OccEnv (OccName, Bool) -> TyClDecl GhcPs
 rnTyClDecl scopes (FamDecl { tcdFam = fam })
   = do { (fam', fvs) <- rnFamDecl Nothing fam
        ; info <- case fdInfo fam' of
-           ClosedTypeFamily _ equations
+           ClosedTypeFamily (anns, _) equations
              | Just (root, is_sum) <- lookupOccEnv scopes (rdrNameOcc (unLoc (fdLName fam))) -> do
                  owner <- getName <$> lookupTopBndrRn WL_TyCon (mkRdrUnqual root)
-                 pure (ClosedTypeFamily (Just (owner, is_sum)) equations)
+                 pure (ClosedTypeFamily (anns, Just (owner, is_sum)) equations)
            ordinary -> pure ordinary
        ; return (FamDecl noExtField fam' { fdInfo = info }, fvs) }
 
@@ -3256,13 +3256,13 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
 
      ----------------------
      rn_info :: FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeNames)
-     rn_info (ClosedTypeFamily _ (Just eqns))
+     rn_info (ClosedTypeFamily anns (Just eqns))
        = do { (eqns', fvs)
                 <- rnList (rnTyFamInstEqn (NonAssocTyFamEqn ClosedTyFam)) eqns
                                           -- no class context
-            ; return (ClosedTypeFamily Nothing (Just eqns'), fvs) }
-     rn_info (ClosedTypeFamily _ Nothing)
-       = return (ClosedTypeFamily Nothing Nothing, emptyFNs)
+            ; return (ClosedTypeFamily (anns, Nothing) (Just eqns'), fvs) }
+     rn_info (ClosedTypeFamily anns Nothing)
+       = return (ClosedTypeFamily (anns, Nothing) Nothing, emptyFNs)
      rn_info (OpenTypeFamily x) = return (OpenTypeFamily x, emptyFNs)
      rn_info (DataFamily x)     = return (DataFamily x, emptyFNs)
 
