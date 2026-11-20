@@ -9,6 +9,15 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+An ordinary module proves that filtering a finite list cannot increase
+its `size`. At each head, a checked `Prelude.filter` equation says
+whether that element stays or goes. For `Prelude.not`, knowing the
+predicate result supplies the equation even when the head is unknown.
+For an abstract predicate, the current compiler requires the step
+equation itself. The source-hidden regression checks both limits and
+rejects the reversed bound for a singleton that the filter drops.
+[Filter proof](examples/open-evaluation/PreludeFilterLengthProof.hs).
+
 A function can repeat the same type-level case in its argument and result.
 For `caseIdentity`, the result type is `Int` at `True` and `Bool` at
 `False`. The body simply returns its argument even while the index is
