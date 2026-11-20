@@ -147,3 +147,52 @@ masked Dict = let
     in ()
 HS
 reject 'This call needs a known' -Wno-simplifiable-class-constraints Given.hs
+
+cat >FoldMethods.hs <<'HS'
+{-# LANGUAGE AllowAmbiguousTypes #-}
+module FoldMethods (Routed(..), Ambiguous(..)) where
+
+import qualified NativeOpenListFoldrProducer as F
+
+class Routed t where
+    routed :: (a -> b -> b) -> b -> t a -> b
+    routedTag :: t a -> Bool
+
+instance Routed [] where
+    routed = F.direct
+    routedTag _ = True
+
+class Ambiguous t where
+    ambiguous :: (a -> b -> b) -> b -> [a] -> b
+    ambiguousTag :: t a -> Bool
+
+instance Ambiguous [] where
+    ambiguous = F.direct
+    ambiguousTag _ = True
+
+instance Ambiguous Maybe where
+    ambiguous _ z _ = z
+    ambiguousTag _ = False
+HS
+cat >FoldMethodProof.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module FoldMethodProof where
+
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (U)
+import qualified FoldMethods as C
+
+cons :: forall a b (k :: a %U -> b %U -> b) (z :: b) (x :: a) (xs :: [a]).
+        Proxy k -> Proxy z -> Proxy x -> Proxy xs
+     -> C.routed k z (x ': xs) :~: k x (C.routed k z xs)
+cons _ _ _ _ = Refl
+HS
+sed 's/C.routed/C.ambiguous/g' FoldMethodProof.hs >AmbiguousMethodProof.hs
+"${ghc[@]}" -O0 "${strip[@]}" -c FoldMethods.hs
+"${ghc[@]}" -O0 -fignore-interface-pragmas -c FoldMethodProof.hs
+reject '[GHC-70565]' -O0 -fignore-interface-pragmas AmbiguousMethodProof.hs
+"${ghc[@]}" -O1 -fforce-recomp -c FoldMethods.hs
+reject '[GHC-70565]' -fno-ignore-interface-pragmas AmbiguousMethodProof.hs

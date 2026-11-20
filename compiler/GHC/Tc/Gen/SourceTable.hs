@@ -10,7 +10,7 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
 import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
-import GHC.Core.Class (Class, classAllSelIds, classMethods, classTyCon)
+import GHC.Core.Class (Class, classAllSelIds, classMethods, classTyCon, classTyVars)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
 import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, boolTy, falseDataCon, trueDataCon, charTy, charTyCon, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
@@ -510,6 +510,7 @@ so that a change to the provider invalidates the proof.
 lookupSourceListFoldMethod :: Id -> Type -> TcM (Maybe (Id, Id, TyCon))
 lookupSourceListFoldMethod selector domain
   | Just cls <- isClassOpId_maybe selector
+  , listFoldSelector cls selector
   , noFreeVarsOfType domain, isTyFamFree domain = do
       insts <- tcGetInstEnvs
       env <- getGblEnv
@@ -536,6 +537,20 @@ lookupSourceListFoldMethod selector domain
                 _ -> pure Nothing
         _ -> pure Nothing
   | otherwise = pure Nothing
+
+-- | The selector's list operand must determine the class parameter.
+-- Inspect the unspecialized method type. A method that always takes a list
+-- can have the same specialized type without selecting the list dictionary.
+listFoldSelector :: Class -> Id -> Bool
+listFoldSelector cls selector = isJust $ do
+    [parameter] <- pure (classTyVars cls)
+    let (_, body) = splitForAllForAllTyBinders
+                      (classMethodInstTy selector [mkTyVarTy parameter])
+    (_, after_step) <- caseArrow body
+    (_, after_seed) <- caseArrow after_step
+    (receiver, _) <- caseArrow after_seed
+    (head_ty, _) <- splitAppTy_maybe receiver
+    guard (getTyVar_maybe head_ty == Just parameter)
 
 -- | Pair the actual fields of a complete ground dictionary with its selectors.
 dictionarySlots :: Class -> Type -> DataCon -> [Core.CoreExpr] -> Maybe [(Id, Core.CoreExpr)]
@@ -578,6 +593,7 @@ publishListFoldMethods mod binds = map publishBind binds
       let methods =
             [ (selector, target)
             | (selector, Core.Var field) <- slots, selector `elem` classMethods cls
+            , listFoldSelector cls selector
             , Just target <- [current field]
             , varType target `eqType` classMethodInstTy selector [domain]
             , Just table <- [sourceTableId_maybe target], isListFoldTable table ]
