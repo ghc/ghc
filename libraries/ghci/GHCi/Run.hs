@@ -130,7 +130,7 @@ run m = case m of
     InfoProv.whereFrom =<< localRef ref
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
-
+  WaitThreadResult b tid -> waitThreadResult b tid
   Shutdown            -> unexpectedMessage m
   RunTH {}            -> unexpectedMessage m
   RunModFinalizers {} -> unexpectedMessage m
@@ -214,7 +214,7 @@ tryEval io = do
 
 --------------------------------------------------------------------------------
 
-evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (EvalStatus [HValueRef])
+evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (RemoteRef ThreadId)
 evalStmt opts expr = do
   io <- mkIO expr
   sandboxIO opts $ do
@@ -256,7 +256,7 @@ evalStringToString r str = do
 -- The UI process has more and therefore also can show more
 -- information about the breakpoint than the current iserv
 -- process.
-doSeq :: RemoteRef a -> IO (EvalStatus [HValueRef])
+doSeq :: RemoteRef a -> IO (RemoteRef ThreadId)
 doSeq ref = do
     sandboxIO evalOptsSeq $ do
       _ <- (void $ evaluate =<< localRef ref)
@@ -264,7 +264,7 @@ doSeq ref = do
 
 -- | Process a ResumeSeq message. Continue the :force processing     #2950
 -- after a breakpoint.
-resumeSeq :: RemoteRef ThreadId -> IO (EvalStatus [HValueRef])
+resumeSeq :: RemoteRef ThreadId -> IO ()
 resumeSeq = resumeStmt evalOptsSeq
 
 evalOptsSeq :: EvalOpts
@@ -287,13 +287,14 @@ evalOptsSeq = EvalOpts
 -- only while we execute the user's code.  We can't afford to lose the final
 -- 'writeThreadEvalStatus', otherwise deadlock ensues. (#1583, #1922, #1946)
 
-sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (EvalStatus [HValueRef])
+sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (RemoteRef ThreadId)
 sandboxIO opts io = do
     -- Make sure the global breakpoint action is set; and that the interpreter
     -- main thread doesn't stop at breakpoints in it.
     -- See Note [Disable breakpoints in certain threads]
     poke breakPointIOAction globalBreakStablePtr
-    disableThreadBreakpoints =<< myThreadId
+    mytid <- myThreadId
+    disableThreadBreakpoints mytid
 
     -- We are running in uninterruptibleMask
     let runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
@@ -309,11 +310,7 @@ sandboxIO opts io = do
            -- * When the "main" thread finishes (here)
            -- * When any thread hits a breakpoint (global break action)
            unsafeUnmask runIt >>= writeThreadEvalStatus tid
-
-         main <- mkMainThreadWithContext tid
-         atomically $ modifyTVar evaluationMainThreadGlobalVar (main :)
-         redirectInterrupts tid $ unsafeUnmask $
-           atomically $ readEvalStatus opts main
+         mkRemoteRef tid
        else
           -- GLUT on OS X needs to run on the main thread. If you
           -- try to use it from another thread then you just get a
@@ -325,7 +322,9 @@ sandboxIO opts io = do
           -- tracing, etc.) need the expression to be running in a
           -- separate thread, so debugging is only enabled when
           -- using the sandbox.
-         runIt
+         runIt >> mkRemoteRef mytid
+          -- the eval is done synchronously, but we still return a tid.
+          -- then, waitThreadResult of this tid will return immediately.
 
 -- We want to turn ^C into a break when -fbreak-on-exception is on,
 -- but it's an async exception and we only break for sync exceptions.
@@ -439,31 +438,47 @@ Likewise for other interactions between eval/resume/abandon.
 TL;DR: always `setBreakFlags` when running/resuming a thread
 -}
 
-resumeStmt :: EvalOpts -> RemoteRef ThreadId -> IO (EvalStatus [HValueRef])
+resumeStmt :: EvalOpts -> RemoteRef ThreadId -> IO ()
 resumeStmt opts rtid = do
   tid <- localRef rtid
   ctx <- getThreadResumeContext tid
   setBreakFlags opts tid
-  main:_ <- readTVarIO evaluationMainThreadGlobalVar
-  mask_ $ do
-    resumeStoppedThread ctx -- this awakens the stopped thread...
+  resumeStoppedThread ctx -- this awakens the stopped thread...
+
+-- | Wait for the given main thread of an evaluation to complete or break or,
+-- if 'readAllBreaks :: Bool', for any other thread to break.
+readEvalStatus :: Bool -> ResumeContext -> STM (EvalStatus [HValueRef])
+readEvalStatus readAllBreaks ctx = do
+  readCtxEvalStatus ctx
+    & if readAllBreaks
+        then (`orElse` (EvalPaused <$> readAnyThreadEvalBreak))
+        else id
+
+-- | Await the result or breakpoint of a main evaluation thread (started with
+-- 'sandboxIO', unless -fno-ghci-sandbox). If the @readAllBreaks :: Bool@ is
+-- @True@, we may also return breakpoints hit by any other non-sandboxed
+-- threads in the interpreter.
+--
+-- If this function is used on a non-main-eval thread, such as one forked by
+-- the main debuggee that hit a breakpoint, we will only ever return its
+-- breakpoints, as that thread won't write ever a 'EvalComplete' result.
+-- @readAllBreaks@ works the same.
+waitThreadResult :: Bool -> RemoteRef ThreadId -> IO (EvalStatus [HValueRef])
+waitThreadResult readAllBreaks r = do
+  tid <- localRef r
+  ctx <- getThreadResumeContext tid
+  atomically $ readEvalStatus readAllBreaks ctx
+{-
+TODO: AWAIT A RESUME STMT
     -- wait for the result of the main thread, not of the stopped one, but
     -- interrupt the thread which was resumed.
     redirectInterrupts tid $ unsafeUnmask $
-      atomically $ readEvalStatus opts main
+      atomically $ readEvalStatus (readAllBreaks opts) main
 
--- | Wait for the given main thread of an evaluation to complete or break or,
--- if 'readAllBreaks', for any other thread to break.
-readEvalStatus :: EvalOpts -> MainThreadWithCtx -> STM (EvalStatus [HValueRef])
-readEvalStatus opts main = do
-  r <- readCtxEvalStatus (mainContext main)
-    & if readAllBreaks opts
-        then (`orElse` (EvalPaused <$> readAnyThreadEvalBreak))
-        else id
-  case r of
-    EvalComplete{} -> popMainThread main
-    EvalPaused{}   -> pure ()
-  pure r
+TODO: AWAIT A SANDBOXIO
+    redirectInterrupts tid $ unsafeUnmask $
+      atomically $ readEvalStatus (readAllBreaks opts) main
+-}
 
 -- | When abandoning a computation we have to
 --      (a) kill the stopped thread with an async exception, so that the
@@ -477,17 +492,14 @@ readEvalStatus opts main = do
 --          This step is necessary to prevent race conditions with
 --          -fbreak-on-exception (see #5975).
 --  See test break010 and break034.
+--
+-- If the expression where we're stopped catches asynchronous exceptions it
+-- might catch the `AbandonException` instead of abandoning.
 abandonStmt :: RemoteRef ThreadId -> IO ()
 abandonStmt hvref = do
-  main:_ <- readTVarIO evaluationMainThreadGlobalVar
   tid <- localRef hvref
   setBreakFlags evalOptsAbandon tid
-  throwTo tid AbandonException -- kill stopped thread, then wait for main thread
-  atomically $
-    readCtxEvalStatus (mainContext main) >>= \case
-      -- throwTo may return before the thread is marked as running
-      EvalPaused{} -> retry
-      EvalComplete{} -> popMainThread main
+  throwTo tid AbandonException -- kill the stopped thread
   where
     -- Don't stop anywhere on abandon
     evalOptsAbandon = EvalOpts
@@ -504,34 +516,3 @@ data AbandonException = AbandonException deriving Show
 instance Exception AbandonException where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
-
---------------------------------------------------------------------------------
--- To remove completely when sandboxIO/resume becomes asynchronous:
---------------------------------------------------------------------------------
-
--- | The main threads of the exprs being currently evaluated, the most recent
--- first. Evaluating an expr while stopped at a breakpoint pushes its thread on
--- top of the stopped one, until it completes.
---
--- FIXME: Remove this global variable. It is only needed while `resumeStmt` is
--- synchronous, since `resumeStmt` currently tries to return the Eval result of
--- the main thread (which is a bit non-sensical for a resume operation to do).
--- It is only needed to preserve the previous behavior, but as soon as
--- `evalStmt` returns the sandboxIO thread id we can wait on that explicitly
--- instead of resuming having anything to do with waiting for the main
--- evaluation result.
-evaluationMainThreadGlobalVar :: TVar [MainThreadWithCtx]
-evaluationMainThreadGlobalVar = unsafePerformIO $ newTVarIO []
-{-# NOINLINE evaluationMainThreadGlobalVar #-}
-
--- | (Keep the ResumeContext to reduce allocations, triggered interpreter_steplocal regression)
-data MainThreadWithCtx = MainThreadWithCtx { mainKey :: !Word64, mainContext :: !ResumeContext }
-
-mkMainThreadWithContext :: ThreadId -> IO MainThreadWithCtx
-mkMainThreadWithContext tid = MainThreadWithCtx (fromThreadId tid) <$> getThreadResumeContext tid
-
--- | FIXME: Kill this function, just like 'evaluationMainThreadGlobalVar' will be killed.
-popMainThread :: MainThreadWithCtx -> STM ()
-popMainThread main =
-  modifyTVar evaluationMainThreadGlobalVar (filter ((/= mainKey main) . mainKey))
-
