@@ -647,6 +647,16 @@ The tests check lazy and cyclic Haskell values separately. They do not establish
 a general preservation theorem. Ambient-evidence normalization under retained
 binders, changed-domain congruence, and alias-expression serialization stay gated.
 
+A proof-bearing case can also inspect a nested constructor such as
+`S (S k)` after a client inlines its provider. CorePrep names the inner
+constructor. It lifts that name's equality through the outer `S` and
+uses it to recover the original proof in each branch. An ordinary
+client exercises this rule by checking empty append for two undefined
+vectors at the known cut `S (S Z)`. Agda's inspect idiom retains an
+equality between a value and a name for it. The Haskell rule uses
+nominal Core coercions and preserves lazy constructor fields.
+[Agda 2.8.0, with-abstraction equality](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#with-abstraction-equality).
+
 [Koronkevich, Rakow, Ahmed, and Bowman, *ANF preserves dependent types up to
 extensional equality*](https://doi.org/10.1017/S0956796822000090), JFP 32, e12
 (2022), studies this naming problem. Section 4.1 retains the identity of the

@@ -958,13 +958,12 @@ cpeBodyF env (Case scrut bndr _ [Alt (DataAlt dc) [token_out, res] rhs])
 
 cpeBodyF env (Case scrut bndr ty alts)
   | cp_allowNativeDependent (cpe_config env)
-  , App (Var fun) arg <- scrut
-  , isNativeIndexFunctionId fun
-  , not (exprIsTrivial arg)
   , any (\alt -> isNativeIndexAlt alt || isNativeIndexAliasAlt alt) alts
   , Just {} <- exprToNativeCaseIndex scrut
-  = do { named <- nameNativeCaseArgument fun arg bndr ty alts
-       ; cpeBodyF env named }
+  , Just prepare <- prepareNativeCaseScrutinee ty scrut
+  = do { (scrut', co, wrap) <- prepare
+       ; alts' <- mapM (transportNativeCaseAlt bndr co) alts
+       ; cpeBodyF env (wrap (Case scrut' bndr ty alts')) }
   | otherwise
   = do { (floats, scrut') <- cpeBodyF env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
@@ -1215,18 +1214,13 @@ nameNativeIndexArg result_ty arg
         | Just con <- isDataConWorkId_maybe worker
         , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
         , not (null fields)
-        -> do { named <- mapM (nameNativeIndexArg result_ty) fields
-              ; let atoms = [atom | (atom, _, _) <- named]
-                    field_cos = [co | (_, co, _) <- named]
-                    wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
-                    scrut = mkConApp con (type_args ++ atoms)
-                    scrut_index = expectJust (exprToNativeIndex scrut)
-                    static_cos = [mkNomReflCo ty | Type ty <- type_args]
+        -> do { (scrut, field_co, wrap_fields) <-
+                   nameNativeConFields result_ty con type_args fields
+              ; let scrut_index = coercionLKind field_co
               ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
               ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
                            (mkNomEqPred (TermVarTy value) scrut_index)
-              ; let co = mkTransCo (mkCoVarCo proof)
-                           (mkTyConAppCo Nominal (promoteDataCon con) (static_cos ++ field_cos))
+              ; let co = mkTransCo (mkCoVarCo proof) field_co
                     wrap body = wrap_fields $
                       Case scrut value result_ty [Alt DEFAULT [proof] body]
               ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
@@ -1234,35 +1228,50 @@ nameNativeIndexArg result_ty arg
       (Var _, args) | all isTypeArg args -> return (normal, mkReflCo Nominal index, id)
       _ -> nativeIndexTransportError "an unsupported normalized retained argument"
 
--- | Preserve strict call evidence when ANF naming changes its scalar argument.
--- See Note [Opaque call arguments in CorePrep].
-nameNativeCaseArgument :: Id -> CoreExpr -> Id -> Type -> [CoreAlt]
-                       -> UniqSM CoreExpr
-nameNativeCaseArgument fun arg bndr ty alts
-  = do { (atom, arg_co, wrap) <- nameNativeIndexArg ty arg
-       ; let call_co = mkTermAppCo fun arg_co
-             prepared_index = coercionLKind call_co
-       ; alts' <- mapM (transport_alt call_co prepared_index) alts
-       ; return (wrap (Case (App (Var fun) atom) bndr ty alts')) }
+-- | Name constructor fields and lift their equalities through the constructor.
+nameNativeConFields :: Type -> DataCon -> [CoreArg] -> [CoreArg]
+                    -> UniqSM (CoreExpr, CoercionN, CoreExpr -> CoreExpr)
+nameNativeConFields result_ty con type_args fields
+  = do { named <- mapM (nameNativeIndexArg result_ty) fields
+       ; let scrut = mkConApp con (type_args ++ [atom | (atom, _, _) <- named])
+             static_cos = [mkNomReflCo ty | Type ty <- type_args]
+             co = mkTyConAppCo Nominal (promoteDataCon con)
+                    (static_cos ++ [field_co | (_, field_co, _) <- named])
+       ; return (scrut, co, foldr (.) id [wrap | (_, _, wrap) <- named]) }
+
+-- | Prepare a scrutinee whose branch proofs refer to its original index.
+-- See Note [Naming fields of a dependent case scrutinee].
+prepareNativeCaseScrutinee :: Type -> CoreExpr
+                           -> Maybe (UniqSM (CoreExpr, CoercionN, CoreExpr -> CoreExpr))
+prepareNativeCaseScrutinee ty (App (Var fun) arg)
+  | isNativeIndexFunctionId fun, not (exprIsTrivial arg)
+  = Just $ do { (atom, co, wrap) <- nameNativeIndexArg ty arg
+              ; return (App (Var fun) atom, mkTermAppCo fun co, wrap) }
+prepareNativeCaseScrutinee ty scrut
+  | (Var worker, args) <- collectArgs scrut
+  , Just con <- isDataConWorkId_maybe worker
+  , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
+  , any (not . exprIsTrivial) fields
+  = Just (nameNativeConFields ty con type_args fields)
+  | otherwise = Nothing
+
+-- | Give the alternative its prepared proof and recover the original proof in its RHS.
+transportNativeCaseAlt :: Id -> CoercionN -> CoreAlt -> UniqSM CoreAlt
+transportNativeCaseAlt bndr scrut_co alt@(Alt con args rhs)
+  | isNativeIndexAlt alt
+  , Just (fields, old_cv) <- snocView args
+  = do { cv <- mkSysLocalOrCoVarM (fsLit "native_case") ManyTy
+                 (mkNomEqPred prepared_index (coVarRType old_cv))
+       ; let old_co = mkTransCo (mkSymCo scrut_co) (mkCoVarCo cv)
+       ; return (Alt con (fields ++ [cv]) (replace_proof old_cv old_co rhs)) }
+  | isNativeIndexAliasAlt alt, [old_cv] <- args
+  = do { cv <- mkSysLocalOrCoVarM (fsLit "native_case_alias") ManyTy
+                 (mkNomEqPred (TermVarTy bndr) prepared_index)
+       ; let old_co = mkTransCo (mkCoVarCo cv) scrut_co
+       ; return (Alt con [cv] (replace_proof old_cv old_co rhs)) }
+  | otherwise = return alt
   where
-    transport_alt call_co prepared_index alt@(Alt con args rhs)
-      | DataAlt dc <- con
-      , isNativeIndexAlt alt
-      , (fields, [old_cv]) <- splitAt (dataConRepArity dc) args
-      = do { cv <- mkSysLocalOrCoVarM (fsLit "native_call") ManyTy
-                     (mkNomEqPred prepared_index
-                       (mkTyConApp (promoteDataCon dc)
-                         (tyConAppArgs (coreFullView (varType bndr)) ++ map TermVarTy fields)))
-           ; let old_co = mkTransCo (mkSymCo call_co) (mkCoVarCo cv)
-           ; return (Alt con (fields ++ [cv]) (replace_proof old_cv old_co rhs)) }
-      | DEFAULT <- con
-      , [old_cv] <- args
-      , isCoVar old_cv
-      = do { cv <- mkSysLocalOrCoVarM (fsLit "native_call_alias") ManyTy
-                     (mkNomEqPred (TermVarTy bndr) prepared_index)
-           ; let old_co = mkTransCo (mkCoVarCo cv) call_co
-           ; return (Alt con [cv] (replace_proof old_cv old_co rhs)) }
-      | otherwise = return alt
+    prepared_index = coercionLKind scrut_co
 
     replace_proof old_cv co rhs
       = assertPpr (coercionType co `eqType` varType old_cv) (ppr old_cv $$ ppr co) $
@@ -1270,6 +1279,23 @@ nameNativeCaseArgument fun arg bndr ty alts
       where
         in_scope = mkInScopeSet
           (extendVarSetList (exprFreeVars rhs `unionVarSet` tyCoVarsOfCo co) [bndr])
+
+{- Note [Naming fields of a dependent case scrutinee]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose a case scrutinises S (S k). Its Z branch has a proof whose
+left endpoint is 'S ('S k), even when that branch is unreachable.
+Ordinary CorePrep names the inner S k and scrutinises S x. A plain
+let does not give Core Lint the equality between x and 'S k.
+
+Name the inner constructor with the checked alias used for retained
+arguments. Lift its equality through the outer constructor to obtain
+q :: 'S x ~# 'S ('S k). The prepared branch binds p :: 'S x ~# 'Z.
+Use sym q ; p wherever the original branch used its proof. For a DEFAULT
+alias use p ; q, since its right endpoint is the scrutinee. The original
+case still scrutinises the outer constructor. Naming an inner constructor
+does not evaluate its fields. Variable fields keep their original names.
+See Note [Retained constructor arguments in CorePrep].
+-}
 
 {- Note [Opaque call arguments in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
