@@ -22,7 +22,10 @@ Matching an indexed vector constructor to refine the value `xs` remains open.
 It returns two vectors of lengths `n` and `m`. The Showcase also
 checks the contents of a concrete split. Appending the two parts of
 `[True, False]` gives that same vector. Swapping the elements makes the
-equality proof fail at `Refl`. The law for every input vector remains open.
+equality proof fail at `Refl`. The ordinary polymorphic `appendVec` can itself appear in a type.
+GHC infers the input lengths of two written vectors, reduces their sum,
+and checks the exact output elements. The law for every input vector
+remains open.
 [Split and prior art](REFERENCES.md#split-a-vector-at-a-retained-length) and
 [contents proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
 

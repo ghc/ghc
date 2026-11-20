@@ -8,6 +8,14 @@ increments.
 
 ## Family and package checkpoints
 
+At `7d04760583`, all 347 Showcase lines matched with the combined compiler
+relink at `-O0`, default `-O1`, and default `-O2`. The registered vector
+program also ran with Core and STG Lint. The proof at the expression
+`Refl` failed with GHC-83865 when the two appended elements were swapped.
+A separately compiled ordinary route function checks a result family
+indexed by a user-defined stop type.
+[Examples](Showcase.hs) and [indexed route](../../testsuite/tests/dependent/should_run/NativeClosedIndexedRoute.hs).
+
 At `c753344c5b`, a compiler relink with the opaque-domain, beta-reduction,
 and signature changes matched all 345 Showcase lines at `-O0`, default
 `-O1`, and default `-O2`. Core and STG Lint passed.
