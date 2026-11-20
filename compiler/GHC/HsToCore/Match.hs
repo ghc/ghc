@@ -45,6 +45,8 @@ import GHC.HsToCore.Match.Literal
 
 import GHC.Core
 import GHC.Core.Utils
+import GHC.Core.FVs (exprFreeVars)
+import qualified GHC.Core.Subst as Subst
 import GHC.Core.Make
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -59,6 +61,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
+import GHC.Types.Var.Env (mkInScopeSet, extendInScopeSetList)
 
 import GHC.Data.Maybe
 import GHC.Utils.Misc
@@ -213,7 +216,7 @@ match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
             PgBang    -> matchBangs      vars ty (dropGroup eqns)
             PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
             PgView {} -> matchView       vars ty (dropGroup eqns)
-            PgExists  -> matchExists     vars ty (dropGroup eqns)
+            PgExists {} -> matchExists     vars ty (dropGroup eqns)
       where eqns' = NE.toList eqns
             ne l = case NE.nonEmpty l of
               Just nel -> nel
@@ -269,14 +272,31 @@ matchCoercion (var :| vars) ty eqns@(eqn1 :| _)
                  { let bind = NonRec var' (core_wrap (matchIdExpr var))
                  ; return (mkCoLetMatchResult bind match_result) } } }
 
--- | Open the package around this equation at the selected match column.
+-- | Open the package once for this group at the selected match column.
 matchExists :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE
             -> DsM (MatchResult CoreExpr)
-matchExists (var :| vars) ty (eqn :| [])
-  | XPat (NativeExistsPat _ witness payload ev_binds pat) <- firstPat eqn
-  = dsTcEvBinds ev_binds $ \binds ->
-    do { result <- match (mkMatchId payload : vars) ty [decomposeFirstPat (const pat) eqn]
-       ; return (fmap (Unpack witness payload (matchIdExpr var) . mkCoreLets binds) result) }
+matchExists (var :| vars) ty eqns@(first :| _)
+  | XPat (NativeExistsPat _ witness payload _ _) <- firstPat first
+  = do { results <- traverse (match_row witness payload) eqns
+       ; return (fmap (Unpack witness payload (matchIdExpr var))
+                     (foldr1 combineMatchResults results)) }
+  where
+    match_row witness payload eqn
+      | XPat (NativeExistsPat _ row_witness row_payload ev_binds pat) <- firstPat eqn
+      = dsTcEvBinds ev_binds $ \binds ->
+        do { result <- match (mkMatchId row_payload : vars) ty
+                              [decomposeFirstPat (const pat) eqn]
+           ; let share body
+                   | row_witness == witness = body
+                   | otherwise =
+                       let scope = mkInScopeSet (exprFreeVars body)
+                                     `extendInScopeSetList` [witness, payload]
+                           subst = Subst.mkOpenSubst scope
+                                     [(row_witness, Type (mkTyVarTy witness)),
+                                      (row_payload, Var payload)]
+                       in Subst.substExpr subst body
+           ; return (fmap (share . mkCoreLets binds) result) }
+      | otherwise = panic "matchExists: incompatible row"
 matchExists _ _ _ = panic "matchExists"
 
 matchView :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
@@ -1018,7 +1038,7 @@ data PatGroup
   | PgView (LHsExpr GhcTc) -- view pattern (e -> p):
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
-  | PgExists            -- A fresh witness for one equation
+  | PgExists Type       -- Checked package type
 
 instance Show PatGroup where
   show PgAny = "PgAny"
@@ -1140,6 +1160,7 @@ sameGroup (PgCo t1)     (PgCo t2)     = t1 `eqType` t2
         -- enclosed pattern is the same. The patterns outside the CoPat
         -- always have the same type, so this boils down to saying that
         -- the two coercions are identical.
+sameGroup (PgExists t1) (PgExists t2) = t1 `eqType` t2
 sameGroup (PgView e1 t1) (PgView e2 t2) = viewLExprEq (e1,t1) (e2,t2)
        -- ViewPats are in the same group iff the expressions
        -- are "equal"---conservatively, we use syntactic equality
@@ -1303,7 +1324,7 @@ patGroup _ EmbTyPat{} = PgAny
 patGroup platform (XPat ext) = case ext of
   CoPat _ p _      -> PgCo (hsPatType p) -- Type of inner pattern
   ExpansionPat _ p -> patGroup platform p
-  NativeExistsPat {} -> PgExists
+  NativeExistsPat ty _ _ _ _ -> PgExists ty
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 
 {-
