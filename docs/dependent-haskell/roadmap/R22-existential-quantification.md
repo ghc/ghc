@@ -236,6 +236,20 @@ does not enter source scope.
 
 This checks a lambda when its expected dot schema has a visible
 ordinary arrow payload. Inference for a lambda without that expected
-shape and automatic opening of a package as an application head remain
-open. [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
+shape remains open. [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
 and [the Elab-Gen rule](https://richarde.dev/papers/2021/exists/exists.pdf).
+
+### A package at the head of a call
+
+A dot package with a visible ordinary arrow payload can head a value
+application. An ordinary invisible prefix is instantiated before
+the opening. When the result expects a dot package, the witness
+stays in scope while the result is packed. When a named call is an
+argument to an ordinary observer, that observer can run in the same
+opening. Thus `list (f x)` consumes the payload without an intermediate
+package.
+
+Each call opens a fresh witness. The source test rejects a call that
+returns its witness at a caller-chosen length. It also rejects an
+observer that equates two independent calls. A direct or nested call
+can consume a linear package once.

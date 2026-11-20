@@ -6,3 +6,8 @@
 (True,True)
 ([True],[],[False],[True])
 forcing the result entered the builder body
+([True],[])
+(([True],[]),([],[False]))
+(True,True)
+([True],[])
+[False]
