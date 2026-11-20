@@ -391,6 +391,15 @@ GHC-83865. Changing either default would also make a currently
 disjoint open equation conflict with GHC-34447.
 [Original program](../../../testsuite/tests/dependent/should_compile/T12088sg3.hs).
 
+In a written type signature, a bare outer arrow in a kind annotation
+can use a named subject's declared U arrow. For example, the
+ordinary type `Proxy (Abstract :: Type -> Type)` checks when `Abstract`
+has kind `Type %U -> Type` in a stripped provider interface. Writing
+`%M` there still conflicts. If the annotation leaves the arrow
+undetermined, GHC defaults it to M.
+[Interface and defaulting controls](../../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.sh)
+and [proposal #242 on kind arrows in type signatures](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#kind-arrows-in-type-signatures).
+
 ### Applying a type at a family-defined arrow kind
 
 `Wrap False` returns `Maybe`. `Wrap True` returns the unsaturated

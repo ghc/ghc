@@ -1979,15 +1979,39 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
   = do { let mode' = mode { mode_tyki = KindLevel
                             , mode_pending_calls = Nothing
                             , mode_complete_type_arg = Nothing }
-       ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
+       ; checked_kind <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
                  -- things like instantiate its foralls, so it needs
                  -- to be fully determined (#14904)
+       ; sig' <- infer_known_arrow checked_kind
        ; traceTc "tcHsType:sig" (ppr ty $$ ppr sig')
        ; ty' <- tcAddKindSigPlaceholders sig $
                 tc_check_lhs_type mode ty sig'
        ; checkExpKind mode rn_ty ty' sig' exp_kind }
+  where
+    -- Keep the separate kind-shape check required by #14904. A declared arrow is
+    -- enough evidence to select U here, without delaying the M default for an
+    -- annotation whose subject has an undetermined kind.
+    infer_known_arrow checked_kind
+      | TypeLevel <- mode_tyki mode
+      , not (mode_declaration mode)
+      , isEmptyNameEnv (mode_indices mode)
+      , matchabilityArrow sig
+      , L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- ignoreParens ty
+      , FunTy flag _ mult domain result <- checked_kind
+      = do { thing <- tcLookup name
+           ; known <- traverse (liftZonkM . zonkTcType) (declared_kind thing)
+           ; return $ case known >>= tcSplitFunTy_maybe of
+               Just (ma, _, _) | ma `tcEqType` unmatchableDataConTy ->
+                 FunTy flag ma mult domain result
+               _ -> checked_kind }
+      | otherwise = pure checked_kind
+
+    declared_kind (ATyVar _ tv) = Just (tyVarKind tv)
+    declared_kind (AGlobal (ATyCon tc))
+      | tyConArity tc == 0 = Just (tyConKind tc)
+    declared_kind _ = Nothing
 
 -- The case alias needs the checked pattern from its enclosing family equation.
 -- See Note [Type case aliases] in GHC.Tc.TyCl.

@@ -11,14 +11,16 @@ cd "$out"
 mkdir provider
 cp "$src/DependentArrowProvider.hs" provider/
 cp "$src/DependentArrowMatchability.hs" .
-(cd provider && "${ghc[@]}" -c DependentArrowProvider.hs)
+(cd provider && "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core \
+    -c DependentArrowProvider.hs)
 cp provider/DependentArrowProvider.hi .
 "${ghc[@]}" -c DependentArrowMatchability.hs
 "${ghc[@]}" -fforce-recomp -XExperimentalDependentTypes -c DependentArrowMatchability.hs
 
 reject() {
     local line=$1 message=$2
-    if "${ghc[@]}" -c Rejected.hs > reject.log 2>&1 ||
+    shift 2
+    if "${ghc[@]}" "$@" -c Rejected.hs > reject.log 2>&1 ||
        ! grep -Eq "^Rejected\\.hs:$line:[0-9]+(-[0-9]+)?: error:" reject.log ||
        ! grep -Fq "$message" reject.log; then
         cat reject.log >&2
@@ -40,4 +42,22 @@ for bad in "P.D (FUN @U 'Many Type Type) Maybe" \
     reject "$line" '[GHC-83865]'
     grep -Fq 'Matchable' reject.log
     grep -Fq 'Unmatchable' reject.log
+done
+
+# An explicit annotation conflicts with the subject. An undetermined bare
+# kind arrow still defaults to M before a later declaration uses it.
+for mode in NoExperimentalDependentTypes ExperimentalDependentTypes; do
+    sed 's/^module DependentArrowMatchability/module Rejected/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    printf '\ntype BadAnnotation = (P.Abstract :: Type %%M -> Type)\n' >> Rejected.hs
+    reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
+
+    sed 's/^module DependentArrowMatchability/module Rejected/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    cat >> Rejected.hs <<'HS'
+
+badDefault :: Proxy P.Abstract -> Proxy P.Abstract
+badDefault = ascribedDefault @P.Abstract
+HS
+    reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
 done

@@ -28,6 +28,25 @@ importedU = Refl
 ordinary :: Proxy (P.D (Type -> Type) Maybe) -> Proxy ImportedM
 ordinary = id
 
+-- | Use the known kind of a scoped variable in its annotation.
+ascribedLocalU :: forall (f :: Type %U -> Type). Proxy f -> Proxy (f :: Type -> Type)
+ascribedLocalU = id
+
+-- | Fix the bare kind arrow to U from the annotated subject.
+ascribedImportedU :: Proxy (P.Abstract :: Type -> Type) -> Proxy P.Abstract
+ascribedImportedU = id
+
+-- | Fix the same kind arrow to M from a datatype constructor.
+ascribedImportedM :: Proxy (Maybe :: Type -> Type) -> Proxy Maybe
+ascribedImportedM = id
+
+-- | Keep the M default when the subject has no known arrow.
+ascribedDefault :: forall f. Proxy (f :: Type -> Type) -> Proxy f
+ascribedDefault = id
+
+ascribedDefaultM :: Proxy Maybe -> Proxy Maybe
+ascribedDefaultM = ascribedDefault @Maybe
+
 -- | Check both matchabilities in H98 constructor fields.
 data Fields = Fields (P.D (Type -> Type) Maybe) (P.D (Type -> Type) P.Abstract)
 
