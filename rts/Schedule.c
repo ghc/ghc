@@ -156,8 +156,7 @@ static void scheduleActivateSpark(Capability *cap);
 #endif
 static void schedulePostRunThread(Capability *cap, StgTSO *t);
 static bool scheduleHandleHeapOverflow( Capability *cap, StgTSO *t );
-static bool scheduleHandleYield( Capability *cap, StgTSO *t,
-                                 uint32_t prev_what_next );
+static bool scheduleHandleYield( StgTSO *t, uint32_t prev_what_next );
 static void scheduleHandleThreadBlocked( StgTSO *t );
 static bool scheduleHandleThreadFinished( Capability *cap, Task *task,
                                           StgTSO *t );
@@ -565,6 +564,18 @@ run_thread:
 
     switch (ret) {
     case HeapOverflow:
+        if (RELAXED_LOAD_ALWAYS(&cap->r.rHpLim) == NULL ||
+                RELAXED_LOAD_ALWAYS(&cap->context_switch)) {
+            // Sometimes we miss a context switch, e.g. when calling
+            // primitives in a tight loop, MAYBE_GC() doesn't check the
+            // context switch flag, and we end up waiting for a GC.
+            // See #1984, and concurrent/should_run/1984
+            RELAXED_STORE_ALWAYS(&cap->context_switch, 0);
+            appendToRunQueue(cap,t);
+        } else {
+            pushOnRunQueue(cap,t);
+        }
+
         ready_to_gc = scheduleHandleHeapOverflow(cap,t);
         break;
 
@@ -576,9 +587,22 @@ run_thread:
         break;
 
     case ThreadYielding:
-        if (scheduleHandleYield(cap, t, prev_what_next)) {
+        if (scheduleHandleYield(t, prev_what_next)) {
             // shortcut for switching between compiler/interpreter:
             goto run_thread;
+        } else {
+            // Reset the context switch flag.  We don't do this just before
+            // running the thread, because that would mean we would lose ticks
+            // during GC, which can lead to unfair scheduling (a thread hogs
+            // the CPU because the tick always arrives during GC).  This way
+            // penalises threads that do a lot of allocation, but that seems
+            // better than the alternative.
+            if (RELAXED_LOAD_ALWAYS(&cap->context_switch) != 0) {
+                RELAXED_STORE_ALWAYS(&cap->context_switch, 0);
+                appendToRunQueue(cap,t);
+            } else {
+                pushOnRunQueue(cap,t);
+            }
         }
         break;
 
@@ -1129,20 +1153,8 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
  * -------------------------------------------------------------------------- */
 
 static bool
-scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
+scheduleHandleHeapOverflow( Capability *cap, StgTSO *t USED_IF_DEBUG)
 {
-    if (RELAXED_LOAD_ALWAYS(&cap->r.rHpLim) == NULL ||
-            RELAXED_LOAD_ALWAYS(&cap->context_switch)) {
-        // Sometimes we miss a context switch, e.g. when calling
-        // primitives in a tight loop, MAYBE_GC() doesn't check the
-        // context switch flag, and we end up waiting for a GC.
-        // See #1984, and concurrent/should_run/1984
-        RELAXED_STORE_ALWAYS(&cap->context_switch, 0);
-        appendToRunQueue(cap,t);
-    } else {
-        pushOnRunQueue(cap,t);
-    }
-
     // did the task ask for a large block?
     if (cap->r.rHpAlloc > BLOCK_SIZE) {
         // if so, get one and push it on the front of the nursery.
@@ -1216,7 +1228,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
  * -------------------------------------------------------------------------- */
 
 static bool
-scheduleHandleYield( Capability *cap, StgTSO *t, uint32_t prev_what_next )
+scheduleHandleYield( StgTSO *t, uint32_t prev_what_next )
 {
     /* put the thread back on the run queue.  Then, if we're ready to
      * GC, check whether this is the last task to stop.  If so, wake
@@ -1235,19 +1247,6 @@ scheduleHandleYield( Capability *cap, StgTSO *t, uint32_t prev_what_next )
                    (long)t->id, what_next_strs[t->what_next]);
 #endif
         return true;
-    }
-
-    // Reset the context switch flag.  We don't do this just before
-    // running the thread, because that would mean we would lose ticks
-    // during GC, which can lead to unfair scheduling (a thread hogs
-    // the CPU because the tick always arrives during GC).  This way
-    // penalises threads that do a lot of allocation, but that seems
-    // better than the alternative.
-    if (RELAXED_LOAD_ALWAYS(&cap->context_switch) != 0) {
-        RELAXED_STORE_ALWAYS(&cap->context_switch, 0);
-        appendToRunQueue(cap,t);
-    } else {
-        pushOnRunQueue(cap,t);
     }
 
     IF_DEBUG(sanity,
