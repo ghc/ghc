@@ -452,7 +452,7 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
        ; let rn_head = (rn_fun, fun_lspan)
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
        ; let check_call fun sigma expected =
-               tcOpenImplicitArgs sigma rn_args expected $
+               tcOpenImplicitArgs rn_expr sigma rn_args expected $
                  tcOrdinaryApp' rn_expr rn_head fun sigma
        ; case implicitSpineHead fun_sigma0 of
            ExistsTy ImplicitExists _ body
@@ -546,16 +546,49 @@ tcOrdinaryApp' rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args ex
 
 -- | Scope implicit existential value arguments over the rest of the application.
 -- See Note [Implicit existential arguments].
-tcOpenImplicitArgs :: TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType
+tcOpenImplicitArgs :: HsExpr GhcRn -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType
                    -> ([HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc))
                    -> TcM (HsExpr GhcTc)
-tcOpenImplicitArgs fun_ty args expected check_app
+tcOpenImplicitArgs rn_expr fun_ty args expected check_app
   = do { marked <- mark fun_ty args
        ; if all isLeft marked
          then check_app args expected
-         else do { result_ty <- expTypeToType expected
-                 ; open result_ty [] marked } }
+         else check_opened marked }
   where
+    check_opened marked
+      | Infer ir <- expected
+      , Just template <- spine_result head_body args
+      = do { level <- getTcLevel
+           ; if level `sameDepthAs` ir_lvl ir
+             then do { let free = tyCoVarsOfType template
+                           result_vars = [v | (_, v) <- head_binders, v `elemVarSet` free]
+                     ; (subst, _) <- newMetaTyVarsX (Subst.mkEmptySubst (mkInScopeSet free))
+                                                   result_vars
+                     ; let schema = Subst.substTy subst template
+                     ; body <- open schema [] marked
+                     ; tcWrapResult rn_expr body schema expected }
+             else check_mono marked }
+      | otherwise = check_mono marked
+
+    check_mono marked = do
+      result_ty <- expTypeToType expected
+      open result_ty [] marked
+
+    (head_binders, head_sigma) = tcSplitForAllInvisTyVars fun_ty
+    (_, head_body) = tcSplitPhiTy head_sigma
+
+    spine_result result []
+      | ExistsTy ImplicitExists binder body <- coreFullView result
+      , isTauTy (varType binder), isTauTy body
+      , isFamFreeTy result
+      , not (hasNativeDependentExpr (Core.Type (varType binder)))
+      , not (hasNativeDependentExpr (Core.Type body))
+      = Just result
+    spine_result ty (EWrap{} : rest) = spine_result ty rest
+    spine_result ty (EValArg{} : rest)
+      | Just (_, res) <- splitVisibleFunTy_maybe ty = spine_result res rest
+    spine_result _ _ = Nothing
+
     isLeft (Left _) = True
     isLeft (Right _) = False
 
@@ -678,6 +711,15 @@ ordinary implication solver rejects a witness that would escape.
 If the result expects another dot package, check and pack the result
 inside the scopes. The erasure of Unpack preserves the payload's
 demand. Bar packages go through the ordinary checker.
+
+An inference slot at this level can receive a directly declared dot
+result. For example, `filterVec p (builder x)` returns the package
+declared by filterVec. Create outer metavariables for the result's
+free head binders only. Check the application against this copy of
+its declared package. The ordinary head instantiation still takes
+place inside the opening, so argument-only variables can match the
+witness. Fill the usual inference slot after closing the implication.
+The outer result's metavariables cannot capture the opened witness.
 -}
 
 -- | Check a saturated explicit existential constructor application.
