@@ -75,18 +75,23 @@ for level in 0 1 2; do
     mkdir -p "rule$level/client"
     (
         cd "rule$level"
-        cp "$area/PackageRules.hs" .
+        cp "$area"/{PackageRules,LexicalPackageRules}.hs .
         extra=()
         if [[ $level == 0 ]]; then extra=("${flags[@]}"); fi
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c PackageRules.hs >provider.log
-        cp PackageRules.hi "$area/NativePackageRuleClient.hs" client/
+        "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c LexicalPackageRules.hs >>provider.log
+        cp PackageRules.hi LexicalPackageRules.hi "$area/NativePackageRuleClient.hs" client/
         cd client
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c NativePackageRuleClient.hs >client.log
         if [[ $level != 0 ]]; then
-            grep -Fq 'Rule fired: open/hide (PackageRules)' ../provider.log
-            grep -Fq 'Rule fired: open/hide (PackageRules)' client.log
+            for log in ../provider.log client.log; do
+                grep -Fq 'Rule fired: open/hide (PackageRules)' "$log"
+                for rule in read/int-pair hide/int project/hidden increment/hidden; do
+                    grep -Fq "Rule fired: $rule (LexicalPackageRules)" "$log"
+                done
+            done
         fi
-        "${g[@]}" NativePackageRuleClient.o ../PackageRules.o -o read-back
+        "${g[@]}" NativePackageRuleClient.o ../PackageRules.o ../LexicalPackageRules.o -o read-back
         ./read-back >observed
     )
 done

@@ -11,4 +11,5 @@ liberate-case distinguishes an outer variable from a hidden payload
 worker/wrapper preserves the scope of an opened package
 the dead-end check distinguishes a lazy opening from a demanded payload
 expression keys distinguish erased witnesses and identify alpha-renamed openings
+erased package rules match bound variables and reject escaping substitutions
 exitification abstracts the hidden witness before its payload

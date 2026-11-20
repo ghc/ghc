@@ -11,11 +11,12 @@ import GHC.Builtin.Modules (gHC_INTERNAL_BASE)
 import GHC.Builtin.WiredIn.Types
     (boolTy, charTy, falseDataCon, trueDataCon, liftedTypeKind, manyDataConTy, maybeTyCon, mkBoxedTupleTy, mkListTy, trueDataConId)
 import GHC.Core
-    (Alt (..), AltCon (DEFAULT, DataAlt), Bind (NonRec, Rec), CoreExpr, Expr (..),
+    (Alt (..), AltCon (DEFAULT, DataAlt), Bind (NonRec, Rec), CoreExpr, Expr (..), InScopeEnv (ISE), noUnfolding,
      Unfolding (CoreUnfolding, uf_tmpl), UnfoldingCache (..), UnfoldingSource (VanillaSrc), mkApps, mkLams)
 import GHC.Core.Coercion (liftCoSubst, mkCoVarCo, mkLiftingContext, mkSubCo)
 import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Dependent (hasExistentialExpr, supportsNativeGentle)
+import GHC.Core.Rules (matchExprs)
 import GHC.Core.FamInstEnv (emptyFamInstEnv)
 import GHC.Core.Opt.Arity (exprIsDeadEnd)
 import GHC.Core.Opt.LiberateCase (LibCaseOpts(lco_threshold), liberateCase)
@@ -62,6 +63,7 @@ import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.Unique (Unique, UniqueTag (PluginTag))
 import GHC.Types.Unique.Supply (mkSplitUniqSupply, uniqsFromSupply)
 import GHC.Types.Var (ExistsTyFlag (ExplicitExists), isTyVar, mkCoVar, mkTyVar, varType)
+import GHC.Types.Var.Env (mkInScopeSetList)
 import GHC.Unit.Module (IsBootInterface (NotBoot), mkModule)
 import GHC.Unit.Module.ModIface (emptyFullModIface, mi_decls, set_mi_decls)
 import GHC.Unit.Types (mainUnit)
@@ -180,6 +182,16 @@ checkPackageOptimizers libdir = session libdir $ \env _ -> do
             && all (\(e, value) -> lookupCoreMap table e == Just value) examples) $
         fail "expression map confused a package schema, witness or scoped payload"
     putStrLn "expression keys distinguish erased witnesses and identify alpha-renamed openings"
+    let hole = mkSysLocal (fsLit "hole") topId manyDataConTy schema
+        template = Unpack witness payload package (Var hole)
+        closed = Unpack other renamedPayload package package
+        rule_env = ISE (mkInScopeSetList [trueDataConId]) (const noUnfolding)
+        matches vars lhs rhs = isJust (matchExprs rule_env vars [lhs] [rhs])
+    unless (matches [] orig renamed && not (matches [] (constant boolTy) (constant charTy))) $
+        fail "Rule matching lost the witness or confused alpha-renamed openings"
+    unless (matches [hole] template closed && not (matches [hole] template renamed)) $
+        fail "A rule substitution captured an opened witness or payload"
+    putStrLn "erased package rules match bound variables and reject escaping substitutions"
 
     -- A lifted exit uses the abstract payload in a strict case. Its type
     -- witness must precede the payload in the new join's telescope.
