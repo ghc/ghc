@@ -1374,7 +1374,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                                  (\v -> isId v && not (v `elemVarSet` scope)) field_ty)
                             && case mb of
                                  Nothing -> True
-                                 Just _  -> isManyTy mult && isNativeRetainedBinderType field_ty
+                                 Just _  -> isManyTy mult && isNativeRetainedFieldType field_ty
                   ; unless valid $
                       failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
                                $$ text "Expected a lifted field with only earlier runtime indices;"

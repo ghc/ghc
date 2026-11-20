@@ -632,7 +632,7 @@ tcCheckRetainedType allow_function = go
           = setSrcSpanA lb $
             case bndr of
               HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
-                do { domain_ty <- tcRetainedBinderDomain True mode domain
+                do { domain_ty <- tcRetainedBinderDomain isNativeRetainedBinderType mode domain
                    ; when (not allow_function && isFunTy domain_ty) $
                        failWithTc $ TcRnRetainedQuantificationError $
                          if mode_complete_type_arg mode == Just False
@@ -680,6 +680,7 @@ tcCheckRetainedConType :: Bool
                       -> LHsType GhcRn -> TcM ([Maybe Id], TcType)
 tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
   where
+    valid_field_domain ty = not validate_domain || isNativeRetainedFieldType ty
     go mode (L _ (HsParTy _ body)) = go mode body
     go mode (L loc (HsForEachTy ann bndrs body))
       = setSrcSpanA loc $
@@ -707,7 +708,7 @@ tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
       = setSrcSpanA loc $
         case bndr of
           HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
-            do { domain_ty <- tcRetainedBinderDomain validate_domain mode domain
+            do { domain_ty <- tcRetainedBinderDomain valid_field_domain mode domain
                ; let index = mkLocalId name ManyTy domain_ty
                      mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
                ; (binders, body_ty) <- bind_indices mode' rest body
@@ -720,14 +721,12 @@ tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
 -- | Check the domain of a retained binder before bringing it into scope.
 -- Constructor kind inference skips the domain predicate until the datatype
 -- constructor knots are available.
-tcRetainedBinderDomain :: Bool -> TcTyMode -> LHsType GhcRn -> TcM TcType
-tcRetainedBinderDomain validate_domain mode domain
+tcRetainedBinderDomain :: (Type -> Bool) -> TcTyMode -> LHsType GhcRn -> TcM TcType
+tcRetainedBinderDomain valid_domain mode domain
   = do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
        ; domain_ty <- liftZonkM $ zonkTcType domain_ty
-       ; when validate_domain $
-           unless (isNativeRetainedBinderType domain_ty) $
-             failWithTc $ TcRnRetainedQuantificationError
-                            (RetainedUnsupportedDomain domain_ty)
+       ; unless (valid_domain domain_ty) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedUnsupportedDomain domain_ty)
        ; return domain_ty }
 
 {- Note [Source retained signatures]
