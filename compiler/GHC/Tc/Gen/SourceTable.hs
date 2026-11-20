@@ -36,7 +36,7 @@ import GHC.Core.TyCo.FVs (tyConsOfTypes)
 import GHC.Core.TyCo.Rep (Coercion, Type(TyConApp, TermVarTy, CastTy))
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Utils (exprType)
+import GHC.Core.Utils (exprType, stripTicksTopE)
 import GHC.Data.Graph.Directed (Node(..), SCC(..), stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
@@ -80,6 +80,7 @@ import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, ex
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
                            unionNameSet, unionNameSets, unitNameSet)
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish (GenTickish(Breakpoint))
 import GHC.Types.SourceFile (hscSourceToIsBoot, isHsBootOrSig)
 import GHC.Unit.External (eps_rule_base)
 import GHC.Unit.Home (homeUnitId)
@@ -1721,10 +1722,15 @@ checkedIndexedProjection prepare owner original = do
   guard (left == scrutinee && isId right)
   [rhs] <- pure [branch | Core.Alt (Core.DataAlt dc) [evidence] branch <- alts,
                          dc == con, isCoVar evidence]
-  case rhs of
+  -- Bytecode inserts a debugger breakpoint around the selected RHS.
+  -- It does not evaluate the captured variables. Keep the original Core.
+  case stripTicksTopE breakpoint rhs of
     Core.Var v | v == right -> pure projection
     Core.Cast (Core.Var v) _ | v == right -> pure projection
     _ -> Nothing
+  where
+    breakpoint Breakpoint{} = True
+    breakpoint _ = False
 
 -- | Publish the selected row with actual nominal result-kind evidence.
 publishIndexedProjection :: Id -> IndexedProjection -> TcM (Maybe TyCon)
