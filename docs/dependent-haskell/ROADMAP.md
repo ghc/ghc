@@ -40,12 +40,14 @@ compression levels the old reader rejects new constructor evidence at
 the header. The new reader checks the coercion's role and scope.
 [R05 interface checks](roadmap/R05-dependent-core.md#default-optimized-interfaces).
 
-At `e669e68e31`, the private combined bootstrap compiler produces all
-277 Showcase lines at `-O0` and default `-O1`. It converts a retained
-pair to an erased package, matches two independently written sums in a
-closed family, and checks an inherited method that fills a length-indexed
-vector. Self-hosting and the dependent-directory comparison are in progress.
-The 272-line results above apply to the published checkpoint `d8f2802ddb`.
+The combined compiler builds itself. Both stages reproduce all 277 Showcase
+lines at `-O0` and default `-O1`. The self-hosted compiler also matches the
+golden output with stripped interfaces and in GHCi. An inherited class method
+fills a length-indexed vector. A conversion discards a stored witness and
+keeps its indexed payload. A closed family matches two independently written
+sums. With the Haddock repair at `d1f1757365`, 279 of 309 executed tests in
+the dependent directory pass. The 30 failing tests match the previous public
+checkpoint `d8f2802ddb`.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
@@ -69,16 +71,21 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R22.** Compile the dot-form vector filter from source. The recursive
-   call introduces a fresh length. Its scope must include construction
-   of the result. Check two independent packages and the unsafe head.
-2. **R04.** Support a `some` binder written in a function argument or
-   result. Test equality with a separately declared sum and reject
-   payloads that come from a different lexical owner.
-3. **R05.** Check the combined module and interface paths for erased
-   operations at `-O1`. Reduce a known pack followed by an unpack without
-   evaluating the payload. Exercise optimized and ordinary clients with
-   optional and compulsory unfoldings.
+1. **R22.** At `64cc2ed6e0`, a private compiler infers packing and opening
+   for the recursive dot-form vector filter. Two independent packages keep
+   distinct lengths. Unsafe head and escaping-length examples fail. At
+   `0d31e72282`, the same inference handles a retained constructor field.
+   Integrate these source tests and their interface and HIE checks.
+2. **R04.** At `6d0a28fc77`, direct `some` binders work in argument and
+   result signatures in private tests. Finish the compiler build and the
+   Template Haskell round trip for an imported direct signature.
+3. **R05.** At `dc5fca502c`, common subexpression elimination preserves a
+   local index when an ordinary client projects from an imported pair. The
+   retained simplifier handles surviving erased package operations in an API
+   test at `46e150b595`. At `82c7c388c0`, demand analysis preserves an
+   unused package and a lazy field. Check worker/wrapper and the remaining
+   scheduled passes before enabling these operations in the normal `-O1`
+   pipeline.
 4. **R19 and R23.** Extend ordered type cases to mixed patterns. Use the
    ordinary-program regression baseline when extending family unsaturation.
 
