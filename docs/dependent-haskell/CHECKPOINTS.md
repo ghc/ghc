@@ -8,6 +8,16 @@ increments.
 
 ## Family and package checkpoints
 
+At `4d5d6e467f`, we relinked six compiler modules against the 337-line
+bootstrap compiler and used the 336 target libraries. All 341 Showcase
+lines matched at `-O0`, default `-O1` and default `-O2` with Core and
+STG Lint. The source regressions cover the captured cutoff, a closed
+proof field under optimization, selection of either vector partition,
+and partial family diagnostics after source expansion. Two diagnostic
+goldens check the span after synonym expansion and a splice.
+[Runtime predicate and demand](roadmap/R16-open-term-evaluator.md#capture-a-runtime-cutoff-in-the-predicate)
+and [partition client](examples/packed-vector/ListVectorClient.hs).
+
 At `410405da2b`, the released 336-line compiler with the four changed
 modules relinked reproduced all 337 Showcase lines at `-O0`, default
 `-O1`, and default `-O2` with Core and STG Lint. The registered
