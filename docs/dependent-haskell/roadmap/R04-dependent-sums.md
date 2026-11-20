@@ -150,6 +150,12 @@ client reifies the selector type with Template Haskell and uses it
 to coerce the wrapper to its field.
 [Registered source test](../../../testsuite/tests/dependent/should_run/NativeScopedSumSignatureReify.sh).
 
+A GADT-style newtype field can use erased binders from its constructor
+signature's outer telescope. GHC checks the constructor result kind
+and the normal restriction on existential variables and contexts.
+The record selector keeps the checked constructor result type and
+Template Haskell reifies the constructor as a GADT record.
+
 Agda's dependent pair uses the stored first component to type the
 second field. The GHC newtype wraps that pair as a whole.
 [Agda's dependent pair](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).

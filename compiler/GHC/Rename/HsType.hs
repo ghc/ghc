@@ -999,7 +999,7 @@ rnHsTyKi _ (XHsType HsTypeLambda{}) = do
 
 rnHsTyKi _ (XHsType HsTypeSome{}) =
   failWithTc (mkTcRnUnknownMessage (mkPlainError []
-    (text "A retained dependent sum is supported in a top-level type synonym, a complete top-level value signature, or an ordinary data or newtype constructor field.")))
+    (text "A retained dependent sum is supported in a top-level type synonym, a complete top-level value signature, a Haskell98 data constructor field, or a newtype constructor field.")))
 
 -- A bare case pattern prefers a data constructor, as before. Resolve it
 -- after the declaration group is in scope. If the data name is absent,

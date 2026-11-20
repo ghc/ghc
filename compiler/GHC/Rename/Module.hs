@@ -336,11 +336,14 @@ Different values use separate counters. The private type namespace also
 separates a function operator from a same-spelled type operator. A
 signature shared by several values uses its first name.
 
-For a Haskell98 data or newtype constructor, use its name and count sums
-from left to right across its fields. Use a separate prefix for constructor
-fields. The constructor name is unique in the module even when record
-labels repeat. A field can use the type header's erased variables.
-Leave constructors with their own telescopes to the ordinary renamer.
+For a constructor field, use the constructor's name and count sums
+from left to right. Use a separate prefix for constructor fields.
+The constructor name is unique in the module even when record labels
+repeat. A Haskell98 field can use the type header's erased variables.
+A GADT newtype field uses the constructor signature's outer binders.
+Use the same free-variable order as rnConDecl for implicit binders.
+Leave the constructor result and any context to ordinary newtype
+checking. Leave inner forall groups to the ordinary renamer.
 
 Copy only the erased parameters used by the sum and the parameters
 used in their written kinds. Keep their original order. Require each
@@ -380,7 +383,7 @@ liftDeclarationSums named_wildcards group
             DataTypeCons False fields ->
               let (fields', lifted) = unzip (map (liftConstructor scope) fields)
               in (DataTypeCons False fields', concat lifted)
-            NewTypeCon field -> first NewTypeCon (liftConstructor scope field)
+            NewTypeCon con -> first NewTypeCon (liftNewtype scope con)
             _ -> (cons, [])
       in (L loc decl{tcdDataDefn = defn{dd_cons = cons'}}, sums)
     liftData decl = (decl, [])
@@ -390,20 +393,40 @@ liftDeclarationSums named_wildcards group
       in (L loc con{con_args = args'}, sums)
     liftConstructor _ con = (con, [])
 
+    liftNewtype _ (L loc con@ConDeclGADT
+      { con_names = names, con_outer_bndrs = L _ outer, con_telescope = telescope
+      , con_g_args = args, con_res_ty = result })
+      | all without_inner_forall telescope
+      = let occurrences = extractHsGadtTelescopes telescope $
+                          extractConDeclGADTDetailsTyVars args $
+                          extractHsTysRdrTyVars [result] []
+            visit = liftField (head names) (outerCaptures outer occurrences)
+            (args', sums) = case args of
+              PrefixConGADT ann fields -> first (PrefixConGADT ann) (liftFieldList visit fields)
+              RecConGADT ann fields -> first (RecConGADT ann) (liftRecordFields visit fields)
+        in (L loc con{con_g_args = args'}, sums)
+      where
+        without_inner_forall (L _ HsGadtForAll{}) = False
+        without_inner_forall _ = True
+    liftNewtype scope con = liftConstructor scope con
+
     liftFields visit (PrefixCon ann fields) =
       first (PrefixCon ann) (liftFieldList visit fields)
-    liftFields visit (RecCon ann (L loc fields)) =
-      first (RecCon ann . L loc) (liftFieldList visitRecord fields)
-      where
-        visitRecord salt (L field_loc field@HsConDeclRecField{cdrf_spec = spec}) =
-          let (next, (spec', sums)) = visit salt spec
-          in (next, (L field_loc field{cdrf_spec = spec'}, sums))
-        visitRecord salt field = (salt, (field, []))
+    liftFields visit (RecCon ann fields) =
+      first (RecCon ann) (liftRecordFields visit fields)
     liftFields visit (InfixCon ann left right) =
       let (next, (left', left_sums)) = visit 0 left
           (_, (right', right_sums)) = visit next right
       in (InfixCon ann left' right', left_sums ++ right_sums)
     liftFields _ fields = (fields, [])
+
+    liftRecordFields visit (L loc fields) =
+      first (L loc) (liftFieldList visitRecord fields)
+      where
+        visitRecord salt (L field_loc field@HsConDeclRecField{cdrf_spec = spec}) =
+          let (next, (spec', sums)) = visit salt spec
+          in (next, (L field_loc field{cdrf_spec = spec'}, sums))
+        visitRecord salt field = (salt, (field, []))
 
     liftFieldList visit fields =
       let (_, lifted) = mapAccumL visit 0 fields
@@ -424,8 +447,10 @@ liftDeclarationSums named_wildcards group
                                                        wc{hswc_body = sig'})), aliases))
     liftBind counters bind = (counters, (bind, []))
 
-    signatureCaptures HsOuterImplicit{} body = implicitCaptures (extractHsTyRdrTyVars body)
-    signatureCaptures HsOuterExplicit{hso_bndrs = binders} _ = explicitCaptures binders
+    signatureCaptures outer body = outerCaptures outer (extractHsTyRdrTyVars body)
+
+    outerCaptures HsOuterImplicit{} occurrences = implicitCaptures occurrences
+    outerCaptures HsOuterExplicit{hso_bndrs = binders} _ = explicitCaptures binders
 
     implicitCaptures occurrences =
       [(liftedTypeVarBinder v, v) | v <- nubN occurrences
