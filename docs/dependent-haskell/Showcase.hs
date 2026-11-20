@@ -1518,6 +1518,9 @@ sourceAddition = do
         (OrdinaryOpenVectorAppend.appendContents joined)
     observe "prove the first cell of append at runtime"
         (OrdinaryOpenVectorAppend.consContents False prefix suffix)
+    zeroCut <- newIORef (0 :: Nat) >>= readIORef
+    observe "prove empty append for two vectors at a shared runtime cut"
+        (OrdinaryOpenVectorAppend.observeAppendPair zeroCut, OrdinaryOpenVectorAppend.observeAppendPair n)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)

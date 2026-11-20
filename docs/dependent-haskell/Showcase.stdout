@@ -155,6 +155,7 @@ runtime sum and appended vector: (3,[True,False,False])
 use ordinary vector append in a type: Refl
 prove empty append preserves a runtime vector: [True,False,False]
 prove the first cell of append at runtime: [False,True,False,False]
+prove empty append for two vectors at a shared runtime cut: (True,True)
 split the appended vector at its first length: ([True],[False,False])
 take and drop at the first runtime length: ([True],[False,False])
 prove the runtime vector is VNil in the empty branch: (True,False)
