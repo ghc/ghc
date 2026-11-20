@@ -1358,6 +1358,12 @@ ppr_mono_ty (HsIParamTy _ (L _ n) ty) u = ppIPName n <+> dcolon u <+> ppr_mono_l
 ppr_mono_ty (HsSpliceTy v _) _ = dataConCantHappen v
 ppr_mono_ty (XHsType (HsBangTy b ty)) u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (XHsType HsRecTy{}) _ = text "{..}"
+ppr_mono_ty (XHsType (HsCheckedTypeCase scrutinee rows)) u =
+  keyword "case" <+> pp scrutinee <+> keyword "of"
+    <+> (char '{' <> hsep (punctuate semi (map row rows)) <> char '}')
+  where
+    pp ty = ppr_mono_lty ty u
+    row (pat, rhs) = pp pat <+> arrow u <+> pp rhs
 ppr_mono_ty (XHsType HsCoreTy{}) _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty (HsExplicitListTy _ IsPromoted tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
 ppr_mono_ty (HsExplicitListTy _ NotPromoted tys) u = brackets $ hsep $ punctuate comma $ map (ppLType u) tys

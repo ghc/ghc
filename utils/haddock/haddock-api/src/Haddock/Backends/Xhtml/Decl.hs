@@ -1862,6 +1862,12 @@ ppr_mono_ty (HsSpliceTy v _) _ _ _ = dataConCantHappen v
 ppr_mono_ty (XHsType (HsBangTy b ty)) u q _ =
   ppBang b +++ ppLParendType u q HideEmptyContexts ty
 ppr_mono_ty (XHsType (HsRecTy{})) _ _ _ = toHtml ("{..}" :: LText)
+ppr_mono_ty (XHsType (HsCheckedTypeCase scrutinee rows)) u q e =
+  keyword "case" <+> pp scrutinee <+> keyword "of"
+    <+> braces (hsep (intersperse (stringToHtml ";") (map row rows)))
+  where
+    pp ty = ppr_mono_lty ty u q e
+    row (pat, rhs) = pp pat <+> arrow u <+> pp rhs
 -- Can now legally occur in ConDeclGADT, the output here is to provide a
 -- placeholder in the signature, which is followed by the field
 -- declarations.

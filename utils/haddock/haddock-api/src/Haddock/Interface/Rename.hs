@@ -34,10 +34,11 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Traversable (mapM)
 
-import GHC hiding (NoLink, HsTypeGhcPsExt (..))
+import GHC hiding (NoLink, HsTypeGhcPsExt (..), typeKind)
 import GHC.Builtin.WiredIn.Types ( tupleDataConName, tupleTyConName)
 import GHC.Builtin.KnownKeys ( eqTyConKey )
 import GHC.Core.TyCon (tyConResKind)
+import GHC.Core.Type (typeKind)
 import GHC.Driver.DynFlags (getDynFlags)
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
 import GHC.Types.Basic (TupleSort (..))
@@ -47,7 +48,7 @@ import GHC.Types.Name
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Haddock.Backends.Hoogle (ppExportD)
-import Haddock.Convert (synifyKindSig)
+import Haddock.Convert (hasPrivateTypeCase, synifyKindSig, synifyTypeCase)
 import Haddock.GhcUtils
 import Haddock.Types
 
@@ -444,7 +445,10 @@ renameType t = case t of
     doc' <- renameLDocHsSyn doc
     return (HsDocTy noAnn ty' doc')
   HsTyLit _ x -> return (HsTyLit noAnn (renameTyLit x))
-  XHsType a -> pure (XHsType (HsCoreTy a))
+  XHsType (HsCoreTyRn ty) -> pure (XHsType (HsCoreTy ty))
+  -- See Note [Checked types in Haddock].
+  XHsType HsTypeLetRn{} -> throwE "Cannot document a source type let without its checked type."
+  XHsType HsTypeCaseAliasRn{} -> throwE "Cannot document a source type case alias without its checked type."
   HsExplicitListTy _ a b -> HsExplicitListTy noAnn a <$> mapM renameLType b
   -- Special-case unary boxed tuples so that they are pretty-printed as
   -- `'MkSolo x`, not `'(x)`
@@ -457,6 +461,15 @@ renameType t = case t of
   HsSpliceTy (HsUntypedSpliceTop _ st) _ -> renameType (unLoc st)
   HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _ -> pure (HsWildCardTy noAnn)
+
+{- Note [Checked types in Haddock]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Haddock.Interface.Create obtains declarations from checked TyThings.
+Haddock.Interface.AttachInstances converts checked class and family instances.
+Both paths rebuild syntax from checked types before this renaming pass.
+A renamed source type let or type case alias still has a local binding.
+Report it if it reaches this pass, since dropping the binding changes the type.
+-}
 
 renameTyLit :: HsLit GhcRn -> HsLit DocNameI
 renameTyLit t = case t of
@@ -588,7 +601,7 @@ renameTyClD d = case d of
   SynDecl{tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdRhs = rhs} -> do
     lname' <- renameNameL lname
     tyvars' <- renameLHsQTyVars tyvars
-    rhs' <- maybe (renameLType rhs) pure <=< runMaybeT $ do
+    rhs' <- maybe (renameSynonymRhs rhs) pure <=< runMaybeT $ do
       expInfo <- MaybeT $ asks rnExportInfo
       -- Given that we have matched on a 'SynDecl', this lookup /really should/
       -- be 'ATyCon', and the 'synTyConRhs_maybe' result /really should/ be
@@ -669,6 +682,18 @@ renameTyClD d = case d of
       return (L (locA loc) (FunDep noExtField (map noLocA xs') (map noLocA ys')))
 
     renameLSig (L loc sig) = return . L (locA loc) =<< renameSig sig
+
+-- | Reconstruct a checked type case or show the kind of the synonym RHS.
+-- See Note [Checked type cases in Haddock] in Haddock.Convert.
+renameSynonymRhs :: LHsType GhcRn -> RnM (LHsType DocNameI)
+renameSynonymRhs (L _ (XHsType (HsCoreTyRn ty)))
+  | Just (scrutinee, rows) <- synifyTypeCase ty = do
+      scrutinee' <- renameLType scrutinee
+      rows' <- traverse (\(pat, rhs) -> (,) <$> renameLType pat <*> renameLType rhs) rows
+      pure (noLocA (XHsType (HsCheckedTypeCase scrutinee' rows')))
+  | hasPrivateTypeCase ty =
+      fmap (XHsType . HsRedacted) <$> renameLType (synifyKindSig (typeKind ty))
+renameSynonymRhs rhs = renameLType rhs
 
 renameFamilyDecl :: FamilyDecl GhcRn -> RnM (FamilyDecl DocNameI)
 renameFamilyDecl
