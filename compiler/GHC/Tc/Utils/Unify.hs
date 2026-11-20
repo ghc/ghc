@@ -3180,6 +3180,7 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
     -- See Note [Decomposing AppTy equalities] in GHC.Tc.Solver.Equality
     go_app vis ty1 s1 t1 ty2 s2 t2
       | Nominal <- role
+      , isMatchableFunTy (typeKind s1), isMatchableFunTy (typeKind s2)
       = -- Unify arguments t1/t2 before function s1/s2, because
         -- the former have smaller kinds, and hence simpler error messages
         -- c.f. GHC.Tc.Solver.Equality.can_eq_app
@@ -3207,7 +3208,13 @@ This little short-cut in 'defer' helps quite a bit.
 
 Note [Care with type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Note: type applications need a bit of care!
+An unmatchable function can reduce when its argument becomes available.
+Defer the complete equality so the solver can rewrite the application.
+For example, Wrap True can return the type family AsList. Comparing
+Wrap True Int with [Int] before reduction would require AsList ~ [].
+The saturated application can reduce even though the heads differ.
+
+Type applications need a bit of care!
 They can match FunTy and TyConApp, so use splitAppTy_maybe
 NB: we've already dealt with type variables and Notes,
 so if one type is an App the other one jolly well better be too
