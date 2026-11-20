@@ -2,10 +2,10 @@
 {-# OPTIONS_GHC -O0 #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, cells, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, filterVec, cells, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import GHC.Sigma (Sigma(Pair))
-import PackedVecLibrary (Nat(..), Vec(..), toList)
+import PackedVecLibrary (Nat(..), Vec(..), toList, zipVec)
 
 -- | A vector whose producer chooses its length.
 type Filtered a = exists (n :: Nat). Vec a n
@@ -20,6 +20,13 @@ filterVec p (VCons x xs)
 -- | Open the hidden length for the call to 'toList'.
 cells :: Filtered a -> [a]
 cells xs = toList xs
+
+-- | Zip two uses of the same vector at its hidden length.
+pairWithSelf :: Filtered a -> [(a, a)]
+pairWithSelf xs = pairs xs xs
+  where
+    pairs :: Vec a n -> Vec b n -> [(a, b)]
+    pairs left right = toList (zipVec left right)
 
 -- | Discard the stored length and keep the vector at the same index.
 forgetLength :: (some (n :: Nat) | Vec a n) -> Filtered a

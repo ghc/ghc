@@ -946,6 +946,9 @@ main = do
         ImplicitVector.observations
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
+    observe "zip a filtered vector with itself at its hidden length" $
+        take 1 (ImplicitVector.pairWithSelf
+            (ImplicitVector.filterVec odd (VCons (7 :: Int) (error "unused vector tail"))))
     observe "pass a lambda with a hidden vector length and filter its result"
         (ImplicitVector.runBuilder ImplicitVector.singletonBuilder odd (7 :: Int))
     observe "forget the retained witness and inspect the indexed payload"
@@ -1029,6 +1032,8 @@ main = do
         (Refl :: MapFlags FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
     observe "pass a type family with an unapplied invisible binder"
         (Refl :: InvisibleFamily.Observed :~: 'True)
+    observe "infer the result kind after passing a visible family argument"
+        (Refl :: InvisibleFamily.ObservedVisible :~: Int)
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "partially apply a two-argument type lambda" TypeLambda.partial
