@@ -4154,7 +4154,7 @@ runPackageSourceRejectChecks = do
         , ("PiOperandDistinctOuterRuntimeIndices", 5617, "Could not deduce", ["TypeFamilies", "FlexibleContexts"], [], ["wrongOuterPi :: forall value. foreach (k :: Nat) -> foreach (m :: Nat) -> value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> (foreach (n :: Nat) -> (Vec Int m, Vec Bool n))", "wrongOuterPi k m f = f"])
         , ("PiOperandRepresentationalEvidenceCannotSupplyNominalProof", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts", "AllowAmbiguousTypes"], ["import Data.Coerce (Coercible)"], ["wrongRolePi :: forall left right. (Coercible left right, left ~ (foreach (n :: Nat) -> Vec Int n)) => right -> (foreach (n :: Nat) -> Vec Int n)", "wrongRolePi f = f"])
         , ("PiOperandLinearOuterIndexCaptureRejected", 83605, "already-bound unrestricted local value", ["TypeFamilies", "FlexibleContexts", "LinearTypes"], [], ["consumeNat :: Nat %1 -> Int", "consumeNat Z = 42", "consumeNat (S rest) = consumeNat rest", "bad :: Nat %1 -> Int", "bad k = let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in consumeNat k"])
-        , ("PiOperandUnsupportedPiDomainRejected", 83605, "supported structural algebraic domain", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Int) -> Int) => value -> Int -> Int", "bad f = f"])
+        , ("PiOperandUnsupportedPiDomainRejected", 83605, "A retained value argument requires a lifted type parameter or a supported algebraic type.", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Int) -> Int) => value -> Int -> Int", "bad f = f"])
         , ("PiOperandPartialPiOperandRejected", 83605, "complete type signature", ["TypeFamilies", "FlexibleContexts", "PartialTypeSignatures"], [], ["bad :: forall value. value ~ (foreach (n :: Nat) -> Vec _ n) => value -> (foreach (n :: Nat) -> Vec Int n)", "bad f = f"])
         , ("PiOperandQuotedPiOperandCaptureRejected", 83605, "Template Haskell", ["TypeFamilies", "FlexibleContexts", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in (42 :: Int) |]"])
         , ("PiOperandEqualityOperandKindMismatch", 83865, "Expected kind", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall (value :: Nat). value ~ (foreach (n :: Nat) -> Vec Int n) => Int", "bad = 42"])
@@ -4734,7 +4734,7 @@ runSourceRejectChecks = do
             ] ++ local [] selection identity "keep (not False) (42 :: Int)"
     mapM_
         check
-        [ ("unsupported algebraic domain", 83605, "supported structural algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
+        [ ("unsupported algebraic domain", 83605, "A retained value argument requires a lifted type parameter or a supported algebraic type.", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
         , ("missing domain annotation", 83605, "explicit domain type", [], local [] "foreach b -> Int -> Int" identity "42")
         , ("anonymous retained binder", 83605, "requires a variable name", [], local [] "foreach (_ :: Bool) -> Int -> Int" identity "42")
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
