@@ -2764,16 +2764,14 @@ tc_app_ty_generic mode rn_ty exp_kind
                Check expected | isTypeLikeKind expected -> KindLevel
                _ -> TypeLevel
        ; (prefix, prefix_kind) <- tcInferTyApps_nosat index_level mode hs_fun_ty fun_ty hs_args
-       -- A checked receiver can require the whole invisible telescope even
-       -- when its kind contains metavariables. Keep the prefix for the kind
-       -- check below in that case. Ordinary inference still saturates it.
+       -- See Note [saturateFamApp] for a checked partial family.
        ; allow_partial <- xoptM LangExt.ExperimentalDependentTypes
        ; (ty, inferred_kind) <- case (exp_kind, tcSplitTyConApp_maybe prefix) of
            (Check expected, Just (tc, args))
              | allow_partial, isUnsaturatedUserFamily tc args
-             , let n_invis = invisibleBndrCount prefix_kind
+             , let n_expected = invisibleBndrCount expected
              , expected `tcEqType` prefix_kind
-               || (n_invis > 0 && n_invis == invisibleBndrCount expected)
+               || (n_expected > 0 && n_expected <= invisibleBndrCount prefix_kind)
              -> return (prefix, prefix_kind)
            _ -> saturateFamApp mode prefix prefix_kind
        ; checkExpKind mode rn_ty ty inferred_kind exp_kind }
@@ -4587,6 +4585,16 @@ is quite different and really does have arity 0.
 
 It's not just type instances where we need to saturate those
 unsaturated arguments: see #11246.  Hence doing this in tcInferApps.
+
+An expected kind can ask for a suffix of the invisible binders of a
+partial user family. For example, F True might have kind
+  forall a. forall b. a
+where the receiver expects forall b. Bool. Keep the partial application
+until checkExpectedKind. It instantiates a, checks the remaining forall,
+and learns a ~ Bool. Saturating both binders here would discard b before
+the receiver could use it. Inference without an expected kind keeps the
+ordinary saturation rule. See Note [Partial type family applications]
+in GHC.Core.Type for the eligible families.
 -}
 
 appTypeToArg :: LHsType GhcRn -> [LHsTypeArg GhcRn] -> LHsType GhcRn
