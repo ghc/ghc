@@ -17,6 +17,17 @@ all Core transformations. Normal optimization remains a broader release gate.
 
 ## Supported subset and evidence
 
+A type synonym can name a dependent function over a lifted parameter.
+The ordinary caller can use `Consumer a p r` in a signature and supply a
+witness and its indexed payload. The Showcase instantiates the witness
+type with a vector whose length comes from IO. An abstract family such as
+`Hidden a` still leaves `a` ambiguous when the rest of the signature
+cannot determine it. The result of a named callback passed to `withPair` can determine the
+result of the call when the two witness domains agree nominally. A result
+that would contain the callback's local witness fails at that callback.
+[Consumer](../examples/packed-vector/DependentPair.hs) and
+[formation rule](../REFERENCES.md#naming-a-dependent-function-type).
+
 A retained length can be a checked source call such as `plus n m`.
 Its two inputs can come from IO. The result index remains the same
 through compilation, and the runtime sum stays lazy.
@@ -39,6 +50,12 @@ cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-op
   The `withPair` callback can name that argument as the index of its
   payload. A function-valued witness can pass through this callback
   without being evaluated. [Example](../examples/packed-vector/DependentPair.hs).
+- Opaque binders at saturated lifted data types, including indexed GADTs.
+  `foreach (xs :: Vec a n) -> xs :~: xs` can return `Refl` without inspecting
+  `xs`. An ordinary client can use that proof through an interface.
+  Structural retained matching still requires a supported constructor schema.
+  See [Agda's dependent function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
+  and the `NativeRetainedPackage` source regression.
 - Closed parameterized domains such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
 - Retained workers and function fields through separate interfaces.
 - Nominal scalar-domain conversion with scoped source body solving at M58.

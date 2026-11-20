@@ -9,11 +9,23 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+A retained function can name an entire indexed vector as its argument.
+`foreach (xs :: Vec a n) -> xs :~: xs` returns `Refl` even for an
+undefined vector. Using two different vector binders in the same equality
+fails at `Refl`. A type synonym can also name a dependent consumer. An
+ordinary module uses the exported synonym to pass an indexed payload.
+Matching an indexed vector constructor to refine the value `xs` remains open.
+[Dependent products](roadmap/R03-dependent-products.md) and
+[named consumer](examples/packed-vector/DependentPair.hs).
+
 `splitAtVec` takes a runtime cut `n` and a vector of length `Add n m`.
-It returns two vectors of lengths `n` and `m`. The 344-line Showcase also
+It returns two vectors of lengths `n` and `m`. The Showcase also
 checks the contents of a concrete split. Appending the two parts of
 `[True, False]` gives that same vector. Swapping the elements makes the
-equality proof fail at `Refl`. The law for every input vector remains open.
+equality proof fail at `Refl`. The ordinary polymorphic `appendVec` can itself appear in a type.
+GHC infers the input lengths of two written vectors, reduces their sum,
+and checks the exact output elements. The law for every input vector
+remains open.
 [Split and prior art](REFERENCES.md#split-a-vector-at-a-retained-length) and
 [contents proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
 

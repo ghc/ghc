@@ -753,6 +753,18 @@ when the linker cannot load the ordinary projection. The kind solver
 finishes specialization before the compiler prepares ordinary evidence
 and the checked family application. The same rule checks still apply.
 
+Closed arguments can also determine erased indices. The literal vector
+constructors in `PackedVecLibrary.appendVec` fix both input lengths.
+The solver reduces addition at those lengths to check the result
+shape. Ordinary term checking instantiates the imported function at
+the resulting type. If the result still needs an unresolved family
+application, the evaluator cannot prepare readback. An imported
+route function also uses this rule with an index of kind `Stop`.
+Agda's vector append likewise obtains implicit lengths from its
+arguments. [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+[Agda vector append](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [route check](../../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
+
 An empty list can use a known result kind before selecting its legacy
 `Natural` default. If an ordinary consumer requires two results of the
 same type, a computed `Char` operand can fix the result of an earlier

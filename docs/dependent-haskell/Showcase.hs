@@ -1481,6 +1481,9 @@ sourceAddition = do
         split :: (Vec Bool n, Vec Bool m)
         split = splitAtVec @Bool @m n joined
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
+    observe "use ordinary vector append in a type"
+        (Refl :: PackedVecLibrary.appendVec ('VCons 'True 'VNil) ('VCons 'False 'VNil)
+              :~: 'VCons 'True ('VCons 'False 'VNil))
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     case (Refl :: VectorSplitObservation.reassembleTwo ('VCons 'True ('VCons 'False 'VNil))
@@ -1565,6 +1568,10 @@ arithmeticNotation = do
 prefixRowExact :: forall a. foreach (n :: Nat) -> a -> [a] -> Maybe (Vec a (1 + n))
 prefixRowExact n x xs = VCons x <$> fromListExact n xs
 
+-- | Read a vector and its label through a named retained telescope.
+describeVector :: Pair.Consumer (Vec Char n) (Const String) (String, String)
+describeVector xs (Const label) = (label, toList xs)
+
 -- | Check a size from IO or let the input list determine its own size.
 listBoundaries :: IO ()
 listBoundaries = do
@@ -1591,6 +1598,12 @@ listBoundaries = do
     observe "use one dependent pair type at two witness types"
         (Pair.withPair chars (\k v -> (natToInt k, toList v)),
          Pair.withPair tag (\_ c -> getConst c))
+    case (Refl :: Pair.Consumer (Vec Char 'Z) (Const String) String
+               :~: (foreach (v :: Vec Char 'Z) -> Const String v -> String)) of
+        Refl -> observe "expand a named consumer over an indexed vector" True
+    let row = replicateNative n 'x'
+    observe "name a dependent consumer at a runtime vector length"
+        (describeVector row (Const "row"))
     observe "project the payload at the first field of a dependent pair"
         (natToInt (Pair.first chars), toList (Pair.second chars), getConst (Pair.second tag))
     observe "read either package field without demanding its sibling"

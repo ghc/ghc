@@ -505,7 +505,7 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy vis1 b1 _) _ ty2@(DepFunTy 
   | bothRewritten ces
   , vis1 == vis2
   , isWanted ev
-  , isNativeIndexFunctionId b1, isNativeIndexFunctionId b2
+  , isNativeOpaqueValueId b1, isNativeOpaqueValueId b2
   , varType b1 `tcEqType` varType b2
   = can_eq_nc_depfun ev eq_rel ty1 ty2 MRefl
 
@@ -515,13 +515,11 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(DepFunTy vis1 b1 _) _ ty2@(DepFunTy 
   , vis1 == vis2
   , isWanted ev
   , isNativeIndexId b1, isNativeIndexId b2
-  = if domain1 `tcEqType` domain2
-    then can_eq_nc_depfun ev eq_rel ty1 ty2 MRefl
-    else do { Reduction co1 normal1 <- rewriteFamilyAxioms (ctEvLoc ev) domain1
-            ; Reduction co2 normal2 <- rewriteFamilyAxioms (ctEvLoc ev) domain2
-            ; if normal1 `tcEqType` normal2
-              then can_eq_nc_depfun ev eq_rel ty1 ty2 (MCo (co1 `mkTransCo` mkSymCo co2))
-              else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
+  = do { Reduction co1 normal1 <- rewriteFamilyAxioms (ctEvLoc ev) domain1
+       ; Reduction co2 normal2 <- rewriteFamilyAxioms (ctEvLoc ev) domain2
+       ; if normal1 `tcEqType` normal2
+         then can_eq_nc_depfun ev eq_rel ty1 ty2 (MCo (co1 `mkTransCo` mkSymCo co2))
+         else canEqSoftFailure IrredShapeReason ev ty1 ty2 }
   where
     domain1 = varType b1
     domain2 = varType b2
@@ -921,7 +919,11 @@ Compare two retained functions with the same visibility using nominal DepFunCo.
 Preserve both endpoint flags in the completed proof. Visibility mismatch cannot
 be solved by this source equality rule.
 See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
-Use MRefl when their complete eligible scalar or function domains agree.
+Use MRefl when both opaque binder domains agree nominally. For example,
+comparing Consumer (IO Int) p r with Consumer (IO Int) p Char can
+determine r. Opening the two bodies with the same Id does not need the
+constructors of IO. The private body check still rejects an assignment
+that would let the index escape.
 Substitute the same fresh bare variable into both bodies. A function head must remain a Var; a reflexive
 cast around that variable is not a supported native call head.
 

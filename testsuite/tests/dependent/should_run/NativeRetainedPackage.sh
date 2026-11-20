@@ -73,12 +73,21 @@ readFlag q = case second q of
   Yes -> True
   No  -> False
 
+type AsWritten t = t
+
+-- Name a retained consumer through an ordinary synonym.
+readTag :: AsWritten (Consumer a (Const Char) Char)
+readTag _ c = getConst c
+
+readAction :: Consumer (IO Int) (Const Char) Char
+readAction action tag = readTag action tag
+
 value :: DPair a (Const r) -> r
 value q = getConst (second q)
 
 main :: IO ()
 main = print (readInt (pack (error "unused integer witness") 7),
-              withPair (pack (error "unused IO" :: IO Int) 'i') (\_ c -> getConst c),
+              withPair (pack (error "unused IO" :: IO Int) 'i') readAction,
               value (pack (error "unused function" :: Int -> Int) 'f'),
               first (pack (12 :: Int) (error "unused payload" :: Char)),
               readFlag (Pair True Yes), readFlag (Pair False No))
@@ -86,6 +95,40 @@ HS
 "${g[@]}" -main-is General -c General.hs
 "${g[@]}" -main-is General General.o ../provider/DependentPair.o ../projection/DependentProjection.o -o general
 ./general
+cat >AmbiguousConsumer.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}
+module AmbiguousConsumer where
+import Data.Functor.Const (Const(..))
+import Data.Kind (Type)
+import DependentPair (Consumer)
+type family Hidden a :: Type
+bad :: Consumer (Hidden a) (Const Bool) Bool
+bad _ (Const b) = b
+HS
+if "${g[@]}" -c AmbiguousConsumer.hs >bad.log 2>&1 ||
+   ! grep -Fq "In the ambiguity check for" bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
+# An inferred result must be independent of the runtime argument.
+cat >EscapeCallback.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, PolyKinds #-}
+module EscapeCallback where
+import Data.Kind (Type)
+import Data.Proxy (Proxy(..))
+type Body (a :: Type) r = foreach (x :: a) -> Proxy x -> r
+type Indexed (a :: Type) = foreach (x :: a) -> Proxy x -> Proxy x
+indexed :: Indexed (IO Int)
+indexed _ value = value
+takeBody :: Body (IO Int) r -> Proxy r
+takeBody _ = Proxy
+leak = takeBody indexed
+HS
+if "${g[@]}" -c EscapeCallback.hs >escape-callback.log 2>&1 ||
+   ! grep -Fq 'EscapeCallback.hs:11:17: error: [GHC-83865]' escape-callback.log; then
+    cat escape-callback.log >&2
+    exit 1
+fi
 cat >StrictRetainedField.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module StrictRetainedField where
@@ -325,10 +368,35 @@ reject_family SHIFTED_WITNESS "    ShiftWitness ('Shift" '[GHC-83605]'
 cd "$out/provider"
 cp "$src/"{StoredVector,ConservedPartition}.hs .
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c StoredVector.hs ConservedPartition.hs
+cat >VectorIdentity.hs <<'HS'
+{-# LANGUAGE CPP, ExperimentalDependentTypes, GADTs, PolyKinds #-}
+module VectorIdentity (vectorRefl, forwardVector) where
+
+import Data.Type.Equality ((:~:)(Refl))
+import PackedVecLibrary (Vec)
+
+vectorRefl :: foreach (xs :: Vec a n) -> xs :~: xs
+vectorRefl _ = Refl
+
+forwardVector :: foreach (xs :: Vec a n) -> xs :~: xs
+forwardVector xs = vectorRefl xs
+
+#ifdef WRONG_VECTOR
+wrongVector :: foreach (xs :: Vec a n) -> foreach (ys :: Vec a n) -> xs :~: ys
+wrongVector _ _ = Refl
+#endif
+HS
+"${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
+if "${g[@]}" -ferror-spans -fforce-recomp -DWRONG_VECTOR -c VectorIdentity.hs >wrong-vector.log 2>&1 ||
+   ! grep -Fq 'VectorIdentity.hs:15:19-22: error: [GHC-83865]' wrong-vector.log; then
+    cat wrong-vector.log >&2
+    exit 1
+fi
 cp {StoredVector,ConservedPartition}.hi "$src/ListVectorClient.hs" "$out/projection/"
 cd "$out/projection"
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c ListVectorClient.hs
 cp {StoredVector,ConservedPartition,ListVectorClient}.hi "$out/client/"
+cp "$out/provider/VectorIdentity.hi" "$out/client/"
 cd "$out/client"
 cat >ListVectorMain.hs <<'HS'
 {-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments #-}
@@ -339,6 +407,7 @@ import GHC.Sigma (Sigma(Pair))
 import ListVectorClient
 import PackedVecLibrary (Nat(..), Vec(..), splitAtVec, toList)
 import StoredVector (ListVector)
+import VectorIdentity (forwardVector, vectorRefl)
 observe :: ListVector Char -> (Int, String)
 observe = contents
 empty :: Split Int 'Z
@@ -346,6 +415,9 @@ empty = partitionVec (error "unused empty predicate") (VNil :: Vec Int 'Z)
 onlyKept, onlyDropped :: Split Int ('S 'Z)
 onlyKept = Pair (S Z) (Pair Z (VCons 7 VNil, error "unused dropped partition", error "unused sum proof"))
 onlyDropped = Pair Z (Pair (S Z) (error "unused kept partition", VCons 9 VNil, Refl))
+vectorProofs :: Vec Int n -> (Bool, Bool)
+vectorProofs xs =
+    (case vectorRefl xs of Refl -> True, case forwardVector xs of Refl -> True)
 main :: IO ()
 main = do
     print (observe (fromList ""), observe (fromList "ab"),
@@ -369,14 +441,16 @@ main = do
                                      (error "unused suffix" :: Vec Int ('S 'Z)))
         demand = (length (toList (fst zeroVector)), length (toList (snd zeroElement)),
                   length (toList (fst one)))
-    case (mixed, lazy, selected, split, demand) of
+    let proofs = (vectorProofs (VCons 7 VNil),
+                  vectorProofs (error "unused indexed vector" :: Vec Int 'Z))
+    case (mixed, lazy, selected, split, demand, proofs) of
         ((4, [3, 4, 1, 2]), 1, [(0, []), (0, []), (1, [7]), (1, [9])],
-         ([7], [9]), (0, 1, 1)) -> pure ()
+         ([7], [9]), (0, 1, 1), ((True, True), (True, True))) -> pure ()
         other -> fail (show other)
 HS
 "${g[@]}" -c ListVectorMain.hs
 "${g[@]}" ListVectorMain.o ../projection/ListVectorClient.o \
-    ../provider/{StoredVector,ConservedPartition,PackedVecLibrary}.o -o list-vector
+    ../provider/{StoredVector,ConservedPartition,PackedVecLibrary,VectorIdentity}.o -o list-vector
 ./list-vector
 cat >WrongPartition.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}

@@ -281,6 +281,12 @@ withRetainedAmbiguityType ty thing_inside
            ; (arg_indices, arg) <- go arg
            ; (res_indices, res) <- go res
            ; return (ma_indices ++ arg_indices ++ res_indices, FunTy flag ma mult arg res) }
+    go ty@(TyConApp tc args)
+      | isTypeSynonymTyCon tc
+      , not (isTauTyCon tc && all isTauTy args)
+      , Just rhs <- coreView ty
+      = do { projected@(indices, _) <- go rhs
+           ; return (if null indices then ([], ty) else projected) }
     go ty = return ([], ty)
 
 {- Note [Ambiguity checking retained signatures]
@@ -298,6 +304,12 @@ See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
 Keep outer erased quantifiers, so ordinary ambiguity checks still apply to
 their type variables and constraints. Do not replace runtime indices with
 fresh type metavariables: Select b need not determine b.
+
+A synonym can name the same telescope. For example, a synonym with RHS
+foreach (x :: a) -> x :~: x determines a from its argument. Open the
+telescope for the ambiguity check as for the written type. A tau synonym
+applied to tau arguments cannot contain a retained binder. Keep the
+original synonym if expansion opens no binder, including in diagnostics.
 
 Project both the argument and result of an ordinary arrow. For example,
 forall a. (foreach m -> Vec a m -> Vec a m) -> Int compares a payload skolem

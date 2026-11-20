@@ -2573,10 +2573,9 @@ Other function values can remain opaque fields. The conversion predicate
 checks endpoints only; its caller must retain nominal evidence and direction.
 
 Core retained value binders and occurrences use the opaque Id judgment.
-Source foreach roots use isNativeRetainedBinder instead. A root can also
-have a lifted type parameter as its domain. See Note [Abstract witness domains].
-Neither judgment establishes
-scope, nominal domain equality or runtime evaluation of an opaque value.
+Source foreach roots use isNativeRetainedBinder instead. See
+Note [Opaque algebraic retained binders] and Note [Abstract witness domains].
+Both checks leave scope and nominal domain equality to their callers.
 -}
 
 -- | Test whether a local unrestricted identifier has a supported index domain.
@@ -2585,18 +2584,49 @@ isNativeIndexId v
   = isNativeOpaqueValueId v && isNativeIndexType (varType v)
 
 -- | Test whether an Id can bind a source value index or a fixed call head.
--- See Note [Function-valued retained binders].
+-- See Note [Opaque algebraic retained binders].
 isNativeRetainedBinder :: Id -> Bool
 isNativeRetainedBinder v
-  = isNativeIndexId v || isNativeIndexFunctionId v
-    || (isTyVarTy (varType v) && isNativeOpaqueValueId v)
+  = (isNativeOpaqueValueId v && isNativeAlgebraicOrAbstractDomain (varType v))
+    || isNativeIndexFunctionId v
 
 -- | Test a source retained-root domain without constructing a temporary Id.
--- See Note [Function-valued retained binders].
+-- See Note [Opaque algebraic retained binders].
 isNativeRetainedBinderType :: Type -> Bool
 isNativeRetainedBinderType ty
-  = isNativeIndexType ty || isJust (nativeIndexFunctionTypeTys_maybe ty)
-    || (isTyVarTy ty && isNativeOpaqueValueType ty)
+  = (isNativeOpaqueValueType ty && isNativeAlgebraicOrAbstractDomain ty)
+    || isJust (nativeIndexFunctionTypeTys_maybe ty)
+
+-- | Test the head of an opaque value domain after expanding synonyms.
+-- The caller checks the full domain's lifted kind.
+isNativeAlgebraicOrAbstractDomain :: Type -> Bool
+isNativeAlgebraicOrAbstractDomain ty = case coreFullView ty of
+  TyVarTy {} -> True
+  TyConApp tc args ->
+    isVanillaAlgTyCon tc && isBoxedDataTyCon tc && tyConArity tc == length args
+  _ -> False
+
+{- Note [Opaque algebraic retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder at a lifted type parameter can already instantiate that
+parameter to Vec a n. Allow the same opaque binder when the signature names
+that domain directly:
+
+  vectorIdentity :: foreach (xs :: Vec a n) -> xs :~: xs
+
+The result mentions the local Id. Binding that Id uses the domain's type
+and requires no traversal of its constructors or their equalities. Use
+the saturated, lifted boxed data head. A synonym can expand to such a head.
+The binder does not reify Vec's constructors as indices. Constructor
+reification and structural matching still require isNativeIndexType.
+Function calls still use the fixed head check in
+Note [Function-valued retained binders].
+
+Agda's checkPiTelescope checks the domain and extends the context for the
+result. See docs/dependent-haskell/REFERENCES.md#agda-provenance. The GHC
+binder preserves the runtime argument and its laziness. Two distinct
+binders at the same domain still name distinct values.
+-}
 
 {- Note [Abstract witness domains]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2646,9 +2676,9 @@ and forward evidence.
 
 {- Note [Function-valued retained binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A source foreach root can bind a structural index, an abstract witness or
-an eligible opaque call head. Core retained value binders use the opaque Id judgment. See
-Note [Opaque runtime index values].
+A source foreach root can bind an opaque algebraic or abstract value,
+or an eligible opaque call head. Core retained value binders use the
+opaque Id judgment. See Note [Opaque runtime index values].
 The function head has a closed ordinary visible Many arrow A -> B. Both A and
 B are independently supported scalar domains. The Id is local, unrestricted,
 and not a join point. Keep the head policy separate from structural schemas.

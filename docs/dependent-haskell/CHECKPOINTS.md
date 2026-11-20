@@ -8,6 +8,43 @@ increments.
 
 ## Family and package checkpoints
 
+At `7278fc1e52`, an ordinary client can pass a named callback to
+`withPair` and infer its `Char` result. The solver compares the callback
+bodies under one shared runtime binder of type `IO Int`. Inferring a
+result that mentions that binder fails at the callback. The combined
+compiler relink matched all 347 Showcase lines at `-O0`, default `-O1`,
+and default `-O2`. Both source regressions and the ten focused kind and
+matchability diagnostics passed.
+[Source test](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [quantifier display](roadmap/R23-unsaturated-type-families.md).
+
+The full build of `4d5d6e467f` matched all 341 Showcase lines at both
+compiler stages and all three optimization levels. Self-hosted GHCi
+also matched. The focused tests recorded 72 passes and one missing-library
+skip. The dependent directory recorded 306 passes and 20 unexpected
+failures. Polykinds recorded 224 passes, one expected failure, and
+18 unexpected failures. Both directories had the same failure names and
+categories as the 337-line compiler.
+
+At `7d04760583`, all 347 Showcase lines matched with the combined compiler
+relink at `-O0`, default `-O1`, and default `-O2`. The registered vector
+program also ran with Core and STG Lint. The proof at the expression
+`Refl` failed with GHC-83865 when the two appended elements were swapped.
+A separately compiled ordinary route function checks a result family
+indexed by a user-defined stop type.
+[Examples](Showcase.hs) and [indexed route](../../testsuite/tests/dependent/should_run/NativeClosedIndexedRoute.hs).
+
+At `c753344c5b`, a compiler relink with the opaque-domain, beta-reduction,
+and signature changes matched all 345 Showcase lines at `-O0`, default
+`-O1`, and default `-O2`. Core and STG Lint passed.
+`NativeRetainedPackage` checked direct vector binders, forwarding,
+distinct vector identities and a named callback in an ordinary consumer.
+A non-injective family in the callback signature still produced an
+ambiguity error. `NativeFunctionIndex` matched its existing golden.
+[Domain check](../../compiler/GHC/Core/Type.hs),
+[source regression](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [callback type](examples/packed-vector/DependentPair.hs).
+
 At `a35653b580`, the public 341-line compiler relink matched all 344
 Showcase lines at `-O0`, default `-O1`, and default `-O2`, with Core and
 STG Lint. The registered source tests for the comparison and the split

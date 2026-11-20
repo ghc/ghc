@@ -658,7 +658,10 @@ The Showcase's `MapFlags` uses a signed callback kind `Bool %U -> Bool`.
 It applies a partial family at that kind. GHCi displays the unsigned
 `Map` callback with a variable modifier, such as `k %t -> a`. With
 `-fprint-explicit-matchabilities`, it also shows the inferred binder
-and fixed modifiers on the outer arrows.
+and fixed modifiers on the outer arrows. A skolem-escape diagnostic
+can show kinds while keeping the default unmatchable `forall` implicit.
+The diagnostic preserves a matchable or variable annotation when it
+affects the type.
 [Showcase](../Showcase.hs) and
 [GHCi regression](../../../testsuite/tests/dependent/should_run/NativeInferredFamilyGhci.script).
 

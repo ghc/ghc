@@ -152,6 +152,7 @@ heads of empty and nonempty runtime lists: (Nothing,Just 11)
 safeHead of a known list cell: False
 safeHead at length 1 + n: True
 runtime sum and appended vector: (3,[True,False,False])
+use ordinary vector append in a type: Refl
 split the appended vector at its first length: ([True],[False,False])
 reassemble the same two vector elements: [True,False]
 outer successor ignores the second addend: True
@@ -185,6 +186,8 @@ project the length of a known dependent package in a type: Refl
 project from two payload families with the same dependent function: ("xx",7)
 use the stored length and vector in a generic dependent eliminator: (2,"xx")
 use one dependent pair type at two witness types: ((2,"xx"),'i')
+expand a named consumer over an indexed vector: True
+name a dependent consumer at a runtime vector length: ("row","xx")
 project the payload at the first field of a dependent pair: (2,"xx",'i')
 read either package field without demanding its sibling: (7,2)
 checked row prefix with a runtime length: (Just "xab",Nothing)
