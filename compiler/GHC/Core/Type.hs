@@ -160,7 +160,7 @@ module GHC.Core.Type (
 
         -- * Type free variables
         tyCoVarsOfType, tyCoVarsOfTypes, tyCoVarsOfTypeDSet,
-        coVarsOfType, coVarsOfTypes,
+        tyCoVarsOfMCo, coVarsOfType, coVarsOfTypes,
 
         anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,

@@ -3143,7 +3143,7 @@ There have been various earlier versions of this patch:
     case_bndr_evald_next _               = False
 
   This patch was part of fixing #7542. See also
-  Note [Eta reduction soundness], criterion (E) in GHC.Core.Utils.)
+  Note [Eta reduction soundness], criterion (EtaE) in GHC.Core.Opt.Arity.)
 
 
 Further notes about case elimination
