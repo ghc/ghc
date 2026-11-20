@@ -14,7 +14,7 @@ flags=(-B"$lib" -v0 -O0 -package-env - -i -i.
 
 mkdir provider hidden client
 cd provider
-cp "$src/"{Vector,Filter,LetFilter,BarProvider,DotHie,BarRank,RetainedDot,Builder,Functions,NestedSignature,Nested,ForwardProducer,ForwardSchemas}.hs .
+cp "$src/"{Vector,Filter,LetFilter,BarProvider,DotHie,BarRank,RetainedDot,Builder,Functions,NestedSignature,Nested,ForwardProducer,ForwardSchemas,WitnessSchema}.hs .
 "$ghc" "${flags[@]}" -c Vector.hs BarRank.hs RetainedDot.hs Functions.hs
 "$ghc" "${flags[@]}" -fwrite-ide-info -c BarProvider.hs
 "$ghc" "${flags[@]}" -ddump-ds -ddump-stg-final -c Filter.hs >filter.log
@@ -28,7 +28,7 @@ test -s Builder.hie
 "$ghc" "${flags[@]}" -c NestedSignature.hs
 "$ghc" "${flags[@]}" -fwrite-ide-info -ddump-ds -ddump-stg-final -c Nested.hs >nested.log
 test -s Nested.hie
-"$ghc" "${flags[@]}" -c ForwardProducer.hs ForwardSchemas.hs
+"$ghc" "${flags[@]}" -c ForwardProducer.hs ForwardSchemas.hs WitnessSchema.hs
 grep -Eq '^[[:space:]]+\(pack ' nested.log
 grep -Eq 'unpack unpacked' nested.log
 sed -n '/Final STG:/,$p' filter.log >filter.stg
@@ -52,10 +52,10 @@ IFS= read -r dot_hie < DotHie.hie
 IFS= read -r bar_hie < BarProvider.hie
 [[ $dot_hie == "HIE$(( ${bar_hie#HIE} + 1 ))" ]]
 mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs Builder.hs Functions.hs NestedSignature.hs Nested.hs \
-    ForwardProducer.hs ForwardSchemas.hs ../hidden/
+    ForwardProducer.hs ForwardSchemas.hs WitnessSchema.hs ../hidden/
 
 cd ../client
-cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Functions,NestedSignature,Nested,ForwardProducer,ForwardSchemas}.hi .
+cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Functions,NestedSignature,Nested,ForwardProducer,ForwardSchemas,WitnessSchema}.hi .
 cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain,CaseMain,NestedMain,StrictMatch,ForwardMain}.hs .
 "$ghc" "${flags[@]}" -c Main.hs Identity.hs Opening.hs LinearDot.hs
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
@@ -86,7 +86,7 @@ grep -Eq 'unpack unpacked.*:: k_' nested-client.log
 grep -A1 'ForwardProducer.choose$' forward.log | grep -Eq '@\(exists .*\. exists '
 grep -A1 'ForwardProducer.choose$' forward.log | grep -Eq '@\(exists .* \| '
 grep -A6 'ForwardProducer.keepTagged$' forward.log | grep -Eq '@\(exists .*\. exists '
-"$ghc" "${flags[@]}" ForwardMain.o ../provider/{Vector,Filter,Nested,ForwardProducer,ForwardSchemas}.o \
+"$ghc" "${flags[@]}" ForwardMain.o ../provider/{Vector,Filter,Nested,ForwardProducer,ForwardSchemas,WitnessSchema}.o \
     -o forward -main-is ForwardMain
 ./run
 ./audit
@@ -114,6 +114,31 @@ for binding in function index; do
         exit 1
     }
 done
+
+cp "$src/"{WitnessClient,WitnessDeep,WitnessMismatch}.hs .
+"$ghc" "${flags[@]}" -ddump-ds -c WitnessDeep.hs >deep-witness.core
+grep -Eq 'pack (GHC(\.Internal)?\.Types\.)?Int' deep-witness.core
+"$ghc" "${flags[@]}" -XImpredicativeTypes -ddump-ds -c WitnessClient.hs -main-is WitnessClient >witnesses.core
+grep -Eq 'pack WitnessSchema.PolyId' witnesses.core
+grep -Eq 'pack WitnessSchema.PolyMaybe' witnesses.core
+"$ghc" "${flags[@]}" WitnessClient.o ../provider/WitnessSchema.o -main-is WitnessClient -o witnesses
+./witnesses
+if "$ghc" "${flags[@]}" -fforce-recomp -XNoImpredicativeTypes -c WitnessClient.hs >monomorphic.log 2>&1; then
+    echo "A higher-rank witness was inferred without ImpredicativeTypes." >&2
+    exit 1
+fi
+for binding in hidden both atKind; do
+    line=$(grep -n "^$binding =" WitnessClient.hs | cut -d: -f1)
+    grep -Eq "^WitnessClient.hs:$line:[0-9]+: error: \[GHC-91028\]" monomorphic.log || {
+        cat monomorphic.log >&2
+        exit 1
+    }
+done
+if "$ghc" "${flags[@]}" -c WitnessMismatch.hs >family-mismatch.log 2>&1; then
+    echo "A higher-rank witness hid a conflicting family result." >&2
+    exit 1
+fi
+grep -Fq '[GHC-83865]' family-mismatch.log
 
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape
