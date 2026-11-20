@@ -311,6 +311,12 @@ test('NativePackageLength',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedLength.hs'])],
      run_command, ['bash NativePackageLength.sh "{compiler}" "{libdir}"'])
 
+test('NativeDefaultVector',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/DefaultVector.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
+     run_command, ['bash NativeDefaultVector.sh "{compiler}" "{libdir}"'])
+
 test('NativeDefaultO1Interface',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeDefaultO1InterfaceProducer.hs',
