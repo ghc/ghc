@@ -249,3 +249,15 @@ family can leave the application stuck.
 [Repeated argument example](../examples/erased-existentials/PackageEquality.hs).
 [Serokell’s R04 card](https://ghc.serokell.io/dh#dependent-sums)
 and [type-lambda elaboration](R17-type-level-lambdas.md#source-and-evidence).
+
+## Partition at the original length
+
+The [vector partition](../examples/packed-vector/ConservedPartition.hs) returns
+two nested `some` packages. Its payload contains the kept vector, the
+dropped vector, and a proof that their lengths add up to the input length.
+The [ordinary caller](../examples/packed-vector/ListVectorClient.hs) opens
+both packages and appends the vectors at the original length. Each
+partition preserves input order. The partition traverses the finite vector
+and tests each element. The elements can stay unevaluated when the
+predicate ignores them.
+[Agda proof and Idris vector partition](../REFERENCES.md#conservation-of-partition-length).

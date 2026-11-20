@@ -334,3 +334,4 @@ prove filter never increases length: (BothSucc (RightSucc ZeroBound),Succ Zero,S
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl
+regroup both partitions at the original length: (4,[3,4,1,2])

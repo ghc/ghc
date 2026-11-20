@@ -6409,3 +6409,16 @@ full dependent coverage. Our example checks one such relation between
 a package and its openings.
 [*Lower Your Guards*, sections 2.4, 3.1 and 7.2.3](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
 and [local R22 examples](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
+
+## Conservation of partition length
+
+Agda's `interleave-length` proves that the length of an interleaving
+equals the sum of its two source lengths. Its right-hand case transports
+addition across a successor in the second operand. The Haskell partition
+uses this step through `addSucc`. Idris 2's `Data.Vect.partition` stores
+each vector with its own length. The Haskell result also stores evidence
+that relates both lengths to the input. Matching `Refl` lets an ordinary
+client return the appended vector at the input index.
+[Agda standard library v1.2, interleaving properties](https://agda.github.io/agda-stdlib/v1.2/Data.List.Relation.Ternary.Interleaving.Properties.html),
+[Idris 2, Data.Vect.partition](https://idris-lang.org/Idris2/base/source/Data.Vect.html#743)
+and [Haskell implementation](examples/packed-vector/ConservedPartition.hs).
