@@ -291,6 +291,39 @@ HS
     "${new[@]}" "${flags[@]}" --make -no-link Client.hs Unrelated.hs >second.log 2>&1
     if grep -F 'Compiling ' second.log; then exit 1; fi
 
+    # The owner can export a class default before it has any instances.
+    cat >DefaultOwner.hs <<'HS'
+{-# LANGUAGE TypeFamilies #-}
+module DefaultOwner (Owner(..)) where
+import Data.Kind (Type)
+class Owner a where
+    type Result a :: Type
+    type Result a = a -> Maybe a
+HS
+    "${old[@]}" "${flags[@]}" -c DefaultOwner.hs
+    cat >Instances.hs <<'HS'
+{-# LANGUAGE TypeFamilies #-}
+module Instances where
+import DefaultOwner
+instance Owner Bool
+HS
+    cat >UseDefault.hs <<'HS'
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
+module UseDefault where
+import DefaultOwner
+import Instances ()
+type family Apply (f :: Result Bool)
+type instance Apply 'Just = Maybe Bool
+callback :: Result Bool
+callback = Just
+value :: Apply 'Just
+value = callback True
+HS
+    "${new[@]}" "${flags[@]}" --make -no-link UseDefault.hs >default.log 2>&1 || { cat default.log; exit 1; }
+    grep -E 'Compiling DefaultOwner .*\[Compiler now infers matchability for associated type defaults\]' default.log
+    "${new[@]}" "${flags[@]}" --make -no-link UseDefault.hs >default-warm.log 2>&1
+    if grep -F 'Compiling ' default-warm.log; then exit 1; fi
+
     # Keep the installed owner fixed while the default in a client changes.
     mkdir "$work/provider"
     cd "$work/provider"
@@ -333,15 +366,20 @@ get :: F AtBase
 get = undefined
 HS
     flags+=(-package-db "$work/package-db" -package-id "$unit")
-    abi() { "${new[@]}" --show-iface Use.hi | grep -F '  ABI hash:'; }
-    "${old[@]}" "${flags[@]}" -c Use.hs
-    abi >old.abi
-    "${new[@]}" "${flags[@]}" -c Use.hs
-    abi >incremental.abi
-    "${new[@]}" "${flags[@]}" -fforce-recomp -c Use.hs
-    abi >clean.abi
-    cmp incremental.abi clean.abi
-    if cmp -s old.abi clean.abi; then exit 1; fi
+    sed '/^get = undefined$/d' Use.hs >Use.hs-boot
+    abi() { "${new[@]}" --show-iface "$1" | grep -F '  ABI hash:'; }
+    for suffix in '' -boot; do
+        input="Use.hs$suffix"
+        iface="Use.hi$suffix"
+        "${old[@]}" "${flags[@]}" -c "$input"
+        abi "$iface" >old.abi
+        "${new[@]}" "${flags[@]}" -c "$input"
+        abi "$iface" >incremental.abi
+        "${new[@]}" "${flags[@]}" -fforce-recomp -c "$input"
+        abi "$iface" >clean.abi
+        cmp incremental.abi clean.abi
+        if cmp -s old.abi clean.abi; then exit 1; fi
+    done
     (cd "$work/provider" && sha256sum -c --quiet original.sha)
     exit 0
 fi
