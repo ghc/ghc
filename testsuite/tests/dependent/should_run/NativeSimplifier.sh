@@ -42,7 +42,15 @@ reject() {
 }
 reject 'optimized module compilation with these options' -O2 "${flags[@]}" -c NativeSimplifierProvider.hs
 reject 'optimized module compilation with these options' -O1 "${flags[@]}" -fno-worker-wrapper -c NativeSimplifierProvider.hs
-reject 'interface unfolding generation' -O1 -fno-write-if-simplified-core -c NativeSimplifierProvider.hs
+"${g[@]}" -O1 -fno-write-if-simplified-core -fforce-recomp -c NativeSimplifierProvider.hs
+cp NativeSimplifierProvider.hi client/
+(
+    cd client
+    "${g[@]}" -O1 -fno-write-if-simplified-core -fforce-recomp -c NativeSimplifierClient.hs
+    "${g[@]}" NativeSimplifierClient.o ../NativeSimplifierProvider.o ../NativeSimplifierLocalRec.o -o run
+    ./run >optimized
+    diff -u observed optimized
+)
 reject 'Core interface serialization' -O1 -fomit-interface-pragmas -fwrite-if-simplified-core -c NativeSimplifierProvider.hs
 
 sed 's/^module NativeSimplifierProvider /module LocalRuleProvider /' NativeSimplifierProvider.hs >LocalRuleProvider.hs
