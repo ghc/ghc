@@ -43,11 +43,15 @@ GHC-46956 and needed a consumer with signature `Callback t -> (Int, Bool)`.
   payload in the bytecode interpreter. The exception occurs when the
   body demands the payload. The STG checks show that a named payload
   goes directly to its consumer and a named package retains its Id.
-- [ ] Compile a producer and an interface-only client. Check both
-  `Nothing` and `Just`. Applying `seq` to a package with an exceptional
-  payload must observe the exception. Opening a package and ignoring its
-  payload should preserve laziness. Inspect the generated code for an
-  extra constructor or witness argument.
+- [x] `NativeExistentialSource` hides the explicit `Maybe` producer's
+  source before compiling its clients. `inspect` sees `Nothing` and
+  `Just`. The ordinary client uses `` lazyPack `seq` () `` to observe the
+  original payload exception. `ignoreBottom` opens the same package
+  without evaluating the payload. A strict payload pattern raises the
+  same exception. The opener matches `Maybe` directly in final STG.
+  At `-O0` and `-O2`, both compiler stages emit the ordinary `Nothing`
+  and `Just` closure layouts and a unary opener. This check covers
+  lifted payloads in the explicit prefix `Pack` form.
 - [x] Infer packing and opening in the vector filter. Test the first
   element of a vector whose tail raises an exception. If the first element
   passes the predicate, the first result should be available immediately.
