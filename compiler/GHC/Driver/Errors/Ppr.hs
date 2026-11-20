@@ -229,9 +229,14 @@ instance Diagnostic DriverMessage where
                    <> (pprWithUnitState state $ ppr (moduleUnit m))
                    <> text ") the module resides in isn't trusted."
                ]
-    DriverCannotOptimizeErasedPackage binder ->
+    DriverUnsupportedRetainedRule rule ->
       mkSimpleDecorated $ vcat
-        [ text "Cannot optimize erased package construction or elimination in" <+> quotes (ppr binder) <+> text "at -O1."
+        [ text "The dependent optimizer cannot run the rewrite rule" <+> quotes (ftext rule) <+> text "at -O1."
+        , text "Compile this module with -O0." ]
+    DriverUnsupportedRetainedBinding binder ->
+      mkSimpleDecorated $ vcat
+        [ text "The dependent optimizer does not support all Core forms"
+            <+> maybe (text "in this module") (\b -> text "in" <+> quotes (ppr b)) binder <+> text "at -O1."
         , text "Compile this module with -O0." ]
     DriverRedirectedNoMain mod_name
       -> mkSimpleDecorated $ (text
@@ -368,7 +373,9 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverCannotImportFromUntrustedPackage{}
       -> ErrorWithoutFlag
-    DriverCannotOptimizeErasedPackage {}
+    DriverUnsupportedRetainedRule {}
+      -> ErrorWithoutFlag
+    DriverUnsupportedRetainedBinding {}
       -> ErrorWithoutFlag
     DriverRedirectedNoMain {}
       -> ErrorWithoutFlag
@@ -449,7 +456,9 @@ instance Diagnostic DriverMessage where
       -> noHints
     DriverCannotImportFromUntrustedPackage{}
       -> noHints
-    DriverCannotOptimizeErasedPackage {}
+    DriverUnsupportedRetainedRule {}
+      -> noHints
+    DriverUnsupportedRetainedBinding {}
       -> noHints
     DriverRedirectedNoMain {}
       -> noHints

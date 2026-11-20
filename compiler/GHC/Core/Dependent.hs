@@ -174,8 +174,10 @@ scanExpr (Lam b body) = scanBinder b <> scanExpr body
 scanExpr (Let bind body) = scanBind bind <> scanExpr body
 scanExpr (Case scrut b result alts) =
     scanExpr scrut <> scanBinder b <> scanType result <> foldMap scanAlt alts
-scanExpr Pack{} = NativeScan (pure True)
-scanExpr Unpack{} = NativeScan (pure True)
+scanExpr (Pack schema witness payload) =
+    gentleForm (scanType schema <> scanType witness <> scanExpr payload)
+scanExpr (Unpack witness payload package body) =
+    gentleForm (scanExpr package <> scanBinder witness <> scanBinder payload <> scanExpr body)
 scanExpr (Cast body co) = scanExpr body <> scanCo co
 scanExpr (Tick tick body) = scanTick tick <> scanExpr body
 scanExpr (Type ty) = scanType ty
@@ -278,7 +280,6 @@ scanType (TermVarTy v) =
     gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
 -- An ordinary client can pass a package through a polymorphic function.
--- Pack and Unpack expressions still require their own optimizer support.
 scanType (ExistsTy _ binder body) =
     gentleForm (scanType (varType binder) <> scanType body)
 scanType (DepFunTy _ b body) =

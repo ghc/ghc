@@ -3,6 +3,8 @@ constructed
 Pack has the demand of its payload
 ("present","present","absent","present","present")
 ("ignored","ignored application","absent")
+("[True]","[7]")
 strict payload pattern forced the package
+optimized package providers and clients preserve payload demand
 ordinary namesakes in a different module and a different unit compile
 typed and untyped quotations and guarded Pack reification pass

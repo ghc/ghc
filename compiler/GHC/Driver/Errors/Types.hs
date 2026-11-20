@@ -24,6 +24,7 @@ import Data.Typeable
 import GHC.Driver.DynFlags (DynFlags, PackageArg, gopt, ReexportedModule)
 import GHC.Driver.Flags (GeneralFlag (Opt_BuildingCabalPackage))
 import GHC.Types.Error
+import GHC.Types.Basic (RuleName)
 import GHC.Types.Name.Occurrence (OccName)
 import GHC.Unit.Module
 import GHC.Unit.Module.Graph
@@ -370,8 +371,11 @@ data DriverMessage where
 
   DriverRedirectedNoMain :: !ModuleName -> DriverMessage
 
-  -- | A binding still contains a package operation after restricted SimpleOpt.
-  DriverCannotOptimizeErasedPackage :: !OccName -> DriverMessage
+  -- | A dependent module defines a rewrite rule outside the retained schedule.
+  DriverUnsupportedRetainedRule :: !RuleName -> DriverMessage
+
+  -- | A binding contains a native form outside the retained optimizer.
+  DriverUnsupportedRetainedBinding :: !(Maybe OccName) -> DriverMessage
 
   DriverHomePackagesNotClosed :: ![(UnitId, UnitId)] -> DriverMessage
 

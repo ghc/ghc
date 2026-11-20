@@ -1,9 +1,10 @@
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE ExperimentalDependentTypes, GADTs #-}
 {-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Eliminate (inspect, inspectBare, ignoreBottom, ignoreCall, forceBottom, unpackLocal) where
+module Eliminate (inspect, inspectBare, ignoreBottom, ignoreCall, forceBottom, unpackLocal, shown, render) where
 
+import Data.Kind (Type)
 import qualified GHC.Exists as Exists
 import Provider
 
@@ -43,3 +44,23 @@ unpackLocal = case Exists.Pack @Hidden Bool Nothing of
     case x of
       Just _ -> "present"
       Nothing -> "absent"
+
+
+-- A list dictionary used by the specialiser depends on the opened witness.
+data Shown a where
+  Shown :: Show a => a -> Shown a
+
+type HiddenShow = exists (a :: Type) | Shown a
+
+{-# NOINLINE shown #-}
+shown :: forall a. Show a => a -> HiddenShow
+shown x = Exists.Pack (type a) (Shown x)
+
+{-# INLINABLE renderList #-}
+renderList :: Show a => a -> String
+renderList = show
+
+{-# NOINLINE render #-}
+render :: HiddenShow -> String
+render p = case p of
+  Exists.Pack (type a) (Shown x) -> renderList [x :: a]

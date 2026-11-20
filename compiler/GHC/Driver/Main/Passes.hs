@@ -1505,16 +1505,23 @@ hscSimplify' plugins ds_result = do
           let result = ds_result { mg_binds = simplified }
           if supportsNativeO1Flags (hsc_dflags lint_env)
             then do
-              unless (null rules && supportsNativeGentle simplified) $
-                case [b | (b, rhs) <- flattenBinds simplified, hasExistentialExpr rhs] of
+              let report loc message =
+                    throwOneError (initSourceErrorContext (hsc_dflags lint_env)) $
+                      mkPlainErrorMsgEnvelope loc (GhcDriverMessage message)
+                  module_loc = mg_loc ds_result
+              case rules of
+                rule : _ -> report module_loc (DriverUnsupportedRetainedRule (ru_name rule))
+                [] -> return ()
+              unless (supportsNativeGentle simplified) $
+                case [b | (b, rhs) <- flattenBinds simplified,
+                          not (supportsNativeGentle [NonRec b rhs])] of
                   b : _ -> do
                     let src = nameSrcSpan (idName b)
-                        loc = if isGoodSrcSpan src then src else mg_loc ds_result
-                    throwOneError (initSourceErrorContext (hsc_dflags lint_env)) $
-                      mkPlainErrorMsgEnvelope loc $
-                      GhcDriverMessage (DriverCannotOptimizeErasedPackage (getOccName b))
-                  [] -> throwGhcExceptionIO (ProgramError
-                    "Retained -O1 requires checked index domains and no local RULES. Use -O0 for this module.")
+                        message = case idCoreRules b of
+                          rule : _ -> DriverUnsupportedRetainedRule (ru_name rule)
+                          [] -> DriverUnsupportedRetainedBinding (Just (getOccName b))
+                    report (if isGoodSrcSpan src then src else module_loc) message
+                  [] -> report module_loc (DriverUnsupportedRetainedBinding Nothing)
               optimized <- core2coreRetained lint_env result
               endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt (mg_binds optimized) rules
               return optimized

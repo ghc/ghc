@@ -17,17 +17,6 @@ cp "$src/Provider.hs" provider/
 "$ghc" "${flags[@]}" -ddump-ds -ddump-stg-final -c provider/Provider.hs \
   -outputdir provider -fwrite-ide-info -hiedir provider >provider/core-stg.log
 test -s provider/Provider.hie
-if "$ghc" "${flags[@]}" -O1 -fomit-interface-pragmas -fforce-recomp \
-    -c provider/Provider.hs -outputdir optimized >optimized.log 2>&1; then
-  echo "optimized compilation unexpectedly admitted Pack" >&2
-  exit 1
-fi
-grep -Eq 'Provider.hs:[0-9]+:[0-9]+: error: \[GHC-36962\]' optimized.log &&
-grep -Fq 'Cannot optimize erased package construction or elimination in' optimized.log &&
-grep -Fq 'Compile this module with -O0.' optimized.log || {
-  cat optimized.log >&2
-  exit 1
-}
 mv provider/Provider.hs hidden-provider-source
 grep -Eq '\bpack\b' provider/core-stg.log || { cat provider/core-stg.log; exit 1; }
 sed -n '/Final STG:/,$p' provider/core-stg.log >provider/stg.log
@@ -42,7 +31,7 @@ cp "$src/"{OrdinaryClient,Eliminate,EliminateMain,QuotePack,TypedQuotePack,Reify
 # The compiler can load the provider only through its interface and object.
 "$ghc" "${flags[@]}" -i../provider -c OrdinaryClient.hs
 "$ghc" "${flags[@]}" OrdinaryClient.o ../provider/Provider.o -o ordinary
-./ordinary
+./ordinary | tee ordinary.stdout
 "$ghc" "${flags[@]}" -i../provider -c Eliminate.hs -fwrite-ide-info \
   -ddump-hie -ddump-ds -ddump-stg-final >eliminate.log
 test -s Eliminate.hie
@@ -59,9 +48,48 @@ fi
 diff -u - actual <<'EXPECTED'
 ("present","present","absent","present","present")
 ("ignored","ignored application","absent")
+("[True]","[7]")
 strict payload pattern forced the package
 EXPECTED
 cat actual
+
+# Compile the producer and both clients with the normal optimized interfaces.
+mkdir ../optimized
+(
+    cd ../optimized
+    opt=(-B"$lib" -v0 -O1 -package-env - -dcore-lint -dstg-lint "$@")
+    cp "$src"/{Provider,OrdinaryClient,Eliminate,EliminateMain}.hs .
+    "$ghc" "${opt[@]}" -c Provider.hs
+    mv Provider.hs Provider.source
+    "$ghc" "${opt[@]}" -c OrdinaryClient.hs
+    "$ghc" "${opt[@]}" OrdinaryClient.o Provider.o -o ordinary
+    ./ordinary | cmp - ../client/ordinary.stdout
+    "$ghc" "${opt[@]}" -c Eliminate.hs
+    mv Eliminate.hs Eliminate.source
+    "$ghc" "${opt[@]}" -c EliminateMain.hs
+    "$ghc" "${opt[@]}" EliminateMain.o Eliminate.o Provider.o -o eliminate
+    ./eliminate | cmp - ../client/actual
+)
+echo "optimized package providers and clients preserve payload demand"
+
+# A module-level rule still requires the restricted optimization setting.
+cat >RuleOwner.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
+module RuleOwner where
+import Data.Kind (Type)
+type Hidden = exists (a :: Type). Maybe a
+packValue :: Bool -> Hidden
+packValue x = Just x
+{-# RULES "package/id" forall (x :: Bool). id x = x #-}
+HS
+if "$ghc" "${flags[@]}" -O1 -Wno-inline-rule-shadowing -c RuleOwner.hs >rule.log 2>&1; then
+    echo "unexpectedly admitted a dependent module's rewrite rule" >&2
+    exit 1
+fi
+grep -Fq '[GHC-51063]' rule.log && grep -Fq 'package/id' rule.log || {
+    cat rule.log >&2
+    exit 1
+}
 
 "$ghc" "${flags[@]}" -i../provider -c OrdinaryPack.hs
 mkdir -p fake/GHC

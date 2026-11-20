@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
-{-# OPTIONS_GHC -O0 #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
 module ImplicitVector (Filtered, filterVec, partitionVec, cells, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where

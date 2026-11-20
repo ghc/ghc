@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
 {-# LANGUAGE RequiredTypeArguments #-}
-{-# OPTIONS_GHC -O0 #-}
 
 -- | Observe payloads whose type witness is erased.
 module ErasedPackage (observation, Filtered, filterVec, cells, filterObservation) where

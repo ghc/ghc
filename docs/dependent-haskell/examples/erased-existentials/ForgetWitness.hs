@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeApplications #-}
-{-# OPTIONS_GHC -O0 #-}
 
 -- | Keep the indexed payload and discard the runtime witness.
 module ForgetWitness (Flag, Retained, Hidden, forget, retained, unknown, observe) where
