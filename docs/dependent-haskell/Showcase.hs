@@ -110,6 +110,7 @@ import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified PreludeFilterProof
+import qualified PreludeAppendLengthProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeMapLengthProof
 import qualified PreludeMapProof
@@ -1236,6 +1237,8 @@ main = do
               ++ PreludeMapProof.showPreludeMapProofs)
     putStrLn ("prove map preserves length and leaves the callback lazy: "
               ++ PreludeMapLengthProof.showPreludeMapLength)
+    putStrLn ("prove that append adds the list lengths: "
+              ++ PreludeAppendLengthProof.showPreludeAppendLength)
     putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     putStrLn ("prove filter never increases length: "

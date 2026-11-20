@@ -1284,3 +1284,32 @@ one of the two elements.
 [Proof](../examples/open-evaluation/PreludeFilterLengthProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
 and [prior art](../REFERENCES.md#list-filtering-with-a-known-predicate-result).
+
+### Prove that append adds the list lengths
+
+`lengthAppend` proves `Count (Appended xs ys) :~: Plus (Count xs) (Count ys)`.
+It matches a finite spine for `xs`. The right list stays abstract.
+At the empty list, the append equation returns `ys` and addition by zero
+on the left returns `Count ys`. At a cons, append preserves the head
+and addition adds a successor. `Count` adds the same successor to the
+left side. Matching the induction hypothesis proves the remaining
+equality for the tail.
+
+`Appended` refers to installed `Prelude.(++)`. GHC checks its two
+clauses in both desugared and optimized Core. The cons clause must keep
+the original head and call itself on the original tail and right operand.
+It must produce a cons before inspecting either list further. The
+producer's interface carries these checked equations. The proof disables
+rewrite rules because the installed append fusion and literal rules still
+require their own checks.
+
+The ordinary proof compiles from stripped interfaces at `-O0` and
+`-O2`. The regression rejects an extra successor, a cons clause without
+its induction hypothesis, and the proof with rewrite rules enabled.
+At runtime, counting the complete appended spine ignores bottom elements
+in both lists. Counting only its first constructor also leaves the left
+tail and the right list unevaluated.
+[Aliases](../examples/open-evaluation/PreludeAppendLengthSource.hs),
+[proof](../examples/open-evaluation/PreludeAppendLengthProof.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),
+and [prior art](../REFERENCES.md#induction-on-the-left-spine-of-append).
