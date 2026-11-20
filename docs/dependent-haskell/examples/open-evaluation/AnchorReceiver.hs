@@ -21,3 +21,7 @@ type Receiver :: forall (m :: Matchability). ((Type %m -> Type) %U -> Type) -> A
 type family Receiver @m f anchor where
     Receiver @M f 'Match = f Maybe
     Receiver @U f 'Unmatch = f Identity
+
+-- | Select the container separately from the element type.
+type family WrapOpen (list :: Bool) (element :: Type) :: Type
+type instance WrapOpen 'True element = [element]

@@ -41,3 +41,12 @@ type AtBool = ApplyBool
 
 -- | Store the result of a callback whose kind is unmatchable.
 data CallbackResult (result :: Type) (f :: Type %U -> Type) = CallbackResult result
+
+-- | Store the result of either a constructor or a type family.
+data FamilyBox f = FamilyBox (f Bool)
+
+-- | Forward a callback to the box.
+type family ForwardBox f where
+  ForwardBox f = FamilyBox f
+
+type ListBox = ForwardBox (WrapOpen 'True)

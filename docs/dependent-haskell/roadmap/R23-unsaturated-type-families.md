@@ -769,6 +769,19 @@ remaining family arrow is U. A saturated family can return a
 matchable arrow. [Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
 and [proposal #242 on family arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families).
 
+### Inferring a callback arrow from a datatype field
+
+In `data FamilyBox f = FamilyBox (f Bool)`, the field fixes the domain
+of `f`. In an unsigned Haskell 98 declaration, the producer can
+generalise its matchability with `ExperimentalDependentTypes` and
+`PolyKinds`. The unsigned family `ForwardBox` passes the callback
+through. The ordinary Showcase client reads boxes for both `Maybe`
+and an imported, partially applied open family.
+A written kind signature retains its default M callback. GHC still
+checks family arity and the matchability of applications in patterns.
+[Source example](../examples/open-evaluation/LaterMatchability.hs) and
+[proposal #242 on higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments).
+
 ## Goal and dependencies
 
 Allow direct higher-order use of type families under explicit matchability,
