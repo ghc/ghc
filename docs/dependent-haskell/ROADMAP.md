@@ -31,6 +31,9 @@ An existential witness can itself be polymorphic. A producer can write
 determines that the first has type `forall a. a -> a`. A consumer can write
 `observePair (f, k) = k f`. If it tries to return `f` at an arbitrary type,
 the error identifies both the use and the pattern that opened the package.
+A function can also hide the witness shared by all its calls. The consumer
+can write `case builder n of Callback f call -> call f` and use `f` at
+both `Int` and `Bool` inside the case.
 [Callback example](examples/erased-existentials/RankedPackage.hs).
 
 A library can export optimizer rules that construct or open an erased
@@ -67,6 +70,28 @@ the odd digits in order and gives 531. The focused checks also run the
 same source at `-O0`.
 [Source folds](examples/erased-existentials/StreamFold.hs) and
 [Core and recompilation checks](roadmap/R05-dependent-core.md#a-list-fold-over-a-hidden-stream-state).
+
+A second interpreter can apply `Either` to two argument types and can
+also describe the type of `(&&)`. The choice of arrow in a family's
+result can differ from the choice in its kind. The client prints
+`(Right 7,False)` and leaves the second Boolean unevaluated. The
+original `GADTSingletons` program still needs two source annotations.
+[Interpreter and compatibility boundary](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+The 303-line Showcase adds `(Right 7,False)` and uses the direct
+callback case. Both compiler stages reproduce the full output at
+`-O0`. The self-hosted compiler also reproduces it at default `-O1`,
+default `-O2` and in GHCi. The family upgrade rebuilds the provider
+once and reuses it on the next build. The old and new compilers both
+compile the ordinary client from the new interface. The R22 source
+test checks witness escapes, linear use and the original GADT pattern.
+[Showcase](Showcase.hs) and [family source and upgrade checks](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+At the preceding 302-line checkpoint, all 61 focused tests that ran
+passed. The dependent directory recorded 294 passes and 20 unexpected
+failures. Polykinds recorded 224 passes, one expected failure and 18
+unexpected failures. Each unexpected failure had the same name and
+failure category as at the 301-line checkpoint.
 
 The 302-line Showcase adds `(4,3,6)` from the package rules. Both
 compiler stages reproduce every line at `-O0`, default `-O1` and
@@ -116,8 +141,8 @@ the header. The new reader checks the coercion's role and scope.
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. | Support orphan rules, retained function rules and more dependent coercions. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. A written scrutinee kind can capture an earlier parameter under a noninjective family. An unknown head or field can still block a later row. | Direct cases in value signatures still need scope and equality checks. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. The declared result of a lambda body can supply the witness before its patterns are checked. | Extend witness inference to other expressions. Direct cases on a packaged function's result can still need a typed consumer. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. The original `KindEqualities2` program checks across its declaration splice. | Infer matchability for existing synonym and family uses in `GADTSingletons`. General unsaturation remains open. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. A direct case on a packaged function call keeps the hidden witness in scope for all alternatives. | Extend witness inference beyond single unguarded lambdas and handle visible type arguments on the packed call head. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. The original `KindEqualities2` program checks across its declaration splice. A curried family result can use the matchability required by its caller. | Restore the unannotated `~>` synonym and `Promote` equation in `GADTSingletons`. General unsaturation remains open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -143,9 +168,9 @@ source examples. General promotion remains open.
    Keep the explicit matchability and noninjective equality checks.
    The staged interpreter selects U when its caller supplies an expected
    U arrow. A result of kind `Type` alone still leaves the choice ambiguous. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
-3. **R22 and R04.** Extend witness projections and retained fields under
-   GADT declarations. Check a direct case on the result of a packaged
-   function against its explicitly typed consumer.
+3. **R22 and R04.** Check a visible type argument on the head of a
+   packaged call, such as `builder @Bool flag`. Extend retained sum
+   fields to GADT constructors with local type parameters.
 4. **R19.** Extend type cases from named synonyms to value signatures.
    Repeated occurrences in a single signature must agree when they bind
    the same variables and use the same ordered rows. Preserve blocked

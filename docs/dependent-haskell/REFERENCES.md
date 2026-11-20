@@ -5852,6 +5852,22 @@ an error. [Serokell closed evaluator](https://ghc.serokell.io/dh#closed-term-eva
 [fromIntegral](../../libraries/ghc-internal/src/GHC/Internal/Real.hs)
 and [Nat](../../libraries/ghc-internal/src/GHC/Internal/TypeNats.hs).
 
+### Independent matchability in a family result and its kind
+
+GHC's `GADTSingletons` test attributes the `PromoteX` and `DemoteX`
+example to Ryan Scott and Richard Eisenberg. In one equation,
+`DemoteX (a :: Type) = Demote a`, the family named on the right also
+occurs in the kind of the left. The independent parameters in R23
+preserve both choices after separate compilation. This rule comes
+from that Haskell equation. Proposal 242 identifies the separate
+compatibility issue with the `singletons` arrow synonym. Agda's
+implicit arguments illustrate how a use can determine an omitted
+index. The matchable and unmatchable arrow choices are specific to GHC.
+[Original GHC test](../../testsuite/tests/dependent/should_compile/GADTSingletons.hs),
+[proposal 242 on type synonyms](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms),
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [the separate-module example](examples/open-evaluation/NestedFunctionClient.hs).
+
 ### Inferring matchability across a declaration splice
 
 Proposal 242 distinguishes inference from checking a written kind

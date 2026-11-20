@@ -399,7 +399,7 @@ tcTyAndClassDecls tyclds_s
 -- Check the remaining TyClGroups that are known to fail,
 -- extending the environment with fake tycons to report more errors.
 -- See Note [Recover from validity error]
-tcFailedTyClGroups :: NameSet -> [TyClGroup GhcRn] -> TcM a
+tcFailedTyClGroups :: OpenFamilyCandidates -> [TyClGroup GhcRn] -> TcM a
 tcFailedTyClGroups _ [] = failM
 tcFailedTyClGroups open_indices (g:gs) = do
   tcg_env <- getGblEnv
@@ -413,7 +413,7 @@ tcFailedTyClGroups open_indices (g:gs) = do
 -- Type check as many TyClGroups as possible, skipping any failures.
 -- thing_inside runs in the extended environment.
 tcTyClGroupsPass :: forall a.
-     NameSet
+     OpenFamilyCandidates
   -> [TyClGroup GhcRn]     -- Mutually-recursive groups in lexical dependency order
   -> (TcTyClGroupsAccum
       -> Int               -- Number of successfully checked groups
@@ -536,7 +536,7 @@ isReadyTyClGroup :: TcGblEnv -> TyClGroup GhcRn -> Bool
 isReadyTyClGroup tcg_env TyClGroup{group_ext = deps} =
   nameSetAll (\n -> n `elemNameEnv` tcg_type_env tcg_env) deps
 
-tcTyClGroup :: NameSet -> TyClGroup GhcRn
+tcTyClGroup :: OpenFamilyCandidates -> TyClGroup GhcRn
             -> TcM (TcGblEnv, TcTyClGroupsAccum)
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
@@ -617,7 +617,7 @@ tcTyClGroup open_indices (TyClGroup { group_tyclds = tyclds
 type KindSigEnv = NameEnv Kind
 
 tcTyClDecls
-  :: NameSet
+  :: OpenFamilyCandidates
   -> [LTyClDecl GhcRn]
   -> KindSigEnv
   -> RoleAnnotEnv
@@ -1283,7 +1283,7 @@ been generalized.
 
 -}
 
-kcTyClGroup :: NameSet -> KindSigEnv -> [LTyClDecl GhcRn] -> TcM ([PolyTcTyCon], NameSet, NameEnv SynonymMetadata)
+kcTyClGroup :: OpenFamilyCandidates -> KindSigEnv -> [LTyClDecl GhcRn] -> TcM ([PolyTcTyCon], NameSet, NameEnv SynonymMetadata)
 
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This binds the TyCons and Classes of the group, but not the DataCons
@@ -1516,13 +1516,34 @@ exported result as a kind. An importer cannot change a family's arity.
 An owner can declare the index in a standalone signature when its
 declarations provide neither use. Preserve explicit signatures and
 injectivity annotations.
+
+An equation can return an application of the same family that appears in
+its result kind. For example:
+  type family DX (a :: k) :: D k
+  type instance DX (a :: Type) = D a
+Suppose D has an inferred matchability argument and D Type reduces to Type.
+The argument to D a controls the returned type. The argument to D k
+controls its kind. Give DX a separate result selector so its equation
+can return D @{m} a at kind D @{n} Type. A caller can use a two-argument
+constructor at matchable arrows or a runtime callback at unmatchable arrows.
+Using one selector for both positions wrongly equates them at a rigid k.
 -}
+
+-- | Uses that can establish a result selector before checking instances.
+data OpenFamilyCandidates = OpenFamilyCandidates
+  { arrow_candidates :: NameSet
+  , result_aliases :: NameEnv Name
+  }
 
 -- | Collect local family heads that need an inferred result selector.
 -- Imported families keep the scheme that their owner has published.
-openFamilyMatchabilityCandidates :: [TyClGroup GhcRn] -> NameSet
+openFamilyMatchabilityCandidates :: [TyClGroup GhcRn] -> OpenFamilyCandidates
 openFamilyMatchabilityCandidates groups =
-  intersectNameSet local_open_families (referenced_families `unionNameSet` arrow_equations)
+  OpenFamilyCandidates
+    (intersectNameSet local_open_families (referenced_families `unionNameSet` arrow_equations))
+    (mkNameEnv [(family, head_name) | (family, rhs) <- equations_rhs,
+                 Just head_name <- [lookupNameEnv result_heads family],
+                 kindHead rhs == Just head_name])
   where
     declarations = [fam | tg <- groups, L _ decl <- group_tyclds tg, fam <- families decl]
     local_open_families = mkNameSet
@@ -1531,10 +1552,13 @@ openFamilyMatchabilityCandidates groups =
     referenced_families = mkNameSet
       [name | fam <- declarations, kind <- declaredKinds fam, Just name <- [kindHead kind]]
 
-    arrow_equations = mkNameSet
-      [family | group <- groups,
-                FamEqn{feqn_tycon = L _ family, feqn_rhs = rhs} <- groupEquations group,
-                matchabilityArrow (caseAliasBody rhs)]
+    equations_rhs = [(family, caseAliasBody rhs) | group <- groups,
+                      FamEqn{feqn_tycon = L _ family, feqn_rhs = rhs} <- groupEquations group]
+    arrow_equations = mkNameSet [family | (family, rhs) <- equations_rhs, matchabilityArrow rhs]
+    result_heads = mkNameEnv [(name, head_name) | FamilyDecl{fdLName = L _ name,
+                                fdResultSig = L _ result} <- declarations,
+                              name `elemNameSet` local_open_families,
+                              Just kind <- [famResultKindSignature result], Just head_name <- [kindHead kind]]
 
     groupEquations :: TyClGroup GhcRn -> [TyFamInstEqn GhcRn]
     groupEquations group =
@@ -1576,12 +1600,11 @@ prefixFamilyMetadata tc
   | otherwise = tc
 
 -- | Install one inferred index when the local family will be used as a kind.
-inferOpenMatchability :: NameSet -> KindSigEnv -> PolyTcTyCon -> TcM PolyTcTyCon
+inferOpenMatchability :: OpenFamilyCandidates -> KindSigEnv -> PolyTcTyCon -> TcM PolyTcTyCon
 inferOpenMatchability candidates signatures tc
-  | tyConName tc `elemNameSet` candidates
-  , not (tyConName tc `elemNameEnv` signatures)
+  | not (tyConName tc `elemNameEnv` signatures)
   , OpenFamilyFlavour IAmType _ <- tyConFlavour tc
-  , tyConResKind tc `eqType` liftedTypeKind
+  , needs_result_selector
   , not (null (tyConVisibleTyVars tc))
   , not (any reserves_matchability (tyConBinders tc)) = do
       ma <- newFlexiTyVar matchabilityTy
@@ -1592,6 +1615,17 @@ inferOpenMatchability candidates signatures tc
               0 (tyConResKind tc) (tcTyConScopedTyVars tc) True (tyConFlavour tc))
   | otherwise = pure tc
   where
+    needs_result_selector
+      | tyConResKind tc `eqType` liftedTypeKind =
+          tyConName tc `elemNameSet` arrow_candidates candidates
+      | Just name <- lookupNameEnv (result_aliases candidates) (tyConName tc)
+      , Just (owner, _) <- tcSplitTyConApp_maybe (tyConResKind tc)
+      , isTypeFamilyTyCon owner
+      , tyConName owner == name
+      , b : _ <- tyConBinders owner =
+          inferredMatchabilityIndex b && not (familyKindUsesMatchability owner b)
+      | otherwise = False
+
     -- A receiver index used in its telescope is independent of the selector
     -- for the result arrow. Explicit metadata takes precedence.
     reserves_matchability b =

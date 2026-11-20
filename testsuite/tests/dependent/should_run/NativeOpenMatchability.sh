@@ -10,7 +10,11 @@ mkdir provider client
 cp "$src/T14038.hs" provider/
 (cd provider && "${ghc[@]}" -c T14038.hs)
 cp provider/T14038.hi "$src"/NativeOpenMatchability{Client,Conflict}.hs client/
+cp "$src/NestedFunctionKind.hs" provider/
+(cd provider && "${ghc[@]}" -c NestedFunctionKind.hs)
+cp provider/NestedFunctionKind.hi "$src/NestedFunctionClient.hs" client/
 cd client
+"${ghc[@]}" -c NestedFunctionClient.hs
 "${ghc[@]}" -c NativeOpenMatchabilityClient.hs
 if "${ghc[@]}" -c NativeOpenMatchabilityConflict.hs >conflict.log 2>&1 ||
     ! grep -Fq 'GHC-83865' conflict.log ||

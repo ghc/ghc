@@ -91,6 +91,7 @@ import qualified ImportedFamily
 import qualified MixedFamily
 import qualified InterpretedKind
 import qualified InterpretedKindUseSite
+import qualified NestedFunctionClient
 import qualified InvisibleFamily
 import qualified TypeLambda
 import qualified TypeLet
@@ -1088,6 +1089,8 @@ main = do
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"
         (InterpretedKindUseSite.atM, InterpretedKindUseSite.atU)
+    observe "use a nested arrow for Either and a short-circuiting callback"
+        (NestedFunctionClient.binaryChoice, NestedFunctionClient.conjunction False (error "unused operand"))
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "partially apply a two-argument type lambda" TypeLambda.partial
     observe "map a type lambda with a constructor case" TypeLambda.mixed
