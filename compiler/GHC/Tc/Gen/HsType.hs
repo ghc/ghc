@@ -2756,13 +2756,16 @@ tc_app_ty_generic :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty_generic mode rn_ty exp_kind
   = do { (fun_ty, _ki) <- tcInferTyAppHead mode hs_fun_ty hs_args
        ; (prefix, prefix_kind) <- tcInferTyApps_nosat mode hs_fun_ty fun_ty hs_args
-       -- Keep an invisible family binder only when the receiver expects
-       -- the whole polymorphic kind. Ordinary inference still saturates it.
+       -- A checked receiver can require the whole invisible telescope even
+       -- when its kind contains metavariables. Keep the prefix for the kind
+       -- check below in that case. Ordinary inference still saturates it.
        ; allow_partial <- xoptM LangExt.ExperimentalDependentTypes
        ; (ty, inferred_kind) <- case (exp_kind, tcSplitTyConApp_maybe prefix) of
            (Check expected, Just (tc, args))
-             | allow_partial, expected `tcEqType` prefix_kind
-             , isUnsaturatedUserFamily tc args
+             | allow_partial, isUnsaturatedUserFamily tc args
+             , let n_invis = invisibleBndrCount prefix_kind
+             , expected `tcEqType` prefix_kind
+               || (n_invis > 0 && n_invis == invisibleBndrCount expected)
              -> return (prefix, prefix_kind)
            _ -> saturateFamApp mode prefix prefix_kind
        ; checkExpKind mode rn_ty ty inferred_kind exp_kind }
