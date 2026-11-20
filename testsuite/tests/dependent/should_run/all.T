@@ -240,6 +240,11 @@ test('NativeNestedPackagePat',
                    'NativeNestedPackagePatClient.hs', 'NativeNestedPackagePatBad.hs'])],
      run_command, ['bash NativeNestedPackagePat.sh "{compiler}" "{libdir}"'])
 
+test('NativeRetainedIndexHpc',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeRetainedIndexHpcProvider.hs', 'NativeRetainedIndexHpcClient.hs'])],
+     run_command, ['bash NativeRetainedIndexHpc.sh "{compiler}" "{libdir}" "{hpc}"'])
+
 test('NativeTypeLet',
      [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs'])],
      run_command, ['bash NativeTypeLet.sh "{compiler}" "{libdir}"'])
