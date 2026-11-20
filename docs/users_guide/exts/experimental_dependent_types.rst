@@ -54,13 +54,55 @@ A type-level let binds one variable in the body. GHC checks its
 right-hand side in the enclosing scope, even if the body ignores it.
 The lambda and case forms currently require a top-level synonym on the
 outside. A case alternative can bind distinct fields of a constructor.
-The case stays stuck while the outer constructor of the scrutinee is unknown.
+A variable or wildcard at the root accepts the scrutinee when matching
+reaches that row. An earlier constructor pattern blocks reduction on an
+unknown input, even if both rows return the same type.
 
 ``ByType Bool`` selects ``Int`` directly at compile time. A bare branch
 head names a data constructor if one is in scope. Otherwise GHC looks
 it up in the type namespace. A promotion tick always selects a data
 constructor. A synonym used as a pattern must still have a constructor
 head after expansion.
+
+Retained pairs and erased lengths
+---------------------------------
+
+A retained pair stores its first component at runtime. The type of its
+second component can mention the first. An existential can instead hide
+a type index chosen by the producer. For example, a vector filter chooses
+its result length after it checks the elements::
+
+    {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
+    {-# OPTIONS_GHC -O0 #-}
+    module Filter where
+    import GHC.Sigma (Sigma(Pair))
+
+    data Nat = Z | S Nat
+    data Vec a (n :: Nat) where
+      Nil  :: Vec a 'Z
+      Cons :: a -> Vec a n -> Vec a ('S n)
+
+    type Filtered a = exists (n :: Nat). Vec a n
+
+    filterVec :: (a -> Bool) -> Vec a n -> Filtered a
+    filterVec _ Nil = Nil
+    filterVec p (Cons x xs)
+      | p x       = Cons x (filterVec p xs)
+      | otherwise = filterVec p xs
+
+    forgetLength :: (some (n :: Nat) | Vec a n) -> Filtered a
+    forgetLength (Pair _ xs) = xs
+
+In the passing branch, GHC opens the recursive result at a fresh length
+and packs the new cell at its successor. Reading the first passing cell
+can leave the tail unevaluated. The caller must establish that the result
+is nonempty before it can use a function that requires a successor length.
+
+The dot form infers package introduction and elimination. The bar form
+(``exists (n :: Nat) | Vec a n``) uses explicit ``Pack`` expressions and
+patterns from ``GHC.Exists``. Compile definitions with surviving erased
+package operations at ``-O0``. A separately compiled ``-O1`` module can
+call them.
 
 Natural numerals in vector indices
 ----------------------------------
