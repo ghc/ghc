@@ -34,6 +34,12 @@ the cut against the expected first length and the input against
 `Vec a (Add n m)`. A suffix hidden under a non-injective family remains
 ambiguous. [Split example and prior art](../REFERENCES.md#split-a-vector-at-a-retained-length).
 
+A constructor equation for the cut can pass the original input vector
+at its refined width. The zero branch can use width `m` and the successor
+branch can use `'S (Add k m)`. Both branches preserve the vector's
+identity in the result and can leave the entire vector unevaluated.
+[Showcase](../Showcase.hs) and [derivation](../REFERENCES.md#passing-the-split-input-at-a-refined-width).
+
 A retained length can be a checked source call such as `plus n m`.
 Its two inputs can come from IO. The result index remains the same
 through compilation, and the runtime sum stays lazy.

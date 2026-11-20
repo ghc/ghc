@@ -1531,6 +1531,9 @@ sourceAddition = do
     observe "check a runtime cut against a vector length"
         (ListVectorClient.checkedSplitObservation n checkedInput,
          ListVectorClient.checkedSplitObservation (S m) checkedInput)
+    observe "pass an unevaluated vector at its branch-refined split width"
+        ( checkCutInput Z (error "forced one-cell input" :: Vec Bool ('S 'Z))
+        , checkCutInput (S Z) (error "forced two-cell input" :: Vec Bool ('S ('S 'Z))) )
     oneCell <- newIORef (VCons True VNil)
     proofFromIO <- ListVectorClient.checkedSplitIO
         (splitAtVecChecked (S Z) (S Z) <$> readIORef oneCell) (VCons False VNil)
@@ -1621,6 +1624,17 @@ arithmeticNotation = do
 -- | Prefix a checked row without changing its runtime tail index.
 prefixRowExact :: forall a. foreach (n :: Nat) -> a -> [a] -> Maybe (Vec a (1 + n))
 prefixRowExact n x xs = VCons x <$> fromListExact n xs
+
+-- | Keep the identity of the input when the cut refines its declared width.
+checkCutInput :: foreach (cut :: Nat) -> foreach (xs :: Vec Bool (Add cut ('S 'Z))) -> Bool
+checkCutInput cut xs = case atCut cut xs of Proxy -> True
+  where
+    atCut :: foreach (n :: Nat) -> foreach (v :: Vec Bool (Add n ('S 'Z))) -> Proxy v
+    atCut Z v = atWidth @('S 'Z) v
+    atCut (S k) v = atWidth @('S (Add k ('S 'Z))) v
+
+    atWidth :: forall n. foreach (v :: Vec Bool n) -> Proxy v
+    atWidth _ = Proxy
 
 -- | Read a vector and its label through a named retained telescope.
 describeVector :: Pair.Consumer (Vec Char n) (Const String) (String, String)

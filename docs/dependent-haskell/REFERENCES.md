@@ -6514,6 +6514,24 @@ congruence to the proof for the tail.
 [Ordinary reassembly](examples/closed-evaluation/VectorSplitObservation.hs)
 and [checked witness](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
 
+### Passing the split input at a refined width
+
+Agda's `splitAt` passes the input unchanged in its zero equation.
+In the Haskell equation, a retained argument can still have its declared
+type `Vec a (Add cut m)`. The pattern `Z` supplies a nominal proof about
+`cut`. GHC lifts that proof through the vector type and reduces `Add`
+using its equations. It can then pass the original vector to a function
+expecting `Vec a m`. The successor equation uses `Vec a ('S (Add k m))`.
+[Agda standard library v2.3, Data.Vec.Base.splitAt](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html#splitAt).
+
+The Haskell implementation uses a Core cast. Both the value and the
+index in the result refer to the same variable. The ordinary client can
+observe the proof with an undefined vector in either branch. Asking for
+a successor width in the zero branch fails at the vector argument.
+See Note [Retained argument application] in `GHC.Tc.Gen.App`.
+[Source equations](../../testsuite/tests/dependent/should_run/NativeRetainedCastDomainWorker.hs)
+and [ordinary client](../../testsuite/tests/dependent/should_run/NativeRetainedCastDomainClient.hs).
+
 ## Check a split at an independent runtime cut
 
 `splitAtVecChecked` compares the runtime cut and total before splitting
