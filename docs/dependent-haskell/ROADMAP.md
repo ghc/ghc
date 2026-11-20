@@ -14,7 +14,7 @@ ordinary functions in types. A pair can store an abstract lifted witness.
 An ordinary client can read its payload without forcing the witness, even
 when that witness comes from IO.
 
-Both native compiler stages reproduce the 280 lines of the [Showcase](Showcase.hs)
+Both native compiler stages reproduce the 283 lines of the [Showcase](Showcase.hs)
 at `-O0` and default `-O1`. The self-hosted compiler also matches the golden
 output with stripped interfaces and in GHCi. The recursive vector filter
 chooses its result length from the elements that pass. Its source uses
@@ -23,11 +23,14 @@ after the first passing element unevaluated.
 [Filter source](examples/erased-existentials/ImplicitVector.hs) and
 [Showcase commands](README.md#run-the-showcase).
 
-At `15bd50018f`, all 58 focused tests that ran passed. In the dependent
+At `8f64aad591`, all 59 focused tests that ran passed. In the dependent
 directory, 284 of 314 executed normal-way tests passed. The same 30 cases
-failed with the same failure categories at `7711c264fc`, where 282 of 312
-passed. A source module that constructs or opens a surviving erased package
-still requires `-O0`. An ordinary client can call its functions at `-O1`.
+failed with the same failure categories at `f88fec2f22`. The Showcase
+zips a filtered vector with itself at its hidden length and projects a
+vector through a strict record field. The family example applies a visible
+argument and passes the remaining invisible binder to another family.
+The `8f64aad591` compiler requires `-O0` for a provider with surviving
+erased package operations. An ordinary client can call it at `-O1`.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -40,12 +43,12 @@ the header. The new reader checks the coercion's role and scope.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A function signature can name its argument or result sum directly with `some`. Independent sums can satisfy a repeated argument in a closed family. | Extend sum syntax to constructor fields. Broaden dependent product domains and inference. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | An ordinary client inherits a length-indexed default method and projects an imported pair at `-O1`. Worker/wrapper preserves an erased package and its payload scope in a GHC API test. | Admit surviving package operations to every scheduled optimizer pass. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Function signatures and ordinary constructor fields accept `some`. A strict record can store a vector alongside its length. | Broaden dependent product domains and inference. Check sum formation in other declaration contexts. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | An ordinary client inherits a length-indexed default method and projects an imported pair at `-O1`. The optimizer can lift a loop exit and abstract its hidden witness before its payload. | Admit surviving package operations to every scheduled optimizer pass. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor row can precede a wildcard or named catch-all. The case stays stuck when an unknown input blocks an earlier constructor test. | General mixed patterns and open GADT indices. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | The recursive vector filter infers its result length under `exists (n :: Nat). Vec a n`. A caller can bind the result in a local `let`. A lambda can produce a packaged function. | Apply a hidden function directly, preserve witness scope across other expressions, and support general witness projections. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The integrated compiler reports conflicting arrow matchabilities and suppresses the argument-count hint for a stuck family. | General family unsaturation and compatibility with ordinary programs. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A local binding can filter the result of a packaged function. Two uses of the same unrestricted local vector can share one hidden length in a call to `zipVec`. | Check ordinary constructor patterns on packages and support general witness projections. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -60,20 +63,20 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R22.** Integrate direct application of an implicitly packaged function.
-   The private compiler at `a29d155eb0` checks the call inside a fresh
-   witness scope. Verify the consumer, linear use and escape diagnostics
-   with the combined compiler.
-2. **R04.** Verify direct sum types in ordinary constructor fields.
-   Check strict boxed storage, selector calls and the lifetime of a local
-   index during float-in. Check that TH can reify a field while generated
-   case helpers remain private.
-3. **R05.** At `4c454fdddc`, worker/wrapper preserves lazy erased packages.
-   The private call-arity change at `7bef69196c` also handles repeated
-   calls to a stored function. Check both floating passes, specialisation,
-   exitification and CSE before admitting raw packages to the normal pipeline.
-4. **R19 and R23.** Broaden type cases over indexed scrutinees. Use the
-   ordinary-program regression baseline when extending family unsaturation.
+1. **R05.** Run the complete `-O1` schedule on erased package providers.
+   The retained simplifier, call arity, exitification, binding floats, demand,
+   CPR and worker/wrapper pass the native laziness check. The full schedule
+   still encounters an unsupported package in the specialiser. Check
+   dictionary scope, expression keys in CSE and separately compiled clients.
+2. **R22.** Check a `case` on a filtered vector with ordinary vector
+   constructor patterns. Preserve linear use, laziness and witness scope.
+   Two independently computed packages can choose different lengths.
+3. **R19.** Check a nested constructor row whose scrutinee kind needs a
+   closed-family reduction. A later constructor index can depend on that
+   kind. Any transport of the later index needs checked equality evidence.
+4. **R04 and R23.** Track the limits of sum formation outside ordinary
+   constructor fields. Use the ordinary-program regression baseline when
+   extending higher-rank family application and defaulting.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
