@@ -134,15 +134,16 @@ cp ../filter/PreludeFilterSource.hi ../length-source/PreludeMapLength{Size,Sourc
 
 # Each rejected proof must reach Refl. The KnownTrue sibling must succeed.
 cp "$src/NativeOpenFilterGivenControls.hs" .
+proofs=(withoutResult wrongResult otherPredicate otherHead representationalResult
+        newtypeHead invertHead invertPredicate 'staleGiven _ _ _ Unknown')
 if "${filter[@]}" -fzap-coercions -fmax-errors=20 -c NativeOpenFilterGivenControls.hs >filter-givens.log 2>&1 ||
-   grep -Fq 'staleGiven _ _ _ KnownTrue = Refl' filter-givens.log; then
+   [[ $(grep -Ec '^NativeOpenFilterGivenControls\.hs:[0-9]+:[0-9]+: error:' filter-givens.log) != "${#proofs[@]}" ]]; then
     cat filter-givens.log >&2
     exit 1
 fi
-for proof in withoutResult wrongResult otherPredicate otherHead representationalResult \
-             invertHead invertPredicate 'staleGiven _ _ _ Unknown'; do
+for proof in "${proofs[@]}"; do
     line=$(awk -v proof="$proof" '$0 ~ "^" proof " .*Refl$" { print NR }' NativeOpenFilterGivenControls.hs)
-    if ! grep -Fq "NativeOpenFilterGivenControls.hs:$line:" filter-givens.log; then
+    if ! grep -Eq "^NativeOpenFilterGivenControls\.hs:$line:[0-9]+: error:" filter-givens.log; then
         cat filter-givens.log >&2
         exit 1
     fi
