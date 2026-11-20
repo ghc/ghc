@@ -89,6 +89,7 @@ for level in 0 1 2; do
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c StreamFold.hs >fold.log
         if [[ $level != 0 ]]; then
             test "$(grep -Fc 'Rule fired: read/int-pair (LexicalPackageRules)' callback.log)" -eq 1
+            grep -Fq 'Rule fired: foldr/mapToList (ErasedStream)' fold.log
             test "$(grep -Fc 'Rule fired: toList/build (ErasedStream)' fold.log)" -ge 2
             test "$(grep -Fc 'Rule fired: fold/build (GHC.Internal.Base)' fold.log)" -ge 2
             for log in ../provider.log client.log; do

@@ -251,9 +251,15 @@ first-element fold leaves an undefined tail unevaluated.
 
 The client needs only the provider's interface to compile. The interface
 must include a declaration for the private step-fold function. Older
-providers could record its name as an unbound local. A rule directly on
-the imported `foldr` still reaches the orphan-rule restriction.
-[Producer](../examples/erased-existentials/ErasedStream.hs),
+providers could record its name as an unbound local. A provider can also
+write a rule directly for `foldr k z (mapToList f s)`. The local name `mapToList`
+anchors the rule. Both the writer and reader check that the anchor still
+occurs in its left-hand side. The rule requires the anchored-rule interface
+capability. A true orphan with an imported head keeps its original format.
+The preceding reader still applies those orphan rules at each interface
+compression level. It rejects the anchored rule at the header.
+[Two-reader check](../examples/erased-existentials/check-imported-rule-interfaces.sh),
+[producer](../examples/erased-existentials/ErasedStream.hs),
 [ordinary client](../examples/erased-existentials/StreamFold.hs)
 and [rule-firing test](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
 

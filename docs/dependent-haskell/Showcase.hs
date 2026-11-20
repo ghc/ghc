@@ -994,6 +994,9 @@ main = do
         (StreamFold.digits (ErasedStream.oddThrough 6),
          StreamFold.first (ErasedStream.fromList (True : error "unused fold tail")),
          StreamFold.first (ErasedStream.fromList ([] :: [Bool])))
+    observe "fold a mapped stream without forcing its head or tail"
+        (StreamFold.firstMapped not (ErasedStream.fromList [False]),
+         StreamFold.firstMapped (const 'x') (ErasedStream.fromList (undefined : undefined)))
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $
