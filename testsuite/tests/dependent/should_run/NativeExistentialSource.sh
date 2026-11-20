@@ -22,7 +22,7 @@ if "$ghc" "${flags[@]}" -O1 -fomit-interface-pragmas -fforce-recomp \
   echo "optimized compilation unexpectedly admitted Pack" >&2
   exit 1
 fi
-grep -Eq 'Retained -O1 requires checked index domains' optimized.log || {
+grep -Fq 'Retained -O1 cannot optimize erased package construction or elimination. Use -O0 for this module.' optimized.log || {
   cat optimized.log >&2
   exit 1
 }
