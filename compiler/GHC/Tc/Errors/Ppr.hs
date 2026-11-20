@@ -159,6 +159,11 @@ instance Diagnostic TcRnMessage where
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg
+             | TcRnSolverReport (SolverReportWithCtxt _ report) _ <- msg
+             , Just field_error <- pprFieldCaptureKindMismatch report
+             -> messageWithInfoDiagnosticMessage unit_state err_info{errInfoContext = []}
+                  (tcOptsShowContext opts) (mkSimpleDecorated field_error)
+             | otherwise
              -> messageWithInfoDiagnosticMessage unit_state err_info
                   (tcOptsShowContext opts)
                   (diagnosticMessage opts msg)
@@ -4907,6 +4912,33 @@ pprTypeCaseOwner owner
   | Just constructor <- stripLiftedTypeOwner "$field-case:" owner
   = text "type case in a field of" <+> quotes (text constructor)
   | otherwise = text "type case in" <+> quotes (text owner)
+
+-- | Report a kind mismatch between a field case and its lifted family.
+-- The saved kind variables belong to different declarations. Use the
+-- written capture and constructor names instead of printing those copies.
+pprFieldCaptureKindMismatch :: TcSolverReportMsg -> Maybe SDoc
+pprFieldCaptureKindMismatch
+  (Mismatch { mismatchMsg = TypeEqMismatch
+                { teq_mismatch_item = item
+                , teq_mismatch_what = Just (HsTypeRnThing capture@HsTyVar{})
+                , teq_mismatch_expected = expected, teq_mismatch_actual = actual }
+            , mismatchAmbiguityInfo = ambiguities })
+  | Just KindLevel <- ctLocTypeOrKind_maybe loc
+  , [family] <- [tc | NonInjectiveTyFam tc <- ambiguities]
+  , has_saved_kind expected, has_saved_kind actual
+  , Just constructor <- listToMaybe
+      [owner | TyConDeclCtxt name _ <- ctl_ctxt (ctLocEnv loc)
+             , Just owner <- [liftedTypeOwner "$field-case:" name]]
+  = Just $ vcat
+      [ text "Cannot check the kind of" <+> quotes (ppr capture) <+>
+          text "in the type case in a field of" <+> quotes (text constructor) <> dot
+      , pprAmbiguityInfo (NonInjectiveTyFam family)
+      , text "Use a named type synonym with a standalone kind signature for the case."
+      ]
+  where
+    loc = errorItemCtLoc item
+    has_saved_kind = anyVarSet (isJust . liftedTypeOwner "$field-kind:" . getName) . tyCoVarsOfType
+pprFieldCaptureKindMismatch _ = Nothing
 
 -- | Find the generated head in an application context.
 liftedTypeHeadContext :: LHsType GhcRn -> Maybe SDoc

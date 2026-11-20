@@ -204,13 +204,17 @@ cat >NativeTypeCaseFieldFamilyKind.hs <<'HS'
 module NativeTypeCaseFieldFamilyKind where
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
-type family PayloadKind (k :: Type) :: Type
-data Compound (k :: Type) (a :: PayloadKind k) = Compound
-  (forall (k :: Type) (b :: Bool). Proxy b ->
-    (case b of { True -> Proxy a; False -> Proxy k }))
+type family PayloadKind (k :: Type) (l :: Type) :: Type
+data Compound (k :: Type) (l :: Type) (a :: PayloadKind k l) = Compound
+  (forall (k :: Type) (l :: Type) (b :: Bool). Proxy b ->
+    (case b of { True -> Proxy a; False -> Proxy '(k, l) }))
 HS
-reject NativeTypeCaseFieldFamilyKind 6:28 '[GHC-83865]'
+reject NativeTypeCaseFieldFamilyKind 6:40 '[GHC-83865]'
+grep -Fq 'Cannot check the kind of' bad.log
+grep -Fq 'in the type case in a field of' bad.log
 grep -Fq 'non-injective type family' bad.log
+grep -Fq 'Use a named type synonym with a standalone kind signature for the case.' bad.log
+if grep -Eq '\$field-(kind|case):' bad.log; then cat bad.log >&2; exit 1; fi
 
 # A speculative branch gets one family step. Checking a written use
 # of the same constructor still reports the solver's reduction limit.
