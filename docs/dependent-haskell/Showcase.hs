@@ -1479,13 +1479,22 @@ sourceAddition = do
         joined :: Vec Bool (n + m)
         joined = appendHidden xs ys
         split :: (Vec Bool n, Vec Bool m)
-        split = splitAtVec @Bool @m n joined
+        split = splitAtVec n joined
+        prefix :: Vec Bool n
+        prefix = takeVec @m n joined
+        suffix :: Vec Bool m
+        suffix = dropVec n joined
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
     observe "use ordinary vector append in a type"
         (Refl :: PackedVecLibrary.appendVec ('VCons 'True 'VNil) ('VCons 'False 'VNil)
               :~: 'VCons 'True ('VCons 'False 'VNil))
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
+    observe "take and drop at the first runtime length" (toList prefix, toList suffix)
+    checkedInput <- newIORef [True, False] >>= readIORef
+    observe "check a runtime cut against a vector length"
+        (ListVectorClient.checkedSplitObservation n checkedInput,
+         ListVectorClient.checkedSplitObservation (S m) checkedInput)
     case (Refl :: VectorSplitObservation.reassembleTwo ('VCons 'True ('VCons 'False 'VNil))
                :~: 'VCons 'True ('VCons 'False 'VNil)) of
         Refl -> observe "reassemble the same two vector elements"

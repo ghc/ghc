@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE ExplicitNamespaces #-}
@@ -62,6 +63,10 @@ module PackedVecLibrary (
     sumNat,
     appendVec,
     splitAtVec,
+    takeVec,
+    dropVec,
+    CheckedSplit,
+    splitAtVecChecked,
     appendNative,
     appendHidden,
     appendPacked,
@@ -91,6 +96,7 @@ module PackedVecLibrary (
 import Control.Exception (ArithException(Underflow), throw)
 import Data.Kind (Type)
 import qualified GHC.TypeNats as TN
+import GHC.Sigma (Sigma (Pair))
 import GHC.TypeNats.Experimental (FromNatural)
 import Data.Type.Equality ((:~:) (Refl))
 
@@ -273,6 +279,50 @@ splitAtVec :: forall a m. foreach (n :: Nat) -> Vec a (Add n m) -> (Vec a n, Vec
 splitAtVec Z xs = (VNil, xs)
 splitAtVec (S k) (VCons x xs) = case splitAtVec k xs of
     (ys, zs) -> (VCons x ys, zs)
+
+-- | Take the first @n@ cells. The result yields each cell before the rest.
+-- Supply the suffix index @m@ explicitly when the cut is abstract.
+takeVec :: forall m a. foreach (n :: Nat) -> Vec a (Add n m) -> Vec a n
+takeVec Z _ = VNil
+takeVec (S k) (VCons x xs) = VCons x (takeVec @m k xs)
+
+-- | Drop the first @n@ cells without evaluating their elements.
+dropVec :: forall m a. foreach (n :: Nat) -> Vec a (Add n m) -> Vec a m
+dropVec n xs = snd (splitAtVec @a @m n xs)
+
+-- | Store a prefix, a suffix at its actual length, and their length sum.
+type CheckedSplit a (cut :: Nat) (total :: Nat) =
+    some (suffix :: Nat) | (Vec a cut, Vec a suffix, Add cut suffix :~: total)
+
+-- | Relate the cut and the remainder to the total.
+type CutRemainder (cut :: Nat) (total :: Nat) =
+    some (suffix :: Nat) | (Add cut suffix :~: total)
+
+-- | Compute the remainder and its sum proof from the length arguments.
+cutRemainder :: foreach (cut :: Nat) -> foreach (total :: Nat) -> Maybe (CutRemainder cut total)
+cutRemainder cut total = case cut of
+    Z ->
+        let proof :: total :~: total
+            proof = Refl
+        in Just (Pair total proof)
+    S k -> case total of
+        Z -> Nothing
+        S n -> case cutRemainder k n of
+            Nothing -> Nothing
+            Just (Pair suffix Refl) ->
+                let proof :: S n :~: S n
+                    proof = Refl
+                in Just (Pair suffix proof)
+
+-- | Check the cut against the total before evaluating either vector field.
+splitAtVecChecked :: forall a. foreach (cut :: Nat) -> foreach (total :: Nat)
+                  -> Vec a total -> Maybe (CheckedSplit a cut total)
+splitAtVecChecked cut total xs = case cutRemainder cut total of
+    Nothing -> Nothing
+    Just (Pair suffix Refl) ->
+        let parts :: (Vec a cut, Vec a suffix)
+            parts = splitAtVec @a @suffix cut xs
+        in Just (Pair suffix (fst parts, snd parts, Refl))
 
 -- | Append vectors indexed by two retained runtime lengths.
 appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (plus n m)

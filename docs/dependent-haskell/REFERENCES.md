@@ -6476,15 +6476,32 @@ Idris 2's `Data.Vect.splitAt` takes a cut `n` and a vector of length
 `n + m`. The zero case returns the empty prefix and the input. The
 successor case splits the tail at the predecessor and adds the head
 back to the prefix. Idris supplies the implicit suffix `{m}` on the
-recursive call. GHC infers the suffix in the recursive Haskell call. With
-two abstract runtime lengths, the Showcase supplies the suffix `@m`.
-The family application `Add n m` alone leaves `m` ambiguous at an abstract cut.
+recursive call. GHC infers the suffix in the recursive Haskell call.
+At a runtime cut, the declared second result vector `Vec a m` determines
+the erased suffix. The Showcase calls `splitAtVec n joined` without a
+type argument. The family application `Add n m` alone leaves `m`
+ambiguous at an abstract cut. Agda likewise permits an expected type
+to determine an implicit argument. [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
 Agda's `Data.Vec.Base.splitAt` follows the same recursion and also
 returns a proof that appending the two outputs gives the input.
 `splitAtVec` exposes the exact lengths of both outputs.
 [Idris 2, Data.Vect.splitAt](https://idris-lang.org/Idris2/base/source/Data.Vect.html#731),
 [Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
 and [Haskell implementation](examples/packed-vector/PackedVecLibrary.hs).
+
+Agda projects `take` and `drop` from `splitAt`. Idris 2 defines both
+operations by recursion on the cut and supplies the same result lengths.
+Idris evaluates ordinary arguments eagerly. In Haskell, `dropVec` projects the suffix from `splitAtVec`. `takeVec`
+uses direct recursion so a caller can inspect the first cell before
+forcing the rest of the prefix. A zero cut returns an empty prefix
+without evaluating the input. Dropping walks the discarded spine
+without evaluating its elements. Both functions quantify the suffix before
+the element type, so the caller can write `takeVec @m n xs`. For an abstract
+cut, the caller supplies `m` because the non-injective `Add n m` cannot determine it. The ordinary
+source-hidden test reads its cut from an `IORef`.
+[Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
+[Idris 2, Data.Vect.take and drop](https://idris-lang.org/Idris2/base/source/Data.Vect.html#99)
+and [Idris 2, Laziness](https://idris2.readthedocs.io/en/latest/tutorial/typesfuns.html#laziness).
 
 The closed evaluator checks reassembly of the written vector
 `VCons True (VCons False VNil)` by running the split and append.
@@ -6496,6 +6513,27 @@ uses the append identity. The successor case applies constructor
 congruence to the proof for the tail.
 [Ordinary reassembly](examples/closed-evaluation/VectorSplitObservation.hs)
 and [checked witness](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
+
+## Check a split at an independent runtime cut
+
+`splitAtVecChecked` compares the runtime cut and total before splitting
+any of the vector. If the cut fits, the result supplies a vector at the
+cut, an existential suffix length with its vector, and evidence that
+`Add cut suffix` equals the total. An excessive cut returns `Nothing`.
+The two vector fields share a lazy call to `splitAtVec`. A zero cut
+leaves the total unevaluated. A positive cut inspects only the length
+constructors needed to reach the cut or detect exhaustion.
+[Haskell implementation](examples/packed-vector/PackedVecLibrary.hs) and
+[ordinary caller](examples/packed-vector/ListVectorClient.hs).
+
+Agda's bounded vector padding turns a length bound into a remainder and
+an addition equality. Idris 2's `isLTE` compares two runtime lengths and
+`plusMinusLte` relates the difference to the original length. Its
+`Data.Vect.splitAt` then uses an input whose length is already a sum.
+[Agda standard library v2.3, Data.Vec.Bounded.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Bounded.Base.html),
+[Idris 2, Data.Nat.isLTE](https://idris-lang.org/Idris2/base/source/Data.Nat.html#200),
+[Idris 2, Data.Nat.plusMinusLte](https://idris-lang.org/Idris2/base/source/Data.Nat.html#713)
+and [Idris 2, Data.Vect.splitAt](https://idris-lang.org/Idris2/base/source/Data.Vect.html#731).
 
 ## Naming a dependent function type
 

@@ -1,0 +1,32 @@
+NativeSplitResult.hs:8:28: error: [GHC-83865]
+    • Couldn't match type ‘n2’ with ‘other1’
+      Expected: (Vec Bool other1, Vec Bool m2)
+        Actual: (Vec Bool n2, Vec Bool m2)
+    • In the expression: splitAtVec n xs
+      In an equation for ‘wrongPrefix’:
+          wrongPrefix n m other xs = splitAtVec n xs
+    • Relevant bindings include
+        xs :: Vec Bool (Add n2 m2) (bound at NativeSplitResult.hs:8:23)
+
+NativeSplitResult.hs:12:41: error: [GHC-83865]
+    • Couldn't match type: plus n1 m1
+                     with: plus n1 other
+      Expected: Vec Bool (Add n1 other)
+        Actual: Vec Bool (Add n1 m1)
+      Note: ‘plus’ is a non-injective type family.
+    • In the second argument of ‘splitAtVec’, namely ‘xs’
+      In the expression: splitAtVec n xs
+      In an equation for ‘wrongSuffix’:
+          wrongSuffix n m other xs = splitAtVec n xs
+    • Relevant bindings include
+        xs :: Vec Bool (Add n1 m1) (bound at NativeSplitResult.hs:12:23)
+
+NativeSplitResult.hs:20:14: error: [GHC-83865]
+    • Couldn't match type: Hidden n m0
+                     with: Hidden n m
+      Expected: (Proxy n, Proxy (Hidden n m))
+        Actual: (Proxy n, Proxy (Hidden n m0))
+      Note: ‘Hidden’ is a non-injective type family.
+      The type variable ‘m0’ is ambiguous
+    • In the expression: project n
+      In an equation for ‘hidden’: hidden n m = project n

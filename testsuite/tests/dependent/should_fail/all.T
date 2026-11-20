@@ -213,6 +213,9 @@ test('NativeClosedNestedStrict',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['../should_run/NativeClosedListsLib.hs'])],
      multimod_compile_fail, ['NativeClosedNestedStrict', '-v0 ' + config.ghc_th_way_flags])
+test('NativeSplitResult',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
+     multimod_compile_fail, ['NativeSplitResult', '-v0 -fomit-interface-pragmas'])
 test('NativeSourceLengthEmpty',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_fail,

@@ -1,12 +1,13 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, RankNTypes, RequiredTypeArguments #-}
 
 -- | Construct and open imported dependent pairs in ordinary Haskell.
-module ListVectorClient (fromList, contents, regroup, regroupObservation, choosePartition) where
+module ListVectorClient (fromList, contents, regroup, regroupObservation, choosePartition, checkedSplitObservation) where
 
 import ConservedPartition (Branch, Split, partitionVec)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
-import PackedVecLibrary (Nat, Vec, appendVec, natToInt, sourceLength, sourceVector, toList)
+import PackedVecLibrary (Nat, Vec, appendVec, natToInt, sourceLength, sourceVector,
+                         splitAtVecChecked, toList)
 import StoredVector (ListVector)
 
 -- | The same list supplies the length and the vector.
@@ -32,3 +33,11 @@ choosePartition :: forall a r. forall (total :: Nat) -> Bool -> Split a total ->
 choosePartition _ selectKept (Pair kept (Pair dropped (xs, ys, _))) consume
     | selectKept = consume kept xs
     | otherwise  = consume dropped ys
+
+-- | Check an independent cut and report the suffix length and both parts.
+checkedSplitObservation :: Nat -> [a] -> Maybe (Int, [a], [a])
+checkedSplitObservation cut input = case fromList input of
+    Pair total cells -> case splitAtVecChecked cut total cells of
+        Nothing -> Nothing
+        Just (Pair suffix (left, right, _)) ->
+            Just (natToInt suffix, toList left, toList right)
