@@ -8,6 +8,23 @@ increments.
 
 ## Family and package checkpoints
 
+At `38c0f996f5`, the bootstrap and self-hosted compilers reproduced
+the 330-line Showcase at stripped `-O0` and default `-O1` and `-O2`.
+Self-hosted GHCi reproduced it too. All 15 focused normal-way tests passed.
+Of the 321 runnable cases in the dependent directory, 301 passed and
+20 failed unexpectedly. Each failing test and its failure category
+matched the 321-line checkpoint.
+
+An optimized client fired three retained rules from a separate interface.
+The Boolean payload match used the same runtime index in its type and
+its call. The preceding compiler rejected a closed retained rule at
+each of the three interface compression levels. The class receiver and
+field cases also passed their separate-client checks. A compiled typed
+splice ran the nested vector matches and checked which fields they forced.
+[Rule firing and interface checks](examples/qualified-pi/check-retained-rules.sh),
+[class receiver](roadmap/R23-unsaturated-type-families.md) and
+[type cases](roadmap/R19-type-level-cases.md).
+
 At `65eebfca2d`, both compiler stages reproduced the 321-line Showcase
 at `-O0`, default `-O1` and default `-O2`. The self-hosted GHCi matched
 the same output. All 12 focused tests passed. In the dependent directory,
