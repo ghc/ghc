@@ -206,7 +206,7 @@ module GHC.Essentials
     , Q, DecsQ, ExpQ, TypeQ, PatQ
     , Name, Decs, TH.Type, FunDep
     , Pred, Code, InjectivityAnn, ModName
-    , Con, BangType, VarBangType, RuleBndr, TySynEqn, Role, DerivClause
+    , Con, RetainedGadtArg, BangType, VarBangType, RuleBndr, TySynEqn, Role, DerivClause
     , Kind, TyVarBndrUnit, TyVarBndrSpec, TyVarBndrVis, DerivStrategy
     , sequenceQ, newName, mkName, mkNameG_v, mkNameG_d, mkNameG_tc, mkNameG_fld, mkNameL
     , mkNameQ, mkNameS, mkModName, unType, unTypeCode, unsafeCodeCoerce
@@ -239,6 +239,7 @@ module GHC.Essentials
     , Body, normalB, guardedB
     , Guard, normalGE, patGE
     , normalC, recC, infixC, forallC, forallMatchC, gadtC, recGadtC
+    , retainedGadtC, gadtValueArg, gadtIndexArg
     , TH.bang, TH.bangType, TH.varBangType
     , TH.unidir, TH.implBidir, TH.explBidir
     , TH.prefixPatSyn, TH.recordPatSyn, TH.infixPatSyn
