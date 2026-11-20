@@ -64,7 +64,8 @@ import qualified FunctionFieldLibrary as FunctionFields
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
-import GHC.Exts (FUN, M, U, Matchability (..), Multiplicity (Many))
+import GHC.Exts (FUN, Multiplicity (Many))
+import GHC.Matchability (M, U, Matchability(..))
 import qualified GHC.TypeNats as TypeNats
 import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta

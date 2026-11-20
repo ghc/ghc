@@ -10,7 +10,7 @@ module TypeLambda
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
-import GHC.Exts (U)
+import GHC.Matchability (U)
 
 -- | Apply a type function to each list element.
 type Map :: (a %U -> b) -> [a] -> [b]

@@ -225,6 +225,7 @@ Library
         , GHC.IsList
         , GHC.Ix
         , GHC.List
+        , GHC.Matchability
         , GHC.Maybe
         , GHC.MVar
         , GHC.Natural

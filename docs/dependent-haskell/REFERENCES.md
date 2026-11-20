@@ -99,6 +99,13 @@ and [Agda with-abstraction](https://agda.readthedocs.io/en/v2.8.0/language/with-
 
 ### Matchability and multiplicity on arrows
 
+Proposal #242 names `GHC.Matchability` as the public module for the
+`Matchability` kind and its `M` and `U` synonyms. The module re-exports
+the existing declarations. For example, importing only `U` lets a
+`Modifiers` module write `a %U -> b`.
+[Proposal #242, Matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities)
+and [GHC.Matchability](../../libraries/base/src/GHC/Matchability.hs).
+
 Proposal #242 writes `a -> @m b` and defines it as `(->) @m a b`.
 The committee accepted the proposal experimentally and singled out its
 syntax for reconsideration in light of #370. [#242 syntax](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#syntax-changes),

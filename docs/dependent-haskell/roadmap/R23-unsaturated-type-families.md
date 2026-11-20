@@ -10,7 +10,7 @@ Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Matchability on a source arrow
 
-Import `U` from `GHC.Exts` and enable `Modifiers` to write the
+Import `U` from `GHC.Matchability` and enable `Modifiers` to write the
 callback kind as `(a %U -> b) -> [a] -> [b]`. The R17 example supplies
 a type lambda at that position. A separate module checks its result
 from the interface. Changing the callback to `a %M -> b` rejects the
