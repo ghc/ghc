@@ -21,6 +21,12 @@ a comparison implementation. External solvers remain later work.
 
 ## References by roadmap feature
 
+For a design question, search the GHC proposals, including open and
+closed PRs. Read the review discussion as well as the proposal. Link
+the comments that explain a design choice, a rejected alternative, or an
+unresolved question. Distinguish the committee decision from the draft
+and from choices made on this fork.
+
 For a new source spelling, record the proposal section, its status, and
 the example that checks the spelling. Use the proposal's surface form
 in the Showcase when the fork accepts it. Keep an explicit constructor
