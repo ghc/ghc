@@ -13,6 +13,7 @@ cp "$src"/{NativeDefaultO1InterfaceProducer,DependentPair,DependentProjection,Pa
 "${ghc[@]}" --show-iface NativeDefaultO1InterfaceProducer.hi >producer.iface
 "${ghc[@]}" --show-iface DependentProjection.hi >projection.iface
 grep -Fq 'retained-constructor-case-v1' projection.iface
+grep -Fq 'retained-index-alias-v1' producer.iface
 grep -Fq '$windexedWorker' producer.iface
 grep -Fq '$wordinaryWorker' producer.iface
 
@@ -25,6 +26,7 @@ cd client
     exit 1
 }
 grep -Fq 'Inlining done: NativeDefaultO1InterfaceProducer.ordinaryWorker' client.log
+grep -Fq 'Inlining done: NativeDefaultO1InterfaceProducer.classify' client.log
 grep -Fq '$wordinaryWorker' client.log
 "${ghc[@]}" NativeDefaultO1Interface.o ../{NativeDefaultO1InterfaceProducer,DependentPair,DependentProjection,PackedVecLibrary}.o -o run
 ./run 5

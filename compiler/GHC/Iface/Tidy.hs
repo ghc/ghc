@@ -48,9 +48,10 @@ import GHC.Core.Utils ( exprType )
 import GHC.Core.DataCon ( dataConWorkId )
 import GHC.Core.Unfold
 import GHC.Core.FVs
+import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
     ( hasNativeDependentExprRhs, hasNativeDependentProgram
-    , hasNativeDependentUnfolding, hasNativeIndexAliasUnfolding )
+    , hasNativeDependentUnfolding )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )
@@ -82,6 +83,7 @@ import GHC.Types.Demand  ( isDeadEndAppSig, isNopSig, nopSig, isDeadEndSig )
 import GHC.Types.Basic
 import GHC.Types.TyThing( implicitTyConThings )
 import GHC.Types.Name hiding (varName)
+import GHC.Types.Name.Env (lookupNameEnv, mkNameEnv)
 import GHC.Types.Name.Set
 import GHC.Types.Name.Cache
 import GHC.Types.Avail
@@ -421,7 +423,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           }) = do
 
   (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules
-  let (trimmed_binds, trimmed_rules) = findExternalRules opts binds imp_rules unfold_env
+  let (trimmed_binds, trimmed_rules) = findExternalRules opts mod binds imp_rules unfold_env
 
   when (opt_has_retained_core opts) $ do
     forM_ (bindersOfBinds trimmed_binds) $ \ bndr ->
@@ -434,7 +436,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                (ppr bndr)
         _ -> pure ()
     forM_ trimmed_rules $ \ rule ->
-      when (hasNativeDependentProgram [] [rule]) $
+      when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]) $
         throwGhcExceptionIO $ PprProgramError
           "Cannot export a rewrite rule that contains retained Core."
           (ppr rule)
@@ -809,9 +811,8 @@ addExternal opts mb_rhs id
 
     can_expose_body rhs
       = not (opt_has_retained_core opts)
-        || (not (hasNativeIndexAliasUnfolding rhs)
-            && (hasNativeDependentExprRhs (Type (idType id))
-                || not (hasNativeDependentUnfolding rhs)))
+        || hasNativeDependentExprRhs (Type (idType id))
+        || not (hasNativeDependentUnfolding rhs)
 
 {- Note [Retained Core across module boundaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -823,22 +824,23 @@ happens in --make, which imports the in-memory result of Core Tidy.
 Keep those unfolding bodies private. Keep ordinary unfoldings from the same
 module available. In a client, a reference to an Id with retained Core in
 its type already selects the retained optimizer. That Id can expose its
-checked template when its branch evidence has an interface encoding. Native
-index alias alternatives lack that encoding. Interface loading also rejects
-retained dictionary operations. Do not expose their optional templates.
+checked template. The interface reader reconstructs constructor and index
+alias evidence from the case. See Note [Native index alias evidence in
+interfaces] in GHC.IfaceToCore. Interface loading also rejects retained
+dictionary operations. Do not expose their optional templates.
 
 A specialization such as numericCall @Int can leave an exported worker and
-an automatic rule that redirects calls to it. If the rule contains retained
-Core, the interface rule reader cannot reconstruct it. Keep the worker and
-the local specialization. Omit this optional rule from the exported rules.
-See Note [Trimming auto-rules].
+an automatic rule that redirects calls to it. Export a retained rule only
+when the reader can validate its specialization. See Note [Trimming auto-rules].
 
 A compulsory template cannot be removed. Check it after the simplifier,
 which can change the body that the desugarer checked. Exported RULES must
 also be safe to apply in ordinary importers. The retained driver rejects
-local user RULES before optimization. Check the RULES selected by Tidy in
-case optimization generated another RULE. Local optimization continues to
-use the original templates before Core Tidy.
+local user RULES before optimization. Keep an optional generated rule
+private if it can introduce native Core into an ordinary client or if it
+has no supported shape. See Note [Exported retained specialisations] in
+GHC.Core.Rules. Tidy applies the same restriction to disk and --make
+imports. Local optimization uses the original rules before Tidy.
 -}
 
 isOverloaded :: Id -> Bool
@@ -1078,12 +1080,13 @@ We discard auto-rules by default, but keep them if -fkeep-auto-rules is on.
 -}
 
 findExternalRules :: TidyOpts
+                  -> Module
                   -> [CoreBind]
                   -> [CoreRule] -- Local rules for imported fns
                   -> UnfoldEnv  -- Ids that are exported, so we need their rules
                   -> ([CoreBind], [CoreRule])
 -- See Note [Finding external rules]
-findExternalRules opts binds imp_id_rules unfold_env
+findExternalRules opts mod binds imp_id_rules unfold_env
   = (trimmed_binds, filter keep_rule all_rules)
   where
     imp_rules | opt_expose_rules opts = filter expose_rule imp_id_rules
@@ -1110,13 +1113,20 @@ findExternalRules opts binds imp_id_rules unfold_env
         --      been discarded; see Note [Trimming auto-rules]
 
     expose_rule rule = all is_external_id (ruleLhsFreeIdsList rule)
-                    && not (opt_has_retained_core opts && isAutoRule rule
-                            && hasNativeDependentProgram [] [rule])
-                -- See Note [Retained Core across module boundaries].
+                    && expose_auto_rule rule
                 -- Don't expose a rule whose LHS mentions a locally-defined
                 -- Id that is completely internal (i.e. not visible to an
                 -- importing module).  NB: ruleLhsFreeIds only returns LocalIds.
                 -- See Note [Which rules to expose]
+
+    expose_auto_rule rule
+      | opt_has_retained_core opts
+      , isAutoRule rule
+      , hasNativeDependentProgram [] [rule]
+      = ru_origin rule == mod
+        && maybe False (`canShareRetainedSpecRule` rule) (lookupNameEnv heads (ru_fn rule))
+      | otherwise = True
+    heads = mkNameEnv [(idName id, id) | id <- bindersOfBinds binds]
 
     is_external_id id = case lookupVarEnv unfold_env id of
                           Just (name, _) -> isExternalName name && not (isImplicitId id)

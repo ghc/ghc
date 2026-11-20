@@ -3681,7 +3681,7 @@ pprRetainedQuantificationError reason = case reason of
     vcat [ text "Only class and equality constraints can depend on a retained index yet:"
          , ppr ty ]
   RetainedPragma ->
-    text "Optimisation pragmas for retained functions are not supported yet."
+    text "SPECIALISE pragmas are not supported for retained functions yet."
   RetainedInference ty ->
     vcat [ text "This inferred retained type requires an explicit signature:"
          , ppr ty ]

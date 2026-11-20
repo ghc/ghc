@@ -1,7 +1,18 @@
 {-# LANGUAGE BangPatterns, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module NativeDefaultO1InterfaceProducer (exposure, ordinaryWorker, indexedWorker) where
+module NativeDefaultO1InterfaceProducer (exposure, ordinaryWorker, indexedWorker, Flag(..), classify) where
 
 import Data.Type.Equality ((:~:)(Refl))
+
+-- | Record the Boolean that the callback returns.
+data Flag (b :: Bool) where
+    Off :: Flag False
+    On  :: Flag True
+
+-- | Keep the callback result as the index of the selected constructor.
+classify :: foreach (f :: Bool -> Bool) -> foreach (b :: Bool) -> Flag (f b)
+classify f b = case f b of
+    False -> Off
+    True  -> On
 
 indexedWorker :: foreach (index :: Bool) -> Bool -> Int -> (Int, index :~: index)
 indexedWorker _ _ !n

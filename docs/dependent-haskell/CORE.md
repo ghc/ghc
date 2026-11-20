@@ -845,8 +845,10 @@ Transport through a remaining retained function uses `DepFunCo` with its
 nominal domain relation and `Many` binder. CorePrep converts each later retained
 argument to its prepared domain and composes its index proof in telescope
 order. Keep the cast on the partial function value. Eta expansion must not hide a bottom function.
-Erased binder kinds that depend on a named index are still gated. Alias proof
-expressions have no interface codec. See Notes [Native index alias evidence]
+Erased binder kinds that depend on a named index are still gated. An
+optimized interface records a DEFAULT alias proof with its own tag. The
+reader builds its nominal equality from the case binder and scrutinee.
+See Notes [Native index alias evidence]
 and [Retained constructor arguments in CorePrep] and the provenance in
 [REFERENCES.md](REFERENCES.md).
 

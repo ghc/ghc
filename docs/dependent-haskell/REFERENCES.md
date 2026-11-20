@@ -149,6 +149,17 @@ This decision adds no source spelling. [Agda function types](https://agda.readth
 [with-abstraction equality](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#with-abstraction-equality)
 and [the CSE implementation](../../compiler/GHC/Core/Opt/CSE.hs).
 
+For a strict case on a callback, the interface reader recovers the equality
+between the case binder and the application from the imported expression.
+Agda's with-abstraction generalises over an intermediate result. Its
+`with … in eq` form keeps evidence relating that result to the original
+expression. Haskell needs the runtime case as well. The interface stores the
+branch proof name. Its reader reconstructs both endpoints and keeps the
+callback application as the scrutinee. See Note [Native index alias evidence
+in interfaces] in GHC.IfaceToCore.
+[Agda with-abstraction equality](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#with-abstraction-equality)
+and [the interface reader](../../compiler/GHC/IfaceToCore.hs).
+
 The GHC-specific precedents are its constructor form for a list on a RULE
 left-hand side and its lazy aliases for local runtime indices across
 Core Tidy. Apply the former when desugaring an indexed list argument.

@@ -56,7 +56,7 @@ import GHC.Hs (HsType (..), hsForEachVisibility)
 import GHC.Iface.Binary (CheckHiWay (CheckHiWay), CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData, readBinIface, writeBinIface)
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
-import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, IfaceSynonym, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
+import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, IfaceSynonym, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceRuleKind (IfaceUserRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
 import GHC.Iface.Type (IfaceAppArgs (IA_Nil, IA_Arg), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo, IfaceForAllCo, IfaceTermAppCo), IfaceForAllTyFlag (IfaceForAllTyFlag), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
@@ -1670,7 +1670,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             rejectsIfaceRule :: String -> [IfaceBndr] -> IfaceExpr -> IO ()
             rejectsIfaceRule label binders body =
                 rejectsDeferredIface label "Native dependent interface rules are not supported" $ \importEnv -> do
-                    let rule = IfaceRule (fsLit "native_rule") AlwaysActive binders (idName (dataConWorkId trueDataCon)) [] body False IsOrphan
+                    let rule = IfaceRule (fsLit "native_rule") AlwaysActive binders (idName (dataConWorkId trueDataCon)) [] body IfaceUserRule IsOrphan
                     rules <-
                         initIfaceLoad importEnv
                             $ initIfaceLcl ifaceModule (text "native rule test") NotBoot
@@ -2784,8 +2784,33 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 _ -> fail "FAIL: interface list constructor evidence shape changed"
         rejectsIfaceExpr "a tagged constructor alternative must bind its proof"
             "Missing or unsupported constructor proof" [xs] (listCase [nilAlt, consAlt [hd, tl] (IfaceLcl hd)])
+        rejectsIfaceExpr "two constructor fields must have distinct names"
+            "distinct field and proof names" [xs] (listCase [nilAlt, consAlt [hd, hd, co] (IfaceLcl hd)])
+        let arg = local 12020 "alias_arg" boolTy
+            alias = local 12021 "case_alias" boolTy
+            witness = mkCoVar (mkSystemName (unique 12022) (mkVarOcc "alias_proof"))
+                              (mkNomEqPred (TermVarTy alias) (TermVarTy arg))
+            original = Case (Var arg) alias boolTy [Alt DEFAULT [witness] (Var alias)]
+            aliasName = listName "case_alias"
+            aliasCase names scrut rhs = IfaceCase scrut aliasName [IfaceAlt IfaceDefaultAltWithProof names rhs]
+        forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
+            encoded <- roundtrip compression (toIfaceExpr original)
+            decoded <- restoreExpr [arg] encoded
+            lintAccepts dflags "imported DEFAULT alias binds nominal evidence" [arg] decoded
+            case decoded of
+                Case _ fresh _ [Alt DEFAULT [cv] (Var result)] -> do
+                    check "alias copy binds fresh identities" (fresh == result && fresh /= alias && cv /= witness)
+                    let evidence = mkCoVarCo cv
+                    check "DEFAULT alias proof has nominal role" (coercionRole evidence == Nominal)
+                    checkType dflags "alias proof names the fresh case binder" (TermVarTy fresh) (coercionLKind evidence)
+                    checkType dflags "alias proof names the actual scrutinee" (TermVarTy arg) (coercionRKind evidence)
+                _ -> fail "FAIL: imported DEFAULT alias changed shape"
+        forM_ [[], [co, hd], [aliasName]] $ \names ->
+            rejectsIfaceExpr "DEFAULT alias needs one distinct proof name"
+                "requires one proof distinct from its case binder" [arg]
+                (aliasCase names (toIfaceExpr (Var arg)) (IfaceLcl aliasName))
         rejectsIfaceExpr "proof name collides with a constructor field"
-            "one distinct proof name" [xs] (listCase [nilAlt, consAlt [hd, tl, hd] (IfaceLcl hd)])
+            "distinct field and proof names" [xs] (listCase [nilAlt, consAlt [hd, tl, hd] (IfaceLcl hd)])
         rejectsIfaceExpr "one constructor cannot read another constructor's field"
             "Iface id out of scope" [xs] (listCase [IfaceAlt (IfaceDataAlt (dataConName nilDataCon)) [] (IfaceLcl hd), goodCons])
         rejectsIfaceExpr "a proof must use a constructor of the actual scrutinee"
@@ -2800,7 +2825,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         rejectsIfaceExpr label fragment [] decoded
                 reject
                     "extra interface proof names"
-                    "Native index interface alternative requires constructor fields followed by one distinct proof name"
+                    "Native index interface alternative requires constructor fields followed by one proof"
                     (wrap scrut [falseAlt, IfaceAlt trueCon [proofName, proofName] rhs])
                 forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
                     decoded <- roundtrip compression (wrap (IfaceApp (IfaceLam retained scrut) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs])
@@ -2825,7 +2850,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     (wrap scrut [falseAlt])
                 reject
                     "interface DEFAULT cannot bind proof names"
-                    "Native index alias evidence has no interface codec"
+                    "An ordinary interface DEFAULT alternative cannot bind names"
                     (wrap scrut [IfaceAlt IfaceDefaultAlt [proofName] rhs, falseAlt, IfaceAlt trueCon [proofName] rhs])
                 reject
                     "interface literal cannot bind proof names"

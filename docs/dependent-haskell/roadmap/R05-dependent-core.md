@@ -126,7 +126,11 @@ The private compiler at `e070cb70cc` also exports a generated specialization
 rule and a written inline pragma on a retained function. A source-free
 client inlines a case on the result of a callback. It distinguishes the
 strict `id` callback from lazy `const True`. The same client fires the
-numeric specialization rule. The 272-line Showcase passes with default
+numeric specialization rule `SPEC numericCall @Int` for lengths two and
+zero, producing `[42,42]` and `[]`. An older compiler that supports the
+rule alone rejects a mixed interface at the header. The reader also
+rejects repeated field names in imported branch evidence. The 272-line
+Showcase passes with default
 `-O1` on that private bootstrap compiler. A retained class method needs
 additional checks because a client that inherits the default can require
 its unfolding even when optional interface pragmas are disabled.

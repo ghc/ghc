@@ -66,6 +66,7 @@ import GHC.Core.Utils
 import GHC.Core.Unfold( calcUnfoldingGuidance )
 import GHC.Core.Unfold.Make
 import GHC.Core.Lint
+import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Make
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -94,6 +95,7 @@ import GHC.Utils.Logger
 import GHC.Utils.Exception ( NonTermination(..), evaluate )
 
 import GHC.Data.Bag
+import GHC.Data.List.SetOps (hasNoDups)
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
@@ -1550,18 +1552,35 @@ tcIfaceRules ignore_prags if_rules
   | otherwise    = mapM tcIfaceRule if_rules
 
 tcIfaceRule :: IfaceRule -> IfL CoreRule
-tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
+tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                         ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
-                        ifRuleAuto = auto, ifRuleOrph = orph })
-  = do  { ~(bndrs', args', rhs') <-
+                        ifRuleKind = kind, ifRuleOrph = orph}
+  = do  { this_mod <- getIfModule
+        ; ~(bndrs', args', rhs') <-
                 -- Typecheck the payload lazily, in the hope it'll never be looked at
                 forkM (text "Rule" <+> pprRuleName name) $
                 bindIfaceBndrs bndrs                      $ \ bndrs' ->
                 do { args'  <- mapM tcIfaceExpr args
                    ; rhs'   <- tcIfaceExpr rhs
-                   ; when (any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')) $
-                       failIfM (text "Native dependent interface rules are not supported:" <+> pprRuleName name)
-                   ; whenGOptM Opt_DoCoreLinting $ do
+                   ; let native = any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')
+                   ; if kind == IfaceRetainedAutoRule
+                       then do
+                         unless (nameModule_maybe fn == Just this_mod) $
+                           failIfM (retained_doc $$ text "Expected a rule head defined in this module.")
+                         thing <- tcIfaceGlobal fn
+                         fun <- case thing of
+                           AnId id -> pure id
+                           _ -> failIfM (retained_doc $$ text "Expected an identifier at the rule head.")
+                         let rule = mk_rule this_mod bndrs' args' rhs'
+                         unless (native && canShareRetainedSpecRule fun rule) $
+                           failIfM (retained_doc $$ text "Unsupported retained specialization shape.")
+                         dflags <- getDynFlags
+                         case lintRule (initLintConfig dflags []) fun rule of
+                           Nothing -> pure ()
+                           Just errs -> failIfM (retained_doc $$ vcat (bagToList errs))
+                       else when native $
+                         failIfM (text "Native dependent interface rules are not supported:" <+> pprRuleName name)
+                   ; when (kind /= IfaceRetainedAutoRule) $ whenGOptM Opt_DoCoreLinting $ do
                       { dflags <- getDynFlags
                       ; (_, lcl_env) <- getEnvs
                       ; let in_scope :: [Var]
@@ -1577,25 +1596,26 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                                (pprCoreExpr rhs')
                                                (emptyBag, errs) }
                    ; return (bndrs', args', rhs') }
-        ; let mb_tcs = map ifTopFreeName args
-              (bndrs_occ, rhs_occ) = occurAnalyseBndrsAndExpr bndrs' rhs'
+        ; let (bndrs_occ, rhs_occ) = occurAnalyseBndrsAndExpr bndrs' rhs'
                    -- See (OUR1) in Note [OccInfo in unfoldings and rules]
+        ; return (mk_rule this_mod bndrs_occ args' rhs_occ) }
+  where
+    retained_doc = text "Invalid retained specialization rule:" <+> pprRuleName name
 
-        ; this_mod <- getIfModule
-        ; return (Rule { ru_name   = name
-                       , ru_fn     = fn
-                       , ru_act    = act
-                       , ru_bndrs  = bndrs_occ
-                       , ru_args   = args'
-                       , ru_rhs    = rhs_occ
-                       , ru_rough  = mb_tcs
-                       , ru_origin = this_mod
-                       , ru_orphan = orph
-                       , ru_auto   = auto
-                       , ru_local  = False }) }
+    mk_rule this_mod bndrs' args' rhs' =
+      Rule { ru_name   = name
+           , ru_fn     = fn
+           , ru_act    = act
+           , ru_bndrs  = bndrs'
+           , ru_args   = args'
+           , ru_rhs    = rhs'
+           , ru_rough  = map ifTopFreeName args
+           , ru_origin = this_mod
+           , ru_orphan = orph
+           , ru_auto   = ifRuleAuto iface_rule
+           , ru_local  = False }
               -- ru_local=False: an imported RULE is never for a local Id or, even if
               -- it is (module loop, perhaps) we'll just leave it in the non-local set
-  where
         -- This function *must* mirror exactly what Rules.roughTopNames does
         -- We could have stored the ru_rough field in the iface file
         -- but that would be redundant, I think.
@@ -2326,13 +2346,17 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     -- See Note [Native index alias evidence in interfaces].
     forM_ alts $ \ (IfaceAlt con names _) -> case con of
       IfaceDefaultAlt | not (null names) ->
-        failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
+        failIfM (text "An ordinary interface DEFAULT alternative cannot bind names:" <+> ppr names)
+      IfaceDefaultAltWithProof -> case names of
+        [proof] | proof /= case_bndr -> return ()
+        _ -> failIfM (text "An index alias alternative requires one proof distinct from its case binder:" <+> ppr names)
       _ -> return ()
     scrut' <- tcIfaceExpr scrut
     -- Resolve each constructor once, before inspecting its representation arity.
     resolved <- forM alts $ \ (IfaceAlt con names rhs) -> do
       alt_con <- case con of
         IfaceDefaultAlt   -> return DEFAULT
+        IfaceDefaultAltWithProof -> return DEFAULT
         IfaceLitAlt lit   -> LitAlt <$> tcIfaceLit lit
         IfaceDataAlt name -> DataAlt <$> tcIfaceDataCon name
         IfaceDataAltWithProof name -> do
@@ -2345,8 +2369,9 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         native_alt _ = False
         has_alt con = any (\(c, _, _) -> c == con) resolved
         scrut_index = exprToNativeIndex scrut'
-        native = any native_alt resolved
-    when native $ do
+        constructor_proof = any native_alt resolved
+        native = constructor_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
+    when constructor_proof $ do
       when (isNothing scrut_index) $
         failIfM (text "Unsupported scrutinee for native index interface evidence:" <+> ppr scrut')
       unless (has_alt DEFAULT || case splitTyConApp_maybe (exprType scrut') of
@@ -2368,7 +2393,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                 --     corresponds to the datacon in this case alternative
 
     extendIfaceIdEnv [case_bndr'] $ do
-     alts' <- mapM (tcIfaceAlt scrut' scrut_index case_mult tc_app) resolved
+     alts' <- mapM (tcIfaceAlt scrut' scrut_index case_bndr' tc_app) resolved
      result_ty <- if native
        then do
          -- coreAltType panics on an escaping binder. Report the interface error.
@@ -2435,23 +2460,30 @@ tcIfaceLit :: Literal -> IfL Literal
 tcIfaceLit lit = return lit
 
 -------------------------
-tcIfaceAlt :: CoreExpr -> Maybe Type -> Mult -> (TyCon, [Type])
+tcIfaceAlt :: CoreExpr -> Maybe Type -> Id -> (TyCon, [Type])
            -> (AltCon, [IfLclName], IfaceExpr) -> IfL CoreAlt
-tcIfaceAlt _ _ _ _ (DEFAULT, names, rhs) = do
-  unless (null names) $
-    failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
+tcIfaceAlt _ _ _ _ (DEFAULT, [], rhs) =
   Alt DEFAULT [] <$> tcIfaceExpr rhs
+tcIfaceAlt scrut _ case_bndr _ (DEFAULT, [proof], rhs)
+  | isNativeIndexId case_bndr
+  , Just index <- exprToNativeCaseIndex scrut
+  , eqType (idType case_bndr) (typeKind index)
+  = do { name <- newIfaceName (mkVarOccFS (ifLclNameFS proof))
+       ; let cv = mkCoVar name (mkNomEqPred (TermVarTy case_bndr) index)
+       ; Alt DEFAULT [cv] <$> extendIfaceIdEnv [cv] (tcIfaceExpr rhs) }
+tcIfaceAlt scrut _ _ _ (DEFAULT, _, _) =
+  failIfM (text "Unsupported scrutinee for native index alias interface evidence:" <+> ppr scrut)
 
 tcIfaceAlt _ _ _ _ (con@(LitAlt _), names, rhs) = do
   unless (null names) $
     failIfM (text "Interface literal alternative cannot bind names:" <+> ppr names)
   Alt con [] <$> tcIfaceExpr rhs
 
-tcIfaceAlt scrut scrut_index mult (tycon, inst_tys) (DataAlt con, names, rhs)
+tcIfaceAlt scrut scrut_index case_bndr (tycon, inst_tys) (DataAlt con, names, rhs)
   | isNativeIndexDataAlt con names
   = do { (field_names, proof_name) <- case splitAt (dataConRepArity con) names of
-           (fs, [p]) | p `notElem` fs -> return (fs, p)
-           _ -> failIfM (text "Native index interface alternative requires constructor fields followed by one distinct proof name:"
+           (fs, [p]) | hasNoDups names -> return (fs, p)
+           _ -> failIfM (text "Native index interface alternative requires constructor fields followed by one proof, with distinct field and proof names:"
                          <+> ppr con <+> ppr names)
        ; index <- case scrut_index of
            Just i  -> return i
@@ -2477,20 +2509,26 @@ tcIfaceAlt scrut scrut_index mult (tycon, inst_tys) (DataAlt con, names, rhs)
                dataConRepFSInstPat (map ifLclNameFS names) uniqs mult con inst_tys
        ; rhs' <- extendIfaceEnvs ex_tvs $ extendIfaceIdEnv arg_ids $ tcIfaceExpr rhs
        ; return (Alt (DataAlt con) (ex_tvs ++ arg_ids) rhs') }
+  where
+    mult = idMult case_bndr
 
 {- Note [Native index alias evidence in interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A DEFAULT index alias alternative binds a CoVar. Its equality relates the
-case binder to the scrutinee index. The current interface expression codec
-cannot reconstruct this proof. Reject every DEFAULT CoVar shape in the writer,
-including malformed shapes. The reader has only local names, without binder
-sorts. Reject any DEFAULT alternative with names before decoding the scrutinee
-or branch body. Do not use the ordinary DEFAULT assertion for these proofs.
+A case on a callback can name its result before matching its constructors.
+In classify f b, the outer DEFAULT binds the equality call_index ~# f b.
+The inner case inspects call_index. The expression that the caller evaluates
+must still be the same application after reading the unfolding.
 
-This gate applies to expression templates. It does not change the type codec
-or the separate module unfolding gate. Add explicit versioned codec support
-before serializing these proofs. See Note [Native index alias evidence]
-in GHC.Core.Lint.
+Write a distinct alternative tag and one local proof name. Derive the left
+endpoint from the fresh, unrestricted case binder and the right endpoint
+from the actual scrutinee with exprToNativeCaseIndex, as in Core Lint.
+This preserves the identity of a local function without unfolding it.
+Bind the fresh nominal CoVar only while reading this branch. Check the
+result type for escaping binders before returning the case.
+
+An ordinary DEFAULT has no binders. Its existing tag and bytes stay the
+same. See Note [Native index alias evidence] in GHC.Core.Lint and
+Note [Versioning retained evidence] in GHC.Iface.Binary.
 -}
 
 {- Note [Native constructor evidence in interfaces]
@@ -2505,6 +2543,8 @@ for Bool. Write IfaceDataAltWithProof for the other supported constructors.
 When reading a legacy unfolding, recognize its proof slot by the same
 constructor shape. See Note [Versioning retained evidence] in GHC.Iface.Binary.
 
+Check that all field and proof names differ before extending the interface
+environment. A repeated name would hide the preceding field in the branch.
 Instantiate the ordinary representation fields from left to right. This
 gives the payload its type at the fresh x. Derive the promoted result from
 those same field Ids and the structural index of the actual scrutinee.

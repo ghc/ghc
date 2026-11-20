@@ -5,7 +5,6 @@ module GHC.Core.Dependent (
     hasNativeDependentExpr,
     hasNativeDependentExprRhs,
     hasNativeDependentUnfolding,
-    hasNativeIndexAliasUnfolding,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
 ) where
@@ -43,7 +42,7 @@ data ScanState = ScanState
     }
 
 -- | Select which retained forms the scan looks for.
-data ScanPurpose = DetectNative | CheckGentle | CheckIndexAlias
+data ScanPurpose = DetectNative | CheckGentle
 
 -- | Select which bound-Id metadata a boundary can demand.
 data MetadataScan = AllMetadata | StableMetadata | NoMetadata
@@ -90,11 +89,6 @@ Do not force unstable nested unfolding templates.
 hasNativeDependentUnfolding :: CoreExpr -> Bool
 hasNativeDependentUnfolding = runScan StableMetadata . scanExpr
 
--- | Detect branch evidence without an interface encoding, including in nested
--- stable unfolding templates.
-hasNativeIndexAliasUnfolding :: CoreExpr -> Bool
-hasNativeIndexAliasUnfolding = runScanFor CheckIndexAlias StableMetadata . scanExpr
-
 -- | Reject native dependent Core before an unsupported program pass.
 rejectNativeDependentProgram :: String -> CoreProgram -> [CoreRule] -> IO ()
 rejectNativeDependentProgram context binds rules =
@@ -121,7 +115,6 @@ gentleForm scan = NativeScan $ do
     case purpose of
         CheckGentle -> runNativeScan scan
         DetectNative -> pure True
-        CheckIndexAlias -> pure False
 
 -- | Report an unsupported compiler operation when a scan finds a native type.
 rejectNative :: String -> Bool -> IO ()
@@ -157,16 +150,7 @@ scanBind (Rec pairs) = foldMap (\(b, rhs) -> scanBinder b <> scanExpr rhs) pairs
 -- | Inspect a case alternative and its binders.
 scanAlt :: CoreAlt -> NativeScan
 scanAlt alt@(Alt con bs rhs)
-    | isNativeIndexAliasAlt alt = NativeScan $ do
-        purpose <- gets scanPurpose
-        case purpose of
-            CheckIndexAlias -> pure True
-            _ -> runNativeScan (gentleForm children)
-    | isNativeIndexAlt alt = NativeScan $ do
-        purpose <- gets scanPurpose
-        case purpose of
-            CheckIndexAlias -> runNativeScan children
-            _ -> runNativeScan (gentleForm children)
+    | isNativeIndexAliasAlt alt || isNativeIndexAlt alt = gentleForm children
     | otherwise = children
   where
     children = scanAltCon con <> foldMap scanBinder bs <> scanExpr rhs

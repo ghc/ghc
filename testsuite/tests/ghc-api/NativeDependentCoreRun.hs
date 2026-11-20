@@ -4732,6 +4732,15 @@ runSourceRejectChecks = do
             , "  Select True = Int"
             , "  Select False = Bool"
             ] ++ local [] selection identity "keep (not False) (42 :: Int)"
+    forM_ [("Inline", "INLINE"), ("Inlinable", "INLINABLE")] $ \(suffix, pragma) -> do
+        let name = "NativeSource" ++ suffix
+        void $ sourceEntry name $ unlines $
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}"
+            , "module " ++ name ++ " where"
+            , "type family Select (b :: Bool) where"
+            , "  Select True = Int"
+            , "  Select False = Bool"
+            ] ++ local ["{-# " ++ pragma ++ " keep #-}"] selection identity "keep True 42"
     mapM_
         check
         [ ("unsupported algebraic domain", 83605, "A retained value argument requires a lifted type parameter or a supported algebraic type.", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
@@ -4747,10 +4756,8 @@ runSourceRejectChecks = do
         , ("nonreflexive indexed constraint", 18872, "True", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
         , ("general indexed constraint", 39999, "Show", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
         , ("Quick Look through ($)", 83605, "Quick Look inference", [], local [] consumer ["keep b x = 42"] "(keep $ True) 42")
-        , ("INLINE retained function", 83605, "Optimisation pragmas", [], local ["{-# INLINE keep #-}"] selection identity "42")
-        , ("INLINABLE retained function", 83605, "Optimisation pragmas", [], local ["{-# INLINABLE keep #-}"] selection identity "42")
-        , ("SPECIALISE type pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep :: Bool -> Int -> Int #-}"] selection identity "42")
-        , ("SPECIALISE expression pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep True #-}"] selection identity "42")
+        , ("SPECIALISE type pragma", 83605, "SPECIALISE pragmas", [], local ["{-# SPECIALISE keep :: Bool -> Int -> Int #-}"] selection identity "42")
+        , ("SPECIALISE expression pragma", 83605, "SPECIALISE pragmas", [], local ["{-# SPECIALISE keep True #-}"] selection identity "42")
         , ("unsigned retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["alias = keep"]) "42")
         , ("unsigned partial retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["index :: Bool", "index = False", "alias = keep index"]) "42")
         , ("unregistered ordinary term name", 37479, "is a term-level binding", [], ["ordinary :: Bool", "ordinary = False", "type Bad = NativeSourceRejected.ordinary"])

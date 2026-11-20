@@ -141,6 +141,13 @@ simpleOptWwTemplate :: SimplCoreMode -> SimpleOpts -> CoreExpr -> CoreExpr
 simpleOptWwTemplate RetainedCore _ = simpleOptNativeExpr
 simpleOptWwTemplate OrdinaryCore opts = simpleOptExpr opts
 
+-- | Simplify an optional template in the mode required by its contents.
+-- See Note [Written retained unfolding pragmas] in GHC.HsToCore.Binds.
+simpleOptUnfolding :: SimpleOpts -> CoreExpr -> CoreExpr
+simpleOptUnfolding opts expr
+  | hasNativeDependentUnfolding expr = simpleOptNativeExpr expr
+  | otherwise                       = simpleOptExpr opts expr
+
 -- | Make an INLINE unfolding that may be used unsaturated
 -- (ug_unsat_ok = unSaturatedOk) and that is reported as having its
 -- manifest arity (the number of outer lambdas applications will
@@ -151,7 +158,7 @@ mkInlineUnfoldingNoArity opts src expr
                     True         -- Note [Top-level flag on inline rules]
                     expr' Nothing guide
   where
-    expr' = simpleOptExpr opts expr
+    expr' = simpleOptUnfolding opts expr
     guide = UnfWhen { ug_arity = manifestArity expr'
                     , ug_unsat_ok = unSaturatedOk
                     , ug_boring_ok = boring_ok }
@@ -165,7 +172,7 @@ mkInlineUnfoldingWithArity opts src arity expr
                     True         -- Note [Top-level flag on inline rules]
                     expr' Nothing guide
   where
-    expr' = simpleOptExpr opts expr
+    expr' = simpleOptUnfolding opts expr
     guide = UnfWhen { ug_arity = arity
                     , ug_unsat_ok = needSaturated
                     , ug_boring_ok = boring_ok }
@@ -178,7 +185,7 @@ mkInlinableUnfolding :: SimpleOpts -> UnfoldingSource -> CoreExpr -> Unfolding
 mkInlinableUnfolding opts src expr
   = mkUnfolding (so_uf_opts opts) src False False False expr' Nothing
   where
-    expr' = simpleOptExpr opts expr
+    expr' = simpleOptUnfolding opts expr
 
 specUnfolding :: SimpleOpts
               -> [Var] -> (CoreExpr -> CoreExpr)
@@ -216,10 +223,9 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
  = mkCoreUnfolding src top_lvl new_tmpl Nothing
                    (old_guidance { ug_arity = old_arity - arity_decrease })
  where
-   new_tmpl = simpleOptExpr opts $
+   new_tmpl = simpleOptUnfolding opts $
               mkLams spec_bndrs  $
-              spec_app tmpl  -- The beta-redexes created by spec_app
-                             -- will be simplified away by simplOptExpr
+              spec_app tmpl  -- Simplify the beta-redexes from spec_app.
    arity_decrease = count isValArg rule_lhs_args - count isId spec_bndrs
 
 
