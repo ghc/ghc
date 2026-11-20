@@ -85,15 +85,26 @@ setIrredIfWanted :: CtEvidence -> SwapFlag -> CtEvidence -> TcS ()
 setIrredIfWanted ev_dest swap ev_source
   | CtWanted (WantedCt { ctev_dest = dest }) <- ev_dest
   = case dest of
-      HoleDest hole -> setWantedEq dest $
-                       CPH { cph_co    = maybeSymCo swap (ctEvCoercion ev_source)
-                           , cph_holes = unitCoHoleSet hole }
+      HoleDest {} -> setWantedEq dest $
+                     CPH { cph_co    = maybeSymCo swap (ctEvCoercion ev_source)
+                         , cph_holes = ctEvCoHoleSet ev_source }
+                     -- See Note [Holes in evidence for equal irreducibles].
 
       EvVarDest {} -> assertPpr (swap==NotSwapped) (ppr ev_dest $$ ppr ev_source) $
                          -- findMatchingIrreds only returns IsSwapped for equalities
                       setWantedDict dest EvCanonical (ctEvTerm ev_source)
   | otherwise
   = return ()
+
+{- Note [Holes in evidence for equal irreducibles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a matching irreducible solves a Wanted equality, its coercion
+comes from the source constraint. A Given contributes no hole. A Wanted
+contributes its source hole, also when the coercion is symmetric.
+Recording the destination hole here makes zonkCoHoleSet follow that
+hole back to itself when another Wanted asks for its rewriters.
+See Note [Coercion holes] in GHC.Core.TyCo.Rep.
+-}
 
 {- Note [Multiple matching irreds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

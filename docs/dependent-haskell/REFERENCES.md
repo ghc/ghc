@@ -6603,6 +6603,15 @@ in `GHC.Core.Coercion`.
 [Source-hidden caller](examples/packed-vector/CertifiedSplitClient.hs) and
 [demand and missing-premise checks](../../testsuite/tests/dependent/should_run/NativeCertifiedSplit.sh).
 
+GHC already records source evidence holes when a canonical equality is
+solved from an inert constraint. The same rule applies to a matching
+irreducible equality. A Given supplies a coercion variable, and another
+Wanted supplies its own hole. The regression exercises the GADT width
+equality while reporting a distinct, unsolved input identity.
+[Canonical equality solver](../../compiler/GHC/Tc/Solver/Equality.hs),
+[irreducible solver](../../compiler/GHC/Tc/Solver/Irred.hs) and
+[coercion-hole invariant](../../compiler/GHC/Core/TyCo/Rep.hs).
+
 ## Check a split at an independent runtime cut
 
 `splitAtVecChecked` compares the runtime cut and total before splitting

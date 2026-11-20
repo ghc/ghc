@@ -278,3 +278,20 @@ and [reflection paper, §§5.2–5.6](https://www.microsoft.com/en-us/research/w
 - [ ] Check a runtime type test only inside the branch that receives
   nominal equality evidence. Specifying source patterns for this test
   remains a separate design decision.
+
+## Report an unresolved input index after a length match
+
+A GADT constructor can take an erased argument that names a retained
+input. In `checkedSplitAtValue`, the length proof establishes the input's
+width. The call supplies `@v` to identify the input itself. With an
+independent value at that width, GHC rejects the mismatched result at
+the constructor application. The negative test uses two Boolean-indexed
+values and a type-family equality supplied by a pattern match.
+
+The solver can discharge that width equality from a Given even when
+the input-index equality remains unsolved. The filled evidence hole
+must then record the holes of the source evidence. Otherwise reporting
+the remaining mismatch can overflow the stack. The regression checks
+the GHC-83865 diagnostic at the source expression.
+[Checked constructor](../examples/packed-vector/CertifiedSplit.hs)
+and [negative regression](../../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
