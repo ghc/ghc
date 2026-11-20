@@ -628,6 +628,7 @@ canUnboxArg fam_envs ty (n :* sd)
   -- From here we are strict and not absent
   | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , Just [dc] <- canUnboxTyCon tc  -- tc is never a newtype
+  , null (dataConRepArgBinders dc)
   , let arity = dataConRepArity dc
   , Just (Unboxed, dmds) <- viewProd arity sd -- See Note [Boxity analysis]
   , dmds `lengthIs` dataConRepArity dc
@@ -649,6 +650,7 @@ canUnboxResult fam_envs ty cpr
   , dcs `lengthAtLeast` con_tag -- This might not be true if we import the
                                 -- type constructor via a .hs-boot file (#8743)
   , let dc = dcs `getNth` (con_tag - fIRST_TAG)
+  , null (dataConRepArgBinders dc) -- Flat worker fields cannot retain scope.
   , null (dataConExTyCoVars dc) -- no existentials;
                                 -- See (CPR1) in Note [Which types are unboxed?]
                                 -- and GHC.Core.Opt.CprAnal.argCprType

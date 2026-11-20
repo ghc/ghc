@@ -1219,6 +1219,7 @@ unboxedWhenSmall env rec_flag (Just ret_ty) sd = go 1 ret_ty sd
       | depth <= max_depth
       , Just (tc, tc_args, _co) <- normSplitTyConApp_maybe (ae_fam_envs env) ty
       , Just [dc] <- canUnboxTyCon tc   -- tc is not a newtype
+      , null (dataConRepArgBinders dc) -- Keep the retained field telescope.
       , null (dataConExTyCoVars dc)     -- Can't unbox results with existentials
       , dataConRepArity dc <= dmd_unbox_width (ae_opts env)
       , Just (_, ds) <- viewProd (dataConRepArity dc) sd
