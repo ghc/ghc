@@ -9,31 +9,31 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-The fork accepts runtime-indexed functions, dependent constructor fields
-and selected ordinary functions in types. A recursive vector partition
-can return two vectors of independent lengths. Its provider and an ordinary
-client both compile at `-O1`. Reading the first matching cell leaves the
-remaining input unevaluated. [Partition source](examples/erased-existentials/ImplicitVector.hs).
+A vector partition can store its two result lengths in one erased package.
+The producer writes `Rows yes no`. The consumer writes
+`case rows of Rows yes no -> …` and can read either vector. Each vector
+retains its own hidden length. Reading the first matching cell leaves the
+remaining input unevaluated. The provider and an ordinary client both
+compile at default `-O1`. [Partition source](examples/erased-existentials/ImplicitVector.hs).
 
-Both native compiler stages reproduce the 284 lines of the [Showcase](Showcase.hs)
-at `-O0` and default `-O1`. The self-hosted compiler also matches the golden
-output with stripped interfaces and in GHCi. The recursive vector filter
-chooses its result length from the elements that pass. Its source uses
-ordinary constructors and recursion. Taking the first result leaves the input
-after the first passing element unevaluated.
-[Filter source](examples/erased-existentials/ImplicitVector.hs) and
-[Showcase commands](README.md#run-the-showcase).
+A function with a proof of `a :~: b` can change a filtered vector's
+element type from `a` to `b` under the same hidden length. A type-level
+case can also use an equality for an earlier constructor index when
+checking a later argument whose kind refers to that index. When a family
+cannot reduce, the case still waits for more information.
+[Type-level case](examples/open-evaluation/NativeNestedCase.hs).
 
-At `b667241915`, all 59 focused tests that ran passed. In the dependent
-directory, 284 of 314 executed normal-way tests passed. The same 30 tests
-failed with the same failure categories at `c3f6a983dd`.
+Both native compiler stages reproduce the 287-line Showcase at `-O0` and
+default `-O1`. The self-hosted compiler also matches the golden output
+with stripped interfaces and in GHCi. An ordinary client can compile
+against the partition provider with its source removed. Both the current
+compiler and the earlier `c3f6a983dd` compiler produce `(([7,9],[2]),Refl)`
+and read `[7]` from a partial input.
+[Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
 
-The Showcase zips a filtered vector with itself at its hidden length and
-projects a vector through a strict record field. A separate ordinary client
-calls the optimized partition provider and reads one matching element from a
-partial input. The client prints `([7,9],[2],[7])`. A client compiled with
-the earlier compiler can also read the new provider's interface. The family
-example passes a family with one invisible binder left to another family.
+At `396774d7d1`, all 59 focused tests that ran passed. In the dependent
+directory 284 of 314 executed normal-way tests passed. Each of the 30
+failures has the same test name and failure category as at `fd90285a0b`.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -47,10 +47,10 @@ the header. The new reader checks the coercion's role and scope.
 | Card | What works | Remaining gap |
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Function signatures and ordinary constructor fields accept `some`. A strict record can store a vector alongside its length. | Broaden dependent product domains and inference. Check sum formation in other declaration contexts. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider can construct and open erased packages at default `-O1`. The optimizer keeps an opened witness in scope through specialization, floating, worker/wrapper, exitification and CSE. | Check coercions under erased binders, local rewrite rules and additional optimization settings. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider can construct and open erased packages at default `-O1`. A given equality can change the payload type under a hidden witness. | Cover more coercions, rewrite rules and optimization settings. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor row can precede a wildcard or named catch-all. The case stays stuck when an unknown input blocks an earlier constructor test. | General mixed patterns and open GADT indices. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A local binding can filter the result of a packaged function. Two uses of the same unrestricted local vector can share one hidden length in a call to `zipVec`. | Check ordinary constructor patterns on packages and support general witness projections. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An unknown input that can still match an earlier row blocks a catch-all. | General mixed patterns and open GADT indices. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | An ordinary payload constructor opens a package with two hidden indices. Repeated uses of one unrestricted local vector can share its hidden length in `zipVec`. | Infer nested package results for polymorphic calls and support general witness projections. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
@@ -66,16 +66,13 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Extend normal optimization to a coercion that transports
-   equality under an erased binder. Preserve its role, endpoints and
-   scope on interface readback. A rule outside the current optimizer
-   schedule must identify the rule at the source boundary.
-2. **R22.** Check a `case` on a filtered vector with ordinary vector
-   constructor patterns. Preserve linear use, laziness and witness scope.
-   Two independently computed packages can choose different lengths.
-3. **R19.** Check a nested constructor row whose scrutinee kind needs a
-   closed-family reduction. A later constructor index can depend on that
-   kind. Any transport of the later index needs checked equality evidence.
+1. **R22.** Check a polymorphic call whose result has a nested existential
+   type. In `choose flag p q` both branches can already contain packages.
+   Preserve their hidden witnesses and the demand of the original call.
+2. **R05.** Extend optimizer coverage beyond the supported coercions and
+   settings. Check package expressions in rewrite rules and at `-O2`.
+3. **R19.** Extend the supported constructor patterns. Keep earlier rows
+   and nominal evidence in scope when matching open GADT indices.
 4. **R04 and R23.** Track the limits of sum formation outside ordinary
    constructor fields. Use the ordinary-program regression baseline when
    extending higher-rank family application and defaulting.
