@@ -93,6 +93,16 @@ signature inside the class and GHC-44432 for one outside it.
 [placement discussion in #227](https://github.com/ghc-proposals/ghc-proposals/pull/227#issuecomment-497878018)
 and [accepted amendment #259](https://github.com/ghc-proposals/ghc-proposals/pull/259).
 
+The discussion that led to #177 asks how a client can establish a
+domain from a GADT constructor or a quantified constraint. Looking up
+a top-level instance alone misses both cases. The local GADT example
+below exercises the first. The same discussion asks whether coverage
+and termination should be separate requirements. The authors disagreed
+about the consequences for closed family reduction.
+[GADT evidence](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-408569969),
+[termination](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-409628107)
+and [the reply](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-409688377).
+
 The accepted proposal #547 disallows `=>` in family result kind
 annotations and standalone kind signatures. Class constraints were
 already forbidden there. It leaves room for dependent types to revisit
@@ -106,6 +116,15 @@ domain constraint. Check both an ordinary client of that producer and
 an ordinary producer that exports the same source declaration. This
 producer opt-in is a local experiment. Keep the choice of migration
 policy separate from the tests of type formation.
+
+A separate proposal, #390, considers declaration-level controls for
+termination and coverage checks. In review, Eisenberg objected to using
+a pragma whose removal changes whether a program typechecks. The author
+revised the draft to use modifiers. This discussion bears on the spelling
+of a per-family opt-in if R24 needs one. Proposal #390 is open and
+does not prescribe a domain annotation for associated families.
+[Review](https://github.com/ghc-proposals/ghc-proposals/pull/390#issuecomment-756446022)
+and [the author's revision](https://github.com/ghc-proposals/ghc-proposals/pull/390#issuecomment-756606415).
 
 ### Interaction with an existing dependent module
 
