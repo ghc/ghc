@@ -572,10 +572,12 @@ tcTyClGroup open_indices (TyClGroup { group_tyclds = tyclds
                        { tyConInstFlavour = tyConFlavour tycls
                        , tyConInstIsDefault = False
                        }
-             ; tcAddFamInstCtxt inst_flav (tyConName tycls) $
-               addErrCtxt (ClosedFamEqnCtxt tycls) $
-                 mapM_ (checkTyFamEqnValidityInfo tycls) ax_validity_infos
-             ; if any hasOrderedPattern ax_validity_infos
+             ; let ordered_case = any hasOrderedPattern ax_validity_infos
+             ; unless ordered_case $
+                 tcAddFamInstCtxt inst_flav (tyConName tycls) $
+                   addErrCtxt (ClosedFamEqnCtxt tycls) $
+                     mapM_ (checkTyFamEqnValidityInfo tycls) ax_validity_infos
+             ; if ordered_case
                then do { forM_ ax_validity_infos $ \vi ->
                            setSrcSpan (vi_loc vi) $
                              checkValidTyFamEqn tycls (vi_pats vi) (vi_rhs vi)
@@ -688,8 +690,23 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
          else fixM $ \ ~(_, _, _, ~(rec_case_axioms, _)) -> do
          { (tycons, data_deriv_infos) <- check_declarations rec_case_axioms
            ; check_syn_cycles tycons
-           ; decisions <- forM [(root, infos) | (root, infos) <- tycons, any hasOrderedPattern infos] $
+           ; let (ordered_cases, other_decls) = partition (any hasOrderedPattern . snd) tycons
+           ; forM_ other_decls $ \(root, infos) -> case infos of
+               _:_:_ -> forM_ infos $ \vi -> case vi of
+                 VI{vi_case_pattern = Just (_, _, pat, ty)}
+                   | Just (tc, _) <- splitTyConAppNoView_maybe ty
+                   , isTypeSynonymTyCon tc -> do
+                       checkNoErrs (checkTyFamEqnValidityInfo root vi)
+                       discardResult (checkedCasePattern [] pat ty)
+                 _ -> pure ()
+               _ -> pure ()
+           ; decisions <- forM ordered_cases $
                  \(root, infos) -> do
+                   let flavour = TyConInstFlavour (tyConFlavour root) False
+                   checkNoErrs $
+                     tcAddFamInstCtxt flavour (tyConName root) $
+                       addErrCtxt (ClosedFamEqnCtxt root) $
+                         mapM_ (checkTyFamEqnValidityInfo root) infos
                    (ax, helpers) <- buildOrderedTypeCase root infos
                    pure ((tyConName root, ax), helpers)
            ; let (axioms, ordered_helpers) = unzip decisions
@@ -4119,6 +4136,15 @@ fields. Every synthetic edge consumes a test. Check the written RHSs for
 ordinary family termination and check the generated axiom shapes without
 retesting the syntactic termination condition on those finite edges.
 
+An alias can put a written field in a different constructor slot.
+Store the checked canonical slot and the written path separately. Use
+the latter to choose the next test in the first surviving row. A
+discarded field cannot supply a test or an RHS binding. Check aliases in
+otherwise flat cases too. An expanded constructor layer would require
+a decision node that the written pattern did not supply. A lone flat
+row can keep its ordinary axiom. The family can reduce only if that
+row matches, so there is no alternative that can bypass its tests.
+
 A Type column has no finite set of constructors. Test one checked
 constructor at a time through a classifier with distinct Boolean results.
 A decision family branches on that result. Its successful branch also
@@ -4128,7 +4154,7 @@ default cannot bypass a test on an unknown input with a compatible RHS.
 
 data CheckedCasePattern
   = CheckedCaseField
-  | CheckedCaseConstructor SrcSpan TyCon [CheckedCasePattern]
+  | CheckedCaseConstructor [Int] SrcSpan TyCon [CheckedCasePattern]
 
 -- | Compile all checked rows of one lifted case. A node has one distinct
 -- branch per constructor. A failed test does not examine later columns.
@@ -4145,7 +4171,7 @@ buildOrderedTypeCase root infos = do
           (text "This nested type case needs an unsupported constructor telescope.")))
   checked_rows <- forM infos $ \vi -> case vi_case_pattern vi of
     Just (owner, i, pat, ty) -> do
-      checked <- checkedPattern pat ty
+      checked <- checkedCasePattern [] pat ty
       pure ((owner, i), (vi, [checked]))
     Nothing -> unsupported
   ((owner, column), rows) <- case unzip checked_rows of
@@ -4190,26 +4216,27 @@ buildOrderedTypeCase root infos = do
 
       -- Test the current column before choosing a branch.
       build sourceArgs variables slots result liveRows@((vi, first):_) =
-        case break isConstructor first of
-          (_, []) -> do
+        case [(path, (field, span, con))
+             | (field, CheckedCaseConstructor path span con _) <- zip [0..] first] of
+          [] -> do
             case tcMatchTyKis (vi_pats vi) sourceArgs of
               Just subst
                 | let rhs = substTyUnchecked subst (vi_rhs vi)
                 , typeKind rhs `eqType` result ->
                     pure ([branch (mkTyVarTys variables) rhs], [])
               _ -> unsupported
-          (left, CheckedCaseConstructor span con _ : _) -> do
-            let field = length left
+          demands -> do
+            let (_, (field, span, con)) =
+                  List.minimumBy (\(p, _) (q, _) -> compare p q) demands
             scrut <- maybe unsupported pure (getTyVar_maybe (slots !! field))
             if varType scrut `eqType` liftedTypeKind
               then openColumn sourceArgs variables slots result liveRows vi span field scrut con
               else closedColumn sourceArgs variables slots result liveRows vi field scrut
-          _ -> unsupported
         where
           specialize field con (row, pats) = case splitAt field pats of
             (prefix, CheckedCaseField : suffix) ->
               Just (row, prefix ++ replicate arity CheckedCaseField ++ suffix)
-            (prefix, CheckedCaseConstructor _ expected fields : suffix)
+            (prefix, CheckedCaseConstructor _ _ expected fields : suffix)
               | expected == con, length fields == arity ->
                   Just (row, prefix ++ fields ++ suffix)
             _ -> Nothing
@@ -4239,7 +4266,7 @@ buildOrderedTypeCase root infos = do
               setSrcSpan span $ failWithTc (TcRnNestedTypeCasePattern (mkTyVarTy scrut))
             let matchRows = mapMaybe (specialize field con) liveRows
                 missRow (_, pats) = case drop field pats of
-                  CheckedCaseConstructor _ expected _ : _ -> expected /= con
+                  CheckedCaseConstructor _ _ expected _ : _ -> expected /= con
                   _ -> True
                 missRows = filter missRow liveRows
                 args = mkTyVarTys variables
@@ -4298,29 +4325,44 @@ buildOrderedTypeCase root infos = do
   ax <- axiom (tyConName root) root branches
   pure (ax, helpers)
   where
-    isConstructor CheckedCaseConstructor{} = True
-    isConstructor _ = False
-
-    checkedPattern CasePatternField _ = pure CheckedCaseField
-    checkedPattern (CasePatternConstructor span _ fields) ty =
-      setSrcSpan span $ case (splitTyConAppNoView_maybe ty, tcSplitTyConApp_maybe ty) of
-        (Just (written, original), Just (resolved, canonical))
-          | let visible tc args = [a | (b,a) <- zip (tyConBinders tc) args
-                                      , isVisibleTyConBinder b]
-                old = visible written original
-                new = visible resolved canonical
-          , length fields == length new
-          , written == resolved || (length old == length new && and (zipWith pickyEqType old new))
-          , isGenerativeTyCon resolved Nominal
-          , not (isTypeFamilyTyCon resolved)
-          -> CheckedCaseConstructor span resolved <$> zipWithM checkedPattern fields new
-        (_, Nothing) -> failWithTc (TcRnTypeCasePattern (Just ty))
-        _ -> failWithTc (TcRnNestedTypeCasePattern ty)
-
     freshBinder fresh previous (Bndr var _) = do
       let subst = substTyWith (map fst previous) (mkTyVarTys (map snd previous))
       field <- fresh (subst (varType var))
       pure (previous ++ [(var, field)])
+
+-- | Align nominal fields with the checked arguments written at the alias.
+-- A new constructor layer has no source field to supply its match order.
+checkedCasePattern :: [Int] -> TypeCasePattern -> Type -> TcM CheckedCasePattern
+checkedCasePattern _ CasePatternField _ = pure CheckedCaseField
+checkedCasePattern path (CasePatternConstructor span _ fields) ty =
+  setSrcSpan span $ case (splitTyConAppNoView_maybe ty, tcSplitTyConApp_maybe ty) of
+    (Just (written, original), Just (resolved, canonical))
+      | let visible tc args = [a | (b,a) <- zip (tyConBinders tc) args
+                                  , isVisibleTyConBinder b]
+            old = visible written original
+            new = visible resolved canonical
+      , length fields == length old
+      , isGenerativeTyCon resolved Nominal
+      , not (isTypeFamilyTyCon resolved)
+      -> do
+          let source = zip3 [0..] fields old
+          aligned <- if written == resolved
+            then pure source
+            else alignFields ty source new
+          CheckedCaseConstructor path span resolved <$>
+            traverse (\(i, field, argument) -> checkedCasePattern (path ++ [i]) field argument) aligned
+    (_, Nothing) -> failWithTc (TcRnTypeCasePattern (Just ty))
+    _ -> failWithTc (TcRnNestedTypeCasePattern ty)
+
+  where
+    -- Extra arguments erased by the synonym have no nominal field.
+    -- The source equation's validity check rules out erased binders.
+    alignFields _ _ [] = pure []
+    alignFields ty source (arg:args) =
+      case break (\(_, _, old) -> pickyEqType old arg) source of
+        (before, (i, field, _):after) ->
+          ((i, field, arg) :) <$> alignFields ty (before ++ after) args
+        _ -> failWithTc (TcRnNestedTypeCasePattern ty)
 
 checkTyFamInstEqn :: TcTyCon -> Name -> [HsArg p tm ty] -> TcM ()
 checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats =
