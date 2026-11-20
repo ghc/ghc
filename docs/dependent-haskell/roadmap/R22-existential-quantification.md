@@ -385,6 +385,9 @@ types before it checks the lambda patterns. The usual lambda check then
 checks the operands and their usage. A pattern-local type cannot supply
 the outer witness. This case uses a single unguarded lambda and a result
 type available before checking its body.
+Leading visible type applications can choose input types when the
+declared result type is independent of the supplied type arguments.
+The ordinary checker checks those applications at their source spans.
 The witness erases before code generation. Agda's `@0` record fields
 use the same runtime distinction between a payload and erased evidence.
 [Source-free client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/WitnessClient.hs)

@@ -77,7 +77,10 @@ import GHC.Types.Basic
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
-import GHC.Types.Var (ExistsTyFlag(ExplicitExists, ImplicitExists), mkTyVar)
+import GHC.Types.Var ( ExistsTyFlag(ExplicitExists, ImplicitExists), mkTyVar
+                     , binderFlag, binderVar, isInferredForAllTyFlag
+                     , isSpecifiedForAllTyFlag )
+import GHC.Types.Var.Set (elemVarSet)
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
@@ -397,19 +400,31 @@ tcDeclaredLambdaWitness binder body (MG { mg_alts = L _ [L _ match] })
   , GRHSs _ (L _ (GRHS _ [] rhs) NE.:| []) (L _ EmptyLocalBinds{}) <- rhss
   , all isVisArgLPat pats
   , Just formal <- result_after (length pats) body
-  , Just (name, nargs) <- application 0 rhs
+  , Just (name, ntypes, nargs) <- application 0 0 rhs
   = do { mb_id <- if isExternalName name
                  then tcLookupIdMaybe name
                  else fmap local_id (tcLookupLcl_maybe name)
        ; declared <- traverse (liftZonkM . zonkTcType . varType) mb_id
        ; formal <- liftZonkM (zonkTcType formal)
-       ; return $ do { actual <- declared >>= result_after nargs
+       ; return $ do { (consumed, residual) <- declared >>= type_prefix ntypes
+                     ; actual <- result_after nargs residual
+                     ; guard (not (any (`elemVarSet` tyCoVarsOfType actual) consumed))
                      ; matchPolytypeExistsWitness binder formal actual } }
   where
-    application n expr = case unLoc (stripParensLHsExpr expr) of
-      HsApp _ fun _ -> application (n + 1) fun
-      HsVar _ name -> Just (unLocWithUserRdr name, n)
+    application ntypes nargs expr = case unLoc (stripParensLHsExpr expr) of
+      HsApp _ fun _ | ntypes == 0 -> application ntypes (nargs + 1) fun
+      HsAppType _ fun _           -> application (ntypes + 1) nargs fun
+      HsVar _ name -> Just (unLocWithUserRdr name, ntypes, nargs)
       _ -> Nothing
+
+    type_prefix :: Int -> Type -> Maybe ([TyVar], Type)
+    type_prefix 0 ty = Just ([], ty)
+    type_prefix n ty
+      = do { let (inferred, sigma) = tcSplitSomeForAllTyVars isInferredForAllTyFlag ty
+           ; (_, specified, rest) <- tcSplitForAllTyVarBinder_maybe sigma
+           ; guard (isSpecifiedForAllTyFlag (binderFlag specified))
+           ; (consumed, residual) <- type_prefix (n - 1) rest
+           ; return (map snd inferred ++ binderVar specified : consumed, residual) }
 
     result_after :: Int -> Type -> Maybe Type
     result_after 0 ty = Just ty
@@ -440,6 +455,16 @@ ordinary check instantiates types, checks operands and records usage.
 A head bound by a lambda pattern is unavailable. Exact invariant matching
 chooses a type without filling any Quick Look variables. Runtime indices
 use their existing checks.
+
+The head can have a leading visible type application prefix. For example,
+  \b -> configured @Bool id b
+can use the result of configured :: forall t. (t -> Bool) -> t -> Callback PolyId.
+Walk the declared inferred and specified binders in IALL/ITYARG order.
+Their choices can affect the domains of later value arguments. Require the
+result type to be independent of those binders, including in its kinds.
+The ordinary application checker instantiates the binders and checks each
+written operand at its original location.
+See Note [Visible type application and abstraction] in GHC.Tc.Gen.App.
 
 Keep the ordinary match checker, including its deep skolemisation and usage
 checks. The outer forall wrapper remains outside the package when tcPolyExprCheck

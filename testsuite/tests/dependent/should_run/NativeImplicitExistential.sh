@@ -127,7 +127,7 @@ if "$ghc" "${flags[@]}" -fforce-recomp -XNoImpredicativeTypes -c WitnessClient.h
     echo "A higher-rank witness was inferred without ImpredicativeTypes." >&2
     exit 1
 fi
-for binding in hidden both atKind viaCall viaValue viaLinear viaGadt; do
+for binding in hidden both atKind viaCall viaValue viaTypeArg viaLinear viaGadt; do
     line=$(grep -n "^$binding =" WitnessClient.hs | cut -d: -f1)
     grep -Eq "^WitnessClient.hs:$line:[0-9]+: error: \[GHC-91028\]" monomorphic.log || {
         cat monomorphic.log >&2
@@ -138,7 +138,7 @@ if "$ghc" "${flags[@]}" -c WitnessLambdaReject.hs >lambda-witness.log 2>&1; then
     echo "The lambda witness check accepted an invalid body." >&2
     exit 1
 fi
-for rejection in escape:91028 duplicate:18872 wrongOperand:83865 missingEquality:25897; do
+for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKind:83865 missingEquality:25897; do
     binding=${rejection%:*}
     code=${rejection#*:}
     line=$(grep -n "^$binding =" WitnessLambdaReject.hs | cut -d: -f1)

@@ -1,6 +1,7 @@
-{-# LANGUAGE GADTs, ImpredicativeTypes, LinearTypes, NoExperimentalDependentTypes, RankNTypes #-}
+{-# LANGUAGE DataKinds, GADTs, ImpredicativeTypes, LinearTypes, NoExperimentalDependentTypes, RankNTypes, TypeApplications #-}
 module WitnessLambdaReject where
 
+import Data.Proxy
 import WitnessSchema
 
 escape :: CapturedBuilder
@@ -14,3 +15,6 @@ wrongOperand = \_ -> buildAt 'a'
 
 missingEquality :: FlaggedBuilder a
 missingEquality = \_ b -> buildAt b
+
+wrongVisibleKind :: RankedBuilder
+wrongVisibleKind = \_ -> configured @True @Maybe Proxy (const True) Nothing

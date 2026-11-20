@@ -2,7 +2,7 @@
 module WitnessSchema
     ( Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer
     , CallbackPair, atTwoTypes, observePair, ignorePair
-    , RankedBuilder, buildAt, observeBuilder
+    , RankedBuilder, buildAt, configured, observeBuilder
     , Flag(..), FlaggedBuilder, observeFlagged
     , Captured(..), CapturedBuilder, LinearBuilder, buildLinear, buildTwice
     ) where
@@ -46,6 +46,9 @@ type RankedBuilder = exists (t :: Type). Bool -> Payload t
 
 buildAt :: Bool -> Payload PolyId
 buildAt b = Payload @PolyId id (\f -> (f (if b then 7 else 9), f b))
+
+configured :: forall {k} (flag :: k) tag. Proxy flag -> (tag -> Bool) -> tag -> Payload PolyId
+configured _ test tag = buildAt (test tag)
 
 observeBuilder :: RankedBuilder -> Bool -> (Int, Bool)
 observeBuilder builder b = observePayload (builder b)
