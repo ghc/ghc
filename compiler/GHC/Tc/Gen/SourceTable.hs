@@ -100,7 +100,7 @@ import GHC.Utils.Monad (allM, anyM)
 import GHC.Utils.Outputable (text)
 import GHC.Utils.Panic (panic)
 
-import Control.Monad (filterM, foldM, forM, forM_, guard, unless, when, zipWithM)
+import Control.Monad (filterM, foldM, forM, forM_, guard, unless, void, when, zipWithM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<|>))
 import Data.Functor.Identity (Identity(..))
@@ -1520,6 +1520,8 @@ leaves the same recursive call lazy. The empty branch skips the callback.
 Check the exact body before and after optimization. Before optimization,
 the simple optimizer removes the desugarer's local failure continuation
 and binder aliases. It does not apply user rewrite rules.
+The optimizer can replace the empty constructor with the binder of the
+list case. The empty alternative already establishes its constructor.
 
 The list family tests the spine first. Its cons equation calls a private
 family whose first argument is the predicate result. An unknown result
@@ -1560,12 +1562,14 @@ directListFilter prepare owner original = do
     [p, ls] <- pure terms
     guard (types == binderVars telescope && all isId terms &&
            eqTypes (map varType terms) [pred_ty, input])
-    Core.Case (Core.Var scrut) _ outer
+    Core.Case (Core.Var scrut) list_binder outer
       [ Core.Alt (Core.DataAlt nil) [] empty
         , Core.Alt (Core.DataAlt cons) [x, xs] nonempty ] <- pure body
     guard (scrut == ls && outer `eqType` result && nil == nilDataCon &&
            cons == consDataCon && isId x && isId xs && eqTypes (map varType [x, xs]) [element, input])
-    [] <- returned nilDataCon 0 empty
+    case empty of
+      Core.Var value | value == list_binder -> pure ()
+      _ -> void (returned nilDataCon 0 empty)
     Core.Case test _ inner
       [ Core.Alt (Core.DataAlt no) [] rejected
         , Core.Alt (Core.DataAlt yes) [] kept ] <- pure nonempty
