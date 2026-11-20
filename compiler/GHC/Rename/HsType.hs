@@ -359,6 +359,7 @@ rnRetainedTelescope env rn_body bndrs body
        ; level <- getThLevel
        ; case level of
            Comp -> pure ()
+           UntypedBrack{} -> pure ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
        ; when (null bndrs) $
            failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
@@ -371,9 +372,11 @@ rnRetainedTelescope env rn_body bndrs body
     bind_bndrs (L lb bndr : rest)
       = setSrcSpanA lb $
         case bndr of
-          HsTvb xb () (HsBndrVar _ (L lv (Unqual occ))) (HsBndrKind _ domain) ->
+          HsTvb xb () (HsBndrVar _ (L lv rdr)) (HsBndrKind _ domain)
+            | Just term_rdr <- retained_binder rdr ->
             do { (domain', domain_fvs) <- rnLHsTyKi env domain
-               ; name <- newLocalBndrRn (L lv (mkRdrUnqual (setOccNameSpace varName occ)))
+               ; name <- newLocalBndrRn (L lv term_rdr)
+               ; let occ = setOccNameSpace tvName (rdrNameOcc rdr)
                ; ((rest', body'), body_fvs) <- bindLocalNamesFV [name] $
                    do { rdr_env <- getLocalRdrEnv
                       ; setLocalRdrEnv (extendLocalRdrEnvWithAlias rdr_env occ name) $
@@ -385,14 +388,25 @@ rnRetainedTelescope env rn_body bndrs body
             failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsName
           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsType
 
+    retained_binder (Unqual occ) = Just (mkRdrUnqual (setOccNameSpace varName occ))
+    retained_binder rdr
+      | Just name <- rdrNameExactName_maybe rdr
+      , not (isExternalName name)
+      , isVarName name
+      = Just rdr
+      | otherwise
+      = Nothing
+
 {- Note [Retained Pi type formation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Rename a supported Pi in a TypeLevel position with the same telescope worker
 as a retained signature. Preserve the caller's context and named wildcard set.
 Each binder has a fresh term Name and a type-lookup alias of that same Name.
 Its domain precedes its scope. Its scope contains later domains and the body.
-Keep KindLevel and quotation restrictions. The typechecker checks the closed
-domain, multiplicity, kind, and later equality evidence independently.
+Untyped quotations can introduce a retained binder. Keep its exact term name
+when the quotation is spliced back. A retained binder does not bind at kind
+level. The typechecker checks the domain, multiplicity, kind, and equality
+evidence independently.
 
 A visible type argument containing a source Pi must be complete. Reject both
 anonymous and named wildcards before renaming that argument. This also covers
@@ -1223,7 +1237,7 @@ rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
        ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
        ; let loc_gre_with_rdr = L loc $ WithUserRdr rdr_name gre
              name = greName gre
-       ; if  | explicit_level_imports
+       ; if  | explicit_level_imports || (isVarName name && not (isExternalName name))
              -- See Note [Strict level checks with ExplicitLevelImports]
              -> checkThLocalNameNoLift loc_gre_with_rdr
 

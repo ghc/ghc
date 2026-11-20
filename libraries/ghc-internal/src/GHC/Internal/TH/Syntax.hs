@@ -1431,6 +1431,12 @@ data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ct
           | WildCardT                      -- ^ @_@
           | ImplicitParamT String Type     -- ^ @?x :: t@
           | ForallMatchT Type Type
+          | ForEachT BndrVis Name Type Type
+            -- ^ A retained function type. The name binds a runtime argument
+            -- in the result type. Its domain is outside that scope.
+            -- 'BndrReq' uses @foreach (x :: t) -> r@. 'BndrInvis' uses
+            -- @foreach (x :: t). r@.
+          | IndexVarT Name                 -- ^ A retained term variable used in a type.
       deriving( Show, Eq, Ord, Generic )
 
 {- Note [Forall matchability wrappers]

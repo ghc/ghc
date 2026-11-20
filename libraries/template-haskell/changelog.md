@@ -1,6 +1,7 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
 ## 2.25.0.0
+  * Add `ForEachT` for retained function types and `IndexVarT` for their runtime indices.
   * Introduce `namedDefaultQuasiQuoter` and `defaultQuasiQuoter`, which fail with a helpful error when used in an inappropriate context.
 
 ## 2.24.0.0

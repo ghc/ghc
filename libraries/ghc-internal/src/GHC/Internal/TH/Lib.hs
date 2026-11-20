@@ -786,6 +786,14 @@ forallT tvars ctxt ty = do
 forallVisT :: Quote m => [m (TyVarBndr ())] -> m Type -> m Type
 forallVisT tvars ty = ForallVisT <$> sequenceA tvars <*> ty
 
+-- | Construct a retained function type.
+forEachT :: Quote m => BndrVis -> Name -> m Type -> m Type -> m Type
+forEachT vis name domain body = ForEachT vis name <$> domain <*> body
+
+-- | Refer to a retained term variable in a type.
+indexVarT :: Quote m => Name -> m Type
+indexVarT = pure . IndexVarT
+
 -- | Set the matchability of an immediate, nonempty type forall group.
 -- See Note [Forall matchability wrappers] in GHC.Internal.TH.Syntax.
 forallMatchT :: Quote m => m Type -> m Type -> m Type

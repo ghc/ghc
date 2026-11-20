@@ -54,7 +54,7 @@ import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless )
+import Control.Monad( unless, when )
 import Data.Bifunctor (first)
 import Data.Foldable (for_)
 import Data.List (isPrefixOf)
@@ -100,7 +100,8 @@ convertToHsType exts origin loc t
 -- Reader context for CvtM
 data CvtCtx =
   CvtCtx { cvt_origin :: !Origin
-         , cvt_listTuplePuns :: !Bool }
+         , cvt_listTuplePuns :: !Bool
+         , cvt_retained_indices :: [TH.Name] }
 
 -- State of CvtM
 type CvtSt = SrcSpan
@@ -140,7 +141,8 @@ mapCvtMError f m = CvtM $ \origin loc -> first f $ unCvtM m origin loc
 initCvt :: EnumSet LangExt.Extension -> Origin -> SrcSpan -> CvtM' err a -> Either err a
 initCvt exts origin loc m = fmap fst (unCvtM m ctx loc)
   where ctx = CvtCtx { cvt_origin = origin
-                     , cvt_listTuplePuns = listTuplePuns }
+                     , cvt_listTuplePuns = listTuplePuns
+                     , cvt_retained_indices = [] }
         listTuplePuns = EnumSet.member LangExt.ListTuplePuns exts
 
 force :: a -> CvtM ()
@@ -154,6 +156,16 @@ getOrigin = CvtM (\ctx s -> Right (cvt_origin ctx,s))
 
 getListTuplePuns :: CvtM Bool
 getListTuplePuns = CvtM (\ctx s -> Right (cvt_listTuplePuns ctx,s))
+
+-- | Check which runtime binders the splice introduced.
+isRetainedIndex :: TH.Name -> CvtM Bool
+isRetainedIndex nm = CvtM $ \ctx loc ->
+  Right (nm `elem` cvt_retained_indices ctx, loc)
+
+-- | Add the binder to the scope of the result of a retained function type.
+withRetainedIndex :: TH.Name -> CvtM a -> CvtM a
+withRetainedIndex nm action = CvtM $ \ctx ->
+  unCvtM action ctx { cvt_retained_indices = nm : cvt_retained_indices ctx }
 
 getL :: CvtM SrcSpan
 getL = CvtM (\_ loc -> Right (loc,loc))
@@ -1760,8 +1772,16 @@ cvtTypeKind typeOrKind ty
              -> do { list_tc <- returnLA $ getRdrName listTyCon
                    ; mk_apps (HsTyVar noAnn NotPromoted list_tc) tys' }
 
-           VarT nm -> do { nm' <- tNameN nm
+           VarT nm -> do { retained <- isRetainedIndex nm
+                         ; when retained $
+                             failWith (MalformedType typeOrKind ty)
+                         ; nm' <- tNameN nm
                          ; mk_apps (HsTyVar noAnn NotPromoted nm') tys' }
+           IndexVarT nm -> do { retained <- isRetainedIndex nm
+                              ; unless retained $
+                                  failWith (MalformedType typeOrKind ty)
+                              ; nm' <- vNameN nm
+                              ; mk_apps (HsTyVar noAnn NotPromoted nm') tys' }
            ConT nm -> do { nm' <- cvtNameWith True OccName.tcClsName nm
                          ; let prom = name_promotedness nm'
                          ; lnm' <- returnLA nm'
@@ -1798,6 +1818,18 @@ cvtTypeKind typeOrKind ty
                    ; let loc' = noAnnSrcSpan loc
                    ; let tele = mkHsForAllVisTele noAnn tvs'
                    ; pure $ mkHsForAllTy loc' tele ty' }
+
+           ForEachT vis nm domain ty
+             | null tys'
+             -> do { nm' <- vNameN nm
+                   ; domain' <- cvtType domain
+                   ; ty' <- withRetainedIndex nm (cvtType ty)
+                   ; binder <- returnLA $
+                       HsTvb noAnn () (HsBndrVar noExtField nm') (HsBndrKind noExtField domain')
+                   ; let delimiter = case vis of
+                           TH.BndrReq   -> Left noEpUniTok
+                           TH.BndrInvis -> Right noEpTok
+                   ; returnLA (HsForEachTy (noEpTok, delimiter) [binder] ty') }
 
            SigT ty ki
              -> do { ty' <- cvtType ty

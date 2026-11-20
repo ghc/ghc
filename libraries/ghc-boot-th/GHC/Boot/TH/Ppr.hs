@@ -901,6 +901,15 @@ pprType p (ForallT tvars ctxt ty) =
   parensIf (p >= funPrec) $ sep [pprForall tvars ctxt, pprType qualPrec ty]
 pprType p (ForallVisT tvars ty) =
   parensIf (p >= funPrec) $ sep [pprForallVis tvars [], pprType qualPrec ty]
+pprType p (ForEachT vis name domain body) =
+  parensIf (p >= funPrec) $
+    sep [ prefix, pprType qualPrec body ]
+  where
+    binder = parens (pprName' Applied name <+> dcolon <+> pprType noPrec domain)
+    prefix = text "foreach" <+> case vis of
+      BndrReq   -> binder <+> text "->"
+      BndrInvis -> binder <> char '.'
+pprType _ (IndexVarT name) = pprName' Applied name
 pprType p (ForallMatchT ma (ForallT tvars ctxt ty)) | not (null tvars) =
   parensIf (p >= funPrec) $
     sep [pprForallMatch ForallInvis (Just ma) tvars ctxt, pprType qualPrec ty]

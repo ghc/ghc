@@ -276,7 +276,8 @@ infixPatSynName  = mkVarOcc "infixPatSyn"
 recordPatSynName = mkVarOcc "recordPatSyn"
 
 -- data Type = ...
-forallTName, forallVisTName, forallMatchTName, varTName, conTName, infixTName, tupleTName,
+forallTName, forallVisTName, forallMatchTName, forEachTName, indexVarTName,
+    varTName, conTName, infixTName, tupleTName,
     unboxedTupleTName, unboxedSumTName, arrowTName, mulArrowTName, listTName,
     appTName, appKindTName, sigTName, equalityTName, litTName, promotedTName,
     promotedTupleTName, promotedNilTName, promotedConsTName,
@@ -284,6 +285,8 @@ forallTName, forallVisTName, forallMatchTName, varTName, conTName, infixTName, t
 forallTName         = mkVarOcc "forallT"
 forallVisTName      = mkVarOcc "forallVisT"
 forallMatchTName    = mkVarOcc "forallMatchT"
+forEachTName        = mkVarOcc "forEachT"
+indexVarTName       = mkVarOcc "indexVarT"
 varTName            = mkVarOcc "varT"
 conTName            = mkVarOcc "conT"
 tupleTName          = mkVarOcc "tupleT"

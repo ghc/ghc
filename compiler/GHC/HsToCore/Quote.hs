@@ -1509,6 +1509,8 @@ repTy tyki (HsForAllTy { hst_tele = tele, hst_body = body }) = do
       addHsTyVarBinds FreshNamesOnly tvs $ \bndrs ->
       do body1 <- repLTyAt tyki body
          repTForallVis bndrs body1 >>= repForallMatch forallMatchTName (not (null tvs)) ma
+repTy tyki (HsForEachTy { hst_xforeach = ann, hst_bndrs = bndrs, hst_body = body }) =
+  repRetainedTelescope tyki (hsForEachVisibility ann) bndrs body
 repTy tyki (HsQualTy { hst_ctxt = ctxt, hst_body = body }) = do
   bndrs <- coreListM tyVarBndrSpecTyConOcc []
   ctxt1 <- repContextAt (independentForallContext tyki) (unLoc ctxt)
@@ -1521,6 +1523,9 @@ repTy _ (HsTyVar _ _ (L _ (WithUserRdr _ n)))
   | n `hasKey` unrestrictedFunTyConKey = repArrowTyCon
   | n `hasKey` fUNTyConKey             = repMulArrowTyCon
   | n `hasKey` eqTyConKey              = repTequality
+  | isVarName n && not (isExternalName n) = do
+      MkC index <- lookupOcc n
+      rep2 indexVarTName [index]
   | isVarNameSpace     ns = do tv1 <- lookupOcc n
                                repTvar tv1
   | isDataConNameSpace ns = do dc1 <- lookupOcc n
@@ -1615,6 +1620,25 @@ repTy tyki (HsIParamTy _ n t) = do
                              repTImplicitParam n' t'
 
 repTy _ ty                      = notHandled (ThExoticFormOfType ty)
+
+-- | The domain of each retained binder can use earlier binders only.
+repRetainedTelescope :: Maybe TypeOrKind -> DepFunTyFlag
+                     -> [LHsTyVarBndr () GhcRn] -> LHsType GhcRn
+                     -> MetaM (Core (M TH.Type))
+repRetainedTelescope tyki _ [] body = repLTyAt tyki body
+repRetainedTelescope tyki vis
+    (L _ (HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain)) : rest) body = do
+  MkC domain' <- repLTy TypeLevel domain
+  addSimpleTyVarBinds FreshNamesOnly [name] $ do
+    MkC name' <- lookupOcc name
+    MkC vis' <- rep2_nw vis_name [] :: MetaM (Core TH.BndrVis)
+    MkC body' <- repRetainedTelescope tyki vis rest body
+    rep2 forEachTName [vis', name', domain', body']
+  where
+    vis_name = case vis of
+      DepFunVisible   -> bndrReqName
+      DepFunInvisible -> bndrInvisName
+repRetainedTelescope _ _ _ _ = panic "repRetainedTelescope: invalid retained binder"
 
 repTyLit :: HsLit GhcRn -> MetaM (Core (M TH.TyLit))
 repTyLit (HsNatural _ i) = do
