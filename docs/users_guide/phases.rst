@@ -715,6 +715,24 @@ Options affecting code generation
     depend on the optimisation level. Any definitions which are already included in
     an interface file (via an unfolding for an exported identifier) are reused.
 
+.. ghc-flag:: -fwrite-source-equations
+    :shortdesc: Write checked source equations for eligible functions.
+    :type: dynamic
+    :reverse: -fno-write-source-equations
+    :default: off
+
+    Check functions for type-level use and write their accepted equations
+    to the module interface. The checker accepts a limited fragment. For
+    example, a function can match each list constructor and pass its tail
+    directly to a recursive call. Rewrite rules can make a function
+    ineligible. GHC compiles unsupported definitions for ordinary use.
+
+    This option lets an ordinary producer publish equations without enabling
+    :extension:`ExperimentalDependentTypes` in that module. It works with
+    stripped interfaces and with :ghc-flag:`-fno-code` when GHC writes an
+    interface. A client that names the term in a type still needs the
+    extension. Clients can use imported type aliases in ordinary signatures.
+
 .. ghc-flag:: -fwrite-if-self-recomp
     :shortdesc: Write information for self-recompilation checking in an interface file
     :type: dynamic

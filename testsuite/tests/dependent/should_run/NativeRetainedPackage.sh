@@ -323,12 +323,12 @@ reject_family SHIFTED_WITNESS "    ShiftWitness ('Shift" '[GHC-83605]'
 )
 
 cd "$out/provider"
-cp "$src/StoredVector.hs" .
-"${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c StoredVector.hs
-cp StoredVector.hi "$src/ListVectorClient.hs" "$out/projection/"
+cp "$src/"{StoredVector,ConservedPartition}.hs .
+"${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c StoredVector.hs ConservedPartition.hs
+cp {StoredVector,ConservedPartition}.hi "$src/ListVectorClient.hs" "$out/projection/"
 cd "$out/projection"
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c ListVectorClient.hs
-cp StoredVector.hi ListVectorClient.hi "$out/client/"
+cp {StoredVector,ConservedPartition,ListVectorClient}.hi "$out/client/"
 cd "$out/client"
 cat >ListVectorMain.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
@@ -338,14 +338,43 @@ import StoredVector (ListVector)
 observe :: ListVector Char -> (Int, String)
 observe = contents
 main :: IO ()
-main = print (observe (fromList ""), observe (fromList "ab"),
-              take 1 (snd (observe (fromList ('x' : error "unused tail")))),
-              fst (observe (fromList [error "unused element" :: Char])),
-              fromList (error "unused list" :: String) `seq` True)
+main = do
+    print (observe (fromList ""), observe (fromList "ab"),
+           take 1 (snd (observe (fromList ('x' : error "unused tail")))),
+           fst (observe (fromList [error "unused element" :: Char])),
+           fromList (error "unused list" :: String) `seq` True)
+    let mixed = regroupObservation (> (2 :: Int)) [3, 1, 4, 2]
+        lazy = length (snd (regroupObservation (const True) [error "unused partition element" :: Int]))
+    case (mixed, lazy) of
+        ((4, [3, 4, 1, 2]), 1) -> pure ()
+        other -> fail (show other)
 HS
 "${g[@]}" -c ListVectorMain.hs
-"${g[@]}" ListVectorMain.o ../projection/ListVectorClient.o ../provider/{StoredVector,PackedVecLibrary}.o -o list-vector
+"${g[@]}" ListVectorMain.o ../projection/ListVectorClient.o \
+    ../provider/{StoredVector,ConservedPartition,PackedVecLibrary}.o -o list-vector
 ./list-vector
+cat >WrongPartition.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+module WrongPartition where
+import ConservedPartition (Split, partitionVec)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import PackedVecLibrary (Nat(..), Vec(..))
+
+keepOnly :: Vec Int n -> Vec Int n
+keepOnly xs = case partitionVec even xs of
+    Pair _ (Pair _ (kept, _, Refl)) -> kept
+
+wrongTotal :: Split Int ('S 'Z)
+wrongTotal = Pair Z (Pair Z (VNil, VNil, Refl))
+HS
+if "${g[@]}" -ferror-spans -c WrongPartition.hs >split-errors.log 2>&1 ||
+   ! grep -Fq 'WrongPartition.hs:10:40-43: error: [GHC-25897]' split-errors.log ||
+   ! grep -Fq 'WrongPartition.hs:13:29-46: error: [GHC-83865]' split-errors.log; then
+    cat split-errors.log >&2
+    exit 1
+fi
+
 cat >WrongList.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module WrongList where

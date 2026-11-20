@@ -1268,6 +1268,10 @@ main = do
         (ConsRuleMapProof.twiceHead (Proxy @'[]), ConsRuleMapProof.composedHead (undefined : undefined))
     observe "collect row heads with an ordinary polymorphic callback"
         (OpenMapProof.firstRowHead (Proxy @'True) (Proxy @'Spine.Empty) (Proxy @'[]))
+    cutoff <- newIORef (2 :: Int) >>= readIORef
+    partitionInput <- newIORef [3, 1, 4, 2] >>= readIORef
+    observe "regroup both partitions at the original length"
+        (ListVectorClient.regroupObservation (> cutoff) partitionInput)
 
 -- | Complement one flag at the type level.
 type family FlipFlag (b :: Bool) :: Bool where

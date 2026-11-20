@@ -133,7 +133,7 @@ printf '%s\n' 'Changing the producer regenerated a path to the first field.'
 mkdir "$out/file-offer"
 cd "$out/file-offer"
 mkdir source
-cp -- "$src"/{BoundaryEvidence,OrdinaryOffer,EmitMembership,FileOffer}.hs "$src/offer.position" source/
+cp -- "$src"/{BoundaryEvidence,OrdinaryOffer,EmitMembership,FileOffer,SearchOffer}.hs "$src/offer.position" source/
 file_offer=("${splice[@]}" -i -isource -ddump-splices -main-is FileOffer source/FileOffer.hs -o file-offer)
 "${file_offer[@]}" >first.log 2>&1 || { cat first.log >&2; exit 1; }
 grep -Fq 'Splicing expression' first.log
@@ -158,11 +158,22 @@ expect_file_failure() {
     fi
 }
 
-# Only the candidate file changes. Position zero is in range but has label seven.
-printf '0\n' >source/offer.position
+"${splice[@]}" -i -isource -main-is SearchOffer source/SearchOffer.hs -o search-offer
+
+# Search a different input. Position zero is valid there, but has label seven here.
+./search-offer 0 8 8 >source/offer.position 2>wrong-candidate.log
+grep -Fxq 'seed=0 input=8 label=8 offer=[8,9] tried=[(0,8)]' wrong-candidate.log
 expect_file_failure "Couldn't match type"
 grep -Fq 'Here' file.log
+cat wrong-candidate.log
 printf '%s\n' 'Changing only the candidate rechecked and rejected the wrong label.'
+
+if ./search-offer 0 7 8 >miss.position 2>miss.log || [[ -s miss.position ]] ||
+   ! grep -Fxq 'seed=0 input=7 label=8 offer=[7,8] tried=[(0,7),(0,7)] no candidate' miss.log; then
+    cat miss.log >&2
+    exit 1
+fi
+cat miss.log
 
 bad_position='Expected a zero-based field position in offer.position'
 for value in -1 2 '01' '1x' $'1\n0'; do
@@ -171,7 +182,14 @@ for value in -1 2 '01' '1x' $'1\n0'; do
 done
 printf '1%010000d\n' 0 >source/offer.position
 expect_file_failure "$bad_position"
-printf '1' >source/offer.position
+# SearchOffer omits the optional newline, so the candidate file changes.
+./search-offer 4 7 8 >source/offer.position 2>candidate.log
+grep -Fxq 'seed=4 input=7 label=8 offer=[7,8] tried=[(0,7),(1,8)]' candidate.log
+./search-offer 4 7 8 >replay.position 2>replay.log
+cmp source/offer.position replay.position
+cmp candidate.log replay.log
 "${file_offer[@]}" >restored.log 2>&1 || { cat restored.log >&2; exit 1; }
+grep -Fq 'Splicing expression' restored.log
 [[ $(./file-offer) == second ]]
-printf '%s\n' 'Invalid candidate files failed. Restoring position one compiled again.'
+cat candidate.log
+printf '%s\n' 'Invalid candidate files failed. GHC checked the seeded path to the second field.'

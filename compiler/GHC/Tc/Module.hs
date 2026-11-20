@@ -699,12 +699,20 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       ; setGblEnv tcg_env' (checkSourceMethodUses tcg_env')
       ; failIfErrsM
       ; tables_enabled <- xoptM LangExt.ExperimentalDependentTypes
+      ; write_equations <- goptM Opt_WriteSourceEquations
       ; setGblEnv tcg_env' $ do
           let binds = tcg_binds tcg_env'
-          tables <- if tables_enabled then sourceTableTyCons binds else pure []
+          tables <- if tables_enabled || write_equations
+                    then sourceTableTyCons binds else pure []
           (cases, fields) <- sourceCaseTables binds
+          -- Keep the existing ordinary certificates when both checkers
+          -- accept the same owner. Enumeration cases retain executable origin.
+          let case_owners = mkNameSet (map (idName . fst) cases)
+              new_tables
+                | tables_enabled = tables
+                | otherwise = filter (\(owner, _) -> not (idName owner `elemNameSet` case_owners)) tables
           with_fields <- if null fields then getGblEnv else fst <$> addTyConsToGblEnv fields
-          env <- setGblEnv with_fields (installSourceTables (tables ++ cases))
+          env <- setGblEnv with_fields (installSourceTables (new_tables ++ cases))
           if tables_enabled then installSourceMethods env else pure env }
 
 -- | Publish only checked method aliases that user rules cannot replace.

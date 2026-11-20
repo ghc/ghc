@@ -1,0 +1,5 @@
+Maybe :: * -> *
+Map :: (k %t -> a) -> [k] -> [a]
+Maybe :: * %Matchable -> *
+Map :: forall {t :: Matchability} {a} {k}. @Unmatchable
+       (k %t -> a) %Unmatchable -> [k] %Unmatchable -> [a]

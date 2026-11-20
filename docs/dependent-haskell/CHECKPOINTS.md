@@ -8,6 +8,33 @@ increments.
 
 ## Family and package checkpoints
 
+At `3f51ce4e50`, bootstrap and self-hosted GHC reproduced all 340
+Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
+Self-hosted GHCi matched. All 21 focused tests passed. Of 324 runnable
+normal-way cases in the dependent directory, 304 passed. The other 20
+had the same names and failure categories as at `a6fa7ededf`.
+
+An optimized client used a type-applied rule on a runtime `Maybe` index
+and a rule declared outside the retained function's module. The checked
+type argument ran its Template Haskell finalizer once. A separate module
+proved that the installed `Prelude.reverse` preserves the length of a
+finite list. The append and reverse upgrade checks verified that a second
+build reused each refreshed interface. An ordinary client also introduced
+a nested existential package and opened it to return 17.
+[Rules](roadmap/R05-dependent-core.md),
+[reverse](roadmap/R16-open-term-evaluator.md) and
+[packages](roadmap/R22-existential-quantification.md).
+
+At `410405da2b`, the released 336-line compiler with the four changed
+modules relinked reproduced all 337 Showcase lines at `-O0`, default
+`-O1`, and default `-O2` with Core and STG Lint. The registered
+`NativeRetainedPackage` test used stripped producer interfaces. It checked
+the ordinary regroup operation, the demand on the elements, and both
+incorrect length claims. The kind-error golden also matched the user-facing
+matchability syntax. This run used the existing 336 target libraries.
+[Source and regressions](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [nested sum typing](roadmap/R04-dependent-sums.md#partition-at-the-original-length).
+
 At `a6fa7ededf`, bootstrap and self-hosted GHC reproduced all 336
 Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
 Self-hosted GHCi matched. All 19 focused normal-way tests passed. The

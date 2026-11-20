@@ -36,7 +36,7 @@ reject -XLinearTypes -XModifiers -c Mismatch.hs
 grep -Fq 'error: [GHC-83865]' err.log
 grep -Fq 'Int %M %1 -> Bool' err.log
 reject -XLinearTypes -XNoModifiers -c Mismatch.hs
-grep -Fq 'Int %1 -> @(M) Bool' err.log
+grep -Fq 'Int %M %1 -> Bool' err.log
 
 cat >MapKind.hs <<'HS'
 {-# LANGUAGE DataKinds, Modifiers, PolyKinds, StandaloneKindSignatures #-}

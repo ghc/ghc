@@ -921,6 +921,8 @@ data GeneralFlag
    | Opt_DefinesKnownKeyNames
    | Opt_RebindableKnownNames
    | Opt_PrintExplicitMatchabilities
+
+   | Opt_WriteSourceEquations
    deriving (Eq, Show, Enum)
 
 -- | The set of flags which affect optimisation for the purposes of

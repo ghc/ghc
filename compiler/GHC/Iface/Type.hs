@@ -1395,9 +1395,11 @@ Maybe as Type -> Type. These arrows can have either matchability.
 
 Show both annotations when the explicit flag is set. The mismatch
 reporter can also set that flag. See Note [Showing invisible bits of
-types in error messages] in GHC.Tc.Errors.Ppr. Modifiers output still
-shows M and symbolic matchabilities. Debug and dump output retain their
-annotations.
+types in error messages] in GHC.Tc.Errors.Ppr. Modifiers output shows M
+and symbolic matchabilities. When user output shows a matchability,
+print it as a source modifier, even if Modifiers is disabled. For
+example, GHCi can show a matchability variable inferred in an imported
+family's kind. Keep the existing notation for debug and dump output.
 
 https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities
 -}
@@ -1414,7 +1416,7 @@ pprTypeArrow af ma mult =
           | user_arrow && explicit = True
           | user_arrow && not debug && not modifiers && ma == ifaceMatchable = False
           | otherwise = ma /= ifaceUnmatchable
-    in if userStyle style && modifiers && isFUNArg af
+    in if user_arrow && (modifiers || not debug)
       then pprArrowWithModifiers ([pprPrecIfaceType appPrec ma | show_ma] ++ mods) af arr
       else pprArrowWithModifiers mods af arr
              <+> ppWhen show_ma (char '@' <> parens (pprPrecIfaceType appPrec ma))

@@ -178,6 +178,13 @@ The type-level `Map` example uses `(a %U -> b) -> [a] -> [b]`.
 and [acceptance](https://github.com/ghc-proposals/ghc-proposals/pull/370).
 [Map example](examples/open-evaluation/TypeLambda.hs).
 
+Proposal #242 generalises a higher-order kind arrow in an unsigned family
+when its equations leave the matchability unconstrained. A written kind
+signature defaults a bare callback arrow to M. The fork checks the
+unsigned closed-family case with `ExperimentalDependentTypes` and `PolyKinds`.
+[Higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments)
+and [source checks](roadmap/R23-unsaturated-type-families.md#inferring-a-callback-arrow-in-a-closed-family).
+
 The inference rules in #242 default a bare arrow on a type synonym's
 right-hand side to U. The proposal identifies the `singletons` arrow
 `type a ~> b = TyFun a b -> Type` as an exception to the common use of
@@ -188,11 +195,12 @@ can write `type a ~> b = TyFun a b %M -> Type` once.
 and [normative inference rules](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference).
 
 Proposal #242 also specifies `-fprint-explicit-matchabilities`.
-The flag matters when copying a callback kind from GHCi. Omitting an
-unmatchable index can make a standalone kind signature require a
-matchable callback. The same display rule applies to fixed matchabilities
-on forall binders. For example, a telescope scope error shows the inferred
-binder order. Explicit printing still shows which binders are matchable.
+The flag shows fixed matchabilities in GHCi. GHCi shows a variable modifier
+such as `%m` even without the flag. Enable `Modifiers` to write this arrow
+syntax in a signature. Omitting an unmatchable index can make a standalone
+kind signature require a matchable callback. A kind mismatch diagnostic
+can show both matchabilities without the flag. Explicit printing also
+shows the matchability of forall binders.
 [Showing matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
 
 These pages record the selected implementation sources, open questions and
@@ -6265,6 +6273,14 @@ the example. Peano constructors give an unbounded count.
 [Data.Type.Equality source](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs)
 and [R16 map length proof](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
 
+An ordinary producer can request checked equations with
+`-fwrite-source-equations`. The list size example descends by one
+constructor, the primitive recursion case in Agda. The option asks
+GHC to check the definition. An `INLINABLE` pragma can retain a
+runtime unfolding, which alone supplies no generic size equation.
+[Agda termination checking](https://agda.readthedocs.io/en/latest/language/termination-checking.html)
+and [GHC's INLINABLE pragma](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/pragmas.html#inlinable-pragma).
+
 ### Induction on the left spine of append
 
 Agda's `length-++` proves the empty-list equation by reflexivity and
@@ -6407,3 +6423,16 @@ full dependent coverage. Our example checks one such relation between
 a package and its openings.
 [*Lower Your Guards*, sections 2.4, 3.1 and 7.2.3](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
 and [local R22 examples](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
+
+## Conservation of partition length
+
+Agda's `interleave-length` proves that the length of an interleaving
+equals the sum of its two source lengths. Its right-hand case transports
+addition across a successor in the second operand. The Haskell partition
+uses this step through `addSucc`. Idris 2's `Data.Vect.partition` stores
+each vector with its own length. The Haskell result also stores evidence
+that relates both lengths to the input. Matching `Refl` lets an ordinary
+client return the appended vector at the input index.
+[Agda standard library v1.2, interleaving properties](https://agda.github.io/agda-stdlib/v1.2/Data.List.Relation.Ternary.Interleaving.Properties.html),
+[Idris 2, Data.Vect.partition](https://idris-lang.org/Idris2/base/source/Data.Vect.html#743)
+and [Haskell implementation](examples/packed-vector/ConservedPartition.hs).
