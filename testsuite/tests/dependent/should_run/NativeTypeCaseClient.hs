@@ -110,3 +110,6 @@ writtenIndex = Refl
 
 apartIndex :: N.ApartGatePick ('Just ('N.PlainGate 'False)) :~: Bool
 apartIndex = Refl
+
+hiddenIndex :: N.HiddenGatePick ('Just 'N.IndexedGate) :~: Int
+hiddenIndex = Refl

@@ -4,7 +4,7 @@ module NativeNestedCase
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
   , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
   , AliasFirst, MixedAlias
-  , FamilyGate(..), FamilyGatePick, WrittenGatePick, ApartGatePick
+  , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   ) where
 
 import Data.Kind (Type)
@@ -124,6 +124,13 @@ type FamilyGatePick (d :: GateInput) = case d of
 type WrittenGatePick (d :: GateInput) = case d of
   Just IndexedGate -> Int
   Just _ -> Bool
+  Nothing -> Char
+
+type HiddenIndexedGate = 'Just ('IndexedGate :: FamilyGate Bool)
+
+type HiddenGatePick (d :: GateInput) = case d of
+  HiddenIndexedGate -> Int
+  Just _ -> Int
   Nothing -> Char
 
 newtype GateIndexOther = GateIndexOther Bool

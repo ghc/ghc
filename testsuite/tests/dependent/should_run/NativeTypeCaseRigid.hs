@@ -43,3 +43,6 @@ mixedAliasFirst _ = Refl
 
 knownIndexRigid :: Proxy field -> N.FamilyGatePick ('Just field) :~: Bool
 knownIndexRigid _ = Refl
+
+hiddenIndex :: Proxy x -> N.HiddenGatePick ('Just x) :~: Int
+hiddenIndex _ = Refl

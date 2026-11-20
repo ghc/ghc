@@ -4121,14 +4121,16 @@ needsOrderedCase root infos
   where
     has_expanded_test vi
       | Just (_, _, pat, ty) <- vi_case_pattern vi
-      , Just (tc, _) <- splitTyConAppNoView_maybe ty
-      , isTypeSynonymTyCon tc
+      , may_expand ty
       = do checkNoErrs (checkTyFamEqnValidityInfo root vi)
            checked <- checkedCasePattern [] pat ty
            pure $ case checked of
              CheckedCaseConstructor _ _ _ fields -> any is_test fields
              CheckedCaseField -> False
       | otherwise = pure False
+
+    may_expand (CastTy ty _) = may_expand ty
+    may_expand ty = maybe False (isTypeSynonymTyCon . fst) (splitTyConAppNoView_maybe ty)
 
     is_test CheckedCaseConstructor{} = True
     is_test CheckedCaseField = False
@@ -4173,10 +4175,10 @@ default cannot bypass a test on an unknown input with a compatible RHS.
 A promoted constructor result kind can contain a closed type family.
 After ordinary unification fails, try one checked reduction at each
 index of the same nominally generative kind constructor. Use only a
-completed family's axiom. The global type environment contains local
-families from completed groups. A family from the current group may be
-tied to the decision families that we are building, so do not inspect
-its axiom.
+completed family's axiom. Build the nodes after leaving
+`tcExtendRecEnv`, so the global type environment contains local
+families from completed groups. A family from the current group may
+depend on the new decision families. Its axiom is still unavailable.
 
 Use the ordinary closed-family branch matcher for this step. Cast the
 constructor with the nominal kind coercion if all the reduced indices
@@ -4184,7 +4186,9 @@ match. A reduced index can also establish apartness. Check apartness
 only between indices whose kinds agree. The case still tests the
 constructor when the indices agree. The source pattern can already
 carry a kind cast from ordinary kind checking. Read the constructor
-under that cast. The generated branch constructs its own evidence.
+under that cast, including casts reached by expanding an alias. The
+generated branch constructs its own evidence. The checked source
+pattern, with its casts, still determines the substitution for the RHS.
 -}
 
 data CheckedCasePattern
@@ -4413,7 +4417,7 @@ checkedCasePattern :: [Int] -> TypeCasePattern -> Type -> TcM CheckedCasePattern
 checkedCasePattern _ CasePatternField _ = pure CheckedCaseField
 checkedCasePattern path pat (CastTy ty _) = checkedCasePattern path pat ty
 checkedCasePattern path (CasePatternConstructor span _ fields) ty =
-  setSrcSpan span $ case (splitTyConAppNoView_maybe ty, tcSplitTyConApp_maybe ty) of
+  setSrcSpan span $ case (splitTyConAppNoView_maybe ty, split_pattern ty) of
     (Just (written, original), Just (resolved, canonical))
       | let old = visible written original
             new = visible resolved canonical
@@ -4445,7 +4449,7 @@ checkedCasePattern path (CasePatternConstructor span _ fields) ty =
           expanded = mkTyConApp written
             (marker_args markers (zip (tyConBinders written) original))
           marked = zip markers (zip [0..] fields)
-      case tcSplitTyConApp_maybe expanded of
+      case split_pattern expanded of
         Just (head_tc, args)
           | head_tc == resolved
           , let shape = visible head_tc args
@@ -4468,15 +4472,15 @@ checkedCasePattern path (CasePatternConstructor span _ fields) ty =
     is_test CasePatternConstructor{} = True
 
     find_marker marked shape = do
-      var <- getTyVar_maybe shape
+      var <- getTyVar_maybe (typeCasePatternView shape)
       lookup var marked
 
     expand_field marked position shape actual
       | Just (i, field) <- find_marker marked shape = do
           checked <- checkedCasePattern position field actual
           pure (checked, [i | is_test field])
-      | Just (con, shape_args) <- tcSplitTyConApp_maybe shape
-      , Just (actual_con, actual_args) <- tcSplitTyConApp_maybe actual
+      | Just (con, shape_args) <- split_pattern shape
+      , Just (actual_con, actual_args) <- split_pattern actual
       , actual_con == con
       , isGenerativeTyCon con Nominal
       , not (isTypeFamilyTyCon con)
@@ -4490,6 +4494,7 @@ checkedCasePattern path (CasePatternConstructor span _ fields) ty =
                 concatMap snd children)
       | otherwise = unsupported
 
+    split_pattern = tcSplitTyConApp_maybe . typeCasePatternView
     visible tc args = [a | (b, a) <- zip (tyConBinders tc) args
                          , isVisibleTyConBinder b]
     unsupported :: TcM a
