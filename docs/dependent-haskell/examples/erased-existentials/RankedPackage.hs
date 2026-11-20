@@ -35,14 +35,12 @@ type Builder = exists (t :: Type). Int -> Callback t
 
 -- | Use the declared result of makeCallback to infer the lambda's witness.
 builder :: Builder
-builder = \n -> makeCallback n
+builder = \n -> makeCallback @Int id n
   where
-    makeCallback :: Int -> Callback PolyId
-    makeCallback n = Callback @PolyId id (\f -> (f n, f True))
+    makeCallback :: forall a. (a -> Int) -> a -> Callback PolyId
+    makeCallback toInt x = Callback @PolyId id (\f -> (f (toInt x), f True))
 
 -- | Apply the builder and use its hidden function at two types.
 runBuilder :: Int -> (Int, Bool)
-runBuilder n = apply (builder n)
-  where
-    apply :: Callback t -> (Int, Bool)
-    apply (Callback f call) = call f
+runBuilder n = case builder n of
+    Callback f call -> call f
