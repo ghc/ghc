@@ -96,7 +96,8 @@ synonymTyConsOfType ty
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go (TermVarTy v)     = go (varType v)
      go (TermAppTy f arg) = go (varType f) `plusNameEnv` go arg
-     go (DepFunTy _ v ty)   = go (varType v) `plusNameEnv` go ty
+     go (DepFunTy _ v ty) = go (varType v) `plusNameEnv` go ty
+     go (ExistsTy v ty)   = go (varType v) `plusNameEnv` go ty
      go (TyConApp tc tys) = go_tc tc `plusNameEnv` go_s tys
      go (LitTy _)         = emptyNameEnv
      go (TyVarTy _)       = emptyNameEnv
