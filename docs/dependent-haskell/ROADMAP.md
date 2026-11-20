@@ -9,6 +9,15 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+A GADT field can package three vectors with two runtime lengths. Two
+vectors share the outer length and can be zipped directly. The third
+uses the inner length. The sample reads lengths 2 and 1 and the first
+aligned pair `('h','s')` without evaluating either remaining tail or
+the third vector. Giving either length the wrong vector is a type error
+in the client that constructs the package.
+[Source](examples/packed-vector/StoredVector.hs)
+and [constructor and interface checks](roadmap/R04-dependent-sums.md#sums-in-constructor-fields).
+
 A vector partition can store its two result lengths in one erased package.
 The producer writes `Rows yes no`. An ordinary function equation can
 inspect the passing vector with `firstPassing (Rows (VCons x _) _) = Just x`.
@@ -90,9 +99,9 @@ is skipped. Both proofs leave the list tail unknown. The client reads
 only the producer interface and disables rewrite rules in the module
 that proves the equations. Keeping rewrite rules enabled reports
 GHC-83605 at the proof. A runtime check reads the kept head with an
-undefined tail. The 306-line Showcase checks the two proofs and this
+undefined tail. The Showcase checks the two proofs and this
 demand behavior. The bootstrap and self-hosted compilers reproduce the
-full output at `-O0`. The self-hosted compiler also reproduces it in
+307-line output at `-O0`. The self-hosted compiler also reproduces it in
 GHCi and at default `-O1` and `-O2`.
 [Proof source](examples/open-evaluation/PreludeFilterProof.hs),
 [filter alias](examples/open-evaluation/PreludeFilterSource.hs)
@@ -109,7 +118,7 @@ the header. The new reader checks the coercion's role and scope.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | GADT data constructors can store nested retained sums and refer to erased parameters from the constructor signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. | Support orphan rules, retained function rules and more dependent coercions. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. Two checked map traversals compose without forcing the inner callback. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. A written scrutinee kind can capture an earlier parameter under a noninjective family. A top-level value signature can repeat the same ordered case in an argument and the result. | Extend direct cases to nested quantifiers and preserve distinct scopes when binder names repeat. |
@@ -140,9 +149,9 @@ source examples. General promotion remains open.
    Keep the explicit matchability and noninjective equality checks.
    The staged interpreter selects U when its caller supplies an expected
    U arrow. A result of kind `Type` alone still leaves the choice ambiguous. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
-3. **R22 and R04.** Extend retained sum fields to GADT constructors
-   with local type parameters. Check that a separately compiled client
-   preserves the stored vector lengths at default optimization.
+3. **R22 and R04.** Bring earlier retained constructor arguments into scope in
+   later sum fields. Check the difference between the index of a field
+   and the index of the constructor result.
 4. **R19.** Check direct type cases under nested explicit `forall` binders
    in a value signature. Preserve the distinction between two sibling
    binders with the same name and keep rigid matches stuck.

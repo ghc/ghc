@@ -16,7 +16,7 @@ module GHC.Core.SimpleOpt (
         joinPointBinding_maybe, joinPointBindings_maybe,
 
         -- ** Predicates on expressions
-        exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
+        exprIsConApp_maybe, exprIsConAppFor_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
 
     ) where
 
@@ -40,7 +40,7 @@ import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSub
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType, getEqPredTys_maybe )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
-import GHC.Core.TyCo.Rep ( Coercion(SubCo) )
+import GHC.Core.TyCo.Rep ( Coercion(SubCo), Type(TermVarTy) )
 import GHC.Core.TyCo.Compare ( eqType )
 
 import GHC.Types.Literal
@@ -67,6 +67,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.OrdList
 import GHC.Data.Graph.UnVar
+import Control.Monad (guard)
 import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
 
@@ -1760,6 +1761,13 @@ But if the case-of-known-constructor doesn't actually fire (i.e.
 exprIsConApp_maybe does not return Just) then nothing happens, and nothing
 will happen the next time either.
 
+In retained Core, a later binder can have type @Vec a n@ when its
+argument has type @Vec a (S Z)@. Floating @let n = S Z@ does not make
+those types equal. Substitute a checked index through the lambda body
+and its annotations before processing later arguments. A function head
+can only use a compatible local variable. Keep the case if the argument
+cannot supply an index. This check does not evaluate a runtime argument.
+
 See test T16254, which checks the behavior of newtypes.
 
 Note [Exploit occ-info in exprIsConApp_maybe]
@@ -1902,7 +1910,14 @@ data ConCont = CC [CoreExpr] MCoercion
 exprIsConApp_maybe :: HasDebugCallStack
                    => InScopeEnv -> CoreExpr
                    -> Maybe (InScopeSet, FloatBinds, DataCon, [Type], [CoreExpr])
-exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
+exprIsConApp_maybe = exprIsConAppFor_maybe OrdinaryCore
+
+-- | Recognize a constructor using the substitution rules of the current pass.
+-- See Note [beta-reduction in exprIsConApp_maybe].
+exprIsConAppFor_maybe :: HasDebugCallStack
+                      => SimplCoreMode -> InScopeEnv -> CoreExpr
+                      -> Maybe (InScopeSet, FloatBinds, DataCon, [Type], [CoreExpr])
+exprIsConAppFor_maybe mode ise@(ISE in_scope id_unf) expr
   = go (Left in_scope) emptyFloatBinds expr (CC [] MRefl)
   where
     go :: Either InScopeSet Subst
@@ -1946,6 +1961,15 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        = go subst floats fun (CC (subst_expr subst arg : args) mco)
 
     go subst floats (Lam bndr body) (CC (arg:args) mco)
+       | RetainedCore <- mode
+       , isNativeOpaqueValueId bndr
+       , hasFreeVarInCoreAnnotations bndr body
+       = do let (_, bndr') = subst_bndr subst bndr
+            index <- if isNativeIndexFunctionId bndr'
+                     then TermVarTy <$> nativeIndexFunctionVar_maybe arg
+                     else exprToNativeIndex arg
+            guard (typeKind index `eqType` idType bndr')
+            go (extend subst bndr arg) floats body (CC args mco)
        | do_beta_by_substitution bndr arg
        = go (extend subst bndr arg) floats body (CC args mco)
        | otherwise

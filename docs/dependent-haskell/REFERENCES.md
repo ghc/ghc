@@ -106,6 +106,15 @@ field applies Haskell's evaluation rule to the pair constructor. Reading its
 payload can leave the witness unevaluated. [Agda's Sigma record](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
 and [Haskell 2010, strictness flags](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html).
 
+The nested GADT field uses the dependency twice. Agda 2.8.0's
+`Agda.Builtin.Sigma` declares `snd : B fst`. An inner pair in `B fst`
+can use the outer `fst` alongside its own witness. The Haskell example
+uses the outer length to type both vectors passed to `zipVec`. The third
+vector has the inner length. The Showcase reads both lengths and the
+first aligned cells. Its two remaining tails and the third vector each
+raise an exception if demanded. [Agda 2.8.0, the Σ-type](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
+and [the nested vector field](examples/packed-vector/StoredVector.hs).
+
 ### Catch-all rows in type cases
 
 A variable pattern binds the scrutinee. A wildcard also succeeds without
