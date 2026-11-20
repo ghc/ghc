@@ -113,3 +113,7 @@ apartIndex = Refl
 
 hiddenIndex :: N.HiddenGatePick ('Just 'N.IndexedGate) :~: Int
 hiddenIndex = Refl
+
+arrowResult ::
+  N.ArrowResult 'LT ('Just ('Just 'True)) :~: (() -> (Proxy 'LT, Proxy 'True))
+arrowResult = Refl

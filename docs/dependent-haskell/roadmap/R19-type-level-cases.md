@@ -104,6 +104,25 @@ available. A separately distributed provider must be rebuilt to
 publish ordered equations. [Nested provider](../examples/open-evaluation/NativeNestedCase.hs)
 and [interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
 
+## A case as an arrow result
+
+A top-level synonym can select the result of an ordinary arrow.
+
+```haskell
+type Result b = () -> (case b of { True -> Int; False -> Char })
+```
+
+The result shares the arrow's lexical scope. The private family takes
+the same captures as a case at the root of the synonym. A local
+`forall` introduces a scope boundary. The compiler stops there to keep
+its binders and their kinds in scope. An ordinary client can use
+`Result 'True` as `() -> Int` through a stripped interface.
+Template Haskell reification preserves the arrow and the exact name of
+the lowered case family. [Serokell roadmap](https://ghc.serokell.io/dh#type-level-case-expressions),
+[promotion paper, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf),
+[Agda pattern lambdas](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#pattern-lambdas),
+and [interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
+
 ## A case in a let body
 
 A case branch can use a let-bound type or kind. For example,

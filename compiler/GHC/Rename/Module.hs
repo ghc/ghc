@@ -318,6 +318,11 @@ it only after checking its RHS in the original lexical scope. The
 helper fragment accepts references to the synonym's parameters.
 An inferred kind parameter must be determined by a checked capture.
 See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
+
+The result of an ordinary arrow has the same lexical scope as the
+arrow. Use the enclosing captures when lifting a case in the result.
+Stop at a forall. Lifting past it would require captures for the
+new skolems and their kinds.
 -}
 liftTypeCases :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
 liftTypeCases group =
@@ -366,6 +371,10 @@ liftTypeCases group =
     liftRhs owner captures aliases (L loc (XHsType (HsTypeLet ann v rhs body))) salt =
       let (rhs', cases, next) = liftRhs owner captures aliases rhs salt
       in (letTy loc ann v rhs' body, cases, next)
+    liftRhs owner captures aliases
+      (L loc (HsFunTy ann arrow@(HsModifiedFunArr _ [] HsStandardArr{}) domain result)) salt =
+      let (result', cases, next) = liftRhs owner captures aliases result salt
+      in (L loc (HsFunTy ann arrow domain result'), cases, next)
     liftRhs owner captures aliases ty salt =
       liftTypeChildren (liftRhs owner captures aliases) ty salt
 

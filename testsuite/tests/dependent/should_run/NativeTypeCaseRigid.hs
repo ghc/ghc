@@ -46,3 +46,7 @@ knownIndexRigid _ = Refl
 
 hiddenIndex :: Proxy x -> N.HiddenGatePick ('Just x) :~: Int
 hiddenIndex _ = Refl
+
+rigidArrowResult ::
+  Proxy x -> N.ArrowResult 'LT ('Just x) :~: (() -> (Proxy 'LT, Proxy 'False))
+rigidArrowResult _ = Refl

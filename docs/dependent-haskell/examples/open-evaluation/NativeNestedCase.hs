@@ -3,7 +3,7 @@ module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
   , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
-  , AliasFirst, MixedAlias
+  , AliasFirst, MixedAlias, ArrowResult
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   ) where
 
@@ -139,3 +139,9 @@ type ApartGatePick (d :: Maybe (FamilyGate GateIndexOther)) = case d of
   Just (PlainGate True) -> Int
   Just _ -> Bool
   Nothing -> Char
+
+type ArrowResult (tag :: k) (d :: Maybe (Maybe Bool)) =
+  () -> (case d of
+    Just (Just field) -> (Proxy tag, Proxy field)
+    Just _ -> (Proxy tag, Proxy 'False)
+    Nothing -> ())
