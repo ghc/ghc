@@ -229,6 +229,10 @@ instance Diagnostic DriverMessage where
                    <> (pprWithUnitState state $ ppr (moduleUnit m))
                    <> text ") the module resides in isn't trusted."
                ]
+    DriverCannotOptimizeErasedPackage binder ->
+      mkSimpleDecorated $ vcat
+        [ text "Cannot optimize erased package construction or elimination in" <+> quotes (ppr binder) <+> text "at -O1."
+        , text "Compile this module with -O0." ]
     DriverRedirectedNoMain mod_name
       -> mkSimpleDecorated $ (text
                        ("Output was redirected with -o, " ++
@@ -364,6 +368,8 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverCannotImportFromUntrustedPackage{}
       -> ErrorWithoutFlag
+    DriverCannotOptimizeErasedPackage {}
+      -> ErrorWithoutFlag
     DriverRedirectedNoMain {}
       -> ErrorWithoutFlag
     DriverHomePackagesNotClosed {}
@@ -442,6 +448,8 @@ instance Diagnostic DriverMessage where
     DriverMarkedTrustworthyButInferredSafe{}
       -> noHints
     DriverCannotImportFromUntrustedPackage{}
+      -> noHints
+    DriverCannotOptimizeErasedPackage {}
       -> noHints
     DriverRedirectedNoMain {}
       -> noHints

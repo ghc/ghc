@@ -394,6 +394,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DriverPackageNotTrusted"                       = 08674
   GhcDiagnosticCode "DriverCannotImportFromUntrustedPackage"        = 75165
   GhcDiagnosticCode "DriverRedirectedNoMain"                        = 95379
+  GhcDiagnosticCode "DriverCannotOptimizeErasedPackage"             = 36962
   GhcDiagnosticCode "DriverHomePackagesNotClosed"                   = 03271
   GhcDiagnosticCode "DriverInconsistentUnitDependencies"            = 51987
   GhcDiagnosticCode "DriverInconsistentDynFlags"                    = 74335
