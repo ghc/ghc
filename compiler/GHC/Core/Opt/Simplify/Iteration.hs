@@ -3687,12 +3687,20 @@ simplAlt :: (SimplAltFlag, SimplEnv)
          -> InAlt
          -> SimplM OutAlt
 
-simplAlt (saf,env) _ _ _ _ cont' (Alt con bndrs rhs)
+simplAlt (saf,env) _ _ _ _ cont' alt@(Alt con bndrs rhs)
   -- See Note [Retained Core in the Gentle simplifier] in GHC.Driver.Main.Passes.
   | sm_core_mode (seMode env) == RetainedCore
-  = do { (env', bndrs') <- simplAltBinders (saf,env) bndrs
+  = do { (env', bndrs') <- case saf of
+           SAF_In | reSimplifying env, retained_binders -> cloneRetainedAltBinders env bndrs
+           _ -> simplAltBinders (saf,env) bndrs
        ; rhs' <- simplAltExprC (saf,env') rhs cont'
        ; return (Alt con bndrs' rhs') }
+  where
+    -- See Note [Inlining retained constructor alternatives].
+    retained_binders = case con of
+      DataAlt dc -> not (null (dataConRepArgBinders dc)) || isNativeIndexAlt alt
+      DEFAULT    -> isNativeIndexAliasAlt alt
+      LitAlt{}   -> False
 
 simplAlt (saf,env) _scrut' imposs_deflt_cons case_bndr' bndr_swap' cont' (Alt DEFAULT bndrs rhs)
   = assert (null bndrs) $
@@ -3724,6 +3732,20 @@ simplAlt (saf,env) scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rh
 
         ; rhs' <- simplAltExprC (saf,env'') rhs cont'
         ; return (Alt (DataAlt con) vs' rhs') }
+
+{- Note [Inlining retained constructor alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Two copies of withPair can initially occur in separate arguments. A later
+case transformation can nest the alternatives. The first copy can bind
+x :: Nat while the second binds x :: IO Int. Reusing a field Unique across
+the copies would let an inner witness capture an outer index.
+
+Allocate fresh field and proof binders while simplifying the copied
+alternative. Clone them from left to right so each payload type refers to
+its own witness. Extend the expression, index and coercion substitutions
+before simplifying the RHS. See Note [Linting retained constructor fields]
+in GHC.Core.Lint.
+-}
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

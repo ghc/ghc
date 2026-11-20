@@ -32,7 +32,7 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
-        simplBinder, simplBinders,
+        simplBinder, simplBinders, cloneRetainedAltBinders,
         substTy, substTyVar, getFullSubst, getTCvSubst,
         substCo, substCoVar,
 
@@ -62,7 +62,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Rules.Config ( RuleOpts(..) )
 import GHC.Core
 import GHC.Core.Utils
-import GHC.Core.Subst( substExprSC )
+import GHC.Core.Subst( cloneBndrsM, substExprSC )
 import GHC.Core.Unfold
 import GHC.Core.TyCo.Subst (emptyIdSubstEnv, mkSubst)
 import GHC.Core.Multiplicity( Scaled(..), mkMultMul )
@@ -1120,6 +1120,16 @@ See also Note [Scaling join point arguments].
 
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplBinders  !env bndrs = mapAccumLM simplBinder  env bndrs
+
+-- | Freshen a whole retained field telescope when copying an unfolding.
+-- See Note [Inlining retained constructor alternatives] in GHC.Core.Opt.Simplify.Iteration.
+cloneRetainedAltBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
+cloneRetainedAltBinders env fields = do
+    (Subst scope indices tvs cvs, fresh) <-
+        cloneBndrsM (getTCvSubst env) (map zapFragileIdInfo fields)
+    let ids = [(old, DoneId new) | (old, new) <- zip fields fresh, isNonCoVarId old]
+    return (env { seInScope = scope, seIndexSubst = indices, seTvSubst = tvs,
+                  seCvSubst = cvs, seIdSubst = extendVarEnvList (seIdSubst env) ids }, fresh)
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)

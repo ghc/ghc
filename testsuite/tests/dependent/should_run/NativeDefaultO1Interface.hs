@@ -5,7 +5,7 @@ import Control.Exception (ErrorCall, evaluate, try)
 import Data.Functor.Const (Const(..))
 import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
-import DependentPair (DPair(..))
+import DependentPair (DPair(..), withPair)
 import DependentProjection (second)
 import NativeDefaultO1InterfaceProducer
 import qualified PackedVecLibrary as Vec
@@ -29,3 +29,8 @@ main = do
     let values :: [Vec.Vec Int ('Vec.S 'Vec.Z)]
         values = [Vec.VCons 19 Vec.VNil]
     print (map Vec.toList (Vec.toList (Vec.genericRefinedNested (Vec.S Vec.Z) values)))
+    let chars = Pair (Vec.S Vec.Z) (Vec.VCons 'x' Vec.VNil) :: DPair Vec.Nat (Vec.Vec Char)
+    firstPair <- readIORef =<< newIORef chars
+    secondPair <- readIORef =<< newIORef pair
+    print (withPair firstPair (\x payload -> (Vec.natToInt x, Vec.toList payload)),
+           withPair secondPair (\_ payload -> getConst payload))
