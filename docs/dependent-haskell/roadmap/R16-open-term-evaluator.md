@@ -1301,6 +1301,23 @@ one of the two elements.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
 and [prior art](../REFERENCES.md#list-filtering-with-a-known-predicate-result).
 
+`runtimeFilterBound` uses the same proof on a list read from an `IORef`.
+It matches the retained list. At a cons, it passes the actual call
+`Prelude.not x` to `booleanResult :: foreach (b :: Bool) -> BooleanResult b`.
+Matching the returned GADT gives the nominal result equality for
+`keepIfTrue` or `skipIfFalse`. A direct `case Prelude.not x` does not
+give those equalities and fails at both step constructors. The generic
+`FilterSteps` API still supports other predicates.
+
+An ordinary module can open the packaged proof using only its interface.
+Forcing the package does not inspect the list. Forcing the first proof
+constructor inspects the first head and leaves the tail lazy for both
+decisions. A complete proof requires a finite spine and defined Boolean
+elements. The example uses module-local `-O0`. At default `-O1`, inlining
+`Prelude.not` turns the retained operand into a case that Core Lint
+rejects. [Runtime example](../examples/open-evaluation/PreludeFilterRuntime.hs)
+and [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
+
 ### Prove that append adds the list lengths
 
 `lengthAppend` proves `Count (Appended xs ys) :~: Plus (Count xs) (Count ys)`.

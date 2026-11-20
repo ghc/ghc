@@ -6332,6 +6332,9 @@ or the corresponding filter equation. GHC uses the Given coercion for
 the whole application in the guard. Proposal 242 limits decomposition
 of nominal application equalities to matchable arrows. The rewriter
 uses congruence on the guard and leaves the predicate and head rigid.
+The runtime example mirrors Agda's split on an evaluated predicate.
+Its retained Boolean witness names the computed result and exposes the
+branch equality when the caller matches the witness constructor.
 [Agda standard library 2.4, length-filter](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1588),
 [Agda with-abstraction](https://agda.readthedocs.io/en/latest/language/with-abstraction.html),
 [GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability),

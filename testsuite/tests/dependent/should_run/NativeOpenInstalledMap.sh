@@ -207,6 +207,70 @@ HS
     ../length-source/PreludeMapLength{Size,Source}.o -o filter-run
 [[ $(./filter-run) == $'(True,True)\n(BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))' ]]
 
+# The proof uses the certified predicate call as a retained argument.
+"${filter[@]}" -c "$src/PreludeFilterRuntime.hs" -odir . -hidir .
+sed -e 's/module PreludeFilterRuntime/module DirectCase/' \
+    -e 's/case booleanResult (P.not x) of/case P.not x of/' \
+    -e 's/IsTrue -> keepIfTrue/True -> keepIfTrue/' \
+    -e 's/IsFalse -> skipIfFalse/False -> skipIfFalse/' \
+    "$src/PreludeFilterRuntime.hs" >DirectCase.hs
+if "${filter[@]}" -c DirectCase.hs >direct-case.log 2>&1 ||
+   ! grep -Fq '[GHC-05617]' direct-case.log ||
+   ! grep -Fq 'True -> keepIfTrue' direct-case.log ||
+   ! grep -Fq 'False -> skipIfFalse' direct-case.log; then
+    cat direct-case.log >&2
+    exit 1
+fi
+
+mkdir "$out/runtime-client"
+cd "$out/runtime-client"
+cp ../filter-client/*.hi .
+cat >RuntimeFilterRun.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import Control.Exception (ErrorCall(..), evaluate, try)
+import Data.IORef (newIORef, readIORef, writeIORef)
+import PreludeFilterLengthProof (AtMost(..))
+import PreludeFilterRuntime
+import System.Environment (getArgs)
+
+outer :: RuntimeFilterBound -> String
+outer (RuntimeFilterBound _ bound) = case bound of
+    ZeroBound -> "empty"
+    BothSucc _ -> "keep"
+    RightSucc _ -> "skip"
+
+main :: IO ()
+main = do
+    ref <- newIORef []
+    args <- getArgs
+    mapM_ (\input -> do
+        writeIORef ref (read input)
+        xs <- readIORef ref
+        putStrLn (showRuntimeBound (packRuntimeBound xs))) args
+    print (case packRuntimeBound (error "package forced list") of RuntimeFilterBound _ _ -> True)
+    putStrLn (outer (packRuntimeBound (False : error "keep forced tail")))
+    putStrLn (outer (packRuntimeBound (True : error "skip forced tail")))
+    result <- try (evaluate (outer (packRuntimeBound [error "predicate head"])))
+    print (case result of Left (ErrorCall "predicate head") -> True; _ -> False)
+HS
+"${filter[@]}" -c RuntimeFilterRun.hs
+"${filter[@]}" RuntimeFilterRun.o ../filter-client/PreludeFilter{LengthProof,Runtime}.o \
+    ../filter/PreludeFilterSource.o ../length-source/PreludeMapLength{Size,Source}.o -o runtime-filter-run
+cat >runtime-filter.expected <<'OUT'
+(ZeroBound,Zero,Zero)
+(BothSucc ZeroBound,Succ Zero,Succ Zero)
+(RightSucc ZeroBound,Zero,Succ Zero)
+(BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
+True
+keep
+skip
+True
+OUT
+./runtime-filter-run '[]' '[False]' '[True]' '[False,True,False]' >runtime-filter.stdout
+diff -u runtime-filter.expected runtime-filter.stdout
+cd "$out/filter-client"
+
 sed -e 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' \
     -e 's/, showPreludeFilterProofs//' \
     -e '/^showPreludeFilterProofs ::/,$d' PreludeFilterProof.hs >RuleFilter.hs
