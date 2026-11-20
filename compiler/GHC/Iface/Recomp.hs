@@ -575,14 +575,15 @@ checkFlagHash hsc_env iface self_recomp = do
         retained_case_fp = retainedCaseFingerprint result_kind_fp
         abstract_fp = abstractWitnessFingerprint retained_case_fp
         ordered_fp = orderedTypeCaseFingerprint retained_case_fp
-        new_fp = orderedTypeCaseFingerprint abstract_fp
+        previous_fp = orderedTypeCaseFingerprint abstract_fp
+        new_fp = stagedMatchabilityFingerprint previous_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
-       | old_fp `elem` [new_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
+       | old_fp `elem` [new_fp, previous_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
          -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
        , couldSeparateFamilyResultMatchability iface
@@ -665,10 +666,9 @@ checkFlagHash hsc_env iface self_recomp = do
                       Nothing -> pure [missingExtraFlagInfo]
                       Just old_flags -> checkIfaceFlags old_flags new_flags
         out_of_date logger FlagsChanged (fmap vcat diffs)
-    case previous of
+    retained <- case previous of
       UpToDate
-        | old_fp /= new_fp
-        , old_fp /= ordered_fp
+        | old_fp `notElem` [new_fp, previous_fp, ordered_fp]
         , mi_hsc_src iface == HsSrcFile
         , couldExportOrderedTypeCase iface ->
             liftIO $ recheck "Compiler now checks type case constructor order"
@@ -683,6 +683,18 @@ checkFlagHash hsc_env iface self_recomp = do
             then liftIO $ recheck "Compiler now checks retained package case projections"
             else pure UpToDate
       _ -> pure previous
+    case retained of
+      UpToDate | old_fp /= new_fp, mi_hsc_src iface == HsSrcFile -> do
+        candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
+        if candidate
+          then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
+          else pure UpToDate
+      _ -> pure retained
+
+-- | Record the inference rules used to compile open family applications.
+stagedMatchabilityFingerprint :: Fingerprint -> Fingerprint
+stagedMatchabilityFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "staged-family-matchability-v1" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -802,27 +814,13 @@ couldExportRetainedCase abstract_only iface usages = anyM candidate (mi_decls if
       = if owner == mi_semantic_module iface
         then pure (any (package exports domain args result owner) (mi_decls iface))
         else if any (fromModuleWithConstructor owner) usages then do
-          mb_provider <- readProvider owner
+          mb_provider <- readRecompProvider (text "Checking retained package") owner
           pure $ case mb_provider of
             Just provider | mi_hsc_src provider == HsSrcFile ->
               any (package (exportNames provider) domain args result owner) (mi_decls provider)
             _ -> False
         else pure False
     candidate _ = pure False
-
-    readProvider owner = do
-      env <- getTopEnv
-      liftIO $ lookupHugByModule owner (hsc_HUG env) >>= \case
-        Just hmi -> pure (Just (hm_iface hmi))
-        Nothing -> case moduleUnit owner of
-          RealUnit (Definite uid) -> do
-            let installed = mkModule uid (moduleName owner)
-            found <- findAndReadIface env (text "Checking retained package")
-                         installed owner NotBoot
-            pure $ case found of
-              Succeeded (provider, _) -> Just provider
-              Failed _ -> Nothing
-          _ -> pure Nothing
 
     operand (IfaceForAllTy ma (Bndr IfaceTvBndr{} _) body)
       | nullaryName ma == Just unmatchableDataConName = operand body
@@ -899,6 +897,75 @@ This check is only a reason to rebuild source. It does not admit a
 certificate from a stale installed interface, or certify a fresh
 worker that fails a body, visibility, or RULE check. Interfaces with
 the current key do not repeat this check.
+-}
+
+-- | Read declarations from the home table or the installed interface file.
+readRecompProvider :: SDoc -> Module -> IfG (Maybe ModIface)
+readRecompProvider reason owner = do
+  env <- getTopEnv
+  liftIO $ lookupHugByModule owner (hsc_HUG env) >>= \case
+    Just hmi -> pure (Just (hm_iface hmi))
+    Nothing -> case moduleUnit owner of
+      RealUnit (Definite uid) -> do
+        let installed = mkModule uid (moduleName owner)
+        found <- findAndReadIface env reason
+                     installed owner NotBoot
+        pure $ case found of
+          Succeeded (provider, _) -> Just provider
+          Failed _ -> Nothing
+      _ -> pure Nothing
+
+-- | Recheck old providers and uses of an inferred family selector.
+-- See Note [Recompiling inferred open family applications].
+checkStagedMatchability :: ModIface -> [Usage] -> IfG Bool
+checkStagedMatchability iface usages
+  | any contains_local_arrow (mi_decls iface) || uses_index (const True) iface = pure True
+  | otherwise = anyM imported usages
+  where
+    local_families = mkNameSet
+      [n | IfaceFamily{ifName = n, ifBinders = bs, ifResKind = k,
+                        ifFamInj = NotInjective, ifFamFlav = IfaceOpenTypeFamilyTyCon}
+                <- ifaceFamilyDecls iface
+         , any isVisibleTyConBinder bs, isIfaceLiftedTypeKind k]
+    contains_local_arrow (_, IfaceAxiom{ifTyCon = tc, ifAxBranches = branches}) =
+      ifaceTyConName tc `elemNameSet` local_families && any (arrow . ifaxbRHS) branches
+    contains_local_arrow _ = False
+    arrow (IfaceFunTy FTF_T_T _ _ _ _) = True
+    arrow (IfaceCastTy t _) = arrow t
+    arrow _ = False
+
+    uses_index used = any (decl_used used . snd) . mi_decls
+    decl_used used f@IfaceFamily{} = used (nameOccName (ifName f)) && indexed f
+    decl_used used IfaceClass{ifName = n, ifBody = IfConcreteClass{ifATs = ats}} =
+      any (\(IfaceAT f _) -> (used (nameOccName n) || used (nameOccName (ifName f))) && indexed f) ats
+    decl_used _ _ = False
+    indexed IfaceFamily{ifBinders = Bndr (IfaceTvBndr (_, IfaceTyConApp tc IA_Nil)) (NamedTCB Inferred) : _} =
+      ifaceTyConName tc == matchabilityTyConName
+    indexed _ = False
+
+    imported UsageHomeModule{usg_mod_name = name, usg_unit_id = uid, usg_entities = entities} =
+      let tycons = Set.fromList [occ | (occ, _) <- entities, isTcOcc occ]
+      in if Set.null tycons then pure False else
+           check_provider (mkModule (RealUnit (Definite uid)) name) (`Set.member` tycons)
+    imported UsagePackageModule{usg_mod = owner} = check_provider owner (const True)
+    imported _ = pure False
+    check_provider owner used = do
+      provider <- readRecompProvider (text "Checking family matchability") owner
+      pure (maybe True (uses_index used) provider)
+
+{- Note [Recompiling inferred open family applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An open family that returns a bare arrow can gain a selector before a
+declaration splice or an import. The older interface records its equation.
+It cannot distinguish a bare source arrow from an explicit one.
+Recheck that owner once. The new family ABI invalidates existing clients.
+
+An existing family with an inferred selector can also keep the same
+header. Its equations and the defaults at a source use can change.
+Check local declarations and imports of those families. Home usages
+name the entities and may record the parent of an associated family.
+Package usages record only the module. A stripped client can omit an
+internal use from its exported types, so consult its usage records.
 -}
 
 -- | Check old family headers that may need an independent result selector.
@@ -1789,7 +1856,8 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = orderedTypeCaseFingerprint
+          current_flag_hash = stagedMatchabilityFingerprint
+                            $ orderedTypeCaseFingerprint
                             $ abstractWitnessFingerprint
                             $ retainedCaseFingerprint
                             $ familyResultMatchabilityFingerprint
