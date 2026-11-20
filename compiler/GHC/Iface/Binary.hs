@@ -336,7 +336,7 @@ evidenceSuffix requirements
     feature_set = featureSetPrefix ++ intercalate "+" [name | (name, feature) <- independentFeatures, needs feature]
 
 legacyEvidenceSuffix :: IfaceEvidence -> String
-legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym"
+legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym-v2"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
@@ -362,7 +362,7 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("scoped", ScopedSigmaEvidence)
                       , ("user-rule", ErasedUserRuleEvidence)
                       , ("lexical-rule", LexicalPackageRuleEvidence)
-                      , ("partial-synonym", PartialSynonymEvidence) ]
+                      , ("partial-synonym-v2", PartialSynonymEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

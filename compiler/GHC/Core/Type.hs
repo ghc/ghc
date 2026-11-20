@@ -420,8 +420,38 @@ expandSynTyConApp_maybe tc arg_tys
     -- that (expand_syn ...) thunk, so it's more efficient not to build a thunk.
     -- Mind you, this function is always INLINEd, so the client context is probably
     -- enough to avoid thunk construction and so the $! is just belt-and-braces.
-  | otherwise
-  = Nothing
+  | Just (tvs, rhs) <- partialSynTyConDefn_maybe tc arg_tys
+  = Just $! (expand_syn tvs rhs arg_tys)
+  | otherwise = Nothing
+
+{- Note [Eta reduction of partial synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For `type Again e a = Column e a`, the prefix `Again Bool` refers to
+`Column Bool`. Strip only the missing parameters, in order. None of
+them may occur free in the function that remains. Check that the two
+functions have the same kind, including visibility and matchability.
+For example, `type Wrap a = Maybe a` has an unmatchable kind arrow,
+whereas Maybe has a matchable arrow. See Note [Newtype eta and
+homogeneous axioms] in GHC.Tc.TyCl.Build.
+
+Inspect the arguments written on the synonym RHS. General application
+splitting deliberately stops at family arity because it can serve
+inverse inference. This expansion only reads a definition. It never
+projects an argument out of an equality between applications.
+
+Compute the optional shorter definition when building the synonym.
+Keep it lazy. Looking through a synonym is also used to compute kinds.
+The expansion path must not repeat the kind check on each use.
+Type applications and coercion applications use the same shorter RHS.
+
+The interface header records this rule when the writer serializes a
+partial synonym. The first prototype treated forwarded prefixes as
+distinct. Its optimizer could reject an imported Refl after inlining.
+Expanding prefixes in new interfaces is insufficient. A proof may
+refer only to saturated aliases from an older module. The two readers
+therefore require different versions of the partial synonym feature.
+Modules without a serialized partial synonym keep their existing header.
+-}
 
 saturates :: [Type] -> Arity -> Bool
 saturates _       0 = True
@@ -2020,9 +2050,11 @@ buildSynTyCon :: Name
 -- This function is here because here is where we have
 --   isFamFree and isTauTy
 buildSynTyCon name kind binders res_kind roles rhs
-  = mkSynonymTyCon name kind binders res_kind roles rhs
-                   is_tau is_fam_free is_forgetful is_concrete
+  = tc
   where
+    tc = mkSynonymTyCon name kind binders res_kind roles rhs eta_rhs
+                        is_tau is_fam_free is_forgetful is_concrete
+    eta_rhs = shortenSynonym tc (reverse (map binderVar binders)) rhs Nothing
     qtvs         = mkVarSet (map binderVar binders)
     is_tau       = isTauTy rhs
     is_fam_free  = isFamFreeTy rhs
@@ -2039,6 +2071,24 @@ buildSynTyCon name kind binders res_kind roles rhs
        --    type Bucket a b c = Key (a,b,c)
        --    type Key x = Any
        -- Here Bucket is definitely forgetful!
+
+-- | Remove trailing parameters that simply forward an argument at the same kind.
+-- See Note [Eta reduction of partial synonyms].
+shortenSynonym :: TyCon -> [TyVar] -> Type -> Maybe ([TyVar], Type) -> Maybe ([TyVar], Type)
+shortenSynonym tc (v:vs) ty _
+  | Just (fun, TyVarTy arg) <- last_arg ty
+  , arg == v, not (v `elemVarSet` tyCoVarsOfType fun)
+  , let supplied = reverse vs
+        args = mkTyVarTys supplied
+  , isPartialTypeFunction tc args
+  , typeKind fun `eqType` piResultTys (tyConKind tc) args
+  = shortenSynonym tc vs fun (Just (supplied, fun))
+  where
+    last_arg (TyConApp head_tc tys)
+      | Just (prefix, a) <- snocView tys = Just (mkTyConApp head_tc prefix, a)
+    last_arg (AppTy f a) = Just (f,a)
+    last_arg _ = Nothing
+shortenSynonym _ _ _ best = best
 
 {-
 ************************************************************************

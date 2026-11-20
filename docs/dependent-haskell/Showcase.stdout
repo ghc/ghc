@@ -279,6 +279,7 @@ interpret two applications of the optional type constructor: Just (Just True)
 use a nested arrow for Either and a short-circuiting callback: (Right 7,False)
 apply a type lambda to Maybe, Either String and IO: Refl
 map a partially applied column type synonym: Refl
+compare two column readers before choosing the cell type: Refl
 partially apply a two-argument type lambda: Refl
 map a type lambda with a constructor case: Refl
 read fields from two indexed type case branches: (Refl,Refl)

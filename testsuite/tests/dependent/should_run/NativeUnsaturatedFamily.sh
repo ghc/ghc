@@ -81,3 +81,20 @@ if "${ghc[@]}" -c BadInjectivity.hs >injectivity.log 2>&1 ||
     cat injectivity.log
     exit 1
 fi
+
+# The omitted variable must be absent from the function that remains.
+cat >BadForward.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeOperators #-}
+module BadForward where
+import Data.Type.Equality
+import NativePartialSynonym (Slot)
+type Pair e a = (e, a)
+type Copy a = Pair a a
+wrong :: Slot Copy :~: Slot (Pair Bool)
+wrong = Refl
+HS
+if "${ghc[@]}" -c BadForward.hs >forward.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' forward.log; then
+    cat forward.log
+    exit 1
+fi

@@ -95,7 +95,7 @@ module GHC.Core.TyCon(
         tyConTuple_maybe, tyConClass_maybe, tyConATs,
         tyConDataFamInst_maybe, tyConDataFamInstSig_maybe, tyConDataFamCoercion_maybe,
         tyConFamilyResVar_maybe,
-        synTyConDefn_maybe, synTyConRhs_maybe,
+        synTyConDefn_maybe, synTyConRhs_maybe, partialSynTyConDefn_maybe,
         famTyConFlav_maybe,
         algTyConRhs,
         newTyConRhs, newTyConEtadArity, newTyConEtadRhs,
@@ -930,6 +930,9 @@ data TyConDetails =
 
         synTcRhs     :: Type,    -- ^ Contains information about the expansion
                                  -- of the synonym
+
+        -- See Note [Eta reduction of partial synonyms] in GHC.Core.Type.
+        synEtaRhs :: Maybe ([TyVar], Type),
 
         synIsTau     :: Bool,   -- True <=> the RHS of this synonym does not
                                  --          have any foralls, after expanding any
@@ -2282,12 +2285,14 @@ mkSynonymTyCon :: Name
                -> Kind   -- ^ /result/ kind
                -> [Role]
                -> Type
+               -> Maybe ([TyVar], Type)
                -> Bool -> Bool -> Bool -> Bool
                -> TyCon
-mkSynonymTyCon name kind binders res_kind roles rhs is_tau
+mkSynonymTyCon name kind binders res_kind roles rhs eta_rhs is_tau
                is_fam_free is_forgetful is_concrete
   = mkTyCon name kind binders 0 res_kind roles $
     SynonymTyCon { synTcRhs       = rhs
+                 , synEtaRhs      = eta_rhs
                  , synIsTau       = is_tau
                  , synIsFamFree   = is_fam_free
                  , synIsForgetful = is_forgetful
@@ -2959,7 +2964,7 @@ expandSynTyCon_maybe
 -- ^ Expand a type synonym application
 -- Return Nothing if the TyCon is not a synonym,
 -- or if not enough arguments are supplied
-expandSynTyCon_maybe (TyCon { tyConTyVars = tvs, tyConArity = arity
+expandSynTyCon_maybe tc@(TyCon { tyConTyVars = tvs, tyConArity = arity
                             , tyConDetails = details }) tys
   | SynonymTyCon { synTcRhs = rhs } <- details
   = if arity == 0
@@ -2967,7 +2972,9 @@ expandSynTyCon_maybe (TyCon { tyConTyVars = tvs, tyConArity = arity
     else case tys `listLengthCmp` arity of
               GT -> ExpandsSyn (tvs `zip` tys) rhs (drop arity tys)
               EQ -> ExpandsSyn (tvs `zip` tys) rhs []
-              LT -> NoExpansion
+              LT | Just (eta_tvs, eta_rhs) <- partialSynTyConDefn_maybe tc tys
+                 -> ExpandsSyn (zip eta_tvs tys) eta_rhs (dropList eta_tvs tys)
+                 | otherwise -> NoExpansion
    | otherwise
    = NoExpansion
 
@@ -3121,6 +3128,13 @@ synTyConDefn_maybe (TyCon { tyConTyVars = tyvars, tyConDetails = details })
   = Just (tyvars, ty)
   | otherwise
   = Nothing
+
+-- | Return the shorter definition when its binders have all been supplied.
+-- See Note [Eta reduction of partial synonyms] in GHC.Core.Type.
+partialSynTyConDefn_maybe :: TyCon -> [a] -> Maybe ([TyVar], Type)
+partialSynTyConDefn_maybe (TyCon { tyConDetails = SynonymTyCon { synEtaRhs = Just def@(tvs, _) } }) args
+  | tvs `leLength` args = Just def
+partialSynTyConDefn_maybe _ _ = Nothing
 
 -- | Extract the information pertaining to the right hand side of a type synonym
 -- (@type@) declaration.

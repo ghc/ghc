@@ -4,7 +4,7 @@
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild
   , IndexedTag(..), IndexedCase, IndexedCaseInferred
-  , roadmap, partial, optionalColumns, mixed, indexedFields
+  , roadmap, partial, optionalColumns, sameColumnReader, mixed, indexedFields
   ) where
 
 import Data.Kind (Type)
@@ -20,6 +20,13 @@ type family Map f xs where
 
 -- | A column read can fail or return a missing cell.
 type Column err a = Either err (Maybe a)
+
+-- | Keep the same reader when the last argument is forwarded unchanged.
+type ReadColumn err a = Column err a
+
+-- | Compare the readers before choosing the cell type.
+sameColumnReader :: ReadColumn String :~: Column String
+sameColumnReader = Refl
 
 -- | Apply one error type to both column readers.
 optionalColumns :: Map (Column String) '[Int, Char]

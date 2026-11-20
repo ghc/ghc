@@ -22,3 +22,14 @@ atChar = Refl
 
 congruent :: a :~: b -> Saved a :~: Saved b
 congruent Refl = Refl
+
+-- Check a forwarding chain and a higher-order parameter at the same kind.
+type Again e a = Column e a
+type Twice e a = Again e a
+type Through (f :: Type %U -> Type) a = f a
+
+forwarded :: Slot (Twice Bool) :~: Saved Bool
+forwarded = Refl
+
+forwardedVariable :: Slot (Through f) :~: Slot f
+forwardedVariable = Refl

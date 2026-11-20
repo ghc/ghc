@@ -665,9 +665,14 @@ the extension. Older readers report GHC-47808 at the import when the
 provider interface contains the new form. An interface containing only
 fully applied synonyms keeps its original encoding.
 
-One equality remains open. Given `type Again e a = Column e a`, the
-two partial synonyms `Again Bool` and `Column Bool` do not yet compare
-equal. Their fully applied forms expand to the same type.
+Given `type Again e a = Column e a`, the prefixes `Again Bool` and
+`Column Bool` compare equal before the caller supplies the last argument.
+The missing parameter must occur only as the final argument. The two
+remaining functions must have the same kind and matchability. Earlier
+experimental interfaces that serialize a partial synonym need recompilation.
+At `-O0` and `-O2`, a source-hidden client can use the forwarded function,
+match the exported equality, or use the equality directly. Tests at all three
+interface compression levels also compare ordinary interface bytes.
 [Source example](../examples/open-evaluation/TypeLambda.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativePartialSynonym.hs)
 and [references](../REFERENCES.md#passing-a-type-synonym-as-a-function).
