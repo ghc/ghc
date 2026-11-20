@@ -565,14 +565,14 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                      ; (subst, _) <- newMetaTyVarsX (Subst.mkEmptySubst (mkInScopeSet free))
                                                    result_vars
                      ; let schema = Subst.substTy subst template
-                     ; body <- open schema [] marked
+                     ; body <- open schema emptyNameEnv [] marked
                      ; tcWrapResult rn_expr body schema expected }
              else check_mono marked }
       | otherwise = check_mono marked
 
     check_mono marked = do
       result_ty <- expTypeToType expected
-      open result_ty [] marked
+      open result_ty emptyNameEnv [] marked
 
     (head_binders, head_sigma) = tcSplitForAllInvisTyVars fun_ty
     (_, head_body) = tcSplitPhiTy head_sigma
@@ -594,7 +594,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
 
     mark :: TcType -> [HsExprArg 'TcpRn]
          -> TcM [Either (HsExprArg 'TcpRn)
-                        (HsExprLoc, Mult, LHsExpr GhcRn, LHsExpr GhcRn -> LHsExpr GhcRn)]
+                        (HsExprLoc, Mult, LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn))]
     mark ty (wrapper@EWrap{} : rest) = (Left wrapper :) <$> mark ty rest
     mark ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
       | FunTy { ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result }
@@ -627,8 +627,8 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
           = do { ident <- tcLookupIdMaybe id_name
                ; return $ case implicitSpineHead . varType <$> ident of
                    Just (ExistsTy ImplicitExists _ body)
-                     | opensImplicitHead n body -> Just (head_expr, rebuild)
-                   Just ty | hasDotResult n ty -> Just (arg, id)
+                     | opensImplicitHead n body -> Just (head_expr, Just rebuild)
+                   Just ty | hasDotResult n ty -> Just (arg, Nothing)
                    _ -> Nothing }
         find_head _ _ _ = return Nothing
 
@@ -640,18 +640,42 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
         hasDotResult (n - 1) result
       _ -> False
 
-    open result_ty rev_args [] =
+    open result_ty _ rev_args [] =
       check_app (reverse rev_args) (mkCheckExpType result_ty)
-    open result_ty rev_args (Left arg : rest) =
-      open result_ty (arg : rev_args) rest
-    open result_ty rev_args (Right (loc, mult, arg, rebuild) : rest) =
+    open result_ty opened rev_args (Left arg : rest) =
+      open result_ty opened (arg : rev_args) rest
+    open result_ty opened rev_args (Right (loc, mult, arg, rebuild) : rest) =
       do { (checked, actual) <- tcScalingUsage mult $ tcInferRho arg
          ; schema <- liftZonkM (zonkTcType actual)
-         ; tcOpenImplicitPackage (getLocA arg) schema checked result_ty $ \payload ->
-             do { let payload_ref = nlHsVar (getName payload)
-                      ref = EValArg loc noExtField $
-                        rebuild (fmap (\e -> mkExpandedLExpr e payload_ref) arg)
-                ; tcExtendIdEnv [payload] $ open result_ty (ref : rev_args) rest } }
+         ; let key | isManyTy mult, isNothing rebuild = lexicalPackage checked
+                   | otherwise = Nothing
+               shared = do
+                 name <- key
+                 (previous, payload) <- lookupNameEnv opened name
+                 guard (eqType previous schema)
+                 return payload
+               continue env payload =
+                 let payload_ref = nlHsVar (getName payload)
+                     ref = EValArg loc noExtField $
+                       fromMaybe id rebuild (fmap (\e -> mkExpandedLExpr e payload_ref) arg)
+                 in open result_ty env (ref : rev_args) rest
+         ; case shared of
+             Just payload -> continue opened payload
+             Nothing -> tcOpenImplicitPackage (getLocA arg) schema checked result_ty $ \payload ->
+               let env = case key of
+                     Just name -> extendNameEnv opened name (schema, payload)
+                     Nothing -> opened
+               in tcExtendIdEnv [payload] $ continue env payload }
+
+    lexicalPackage :: LHsExpr GhcTc -> Maybe Name
+    lexicalPackage (L _ (HsPar _ arg)) = lexicalPackage arg
+    lexicalPackage (L _ (HsVar _ (L _ ident)))
+      | isLocalId ident
+      , let name = getName ident
+      , not (isExternalName name)
+      , ExistsTy ImplicitExists _ _ <- coreFullView (varType ident)
+      = Just name
+    lexicalPackage _ = Nothing
 
 -- | Find the declared shape after ordinary invisible instantiation.
 implicitSpineHead :: TcType -> TcType
@@ -704,8 +728,16 @@ consumer. When its formal domain requests a payload, open only the inner
 head and replace that head in the original expression. The ordinary
 checker then checks the rewritten call once, as part of the outer call.
 
-For each dot operand, introduce a fresh skolem and a lazy payload
-binding. Instantiate the application under all of the skolems. The
+Introduce a fresh skolem and lazy payload binding for each distinct
+opening. Two unrestricted operands in this application can share an
+opening when both are the same checked local package variable at the
+same schema. Reuse the payload Id under its existing skolem. This is
+the lexical-variable case of IExistCore in An Existential Crisis
+Resolved. It preserves the source use check for each operand.
+Computed operands, instantiated variables and linear arguments each
+have their own opening. The map is local to the application spine.
+
+Instantiate the application under all of the skolems. The
 outer result type is present before any of these scopes, so the
 ordinary implication solver rejects a witness that would escape.
 If the result expects another dot package, check and pack the result
