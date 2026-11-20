@@ -52,7 +52,7 @@ import Control.Exception (SomeException, evaluate, try)
 import Control.Monad (unless, void)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
-import OpenVectorAppend (appendEmptyAt)
+import OpenVectorAppend (appendConsAt, appendEmptyAt)
 import OrdinaryOpenVectorAppend (appendContents, observeAppendCons, observeAppendEmpty)
 import qualified PackedVecLibrary as P
 
@@ -69,6 +69,9 @@ main = do
     print (observeAppendEmpty, appendContents xs, proofOnly (error "forced proof input" :: P.Vec Bool 'P.Z))
     putStrLn observeAppendCons
     let bottom = error "forced vector" :: P.Vec Bool 'P.Z
+    let consProof :: a -> P.Vec a n -> P.Vec a m -> Bool
+        consProof hd tl ys = case appendConsAt hd tl ys of Refl -> True
+    unless (consProof (error "forced proof head") bottom bottom) (fail "missing recursive proof")
     left <- raises (P.appendVec bottom P.VNil)
     unless left (fail "append did not inspect its left operand")
     case P.appendVec (P.VCons (error "forced head") bottom) bottom of
@@ -112,6 +115,32 @@ wrong :: foreach (xs :: P.Vec Bool 'P.Z) -> foreach (ys :: P.Vec Bool 'P.Z)
 wrong xs ys = Refl
 HS
 reject WrongRuntime.hs 83865 'wrong xs ys = Refl' -O1
+
+cat >WrongConsAt.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module WrongConsAt where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+wrong :: foreach (x :: Bool) -> foreach (y :: Bool) -> foreach (xs :: P.Vec Bool n)
+      -> foreach (ys :: P.Vec Bool m)
+      -> P.appendVec ('P.VCons x xs) ys :~: 'P.VCons y (P.appendVec xs ys)
+wrong x y xs ys = Refl
+HS
+reject WrongConsAt.hs 83865 'wrong x y xs ys = Refl' -O1
+
+cat >AnnotatedField.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module AnnotatedField where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+proof :: forall n. foreach (xs :: P.Vec Bool n)
+      -> P.appendVec ('P.VCons 'True (xs :: P.Vec Bool n)) 'P.VNil
+         :~: 'P.VCons 'True (P.appendVec xs 'P.VNil)
+proof _ = Refl
+HS
+"${ghc[@]}" -O1 -c AnnotatedField.hs
 
 cat >OpaqueLeft.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, TypeOperators #-}
@@ -240,7 +269,8 @@ for mutant in force-head change-carried; do
     fi
     cd "$out/client"
     cp ../provider/PackedVecLibrary.hi .
-    sed -e '/^-- | Appending a cons/,$d' -e 's/OpenVectorAppend (appendEmpty, appendCons)/EmptyOnly (appendEmpty)/'         "$src/OpenVectorAppend.hs" > EmptyOnly.hs
+    sed -e '/^-- | Appending a cons/,$d' -e 's/^module OpenVectorAppend .*/module EmptyOnly (appendEmpty, appendEmptyAt) where/' \
+        "$src/OpenVectorAppend.hs" > EmptyOnly.hs
     "${ghc[@]}" -O1 -fforce-recomp -c EmptyOnly.hs
     reject OpenVectorAppend.hs 70565 'This operand contains an open or unsupported field.' -O1 -fforce-recomp
 done

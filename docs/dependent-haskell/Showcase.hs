@@ -1481,12 +1481,14 @@ sourceAddition = do
               :~: 'VCons 'True ('VCons 'False 'VNil))
     observe "prove empty append preserves a runtime vector"
         (OrdinaryOpenVectorAppend.appendContents joined)
+    observe "prove the first cell of append at runtime"
+        (OrdinaryOpenVectorAppend.consContents False prefix suffix)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)
     checkedInput <- newIORef [True, False] >>= readIORef
     let matchesEmpty input = case ListVectorClient.fromList input of
-            Sigma.Pair _ xs -> case emptyVectorProof xs of
+            Sigma.Pair size xs -> case emptyVectorProof @_ @size xs of
                 Just HRefl -> True
                 Nothing -> False
     observe "prove the runtime vector is VNil in the empty branch"

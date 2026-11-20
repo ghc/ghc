@@ -1,11 +1,11 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module OrdinaryOpenVectorAppend (observeAppendEmpty, appendContents, observeAppendCons) where
+module OrdinaryOpenVectorAppend (observeAppendEmpty, appendContents, observeAppendCons, consContents) where
 
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import OpenVectorAppend (appendCons, appendEmpty, appendEmptyAt)
+import OpenVectorAppend (appendCons, appendConsAt, appendEmpty, appendEmptyAt)
 import qualified PackedVecLibrary as P
 
 -- | Use the imported proof and read the head with a suspended tail.
@@ -30,3 +30,8 @@ observeAppendCons :: String
 observeAppendCons =
     show (appendCons @Bool @'P.Z @('P.S 'P.Z) @'True
                      (Proxy @'P.VNil) (Proxy @('P.VCons 'False 'P.VNil)))
+
+-- | Use the recursive equation at an ordinary call with runtime arguments.
+consContents :: a -> P.Vec a n -> P.Vec a m -> [a]
+consContents x xs ys = case appendConsAt x xs ys of
+    Refl -> P.toList (P.appendVec (P.VCons x xs) ys)
