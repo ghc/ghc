@@ -12,6 +12,9 @@ type ImportedM = P.D (Type -> Type) Maybe
 -- | Fix it to U from the imported abstract family.
 type ImportedU = P.D (Type -> Type) P.Abstract
 
+-- | Apply the callback at both arrows selected by its provider.
+type CallbackResults = (P.Callback False Int, P.Callback True Int)
+
 -- | Compare the inferred type with its explicit M form.
 importedM :: ImportedM :~: P.D (FUN @M 'Many Type Type) Maybe
 importedM = Refl

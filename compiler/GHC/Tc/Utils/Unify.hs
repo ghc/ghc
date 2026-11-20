@@ -66,6 +66,7 @@ import {-# SOURCE #-} GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Hs
 import GHC.Tc.Errors.Types ( HsCtxt(..), TcRnMessage(TcRnRetainedQuantificationError)
                            , RetainedQuantificationError(RetainedPatternType) )
+import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -88,6 +89,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
+import GHC.Core.FamInstEnv ( reduceTyFamApp_maybe )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Type
@@ -3764,6 +3766,15 @@ matchExpectedFunKind
   -> TcKind          -- ^ fun_kind
   -> TcM Coercion    -- ^ co :: fun_kind ~ (arg1 -> ... -> argn -> res)
 
+{- Note [Applying a type at a family-defined arrow kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An application can use any visible arrow. A family equation can reduce
+IK (Arr a b) to IK a %U -> IK b. Use that selector just as for a
+visible arrow in the input.
+Try one nominal family step. Use its coercion only if it exposes a
+visible arrow. The next step then consumes an argument. For a stuck
+family, keep the usual constraint and its source location.
+-}
 matchExpectedFunKind hs_ty n k = go n k
   where
     go 0 k = return (mkNomReflCo k)
@@ -3781,6 +3792,16 @@ matchExpectedFunKind hs_ty n k = go n k
       | isVisibleFunArg af
       = do { co <- go (n-1) res
            ; return (mkNakedFunCo Nominal af (mkNomReflCo ma) (mkNomReflCo w) (mkNomReflCo arg) co) }
+
+    -- See Note [Applying a type at a family-defined arrow kind].
+    go n k@(TyConApp tc args)
+      | isTypeFamilyTyCon tc
+      = do { envs <- tcGetFamInstEnvs
+           ; args <- liftZonkM (mapM zonkTcType args)
+           ; case reduceTyFamApp_maybe envs Nominal tc args of
+               Just (Reduction co rhs@FunTy{ft_af = af})
+                 | isVisibleFunArg af -> mkTransCo co <$> go n rhs
+               _ -> defer n k }
 
     go n other
      = defer n other
