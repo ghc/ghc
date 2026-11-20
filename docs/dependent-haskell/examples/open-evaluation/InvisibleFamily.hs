@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, RankNTypes #-}
 {-# LANGUAGE StandaloneKindSignatures, TypeAbstractions, TypeApplications, TypeFamilies #-}
-module InvisibleFamily (Test, Observed, Inferred, PickVisible, ObservedVisible, IndexedVisible, wrappedValues) where
+module InvisibleFamily (Test, Observed, Inferred, PickVisible, ObservedVisible, IndexedVisible, ReadAt, ReadFlag, ReadType, wrappedValues) where
 
 import Data.Kind (Type)
 import GHC.Exts (M, U)
@@ -44,6 +44,16 @@ type family RunVisible @r f where
 
 type ObservedVisible = RunVisible (PickVisible 'True)
 type IndexedVisible flag = RunVisible (PickVisible flag)
+
+-- | Choose a result using the result kind and a later input type.
+type ReadAt :: Bool -> forall (result :: Type). @U forall (input :: Type). @U result
+type family ReadAt flag @result @input
+type instance ReadAt 'True @Bool @Bool = 'True
+type instance ReadAt 'True @Type @Bool = Int
+
+-- | Let the receiver determine the result kind and supply the input later.
+type ReadFlag = RunVisible @Bool (ReadAt 'True)
+type ReadType = RunVisible @Type (ReadAt 'True)
 
 -- | Select the kind of the type function returned by Wrap.
 type family Arrow (list :: Bool) where

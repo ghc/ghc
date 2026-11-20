@@ -981,7 +981,7 @@ main = do
         PartitionChoices.partitionViews (VCons 7 (VCons 2 (VCons 9 VNil)))
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
-    observe "infer a polymorphic witness for a packaged lambda" (RankedPackage.runBuilder 11)
+    observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
     observe "match and open existential packages in optimizer rules"
         (LexicalPackageRules.local 3 (LexicalPackageRules.hideInt 5))
@@ -1084,6 +1084,8 @@ main = do
         (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "infer the result kind after passing a visible family argument"
         (Refl :: InvisibleFamily.ObservedVisible :~: Int)
+    observe "infer the first invisible family argument and leave the second open"
+        (Refl :: InvisibleFamily.ReadFlag :~: 'True, Refl :: InvisibleFamily.ReadType :~: Int)
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional

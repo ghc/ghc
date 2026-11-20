@@ -26,9 +26,10 @@ if "${ghc[@]}" -c NativeUnsaturatedInvisibleInverse.hs > inverse.log 2>&1 ||
     exit 1
 fi
 if "${ghc[@]}" -c NativeUnsaturatedInvisibleMatchable.hs > matchable.log 2>&1 ||
-   [[ $(grep -Fc '[GHC-83865]' matchable.log) -ne 2 ]] ||
+   [[ $(grep -Fc '[GHC-83865]' matchable.log) -ne 3 ]] ||
    ! grep -Fq 'type Bad :: forall k. @M k' matchable.log ||
    ! grep -Fq "type BadVisible = ExpectsM (PickVisible 'True)" matchable.log ||
+   ! grep -Fq "type BadSuffix = ExpectsM (ReadAt 'True)" matchable.log ||
    ! grep -Fq 'Expected kind ‘forall k. @M' matchable.log ||
    ! grep -Eq 'has kind ‘forall k\. @([^[:space:]]*\.)?U([[:space:]]|$)' matchable.log; then
     cat matchable.log >&2

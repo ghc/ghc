@@ -21,6 +21,16 @@ viaValue = \_ -> callback
 viaTypeArg :: RankedBuilder
 viaTypeArg = \b -> configured @True @Bool Proxy id b
 
+viaPackageTypeArg :: Bool -> (Int, Bool)
+viaPackageTypeArg flag = case ranked @Bool flag of
+    Payload value run -> run value
+
+viaObserverTypeArg :: Bool -> (Int, Bool)
+viaObserverTypeArg flag = observe (ranked @Bool flag)
+  where
+    observe :: Payload t -> (Int, Bool)
+    observe (Payload value run) = run value
+
 viaLinear :: LinearBuilder
 viaLinear = \b -> buildLinear b
 
@@ -34,4 +44,5 @@ main = do
         fail "GADT pattern did not refine the builder operand"
     print (unpack hidden, observeBuilder viaCall False,
            observeBuilder viaValue (error "unused builder operand"),
-           observeBuilder viaTypeArg False)
+           observeBuilder viaTypeArg False, viaPackageTypeArg False,
+           viaObserverTypeArg True)

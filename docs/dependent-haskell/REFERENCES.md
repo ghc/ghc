@@ -1484,6 +1484,18 @@ constraint into a different Core application order. The existing IALL and
 This is a GHC frontend requirement. It adds no new Core proof rule or mutable
 type-meta assignment for the runtime index.
 
+## Visible type arguments before an erased function package
+
+Proposal 378 describes checking a dependent application one argument
+at a time. Quick Look describes instantiation at an application head.
+For `builder @Int n`, the fork checks `@Int` and the resulting
+dictionary on the declared builder. It opens the erased package
+around the remaining call and its consumer. A mismatch in `n`
+still points to the written application.
+[Proposal 378 on dependent application](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset),
+[Quick Look, §4.4](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=10)
+and [packaged callback](examples/erased-existentials/RankedPackage.hs).
+
 ## Source package patterns
 
 Decision: allow ordinary nested patterns in non-retained package fields.
@@ -5867,6 +5879,18 @@ index. The matchable and unmatchable arrow choices are specific to GHC.
 [proposal 242 on type synonyms](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms),
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [the separate-module example](examples/open-evaluation/NestedFunctionClient.hs).
+
+### Inferring a prefix of invisible family arguments
+
+Proposal 242 gives partial type family applications a kind with
+matchability on the remaining binders. Agda inserts implicit arguments
+from an expected type. In this fork, GHC's existing `checkExpectedKind`
+instantiates the excess leading binders of an eligible family and
+checks the kinds that remain. A caller can therefore request just the
+last invisible binder. The family still reduces only at its arity.
+[Proposal 242 on quantifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers),
+[Agda 2.8.0 on implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [source example](examples/open-evaluation/InvisibleFamily.hs).
 
 ### Inferring matchability across a declaration splice
 

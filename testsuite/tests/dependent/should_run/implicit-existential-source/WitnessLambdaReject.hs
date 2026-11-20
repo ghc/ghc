@@ -18,3 +18,10 @@ missingEquality = \_ b -> buildAt b
 
 wrongVisibleKind :: RankedBuilder
 wrongVisibleKind = \_ -> configured @True @Maybe Proxy (const True) Nothing
+
+wrongPackageArgument :: Bool -> (Int, Bool)
+wrongPackageArgument flag = case ranked @Char flag of
+    Payload value run -> run value
+
+escapePackageCall :: Bool -> t
+escapePackageCall flag = case ranked @Bool flag of Payload value _ -> value
