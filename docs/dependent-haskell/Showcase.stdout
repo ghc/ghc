@@ -218,6 +218,7 @@ infer the hidden lengths of a lazy filter and a retained vector: ([7],[],[9])
 project a stored vector from a strict record field: "h"
 read a retained length through a newtype record selector: (2,"hs")
 read a GADT newtype length without forcing its vector: 1
+read nested lengths and the first aligned cells: (2,1,[('h','s')])
 partition a vector at two independent result lengths: ([7,9],[2],[7])
 match both hidden lengths in one partition result: ([7,9],[2])
 choose a partition without forcing the unused branch: ([7,9],[2])

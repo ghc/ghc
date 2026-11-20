@@ -960,6 +960,8 @@ main = do
             (VCons 'h' (VCons 's' VNil)))
     observe "read a GADT newtype length without forcing its vector" $
         StoredVector.gadtLength 1 (error "unused vector" :: Vec Char 1)
+    observe "read nested lengths and the first aligned cells"
+        StoredVector.nestedObservation
     let (passing, failing) = ImplicitVector.partitionVec odd
             (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
         (firstPart, _) = ImplicitVector.partitionVec odd (VCons (7 :: Int) (error "unused partition tail"))
