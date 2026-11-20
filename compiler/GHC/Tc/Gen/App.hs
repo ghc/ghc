@@ -1163,7 +1163,7 @@ tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
        ; residual <- liftZonkM (zonkTcType residual)
        ; let keep_ql = return (prefix, DoQL, residual, remaining, Nothing)
              declared_plan =
-               do { plan <- tcRetainedKnownArgPlan tcRetainedQuickLookArgType expected fun residual remaining
+               do { plan <- tcRetainedKnownArgPlan declared_arg_type expected fun residual remaining
                   ; case plan of
                       Just _ -> return (prefix, NoQL, residual, remaining, plan)
                       Nothing -> keep_ql }
@@ -1197,6 +1197,14 @@ tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
                                  else keep_ql }
                        _ -> declared_plan } } } }
   where
+    -- Use the complete result and cached RHS in tcRetainedDollarInst.
+    -- See Note [Immutable native dollar applications].
+    declared_arg_type
+      | HsVar _ (L _ dollar) <- fun, dollar `hasKey` dollarIdKey
+      = tcRetainedDeclaredArgType tcRetainedDeclaredTypeView
+      | otherwise
+      = tcRetainedQuickLookArgType
+
     known_head HsVar{} = True
     known_head (XExpr (ConLikeTc (RealDataCon _))) = True
     known_head _ = False

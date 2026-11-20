@@ -366,11 +366,14 @@ Agda compares Pi codomains under one shared extended context.
 calls [`compareDom`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849),
 which checks the domains and extends that context before comparing the bodies.
 The pinned `Conversion.hs` blob is `69423e2c11b6f35bc5eee2d502cf2830efbc005a`.
-The GHC ambiguity check opens each retained binder with one shared opaque runtime
-Id. It compares temporary ordinary arrows under those Ids and retains outer
-erased quantifiers. It discards the wrapper and evidence. This checking-only
-projection is a GHC adaptation. It does not extend FC coercions or disable
-ordinary ambiguity checks. A noninjective payload family remains ambiguous.
+GHC first skolemises one copy of the signature and instantiates the other.
+It checks each pair of retained domains nominally before opening the body.
+The shared runtime Id has the expected domain. The actual body can use it
+at a different domain through the nominal equality Wanted. The ambiguity
+check discards its evidence. A suffix that appears only under a
+noninjective family remains ambiguous in the vector regression.
+[GHC ambiguity check](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/ambiguous_types.html)
+and [retained vector regression](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppend.sh).
 
 Expected-result instantiation uses a separate GHC adaptation. It matches an
 ordinary constructor or helper result against a checked expected type. It binds
@@ -1547,6 +1550,18 @@ still points to the written application.
 [Proposal 378 on dependent application](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset),
 [Quick Look, §4.4](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=10)
 and [packaged callback](examples/erased-existentials/RankedPackage.hs).
+
+GHC proposal #274 keeps Quick Look for the wired-in `($)` even when the
+caller omits `ImpredicativeTypes`. The review asks whether the operator
+or its instantiation needs special treatment. Serrano uses `runST $ do
+...` to show why existing callers depend on this rule. In the fork,
+`expectMarker label marker $ evaluate proof` also needs the left
+operand's polymorphic argument to accept a proof whose type mentions a
+local vector length. The retained-argument checker has a separate path
+for this use of `($)`.
+[Accepted proposal #274](https://ghc-proposals.readthedocs.io/en/latest/proposals/0274-quick-look-impredicativity.html#the-dollar-rule),
+[review question](https://github.com/ghc-proposals/ghc-proposals/pull/274#issuecomment-533569608),
+and [author's reply](https://github.com/ghc-proposals/ghc-proposals/pull/274#issuecomment-533664634).
 
 ## Source package patterns
 

@@ -168,6 +168,36 @@ sed -e 's/^module OpenVectorAppend .*/module WrongAppendPair where/' \
     "$src/OpenVectorAppend.hs" >WrongAppendPair.hs
 reject WrongAppendPair.hs 05617 "In the expression: appendEmptyAt @a @'P.Z xs" -O1
 
+cat >AmbiguousRetainedWidth.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module AmbiguousRetainedWidth where
+
+import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+
+type EmptyProof a (n :: P.Nat) (xs :: P.Vec a n) = P.appendVec 'P.VNil xs :~: xs
+
+ambiguous :: forall m a. foreach (cut :: P.Nat) -> foreach (xs :: P.Vec a (P.Add cut m))
+          -> EmptyProof a (P.Add cut m) xs
+ambiguous _ _ = Refl
+HS
+reject AmbiguousRetainedWidth.hs 83865 'is a non-injective type family' -O1
+grep -Fq 'In the ambiguity check for' AmbiguousRetainedWidth.log
+
+sed -e 's/^module AmbiguousRetainedWidth/module DeterminedRetainedWidth/' \
+    -e 's/^ambiguous/determined/' \
+    -e 's/-> EmptyProof a (P.Add cut m) xs/-> (Proxy m, EmptyProof a (P.Add cut m) xs)/' \
+    -e 's/= Refl$/= (Proxy, Refl)/' \
+    AmbiguousRetainedWidth.hs >DeterminedRetainedWidth.hs
+cat >>DeterminedRetainedWidth.hs <<'HS'
+
+nested :: forall a. (forall n. foreach (xs :: P.Vec a n) -> EmptyProof a n xs) -> Int
+nested _ = 0
+HS
+"${ghc[@]}" -O1 -c DeterminedRetainedWidth.hs
+
 cat >WrongConsAt.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
