@@ -1,9 +1,11 @@
 {-# LANGUAGE ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments #-}
 module RankedPackageClient
     ( runGuarded, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
+    , runMixedPackage
     ) where
 
 import Data.Proxy (Proxy(..))
+import qualified ErasedPackage
 import RankedPackage
     ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
     , TwoWitnessBuilder, atTwoTypes, consumeIdentity, fromLeft, fromRight
@@ -62,3 +64,10 @@ runExplicitBranches =
             then Callback @PolyId id (\f -> (f 7, f input))
             else Callback @PolyMaybe Just
                 (\f -> (maybe 0 id (f 17), maybe False id (f input)))
+
+-- | Hide the outer witness in an ordinary module and read the number.
+runMixedPackage :: Int -> Int
+runMixedPackage n = ErasedPackage.readMixedNumber (hide n)
+  where
+    hide :: Int -> ErasedPackage.MixedNumber
+    hide value = ErasedPackage.packNumber value

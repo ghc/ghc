@@ -1,8 +1,11 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
-{-# LANGUAGE RequiredTypeArguments #-}
+{-# LANGUAGE RequiredTypeArguments, ScopedTypeVariables #-}
 
 -- | Observe payloads whose type witness is erased.
-module ErasedPackage (observation, Filtered, filterVec, cells, filterObservation) where
+module ErasedPackage
+  ( observation, MixedNumber, packNumber, readMixedNumber
+  , Filtered, filterVec, cells, filterObservation
+  ) where
 
 import Data.Kind (Type)
 import GHC.Exists
@@ -25,6 +28,20 @@ observation =
   , case error "unused package" :: Hidden of
       Pack (type a) _ -> True
   )
+
+type NumberPackage a = exists (b :: Type) | (a, b, Int)
+
+-- | Hide the remaining type of an explicitly packed number.
+type MixedNumber = exists (a :: Type). NumberPackage a
+
+-- | Introduce the explicit witness while keeping the outer type visible.
+packNumber :: Int -> NumberPackage Bool
+packNumber n = Pack (type Char) (True, 'x', n)
+
+-- | Open both packages and read the number.
+readMixedNumber :: MixedNumber -> Int
+readMixedNumber p = case p of
+  Pack (type b) (_, _ :: b, n) -> n
 
 -- | A vector whose result length is known only to its producer.
 type Filtered a = exists (m :: Nat) | Vec a m
