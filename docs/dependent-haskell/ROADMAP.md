@@ -9,12 +9,13 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-The fork accepts runtime-indexed functions, constructor fields and selected
-ordinary functions in types. A pair can store an abstract lifted witness.
-An ordinary client can read its payload without forcing the witness, even
-when that witness comes from IO.
+The fork accepts runtime-indexed functions, dependent constructor fields
+and selected ordinary functions in types. A recursive vector partition
+can return two vectors of independent lengths. Its provider and an ordinary
+client both compile at `-O1`. Reading the first matching cell leaves the
+remaining input unevaluated. [Partition source](examples/erased-existentials/ImplicitVector.hs).
 
-Both native compiler stages reproduce the 283 lines of the [Showcase](Showcase.hs)
+Both native compiler stages reproduce the 284 lines of the [Showcase](Showcase.hs)
 at `-O0` and default `-O1`. The self-hosted compiler also matches the golden
 output with stripped interfaces and in GHCi. The recursive vector filter
 chooses its result length from the elements that pass. Its source uses
@@ -23,14 +24,16 @@ after the first passing element unevaluated.
 [Filter source](examples/erased-existentials/ImplicitVector.hs) and
 [Showcase commands](README.md#run-the-showcase).
 
-At `8f64aad591`, all 59 focused tests that ran passed. In the dependent
-directory, 284 of 314 executed normal-way tests passed. The same 30 cases
-failed with the same failure categories at `f88fec2f22`. The Showcase
-zips a filtered vector with itself at its hidden length and projects a
-vector through a strict record field. The family example applies a visible
-argument and passes the remaining invisible binder to another family.
-The `8f64aad591` compiler requires `-O0` for a provider with surviving
-erased package operations. An ordinary client can call it at `-O1`.
+At `b667241915`, all 59 focused tests that ran passed. In the dependent
+directory, 284 of 314 executed normal-way tests passed. The same 30 tests
+failed with the same failure categories at `c3f6a983dd`.
+
+The Showcase zips a filtered vector with itself at its hidden length and
+projects a vector through a strict record field. A separate ordinary client
+calls the optimized partition provider and reads one matching element from a
+partial input. The client prints `([7,9],[2],[7])`. A client compiled with
+the earlier compiler can also read the new provider's interface. The family
+example passes a family with one invisible binder left to another family.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -44,7 +47,7 @@ the header. The new reader checks the coercion's role and scope.
 | Card | What works | Remaining gap |
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Function signatures and ordinary constructor fields accept `some`. A strict record can store a vector alongside its length. | Broaden dependent product domains and inference. Check sum formation in other declaration contexts. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | An ordinary client inherits a length-indexed default method and projects an imported pair at `-O1`. The optimizer can lift a loop exit and abstract its hidden witness before its payload. | Admit surviving package operations to every scheduled optimizer pass. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider can construct and open erased packages at default `-O1`. The optimizer keeps an opened witness in scope through specialization, floating, worker/wrapper, exitification and CSE. | Check coercions under erased binders, local rewrite rules and additional optimization settings. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor row can precede a wildcard or named catch-all. The case stays stuck when an unknown input blocks an earlier constructor test. | General mixed patterns and open GADT indices. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | A local binding can filter the result of a packaged function. Two uses of the same unrestricted local vector can share one hidden length in a call to `zipVec`. | Check ordinary constructor patterns on packages and support general witness projections. |
@@ -63,11 +66,10 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Run the complete `-O1` schedule on erased package providers.
-   The retained simplifier, call arity, exitification, binding floats, demand,
-   CPR and worker/wrapper pass the native laziness check. The full schedule
-   still encounters an unsupported package in the specialiser. Check
-   dictionary scope, expression keys in CSE and separately compiled clients.
+1. **R05.** Extend normal optimization to a coercion that transports
+   equality under an erased binder. Preserve its role, endpoints and
+   scope on interface readback. A rule outside the current optimizer
+   schedule must identify the rule at the source boundary.
 2. **R22.** Check a `case` on a filtered vector with ordinary vector
    constructor patterns. Preserve linear use, laziness and witness scope.
    Two independently computed packages can choose different lengths.
