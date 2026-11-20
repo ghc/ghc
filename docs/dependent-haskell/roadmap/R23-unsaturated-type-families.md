@@ -231,6 +231,24 @@ checks that the provider rebuilds, unrelated objects retain their
 modification times, and the next build reuses the results.
 [Upgrade check, option `--family-stages`](../examples/closed-evaluation/check-readback-upgrade.sh).
 
+#### Associated type defaults
+
+A class can supply the arrow before any instance exists. Its default
+`type Callback a = a -> Maybe a` gives the promoted constructor `'Just`
+the required kind in one use. In another use, the same default gives a
+runtime callback its function type. The ordinary client returns
+`Just True`. Fixing the arrow to U rejects the constructor. Fixing it
+to M rejects the callback.
+[Class default](../examples/open-evaluation/DefaultCallback.hs) and
+[ordinary client](../examples/open-evaluation/LegacyKindArgument.hs).
+
+Previous interfaces store the default in the class declaration. A
+compiler upgrade must inspect that declaration even when the module
+has no local instances. Both ordinary and boot interfaces can record
+a signature whose inferred index changes. The upgrade check compares
+both client ABIs with clean builds.
+[Upgrade test](../examples/closed-evaluation/check-readback-upgrade.sh).
+
 #### Earlier failures
 
 In `KindEqualities2`, the equation for `IK (Arr k1 k2)` returns

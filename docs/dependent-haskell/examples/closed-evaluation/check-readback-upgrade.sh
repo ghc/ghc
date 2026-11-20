@@ -324,6 +324,19 @@ HS
     "${new[@]}" "${flags[@]}" --make -no-link UseDefault.hs >default-warm.log 2>&1
     if grep -F 'Compiling ' default-warm.log; then exit 1; fi
 
+    # Check each explicitly fixed arrow at the use that requires the other one.
+    cp DefaultOwner.hs DefaultOwner.orig
+    for arrow in U M; do
+        sed -e '/^import Data.Kind/a import GHC.Exts (M, U)' \
+            -e "s/= a -> Maybe a/= a %$arrow -> Maybe a/" DefaultOwner.orig >DefaultOwner.hs
+        if "${new[@]}" "${flags[@]}" -XModifiers --make -no-link UseDefault.hs >explicit.log 2>&1; then exit 1; fi
+        grep -Fq '[GHC-83865]' explicit.log || { cat explicit.log; exit 1; }
+        case $arrow in
+            U) grep -Fq "type instance Apply 'Just" explicit.log ;;
+            M) grep -Fq 'callback = Just' explicit.log ;;
+        esac
+    done
+
     # Keep the installed owner fixed while the default in a client changes.
     mkdir "$work/provider"
     cd "$work/provider"

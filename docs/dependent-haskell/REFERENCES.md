@@ -5845,6 +5845,15 @@ Agda has no corresponding GHC matchability default.
 [Agda 2.8.0 implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [staging and compatibility examples](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
 
+The GHC User’s Guide requires distinct variables in the patterns of an
+associated type default. This includes invisible kind patterns. The
+example therefore gives the class parameter kind `Type`. Without this
+annotation, the right side specializes the parameter's kind and stock
+GHC 9.14.1 reports GHC-41522. The fork applies its existing open-family
+inference to the default written in the class.
+[GHC User’s Guide, associated type synonym defaults](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#assoc-decl-defs)
+and [class example](examples/open-evaluation/DefaultCallback.hs).
+
 ### Applications at a computed arrow kind
 
 Kiss, Field, Eisenbach and Peyton Jones allow type application at
