@@ -109,13 +109,15 @@ import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
-import qualified PreludeFilterProof
+import qualified PreludeFilterCutoff
 import qualified PreludeFilterDecider
 import qualified PreludeAppendLengthProof
 import qualified PreludeFilterLengthProof
+import qualified PreludeFilterProof
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapLengthProof
+import qualified PreludeMapLengthSize as Size
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
 import qualified OpenBuildWorker as Build
@@ -1256,6 +1258,10 @@ main = do
     decider <- readIORef ref
     putStrLn ("prove the filter bound with a runtime decider: "
               ++ PreludeFilterDecider.showDecidedBound decider xs)
+    cutoff <- newIORef (Size.Succ Size.Zero) >>= readIORef
+    rows <- newIORef [[], [False], [True, False]] >>= readIORef
+    putStrLn ("prove the filter bound for rows at a runtime cutoff: "
+              ++ PreludeFilterCutoff.showCutoffBound (PreludeFilterCutoff.packCutoff cutoff rows))
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"

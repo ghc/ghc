@@ -31,6 +31,9 @@ An imported higher-order contract can take a decider with a retained
 head and a result indexed by the chosen predicate. An ordinary module
 can choose that decider at runtime. [Runtime filter decider](R16-open-term-evaluator.md#supply-a-runtime-filter-decider).
 
+A package can retain a local predicate that captures an IO-supplied
+cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-open-term-evaluator.md#capture-a-runtime-cutoff-in-the-predicate).
+
 - Runtime Bool and Peano Nat indices, checked equations and bounded lambdas.
 - A retained binder can have a lifted type parameter as its domain.
   The `withPair` callback can name that argument as the index of its

@@ -6376,6 +6376,14 @@ the decider controls whether to evaluate the head.
 [linear-base 0.5.0, Data.Bool.Linear](https://hackage-content.haskell.org/package/linear-base-0.5.0/docs/Data-Bool-Linear.html)
 and [R16 runtime decider](roadmap/R16-open-term-evaluator.md#supply-a-runtime-filter-decider).
 
+An Agda filter decision can close over a value. For a fixed cutoff
+`k`, the decision can compare the length of each row with `k` using
+`_≤?_`. The Haskell cutoff uses the same local predicate at the
+decision site and in the filter call. Its length test can stop at
+the first successor past the cutoff. [Agda standard library 2.4, list filter](https://agda.github.io/agda-stdlib/v2.4/Data.List.Base.html),
+[Agda natural-number decisions](https://agda.github.io/agda-stdlib/v2.4/Data.Nat.Properties.html),
+and [R16 captured cutoff](roadmap/R16-open-term-evaluator.md#capture-a-runtime-cutoff-in-the-predicate).
+
 Agda permits a datatype declaration and its constructors to appear at
 different positions in an interleaved mutual block. Haskell's renamer
 already groups mutually dependent type declarations. R21 uses those

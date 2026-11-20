@@ -1337,6 +1337,34 @@ pure decider separately. [Runtime decider](../examples/open-evaluation/PreludeFi
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
 and [prior art](../REFERENCES.md#checked-runtime-decisions-for-filter).
 
+### Capture a runtime cutoff in the predicate
+
+`packCutoff` closes over a Peano cutoff read from an `IORef`. It checks
+each row with the ordinary `size` function. The same local function goes
+in the proof index and in the installed `Prelude.filter` call. A strict
+case on that function's result supplies the decision at each row. The
+proof passes the element type and predicate explicitly. Omitting the
+predicate would leave it ambiguous under the non-injective size equation.
+A proof built with a different local closure fails with GHC-83865.
+
+The Boolean control captures the argument of ordinary equality. Both
+cutoffs run through the same function body. The direct type alias for the
+unpromoted binary equality fails with open operands. Its partial
+application fails because the closed evaluator requires both arguments.
+The retained route uses the closure identity and the result observed at
+each call. The proof accepts a decider for any element type. Constructing
+a witness from an opaque function still requires a closed function domain
+such as `[Bool] -> Bool`.
+
+The Peano example keeps one, two, or three rows as the runtime cutoff
+increases from zero to two. The first proof constructor leaves the outer
+tail lazy. Zero rejects a nonempty row without inspecting its elements
+or tail. A finite cutoff can reject an infinite row after a finite prefix.
+The whole bound requires a finite outer spine and a defined decision for
+each row. [Cutoff example](../examples/open-evaluation/PreludeFilterCutoff.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenFilterCutoff.sh),
+and [prior art](../REFERENCES.md#checked-runtime-decisions-for-filter).
+
 ### Prove that append adds the list lengths
 
 `lengthAppend` proves `Count (Appended xs ys) :~: Plus (Count xs) (Count ys)`.
