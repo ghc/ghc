@@ -24,12 +24,16 @@ module Haddock.Convert
   , synifyInstHead
   , synifyFamInst
   , synifyKindSig
+  , hasPrivateTypeCase
+  , synifyTypeCase
   , PrintRuntimeReps (..)
   ) where
 
 import Control.DeepSeq (force)
+import Control.Monad (guard)
 import Data.Either (lefts, partitionEithers, rights)
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.List (isPrefixOf, unsnoc)
+import Data.Maybe (catMaybes, isJust, mapMaybe)
 import GHC.Builtin.KnownKeys
   ( boxedRepDataConKey
   , eqTyConKey
@@ -59,6 +63,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Tidy (tidyOpenTypes, tidyOpenTypesX)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Hs
@@ -72,6 +77,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.Unique (getUnique)
 import GHC.Types.Var
+import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Types.Var.Set
 import GHC.Unit.Types
 import GHC.Utils.Misc
@@ -83,7 +89,7 @@ import GHC.Utils.Misc
   )
 import GHC.Utils.Panic.Plain (assert)
 
-import Haddock.GhcUtils (defaultRuntimeRepVars, mkEmptySigType, orderedFVs)
+import Haddock.GhcUtils (defaultRuntimeRepVars, mkEmptySigType, orderedFVs, reparenLType, typeNames)
 import Haddock.Interface.RenameType
 import Haddock.Types
 
@@ -253,6 +259,73 @@ synifyAxiom ax@(CoAxiom{co_ax_tc = tc})
   | otherwise =
       Left "synifyAxiom: closed/open family confusion"
 
+-- | Detect references to private type-case helpers without expanding synonyms.
+hasPrivateTypeCase :: Type -> Bool
+hasPrivateTypeCase = any (hasPrefix casePrefixes) . typeNames
+
+-- | Name prefixes reserved for type-case families and their helpers.
+casePrefixes :: [String]
+casePrefixes = ["$case:", "$case-node:", "$case-let-rhs:"]
+
+-- | Check whether a name has one of the supplied prefixes.
+hasPrefix :: [String] -> Name -> Bool
+hasPrefix prefixes name = any (`isPrefixOf` getOccString name) prefixes
+
+{- Note [Checked type cases in Haddock]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The checked RHS of a synonym can apply a private case family. A flat
+case passes its captures before its last argument, the scrutinee. See
+liftTypeCases in GHC.Rename.Module. Each axiom row
+has the same captures followed by a constructor pattern. Substitute the
+actual captures into the row. This preserves uses of the scrutinee in
+the body as well as the order of the alternatives. The scrutinee
+supplies the kind of each pattern.
+
+The interface stores checked equations. For example, it drops source
+parentheses and can replace nested cases with decision-tree families.
+Reconstruct only the flat shape described above. When this view is
+unavailable, render the synonym's kind without exposing a helper.
+-}
+
+-- | Reconstruct a flat type case from its checked family equations.
+synifyTypeCase :: Type -> Maybe (LHsType GhcRn, [(LHsType GhcRn, LHsType GhcRn)])
+synifyTypeCase (TyConApp tc args)
+  | "$case:" `isPrefixOf` getOccString tc
+  , length args == tyConArity tc
+  , Just (_, binder) <- unsnoc (tyConBinders tc)
+  , isVisibleTyConBinder binder
+  = do
+      (captures, scrutinee) <- unsnoc args
+      axiom <- closedFamilyTyConCoAxiom_maybe tc
+      let branches = fromBranches (coAxiomBranches axiom)
+      guard (not (null branches) && userType scrutinee)
+      let (tidyEnv, _) = tidyOpenTypesX emptyTidyEnv (scrutinee : captures)
+      rows <- traverse (synifyRow tidyEnv captures) branches
+      pure (synifyPart scrutinee, rows)
+  where
+    synifyRow tidyEnv captures branch = do
+      (lhs, pat) <- unsnoc (coAxBranchLHS branch)
+      vars <- traverse getTyVar_maybe lhs
+      (con, fields) <- splitTyConAppNoView_maybe pat
+      guard (length vars == length captures && (isAlgTyCon con || isJust (isPromotedDataCon_maybe con)))
+      fieldVars <- traverse getTyVar_maybe (filterOutInvisibleTypes con fields)
+      let patternVars = vars ++ fieldVars
+      guard (sizeVarSet (mkVarSet patternVars) == length patternVars)
+      guard (userType pat && all (not . ("$" `isPrefixOf`) . getOccString) fieldVars)
+      let subst = substTyWith vars captures
+          rhs = subst (coAxBranchRHS branch)
+      guard (userType rhs)
+      [tidyPat, tidyRhs] <- pure (tidyOpenTypes tidyEnv [subst pat, rhs])
+      pure (synifyPat tidyPat, synifyPart tidyRhs)
+
+    synifyPat ty = reparenLType $ case synifyKindSig ty of
+      L _ (HsKindSig _ pat _) -> pat
+      pat -> pat
+    synifyPart = reparenLType . synifyKindSig
+
+    userType = not . any (hasPrefix ("$lambda:" : casePrefixes)) . typeNames
+synifyTypeCase _ = Nothing
+
 -- | Turn type constructors into data declarations, type families, or type synonyms
 synifyTyCon
   :: PrintRuntimeReps
@@ -355,7 +428,10 @@ synifyTyCon _prr coax tc
           , tcdLName = synifyNameN tc
           , tcdTyVars = synifyTyVars (tyConVisibleTyVars tc)
           , tcdFixity = synifyFixity tc
-          , tcdRhs = synifyType WithinType emptyVarSet ty
+          , tcdRhs =
+              if hasPrivateTypeCase ty
+                then noLocA (XHsType (HsCoreTyRn ty))
+                else synifyType WithinType emptyVarSet ty
           }
   -- (closed) newtype and data
   | otherwise = do

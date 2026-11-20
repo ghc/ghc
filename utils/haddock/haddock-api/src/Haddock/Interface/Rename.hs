@@ -34,10 +34,11 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Traversable (mapM)
 
-import GHC hiding (NoLink, HsTypeGhcPsExt (..))
+import GHC hiding (NoLink, HsTypeGhcPsExt (..), typeKind)
 import GHC.Builtin.WiredIn.Types ( tupleDataConName, tupleTyConName)
 import GHC.Builtin.KnownKeys ( eqTyConKey )
 import GHC.Core.TyCon (tyConResKind)
+import GHC.Core.Type (typeKind)
 import GHC.Driver.DynFlags (getDynFlags)
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
 import GHC.Types.Basic (TupleSort (..))
@@ -47,7 +48,7 @@ import GHC.Types.Name
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Haddock.Backends.Hoogle (ppExportD)
-import Haddock.Convert (synifyKindSig)
+import Haddock.Convert (hasPrivateTypeCase, synifyKindSig, synifyTypeCase)
 import Haddock.GhcUtils
 import Haddock.Types
 
@@ -600,7 +601,7 @@ renameTyClD d = case d of
   SynDecl{tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdRhs = rhs} -> do
     lname' <- renameNameL lname
     tyvars' <- renameLHsQTyVars tyvars
-    rhs' <- maybe (renameLType rhs) pure <=< runMaybeT $ do
+    rhs' <- maybe (renameSynonymRhs rhs) pure <=< runMaybeT $ do
       expInfo <- MaybeT $ asks rnExportInfo
       -- Given that we have matched on a 'SynDecl', this lookup /really should/
       -- be 'ATyCon', and the 'synTyConRhs_maybe' result /really should/ be
@@ -681,6 +682,18 @@ renameTyClD d = case d of
       return (L (locA loc) (FunDep noExtField (map noLocA xs') (map noLocA ys')))
 
     renameLSig (L loc sig) = return . L (locA loc) =<< renameSig sig
+
+-- | Reconstruct a checked type case or show the kind of the synonym RHS.
+-- See Note [Checked type cases in Haddock] in Haddock.Convert.
+renameSynonymRhs :: LHsType GhcRn -> RnM (LHsType DocNameI)
+renameSynonymRhs (L _ (XHsType (HsCoreTyRn ty)))
+  | Just (scrutinee, rows) <- synifyTypeCase ty = do
+      scrutinee' <- renameLType scrutinee
+      rows' <- traverse (\(pat, rhs) -> (,) <$> renameLType pat <*> renameLType rhs) rows
+      pure (noLocA (XHsType (HsCheckedTypeCase scrutinee' rows')))
+  | hasPrivateTypeCase ty =
+      fmap (XHsType . HsRedacted) <$> renameLType (synifyKindSig (typeKind ty))
+renameSynonymRhs rhs = renameLType rhs
 
 renameFamilyDecl :: FamilyDecl GhcRn -> RnM (FamilyDecl DocNameI)
 renameFamilyDecl

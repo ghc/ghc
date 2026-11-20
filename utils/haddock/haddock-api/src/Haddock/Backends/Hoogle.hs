@@ -30,8 +30,9 @@ import Data.List (intercalate, isPrefixOf)
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Version
-import GHC
+import GHC hiding (typeKind)
 import GHC.Core.InstEnv
+import GHC.Core.Type (typeKind)
 import qualified GHC.Driver.DynFlags as DynFlags
 import GHC.Driver.Ppr
 import GHC.Types.SourceText
@@ -42,6 +43,7 @@ import System.Directory
 import System.FilePath
 
 import Documentation.Haddock.Markup
+import Haddock.Convert (hasPrivateTypeCase, synifyKindSig, synifyTypeCase)
 import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
@@ -276,6 +278,19 @@ ppInstance dflags unit_state x =
         }
 
 ppSynonym :: SDocContext -> TyClDecl GhcRn -> [String]
+ppSynonym sDocContext SynDecl{tcdLName = name, tcdTyVars = tyvars, tcdRhs = L _ (XHsType (HsCoreTyRn ty))}
+  | hasPrivateTypeCase ty =
+      [Outputable.renderWithContext sDocContext (header <+> rhs)]
+  where
+    header =
+      text "type" <+> pprPrefixOcc (unLoc name)
+        <+> hsep (map (ppr . reparenTyVar . unLoc) (hsq_explicit tyvars))
+    rhs
+      | Just (scrutinee, rows) <- synifyTypeCase ty =
+          equals <+> text "case" <+> ppr scrutinee <+> text "of"
+            <+> braces (hsep (punctuate semi (map row rows)))
+      | otherwise = dcolon <+> ppr (reparenLType (synifyKindSig (typeKind ty)))
+    row (pat, body) = ppr pat <+> arrow <+> ppr body
 ppSynonym sDocContext x = [out sDocContext x]
 
 ppData :: SDocContext -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]

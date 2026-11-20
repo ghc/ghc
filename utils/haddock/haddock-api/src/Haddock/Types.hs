@@ -895,6 +895,8 @@ data HsTypeDocNameIExt
 
   | HsRecTy     [LHsConDeclRecField DocNameI]
 
+  | HsCheckedTypeCase (LHsType DocNameI) [(LHsType DocNameI, LHsType DocNameI)]
+
   | HsRedacted  (HsType DocNameI) -- ^ contains the kind of the redacted type
 
 type instance XHsNatural DocNameI = NoExtField
