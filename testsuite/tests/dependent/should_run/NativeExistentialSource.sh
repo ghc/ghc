@@ -22,7 +22,10 @@ if "$ghc" "${flags[@]}" -O1 -fomit-interface-pragmas -fforce-recomp \
   echo "optimized compilation unexpectedly admitted Pack" >&2
   exit 1
 fi
-grep -Eq 'Retained -O1 requires checked index domains' optimized.log
+grep -Eq 'Retained -O1 requires checked index domains' optimized.log || {
+  cat optimized.log >&2
+  exit 1
+}
 mv provider/Provider.hs hidden-provider-source
 grep -Eq '\bpack\b' provider/core-stg.log || { cat provider/core-stg.log; exit 1; }
 sed -n '/Final STG:/,$p' provider/core-stg.log >provider/stg.log
@@ -76,18 +79,20 @@ for bad in Escape Scope WrongWitnessKind WrongPayload MissingSchema WrongSchema 
     echo "$bad unexpectedly compiled" >&2
     exit 1
   fi
-  grep -Eq "$bad[.]hs:[0-9]+:[0-9]+: error" "$bad.log"
-  if grep -Eiq 'panic|internal error' "$bad.log"; then
+  case "$bad" in
+    Escape) expected='escape its scope|rigid.*type variable' ;;
+    Scope) expected='[Nn]ot in scope' ;;
+    WrongWitnessKind|WrongPayload) expected='\[GHC-83865\]' ;;
+    MissingSchema) expected='needs an explicit existential type when' ;;
+    WrongSchema) expected='The available type is' ;;
+    WithoutExtension) expected='requires -XExperimentalDependentTypes' ;;
+    RecordMarker) expected='explicit existential application or a sole case alternative' ;;
+    OverSat) expected='Apply GHC.Exists.Pack to a required type witness and a payload' ;;
+  esac
+  if ! grep -Eq "$bad[.]hs:[0-9]+:[0-9]+: error" "$bad.log" ||
+     ! grep -Eq "$expected" "$bad.log" ||
+     grep -Eiq 'panic|internal error' "$bad.log"; then
+    cat "$bad.log" >&2
     exit 1
   fi
-  case "$bad" in
-    Escape) grep -Eq 'escape its scope|rigid.*type variable' "$bad.log" ;;
-    Scope) grep -Eiq 'not in scope' "$bad.log" ;;
-    WrongWitnessKind|WrongPayload) grep -Eq '\[GHC-83865\]' "$bad.log" ;;
-    MissingSchema) grep -Eq 'needs an explicit existential type when' "$bad.log" ;;
-    WrongSchema) grep -Eq 'The available type is' "$bad.log" ;;
-    WithoutExtension) grep -Eq 'requires -XExperimentalDependentTypes' "$bad.log" ;;
-    RecordMarker) grep -Eq 'explicit existential application or a sole case alternative' "$bad.log" ;;
-    OverSat) grep -Eq 'Apply GHC.Exists.Pack to a required type witness and a payload' "$bad.log" ;;
-  esac
 done
