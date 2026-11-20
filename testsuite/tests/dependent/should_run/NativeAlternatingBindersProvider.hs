@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, ScopedTypeVariables #-}
 {-# LANGUAGE TypeAbstractions, TypeFamilies #-}
 module NativeAlternatingBindersProvider
-  (Reading(..), Marker(..), keepAfter, keepExplicit, forwardKind, sameSpelling, twice, plainFirst) where
+  ( Reading(..), Marker(..), keepAfter, keepExplicit, keepImplicit
+  , forwardKind, sameSpelling, twice, plainFirst, showAfter ) where
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 
@@ -16,6 +17,10 @@ keepAfter _ _ x = x
 keepExplicit :: foreach (b :: Bool) -> forall (a :: Type).
                 foreach (m :: Maybe a) -> Reading b m -> Reading b m
 keepExplicit _ @a _ x = case Proxy @a of Proxy -> x
+
+keepImplicit :: foreach (b :: Bool) -> forall {a :: Type}.
+                foreach (m :: Maybe a) -> Reading b m -> Reading b m
+keepImplicit _ _ x = x
 
 data Marker (k :: Type) (a :: k) = Marker
 
@@ -40,3 +45,7 @@ twice _ _ _ x = (x, Proxy)
 plainFirst :: () -> forall (a :: Type). foreach (m :: Maybe a) ->
               Reading True m -> Reading True m
 plainFirst _ _ x = x
+
+showAfter :: foreach (b :: Bool) -> forall (a :: Type). Show a =>
+             foreach (m :: Maybe a) -> a -> Reading b m -> (String, Int)
+showAfter _ _ value (Reading n) = (show value, n)

@@ -10,10 +10,14 @@ provider=NativeAlternatingBindersProvider
 client=NativeAlternatingBindersClient
 
 for opt in O0 O2; do
+    flags=("-$opt")
+    if [[ $opt == O0 ]]; then
+        flags+=(-fomit-interface-pragmas -fno-write-if-simplified-core)
+    fi
     mkdir -p "$out/$opt"/{provider,client}
     cd "$out/$opt/provider"
     cp "$src/$provider.hs" .
-    "${ghc[@]}" "-$opt" -c "$provider.hs"
+    "${ghc[@]}" "${flags[@]}" -c "$provider.hs"
     mv "$provider.hs" ../
     cp "$provider.hi" "$src/$client.hs" ../client/
     cd ../client
@@ -40,10 +44,23 @@ module WrongIndex where
 import NativeAlternatingBindersProvider
 wrong :: foreach (left :: Bool) -> foreach (right :: Bool) ->
          forall a. foreach (m :: Maybe a) -> Reading left m -> Reading right m
-wrong l r @a m x = keepAfter r @a m x
+wrong l r @a m x = keepAfter r m x
 HS
 if "${ghc[@]}" -c WrongIndex.hs >reject.log 2>&1; then
     echo 'Accepted two different runtime indices' >&2
     exit 1
 fi
 grep -Fq "Couldn't match type ‘l’ with ‘r’" reject.log || { cat reject.log >&2; exit 1; }
+
+cat >MissingShow.hs <<'HS'
+module MissingShow where
+import NativeAlternatingBindersProvider
+data NoShow = NoShow
+wrong :: Maybe NoShow -> (String, Int)
+wrong index = showAfter True index NoShow (Reading 51)
+HS
+if "${ghc[@]}" -XNoExperimentalDependentTypes -c MissingShow.hs >reject.log 2>&1; then
+    echo 'Accepted a call without the required Show instance' >&2
+    exit 1
+fi
+grep -Fq 'No instance for ‘Show NoShow’' reject.log || { cat reject.log >&2; exit 1; }

@@ -84,8 +84,9 @@ cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-op
   with `@a` and continue with more retained arguments. A binder kind can refer
   to an earlier retained index. The separate `NativeAlternatingBinders` client
   checks written type applications, runtime inputs, and lazy ignored indices.
-  A strict prefix in a flat equation and inference of an erased type from a
-  later retained argument remain separate cases.
+  The immediate retained operand can determine a complete erased prefix
+  from its declared type. A strict prefix in a flat equation remains a
+  separate case.
 - Nominal scalar-domain conversion with scoped source body solving at M58.
 - Fixed function-domain body comparison and payload selection at M59.
   Both stages pass the selected source, runtime and rejection controls.

@@ -1939,6 +1939,13 @@ subsumption and scaled usage; all constraints and final result checks remain.
 A linear value may supply a type. Only runtime indices inside that type must
 meet the unrestricted native-index scope rule. No native meta is assigned.
 
+A checked runtime argument can expose another erased prefix. For example,
+in keepAfter b m the remaining type first binds a, then m :: Maybe a.
+At IALL, reuse the declaration check on m before instantiating that prefix.
+Use only the next retained operand. A later written type argument belongs
+to a different position. Written type arguments at this position still use
+the usual visible type application rule.
+
 Quick Look's h-var reads a declared type and its argument advice precedes full
 checking. Agda checks each domain under the substituted telescope and retains
 the checked prefix. This route uses complete immutable choices, not their
@@ -2905,11 +2912,20 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
       , let no_tvs   = null tvs
             no_theta = null theta
       , not (no_tvs && no_theta)
-      = do { (wrap, fun_rho, rest_plan) <-
+      = do { selected <- case plan of
+                Just (_ : _) -> return plan
+                _ | NoQL <- do_ql, not prefix_only, pos > 1, not no_tvs
+                  , DepFunTy DepFunVisible _ _ <- coreFullView body2
+                  , arg@EValArg{} : _ <- args
+                  -> do { sigma <- liftZonkM (zonkTcType fun_ty)
+                        ; tcRetainedKnownArgPlan (tcRetainedDeclaredArgType tcRetainedDeclaredTypeView)
+                                                 Nothing tc_fun sigma [arg] }
+                _ -> return plan
+           ; (wrap, fun_rho, rest_plan) <-
                 -- setSrcSpan of the function: important for the class constraints
                 -- that may be emitted from instantiating fun_sigma
                 setSrcSpan fun_lspan $
-                case plan of
+                case selected of
                   Nothing -> do { (wrap, rho) <- instantiateSigmaQL do_ql fun_orig
                                                   fun_conc_tvs tvs theta body2
                                 ; return (wrap, rho, Nothing) }
