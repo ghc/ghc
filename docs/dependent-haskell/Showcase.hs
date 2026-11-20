@@ -47,6 +47,7 @@ import Control.Monad (unless)
 import qualified Data.Char
 import qualified Data.Either
 import qualified ErasedPackage
+import qualified ForgetWitness
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Functor.Const (Const(..))
@@ -933,6 +934,9 @@ main = do
         ErasedPackage.observation
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
+    observe "forget the retained witness and inspect the indexed payload"
+        ( map (ForgetWitness.observe . ForgetWitness.forget . ForgetWitness.retained) [True, False]
+        , ForgetWitness.observe (ForgetWitness.forget (ForgetWitness.unknown (error "forced witness"))) )
     observe "read the cells of a vector packaged with its length"
         (Refl :: E.readSomeVec ('E.SomeVec ('E.SS ('E.SS 'E.SZ))
                     ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))) :~: '[4, 5])

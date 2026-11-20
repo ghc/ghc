@@ -131,6 +131,15 @@ packages. The GHC API tests restore both forms in a fresh compiler
 session. The R22 Showcase matches all 268 output lines. Its existential
 provider is compiled at `-O0`.
 
+An erased package can preserve a payload whose index comes from a retained
+pair. In `forget (Pair _ flag) = Pack _ flag`, the declaration of `flag`
+identifies the witness. The checker matches the existential body to that
+declaration after family reduction and checks the payload at the selected
+index. If the payload also requires the unknown index to equal `True`,
+the checker rejects it. A caller can inspect a defined payload without
+forcing a bottom-valued witness in the original pair.
+[Conversion example](../examples/erased-existentials/ForgetWitness.hs).
+
 For the implicit form the crucial source branch is
 `VCons x (filterVec p xs)`. Opening the recursive result introduces a
 fresh length `m`. The result witness `'S m` must be packed inside that

@@ -1,8 +1,8 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeApplications #-}
 {-# OPTIONS_GHC -O0 #-}
 
 -- | Keep the indexed payload and discard the runtime witness.
-module ForgetWitness (Retained, Hidden, forget, retained, observe) where
+module ForgetWitness (Retained, Hidden, forget, retained, unknown, observe) where
 
 import GHC.Exists
 import GHC.Sigma (Sigma(Pair))
@@ -10,6 +10,7 @@ import GHC.Sigma (Sigma(Pair))
 data Flag (b :: Bool) where
   On  :: Flag 'True
   Off :: Flag 'False
+  Unknown :: Flag b
 
 -- | Store the Boolean together with its indexed payload.
 type Retained = some (b :: Bool) | Flag b
@@ -26,9 +27,14 @@ retained :: Bool -> Retained
 retained True  = Pair True On
 retained False = Pair False Off
 
--- | A payload pattern can recover which constructor was packed.
-observe :: Hidden -> Bool
+-- | Store a payload that can accompany either Boolean.
+unknown :: Bool -> Retained
+unknown b = Pair b (Unknown @b)
+
+-- | Inspect the payload without reading the stored Boolean.
+observe :: Hidden -> Maybe Bool
 observe package = case package of
   Pack _ flag -> case flag of
-    On  -> True
-    Off -> False
+    On      -> Just True
+    Off     -> Just False
+    Unknown -> Nothing

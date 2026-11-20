@@ -146,13 +146,18 @@ to `Int` and `False` to `Char`. GHC rejected an `Int` payload at
 with Core and STG lint. A type lambda can also apply a captured matchable
 constructor, such as `Proxy`, to the witness.
 
-The source experiment elaborates the body of `some` to a type lambda.
-The current lambda implementation generates a fresh nominal family.
-Two modules that spell the same sum with different binder names can agree
-at both Boolean inputs and still fail to exchange their packages. The
-acceptance test for first-class sums must pass one module's package to
-the other module's consumer. It must also reject a body that gives a
-different result at an index. The representation above supplies the
-runtime fields and their projection. Type equality across declarations
-remains open. [Serokell's R04 card](https://ghc.serokell.io/dh#dependent-sums)
+The compiler elaborates a `some` type synonym to `GHC.Sigma.Sigma`.
+It checks the payload under the witness binder. The generated payload
+family records its lexical owner in the interface. When two modules
+write equivalent sums with different binder names, a checked nominal
+coercion can establish their equality. A consumer with only the other
+module’s interface can use this proof at `-O0` and `-O1`. Changing a
+payload or the priority of overlapping branches rejects the proof.
+An unrelated nominal family keeps its own identity.
+
+The private self-hosted compiler at `a957f54932` passed the positive
+and negative checks with `GHC.Sigma` registered in `base`. A closed
+family such as `Same a a` can still get stuck when the two arguments
+are equivalent sums written in different modules.
+[Serokell’s R04 card](https://ghc.serokell.io/dh#dependent-sums)
 and [type-lambda elaboration](R17-type-level-lambdas.md#source-and-evidence).
