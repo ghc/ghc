@@ -113,3 +113,8 @@ for binding in alias repeatedCall polymorphic escape duplicate; do
         exit 1
     fi
 done
+
+if grep -Eq '\[GHC-39999\]' witness-rejections.log; then
+    cat witness-rejections.log >&2
+    exit 1
+fi

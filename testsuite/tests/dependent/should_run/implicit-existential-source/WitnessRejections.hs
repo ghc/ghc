@@ -17,6 +17,18 @@ repeatedCall xs = same (filterVec odd xs) (filterVec odd xs)
 class Pick a where
     pick :: Hidden a
 
+instance Pick Bool where
+    pick = filterVec id (Cons True Nil)
+
+instance Pick Int where
+    pick = filterVec odd Nil
+
+independent :: (forall a. Pick a => Hidden a) -> Bool
+independent p = observe p p
+  where
+    observe :: Vec n Bool -> Vec m Int -> Bool
+    observe _ _ = True
+
 sharedLength :: Vec n Bool -> Vec n Int -> Bool
 sharedLength _ _ = True
 
