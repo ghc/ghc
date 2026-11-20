@@ -1536,13 +1536,17 @@ openFamilyMatchabilityCandidates groups =
                 FamEqn{feqn_tycon = L _ family, feqn_rhs = rhs} <- groupEquations group,
                 matchabilityArrow (caseAliasBody rhs)]
 
+    groupEquations :: TyClGroup GhcRn -> [TyFamInstEqn GhcRn]
     groupEquations group =
       concatMap (equations . unLoc) (group_instds group) ++
       concat [associated nested | L _ ClassDecl{tcdCExt = (nested, _)} <- group_tyclds group]
 
+    equations :: InstDecl GhcRn -> [TyFamInstEqn GhcRn]
     equations (TyFamInstD{tfid_inst = inst}) = [tfid_eqn inst]
     equations (ClsInstD{cid_inst = ClsInstDecl{cid_ext = (_, nested)}}) = associated nested
     equations _ = []
+
+    associated :: HsNestedGroup GhcRn -> [TyFamInstEqn GhcRn]
     associated nested = map (tfid_eqn . unLoc) (ng_tyfam_insts nested)
 
     families (FamDecl{tcdFam = f}) = [f]
