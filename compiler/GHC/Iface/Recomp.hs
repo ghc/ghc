@@ -84,7 +84,7 @@ import GHC.Unit.Module.Deps
 
 import Control.Monad
 import Control.Monad.Trans.State
-import Data.List (sortBy, sort, sortOn)
+import Data.List (isPrefixOf, sortBy, sort, sortOn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Word (Word64)
@@ -573,14 +573,16 @@ checkFlagHash hsc_env iface self_recomp = do
         intermediate_kind_fp = familyKindMatchabilityFingerprint old_readback_fp
         result_kind_fp = familyResultMatchabilityFingerprint intermediate_kind_fp
         retained_case_fp = retainedCaseFingerprint result_kind_fp
-        new_fp = abstractWitnessFingerprint retained_case_fp
+        abstract_fp = abstractWitnessFingerprint retained_case_fp
+        ordered_fp = orderedTypeCaseFingerprint retained_case_fp
+        new_fp = orderedTypeCaseFingerprint abstract_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
-       | old_fp == new_fp || old_fp == retained_case_fp || old_fp == result_kind_fp
+       | old_fp `elem` [new_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
          -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
        , couldSeparateFamilyResultMatchability iface
@@ -666,10 +668,17 @@ checkFlagHash hsc_env iface self_recomp = do
     case previous of
       UpToDate
         | old_fp /= new_fp
-        , old_fp `elem` (retained_case_fp : result_kind_fp : intermediate_kind_fp : old_readback_fp :
+        , old_fp /= ordered_fp
+        , mi_hsc_src iface == HsSrcFile
+        , couldExportOrderedTypeCase iface ->
+            liftIO $ recheck "Compiler now checks type case constructor order"
+        | old_fp /= new_fp
+        , old_fp `elem` (ordered_fp : retained_case_fp : result_kind_fp :
+                         intermediate_kind_fp : old_readback_fp :
                          open_matchability_fp : closed_matchability_fp : archived)
         , mi_hsc_src iface == HsSrcFile -> do
-          candidate <- couldExportRetainedCase (old_fp == retained_case_fp) iface (mi_sr_usages self_recomp)
+          let abstract_only = old_fp == retained_case_fp || old_fp == ordered_fp
+          candidate <- couldExportRetainedCase abstract_only iface (mi_sr_usages self_recomp)
           if candidate
             then liftIO $ recheck "Compiler now checks retained package case projections"
             else pure UpToDate
@@ -744,6 +753,37 @@ retainedCaseFingerprint fp =
 abstractWitnessFingerprint :: Fingerprint -> Fingerprint
 abstractWitnessFingerprint fp =
     computeFingerprint putNameLiterally (fp, "retained-abstract-witness-v1" :: String)
+
+-- | Record that the compiler preserves the constructor test order of type cases.
+orderedTypeCaseFingerprint :: Fingerprint -> Fingerprint
+orderedTypeCaseFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "ordered-type-cases-v1" :: String)
+
+{- Note [Recompiling ordered type cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old interface can contain flat equations for a source type case.
+If a synonym introduced an inner constructor test, a later compatible
+equation could bypass that test. Recheck a lifted case with several
+equations when its source is available. A lifted type lambda can also
+contain such a case. The old interface need not preserve the written
+pattern order. Let the usual ABI checks recompile callers when the
+provider's axioms change.
+
+Reusing a provider compiled by either standalone implementation can
+still lose the other feature's check. Recognize each standalone hash.
+Use the producer's missing check to decide whether to recompile.
+-}
+
+-- | Does the interface contain a lifted type case that may use flat equations?
+-- See Note [Recompiling ordered type cases].
+couldExportOrderedTypeCase :: ModIface -> Bool
+couldExportOrderedTypeCase = any candidate . mi_decls
+  where
+    candidate (_, IfaceFamily {ifName = name, ifFamFlav = family})
+      | IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon (Just (_, _:_:_))) <- family
+      = let occ = occNameString (nameOccName name)
+        in any (`isPrefixOf` occ) ["$case:", "$lambda:"]
+    candidate _ = False
 
 -- | Find exported ordinary worker signatures whose direct domain uses a
 -- retained package telescope from a normal import or a local declaration.
@@ -1749,7 +1789,8 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = abstractWitnessFingerprint
+          current_flag_hash = orderedTypeCaseFingerprint
+                            $ abstractWitnessFingerprint
                             $ retainedCaseFingerprint
                             $ familyResultMatchabilityFingerprint
                             $ familyKindMatchabilityFingerprint
