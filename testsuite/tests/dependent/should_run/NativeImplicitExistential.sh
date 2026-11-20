@@ -100,7 +100,7 @@ grep -A6 'ForwardProducer.keepTagged$' forward.log | grep -Eq '@\(exists .*\. ex
 
 cp "$src/"{QuickLookForward,QuickLookRuntime}.hs .
 "$ghc" "${flags[@]}" -c QuickLookForward.hs -main-is QuickLookForward
-"$ghc" "${flags[@]}" QuickLookForward.o ../provider/ForwardSchemas.o ../provider/Vector.o \
+"$ghc" "${flags[@]}" QuickLookForward.o ../provider/{Filter,ForwardSchemas,Vector}.o \
     -o quick-look -main-is QuickLookForward
 ./quick-look
 if "$ghc" "${flags[@]}" -c QuickLookRuntime.hs >quick-look-runtime.log 2>&1; then

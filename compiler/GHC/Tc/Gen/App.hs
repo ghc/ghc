@@ -100,6 +100,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Data ( Data, cast, gmapQ )
+import Data.Either ( isLeft, isRight )
 import Data.Function
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
@@ -573,7 +574,7 @@ tcOpenImplicitArgs :: HsExpr GhcRn -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRh
                    -> ([HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc))
                    -> TcM (HsExpr GhcTc)
 tcOpenImplicitArgs rn_expr fun_ty args expected check_app
-  = do { marked <- mark fun_ty args
+  = do { marked <- tcImplicitAppArgs fun_ty args
        ; if all isLeft marked
          then check_app args expected
          else check_opened marked }
@@ -612,32 +613,6 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       | Just (_, res) <- splitVisibleFunTy_maybe ty = spine_result res rest
     spine_result _ _ = Nothing
 
-    isLeft (Left _) = True
-    isLeft (Right _) = False
-
-    mark :: TcType -> [HsExprArg 'TcpRn]
-         -> TcM [Either (HsExprArg 'TcpRn)
-                        (HsExprLoc, Mult, LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn))]
-    mark ty (wrapper@EWrap{} : rest) = (Left wrapper :) <$> mark ty rest
-    mark ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
-      | FunTy { ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result }
-          <- implicitSpineHead ty
-      , isVisibleFunArg af
-      = do { implicit <- if (isManyTy mult || isOneTy mult)
-                            && demandsPayload (coreFullView domain)
-                         then tcImplicitOperand arg
-                         else return Nothing
-           ; let operand = case implicit of
-                   Just (package, replace) -> Right (loc, mult, package, replace)
-                   Nothing -> Left ordinary
-           ; (operand :) <$> mark result rest }
-    mark _ rest = return (map Left rest)
-
-    demandsPayload TyConApp{} = True
-    demandsPayload AppTy{} = True
-    demandsPayload FunTy{} = True
-    demandsPayload _ = False
-
     open result_ty _ rev_args [] =
       check_app (reverse rev_args) (mkCheckExpType result_ty)
     open result_ty opened rev_args (Left arg : rest) =
@@ -674,6 +649,32 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       , ExistsTy ImplicitExists _ _ <- coreFullView (varType ident)
       = Just name
     lexicalPackage _ = Nothing
+
+-- | Find operands that need an implicit package opening before checking a call.
+-- See Note [Implicit existential arguments].
+-- See Note [Quick Look and implicit existential arguments].
+tcImplicitAppArgs :: TcType -> [HsExprArg 'TcpRn]
+                  -> TcM [Either (HsExprArg 'TcpRn)
+                                 (HsExprLoc, Mult, LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn))]
+tcImplicitAppArgs ty (wrapper@EWrap{} : rest) = (Left wrapper :) <$> tcImplicitAppArgs ty rest
+tcImplicitAppArgs ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
+  | FunTy { ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result }
+      <- implicitSpineHead ty
+  , isVisibleFunArg af
+  = do { implicit <- if (isManyTy mult || isOneTy mult)
+                        && demands_payload (coreFullView domain)
+                     then tcImplicitOperand arg
+                     else return Nothing
+       ; let operand = case implicit of
+               Just (package, replace) -> Right (loc, mult, package, replace)
+               Nothing -> Left ordinary
+       ; (operand :) <$> tcImplicitAppArgs result rest }
+  where
+    demands_payload TyConApp{} = True
+    demands_payload AppTy{} = True
+    demands_payload FunTy{} = True
+    demands_payload _ = False
+tcImplicitAppArgs _ rest = return (map Left rest)
 
 -- | Read the declaration for an implicit package or a call with a package head.
 -- The replacement function rebuilds a call on a checked payload.
@@ -6187,6 +6188,43 @@ isGuardedTy ty
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | otherwise                               = False
 
+{- Note [Quick Look and implicit existential arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In take 1 (toList (fst (partitionVec odd xs))), checking the call to
+toList opens the package at the head of its argument. Quick Look can
+prepare toList as an EValArgQL for take. Resuming that argument calls
+finishApp directly. It skips the opening in tcOrdinaryApp.
+
+For a plain named value application, consult the same read-only
+argument classifier before Quick Look checks the head and arguments.
+If the call needs to open an argument, keep its original syntax for
+ordinary checking. This leaves the opening, result scope, constraints
+and multiplicities with tcOpenImplicitArgs. Calls without an opening
+can still perform the APP-lightning-bolt step of Quick Look (Figure 5).
+See Note [Quick Look at value arguments].
+
+Do not select this fallback after splitting an expansion. The ordinary
+check would split it again and could repeat an untyped Template Haskell
+splice.
+-}
+
+-- | Leave openings in plain named applications to the ordinary checker.
+-- See Note [Quick Look and implicit existential arguments].
+tcQuickLookNeedsImplicitArgs :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM Bool
+tcQuickLookNeedsImplicitArgs (HsVar _ lname) args
+  | let name = unLocWithUserRdr lname
+  , not (isDataOcc (nameOccName name))
+  , any isHsValArg args, all plain args
+  = do { ident <- tcLookupIdMaybe name
+       ; case ident of
+           Just var -> any isRight <$> tcImplicitAppArgs (varType var) args
+           Nothing -> return False }
+  where
+    plain EValArg{} = True
+    plain (EWrap EPar{}) = True
+    plain _ = False
+tcQuickLookNeedsImplicitArgs _ _ = return False
+
 quickLookArg1 :: Int
               -> HsExprLoc
               -> (HsExpr GhcRn, SrcSpan)
@@ -6206,7 +6244,8 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
        ; fun_lspan_arg <- getFunSrcSpan rn_args
 
        -- Step 1: get the type of the head of the argument
-       ; (fun_ue, mb_fun_ty) <- if any isExplicitRetainedArg rn_args
+       ; opens_args <- tcQuickLookNeedsImplicitArgs rn_fun_arg rn_args
+       ; (fun_ue, mb_fun_ty) <- if opens_args || any isExplicitRetainedArg rn_args
                                then return (zeroUE, Nothing)
                                else tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg
          -- tcCollectingUsage: the use of an Id at the head generates usage-info
