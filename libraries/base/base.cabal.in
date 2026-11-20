@@ -243,6 +243,8 @@ Library
         , GHC.StaticPtr
         , GHC.STRef
         , GHC.Show
+        , GHC.Sigma
+        , GHC.Sigma.Projection
         , GHC.Stable
         , GHC.StableName
         , GHC.Stack
