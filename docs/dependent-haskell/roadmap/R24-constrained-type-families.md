@@ -107,6 +107,36 @@ an ordinary producer that exports the same source declaration. This
 producer opt-in is a local experiment. Keep the choice of migration
 policy separate from the tests of type formation.
 
+### Interaction with an existing dependent module
+
+The producer experiment uses the same extension as R23. Consider one
+module with both of these declarations:
+
+```haskell
+type family First a b where
+    First a b = a
+data Accepts (f :: Type %U -> Type) = Accepts
+type UsesExperimental = Accepts (First Int)
+
+class C a where
+    type F a
+data Witness a where
+    Witness :: F a -> Witness a
+```
+
+The pre-R24 compiler accepts this module with
+`ExperimentalDependentTypes`. The initial R24 prototype reported
+GHC-90647 at the constructor field. GHC now checks the constructor's
+own context. The field above reports GHC-39999 for the missing `C a`.
+Writing `Witness :: C a => F a -> Witness a` supplies the evidence.
+An equality in a GADT context can also determine a known instance.
+With the extension disabled, both compilers report GHC-27346 at
+`First Int`. A separate producer switch could preserve existing R23
+modules during the experiment. Inferring a missing constraint could
+also change a constructor's type and runtime representation.
+[Eisenberg's compatibility example](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-430274548)
+and [review of constructor dictionaries, inference and newtypes](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671).
+
 ## Evidence and next check
 
 Section 4.2 of *Constrained Type Families* requires the source context

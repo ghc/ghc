@@ -470,7 +470,7 @@ checkConstrainedSignature ctxt ty
   | fam : _ <- [f | FamilyInSynonym f <- uses]
   = failWithTc $ TcRnConstrainedFamilyUnsupported fam $
       text "This occurrence comes from a type synonym definition."
-  | FunSigCtxt {} <- ctxt
+  | checks_domain ctxt
   = do { let (bndrs, theta, rho) = tcSplitSigmaTy ty
        ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
        ; traverse_ checkNoConstrainedFamilyApps theta
@@ -487,6 +487,9 @@ checkConstrainedSignature ctxt ty
   = checkNoConstrainedFamilyApps ty
   where
     uses = constrainedFamilyApps ty
+    checks_domain FunSigCtxt{} = True
+    checks_domain ConArgCtxt{} = True
+    checks_domain _ = False
 
     checkNested rho
       | isSigmaTy rho = checkNoConstrainedFamilyApps rho
@@ -516,7 +519,7 @@ checkNoConstrainedFamilyApps :: Type -> TcM ()
 checkNoConstrainedFamilyApps ty
   | use : _ <- constrainedFamilyApps ty
   = failWithTc $ TcRnConstrainedFamilyUnsupported (familyTyCon use) $
-      text "This use requires a saturated application in an explicit term signature."
+      text "This use requires a saturated application in a term or constructor signature."
   | otherwise = pure ()
   where
     familyTyCon (WrittenFamily fam _) = fam
@@ -569,7 +572,9 @@ Check an application in a written signature, before solving a term can
 reduce the family and forget the domain obligation. Solve the class
 predicate from the written Givens and the instance environment. Do not
 add an inferred predicate to the signature or put a dictionary into the
-family's Core kind. This is a source subset of the formulation in
+family's Core kind. For a constructor, check its wrapper type after the
+usual newtype validity check. The wrapper already contains the Givens
+available to its fields, including the constructor's explicit context. This is a source subset of the formulation in
 Morris and Eisenberg, "Constrained Type Families", section 4.2.
 -}
 

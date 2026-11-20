@@ -19,6 +19,21 @@ for reader in marked ordinary; do
     (
         cd "$reader"
         "${ghc[@]}" -c NativeConstrainedFamilyClient.hs
+        cat >MissingField.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}
+module MissingField where
+import Data.Proxy
+import NativeConstrainedFamilyProvider (Collects(..))
+data Unqualified c = Unqualified (Proxy (Elem c))
+HS
+        if [[ $reader == ordinary ]]; then
+            "${ghc[@]}" -c MissingField.hs
+        elif "${ghc[@]}" -c MissingField.hs >field.log 2>&1 ||
+             ! grep -Fq '[GHC-39999]' field.log ||
+             ! grep -Fq 'Collects c' field.log; then
+            cat field.log
+            exit 1
+        fi
         cat >MissingGround.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
 module MissingGround where

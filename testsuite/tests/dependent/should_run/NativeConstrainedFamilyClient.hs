@@ -1,4 +1,4 @@
-{-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
 module NativeConstrainedFamilyClient where
 
 import Data.Proxy (Proxy(..))
@@ -19,3 +19,9 @@ defaulted = Refl
 
 permuted :: Swapped Int Bool :~: Char
 permuted = Refl
+
+data Witness c where
+    Witness :: Collects c => Proxy (Elem c) -> Witness c
+    ByEquality :: c ~ [Bool] => Proxy (Elem c) -> Witness c
+
+newtype Known = Known (Proxy (Elem [Bool]))

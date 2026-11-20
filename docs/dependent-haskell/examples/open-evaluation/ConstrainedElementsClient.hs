@@ -1,4 +1,4 @@
-{-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module ConstrainedElementsClient (constrainedElements) where
 
 import ConstrainedElements (Collects(..))
@@ -12,6 +12,14 @@ assumed _ = Refl
 ground :: Elem [Bool] :~: Bool
 ground = Refl
 
--- | Check the family under a local constraint and on a known instance.
-constrainedElements :: (Bool :~: Bool, Bool :~: Bool)
-constrainedElements = (assumed (Proxy :: Proxy [Bool]), ground)
+-- | Carry the evidence required by this field.
+data Witness c where
+    Witness :: Collects c => Proxy (Elem c) -> Witness c
+
+fromWitness :: forall c. Witness c -> Bool
+fromWitness (Witness _) = case assumed (Proxy :: Proxy c) of Refl -> True
+
+-- | Check the family under a signature, an instance and a constructor context.
+constrainedElements :: (Bool :~: Bool, Bool :~: Bool, Bool)
+constrainedElements =
+    (assumed (Proxy :: Proxy [Bool]), ground, fromWitness (Witness Proxy :: Witness [Bool]))
