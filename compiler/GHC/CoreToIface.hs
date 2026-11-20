@@ -749,8 +749,10 @@ toIfaceAlt alt@(Alt (DataAlt con) bs rhs)
   | isNativeIndexedDataAlt con bs
   = case splitAt (length bs - 1) bs of
       (_, [cv]) | isCoVar cv, isLocalId cv ->
-        let iface_con | dataConSourceArity con == 0 = IfaceIndexedDataAltWithProof
-                      | otherwise = IfaceIndexedFieldsAltWithProof
+        let iface_con
+              | dataConSourceArity con > 0 = IfaceIndexedFieldsAltWithProof
+              | null (dataConExTyCoVars con) = IfaceIndexedDataAltWithProof
+              | otherwise = IfaceIndexedExistentialAltWithProof
         in IfaceAlt (iface_con (getName con))
              (map (mkIfLclName . getOccFS) bs) (toIfaceExpr rhs)
       _ -> pprPanic "toIfaceAlt: invalid indexed constructor proof binder" (ppr alt)

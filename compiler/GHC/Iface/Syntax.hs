@@ -846,6 +846,7 @@ data IfaceConAlt = IfaceDefaultAlt
                  | IfaceDefaultAltWithProof
                  | IfaceIndexedDataAltWithProof IfExtName
                  | IfaceIndexedFieldsAltWithProof IfExtName
+                 | IfaceIndexedExistentialAltWithProof IfExtName
 
 type IfaceBinding b = IfaceBindingX IfaceExpr b
 
@@ -2035,6 +2036,7 @@ instance Outputable IfaceConAlt where
     ppr (IfaceDataAltWithProof d) = ppr d
     ppr (IfaceIndexedDataAltWithProof d) = ppr d
     ppr (IfaceIndexedFieldsAltWithProof d) = ppr d
+    ppr (IfaceIndexedExistentialAltWithProof d) = ppr d
 
 ------------------
 instance Outputable IfaceIdDetails where
@@ -2385,6 +2387,7 @@ freeNamesIfExpr (IfaceCase s _ alts)
     fn_cons (IfaceAlt (IfaceDataAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedDataAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedFieldsAltWithProof con) _ _ : _) = unitNameSet con
+    fn_cons (IfaceAlt (IfaceIndexedExistentialAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (_                               : _ ) = emptyNameSet
 
 freeNamesIfExpr (IfaceLet (IfaceNonRec bndr rhs) body)
@@ -3292,6 +3295,10 @@ instance Binary IfaceConAlt where
         requireIfaceEvidenceVersion bh IndexedConstructorFieldsEvidence
         putByte bh 6
         put_ bh con
+    put_ bh (IfaceIndexedExistentialAltWithProof con) = do
+        requireIfaceEvidenceVersion bh IndexedConstructorExistentialCaseEvidence
+        putByte bh 7
+        put_ bh con
     get bh = do
         h <- getByte bh
         case h of
@@ -3302,6 +3309,7 @@ instance Binary IfaceConAlt where
             4 -> return IfaceDefaultAltWithProof
             5 -> liftM IfaceIndexedDataAltWithProof $ get bh
             6 -> liftM IfaceIndexedFieldsAltWithProof $ get bh
+            7 -> liftM IfaceIndexedExistentialAltWithProof $ get bh
             _ -> fail ("Unknown interface case alternative tag " ++ show h)
 
 instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
@@ -3571,6 +3579,7 @@ instance NFData IfaceConAlt where
     IfaceDataAltWithProof nm -> rnf nm
     IfaceIndexedDataAltWithProof nm -> rnf nm
     IfaceIndexedFieldsAltWithProof nm -> rnf nm
+    IfaceIndexedExistentialAltWithProof nm -> rnf nm
     IfaceLitAlt lit -> rnf lit `seq` ()
 
 instance NFData IfaceCompleteMatch where

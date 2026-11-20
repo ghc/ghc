@@ -3192,7 +3192,7 @@ nativeIndexedGadtSpec_maybe con
   , dataConRepArity con == 1 + length fields
   , all (\(Scaled mult ty) -> (isOneTy mult || isManyTy mult) && isNativeOpaqueValueType ty) fields
   , all (not . isBanged) (dataConImplBangs con)
-  , not (null fields) || (null exs && noFreeVarsOfType (eqSpecType spec))
+  , not (null fields) || not (null exs) || noFreeVarsOfType (eqSpecType spec)
   = Just spec
   | otherwise = Nothing
 
@@ -3216,6 +3216,11 @@ GHC.Tc.Gen.Match transports the expected result through the virtual
 proof and casts the branch result back. Coverage uses the ordinary
 GADT evidence. It does not treat the virtual proof as a constraint
 on which constructors can match.
+
+An indexed branch can bind erased arguments without binding any fields.
+For FZ :: Fin (S n), the ordinary alternative binds n and the nominal
+equality with S n. Form the promoted FZ at that n. The proof identifies
+the matched value at the scrutinee kind and adds no runtime argument.
 
 Agda's indexed constructor split refines the indices and binds the
 constructor fields in the branch context. See

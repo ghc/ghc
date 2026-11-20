@@ -2520,10 +2520,10 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
       IfaceIndexedConArg operand -> (True,) <$> tcIfaceExpr operand
       _ -> (False,) <$> tcIfaceExpr scrut
     -- Resolve each constructor once, before inspecting its representation arity.
-    let indexed_data_alt fieldful name names = do
+    let indexed_data_alt valid_shape name names = do
           dc <- tcIfaceDataCon name
           unless (isNativeIndexedDataAlt dc names && hasNoDups (case_bndr : names)
-                  && fieldful == (dataConSourceArity dc > 0)) $
+                  && valid_shape dc) $
             failIfM (text "Invalid indexed constructor proof in interface alternative:"
                      <+> ppr dc <+> ppr names)
           return (DataAlt dc)
@@ -2537,8 +2537,12 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
           when (isNativeIndexedDataAlt dc names) $
             failIfM (text "Missing indexed constructor proof tag:" <+> ppr dc)
           return (DataAlt dc)
-        IfaceIndexedDataAltWithProof name -> indexed_data_alt False name names
-        IfaceIndexedFieldsAltWithProof name -> indexed_data_alt True name names
+        IfaceIndexedDataAltWithProof name ->
+          indexed_data_alt (\dc -> dataConSourceArity dc == 0 && null (dataConExTyCoVars dc)) name names
+        IfaceIndexedFieldsAltWithProof name ->
+          indexed_data_alt (\dc -> dataConSourceArity dc > 0) name names
+        IfaceIndexedExistentialAltWithProof name ->
+          indexed_data_alt (\dc -> dataConSourceArity dc == 0 && not (null (dataConExTyCoVars dc))) name names
         IfaceDataAltWithProof name -> do
           dc <- tcIfaceDataCon name
           unless (isNativeIndexDataAlt dc names) $

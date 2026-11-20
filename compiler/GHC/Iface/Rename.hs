@@ -896,6 +896,7 @@ rnIfaceConAlt (IfaceDataAlt data_occ) = IfaceDataAlt <$> rnIfaceGlobal data_occ
 rnIfaceConAlt (IfaceDataAltWithProof data_occ) = IfaceDataAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt (IfaceIndexedDataAltWithProof data_occ) = IfaceIndexedDataAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt (IfaceIndexedFieldsAltWithProof data_occ) = IfaceIndexedFieldsAltWithProof <$> rnIfaceGlobal data_occ
+rnIfaceConAlt (IfaceIndexedExistentialAltWithProof data_occ) = IfaceIndexedExistentialAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt alt = pure alt
 
 rnIfaceLetBndr :: Rename IfaceLetBndr
