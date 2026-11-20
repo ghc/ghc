@@ -6578,6 +6578,31 @@ the last value argument] in `GHC.Core.Opt.WorkWrap.Utils`.
 [Worker construction](../../compiler/GHC/Core/Opt/WorkWrap/Utils.hs)
 and [case regression](../../testsuite/tests/dependent/should_run/NativeRetainedCastDomainWorker.hs).
 
+### Prove that the pieces reconstruct the input
+
+Agda's `Data.Vec.Base.splitAt` returns two vectors and a proof that the
+input equals their append. The successor clause applies congruence for
+the original head to the recursive proof. The Haskell example stores
+both vectors in nested retained sums. Its equality has append on the
+left. Matching the tail proof on `Refl` allows GHC to check the same
+induction step using the ordinary `appendVec` equations.
+[Agda stdlib v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html#splitAt)
+and [Haskell definition](examples/packed-vector/CertifiedSplit.hs).
+
+The input index in `SplitAtValue a cut suffix original` has kind
+`Vec a (Add cut suffix)`. The generated sum payloads keep the captured
+`cut` and `suffix` in that kind. Both sides of the equality then have
+the same vector kind. Agda also permits a later binder to depend on
+earlier binders in its telescope.
+[Agda 2.8.0 telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html).
+
+CorePrep names the constructed prefix and transports the inner sum through
+that equality. The GADT length proof can mention the prefix's length
+without mentioning the prefix. See Note [Scoped native index abstraction]
+in `GHC.Core.Coercion`.
+[Source-hidden caller](examples/packed-vector/CertifiedSplitClient.hs) and
+[demand and missing-premise checks](../../testsuite/tests/dependent/should_run/NativeCertifiedSplit.sh).
+
 ## Check a split at an independent runtime cut
 
 `splitAtVecChecked` compares the runtime cut and total before splitting
@@ -6589,6 +6614,16 @@ leaves the total unevaluated. A positive cut inspects only the length
 constructors needed to reach the cut or detect exhaustion.
 [Haskell implementation](examples/packed-vector/PackedVecLibrary.hs) and
 [ordinary caller](examples/packed-vector/ListVectorClient.hs).
+
+`checkedSplitAtValue` uses the same bound to return the contents
+equality from `splitAtValue`. An ordinary caller can open the suffix
+length and the addition equality before it asks for either piece.
+Matching the `SplitAtWidth` GADT gives the caller the length equation.
+Its field holds the recursive split at that width. The vector stays lazy
+when the caller only inspects the length. On demand, the client opens
+both stored pieces and matches their homogeneous equality.
+[Checked contents](examples/packed-vector/CertifiedSplit.hs)
+and [ordinary observations](examples/packed-vector/CertifiedSplitClient.hs).
 
 Agda's bounded vector padding turns a length bound into a remainder and
 an addition equality. Idris 2's `isLTE` compares two runtime lengths and

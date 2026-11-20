@@ -146,6 +146,15 @@ the actual arguments for n and m in the kind of x. Give the hidden
 family a standalone kind signature when all the written kinds determine
 the telescope. Keep the inference path for incomplete kinds and do not
 copy source splices into the signature.
+
+A nested sum also captures the enclosing witness. Keep the written
+domain on the witness header when the same syntax checks as a type
+and a kind. Otherwise, infer the domain from the Sigma application.
+A written domain scopes over the enclosing equation's variables.
+Restore those names with type lets if the header has private names.
+For example, a domain of Proxy x after some (x :: A) must refer to
+the witness header, even when it shadows a synonym parameter x.
+See Note [Provisional kinds of sum payloads] in GHC.Tc.TyCl.
 -}
 -- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
 liftTypeLambdas :: RdrName -> HsGroup GhcPs
@@ -179,17 +188,17 @@ liftTypeLambdas sigma group =
       , (_, result) <- collectLambdas salt vars rhs
       , L _ (XHsType HsTypeCase{}) <- stripParens result
       = let (body', families, next) =
-                liftLambdaRhs scoped False owner captures lam_loc vars rhs salt
+                liftLambdaRhs scoped Nothing owner captures lam_loc vars rhs salt
                   (Just (foldr nlHsFunTy kind capture_kinds))
         in (L loc (HsKindSig ann body' kind), families, next)
     liftRhs scoped owner captures (L loc (HsKindSig ann body kind)) salt =
       let (body', families, next) = liftRhs scoped owner captures body salt
       in (L loc (HsKindSig ann body' kind), families, next)
     liftRhs scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
-      liftLambdaRhs scoped False owner captures loc vars body salt Nothing
+      liftLambdaRhs scoped Nothing owner captures loc vars body salt Nothing
     liftRhs scoped owner captures (L loc (XHsType (HsTypeSome _ binder domain body))) salt =
       let signature = sumPayloadKind captures domain
-          (schema, families, next) = liftLambdaRhs scoped True owner captures loc [binder] body salt signature
+          (schema, families, next) = liftLambdaRhs scoped (Just domain) owner captures loc [binder] body salt signature
           sigma_ty = typeName (L (l2l loc) sigma)
           app f arg = L loc (HsAppTy noExtField f arg)
       in (app (app sigma_ty domain) schema, families, next)
@@ -216,6 +225,7 @@ liftTypeLambdas sigma group =
 
     -- See Note [Lifting type lambdas]. Bind only captures that occur in a
     -- later kind. Check closure after binding the captures in source order.
+    -- The written domain must refer to the same names in this signature.
     sumPayloadKind captures domain
       | Just binders <- traverse explicitCapture captures
       , completeKind domain
@@ -227,8 +237,10 @@ liftTypeLambdas sigma group =
         result = nlHsFunTy domain (nlHsTyVar NotPromoted (Exact (ExactName liftedTypeKindTyConName)))
         kindVars = Set.fromList . map unLoc . extractHsTyRdrTyVars
 
-        explicitCapture (binder@(L _ (HsTvb _ _ (HsBndrVar _ name) (HsBndrKind _ kind))), _)
-          | completeKind kind = Just (binder, unLoc name, kind)
+        explicitCapture (binder@(L _ (HsTvb _ _ (HsBndrVar _ name) (HsBndrKind _ kind))), source)
+          | completeKind kind
+          , sameBinder name source || not (unLoc source `Set.member` kindVars domain)
+          = Just (binder, unLoc name, kind)
         explicitCapture _ = Nothing
 
         addCapture (binder, name, kind) (body, free, dependent) =
@@ -238,16 +250,41 @@ liftTypeLambdas sigma group =
                     | otherwise = nlHsFunTy kind body
           in (kind', kindVars kind `Set.union` Set.delete name free, used || dependent)
 
-        completeKind :: Data a => a -> Bool
-        completeKind node =
-          case cast node :: Maybe (LHsType GhcPs) of
-            Just (L _ HsSpliceTy{})    -> False
-            Just (L _ HsWildCardTy{})  -> False
-            Just (L _ XHsType{})      -> False
-            _ -> and (gmapQ completeKind node)
+    completeKind :: Data a => a -> Bool
+    completeKind node =
+      case cast node :: Maybe (LHsType GhcPs) of
+        Just (L _ HsSpliceTy{})    -> False
+        Just (L _ HsWildCardTy{})  -> False
+        Just (L _ XHsType{})      -> False
+        _ -> and (gmapQ completeKind node)
 
-    liftLambdaRhs outer_scope is_sum owner captures loc vars body salt signature =
+    -- See Note [Lifting type lambdas].
+    witnessKind captures domain
+      | completeKind domain
+      , sameDomainMode domain
+      , Set.null (free `Set.difference` scope)
+      = Just (foldr restore domain captures)
+      | otherwise = Nothing
+      where
+        free = Set.fromList (map unLoc (extractHsTyRdrTyVars domain))
+        scope = Set.fromList (map (unLoc . snd) captures)
+        restore (L _ HsTvb{tvb_var = HsBndrVar _ header}, source) body
+          | not (sameBinder header source)
+          , unLoc source `Set.member` free
+          = L (getLoc body) (XHsType (HsTypeLet (noAnn, noAnn, noAnn) source (typeName header) body))
+        restore _ body = body
+
+    -- For example, a bare arrow can change matchability in a kind.
+    sameDomainMode :: Data a => a -> Bool
+    sameDomainMode node = case cast node :: Maybe (LHsType GhcPs) of
+      Just (L _ HsFunTy{}) -> False
+      Just (L _ HsForAllTy{}) -> False
+      Just (L _ HsForEachTy{}) -> False
+      _ -> and (gmapQ sameDomainMode node)
+
+    liftLambdaRhs outer_scope domain owner captures loc vars body salt signature =
       let owner_occ = rdrNameOcc (unLoc owner)
+          is_sum = isJust domain
           scoped
             | is_sum, Nothing <- outer_scope = Just (lambdaOcc owner_occ salt True)
             | otherwise = outer_scope
@@ -257,7 +294,12 @@ liftTypeLambdas sigma group =
           header_names
             | hasDuplicates binders = binders
             | otherwise = zipWith (privateName "header" salt) [0..] binders
-          locals = zip (map liftedTypeVarBinder header_names) binders
+          local_binders = map liftedTypeVarBinder header_names
+          locals = zip (annotateWitness local_binders) binders
+          annotateWitness (L b_loc binder : rest)
+            | Just kind <- domain >>= witnessKind captures
+            = L b_loc binder{tvb_kind = HsBndrKind noExtField kind} : rest
+          annotateWitness bs = bs
           equation_captures = zipWith (hideCapture binders salt) [0..] captures
           equation_scope = equation_captures ++ locals
           (body', families, next) =

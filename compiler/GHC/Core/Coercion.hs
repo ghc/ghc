@@ -2163,8 +2163,10 @@ abstractNativeIndices pairs ty = go emptyVarEnv initial_scope pairs ty
       | otherwise = lookup_index rest index
 
     mask binder = filter (not . elemVarSet binder . tyCoVarsOfType . fst)
-    independent replacements vars =
-      all (disjointVarSet vars . tyCoVarsOfType . fst) replacements
+    independent replacements vars = all independent_of replacements
+      where
+        independent_of (TermVarTy v, _) = not (v `elemVarSet` vars)
+        independent_of (index, _) = disjointVarSet vars (tyCoVarsOfType index)
 
     rename_co renamed scope co = substCo (Subst scope ids tvs cvs) co
       where
@@ -2187,6 +2189,12 @@ metadata outside its own group. Do not inspect recursive IdInfo.
 The temporary TyVars are local lifting templates. They do not become checked
 runtime indices. Input casts and coercion types retain independent evidence;
 abstracting selected runtime indices inside such evidence remains unsupported.
+When abstracting one runtime variable, check whether the coercion mentions
+that variable. Its type can share parameters with the coercion. For example,
+a prefix of type Vec a (S k) and a GADT branch proof about k share k, but
+the branch proof is independent of the prefix. The free variables of a
+coercion include the types of its CoVars. This also catches an occurrence
+of the prefix in a CoVar endpoint.
 The later lifting step constructs new domain evidence explicitly.
 -}
 

@@ -333,9 +333,11 @@ analysis again. Do not create join points from pre-existing occurrence metadata.
 
 When a beta redex uses its binder in an annotation, substitute a checked
 index. An opaque binder at Vec a n can occur in its result type even though
-the constructors of Vec do not form a structural domain. An ordinary beta let
-would leave that let binder free in the result type. Function heads use the
-separate fixed-type check. The index check still governs operand reification.
+the constructors of Vec do not form a structural domain. Also check the type
+of the body. An application can compute its index from a constructor operand
+without an explicit annotation. An ordinary beta let would leave that let
+binder free in the result type. Function heads use the separate fixed-type
+check. The index check still governs operand reification.
 
 A local nonrecursive binding whose input RHS is literally a variable can be
 removed when both input Ids are eligible local Many indices or native function
@@ -800,7 +802,9 @@ simple_app env e0@(Lam {}) as0@(_:_)
 
       | soe_native env
       , isNativeIndexId b'
-        || (isNativeOpaqueValueId b' && hasFreeVarInCoreAnnotations b body)
+        || (isNativeOpaqueValueId b'
+            && (hasFreeVarInCoreAnnotations b body
+                || anyFreeVarsOfType (== b) (exprType body)))
       -- See Note [Restricted dependent simplification].
       = let arg = simple_opt_clo (soeInScope env') a
         in case exprToNativeIndex arg of

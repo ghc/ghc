@@ -805,8 +805,10 @@ A TcTyCon is one of the variants of TyCon.  First, here are its invariants:
     unification variables.
 
   - tyConKind: the Monomorphic Recursion Principle:
-       a MonoTcTyCon has a /monomorphic kind/.
+       a MonoTcTyCon has a /monomorphic kind/, except for the visible
+       dependencies of a generated sum payload family.
     See Note [No polymorphic recursion in type decls].
+    See also Note [Provisional kinds of sum payloads].
     But the tyConKind may contain free unification variables.
 
   - tyConScopedTyVars is important; maps a Name to a TyVarTv unification variable
@@ -830,8 +832,8 @@ A TcTyCon is one of the variants of TyCon.  First, here are its invariants:
         tyConScopedTyVars.
       * at construction time (mkTcTyCon) for a MonoTcTyCon (the call to mkTcTyCon
         in GHC.Tc.Gen.HsType.kcInferDeclHeader) the tyConBinders are used to
-        construct the tyConKind; all must have AnonTCB visiblity so we we get
-        a monokind.
+        construct the tyConKind. Ordinary declarations use AnonTCB visibility
+        for a monokind.
 
 * PolyTcTyCon: a form of TcTyCon
   - Flag tcTyConIsPoly = True; this is used only to short-cut zonking
@@ -1011,6 +1013,33 @@ But notice that (#16344 comment:3)
      data T3 ka (a::ka) = forall b. MkT3 (T3 Type b)
   although T3 is really polymorphic-recursive too.
   Perhaps we should somehow reject that.
+
+Note [Provisional kinds of sum payloads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The renamer lifts the payload of `some` to a private family. An inner
+payload family can capture the same variables as its enclosing family:
+
+  type Keep a (n :: N) (m :: N) (v :: Vec a (Add n m)) =
+    some (left :: Vec a n) | (some (right :: Vec a m) | v :~: v)
+
+The inner header binds a, n, m, v, and left, in that order. If its
+provisional kind has only anonymous binders, the inner application in
+the outer equation checks v against a kind containing the inner
+header's n and m. The solver cannot identify those variables from
+Add n m because Add is non-injective.
+
+Keep visible binders that the checked header uses in later kinds.
+Then each helper application substitutes a, n, and m before it checks
+v. As with Agda's telescopes, each domain refers to the binders that
+precede it. For the renamer's copy of the witness domain, see
+Note [Lifting type lambdas] in GHC.Rename.Module.
+
+Use the renamer's sum payload provenance to select this path. The
+generated applications pass the same lexical captures in order. Their
+visible dependencies come from the header, before the body can
+constrain its metas. The normal kind generalizer still determines
+which remaining variables to quantify. Ordinary declarations keep
+the monomorphic recursion principle.
 
 Note [No inference for invisible binders in type decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2398,7 +2427,7 @@ get_fam_decl_initial_kind mb_parent_tycon
                , fdTyVars    = ktvs
                , fdResultSig = L _ resultSig
                , fdInfo      = info }
-  = kcDeclHeader InitialKindInfer name flav ktvs $
+  = kc_header $
     case resultSig of
       KindSig _ ki                          -> TheKind <$> tcLHsFamilyResultKindSig ctxt ki
       TyVarSig _ (L _ tvb) | HsTvb { tvb_kind = HsBndrKind _ ki } <- tvb
@@ -2409,6 +2438,10 @@ get_fam_decl_initial_kind mb_parent_tycon
                -- by default
         | otherwise                         -> return AnyKind
   where
+    kc_header = case info of
+      -- See Note [Provisional kinds of sum payloads].
+      ClosedTypeFamily (_, Just (_, True)) _ -> kcInferSumPayloadHeader name ktvs
+      _ -> kcDeclHeader InitialKindInfer name flav ktvs
     flav = familyInfoTyConFlavour mb_parent_tycon info
     ctxt = TyFamResKindCtxt name
 
@@ -7162,9 +7195,9 @@ addVDQNote tycon thing_inside
       -- Check whether a tycon has visible dependent quantification.
       -- This will *always* be a TcTyCon. Furthermore, it will *always*
       -- be an ungeneralised TcTyCon, straight out of kcInferDeclHeader.
-      -- Thus, all the TyConBinders will be anonymous. Thus, the
-      -- free variables of the tycon's kind will be the same as the free
-      -- variables from all the binders.
+      -- Look for dependencies still expressed as free variables. This
+      -- excludes the visible dependencies bound in private sum payloads.
+      -- See Note [Provisional kinds of sum payloads].
     has_vdq  = any is_vdq_tcb (tyConBinders tycon)
     tc_kind  = tyConKind tycon
     kind_fvs = tyCoVarsOfType tc_kind

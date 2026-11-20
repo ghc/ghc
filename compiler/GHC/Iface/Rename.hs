@@ -848,6 +848,7 @@ rnIfaceExpr (IfaceUnpack witness value package body)
                   <*> rnIfaceExpr package <*> rnIfaceExpr body
 rnIfaceExpr (IfaceApp fun arg)
     = IfaceApp <$> rnIfaceExpr fun <*> rnIfaceExpr arg
+rnIfaceExpr (IfaceIndexedConArg arg) = IfaceIndexedConArg <$> rnIfaceExpr arg
 rnIfaceExpr (IfaceCase scrut case_bndr alts)
     = IfaceCase <$> rnIfaceExpr scrut
                 <*> pure case_bndr
@@ -894,6 +895,7 @@ rnIfaceConAlt :: Rename IfaceConAlt
 rnIfaceConAlt (IfaceDataAlt data_occ) = IfaceDataAlt <$> rnIfaceGlobal data_occ
 rnIfaceConAlt (IfaceDataAltWithProof data_occ) = IfaceDataAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt (IfaceIndexedDataAltWithProof data_occ) = IfaceIndexedDataAltWithProof <$> rnIfaceGlobal data_occ
+rnIfaceConAlt (IfaceIndexedFieldsAltWithProof data_occ) = IfaceIndexedFieldsAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt alt = pure alt
 
 rnIfaceLetBndr :: Rename IfaceLetBndr

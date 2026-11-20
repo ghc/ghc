@@ -1,0 +1,9 @@
+NativeNestedSumCaptureWrong.hs:24:54: error: [GHC-83865]
+    • Couldn't match kind: Add n m
+                     with: Add m n
+      Expected kind ‘Vec Bool (Add m n)’,
+        but ‘v’ has kind ‘Vec Bool (Add n m)’
+      Note: ‘Add’ is a non-injective type family.
+    • In the second argument of ‘AtLength’, namely ‘v’
+      In the type ‘AtLength (Add m n) v’
+      In the type lambda in ‘Wrong’

@@ -388,6 +388,12 @@ test('NativeFunctionIndex',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeFunctionIndex.sh "{compiler}" "{libdir}"'])
 
+test('NativeIndexedGadtFields',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
+                   'NativeIndexedGadtFieldsProvider.hs', 'NativeIndexedGadtFields.hs'])],
+     run_command, ['bash NativeIndexedGadtFields.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedPackage',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativePackageOperand.hs',
@@ -404,11 +410,23 @@ test('NativeRetainedPackage',
                    '../../../../docs/dependent-haskell/examples/packed-vector/RetainedProjection.hs'])],
      run_command, ['bash NativeRetainedPackage.sh "{compiler}" "{libdir}"'])
 
+test('NativeCertifiedSplit',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['PackedVecLibrary.hs', 'CertifiedSplit.hs', 'CertifiedSplitClient.hs']])],
+     run_command, ['bash NativeCertifiedSplit.sh "{compiler}" "{libdir}"'])
 test('NativeNamedSplit',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/NamedSplitClient.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeNamedSplit.sh "{compiler}" "{libdir}"'])
+
+test('NativeIndexedConsProof',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeIndexedConsProof.hs', 'NativeIndexedConsProofClient.hs',
+                   'NativeIndexedOperandWire.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
+     run_command, ['bash NativeIndexedConsProof.sh "{compiler}" "{libdir}"'])
 
 test('NativeRetainedCast',
      [req_host_target_ghc, only_ways(['normal']),

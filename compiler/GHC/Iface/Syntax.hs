@@ -510,6 +510,7 @@ hasIfacePackageExpr = go
     go (IfaceTuple _ args) = any go args
     go (IfaceLam _ rhs) = go rhs
     go (IfaceApp fun arg) = go fun || go arg
+    go (IfaceIndexedConArg arg) = go arg
     go (IfaceCase scrut _ alts) = go scrut || any (\(IfaceAlt _ _ rhs) -> go rhs) alts
     go (IfaceECase scrut _) = go scrut
     go (IfaceLet binding rhs) = goBind binding || go rhs
@@ -824,6 +825,7 @@ data IfaceExpr
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
   | IfacePack   IfaceType IfaceType IfaceExpr
   | IfaceUnpack IfaceTvBndr IfaceIdBndr IfaceExpr IfaceExpr
+  | IfaceIndexedConArg IfaceExpr
 
 
 data IfaceTickish
@@ -843,6 +845,7 @@ data IfaceConAlt = IfaceDefaultAlt
                  | IfaceDataAltWithProof IfExtName
                  | IfaceDefaultAltWithProof
                  | IfaceIndexedDataAltWithProof IfExtName
+                 | IfaceIndexedFieldsAltWithProof IfExtName
 
 type IfaceBinding b = IfaceBindingX IfaceExpr b
 
@@ -1947,6 +1950,7 @@ pprIfaceExpr add_par (IfaceUnpack (witness, _) (_, payload, _) package body)
                     2 (ppr body)
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
+pprIfaceExpr add_par (IfaceIndexedConArg arg) = pprIfaceExpr add_par arg
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -2030,6 +2034,7 @@ instance Outputable IfaceConAlt where
     ppr (IfaceDataAlt d)  = ppr d
     ppr (IfaceDataAltWithProof d) = ppr d
     ppr (IfaceIndexedDataAltWithProof d) = ppr d
+    ppr (IfaceIndexedFieldsAltWithProof d) = ppr d
 
 ------------------
 instance Outputable IfaceIdDetails where
@@ -2362,6 +2367,7 @@ freeNamesIfExpr (IfaceUnpack witness payload@(mult, _, _) package body)
   = freeNamesIfTvBndr witness &&& freeNamesIfType mult &&& freeNamesIfIdBndr payload
       &&& freeNamesIfExpr package &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
+freeNamesIfExpr (IfaceIndexedConArg a) = freeNamesIfExpr a
 freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTick t e)       = freeNamesIfTickish t &&& freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
@@ -2378,6 +2384,7 @@ freeNamesIfExpr (IfaceCase s _ alts)
     fn_cons (IfaceAlt (IfaceDataAlt con) _ _ : _ ) = unitNameSet con
     fn_cons (IfaceAlt (IfaceDataAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedDataAltWithProof con) _ _ : _) = unitNameSet con
+    fn_cons (IfaceAlt (IfaceIndexedFieldsAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (_                               : _ ) = emptyNameSet
 
 freeNamesIfExpr (IfaceLet (IfaceNonRec bndr rhs) body)
@@ -3111,6 +3118,10 @@ instance Binary IfaceExpr where
         put_ bh ae
         put_ bh os
         put_ bh af
+    put_ bh (IfaceIndexedConArg arg) = do
+        requireIfaceEvidenceVersion bh IndexedConstructorOperandEvidence
+        putByte bh 17
+        put_ bh arg
     put_ bh (IfaceApp ag ah) = do
         putByte bh 5
         put_ bh ag
@@ -3210,6 +3221,7 @@ instance Binary IfaceExpr where
                      return (IfaceLitRubbish torc r)
             15 -> IfacePack <$> get bh <*> get bh <*> get bh
             16 -> IfaceUnpack <$> get bh <*> get bh <*> get bh <*> get bh
+            17 -> IfaceIndexedConArg <$> get bh
             _ -> ioError (userError ("get IfaceExpr: invalid expression tag " ++ show h))
 
 instance Binary IfaceTickish where
@@ -3276,6 +3288,10 @@ instance Binary IfaceConAlt where
         requireIfaceEvidenceVersion bh IndexedConstructorCaseEvidence
         putByte bh 5
         put_ bh con
+    put_ bh (IfaceIndexedFieldsAltWithProof con) = do
+        requireIfaceEvidenceVersion bh IndexedConstructorFieldsEvidence
+        putByte bh 6
+        put_ bh con
     get bh = do
         h <- getByte bh
         case h of
@@ -3285,6 +3301,7 @@ instance Binary IfaceConAlt where
             3 -> liftM IfaceDataAltWithProof $ get bh
             4 -> return IfaceDefaultAltWithProof
             5 -> liftM IfaceIndexedDataAltWithProof $ get bh
+            6 -> liftM IfaceIndexedFieldsAltWithProof $ get bh
             _ -> fail ("Unknown interface case alternative tag " ++ show h)
 
 instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
@@ -3496,6 +3513,7 @@ instance NFData IfaceExpr where
     IfacePack schema w e -> rnf schema `seq` rnf w `seq` rnf e
     IfaceUnpack w v p e -> rnf w `seq` rnf v `seq` rnf p `seq` rnf e
     IfaceApp e1 e2 -> rnf e1 `seq` rnf e2
+    IfaceIndexedConArg e -> rnf e
     IfaceCase e nm alts -> rnf e `seq` rnf nm `seq` rnf alts
     IfaceECase e ty -> rnf e `seq` rnf ty
     IfaceLet bind e -> rnf bind `seq` rnf e
@@ -3552,6 +3570,7 @@ instance NFData IfaceConAlt where
     IfaceDataAlt nm -> rnf nm
     IfaceDataAltWithProof nm -> rnf nm
     IfaceIndexedDataAltWithProof nm -> rnf nm
+    IfaceIndexedFieldsAltWithProof nm -> rnf nm
     IfaceLitAlt lit -> rnf lit `seq` ()
 
 instance NFData IfaceCompleteMatch where

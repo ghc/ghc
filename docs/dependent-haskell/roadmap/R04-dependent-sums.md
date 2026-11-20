@@ -312,3 +312,35 @@ Agda's `uncurry` opens a dependent pair by binding both components;
 here the equality also depends on which patterns Haskell evaluates.
 [Agda's dependent pair eliminator](https://github.com/agda/agda-stdlib/blob/master/src/Data/Product/Base.agda)
 and [scope and demand checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
+
+## Prove a split preserves the original vector
+
+`splitAtValue` takes a runtime cut and the original vector.
+It returns a retained prefix, a retained suffix, and
+`appendVec left right :~: original`. The zero branch stores the
+input as the suffix. The successor branch opens the recursive result
+and uses its equality to put the original head on the prefix.
+Removing the match on the induction premise makes GHC reject the final
+`Refl` with GHC-83865.
+
+A separate ordinary client splits `[True, False, True]` at two and reads
+`[True, False]` and `[True]`. After matching the equality it appends
+the pieces. Demanding the zero-cut proof leaves an undefined input
+unevaluated. Demanding the successor proof evaluates the input spine
+up to the cut and leaves the tested head and suffix unevaluated.
+The client also checks a cut read from an IORef. The registered test
+compiles each module from the preceding modules' interfaces at
+`-O0`, `-O1`, and `-O2`.
+[Producer](../examples/packed-vector/CertifiedSplit.hs),
+[ordinary client](../examples/packed-vector/CertifiedSplitClient.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeCertifiedSplit.sh)
+and [Agda provenance](../REFERENCES.md#prove-that-the-pieces-reconstruct-the-input).
+
+An independent runtime cut uses the existing remainder proof.
+`checkedSplitAtValue cut total input` returns `Nothing` when the cut
+exceeds the total. A successful result stores the actual suffix length,
+the GADT that relates the three lengths, the two vectors, and their contents equality.
+The client can inspect the length result without evaluating the vector.
+The source-hidden regression checks zero, interior, exact, and excessive
+cuts. [Checked split](../examples/packed-vector/CertifiedSplit.hs)
+and [ordinary client](../examples/packed-vector/CertifiedSplitClient.hs).

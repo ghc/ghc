@@ -9,18 +9,21 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-An ordinary caller can open a vector split returned by `IO`, name its
-suffix index in a pattern, and write `toList (appendVec left right)`.
-The compiler infers both indices with Quick Look enabled or disabled.
-The 364-line Showcase runs in native code and source-loaded GHCi.
-Matching the cut supplies the width of the original vector without
-evaluating it. A proof module also checks `appendVec VNil xs :~: xs`
-for each of two vectors at one runtime length. An ordinary caller can
-demand both proofs and leave both vectors unevaluated.
-[Paired append proof](roadmap/R16-open-term-evaluator.md#two-append-equalities-at-one-runtime-length).
-The earlier 360-line compiler also passed a clean two-stage build.
-[Ordinary split consumer](examples/packed-vector/NamedSplitClient.hs)
-and [verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
+An ordinary caller can split a vector at a runtime cut and obtain a
+proof that appending the two pieces gives back its original input.
+`splitAtValue` returns two retained vectors and a homogeneous equality.
+For an independently read cut and total, `checkedSplitAtValue` returns
+`Nothing` if the cut exceeds the total. On success, checking the suffix
+length leaves the vector unevaluated. Opening the contents proof takes
+the recursive path down the input spine.
+[Split theorem](examples/packed-vector/CertifiedSplit.hs) and
+[ordinary caller](examples/packed-vector/CertifiedSplitClient.hs).
+
+The 366-line Showcase runs in native code and source-loaded GHCi.
+The source-hidden proof regression passes at `-O0`, `-O1`, and `-O2`.
+Removing the induction premise fails at the final `Refl`. The earlier
+360-line checkpoint also passed a clean two-stage Hadrian build.
+[Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A retained function can name an entire indexed vector as its argument.
 `foreach (xs :: Vec a n) -> xs :~: xs` returns `Refl` even for an
@@ -29,8 +32,9 @@ fails at `Refl`. A type synonym can also name a dependent consumer. An
 ordinary module uses the exported synonym to pass an indexed payload.
 A match on `VNil` now refines the value `xs` and its length. The
 branch can return a heterogeneous equality between `xs` and `VNil`.
-Matching the outer constructor still forces the vector. Refinement to
-`VCons x rest` with the actual head and tail remains under development.
+Matching `VCons x rest` refines the input to its actual head and tail.
+The match forces the outer constructor. The fields stay lazy until the
+caller inspects them.
 [Dependent products](roadmap/R03-dependent-products.md) and
 [named consumer](examples/packed-vector/DependentPair.hs).
 
@@ -280,21 +284,26 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R03 and R05.** Check indexed constructor patterns. A caller must
-   be able to match a returned equality and use the refined length.
-   Extend the empty case to a constructor with runtime fields. Preserve
-   the identity of each field and the demand on the original scrutinee.
-   [Indexed patterns](roadmap/R03-dependent-products.md).
-2. **R16.** Check both equations of ordinary vector append at symbolic
-   arguments through separate compilation. The right operand can be
-   undefined. The recursive equation must preserve the head and must
-   recurse on the tail. [Append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
-3. **R03 and R04.** Return the prefix and suffix together with evidence
-   that their append equals the original vector. This uses both the
-   constructor refinement and the open equations. Check generated
-   package signatures where the kind of one captured variable mentions
-   an earlier capture. [Dependent sums](roadmap/R04-dependent-sums.md)
-   and [Agda's split proof](REFERENCES.md#split-a-vector-at-a-retained-length).
+The vector split now exercises dependent products, dependent sums, Core,
+and open evaluation together. The empty and cons equations for ordinary
+append pass through separate compilation. The split returns a
+reconstruction proof for an arbitrary cut within the vector.
+[Split evidence](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector)
+and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
+
+1. **R03 and R05.** Extend indexed pattern refinement to the existing
+   finite positions. In `Fin ('S n)`, the zero position has a hidden
+   predecessor bound and no runtime fields. A view of the successor
+   must refer to its actual predecessor. Keep the ordinary case's demand
+   and its error location. [Finite positions](examples/qualified-pi/ParameterizedIndexLibrary.hs).
+2. **R04 and R21.** Check generated nested sum families without requiring
+   a source termination extension when the helper dependencies are
+   finite. Check recursive source aliases and calls to open families
+   separately. [Captured vector indices](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector).
+3. **R03 and R05.** Infer the input index of a GADT result after matching
+   a length equality. The checked split currently writes that argument
+   explicitly. A failed inference must give a located type error.
+   [Checked constructor](examples/packed-vector/CertifiedSplit.hs).
 
 ### Other open work
 

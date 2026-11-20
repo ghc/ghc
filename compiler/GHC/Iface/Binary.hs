@@ -324,7 +324,8 @@ evidenceSuffix requirements
   | needs ErasedUserRuleEvidence || needs LexicalPackageRuleEvidence
     || needs OrphanErasedUserRuleEvidence || needs AnchoredErasedRuleEvidence
     || needs RetainedUserRuleEvidence || needs ImportedRetainedRuleEvidence
-    || needs IndexedConstructorCaseEvidence = feature_set
+    || needs IndexedConstructorCaseEvidence || needs IndexedConstructorFieldsEvidence
+    || needs IndexedConstructorOperandEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -346,6 +347,8 @@ legacyEvidenceSuffix AnchoredErasedRuleEvidence = featureSetPrefix ++ "anchored-
 legacyEvidenceSuffix RetainedUserRuleEvidence = featureSetPrefix ++ "retained-user-rule"
 legacyEvidenceSuffix ImportedRetainedRuleEvidence = featureSetPrefix ++ "imported-retained-rule"
 legacyEvidenceSuffix IndexedConstructorCaseEvidence = featureSetPrefix ++ "indexed-constructor-case"
+legacyEvidenceSuffix IndexedConstructorFieldsEvidence = featureSetPrefix ++ "indexed-constructor-fields"
+legacyEvidenceSuffix IndexedConstructorOperandEvidence = featureSetPrefix ++ "indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
 legacyEvidenceSuffix RetainedSpecRuleEvidence  = "-retained-specialisation-rule-v1"
@@ -373,7 +376,9 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("anchored-user-rule", AnchoredErasedRuleEvidence)
                       , ("retained-user-rule", RetainedUserRuleEvidence)
                       , ("imported-retained-rule", ImportedRetainedRuleEvidence)
-                      , ("indexed-constructor-case", IndexedConstructorCaseEvidence) ]
+                      , ("indexed-constructor-case", IndexedConstructorCaseEvidence)
+                      , ("indexed-constructor-fields", IndexedConstructorFieldsEvidence)
+                      , ("indexed-constructor-operand", IndexedConstructorOperandEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
