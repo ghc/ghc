@@ -234,6 +234,19 @@ cprAnal' env (Tick t e)
   where
     (cpr_ty, e') = cprAnal env e
 
+-- Pack exposes the lifted value and hides its constructor type.
+cprAnal' env (Pack schema witness payload)
+  = (topCprType, Pack schema witness payload')
+  where
+    (_, payload') = cprAnal env payload
+
+-- The body result has a type independent of the opened binders.
+cprAnal' env (Unpack witness payload package body)
+  = (body_ty, Unpack witness payload package' body')
+  where
+    (_, package') = cprAnal env package
+    (body_ty, body') = cprAnal (extendSigEnv env payload topCprSig) body
+
 cprAnal' env e@(Var{})
   = cprAnalApp env e []
 cprAnal' env e@(App{})

@@ -458,6 +458,23 @@ dmdAnal' env dmd (Tick t e)
   where
     WithDmdType dmd_ty e' = dmdAnal env dmd e
 
+-- See Note [Demand for erased packages].
+dmdAnal' env _ (Pack schema witness payload)
+  = WithDmdType payload_ty (Pack schema witness payload')
+  where
+    WithDmdType payload_ty payload' = dmdAnal env topSubDmd payload
+
+dmdAnal' env dmd (Unpack witness payload package body)
+  = WithDmdType (body_ty' `plusDmdType` package_env)
+                (Unpack witness payload' package' body')
+  where
+    WithDmdType body_ty body' = dmdAnal (addInScopeAnalEnv env payload) dmd body
+    (body_ty', raw_dmd) = peelFV body_ty payload
+    payload_dmd@(card :* _) =
+      trimBoxity (trimToType raw_dmd (findTypeShape (ae_fam_envs env) (idType payload)))
+    !payload' = setIdDemandInfo payload payload_dmd
+    (package_env, package') = dmdAnalStar env (card :* topSubDmd) package
+
 dmdAnal' env dmd (App fun (Type ty))
   = WithDmdType fun_ty (App fun' (Type ty))
   where
@@ -601,6 +618,22 @@ dmdAnal' env dmd (Let bind body)
   where
     !(WithDmdType final_ty (R bind' body')) = dmdAnalBind NotTopLevel env dmd bind go'
     go' !env'                 = dmdAnal env' dmd body
+
+{- Note [Demand for erased packages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Pack uses the lifted representation of its payload. Evaluating the
+package evaluates the payload. Analyse the payload at boxed top
+sub-demand because the package type hides its constructor shape.
+
+Unpack binds the payload lazily. Analyse its body first, using the
+scope of the opened binder. Take that binder's demand from the body
+directly, so dictionary parameter strictification cannot affect it.
+Keep the binder boxed. Pass its evaluation cardinality to the package
+without passing the payload's structural sub-demand. This preserves
+absence, conditional use and sharing of the package.
+
+See Note [Erasing a lexical existential] in GHC.CoreToStg.
+-}
 
 -- | A simple, syntactic analysis of whether an expression MAY throw a precise
 -- exception when evaluated. It's always sound to return 'True'.
