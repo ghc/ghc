@@ -1,6 +1,5 @@
 FamilyArrowArity.hs:10:13: error: [GHC-83865]
     • Expecting one more argument to ‘Maybe’
-      Expected kind ‘Expected’,
-        but ‘Maybe’ has kind ‘* -> @(GHC.Internal.Types.Matchable) *’
+      Expected kind ‘Expected’, but ‘Maybe’ has kind ‘* -> *’
     • In the type ‘(Maybe :: Expected)’
       In the type synonym declaration for ‘Bad’
