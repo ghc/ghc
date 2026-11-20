@@ -3,6 +3,7 @@ runtime Bool choice: "42"
 choose True has result Int: 42
 choose False has result Bool: False
 keep ignores bottom index and payload: 42
+inline retained type case: ("7","'f'",42)
 three-constructor runtime domain: "'G'"
 empty-domain elimination demands its scrutinee: showcase-empty-domain
 IORef length and dependent vector: (3,[7,7,7])

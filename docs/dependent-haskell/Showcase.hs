@@ -59,7 +59,7 @@ import qualified LexicalPackageRules
 import qualified RankedPackage
 import qualified StoredVector
 import qualified ExistentialVec as E
-import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Functor.Const (Const(..))
 import Data.Kind (Type)
 import Data.List (isInfixOf)
@@ -231,6 +231,14 @@ booleans = do
     let payload :: Select bottomB
         payload = bottomValue @(Select bottomB) "showcase-payload"
     observe "keep ignores bottom index and payload" (keep bottomB payload)
+    writeIORef cell False
+    other <- readIORef cell
+    ignored <- newIORef bottomB >>= readIORef
+    observe "inline retained type case"
+        ( NativeCase.renderRetainedPick b
+        , NativeCase.renderRetainedPick other
+        , NativeCase.retainedKeep ignored (error "showcase-inline-payload")
+        )
   where
     -- Return a result at the selected Boolean type.
     choose :: foreach (b :: Bool) -> Select b
