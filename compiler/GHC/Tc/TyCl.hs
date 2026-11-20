@@ -1819,6 +1819,10 @@ generaliseTcTyCon (tc, tc_kind, skol_info, scoped_prs, tc_res_kind)
        -- Step 2b: quantify, mainly meaning skolemise the free variables
        -- Returned 'inferred' are scope-sorted and skolemised
        ; quantified <- quantifyTyVars skol_info DefaultNonStandardTyVars dvs2
+       -- Matchability has a closed kind, so its inferred binders have no
+       -- predecessors. Keep them together for tcInferredMatchabilityFamPats.
+       -- The relative order of other inferred binders and of all written
+       -- binders stays the same.
        ; let inferred = case tyConFlavour tc of
                ClosedTypeFamilyFlavour ->
                  let (metadata, others) = partition ((`eqType` matchabilityTy) . tyVarKind) quantified

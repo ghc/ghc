@@ -211,6 +211,11 @@ call either branch after refining the Boolean. At an unknown index, the
 case still waits for the first row. Function-arrow domains and computed
 scrutinees in retained fields remain outside this rule.
 
+Template Haskell reports GHC-75721 at a splice that reifies a retained
+`foreach` binder or an index bound by that binder. Its `ForallVisT` binds a visible
+erased type argument. The type AST has no binder for a runtime argument.
+Ordinary module interfaces retain the runtime binder.
+
 ## A case in a value signature
 
 A top-level function can write a case directly in its argument and result

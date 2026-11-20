@@ -1,0 +1,5 @@
+NativeTypeCaseRetainedReify.hs:22:2: error: [GHC-75721]
+    Template Haskell cannot represent a retained ‘foreach’ binder.
+   |
+22 | $(do named <- recover (pure True) (False <$ reifyType 'Named)
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...

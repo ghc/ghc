@@ -3929,8 +3929,10 @@ reifyType ty                | tcIsLiftedTypeKind ty = return TH.StarT
   -- Make sure to use tcIsLiftedTypeKind here, since we don't want to confuse it
   -- with Constraint (#14869).
 reifyType ty@(TermAppTy {}) = pprPanic "reifyType: unsupported runtime call index" (ppr ty)
-reifyType ty@(TermVarTy {}) = pprPanic "reifyType: unsupported runtime index" (ppr ty)
-reifyType ty@(DepFunTy {}) = pprPanic "reifyType: unsupported retained function" (ppr ty)
+reifyType ty@(TermVarTy {}) = noTH RetainedRuntimeIndex ty
+-- ForallVisT represents an erased type argument. It cannot bind a runtime
+-- argument in a function type or scope that argument over the result type.
+reifyType ty@(DepFunTy {}) = noTH RetainedFunctionType ty
 reifyType ty@ExistsTy{}     = noTH FirstClassExistential ty
 reifyType (ForAllTy ma (Bndr tv argf) body)
   -- See Note [Reifying forall matchability].

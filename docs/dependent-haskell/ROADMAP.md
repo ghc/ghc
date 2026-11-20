@@ -14,7 +14,7 @@ of an ordered type case in a value signature. The sample renders the
 two results as `"7"` and `"'f'"`. A call that ignores its arguments
 still returns 42 with an undefined index and payload. An ordinary client
 can also open a hidden vector inside a pair without forcing the other
-field. All 331 Showcase lines ran with both compiler stages at `-O0`,
+field. All 336 Showcase lines ran with both compiler stages at `-O0`,
 default `-O1` and default `-O2`, and with the self-hosted GHCi.
 [Showcase](Showcase.hs) and [verification](CHECKPOINTS.md#family-and-package-checkpoints).
 
@@ -28,6 +28,14 @@ values indexed by `Maybe` or by a partially applied type family.
 [Rewrite rules](examples/qualified-pi/RetainedRules.hs),
 [field cases](examples/open-evaluation/NativeNestedCase.hs) and
 [class method client](examples/open-evaluation/IndexedMapClient.hs).
+
+An ordinary caller can package a list's computed length with the vector
+indexed by that length. A separate proof module uses the checked
+equations for Prelude `(++)` to prove that append adds lengths and that
+`map` distributes over append for finite lists. Its tests also check
+that the right list and the elements remain lazy where promised.
+[List-to-vector example](roadmap/R04-dependent-sums.md)
+and [append proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
 An ordinary module proves that filtering a finite list cannot increase
 its `size`. At each head, a checked `Prelude.filter` equation says
@@ -200,10 +208,10 @@ source examples. General promotion remains open.
    A visible type application in the rule head also needs a checked
    source of types for unannotated payload binders.
    [Rule and interface support](roadmap/R05-dependent-core.md).
-2. **R23.** An unsigned recursive family can accept a constructor or
-   a partial family through the same inferred arrow. Check explicit named
-   binder order and defaults across language modes. Continue testing
-   ordinary clients against stripped provider interfaces.
+2. **R23.** One unsigned recursive family can forward a constructor
+   or a partial family. GHC preserves named binder order and checks
+   extension-off clients through stripped interfaces. Check the diagnostic
+   when the caller writes a partial family application directly.
    [Later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
 3. **R22 and R04.** A conditional can package a different callback type

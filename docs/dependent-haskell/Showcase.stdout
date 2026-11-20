@@ -119,6 +119,7 @@ generic opaque head demand: opaque head forced
 generic partial worker WHNF: True
 ordinary module runtime replicate: [7,7]
 ordinary module generic round-trip: [11,22]
+pair a list's computed length with its vector: (2,[11,22])
 generic checked Int position: Just 22
 generic negative position ignores list: Nothing
 generic checked function position: Just 42
@@ -290,6 +291,7 @@ infer the first invisible family argument and leave the second open: (Refl,Refl)
 apply Maybe and a type family through a computed arrow kind: (Just 7,[7])
 map cells with a class method over a family prefix and Maybe: ([Just True,Nothing],[Just True,Nothing])
 infer the matchability of a family prefix from a later argument: (Just True,True)
+forward an inferred partial-family callback and an ordinary constructor: (Refl,Refl)
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
 choose an interpreted arrow from its expected kind: (Just 3,Right 3)
@@ -310,6 +312,7 @@ distinguish an outer index from a shadowing pattern variable: (Refl,Refl)
 refine a constructor field and transport a later dependent index: (Refl,Refl)
 refine the outer and inner GADT indices in one type case: (7,True,'x')
 choose types in ordinary and rank-n constructor fields: (7,'x')
+branch on a runtime Boolean before calling a retained field: ("11","x")
 select through an ordinary type constructor: (7,'x',())
 select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
 match Bool and Ordering directly in a type: (7,'x')
@@ -324,6 +327,8 @@ leave the permission argument open in an ordinary traffic-light function: (Refl,
 use Prelude.not on a known head with an unknown tail: Refl
 map Prelude.not and Prelude.id over a known head and an unknown tail: (Refl,Refl,Refl)
 prove map preserves length and leaves the callback lazy: (Refl,Succ (Succ Zero))
+prove that append adds the list lengths: (Refl,Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)),True)
+prove that map distributes over append: (Refl,[False,True,False],[False,True,False],(True,True))
 filter with Prelude.not and Prelude.id without forcing the kept tail: ((Refl,Refl,True),(Refl,Refl,True))
 prove filter never increases length: (BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)

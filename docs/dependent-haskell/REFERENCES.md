@@ -6251,6 +6251,29 @@ the example. Peano constructors give an unbounded count.
 [Data.Type.Equality source](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs)
 and [R16 map length proof](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
 
+### Induction on the left spine of append
+
+Agda's `length-++` proves the empty-list equation by reflexivity and
+lifts the induction hypothesis through successor at a cons. Both
+proofs recurse on the left list with the right list held fixed.
+[Agda standard library 2.4, length-++](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html).
+
+GHC checks the same two append equations in the installed producer.
+Its proof matches `Refl` on the recursive result and uses the existing
+source `size` on both lists. A separate runtime check observes a
+constructor of the appended spine with a bottom left tail and right
+list. [GHC append definition and fusion rules](../../libraries/ghc-internal/src/GHC/Internal/Base.hs)
+and [R16 append length proof](roadmap/R16-open-term-evaluator.md#prove-that-append-adds-the-list-lengths).
+
+### Distributing map over append
+
+Agda's `map-++` uses reflexivity at the empty list and lifts the
+induction hypothesis through a cons with head `f x`. The R16 proof uses
+the same induction with the installed Prelude equations. It keeps
+`f x` abstract.
+[Agda standard library 2.4, map-++](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html)
+and [R16 map distribution proof](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
+
 ### An ordinary enumeration function as a callback
 
 Agda's standard library defines Boolean negation by two constructor

@@ -7351,6 +7351,8 @@ data UnrepresentableTypeDescr
   | CoercionsInTypes
   | DataConVisibleForall
   | FirstClassExistential
+  | RetainedFunctionType
+  | RetainedRuntimeIndex
 
 -- FFI error types
 data IllegalForeignTypeReason
