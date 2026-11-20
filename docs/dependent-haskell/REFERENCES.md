@@ -26,6 +26,14 @@ the example that checks the spelling. Use the proposal's surface form
 in the Showcase when the fork accepts it. Keep an explicit constructor
 application when the example tests the representation itself.
 
+For R24, proposal #177 derives the domain of an associated family from
+its enclosing class. Proposal #547 records GHC's current restriction
+on constraints in kinds. The R24 card tracks their different purposes,
+the review status and the interface experiment.
+[Simple constrained type families](https://github.com/ghc-proposals/ghc-proposals/pull/177),
+[Disallow constraints in kinds](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html)
+and [R24 source syntax](roadmap/R24-constrained-type-families.md#source-syntax-and-separate-compilation).
+
 The [program roadmap](ROADMAP.md) owns the work queue and the upstream task
 index. The 2026-11-16 review adds feature pages that connect research to the
 next implementation obligations:

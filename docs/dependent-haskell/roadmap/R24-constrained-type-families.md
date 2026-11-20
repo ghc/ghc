@@ -41,6 +41,39 @@ requires `Allowed Int`, which is absent. A term helper with signature
 It accepts `[Bool]` or a local `Collects c` assumption. Calling it at
 `[Int]` gives GHC-39999. That qualification applies only to calls to the helper.
 
+## Source syntax and separate compilation
+
+GHC proposal #177, *Simple constrained type families*, keeps the
+declaration `type Elem c` inside `class Collects c`. The class supplies
+the domain. A client must establish `Collects c` to form `Elem c`, even
+when it only mentions the application under `Proxy`. The draft also shows
+how a separate family that calls an associated family could state the
+constraint in a standalone kind signature.
+[Proposal text at the reviewed revision](https://github.com/typedrat/ghc-proposals/blob/faf45d2290f06696627b1f5d60ce92741ae9e38b/proposals/0000-simple-constrained-type-families.rst).
+
+The draft considers an extension that changes the meaning of the same
+library for different consumers. Its migration plan infers missing
+constraints in existing signatures and warns. It suggests
+`InferKindConstraints` as a temporary extension name. On 2026-11-20 the
+PR was open with the label *Needs revision*. The latest discussion on
+the PR was on 2019-11-05.
+[PR #177](https://github.com/ghc-proposals/ghc-proposals/pull/177)
+and [Eisenberg's review](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671).
+
+The accepted proposal #547 disallows `=>` in family result kind
+annotations and standalone kind signatures. Class constraints were
+already forbidden there. It leaves room for dependent types to revisit
+this rule. The spelling `type Elem c :: Collects c => Type` would
+require a new language decision.
+[Proposal #547](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html).
+
+The first experiment uses #177's plain declaration in an opted-in
+producer. Its interface records whether clients must discharge the
+domain constraint. Check both an ordinary client of that producer and
+an ordinary producer that exports the same source declaration. This
+producer opt-in is a local experiment. Keep the choice of migration
+policy separate from the tests of type formation.
+
 ## Evidence and next check
 
 Section 4.2 of *Constrained Type Families* requires the source context
