@@ -37,6 +37,7 @@ module GHC.Core.Opt.OccurAnal (
 import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Core
+import GHC.Core.Dependent ( hasExistentialExpr )
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           mkCastMCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap )
@@ -91,7 +92,9 @@ occurAnalyseExpr expr = expr'
 -- | Remove unused lazy local bindings without rewriting dependent scope.
 -- See Note [Native dead local bindings].
 occurAnalyseNativeExpr :: CoreExpr -> CoreExpr
-occurAnalyseNativeExpr = go . freeVars
+occurAnalyseNativeExpr expr
+  | hasExistentialExpr expr = expr  -- See Note [Native dead local bindings].
+  | otherwise = go (freeVars expr)
   where
     opts = (occ_opts initOccEnv) { oa_can_drop = canDropNativeLocalBinding }
 
@@ -143,6 +146,10 @@ bindings in occurrence analysis]. Require a lifted Many binding. Unlifted
 bindings can be strict. Protect joins and stable or rule-bearing metadata.
 The same rule applies to an unused scalar index or function head: their
 eligible domains do not make an unused lazy binding necessary.
+
+The annotated free-variable tree does not have Pack and Unpack nodes.
+Keep an RHS that contains either node intact. Its checked scoped
+substitution runs in restricted SimpleOpt.
 
 Reconstruct every other node with its original binders and annotations.
 Do not infer occurrence counts, swap case binders, create joins or split

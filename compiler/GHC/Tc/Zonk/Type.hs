@@ -1933,6 +1933,14 @@ zonkCoreExpr (Case scrut b ty alts)
          ; runZonkBndrT (zonkIdBndrX b) $ \ b' ->
       do { alts' <- mapM zonkCoreAlt alts
          ; return $ Case scrut' b' ty' alts' } }
+zonkCoreExpr (Pack schema witness payload)
+    = Pack <$> zonkTcTypeToTypeX schema
+           <*> zonkTcTypeToTypeX witness <*> zonkCoreExpr payload
+zonkCoreExpr (Unpack witness payload package body)
+    = do { package' <- zonkCoreExpr package
+         ; runZonkBndrT (zonkTyBndrX witness) $ \witness' ->
+           runZonkBndrT (zonkIdBndrX payload) $ \payload' ->
+             Unpack witness' payload' package' <$> zonkCoreExpr body }
 
 zonkCoreAlt :: CoreAlt -> ZonkTcM CoreAlt
 zonkCoreAlt (Alt dc bndrs rhs)
