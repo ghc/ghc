@@ -3,7 +3,7 @@
 module Main (main) where
 
 import Control.Exception (IOException, SomeException, displayException, evaluate, try)
-import Control.Monad (forM_, unless, void)
+import Control.Monad (forM_, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Array as A
 import qualified Data.IntMap.Strict as IM
@@ -23,6 +23,7 @@ import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type (..))
 import GHC.Core.Type (isForAllTy, mkTyConApp, substTyWith, typeKind, tyCoVarsOfType)
 import GHC.Core.Unify (tcMatchTy, tcUnifyTy, typesCantMatch)
 import GHC.CoreToIface (toIfaceType)
+import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.Env.Types (HscEnv (hsc_NC, hsc_dflags))
@@ -51,6 +52,7 @@ import GHC.Unit.Types (mainUnit)
 import GHC.Utils.Binary (openBinMem, putByte, readBinMem, writeBinMem)
 import GHC.Utils.Fingerprint (fingerprint0)
 import GHC.Utils.Monad.StrictState (runState)
+import GHC.Utils.Outputable (showSDocUnsafe, vcat)
 import System.Environment (getArgs)
 
 fixture :: TyVar -> Type -> Type
@@ -119,7 +121,8 @@ verify interfacePath env = do
 
     let hidden = fresh uWitness "hidden" liftedTypeKind
         packed x = fixture hidden (mkBoxedTupleTy [TyVarTy x, TyVarTy hidden])
-        wellScoped scope co = isNothing (lintExpr (initLintConfig (hsc_dflags env) scope) (Coercion co))
+        lintCo scope co = lintExpr (initLintConfig (hsc_dflags env) scope) (Coercion co)
+        wellScoped scope = isNothing . lintCo scope
     forM_ [(Nominal, mkNomEqPred), (Representational, mkReprEqPred)] $ \(role, predicate) -> do
         let cv = mkCoVar (mkSystemName uProof (mkVarOcc "given")) (predicate (TyVarTy a) (TyVarTy b))
             co = liftCoSubst role (mkLiftingContext [(c, mkCoVarCo cv)]) (packed c)
@@ -127,11 +130,16 @@ verify interfacePath env = do
         assert "existential lifting changed the role or endpoints"
             (coercionRole co == role && coercionLKind co `eqType` packed a && coercionRKind co `eqType` packed b)
         assert "Core Lint rejected the lifted existential evidence" (wellScoped scope co)
-        case co of
-            AxiomCo _ [premise] | role == Representational ->
-                assert "representational evidence yielded nominal existential equality"
-                    (not (wellScoped scope (AxiomCo (snd (existsCoRule Nominal)) [premise])))
-            _ -> pure ()
+        when (role == Representational) $ case co of
+            AxiomCo _ [premise] ->
+                case lintCo scope (AxiomCo (snd (existsCoRule Nominal)) [premise]) of
+                    Just errors -> do
+                        let diagnostic = showSDocUnsafe (vcat (bagToList errors))
+                        assert diagnostic $ all (`isInfixOf` diagnostic)
+                            [ "Argument roles mismatch", "NominalExistsCo"
+                            , "Expected: nominal", "Found: representational" ]
+                    Nothing -> fail "representational evidence yielded nominal existential equality"
+            _ -> fail "expected a representational existential coercion with one premise"
     assert "a non-universal premise yielded existential equality"
         (not (wellScoped [] (AxiomCo (snd (existsCoRule Nominal)) [mkNomReflCo boolTy])))
 
