@@ -10,12 +10,13 @@ records every edge. The R numbers are local labels for those cards.
 ## Where this fork stands
 
 An ordinary module proves that `Prelude.map` preserves the length of
-any finite list for any callback. It counts the list constructors with
-`Count`. The empty case is immediate. In the cons case the proof uses
-the equation from the installed library and the induction hypothesis
-for the tail. A claim that mapping adds one element fails at the empty
-case with GHC-83865. Counting two mapped elements at runtime also
-returns 2 when the callback is undefined.
+any finite list spine for any callback. The proof counts constructors
+with the same Haskell `size` function that the program calls at runtime.
+The empty case is immediate. The cons case uses the installed map equation
+and the induction hypothesis for the tail. A claim that mapping adds one
+element fails at the empty case. Omitting the induction hypothesis leaves
+the tail equality unsolved. The runtime example counts two elements
+without evaluating the callback.
 [Proof](examples/open-evaluation/PreludeMapLengthProof.hs)
 and [assumptions and checks](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
 
