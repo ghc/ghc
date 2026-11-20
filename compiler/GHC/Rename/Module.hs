@@ -411,11 +411,12 @@ case its own helper, including cases in different fields of one
 constructor. A copied retained domain can change matchability in
 the helper, so leave cases under a retained binder outside this
 field rule. Keep an inner erased forall and put the helper
-application in its body. If an outer capture has a bare kind
-variable that the forall shadows, save that variable with a type let
-before the forall. Use the saved variable in the helper's header
-and application. The original kind remains in scope for that
-capture. Other kinds that cross a shadow still need a named helper.
+application in its body. Save any shadowed variables that a capture
+kind uses with type lets before the forall. Give the saved variables
+formal parameters in the helper. Use type lets in the copied kinds
+to bind the original names to those parameters. The renamer then
+checks the original kind syntax with its own local scopes. Include
+the dependencies of the saved variables in telescope order.
 -}
 -- | Select the expressions that can be lifted at a declaration type position.
 data LiftedTypeSite
@@ -533,8 +534,7 @@ liftDeclarationTypes source_heads named_wildcards group
       where
         shadowed = Set.fromList (map (unLoc . snd) hidden)
 
-    -- Save a bare kind variable of a capture before an erased forall
-    -- shadows it. The helper takes the original kind as an argument.
+    -- Preserve the capture kinds across an erased forall's shadowing.
     rankedFieldScope scope hidden outer locals loc salt
       | fieldKindsInScope hidden outer locals = Just (outer ++ locals, [])
       | otherwise = do
@@ -543,8 +543,8 @@ liftDeclarationTypes source_heads named_wildcards group
           pure (catMaybes copied ++ locals, saved)
       where
         hidden_names = Set.fromList (map (unLoc . snd) hidden)
-        needed = [v | (_, v) <- hidden
-                    , any (Set.member (unLoc v) . kindNames . fst) outer]
+        (required, _) = foldr select ([], Set.fromList (map (unLoc . snd) outer)) scope
+        needed = [v | (_, v) <- required, unLoc v `Set.member` hidden_names]
         occupied = Set.fromList (map (unLoc . snd) (scope ++ locals))
         fresh = [L (l2l loc) name
                 | i <- [0 :: Int ..]
@@ -552,23 +552,27 @@ liftDeclarationTypes source_heads named_wildcards group
                              ("$field-kind:" ++ show salt ++ ":" ++ show i))
                 , not (Set.member name occupied)]
         saved = zip needed fresh
-        name_for n = lookup (unLoc n) [(unLoc old, new) | (old, new) <- saved]
-        independent = Set.disjoint hidden_names . kindNames
+        saved_names = [(unLoc old, new) | (old, new) <- saved]
 
-        copy entry@(L binder_loc binder@HsTvb{}, v)
-          | Just new <- name_for v
-          , independent (fst entry)
-          , HsBndrVar ann _ <- tvb_var binder
-          = Just (Just (L binder_loc binder{tvb_var = HsBndrVar ann new}, new))
-          | unLoc v `Set.member` hidden_names
-          = if isJust (name_for v) then Nothing else Just Nothing
-          | independent (fst entry)
-          = Just (Just entry)
-          | HsBndrKind ann kind <- tvb_kind binder
-          , L _ (HsTyVar _ NotPromoted old) <- ignoreParens kind
-          , Just new <- name_for old
-          = Just (Just (L binder_loc binder{tvb_kind = HsBndrKind ann (typeName new)}, v))
+        copy (old_binder@(L binder_loc binder@HsTvb{tvb_var = HsBndrVar ann _}), v)
+          | Just new <- lookup (unLoc v) saved_names
+          = Just (Just (L binder_loc binder{tvb_var = HsBndrVar ann new,
+                                           tvb_kind = restoreKind old_binder}, new))
+          | unLoc v `Set.member` hidden_names = Just Nothing
+          | otherwise = Just (Just (L binder_loc binder{tvb_kind = restoreKind old_binder}, v))
         copy _ = Nothing
+
+        restoreKind binder@(L _ HsTvb{tvb_kind = HsBndrKind ann kind}) =
+          HsBndrKind ann (foldr restore kind saved)
+          where
+            free = kindNames binder
+            restore (old, new) body
+              | unLoc old `Set.member` free = bindTypeName old new body
+              | otherwise = body
+        restoreKind (L _ HsTvb{tvb_kind = kind}) = kind
+
+    bindTypeName binder rhs body =
+      L (getLoc body) (XHsType (HsTypeLet (noAnn, noAnn, noAnn) binder (typeName rhs) body))
 
     localKindsInScope _ [] = True
     localKindsInScope hidden ((binder, name):locals) =
@@ -721,8 +725,7 @@ liftDeclarationTypes source_heads named_wildcards group
       = let (body', aliases, (next, _)) = liftBody inner owner scope' body (salt, [])
             uses = Set.fromList (map unLoc (extractHsTyRdrTyVars body'))
             save (old, new) ty
-              | unLoc new `Set.member` uses =
-                  L loc (XHsType (HsTypeLet (noAnn, noAnn, noAnn) new (typeName old) ty))
+              | unLoc new `Set.member` uses = bindTypeName new old ty
               | otherwise = ty
             result = foldr save (L loc quantified{hst_body = body'}) saved
         in (result, aliases, (next, seen))

@@ -156,9 +156,52 @@ data Escape (d :: Maybe Bool) where
 HS
 reject NativeTypeCaseFieldEscape 6:6 '[GHC-97233]'
 
+# Keep both outer kind arguments even though the forall shadows them.
 cat >NativeTypeCaseFieldCompoundKind.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, RankNTypes, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, RankNTypes #-}
 module NativeTypeCaseFieldCompoundKind where
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+
+data Tag k l = Tag
+
+data Compound (k :: Type) (l :: Type) (a :: Tag k l) = Compound
+  (forall (k :: Type) (l :: Type) (b :: Bool). Proxy b ->
+    (case b of { True -> Proxy a; False -> Proxy '(k, l) }))
+HS
+"${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseFieldCompoundKind.hs
+cp NativeTypeCaseFieldCompoundKind.hi interfaces/
+(
+    cd interfaces
+    cat >CompoundKindClient.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, PolyKinds, RankNTypes, TypeApplications #-}
+module CompoundKindClient where
+import Data.Proxy (Proxy(..))
+import NativeTypeCaseFieldCompoundKind
+
+outer :: forall k l (a :: Tag k l). Compound k l a -> Proxy a
+outer (Compound f) = f @Int @Double @'True Proxy
+
+inner :: forall k l (a :: Tag k l). Compound k l a -> Proxy '(Int, Double)
+inner (Compound f) = f @Int @Double @'False Proxy
+HS
+    "${g[@]}" -c CompoundKindClient.hs
+    cat >CompoundKindWrong.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, PolyKinds, RankNTypes, TypeApplications #-}
+module CompoundKindWrong where
+import Data.Proxy (Proxy(..))
+import NativeTypeCaseFieldCompoundKind
+
+swapped :: forall k l. Compound k l ('Tag :: Tag k l) -> Proxy ('Tag :: Tag l k)
+swapped (Compound f) = f @Int @Double @'True Proxy
+HS
+    reject CompoundKindWrong 7:24 '[GHC-25897]'
+)
+
+# A family application in a capture kind can still require a signature.
+cat >NativeTypeCaseFieldFamilyKind.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, RankNTypes, TypeFamilies #-}
+module NativeTypeCaseFieldFamilyKind where
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 type family PayloadKind (k :: Type) :: Type
@@ -166,7 +209,8 @@ data Compound (k :: Type) (a :: PayloadKind k) = Compound
   (forall (k :: Type) (b :: Bool). Proxy b ->
     (case b of { True -> Proxy a; False -> Proxy k }))
 HS
-reject NativeTypeCaseFieldCompoundKind 8:6 '[GHC-97233]'
+reject NativeTypeCaseFieldFamilyKind 6:28 '[GHC-83865]'
+grep -Fq 'non-injective type family' bad.log
 
 # A speculative branch gets one family step. Checking a written use
 # of the same constructor still reports the solver's reduction limit.
