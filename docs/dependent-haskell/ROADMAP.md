@@ -69,6 +69,21 @@ result can differ from the choice in its kind. The client prints
 original `GADTSingletons` program still needs two source annotations.
 [Interpreter and compatibility boundary](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
+The 303-line Showcase adds `(Right 7,False)` and uses the direct
+callback case. Both compiler stages reproduce the full output at
+`-O0`. The self-hosted compiler also reproduces it at default `-O1`,
+default `-O2` and in GHCi. The family upgrade rebuilds the provider
+once and reuses it on the next build. The old and new compilers both
+compile the ordinary client from the new interface. The R22 source
+test checks witness escapes, linear use and the original GADT pattern.
+[Showcase](Showcase.hs) and [family source and upgrade checks](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+At the preceding 302-line checkpoint, all 61 focused tests that ran
+passed. The dependent directory recorded 294 passes and 20 unexpected
+failures. Polykinds recorded 224 passes, one expected failure and 18
+unexpected failures. Each unexpected failure had the same name and
+failure category as at the 301-line checkpoint.
+
 The 302-line Showcase adds `(4,3,6)` from the package rules. Both
 compiler stages reproduce every line at `-O0`, default `-O1` and
 default `-O2`. The self-hosted compiler also reproduces it in GHCi.
