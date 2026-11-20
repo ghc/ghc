@@ -176,6 +176,20 @@ failures before reconsidering those goldens.
 [RAE_T32a](../../../testsuite/tests/dependent/should_fail/RAE_T32a.hs)
 and [T13135](../../../testsuite/tests/dependent/should_fail/T13135.hs).
 
+### An open family used after a declaration splice
+
+In `KindEqualities2`, the equation for `IK (Arr k1 k2)` returns
+`IK k1 -> IK k2`. After a Template Haskell declaration splice, the
+family `I` uses `IK` as its result kind. At `6d16505aaa` the original
+program reports GHC-83865 at `Maybe` and at `(I a) (I b)`. Writing
+`IK k1 %M -> IK k2` in the equation makes the program print `Nothing`.
+
+Moving only the declaration of `I` before the splice lets GHC check
+the `Maybe` equation. In the application equation GHC still expects
+`IK @{t} k2` and gets `IK @{M} k2`. The family is non-injective.
+Inferring the result selector for this equation remains open.
+[Original program](../../../testsuite/tests/dependent/should_compile/KindEqualities2.hs).
+
 ### M141. Inferring an omitted arrow in a dependent argument
 
 In `D (Type -> Type) Maybe`, the declared kind of `D` says that its
