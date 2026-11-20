@@ -8,6 +8,24 @@ increments.
 
 ## Family and package checkpoints
 
+At `a35653b580`, the public 341-line compiler relink matched all 344
+Showcase lines at `-O0`, default `-O1`, and default `-O2`, with Core and
+STG Lint. The registered source tests for the comparison and the split
+matched their goldens. The source-hidden filter regression rejected all
+nine incorrect evidence uses at their expected locations. The concrete
+contents proof also passed the indexed-vector regression on self-hosted
+337 at `-O0` and `-O1`. Swapping the result elements failed at `Refl`
+with GHC-83865.
+[Indexed-vector proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs)
+and [filter evidence](../../testsuite/tests/dependent/should_run/NativeOpenFilterGivenControls.hs).
+
+The full build of `410405da2b` reproduced the 337-line Showcase with
+both bootstrap and self-hosted GHC at all three optimization levels.
+Self-hosted GHCi matched. The focused run had 68 passes and one
+missing-library skip. The dependent directory recorded 303 passes and
+20 unexpected failures. Polykinds recorded 224 passes, one expected
+failure, and 18 unexpected failures.
+
 At `4d5d6e467f`, we relinked six compiler modules against the 337-line
 bootstrap compiler and used the 336 target libraries. All 341 Showcase
 lines matched at `-O0`, default `-O1` and default `-O2` with Core and

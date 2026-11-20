@@ -9,6 +9,20 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+`splitAtVec` takes a runtime cut `n` and a vector of length `Add n m`.
+It returns two vectors of lengths `n` and `m`. The 344-line Showcase also
+checks the contents of a concrete split. Appending the two parts of
+`[True, False]` gives that same vector. Swapping the elements makes the
+equality proof fail at `Refl`. The law for every input vector remains open.
+[Split and prior art](REFERENCES.md#split-a-vector-at-a-retained-length) and
+[contents proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
+
+A case on an ordinary comparator can return a witness for `p x` in all
+three `Ordering` branches. A separately compiled ordinary module uses
+the witness to choose an `Int`, `Bool`, or `Char` payload. It leaves the
+other two payloads unevaluated. [Provider](examples/open-evaluation/RuntimeOrdering.hs)
+and [ordinary client](examples/open-evaluation/OrderingPayload.hs).
+
 An ordinary client can partition a vector with a runtime predicate and
 return the two parts appended at the original input length. The producer
 returns two nested `some` packages and proves that their lengths add up to
