@@ -1,4 +1,4 @@
-{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
 module Main where
 
 import Control.Exception (ErrorCall, evaluate, try)
@@ -8,6 +8,7 @@ import Data.List (isInfixOf)
 import DependentPair (DPair(..))
 import DependentProjection (second)
 import NativeDefaultO1InterfaceProducer
+import qualified PackedVecLibrary as Vec
 import System.Environment (getArgs)
 
 main :: IO ()
@@ -25,3 +26,6 @@ main = do
     witness <- readIORef ref
     let pair = Pair witness (Const 'i') :: DPair (IO Int) (Const Char)
     print (getConst (second pair))
+    let values :: [Vec.Vec Int ('Vec.S 'Vec.Z)]
+        values = [Vec.VCons 19 Vec.VNil]
+    print (map Vec.toList (Vec.toList (Vec.genericRefinedNested (Vec.S Vec.Z) values)))

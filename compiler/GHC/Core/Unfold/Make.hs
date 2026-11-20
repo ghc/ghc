@@ -400,6 +400,13 @@ unstable unfolding templates. Validate each native imported RHS inside its own
 forkM thunk in GHC.IfaceToCore, using a separate scan that skips bound metadata.
 That validation checks Core and compares its type with the declared signature.
 
+Core Tidy also regenerates non-stable templates. Ordinary occurrence analysis
+can replace a nested case scrutinee with the enclosing case binder while the
+payload type still names the original argument. On interface import, the fresh
+constructor proof would then start at the wrong index. Use the tidied RHS of a
+native binding directly. Classify the original RHS before the top-level Ids
+are tied. See Note [tidyTopUnfolding: avoiding black holes] in GHC.Iface.Tidy.
+
 Keep classification inside uf_tmpl. Inspecting uf_src must not force expr.
 Preserve the precomputed cache and its forcing contract. See
 Note [Lazily checking Unfoldings] and Note [Tying the 'CoreUnfolding' knot]

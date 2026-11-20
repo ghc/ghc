@@ -315,6 +315,7 @@ test('NativeDefaultO1Interface',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeDefaultO1InterfaceProducer.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/DependentPair.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/DependentProjection.hs'])],
      run_command, ['bash NativeDefaultO1Interface.sh "{compiler}" "{libdir}"'])
 

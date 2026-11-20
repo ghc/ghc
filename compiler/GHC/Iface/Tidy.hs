@@ -1514,7 +1514,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
     !minimal_unfold_info = trimUnfolding unf_info
 
     !unfold_info | isCompulsoryUnfolding unf_info || show_unfold
-                 = tidyTopUnfolding rhs_tidy_env tidy_rhs unf_info
+                 = tidyTopUnfolding rhs_tidy_env orig_rhs tidy_rhs unf_info
                  | otherwise
                  = minimal_unfold_info
      -- NB: use `orig_rhs` not `tidy_rhs` in this call to mkFinalUnfolding
@@ -1536,23 +1536,25 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
             --            in GHC.Core.Opt.Arity
 
 ------------ Unfolding  --------------
-tidyTopUnfolding :: TidyEnv -> CoreExpr -> Unfolding -> Unfolding
-tidyTopUnfolding _ _ NoUnfolding   = NoUnfolding
-tidyTopUnfolding _ _ BootUnfolding = BootUnfolding
-tidyTopUnfolding _ _ (OtherCon {}) = evaldUnfolding
+tidyTopUnfolding :: TidyEnv -> CoreExpr -> CoreExpr -> Unfolding -> Unfolding
+tidyTopUnfolding _ _ _ NoUnfolding   = NoUnfolding
+tidyTopUnfolding _ _ _ BootUnfolding = BootUnfolding
+tidyTopUnfolding _ _ _ (OtherCon {}) = evaldUnfolding
 
-tidyTopUnfolding tidy_env _ df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
+tidyTopUnfolding tidy_env _ _ df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
   = df { df_bndrs = bndrs', df_args = map (tidyExpr tidy_env') args }
   where
     (tidy_env', bndrs') = tidyBndrs tidy_env bndrs
 
-tidyTopUnfolding tidy_env tidy_rhs
+tidyTopUnfolding tidy_env orig_rhs tidy_rhs
      unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src  })
   = -- See Note [tidyTopUnfolding: avoiding black holes]
     unf { uf_tmpl = tidy_unf_rhs }
   where
     tidy_unf_rhs | isStableSource src
                  = tidyExpr tidy_env unf_rhs    -- Preserves OccInfo in unf_rhs
+                 | hasNativeDependentUnfolding orig_rhs
+                 = tidy_rhs  -- See Note [Native dependent unfolding templates] in GHC.Core.Unfold.Make.
                  | otherwise
                  = occurAnalyseExpr tidy_rhs    -- Do occ-anal
 

@@ -191,6 +191,14 @@ the manual does not prove those decisions correct in System FC.
   from that constructor and those two fields. The interface stores the
   branch binder names. See `Note [Native constructor evidence in interfaces]`
   in `GHC.IfaceToCore`. [Agda 2.8.0, dot patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#dot-patterns)
+- In `genericRefinedNested`, an earlier length is the index in a later
+  vector argument. Both the branch proof and the vector must refer to the
+  same length after optimization. Agda's generalisation rule explains
+  why a change of scrutinee affects subsequent argument types. The GHC
+  implementation preserves the scoped Core during interface preparation.
+  See `Note [The binder-swap substitution]` in `GHC.Core.Opt.OccurAnal`
+  and `Note [Native dependent unfolding templates]` in `GHC.Core.Unfold.Make`.
+  [Agda 2.8.0, generalisation](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#generalisation)
 - [With-abstraction equality](https://agda.readthedocs.io/en/v2.8.0.2/language/with-abstraction.html#with-abstraction-equality)
   explains how `with ... in eq` retains an equation for an inspected expression.
   It motivates keeping explicit refinement evidence until checked lowering.
