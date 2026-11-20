@@ -3631,6 +3631,9 @@ reifyDataCon isGadtDataCon tys dc
 mkDataConI :: DataCon -> TcM TH.Info
 mkDataConI dc
   = do  { let name = dataConName dc
+        -- Pack quotes can retain its name. Its marker type is private.
+        ; pack <- isExistsPackName name
+        ; when pack $ failWithTc (TcRnExistsPack ExistsPackInvalidContext)
         ; ty <- reifyType (idType (dataConWrapId dc))
         ; return (TH.DataConI (reifyName name) ty
                               (reifyName (dataConOrigTyCon dc)))
