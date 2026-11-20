@@ -1532,14 +1532,18 @@ openFamilyMatchabilityCandidates groups =
       [name | fam <- declarations, kind <- declaredKinds fam, Just name <- [kindHead kind]]
 
     arrow_equations = mkNameSet
-      [family | group <- groups, L _ inst <- group_instds group,
-                FamEqn{feqn_tycon = L _ family, feqn_rhs = rhs} <- equations inst,
+      [family | group <- groups,
+                FamEqn{feqn_tycon = L _ family, feqn_rhs = rhs} <- groupEquations group,
                 matchabilityArrow (caseAliasBody rhs)]
 
+    groupEquations group =
+      concatMap (equations . unLoc) (group_instds group) ++
+      concat [associated nested | L _ ClassDecl{tcdCExt = (nested, _)} <- group_tyclds group]
+
     equations (TyFamInstD{tfid_inst = inst}) = [tfid_eqn inst]
-    equations (ClsInstD{cid_inst = ClsInstDecl{cid_ext = (_, nested)}}) =
-      map (tfid_eqn . unLoc) (ng_tyfam_insts nested)
+    equations (ClsInstD{cid_inst = ClsInstDecl{cid_ext = (_, nested)}}) = associated nested
     equations _ = []
+    associated nested = map (tfid_eqn . unLoc) (ng_tyfam_insts nested)
 
     families (FamDecl{tcdFam = f}) = [f]
     families (ClassDecl{tcdCExt = (HsNestedGroup{ng_ats = ats}, _)}) = map unLoc ats

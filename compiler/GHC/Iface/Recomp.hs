@@ -576,14 +576,15 @@ checkFlagHash hsc_env iface self_recomp = do
         abstract_fp = abstractWitnessFingerprint retained_case_fp
         ordered_fp = orderedTypeCaseFingerprint retained_case_fp
         previous_fp = orderedTypeCaseFingerprint abstract_fp
-        new_fp = stagedMatchabilityFingerprint previous_fp
+        staged_fp = stagedMatchabilityFingerprint previous_fp
+        new_fp = classDefaultMatchabilityFingerprint staged_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
-       | old_fp `elem` [new_fp, previous_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
+       | old_fp `elem` [new_fp, staged_fp, previous_fp, abstract_fp, ordered_fp, retained_case_fp, result_kind_fp]
          -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
        , couldSeparateFamilyResultMatchability iface
@@ -668,7 +669,7 @@ checkFlagHash hsc_env iface self_recomp = do
         out_of_date logger FlagsChanged (fmap vcat diffs)
     retained <- case previous of
       UpToDate
-        | old_fp `notElem` [new_fp, previous_fp, ordered_fp]
+        | old_fp `notElem` [new_fp, staged_fp, previous_fp, ordered_fp]
         , mi_hsc_src iface == HsSrcFile
         , couldExportOrderedTypeCase iface ->
             liftIO $ recheck "Compiler now checks type case constructor order"
@@ -684,7 +685,9 @@ checkFlagHash hsc_env iface self_recomp = do
             else pure UpToDate
       _ -> pure previous
     case retained of
-      UpToDate | old_fp /= new_fp, mi_hsc_src iface == HsSrcFile -> do
+      UpToDate | old_fp /= new_fp, couldInferClassDefaultSelector iface ->
+        liftIO $ recheck "Compiler now infers matchability for associated type defaults"
+      UpToDate | old_fp /= new_fp, old_fp /= staged_fp -> do
         candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
         if candidate
           then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
@@ -695,6 +698,11 @@ checkFlagHash hsc_env iface self_recomp = do
 stagedMatchabilityFingerprint :: Fingerprint -> Fingerprint
 stagedMatchabilityFingerprint fp =
     computeFingerprint putNameLiterally (fp, "staged-family-matchability-v1" :: String)
+
+-- | Record the check of arrow defaults stored in class declarations.
+classDefaultMatchabilityFingerprint :: Fingerprint -> Fingerprint
+classDefaultMatchabilityFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "class-default-matchability-v1" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -915,6 +923,27 @@ readRecompProvider reason owner = do
           Failed _ -> Nothing
       _ -> pure Nothing
 
+-- | A class can supply a bare result arrow before any instance exists.
+couldInferClassDefaultSelector :: ModIface -> Bool
+couldInferClassDefaultSelector = any (has_default . snd) . mi_decls
+  where
+    has_default IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
+      or [canInferResultSelector decl && ifaceResultArrow rhs | IfaceAT decl (Just rhs) <- ats]
+    has_default _ = False
+
+-- | Recognize a header whose source may omit the result selector.
+canInferResultSelector :: IfaceDecl -> Bool
+canInferResultSelector IfaceFamily{ifBinders = bs, ifResKind = k, ifFamInj = NotInjective,
+                                   ifFamFlav = IfaceOpenTypeFamilyTyCon} =
+  any isVisibleTyConBinder bs && isIfaceLiftedTypeKind k
+canInferResultSelector _ = False
+
+-- | An interface can retain a kind cast around a source arrow.
+ifaceResultArrow :: IfaceType -> Bool
+ifaceResultArrow (IfaceFunTy FTF_T_T _ _ _ _) = True
+ifaceResultArrow (IfaceCastTy t _) = ifaceResultArrow t
+ifaceResultArrow _ = False
+
 -- | Recheck old providers and uses of an inferred family selector.
 -- See Note [Recompiling inferred open family applications].
 checkStagedMatchability :: ModIface -> [Usage] -> IfG Bool
@@ -923,16 +952,10 @@ checkStagedMatchability iface usages
   | otherwise = anyM imported usages
   where
     local_families = mkNameSet
-      [n | IfaceFamily{ifName = n, ifBinders = bs, ifResKind = k,
-                        ifFamInj = NotInjective, ifFamFlav = IfaceOpenTypeFamilyTyCon}
-                <- ifaceFamilyDecls iface
-         , any isVisibleTyConBinder bs, isIfaceLiftedTypeKind k]
+      [ifName decl | decl <- ifaceFamilyDecls iface, canInferResultSelector decl]
     contains_local_arrow (_, IfaceAxiom{ifTyCon = tc, ifAxBranches = branches}) =
-      ifaceTyConName tc `elemNameSet` local_families && any (arrow . ifaxbRHS) branches
+      ifaceTyConName tc `elemNameSet` local_families && any (ifaceResultArrow . ifaxbRHS) branches
     contains_local_arrow _ = False
-    arrow (IfaceFunTy FTF_T_T _ _ _ _) = True
-    arrow (IfaceCastTy t _) = arrow t
-    arrow _ = False
 
     uses_index used = any (decl_used used . snd) . mi_decls
     decl_used used f@IfaceFamily{} = used (nameOccName (ifName f)) && indexed f
@@ -966,6 +989,9 @@ Check local declarations and imports of those families. Home usages
 name the entities and may record the parent of an associated family.
 Package usages record only the module. A stripped client can omit an
 internal use from its exported types, so consult its usage records.
+Signatures in boot files also use these defaults. Class defaults reside
+in the class interface even when a different module will supply the
+first instance. Recheck the owning class before reading that instance.
 -}
 
 -- | Check old family headers that may need an independent result selector.
@@ -1856,7 +1882,8 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          current_flag_hash = stagedMatchabilityFingerprint
+          current_flag_hash = classDefaultMatchabilityFingerprint
+                            $ stagedMatchabilityFingerprint
                             $ orderedTypeCaseFingerprint
                             $ abstractWitnessFingerprint
                             $ retainedCaseFingerprint
