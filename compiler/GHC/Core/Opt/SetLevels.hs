@@ -389,8 +389,25 @@ lvlExpr env (_, AnnLet bind body)
        ; return (Let bind' body') }
 
 lvlExpr env (_, AnnCase scrut case_bndr ty alts)
-  = do { scrut' <- lvlNonTailMFE env True scrut
+  = do { scrut' <- if floatCoreMode (le_switches env) == RetainedCore
+                       && any has_proof alts
+                   then return (keepBindingsInPlace env (deAnnotate scrut))
+                   else lvlNonTailMFE env True scrut
+                   -- See Note [Floating native index scrutinees].
        ; lvlCase env (freeVarsOf scrut) scrut' case_bndr ty alts }
+  where
+    has_proof alt = let core_alt = deAnnAlt alt
+                    in isNativeIndexAlt core_alt || isNativeIndexAliasAlt core_alt
+
+{- Note [Floating native index scrutinees]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A native case proof refers to the index of its whole scrutinee. If we float
+the scrutinee S Z as lvl = S Z, the case inspects lvl but its proof still
+refers to 'S 'Z. Floating a constructor argument has the same problem.
+Keep the scrutinee in place and apply the lexical substitution to its
+expressions and annotations. The case alternatives and surrounding
+bindings still participate in the usual float-out transformations.
+-}
 
 lvlNonTailExpr :: LevelEnv             -- Context
                -> CoreExprWithFVs      -- Input expression
